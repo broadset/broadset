@@ -25,7 +25,7 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{ts,tsx}": "eslint --fix --no-cache --max-warnings 0",
+    "*.{ts,tsx}": "eslint --fix --no-cache --max-warnings 0 --no-warn-ignored",
     "*.{ts,tsx,js,jsx,cjs,mjs,json,md,yml,yaml,css,html}": "prettier --config .prettierrc.json --ignore-path .prettierignore --write"
   },
   "devDependencies": {
