@@ -89,8 +89,8 @@ arrays, unique IDs, intra-page acyclic parentId.
 
 ### 1.9 Model utilities (`model/utilities.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/model/utilities.md`
 _What to cover:_ deepClone (structural independence), capability profile lookup
@@ -120,6 +120,7 @@ sizes parse correctly; invalid documents are rejected with structured errors.
 | 1.6 animation structures | ✅  | ✅    |
 | 1.7 EditorConfig         | ✅  | ✅    |
 | 1.8 document invariants  | ✅  | ✅    |
+| 1.9 model utilities      | ✅  | ✅    |
 | 1.7 EditorConfig         | ☐   | ☐     |
 | 1.8 document root        | ☐   | ☐     |
 | 1.9 utilities            | ☐   | ☐     |
