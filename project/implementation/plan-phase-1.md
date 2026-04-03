@@ -59,8 +59,8 @@ fields; type guards / Zod discriminated union parse correctly.
 
 ### 1.6 Animation data structures (`model/animation.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/model/animation.md`
 _What to cover:_ AnimationRegistry (unique IDs, stale entries ignored),
@@ -117,7 +117,7 @@ sizes parse correctly; invalid documents are rejected with structured errors.
 | 1.3 screen properties    | ✅  | ✅    |
 | 1.4 capability flags     | ✅  | ✅    |
 | 1.5 change stream types  | ✅  | ✅    |
-| 1.6 animation structures | ☐   | ☐     |
+| 1.6 animation structures | ✅  | ✅    |
 | 1.7 EditorConfig         | ☐   | ☐     |
 | 1.8 document root        | ☐   | ☐     |
 | 1.9 utilities            | ☐   | ☐     |
