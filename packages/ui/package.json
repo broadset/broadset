@@ -1,0 +1,30 @@
+{
+  "name": "@broadset/ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:strict": "npm run lint -- --no-cache --max-warnings 0",
+    "typecheck": "tsc -b",
+    "test": "jest --config jest.config.cjs --passWithNoTests",
+    "quality": "npm run lint && npm run typecheck && npm run test -- --runInBand",
+    "quality:strict": "npm run lint:strict && npm run typecheck && npm run test -- --runInBand"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  },
+  "peerDependencies": {
+    "@broadset/editor": "^0.1.0",
+    "@broadset/formats": "^0.1.0",
+    "@broadset/model": "^0.1.0",
+    "@broadset/renderer": "^0.1.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  }
+}
