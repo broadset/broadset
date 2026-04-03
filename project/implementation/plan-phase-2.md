@@ -36,8 +36,8 @@ it passes the Phase 1 Zod schema.
 
 ## 2.3 Demo shell: mount renderer
 
-- [ ] tests: red (Playwright CT)
-- [ ] impl: green
+- [x] tests: red (Playwright CT)
+- [x] impl: green
 
 _Spec:_ `project/spec/demo/layout.md`, `project/spec/demo/visual.md`
 _What to cover:_
@@ -55,4 +55,4 @@ _What to cover:_
 | --------------------------- | --- | ----- |
 | 2.1 renderer core           | ☑   | ☑     |
 | 2.2 sample document fixture | ☑   | ☑     |
-| 2.3 demo shell              | ☐   | ☐     |
+| 2.3 demo shell              | ☑   | ☑     |

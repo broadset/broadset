@@ -30,9 +30,9 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 2 — Renderer (static) + Demo shell
-- **In Progress:** 2.3 Demo shell
-- **Last Merged:** 1.10 JSON format reference / Zod schema
+- **Active Phase:** Phase 3 — Playback + Demo animated
+- **In Progress:** 3.1 (first unit of Phase 3)
+- **Last Merged:** 2.3 Demo shell
 
 ---
 
