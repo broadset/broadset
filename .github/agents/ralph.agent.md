@@ -104,14 +104,37 @@ cd packages && npm run quality
 
 All packages must stay green. Fix regressions (they count toward the retry limit too). Do not commit until quality passes.
 
-### Step 7 — Commit (only after quality is green)
+### Step 7 — PR Review (fresh-eye, zero-context)
+
+Before committing, perform a ruthless self-review of every changed file as if you are a senior reviewer seeing this code for the first time with zero context.
+
+1. Stage all changes and inspect the full diff:
 
 ```bash
 git add -A
+git diff --cached
+```
+
+2. Review every hunk against **all** of these criteria:
+   - **Correctness** — Does the logic actually do what the spec requires? Are there off-by-one errors, wrong comparisons, missing edge cases, or silent failures?
+   - **Type safety** — Are types precise? No `any`, no unsafe casts, no unnecessary type assertions? Are generics constrained properly?
+   - **Performance** — No unnecessary allocations, redundant iterations, expensive operations inside loops, or O(n²) where O(n) is possible?
+   - **Code smells** — No dead code, unused imports, magic numbers, copy-pasted blocks, overly clever one-liners, or misleading names?
+   - **Shortcuts & suppressions** — No `// eslint-disable`, `@ts-ignore`, `TODO`, placeholder throws, hardcoded values that should be constants, or weakened configs?
+   - **Production readiness** — Would you ship this to thousands of users tomorrow? Is error handling appropriate? Are invariants enforced?
+   - **Test quality** — Do tests assert behavior (not implementation)? Are edge cases covered? Are test descriptions clear? No snapshot-only tests without behavioral assertions?
+
+3. If **any** issue is found: fix it, rerun `npm run quality` (Step 6), and repeat this review from scratch on the new diff. Do not commit until the diff is clean.
+
+4. Only proceed to Step 8 when the diff passes review with zero findings.
+
+### Step 8 — Commit (only after quality + review are clean)
+
+```bash
 git commit -m "feat(<pkg>): unit <N.M> — <one-line description>"
 ```
 
-### Step 8 — Mark the plan
+### Step 9 — Mark the plan
 
 In the active phase plan file, change the completed unit's boxes from `[ ]` to `[x]`.
 
@@ -123,11 +146,11 @@ If all units in the phase are now checked, also update `project/implementation/p
 
 Update the session file: increment `units_completed`, reset `no_progress` to 0.
 
-### Step 9 — Update AGENTS.md if needed
+### Step 10 — Update AGENTS.md if needed
 
 If you discovered a new build command or convention not yet in `AGENTS.md`, add one brief bullet.
 
-### Step 10 — Continue or stop
+### Step 11 — Continue or stop
 
 Go back to Step 1 and pick the next unchecked unit **in this phase only**. Keep working until the phase is done or you hit a stop condition.
 
@@ -152,6 +175,7 @@ A healthy session shows test count growing and pass rate near 100% for each comp
 | No placeholders         | `TODO` stubs and un-implemented `throw`s are forbidden                                    |
 | JSDoc on every test     | Future loops need the reasoning                                                           |
 | Quality before commit   | `npm run quality` must be green before `git commit`                                       |
+| PR Review before commit | Ruthless zero-context review of `git diff --cached` — fix all findings before committing  |
 | Commit after every unit | A bad loop is cheap to recover with `git reset --hard`                                    |
 | No permission-seeking   | Never ask "should I continue?" — just proceed                                             |
 | **No cutting corners**  | **NEVER weaken quality checks to make them pass — always fix the root cause (see below)** |
