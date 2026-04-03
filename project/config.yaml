@@ -1,0 +1,35 @@
+project: broadset
+description: 'Design Once, Render Anywhere — headless template editor'
+schema: spec-driven
+validation:
+  type-check:
+    command: 'npx tsc --noEmit'
+    description: 'Type system contract verification'
+  test:
+    command: 'npm test'
+    description: 'Behavioral acceptance criteria verification'
+domains:
+  model:
+    package: '@broadset/model'
+    test-pattern: 'documentValidation|documentClone|elementCapabilities|units|clipPathPathUtils'
+  playback:
+    package: '@broadset/playback'
+    test-pattern: 'easing|interpolat|colorLerp|pathLerp|timelineCompute|actionState|playbackHandle|styleWriter|playbackController'
+  renderer:
+    package: '@broadset/renderer'
+    test-pattern: 'componentRegistry|renderUtils'
+    ct-pattern: 'Screen Renderer'
+  editor:
+    package: '@broadset/editor'
+    test-pattern: 'dataStoreFactory|changeStream|storeRemote|storePath|animationConfig|screenState|pathEditing|pathDrawing|elementPlacement'
+  formats:
+    package: '@broadset/formats'
+    test-pattern: 'pdfGenerator|pdfColorUtils|pdfFontUtils|pdfTextWrap|pdfQrCode|pptx|psd|svg|html|video|ogr|raster|sanitize'
+  ui:
+    package: '@broadset/ui'
+    test-pattern: 'PropertiesSidebar|BoxEffectsPanel|ClipPathPanel|PreflightPanel|AnimationSidebar|AnimationBuilder|PropertyField|LayersSidebar'
+    ct-pattern: 'ui'
+  demo:
+    package: '@broadset/demo'
+    build-command: 'npm run build -w packages/demo'
+    description: 'Integration validation — build must succeed'

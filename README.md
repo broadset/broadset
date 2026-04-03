@@ -7,9 +7,9 @@ A web-native broadcast graphics suite for authoring and rendering motion graphic
 - `README.md` — human-facing project overview
 - `CONTRIBUTING.md` — working agreements, quality gates, and spec conventions
 - `AGENTS.md` — concise workspace instructions for coding agents
-- `spec/openspec/` — behavioral source of truth
-- `spec/implementation/` — implementation definitions and architecture context
-- `spec/README.md` — spec and documentation map
+- `project/spec/` — behavioral source of truth
+- `project/implementation/` — implementation definitions and architecture context
+- `project/spec/README.md` — spec and documentation map
 
 ## Packages
 

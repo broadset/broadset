@@ -3,10 +3,10 @@
 ## Working Agreements
 
 - Prefer **spec-first** and **test-first** changes for behavioral work.
-- Keep package boundaries intact and respect the dependency graph in `spec/implementation/architecture.md`.
+- Keep package boundaries intact and respect the dependency graph in `project/implementation/architecture.md`.
 - Use the demo app as the integration validation surface for user-facing features.
 - Prefer small, reviewable increments over large mixed changes.
-- Put **WHAT** in `spec/openspec/`; put **HOW** in `spec/implementation/`.
+- Put **WHAT** in `project/spec/`; put **HOW** in `project/implementation/`.
 
 ## Quality Gates
 
@@ -58,7 +58,7 @@ Parent `spec.md` files should stay concise. When a domain grows, split it into f
 
 When a bug reveals a missing or unclear requirement:
 
-1. Add or update the requirement in OpenSpec.
+1. Add or update the requirement in `project/spec/`.
 2. Add or update the validation/tests.
 3. Remove any related item from `## Spec Gaps` only when it is genuinely covered.
 

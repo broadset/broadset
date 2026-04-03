@@ -5,9 +5,9 @@ Use it together with the detailed reference docs linked below.
 
 ## Sources of truth
 
-- `spec/openspec/` defines **what** broadset must do.
-- `spec/implementation/` defines **how** the repository is structured and implemented.
-- If behavior changes, update the relevant OpenSpec file first or alongside the implementation.
+- `project/spec/` defines **what** broadset must do.
+- `project/implementation/` defines **how** the repository is structured and implemented.
+- If behavior changes, update the relevant spec file in `project/spec/` first or alongside the implementation.
 
 ## Working expectations, quality gates, and spec conventions
 
@@ -17,4 +17,4 @@ See `CONTRIBUTING.md` for working agreements, quality gates, development command
 
 - `README.md` — project overview
 - `CONTRIBUTING.md` — working agreements, quality gates, and spec conventions
-- `spec/README.md` — documentation map
+- `project/spec/README.md` — documentation map
