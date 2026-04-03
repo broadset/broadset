@@ -32,8 +32,8 @@ _What to cover:_ Typography, background (solid vs gradient precedence), border
 
 ### 1.3 Screen properties (`model/screen.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/model/screen.md`
 _What to cover:_ Anchor values, visibility enum, state/modifier arrays, mask
@@ -114,7 +114,7 @@ sizes parse correctly; invalid documents are rejected with structured errors.
 | ------------------------ | --- | ----- |
 | 1.1 element vocabulary   | ✅  | ✅    |
 | 1.2 style properties     | ✅  | ✅    |
-| 1.3 screen properties    | ☐   | ☐     |
+| 1.3 screen properties    | ✅  | ✅    |
 | 1.4 capability flags     | ☐   | ☐     |
 | 1.5 change stream types  | ☐   | ☐     |
 | 1.6 animation structures | ☐   | ☐     |
