@@ -4,7 +4,9 @@ import {
   computeEdgeAnchors,
   deepClone,
   generateDefaultClipPath,
+  mmToPx,
   parseClipPathData,
+  pxToMm,
   scalePathData,
   serializeClipPath,
 } from './utilities';
@@ -152,5 +154,24 @@ describe('Edge anchor inference', () => {
 
     expect(result.anchorX).toBe('right');
     expect(result.anchorY).toBe('bottom');
+  });
+});
+
+/** @description Unit conversion between px and mm at 96 DPI */
+describe('Unit conversion', () => {
+  /** @description 96 pixels equals 25.4 millimeters at standard web DPI */
+  it('converts 96 pixels to 25.4 mm', () => {
+    expect(pxToMm(96)).toBeCloseTo(25.4, 10);
+  });
+
+  /** @description 25.4 millimeters equals 96 pixels at standard web DPI */
+  it('converts 25.4 mm to 96 pixels', () => {
+    expect(mmToPx(25.4)).toBeCloseTo(96, 10);
+  });
+
+  /** @description 0 converts bidirectionally */
+  it('converts 0 correctly', () => {
+    expect(pxToMm(0)).toBe(0);
+    expect(mmToPx(0)).toBe(0);
   });
 });

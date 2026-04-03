@@ -1,6 +1,21 @@
 import type { AnchorX, AnchorY } from './screen';
 
 // ---------------------------------------------------------------------------
+// Unit conversion — 96 DPI standard web convention
+// ---------------------------------------------------------------------------
+
+const MM_PER_INCH = 25.4;
+const PX_PER_INCH = 96;
+
+export function pxToMm(px: number): number {
+  return (px * MM_PER_INCH) / PX_PER_INCH;
+}
+
+export function mmToPx(mm: number): number {
+  return (mm * PX_PER_INCH) / MM_PER_INCH;
+}
+
+// ---------------------------------------------------------------------------
 // Deep clone
 // ---------------------------------------------------------------------------
 

@@ -7,9 +7,6 @@ import {
   editorConfigSchema,
   FALLBACK_SYSTEM_FONTS,
   featureConfigSchema,
-  mmToPx,
-  normalizeColor,
-  pxToMm,
   resolveFonts,
 } from './config';
 
@@ -128,25 +125,6 @@ describe('Default grid settings', () => {
   });
 });
 
-/** @description Unit conversion between px and mm at 96 DPI */
-describe('Unit conversion', () => {
-  /** @description 96 pixels equals 25.4 millimeters at standard web DPI */
-  it('converts 96 pixels to 25.4 mm', () => {
-    expect(pxToMm(96)).toBeCloseTo(25.4, 10);
-  });
-
-  /** @description 25.4 millimeters equals 96 pixels at standard web DPI */
-  it('converts 25.4 mm to 96 pixels', () => {
-    expect(mmToPx(25.4)).toBeCloseTo(96, 10);
-  });
-
-  /** @description 0 converts bidirectionally */
-  it('converts 0 correctly', () => {
-    expect(pxToMm(0)).toBe(0);
-    expect(mmToPx(0)).toBe(0);
-  });
-});
-
 /** @description Fallback fonts are provided when no fonts are configured */
 describe('Fallback system fonts', () => {
   /** @description When no fonts are configured, fallback system fonts are used */
@@ -169,50 +147,5 @@ describe('Fallback system fonts', () => {
 
     expect(fonts).toHaveLength(1);
     expect(fonts[0]?.family).toBe('Roboto');
-  });
-});
-
-/** @description All color inputs are normalized to 6- or 8-digit hex at the model boundary */
-describe('Color normalization', () => {
-  /** @description CSS named color "red" normalizes to #ff0000 */
-  it('normalizes CSS named color to hex', () => {
-    expect(normalizeColor('red')).toBe('#ff0000');
-  });
-
-  /** @description rgb(255, 128, 0) normalizes to #ff8000 */
-  it('normalizes rgb() to hex', () => {
-    expect(normalizeColor('rgb(255, 128, 0)')).toBe('#ff8000');
-  });
-
-  /** @description hsl(120, 100%, 50%) normalizes to #00ff00 */
-  it('normalizes hsl() to hex', () => {
-    expect(normalizeColor('hsl(120, 100%, 50%)')).toBe('#00ff00');
-  });
-
-  /** @description 3-digit hex #abc expands to #aabbcc */
-  it('expands 3-digit hex to 6-digit', () => {
-    expect(normalizeColor('#abc')).toBe('#aabbcc');
-  });
-
-  /** @description 4-digit hex #abcd expands to #aabbccdd */
-  it('expands 4-digit hex to 8-digit', () => {
-    expect(normalizeColor('#abcd')).toBe('#aabbccdd');
-  });
-
-  /** @description 6-digit hex is stored unchanged */
-  it('keeps 6-digit hex unchanged', () => {
-    expect(normalizeColor('#aabbcc')).toBe('#aabbcc');
-  });
-
-  /** @description 8-digit hex is stored unchanged */
-  it('keeps 8-digit hex unchanged', () => {
-    expect(normalizeColor('#aabbccdd')).toBe('#aabbccdd');
-  });
-
-  /** @description rgba(255, 128, 0, 0.5) normalizes to 8-digit hex */
-  it('normalizes rgba() to 8-digit hex', () => {
-    const result = normalizeColor('rgba(255, 128, 0, 0.5)');
-
-    expect(result).toBe('#ff800080');
   });
 });
