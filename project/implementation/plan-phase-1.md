@@ -69,8 +69,8 @@ state/modifier binding structures, reserved IN/OUT names.
 
 ### 1.7 EditorConfig and feature flags (`model/config.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/model/config.md`
 _What to cover:_ EditorConfig shape, EditorFeatureConfig defaults per
@@ -118,6 +118,7 @@ sizes parse correctly; invalid documents are rejected with structured errors.
 | 1.4 capability flags     | ✅  | ✅    |
 | 1.5 change stream types  | ✅  | ✅    |
 | 1.6 animation structures | ✅  | ✅    |
+| 1.7 EditorConfig         | ✅  | ✅    |
 | 1.7 EditorConfig         | ☐   | ☐     |
 | 1.8 document root        | ☐   | ☐     |
 | 1.9 utilities            | ☐   | ☐     |
