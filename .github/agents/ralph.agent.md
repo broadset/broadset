@@ -176,7 +176,9 @@ Create the file if it does not exist. Only log decisions that have real trade-of
 
 Go back to Step 1 and pick the next unchecked unit **in this phase only**. Keep working until the phase is done or you hit a stop condition.
 
-When you stop, report:
+If all units in the phase are checked off, proceed to **Step 12 — End-of-Phase Review** before reporting.
+
+When you stop (for any reason other than phase complete), report:
 
 - Units completed this session
 - Total tests added and passing across all completed units
@@ -185,6 +187,52 @@ When you stop, report:
 - If stash was created in Step 0, remind: `git stash list` to review
 
 A healthy session shows test count growing and pass rate near 100% for each completed unit. If a unit's pass rate plateaued below 100%, that is a **fixpoint signal** — the spec likely needs clarification before the next session.
+
+### Step 12 — End-of-Phase Review
+
+**Trigger:** Run this step only when all units in the current phase are checked off.
+
+This is a full-branch, zero-context, adversarial code review. You are no longer the author — you are a hostile reviewer who assumes every line is guilty until proven innocent.
+
+1. **Diff the full branch against main:**
+
+```bash
+git diff main --stat
+git diff main
+```
+
+2. **Re-read the phase plan** (`project/implementation/plan-phase-N.md`). For every unit listed, verify:
+   - Was it actually implemented (not just marked `[x]`)?
+   - Do the tests cover the acceptance criteria from the spec?
+   - Is anything partially done, stubbed, or suspiciously thin?
+
+3. **Review every file in the diff.** For each one, evaluate ruthlessly:
+   - **Architecture** — Does this file belong in this package? Is the logic in the right layer? Are there misplaced utilities dumped into unrelated files?
+   - **Correctness** — Are there off-by-one errors, wrong comparisons, missing edge cases, silent failures, or logic that only works for happy paths?
+   - **Type safety** — Any `any`, unsafe casts, overly permissive generics, or types that should be narrower?
+   - **Code smells** — Dead code, copy-paste duplication, magic numbers, overly clever code, misleading names, grab-bag files, functions doing too many things?
+   - **Shortcuts** — Suppression comments, TODO stubs, hardcoded values that should be constants, weakened configs, placeholder implementations?
+   - **Performance** — Unnecessary allocations in hot paths, O(n²) where O(n) is possible, redundant iterations, expensive operations inside loops?
+   - **Test quality** — Do tests assert behavior or just implementation details? Are edge cases covered? Are descriptions clear? Any snapshot-only tests?
+   - **Missing pieces** — Are there spec requirements with no corresponding test? Features with no barrel export? Types that should be reused but aren't?
+
+4. **Write up findings** in a structured review report. For each finding use:
+
+```
+#### [severity] file.ts:L<line> — <one-line summary>
+<what's wrong and why it matters>
+**Fix:** <concrete action>
+```
+
+Severity levels: `🔴 BUG`, `🟠 SMELL`, `🟡 STYLE`, `🔵 NIT`
+
+5. **Fix every 🔴 BUG and 🟠 SMELL finding.** For each fix: make the change, rerun `npm run quality:all`, and verify tests still pass. Commit fixes as:
+
+```bash
+git commit -m "fix(<pkg>): phase N review — <description>"
+```
+
+6. **Include the full review report** (including 🟡 and 🔵 items left unfixed) in your final stop report so the user can review remaining style/nit items and decide whether to act on them.
 
 ## Hard constraints
 
@@ -199,6 +247,7 @@ A healthy session shows test count growing and pass rate near 100% for each comp
 | Quality before commit   | `npm run quality` must be green before `git commit`                                       |
 | PR Review before commit | Ruthless zero-context review of `git diff --cached` — fix all findings before committing  |
 | Commit after every unit | A bad loop is cheap to recover with `git reset --hard`                                    |
+| End-of-phase review     | Full-branch adversarial review against main — fix all bugs and smells before reporting    |
 | No permission-seeking   | Never ask "should I continue?" — just proceed                                             |
 | **No cutting corners**  | **NEVER weaken quality checks to make them pass — always fix the root cause (see below)** |
 
