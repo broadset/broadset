@@ -30,7 +30,7 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 0 — scaffolding complete; implementation not started
+- **Active Phase:** Phase 1 — scaffolding complete; implementation not started
 - **In Progress:** —
 - **Last Merged:** —
 
