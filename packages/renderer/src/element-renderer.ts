@@ -65,7 +65,7 @@ export class ElementRenderer {
     }
 
     // Clear host before mounting new renderer
-    this.host.innerHTML = '';
+    this.host.replaceChildren();
 
     // Mount the new renderer
     this.mount(element);
@@ -82,7 +82,7 @@ export class ElementRenderer {
       this.activeInstance = undefined;
     }
 
-    this.host.innerHTML = '';
+    this.host.replaceChildren();
     this.destroyed = true;
   }
 }

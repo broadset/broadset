@@ -61,7 +61,7 @@ export class PageRenderer {
     this.instances.length = 0;
 
     if (this.host !== undefined) {
-      this.host.innerHTML = '';
+      this.host.replaceChildren();
       this.host = undefined;
     }
   }

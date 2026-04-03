@@ -1,8 +1,22 @@
 import type { PageElement } from '@broadset/model';
+import { sanitizeTextContent } from '@broadset/model';
 import qrcode from 'qrcode-generator';
 
 import type { ElementRendererInstance } from './component-registry';
 import { DATA_ELEMENT_CONTENT, DATA_ELEMENT_ID } from './data-attributes';
+
+// ---------------------------------------------------------------------------
+// Visual constants for placeholder / fallback renderers
+// ---------------------------------------------------------------------------
+
+const FALLBACK_BG_COLOR = '#555';
+const FALLBACK_BORDER = '1px dashed #999';
+const FALLBACK_TEXT_COLOR = '#aaa';
+const FALLBACK_FONT_SIZE = '10px';
+
+const IMAGE_PLACEHOLDER_BG = '#333';
+const IMAGE_PLACEHOLDER_COLOR = '#999';
+const IMAGE_PLACEHOLDER_FONT_SIZE = '12px';
 
 // ---------------------------------------------------------------------------
 // Common style helpers
@@ -30,7 +44,7 @@ export function applyCommonStyles(container: HTMLElement, element: PageElement):
  * Apply style properties from the element's style object to a DOM element.
  */
 export function applyElementStyle(target: HTMLElement, element: PageElement): void {
-  const style = (element as { style?: Record<string, unknown> })['style'];
+  const style = element.style;
 
   if (style === undefined) {
     return;
@@ -115,7 +129,7 @@ function createTextRenderer(element: PageElement, host: HTMLElement): ElementRen
       const content = document.createElement('div');
 
       content.setAttribute(DATA_ELEMENT_CONTENT, '');
-      content.innerHTML = element.content;
+      content.innerHTML = sanitizeTextContent(element.content);
       container.appendChild(content);
       host.appendChild(container);
     },
@@ -126,7 +140,7 @@ function createTextRenderer(element: PageElement, host: HTMLElement): ElementRen
       const content = container.querySelector(`[${DATA_ELEMENT_CONTENT}]`);
 
       if (content) {
-        content.innerHTML = updated.content;
+        content.innerHTML = sanitizeTextContent(updated.content);
       }
     },
     destroy(): void {
@@ -161,12 +175,12 @@ function createImageRenderer(element: PageElement, host: HTMLElement): ElementRe
 
         placeholder.style.width = '100%';
         placeholder.style.height = '100%';
-        placeholder.style.backgroundColor = '#333';
+        placeholder.style.backgroundColor = IMAGE_PLACEHOLDER_BG;
         placeholder.style.display = 'flex';
         placeholder.style.alignItems = 'center';
         placeholder.style.justifyContent = 'center';
-        placeholder.style.color = '#999';
-        placeholder.style.fontSize = '12px';
+        placeholder.style.color = IMAGE_PLACEHOLDER_COLOR;
+        placeholder.style.fontSize = IMAGE_PLACEHOLDER_FONT_SIZE;
         placeholder.textContent = '⚠ Image';
         container.appendChild(placeholder);
       };
@@ -251,7 +265,7 @@ function createPathRenderer(element: PageElement, host: HTMLElement): ElementRen
 
       path.setAttribute('d', element.content);
 
-      const style = (element as { style?: Record<string, unknown> })['style'];
+      const style = element.style;
 
       path.setAttribute('fill', typeof style?.['fill'] === 'string' ? style['fill'] : 'none');
 
@@ -356,13 +370,13 @@ function createFallbackRenderer(element: PageElement, host: HTMLElement): Elemen
       container.setAttribute(DATA_ELEMENT_ID, element.id);
       container.setAttribute(DATA_ELEMENT_CONTENT, '');
       applyCommonStyles(container, element);
-      container.style.backgroundColor = '#555';
-      container.style.border = '1px dashed #999';
+      container.style.backgroundColor = FALLBACK_BG_COLOR;
+      container.style.border = FALLBACK_BORDER;
       container.style.display = 'flex';
       container.style.alignItems = 'center';
       container.style.justifyContent = 'center';
-      container.style.color = '#aaa';
-      container.style.fontSize = '10px';
+      container.style.color = FALLBACK_TEXT_COLOR;
+      container.style.fontSize = FALLBACK_FONT_SIZE;
       container.textContent = element.type;
       host.appendChild(container);
     },

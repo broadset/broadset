@@ -1,4 +1,3 @@
-import type { BroadsetDocument } from '@broadset/model';
 import { DocumentRenderer } from '@broadset/renderer';
 import { useEffect, useRef } from 'react';
 
@@ -24,9 +23,7 @@ export default function App(): React.JSX.Element {
 
     const renderer = new DocumentRenderer();
 
-    // SAMPLE_DOCUMENT is runtime-validated via Zod in tests. The cast is
-    // needed because the untyped literal widens `documentMode` to `string`.
-    renderer.mount(SAMPLE_DOCUMENT as BroadsetDocument, host);
+    renderer.mount(SAMPLE_DOCUMENT, host);
     rendererRef.current = renderer;
 
     return (): void => {

@@ -78,6 +78,8 @@ export interface PageElement {
   readonly content: string;
   readonly parentId: string | null;
   readonly groupId: string | null;
+  readonly screen?: Record<string, unknown>;
+  readonly style?: Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------
