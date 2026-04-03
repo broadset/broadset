@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": ".github/hooks/session-context.sh",
+        "timeout": 5
+      }
+    ],
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": ".github/hooks/gate-commit.sh",
+        "timeout": 120
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "type": "command",
+        "command": ".github/hooks/check-quality.sh",
+        "timeout": 120
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "cd \"$WORKSPACE\" && npm run format && npm run typecheck && npm run quality:strict",
+        "timeout": 120
+      }
+    ]
+  }
+}
