@@ -23,8 +23,8 @@ screen/style props, parentId/groupId independence.
 
 ### 1.2 Style properties (`model/style.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/model/style.md`
 _What to cover:_ Typography, background (solid vs gradient precedence), border
@@ -113,7 +113,7 @@ sizes parse correctly; invalid documents are rejected with structured errors.
 | Unit                     | Red | Green |
 | ------------------------ | --- | ----- |
 | 1.1 element vocabulary   | ✅  | ✅    |
-| 1.2 style properties     | ☐   | ☐     |
+| 1.2 style properties     | ✅  | ✅    |
 | 1.3 screen properties    | ☐   | ☐     |
 | 1.4 capability flags     | ☐   | ☐     |
 | 1.5 change stream types  | ☐   | ☐     |
