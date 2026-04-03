@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
+import { createEmptyBroadsetDocument } from './document';
 import {
   computeEdgeAnchors,
   deepClone,
@@ -10,7 +11,6 @@ import {
   scalePathData,
   serializeClipPath,
 } from './utilities';
-import { createEmptyBroadsetDocument } from './document';
 
 /** @description Deep clone produces a value-equal but referentially independent copy */
 describe('Document clone fidelity', () => {
@@ -103,6 +103,20 @@ describe('Path zoom scaling', () => {
     const result = scalePathData('M 10 10', 0.333);
 
     expect(result).toMatch(/^M 3\.33 3\.33$/);
+  });
+
+  /** @description Arc command flags must not be scaled */
+  it('preserves arc command flags when scaling', () => {
+    const result = scalePathData('M 0 0 A 10 20 30 0 1 50 60', 2);
+
+    expect(result).toBe('M 0 0 A 20 40 30 0 1 100 120');
+  });
+
+  /** @description Repeated arc parameters reset flag tracking correctly */
+  it('handles repeated arc parameters', () => {
+    const result = scalePathData('A 10 20 30 0 1 50 60 10 20 30 0 1 70 80', 2);
+
+    expect(result).toBe('A 20 40 30 0 1 100 120 20 40 30 0 1 140 160');
   });
 });
 

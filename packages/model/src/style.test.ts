@@ -349,4 +349,66 @@ describe('Padding validation', () => {
 
     expect(result.success).toBe(false);
   });
+
+  /** @description CSS padding with px units must be accepted */
+  it('accepts CSS padding with px units', () => {
+    const result = styleSchema.safeParse({
+      opacity: 1,
+      padding: '8px 16px',
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
+
+/** @description fontSize must be positive, borderWidth and strokeWidth must be non-negative */
+describe('Numeric field constraints', () => {
+  /** @description Negative fontSize must be rejected */
+  it('rejects negative fontSize', () => {
+    const result = styleSchema.safeParse({ opacity: 1, fontSize: -10 });
+
+    expect(result.success).toBe(false);
+  });
+
+  /** @description Zero fontSize must be rejected (must be positive) */
+  it('rejects zero fontSize', () => {
+    const result = styleSchema.safeParse({ opacity: 1, fontSize: 0 });
+
+    expect(result.success).toBe(false);
+  });
+
+  /** @description Positive fontSize must be accepted */
+  it('accepts positive fontSize', () => {
+    const result = styleSchema.safeParse({ opacity: 1, fontSize: 16 });
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description Negative borderWidth must be rejected */
+  it('rejects negative borderWidth', () => {
+    const result = styleSchema.safeParse({ opacity: 1, borderWidth: -5 });
+
+    expect(result.success).toBe(false);
+  });
+
+  /** @description Zero borderWidth must be accepted */
+  it('accepts zero borderWidth', () => {
+    const result = styleSchema.safeParse({ opacity: 1, borderWidth: 0 });
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description Negative strokeWidth must be rejected */
+  it('rejects negative strokeWidth', () => {
+    const result = styleSchema.safeParse({ opacity: 1, strokeWidth: -2 });
+
+    expect(result.success).toBe(false);
+  });
+
+  /** @description Zero strokeWidth must be accepted */
+  it('accepts zero strokeWidth', () => {
+    const result = styleSchema.safeParse({ opacity: 1, strokeWidth: 0 });
+
+    expect(result.success).toBe(true);
+  });
 });

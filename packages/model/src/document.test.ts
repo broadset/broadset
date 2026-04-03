@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { broadsetDocumentSchema, createEmptyBroadsetDocument } from './document';
 import type { BroadsetDocument } from './document';
+import { broadsetDocumentSchema, createEmptyBroadsetDocument } from './document';
 
 /** @description Helper to build a minimal valid document for mutation tests */
 function makeValidDoc(overrides: Record<string, unknown> = {}): Record<string, unknown> {

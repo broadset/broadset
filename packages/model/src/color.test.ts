@@ -45,4 +45,9 @@ describe('Color normalization', () => {
 
     expect(result).toBe('#ff800080');
   });
+
+  /** @description Unrecognized color strings must throw an error */
+  it('throws on unrecognized color input', () => {
+    expect(() => normalizeColor('rainbow')).toThrow('Unable to normalize color');
+  });
 });

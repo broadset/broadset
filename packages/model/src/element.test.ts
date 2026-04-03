@@ -7,6 +7,7 @@ describe('Element type vocabulary', () => {
   /** @description The system must accept exactly 8 built-in type literals — no fewer, no more */
   it('defines exactly 8 built-in element types', () => {
     const expectedTypes = ['text', 'image', 'svg', 'path', 'rectangle', 'ellipse', 'qrcode', 'group'];
+
     expect(BUILT_IN_ELEMENT_TYPES).toEqual(expect.arrayContaining(expectedTypes));
     expect(BUILT_IN_ELEMENT_TYPES).toHaveLength(8);
   });
@@ -17,6 +18,7 @@ describe('Element type vocabulary', () => {
     (type) => {
       const element = createDefaultElement(type);
       const result = elementSchema.safeParse(element);
+
       expect(result.success).toBe(true);
     },
   );
@@ -25,6 +27,7 @@ describe('Element type vocabulary', () => {
   it('accepts a custom plugin type', () => {
     const element = createDefaultElement('countdown');
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(true);
   });
 });
@@ -40,6 +43,7 @@ describe('Element position and dimensions', () => {
       rotation: 45,
     });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(true);
   });
 
@@ -47,6 +51,7 @@ describe('Element position and dimensions', () => {
   it('rejects zero width', () => {
     const element = createDefaultElement('rectangle', { width: 0 });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(false);
   });
 
@@ -54,6 +59,7 @@ describe('Element position and dimensions', () => {
   it('rejects negative height', () => {
     const element = createDefaultElement('rectangle', { height: -10 });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(false);
   });
 });
@@ -63,6 +69,7 @@ describe('Element content semantics', () => {
   /** @description Text element content is used as display text (rich or plain) */
   it('uses content as display text for text elements', () => {
     const element = createDefaultElement('text', { content: 'Hello World' });
+
     expect(element.content).toBe('Hello World');
   });
 
@@ -71,12 +78,14 @@ describe('Element content semantics', () => {
     const element = createDefaultElement('image', {
       content: 'https://example.com/photo.jpg',
     });
+
     expect(element.content).toBe('https://example.com/photo.jpg');
   });
 
   /** @description Path element content holds SVG path d attribute data */
   it('uses content as SVG path data for path elements', () => {
     const element = createDefaultElement('path', { content: 'M 0 0 L 10 10' });
+
     expect(element.content).toBe('M 0 0 L 10 10');
   });
 });
@@ -86,8 +95,11 @@ describe('Element hierarchy', () => {
   /** @description null parentId means the element is at root level on its page */
   it('treats null parentId as root-level', () => {
     const element = createDefaultElement('rectangle', { parentId: null });
+
     expect(element.parentId).toBeNull();
+
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(true);
   });
 
@@ -96,8 +108,11 @@ describe('Element hierarchy', () => {
     const element = createDefaultElement('rectangle', {
       parentId: 'parent-group-id',
     });
+
     expect(element.parentId).toBe('parent-group-id');
+
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(true);
   });
 
@@ -105,6 +120,7 @@ describe('Element hierarchy', () => {
   it('accepts elements sharing a groupId', () => {
     const a = createDefaultElement('rectangle', { groupId: 'g1' });
     const b = createDefaultElement('ellipse', { groupId: 'g1' });
+
     expect(a.groupId).toBe('g1');
     expect(b.groupId).toBe('g1');
   });
@@ -115,20 +131,27 @@ describe('Element default values', () => {
   /** @description Screen property defaults ensure elements are visible and unanchored by default */
   it('has correct screen property defaults', () => {
     const element = createDefaultElement('rectangle');
+
     expect(element.screen.anchorX).toBe('left');
     expect(element.screen.anchorY).toBe('top');
     expect(element.screen.visibility).toBe('onscreen');
     expect(element.screen.locked).toBe(false);
     expect(element.screen.maskType).toBe('none');
-    expect(element.screen.rotate3dX).toBe(0);
-    expect(element.screen.rotate3dY).toBe(0);
-    expect(element.screen.rotate3dZ).toBe(0);
+    expect(element.screen.rotateX).toBe(0);
+    expect(element.screen.rotateY).toBe(0);
+    expect(element.screen.rotateZ).toBe(0);
+    expect(element.screen.translateZ).toBe(0);
     expect(element.screen.clipChildren).toBe(false);
+    expect(element.screen.name).toBe('');
+    expect(element.screen.activeState).toBeNull();
+    expect(element.screen.modifiers).toEqual([]);
+    expect(element.screen.customClipPath).toBe('');
   });
 
   /** @description Style opacity defaults to 1 (fully visible) */
   it('has style opacity 1 by default', () => {
     const element = createDefaultElement('rectangle');
+
     expect(element.style.opacity).toBe(1);
   });
 });
@@ -142,6 +165,7 @@ describe('parentId and groupId independence', () => {
       groupId: 'group-1',
     });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(true);
   });
 
@@ -152,6 +176,7 @@ describe('parentId and groupId independence', () => {
       groupId: null,
     });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(true);
   });
 
@@ -162,6 +187,7 @@ describe('parentId and groupId independence', () => {
       groupId: 'group-1',
     });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(true);
   });
 });
@@ -171,12 +197,14 @@ describe('Rotation normalization', () => {
   /** @description Negative rotation is stored as-is (no normalization to [0,360)) */
   it('preserves negative rotation values', () => {
     const element = createDefaultElement('rectangle', { rotation: -90 });
+
     expect(element.rotation).toBe(-90);
   });
 
   /** @description Rotation > 360 is stored as-is (no wrapping) */
   it('preserves rotation values exceeding 360', () => {
     const element = createDefaultElement('rectangle', { rotation: 450 });
+
     expect(element.rotation).toBe(450);
   });
 
@@ -184,6 +212,7 @@ describe('Rotation normalization', () => {
   it('rejects NaN rotation', () => {
     const element = createDefaultElement('rectangle', { rotation: NaN });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(false);
   });
 
@@ -191,6 +220,7 @@ describe('Rotation normalization', () => {
   it('rejects Infinity rotation', () => {
     const element = createDefaultElement('rectangle', { rotation: Infinity });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(false);
   });
 });
@@ -203,6 +233,7 @@ describe('Position finite validation', () => {
       position: { x: NaN, y: 0 },
     });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(false);
   });
 
@@ -212,6 +243,7 @@ describe('Position finite validation', () => {
       position: { x: 0, y: NaN },
     });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(false);
   });
 
@@ -221,6 +253,7 @@ describe('Position finite validation', () => {
       position: { x: Infinity, y: 0 },
     });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(false);
   });
 
@@ -230,6 +263,7 @@ describe('Position finite validation', () => {
       position: { x: 0, y: -Infinity },
     });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(false);
   });
 
@@ -239,6 +273,7 @@ describe('Position finite validation', () => {
       position: { x: -500, y: -200 },
     });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(true);
   });
 });
@@ -251,7 +286,9 @@ describe('Content validation by element type', () => {
       content: "<script>alert('xss')</script>Hello",
     });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.data.content).toBe('Hello');
     }
@@ -262,6 +299,7 @@ describe('Content validation by element type', () => {
     const html =
       '<b>bold</b> <i>italic</i> <u>underline</u> <br> <span>text</span> <strong>strong</strong> <em>emphasis</em>';
     const result = sanitizeTextContent(html);
+
     expect(result).toContain('<b>');
     expect(result).toContain('<i>');
     expect(result).toContain('<u>');
@@ -275,6 +313,7 @@ describe('Content validation by element type', () => {
   it('preserves style attribute but strips other attributes', () => {
     const input = '<span onclick="alert()" class="foo" style="color: red">text</span>';
     const result = sanitizeTextContent(input);
+
     expect(result).not.toContain('onclick');
     expect(result).not.toContain('class=');
     expect(result).toContain('style="color: red"');
@@ -286,6 +325,7 @@ describe('Content validation by element type', () => {
       content: 'https://example.com/img.png',
     });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(true);
   });
 
@@ -293,6 +333,7 @@ describe('Content validation by element type', () => {
   it('accepts image element with empty content (placeholder)', () => {
     const element = createDefaultElement('image', { content: '' });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(true);
   });
 
@@ -302,6 +343,7 @@ describe('Content validation by element type', () => {
       content: 'M 0 0 L 10 10',
     });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(true);
   });
 
@@ -309,6 +351,7 @@ describe('Content validation by element type', () => {
   it('rejects path element with invalid d attribute', () => {
     const element = createDefaultElement('path', { content: 'not a path' });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(false);
   });
 
@@ -316,6 +359,7 @@ describe('Content validation by element type', () => {
   it('rejects qrcode element with empty content', () => {
     const element = createDefaultElement('qrcode', { content: '' });
     const result = elementSchema.safeParse(element);
+
     expect(result.success).toBe(false);
   });
 });

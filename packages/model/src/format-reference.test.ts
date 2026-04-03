@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { fullDocumentSchema, COMMON_CANVAS_SIZES } from './format-reference';
+import { COMMON_CANVAS_SIZES, fullDocumentSchema } from './format-reference';
 
 /** @description Helper to build the minimal valid document from the spec example */
 function minimalDoc(): Record<string, unknown> {
@@ -106,6 +106,13 @@ describe('Complete minimal example', () => {
   });
 });
 
+/** @description Helper to get the first element from the first page for mutation tests */
+function getFirstElement(doc: Record<string, unknown>): Record<string, unknown> {
+  const pages = doc['pages'] as [{ elements: [Record<string, unknown>] }];
+
+  return pages[0].elements[0];
+}
+
 /** @description Invalid documents are rejected with structured errors */
 describe('Structured error rejection', () => {
   /** @description Missing id is rejected */
@@ -122,9 +129,9 @@ describe('Structured error rejection', () => {
   /** @description Invalid element style (opacity > 1) is rejected */
   it('rejects element with invalid opacity', () => {
     const doc = minimalDoc();
-    const pages = doc['pages'] as Array<{ elements: Array<Record<string, unknown>> }>;
+    const el = getFirstElement(doc);
 
-    pages[0]!.elements[0]!['style'] = { opacity: 2 };
+    el['style'] = { opacity: 2 };
 
     const result = fullDocumentSchema.safeParse(doc);
 
@@ -134,10 +141,10 @@ describe('Structured error rejection', () => {
   /** @description Invalid screen property (bad anchorX) is rejected */
   it('rejects element with invalid screen anchorX', () => {
     const doc = minimalDoc();
-    const pages = doc['pages'] as Array<{ elements: Array<Record<string, unknown>> }>;
+    const el = getFirstElement(doc);
 
-    pages[0]!.elements[0]!['screen'] = {
-      ...(pages[0]!.elements[0]!['screen'] as Record<string, unknown>),
+    el['screen'] = {
+      ...(el['screen'] as Record<string, unknown>),
       anchorX: 'middle',
     };
 
@@ -149,9 +156,9 @@ describe('Structured error rejection', () => {
   /** @description Negative element width is rejected */
   it('rejects element with negative width', () => {
     const doc = minimalDoc();
-    const pages = doc['pages'] as Array<{ elements: Array<Record<string, unknown>> }>;
+    const el = getFirstElement(doc);
 
-    pages[0]!.elements[0]!['width'] = -10;
+    el['width'] = -10;
 
     const result = fullDocumentSchema.safeParse(doc);
 
@@ -161,10 +168,10 @@ describe('Structured error rejection', () => {
   /** @description Duplicate element IDs are rejected */
   it('rejects duplicate element IDs on a page', () => {
     const doc = minimalDoc();
-    const pages = doc['pages'] as Array<{ elements: unknown[] }>;
-    const el = pages[0]!.elements[0]!;
+    const pages = doc['pages'] as [{ elements: unknown[] }];
+    const el = getFirstElement(doc);
 
-    pages[0]!.elements = [el, el];
+    pages[0].elements = [el, el];
 
     const result = fullDocumentSchema.safeParse(doc);
 

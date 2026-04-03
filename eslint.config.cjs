@@ -47,10 +47,6 @@ module.exports = [
       'playwright/.cache/**',
       'playwright-report/**',
       'test-results/**',
-      '**/*.test.ts',
-      '**/*.test.tsx',
-      '**/*.spec.ts',
-      '**/*.spec.tsx',
     ],
   },
   {
@@ -126,7 +122,7 @@ module.exports = [
     },
   },
   {
-    files: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'ct/**/*.ts', 'ct/**/*.tsx'],
+    files: ['**/src/**/*.test.ts', '**/src/**/*.test.tsx', 'ct/**/*.ts', 'ct/**/*.tsx'],
     rules: {
       '@typescript-eslint/unbound-method': 'off',
     },
