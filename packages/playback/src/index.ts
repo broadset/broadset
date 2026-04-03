@@ -10,3 +10,7 @@ export {
   interpolatePath,
   interpolateValue,
 } from './interpolation';
+
+// Timeline
+export type { TimelineFrame } from './timeline';
+export { computeElementTimelines, computeTimelineDuration, computeTimelineFrame } from './timeline';

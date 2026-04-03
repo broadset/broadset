@@ -12,8 +12,8 @@ modifiers. A play/pause control proves the playback controller is wired up.
 
 ## 3.1 Interpolation engine (`playback/interpolation.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/playback/interpolation.md`
 _What to cover:_ All 5 easing presets, cubic-bezier solver (Newton's method,
