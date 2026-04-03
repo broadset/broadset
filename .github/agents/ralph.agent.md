@@ -143,14 +143,29 @@ A healthy session shows test count growing and pass rate near 100% for each comp
 
 ## Hard constraints
 
-| Constraint              | Rule                                                                                    |
-| ----------------------- | --------------------------------------------------------------------------------------- |
-| Same phase only         | Never jump to the next phase file                                                       |
-| Tests first             | Always write and run failing tests before any implementation                            |
-| Iterate on failures     | Read error, fix, rerun — no permission needed                                           |
-| Retry limit             | Stop after 15 attempts with **no new test passing** (progress-based, not attempt-based) |
-| No placeholders         | `TODO` stubs and un-implemented `throw`s are forbidden                                  |
-| JSDoc on every test     | Future loops need the reasoning                                                         |
-| Quality before commit   | `npm run quality` must be green before `git commit`                                     |
-| Commit after every unit | A bad loop is cheap to recover with `git reset --hard`                                  |
-| No permission-seeking   | Never ask "should I continue?" — just proceed                                           |
+| Constraint              | Rule                                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| Same phase only         | Never jump to the next phase file                                                         |
+| Tests first             | Always write and run failing tests before any implementation                              |
+| Iterate on failures     | Read error, fix, rerun — no permission needed                                             |
+| Retry limit             | Stop after 15 attempts with **no new test passing** (progress-based, not attempt-based)   |
+| No placeholders         | `TODO` stubs and un-implemented `throw`s are forbidden                                    |
+| JSDoc on every test     | Future loops need the reasoning                                                           |
+| Quality before commit   | `npm run quality` must be green before `git commit`                                       |
+| Commit after every unit | A bad loop is cheap to recover with `git reset --hard`                                    |
+| No permission-seeking   | Never ask "should I continue?" — just proceed                                             |
+| **No cutting corners**  | **NEVER weaken quality checks to make them pass — always fix the root cause (see below)** |
+
+## No cutting corners — ABSOLUTE rule
+
+When a quality gate, lint rule, or CI check fails, you MUST fix the underlying code problem. You are **strictly forbidden** from:
+
+- Adding CLI flags that suppress or silence warnings/errors (e.g. `--no-warn-ignored`, `--quiet`, `--no-verify`)
+- Widening lint globs, ignore patterns, or exclusions to dodge failures
+- Adding `// eslint-disable`, `@ts-ignore`, `@ts-expect-error`, or equivalent suppression comments
+- Raising `--max-warnings` thresholds or removing `--max-warnings 0`
+- Modifying `.eslintignore`, `.prettierignore`, `tsconfig.json` excludes, or similar config solely to skip failing files
+- Downgrading lint rule severity (error → warn → off)
+- Deleting or skipping tests that reveal real bugs
+
+If a check fails, **diagnose the root cause** and fix the code, the type, or the test expectation. If you believe the lint rule or config is genuinely wrong for this project, stop and report it — do not change it yourself.

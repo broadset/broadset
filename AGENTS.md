@@ -14,6 +14,17 @@ Use it together with the detailed reference docs linked below.
 
 See `CONTRIBUTING.md` for working agreements, quality gates, development commands, and spec authoring rules.
 
+## No cutting corners — applies to ALL agents
+
+When a quality gate, lint rule, typecheck, or CI check fails, **always fix the root cause**. Never weaken, suppress, or bypass the check to make it pass. Specifically forbidden:
+
+- Adding CLI flags that silence warnings/errors (e.g. `--no-warn-ignored`, `--quiet`, `--no-verify`)
+- Adding suppression comments (`// eslint-disable`, `@ts-ignore`, `@ts-expect-error`)
+- Widening ignore patterns, raising warning thresholds, or downgrading rule severity
+- Deleting or skipping tests that reveal real bugs
+
+If you believe a rule or config is genuinely wrong, **stop and report it** — do not change it yourself.
+
 ## References
 
 - `README.md` — project overview

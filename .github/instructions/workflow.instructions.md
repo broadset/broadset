@@ -56,6 +56,7 @@ When feature is done, mark that task with [DONE]
 
 - Run `npm run quality:strict` (lint strict + prettier check + strict typecheck + tests) before merging or concluding a feature block.
 - Run `npm run ct` before every 25th commit or before concluding a major feature block.
+- **When a quality gate fails, fix the code — never weaken the check.** Do not add suppression flags, ignore comments, or config changes that make the check more lenient.
 
 ## Keep working
 
