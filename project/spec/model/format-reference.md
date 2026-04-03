@@ -39,7 +39,7 @@ All dimensions are in **millimetres** unless stated otherwise. Documents are val
   "documentMode": "screen" | "print", // Required
   "canvas": { ... },                  // Required
   "pages": [ ... ],                   // Required, at least 1 page
-  "animationRegistry": { ... },       // Required (can be empty object {})
+  "animationRegistry": [ ... ],       // Required (can be empty array [])
   "metadata": { ... }                 // Optional
 }
 ```
@@ -91,11 +91,12 @@ All values are in **millimetres**.
 
 ```jsonc
 {
-  "elements": [ ... ]  // Array of BroadsetElement objects (can be empty)
+  "id": "page-1",       // Required, non-empty unique identifier
+  "elements": [ ... ]   // Array of BroadsetElement objects (can be empty)
 }
 ```
 
-A document must have at least one page. Each page contains a flat array of elements. Parent-child relationships are defined via `parentId`, not nesting.
+A document must have at least one page. Each page has a unique `id` and contains a flat array of elements. Parent-child relationships are defined via `parentId`, not nesting.
 
 ---
 
@@ -316,21 +317,24 @@ scoreboard-group  (type: group,     parentId: null)
 
 ## 9. Animation Registry
 
-The `animationRegistry` maps element IDs to their animation configurations:
+The `animationRegistry` is a flat array of entries, each binding an element ID to its animation configuration:
 
 ```jsonc
 {
-  "animationRegistry": {
-    "<element-id>": {
-      "timelines": [ ... ],                // Array of ElementTimeline
-      "stateTimelineBindings": { ... },    // State name → binding
-      "modifierTimelineBindings": { ... }  // Modifier name → in/out pair
+  "animationRegistry": [
+    {
+      "elementId": "<element-id>",
+      "config": {
+        "timelines": [ ... ],                // Array of ElementTimeline
+        "stateTimelineBindings": [ ... ],    // Array of StateTimelineBinding
+        "modifierTimelineBindings": [ ... ]  // Array of ModifierTimelineBinding
+      }
     }
-  }
+  ]
 }
 ```
 
-Only elements that have animations need entries. Elements without animations are simply absent from the registry.
+Only elements that have animations need entries. Elements without animations are simply absent from the registry. Element IDs within the registry must be unique.
 
 ---
 
@@ -418,25 +422,15 @@ Custom state names (e.g., `"warning"`, `"highlighted"`) can be added.
 
 ### stateTimelineBindings
 
+An array of bindings, each mapping a state name to its timeline:
+
 ```jsonc
 {
-  "stateTimelineBindings": {
-    "IN": {
-      "id": "state-in",
-      "timelineId": "tl-element-in",
-      "order": -1,
-    },
-    "OUT": {
-      "id": "state-out",
-      "timelineId": "tl-element-out",
-      "order": 2147483647,
-    },
-    "warning": {
-      "id": "state-warning",
-      "timelineId": "tl-warning-enter",
-      "order": 0,
-    },
-  },
+  "stateTimelineBindings": [
+    { "stateName": "IN", "timelineId": "tl-element-in" },
+    { "stateName": "OUT", "timelineId": "tl-element-out" },
+    { "stateName": "warning", "timelineId": "tl-warning-enter" },
+  ],
 }
 ```
 
@@ -453,18 +447,22 @@ Custom state names (e.g., `"warning"`, `"highlighted"`) can be added.
 
 Modifiers are **additive** — zero or many can be active simultaneously.
 
+An array of bindings, each mapping a modifier name to its in/out timelines:
+
 ```jsonc
 {
-  "modifierTimelineBindings": {
-    "pulse": {
-      "inTimeline": "tl-pulse-in",
-      "outTimeline": "tl-pulse-out",
+  "modifierTimelineBindings": [
+    {
+      "modifierName": "pulse",
+      "inTimelineId": "tl-pulse-in",
+      "outTimelineId": "tl-pulse-out",
     },
-    "glow": {
-      "inTimeline": "tl-glow-in",
-      // No outTimeline → in timeline plays in reverse on removal
+    {
+      "modifierName": "glow",
+      "inTimelineId": "tl-glow-in",
+      // No outTimelineId → in timeline plays in reverse on removal
     },
-  },
+  ],
 }
 ```
 
@@ -563,7 +561,9 @@ Enforced by Zod at load time. Documents that violate these rules are **rejected*
 
 - `offsetMs`: non-negative number (≥ 0)
 - `action`: one of `"none"`, `"setState"`, `"addModifier"`, `"removeModifier"`
-- State binding `order`: integer
+- `stateName` / `modifierName`: non-empty string (in bindings)
+- `timelineId` / `inTimelineId`: non-empty string referencing a timeline `id`
+- `outTimelineId`: optional non-empty string referencing a timeline `id`
 - Timeline `entries`: array (can be empty)
 
 ---
@@ -598,6 +598,7 @@ All spatial dimensions are in **millimetres**. To convert:
   },
   "pages": [
     {
+      "id": "page-1",
       "elements": [
         {
           "id": "title",
@@ -636,7 +637,7 @@ All spatial dimensions are in **millimetres**. To convert:
       ]
     }
   ],
-  "animationRegistry": {}
+  "animationRegistry": []
 }
 ```
 
@@ -653,6 +654,7 @@ A broadcast overlay with animated scoreboard using state transitions:
   "canvas": { "width": 508, "height": 285.75, "padding": [0, 0, 0, 0] },
   "pages": [
     {
+      "id": "page-1",
       "elements": [
         {
           "id": "scoreboard-bg",
@@ -719,56 +721,59 @@ A broadcast overlay with animated scoreboard using state transitions:
       ]
     }
   ],
-  "animationRegistry": {
-    "scoreboard-bg": {
-      "timelines": [
-        {
-          "id": "tl-bg-in",
-          "name": "State IN",
-          "entries": [
-            {
-              "name": "fade-slide-in",
-              "action": "none",
-              "offsetMs": 350,
-              "properties": {
-                "opacity": { "value": "0.85", "interpolation": "ease-out" },
-                "translateY": { "value": "0%", "interpolation": "ease-out" }
+  "animationRegistry": [
+    {
+      "elementId": "scoreboard-bg",
+      "config": {
+        "timelines": [
+          {
+            "id": "tl-bg-in",
+            "name": "State IN",
+            "entries": [
+              {
+                "name": "fade-slide-in",
+                "action": "none",
+                "offsetMs": 350,
+                "properties": {
+                  "opacity": { "value": "0.85", "interpolation": "ease-out" },
+                  "translateY": { "value": "0%", "interpolation": "ease-out" }
+                }
               }
-            }
-          ]
-        },
-        {
-          "id": "tl-bg-out",
-          "name": "State OUT",
-          "entries": [
-            {
-              "name": "fade-slide-out",
-              "action": "none",
-              "offsetMs": 350,
-              "properties": {
-                "opacity": { "value": "0", "interpolation": "ease-in" },
-                "translateY": { "value": "-100%", "interpolation": "ease-in" }
+            ]
+          },
+          {
+            "id": "tl-bg-out",
+            "name": "State OUT",
+            "entries": [
+              {
+                "name": "fade-slide-out",
+                "action": "none",
+                "offsetMs": 350,
+                "properties": {
+                  "opacity": { "value": "0", "interpolation": "ease-in" },
+                  "translateY": { "value": "-100%", "interpolation": "ease-in" }
+                }
               }
-            }
-          ]
-        },
-        {
-          "id": "tl-bg-sequence",
-          "name": "Show Sequence",
-          "entries": [
-            { "name": "start-hidden", "action": "setState", "payload": "OUT", "offsetMs": 0, "properties": {} },
-            { "name": "reveal", "action": "setState", "payload": "IN", "offsetMs": 600, "properties": {} },
-            { "name": "hide-again", "action": "setState", "payload": "OUT", "offsetMs": 2000, "properties": {} }
-          ]
-        }
-      ],
-      "stateTimelineBindings": {
-        "IN": { "id": "state-bg-in", "timelineId": "tl-bg-in", "order": -1 },
-        "OUT": { "id": "state-bg-out", "timelineId": "tl-bg-out", "order": 2147483647 }
-      },
-      "modifierTimelineBindings": {}
+            ]
+          },
+          {
+            "id": "tl-bg-sequence",
+            "name": "Show Sequence",
+            "entries": [
+              { "name": "start-hidden", "action": "setState", "payload": "OUT", "offsetMs": 0, "properties": {} },
+              { "name": "reveal", "action": "setState", "payload": "IN", "offsetMs": 600, "properties": {} },
+              { "name": "hide-again", "action": "setState", "payload": "OUT", "offsetMs": 2000, "properties": {} }
+            ]
+          }
+        ],
+        "stateTimelineBindings": [
+          { "stateName": "IN", "timelineId": "tl-bg-in" },
+          { "stateName": "OUT", "timelineId": "tl-bg-out" }
+        ],
+        "modifierTimelineBindings": []
+      }
     }
-  }
+  ]
 }
 ```
 

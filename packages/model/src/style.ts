@@ -97,13 +97,13 @@ export interface BroadsetElementStyle {
 
 /**
  * Validates that a CSS padding shorthand contains only non-negative values.
- * Accepts numeric tokens (e.g. "10 20 10 20" or "0").
+ * Accepts numeric tokens with optional CSS units (e.g. "10px 20px" or "0").
  */
 function isNonNegativePadding(padding: string): boolean {
   const tokens = padding.trim().split(/\s+/);
 
   for (const token of tokens) {
-    const num = Number(token);
+    const num = parseFloat(token);
 
     if (Number.isNaN(num) || num < 0) {
       return false;
@@ -128,7 +128,7 @@ export const styleSchema = z
 
     // Typography
     fontFamily: z.string().optional(),
-    fontSize: z.number().optional(),
+    fontSize: z.number().positive().optional(),
     fontColor: z.string().optional(),
     fontWeight: z.string().optional(),
     fontStyle: z.string().optional(),
@@ -148,7 +148,7 @@ export const styleSchema = z
     backgroundGradient: z.string().optional(),
 
     // Border
-    borderWidth: z.number().optional(),
+    borderWidth: z.number().nonnegative().optional(),
     borderColor: z.string().optional(),
     borderRadius: borderRadiusSchema.optional(),
     borderStyle: z.string().optional(),
@@ -166,7 +166,7 @@ export const styleSchema = z
 
     // SVG stroke/fill
     stroke: z.string().optional(),
-    strokeWidth: z.number().optional(),
+    strokeWidth: z.number().nonnegative().optional(),
     strokeDasharray: z.string().optional(),
     strokeDashoffset: z.number().optional(),
     strokeLinecap: z.enum(['butt', 'round', 'square']).optional(),

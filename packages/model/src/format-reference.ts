@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { animationRegistrySchema } from './animation';
+import { hasAcyclicParentIds, hasUniqueElementIds, hasValidParentIds } from './page-validation';
 import { screenPropsSchema } from './screen';
 import { styleSchema } from './style';
 
@@ -55,62 +56,9 @@ const fullPageSchema = z
     id: z.string().min(1),
     elements: z.array(fullElementSchema),
   })
-  .refine(
-    (page) => {
-      const ids = new Set<string>();
-
-      for (const el of page.elements) {
-        if (ids.has(el.id)) {
-          return false;
-        }
-
-        ids.add(el.id);
-      }
-
-      return true;
-    },
-    { message: 'Duplicate element IDs within a page' },
-  )
-  .refine(
-    (page) => {
-      const idSet = new Set(page.elements.map((el) => el.id));
-
-      for (const el of page.elements) {
-        if (el.parentId !== null && !idSet.has(el.parentId)) {
-          return false;
-        }
-      }
-
-      return true;
-    },
-    { message: 'parentId references an element not on this page' },
-  )
-  .refine(
-    (page) => {
-      const parentMap = new Map<string, string | null>();
-
-      for (const el of page.elements) {
-        parentMap.set(el.id, el.parentId);
-      }
-
-      for (const el of page.elements) {
-        const visited = new Set<string>();
-        let current: string | null = el.id;
-
-        while (current !== null) {
-          if (visited.has(current)) {
-            return false;
-          }
-
-          visited.add(current);
-          current = parentMap.get(current) ?? null;
-        }
-      }
-
-      return true;
-    },
-    { message: 'Circular parentId references detected' },
-  );
+  .refine(hasUniqueElementIds, { message: 'Duplicate element IDs within a page' })
+  .refine(hasValidParentIds, { message: 'parentId references an element not on this page' })
+  .refine(hasAcyclicParentIds, { message: 'Circular parentId references detected' });
 
 // ---------------------------------------------------------------------------
 // Canvas schema

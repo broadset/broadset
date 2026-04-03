@@ -162,10 +162,10 @@ export function createDefaultFeatureConfig(mode: DocumentMode): EditorFeatureCon
 // ---------------------------------------------------------------------------
 
 export interface GridSettings {
-  gridSize: number;
-  showGrid: boolean;
-  snapToGrid: boolean;
-  snapThreshold: number;
+  readonly gridSize: number;
+  readonly showGrid: boolean;
+  readonly snapToGrid: boolean;
+  readonly snapThreshold: number;
 }
 
 export function createDefaultGridSettings(): GridSettings {
@@ -182,24 +182,24 @@ export function createDefaultGridSettings(): GridSettings {
 // ---------------------------------------------------------------------------
 
 export interface Guide {
-  id: string;
-  type: 'h' | 'v';
-  pos: number;
-  locked: boolean;
+  readonly id: string;
+  readonly type: 'h' | 'v';
+  readonly pos: number;
+  readonly locked: boolean;
 }
 
 export interface CanvasSettings {
-  units: 'px' | 'mm' | 'in';
-  viewMode: 'broadcast' | 'print' | 'none';
-  showRulers: boolean;
-  originX: number;
-  originY: number;
-  perspective: number;
-  zoom: number;
-  panX: number;
-  panY: number;
-  guides: readonly Guide[];
-  backgroundPdf?: string | undefined;
+  readonly units: 'px' | 'mm' | 'in';
+  readonly viewMode: 'broadcast' | 'print' | 'none';
+  readonly showRulers: boolean;
+  readonly originX: number;
+  readonly originY: number;
+  readonly perspective: number;
+  readonly zoom: number;
+  readonly panX: number;
+  readonly panY: number;
+  readonly guides: readonly Guide[];
+  readonly backgroundPdf?: string | undefined;
 }
 
 export function createDefaultCanvasSettings(): CanvasSettings {

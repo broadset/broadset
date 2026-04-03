@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import type { BroadsetScreenProps } from './screen';
+import { createDefaultScreenProps, screenPropsSchema } from './screen';
+import type { BroadsetElementStyle } from './style';
+import { styleSchema } from './style';
+
 // ---------------------------------------------------------------------------
 // Built-in element type vocabulary
 // ---------------------------------------------------------------------------
@@ -21,36 +26,12 @@ export const BUILT_IN_ELEMENT_TYPES: readonly string[] = BUILT_IN_ELEMENT_TYPES_
 export type BuiltInElementType = (typeof BUILT_IN_ELEMENT_TYPES_TUPLE)[number];
 
 // ---------------------------------------------------------------------------
-// Sub-structures: position, screen defaults, style defaults
+// Sub-structures
 // ---------------------------------------------------------------------------
 
 export interface ElementPosition {
   readonly x: number;
   readonly y: number;
-}
-
-/**
- * Minimal screen property defaults used by the element factory.
- * The full ScreenProperties type is defined in screen.ts (unit 1.3).
- */
-export interface ElementScreenDefaults {
-  readonly anchorX: string;
-  readonly anchorY: string;
-  readonly visibility: string;
-  readonly locked: boolean;
-  readonly maskType: string;
-  readonly rotate3dX: number;
-  readonly rotate3dY: number;
-  readonly rotate3dZ: number;
-  readonly clipChildren: boolean;
-}
-
-/**
- * Minimal style property defaults used by the element factory.
- * The full StyleProperties type is defined in style.ts (unit 1.2).
- */
-export interface ElementStyleDefaults {
-  readonly opacity: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -67,8 +48,8 @@ export interface BroadsetElement {
   readonly content: string;
   readonly parentId: string | null;
   readonly groupId: string | null;
-  readonly screen: ElementScreenDefaults;
-  readonly style: ElementStyleDefaults;
+  readonly screen: BroadsetScreenProps;
+  readonly style: BroadsetElementStyle;
 }
 
 // ---------------------------------------------------------------------------
@@ -202,22 +183,6 @@ const positionSchema = z.object({
   y: z.number(),
 });
 
-const screenDefaultsSchema = z.object({
-  anchorX: z.string(),
-  anchorY: z.string(),
-  visibility: z.string(),
-  locked: z.boolean(),
-  maskType: z.string(),
-  rotate3dX: z.number(),
-  rotate3dY: z.number(),
-  rotate3dZ: z.number(),
-  clipChildren: z.boolean(),
-});
-
-const styleDefaultsSchema = z.object({
-  opacity: z.number(),
-});
-
 const baseElementSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),
@@ -228,8 +193,8 @@ const baseElementSchema = z.object({
   content: z.string(),
   parentId: z.string().nullable(),
   groupId: z.string().nullable(),
-  screen: screenDefaultsSchema,
-  style: styleDefaultsSchema,
+  screen: screenPropsSchema,
+  style: styleSchema,
 });
 
 /**
@@ -271,8 +236,6 @@ export const elementSchema = baseElementSchema
 // Factory
 // ---------------------------------------------------------------------------
 
-let nextId = 1;
-
 /** Overrides accepted by createDefaultElement. */
 export interface ElementOverrides {
   readonly id?: string;
@@ -291,7 +254,7 @@ export interface ElementOverrides {
  */
 export function createDefaultElement(type: string, overrides?: ElementOverrides): BroadsetElement {
   return {
-    id: overrides?.id ?? `element-${String(nextId++)}`,
+    id: overrides?.id ?? crypto.randomUUID(),
     type,
     position: overrides?.position ?? { x: 0, y: 0 },
     width: overrides?.width ?? 100,
@@ -300,17 +263,7 @@ export function createDefaultElement(type: string, overrides?: ElementOverrides)
     content: overrides?.content ?? (type === 'qrcode' ? 'https://example.com' : ''),
     parentId: overrides?.parentId ?? null,
     groupId: overrides?.groupId ?? null,
-    screen: {
-      anchorX: 'left',
-      anchorY: 'top',
-      visibility: 'onscreen',
-      locked: false,
-      maskType: 'none',
-      rotate3dX: 0,
-      rotate3dY: 0,
-      rotate3dZ: 0,
-      clipChildren: false,
-    },
+    screen: createDefaultScreenProps(),
     style: {
       opacity: 1,
     },

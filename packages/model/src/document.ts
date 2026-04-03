@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import type { AnimationRegistryEntry } from './animation';
 import { animationRegistrySchema } from './animation';
+import { hasAcyclicParentIds, hasUniqueElementIds, hasValidParentIds } from './page-validation';
 
 // ---------------------------------------------------------------------------
 // Canvas schema
@@ -54,62 +55,9 @@ const pageSchema = z
     id: z.string().min(1),
     elements: z.array(pageElementSchema),
   })
-  .refine(
-    (page) => {
-      const ids = new Set<string>();
-
-      for (const el of page.elements) {
-        if (ids.has(el.id)) {
-          return false;
-        }
-
-        ids.add(el.id);
-      }
-
-      return true;
-    },
-    { message: 'Duplicate element IDs within a page' },
-  )
-  .refine(
-    (page) => {
-      const idSet = new Set(page.elements.map((el) => el.id));
-
-      for (const el of page.elements) {
-        if (el.parentId !== null && !idSet.has(el.parentId)) {
-          return false;
-        }
-      }
-
-      return true;
-    },
-    { message: 'parentId references an element not on this page' },
-  )
-  .refine(
-    (page) => {
-      const parentMap = new Map<string, string | null>();
-
-      for (const el of page.elements) {
-        parentMap.set(el.id, el.parentId);
-      }
-
-      for (const el of page.elements) {
-        const visited = new Set<string>();
-        let current: string | null = el.id;
-
-        while (current !== null) {
-          if (visited.has(current)) {
-            return false;
-          }
-
-          visited.add(current);
-          current = parentMap.get(current) ?? null;
-        }
-      }
-
-      return true;
-    },
-    { message: 'Circular parentId references detected' },
-  );
+  .refine(hasUniqueElementIds, { message: 'Duplicate element IDs within a page' })
+  .refine(hasValidParentIds, { message: 'parentId references an element not on this page' })
+  .refine(hasAcyclicParentIds, { message: 'Circular parentId references detected' });
 
 // ---------------------------------------------------------------------------
 // Page interface
@@ -156,17 +104,9 @@ export const broadsetDocumentSchema = z.object({
 // Factory
 // ---------------------------------------------------------------------------
 
-let counter = 0;
-
-function generateId(): string {
-  counter += 1;
-
-  return `doc-${String(Date.now())}-${String(counter)}`;
-}
-
 export function createEmptyBroadsetDocument(): BroadsetDocument {
   return {
-    id: generateId(),
+    id: crypto.randomUUID(),
     documentMode: 'screen',
     canvas: {
       width: 508,

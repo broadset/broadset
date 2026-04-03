@@ -20,7 +20,7 @@ export function mmToPx(mm: number): number {
 // ---------------------------------------------------------------------------
 
 export function deepClone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -47,8 +47,66 @@ export function serializeClipPath(pathData: string): string {
 // Path zoom scaling
 // ---------------------------------------------------------------------------
 
+/** Parameter counts per SVG path command. */
+const SVG_PARAM_COUNTS: Readonly<Record<string, number>> = {
+  M: 2,
+  m: 2,
+  L: 2,
+  l: 2,
+  H: 1,
+  h: 1,
+  V: 1,
+  v: 1,
+  C: 6,
+  c: 6,
+  S: 4,
+  s: 4,
+  Q: 4,
+  q: 4,
+  T: 2,
+  t: 2,
+  A: 7,
+  a: 7,
+  Z: 0,
+  z: 0,
+};
+
+/** Arc parameter indices that must NOT be scaled (x-rotation, large-arc-flag, sweep-flag). */
+const ARC_NO_SCALE_INDICES = new Set([2, 3, 4]);
+
+/**
+ * Scales coordinate values in an SVG path data string by `zoom`.
+ * Arc command flags and rotation angle are preserved unscaled.
+ */
 export function scalePathData(pathData: string, zoom: number): string {
-  return pathData.replace(/-?\d+(?:\.\d+)?/g, (token) => {
+  let currentCmd = '';
+  let paramIndex = 0;
+
+  return pathData.replace(/[MmLlHhVvCcSsQqTtAaZz]|-?\d+(?:\.\d+)?/g, (token) => {
+    // SVG command letter
+    if (token.length === 1 && token in SVG_PARAM_COUNTS) {
+      currentCmd = token;
+      paramIndex = 0;
+
+      return token;
+    }
+
+    // Number token — decide whether to scale
+    const isArc = currentCmd === 'A' || currentCmd === 'a';
+    const shouldScale = !(isArc && ARC_NO_SCALE_INDICES.has(paramIndex));
+
+    paramIndex++;
+
+    const count = SVG_PARAM_COUNTS[currentCmd];
+
+    if (count !== undefined && count > 0 && paramIndex >= count) {
+      paramIndex = 0;
+    }
+
+    if (!shouldScale) {
+      return token;
+    }
+
     const scaled = Number(token) * zoom;
     const rounded = Math.round(scaled * 100) / 100;
 

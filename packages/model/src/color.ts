@@ -268,5 +268,5 @@ export function normalizeColor(input: string): string {
     return hex;
   }
 
-  return trimmed;
+  throw new Error(`Unable to normalize color: "${input}"`);
 }
