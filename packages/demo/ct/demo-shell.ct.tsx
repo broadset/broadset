@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/experimental-ct-react';
 import App from '../src/App';
 
 test.describe('Demo Shell — mount renderer', () => {
-  test('fills viewport with dark theme and overflow hidden', async ({ mount, page }) => {
+  test('fills viewport with transparent background and overflow hidden', async ({ mount, page }) => {
     const component = await mount(<App />);
 
     // Full viewport layout
@@ -12,23 +12,13 @@ test.describe('Demo Shell — mount renderer', () => {
 
     expect(overflow).toBe('hidden');
 
-    // Dark theme — background should be dark
+    // Background should be transparent (rgba with alpha 0)
     const bgColor = await component.evaluate((el) => getComputedStyle(el).backgroundColor);
 
-    // Parse RGB values to check it's a dark color
-    const rgbMatch = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(bgColor);
+    // Transparent can be reported as 'rgba(0, 0, 0, 0)' or 'transparent'
+    const isTransparent = bgColor === 'transparent' || bgColor === 'rgba(0, 0, 0, 0)';
 
-    expect(rgbMatch).not.toBeNull();
-
-    if (rgbMatch) {
-      const r = Number(rgbMatch[1]);
-      const g = Number(rgbMatch[2]);
-      const b = Number(rgbMatch[3]);
-      const luminance = (r + g + b) / 3;
-
-      // Luminance below 80 = dark theme
-      expect(luminance).toBeLessThan(80);
-    }
+    expect(isTransparent).toBe(true);
   });
 
   test('renders sample document with all 8 element types', async ({ mount }) => {

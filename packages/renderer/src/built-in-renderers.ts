@@ -1,4 +1,5 @@
 import type { PageElement } from '@broadset/model';
+import qrcode from 'qrcode-generator';
 
 import type { ElementRendererInstance } from './component-registry';
 import { DATA_ELEMENT_CONTENT, DATA_ELEMENT_ID } from './data-attributes';
@@ -15,10 +16,10 @@ export function applyCommonStyles(container: HTMLElement, element: PageElement):
   const s = container.style;
 
   s.position = 'absolute';
-  s.left = `${String(element.position.x)}mm`;
-  s.top = `${String(element.position.y)}mm`;
-  s.width = `${String(element.width)}mm`;
-  s.height = `${String(element.height)}mm`;
+  s.left = `${String(element.position.x)}px`;
+  s.top = `${String(element.position.y)}px`;
+  s.width = `${String(element.width)}px`;
+  s.height = `${String(element.height)}px`;
 
   if (element.rotation !== 0) {
     s.transform = `rotate(${String(element.rotation)}deg)`;
@@ -395,16 +396,7 @@ function createQrcodeRenderer(element: PageElement, host: HTMLElement): ElementR
       content.style.height = '100%';
 
       if (element.content.length > 0) {
-        // Dynamic import is not feasible in synchronous mount, use a placeholder
-        // that gets replaced. For now, render a simple QR placeholder.
-        content.style.backgroundColor = '#fff';
-        content.style.display = 'flex';
-        content.style.alignItems = 'center';
-        content.style.justifyContent = 'center';
-        content.style.fontSize = '10px';
-        content.style.color = '#333';
-        content.textContent = 'QR';
-        content.title = element.content;
+        renderQrInto(content, element.content);
       }
 
       container.appendChild(content);
@@ -416,14 +408,36 @@ function createQrcodeRenderer(element: PageElement, host: HTMLElement): ElementR
       const content = container.querySelector(`[${DATA_ELEMENT_CONTENT}]`);
 
       if (content) {
-        content.textContent = updated.content.length > 0 ? 'QR' : '';
-        (content as HTMLElement).title = updated.content;
+        content.innerHTML = '';
+
+        if (updated.content.length > 0) {
+          renderQrInto(content as HTMLElement, updated.content);
+        }
       }
     },
     destroy(): void {
       container.remove();
     },
   };
+}
+
+/** Generate a QR code SVG and insert it into the target element. */
+function renderQrInto(target: HTMLElement, data: string): void {
+  const qr = qrcode(0, 'M');
+
+  qr.addData(data);
+  qr.make();
+
+  const svgTag = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+
+  target.innerHTML = svgTag;
+
+  const svg = target.querySelector('svg');
+
+  if (svg) {
+    svg.style.width = '100%';
+    svg.style.height = '100%';
+  }
 }
 
 // ---------------------------------------------------------------------------

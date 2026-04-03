@@ -43,7 +43,7 @@ export default function App(): React.JSX.Element {
         width: '100vw',
         height: '100vh',
         overflow: 'hidden',
-        backgroundColor: '#1a1a2e',
+        backgroundColor: 'transparent',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

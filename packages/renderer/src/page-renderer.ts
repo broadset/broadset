@@ -15,7 +15,7 @@ import { buildSceneTree, type SceneNode } from './scene-tree';
  * - Builds a scene tree from the flat element array
  * - Creates renderer instances for each element
  * - Respects parent→child nesting from the scene tree
- * - Applies canvas dimensions as mm-based CSS sizing
+ * - Applies canvas dimensions as px-based CSS sizing
  */
 export class PageRenderer {
   private readonly registry: ComponentRegistry;
@@ -40,8 +40,8 @@ export class PageRenderer {
 
     // Set up the canvas with dimensions
     host.style.position = 'relative';
-    host.style.width = `${String(canvas.width)}mm`;
-    host.style.height = `${String(canvas.height)}mm`;
+    host.style.width = `${String(canvas.width)}px`;
+    host.style.height = `${String(canvas.height)}px`;
     host.style.overflow = 'hidden';
 
     // Build scene tree and render recursively
