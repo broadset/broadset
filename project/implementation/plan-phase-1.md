@@ -14,8 +14,8 @@ first, then compound structures that reference them.
 
 ### 1.1 Element type vocabulary and defaults (`model/element.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/model/element.md`
 _What to cover:_ 8 built-in type literals, width/height > 0 invariant, default
@@ -112,7 +112,7 @@ sizes parse correctly; invalid documents are rejected with structured errors.
 
 | Unit                     | Red | Green |
 | ------------------------ | --- | ----- |
-| 1.1 element vocabulary   | ☐   | ☐     |
+| 1.1 element vocabulary   | ✅  | ✅    |
 | 1.2 style properties     | ☐   | ☐     |
 | 1.3 screen properties    | ☐   | ☐     |
 | 1.4 capability flags     | ☐   | ☐     |
