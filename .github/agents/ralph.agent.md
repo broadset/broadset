@@ -183,7 +183,11 @@ Commit spec refinements alongside the unit implementation.
 
 ### Step 4 — Red phase (tests first)
 
-Create or open `packages/<pkg>/src/<unit>.test.ts`. Write failing tests that cover every acceptance criterion. Every `describe`/`it` block **must** have a JSDoc `@description` explaining _why_ the test matters for future loops that won't have this context. Run them:
+Create or open `packages/<pkg>/src/<unit>.test.ts`. For every `#### Acceptance Criteria` checkbox (`- [ ]`) in the spec, write at least one corresponding test. Every `describe`/`it` block **must** have a JSDoc `@description` explaining _why_ the test matters for future loops that won't have this context.
+
+Before writing any implementation, explicitly verify coverage: list each spec criterion and confirm a matching test exists. If a criterion cannot be tested at this layer (e.g., it requires UI or integration), note it as a `## Spec Gaps` entry in the spec file.
+
+Run the tests:
 
 ```bash
 cd packages/<pkg> && npx jest --testPathPattern=<unit> --no-coverage
