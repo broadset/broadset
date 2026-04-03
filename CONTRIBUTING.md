@@ -54,13 +54,16 @@ If a requirement is known but not yet fully or automatically validated, record i
 
 Parent `spec.md` files should stay concise. When a domain grows, split it into focused child files under the same domain folder and keep the parent as the index.
 
-### Backpropagate Bugs Into Specs
+### Backpropagate Into Specs
 
-When a bug reveals a missing or unclear requirement:
+Implementation often surfaces insights the original spec didn't anticipate. It is expected and encouraged to update specs during implementation.
+
+When updating a spec:
 
 1. Add or update the requirement in `project/spec/`.
-2. Add or update the validation/tests.
+2. Add or update the corresponding validation/tests.
 3. Remove any related item from `## Spec Gaps` only when it is genuinely covered.
+4. Commit spec changes alongside (or before) the implementation, never after.
 
 ### RFC 2119 Keywords
 

@@ -63,6 +63,16 @@ Use the Explore subagent to check whether the production file already exists in 
 
 Read the spec file linked in the unit entry. Derive acceptance criteria from it.
 
+### Step 3b — Refine the spec (if needed)
+
+During implementation you may discover things the spec didn't anticipate — missing edge cases, ambiguous wording, omitted defaults or constraints. You are **expected** to update the spec when this happens, but only as **additive refinements** — never change the intended behavior.
+
+Allowed: adding acceptance criteria, clarifying ambiguity, noting edge cases, adding default values or valid ranges, adding `## Spec Gaps` entries.
+
+Forbidden: changing existing behavioral requirements, weakening criteria, rewriting specs to match a convenient implementation.
+
+Commit spec refinements alongside the unit implementation.
+
 ### Step 4 — Red phase (tests first)
 
 Create or open `packages/<pkg>/src/<unit>.test.ts`. Write failing tests that cover every acceptance criterion. Every `describe`/`it` block **must** have a JSDoc `@description` explaining _why_ the test matters for future loops that won't have this context. Run them:

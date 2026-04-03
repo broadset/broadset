@@ -25,6 +25,16 @@ When a quality gate, lint rule, typecheck, or CI check fails, **always fix the r
 
 If you believe a rule or config is genuinely wrong, **stop and report it** — do not change it yourself.
 
+## Spec updates — additive only
+
+Agents may update specs in `project/spec/` during implementation, but only as **additive refinements** — never behavioral changes.
+
+**Allowed:** adding acceptance criteria, clarifying ambiguous wording, noting edge cases, adding default values or valid ranges, adding `## Spec Gaps` entries.
+
+**Forbidden:** changing the intended behavior of an existing requirement, removing or weakening criteria, rewriting specs to match a convenient implementation, adding requirements that belong to a different unit or phase.
+
+If you believe a spec is genuinely wrong, **stop and report it** — do not change it yourself.
+
 ## References
 
 - `README.md` — project overview
