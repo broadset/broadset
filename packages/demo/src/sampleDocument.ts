@@ -32,10 +32,6 @@ const DEFAULT_STYLE = { opacity: 1 };
  * No animation bindings — those are added in Phase 3.
  * Runtime validation against fullDocumentSchema is in sampleDocument.test.ts.
  */
-// SVG data URI used as a reliable demo image (no external network dependency)
-const LOGO_DATA_URI =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Crect width='160' height='160' rx='16' fill='%230f3460'/%3E%3Ctext x='80' y='100' text-anchor='middle' font-size='64' font-family='Arial' font-weight='bold' fill='%23e94560'%3EB%3C/text%3E%3C/svg%3E";
-
 export const SAMPLE_DOCUMENT = {
   id: 'sample-doc-001',
   documentMode: 'screen' as const,
@@ -85,7 +81,7 @@ export const SAMPLE_DOCUMENT = {
             fontWeight: '700',
           },
         },
-        // Image — SVG data URI logo
+        // Image — placeholder photo
         {
           id: 'el-logo',
           type: 'image',
@@ -93,7 +89,7 @@ export const SAMPLE_DOCUMENT = {
           width: 160,
           height: 160,
           rotation: 0,
-          content: LOGO_DATA_URI,
+          content: 'https://picsum.photos/160/160',
           parentId: null,
           groupId: null,
           screen: { ...DEFAULT_SCREEN, name: 'Logo' },
@@ -168,13 +164,13 @@ export const SAMPLE_DOCUMENT = {
           screen: { ...DEFAULT_SCREEN, name: 'QR Code' },
           style: DEFAULT_STYLE,
         },
-        // Group with two children
+        // Score group — TV-style lower-third scoreboard
         {
           id: 'el-group-score',
           type: 'group',
-          position: { x: 80, y: 750 },
-          width: 1000,
-          height: 200,
+          position: { x: 80, y: 900 },
+          width: 700,
+          height: 100,
           rotation: 0,
           content: '',
           parentId: null,
@@ -182,22 +178,41 @@ export const SAMPLE_DOCUMENT = {
           screen: { ...DEFAULT_SCREEN, name: 'Score Group' },
           style: DEFAULT_STYLE,
         },
+        // Group child — scoreboard background box
+        {
+          id: 'el-score-bg',
+          type: 'rectangle',
+          position: { x: 0, y: 0 },
+          width: 700,
+          height: 100,
+          rotation: 0,
+          content: '',
+          parentId: 'el-group-score',
+          groupId: 'el-group-score',
+          screen: { ...DEFAULT_SCREEN, name: 'Score Background' },
+          style: {
+            ...DEFAULT_STYLE,
+            backgroundColor: '#1a1a2e',
+            opacity: 0.9,
+            borderRadius: 8,
+          },
+        },
         // Group child — home label
         {
           id: 'el-home-label',
           type: 'text',
-          position: { x: 0, y: 0 },
-          width: 400,
-          height: 100,
+          position: { x: 20, y: 16 },
+          width: 280,
+          height: 68,
           rotation: 0,
-          content: 'HOME',
+          content: '<b>HOME</b>',
           parentId: 'el-group-score',
           groupId: 'el-group-score',
           screen: { ...DEFAULT_SCREEN, name: 'Home Label' },
           style: {
             ...DEFAULT_STYLE,
             fontFamily: 'Arial',
-            fontSize: 48,
+            fontSize: 44,
             fontColor: '#ffffff',
           },
         },
@@ -205,18 +220,18 @@ export const SAMPLE_DOCUMENT = {
         {
           id: 'el-away-label',
           type: 'text',
-          position: { x: 500, y: 0 },
-          width: 400,
-          height: 100,
+          position: { x: 400, y: 16 },
+          width: 280,
+          height: 68,
           rotation: 0,
-          content: 'AWAY',
+          content: '<b>AWAY</b>',
           parentId: 'el-group-score',
           groupId: 'el-group-score',
           screen: { ...DEFAULT_SCREEN, name: 'Away Label' },
           style: {
             ...DEFAULT_STYLE,
             fontFamily: 'Arial',
-            fontSize: 48,
+            fontSize: 44,
             fontColor: '#ffffff',
           },
         },

@@ -27,7 +27,7 @@ test.describe('Demo Shell — mount renderer', () => {
     // Verify data-element-id attributes exist for all sample document elements
     const elements = await component.locator('[data-element-id]').count();
 
-    // Sample document has 13 elements total (10 on page 1 + 3 on page 2, showing page 1)
+    // Sample document has 14 elements total (11 on page 1 + 3 on page 2, showing page 1)
     expect(elements).toBeGreaterThanOrEqual(8);
 
     // Verify specific element types by their data-element-id
@@ -75,9 +75,11 @@ test.describe('Demo Shell — mount renderer', () => {
     await expect(group).toBeVisible();
 
     // Children should be inside the group
+    const scoreBg = group.locator('[data-element-id="el-score-bg"]');
     const homeLabel = group.locator('[data-element-id="el-home-label"]');
     const awayLabel = group.locator('[data-element-id="el-away-label"]');
 
+    await expect(scoreBg).toBeVisible();
     await expect(homeLabel).toBeVisible();
     await expect(awayLabel).toBeVisible();
   });
