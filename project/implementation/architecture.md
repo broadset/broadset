@@ -39,6 +39,8 @@ This document provides the structural and technology context that behavioral spe
 
 ## 3. Package Dependency Graph
 
+The dependencies listed below are the **starting point**, not an exhaustive allowlist. Reliable, widely-used, well-maintained external packages MAY be added when they solve a real problem better than a hand-rolled implementation. The graph below primarily defines the hierarchy of **our own packages** and their key external deps.
+
 ```
 model (foundation — no internal deps)
   ├── zod ^4.3

@@ -150,6 +150,28 @@ Update the session file: increment `units_completed`, reset `no_progress` to 0.
 
 If you discovered a new build command or convention not yet in `AGENTS.md`, add one brief bullet.
 
+### Step 10b — Decision log
+
+If you made a non-trivial judgment call during this unit, append it to `project/implementation/decisions.md`. Examples of decisions worth logging:
+
+- Choosing an external dependency over a custom implementation (or vice versa)
+- Deviating from the spec's suggested approach for a technical reason
+- Picking one data structure or algorithm over alternatives
+- Interpreting an ambiguous spec requirement in a specific way
+- Structuring types or modules differently than the obvious default
+
+Use this format (append, never overwrite existing entries):
+
+```md
+### <Unit N.M> — <short title>
+
+**Decision:** <what you decided>
+**Alternatives considered:** <what you rejected and why>
+**Rationale:** <why this is the right call>
+```
+
+Create the file if it does not exist. Only log decisions that have real trade-offs — do not log routine implementation choices.
+
 ### Step 11 — Continue or stop
 
 Go back to Step 1 and pick the next unchecked unit **in this phase only**. Keep working until the phase is done or you hit a stop condition.
