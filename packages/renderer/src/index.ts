@@ -19,3 +19,9 @@ export { ComponentRegistry } from './component-registry';
 
 // Element renderer
 export { ElementRenderer } from './element-renderer';
+
+// Built-in renderers
+export { registerBuiltInRenderers } from './built-in-renderers';
+
+// Page / document renderer
+export { DocumentRenderer, PageRenderer } from './page-renderer';

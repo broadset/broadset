@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@broadset/model": "^0.1.0",
-    "@broadset/playback": "^0.1.0"
+    "@broadset/playback": "^0.1.0",
+    "qrcode-generator": "^2.0.4"
   }
 }

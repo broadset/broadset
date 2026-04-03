@@ -34,11 +34,11 @@ const DEFAULT_STYLE = { opacity: 1 };
  */
 export const SAMPLE_DOCUMENT = {
   id: 'sample-doc-001',
-  documentMode: 'screen',
+  documentMode: 'screen' as const,
   canvas: {
     width: 508,
     height: 285.75,
-    padding: [0, 0, 0, 0],
+    padding: [0, 0, 0, 0] as const,
   },
   pages: [
     {

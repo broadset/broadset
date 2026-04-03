@@ -15,6 +15,11 @@ export default defineConfig({
   },
   use: {
     ctPort: 3100,
+    ctViteConfig: {
+      resolve: {
+        conditions: ['import', 'module', 'browser', 'default'],
+      },
+    },
   },
   projects: [
     {

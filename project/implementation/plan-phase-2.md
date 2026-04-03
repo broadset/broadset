@@ -25,8 +25,8 @@ capability resolution order (plugin > built-in > all-false); renderer lifecycle
 
 ## 2.2 Sample document fixture
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/demo/data-integration.md` (sample document section)
 _What to cover:_ A hard-coded `BroadsetDocument` exercising all 8 built-in
@@ -54,5 +54,5 @@ _What to cover:_
 | Unit                        | Red | Green |
 | --------------------------- | --- | ----- |
 | 2.1 renderer core           | ☑   | ☑     |
-| 2.2 sample document fixture | ☐   | ☐     |
+| 2.2 sample document fixture | ☑   | ☑     |
 | 2.3 demo shell              | ☐   | ☐     |
