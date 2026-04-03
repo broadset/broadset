@@ -7,6 +7,7 @@ Use it together with the detailed reference docs linked below.
 
 - `project/spec/` defines **what** broadset must do.
 - `project/implementation/` defines **how** the repository is structured and implemented.
+- `project/implementation/architecture.md` defines which packages and external dependencies to use.
 - If behavior changes, update the relevant spec file in `project/spec/` first or alongside the implementation.
 
 ## Working expectations, quality gates, and spec conventions
