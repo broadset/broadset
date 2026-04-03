@@ -1,6 +1,6 @@
 # Architecture Manifest
 
-This document provides the structural and technology context that behavioral specs intentionally omit. Together with the OpenSpec files in `../openspec/`, this manifest gives builders the implementation context needed to reconstruct the broadset project from scratch.
+This document provides the structural and technology context that behavioral specs intentionally omit. Together with the Spec files in `../spec/`, this manifest gives builders the implementation context needed to reconstruct the broadset project from scratch.
 
 **Specs define WHAT the system does. This document defines HOW it is structured.**
 
@@ -306,7 +306,7 @@ broadset/
 ├── spec/
 │   ├── README.md             (spec map)
 │   ├── config.yaml           (domain/test mapping)
-│   ├── openspec/             (behavioral specifications)
+│   ├── spec/             (behavioral specifications)
 │   │   ├── README.md
 │   │   ├── executive-summary.md
 │   │   ├── model/            (model domain specs)
@@ -383,7 +383,7 @@ broadset/
 An agent tasked with rebuilding this project should:
 
 1. **Read this manifest** to understand the technology stack, package boundaries, and build pipeline
-2. **Read `spec/openspec/model/spec.md`** first — the model is the foundation
+2. **Read `project/spec/model/spec.md`** first — the model is the foundation
 3. **Follow the dependency graph** — implement packages in build order: playback → model → formats → renderer → editor → ui → demo
 4. **Use the acceptance criteria** in each spec as the definition of done
 5. **Use `spec/config.yaml`** to understand how domains map to test patterns
@@ -409,7 +409,7 @@ These are the architectural choices that specs intentionally don't prescribe but
 
 ## 12. Coding Conventions
 
-The `.github/instructions/` directory contains project-wide coding conventions that are NOT part of the OpenSpec behavioral specs but govern implementation style:
+The `.github/instructions/` directory contains project-wide coding conventions that are NOT part of the Spec behavioral specs but govern implementation style:
 
 | File                         | Scope                               | Key Rules                                                                                                                                                       |
 | ---------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
