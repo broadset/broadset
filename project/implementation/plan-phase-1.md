@@ -99,8 +99,8 @@ and unquoted, ≥2 decimal places, minimum non-zero dimensions).
 
 ### 1.10 JSON format reference / Zod schema (`model/format-reference.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/model/format-reference.md`
 _What to cover:_ Full Zod schema validating BroadsetDocument; common canvas
@@ -121,7 +121,4 @@ sizes parse correctly; invalid documents are rejected with structured errors.
 | 1.7 EditorConfig         | ✅  | ✅    |
 | 1.8 document invariants  | ✅  | ✅    |
 | 1.9 model utilities      | ✅  | ✅    |
-| 1.7 EditorConfig         | ☐   | ☐     |
-| 1.8 document root        | ☐   | ☐     |
-| 1.9 utilities            | ☐   | ☐     |
-| 1.10 Zod schema          | ☐   | ☐     |
+| 1.10 Zod schema          | ✅  | ✅    |

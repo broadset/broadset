@@ -30,9 +30,9 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 1 — scaffolding complete; implementation not started
-- **In Progress:** —
-- **Last Merged:** —
+- **Active Phase:** Phase 2 — Renderer (static) + Demo shell
+- **In Progress:** 2.1 Renderer core
+- **Last Merged:** 1.10 JSON format reference / Zod schema
 
 ---
 
