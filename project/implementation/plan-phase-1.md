@@ -50,8 +50,8 @@ false; profile shape is complete (no missing keys).
 
 ### 1.5 Change stream types (`model/changes.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/model/changes.md`
 _What to cover:_ All 8 discriminated union variants; each carries required
@@ -116,7 +116,7 @@ sizes parse correctly; invalid documents are rejected with structured errors.
 | 1.2 style properties     | ✅  | ✅    |
 | 1.3 screen properties    | ✅  | ✅    |
 | 1.4 capability flags     | ✅  | ✅    |
-| 1.5 change stream types  | ☐   | ☐     |
+| 1.5 change stream types  | ✅  | ✅    |
 | 1.6 animation structures | ☐   | ☐     |
 | 1.7 EditorConfig         | ☐   | ☐     |
 | 1.8 document root        | ☐   | ☐     |
