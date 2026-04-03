@@ -12,8 +12,8 @@ controls. No animations. Just pixels on screen proving the renderer works.
 
 ## 2.1 Renderer core (`renderer/spec.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/renderer/spec.md`
 _What to cover:_ All 4 data-attribute contracts (`data-element-id`,
@@ -53,6 +53,6 @@ _What to cover:_
 
 | Unit                        | Red | Green |
 | --------------------------- | --- | ----- |
-| 2.1 renderer core           | ☐   | ☐     |
+| 2.1 renderer core           | ☑   | ☑     |
 | 2.2 sample document fixture | ☐   | ☐     |
 | 2.3 demo shell              | ☐   | ☐     |
