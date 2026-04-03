@@ -1,6 +1,5 @@
-import { describe, expect, it } from '@jest/globals';
-
 import type { Keyframe, Timeline } from '@broadset/model';
+import { describe, expect, it } from '@jest/globals';
 
 import { computeElementTimelines, computeTimelineDuration, computeTimelineFrame } from './timeline';
 
@@ -36,6 +35,7 @@ describe('computeTimelineDuration', () => {
    */
   it('returns 0 for an empty timeline', () => {
     const tl = makeTimeline({ entries: [] });
+
     expect(computeTimelineDuration(tl)).toBe(0);
   });
 
@@ -47,6 +47,7 @@ describe('computeTimelineDuration', () => {
     const tl = makeTimeline({
       entries: [makeKeyframe({ offsetMs: 0 }), makeKeyframe({ offsetMs: 500 }), makeKeyframe({ offsetMs: 1000 })],
     });
+
     expect(computeTimelineDuration(tl)).toBe(1300);
   });
 
@@ -97,6 +98,7 @@ describe('computeTimelineFrame', () => {
     });
 
     const frame = computeTimelineFrame(tl, 500);
+
     expect(frame.properties['opacity']).toBe(0.5);
   });
 
@@ -119,6 +121,7 @@ describe('computeTimelineFrame', () => {
     });
 
     const frame = computeTimelineFrame(tl, 250);
+
     expect(frame.properties['visibility']).toBe('hidden');
   });
 
@@ -137,6 +140,7 @@ describe('computeTimelineFrame', () => {
     });
 
     const frame = computeTimelineFrame(tl, 0);
+
     expect(Object.keys(frame.properties)).toHaveLength(0);
   });
 
@@ -159,6 +163,7 @@ describe('computeTimelineFrame', () => {
     });
 
     const frame = computeTimelineFrame(tl, 5000);
+
     expect(frame.properties['opacity']).toBe(1);
   });
 });
@@ -182,6 +187,7 @@ describe('computeTimelineFrame — action state', () => {
     });
 
     const frame = computeTimelineFrame(tl, 250);
+
     expect(frame.activeState).toBe('IN');
   });
 
@@ -200,10 +206,12 @@ describe('computeTimelineFrame — action state', () => {
     });
 
     const at300 = computeTimelineFrame(tl, 300);
+
     expect(at300.modifiers).toContain('pulse');
     expect(at300.modifiers).toContain('glow');
 
     const at600 = computeTimelineFrame(tl, 600);
+
     expect(at600.modifiers).not.toContain('pulse');
     expect(at600.modifiers).toContain('glow');
   });
@@ -227,6 +235,7 @@ describe('computeTimelineFrame — action state', () => {
     // Then backward to 200ms — must match a fresh computation at 200ms
     const backward = computeTimelineFrame(tl, 200);
     const fresh = computeTimelineFrame(tl, 200);
+
     expect(backward.activeState).toBe(fresh.activeState);
     expect(backward.activeState).toBe('A');
   });
@@ -244,9 +253,11 @@ describe('computeTimelineFrame — action state', () => {
     });
 
     const at250 = computeTimelineFrame(tl, 250);
+
     expect(at250.activeState).toBe('A');
 
     const at600 = computeTimelineFrame(tl, 600);
+
     expect(at600.activeState).toBe('B');
   });
 });
@@ -282,6 +293,7 @@ describe('computeTimelineFrame — child timelines', () => {
     });
 
     const frame = computeTimelineFrame(parent, 400);
+
     expect(frame.childFrames['el-child']).toBeUndefined();
   });
 
@@ -312,6 +324,7 @@ describe('computeTimelineFrame — child timelines', () => {
 
     const frame = computeTimelineFrame(parent, 600);
     const childFrame = frame.childFrames['el-child'];
+
     expect(childFrame).toBeDefined();
     expect(childFrame?.properties['x']).toBe(10);
   });
@@ -343,6 +356,7 @@ describe('computeTimelineFrame — child timelines', () => {
 
     const frame = computeTimelineFrame(parent, 700);
     const childFrame = frame.childFrames['el-child'];
+
     expect(childFrame?.properties['opacity']).toBe(0.5);
   });
 });
@@ -373,6 +387,7 @@ describe('computeTimelineFrame — target routing', () => {
     });
 
     const frame = computeTimelineFrame(tl, 500);
+
     expect(frame.targetProperties['other-el']?.['opacity']).toBe(0.5);
     expect(frame.properties['opacity']).toBeUndefined();
   });
@@ -389,6 +404,7 @@ describe('computeElementTimelines', () => {
    */
   it('returns empty array for missing element ID', () => {
     const result = computeElementTimelines([], 'nonexistent', 0);
+
     expect(result).toEqual([]);
   });
 
@@ -438,6 +454,7 @@ describe('computeElementTimelines', () => {
     ];
 
     const result = computeElementTimelines(registry, 'el-1', 250);
+
     expect(result).toHaveLength(2);
     expect(result[0]?.properties['opacity']).toBe(0.5);
     expect(result[1]?.properties['x']).toBe(50);

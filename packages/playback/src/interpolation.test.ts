@@ -2,10 +2,10 @@ import { describe, expect, it } from '@jest/globals';
 
 import {
   applyEasing,
-  interpolateValue,
   interpolateColor,
-  interpolatePath,
   interpolateKeyframeProperties,
+  interpolatePath,
+  interpolateValue,
 } from './interpolation';
 
 // ---------------------------------------------------------------------------
@@ -106,6 +106,7 @@ describe('applyEasing', () => {
      */
     it('returns approximately 0.5 at t=0.5', () => {
       const result = applyEasing('ease-in-out', 0.5);
+
       expect(result).toBeGreaterThan(0.3);
       expect(result).toBeLessThan(0.7);
     });
@@ -129,6 +130,7 @@ describe('applyEasing', () => {
      */
     it('cubic-bezier(0.42,0,1,1) returns less than 0.5 at t=0.5', () => {
       const result = applyEasing('cubic-bezier(0.42,0,1,1)', 0.5);
+
       expect(result).toBeLessThan(0.5);
     });
 
@@ -257,6 +259,7 @@ describe('interpolateValue', () => {
     it('holds from-value for objects until t=1', () => {
       const from = { a: 1 };
       const to = { a: 2 };
+
       expect(interpolateValue(from, to, 0.5)).toEqual(from);
       expect(interpolateValue(from, to, 1)).toEqual(to);
     });
@@ -283,10 +286,13 @@ describe('interpolateColor', () => {
    */
   it('interpolates alpha channel linearly', () => {
     const result = interpolateColor('#ff000000', '#ff0000ff', 0.5);
+
     // Result should be 8-digit hex with partial alpha
     expect(result).toMatch(/^#[0-9a-f]{8}$/);
+
     // Alpha channel is last two digits; midpoint of 00 and ff ≈ 80
     const alpha = parseInt(result.slice(7, 9), 16);
+
     expect(alpha).toBeGreaterThan(0x60);
     expect(alpha).toBeLessThan(0xa0);
   });
@@ -297,6 +303,7 @@ describe('interpolateColor', () => {
    */
   it('produces valid hex with no NaN for saturated colors', () => {
     const result = interpolateColor('#ff0000', '#0000ff', 0.5);
+
     expect(result).toMatch(/^#[0-9a-f]{6}$/);
     expect(result).not.toContain('NaN');
   });
@@ -306,6 +313,7 @@ describe('interpolateColor', () => {
    */
   it('handles 3-digit hex shorthand', () => {
     const result = interpolateColor('#f00', '#00f', 0.5);
+
     expect(result).toMatch(/^#[0-9a-f]{6}$/);
   });
 
@@ -314,6 +322,7 @@ describe('interpolateColor', () => {
    */
   it('handles 4-digit hex shorthand with alpha', () => {
     const result = interpolateColor('#f000', '#f00f', 0.5);
+
     expect(result).toMatch(/^#[0-9a-f]{8}$/);
   });
 
@@ -337,6 +346,7 @@ describe('interpolateColor', () => {
    */
   it('produces valid hex for two valid hex inputs', () => {
     const result = interpolateColor('#ff0000', '#0000ff', 0.5);
+
     expect(result).toMatch(/^#[0-9a-f]{6}$/);
   });
 });
@@ -355,6 +365,7 @@ describe('interpolatePath', () => {
     const fromCoords = [0, 0, 100, 0, 50, 100];
     const toCoords = [10, 10, 110, 10, 60, 110];
     const result = interpolatePath(commands, fromCoords, toCoords, 0.5);
+
     expect(result).toBe('M 5 5 L 105 5 L 55 105 Z');
   });
 
@@ -367,6 +378,7 @@ describe('interpolatePath', () => {
     const fromCoords = [0, 0, 100, 0];
     const toCoords = [1, 1, 101, 1];
     const result = interpolatePath(commands, fromCoords, toCoords, 0.333);
+
     // 0 + (1-0)*0.333 = 0.333 → 0.33
     expect(result).toContain('0.33');
   });
@@ -379,6 +391,7 @@ describe('interpolatePath', () => {
     const commands = ['M', 'L', 'Z'];
     const fromCoords = [0, 0, 100, 0];
     const toCoords = [0, 0];
+
     expect(() => interpolatePath(commands, fromCoords, toCoords, 0.5)).toThrow();
   });
 
@@ -390,6 +403,7 @@ describe('interpolatePath', () => {
     const fromCoords = [10, 20, 30, 40];
     const toCoords = [50, 60, 70, 80];
     const result = interpolatePath(commands, fromCoords, toCoords, 0);
+
     expect(result).toBe('M 10 20 L 30 40 Z');
   });
 
@@ -401,6 +415,7 @@ describe('interpolatePath', () => {
     const fromCoords = [10, 20, 30, 40];
     const toCoords = [50, 60, 70, 80];
     const result = interpolatePath(commands, fromCoords, toCoords, 1);
+
     expect(result).toBe('M 50 60 L 70 80 Z');
   });
 });
@@ -425,6 +440,7 @@ describe('interpolateKeyframeProperties', () => {
       translateX: { value: 100, interpolation: 'linear' },
     };
     const result = interpolateKeyframeProperties(fromProps, toProps, 0.5);
+
     expect(result['opacity']).toBe(0.5);
     expect(result['translateX'] as number).toBeLessThan(50);
   });
@@ -442,6 +458,7 @@ describe('interpolateKeyframeProperties', () => {
       opacity: { value: 1, interpolation: 'linear' },
     };
     const result = interpolateKeyframeProperties(fromProps, toProps, 0.5);
+
     expect(result['extra']).toBe(42);
     expect(result['opacity']).toBe(0.9);
   });
@@ -460,6 +477,7 @@ describe('interpolateKeyframeProperties', () => {
       pathCoordinates: { value: [10, 10, 110, 10], interpolation: 'linear' },
     };
     const result = interpolateKeyframeProperties(fromProps, toProps, 0.5);
+
     expect(typeof result['d']).toBe('string');
     expect(result['d']).toContain('M');
   });

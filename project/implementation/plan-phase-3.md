@@ -24,8 +24,8 @@ contract.
 
 ## 3.2 Timeline computation (`playback/timeline.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/playback/timeline.md`
 _What to cover:_ Duration (max offset + 300ms, empty = 0, child timelines
