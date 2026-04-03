@@ -41,8 +41,8 @@ types, 3D transform fields, clipChildren default.
 
 ### 1.4 Capability flags (`model/capabilities.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/model/capabilities.md`
 _What to cover:_ 10 boolean flags for each built-in type; unknown type → all
@@ -115,7 +115,7 @@ sizes parse correctly; invalid documents are rejected with structured errors.
 | 1.1 element vocabulary   | ✅  | ✅    |
 | 1.2 style properties     | ✅  | ✅    |
 | 1.3 screen properties    | ✅  | ✅    |
-| 1.4 capability flags     | ☐   | ☐     |
+| 1.4 capability flags     | ✅  | ✅    |
 | 1.5 change stream types  | ☐   | ☐     |
 | 1.6 animation structures | ☐   | ☐     |
 | 1.7 EditorConfig         | ☐   | ☐     |
