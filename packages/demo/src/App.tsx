@@ -1,10 +1,10 @@
 import type { EditorDocument, EditorPage, EditorStore } from '@broadset/editor';
 import { createEditorStore } from '@broadset/editor';
-import type { BroadsetDocument, BroadsetElement, PageElement } from '@broadset/model';
+import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle, PageElement } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { DocumentRenderer } from '@broadset/renderer';
-import type { ElementTypeInfo } from '@broadset/ui';
-import { ElementLibrary, PageSorter } from '@broadset/ui';
+import type { ElementTypeInfo, LayerInfo, PanelElement } from '@broadset/ui';
+import { ElementLibrary, LayersSidebar, PageSorter, PropertiesSidebar } from '@broadset/ui';
 import type { JSX, MouseEvent } from 'react';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
@@ -87,6 +87,35 @@ function toRendererDoc(doc: EditorDocument): BroadsetDocument {
   };
 }
 
+function elementToPanelElement(el: BroadsetElement): PanelElement {
+  return {
+    id: el.id,
+    type: el.type,
+    name: el.content || el.id,
+    x: el.position.x,
+    y: el.position.y,
+    width: el.width,
+    height: el.height,
+    rotation: el.rotation,
+    backgroundColor: el.style.backgroundColor ?? '',
+    borderWidth: el.style.borderWidth ?? 0,
+    borderColor: el.style.borderColor ?? '',
+    borderStyle: el.style.borderStyle ?? 'none',
+    borderRadius: typeof el.style.borderRadius === 'number' ? el.style.borderRadius : 0,
+    opacity: el.style.opacity,
+    blendMode: el.style.mixBlendMode ?? 'normal',
+  };
+}
+
+function elementsToLayers(elements: readonly BroadsetElement[]): readonly LayerInfo[] {
+  return elements.map((el) => ({
+    id: el.id,
+    name: el.content || el.id,
+    locked: false,
+    visible: true,
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // App component
 // ---------------------------------------------------------------------------
@@ -106,6 +135,10 @@ export default function App(): JSX.Element {
   const editorDoc = useSyncExternalStore(store.subscribe, () => store.getState().document);
 
   const activePageIndex = useSyncExternalStore(store.subscribe, () => store.getState().activePageIndex);
+
+  const activeElementIds = useSyncExternalStore(store.subscribe, () => store.getState().activeElementIds);
+
+  const documentMode = useSyncExternalStore(store.subscribe, () => store.getState().documentMode);
 
   // --- Refs ---
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -271,6 +304,72 @@ export default function App(): JSX.Element {
     [store],
   );
 
+  // --- Properties sidebar handlers ---
+
+  const handlePropertyUpdate = useCallback(
+    (key: string, value: string | number): void => {
+      const state = store.getState();
+      const elementId = state.activeElementIds[0];
+
+      if (elementId === undefined) return;
+
+      // Geometry fields route through commitElementUpdate
+      const geometryKeys = ['x', 'y', 'width', 'height', 'rotation'];
+
+      if (geometryKeys.includes(key)) {
+        const numValue = typeof value === 'number' ? value : parseFloat(value);
+
+        if (key === 'x' || key === 'y') {
+          const currentEl = state.document.pages[state.activePageIndex]?.elements.find((el) => el.id === elementId);
+
+          if (currentEl === undefined) return;
+
+          state.commitElementUpdate(elementId, {
+            position: {
+              ...currentEl.position,
+              [key]: numValue,
+            },
+          });
+        } else {
+          state.commitElementUpdate(elementId, { [key]: numValue });
+        }
+      } else {
+        // Style fields
+        const styleKey = key === 'blendMode' ? 'mixBlendMode' : key;
+
+        state.updateElementStyle(elementId, { [styleKey]: value } as Partial<BroadsetElementStyle>);
+      }
+    },
+    [store],
+  );
+
+  const handleLayerSelect = useCallback(
+    (id: string): void => {
+      store.getState().selectElement(id);
+    },
+    [store],
+  );
+
+  const handleLayerToggleLock = useCallback((_id: string): void => {
+    // Lock toggle will be implemented in later phases
+  }, []);
+
+  const handleLayerDelete = useCallback(
+    (id: string): void => {
+      store.getState().removeElement(id);
+    },
+    [store],
+  );
+
+  // --- Derived data ---
+
+  const activePage = editorDoc.pages[activePageIndex];
+  const activeElements = activePage?.elements ?? [];
+  const firstActiveId = activeElementIds[0];
+  const selectedElement =
+    firstActiveId !== undefined ? activeElements.find((el) => el.id === firstActiveId) : undefined;
+  const panelElement = selectedElement !== undefined ? elementToPanelElement(selectedElement) : undefined;
+  const layers = elementsToLayers(activeElements);
   const pages = editorDoc.pages.map((p) => ({ id: p.id }));
 
   return (
@@ -296,18 +395,54 @@ export default function App(): JSX.Element {
         <ElementLibrary elementTypes={ELEMENT_TYPES} onSelect={handleElementTypeSelect} />
       </div>
 
-      {/* Canvas Area */}
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
-        <div ref={canvasRef} onClick={handleCanvasClick} style={{ transformOrigin: 'center center' }} />
+      {/* Main area: canvas + sidebar */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* Layers sidebar */}
+        <div
+          style={{
+            width: 180,
+            flexShrink: 0,
+            borderRight: '1px solid #ccc',
+            overflowY: 'auto',
+            padding: 4,
+          }}
+        >
+          <LayersSidebar
+            layers={layers}
+            onSelect={handleLayerSelect}
+            onToggleLock={handleLayerToggleLock}
+            onDelete={handleLayerDelete}
+          />
+        </div>
+
+        {/* Canvas Area */}
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <div ref={canvasRef} onClick={handleCanvasClick} style={{ transformOrigin: 'center center' }} />
+        </div>
+
+        {/* Properties sidebar */}
+        {panelElement !== undefined ?
+          <div
+            style={{
+              width: 260,
+              flexShrink: 0,
+              borderLeft: '1px solid #ccc',
+              overflowY: 'auto',
+              padding: 8,
+            }}
+          >
+            <PropertiesSidebar element={panelElement} documentMode={documentMode} onUpdate={handlePropertyUpdate} />
+          </div>
+        : null}
       </div>
 
       {/* Bottom Controls */}

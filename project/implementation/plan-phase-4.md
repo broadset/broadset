@@ -37,8 +37,8 @@ _UI specs:_ `ui/utilities.md` (CSS parsers), `ui/inputs.md` (input components),
 - [x] tests: red — ui/utilities
 - [x] tests: red — ui/inputs
 - [x] tests: red — ui/panels (properties sidebar)
-- [ ] impl: green — all
-- [ ] demo milestone: select an element → drag it, resize via handles, rotate;
+- [x] impl: green — all
+- [x] demo milestone: select an element → drag it, resize via handles, rotate;
       properties sidebar shows style fields; changing color/opacity updates the canvas
 
 ## Feature Group 4-C: Undo/redo, page management, canvas
