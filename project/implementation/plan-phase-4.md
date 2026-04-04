@@ -143,9 +143,9 @@ _UI specs:_ `ui/modals.md`
 _Editor specs:_ `editor/data-store.md`, `editor/react-data-integration.md`
 _Demo:_ `demo/data-integration.md` (live data section)
 
-- [ ] tests: red — editor/data-store
-- [ ] tests: red — editor/react-data-integration
-- [ ] impl: green — all
+- [x] tests: red — editor/data-store
+- [x] tests: red — editor/react-data-integration
+- [x] impl: green — all
 - [ ] demo milestone: live data placeholders (scores, clock, ticker) update on
       a timer and are reflected in the rendered output without a full re-render of
       the canvas; EditorProvider error boundary shows fallback on deliberate throw

@@ -128,4 +128,19 @@ describe('Sample Document Fixture', () => {
 
     expect(hasTransform).toBe(true);
   });
+
+  /**
+   * @description The sample document must include elements intended for live data
+   * binding (scores, clock, ticker) so the data store can inject runtime values.
+   */
+  it('includes elements bound to live data keys', () => {
+    const allElements = SAMPLE_DOCUMENT.pages.flatMap((p) => p.elements);
+    const ids = new Set(allElements.map((el) => el.id));
+
+    // These IDs must match the useMockLiveData hook
+    expect(ids.has('el-home-score')).toBe(true);
+    expect(ids.has('el-away-score')).toBe(true);
+    expect(ids.has('el-clock')).toBe(true);
+    expect(ids.has('el-ticker')).toBe(true);
+  });
 });

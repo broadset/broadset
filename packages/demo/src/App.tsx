@@ -1,8 +1,10 @@
 import type { EditingMode, EditorStore } from '@broadset/editor';
 import {
   appendPathPoint,
+  BroadsetDataStoreProvider,
   cancelPlacement,
   createEditorStore,
+  EditorErrorBoundary,
   handleShortcutAction,
   matchShortcut,
   resolveShortcuts,
@@ -62,6 +64,7 @@ import {
   SIDEBAR_ICON_MAP,
   ToolbarButton,
 } from './toolbar-helpers';
+import { useMockLiveData } from './useMockLiveData';
 
 // ---------------------------------------------------------------------------
 // Modal name type
@@ -99,6 +102,9 @@ export default function App(): JSX.Element {
   }
 
   const store = storeRef.current;
+
+  // --- Live data store (scores, clock, ticker) ---
+  const dataStore = useMockLiveData();
 
   // --- Subscribe to store state ---
   const editorDoc = useSyncExternalStore(store.subscribe, () => store.getState().document);
@@ -195,6 +201,29 @@ export default function App(): JSX.Element {
       rendererRef.current = null;
     };
   }, [editorDoc, activePageIndex]);
+
+  // --- Push data store values into rendered DOM elements ---
+  useEffect(() => {
+    const host = canvasRef.current;
+
+    if (host === null) return;
+
+    const unsubscribe = dataStore.subscribe((state) => {
+      for (const [elementId, data] of Object.entries(state.elements)) {
+        const textValue = data['text'];
+
+        if (typeof textValue !== 'string') continue;
+
+        const contentNode = host.querySelector(`[data-element-id="${CSS.escape(elementId)}"] [data-element-content]`);
+
+        if (contentNode !== null) {
+          contentNode.textContent = textValue;
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [dataStore]);
 
   // --- Keyboard shortcut handler ---
   useEffect(() => {
@@ -507,448 +536,456 @@ export default function App(): JSX.Element {
     : undefined;
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden">
-      {/* ---- Canvas area (fills entire viewport) ---- */}
-      <div className="absolute inset-0" onWheel={handleWheel} onContextMenu={handleContextMenu}>
-        <div className="flex h-full w-full items-center justify-center">
-          <div
-            style={{
-              position: 'relative',
-              transform: `scale(${String(canvasSettings.zoom)})`,
-              transformOrigin: 'center center',
-            }}
-          >
-            <div ref={canvasRef} onClick={handleCanvasClick} />
+    <EditorErrorBoundary>
+      <BroadsetDataStoreProvider store={dataStore}>
+        <div className="relative h-screen w-screen overflow-hidden">
+          {/* ---- Canvas area (fills entire viewport) ---- */}
+          <div className="absolute inset-0" onWheel={handleWheel} onContextMenu={handleContextMenu}>
+            <div className="flex h-full w-full items-center justify-center">
+              <div
+                style={{
+                  position: 'relative',
+                  transform: `scale(${String(canvasSettings.zoom)})`,
+                  transformOrigin: 'center center',
+                }}
+              >
+                <div ref={canvasRef} onClick={handleCanvasClick} />
 
-            <CanvasOverlays
-              showGrid={gridSettings.showGrid}
-              gridSize={gridSettings.gridSize}
-              canvasWidth={editorDoc.canvas.width}
-              canvasHeight={editorDoc.canvas.height}
-              padding={editorDoc.canvas.padding}
-              viewMode={canvasSettings.viewMode}
+                <CanvasOverlays
+                  showGrid={gridSettings.showGrid}
+                  gridSize={gridSettings.gridSize}
+                  canvasWidth={editorDoc.canvas.width}
+                  canvasHeight={editorDoc.canvas.height}
+                  padding={editorDoc.canvas.padding}
+                  viewMode={canvasSettings.viewMode}
+                />
+
+                {/* Selection overlay — highlight borders for active elements */}
+                {activeElements
+                  .filter((el) => activeElementIds.includes(el.id))
+                  .map((el) => (
+                    <div
+                      key={`sel-${el.id}`}
+                      style={{
+                        position: 'absolute',
+                        left: el.position.x,
+                        top: el.position.y,
+                        width: el.width,
+                        height: el.height,
+                        transform: el.rotation !== 0 ? `rotate(${String(el.rotation)}deg)` : undefined,
+                        outline: '2px solid #006FEE',
+                        outlineOffset: '1px',
+                        pointerEvents: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ---- Placement mode banner (top-center) ---- */}
+          {editingMode.type === 'placement' ?
+            <div className="toolbar-glass absolute top-3 left-1/2 z-[8001] flex -translate-x-1/2 items-center gap-3 rounded-lg px-4 py-2 text-sm">
+              <span>
+                Placement mode: click on the canvas to place <strong>{editingMode.elementType}</strong>
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onPress={() => {
+                  cancelPlacement(store);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          : null}
+
+          {/* ---- Path mode indicator (top-center) ---- */}
+          {editingMode.type === 'path-editing' || editingMode.type === 'path-drawing' ?
+            <div
+              data-testid="path-mode-indicator"
+              className={`absolute top-3 left-1/2 z-[8001] -translate-x-1/2 rounded-lg px-4 py-2 text-xs font-semibold text-white ${
+                editingMode.type === 'path-drawing' ? 'bg-primary' : 'bg-warning'
+              }`}
+            >
+              {editingMode.type === 'path-drawing' ? 'Drawing Path' : 'Editing Path'}
+            </div>
+          : null}
+
+          {/* ---- Floating main toolbar (top-left) ---- */}
+          <div
+            role="toolbar"
+            aria-label="Main toolbar"
+            className="toolbar-glass absolute top-[28px] left-[28px] z-[8000] flex items-center gap-1 rounded-lg p-1.5"
+          >
+            {/* Document actions */}
+            <ToolbarButton
+              icon={FilePlus}
+              label="New Document"
+              onPress={() => {
+                setActiveModal('newDocument');
+              }}
+            />
+            <ToolbarButton
+              icon={Save}
+              label="Save"
+              onPress={() => {
+                console.log('Save triggered');
+              }}
+            />
+            <ToolbarButton
+              icon={Upload}
+              label="Import"
+              onPress={() => {
+                console.log('Import triggered');
+              }}
+            />
+            <ToolbarButton
+              icon={Download}
+              label="Export"
+              onPress={() => {
+                setActiveModal('export');
+              }}
+            />
+            <ToolbarButton
+              icon={Image}
+              label="Media Library"
+              onPress={() => {
+                setActiveModal('mediaLibrary');
+              }}
             />
 
-            {/* Selection overlay — highlight borders for active elements */}
-            {activeElements
-              .filter((el) => activeElementIds.includes(el.id))
-              .map((el) => (
-                <div
-                  key={`sel-${el.id}`}
-                  style={{
-                    position: 'absolute',
-                    left: el.position.x,
-                    top: el.position.y,
-                    width: el.width,
-                    height: el.height,
-                    transform: el.rotation !== 0 ? `rotate(${String(el.rotation)}deg)` : undefined,
-                    outline: '2px solid #006FEE',
-                    outlineOffset: '1px',
-                    pointerEvents: 'none',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              ))}
-          </div>
-        </div>
-      </div>
+            <div className="mx-1 h-5 w-px bg-divider" />
 
-      {/* ---- Placement mode banner (top-center) ---- */}
-      {editingMode.type === 'placement' ?
-        <div className="toolbar-glass absolute top-3 left-1/2 z-[8001] flex -translate-x-1/2 items-center gap-3 rounded-lg px-4 py-2 text-sm">
-          <span>
-            Placement mode: click on the canvas to place <strong>{editingMode.elementType}</strong>
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            onPress={() => {
-              cancelPlacement(store);
-            }}
-          >
-            Cancel
-          </Button>
-        </div>
-      : null}
+            {/* Edit actions */}
+            <ToolbarButton icon={Undo2} label="Undo" onPress={handleUndo} data-testid="undo-button" />
+            <ToolbarButton icon={Redo2} label="Redo" onPress={handleRedo} data-testid="redo-button" />
 
-      {/* ---- Path mode indicator (top-center) ---- */}
-      {editingMode.type === 'path-editing' || editingMode.type === 'path-drawing' ?
-        <div
-          data-testid="path-mode-indicator"
-          className={`absolute top-3 left-1/2 z-[8001] -translate-x-1/2 rounded-lg px-4 py-2 text-xs font-semibold text-white ${
-            editingMode.type === 'path-drawing' ? 'bg-primary' : 'bg-warning'
-          }`}
-        >
-          {editingMode.type === 'path-drawing' ? 'Drawing Path' : 'Editing Path'}
-        </div>
-      : null}
+            <div className="mx-1 h-5 w-px bg-divider" />
 
-      {/* ---- Floating main toolbar (top-left) ---- */}
-      <div
-        role="toolbar"
-        aria-label="Main toolbar"
-        className="toolbar-glass absolute top-[28px] left-[28px] z-[8000] flex items-center gap-1 rounded-lg p-1.5"
-      >
-        {/* Document actions */}
-        <ToolbarButton
-          icon={FilePlus}
-          label="New Document"
-          onPress={() => {
-            setActiveModal('newDocument');
-          }}
-        />
-        <ToolbarButton
-          icon={Save}
-          label="Save"
-          onPress={() => {
-            console.log('Save triggered');
-          }}
-        />
-        <ToolbarButton
-          icon={Upload}
-          label="Import"
-          onPress={() => {
-            console.log('Import triggered');
-          }}
-        />
-        <ToolbarButton
-          icon={Download}
-          label="Export"
-          onPress={() => {
-            setActiveModal('export');
-          }}
-        />
-        <ToolbarButton
-          icon={Image}
-          label="Media Library"
-          onPress={() => {
-            setActiveModal('mediaLibrary');
-          }}
-        />
+            {/* View actions */}
+            <ToolbarButton
+              icon={Grid3x3}
+              label={gridSettings.showGrid ? 'Hide Grid' : 'Show Grid'}
+              onPress={handleToggleGrid}
+              data-testid="grid-toggle"
+            />
+            <ToolbarButton
+              icon={Settings}
+              label="Canvas Settings"
+              onPress={() => {
+                setActiveModal('canvasSettings');
+              }}
+            />
 
-        <div className="mx-1 h-5 w-px bg-divider" />
+            <div className="mx-1 h-5 w-px bg-divider" />
 
-        {/* Edit actions */}
-        <ToolbarButton icon={Undo2} label="Undo" onPress={handleUndo} data-testid="undo-button" />
-        <ToolbarButton icon={Redo2} label="Redo" onPress={handleRedo} data-testid="redo-button" />
+            {/* Playback actions */}
+            <ToolbarButton
+              icon={isPlaying ? Pause : Play}
+              label={isPlaying ? 'Pause' : 'Play'}
+              onPress={handlePlayPause}
+              data-testid="play-button"
+              data-playing={String(isPlaying)}
+            />
+            <ToolbarButton icon={RotateCcw} label="Reset" onPress={handleReset} data-testid="reset-button" />
 
-        <div className="mx-1 h-5 w-px bg-divider" />
+            <div className="mx-1 h-5 w-px bg-divider" />
 
-        {/* View actions */}
-        <ToolbarButton
-          icon={Grid3x3}
-          label={gridSettings.showGrid ? 'Hide Grid' : 'Show Grid'}
-          onPress={handleToggleGrid}
-          data-testid="grid-toggle"
-        />
-        <ToolbarButton
-          icon={Settings}
-          label="Canvas Settings"
-          onPress={() => {
-            setActiveModal('canvasSettings');
-          }}
-        />
+            {/* Utilities */}
+            <ToolbarButton
+              icon={Bug}
+              label="Debug Snapshot"
+              onPress={() => {
+                console.log('Debug snapshot downloaded');
+              }}
+            />
+            <ToolbarButton
+              icon={Keyboard}
+              label="Keyboard Shortcuts"
+              onPress={() => {
+                setActiveModal('shortcutHelp');
+              }}
+            />
+            <ToolbarButton
+              icon={Info}
+              label="About"
+              onPress={() => {
+                setActiveModal('about');
+              }}
+            />
 
-        <div className="mx-1 h-5 w-px bg-divider" />
-
-        {/* Playback actions */}
-        <ToolbarButton
-          icon={isPlaying ? Pause : Play}
-          label={isPlaying ? 'Pause' : 'Play'}
-          onPress={handlePlayPause}
-          data-testid="play-button"
-          data-playing={String(isPlaying)}
-        />
-        <ToolbarButton icon={RotateCcw} label="Reset" onPress={handleReset} data-testid="reset-button" />
-
-        <div className="mx-1 h-5 w-px bg-divider" />
-
-        {/* Utilities */}
-        <ToolbarButton
-          icon={Bug}
-          label="Debug Snapshot"
-          onPress={() => {
-            console.log('Debug snapshot downloaded');
-          }}
-        />
-        <ToolbarButton
-          icon={Keyboard}
-          label="Keyboard Shortcuts"
-          onPress={() => {
-            setActiveModal('shortcutHelp');
-          }}
-        />
-        <ToolbarButton
-          icon={Info}
-          label="About"
-          onPress={() => {
-            setActiveModal('about');
-          }}
-        />
-
-        <span className="ml-1 flex items-center text-xs text-default-500">
-          {Math.round(canvasSettings.zoom * 100)}%
-        </span>
-      </div>
-
-      {/* ---- Vertical element toolbar (below main toolbar) ---- */}
-      <div className="toolbar-glass absolute top-[80px] left-[28px] z-[8000] rounded-lg p-1.5">
-        <div role="toolbar" aria-label="Element library" className="flex flex-col gap-0.5">
-          {ELEMENT_TYPES.map((info) => {
-            const Icon = ELEMENT_ICON_MAP[info.type] ?? ELEMENT_FALLBACK_ICON;
-
-            return (
-              <Tooltip key={info.type}>
-                <Tooltip.Trigger>
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="ghost"
-                    aria-label={info.label}
-                    onPress={() => {
-                      handleElementTypeSelect(info.type);
-                    }}
-                  >
-                    <Icon size={16} />
-                  </Button>
-                </Tooltip.Trigger>
-                <Tooltip.Content>{info.label}</Tooltip.Content>
-              </Tooltip>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ---- Right-side tabbed drawer ---- */}
-      {sidebarTab !== null ?
-        <div
-          className="toolbar-glass absolute top-0 right-0 z-[8000] flex h-full flex-col overflow-hidden"
-          style={{ width: sidebarWidth }}
-        >
-          {/* Resize handle */}
-          <div
-            className="absolute top-0 left-0 z-10 h-full w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary/50"
-            onMouseDown={handleSidebarResizeStart}
-          />
-
-          {/* Tabs */}
-          <div className="shrink-0 border-b border-divider px-2 pt-2">
-            <Tabs selectedKey={sidebarTab} onSelectionChange={handleSidebarTabChange}>
-              <Tabs.List>
-                <Tabs.Tab id="layers">Layers</Tabs.Tab>
-                <Tabs.Tab id="properties">Properties</Tabs.Tab>
-                <Tabs.Tab id="animation">Animation</Tabs.Tab>
-                <Tabs.Tab id="preflight">Preflight</Tabs.Tab>
-              </Tabs.List>
-            </Tabs>
+            <span className="ml-1 flex items-center text-xs text-default-500">
+              {Math.round(canvasSettings.zoom * 100)}%
+            </span>
           </div>
 
-          {/* Tab content */}
-          <div className="flex-1 overflow-y-auto p-2">
-            {sidebarTab === 'layers' ?
-              <LayersSidebar
-                layers={layers}
-                selectedIds={activeElementIds as string[]}
-                onSelect={handleLayerSelect}
-                onToggleLock={handleLayerToggleLock}
-                onDelete={handleLayerDelete}
+          {/* ---- Vertical element toolbar (below main toolbar) ---- */}
+          <div className="toolbar-glass absolute top-[80px] left-[28px] z-[8000] rounded-lg p-1.5">
+            <div role="toolbar" aria-label="Element library" className="flex flex-col gap-0.5">
+              {ELEMENT_TYPES.map((info) => {
+                const Icon = ELEMENT_ICON_MAP[info.type] ?? ELEMENT_FALLBACK_ICON;
+
+                return (
+                  <Tooltip key={info.type}>
+                    <Tooltip.Trigger>
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="ghost"
+                        aria-label={info.label}
+                        onPress={() => {
+                          handleElementTypeSelect(info.type);
+                        }}
+                      >
+                        <Icon size={16} />
+                      </Button>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>{info.label}</Tooltip.Content>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ---- Right-side tabbed drawer ---- */}
+          {sidebarTab !== null ?
+            <div
+              className="toolbar-glass absolute top-0 right-0 z-[8000] flex h-full flex-col overflow-hidden"
+              style={{ width: sidebarWidth }}
+            >
+              {/* Resize handle */}
+              <div
+                className="absolute top-0 left-0 z-10 h-full w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary/50"
+                onMouseDown={handleSidebarResizeStart}
               />
-            : null}
 
-            {sidebarTab === 'properties' && panelElement !== undefined ?
-              <>
-                <PropertiesSidebar element={panelElement} documentMode={documentMode} onUpdate={handlePropertyUpdate} />
-                {selectedElement?.type === 'path' ?
-                  <PathToolsPanel
-                    editingMode={editingMode}
-                    onEnterEditing={handleEnterPathEditing}
-                    onExitEditing={handleExitPathEditing}
-                    onEnterDrawing={handleEnterPathDrawing}
-                    onExitDrawing={handleExitPathDrawing}
+              {/* Tabs */}
+              <div className="shrink-0 border-b border-divider px-2 pt-2">
+                <Tabs selectedKey={sidebarTab} onSelectionChange={handleSidebarTabChange}>
+                  <Tabs.List>
+                    <Tabs.Tab id="layers">Layers</Tabs.Tab>
+                    <Tabs.Tab id="properties">Properties</Tabs.Tab>
+                    <Tabs.Tab id="animation">Animation</Tabs.Tab>
+                    <Tabs.Tab id="preflight">Preflight</Tabs.Tab>
+                  </Tabs.List>
+                </Tabs>
+              </div>
+
+              {/* Tab content */}
+              <div className="flex-1 overflow-y-auto p-2">
+                {sidebarTab === 'layers' ?
+                  <LayersSidebar
+                    layers={layers}
+                    selectedIds={activeElementIds as string[]}
+                    onSelect={handleLayerSelect}
+                    onToggleLock={handleLayerToggleLock}
+                    onDelete={handleLayerDelete}
                   />
                 : null}
-              </>
-            : null}
 
-            {sidebarTab === 'animation' && featureConfig.animations && selectedAnimConfig !== undefined ?
-              <AnimationSidebar
-                elementId={firstActiveId ?? null}
-                animationsEnabled={featureConfig.animations}
-                locked={false}
-                config={selectedAnimConfig}
-              />
-            : null}
+                {sidebarTab === 'properties' && panelElement !== undefined ?
+                  <>
+                    <PropertiesSidebar
+                      element={panelElement}
+                      documentMode={documentMode}
+                      onUpdate={handlePropertyUpdate}
+                    />
+                    {selectedElement?.type === 'path' ?
+                      <PathToolsPanel
+                        editingMode={editingMode}
+                        onEnterEditing={handleEnterPathEditing}
+                        onExitEditing={handleExitPathEditing}
+                        onEnterDrawing={handleEnterPathDrawing}
+                        onExitDrawing={handleExitPathDrawing}
+                      />
+                    : null}
+                  </>
+                : null}
 
-            {sidebarTab === 'preflight' ?
-              <div className="space-y-2 text-sm text-default-500">
-                <p>Preflight checks will be available in a future update.</p>
+                {sidebarTab === 'animation' && featureConfig.animations && selectedAnimConfig !== undefined ?
+                  <AnimationSidebar
+                    elementId={firstActiveId ?? null}
+                    animationsEnabled={featureConfig.animations}
+                    locked={false}
+                    config={selectedAnimConfig}
+                  />
+                : null}
+
+                {sidebarTab === 'preflight' ?
+                  <div className="space-y-2 text-sm text-default-500">
+                    <p>Preflight checks will be available in a future update.</p>
+                  </div>
+                : null}
               </div>
-            : null}
-          </div>
-        </div>
-      : null}
+            </div>
+          : null}
 
-      {/* Sidebar tab strip (visible when drawer is closed) */}
-      {sidebarTab === null ?
-        <div className="toolbar-glass absolute top-1/2 right-0 z-[8000] flex -translate-y-1/2 flex-col gap-1 rounded-l-lg p-1">
-          {(['layers', 'properties', 'animation', 'preflight'] as const).map((tab) => {
-            const TabIcon = SIDEBAR_ICON_MAP[tab];
+          {/* Sidebar tab strip (visible when drawer is closed) */}
+          {sidebarTab === null ?
+            <div className="toolbar-glass absolute top-1/2 right-0 z-[8000] flex -translate-y-1/2 flex-col gap-1 rounded-l-lg p-1">
+              {(['layers', 'properties', 'animation', 'preflight'] as const).map((tab) => {
+                const TabIcon = SIDEBAR_ICON_MAP[tab];
 
-            return (
-              <Tooltip key={tab}>
-                <Tooltip.Trigger>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    isIconOnly
-                    aria-label={tab.charAt(0).toUpperCase() + tab.slice(1)}
-                    onPress={() => {
-                      setSidebarTab(tab);
-                    }}
-                  >
-                    <TabIcon size={16} />
-                  </Button>
-                </Tooltip.Trigger>
-                <Tooltip.Content>{tab.charAt(0).toUpperCase() + tab.slice(1)}</Tooltip.Content>
-              </Tooltip>
-            );
-          })}
-        </div>
-      : null}
+                return (
+                  <Tooltip key={tab}>
+                    <Tooltip.Trigger>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        isIconOnly
+                        aria-label={tab.charAt(0).toUpperCase() + tab.slice(1)}
+                        onPress={() => {
+                          setSidebarTab(tab);
+                        }}
+                      >
+                        <TabIcon size={16} />
+                      </Button>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>{tab.charAt(0).toUpperCase() + tab.slice(1)}</Tooltip.Content>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          : null}
 
-      {/* ---- Timeline Bottom Panel ---- */}
-      <TimelineBottomPanel
-        isOpen={timelineOpen}
-        onClose={() => {
-          setTimelineOpen(false);
-        }}
-        keyframes={
-          selectedAnimConfig?.timelines[0]?.entries.map((e) => ({
-            offsetMs: e.offsetMs,
-            properties: e.properties,
-          })) ?? []
-        }
-        durationMs={3000}
-        selectedIndex={null}
-        onSelectKeyframe={() => {
-          /* keyframe selection will be wired in later phases */
-        }}
-        onAddKeyframe={() => {
-          /* keyframe creation will be wired in later phases */
-        }}
-        onMoveKeyframe={() => {
-          /* keyframe reorder will be wired in later phases */
-        }}
-        onPlayTimeline={handlePlayPause}
-      />
-
-      {/* ---- Timeline toggle button (visible when timeline is closed) ---- */}
-      {!timelineOpen ?
-        <div className="toolbar-glass absolute bottom-4 left-1/2 z-[8000] -translate-x-1/2 rounded-lg p-1">
-          <ToolbarButton
-            icon={Timer}
-            label="Open Timeline"
-            onPress={() => {
-              setTimelineOpen(true);
+          {/* ---- Timeline Bottom Panel ---- */}
+          <TimelineBottomPanel
+            isOpen={timelineOpen}
+            onClose={() => {
+              setTimelineOpen(false);
             }}
-            data-testid="timeline-toggle"
+            keyframes={
+              selectedAnimConfig?.timelines[0]?.entries.map((e) => ({
+                offsetMs: e.offsetMs,
+                properties: e.properties,
+              })) ?? []
+            }
+            durationMs={3000}
+            selectedIndex={null}
+            onSelectKeyframe={() => {
+              /* keyframe selection will be wired in later phases */
+            }}
+            onAddKeyframe={() => {
+              /* keyframe creation will be wired in later phases */
+            }}
+            onMoveKeyframe={() => {
+              /* keyframe reorder will be wired in later phases */
+            }}
+            onPlayTimeline={handlePlayPause}
+          />
+
+          {/* ---- Timeline toggle button (visible when timeline is closed) ---- */}
+          {!timelineOpen ?
+            <div className="toolbar-glass absolute bottom-4 left-1/2 z-[8000] -translate-x-1/2 rounded-lg p-1">
+              <ToolbarButton
+                icon={Timer}
+                label="Open Timeline"
+                onPress={() => {
+                  setTimelineOpen(true);
+                }}
+                data-testid="timeline-toggle"
+              />
+            </div>
+          : null}
+
+          {/* ---- Page sorter (floating bottom-left) ---- */}
+          <div className="toolbar-glass absolute bottom-4 left-[28px] z-[8000] flex items-center gap-1 rounded-lg p-1">
+            <PageSorter
+              pages={pages}
+              activePageIndex={activePageIndex}
+              onPageSelect={handlePageSelect}
+              onPageAdd={handlePageAdd}
+              onPageRemove={handlePageRemove}
+            />
+          </div>
+
+          {/* ---- Modals ---- */}
+          <AboutModal
+            isOpen={activeModal === 'about'}
+            onClose={() => {
+              setActiveModal(null);
+            }}
+          />
+
+          <CanvasSettingsModal
+            isOpen={activeModal === 'canvasSettings'}
+            onClose={() => {
+              setActiveModal(null);
+            }}
+            documentName={documentName}
+            onDocumentNameChange={setDocumentName}
+            viewMode={canvasSettings.viewMode}
+            onViewModeChange={(mode) => {
+              store.getState().updateCanvasSettings({ viewMode: mode });
+            }}
+            showRulers={canvasSettings.showRulers}
+            onRulersChange={(show) => {
+              store.getState().updateCanvasSettings({ showRulers: show });
+            }}
+            perspectiveAngle={canvasSettings.perspective}
+            onPerspectiveChange={(angle) => {
+              store.getState().updateCanvasSettings({ perspective: angle });
+            }}
+            gridSettings={gridSettings}
+            onGridChange={(gs) => {
+              store.getState().updateGridSettings(gs);
+            }}
+          />
+
+          <ExportModal
+            isOpen={activeModal === 'export'}
+            onClose={() => {
+              setActiveModal(null);
+            }}
+            featureConfig={{ ...featureConfig }}
+            onExport={(format) => {
+              console.log('Export requested:', format);
+              setActiveModal(null);
+            }}
+          />
+
+          <MediaLibraryModal
+            isOpen={activeModal === 'mediaLibrary'}
+            onClose={() => {
+              setActiveModal(null);
+            }}
+            assets={DEMO_ASSETS}
+            categories={DEMO_CATEGORIES}
+            onSelect={(assetId) => {
+              console.log('Media selected:', assetId);
+              setActiveModal(null);
+            }}
+          />
+
+          <NewDocumentModal
+            isOpen={activeModal === 'newDocument'}
+            onClose={() => {
+              setActiveModal(null);
+            }}
+            onCreateDocument={(preset) => {
+              store.getState().loadTemplate({
+                id: crypto.randomUUID(),
+                documentMode: 'screen',
+                canvas: { width: preset.width, height: preset.height, padding: [0, 0, 0, 0] },
+                pages: [{ id: 'page-1', elements: [] }],
+                animationRegistry: [],
+              });
+              setDocumentName(preset.label);
+              setActiveModal(null);
+            }}
+          />
+
+          <ShortcutHelpModal
+            isOpen={activeModal === 'shortcutHelp'}
+            onClose={() => {
+              setActiveModal(null);
+            }}
           />
         </div>
-      : null}
-
-      {/* ---- Page sorter (floating bottom-left) ---- */}
-      <div className="toolbar-glass absolute bottom-4 left-[28px] z-[8000] flex items-center gap-1 rounded-lg p-1">
-        <PageSorter
-          pages={pages}
-          activePageIndex={activePageIndex}
-          onPageSelect={handlePageSelect}
-          onPageAdd={handlePageAdd}
-          onPageRemove={handlePageRemove}
-        />
-      </div>
-
-      {/* ---- Modals ---- */}
-      <AboutModal
-        isOpen={activeModal === 'about'}
-        onClose={() => {
-          setActiveModal(null);
-        }}
-      />
-
-      <CanvasSettingsModal
-        isOpen={activeModal === 'canvasSettings'}
-        onClose={() => {
-          setActiveModal(null);
-        }}
-        documentName={documentName}
-        onDocumentNameChange={setDocumentName}
-        viewMode={canvasSettings.viewMode}
-        onViewModeChange={(mode) => {
-          store.getState().updateCanvasSettings({ viewMode: mode });
-        }}
-        showRulers={canvasSettings.showRulers}
-        onRulersChange={(show) => {
-          store.getState().updateCanvasSettings({ showRulers: show });
-        }}
-        perspectiveAngle={canvasSettings.perspective}
-        onPerspectiveChange={(angle) => {
-          store.getState().updateCanvasSettings({ perspective: angle });
-        }}
-        gridSettings={gridSettings}
-        onGridChange={(gs) => {
-          store.getState().updateGridSettings(gs);
-        }}
-      />
-
-      <ExportModal
-        isOpen={activeModal === 'export'}
-        onClose={() => {
-          setActiveModal(null);
-        }}
-        featureConfig={{ ...featureConfig }}
-        onExport={(format) => {
-          console.log('Export requested:', format);
-          setActiveModal(null);
-        }}
-      />
-
-      <MediaLibraryModal
-        isOpen={activeModal === 'mediaLibrary'}
-        onClose={() => {
-          setActiveModal(null);
-        }}
-        assets={DEMO_ASSETS}
-        categories={DEMO_CATEGORIES}
-        onSelect={(assetId) => {
-          console.log('Media selected:', assetId);
-          setActiveModal(null);
-        }}
-      />
-
-      <NewDocumentModal
-        isOpen={activeModal === 'newDocument'}
-        onClose={() => {
-          setActiveModal(null);
-        }}
-        onCreateDocument={(preset) => {
-          store.getState().loadTemplate({
-            id: crypto.randomUUID(),
-            documentMode: 'screen',
-            canvas: { width: preset.width, height: preset.height, padding: [0, 0, 0, 0] },
-            pages: [{ id: 'page-1', elements: [] }],
-            animationRegistry: [],
-          });
-          setDocumentName(preset.label);
-          setActiveModal(null);
-        }}
-      />
-
-      <ShortcutHelpModal
-        isOpen={activeModal === 'shortcutHelp'}
-        onClose={() => {
-          setActiveModal(null);
-        }}
-      />
-    </div>
+      </BroadsetDataStoreProvider>
+    </EditorErrorBoundary>
   );
 }
