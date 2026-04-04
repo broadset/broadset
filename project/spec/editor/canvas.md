@@ -236,7 +236,12 @@ The canvas MUST support an inline text editing mode that activates on double-cli
 
 ## Spec Gaps
 
-- [ ] **Canvas Inline Text Editing Mode:** No automated tests verify overlay positioning, zoom compensation, or pan/zoom suppression during inline editing.
+- [ ] **Canvas Element Rendering:** No automated tests verify DOM element positioning within the viewport (requires CT).
+- [ ] **Element Selection by Click:** Click-to-select and click-to-deselect interactions are not unit-testable (requires CT with pointer events).
+- [ ] **Zoom and Pan Interaction:** Wheel/pinch zoom and drag pan interactions are not unit-testable (requires CT).
+- [ ] **Grid Visibility Toggle:** Showing/hiding grid based on `showGrid` flag is a rendering concern (requires CT).
+- [ ] **Ruler Drag to Guide:** Dragging from ruler to create a guide requires pointer interaction (requires CT).
+- [ ] **Canvas Inline Text Editing Mode:** Overlay appearance, zoom compensation rendering, and pan/zoom suppression during inline editing are not unit-testable (requires CT). The zoom math is covered by `computeInlineEditOverlay` unit tests.
 
 ---
 

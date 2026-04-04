@@ -82,7 +82,7 @@ _Editor specs:_ `editor/store-ui-actions.md` (pages, canvas settings, guides),
 `editor/canvas.md`
 _UI specs:_ `ui/toolbar-nav.md` (undo/redo buttons, updated page sorter)
 
-- [ ] tests: red — editor/store-ui-actions
+- [x] tests: red — editor/store-ui-actions
 - [ ] tests: red — editor/canvas
 - [ ] impl: green — all
 - [ ] **HeroUI verified** — no raw HTML elements in ui/ files
