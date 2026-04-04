@@ -146,7 +146,7 @@ State bindings MUST map state names to timeline IDs. Reserved states `IN` and `O
 
 ### Requirement: Easing and Interpolation Modes
 
-The system MUST support these interpolation modes: `'linear'`, `'ease-in'`, `'ease-out'`, `'ease-in-out'`, `'cubic-bezier(...)'` (custom curve), and `'step'` (discrete snap). Easing presets are a subset: `'linear'`, `'ease-in'`, `'ease-out'`, `'ease-in-out'`.
+The system MUST support these interpolation modes: `'linear'`, `'ease'`, `'ease-in'`, `'ease-out'`, `'ease-in-out'`, `'cubic-bezier(...)'` (custom curve), and `'step'` (discrete snap). The `'ease'` preset is equivalent to `cubic-bezier(0.25, 0.1, 0.25, 1.0)`. Easing presets are a subset: `'linear'`, `'ease'`, `'ease-in'`, `'ease-out'`, `'ease-in-out'`.
 
 #### Scenario: All easing presets are valid
 
@@ -162,7 +162,7 @@ The system MUST support these interpolation modes: `'linear'`, `'ease-in'`, `'ea
 
 #### Acceptance Criteria
 
-- [ ] Given any easing preset (linear, ease-in, ease-out, ease-in-out), it is a valid interpolation mode
+- [ ] Given any easing preset (linear, ease, ease-in, ease-out, ease-in-out), it is a valid interpolation mode
 - [ ] Given a cubic-bezier interpolation value, it is accepted as valid
 
 ---

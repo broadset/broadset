@@ -1,6 +1,20 @@
 import { Accordion, Button, Input, ListBox, ListBoxItem, NumberField, Select, TextField } from '@heroui/react';
+import type { LucideIcon } from 'lucide-react';
+import { Circle, Code, Eye, EyeOff, Folder, Image, Lock, PenTool, QrCode, Square, Type, Unlock } from 'lucide-react';
 import type { JSX, Key } from 'react';
 import { useCallback, useState } from 'react';
+
+// Layer type → icon map
+const LAYER_ICON_MAP: Record<string, LucideIcon> = {
+  text: Type,
+  image: Image,
+  svg: Code,
+  path: PenTool,
+  rectangle: Square,
+  ellipse: Circle,
+  qrcode: QrCode,
+  group: Folder,
+};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -16,16 +30,21 @@ export interface PanelElement {
   readonly height: number;
   readonly rotation: number;
   readonly backgroundColor: string;
+  readonly backgroundGradient: string;
   readonly borderWidth: number;
   readonly borderColor: string;
   readonly borderStyle: string;
   readonly borderRadius: number;
   readonly opacity: number;
   readonly blendMode: string;
+  readonly boxShadow: string;
+  readonly filter: string;
+  readonly backdropFilter: string;
 }
 
 export interface LayerInfo {
   readonly id: string;
+  readonly type: string;
   readonly name: string;
   readonly locked: boolean;
   readonly visible: boolean;
@@ -243,10 +262,11 @@ export function PropertiesSidebar({
 
   const isScreen = documentMode === 'screen';
 
-  const defaultKeys = isScreen ? ['geometry', 'appearance', 'gradient'] : ['geometry', 'appearance'];
+  const defaultKeys = isScreen ? ['geometry', 'appearance', 'gradient', 'boxEffects'] : ['geometry', 'appearance'];
 
   return (
     <aside role="region" aria-label="Properties">
+      {/* Empty state */}
       <Accordion defaultExpandedKeys={defaultKeys} allowsMultipleExpanded>
         <Accordion.Item id="geometry">
           <Accordion.Heading>
@@ -283,13 +303,57 @@ export function PropertiesSidebar({
         {isScreen ?
           <Accordion.Item id="gradient">
             <Accordion.Heading>
-              <Accordion.Trigger>Gradient fill</Accordion.Trigger>
+              <Accordion.Trigger>Gradient Fill</Accordion.Trigger>
             </Accordion.Heading>
             <Accordion.Panel>
-              <p>Gradient controls here</p>
+              <TextField
+                aria-label="CSS Gradient"
+                value={element.backgroundGradient}
+                onChange={(v: string) => {
+                  onUpdate('backgroundGradient', v);
+                }}
+              >
+                <Input placeholder="e.g. linear-gradient(90deg, #ff0000, #0000ff)" />
+              </TextField>
             </Accordion.Panel>
           </Accordion.Item>
         : null}
+        <Accordion.Item id="boxEffects">
+          <Accordion.Heading>
+            <Accordion.Trigger>Box Effects</Accordion.Trigger>
+          </Accordion.Heading>
+          <Accordion.Panel>
+            <TextField
+              aria-label="Box shadow"
+              value={element.boxShadow}
+              onChange={(v: string) => {
+                onUpdate('boxShadow', v);
+              }}
+            >
+              <Input placeholder="e.g. 2px 4px 8px rgba(0,0,0,0.3)" />
+            </TextField>
+            <TextField
+              aria-label="CSS Filter"
+              value={element.filter}
+              onChange={(v: string) => {
+                onUpdate('filter', v);
+              }}
+            >
+              <Input placeholder="e.g. blur(4px) brightness(1.2)" />
+            </TextField>
+            {isScreen ?
+              <TextField
+                aria-label="Backdrop filter"
+                value={element.backdropFilter}
+                onChange={(v: string) => {
+                  onUpdate('backdropFilter', v);
+                }}
+              >
+                <Input placeholder="e.g. blur(10px)" />
+              </TextField>
+            : null}
+          </Accordion.Panel>
+        </Accordion.Item>
       </Accordion>
     </aside>
   );
@@ -304,6 +368,7 @@ export interface LayersSidebarProps {
   readonly selectedIds?: readonly string[];
   readonly onSelect: (id: string) => void;
   readonly onToggleLock: (id: string) => void;
+  readonly onToggleVisibility?: (id: string) => void;
   readonly onDelete: (id: string) => void;
   readonly onRename?: (id: string, name: string) => void;
 }
@@ -313,7 +378,8 @@ export function LayersSidebar({
   selectedIds = [],
   onSelect,
   onToggleLock,
-  onDelete,
+  onToggleVisibility,
+  onDelete: _onDelete,
   onRename,
 }: LayersSidebarProps): JSX.Element {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -351,16 +417,28 @@ export function LayersSidebar({
 
   return (
     <aside role="region" aria-label="Layers">
-      <ul>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
         {layers.map((layer) => {
           const isSelected = selectedIds.includes(layer.id);
+          const LayerIcon = LAYER_ICON_MAP[layer.type] ?? Square;
 
           return (
             <li
               key={layer.id}
-              style={isSelected ? { backgroundColor: 'rgba(0, 111, 238, 0.15)' } : undefined}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '4px 8px',
+                borderRadius: 4,
+                backgroundColor: isSelected ? 'rgba(0, 111, 238, 0.15)' : undefined,
+                cursor: 'pointer',
+                opacity: layer.visible ? 1 : 0.5,
+              }}
               aria-selected={isSelected}
             >
+              <LayerIcon size={14} style={{ flexShrink: 0, opacity: 0.6 }} />
+
               {editingId === layer.id ?
                 <TextField
                   aria-label="Rename layer"
@@ -394,29 +472,40 @@ export function LayersSidebar({
                       onSelect(layer.id);
                     }
                   }}
+                  style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}
                 >
                   {layer.name}
                 </span>
               }
+
+              {onToggleVisibility !== undefined ?
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  isIconOnly
+                  aria-label={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}
+                  onPress={() => {
+                    onToggleVisibility(layer.id);
+                  }}
+                >
+                  {layer.visible ?
+                    <Eye size={14} />
+                  : <EyeOff size={14} />}
+                </Button>
+              : null}
+
               <Button
                 size="sm"
                 variant="ghost"
+                isIconOnly
                 aria-label={`Toggle lock ${layer.name}`}
                 onPress={() => {
                   onToggleLock(layer.id);
                 }}
               >
-                {layer.locked ? 'Unlock' : 'Lock'}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label={`Delete ${layer.name}`}
-                onPress={() => {
-                  onDelete(layer.id);
-                }}
-              >
-                Delete
+                {layer.locked ?
+                  <Lock size={14} />
+                : <Unlock size={14} />}
               </Button>
             </li>
           );

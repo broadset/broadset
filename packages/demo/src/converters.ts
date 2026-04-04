@@ -73,20 +73,25 @@ export function elementToPanelElement(el: BroadsetElement): PanelElement {
     height: el.height,
     rotation: el.rotation,
     backgroundColor: el.style.backgroundColor ?? '',
+    backgroundGradient: el.style.backgroundGradient ?? '',
     borderWidth: el.style.borderWidth ?? 0,
     borderColor: el.style.borderColor ?? '',
     borderStyle: el.style.borderStyle ?? 'none',
     borderRadius: typeof el.style.borderRadius === 'number' ? el.style.borderRadius : 0,
     opacity: el.style.opacity,
     blendMode: el.style.mixBlendMode ?? 'normal',
+    boxShadow: el.style.boxShadow ?? '',
+    filter: el.style.filter ?? '',
+    backdropFilter: el.style.backdropFilter ?? '',
   };
 }
 
 export function elementsToLayers(elements: readonly BroadsetElement[]): readonly LayerInfo[] {
   return elements.map((el) => ({
     id: el.id,
+    type: el.type,
     name: el.content || el.id,
-    locked: false,
-    visible: true,
+    locked: el.screen.locked,
+    visible: el.screen.visibility !== 'offscreen',
   }));
 }

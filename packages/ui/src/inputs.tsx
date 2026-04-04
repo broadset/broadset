@@ -422,6 +422,21 @@ export interface ShadowEditorProps {
 export function ShadowEditor({ value, onChange, label }: ShadowEditorProps): JSX.Element {
   const layers = parseShadowLayers(value);
 
+  const handleFieldChange = useCallback(
+    (layerIndex: number, field: keyof ParsedShadow, newFieldValue: string): void => {
+      const updated = layers.map((layer, i) => {
+        if (i !== layerIndex) return layer;
+
+        return { ...layer, [field]: newFieldValue };
+      });
+
+      const serialized = updated.map((l) => `${l.offsetX} ${l.offsetY} ${l.blur} ${l.color}`).join(', ');
+
+      onChange(serialized);
+    },
+    [layers, onChange],
+  );
+
   return (
     <div aria-label={label}>
       {layers.map((layer, i) => (
@@ -429,8 +444,8 @@ export function ShadowEditor({ value, onChange, label }: ShadowEditorProps): JSX
           <TextField
             aria-label={`Offset X (layer ${String(i + 1)})`}
             value={layer.offsetX}
-            onChange={() => {
-              onChange(value);
+            onChange={(v: string) => {
+              handleFieldChange(i, 'offsetX', v);
             }}
           >
             <Input />
@@ -438,8 +453,8 @@ export function ShadowEditor({ value, onChange, label }: ShadowEditorProps): JSX
           <TextField
             aria-label={`Offset Y (layer ${String(i + 1)})`}
             value={layer.offsetY}
-            onChange={() => {
-              onChange(value);
+            onChange={(v: string) => {
+              handleFieldChange(i, 'offsetY', v);
             }}
           >
             <Input />
@@ -447,8 +462,8 @@ export function ShadowEditor({ value, onChange, label }: ShadowEditorProps): JSX
           <TextField
             aria-label={`Blur radius (layer ${String(i + 1)})`}
             value={layer.blur}
-            onChange={() => {
-              onChange(value);
+            onChange={(v: string) => {
+              handleFieldChange(i, 'blur', v);
             }}
           >
             <Input />
@@ -456,8 +471,8 @@ export function ShadowEditor({ value, onChange, label }: ShadowEditorProps): JSX
           <TextField
             aria-label={`Color (layer ${String(i + 1)})`}
             value={layer.color}
-            onChange={() => {
-              onChange(value);
+            onChange={(v: string) => {
+              handleFieldChange(i, 'color', v);
             }}
           >
             <Input />

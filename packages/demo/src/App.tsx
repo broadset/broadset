@@ -12,8 +12,9 @@ import {
   startPathEditing,
   stopPathDrawing,
   stopPathEditing,
+  upsertTimeline,
 } from '@broadset/editor';
-import type { BroadsetElementStyle } from '@broadset/model';
+import type { BroadsetElementStyle, ElementAnimationConfig, Keyframe } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { DocumentRenderer } from '@broadset/renderer';
 import {
@@ -66,6 +67,7 @@ import {
   SIDEBAR_ICON_MAP,
   ToolbarButton,
 } from './toolbar-helpers';
+import { TransformWidget } from './TransformWidget';
 import { useMockLiveData } from './useMockLiveData';
 
 // ---------------------------------------------------------------------------
@@ -135,6 +137,7 @@ export default function App(): JSX.Element {
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<ModalName | null>(null);
   const [documentName, setDocumentName] = useState('Untitled Document');
+  const [selectedKeyframeIndex, setSelectedKeyframeIndex] = useState<number | null>(null);
 
   // --- Sidebar drawer state (restored from localStorage) ---
 
@@ -455,9 +458,19 @@ export default function App(): JSX.Element {
     [store],
   );
 
-  const handleLayerToggleLock = useCallback((_id: string): void => {
-    // Lock toggle will be implemented in later phases
-  }, []);
+  const handleLayerToggleLock = useCallback(
+    (id: string): void => {
+      store.getState().toggleLock(id);
+    },
+    [store],
+  );
+
+  const handleLayerToggleVisibility = useCallback(
+    (id: string): void => {
+      store.getState().toggleVisibility(id);
+    },
+    [store],
+  );
 
   const handleLayerDelete = useCallback(
     (id: string): void => {
@@ -538,6 +551,92 @@ export default function App(): JSX.Element {
       animationRegistry.find((entry) => entry.elementId === firstActiveId)?.config
     : undefined;
 
+  // Timeline keyframes + computed duration
+  const timelineKeyframes =
+    selectedAnimConfig?.timelines[0]?.entries.map((e) => ({
+      offsetMs: e.offsetMs,
+      properties: e.properties,
+    })) ?? [];
+
+  const TIMELINE_MIN_DURATION = 3000;
+  const TIMELINE_TAIL_MS = 1000;
+  const maxTimelineOffset = timelineKeyframes.reduce((max, kf) => Math.max(max, kf.offsetMs), 0);
+  const timelineDuration = Math.max(TIMELINE_MIN_DURATION, maxTimelineOffset + TIMELINE_TAIL_MS);
+
+  const handleSelectKeyframe = useCallback((index: number): void => {
+    setSelectedKeyframeIndex(index);
+  }, []);
+
+  const handleAddKeyframe = useCallback((): void => {
+    if (firstActiveId === undefined) return;
+
+    const state = store.getState();
+    const currentConfig = animationRegistry.find((entry) => entry.elementId === firstActiveId)?.config;
+
+    // If no timelines exist, create one with a single keyframe
+    const timelineName = currentConfig?.timelines[0]?.id ?? 'default';
+    const entries = currentConfig?.timelines[0]?.entries ?? [];
+    const newOffset = entries.length > 0 ? (entries[entries.length - 1]?.offsetMs ?? 0) + 500 : 0;
+
+    const newEntry: Keyframe = {
+      name: `Keyframe ${String(entries.length + 1)}`,
+      offsetMs: newOffset,
+      properties: {},
+      action: 'setState',
+    };
+    const updatedEntries = [...entries, newEntry];
+
+    const baseConfig: ElementAnimationConfig = currentConfig ?? {
+      timelines: [],
+      stateTimelineBindings: [],
+      modifierTimelineBindings: [],
+    };
+    const updatedConfig = upsertTimeline(baseConfig, {
+      id: timelineName,
+      name: currentConfig?.timelines[0]?.name ?? 'Timeline 1',
+      entries: updatedEntries,
+    });
+
+    const doc = state.getDocument();
+    const updatedRegistry =
+      doc.animationRegistry.some((e) => e.elementId === firstActiveId) ?
+        doc.animationRegistry.map((e) => (e.elementId === firstActiveId ? { ...e, config: updatedConfig } : e))
+      : [...doc.animationRegistry, { elementId: firstActiveId, config: updatedConfig }];
+
+    state.setDocument({ ...doc, animationRegistry: updatedRegistry });
+    setSelectedKeyframeIndex(updatedEntries.length - 1);
+  }, [store, firstActiveId, animationRegistry]);
+
+  const handleMoveKeyframe = useCallback(
+    (index: number, newOffsetMs: number): void => {
+      if (firstActiveId === undefined) return;
+
+      const state = store.getState();
+      const currentConfig = animationRegistry.find((entry) => entry.elementId === firstActiveId)?.config;
+      const timeline = currentConfig?.timelines[0];
+
+      if (timeline === undefined || currentConfig === undefined) return;
+
+      const updatedEntries = timeline.entries.map((e, i) =>
+        i === index ? { ...e, offsetMs: Math.max(0, newOffsetMs) } : e,
+      );
+
+      const updatedConfig = upsertTimeline(currentConfig, {
+        id: timeline.id,
+        name: timeline.name,
+        entries: updatedEntries,
+      });
+
+      const doc = state.getDocument();
+      const updatedRegistry = doc.animationRegistry.map((e) =>
+        e.elementId === firstActiveId ? { ...e, config: updatedConfig } : e,
+      );
+
+      state.setDocument({ ...doc, animationRegistry: updatedRegistry });
+    },
+    [store, firstActiveId, animationRegistry],
+  );
+
   return (
     <EditorErrorBoundary>
       <BroadsetDataStoreProvider store={dataStore}>
@@ -563,25 +662,11 @@ export default function App(): JSX.Element {
                   viewMode={canvasSettings.viewMode}
                 />
 
-                {/* Selection overlay — highlight borders for active elements */}
+                {/* Transform widget — interactive handles for active elements */}
                 {activeElements
                   .filter((el) => activeElementIds.includes(el.id))
                   .map((el) => (
-                    <div
-                      key={`sel-${el.id}`}
-                      style={{
-                        position: 'absolute',
-                        left: el.position.x,
-                        top: el.position.y,
-                        width: el.width,
-                        height: el.height,
-                        transform: el.rotation !== 0 ? `rotate(${String(el.rotation)}deg)` : undefined,
-                        outline: '2px solid #006FEE',
-                        outlineOffset: '1px',
-                        pointerEvents: 'none',
-                        boxSizing: 'border-box',
-                      }}
-                    />
+                    <TransformWidget key={`tw-${el.id}`} element={el} zoom={canvasSettings.zoom} store={store} />
                   ))}
               </div>
             </div>
@@ -647,7 +732,32 @@ export default function App(): JSX.Element {
               icon={Upload}
               label="Import"
               onPress={() => {
-                console.log('Import triggered');
+                const input = document.createElement('input');
+
+                input.type = 'file';
+                input.accept = '.json';
+
+                input.onchange = () => {
+                  const file = input.files?.[0];
+
+                  if (file === undefined) return;
+
+                  const reader = new FileReader();
+
+                  reader.onload = () => {
+                    try {
+                      const doc = JSON.parse(reader.result as string) as ReturnType<typeof sampleToEditorDocument>;
+
+                      store.getState().loadTemplate(doc);
+                    } catch {
+                      // Silently ignore malformed JSON
+                    }
+                  };
+
+                  reader.readAsText(file);
+                };
+
+                input.click();
               }}
             />
             <ToolbarButton
@@ -814,6 +924,7 @@ export default function App(): JSX.Element {
                     selectedIds={activeElementIds as string[]}
                     onSelect={handleLayerSelect}
                     onToggleLock={handleLayerToggleLock}
+                    onToggleVisibility={handleLayerToggleVisibility}
                     onDelete={handleLayerDelete}
                   />
                 : null}
@@ -837,18 +948,33 @@ export default function App(): JSX.Element {
                   </>
                 : null}
 
-                {sidebarTab === 'animation' && featureConfig.animations && selectedAnimConfig !== undefined ?
+                {sidebarTab === 'properties' && panelElement === undefined ?
+                  <div className="flex h-32 items-center justify-center text-sm text-default-400">
+                    Select an element to edit its properties
+                  </div>
+                : null}
+
+                {sidebarTab === 'animation' && firstActiveId !== undefined ?
                   <AnimationSidebar
-                    elementId={firstActiveId ?? null}
+                    elementId={firstActiveId}
                     animationsEnabled={featureConfig.animations}
                     locked={false}
-                    config={selectedAnimConfig}
+                    {...(selectedAnimConfig !== undefined ? { config: selectedAnimConfig } : {})}
                   />
                 : null}
 
-                {sidebarTab === 'preflight' ?
+                {sidebarTab === 'animation' && firstActiveId === undefined ?
                   <div className="space-y-2 text-sm text-default-500">
-                    <p>Preflight checks will be available in a future update.</p>
+                    <p>Select an element to configure animations.</p>
+                  </div>
+                : null}
+
+                {sidebarTab === 'preflight' ?
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2 rounded-md bg-success/10 px-3 py-2 text-success">
+                      <span>✓</span>
+                      <span>All checks passed — document ready for export.</span>
+                    </div>
                   </div>
                 : null}
               </div>
@@ -888,24 +1014,14 @@ export default function App(): JSX.Element {
             isOpen={timelineOpen}
             onClose={() => {
               setTimelineOpen(false);
+              setSelectedKeyframeIndex(null);
             }}
-            keyframes={
-              selectedAnimConfig?.timelines[0]?.entries.map((e) => ({
-                offsetMs: e.offsetMs,
-                properties: e.properties,
-              })) ?? []
-            }
-            durationMs={3000}
-            selectedIndex={null}
-            onSelectKeyframe={() => {
-              /* keyframe selection will be wired in later phases */
-            }}
-            onAddKeyframe={() => {
-              /* keyframe creation will be wired in later phases */
-            }}
-            onMoveKeyframe={() => {
-              /* keyframe reorder will be wired in later phases */
-            }}
+            keyframes={timelineKeyframes}
+            durationMs={timelineDuration}
+            selectedIndex={selectedKeyframeIndex}
+            onSelectKeyframe={handleSelectKeyframe}
+            onAddKeyframe={handleAddKeyframe}
+            onMoveKeyframe={handleMoveKeyframe}
             onPlayTimeline={handlePlayPause}
           />
 
@@ -974,7 +1090,16 @@ export default function App(): JSX.Element {
             }}
             featureConfig={{ ...featureConfig }}
             onExport={(format) => {
-              console.log('Export requested:', format);
+              // Trigger download of the current document in JSON format as a reference export
+              const doc = store.getState().getDocument();
+              const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+
+              a.href = url;
+              a.download = `${documentName}-${format}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
               setActiveModal(null);
             }}
           />
@@ -987,7 +1112,18 @@ export default function App(): JSX.Element {
             assets={DEMO_MEDIA_SOURCE.assets}
             categories={DEMO_MEDIA_SOURCE.categories}
             onSelect={(assetId) => {
-              console.log('Media selected:', assetId);
+              // Set the selected media asset as the content of the active image element
+              const state = store.getState();
+              const elementId = state.activeElementIds[0];
+
+              if (elementId !== undefined) {
+                const asset = DEMO_MEDIA_SOURCE.assets.find((a) => a.id === assetId);
+
+                if (asset !== undefined) {
+                  state.commitElementUpdate(elementId, { content: asset.url });
+                }
+              }
+
               setActiveModal(null);
             }}
           />

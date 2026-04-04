@@ -10,7 +10,7 @@ Defines how the system applies easing curves to progress values and interpolates
 
 ### Requirement: Easing Presets
 
-The system MUST support the named easing presets `linear`, `ease-in`, `ease-out`, `ease-in-out`, and `step`. All presets MUST return `0` at `t=0` and `1` at `t=1`. The `step` preset MUST hold `0` until exactly `t=1`, then snap to `1`. At exactly `t=1.0`, the step function MUST return the target value (1). For all `t < 1.0`, the step function MUST return the source value (0).
+The system MUST support the named easing presets `linear`, `ease`, `ease-in`, `ease-out`, `ease-in-out`, and `step`. The `ease` preset is equivalent to `cubic-bezier(0.25, 0.1, 0.25, 1.0)`. All presets MUST return `0` at `t=0` and `1` at `t=1`. The `step` preset MUST hold `0` until exactly `t=1`, then snap to `1`. At exactly `t=1.0`, the step function MUST return the target value (1). For all `t < 1.0`, the step function MUST return the source value (0).
 
 #### Scenario: Linear easing identity
 

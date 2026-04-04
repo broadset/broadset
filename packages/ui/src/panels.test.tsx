@@ -27,6 +27,10 @@ describe('PropertiesSidebar', () => {
     borderRadius: 0,
     opacity: 1,
     blendMode: 'normal',
+    backgroundGradient: '',
+    boxShadow: '',
+    filter: '',
+    backdropFilter: '',
   };
 
   /**
@@ -172,8 +176,8 @@ describe('AppearancePanel', () => {
 
 describe('LayersSidebar', () => {
   const layers: readonly LayerInfo[] = [
-    { id: 'el-1', name: 'Box', locked: false, visible: true },
-    { id: 'el-2', name: 'Circle', locked: false, visible: true },
+    { id: 'el-1', name: 'Box', type: 'rectangle', locked: false, visible: true },
+    { id: 'el-2', name: 'Circle', type: 'ellipse', locked: false, visible: true },
   ];
 
   /**
@@ -344,6 +348,10 @@ describe('WCAG AA Panel Accessibility', () => {
           borderRadius: 0,
           opacity: 1,
           blendMode: 'normal',
+          backgroundGradient: '',
+          boxShadow: '',
+          filter: '',
+          backdropFilter: '',
         }}
         documentMode="screen"
         onUpdate={jest.fn()}

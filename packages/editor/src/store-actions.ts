@@ -112,6 +112,7 @@ export interface EditorState extends UIActionsState {
   groupElements: () => void;
   ungroupElements: () => void;
   toggleLock: (elementId: string) => void;
+  toggleVisibility: (elementId: string) => void;
 }
 
 export type EditorStore = StoreApi<EditorState> & {
@@ -505,6 +506,18 @@ export function createEditorStore(options?: CreateEditorStoreOptions): EditorSto
             document: updateElementInDoc(state.document, state.activePageIndex, elementId, (el) => ({
               ...el,
               screen: { ...el.screen, locked: !el.screen.locked },
+            })),
+          }));
+        },
+
+        toggleVisibility: (elementId: string): void => {
+          set((state) => ({
+            document: updateElementInDoc(state.document, state.activePageIndex, elementId, (el) => ({
+              ...el,
+              screen: {
+                ...el.screen,
+                visibility: el.screen.visibility === 'offscreen' ? ('onscreen' as const) : ('offscreen' as const),
+              },
             })),
           }));
         },
