@@ -194,6 +194,8 @@ Commit spec refinements alongside the unit implementation.
 
 Create or open `packages/<pkg>/src/<unit>.test.ts`. For every `#### Acceptance Criteria` checkbox (`- [ ]`) in the spec, write at least one corresponding test. Every `describe`/`it` block **must** have a JSDoc `@description` explaining _why_ the test matters for future loops that won't have this context.
 
+**Read the FULL spec — not just the section for this unit.** Many specs define layout, visual, spatial, and UX requirements alongside functional ones (e.g., panel positions, theme colors, responsive behavior, glass-morphism styling, auto-switching tabs). These are **first-class requirements**, not cosmetic nice-to-haves. A unit is not complete if it only satisfies "click X → Y happens" while ignoring the layout, visual, and interaction-design criteria the spec defines.
+
 Before writing any implementation, explicitly verify coverage: list each spec criterion and confirm a matching test exists. If a criterion cannot be tested at this layer (e.g., it requires UI or integration), note it as a `## Spec Gaps` entry in the spec file.
 
 Run the tests:
@@ -248,6 +250,7 @@ git diff --cached
 
 2. Review every hunk against **all** of these criteria:
    - **Correctness** — Does the logic actually do what the spec requires? Are there off-by-one errors, wrong comparisons, missing edge cases, or silent failures?
+   - **Spec completeness** — Does the implementation address **all** spec requirements for this unit — including layout, visual, spatial, theming, and UX criteria? A unit that only does "click X → Y" while ignoring positioning, styling, or interaction-design requirements from the spec is **incomplete**.
    - **Type safety** — Are types precise? No `any`, no unsafe casts, no unnecessary type assertions? Are generics constrained properly?
    - **Package boundaries** — Does every import respect the dependency graph in `architecture.md`? (e.g., `model` MUST NOT import other packages; `renderer` MUST only import `model` and `playback`.) Are required external dependencies (e.g., `@heroui/react`, `zod`) actually listed in the package's `package.json`?
    - **Barrel exports** — Are all new public types, functions, and components exported from the package's `index.ts`? Consumers must import from the package root, never from internal paths.
@@ -340,6 +343,7 @@ git diff main
    - Was it actually implemented (not just marked `[x]`)?
    - Do the tests cover the acceptance criteria from the spec?
    - Is anything partially done, stubbed, or suspiciously thin?
+   - Were **all** spec requirements addressed — including layout, visual, spatial, theming, and UX criteria? Flag any unit that only implements functional behavior ("click X → Y") while ignoring the spec's non-functional requirements.
 
 3. **Review every file in the diff.** For each one, evaluate ruthlessly:
    - **Architecture** — Does this file belong in this package? Is the logic in the right layer? Are there misplaced utilities dumped into unrelated files?
