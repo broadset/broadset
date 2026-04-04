@@ -43,6 +43,16 @@ export {
   resolveSnap,
   updateDocumentElement,
 } from './element-operations';
+export type { ShortcutAction, ShortcutBinding, ShortcutMap, ShortcutModifiers } from './keyboard';
+export {
+  clearClipboard,
+  DEFAULT_SHORTCUT_MAP,
+  handleShortcutAction,
+  matchShortcut,
+  NUDGE_LARGE_MM,
+  NUDGE_SMALL_MM,
+  resolveShortcuts,
+} from './keyboard';
 export type { PathHandle, PathSegment } from './path-geometry';
 export { extractHandles, parsePath, refitPathBounds, refitPathBoundsSvg, serializePath } from './path-geometry';
 export type {
