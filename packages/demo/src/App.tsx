@@ -4,12 +4,25 @@ import type { BroadsetElementStyle } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { DocumentRenderer } from '@broadset/renderer';
 import type { ElementTypeInfo } from '@broadset/ui';
-import { ElementLibrary, LayersSidebar, PageSorter, PropertiesSidebar } from '@broadset/ui';
+import {
+  AnimationSidebar,
+  ElementLibrary,
+  LayersSidebar,
+  PageSorter,
+  PropertiesSidebar,
+  TimelineBottomPanel,
+} from '@broadset/ui';
 import type { JSX, MouseEvent, WheelEvent } from 'react';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { createDemoController } from './animationSetup';
 import { elementsToLayers, elementToPanelElement, sampleToEditorDocument, toRendererDoc } from './converters';
+
+// ---------------------------------------------------------------------------
+// Shared styles
+// ---------------------------------------------------------------------------
+
+const BUTTON_STYLE = { padding: '8px 16px', fontSize: 14, cursor: 'pointer' } as const;
 
 // ---------------------------------------------------------------------------
 // Element type registry for the toolbar
@@ -53,11 +66,16 @@ export default function App(): JSX.Element {
 
   const gridSettings = useSyncExternalStore(store.subscribe, () => store.getState().gridSettings);
 
+  const featureConfig = useSyncExternalStore(store.subscribe, () => store.getState().featureConfig);
+
+  const animationRegistry = useSyncExternalStore(store.subscribe, () => store.getState().document.animationRegistry);
+
   // --- Refs ---
   const canvasRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<DocumentRenderer | null>(null);
   const controllerRef = useRef<PlaybackController | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
 
   // --- Lock viewport overflow (runs once) ---
   useEffect(() => {
@@ -288,6 +306,12 @@ export default function App(): JSX.Element {
   const layers = elementsToLayers(activeElements);
   const pages = editorDoc.pages.map((p) => ({ id: p.id }));
 
+  // Animation config for the selected element
+  const selectedAnimConfig =
+    firstActiveId !== undefined ?
+      animationRegistry.find((entry) => entry.elementId === firstActiveId)?.config
+    : undefined;
+
   return (
     <div
       style={{
@@ -411,7 +435,7 @@ export default function App(): JSX.Element {
           </div>
         </div>
 
-        {/* Properties sidebar */}
+        {/* Properties sidebar + Animation sidebar */}
         {panelElement !== undefined ?
           <div
             style={{
@@ -423,9 +447,43 @@ export default function App(): JSX.Element {
             }}
           >
             <PropertiesSidebar element={panelElement} documentMode={documentMode} onUpdate={handlePropertyUpdate} />
+            {featureConfig.animations && selectedAnimConfig !== undefined ?
+              <AnimationSidebar
+                elementId={firstActiveId ?? null}
+                animationsEnabled={featureConfig.animations}
+                locked={false}
+                config={selectedAnimConfig}
+              />
+            : null}
           </div>
         : null}
       </div>
+
+      {/* Timeline Bottom Panel */}
+      <TimelineBottomPanel
+        isOpen={timelineOpen}
+        onClose={() => {
+          setTimelineOpen(false);
+        }}
+        keyframes={
+          selectedAnimConfig?.timelines[0]?.entries.map((e) => ({
+            offsetMs: e.offsetMs,
+            properties: e.properties,
+          })) ?? []
+        }
+        durationMs={3000}
+        selectedIndex={null}
+        onSelectKeyframe={() => {
+          /* keyframe selection will be wired in later phases */
+        }}
+        onAddKeyframe={() => {
+          /* keyframe creation will be wired in later phases */
+        }}
+        onMoveKeyframe={() => {
+          /* keyframe reorder will be wired in later phases */
+        }}
+        onPlayTimeline={handlePlayPause}
+      />
 
       {/* Bottom Controls */}
       <div
@@ -447,28 +505,13 @@ export default function App(): JSX.Element {
           onPageRemove={handlePageRemove}
         />
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            data-testid="undo-button"
-            onClick={handleUndo}
-            type="button"
-            style={{ padding: '8px 16px', fontSize: 14, cursor: 'pointer' }}
-          >
+          <button data-testid="undo-button" onClick={handleUndo} type="button" style={BUTTON_STYLE}>
             Undo
           </button>
-          <button
-            data-testid="redo-button"
-            onClick={handleRedo}
-            type="button"
-            style={{ padding: '8px 16px', fontSize: 14, cursor: 'pointer' }}
-          >
+          <button data-testid="redo-button" onClick={handleRedo} type="button" style={BUTTON_STYLE}>
             Redo
           </button>
-          <button
-            data-testid="grid-toggle"
-            onClick={handleToggleGrid}
-            type="button"
-            style={{ padding: '8px 16px', fontSize: 14, cursor: 'pointer' }}
-          >
+          <button data-testid="grid-toggle" onClick={handleToggleGrid} type="button" style={BUTTON_STYLE}>
             {gridSettings.showGrid ? 'Hide Grid' : 'Show Grid'}
           </button>
           <span style={{ fontSize: 12, display: 'flex', alignItems: 'center' }}>
@@ -481,25 +524,22 @@ export default function App(): JSX.Element {
             data-playing={String(isPlaying)}
             onClick={handlePlayPause}
             type="button"
-            style={{
-              padding: '8px 16px',
-              fontSize: 14,
-              cursor: 'pointer',
-            }}
+            style={BUTTON_STYLE}
           >
             {isPlaying ? 'Pause' : 'Play'}
           </button>
-          <button
-            data-testid="reset-button"
-            onClick={handleReset}
-            type="button"
-            style={{
-              padding: '8px 16px',
-              fontSize: 14,
-              cursor: 'pointer',
-            }}
-          >
+          <button data-testid="reset-button" onClick={handleReset} type="button" style={BUTTON_STYLE}>
             Reset
+          </button>
+          <button
+            data-testid="timeline-toggle"
+            onClick={() => {
+              setTimelineOpen((prev) => !prev);
+            }}
+            type="button"
+            style={BUTTON_STYLE}
+          >
+            {timelineOpen ? 'Close Timeline' : 'Open Timeline'}
           </button>
         </div>
       </div>

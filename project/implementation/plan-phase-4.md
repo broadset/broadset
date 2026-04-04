@@ -98,9 +98,9 @@ _UI specs:_ `ui/timeline.md` (timeline editor + bottom panel),
 
 - [x] tests: red — editor/animation-state
 - [x] tests: red — editor/timeline-playback
-- [ ] tests: red — ui/timeline
-- [ ] tests: red — ui/panels (animation sidebar + keyframe properties)
-- [ ] impl: green — all
+- [x] tests: red — ui/timeline
+- [x] tests: red — ui/panels (animation sidebar + keyframe properties)
+- [x] impl: green — all
 - [ ] **HeroUI verified** — no raw HTML elements in ui/ files
 - [ ] demo milestone: select an element → open animation sidebar → add keyframe
       in timeline editor → hit play → see the animation running in the demo
