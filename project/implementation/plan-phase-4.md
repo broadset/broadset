@@ -121,8 +121,8 @@ editing/drawing modes)
 
 _Editor specs:_ `editor/keyboard.md`
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 - [ ] demo milestone: arrow nudge moves selected element 1 mm; Shift+arrow moves
       10 mm; Ctrl+Z/Y undo/redo; Ctrl+C/V copy/paste; Delete removes; Ctrl+G groups;
       Ctrl+A selects all

@@ -2,6 +2,9 @@ import type { EditingMode, EditorStore } from '@broadset/editor';
 import {
   appendPathPoint,
   createEditorStore,
+  handleShortcutAction,
+  matchShortcut,
+  resolveShortcuts,
   startPathDrawing,
   startPathEditing,
   stopPathDrawing,
@@ -134,8 +137,10 @@ export default function App(): JSX.Element {
     };
   }, [editorDoc, activePageIndex]);
 
-  // --- Delete key handler ---
+  // --- Keyboard shortcut handler ---
   useEffect(() => {
+    const shortcuts = resolveShortcuts({});
+
     const handler = (e: KeyboardEvent): void => {
       const mode = store.getState().editingMode;
 
@@ -154,21 +159,23 @@ export default function App(): JSX.Element {
         }
       }
 
-      // Enter: close path (connect last to first) and exit drawing
+      // Enter: close path and exit drawing
       if (e.key === 'Enter' && mode.type === 'path-drawing') {
-        // Close the path by appending a Z command would require direct content manipulation
-        // For now, just exit drawing mode (same as Escape)
         stopPathDrawing(store);
 
         return;
       }
 
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        const state = store.getState();
+      // Match and dispatch all other shortcuts
+      const action = matchShortcut(shortcuts, e.key, {
+        ctrl: e.ctrlKey || e.metaKey,
+        shift: e.shiftKey,
+        alt: e.altKey,
+      });
 
-        for (const id of state.activeElementIds) {
-          state.removeElement(id);
-        }
+      if (action) {
+        e.preventDefault();
+        handleShortcutAction(store, action);
       }
     };
 
