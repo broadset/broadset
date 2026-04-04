@@ -22,6 +22,25 @@ export type {
   TextStrokeInputProps,
 } from './inputs';
 export { ColorInput, CssLengthInput, FilterEditor, ShadowEditor, TextStrokeInput } from './inputs';
+export type { DocumentPreset, PresetCategory } from './modal-data';
+export type {
+  AboutModalProps,
+  CanvasSettingsModalProps,
+  ExportModalProps,
+  MediaAsset,
+  MediaCategory,
+  MediaLibraryModalProps,
+  NewDocumentModalProps,
+  ShortcutHelpModalProps,
+} from './modals';
+export {
+  AboutModal,
+  CanvasSettingsModal,
+  ExportModal,
+  MediaLibraryModal,
+  NewDocumentModal,
+  ShortcutHelpModal,
+} from './modals';
 export type {
   AppearancePanelProps,
   GeometryPanelProps,
