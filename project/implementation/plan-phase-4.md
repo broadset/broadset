@@ -34,8 +34,8 @@ _UI specs:_ `ui/utilities.md` (CSS parsers), `ui/inputs.md` (input components),
 `ui/panels.md` (properties sidebar — basic style fields)
 
 - [x] tests: red — editor/transforms
-- [ ] tests: red — ui/utilities
-- [ ] tests: red — ui/inputs
+- [x] tests: red — ui/utilities
+- [x] tests: red — ui/inputs
 - [ ] tests: red — ui/panels (properties sidebar)
 - [ ] impl: green — all
 - [ ] demo milestone: select an element → drag it, resize via handles, rotate;
