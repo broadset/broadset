@@ -632,4 +632,94 @@ describe('createPlaybackHandle', () => {
       globalThis.cancelAnimationFrame = origCaf;
     }
   });
+
+  /**
+   * @description When non-looping playback naturally reaches durationMs,
+   * the handle MUST invoke the onComplete callback exactly once before
+   * becoming inactive. This enables callers (e.g. the controller) to
+   * run post-animation cleanup such as hiding elements.
+   */
+  it('fires onComplete when playback reaches end', () => {
+    const container = document.createElement('div');
+    const callbacks: Array<(time: number) => void> = [];
+    const origRaf = globalThis.requestAnimationFrame;
+    const origCaf = globalThis.cancelAnimationFrame;
+
+    globalThis.requestAnimationFrame = (cb: FrameRequestCallback): number => {
+      callbacks.push(cb);
+
+      return callbacks.length;
+    };
+    globalThis.cancelAnimationFrame = (): void => {
+      /* no-op */
+    };
+
+    try {
+      let completed = false;
+
+      const handle = createPlaybackHandle(simpleTl, container, {
+        onComplete: () => {
+          completed = true;
+        },
+      });
+
+      handle.play();
+
+      // First tick sets lastFrameTime
+      callbacks[0]?.(0);
+
+      // Second tick at 2000ms — past 1100ms duration
+      callbacks[1]?.(2000);
+
+      expect(completed).toBe(true);
+      expect(handle.isActive).toBe(false);
+    } finally {
+      globalThis.requestAnimationFrame = origRaf;
+      globalThis.cancelAnimationFrame = origCaf;
+    }
+  });
+
+  /**
+   * @description onComplete MUST NOT fire when the handle is cancelled
+   * before reaching durationMs. Cancel is an explicit abort, not a
+   * natural ending.
+   */
+  it('does not fire onComplete on cancel', () => {
+    const container = document.createElement('div');
+    const callbacks: Array<(time: number) => void> = [];
+    const origRaf = globalThis.requestAnimationFrame;
+    const origCaf = globalThis.cancelAnimationFrame;
+
+    globalThis.requestAnimationFrame = (cb: FrameRequestCallback): number => {
+      callbacks.push(cb);
+
+      return callbacks.length;
+    };
+    globalThis.cancelAnimationFrame = (): void => {
+      /* no-op */
+    };
+
+    try {
+      let completed = false;
+
+      const handle = createPlaybackHandle(simpleTl, container, {
+        onComplete: () => {
+          completed = true;
+        },
+      });
+
+      handle.play();
+
+      // First tick
+      callbacks[0]?.(0);
+
+      // Cancel before reaching end
+      handle.cancel();
+
+      expect(completed).toBe(false);
+    } finally {
+      globalThis.requestAnimationFrame = origRaf;
+      globalThis.cancelAnimationFrame = origCaf;
+    }
+  });
 });

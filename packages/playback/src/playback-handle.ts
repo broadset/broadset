@@ -12,8 +12,9 @@ import { computeTimelineDuration, computeTimelineFrame } from './timeline';
 // ---------------------------------------------------------------------------
 
 export interface PlaybackHandleOptions {
-  readonly onAction?: (action: string, payload: string | undefined) => void;
-  readonly loop?: boolean;
+  readonly onAction?: ((action: string, payload: string | undefined) => void) | undefined;
+  readonly onComplete?: (() => void) | undefined;
+  readonly loop?: boolean | undefined;
 }
 
 export interface PlaybackHandle {
@@ -126,6 +127,7 @@ export function createPlaybackHandle(
 
           if (currentTime >= durationMs) {
             active = false;
+            options?.onComplete?.();
 
             return;
           }

@@ -350,6 +350,53 @@ describe('Visibility and State Transitions', () => {
     controller.destroy();
     document.body.removeChild(container);
   });
+
+  /**
+   * @description When an element transitions offscreen with an OUT timeline
+   * in non-suppress mode, visibility:hidden and pointer-events:none MUST be
+   * applied only after the OUT animation completes. This prevents the element
+   * from remaining visible indefinitely after the OUT animation finishes.
+   */
+  it('OUT timeline completion hides element', async () => {
+    const tl = createOpacityTimeline('tl-out', 'OUT', 500);
+    const config = createTestConfig({
+      timelines: [tl],
+      stateTimelineBindings: [{ stateName: 'OUT', timelineId: 'tl-out' }],
+    });
+    const registry = buildRegistry({ elementId: 'el-1', config });
+    const controller = createPlaybackController(registry);
+
+    const { container } = createDomElement();
+
+    container.className = 'onscreen';
+    document.body.appendChild(container);
+    controller.attach(container, 'el-1');
+
+    // Transition to offscreen → should start OUT timeline
+    container.className = 'offscreen';
+    await flushMutations();
+    jest.advanceTimersByTime(50);
+
+    // During playback, element should NOT yet be hidden
+    expect(container.style.visibility).not.toBe('hidden');
+    expect(rafCallbacks.length).toBeGreaterThan(0);
+
+    // Tick past the OUT timeline duration (500ms offset + 300ms default tween = 800ms)
+    const firstCb = rafCallbacks[rafCallbacks.length - 1];
+
+    firstCb?.(0);
+
+    const secondCb = rafCallbacks[rafCallbacks.length - 1];
+
+    secondCb?.(900);
+
+    // After OUT completes, element MUST be hidden
+    expect(container.style.visibility).toBe('hidden');
+    expect(container.style.pointerEvents).toBe('none');
+
+    controller.destroy();
+    document.body.removeChild(container);
+  });
 });
 
 // ---------------------------------------------------------------------------

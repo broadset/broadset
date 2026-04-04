@@ -10,7 +10,7 @@ Defines how the system drives timeline playback in the browser, applies computed
 
 ### Requirement: Playback Handle Lifecycle
 
-The system MUST provide a playback handle that drives a single timeline with frame-based scheduling. The handle MUST support play, pause, seek, setSpeed, and cancel. Seek MUST clamp to `[0, durationMs]`. Cancel MUST make subsequent play calls a no-op.
+The system MUST provide a playback handle that drives a single timeline with frame-based scheduling. The handle MUST support play, pause, seek, setSpeed, and cancel. Seek MUST clamp to `[0, durationMs]`. Cancel MUST make subsequent play calls a no-op. When playback reaches the end of the timeline (non-looping), the handle MUST invoke an optional `onComplete` callback before becoming inactive.
 
 #### Scenario: Seek clamping
 
@@ -50,6 +50,19 @@ The system MUST provide a playback handle that drives a single timeline with fra
 - WHEN seeked to durationMs
 - THEN the animation target element's inline `opacity` style MUST equal the final keyframe value
 
+#### Scenario: onComplete fires when playback reaches end
+
+- GIVEN a non-looping playback handle with an `onComplete` callback
+- WHEN playback naturally reaches `durationMs`
+- THEN the `onComplete` callback is invoked exactly once
+- AND `isActive` is `false`
+
+#### Scenario: onComplete does not fire on cancel
+
+- GIVEN an active playback handle with an `onComplete` callback
+- WHEN the handle is cancelled before reaching durationMs
+- THEN the `onComplete` callback is NOT invoked
+
 #### Acceptance Criteria
 
 - [ ] Given a timeline with duration 800ms, currentTimeMs is `0` and when seeked to 99999 then currentTimeMs is `800`
@@ -58,6 +71,8 @@ The system MUST provide a playback handle that drives a single timeline with fra
 - [ ] Given sequential forward seeks, each seek fires only the actions between the previous and current position
 - [ ] Given a backward seek followed by a forward seek, previously fired actions are fired again
 - [ ] Given a timeline with opacity keyframes, seeking to the end results in the target element's inline style reflecting the final opacity value
+- [ ] Given a non-looping handle with onComplete, the callback fires exactly once when playback reaches durationMs
+- [ ] Given a cancelled handle with onComplete, the callback is NOT invoked
 
 ---
 
@@ -168,11 +183,18 @@ The system MUST animate visibility changes using bound IN/OUT timelines. When no
 - WHEN transitions are checked
 - THEN no timeline is played
 
+#### Scenario: OUT timeline completion hides element
+
+- GIVEN an element transitioning from onscreen to offscreen with a bound OUT timeline
+- WHEN the OUT timeline animation finishes (non-suppress mode)
+- THEN the element MUST have `visibility:hidden` and `pointer-events:none`
+
 #### Acceptance Criteria
 
 - [ ] Given visibility changes from offscreen to onscreen, the IN state timeline is played
 - [ ] Given no state timeline bindings exist, `visibility:hidden` is set directly
 - [ ] Given visibility remains onscreen, no timeline is played
+- [ ] Given an OUT timeline that finishes playing, the element has `visibility:hidden` and `pointer-events:none`
 
 ---
 
@@ -398,7 +420,7 @@ Multiple timelines MAY play simultaneously on different elements. However, only 
 - [x] **Style Writer Target Routing — fallback to container:** Automated test coverage now exists.
 - [x] **Settle Timer Behavior — reset on mutation:** Automated test coverage now exists.
 - [x] **Simultaneous Timeline Playback:** Automated tests now cover single-element cancellation-on-replacement, style cleanup, and multi-element independence.
-- [ ] **Visibility transition post-animation:** When an OUT timeline finishes playing (non-suppress mode), the element should become hidden. No automated coverage for this post-animation callback exists yet.
+- [x] **Visibility transition post-animation:** When an OUT timeline finishes playing (non-suppress mode), the element becomes hidden. Covered via `onComplete` callback.
 - [ ] **State cleared to null:** When `activeState` transitions from a named state to `null`, the previous state's timeline control should be stopped. No automated test exists for this case.
 
 ---

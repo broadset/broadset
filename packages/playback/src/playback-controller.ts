@@ -152,7 +152,7 @@ export function createPlaybackController(
   }
 
   /** Play (or suppress-apply) a timeline on an element runtime. */
-  function playTimeline(runtime: ElementRuntime, timeline: Timeline): void {
+  function playTimeline(runtime: ElementRuntime, timeline: Timeline, onComplete?: () => void): void {
     cancelWithCleanup(runtime);
 
     if (suppressTransitions) {
@@ -161,7 +161,7 @@ export function createPlaybackController(
       return;
     }
 
-    const handle = createPlaybackHandle(timeline, runtime.element);
+    const handle = createPlaybackHandle(timeline, runtime.element, { onComplete });
 
     runtime.activeHandle = { handle, timeline };
     handle.play();
@@ -190,7 +190,10 @@ export function createPlaybackController(
         const outTimeline = resolveStateTimeline(runtime.config, 'OUT');
 
         if (outTimeline) {
-          playTimeline(runtime, outTimeline);
+          playTimeline(runtime, outTimeline, () => {
+            runtime.element.style.setProperty('visibility', 'hidden');
+            runtime.element.style.setProperty('pointer-events', 'none');
+          });
 
           if (suppressTransitions) {
             runtime.element.style.setProperty('visibility', 'hidden');
