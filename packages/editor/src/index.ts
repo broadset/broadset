@@ -35,3 +35,5 @@ export type {
 } from './store-actions';
 export { createEditorStore, createEmptyEditorDocument } from './store-actions';
 export type { UIActionsState } from './store-ui-actions';
+export type { PlaybackControllerRef, ScreenStateApplicator } from './timeline-playback';
+export { TimelinePlaybackCoordinator } from './timeline-playback';
