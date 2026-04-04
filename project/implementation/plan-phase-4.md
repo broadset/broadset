@@ -96,8 +96,8 @@ _Editor specs:_ `editor/animation-state.md`, `editor/timeline-playback.md`
 _UI specs:_ `ui/timeline.md` (timeline editor + bottom panel),
 `ui/panels.md` (animation sidebar)
 
-- [ ] tests: red — editor/animation-state
-- [ ] tests: red — editor/timeline-playback
+- [x] tests: red — editor/animation-state
+- [x] tests: red — editor/timeline-playback
 - [ ] tests: red — ui/timeline
 - [ ] tests: red — ui/panels (animation sidebar + keyframe properties)
 - [ ] impl: green — all

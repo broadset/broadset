@@ -15,5 +15,13 @@ export type {
   PropertiesSidebarProps,
 } from './panels';
 export { AppearancePanel, GeometryPanel, LayersSidebar, PropertiesSidebar } from './panels';
+export type { AnimationBindingSectionsProps, TimelineBottomPanelProps, TimelineEditorProps } from './timeline';
+export {
+  AnimationBindingSections,
+  TimelineBottomPanel,
+  TimelineEditingProvider,
+  TimelineEditor,
+  useTimelineEditing,
+} from './timeline';
 export type { ElementLibraryProps, ElementTypeInfo, PageInfo, PageSorterProps } from './toolbar-nav';
 export { ElementLibrary, PageSorter } from './toolbar-nav';
