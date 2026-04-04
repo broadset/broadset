@@ -14,7 +14,20 @@ import type { BroadsetElementStyle } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { DocumentRenderer } from '@broadset/renderer';
 import type { ElementTypeInfo } from '@broadset/ui';
-import { AnimationSidebar, ElementLibrary, LayersSidebar, PropertiesSidebar, TimelineBottomPanel } from '@broadset/ui';
+import {
+  AboutModal,
+  AnimationSidebar,
+  CanvasSettingsModal,
+  ElementLibrary,
+  ExportModal,
+  LayersSidebar,
+  MediaLibraryModal,
+  NewDocumentModal,
+  PropertiesSidebar,
+  ShortcutHelpModal,
+  TimelineBottomPanel,
+} from '@broadset/ui';
+import { Button } from '@heroui/react';
 import type { JSX, MouseEvent, WheelEvent } from 'react';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
@@ -23,6 +36,28 @@ import { BottomBar } from './BottomBar';
 import { CanvasOverlays } from './CanvasOverlays';
 import { elementsToLayers, elementToPanelElement, sampleToEditorDocument, toRendererDoc } from './converters';
 import { PathToolsPanel } from './PathToolsPanel';
+
+// ---------------------------------------------------------------------------
+// Modal name type
+// ---------------------------------------------------------------------------
+
+type ModalName = 'about' | 'canvasSettings' | 'export' | 'mediaLibrary' | 'newDocument' | 'shortcutHelp';
+
+// ---------------------------------------------------------------------------
+// Sample media assets for the Media Library demo
+// ---------------------------------------------------------------------------
+
+const DEMO_ASSETS = [
+  { id: 'a1', name: 'Company Logo', url: '/assets/logo.png', categoryId: 'logos' },
+  { id: 'a2', name: 'Event Banner', url: '/assets/banner.jpg', categoryId: 'graphics' },
+  { id: 'a3', name: 'Score Bug', url: '/assets/bug.svg', categoryId: 'graphics' },
+  { id: 'a4', name: 'Sponsor Logo', url: '/assets/sponsor.png', categoryId: 'logos' },
+] as const;
+
+const DEMO_CATEGORIES = [
+  { id: 'logos', name: 'Logos' },
+  { id: 'graphics', name: 'Graphics' },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Element type registry for the toolbar
@@ -78,6 +113,8 @@ export default function App(): JSX.Element {
   const controllerRef = useRef<PlaybackController | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [activeModal, setActiveModal] = useState<ModalName | null>(null);
+  const [documentName, setDocumentName] = useState('Untitled Document');
 
   // --- Lock viewport overflow (runs once) ---
   useEffect(() => {
@@ -404,6 +441,61 @@ export default function App(): JSX.Element {
         }}
       >
         <ElementLibrary elementTypes={ELEMENT_TYPES} onSelect={handleElementTypeSelect} />
+        <span style={{ borderLeft: '1px solid #ccc', margin: '0 4px' }} />
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={() => {
+            setActiveModal('newDocument');
+          }}
+        >
+          New
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={() => {
+            setActiveModal('canvasSettings');
+          }}
+        >
+          Settings
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={() => {
+            setActiveModal('export');
+          }}
+        >
+          Export
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={() => {
+            setActiveModal('mediaLibrary');
+          }}
+        >
+          Media
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={() => {
+            setActiveModal('shortcutHelp');
+          }}
+        >
+          Shortcuts
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={() => {
+            setActiveModal('about');
+          }}
+        >
+          About
+        </Button>
       </div>
 
       {/* Main area: canvas + sidebar */}
@@ -556,6 +648,89 @@ export default function App(): JSX.Element {
         timelineOpen={timelineOpen}
         onToggleTimeline={() => {
           setTimelineOpen((prev) => !prev);
+        }}
+      />
+
+      {/* --- Modals --- */}
+      <AboutModal
+        isOpen={activeModal === 'about'}
+        onClose={() => {
+          setActiveModal(null);
+        }}
+      />
+
+      <CanvasSettingsModal
+        isOpen={activeModal === 'canvasSettings'}
+        onClose={() => {
+          setActiveModal(null);
+        }}
+        documentName={documentName}
+        onDocumentNameChange={setDocumentName}
+        viewMode={canvasSettings.viewMode}
+        onViewModeChange={(mode) => {
+          store.getState().updateCanvasSettings({ viewMode: mode });
+        }}
+        showRulers={canvasSettings.showRulers}
+        onRulersChange={(show) => {
+          store.getState().updateCanvasSettings({ showRulers: show });
+        }}
+        perspectiveAngle={canvasSettings.perspective}
+        onPerspectiveChange={(angle) => {
+          store.getState().updateCanvasSettings({ perspective: angle });
+        }}
+        gridSettings={gridSettings}
+        onGridChange={(gs) => {
+          store.getState().updateGridSettings(gs);
+        }}
+      />
+
+      <ExportModal
+        isOpen={activeModal === 'export'}
+        onClose={() => {
+          setActiveModal(null);
+        }}
+        featureConfig={{ ...featureConfig }}
+        onExport={(format) => {
+          console.log('Export requested:', format);
+          setActiveModal(null);
+        }}
+      />
+
+      <MediaLibraryModal
+        isOpen={activeModal === 'mediaLibrary'}
+        onClose={() => {
+          setActiveModal(null);
+        }}
+        assets={DEMO_ASSETS}
+        categories={DEMO_CATEGORIES}
+        onSelect={(assetId) => {
+          console.log('Media selected:', assetId);
+          setActiveModal(null);
+        }}
+      />
+
+      <NewDocumentModal
+        isOpen={activeModal === 'newDocument'}
+        onClose={() => {
+          setActiveModal(null);
+        }}
+        onCreateDocument={(preset) => {
+          store.getState().loadTemplate({
+            id: crypto.randomUUID(),
+            documentMode: 'screen',
+            canvas: { width: preset.width, height: preset.height, padding: [0, 0, 0, 0] },
+            pages: [{ id: 'page-1', elements: [] }],
+            animationRegistry: [],
+          });
+          setDocumentName(preset.label);
+          setActiveModal(null);
+        }}
+      />
+
+      <ShortcutHelpModal
+        isOpen={activeModal === 'shortcutHelp'}
+        onClose={() => {
+          setActiveModal(null);
         }}
       />
     </div>
