@@ -23,6 +23,17 @@ export {
 } from './canvas';
 export type { ElementDefaults, PluginDefaults } from './editing';
 export { cancelPlacement, getElementDefaults, placeElement, startPlacement, validateEditorConfig } from './editing';
+export {
+  alignElements,
+  collectDescendants,
+  distributeElements,
+  getResizeHandlePositions,
+  registerShortcut,
+  resolveSnap,
+  updateDocumentElement,
+} from './element-operations';
+export type { PathHandle, PathSegment } from './path-geometry';
+export { extractHandles, parsePath, refitPathBounds, refitPathBoundsSvg, serializePath } from './path-geometry';
 export type {
   CreateEditorStoreOptions,
   EditingMode,

@@ -102,7 +102,7 @@ _UI specs:_ `ui/timeline.md` (timeline editor + bottom panel),
 - [x] tests: red — ui/panels (animation sidebar + keyframe properties)
 - [x] impl: green — all
 - [ ] **HeroUI verified** — no raw HTML elements in ui/ files
-- [ ] demo milestone: select an element → open animation sidebar → add keyframe
+- [x] demo milestone: select an element → open animation sidebar → add keyframe
       in timeline editor → hit play → see the animation running in the demo
 
 ## Feature Group 4-E: Path editing
