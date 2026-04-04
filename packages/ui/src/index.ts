@@ -1,4 +1,20 @@
 export type {
+  AnimationBuilderProps,
+  AnimationConfigLike,
+  AnimationModePropertiesPanelProps,
+  AnimationSidebarProps,
+  KeyframeAdapter,
+  PropertyFieldProps,
+} from './animation-panels';
+export {
+  AnimationBuilder,
+  AnimationModePropertiesPanel,
+  AnimationSidebar,
+  PropertyEditingProvider,
+  PropertyField,
+  usePropertyEditing,
+} from './animation-panels';
+export type {
   ColorInputProps,
   CssLengthInputProps,
   FilterEditorProps,
