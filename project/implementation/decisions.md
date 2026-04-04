@@ -51,3 +51,13 @@ Non-trivial judgment calls made during implementation. See each unit for context
 **Alternatives considered:** Controller-level loop management that restarts timelines — would require the controller to detect timeline completion and re-trigger, adding significant complexity and coupling.
 
 **Rationale:** The handle already owns the rAF loop and timing. Adding modular wrapping there is minimal code (6 lines vs a callback-based coordinator). The controller can pass `loop: true` when creating handles if needed.
+
+---
+
+### Unit 4-A.1 — Internal EditorDocument / EditorPage types
+
+**Decision:** Introduced `EditorDocument` and `EditorPage` types in the editor package that use `BroadsetElement[]` directly, instead of reusing the model's `BroadsetDocument` / `Page` types which use `PageElement` (with `screen?: Record<string, unknown>`).
+
+**Alternatives considered:** (a) Add an index signature to `BroadsetScreenProps` in the model — would weaken the model's type safety for all consumers. (b) Use `PageElement` and cast back to `BroadsetElement` when needed — lots of unsafe casts throughout the store. (c) Make `PageElement.screen` typed as `BroadsetScreenProps` — would be a breaking change to the model's serialization-friendly `PageElement` interface.
+
+**Rationale:** Under strict TypeScript (`exactOptionalPropertyTypes`, no index signatures), `BroadsetScreenProps` is not assignable to `Record<string, unknown>`. The editor works with fully typed elements internally, so using `BroadsetElement` directly is both safer and simpler. Conversion to/from `BroadsetDocument` happens at the boundary (load/save).

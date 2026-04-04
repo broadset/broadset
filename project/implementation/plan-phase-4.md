@@ -20,7 +20,7 @@ _Editor specs:_ `editor/store-actions.md` (doc init, element CRUD, selection),
 `editor/editing.md` (element placement mode)
 _UI specs:_ `ui/toolbar-nav.md` (element library tiles, page sorter)
 
-- [ ] tests: red — editor/store-actions
+- [x] tests: red — editor/store-actions
 - [ ] tests: red — editor/editing (placement)
 - [ ] tests: red — ui/toolbar-nav (element library + page sorter)
 - [ ] impl: green — all three
