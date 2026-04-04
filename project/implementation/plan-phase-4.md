@@ -21,8 +21,8 @@ _Editor specs:_ `editor/store-actions.md` (doc init, element CRUD, selection),
 _UI specs:_ `ui/toolbar-nav.md` (element library tiles, page sorter)
 
 - [x] tests: red — editor/store-actions
-- [ ] tests: red — editor/editing (placement)
-- [ ] tests: red — ui/toolbar-nav (element library + page sorter)
+- [x] tests: red — editor/editing (placement)
+- [x] tests: red — ui/toolbar-nav (element library + page sorter)
 - [ ] impl: green — all three
 - [ ] demo milestone: click element type in toolbar → element appears on canvas;
       click to select; Delete key removes it; page tabs visible and switching works
