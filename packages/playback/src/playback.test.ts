@@ -571,4 +571,65 @@ describe('createPlaybackHandle', () => {
       globalThis.cancelAnimationFrame = origCAF;
     }
   });
+
+  /**
+   * @description When loop is enabled, playback MUST wrap to the
+   * beginning when it reaches the end, instead of stopping. The handle
+   * MUST remain active after wrapping.
+   */
+  it('wraps at end when loop is enabled', () => {
+    const container = document.createElement('div');
+    const callbacks: Array<(time: number) => void> = [];
+    const origRaf = globalThis.requestAnimationFrame;
+    const origCaf = globalThis.cancelAnimationFrame;
+
+    globalThis.requestAnimationFrame = (cb: FrameRequestCallback): number => {
+      callbacks.push(cb);
+
+      return callbacks.length;
+    };
+    globalThis.cancelAnimationFrame = (): void => {
+      /* no-op */
+    };
+
+    try {
+      // Short timeline: max offset 100ms → duration = 100 + 300 = 400ms
+      const shortTl: Timeline = {
+        id: 'tl-loop',
+        name: 'loop',
+        entries: [
+          {
+            name: 'start',
+            action: 'none',
+            offsetMs: 0,
+            properties: { opacity: { value: 0, interpolation: 'linear' } },
+          },
+          {
+            name: 'end',
+            action: 'none',
+            offsetMs: 100,
+            properties: { opacity: { value: 1, interpolation: 'linear' } },
+          },
+        ],
+      };
+
+      const handle = createPlaybackHandle(shortTl, container, { loop: true });
+
+      handle.play();
+
+      // First tick sets lastFrameTime
+      callbacks[0]?.(0);
+
+      // Second tick at 500ms — delta = 500ms, past 400ms duration
+      callbacks[1]?.(500);
+
+      // Should have wrapped and still be active
+      expect(handle.isActive).toBe(true);
+      // Wrapped: 500 % 400 = 100
+      expect(handle.currentTimeMs).toBe(100);
+    } finally {
+      globalThis.requestAnimationFrame = origRaf;
+      globalThis.cancelAnimationFrame = origCaf;
+    }
+  });
 });

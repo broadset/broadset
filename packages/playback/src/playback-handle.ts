@@ -13,6 +13,7 @@ import { computeTimelineDuration, computeTimelineFrame } from './timeline';
 
 export interface PlaybackHandleOptions {
   readonly onAction?: (action: string, payload: string | undefined) => void;
+  readonly loop?: boolean;
 }
 
 export interface PlaybackHandle {
@@ -115,12 +116,19 @@ export function createPlaybackHandle(
         const delta = (now - lastFrameTime) * speed;
         const nextTime = currentTime + delta;
 
-        seek(nextTime);
+        if (nextTime >= durationMs && options?.loop && durationMs > 0) {
+          // Loop: wrap around, keeping the overflow
+          const wrapped = nextTime % durationMs;
 
-        if (currentTime >= durationMs) {
-          active = false;
+          seek(wrapped);
+        } else {
+          seek(nextTime);
 
-          return;
+          if (currentTime >= durationMs) {
+            active = false;
+
+            return;
+          }
         }
       }
 

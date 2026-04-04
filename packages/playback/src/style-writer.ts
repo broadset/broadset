@@ -95,3 +95,26 @@ export function applyStylesToElement(container: HTMLElement, styles: Readonly<Re
     }
   }
 }
+
+/**
+ * Remove specific CSS properties from the correct sub-targets.
+ *
+ * Uses the same routing rules as `applyStylesToElement`:
+ * opacity → opacity target, everything else → content target.
+ *
+ * @param container  The root element (element wrapper in the DOM)
+ * @param properties camelCase CSS property names to remove
+ */
+export function clearStylesFromElement(container: HTMLElement, properties: readonly string[]): void {
+  const { content: contentTarget, opacity: opacityTarget } = resolveTargets(container);
+
+  for (const key of properties) {
+    if (key === 'opacity' && opacityTarget) {
+      opacityTarget.style.removeProperty(camelToKebab(key));
+    } else {
+      const target = contentTarget ?? container;
+
+      target.style.removeProperty(camelToKebab(key));
+    }
+  }
+}

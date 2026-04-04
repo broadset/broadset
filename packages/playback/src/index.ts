@@ -22,8 +22,12 @@ export type { ModifierTimelines } from './resolve-timeline';
 export { resolveModifierTimelines, resolveStateTimeline } from './resolve-timeline';
 
 // Style writer
-export { applyStylesToElement, camelToKebab, invalidateStyleTargetCache } from './style-writer';
+export { applyStylesToElement, camelToKebab, clearStylesFromElement, invalidateStyleTargetCache } from './style-writer';
 
 // Playback handle
 export type { PlaybackHandle, PlaybackHandleOptions } from './playback-handle';
 export { createPlaybackHandle } from './playback-handle';
+
+// Playback controller
+export type { PlaybackController, PlaybackControllerOptions } from './playback-controller';
+export { createPlaybackController } from './playback-controller';
