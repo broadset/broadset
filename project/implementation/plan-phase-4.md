@@ -85,8 +85,8 @@ _UI specs:_ `ui/toolbar-nav.md` (undo/redo buttons, updated page sorter)
 - [x] tests: red — editor/store-ui-actions
 - [x] tests: red — editor/canvas
 - [x] impl: green — all
-- [ ] **HeroUI verified** — no raw HTML elements in ui/ files
-- [ ] demo milestone: add/remove pages; undo/redo buttons work; zoom and pan
+- [x] **HeroUI verified** — no raw HTML elements in ui/ files
+- [x] demo milestone: add/remove pages; undo/redo buttons work; zoom and pan
       canvas; grid visible; rulers rendered; drag from ruler creates a guide;
       safety overlay visible in broadcast mode
 

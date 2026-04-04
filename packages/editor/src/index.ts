@@ -1,3 +1,18 @@
+export type { AnimationStateActions } from './animation-state';
+export {
+  applyElementState,
+  disableModifier,
+  enableModifier,
+  removeModifierBinding,
+  removeStateBinding,
+  removeTimeline,
+  reorderStateBindings,
+  setModifierBinding,
+  setStateBinding,
+  toggleModifier,
+  updateScreenClipPath,
+  upsertTimeline,
+} from './animation-state';
 export type { GridLine, RulerTick, SafetyRect } from './canvas';
 export {
   computeGridLines,
