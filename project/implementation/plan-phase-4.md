@@ -156,9 +156,9 @@ _Editor specs:_ `editor/collaboration.md`
 _Demo:_ `demo/config.md`, `demo/state.md` (provider wiring, persistence,
 toasts, fullscreen)
 
-- [ ] tests: red — editor/collaboration
-- [ ] impl: green
-- [ ] demo milestone: change stream logs batches to console with cumulative
+- [x] tests: red — editor/collaboration
+- [x] impl: green
+- [x] demo milestone: change stream logs batches to console with cumulative
       count; sidebar width and active tab persist across page reload; export/import
       toasts appear; fullscreen toggle works; ≥5 fonts, ≥8 palette colors, ≥1
       custom plugin, ≥1 required element all configured

@@ -61,3 +61,13 @@ Non-trivial judgment calls made during implementation. See each unit for context
 **Alternatives considered:** (a) Add an index signature to `BroadsetScreenProps` in the model — would weaken the model's type safety for all consumers. (b) Use `PageElement` and cast back to `BroadsetElement` when needed — lots of unsafe casts throughout the store. (c) Make `PageElement.screen` typed as `BroadsetScreenProps` — would be a breaking change to the model's serialization-friendly `PageElement` interface.
 
 **Rationale:** Under strict TypeScript (`exactOptionalPropertyTypes`, no index signatures), `BroadsetScreenProps` is not assignable to `Record<string, unknown>`. The editor works with fully typed elements internally, so using `BroadsetElement` directly is both safer and simpler. Conversion to/from `BroadsetDocument` happens at the boundary (load/save).
+
+---
+
+### Unit 4-I — Collaboration diffing via shallow comparison
+
+**Decision:** Document diffing uses shallow equality per top-level element property (position, width, height, style, screen) rather than deep recursive property-level diffs.
+
+**Alternatives considered:** (a) Deep recursive property-level diffs producing granular changes like `style.opacity` — much more complex to implement, harder to roundtrip, and the collaboration spec doesn't require sub-property granularity. (b) Using a third-party diff library like `deep-diff` — adds dependency for a straightforward feature.
+
+**Rationale:** The spec defines change types as `element:update` with a `path` field. Shallow comparison at the top-level property level (position, style, screen) is sufficient for the change stream's primary purpose of logging and remote synchronization. A host that needs deeper granularity can diff the old/new values in the change payload itself.
