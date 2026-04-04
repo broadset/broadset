@@ -31,3 +31,23 @@ Non-trivial judgment calls made during implementation. See each unit for context
 **Alternatives considered:** (a) `as const` on entire object — breaks due to spread operators with DEFAULT_SCREEN/DEFAULT_STYLE producing mutable types. (b) Runtime Zod parsing at module load — adds import-time cost and Zod runtime dep to demo bundle. (c) Type annotation `BroadsetDocument` on constant — fails because `readonly` arrays in interface vs mutable arrays in Zod-inferred type.
 
 **Rationale:** Minimal `as const` on the two widened fields + cast at consumption site is the least invasive. The constant is runtime-validated via Zod in tests.
+
+---
+
+### Unit 3.3 — PlaybackController architecture (factory vs class)
+
+**Decision:** Used a closure-based factory function (`createPlaybackController`) rather than a class, consistent with the existing `createPlaybackHandle` pattern.
+
+**Alternatives considered:** (a) Class-based controller — more natural for stateful objects with many mutable fields, but would be inconsistent with the rest of the package. (b) Separate controller per element — simpler per-element state, but the spec requires global play/pause/seek/setSpeed that affect all elements.
+
+**Rationale:** Factory pattern keeps the public API consistent with `createPlaybackHandle` and other playback exports. Internal mutable state is encapsulated via closure variables with `/* mutable */` comments.
+
+---
+
+### Unit 3.3 — Playback loop at handle level (not controller)
+
+**Decision:** Implemented loop wrapping in `createPlaybackHandle` (via `options.loop`) rather than in the controller.
+
+**Alternatives considered:** Controller-level loop management that restarts timelines — would require the controller to detect timeline completion and re-trigger, adding significant complexity and coupling.
+
+**Rationale:** The handle already owns the rAF loop and timing. Adding modular wrapping there is minimal code (6 lines vs a callback-based coordinator). The controller can pass `loop: true` when creating handles if needed.

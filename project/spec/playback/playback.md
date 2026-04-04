@@ -395,9 +395,11 @@ Multiple timelines MAY play simultaneously on different elements. However, only 
 
 ## Spec Gaps
 
-- [x] **Style Writer Target Routing — fallback to container:** Automated test coverage for the case where no `[data-element-content]` is present (fall back to container element) now exists.
-- [ ] **Settle Timer Behavior — reset on mutation:** Automated test coverage for settle timer reset on a new class mutation during an active settle window does not yet exist.
-- [ ] **Simultaneous Timeline Playback:** No automated tests currently cover single-element timeline cancellation-on-replacement or the associated style cleanup. Tests covering multi-element independent playback also need to be added.
+- [x] **Style Writer Target Routing — fallback to container:** Automated test coverage now exists.
+- [x] **Settle Timer Behavior — reset on mutation:** Automated test coverage now exists.
+- [x] **Simultaneous Timeline Playback:** Automated tests now cover single-element cancellation-on-replacement, style cleanup, and multi-element independence.
+- [ ] **Visibility transition post-animation:** When an OUT timeline finishes playing (non-suppress mode), the element should become hidden. No automated coverage for this post-animation callback exists yet.
+- [ ] **State cleared to null:** When `activeState` transitions from a named state to `null`, the previous state's timeline control should be stopped. No automated test exists for this case.
 
 ---
 
