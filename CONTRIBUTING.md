@@ -21,6 +21,14 @@ Run the relevant verification before considering work complete:
 
 All React components in `packages/ui` and `packages/demo` **MUST** use `@heroui/react` components for UI chrome. Before committing, verify that no raw HTML elements (`<button>`, `<input>`, `<select>`, `<textarea>`) are used where HeroUI equivalents exist. See `AGENTS.md` and `.github/instructions/heroui.instructions.md` for the full checklist.
 
+## Package Boundary Gate
+
+Imports must respect the dependency graph defined in `project/implementation/architecture.md`. Before committing, verify that no package imports from a workspace package it is not allowed to depend on. See `AGENTS.md` → "Package boundary rules" for the full matrix.
+
+## Barrel Export Gate
+
+Every new public type, function, or component MUST be exported from the package's `index.ts`. Consumers must be able to `import { Foo } from '@broadset/pkg'` — never from internal file paths.
+
 ## Development
 
 ```bash

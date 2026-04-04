@@ -343,8 +343,12 @@ git diff main
 
 3. **Review every file in the diff.** For each one, evaluate ruthlessly:
    - **Architecture** — Does this file belong in this package? Is the logic in the right layer? Are there misplaced utilities dumped into unrelated files?
+   - **Package boundaries** — Do all imports respect the dependency graph in `architecture.md`? Are required external deps actually in `package.json`?
+   - **Barrel exports** — Are all new public symbols exported from `index.ts`?
+   - **HeroUI compliance** — If `packages/ui/` or `packages/demo/` files are in the diff, grep for raw `<button`, `<input`, `<select`, `<textarea` — any hits (outside test mocks) are violations.
    - **Correctness** — Are there off-by-one errors, wrong comparisons, missing edge cases, silent failures, or logic that only works for happy paths?
    - **Type safety** — Any `any`, unsafe casts, overly permissive generics, or types that should be narrower?
+   - **File size** — Any file exceeding 500 non-empty lines? Split it.
    - **Code smells** — Dead code, copy-paste duplication, magic numbers, overly clever code, misleading names, grab-bag files, functions doing too many things?
    - **Shortcuts** — Suppression comments, TODO stubs, hardcoded values that should be constants, weakened configs, placeholder implementations?
    - **Performance** — Unnecessary allocations in hot paths, O(n²) where O(n) is possible, redundant iterations, expensive operations inside loops?
@@ -381,6 +385,9 @@ git commit -m "fix(<pkg>): phase N review — <description>"
 | JSDoc on every test     | Future loops need the reasoning                                                           |
 | Quality before commit   | `npm run quality` must be green before `git commit`                                       |
 | PR Review before commit | Ruthless zero-context review of `git diff --cached` — fix all findings before committing  |
+| Package boundaries      | Imports must respect `architecture.md` dependency graph — never import across boundaries  |
+| Barrel exports          | Every new public symbol must be exported from the package's `index.ts`                    |
+| HeroUI compliance       | No raw HTML elements in `packages/ui/` or `packages/demo/` when HeroUI equivalents exist  |
 | Commit after every unit | A bad loop is cheap to recover with `git reset --hard`                                    |
 | End-of-phase review     | Full-branch adversarial review against main — fix all bugs and smells before reporting    |
 | No permission-seeking   | Never ask "should I continue?" — just proceed                                             |

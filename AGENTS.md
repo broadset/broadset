@@ -35,6 +35,23 @@ Agents may update specs in `project/spec/` during implementation, but only as **
 
 If you believe a spec is genuinely wrong, **stop and report it** — do not change it yourself.
 
+## Package boundary rules
+
+Every package has strict import boundaries defined in `project/implementation/architecture.md`. These are non-negotiable:
+
+- `model` MUST NOT import any other workspace package
+- `playback` MUST only import `model`
+- `renderer` MUST only import `model` and `playback`
+- `editor` MUST only import `model`, `playback`, and `renderer`
+- `formats` MUST only import `model` and `playback`
+- `ui` MUST only import via its peer dependencies (`editor`, `formats`, `model`, `renderer`)
+- `demo` MAY import all packages
+
+Additionally:
+
+- **Barrel exports:** Every package must have a well-maintained `index.ts` that re-exports the public API. New public types, functions, and components MUST be added to `index.ts`. Consumers import from the package root — never from internal file paths.
+- **Required dependencies:** If `architecture.md` lists an external dependency for a package (e.g., `@heroui/react` for `ui`), it MUST be in that package's `package.json` before the unit is marked complete.
+
 ## HeroUI mandate — `packages/ui` and `packages/demo`
 
 The `packages/ui` package and any user-facing React components in `packages/demo` **MUST** use `@heroui/react` components for all UI chrome (toolbars, sidebars, panels, modals, inputs, toggles, tabs, accordions). Building custom equivalents with raw `<button>`, `<div>`, `<input>` etc. when a HeroUI component exists is **forbidden**.

@@ -1,15 +1,15 @@
-import type { EditorDocument, EditorPage, EditorStore } from '@broadset/editor';
-import { createEditorStore } from '@broadset/editor';
-import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle, PageElement } from '@broadset/model';
+import type { EditorStore } from '@broadset/editor';
+import { computeGridLines, computeSafetyBoundaries, createEditorStore } from '@broadset/editor';
+import type { BroadsetElementStyle } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { DocumentRenderer } from '@broadset/renderer';
-import type { ElementTypeInfo, LayerInfo, PanelElement } from '@broadset/ui';
+import type { ElementTypeInfo } from '@broadset/ui';
 import { ElementLibrary, LayersSidebar, PageSorter, PropertiesSidebar } from '@broadset/ui';
-import type { JSX, MouseEvent } from 'react';
+import type { JSX, MouseEvent, WheelEvent } from 'react';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { createDemoController } from './animationSetup';
-import { SAMPLE_DOCUMENT } from './sampleDocument';
+import { elementsToLayers, elementToPanelElement, sampleToEditorDocument, toRendererDoc } from './converters';
 
 // ---------------------------------------------------------------------------
 // Element type registry for the toolbar
@@ -24,97 +24,6 @@ const ELEMENT_TYPES: readonly ElementTypeInfo[] = [
   { type: 'ellipse', label: 'Ellipse' },
   { type: 'qrcode', label: 'QR Code' },
 ];
-
-// ---------------------------------------------------------------------------
-// Document conversion utilities
-// ---------------------------------------------------------------------------
-
-function sampleToEditorDocument(): EditorDocument {
-  return {
-    id: SAMPLE_DOCUMENT.id,
-    documentMode: SAMPLE_DOCUMENT.documentMode,
-    canvas: SAMPLE_DOCUMENT.canvas,
-    pages: SAMPLE_DOCUMENT.pages.map(
-      (page): EditorPage => ({
-        id: page.id,
-        elements: page.elements.map(
-          (el): BroadsetElement => ({
-            id: el.id,
-            type: el.type,
-            position: el.position,
-            width: el.width,
-            height: el.height,
-            rotation: el.rotation,
-            content: el.content,
-            parentId: el.parentId,
-            groupId: el.groupId,
-            screen: el.screen,
-            style: el.style,
-          }),
-        ),
-      }),
-    ),
-    animationRegistry: SAMPLE_DOCUMENT.animationRegistry,
-  };
-}
-
-function elementToPageElement(el: BroadsetElement): PageElement {
-  return {
-    id: el.id,
-    type: el.type,
-    position: el.position,
-    width: el.width,
-    height: el.height,
-    rotation: el.rotation,
-    content: el.content,
-    parentId: el.parentId,
-    groupId: el.groupId,
-    screen: Object.fromEntries(Object.entries(el.screen)),
-    style: Object.fromEntries(Object.entries(el.style)),
-  };
-}
-
-function toRendererDoc(doc: EditorDocument): BroadsetDocument {
-  return {
-    id: doc.id,
-    documentMode: doc.documentMode,
-    canvas: doc.canvas,
-    pages: doc.pages.map((page) => ({
-      id: page.id,
-      elements: page.elements.map(elementToPageElement),
-    })),
-    animationRegistry: doc.animationRegistry,
-  };
-}
-
-function elementToPanelElement(el: BroadsetElement): PanelElement {
-  return {
-    id: el.id,
-    type: el.type,
-    name: el.content || el.id,
-    x: el.position.x,
-    y: el.position.y,
-    width: el.width,
-    height: el.height,
-    rotation: el.rotation,
-    backgroundColor: el.style.backgroundColor ?? '',
-    borderWidth: el.style.borderWidth ?? 0,
-    borderColor: el.style.borderColor ?? '',
-    borderStyle: el.style.borderStyle ?? 'none',
-    borderRadius: typeof el.style.borderRadius === 'number' ? el.style.borderRadius : 0,
-    opacity: el.style.opacity,
-    blendMode: el.style.mixBlendMode ?? 'normal',
-  };
-}
-
-function elementsToLayers(elements: readonly BroadsetElement[]): readonly LayerInfo[] {
-  return elements.map((el) => ({
-    id: el.id,
-    name: el.content || el.id,
-    locked: false,
-    visible: true,
-  }));
-}
 
 // ---------------------------------------------------------------------------
 // App component
@@ -139,6 +48,10 @@ export default function App(): JSX.Element {
   const activeElementIds = useSyncExternalStore(store.subscribe, () => store.getState().activeElementIds);
 
   const documentMode = useSyncExternalStore(store.subscribe, () => store.getState().documentMode);
+
+  const canvasSettings = useSyncExternalStore(store.subscribe, () => store.getState().canvasSettings);
+
+  const gridSettings = useSyncExternalStore(store.subscribe, () => store.getState().gridSettings);
 
   // --- Refs ---
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -264,42 +177,18 @@ export default function App(): JSX.Element {
 
   const handlePageSelect = useCallback(
     (index: number): void => {
-      store.setState({ activePageIndex: index });
+      store.getState().switchPage(index);
     },
     [store],
   );
 
   const handlePageAdd = useCallback((): void => {
-    const state = store.getState();
-    const newPage: EditorPage = {
-      id: `page-${crypto.randomUUID()}`,
-      elements: [],
-    };
-
-    state.setDocument({
-      ...state.document,
-      pages: [...state.document.pages, newPage],
-    });
+    store.getState().addPage();
   }, [store]);
 
   const handlePageRemove = useCallback(
     (index: number): void => {
-      const state = store.getState();
-
-      if (state.document.pages.length <= 1) {
-        return;
-      }
-
-      const newPages = state.document.pages.filter((_, i) => i !== index);
-
-      state.setDocument({
-        ...state.document,
-        pages: newPages,
-      });
-
-      if (state.activePageIndex >= newPages.length) {
-        store.setState({ activePageIndex: newPages.length - 1 });
-      }
+      store.getState().removePage(index);
     },
     [store],
   );
@@ -360,6 +249,33 @@ export default function App(): JSX.Element {
     },
     [store],
   );
+
+  const handleUndo = useCallback((): void => {
+    store.getState().undo();
+  }, [store]);
+
+  const handleRedo = useCallback((): void => {
+    store.getState().redo();
+  }, [store]);
+
+  const handleWheel = useCallback(
+    (e: WheelEvent<HTMLDivElement>): void => {
+      e.preventDefault();
+
+      const state = store.getState();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Math.max(0.1, Math.min(10, state.canvasSettings.zoom * delta));
+
+      state.updateCanvasSettings({ zoom: newZoom });
+    },
+    [store],
+  );
+
+  const handleToggleGrid = useCallback((): void => {
+    const gs = store.getState().gridSettings;
+
+    store.getState().updateGridSettings({ showGrid: !gs.showGrid });
+  }, [store]);
 
   // --- Derived data ---
 
@@ -425,8 +341,74 @@ export default function App(): JSX.Element {
             position: 'relative',
             overflow: 'hidden',
           }}
+          onWheel={handleWheel}
         >
-          <div ref={canvasRef} onClick={handleCanvasClick} style={{ transformOrigin: 'center center' }} />
+          <div
+            style={{
+              position: 'relative',
+              transform: `scale(${String(canvasSettings.zoom)})`,
+              transformOrigin: 'center center',
+            }}
+          >
+            <div ref={canvasRef} onClick={handleCanvasClick} />
+
+            {/* Grid overlay */}
+            {gridSettings.showGrid ?
+              <svg
+                data-testid="grid-overlay"
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+              >
+                {computeGridLines({
+                  canvasWidth: editorDoc.canvas.width,
+                  canvasHeight: editorDoc.canvas.height,
+                  gridSize: gridSettings.gridSize,
+                  zoom: 1,
+                }).map((line) =>
+                  line.axis === 'v' ?
+                    <line
+                      key={`v-${String(line.position)}`}
+                      x1={line.position}
+                      y1={0}
+                      x2={line.position}
+                      y2={editorDoc.canvas.height}
+                      stroke="rgba(0,0,0,0.1)"
+                      strokeWidth={0.5}
+                    />
+                  : <line
+                      key={`h-${String(line.position)}`}
+                      x1={0}
+                      y1={line.position}
+                      x2={editorDoc.canvas.width}
+                      y2={line.position}
+                      stroke="rgba(0,0,0,0.1)"
+                      strokeWidth={0.5}
+                    />,
+                )}
+              </svg>
+            : null}
+
+            {/* Safety boundaries */}
+            {computeSafetyBoundaries({
+              canvasWidth: editorDoc.canvas.width,
+              canvasHeight: editorDoc.canvas.height,
+              padding: editorDoc.canvas.padding,
+              viewMode: canvasSettings.viewMode,
+            }).map((rect, idx) => (
+              <div
+                key={`safety-${String(idx)}`}
+                data-testid="safety-boundary"
+                style={{
+                  position: 'absolute',
+                  left: rect.x,
+                  top: rect.y,
+                  width: rect.width,
+                  height: rect.height,
+                  backgroundColor: 'rgba(255,0,0,0.08)',
+                  pointerEvents: 'none',
+                }}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Properties sidebar */}
@@ -464,6 +446,35 @@ export default function App(): JSX.Element {
           onPageAdd={handlePageAdd}
           onPageRemove={handlePageRemove}
         />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            data-testid="undo-button"
+            onClick={handleUndo}
+            type="button"
+            style={{ padding: '8px 16px', fontSize: 14, cursor: 'pointer' }}
+          >
+            Undo
+          </button>
+          <button
+            data-testid="redo-button"
+            onClick={handleRedo}
+            type="button"
+            style={{ padding: '8px 16px', fontSize: 14, cursor: 'pointer' }}
+          >
+            Redo
+          </button>
+          <button
+            data-testid="grid-toggle"
+            onClick={handleToggleGrid}
+            type="button"
+            style={{ padding: '8px 16px', fontSize: 14, cursor: 'pointer' }}
+          >
+            {gridSettings.showGrid ? 'Hide Grid' : 'Show Grid'}
+          </button>
+          <span style={{ fontSize: 12, display: 'flex', alignItems: 'center' }}>
+            Zoom: {Math.round(canvasSettings.zoom * 100)}%
+          </span>
+        </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             data-testid="play-button"
