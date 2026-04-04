@@ -98,6 +98,10 @@ Dragging on the canvas background MUST create a selection rectangle. All element
 
 The canvas MUST support zoom (via scroll wheel or pinch gesture) and pan (via background drag or modifier key). Zoom and pan values MUST be reflected in CanvasSettings.
 
+Zoom MUST be clamped to a range of **0.1** (10%) to **4.0** (400%). Each scroll-wheel tick MUST change the zoom by **0.1** (10 percentage points). Zoom MUST be centered on the pointer position so the point under the cursor remains stationary. The editor MUST provide a **zoom-to-fit** action that scales and pans the viewport so the full document fits within the visible canvas area with a small margin.
+
+The current zoom level MUST be displayed in the toolbar as a percentage (e.g. "100%").
+
 #### Scenario: Zoom changes viewport scale
 
 - GIVEN zoom at 1.0
@@ -110,10 +114,33 @@ The canvas MUST support zoom (via scroll wheel or pinch gesture) and pan (via ba
 - WHEN the user pans right by 100px
 - THEN canvasSettings.panX is 100
 
+#### Scenario: Zoom clamped at maximum
+
+- GIVEN zoom at 4.0
+- WHEN the user scrolls to zoom in further
+- THEN zoom remains at 4.0
+
+#### Scenario: Zoom clamped at minimum
+
+- GIVEN zoom at 0.1
+- WHEN the user scrolls to zoom out further
+- THEN zoom remains at 0.1
+
+#### Scenario: Zoom-to-fit
+
+- GIVEN a 1920×1080 document with the viewport showing only a corner
+- WHEN zoom-to-fit is invoked
+- THEN the viewport scales and pans so the full document is visible with margin
+
 #### Acceptance Criteria
 
 - [ ] Given a zoom operation, canvasSettings.zoom is updated and the viewport scales
 - [ ] Given a pan operation, canvasSettings.panX/panY are updated
+- [ ] Given zoom at 4.0, further zoom-in is clamped
+- [ ] Given zoom at 0.1, further zoom-out is clamped
+- [ ] Given scroll-wheel zoom, the zoom changes by 0.1 per tick
+- [ ] Given scroll-wheel zoom, the zoom centers on the pointer position
+- [ ] Given zoom-to-fit, the viewport scales and pans to show the full document
 
 ---
 
@@ -236,7 +263,7 @@ Rapidly cycling selection across multiple elements MUST NOT produce stale or inc
 
 ### Requirement: Canvas Inline Text Editing Mode
 
-The canvas MUST support an inline text editing mode that activates on double-click of a text element. During this mode the canvas MUST render a `contenteditable` overlay positioned and sized to match the text element's bounding box, adjusted for the current zoom level. The overlay MUST be zoom-compensated: text size and position MUST visually match the element's rendered appearance at the current zoom level. Canvas pan/zoom interactions MUST be suppressed while inline editing is active. The canvas MUST exit inline editing mode on Escape, Enter (for commit), or click-outside events.
+The canvas MUST support an inline text editing mode that activates on double-click of a text element. During this mode the canvas MUST render a `contenteditable` overlay positioned and sized to match the text element's bounding box, adjusted for the current zoom level. The overlay MUST be zoom-compensated: text size and position MUST visually match the element's rendered appearance at the current zoom level. Canvas pan/zoom interactions MUST be suppressed while inline editing is active. The canvas MUST exit inline editing mode on Escape (cancel, discarding changes), click-outside (commit), or blur events. The overlay MUST have a visible border using the `--accent` color token so the user can see the editing boundary. The overlay MUST have a minimum size of 20×10px (screen pixels) to remain usable at small zoom levels.
 
 #### Scenario: Double-click at non-default zoom
 
@@ -255,6 +282,107 @@ The canvas MUST support an inline text editing mode that activates on double-cli
 - [ ] Given a double-click on a text element, a `contenteditable` overlay appears at the element's position
 - [ ] Given inline editing at a non-100% zoom level, the overlay position and size are zoom-compensated
 - [ ] Given inline editing mode, canvas pan and zoom are suppressed
+- [ ] Given Escape during inline editing, changes are discarded and editing exits
+- [ ] Given click-outside during inline editing, changes are committed and editing exits
+- [ ] Given the overlay, it has a visible border using the `--accent` color token
+- [ ] Given a very small element at low zoom, the overlay is at least 20×10px
+
+---
+
+### Requirement: Space-Bar Pan Mode
+
+Holding the Space bar MUST temporarily switch the canvas cursor to a grab/pan cursor regardless of the current tool. While Space is held, clicking and dragging MUST pan the viewport. Releasing Space MUST restore the previous cursor and tool behavior. Space-bar pan MUST NOT activate while inline text editing is active.
+
+#### Scenario: Space-bar panning
+
+- GIVEN the pointer tool is active
+- WHEN Space is held and the user drags on the canvas
+- THEN the viewport pans and the cursor shows a grab icon
+
+#### Scenario: Space released restores tool
+
+- GIVEN Space is held (pan mode)
+- WHEN Space is released
+- THEN the cursor and tool behavior return to normal
+
+#### Scenario: Space-bar suppressed during text editing
+
+- GIVEN inline text editing is active
+- WHEN Space is pressed
+- THEN normal text input occurs (no pan mode)
+
+#### Acceptance Criteria
+
+- [ ] Given Space held, the cursor changes to a grab icon
+- [ ] Given Space held and drag, the viewport pans
+- [ ] Given Space released, the previous cursor and tool are restored
+- [ ] Given inline text editing active, Space does not trigger pan mode
+
+---
+
+### Requirement: Marquee Selection Visual
+
+The marquee selection rectangle MUST render with a semi-transparent fill using `--accent` at low opacity and a dashed border using `--accent` at full opacity. The dash pattern MUST be visible at all zoom levels.
+
+#### Scenario: Marquee visual appearance
+
+- GIVEN the user is dragging a selection marquee
+- WHEN the rectangle is visible
+- THEN it has a semi-transparent accent fill and a dashed accent border
+
+#### Acceptance Criteria
+
+- [ ] Given a marquee drag, the rectangle has a semi-transparent `--accent` fill
+- [ ] Given a marquee drag, the rectangle has a dashed `--accent` border
+
+---
+
+### Requirement: Snap Guide Line Visual
+
+Snap guide lines (generated during element drag/resize when edges or centers align) MUST render as thin solid lines using the `--accent` color. They MUST span the full visible canvas area along the axis of alignment (horizontal or vertical).
+
+#### Scenario: Snap guide appears during drag
+
+- GIVEN element A is being dragged near element B's left edge
+- WHEN element A's left edge aligns within the snap threshold
+- THEN a vertical `--accent` line appears spanning the full canvas height at that x-position
+
+#### Acceptance Criteria
+
+- [ ] Given a snap alignment, a guide line is rendered in `--accent` color
+- [ ] Given a snap guide, it spans the full visible canvas along the alignment axis
+- [ ] Given the drag ends, snap guide lines are removed
+
+---
+
+### Requirement: User Guide Line Visual
+
+User-created guide lines (dragged from rulers) MUST render as thin solid lines using a distinct color from snap guides (e.g. `--danger` or a dedicated guide color token). Guides MUST have a hover hit area wider than the visible line to make them easy to grab. Locked guides MUST show a different opacity or dash pattern to indicate they cannot be moved. Dragging a guide back onto the ruler area MUST remove it.
+
+#### Scenario: Guide line appearance
+
+- GIVEN a horizontal guide at position 100mm
+- WHEN the canvas is rendered
+- THEN a thin horizontal line is visible at 100mm in the guide color
+
+#### Scenario: Guide removal by dragging to ruler
+
+- GIVEN an unlocked guide line
+- WHEN the user drags it back to the ruler area
+- THEN the guide is removed
+
+#### Scenario: Locked guide visual
+
+- GIVEN a locked guide line
+- WHEN the canvas is rendered
+- THEN the guide renders with reduced opacity or a dashed pattern
+
+#### Acceptance Criteria
+
+- [ ] Given a user guide, it renders as a solid line in the guide color
+- [ ] Given a guide, the hover hit area is wider than the visible line
+- [ ] Given a locked guide, it has a distinct visual (reduced opacity or dashed)
+- [ ] Given a guide dragged to the ruler area, the guide is removed
 
 ---
 

@@ -118,18 +118,27 @@ The editor provider MUST wrap the editor component tree, providing store access 
 
 ### Requirement: Error Boundary Recovery
 
-The editor error boundary MUST catch rendering errors in the editor tree and display a recovery UI instead of crashing the entire application.
+The editor error boundary MUST catch rendering errors in the editor tree and display a recovery UI instead of crashing the entire application. The fallback UI MUST display: a heading ("Something went wrong"), the error message text (for debugging), and a "Reload" button that reloads the page. The fallback MUST be styled with `--surface` background, centered in the canvas area, and use the `--danger` color for the heading icon. The error boundary MUST log the caught error to `console.error` with the component stack.
 
 #### Scenario: Rendering error caught
 
 - GIVEN a rendering error in an editor child component
 - WHEN the error propagates
-- THEN the error boundary catches it and displays a fallback UI
+- THEN the error boundary catches it and displays a fallback UI with heading, error message, and reload button
 - AND the rest of the application continues functioning
+
+#### Scenario: Reload button reloads page
+
+- GIVEN the error boundary fallback is displayed
+- WHEN the user clicks the Reload button
+- THEN the page reloads
 
 #### Acceptance Criteria
 
 - [ ] Given a rendering error in the editor tree, a fallback UI is displayed instead of a crash
+- [ ] Given the fallback UI, it shows a heading, the error message, and a Reload button
+- [ ] Given the fallback UI, it is centered in the canvas area with `--surface` background
+- [ ] Given a caught error, it is logged to console.error with component stack
 
 ---
 

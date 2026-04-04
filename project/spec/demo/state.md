@@ -54,6 +54,14 @@ Sidebar open/closed state, active tab, and drawer width MUST persist to localSto
 
 Export success/failure, import success/failure, save, and placement mode actions MUST display auto-dismissing toast notifications. Success and info toasts MUST dismiss after approximately 3 seconds. Error toasts MUST dismiss after approximately 5 seconds.
 
+Toasts MUST be positioned at the **bottom-right** of the viewport, stacked vertically with the newest toast on top. Each toast MUST contain a severity icon (check-circle for success, alert-triangle for error, info for info), a message string, and an optional close button to dismiss early. Toasts MUST slide in from the right edge with the `--transition-fast` token and slide out when dismissing. Multiple toasts MUST stack without overlapping, each offset vertically by the previous toast's height plus `sp-02` spacing.
+
+| Severity | Icon            | Auto-dismiss | Background                             |
+| -------- | --------------- | ------------ | -------------------------------------- |
+| success  | `CheckCircle`   | ~3 seconds   | `--surface` + green accent border      |
+| error    | `AlertTriangle` | ~5 seconds   | `--surface` + `--danger` accent border |
+| info     | `Info`          | ~3 seconds   | `--surface` + `--accent` accent border |
+
 #### Scenario: Export success toast
 
 - GIVEN an export completes successfully
@@ -71,6 +79,10 @@ Export success/failure, import success/failure, save, and placement mode actions
 - [ ] Given a successful action, a success toast appears and auto-dismisses after ~3 seconds
 - [ ] Given a failed action, an error toast appears and auto-dismisses after ~5 seconds
 - [ ] Given multiple simultaneous toasts, all are visible and dismiss independently
+- [ ] Given a toast, it is positioned at the bottom-right of the viewport
+- [ ] Given multiple toasts, they stack vertically with newest on top
+- [ ] Given a toast, it slides in from the right and slides out when dismissing
+- [ ] Given a toast, it contains a severity icon, message, and close button
 
 ---
 

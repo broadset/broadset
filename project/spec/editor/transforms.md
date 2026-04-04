@@ -35,6 +35,21 @@ Dragging a selected element MUST update its position. During drag, updates are e
 
 The transform widget MUST provide 8 resize handles (nw, n, ne, e, se, s, sw, w). Dragging a handle MUST change the element's width and/or height. Corner handles resize both axes; edge handles resize one axis.
 
+Each handle MUST display an appropriate resize cursor based on its position:
+
+| Handle | Cursor      |
+| ------ | ----------- |
+| nw     | `nw-resize` |
+| n      | `n-resize`  |
+| ne     | `ne-resize` |
+| e      | `e-resize`  |
+| se     | `se-resize` |
+| s      | `s-resize`  |
+| sw     | `sw-resize` |
+| w      | `w-resize`  |
+
+Handles MUST be rendered as small squares (sized in screen pixels, not canvas units, so they remain a consistent size regardless of zoom). Handle fill MUST use `--accent` color. Handle border MUST be white for contrast.
+
 #### Scenario: Corner resize
 
 - GIVEN a selected element with width 80, height 50
@@ -51,12 +66,15 @@ The transform widget MUST provide 8 resize handles (nw, n, ne, e, se, s, sw, w).
 
 - [ ] Given a corner handle drag, both width and height change
 - [ ] Given an edge handle drag, only the corresponding axis changes
+- [ ] Given each handle position, the appropriate directional resize cursor is shown
+- [ ] Given any zoom level, handles remain a constant screen-pixel size
+- [ ] Given handles, they are rendered as `--accent` filled squares with white borders
 
 ---
 
 ### Requirement: Rotation
 
-A rotation handle MUST allow rotating the element. Rotation is stored in degrees.
+A rotation handle MUST allow rotating the element. Rotation is stored in degrees. The rotation handle MUST be positioned above the top-center of the selection bounds, offset vertically from the bounding box. It MUST display a `grab` cursor on hover and a `grabbing` cursor during drag. A thin line MUST connect the rotation handle to the top-center of the bounding box.
 
 #### Scenario: Rotate element
 
@@ -67,6 +85,9 @@ A rotation handle MUST allow rotating the element. Rotation is stored in degrees
 #### Acceptance Criteria
 
 - [ ] Given a rotation handle drag, the element's rotation updates in degrees
+- [ ] Given the rotation handle, it is positioned above top-center of the bounding box
+- [ ] Given hover on the rotation handle, the cursor is `grab`; during drag it is `grabbing`
+- [ ] Given the rotation handle, a thin line connects it to the bounding box top-center
 
 ---
 

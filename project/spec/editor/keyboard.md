@@ -188,6 +188,142 @@ Copy and paste operations use an internal clipboard scoped to the editor instanc
 
 ---
 
+### Requirement: Undo and Redo Shortcuts
+
+Ctrl+Z MUST invoke undo. Ctrl+Y (or Ctrl+Shift+Z) MUST invoke redo. Both MUST operate on the undo/redo history stack, reverting or re-applying the most recent committed operation.
+
+#### Scenario: Undo last change
+
+- GIVEN an element was moved from (10, 10) to (50, 50)
+- WHEN Ctrl+Z is pressed
+- THEN the element returns to (10, 10)
+
+#### Scenario: Redo after undo
+
+- GIVEN undo was just performed
+- WHEN Ctrl+Y is pressed
+- THEN the change is re-applied
+
+#### Acceptance Criteria
+
+- [ ] Given Ctrl+Z, the last committed operation is undone
+- [ ] Given Ctrl+Y or Ctrl+Shift+Z, the last undone operation is redone
+- [ ] Given no undo history, Ctrl+Z is a no-op
+- [ ] Given no redo history, Ctrl+Y is a no-op
+
+---
+
+### Requirement: Save Shortcut
+
+Ctrl+S MUST invoke the save action, which delegates to `EditorConfig.onSave`. If `onSave` is not configured, the shortcut MUST be a no-op.
+
+#### Scenario: Save with configured callback
+
+- GIVEN `onSave` is configured
+- WHEN Ctrl+S is pressed
+- THEN the `onSave` callback is invoked with the current document
+
+#### Scenario: Save without callback
+
+- GIVEN `onSave` is not configured
+- WHEN Ctrl+S is pressed
+- THEN nothing happens
+
+#### Acceptance Criteria
+
+- [ ] Given Ctrl+S with `onSave` configured, the callback is invoked
+- [ ] Given Ctrl+S without `onSave`, the shortcut is a no-op
+
+---
+
+### Requirement: Zoom Shortcuts
+
+Ctrl+= (or Ctrl+Plus) MUST zoom in by one step. Ctrl+- (or Ctrl+Minus) MUST zoom out by one step. Ctrl+0 MUST reset zoom to 100% (1.0). Zoom step size and range limits are defined in [canvas.md](canvas.md).
+
+#### Scenario: Zoom in via shortcut
+
+- GIVEN zoom at 1.0
+- WHEN Ctrl+= is pressed
+- THEN zoom increases by one step
+
+#### Scenario: Zoom out via shortcut
+
+- GIVEN zoom at 1.0
+- WHEN Ctrl+- is pressed
+- THEN zoom decreases by one step
+
+#### Scenario: Reset zoom via shortcut
+
+- GIVEN zoom at 2.0
+- WHEN Ctrl+0 is pressed
+- THEN zoom resets to 1.0
+
+#### Acceptance Criteria
+
+- [ ] Given Ctrl+=, zoom increases by one step
+- [ ] Given Ctrl+-, zoom decreases by one step
+- [ ] Given Ctrl+0, zoom resets to 1.0
+- [ ] Given zoom already at maximum, Ctrl+= is a no-op
+- [ ] Given zoom already at minimum, Ctrl+- is a no-op
+
+---
+
+### Requirement: Layer Reorder Shortcuts
+
+`]` MUST bring the selected element(s) forward one position (higher in z-order). `[` MUST send the selected element(s) backward one position. Ctrl+`]` MUST bring the selected element(s) to front (top of z-order). Ctrl+`[` MUST send the selected element(s) to back (bottom of z-order). All layer reorder shortcuts MUST be no-ops with no selection.
+
+#### Scenario: Bring forward
+
+- GIVEN element A is at position 1 of 3 in the layer stack
+- WHEN `]` is pressed
+- THEN element A moves to position 2
+
+#### Scenario: Send to back
+
+- GIVEN element A is at position 2 of 3
+- WHEN Ctrl+`[` is pressed
+- THEN element A moves to position 0 (bottom)
+
+#### Scenario: No selection no-op
+
+- GIVEN no elements are selected
+- WHEN `]` is pressed
+- THEN the layer order is unchanged
+
+#### Acceptance Criteria
+
+- [ ] Given `]`, the selected element moves forward one position
+- [ ] Given `[`, the selected element moves backward one position
+- [ ] Given Ctrl+`]`, the selected element moves to the front
+- [ ] Given Ctrl+`[`, the selected element moves to the back
+- [ ] Given no selection, layer reorder shortcuts are no-ops
+
+---
+
+### Requirement: Toggle Lock Shortcut
+
+Ctrl+Shift+L MUST toggle the `locked` flag on the selected element(s). Locked elements cannot be moved, resized, or rotated via canvas interactions. The shortcut MUST be a no-op with no selection.
+
+#### Scenario: Lock an element
+
+- GIVEN an unlocked selected element
+- WHEN Ctrl+Shift+L is pressed
+- THEN the element is locked
+
+#### Scenario: Unlock an element
+
+- GIVEN a locked selected element
+- WHEN Ctrl+Shift+L is pressed
+- THEN the element is unlocked
+
+#### Acceptance Criteria
+
+- [ ] Given Ctrl+Shift+L on an unlocked element, it becomes locked
+- [ ] Given Ctrl+Shift+L on a locked element, it becomes unlocked
+- [ ] Given no selection, the shortcut is a no-op
+
+---
+
 ## Spec Gaps
 
 - [ ] **Clipboard Scope:** No automated tests verify cross-page paste, clipboard replacement, or clipboard destruction on editor teardown.
