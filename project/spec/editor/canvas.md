@@ -54,6 +54,30 @@ Clicking an element on the canvas MUST select it in the store. Clicking empty ca
 
 ---
 
+### Requirement: Transform Widget
+
+When one or more elements are selected, the canvas MUST display a transform widget around the selection bounds. The widget MUST provide visual handles for resize, rotate, and border-radius adjustment as defined in [transforms.md](transforms.md). Pointer interactions on these handles MUST initiate the corresponding transform operation, updating element geometry via ephemeral updates during drag and committing the final state on drop.
+
+#### Scenario: Widget appears on selection
+
+- GIVEN an element is selected on the canvas
+- WHEN the selection is displayed
+- THEN a transform widget with resize handles, a rotation handle, and (for rectangles) border-radius handles is rendered around the element bounds
+
+#### Scenario: Pointer interaction initiates transform
+
+- GIVEN a selected element with a visible transform widget
+- WHEN the user drags a resize handle, the rotation handle, or the element body
+- THEN the corresponding transform operation (resize, rotate, or translate) is applied to the element in real time
+
+#### Acceptance Criteria
+
+- [ ] Given a selected element, a transform widget with handles is displayed around the element bounds
+- [ ] Given a pointer drag on a widget handle, the corresponding transform operation from [transforms.md](transforms.md) is applied
+- [ ] Given a pointer drag on the element body, the element is translated following the drag
+
+---
+
 ### Requirement: Marquee Selection
 
 Dragging on the canvas background MUST create a selection rectangle. All elements whose bounds intersect the rectangle MUST be selected.
@@ -242,11 +266,12 @@ The canvas MUST support an inline text editing mode that activates on double-cli
 - [ ] **Grid Visibility Toggle:** Showing/hiding grid based on `showGrid` flag is a rendering concern (requires CT).
 - [ ] **Ruler Drag to Guide:** Dragging from ruler to create a guide requires pointer interaction (requires CT).
 - [ ] **Canvas Inline Text Editing Mode:** Overlay appearance, zoom compensation rendering, and pan/zoom suppression during inline editing are not unit-testable (requires CT). The zoom math is covered by `computeInlineEditOverlay` unit tests.
+- [ ] **Transform Widget:** Displaying the widget, rendering handles, and routing pointer events to transform operations are not unit-testable (requires CT). The transform computations are covered by unit tests in `transforms.test.ts`.
 
 ---
 
 ## Non-Goals
 
-- Transform handle interactions (drag, resize, rotate) → see [transforms.md](transforms.md)
+- Transform computation logic (zoom compensation, snap algorithms, anchor assignment) → see [transforms.md](transforms.md)
 - Keyboard shortcut handling → see [keyboard.md](keyboard.md)
 - Element rendering internals → see `project/spec/renderer/spec.md`

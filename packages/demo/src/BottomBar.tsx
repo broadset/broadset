@@ -22,17 +22,7 @@ interface BottomBarProps {
 
 export function BottomBar(props: BottomBarProps): JSX.Element {
   return (
-    <div
-      style={{
-        position: 'absolute',
-        bottom: 16,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        display: 'flex',
-        gap: 16,
-        alignItems: 'center',
-      }}
-    >
+    <div className="toolbar-glass absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-4 rounded-lg px-4 py-1.5">
       <PageSorter
         pages={props.pages}
         activePageIndex={props.activePageIndex}
@@ -40,7 +30,7 @@ export function BottomBar(props: BottomBarProps): JSX.Element {
         onPageAdd={props.onPageAdd}
         onPageRemove={props.onPageRemove}
       />
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div className="flex items-center gap-2">
         <Button data-testid="undo-button" onPress={props.onUndo} size="sm" variant="ghost">
           Undo
         </Button>
@@ -50,11 +40,9 @@ export function BottomBar(props: BottomBarProps): JSX.Element {
         <Button data-testid="grid-toggle" onPress={props.onToggleGrid} size="sm" variant="ghost">
           {props.showGrid ? 'Hide Grid' : 'Show Grid'}
         </Button>
-        <span style={{ fontSize: 12, display: 'flex', alignItems: 'center' }}>
-          Zoom: {Math.round(props.zoom * 100)}%
-        </span>
+        <span className="flex items-center text-xs text-default-500">Zoom: {Math.round(props.zoom * 100)}%</span>
       </div>
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div className="flex items-center gap-2">
         <Button
           data-testid="play-button"
           data-playing={String(props.isPlaying)}

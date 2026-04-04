@@ -32,7 +32,7 @@ export function CanvasOverlays(props: CanvasOverlaysProps): JSX.Element {
                 y1={0}
                 x2={line.position}
                 y2={props.canvasHeight}
-                stroke="rgba(0,0,0,0.1)"
+                stroke="hsl(var(--heroui-default-300) / 0.3)"
                 strokeWidth={0.5}
               />
             : <line
@@ -41,7 +41,7 @@ export function CanvasOverlays(props: CanvasOverlaysProps): JSX.Element {
                 y1={line.position}
                 x2={props.canvasWidth}
                 y2={line.position}
-                stroke="rgba(0,0,0,0.1)"
+                stroke="hsl(var(--heroui-default-300) / 0.3)"
                 strokeWidth={0.5}
               />,
           )}
@@ -64,7 +64,7 @@ export function CanvasOverlays(props: CanvasOverlaysProps): JSX.Element {
             top: rect.y,
             width: rect.width,
             height: rect.height,
-            backgroundColor: 'rgba(255,0,0,0.08)',
+            backgroundColor: 'hsl(var(--heroui-danger) / 0.08)',
             pointerEvents: 'none',
           }}
         />

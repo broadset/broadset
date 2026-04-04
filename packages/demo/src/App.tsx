@@ -1,6 +1,7 @@
 import type { EditingMode, EditorStore } from '@broadset/editor';
 import {
   appendPathPoint,
+  cancelPlacement,
   createEditorStore,
   handleShortcutAction,
   matchShortcut,
@@ -13,29 +14,54 @@ import {
 import type { BroadsetElementStyle } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { DocumentRenderer } from '@broadset/renderer';
-import type { ElementTypeInfo } from '@broadset/ui';
 import {
   AboutModal,
   AnimationSidebar,
   CanvasSettingsModal,
-  ElementLibrary,
   ExportModal,
   LayersSidebar,
   MediaLibraryModal,
   NewDocumentModal,
+  PageSorter,
   PropertiesSidebar,
   ShortcutHelpModal,
   TimelineBottomPanel,
 } from '@broadset/ui';
-import { Button } from '@heroui/react';
+import { Button, Tabs, Tooltip } from '@heroui/react';
+import {
+  Bug,
+  Download,
+  FilePlus,
+  Grid3x3,
+  Image,
+  Info,
+  Keyboard,
+  Pause,
+  Play,
+  Redo2,
+  RotateCcw,
+  Save,
+  Settings,
+  Timer,
+  Undo2,
+  Upload,
+} from 'lucide-react';
 import type { JSX, MouseEvent, WheelEvent } from 'react';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { createDemoController } from './animationSetup';
-import { BottomBar } from './BottomBar';
 import { CanvasOverlays } from './CanvasOverlays';
 import { elementsToLayers, elementToPanelElement, sampleToEditorDocument, toRendererDoc } from './converters';
 import { PathToolsPanel } from './PathToolsPanel';
+import {
+  ELEMENT_FALLBACK_ICON,
+  ELEMENT_ICON_MAP,
+  ELEMENT_TYPES,
+  persistSidebarWidth,
+  readSidebarWidth,
+  SIDEBAR_ICON_MAP,
+  ToolbarButton,
+} from './toolbar-helpers';
 
 // ---------------------------------------------------------------------------
 // Modal name type
@@ -58,20 +84,6 @@ const DEMO_CATEGORIES = [
   { id: 'logos', name: 'Logos' },
   { id: 'graphics', name: 'Graphics' },
 ] as const;
-
-// ---------------------------------------------------------------------------
-// Element type registry for the toolbar
-// ---------------------------------------------------------------------------
-
-const ELEMENT_TYPES: readonly ElementTypeInfo[] = [
-  { type: 'text', label: 'Text' },
-  { type: 'image', label: 'Image' },
-  { type: 'svg', label: 'SVG' },
-  { type: 'path', label: 'Path' },
-  { type: 'rectangle', label: 'Rectangle' },
-  { type: 'ellipse', label: 'Ellipse' },
-  { type: 'qrcode', label: 'QR Code' },
-];
 
 // ---------------------------------------------------------------------------
 // App component
@@ -115,6 +127,16 @@ export default function App(): JSX.Element {
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<ModalName | null>(null);
   const [documentName, setDocumentName] = useState('Untitled Document');
+
+  // --- Sidebar drawer state ---
+
+  type SidebarTab = 'layers' | 'properties' | 'animation' | 'preflight';
+
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab | null>('layers');
+  const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
+  const sidebarResizing = useRef(false);
+  const SIDEBAR_MIN = 256;
+  const SIDEBAR_MAX = 800;
 
   // --- Lock viewport overflow (runs once) ---
   useEffect(() => {
@@ -181,8 +203,14 @@ export default function App(): JSX.Element {
     const handler = (e: KeyboardEvent): void => {
       const mode = store.getState().editingMode;
 
-      // Escape: commit and exit path editing/drawing
+      // Escape: cancel placement mode, commit and exit path editing/drawing
       if (e.key === 'Escape') {
+        if (mode.type === 'placement') {
+          cancelPlacement(store);
+
+          return;
+        }
+
         if (mode.type === 'path-drawing') {
           stopPathDrawing(store);
 
@@ -223,7 +251,59 @@ export default function App(): JSX.Element {
     };
   }, [store]);
 
-  // --- Handlers ---
+  // --- Sidebar resize via drag ---
+  const handleSidebarResizeStart = useCallback(
+    (e: MouseEvent): void => {
+      e.preventDefault();
+      sidebarResizing.current = true;
+
+      const startX = e.clientX;
+      const startWidth = sidebarWidth;
+
+      const onMove = (ev: globalThis.MouseEvent): void => {
+        const delta = startX - ev.clientX;
+        const next = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, startWidth + delta));
+
+        setSidebarWidth(next);
+      };
+
+      const onUp = (): void => {
+        sidebarResizing.current = false;
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      };
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+    [sidebarWidth],
+  );
+
+  // Persist sidebar width on change
+  useEffect(() => {
+    persistSidebarWidth(sidebarWidth);
+  }, [sidebarWidth]);
+
+  // Auto-switch sidebar: if Properties or Animation tab active but nothing selected, switch to Layers
+  useEffect(() => {
+    if (activeElementIds.length === 0 && (sidebarTab === 'properties' || sidebarTab === 'animation')) {
+      setSidebarTab('layers');
+    }
+  }, [activeElementIds, sidebarTab]);
+
+  const handleSidebarTabChange = useCallback(
+    (key: string | number): void => {
+      const tab = key as SidebarTab;
+
+      if (tab === sidebarTab) {
+        // Clicking active tab closes sidebar
+        setSidebarTab(null);
+      } else {
+        setSidebarTab(tab);
+      }
+    },
+    [sidebarTab],
+  );
 
   const handlePlayPause = useCallback((): void => {
     if (isPlaying) {
@@ -375,6 +455,12 @@ export default function App(): JSX.Element {
     [store],
   );
 
+  // --- Context menu handler ---
+  const handleContextMenu = useCallback((e: MouseEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    // Context menu actions will be wired in later phases
+  }, []);
+
   const handleToggleGrid = useCallback((): void => {
     const gs = store.getState().gridSettings;
 
@@ -421,136 +507,10 @@ export default function App(): JSX.Element {
     : undefined;
 
   return (
-    <div
-      style={{
-        width: '100vw',
-        height: '100vh',
-        overflow: 'hidden',
-        backgroundColor: 'transparent',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      {/* Element Library Toolbar */}
-      <div
-        style={{
-          padding: 8,
-          display: 'flex',
-          gap: 4,
-          flexShrink: 0,
-        }}
-      >
-        <ElementLibrary elementTypes={ELEMENT_TYPES} onSelect={handleElementTypeSelect} />
-        <span style={{ borderLeft: '1px solid #ccc', margin: '0 4px' }} />
-        <Button
-          size="sm"
-          variant="ghost"
-          onPress={() => {
-            setActiveModal('newDocument');
-          }}
-        >
-          New
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onPress={() => {
-            setActiveModal('canvasSettings');
-          }}
-        >
-          Settings
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onPress={() => {
-            setActiveModal('export');
-          }}
-        >
-          Export
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onPress={() => {
-            setActiveModal('mediaLibrary');
-          }}
-        >
-          Media
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onPress={() => {
-            setActiveModal('shortcutHelp');
-          }}
-        >
-          Shortcuts
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onPress={() => {
-            setActiveModal('about');
-          }}
-        >
-          About
-        </Button>
-      </div>
-
-      {/* Main area: canvas + sidebar */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Layers sidebar */}
-        <div
-          style={{
-            width: 180,
-            flexShrink: 0,
-            borderRight: '1px solid #ccc',
-            overflowY: 'auto',
-            padding: 4,
-          }}
-        >
-          <LayersSidebar
-            layers={layers}
-            onSelect={handleLayerSelect}
-            onToggleLock={handleLayerToggleLock}
-            onDelete={handleLayerDelete}
-          />
-        </div>
-
-        {/* Canvas Area */}
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-          onWheel={handleWheel}
-        >
-          {/* Path mode indicator */}
-          {editingMode.type === 'path-editing' || editingMode.type === 'path-drawing' ?
-            <div
-              data-testid="path-mode-indicator"
-              style={{
-                position: 'absolute',
-                top: 8,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                backgroundColor: editingMode.type === 'path-drawing' ? '#2196F3' : '#FF9800',
-                color: '#fff',
-                padding: '4px 12px',
-                borderRadius: 4,
-                fontSize: 12,
-                fontWeight: 600,
-                zIndex: 10,
-              }}
-            >
-              {editingMode.type === 'path-drawing' ? 'Drawing Path' : 'Editing Path'}
-            </div>
-          : null}
+    <div className="relative h-screen w-screen overflow-hidden">
+      {/* ---- Canvas area (fills entire viewport) ---- */}
+      <div className="absolute inset-0" onWheel={handleWheel} onContextMenu={handleContextMenu}>
+        <div className="flex h-full w-full items-center justify-center">
           <div
             style={{
               position: 'relative',
@@ -570,30 +530,225 @@ export default function App(): JSX.Element {
             />
           </div>
         </div>
+      </div>
 
-        {/* Properties sidebar + Animation sidebar */}
-        {panelElement !== undefined ?
-          <div
-            style={{
-              width: 260,
-              flexShrink: 0,
-              borderLeft: '1px solid #ccc',
-              overflowY: 'auto',
-              padding: 8,
+      {/* ---- Placement mode banner (top-center) ---- */}
+      {editingMode.type === 'placement' ?
+        <div className="toolbar-glass absolute top-3 left-1/2 z-[8001] flex -translate-x-1/2 items-center gap-3 rounded-lg px-4 py-2 text-sm">
+          <span>
+            Placement mode: click on the canvas to place <strong>{editingMode.elementType}</strong>
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onPress={() => {
+              cancelPlacement(store);
             }}
           >
-            <PropertiesSidebar element={panelElement} documentMode={documentMode} onUpdate={handlePropertyUpdate} />
-            {/* Path editing controls */}
-            {selectedElement?.type === 'path' ?
-              <PathToolsPanel
-                editingMode={editingMode}
-                onEnterEditing={handleEnterPathEditing}
-                onExitEditing={handleExitPathEditing}
-                onEnterDrawing={handleEnterPathDrawing}
-                onExitDrawing={handleExitPathDrawing}
+            Cancel
+          </Button>
+        </div>
+      : null}
+
+      {/* ---- Path mode indicator (top-center) ---- */}
+      {editingMode.type === 'path-editing' || editingMode.type === 'path-drawing' ?
+        <div
+          data-testid="path-mode-indicator"
+          className={`absolute top-3 left-1/2 z-[8001] -translate-x-1/2 rounded-lg px-4 py-2 text-xs font-semibold text-white ${
+            editingMode.type === 'path-drawing' ? 'bg-primary' : 'bg-warning'
+          }`}
+        >
+          {editingMode.type === 'path-drawing' ? 'Drawing Path' : 'Editing Path'}
+        </div>
+      : null}
+
+      {/* ---- Floating main toolbar (top-left) ---- */}
+      <div
+        role="toolbar"
+        aria-label="Main toolbar"
+        className="toolbar-glass absolute top-[28px] left-[28px] z-[8000] flex items-center gap-1 rounded-lg p-1.5"
+      >
+        {/* Document actions */}
+        <ToolbarButton
+          icon={FilePlus}
+          label="New Document"
+          onPress={() => {
+            setActiveModal('newDocument');
+          }}
+        />
+        <ToolbarButton
+          icon={Save}
+          label="Save"
+          onPress={() => {
+            console.log('Save triggered');
+          }}
+        />
+        <ToolbarButton
+          icon={Upload}
+          label="Import"
+          onPress={() => {
+            console.log('Import triggered');
+          }}
+        />
+        <ToolbarButton
+          icon={Download}
+          label="Export"
+          onPress={() => {
+            setActiveModal('export');
+          }}
+        />
+        <ToolbarButton
+          icon={Image}
+          label="Media Library"
+          onPress={() => {
+            setActiveModal('mediaLibrary');
+          }}
+        />
+
+        <div className="mx-1 h-5 w-px bg-divider" />
+
+        {/* Edit actions */}
+        <ToolbarButton icon={Undo2} label="Undo" onPress={handleUndo} data-testid="undo-button" />
+        <ToolbarButton icon={Redo2} label="Redo" onPress={handleRedo} data-testid="redo-button" />
+
+        <div className="mx-1 h-5 w-px bg-divider" />
+
+        {/* View actions */}
+        <ToolbarButton
+          icon={Grid3x3}
+          label={gridSettings.showGrid ? 'Hide Grid' : 'Show Grid'}
+          onPress={handleToggleGrid}
+          data-testid="grid-toggle"
+        />
+        <ToolbarButton
+          icon={Settings}
+          label="Canvas Settings"
+          onPress={() => {
+            setActiveModal('canvasSettings');
+          }}
+        />
+
+        <div className="mx-1 h-5 w-px bg-divider" />
+
+        {/* Playback actions */}
+        <ToolbarButton
+          icon={isPlaying ? Pause : Play}
+          label={isPlaying ? 'Pause' : 'Play'}
+          onPress={handlePlayPause}
+          data-testid="play-button"
+          data-playing={String(isPlaying)}
+        />
+        <ToolbarButton icon={RotateCcw} label="Reset" onPress={handleReset} data-testid="reset-button" />
+
+        <div className="mx-1 h-5 w-px bg-divider" />
+
+        {/* Utilities */}
+        <ToolbarButton
+          icon={Bug}
+          label="Debug Snapshot"
+          onPress={() => {
+            console.log('Debug snapshot downloaded');
+          }}
+        />
+        <ToolbarButton
+          icon={Keyboard}
+          label="Keyboard Shortcuts"
+          onPress={() => {
+            setActiveModal('shortcutHelp');
+          }}
+        />
+        <ToolbarButton
+          icon={Info}
+          label="About"
+          onPress={() => {
+            setActiveModal('about');
+          }}
+        />
+
+        <span className="ml-1 flex items-center text-xs text-default-500">
+          {Math.round(canvasSettings.zoom * 100)}%
+        </span>
+      </div>
+
+      {/* ---- Vertical element toolbar (below main toolbar) ---- */}
+      <div className="toolbar-glass absolute top-[80px] left-[28px] z-[8000] flex flex-col gap-0.5 rounded-lg p-1.5">
+        <div role="toolbar" aria-label="Element library" className="grid grid-cols-2 gap-0.5">
+          {ELEMENT_TYPES.map((info) => {
+            const Icon = ELEMENT_ICON_MAP[info.type] ?? ELEMENT_FALLBACK_ICON;
+
+            return (
+              <Tooltip key={info.type}>
+                <Tooltip.Trigger>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    aria-label={info.label}
+                    onPress={() => {
+                      handleElementTypeSelect(info.type);
+                    }}
+                  >
+                    <Icon size={16} />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>{info.label}</Tooltip.Content>
+              </Tooltip>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ---- Right-side tabbed drawer ---- */}
+      {sidebarTab !== null ?
+        <div
+          className="toolbar-glass absolute top-0 right-0 z-[8000] flex h-full flex-col overflow-hidden"
+          style={{ width: sidebarWidth }}
+        >
+          {/* Resize handle */}
+          <div
+            className="absolute top-0 left-0 z-10 h-full w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary/50"
+            onMouseDown={handleSidebarResizeStart}
+          />
+
+          {/* Tabs */}
+          <div className="shrink-0 border-b border-divider px-2 pt-2">
+            <Tabs selectedKey={sidebarTab} onSelectionChange={handleSidebarTabChange}>
+              <Tabs.List>
+                <Tabs.Tab id="layers">Layers</Tabs.Tab>
+                <Tabs.Tab id="properties">Properties</Tabs.Tab>
+                <Tabs.Tab id="animation">Animation</Tabs.Tab>
+                <Tabs.Tab id="preflight">Preflight</Tabs.Tab>
+              </Tabs.List>
+            </Tabs>
+          </div>
+
+          {/* Tab content */}
+          <div className="flex-1 overflow-y-auto p-2">
+            {sidebarTab === 'layers' ?
+              <LayersSidebar
+                layers={layers}
+                onSelect={handleLayerSelect}
+                onToggleLock={handleLayerToggleLock}
+                onDelete={handleLayerDelete}
               />
             : null}
-            {featureConfig.animations && selectedAnimConfig !== undefined ?
+
+            {sidebarTab === 'properties' && panelElement !== undefined ?
+              <>
+                <PropertiesSidebar element={panelElement} documentMode={documentMode} onUpdate={handlePropertyUpdate} />
+                {selectedElement?.type === 'path' ?
+                  <PathToolsPanel
+                    editingMode={editingMode}
+                    onEnterEditing={handleEnterPathEditing}
+                    onExitEditing={handleExitPathEditing}
+                    onEnterDrawing={handleEnterPathDrawing}
+                    onExitDrawing={handleExitPathDrawing}
+                  />
+                : null}
+              </>
+            : null}
+
+            {sidebarTab === 'animation' && featureConfig.animations && selectedAnimConfig !== undefined ?
               <AnimationSidebar
                 elementId={firstActiveId ?? null}
                 animationsEnabled={featureConfig.animations}
@@ -601,11 +756,45 @@ export default function App(): JSX.Element {
                 config={selectedAnimConfig}
               />
             : null}
-          </div>
-        : null}
-      </div>
 
-      {/* Timeline Bottom Panel */}
+            {sidebarTab === 'preflight' ?
+              <div className="space-y-2 text-sm text-default-500">
+                <p>Preflight checks will be available in a future update.</p>
+              </div>
+            : null}
+          </div>
+        </div>
+      : null}
+
+      {/* Sidebar tab strip (visible when drawer is closed) */}
+      {sidebarTab === null ?
+        <div className="toolbar-glass absolute top-1/2 right-0 z-[8000] flex -translate-y-1/2 flex-col gap-1 rounded-l-lg p-1">
+          {(['layers', 'properties', 'animation', 'preflight'] as const).map((tab) => {
+            const TabIcon = SIDEBAR_ICON_MAP[tab];
+
+            return (
+              <Tooltip key={tab}>
+                <Tooltip.Trigger>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    isIconOnly
+                    aria-label={tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    onPress={() => {
+                      setSidebarTab(tab);
+                    }}
+                  >
+                    <TabIcon size={16} />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>{tab.charAt(0).toUpperCase() + tab.slice(1)}</Tooltip.Content>
+              </Tooltip>
+            );
+          })}
+        </div>
+      : null}
+
+      {/* ---- Timeline Bottom Panel ---- */}
       <TimelineBottomPanel
         isOpen={timelineOpen}
         onClose={() => {
@@ -631,27 +820,32 @@ export default function App(): JSX.Element {
         onPlayTimeline={handlePlayPause}
       />
 
-      <BottomBar
-        pages={pages}
-        activePageIndex={activePageIndex}
-        onPageSelect={handlePageSelect}
-        onPageAdd={handlePageAdd}
-        onPageRemove={handlePageRemove}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        showGrid={gridSettings.showGrid}
-        onToggleGrid={handleToggleGrid}
-        zoom={canvasSettings.zoom}
-        isPlaying={isPlaying}
-        onPlayPause={handlePlayPause}
-        onReset={handleReset}
-        timelineOpen={timelineOpen}
-        onToggleTimeline={() => {
-          setTimelineOpen((prev) => !prev);
-        }}
-      />
+      {/* ---- Timeline toggle button (visible when timeline is closed) ---- */}
+      {!timelineOpen ?
+        <div className="toolbar-glass absolute bottom-4 left-1/2 z-[8000] -translate-x-1/2 rounded-lg p-1">
+          <ToolbarButton
+            icon={Timer}
+            label="Open Timeline"
+            onPress={() => {
+              setTimelineOpen(true);
+            }}
+            data-testid="timeline-toggle"
+          />
+        </div>
+      : null}
 
-      {/* --- Modals --- */}
+      {/* ---- Page sorter (floating bottom-left) ---- */}
+      <div className="toolbar-glass absolute bottom-4 left-[28px] z-[8000] flex items-center gap-1 rounded-lg p-1">
+        <PageSorter
+          pages={pages}
+          activePageIndex={activePageIndex}
+          onPageSelect={handlePageSelect}
+          onPageAdd={handlePageAdd}
+          onPageRemove={handlePageRemove}
+        />
+      </div>
+
+      {/* ---- Modals ---- */}
       <AboutModal
         isOpen={activeModal === 'about'}
         onClose={() => {

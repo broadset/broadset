@@ -12,8 +12,8 @@ interface PathToolsPanelProps {
 
 export function PathToolsPanel(props: PathToolsPanelProps): JSX.Element {
   return (
-    <div style={{ marginTop: 12, padding: 8, borderTop: '1px solid #ccc' }}>
-      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Path Tools</div>
+    <div className="mt-3 border-t border-divider pt-2">
+      <div className="mb-2 text-xs font-semibold">Path Tools</div>
       {props.editingMode.type === 'path-editing' ?
         <Button data-testid="exit-path-edit" onPress={props.onExitEditing} size="sm" variant="ghost">
           Exit Edit
@@ -22,7 +22,7 @@ export function PathToolsPanel(props: PathToolsPanelProps): JSX.Element {
         <Button data-testid="exit-path-draw" onPress={props.onExitDrawing} size="sm" variant="ghost">
           Stop Drawing
         </Button>
-      : <div style={{ display: 'flex', gap: 4 }}>
+      : <div className="flex gap-1">
           <Button data-testid="enter-path-edit" onPress={props.onEnterEditing} size="sm" variant="ghost">
             Edit Path
           </Button>
@@ -32,7 +32,7 @@ export function PathToolsPanel(props: PathToolsPanelProps): JSX.Element {
         </div>
       }
       {props.editingMode.type === 'path-drawing' ?
-        <div style={{ marginTop: 4, fontSize: 11, color: '#666' }}>
+        <div className="mt-1 text-[11px] text-default-500">
           Click canvas to add points. Escape to commit, Enter to close path.
         </div>
       : null}

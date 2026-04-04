@@ -148,7 +148,13 @@ A right-click context menu MUST be available on the canvas area, providing eleme
 
 ### Requirement: Timeline Panel
 
-The TimelineBottomPanel MUST render at the bottom of the canvas area when a timeline is being edited. It MUST receive play, seek, and stop callbacks from the timeline playback hook.
+The bottom area of the canvas MUST contain only the timeline. When no timeline is being edited, a single toggle button MUST be visible to open the timeline. When a timeline is opened, the TimelineBottomPanel MUST render at the bottom of the canvas area. It MUST receive play, seek, and stop callbacks from the timeline playback hook. No other controls (undo/redo, page sorter, grid toggle, zoom, playback) belong in the bottom bar — these MUST be located in the floating main toolbar or sidebar.
+
+#### Scenario: Timeline toggle when closed
+
+- GIVEN no timeline is being edited
+- WHEN the bottom area renders
+- THEN only a timeline toggle button is visible
 
 #### Scenario: Timeline panel appears when editing
 
@@ -158,8 +164,9 @@ The TimelineBottomPanel MUST render at the bottom of the canvas area when a time
 
 #### Acceptance Criteria
 
+- [ ] Given no timeline being edited, only a timeline toggle button is visible at the bottom
 - [ ] Given a timeline being edited, the TimelineBottomPanel is visible at the bottom
-- [ ] Given no timeline being edited, the timeline panel is hidden
+- [ ] Given the bottom area, no undo/redo, page sorter, grid, zoom, or playback buttons are present
 
 ---
 

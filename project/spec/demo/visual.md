@@ -40,7 +40,7 @@ The demo MUST use a dark color scheme. Floating panels (toolbar, sidebar, modals
 
 ### Requirement: Icon System
 
-Element types, sidebar tabs, and toolbar actions MUST use consistent iconography. Each built-in element type MUST have a distinct icon. Toolbar action buttons (save, export, import, new, settings, debug) MUST have icons. Custom component plugins MAY provide their own icon via the plugin configuration.
+Element types, sidebar tabs, and toolbar actions MUST use consistent iconography from `lucide-react`. Each built-in element type MUST have a distinct icon. Toolbar action buttons (save, export, import, new, settings, debug) MUST have icons. Custom component plugins MAY provide their own icon via the plugin configuration. All toolbar and element toolbar buttons MUST be icon-only (`isIconOnly`) with an `aria-label` describing the action. The button label text MUST be shown as an auto-positioned tooltip (via HeroUI `Tooltip`).
 
 #### Scenario: Element type icons
 
@@ -65,6 +65,8 @@ Element types, sidebar tabs, and toolbar actions MUST use consistent iconography
 - [ ] Given built-in element types, each type has a distinct icon in the element toolbar
 - [ ] Given toolbar actions, each action button has a corresponding icon
 - [ ] Given a plugin without an icon, a default fallback icon is used
+- [ ] Given any toolbar or element toolbar button, it is icon-only with an aria-label
+- [ ] Given hovering over an icon-only button, a tooltip with the action name appears
 
 ---
 

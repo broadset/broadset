@@ -1,2 +1,9 @@
 @import 'tailwindcss';
 @import '@heroui/styles';
+
+/* Blurred backdrop for floating toolbars */
+.toolbar-glass {
+  background-color: hsl(var(--heroui-content1) / 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
