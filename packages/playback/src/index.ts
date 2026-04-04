@@ -3,13 +3,8 @@
 // ---------------------------------------------------------------------------
 
 // Interpolation
-export {
-  applyEasing,
-  interpolateColor,
-  interpolateKeyframeProperties,
-  interpolatePath,
-  interpolateValue,
-} from './interpolation';
+export { interpolateColor } from './color-interpolation';
+export { applyEasing, interpolateKeyframeProperties, interpolatePath, interpolateValue } from './interpolation';
 
 // Timeline
 export type { TimelineFrame } from './timeline';
@@ -27,7 +22,7 @@ export type { ModifierTimelines } from './resolve-timeline';
 export { resolveModifierTimelines, resolveStateTimeline } from './resolve-timeline';
 
 // Style writer
-export { applyStylesToElement, camelToKebab } from './style-writer';
+export { applyStylesToElement, camelToKebab, invalidateStyleTargetCache } from './style-writer';
 
 // Playback handle
 export type { PlaybackHandle, PlaybackHandleOptions } from './playback-handle';

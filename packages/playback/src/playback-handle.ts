@@ -59,6 +59,8 @@ export function createPlaybackHandle(
   let speed = 1;
   let rafId: number | null = null;
   let lastFrameTime: number | null = null;
+  /** Track the highest time for which actions have already been fired. */
+  let lastActionTimeMs = -1;
 
   function seek(timeMs: number): void {
     const clamped = Math.max(0, Math.min(durationMs, timeMs));
@@ -71,15 +73,26 @@ export function createPlaybackHandle(
     // Apply styles
     applyStylesToElement(container, frame.properties);
 
-    // Replay actions from t=0 to clamped
+    // Fire only actions between the last-fired time and the current seek point.
+    // On backward seek, reset the action tracker so the next forward seek
+    // replays from the beginning.
     if (options?.onAction) {
+      if (clamped < lastActionTimeMs) {
+        // Backward seek — reset tracker
+        lastActionTimeMs = -1;
+      }
+
       const sorted = [...timeline.entries].filter((kf) => kf.action !== 'none').sort((a, b) => a.offsetMs - b.offsetMs);
 
       for (const kf of sorted) {
         if (kf.offsetMs > clamped) break;
 
-        options.onAction(kf.action, kf.payload);
+        if (kf.offsetMs > lastActionTimeMs) {
+          options.onAction(kf.action, kf.payload);
+        }
       }
+
+      lastActionTimeMs = clamped;
     }
   }
 

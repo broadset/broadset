@@ -104,4 +104,28 @@ describe('Sample Document Fixture', () => {
 
     expect(hasInBinding).toBe(true);
   });
+
+  /**
+   * @description At least one animation entry must have an OUT state
+   * timeline binding to exercise exit transitions.
+   */
+  it('has at least one OUT state timeline binding', () => {
+    const hasOutBinding = SAMPLE_DOCUMENT.animationRegistry.some((entry) =>
+      entry.config.stateTimelineBindings.some((b) => b.stateName === 'OUT'),
+    );
+
+    expect(hasOutBinding).toBe(true);
+  });
+
+  /**
+   * @description At least one animation entry must have a timeline with
+   * transform keyframes (e.g. translateX) to exercise position animation.
+   */
+  it('has at least one animation with transform keyframes', () => {
+    const hasTransform = SAMPLE_DOCUMENT.animationRegistry.some((entry) =>
+      entry.config.timelines.some((tl) => tl.entries.some((kf) => 'transform' in kf.properties)),
+    );
+
+    expect(hasTransform).toBe(true);
+  });
 });

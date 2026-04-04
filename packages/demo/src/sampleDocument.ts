@@ -297,7 +297,7 @@ export const SAMPLE_DOCUMENT = {
     },
   ],
   animationRegistry: [
-    // Title: fade in from opacity 0 → 1 on IN state
+    // Title: slide in from left + fade in on IN state
     {
       elementId: 'el-title',
       config: {
@@ -310,22 +310,55 @@ export const SAMPLE_DOCUMENT = {
                 name: 'start',
                 action: 'none' as const,
                 offsetMs: 0,
-                properties: { opacity: { value: 0, interpolation: 'linear' } },
+                properties: {
+                  opacity: { value: 0, interpolation: 'linear' },
+                  transform: { value: 'translateX(-200px)', interpolation: 'ease-out' },
+                },
               },
               {
                 name: 'end',
                 action: 'none' as const,
                 offsetMs: 500,
-                properties: { opacity: { value: 1, interpolation: 'ease-out' } },
+                properties: {
+                  opacity: { value: 1, interpolation: 'ease-out' },
+                  transform: { value: 'translateX(0px)', interpolation: 'ease-out' },
+                },
+              },
+            ],
+          },
+          {
+            id: 'tl-title-out',
+            name: 'title-exit',
+            entries: [
+              {
+                name: 'start',
+                action: 'none' as const,
+                offsetMs: 0,
+                properties: {
+                  opacity: { value: 1, interpolation: 'linear' },
+                  transform: { value: 'translateX(0px)', interpolation: 'ease-in' },
+                },
+              },
+              {
+                name: 'end',
+                action: 'none' as const,
+                offsetMs: 400,
+                properties: {
+                  opacity: { value: 0, interpolation: 'ease-in' },
+                  transform: { value: 'translateX(200px)', interpolation: 'ease-in' },
+                },
               },
             ],
           },
         ],
-        stateTimelineBindings: [{ stateName: 'IN', timelineId: 'tl-title-in' }],
+        stateTimelineBindings: [
+          { stateName: 'IN', timelineId: 'tl-title-in' },
+          { stateName: 'OUT', timelineId: 'tl-title-out' },
+        ],
         modifierTimelineBindings: [],
       },
     },
-    // Background bar: fade in from opacity 0 → 1 on IN state (slower)
+    // Background bar: fade in on IN state, fade out on OUT state
     {
       elementId: 'el-bg-bar',
       config: {
@@ -348,8 +381,29 @@ export const SAMPLE_DOCUMENT = {
               },
             ],
           },
+          {
+            id: 'tl-bgbar-out',
+            name: 'bar-exit',
+            entries: [
+              {
+                name: 'start',
+                action: 'none' as const,
+                offsetMs: 0,
+                properties: { opacity: { value: 1, interpolation: 'linear' } },
+              },
+              {
+                name: 'end',
+                action: 'none' as const,
+                offsetMs: 500,
+                properties: { opacity: { value: 0, interpolation: 'ease-in' } },
+              },
+            ],
+          },
         ],
-        stateTimelineBindings: [{ stateName: 'IN', timelineId: 'tl-bgbar-in' }],
+        stateTimelineBindings: [
+          { stateName: 'IN', timelineId: 'tl-bgbar-in' },
+          { stateName: 'OUT', timelineId: 'tl-bgbar-out' },
+        ],
         modifierTimelineBindings: [],
       },
     },

@@ -69,7 +69,7 @@ _What to cover:_
 
 | Unit                      | Red | Green |
 | ------------------------- | --- | ----- |
-| 3.1 interpolation engine  | ☐   | ☐     |
-| 3.2 timeline computation  | ☐   | ☐     |
+| 3.1 interpolation engine  | ✅  | ✅    |
+| 3.2 timeline computation  | ✅  | ✅    |
 | 3.3 playback controller   | ✅  | ✅    |
 | 3.4 demo animated content | ✅  | ✅    |

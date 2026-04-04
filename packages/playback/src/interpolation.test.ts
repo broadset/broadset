@@ -1,12 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
-import {
-  applyEasing,
-  interpolateColor,
-  interpolateKeyframeProperties,
-  interpolatePath,
-  interpolateValue,
-} from './interpolation';
+import { interpolateColor } from './color-interpolation';
+import { applyEasing, interpolateKeyframeProperties, interpolatePath, interpolateValue } from './interpolation';
 
 // ---------------------------------------------------------------------------
 // Easing presets

@@ -5,7 +5,7 @@ import { parseClassState } from './class-state';
 import { escapeCssId } from './css-escape';
 import { createPlaybackHandle } from './playback-handle';
 import { resolveModifierTimelines, resolveStateTimeline } from './resolve-timeline';
-import { applyStylesToElement, camelToKebab } from './style-writer';
+import { applyStylesToElement, camelToKebab, invalidateStyleTargetCache } from './style-writer';
 
 // ---------------------------------------------------------------------------
 // CSS Identifier Escaping
@@ -247,6 +247,54 @@ describe('applyStylesToElement', () => {
     applyStylesToElement(container, { transform: 'rotate(45deg)' });
     expect(container.style.transform).toBe('rotate(45deg)');
   });
+
+  /**
+   * @description Offscreen elements must have visibility:hidden and
+   * pointer-events:none applied directly to the container (no sub-targets).
+   */
+  it('offscreen element gets visibility hidden and pointer-events none', () => {
+    const container = document.createElement('div');
+
+    container.className = 'offscreen';
+
+    applyStylesToElement(container, {
+      visibility: 'hidden',
+      pointerEvents: 'none',
+    });
+
+    expect(container.style.visibility).toBe('hidden');
+    expect(container.style.pointerEvents).toBe('none');
+  });
+
+  /**
+   * @description When the DOM structure changes (e.g. a new content target is
+   * inserted), the cached target references become stale. Calling
+   * invalidateStyleTargetCache must cause the next applyStylesToElement call
+   * to re-query and find the new targets.
+   */
+  it('invalidateStyleTargetCache causes re-query of targets', () => {
+    const container = document.createElement('div');
+
+    // First call routes transform to container (no content target)
+    applyStylesToElement(container, { transform: 'translateX(0)' });
+    expect(container.style.transform).toBe('translateX(0)');
+
+    // Now add a content target
+    const content = document.createElement('div');
+
+    content.setAttribute('data-element-content', '');
+    container.appendChild(content);
+
+    // Without cache invalidation, stale cache still targets the container
+    applyStylesToElement(container, { transform: 'translateX(50px)' });
+    expect(container.style.transform).toBe('translateX(50px)');
+    expect(content.style.transform).toBe('');
+
+    // After invalidation, the new content target is found
+    invalidateStyleTargetCache(container);
+    applyStylesToElement(container, { transform: 'translateX(100px)' });
+    expect(content.style.transform).toBe('translateX(100px)');
+  });
 });
 
 describe('camelToKebab', () => {
@@ -356,38 +404,171 @@ describe('createPlaybackHandle', () => {
   });
 
   /**
-   * @description Seek to end must apply final transform styles to
-   * the element's animation target.
+   * @description Forward seeks must not re-fire actions already triggered
+   * in previous seek calls. Only actions between the previous and new
+   * seek points should be fired, preventing unbounded growth.
+   */
+  it('forward seeks do not re-fire previously triggered actions', () => {
+    const actionTl: Timeline = {
+      id: 'tl-action-inc',
+      name: 'action-inc',
+      entries: [
+        {
+          name: 'a1',
+          action: 'setState',
+          offsetMs: 100,
+          properties: {},
+          payload: 'active',
+        },
+        {
+          name: 'a2',
+          action: 'addModifier',
+          offsetMs: 300,
+          properties: {},
+          payload: 'pulse',
+        },
+      ],
+    };
+
+    const container = document.createElement('div');
+    const firedActions: Array<{ readonly action: string; readonly payload: string }> = [];
+
+    const handle = createPlaybackHandle(actionTl, container, {
+      onAction: (action, payload) => {
+        firedActions.push({ action, payload: payload ?? '' });
+      },
+    });
+
+    // First seek fires the first action
+    handle.seek(200);
+    expect(firedActions).toHaveLength(1);
+    expect(firedActions[0]?.action).toBe('setState');
+
+    // Second seek fires only the second action (not the first again)
+    handle.seek(400);
+    expect(firedActions).toHaveLength(2);
+    expect(firedActions[1]?.action).toBe('addModifier');
+  });
+
+  /**
+   * @description Backward seeks must reset action tracking so that a
+   * subsequent forward seek replays actions from the beginning.
+   */
+  it('backward seek resets action tracking', () => {
+    const actionTl: Timeline = {
+      id: 'tl-action-bw',
+      name: 'action-bw',
+      entries: [
+        {
+          name: 'a1',
+          action: 'setState',
+          offsetMs: 100,
+          properties: {},
+          payload: 'active',
+        },
+      ],
+    };
+
+    const container = document.createElement('div');
+    const firedActions: string[] = [];
+
+    const handle = createPlaybackHandle(actionTl, container, {
+      onAction: (action) => {
+        firedActions.push(action);
+      },
+    });
+
+    handle.seek(200);
+    expect(firedActions).toHaveLength(1);
+
+    // Seek backward past the action
+    handle.seek(50);
+    // No new action fired on backward seek
+    expect(firedActions).toHaveLength(1);
+
+    // Forward seek replays the action
+    handle.seek(200);
+    expect(firedActions).toHaveLength(2);
+  });
+
+  /**
+   * @description Seek to end must apply final opacity styles to
+   * the element's animation target. Verifies that the style writer
+   * is actually invoked and CSS values appear on the DOM element.
    */
   it('seek applies styles to DOM', () => {
     const container = document.createElement('div');
     const content = document.createElement('div');
+    const opacityTarget = document.createElement('div');
 
     content.setAttribute('data-element-content', '');
+    opacityTarget.setAttribute('data-opacity-target', '');
     container.appendChild(content);
+    container.appendChild(opacityTarget);
 
     const handle = createPlaybackHandle(simpleTl, container);
 
-    handle.seek(1100); // duration
-    // Just verify seek set the time correctly
+    // Seek to duration (opacity timeline: 0 → 1 over 800ms)
+    handle.seek(1100);
     expect(handle.currentTimeMs).toBe(1100);
+    // After the last keyframe offset, opacity is held at the final value (1)
+    expect(opacityTarget.style.opacity).toBe('1');
   });
 
   /**
-   * @description Offscreen elements must have visibility:hidden and
-   * pointer-events:none when the playback handle manages them.
+   * @description setSpeed must scale playback progression rate. At 2x speed,
+   * the delta applied per frame should be doubled, causing the timeline to
+   * advance twice as fast over the same wall-clock interval.
    */
-  it('offscreen element gets visibility hidden and pointer-events none', () => {
+  it('setSpeed scales playback progression', () => {
     const container = document.createElement('div');
 
-    container.className = 'offscreen';
+    // Mock requestAnimationFrame to control timing
+    const callbacks: Array<(time: number) => void> = [];
+    const origRAF = globalThis.requestAnimationFrame;
+    const origCAF = globalThis.cancelAnimationFrame;
 
-    applyStylesToElement(container, {
-      visibility: 'hidden',
-      pointerEvents: 'none',
-    });
+    globalThis.requestAnimationFrame = (cb: FrameRequestCallback): number => {
+      callbacks.push(cb);
 
-    expect(container.style.visibility).toBe('hidden');
-    expect(container.style.pointerEvents).toBe('none');
+      return callbacks.length;
+    };
+
+    globalThis.cancelAnimationFrame = (): void => {
+      // no-op for this test
+    };
+
+    try {
+      const handle = createPlaybackHandle(simpleTl, container);
+
+      // Play at 1x speed
+      handle.play();
+      expect(callbacks).toHaveLength(1);
+
+      // First rAF call at t=0 — sets lastFrameTime
+      callbacks[0]?.(0);
+      expect(callbacks).toHaveLength(2);
+
+      // Second call at t=100ms — advances 100ms at 1x speed
+      callbacks[1]?.(100);
+
+      const timeAt1x = handle.currentTimeMs;
+
+      expect(timeAt1x).toBe(100);
+
+      // Now set speed to 2x
+      handle.setSpeed(2);
+
+      // Third call at t=200ms — delta = 100ms wall-clock × 2x = 200ms
+      callbacks[2]?.(200);
+
+      const timeAt2x = handle.currentTimeMs;
+
+      // Should have advanced 200ms (not 100ms)
+      expect(timeAt2x).toBe(300);
+    } finally {
+      globalThis.requestAnimationFrame = origRAF;
+      globalThis.cancelAnimationFrame = origCAF;
+    }
   });
 });
