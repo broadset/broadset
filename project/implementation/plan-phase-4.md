@@ -134,7 +134,7 @@ _UI specs:_ `ui/modals.md`
 - [x] tests: red
 - [x] impl: green
 - [x] **HeroUI verified** — no raw HTML elements in ui/ files
-- [ ] demo milestone: all 6 modals open/close correctly — About, Canvas Settings
+- [x] demo milestone: all 6 modals open/close correctly — About, Canvas Settings
       (updates take effect), Export (feature-gated exporters), Media Library (assets
       browsable), New Document (presets create correct canvas), Shortcut Help
 
