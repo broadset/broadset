@@ -1,19 +1,32 @@
+import type { PlaybackHandle } from '@broadset/playback';
 import { DocumentRenderer } from '@broadset/renderer';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { createAnimationHandles } from './animationSetup';
 import { SAMPLE_DOCUMENT } from './sampleDocument';
 
 export default function App(): React.JSX.Element {
   const canvasRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<DocumentRenderer | null>(null);
+  const handlesRef = useRef<readonly PlaybackHandle[]>([]);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
-    // Ensure no scrollbars on body
-    const prevOverflow = document.body.style.overflow;
-    const prevMargin = document.body.style.margin;
+    // Lock overflow on html/body/root for viewport overflow prevention
+    const html = document.documentElement;
+    const body = document.body;
 
-    document.body.style.overflow = 'hidden';
-    document.body.style.margin = '0';
+    const prevHtmlOverflow = html.style.overflow;
+    const prevHtmlHeight = html.style.height;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyHeight = body.style.height;
+    const prevBodyMargin = body.style.margin;
+
+    html.style.overflow = 'hidden';
+    html.style.height = '100%';
+    body.style.overflow = 'hidden';
+    body.style.height = '100%';
+    body.style.margin = '0';
 
     const host = canvasRef.current;
 
@@ -26,12 +39,54 @@ export default function App(): React.JSX.Element {
     renderer.mount(SAMPLE_DOCUMENT, host);
     rendererRef.current = renderer;
 
+    // Create playback handles and seek to t=0
+    const handles = createAnimationHandles(SAMPLE_DOCUMENT, host);
+
+    handlesRef.current = handles;
+
+    for (const h of handles) {
+      h.seek(0);
+    }
+
     return (): void => {
+      for (const h of handlesRef.current) {
+        h.cancel();
+      }
+
+      handlesRef.current = [];
       renderer.destroy();
       rendererRef.current = null;
-      document.body.style.overflow = prevOverflow;
-      document.body.style.margin = prevMargin;
+      html.style.overflow = prevHtmlOverflow;
+      html.style.height = prevHtmlHeight;
+      body.style.overflow = prevBodyOverflow;
+      body.style.height = prevBodyHeight;
+      body.style.margin = prevBodyMargin;
     };
+  }, []);
+
+  const handlePlayPause = useCallback((): void => {
+    if (isPlaying) {
+      for (const h of handlesRef.current) {
+        h.pause();
+      }
+
+      setIsPlaying(false);
+    } else {
+      for (const h of handlesRef.current) {
+        h.play();
+      }
+
+      setIsPlaying(true);
+    }
+  }, [isPlaying]);
+
+  const handleReset = useCallback((): void => {
+    for (const h of handlesRef.current) {
+      h.pause();
+      h.seek(0);
+    }
+
+    setIsPlaying(false);
   }, []);
 
   return (
@@ -44,6 +99,7 @@ export default function App(): React.JSX.Element {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
       }}
     >
       <div
@@ -52,6 +108,42 @@ export default function App(): React.JSX.Element {
           transformOrigin: 'center center',
         }}
       />
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 16,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          gap: 8,
+        }}
+      >
+        <button
+          data-testid="play-button"
+          data-playing={String(isPlaying)}
+          onClick={handlePlayPause}
+          type="button"
+          style={{
+            padding: '8px 16px',
+            fontSize: 14,
+            cursor: 'pointer',
+          }}
+        >
+          {isPlaying ? 'Pause' : 'Play'}
+        </button>
+        <button
+          data-testid="reset-button"
+          onClick={handleReset}
+          type="button"
+          style={{
+            padding: '8px 16px',
+            fontSize: 14,
+            cursor: 'pointer',
+          }}
+        >
+          Reset
+        </button>
+      </div>
     </div>
   );
 }

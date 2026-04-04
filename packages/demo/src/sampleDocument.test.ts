@@ -80,4 +80,28 @@ describe('Sample Document Fixture', () => {
 
     expect(children.length).toBeGreaterThan(0);
   });
+
+  /**
+   * @description Animation registry must contain entries with timelines
+   * to exercise playback in the demo.
+   */
+  it('has animation registry entries with timelines', () => {
+    expect(SAMPLE_DOCUMENT.animationRegistry.length).toBeGreaterThanOrEqual(1);
+
+    const firstEntry = SAMPLE_DOCUMENT.animationRegistry[0];
+
+    expect(firstEntry?.config.timelines.length).toBeGreaterThanOrEqual(1);
+  });
+
+  /**
+   * @description At least one animation entry must have an IN state
+   * timeline binding to exercise state-based playback.
+   */
+  it('has at least one IN state timeline binding', () => {
+    const hasInBinding = SAMPLE_DOCUMENT.animationRegistry.some((entry) =>
+      entry.config.stateTimelineBindings.some((b) => b.stateName === 'IN'),
+    );
+
+    expect(hasInBinding).toBe(true);
+  });
 });

@@ -296,5 +296,62 @@ export const SAMPLE_DOCUMENT = {
       ],
     },
   ],
-  animationRegistry: [],
+  animationRegistry: [
+    // Title: fade in from opacity 0 → 1 on IN state
+    {
+      elementId: 'el-title',
+      config: {
+        timelines: [
+          {
+            id: 'tl-title-in',
+            name: 'title-entrance',
+            entries: [
+              {
+                name: 'start',
+                action: 'none' as const,
+                offsetMs: 0,
+                properties: { opacity: { value: 0, interpolation: 'linear' } },
+              },
+              {
+                name: 'end',
+                action: 'none' as const,
+                offsetMs: 500,
+                properties: { opacity: { value: 1, interpolation: 'ease-out' } },
+              },
+            ],
+          },
+        ],
+        stateTimelineBindings: [{ stateName: 'IN', timelineId: 'tl-title-in' }],
+        modifierTimelineBindings: [],
+      },
+    },
+    // Background bar: fade in from opacity 0 → 1 on IN state (slower)
+    {
+      elementId: 'el-bg-bar',
+      config: {
+        timelines: [
+          {
+            id: 'tl-bgbar-in',
+            name: 'bar-entrance',
+            entries: [
+              {
+                name: 'start',
+                action: 'none' as const,
+                offsetMs: 0,
+                properties: { opacity: { value: 0, interpolation: 'linear' } },
+              },
+              {
+                name: 'end',
+                action: 'none' as const,
+                offsetMs: 700,
+                properties: { opacity: { value: 1, interpolation: 'ease-in-out' } },
+              },
+            ],
+          },
+        ],
+        stateTimelineBindings: [{ stateName: 'IN', timelineId: 'tl-bgbar-in' }],
+        modifierTimelineBindings: [],
+      },
+    },
+  ],
 };

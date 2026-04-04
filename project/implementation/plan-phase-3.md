@@ -36,8 +36,8 @@ routing into targetProperties map, batch computation for all named timelines.
 
 ## 3.3 Playback controller (`playback/playback.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/playback/playback.md`
 _What to cover:_ PlaybackHandle API (play/pause/seek/setSpeed/cancel; cancelled
@@ -71,5 +71,5 @@ _What to cover:_
 | ------------------------- | --- | ----- |
 | 3.1 interpolation engine  | ☐   | ☐     |
 | 3.2 timeline computation  | ☐   | ☐     |
-| 3.3 playback controller   | ☐   | ☐     |
+| 3.3 playback controller   | ✅  | ✅    |
 | 3.4 demo animated content | ☐   | ☐     |
