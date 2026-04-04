@@ -36,7 +36,7 @@ _UI specs:_ `ui/utilities.md` (CSS parsers), `ui/inputs.md` (input components),
 - [x] tests: red — editor/transforms
 - [x] tests: red — ui/utilities
 - [x] tests: red — ui/inputs
-- [ ] tests: red — ui/panels (properties sidebar)
+- [x] tests: red — ui/panels (properties sidebar)
 - [ ] impl: green — all
 - [ ] demo milestone: select an element → drag it, resize via handles, rotate;
       properties sidebar shows style fields; changing color/opacity updates the canvas
