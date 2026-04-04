@@ -31,24 +31,41 @@ The system MUST provide a playback handle that drives a single timeline with fra
 - WHEN seeked to 400ms
 - THEN both actions are fired in order
 
+#### Scenario: Forward seek fires only unfired actions
+
+- GIVEN a timeline with actions at 100ms, 200ms, and 300ms
+- WHEN seeked forward from 0ms to 150ms, then seeked forward from 150ms to 250ms
+- THEN the first seek fires only the 100ms action, and the second seek fires only the 200ms action
+- AND the 300ms action is NOT fired in either seek
+
+#### Scenario: Backward seek resets action tracking
+
+- GIVEN a timeline where actions at 100ms and 200ms have already been fired by a forward seek to 250ms
+- WHEN seeked backward to 50ms, then seeked forward again to 250ms
+- THEN the forward seek fires the 100ms and 200ms actions again
+
 #### Scenario: Seek applies styles to DOM
 
-- GIVEN a timeline with transform keyframes
-- WHEN seeked to the end
-- THEN the element's animation target has the final transform style
+- GIVEN a timeline with opacity keyframes from 0 to 1
+- WHEN seeked to durationMs
+- THEN the animation target element's inline `opacity` style MUST equal the final keyframe value
 
 #### Acceptance Criteria
 
 - [ ] Given a timeline with duration 800ms, currentTimeMs is `0` and when seeked to 99999 then currentTimeMs is `800`
 - [ ] Given a cancelled handle, isActive remains `false`
 - [ ] Given a timeline with setState at 100ms and addModifier at 300ms, both actions are fired in order
-- [ ] Given a timeline with transform keyframes, the element's animation target has the final transform style
+- [ ] Given sequential forward seeks, each seek fires only the actions between the previous and current position
+- [ ] Given a backward seek followed by a forward seek, previously fired actions are fired again
+- [ ] Given a timeline with opacity keyframes, seeking to the end results in the target element's inline style reflecting the final opacity value
 
 ---
 
 ### Requirement: Style Writer Target Routing
 
 The system MUST apply CSS properties to the animation target element, located by querying for the `[data-element-content]` attribute within the rendered node. The renderer is responsible for placing this attribute on the content element. If no element with `data-element-content` is found, the style writer MUST fall back to the container element itself. The `opacity` property MUST be routed to the `data-opacity-target` descendant instead, to preserve 3D rendering contexts. CamelCase property names MUST be converted to kebab-case.
+
+The style writer MUST NOT re-query the DOM for sub-targets (content element, opacity target) on every style-application call. Resolved targets MUST be reused across calls for the same container element. A cache-invalidation entry point MUST be available so that callers can signal when the DOM structure has changed and targets need to be re-resolved.
 
 #### Scenario: Opacity routed to opacity target
 
@@ -331,17 +348,18 @@ The system MUST support on-demand settle timing that defers final settled state 
 
 ### Requirement: Playback Speed Multiplier
 
-The system MUST scale playback progression rate proportionally when playback speed is changed during active playback.
+The system MUST scale playback progression rate by the configured speed factor. At speed 1.0, wall-clock time and playback time advance at the same rate. At speed 2.0, each unit of wall-clock time advances playback time by two units.
 
 #### Scenario: Speed change increases progression rate
 
-- GIVEN active playback at baseline speed
-- WHEN speed is increased during playback
-- THEN observed progression over equal wall-clock time increases proportionally
+- GIVEN active playback at speed 1.0 where 100ms of wall-clock time advances playback by 100ms
+- WHEN speed is changed to 2.0
+- THEN 100ms of wall-clock time advances playback by 200ms
 
 #### Acceptance Criteria
 
-- [ ] Given active playback at baseline speed, observed progression over equal wall-clock time increases proportionally
+- [ ] Given playback at speed 1.0, 100ms of wall-clock time advances playback by 100ms
+- [ ] Given playback at speed 2.0, 100ms of wall-clock time advances playback by 200ms
 
 ---
 
@@ -377,7 +395,7 @@ Multiple timelines MAY play simultaneously on different elements. However, only 
 
 ## Spec Gaps
 
-- [ ] **Style Writer Target Routing — fallback to container:** Automated test coverage for the case where no `[data-element-content]` is present (fall back to container element) does not yet exist.
+- [x] **Style Writer Target Routing — fallback to container:** Automated test coverage for the case where no `[data-element-content]` is present (fall back to container element) now exists.
 - [ ] **Settle Timer Behavior — reset on mutation:** Automated test coverage for settle timer reset on a new class mutation during an active settle window does not yet exist.
 - [ ] **Simultaneous Timeline Playback:** No automated tests currently cover single-element timeline cancellation-on-replacement or the associated style cleanup. Tests covering multi-element independent playback also need to be added.
 

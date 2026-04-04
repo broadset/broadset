@@ -158,6 +158,8 @@ The demo MUST load a sample document on startup that exercises key features: mul
 - [ ] Given app initialization, a sample document is loaded automatically
 - [ ] Given the sample document, it includes at least text, rectangle, image, and path elements
 - [ ] Given the sample document, it includes elements with animation bindings and live data keys
+- [ ] Given the sample document, at least one element has `transform` keyframes (e.g. translateX)
+- [ ] Given the sample document, at least one element has both IN and OUT state bindings
 
 ---
 
