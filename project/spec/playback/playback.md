@@ -189,12 +189,19 @@ The system MUST animate visibility changes using bound IN/OUT timelines. When no
 - WHEN the OUT timeline animation finishes (non-suppress mode)
 - THEN the element MUST have `visibility:hidden` and `pointer-events:none`
 
+#### Scenario: State cleared to null stops active timeline
+
+- GIVEN an element with an active state timeline playing
+- WHEN the state class is removed (activeState transitions to null)
+- THEN the active timeline MUST be stopped and applied styles cleaned up
+
 #### Acceptance Criteria
 
 - [ ] Given visibility changes from offscreen to onscreen, the IN state timeline is played
 - [ ] Given no state timeline bindings exist, `visibility:hidden` is set directly
 - [ ] Given visibility remains onscreen, no timeline is played
 - [ ] Given an OUT timeline that finishes playing, the element has `visibility:hidden` and `pointer-events:none`
+- [ ] Given an active state timeline and state cleared to null, the timeline is stopped and styles are cleaned up
 
 ---
 
@@ -421,7 +428,7 @@ Multiple timelines MAY play simultaneously on different elements. However, only 
 - [x] **Settle Timer Behavior — reset on mutation:** Automated test coverage now exists.
 - [x] **Simultaneous Timeline Playback:** Automated tests now cover single-element cancellation-on-replacement, style cleanup, and multi-element independence.
 - [x] **Visibility transition post-animation:** When an OUT timeline finishes playing (non-suppress mode), the element becomes hidden. Covered via `onComplete` callback.
-- [ ] **State cleared to null:** When `activeState` transitions from a named state to `null`, the previous state's timeline control should be stopped. No automated test exists for this case.
+- [x] **State cleared to null:** When `activeState` transitions from a named state to `null`, the previous state's timeline control is stopped and applied styles are cleaned up. Automated test coverage exists.
 
 ---
 

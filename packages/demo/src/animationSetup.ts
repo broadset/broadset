@@ -1,21 +1,19 @@
 // ---------------------------------------------------------------------------
-// Animation setup — creates PlaybackHandles for a sample document
+// Animation setup — creates a PlaybackController for a sample document
 // ---------------------------------------------------------------------------
 
 import type { BroadsetDocument } from '@broadset/model';
-import type { PlaybackHandle } from '@broadset/playback';
-import { createPlaybackHandle, escapeCssId } from '@broadset/playback';
+import type { PlaybackController } from '@broadset/playback';
+import { createPlaybackController, escapeCssId, resolveStateTimeline } from '@broadset/playback';
 import { DATA_ELEMENT_ID } from '@broadset/renderer';
 
 /**
- * Create PlaybackHandles for all elements in the document that have
- * animation registry entries with IN state bindings.
- *
- * For each entry, the first timeline bound to IN state is used.
- * If no IN binding exists, the first timeline in the config is used.
+ * Create a PlaybackController for all animated elements in the document.
+ * Attaches each element and seeks its IN timeline to t=0 so the initial
+ * frame is visible without triggering a full playback.
  */
-export function createAnimationHandles(doc: BroadsetDocument, host: HTMLElement): readonly PlaybackHandle[] {
-  const handles: PlaybackHandle[] = [];
+export function createDemoController(doc: BroadsetDocument, host: HTMLElement): PlaybackController {
+  const controller = createPlaybackController(doc.animationRegistry);
 
   for (const entry of doc.animationRegistry) {
     const selector = `[${DATA_ELEMENT_ID}="${escapeCssId(entry.elementId)}"]`;
@@ -23,18 +21,17 @@ export function createAnimationHandles(doc: BroadsetDocument, host: HTMLElement)
 
     if (!container) continue;
 
-    // Find the IN state timeline, or fall back to the first timeline
-    const inBinding = entry.config.stateTimelineBindings.find((b) => b.stateName === 'IN');
+    controller.attach(container, entry.elementId);
 
-    const timeline =
-      inBinding ?
-        entry.config.timelines.find((tl) => tl.id === inBinding.timelineId || tl.name === inBinding.timelineId)
-      : entry.config.timelines[0];
+    // Seek the IN timeline to t=0 for the initial frame
+    const inTimeline = resolveStateTimeline(entry.config, 'IN');
 
-    if (!timeline) continue;
+    if (inTimeline) {
+      const timelineName = inTimeline.name || inTimeline.id;
 
-    handles.push(createPlaybackHandle(timeline, container));
+      controller.seekTimeline(entry.elementId, timelineName, 0);
+    }
   }
 
-  return handles;
+  return controller;
 }

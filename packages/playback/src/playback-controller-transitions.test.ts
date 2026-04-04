@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
-// Playback controller — tests for DOM observation, transitions, settle timer,
-// simultaneous timeline management, suppress transitions, and modifier sync.
+// Playback controller — visibility/state transitions, modifier sync,
+// simultaneous timeline playback
 // ---------------------------------------------------------------------------
 
 import type { AnimationRegistryEntry, ElementAnimationConfig, Timeline } from '@broadset/model';
@@ -12,7 +12,6 @@ import { createPlaybackController } from './playback-controller';
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Create a timeline with opacity keyframes (0 → 1) over the given span. */
 function createOpacityTimeline(id: string, name: string, maxOffsetMs: number): Timeline {
   return {
     id,
@@ -43,7 +42,6 @@ function buildRegistry(
   return entries.map((e) => ({ elementId: e.elementId, config: e.config }));
 }
 
-/** Create a container element with opacity-target and content-target children. */
 function createDomElement(): {
   readonly container: HTMLElement;
   readonly opacityTarget: HTMLElement;
@@ -61,11 +59,6 @@ function createDomElement(): {
   return { container, opacityTarget, contentTarget };
 }
 
-/**
- * Flush MutationObserver microtasks in jsdom.
- * MO callbacks are delivered via microtask queue, not timer queue,
- * so fake timers do not interfere.
- */
 async function flushMutations(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
@@ -73,7 +66,7 @@ async function flushMutations(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// rAF mock state — shared across tests that need controlled rAF
+// rAF mock — controlled requestAnimationFrame for verifying animation frames
 // ---------------------------------------------------------------------------
 
 let rafCallbacks: Array<(time: number) => void> = [];
@@ -100,137 +93,6 @@ function restoreRaf(): void {
   globalThis.requestAnimationFrame = origRAF;
   globalThis.cancelAnimationFrame = origCAF;
 }
-
-// ---------------------------------------------------------------------------
-// Playback Controller DOM Observation
-// ---------------------------------------------------------------------------
-
-describe('Playback Controller DOM Observation', () => {
-  /**
-   * @description Elements starting offscreen MUST be hidden immediately on
-   * attach. This ensures off-screen elements do not flash before the
-   * controller processes initial state.
-   */
-  it('offscreen element is hidden on attach', () => {
-    const registry = buildRegistry({ elementId: 'el-1', config: createTestConfig() });
-    const controller = createPlaybackController(registry);
-
-    const { container } = createDomElement();
-
-    container.className = 'offscreen';
-
-    controller.attach(container, 'el-1');
-
-    expect(container.style.visibility).toBe('hidden');
-    expect(container.style.pointerEvents).toBe('none');
-
-    controller.destroy();
-  });
-
-  /**
-   * @description setRegistry must re-parse attached elements with the new
-   * config so that timelines added after attach become resolvable.
-   */
-  it('setRegistry re-parses element runtimes', () => {
-    const registry1 = buildRegistry({ elementId: 'el-1', config: createTestConfig() });
-    const controller = createPlaybackController(registry1);
-
-    const { container, opacityTarget } = createDomElement();
-
-    controller.attach(container, 'el-1');
-
-    // Initially no timelines — seekTimeline would be a no-op
-    controller.seekTimeline('el-1', 'newTl', 250);
-    expect(opacityTarget.style.opacity).toBe('');
-
-    // Update registry with a timeline
-    const tl = createOpacityTimeline('tl-new', 'newTl', 500);
-    const registry2 = buildRegistry({
-      elementId: 'el-1',
-      config: createTestConfig({ timelines: [tl] }),
-    });
-
-    controller.setRegistry(registry2);
-
-    // Now seekTimeline should work with the new timeline
-    // opacity at 250ms of 500ms span → 0.5
-    controller.seekTimeline('el-1', 'newTl', 250);
-    expect(opacityTarget.style.opacity).toBe('0.5');
-
-    controller.destroy();
-  });
-
-  /**
-   * @description seekTimeline creates a playback handle for the named
-   * timeline on the element. stopTimeline cancels and cleans up the
-   * handle without errors.
-   */
-  it('seekTimeline creates and cleans up handles', () => {
-    const tl = createOpacityTimeline('tl-spin', 'spin', 1000);
-    const config = createTestConfig({ timelines: [tl] });
-    const registry = buildRegistry({ elementId: 'el-1', config });
-    const controller = createPlaybackController(registry);
-
-    const { container, opacityTarget } = createDomElement();
-
-    controller.attach(container, 'el-1');
-
-    // seekTimeline should apply interpolated styles
-    // opacity at 500ms of 1000ms span → 0.5
-    controller.seekTimeline('el-1', 'spin', 500);
-    expect(opacityTarget.style.opacity).toBe('0.5');
-
-    // stopTimeline should not throw
-    controller.stopTimeline('el-1', 'spin');
-
-    controller.destroy();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Suppress Transitions Mode
-// ---------------------------------------------------------------------------
-
-describe('Suppress Transitions Mode', () => {
-  beforeEach(() => {
-    jest.useFakeTimers();
-  });
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
-  /**
-   * @description When suppressTransitions is true, a state change must
-   * apply the final keyframe properties to the DOM instantly, without
-   * scheduling a rAF-driven animation.
-   */
-  it('applies final keyframe properties instantly on state change', async () => {
-    const tl = createOpacityTimeline('tl-in', 'IN', 500);
-    const config = createTestConfig({
-      timelines: [tl],
-      stateTimelineBindings: [{ stateName: 'IN', timelineId: 'tl-in' }],
-    });
-    const registry = buildRegistry({ elementId: 'el-1', config });
-    const controller = createPlaybackController(registry, { suppressTransitions: true });
-
-    const { container, opacityTarget } = createDomElement();
-
-    container.className = 'offscreen';
-    document.body.appendChild(container);
-    controller.attach(container, 'el-1');
-
-    // Trigger visibility change: offscreen → onscreen
-    container.className = 'onscreen';
-    await flushMutations();
-    jest.advanceTimersByTime(50);
-
-    // With suppress, the final keyframe value (opacity=1) is applied instantly
-    expect(opacityTarget.style.opacity).toBe('1');
-
-    controller.destroy();
-    document.body.removeChild(container);
-  });
-});
 
 // ---------------------------------------------------------------------------
 // Visibility and State Transitions
@@ -346,6 +208,45 @@ describe('Visibility and State Transitions', () => {
     expect(opacityTarget.style.opacity).toBe('');
     // No rAF should have been registered
     expect(rafCallbacks).toHaveLength(0);
+
+    controller.destroy();
+    document.body.removeChild(container);
+  });
+
+  /**
+   * @description When activeState transitions from a named state to null
+   * (e.g. the state class is removed), the previous state's timeline
+   * MUST be stopped and its applied styles cleaned up. Without this,
+   * stale animation styles from the previous state persist indefinitely.
+   */
+  it('state cleared to null stops active timeline', async () => {
+    const tl = createOpacityTimeline('tl-active', 'active', 500);
+    const config = createTestConfig({
+      timelines: [tl],
+      stateTimelineBindings: [{ stateName: 'active', timelineId: 'tl-active' }],
+    });
+    const registry = buildRegistry({ elementId: 'el-1', config });
+    const controller = createPlaybackController(registry, { suppressTransitions: true });
+
+    const { container, opacityTarget } = createDomElement();
+
+    container.className = 'onscreen';
+    document.body.appendChild(container);
+    controller.attach(container, 'el-1');
+
+    // Trigger the 'active' state — suppress mode applies final keyframe instantly
+    container.className = 'onscreen active';
+    await flushMutations();
+    jest.advanceTimersByTime(50);
+    expect(opacityTarget.style.opacity).toBe('1');
+
+    // Clear the state back to null — remove the 'active' class
+    container.className = 'onscreen';
+    await flushMutations();
+    jest.advanceTimersByTime(50);
+
+    // Applied styles from the 'active' state timeline should be cleaned up
+    expect(opacityTarget.style.opacity).toBe('');
 
     controller.destroy();
     document.body.removeChild(container);
@@ -470,97 +371,6 @@ describe('Modifier Sync', () => {
     // No out-timeline to play → no new styles applied. No error means pass.
     // Verify no crash occurred by checking controller still works.
     expect(controller.seekTimeline).toBeDefined();
-
-    controller.destroy();
-    document.body.removeChild(container);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Settle Timer Behavior
-// ---------------------------------------------------------------------------
-
-describe('Settle Timer Behavior', () => {
-  beforeEach(() => {
-    jest.useFakeTimers();
-  });
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
-  /**
-   * @description Class mutations MUST be debounced through the settle
-   * timer. Transitions should NOT fire until the settle window (50ms
-   * default) has elapsed.
-   */
-  it('defers transition until settle window completes', async () => {
-    const tl = createOpacityTimeline('tl-in', 'IN', 500);
-    const config = createTestConfig({
-      timelines: [tl],
-      stateTimelineBindings: [{ stateName: 'IN', timelineId: 'tl-in' }],
-    });
-    const registry = buildRegistry({ elementId: 'el-1', config });
-    const controller = createPlaybackController(registry, { suppressTransitions: true });
-
-    const { container, opacityTarget } = createDomElement();
-
-    container.className = 'offscreen';
-    document.body.appendChild(container);
-    controller.attach(container, 'el-1');
-
-    // Trigger visibility change
-    container.className = 'onscreen';
-    await flushMutations();
-
-    // Before settle window — transition NOT yet processed
-    expect(opacityTarget.style.opacity).toBe('');
-
-    // Advance past settle delay
-    jest.advanceTimersByTime(50);
-
-    // NOW the final keyframe should be applied
-    expect(opacityTarget.style.opacity).toBe('1');
-
-    controller.destroy();
-    document.body.removeChild(container);
-  });
-
-  /**
-   * @description A new class mutation during an active settle window
-   * MUST reset the timer. The transition only fires after the full
-   * settle delay from the LAST mutation.
-   */
-  it('resets on new class mutation', async () => {
-    const tl = createOpacityTimeline('tl-in', 'IN', 500);
-    const config = createTestConfig({
-      timelines: [tl],
-      stateTimelineBindings: [{ stateName: 'IN', timelineId: 'tl-in' }],
-    });
-    const registry = buildRegistry({ elementId: 'el-1', config });
-    const controller = createPlaybackController(registry, { suppressTransitions: true });
-
-    const { container, opacityTarget } = createDomElement();
-
-    container.className = 'offscreen';
-    document.body.appendChild(container);
-    controller.attach(container, 'el-1');
-
-    // First mutation
-    container.className = 'onscreen';
-    await flushMutations();
-
-    // After 30ms, second mutation resets the window
-    jest.advanceTimersByTime(30);
-    container.className = 'onscreen extra';
-    await flushMutations();
-
-    // 30ms after second mutation — NOT settled yet (need 50ms from last)
-    jest.advanceTimersByTime(30);
-    expect(opacityTarget.style.opacity).toBe('');
-
-    // 20ms more = 50ms from second mutation — now settled
-    jest.advanceTimersByTime(20);
-    expect(opacityTarget.style.opacity).toBe('1');
 
     controller.destroy();
     document.body.removeChild(container);

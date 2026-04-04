@@ -203,7 +203,7 @@ Color interpolation functions MUST accept only hexadecimal color strings (`#RGB`
 
 ## Spec Gaps
 
-- [ ] **Hex-Only Color Input Guarantee:** Automated test coverage for the non-hex fallback behavior (returning `from` unchanged) does not yet exist and should be added.
+- [x] **Hex-Only Color Input Guarantee:** Test coverage exists — `returns from value unchanged for non-hex input` and `returns from value unchanged for named colors` in `interpolation.test.ts`.
 
 ---
 

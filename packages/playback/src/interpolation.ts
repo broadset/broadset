@@ -8,6 +8,20 @@ import { HEX_COLOR_RE, interpolateColor } from './color-interpolation';
 
 const COORDINATE_PRECISION = 2;
 
+// ---------------------------------------------------------------------------
+// Type guards for keyframe property arrays
+// ---------------------------------------------------------------------------
+
+/** Type guard — checks that value is an array of strings (O(1) first-element check). */
+function isStringArray(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && (value.length === 0 || typeof value[0] === 'string');
+}
+
+/** Type guard — checks that value is an array of numbers (O(1) first-element check). */
+function isNumberArray(value: unknown): value is readonly number[] {
+  return Array.isArray(value) && (value.length === 0 || typeof value[0] === 'number');
+}
+
 /**
  * Cubic-bezier control points for the built-in easing presets.
  * source: https://developer.mozilla.org/en-US/docs/Web/CSS/easing-function
@@ -314,12 +328,11 @@ export function interpolateKeyframeProperties(
   const toCoords = toProps['pathCoordinates'];
 
   if (fromCommands && toCommands && fromCoords && toCoords) {
-    const commands = fromCommands.value as readonly string[];
-    const from = fromCoords.value as readonly number[];
-    const to = toCoords.value as readonly number[];
-    const eased = applyEasing(fromCoords.interpolation, t);
+    if (isStringArray(fromCommands.value) && isNumberArray(fromCoords.value) && isNumberArray(toCoords.value)) {
+      const eased = applyEasing(fromCoords.interpolation, t);
 
-    result['d'] = interpolatePath(commands, from, to, eased);
+      result['d'] = interpolatePath(fromCommands.value, fromCoords.value, toCoords.value, eased);
+    }
   }
 
   // Interpolate each property

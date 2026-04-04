@@ -5,9 +5,8 @@
 
 import type { AnimationRegistryEntry, ElementAnimationConfig, Timeline } from '@broadset/model';
 
-import type { ClassState } from './class-state';
 import { parseClassState } from './class-state';
-import type { PlaybackHandle } from './playback-handle';
+import type { ElementRuntime, PlaybackController, PlaybackControllerOptions } from './playback-controller-types';
 import { createPlaybackHandle } from './playback-handle';
 import { resolveModifierTimelines, resolveStateTimeline } from './resolve-timeline';
 import { applyStylesToElement, clearStylesFromElement } from './style-writer';
@@ -19,57 +18,13 @@ import { computeTimelineDuration, computeTimelineFrame } from './timeline';
 
 const DEFAULT_SETTLE_DELAY_MS = 50;
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export interface PlaybackControllerOptions {
-  readonly suppressTransitions?: boolean;
-  readonly settleDelayMs?: number;
-}
-
-export interface PlaybackController {
-  readonly attach: (element: HTMLElement, elementId: string) => void;
-  readonly detach: (element: HTMLElement) => void;
-  readonly play: () => void;
-  readonly pause: () => void;
-  readonly seek: (timeMs: number) => void;
-  readonly setSpeed: (multiplier: number) => void;
-  readonly setRegistry: (registry: readonly AnimationRegistryEntry[]) => void;
-  readonly seekTimeline: (elementId: string, timelineName: string, timeMs: number) => void;
-  readonly stopTimeline: (elementId: string, timelineName: string) => void;
-  readonly destroy: () => void;
-}
-
-// ---------------------------------------------------------------------------
-// Internal types
-// ---------------------------------------------------------------------------
-
-interface ActiveHandle {
-  readonly handle: PlaybackHandle;
-  readonly timeline: Timeline;
-}
-
-/**
- * Per-element mutable runtime state.
- * Fields are mutable because they change during the attach/detach lifecycle,
- * registry updates, settle timer processing, and handle creation/cancellation.
- */
-interface ElementRuntime {
-  readonly elementId: string;
-  readonly element: HTMLElement;
-  readonly observer: MutationObserver;
-  /** Mutable — updated when setRegistry provides a new config. */
-  config: ElementAnimationConfig | null;
-  /** Mutable — updated after each settled class mutation. */
-  previousState: ClassState;
-  /** Mutable — cleared/set during settle timer lifecycle. */
-  settleTimer: ReturnType<typeof setTimeout> | null;
-  /** Mutable — set/cleared when timeline handles are created/cancelled. */
-  activeHandle: ActiveHandle | null;
-  /** Mutable map — entries modified when modifier timelines are created/cancelled. */
-  readonly modifierHandles: Map<string, ActiveHandle>;
-}
+// Types re-exported from the dedicated types module.
+export type {
+  ActiveHandle,
+  ElementRuntime,
+  PlaybackController,
+  PlaybackControllerOptions,
+} from './playback-controller-types';
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -95,10 +50,21 @@ export function createPlaybackController(
   // Registry lookup helpers
   // -----------------------------------------------------------------------
 
-  function findConfig(elementId: string): ElementAnimationConfig | null {
-    const entry = registry.find((e) => e.elementId === elementId);
+  /** Mutable — rebuilt on construction and setRegistry. O(1) lookup by elementId. */
+  let configMap = new Map<string, ElementAnimationConfig>();
 
-    return entry?.config ?? null;
+  function rebuildConfigMap(): void {
+    configMap = new Map<string, ElementAnimationConfig>();
+
+    for (const entry of registry) {
+      configMap.set(entry.elementId, entry.config);
+    }
+  }
+
+  rebuildConfigMap();
+
+  function findConfig(elementId: string): ElementAnimationConfig | null {
+    return configMap.get(elementId) ?? null;
   }
 
   function getKnownStates(config: ElementAnimationConfig | null): readonly string[] {
@@ -135,7 +101,7 @@ export function createPlaybackController(
     if (!runtime.activeHandle) return;
 
     runtime.activeHandle.handle.cancel();
-    clearStylesFromElement(runtime.element, collectProperties(runtime.activeHandle.timeline));
+    clearStylesFromElement(runtime.element, runtime.activeHandle.properties);
     runtime.activeHandle = null;
   }
 
@@ -158,12 +124,20 @@ export function createPlaybackController(
     if (suppressTransitions) {
       applyInstant(runtime.element, timeline);
 
+      // Store the timeline reference so cancelWithCleanup can clear styles
+      // when the state is later cleared to null.
+      const handle = createPlaybackHandle(timeline, runtime.element);
+      const properties = collectProperties(timeline);
+
+      handle.cancel();
+      runtime.activeHandle = { handle, timeline, properties };
+
       return;
     }
 
     const handle = createPlaybackHandle(timeline, runtime.element, { onComplete });
 
-    runtime.activeHandle = { handle, timeline };
+    runtime.activeHandle = { handle, timeline, properties: collectProperties(timeline) };
     handle.play();
   }
 
@@ -212,7 +186,14 @@ export function createPlaybackController(
   }
 
   function handleStateChange(runtime: ElementRuntime, newState: string | null): void {
-    if (!runtime.config || newState === null) return;
+    if (!runtime.config) return;
+
+    // State cleared to null — stop the active state timeline
+    if (newState === null) {
+      cancelWithCleanup(runtime);
+
+      return;
+    }
 
     const timeline = resolveStateTimeline(runtime.config, newState);
 
@@ -241,10 +222,21 @@ export function createPlaybackController(
 
       if (suppressTransitions) {
         applyInstant(runtime.element, resolved.inTimeline);
+
+        // Store reference so removal can clean up applied styles
+        const handle = createPlaybackHandle(resolved.inTimeline, runtime.element);
+        const properties = collectProperties(resolved.inTimeline);
+
+        handle.cancel();
+        runtime.modifierHandles.set(mod, { handle, timeline: resolved.inTimeline, properties });
       } else {
         const handle = createPlaybackHandle(resolved.inTimeline, runtime.element);
 
-        runtime.modifierHandles.set(mod, { handle, timeline: resolved.inTimeline });
+        runtime.modifierHandles.set(mod, {
+          handle,
+          timeline: resolved.inTimeline,
+          properties: collectProperties(resolved.inTimeline),
+        });
         handle.play();
       }
     }
@@ -257,7 +249,7 @@ export function createPlaybackController(
 
       if (existing) {
         existing.handle.cancel();
-        clearStylesFromElement(runtime.element, collectProperties(existing.timeline));
+        clearStylesFromElement(runtime.element, existing.properties);
         runtime.modifierHandles.delete(mod);
       }
 
@@ -270,7 +262,11 @@ export function createPlaybackController(
         } else {
           const handle = createPlaybackHandle(resolved.outTimeline, runtime.element);
 
-          runtime.modifierHandles.set(mod + ':out', { handle, timeline: resolved.outTimeline });
+          runtime.modifierHandles.set(mod + ':out', {
+            handle,
+            timeline: resolved.outTimeline,
+            properties: collectProperties(resolved.outTimeline),
+          });
           handle.play();
         }
       }
@@ -288,7 +284,7 @@ export function createPlaybackController(
     }
 
     // State change
-    if (newState.activeState !== oldState.activeState && newState.activeState !== null) {
+    if (newState.activeState !== oldState.activeState) {
       handleStateChange(runtime, newState.activeState);
     }
 
@@ -335,7 +331,10 @@ export function createPlaybackController(
       handleClassMutation(element);
     });
 
-    observer.observe(element, { attributes: true, attributeFilter: ['class'] });
+    observer.observe(element, {
+      attributes: true,
+      attributeFilter: ['class', 'data-visibility', 'data-active-state', 'data-modifiers'],
+    });
 
     const runtime: ElementRuntime = {
       elementId,
@@ -401,6 +400,7 @@ export function createPlaybackController(
 
   function setRegistry(newRegistry: readonly AnimationRegistryEntry[]): void {
     registry = newRegistry;
+    rebuildConfigMap();
 
     for (const runtime of runtimes.values()) {
       const newConfig = findConfig(runtime.elementId);
@@ -429,11 +429,11 @@ export function createPlaybackController(
     // Create new handle and seek
     const handle = createPlaybackHandle(timeline, element);
 
-    runtime.activeHandle = { handle, timeline };
+    runtime.activeHandle = { handle, timeline, properties: collectProperties(timeline) };
     handle.seek(timeMs);
   }
 
-  function stopTimeline(elementId: string, _timelineName: string): void {
+  function stopTimeline(elementId: string, timelineName: string): void {
     const element = elementMap.get(elementId);
 
     if (!element) return;
@@ -442,7 +442,13 @@ export function createPlaybackController(
 
     if (!runtime) return;
 
-    cancelWithCleanup(runtime);
+    // Only cancel if the active handle's timeline matches the requested name/id
+    if (
+      runtime.activeHandle &&
+      (runtime.activeHandle.timeline.name === timelineName || runtime.activeHandle.timeline.id === timelineName)
+    ) {
+      cancelWithCleanup(runtime);
+    }
   }
 
   function destroy(): void {

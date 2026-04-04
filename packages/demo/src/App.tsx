@@ -1,14 +1,14 @@
-import type { PlaybackHandle } from '@broadset/playback';
+import type { PlaybackController } from '@broadset/playback';
 import { DocumentRenderer } from '@broadset/renderer';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { createAnimationHandles } from './animationSetup';
+import { createDemoController } from './animationSetup';
 import { SAMPLE_DOCUMENT } from './sampleDocument';
 
 export default function App(): React.JSX.Element {
   const canvasRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<DocumentRenderer | null>(null);
-  const handlesRef = useRef<readonly PlaybackHandle[]>([]);
+  const controllerRef = useRef<PlaybackController | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
@@ -39,21 +39,13 @@ export default function App(): React.JSX.Element {
     renderer.mount(SAMPLE_DOCUMENT, host);
     rendererRef.current = renderer;
 
-    // Create playback handles and seek to t=0
-    const handles = createAnimationHandles(SAMPLE_DOCUMENT, host);
+    const controller = createDemoController(SAMPLE_DOCUMENT, host);
 
-    handlesRef.current = handles;
-
-    for (const h of handles) {
-      h.seek(0);
-    }
+    controllerRef.current = controller;
 
     return (): void => {
-      for (const h of handlesRef.current) {
-        h.cancel();
-      }
-
-      handlesRef.current = [];
+      controller.destroy();
+      controllerRef.current = null;
       renderer.destroy();
       rendererRef.current = null;
       html.style.overflow = prevHtmlOverflow;
@@ -66,26 +58,17 @@ export default function App(): React.JSX.Element {
 
   const handlePlayPause = useCallback((): void => {
     if (isPlaying) {
-      for (const h of handlesRef.current) {
-        h.pause();
-      }
-
+      controllerRef.current?.pause();
       setIsPlaying(false);
     } else {
-      for (const h of handlesRef.current) {
-        h.play();
-      }
-
+      controllerRef.current?.play();
       setIsPlaying(true);
     }
   }, [isPlaying]);
 
   const handleReset = useCallback((): void => {
-    for (const h of handlesRef.current) {
-      h.pause();
-      h.seek(0);
-    }
-
+    controllerRef.current?.pause();
+    controllerRef.current?.seek(0);
     setIsPlaying(false);
   }, []);
 
