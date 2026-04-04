@@ -52,35 +52,6 @@ export const SIDEBAR_ICON_MAP = {
   preflight: ClipboardCheck,
 } as const satisfies Record<string, LucideIcon>;
 
-// localStorage key for sidebar width persistence
-const SIDEBAR_WIDTH_KEY = 'broadset-sidebar-width';
-
-export function readSidebarWidth(): number {
-  try {
-    const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-
-    if (raw !== null) {
-      const n = Number(raw);
-
-      if (Number.isFinite(n) && n >= 256 && n <= 800) {
-        return n;
-      }
-    }
-  } catch {
-    // localStorage may be unavailable
-  }
-
-  return 320;
-}
-
-export function persistSidebarWidth(width: number): void {
-  try {
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
-  } catch {
-    // localStorage may be unavailable
-  }
-}
-
 // ---------------------------------------------------------------------------
 // ToolbarButton — icon-only Button with auto-positioned Tooltip
 // ---------------------------------------------------------------------------

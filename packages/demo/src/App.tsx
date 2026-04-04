@@ -38,6 +38,8 @@ import {
   Image,
   Info,
   Keyboard,
+  Maximize,
+  Minimize,
   Pause,
   Play,
   Redo2,
@@ -54,13 +56,13 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { createDemoController } from './animationSetup';
 import { CanvasOverlays } from './CanvasOverlays';
 import { elementsToLayers, elementToPanelElement, sampleToEditorDocument, toRendererDoc } from './converters';
+import { createDemoConfig, DEMO_MEDIA_SOURCE, loadSavedDocument } from './demoConfig';
+import { lockViewportOverflow, preventBrowserZoom, readSidebarPreferences, saveSidebarPreferences } from './demoState';
 import { PathToolsPanel } from './PathToolsPanel';
 import {
   ELEMENT_FALLBACK_ICON,
   ELEMENT_ICON_MAP,
   ELEMENT_TYPES,
-  persistSidebarWidth,
-  readSidebarWidth,
   SIDEBAR_ICON_MAP,
   ToolbarButton,
 } from './toolbar-helpers';
@@ -73,32 +75,32 @@ import { useMockLiveData } from './useMockLiveData';
 type ModalName = 'about' | 'canvasSettings' | 'export' | 'mediaLibrary' | 'newDocument' | 'shortcutHelp';
 
 // ---------------------------------------------------------------------------
-// Sample media assets for the Media Library demo
-// ---------------------------------------------------------------------------
-
-const DEMO_ASSETS = [
-  { id: 'a1', name: 'Company Logo', url: '/assets/logo.png', categoryId: 'logos' },
-  { id: 'a2', name: 'Event Banner', url: '/assets/banner.jpg', categoryId: 'graphics' },
-  { id: 'a3', name: 'Score Bug', url: '/assets/bug.svg', categoryId: 'graphics' },
-  { id: 'a4', name: 'Sponsor Logo', url: '/assets/sponsor.png', categoryId: 'logos' },
-] as const;
-
-const DEMO_CATEGORIES = [
-  { id: 'logos', name: 'Logos' },
-  { id: 'graphics', name: 'Graphics' },
-] as const;
-
-// ---------------------------------------------------------------------------
 // App component
 // ---------------------------------------------------------------------------
 
 export default function App(): JSX.Element {
-  // --- Editor store (created once) ---
+  // --- Editor store (created once, with full demo config) ---
   const storeRef = useRef<EditorStore | null>(null);
+  const configRef = useRef<ReturnType<typeof createDemoConfig> | null>(null);
 
   if (storeRef.current === null) {
-    storeRef.current = createEditorStore();
-    storeRef.current.getState().loadTemplate(sampleToEditorDocument());
+    const config = createDemoConfig();
+
+    configRef.current = config;
+    storeRef.current = createEditorStore({ config });
+
+    // Load saved document from localStorage, or fall back to sample
+    const saved = loadSavedDocument();
+
+    if (saved !== null) {
+      try {
+        storeRef.current.getState().loadTemplate(saved as ReturnType<typeof sampleToEditorDocument>);
+      } catch {
+        storeRef.current.getState().loadTemplate(sampleToEditorDocument());
+      }
+    } else {
+      storeRef.current.getState().loadTemplate(sampleToEditorDocument());
+    }
   }
 
   const store = storeRef.current;
@@ -134,39 +136,36 @@ export default function App(): JSX.Element {
   const [activeModal, setActiveModal] = useState<ModalName | null>(null);
   const [documentName, setDocumentName] = useState('Untitled Document');
 
-  // --- Sidebar drawer state ---
+  // --- Sidebar drawer state (restored from localStorage) ---
 
   type SidebarTab = 'layers' | 'properties' | 'animation' | 'preflight';
 
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab | null>('layers');
-  const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
+  const initialPrefs = useRef(readSidebarPreferences());
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab | null>(
+    initialPrefs.current.open ? (initialPrefs.current.tab as SidebarTab) : null,
+  );
+  const [sidebarWidth, setSidebarWidth] = useState(initialPrefs.current.width);
   const sidebarResizing = useRef(false);
   const SIDEBAR_MIN = 256;
   const SIDEBAR_MAX = 800;
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // --- Lock viewport overflow (runs once) ---
+  useEffect(() => lockViewportOverflow(), []);
+
+  // --- Prevent browser zoom gestures ---
+  useEffect(() => preventBrowserZoom(), []);
+
+  // --- Fullscreen change listener ---
   useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
+    const handler = (): void => {
+      setIsFullscreen(document.fullscreenElement !== null);
+    };
 
-    const prevHtmlOverflow = html.style.overflow;
-    const prevHtmlHeight = html.style.height;
-    const prevBodyOverflow = body.style.overflow;
-    const prevBodyHeight = body.style.height;
-    const prevBodyMargin = body.style.margin;
-
-    html.style.overflow = 'hidden';
-    html.style.height = '100%';
-    body.style.overflow = 'hidden';
-    body.style.height = '100%';
-    body.style.margin = '0';
+    document.addEventListener('fullscreenchange', handler);
 
     return (): void => {
-      html.style.overflow = prevHtmlOverflow;
-      html.style.height = prevHtmlHeight;
-      body.style.overflow = prevBodyOverflow;
-      body.style.height = prevBodyHeight;
-      body.style.margin = prevBodyMargin;
+      document.removeEventListener('fullscreenchange', handler);
     };
   }, []);
 
@@ -308,10 +307,14 @@ export default function App(): JSX.Element {
     [sidebarWidth],
   );
 
-  // Persist sidebar width on change
+  // Persist sidebar preferences on change
   useEffect(() => {
-    persistSidebarWidth(sidebarWidth);
-  }, [sidebarWidth]);
+    saveSidebarPreferences({
+      open: sidebarTab !== null,
+      tab: sidebarTab ?? 'layers',
+      width: sidebarWidth,
+    });
+  }, [sidebarWidth, sidebarTab]);
 
   // Auto-switch sidebar: if Properties or Animation tab active but nothing selected, switch to Layers
   useEffect(() => {
@@ -632,7 +635,12 @@ export default function App(): JSX.Element {
               icon={Save}
               label="Save"
               onPress={() => {
-                console.log('Save triggered');
+                const doc = store.getState().getDocument();
+                const config = configRef.current;
+
+                if (config !== null && typeof config.onSave === 'function') {
+                  (config.onSave as (doc: unknown) => void)(doc);
+                }
               }}
             />
             <ToolbarButton
@@ -699,7 +707,16 @@ export default function App(): JSX.Element {
               icon={Bug}
               label="Debug Snapshot"
               onPress={() => {
-                console.log('Debug snapshot downloaded');
+                const doc = store.getState().getDocument();
+                const snapshot = JSON.stringify(doc, null, 2);
+                const blob = new Blob([snapshot], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+
+                a.href = url;
+                a.download = `broadset-debug-${Date.now().toString()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
               }}
             />
             <ToolbarButton
@@ -714,6 +731,21 @@ export default function App(): JSX.Element {
               label="About"
               onPress={() => {
                 setActiveModal('about');
+              }}
+            />
+
+            <div className="mx-1 h-5 w-px bg-divider" />
+
+            {/* Fullscreen toggle */}
+            <ToolbarButton
+              icon={isFullscreen ? Minimize : Maximize}
+              label={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+              onPress={() => {
+                if (document.fullscreenElement !== null) {
+                  void document.exitFullscreen();
+                } else {
+                  void document.documentElement.requestFullscreen();
+                }
               }}
             />
 
@@ -952,8 +984,8 @@ export default function App(): JSX.Element {
             onClose={() => {
               setActiveModal(null);
             }}
-            assets={DEMO_ASSETS}
-            categories={DEMO_CATEGORIES}
+            assets={DEMO_MEDIA_SOURCE.assets}
+            categories={DEMO_MEDIA_SOURCE.categories}
             onSelect={(assetId) => {
               console.log('Media selected:', assetId);
               setActiveModal(null);

@@ -21,6 +21,13 @@ export {
   computeRulerTicks,
   computeSafetyBoundaries,
 } from './canvas';
+export type { ChangeListener, ChangeStreamController } from './collaboration';
+export {
+  applyRemoteChanges,
+  createChangeStreamController,
+  diffAnimationRegistries,
+  diffDocuments,
+} from './collaboration';
 export type { BroadsetDataStore, DataStoreState, ElementData, ElementDataMap } from './data-store';
 export { createDataStore } from './data-store';
 export type { ElementDefaults, PluginDefaults } from './editing';
