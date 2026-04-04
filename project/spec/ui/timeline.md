@@ -16,17 +16,37 @@ The system MUST render an empty state when no keyframes exist. A `+` button MUST
 
 The timeline editor MUST be composed of these visual zones:
 
-| Zone              | Position      | Content                                                                                                                               |
-| ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Playback controls | Top-left      | Play/Pause toggle, Stop button, Loop toggle                                                                                           |
-| Timeline ruler    | Top, spanning | Horizontal ruler with time markers (step interval configurable, default every 500ms). Grid lines at snap intervals (default 100ms)    |
-| Keyframe track    | Center        | Horizontal track where keyframe markers are positioned at their time offsets                                                          |
-| Playhead          | Vertical line | Red/accent-colored vertical line indicating current playback time. Draggable for timeline scrubbing. Synced with playback engine time |
-| Keyframe list     | Bottom        | Table/list of keyframes showing: Name, Offset (ms), Action type, Property count. Click to select, double-click to rename              |
+| Zone              | Position      | Content                                                                                                                                                   |
+| ----------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Playback controls | Top-left      | Play/Pause toggle, Stop button, Loop toggle                                                                                                               |
+| Timeline ruler    | Top, spanning | Horizontal ruler with time markers (step interval configurable, default every 500ms). Grid lines at snap intervals (default 100ms)                        |
+| Keyframe track    | Center        | Horizontal track where keyframe markers are positioned at their time offsets. Clicking an empty area of the track MUST position the playhead at that time |
+| Playhead          | Vertical line | Red/accent-colored vertical line indicating current playback time. Draggable for timeline scrubbing. Synced with playback engine time                     |
+| Keyframe list     | Bottom        | Table/list of keyframes showing: Name, Offset (ms), Action type, Property count. Click to select, double-click to rename                                  |
+
+**Timeline Duration:**
+
+The visible timeline length MUST be calculated as `max(keyframe offsets) + 1000ms`, with a minimum of `3000ms`. This ensures the user always has visible space beyond the last keyframe for adding new ones or extending animations.
+
+**Ruler Time Format:**
+
+Ruler time labels MUST use seconds with one decimal place (e.g., `0.0s`, `0.5s`, `1.0s`, `2.5s`). This provides clear, scannable time references without millisecond clutter.
 
 **Keyframe Markers:**
 
 Keyframe markers MUST appear as small circular or diamond-shaped indicators positioned along the timeline track at their offset. Selected markers MUST have a distinct highlight (e.g., accent color fill). Markers MUST be draggable to reposition.
+
+Markers MUST be color-coded by their action type for quick visual identification:
+
+| Action type      | Color  | Semantic                   |
+| ---------------- | ------ | -------------------------- |
+| `setState`       | Accent | Primary state change       |
+| `addModifier`    | Focus  | Adding a visual modifier   |
+| `removeModifier` | Danger | Removing a visual modifier |
+
+**Keyframe Easing:**
+
+Each keyframe MUST have a configurable easing function that controls interpolation from this keyframe to the next. The default easing MUST be `ease`. Common presets MUST be available via a dropdown (e.g., `linear`, `ease`, `ease-in`, `ease-out`, `ease-in-out`). The easing dropdown MUST appear in the keyframe detail area when a keyframe is selected.
 
 **Snap Behavior:**
 
@@ -66,6 +86,12 @@ Dragging the playhead MUST call `onSeekTimeline` to preview the animation at the
 - [ ] Given the add button (+), a new keyframe is added and selected
 - [ ] Given multiple keyframes, only the new marker has `aria-pressed="true"`
 - [ ] Given a keyframe marker, the keyframe hint is shown
+- [ ] Given keyframes at 500ms and 1200ms, the visible timeline length is at least 2200ms (max offset + 1000ms)
+- [ ] Given no keyframes, the visible timeline length is at least 3000ms
+- [ ] Given ruler markers, time labels use `N.Ns` format (e.g., `0.5s`, `1.0s`)
+- [ ] Given keyframes with different action types, markers are color-coded (setState=accent, addModifier=focus, removeModifier=danger)
+- [ ] Given a click on an empty area of the keyframe track, the playhead moves to that time position
+- [ ] Given a selected keyframe, an easing dropdown is available with common presets
 
 ---
 
@@ -106,6 +132,10 @@ The system MUST support starting playback. When starting playback, the system MU
 
 The playhead MUST animate in sync with the playback engine via `requestAnimationFrame`. When playback reaches the end without loop mode, it MUST stop automatically.
 
+**Snapshot Restore on Play:**
+
+Before starting playback or seeking, the system MUST restore the element to its base snapshot state. This ensures the animation always starts from a known visual state rather than accumulating incremental changes.
+
 #### Scenario: Playback start
 
 - GIVEN a timeline with keyframes
@@ -115,6 +145,7 @@ The playhead MUST animate in sync with the playback engine via `requestAnimation
 #### Acceptance Criteria
 
 - [ ] Given a timeline with keyframes, onPlayTimeline is called without onComplete
+- [ ] Given playback starting, the element is restored to its base snapshot state before animation begins
 
 ---
 
@@ -193,11 +224,21 @@ AnimationBindingSections MUST render state and modifier binding UI for the selec
 - WHEN a new modifier binding is added
 - THEN an in/out timeline pair is created for the modifier
 
+**State Binding Ordering:**
+
+State bindings MUST be displayed in a fixed order: `Enter` first, then custom states in alphabetical order, then `Exit` last. This ensures a predictable, scannable list regardless of creation order.
+
+**Modifier Out-Timeline Default:**
+
+When creating a new modifier binding, the out-timeline MUST default to a reversed copy of the in-timeline. This saves the user from manually building the reverse animation for common show/hide patterns.
+
 #### Acceptance Criteria
 
 - [ ] Given an element with state bindings, each binding is listed with its timeline
 - [ ] Given a modifier binding addition, an in/out timeline pair is created
 - [ ] Given state binding removal, the binding and its timeline reference are cleared
+- [ ] Given multiple state bindings, they are ordered: Enter first, custom alphabetically, Exit last
+- [ ] Given a new modifier binding with an in-timeline, the out-timeline defaults to a reversed copy
 
 ---
 
@@ -266,3 +307,5 @@ Selected keyframes MUST be deletable via the Delete/Backspace key or a right-cli
 - Property panels → see [panels.md](panels.md)
 - Modal dialogs → see [modals.md](modals.md)
 - Toolbar and navigation → see [toolbar-nav.md](toolbar-nav.md)
+- Timeline zoom or horizontal scroll — the full duration is always visible at the current scale
+- Playback speed control — animations always play at 1× speed
