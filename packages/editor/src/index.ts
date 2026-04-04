@@ -21,6 +21,8 @@ export {
   computeRulerTicks,
   computeSafetyBoundaries,
 } from './canvas';
+export type { BroadsetDataStore, DataStoreState, ElementData, ElementDataMap } from './data-store';
+export { createDataStore } from './data-store';
 export type { ElementDefaults, PluginDefaults } from './editing';
 export {
   appendPathPoint,
@@ -55,6 +57,15 @@ export {
 } from './keyboard';
 export type { PathHandle, PathSegment } from './path-geometry';
 export { extractHandles, parsePath, refitPathBounds, refitPathBoundsSvg, serializePath } from './path-geometry';
+export {
+  BroadsetDataStoreProvider,
+  EditorErrorBoundary,
+  EditorProvider,
+  useComponentRegistry,
+  useDataStoreApi,
+  useEditorStore,
+  useElementData,
+} from './react-data-integration';
 export type {
   CreateEditorStoreOptions,
   EditingMode,

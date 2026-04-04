@@ -17,6 +17,8 @@
     "quality:strict": "npm run lint:strict && npm run typecheck && npm run test -- --runInBand"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "typescript": "^6.0.2"
   },
   "dependencies": {

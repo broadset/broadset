@@ -29,7 +29,19 @@ The swatch button MUST show a checkerboard pattern behind the color to indicate 
 
 **User Palette:**
 
-Users MUST be able to save colors to a persistent palette via the "Add to palette" button. Saved colors MUST appear in the preset swatch grid alongside the default palette colors.
+Users MUST be able to save colors to a persistent palette via the "Add to palette" button. Saved colors MUST appear in the preset swatch grid alongside the default palette colors. Individual saved colors MUST be removable.
+
+**Format Toggle Persistence:**
+
+The selected display format (HEX / RGB / HSL) MUST persist within the editing session. Switching format MUST convert the displayed text value to the new format. If conversion of a partial/draft input fails, the last valid value MUST be shown in the new format.
+
+**Transparent Color Handling:**
+
+The value `'rgba(0, 0, 0, 0)'` (fully transparent) MUST display a checkerboard pattern on the swatch button to indicate transparency. The alpha slider MUST be set to 0 when this value is active.
+
+**Draft Value Management:**
+
+During text input, the color picker MUST maintain a draft state to prevent losing partial input. The draft MUST be committed on blur or Enter. Invalid color strings on blur MUST revert to the last valid color — no error toast.
 
 #### Scenario: Pick a color
 
@@ -49,14 +61,73 @@ Users MUST be able to save colors to a persistent palette via the "Add to palett
 - [ ] Given valid hex text input, the color value is accepted and emitted
 - [ ] Given the color picker, a saturation/brightness area and hue slider are available
 - [ ] Given alpha adjustment, the emitted color includes opacity
+- [ ] Given an invalid color string on blur, the input reverts to the last valid color
+- [ ] Given format toggle, the displayed value converts to the selected format
+- [ ] Given a fully transparent color, the swatch shows a checkerboard pattern
+- [ ] Given saved palette colors, individual colors can be removed
 
 > **Note:** Gradient editing (linear, radial) is handled by the fill type switcher in the appearance panel (see [panels.md](panels.md)). The color picker described here applies to solid color stops within a gradient as well as standalone solid colors.
 
 ---
 
+### Requirement: NumField (Numeric Input)
+
+NumField wraps HeroUI `NumberField` to provide a consistent numeric input used across all property panels. It MUST include decrement and increment buttons flanking the text input. Arrow Up/Down keys MUST increment/decrement the value by the configured `step`. The value MUST be formatted with a maximum of 2 decimal places for display.
+
+**Commit Timing:**
+
+Value changes MUST be committed to the store on **blur** or **Enter** key — not in real-time during typing. This prevents partial values (e.g. typing "12" mid-way to "120") from triggering store updates. During increment/decrement button clicks and arrow key presses, the value MUST be committed immediately on each step.
+
+**Invalid Input Recovery:**
+
+If the user enters non-numeric or invalid text and blurs the field, the input MUST revert to the last valid formatted value. No error toast or alert is needed — silent recovery.
+
+**Step Sizes:**
+
+| Field context        | Step         | Notes                   |
+| -------------------- | ------------ | ----------------------- |
+| Position (x, y)      | 1            | In current unit         |
+| Size (width, height) | 1            | In current unit         |
+| Rotation             | 1            | Degrees                 |
+| Border width         | 1            | px                      |
+| Border radius        | 1            | px                      |
+| Font size            | 1            | pt                      |
+| Shadow offset        | 1            | px                      |
+| Shadow blur/spread   | 1            | px                      |
+| Opacity              | 0.01         | Slider, 0–1 range       |
+| Filter values        | Per function | See filter editor table |
+
+#### Scenario: Arrow key increments value
+
+- GIVEN a NumField with value 50 and step 1
+- WHEN the user presses Arrow Up
+- THEN the value becomes 51 and is committed
+
+#### Scenario: Blur commits value
+
+- GIVEN a NumField with the user typing "75"
+- WHEN the field loses focus
+- THEN the value 75 is committed to the store
+
+#### Scenario: Invalid input reverts
+
+- GIVEN a NumField with current value 50
+- WHEN the user types "abc" and blurs
+- THEN the field reverts to 50
+
+#### Acceptance Criteria
+
+- [ ] Given Arrow Up/Down, the value increments/decrements by the configured step
+- [ ] Given blur or Enter, the current value is committed to the store
+- [ ] Given invalid text input on blur, the field reverts to the last valid value
+- [ ] Given the displayed value, it has a maximum of 2 decimal places
+- [ ] Given increment/decrement buttons, each click commits the new value immediately
+
+---
+
 ### Requirement: CSS Length Input
 
-The CSS length input MUST provide a numeric input with unit switching (px, mm, in, %, em, rem). It MUST convert between units when the unit is changed.
+The CSS length input MUST provide a numeric input with unit switching (px, mm, in, %, em, rem). It MUST convert between units when the unit is changed. The unit selector MUST be positioned to the right of the numeric input. When the unit is blank/unitless, the display label MUST show '—' (em dash).
 
 #### Scenario: Switch units
 
@@ -96,6 +167,10 @@ The text stroke input MUST provide width and color inputs for CSS text-stroke. I
 ### Requirement: Filter Editor
 
 The filter editor MUST provide a stack editor for CSS filter functions. Supported functions: blur, brightness, contrast, grayscale, hue-rotate, invert, opacity, saturate, sepia. Filters MUST be ordered and individually configurable. Adding, removing, and reordering filters MUST be supported.
+
+**Duplicate Prevention:**
+
+Each filter function MUST appear at most once in the stack. The "Add filter" dropdown MUST exclude functions already present in the stack. When a filter is removed, its function becomes available in the dropdown again.
 
 **Per-Filter Fields:**
 
@@ -144,12 +219,17 @@ The emitted value MUST be a space-separated list of filter functions in stack di
 - [ ] Given a single filter, the correct CSS filter function string is emitted
 - [ ] Given multiple filters, they are concatenated in stack order
 - [ ] Given filter removal, the remaining filters form the emitted string
+- [ ] Given a filter already in the stack, it is excluded from the Add dropdown
 
 ---
 
 ### Requirement: Shadow Editor
 
 The shadow editor MUST provide inputs for box-shadow or text-shadow properties: offsetX, offsetY, blur radius, spread (box-shadow only), and color. It MUST support multiple shadow layers. Inset toggle MUST be available for box-shadow mode only.
+
+**Enable/Disable Toggle:**
+
+The shadow editor MUST include a top-level HeroUI `Switch` to enable or disable the entire shadow effect. When disabled, all layer controls MUST be dimmed and non-interactive, and the emitted shadow value MUST be `'none'` (or empty). This allows users to temporarily remove shadows without deleting configured layers.
 
 **Layer Management:**
 
@@ -188,6 +268,8 @@ Multiple shadow layers MUST be emitted as a comma-separated CSS shadow string.
 
 - [ ] Given shadow values, a valid CSS shadow string is emitted
 - [ ] Given multiple shadow layers, they are comma-separated in the emitted value
+- [ ] Given the shadow disabled via toggle, the emitted value is 'none'
+- [ ] Given the shadow re-enabled, previously configured layers are restored
 
 ---
 

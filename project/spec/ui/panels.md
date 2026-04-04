@@ -301,13 +301,25 @@ Child elements MUST be indented relative to their parent. Each nesting level MUS
 
 **Drag and Drop Reorder:**
 
-Layer rows MUST support drag-and-drop reordering. During drag, a visual drop indicator MUST show the insertion position with three modes: before (insert above), inside (nest into group), and after (insert below). Dropping MUST update the element z-order in the document.
+Layer rows MUST support drag-and-drop reordering. Dragging MUST only initiate from the grip icon zone (left side of the row) — dragging from the name or action buttons MUST NOT start a drag. A 1×1 transparent image MUST replace the browser's default drag ghost.
+
+During drag, a visual drop indicator MUST show the insertion position with three modes: before (insert above), inside (nest into group), and after (insert below). The drop zone is determined by the vertical pointer position within the target row.
+
+**Subtree validation:** An element MUST NOT be dropped into its own descendants. The system MUST check the full subtree of the dragged element and reject any drop target that is a descendant. Invalid drop targets MUST NOT show a drop indicator.
+
+**New element insertion:** When a new element is added to the document, it MUST appear at the top of the layer list (highest z-order) so it renders on top of existing elements.
+
+Dropping MUST update the element z-order in the document.
 
 **Multi-Selection:**
 
-- Click: select single element
-- Shift+Click: select range from last clicked to current
-- Ctrl/Cmd+Click: toggle individual element in selection
+- Click: select single element (clears previous selection)
+- Shift+Click: select range from the last clicked element to the current element (inclusive, in visual order)
+- Ctrl/Cmd+Click: toggle individual element in/out of selection without affecting others
+
+**Visibility Toggle Semantics:**
+
+The visibility toggle MUST set the element's `visibility` class property to `'onscreen'` (visible) or `'offscreen'` (hidden). This is a class-level property, not a style property — hidden elements remain in the DOM but are not rendered.
 
 #### Scenario: Layer click selects element
 
@@ -321,10 +333,26 @@ Layer rows MUST support drag-and-drop reordering. During drag, a visual drop ind
 - WHEN the sidebar renders
 - THEN an empty message is shown
 
+#### Scenario: Drop into own descendant rejected
+
+- GIVEN a group with a child element
+- WHEN the group is dragged onto its own child
+- THEN the drop is rejected and no reorder occurs
+
+#### Scenario: New element appears at top
+
+- GIVEN 3 elements in the layer list
+- WHEN a new element is added
+- THEN it appears at the top of the layer list (highest z-order)
+
 #### Acceptance Criteria
 
 - [ ] Given elements in the document, setActiveElement is fired with the element ID
 - [ ] Given no elements in the document, an empty message is shown
+- [ ] Given a drag operation, it only initiates from the grip icon zone
+- [ ] Given a drop into own descendant, the drop is rejected
+- [ ] Given a new element added, it appears at the top of the layer list
+- [ ] Given a visibility toggle, the element's visibility class is set to 'onscreen' or 'offscreen'
 
 ---
 
@@ -356,16 +384,34 @@ GeometryPanel MUST display and edit element position (x, y), size (width, height
 
 Anchor toggles MUST use HeroUI `ButtonGroup`. Numeric fields MUST use `NumField` (HeroUI `NumberField` wrapper). Unit selection MUST be preserved within the editing session.
 
+**Anchor-Relative Position Display:**
+
+When `anchorX` is `'right'`, the X field MUST display the position relative to the right edge of the canvas (`canvasWidth - x - width`). When `anchorY` is `'bottom'`, the Y field MUST display the position relative to the bottom edge (`canvasHeight - y - height`). The field label MUST dynamically reflect the anchor direction (e.g. "X (Right mm)" vs "X (mm)"). Editing the value MUST convert back to the internal left/top-origin coordinate before committing.
+
+**Width/Height Minimum:**
+
+Displayed width and height values MUST be clamped to a minimum of 0.1 in the current unit to prevent zero-size elements.
+
 #### Scenario: Edit element position
 
 - GIVEN a selected element at position (10, 20)
 - WHEN the user changes x to 50
 - THEN the element's x position is updated to 50
 
+#### Scenario: Right-anchored position display
+
+- GIVEN an element at x=100, width=80 on a 1920-wide canvas with anchorX='right'
+- WHEN the Geometry panel renders
+- THEN the X field shows 1740 (1920 - 100 - 80) and the label reads "X (Right ...)"
+
 #### Acceptance Criteria
 
 - [ ] Given a selected element, position, size, and rotation fields are editable
 - [ ] Given a value change, the update is committed to the store
+- [ ] Given anchorX='right', the X field displays the right-edge-relative value
+- [ ] Given anchorY='bottom', the Y field displays the bottom-edge-relative value
+- [ ] Given anchor labels, they dynamically reflect the anchor direction
+- [ ] Given width or height, the minimum displayed value is 0.1
 
 ---
 
@@ -387,6 +433,14 @@ AppearancePanel MUST display and edit fill color, background gradient, border (w
 | Blend mode          | HeroUI Select       | No           | normal, multiply, screen, overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, color, luminosity |
 
 The gradient editor MUST allow adding, removing, and repositioning color stops along the gradient axis. A fill-type switcher MUST toggle between solid color and gradient modes (visible in screen mode only — hidden in print mode). The border-radius link toggle, when active, MUST synchronize all four corner values when any single corner is edited.
+
+**Gradient Editor Interaction Details:**
+
+- Stop positions MUST be draggable along the gradient bar using pointer capture. Position MUST be calculated as a percentage (0–100) of bar width, snapped to integer values.
+- Clicking a stop MUST select it and display a color picker for that stop below the gradient bar.
+- A minimum of 2 gradient stops MUST be enforced — the remove button MUST be disabled when only 2 stops remain.
+- The gradient MUST update live (optimistic) during stop drag, with the final value emitted on pointer-up.
+- A separate angle control (0–360°) MUST allow adjusting the gradient rotation.
 
 #### Scenario: Change fill color
 
