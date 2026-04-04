@@ -301,13 +301,21 @@ export function PropertiesSidebar({
 
 export interface LayersSidebarProps {
   readonly layers: readonly LayerInfo[];
+  readonly selectedIds?: readonly string[];
   readonly onSelect: (id: string) => void;
   readonly onToggleLock: (id: string) => void;
   readonly onDelete: (id: string) => void;
   readonly onRename?: (id: string, name: string) => void;
 }
 
-export function LayersSidebar({ layers, onSelect, onToggleLock, onDelete, onRename }: LayersSidebarProps): JSX.Element {
+export function LayersSidebar({
+  layers,
+  selectedIds = [],
+  onSelect,
+  onToggleLock,
+  onDelete,
+  onRename,
+}: LayersSidebarProps): JSX.Element {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
 
@@ -344,67 +352,75 @@ export function LayersSidebar({ layers, onSelect, onToggleLock, onDelete, onRena
   return (
     <aside role="region" aria-label="Layers">
       <ul>
-        {layers.map((layer) => (
-          <li key={layer.id}>
-            {editingId === layer.id ?
-              <TextField
-                aria-label="Rename layer"
-                value={editValue}
-                onChange={(v: string) => {
-                  setEditValue(v);
-                }}
-                autoFocus
-              >
-                <Input
-                  onKeyDown={(e: React.KeyboardEvent) => {
+        {layers.map((layer) => {
+          const isSelected = selectedIds.includes(layer.id);
+
+          return (
+            <li
+              key={layer.id}
+              style={isSelected ? { backgroundColor: 'rgba(0, 111, 238, 0.15)' } : undefined}
+              aria-selected={isSelected}
+            >
+              {editingId === layer.id ?
+                <TextField
+                  aria-label="Rename layer"
+                  value={editValue}
+                  onChange={(v: string) => {
+                    setEditValue(v);
+                  }}
+                  autoFocus
+                >
+                  <Input
+                    onKeyDown={(e: React.KeyboardEvent) => {
+                      if (e.key === 'Enter') {
+                        commitRename(layer.id);
+                      } else if (e.key === 'Escape') {
+                        cancelRename();
+                      }
+                    }}
+                  />
+                </TextField>
+              : <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    onSelect(layer.id);
+                  }}
+                  onDoubleClick={() => {
+                    startRename(layer.id, layer.name);
+                  }}
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                      commitRename(layer.id);
-                    } else if (e.key === 'Escape') {
-                      cancelRename();
+                      onSelect(layer.id);
                     }
                   }}
-                />
-              </TextField>
-            : <span
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  onSelect(layer.id);
-                }}
-                onDoubleClick={() => {
-                  startRename(layer.id, layer.name);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    onSelect(layer.id);
-                  }
+                >
+                  {layer.name}
+                </span>
+              }
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={`Toggle lock ${layer.name}`}
+                onPress={() => {
+                  onToggleLock(layer.id);
                 }}
               >
-                {layer.name}
-              </span>
-            }
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label={`Toggle lock ${layer.name}`}
-              onPress={() => {
-                onToggleLock(layer.id);
-              }}
-            >
-              {layer.locked ? 'Unlock' : 'Lock'}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label={`Delete ${layer.name}`}
-              onPress={() => {
-                onDelete(layer.id);
-              }}
-            >
-              Delete
-            </Button>
-          </li>
-        ))}
+                {layer.locked ? 'Unlock' : 'Lock'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={`Delete ${layer.name}`}
+                onPress={() => {
+                  onDelete(layer.id);
+                }}
+              >
+                Delete
+              </Button>
+            </li>
+          );
+        })}
       </ul>
     </aside>
   );

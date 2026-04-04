@@ -61,7 +61,7 @@ A glass-morphism toolbar MUST float at the top-left of the canvas area (offset b
 
 ### Requirement: Element Toolbar
 
-A vertical element toolbar MUST render below the main toolbar listing all built-in element types and registered custom plugins. Each button MUST enter placement mode for its type. The active placement type MUST be visually highlighted.
+A vertical element toolbar MUST render below the main toolbar in a single column listing all built-in element types and registered custom plugins. Each button MUST be icon-only with a tooltip and MUST enter placement mode for its type. The active placement type MUST be visually highlighted.
 
 #### Scenario: All element types listed
 
@@ -184,6 +184,30 @@ When placement mode is active, a banner MUST appear at the top-center of the can
 
 - [ ] Given active placement mode, a banner with the type name and Cancel button is visible
 - [ ] Given Escape key during placement, placement is cancelled
+
+---
+
+### Requirement: Canvas Selection Indicator
+
+When one or more elements are selected on the canvas, a visible selection outline MUST appear around each selected element. The outline MUST match the element's position, size, and rotation. Clicking on an element MUST display the outline; clicking empty canvas space MUST clear it.
+
+#### Scenario: Selection outline on click
+
+- GIVEN the canvas is rendered with elements
+- WHEN the user clicks on an element
+- THEN a blue outline appears around the clicked element
+
+#### Scenario: Deselect clears outline
+
+- GIVEN an element is selected
+- WHEN the user clicks on empty canvas space
+- THEN no selection outline is visible
+
+#### Acceptance Criteria
+
+- [ ] Given an element click, a selection outline appears around that element
+- [ ] Given a click on empty canvas space, no selection outline is visible
+- [ ] Given a selected element, the layers sidebar highlights the selected layer
 
 ---
 

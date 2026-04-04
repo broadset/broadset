@@ -528,6 +528,27 @@ export default function App(): JSX.Element {
               padding={editorDoc.canvas.padding}
               viewMode={canvasSettings.viewMode}
             />
+
+            {/* Selection overlay — highlight borders for active elements */}
+            {activeElements
+              .filter((el) => activeElementIds.includes(el.id))
+              .map((el) => (
+                <div
+                  key={`sel-${el.id}`}
+                  style={{
+                    position: 'absolute',
+                    left: el.position.x,
+                    top: el.position.y,
+                    width: el.width,
+                    height: el.height,
+                    transform: el.rotation !== 0 ? `rotate(${String(el.rotation)}deg)` : undefined,
+                    outline: '2px solid #006FEE',
+                    outlineOffset: '1px',
+                    pointerEvents: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              ))}
           </div>
         </div>
       </div>
@@ -671,8 +692,8 @@ export default function App(): JSX.Element {
       </div>
 
       {/* ---- Vertical element toolbar (below main toolbar) ---- */}
-      <div className="toolbar-glass absolute top-[80px] left-[28px] z-[8000] flex flex-col gap-0.5 rounded-lg p-1.5">
-        <div role="toolbar" aria-label="Element library" className="grid grid-cols-2 gap-0.5">
+      <div className="toolbar-glass absolute top-[80px] left-[28px] z-[8000] rounded-lg p-1.5">
+        <div role="toolbar" aria-label="Element library" className="flex flex-col gap-0.5">
           {ELEMENT_TYPES.map((info) => {
             const Icon = ELEMENT_ICON_MAP[info.type] ?? ELEMENT_FALLBACK_ICON;
 
@@ -727,6 +748,7 @@ export default function App(): JSX.Element {
             {sidebarTab === 'layers' ?
               <LayersSidebar
                 layers={layers}
+                selectedIds={activeElementIds as string[]}
                 onSelect={handleLayerSelect}
                 onToggleLock={handleLayerToggleLock}
                 onDelete={handleLayerDelete}
