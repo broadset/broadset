@@ -347,7 +347,7 @@ export default function App(): JSX.Element {
         return;
       }
 
-      if (!(e.target instanceof HTMLElement)) {
+      if (!(e.target instanceof Element)) {
         return;
       }
 
