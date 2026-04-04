@@ -15,8 +15,8 @@ independent of the others; implement in order of increasing complexity.
 
 ### 5.1 JSON interchange and utilities (`formats/interchange.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/formats/interchange.md`
 _What to cover:_ JSON export/import round-trip (BroadsetDocument ↔ JSON string);
@@ -25,8 +25,8 @@ OGraf package creation; QR SVG generation; filename sanitization; stress tests
 
 ### 5.2 Raster export (`formats/raster.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/formats/raster.md`
 _What to cover:_ PNG/JPEG export; pixel-ratio behaviour (1x, 2x); canvas

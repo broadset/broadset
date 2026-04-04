@@ -31,8 +31,8 @@ its package.
 ## Current Status
 
 - **Active Phase:** Phase 5 — Formats
-- **In Progress:** 5.1 (first unit of Phase 5)
-- **Last Merged:** 4-I Collaboration / change stream + full demo config
+- **In Progress:** 5.3 (web vector export)
+- **Last Merged:** 5.2 Raster export
 
 ---
 

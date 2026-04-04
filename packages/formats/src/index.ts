@@ -13,3 +13,16 @@ export {
   isVideoExportSupported,
   sanitizeFilename,
 } from './interchange';
+
+// Raster export
+export {
+  CANVAS_DATA_MARKER,
+  DEFAULT_JPEG_QUALITY,
+  downloadEmbeddedSvg,
+  downloadJpeg,
+  downloadPng,
+  exportEmbeddedSvgBlob,
+  exportJpegBlob,
+  exportPngBlob,
+  findCanvasElement,
+} from './raster';
