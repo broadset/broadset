@@ -48,8 +48,8 @@ transition suppression flag.
 
 ## 3.4 Demo: animated sample content + play/pause control
 
-- [ ] tests: red (Playwright CT)
-- [ ] impl: green
+- [x] tests: red (Playwright CT)
+- [x] impl: green
 
 _Spec:_ `project/spec/demo/data-integration.md`, `project/spec/demo/state.md`
 _What to cover:_
@@ -72,4 +72,4 @@ _What to cover:_
 | 3.1 interpolation engine  | ☐   | ☐     |
 | 3.2 timeline computation  | ☐   | ☐     |
 | 3.3 playback controller   | ✅  | ✅    |
-| 3.4 demo animated content | ☐   | ☐     |
+| 3.4 demo animated content | ✅  | ✅    |

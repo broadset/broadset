@@ -86,6 +86,12 @@ export function createPlaybackHandle(
   function play(): void {
     if (cancelled) return;
 
+    // Cancel any existing rAF loop before starting a new one
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+
     active = true;
     lastFrameTime = null;
 

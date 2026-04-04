@@ -30,9 +30,9 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 3 — Playback + Demo animated
-- **In Progress:** 3.1 (first unit of Phase 3)
-- **Last Merged:** 2.3 Demo shell
+- **Active Phase:** Phase 4 — Editor + UI
+- **In Progress:** 4.1 (first unit of Phase 4)
+- **Last Merged:** 3.4 Demo animated content + play/pause control
 
 ---
 
