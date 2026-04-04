@@ -12,6 +12,30 @@ Defines the behavioral requirements for the timeline editor, timeline bottom pan
 
 The system MUST render an empty state when no keyframes exist. A `+` button MUST add a keyframe and select it. Clicking a keyframe marker MUST show the keyframe hint and set `aria-pressed`. Only one keyframe MUST be selected at a time. Re-clicking the same marker MUST keep it selected.
 
+**Timeline Editor Visual Structure:**
+
+The timeline editor MUST be composed of these visual zones:
+
+| Zone              | Position      | Content                                                                                                                               |
+| ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Playback controls | Top-left      | Play/Pause toggle, Stop button, Loop toggle                                                                                           |
+| Timeline ruler    | Top, spanning | Horizontal ruler with time markers (step interval configurable, default every 500ms). Grid lines at snap intervals (default 100ms)    |
+| Keyframe track    | Center        | Horizontal track where keyframe markers are positioned at their time offsets                                                          |
+| Playhead          | Vertical line | Red/accent-colored vertical line indicating current playback time. Draggable for timeline scrubbing. Synced with playback engine time |
+| Keyframe list     | Bottom        | Table/list of keyframes showing: Name, Offset (ms), Action type, Property count. Click to select, double-click to rename              |
+
+**Keyframe Markers:**
+
+Keyframe markers MUST appear as small circular or diamond-shaped indicators positioned along the timeline track at their offset. Selected markers MUST have a distinct highlight (e.g., accent color fill). Markers MUST be draggable to reposition.
+
+**Snap Behavior:**
+
+When dragging keyframes, positions MUST snap to the grid interval. The default snap interval is 100ms.
+
+**Playhead Scrubbing:**
+
+Dragging the playhead MUST call `onSeekTimeline` to preview the animation at the scrub position in real-time.
+
 #### Scenario: Empty state
 
 - GIVEN no keyframes in the timeline
@@ -72,6 +96,16 @@ Dragging a keyframe marker along the timeline MUST reposition it to a new time o
 
 The system MUST support starting playback. When starting playback, the system MUST NOT pass an onComplete callback.
 
+**Playback Controls:**
+
+| Control    | Icon         | Behavior                                              |
+| ---------- | ------------ | ----------------------------------------------------- |
+| Play/Pause | Play / Pause | Starts playback from playhead position; toggles pause |
+| Stop       | Square       | Stops playback, resets playhead to start              |
+| Loop       | Repeat       | Toggles loop mode (repeat when timeline ends)         |
+
+The playhead MUST animate in sync with the playback engine via `requestAnimationFrame`. When playback reaches the end without loop mode, it MUST stop automatically.
+
 #### Scenario: Playback start
 
 - GIVEN a timeline with keyframes
@@ -87,6 +121,12 @@ The system MUST support starting playback. When starting playback, the system MU
 ### Requirement: Timeline Bottom Panel
 
 The system MUST render with `aria-hidden` when no timeline is being edited. When a timeline is open, the TimelineEditor MUST be rendered. Closing the panel MUST call onClose. Custom height and className props MUST be respected. Play/stop timeline callbacks MUST be threaded to the editor.
+
+**Visual Behavior:**
+
+The bottom panel MUST slide up from the bottom edge of the canvas area using a CSS transform transition. When closed, it MUST be translated off-screen (`translateY(100%)`) with `pointer-events: none` to avoid blocking canvas interaction. When open, it MUST translate to its natural position (`translateY(0)`) with full interactivity.
+
+The panel MUST have a glass-morphism background consistent with the sidebar, with top border-radius for visual distinction from the canvas. A close button (X icon) MUST be visible in the panel header to close the timeline editor.
 
 #### Scenario: Hidden when no timeline
 

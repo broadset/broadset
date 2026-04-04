@@ -44,17 +44,27 @@ The demo MUST configure a default palette with at least 8 colors including black
 
 ### Requirement: Document Size Presets
 
-The demo MUST include presets covering at least three categories: Broadcast (e.g., 1080p), Print (e.g., A4), and Social Media (e.g., Instagram Post). Each preset MUST specify: name, category, width, height, units (`'px'` or `'mm'`), and viewMode (`'broadcast'` or `'print'`).
+The demo MUST include presets covering at least five categories: Broadcast, Print, Social Media, Commercial, and Large Format. Each preset MUST specify: name, category, width, height, units (`'px'` or `'mm'`), and viewMode (`'broadcast'` or `'print'`).
+
+**Minimum Preset Categories:**
+
+| Category     | Example presets                                  |
+| ------------ | ------------------------------------------------ |
+| Broadcast    | 1080p (1920×1080), 720p, 4K UHD                  |
+| Print        | A4, A3, Letter, Tabloid                          |
+| Social Media | Instagram Post, Facebook Cover, Twitter/X Header |
+| Commercial   | Billboard, Banner ad, Leaderboard                |
+| Large Format | Poster, Roll-up, Exhibition panel                |
 
 #### Scenario: Preset categories
 
 - GIVEN the demo EditorConfig
 - WHEN document size presets are inspected
-- THEN at least one preset exists for Broadcast, Print, and Social Media categories
+- THEN at least one preset exists for Broadcast, Print, Social Media, Commercial, and Large Format categories
 
 #### Acceptance Criteria
 
-- [ ] Given the demo config, at least one preset exists per category (Broadcast, Print, Social Media)
+- [ ] Given the demo config, at least one preset exists per category (Broadcast, Print, Social Media, Commercial, Large Format)
 - [ ] Given each preset, it specifies name, category, width, height, units, and viewMode
 
 ---

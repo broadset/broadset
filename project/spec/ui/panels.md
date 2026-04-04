@@ -12,6 +12,31 @@ Defines the behavioral requirements for editor property panels and sidebars: the
 
 The system MUST render the selected element from the native document. In screen mode, gradient fill switcher MUST be visible for rectangle elements. In print mode, gradient fill and 3D transform controls MUST be hidden. When a component registry provides a custom property panel for an element type, it MUST be rendered. When `showAnimations` is false, the animation builder MUST be hidden.
 
+**Panel Ordering:**
+
+The Properties sidebar MUST present accordion sections in this order. Each section MUST use a HeroUI `Accordion` panel with an icon next to the section title. Sections MUST only appear when relevant to the selected element type and document mode:
+
+| #   | Section           | Shown for                          | Hidden in print mode |
+| --- | ----------------- | ---------------------------------- | -------------------- |
+| 1   | Geometry          | All elements                       | 3D fields only       |
+| 2   | Appearance        | All elements                       | Gradient fill        |
+| 3   | Typography        | Text elements                      | No                   |
+| 4   | Text Effects      | Text elements                      | No                   |
+| 5   | Spacing           | Text and group elements            | No                   |
+| 6   | Box Effects       | All elements                       | Partially            |
+| 7   | Clip Path         | All elements                       | No                   |
+| 8   | Path Properties   | Path and SVG elements              | No                   |
+| 9   | Image             | Image elements                     | No                   |
+| 10  | Object Fit        | Elements with objectFit capability | No                   |
+| 11  | QR Code           | QR code elements                   | No                   |
+| 12  | Group             | Group elements                     | No                   |
+| 13  | Animation Builder | All elements (if enabled)          | No                   |
+| 14  | Custom Panel      | Custom plugin types                | No                   |
+
+**Empty State:**
+
+When no element is selected, the Properties sidebar MUST show a "Select an element to edit its properties" message centered in the panel area.
+
 #### Scenario: Gradient fill in screen mode
 
 - GIVEN a rectangle element selected in screen mode
@@ -88,6 +113,19 @@ When no adapter is active (normal mode), all properties route to element updates
 
 The system MUST render compositing helper text and controls (mixBlendMode, isolation) in screen mode. Print mode without relevant style properties MUST hide the panel.
 
+**Fields:**
+
+| Field           | Input type    | Notes                                                                     |
+| --------------- | ------------- | ------------------------------------------------------------------------- |
+| Box shadow      | ShadowEditor  | Offset X/Y, blur, spread, color, inset toggle; multi-layer                |
+| Filter          | FilterEditor  | Stack of CSS filter functions (blur, brightness, etc.)                    |
+| Backdrop filter | FilterEditor  | Same filter set, applied as CSS `backdrop-filter`                         |
+| Mix blend mode  | HeroUI Select | All standard blend modes (see Appearance Panel blend list)                |
+| Isolation       | HeroUI Select | auto / isolate                                                            |
+| Border style    | HeroUI Select | solid / dashed / dotted / double / groove / ridge / inset / outset / none |
+
+The panel MUST use HeroUI `Accordion` sections to group shadow, filter, backdrop-filter, and compositing controls.
+
 #### Scenario: Screen mode compositing controls
 
 - GIVEN screen document mode
@@ -103,6 +141,21 @@ The system MUST render compositing helper text and controls (mixBlendMode, isola
 ### Requirement: Clip-Path Panel
 
 The system MUST show a start button for custom mask editing when not in editing mode. When editing starts, a default path MUST be seeded if the clip-path is empty. A stop button MUST be shown while editing.
+
+**Preset Clip Shapes:**
+
+The panel MUST provide a selector with built-in clip-path presets:
+
+| Preset   | Generated clip-path           |
+| -------- | ----------------------------- |
+| None     | removes clip-path             |
+| Circle   | `circle(50%)`                 |
+| Squircle | smooth rounded-rectangle path |
+| Triangle | 3-point polygon               |
+| Star     | 5-point star polygon          |
+| Custom   | opens inline SVG path editor  |
+
+Selecting a preset MUST immediately apply the clip-path and update the element's style. Custom mode MUST allow editing the raw SVG path coordinate string inline.
 
 #### Scenario: Start editing seeds default path
 
@@ -142,6 +195,21 @@ The system MUST render a success notification when there are no issues. When iss
 ### Requirement: Animation Sidebar
 
 The system MUST render the animation builder when an element is selected and animations are enabled. Empty state MUST be shown when no element is selected. Disabled state MUST be shown when animation feature is off. Lock helper text MUST appear when the selected element is locked.
+
+**Header:**
+
+The sidebar MUST display the active element's name and a type chip (HeroUI `Chip`). If the element is locked, a lock icon and helper text MUST appear, and the animation controls below MUST be dimmed / non-interactive.
+
+**Animation Builder Accordion Sections:**
+
+The animation builder MUST be organized as a HeroUI `Accordion` with these sections:
+
+| Section                    | Content                                                                                                                                                                                                                                                  |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Active States & Modifiers  | State selector dropdown (None, Enter, Exit, custom states); modifier checkboxes for each defined modifier (independent toggles)                                                                                                                          |
+| Timelines                  | List of timelines for the element, each with: Edit button (opens TimelineEditor in bottom panel), Rename, Duplicate, Delete actions. "Add Timeline" button creates a new timeline. "Quick setup" button creates Enter/Exit animations with preset values |
+| State Timeline Bindings    | Maps states to timelines. State selector + timeline selector per binding. "Add binding" button links a timeline to a state                                                                                                                               |
+| Modifier Timeline Bindings | Maps modifiers to timelines. Modifier selector + in/out timeline pair. "Add/remove binding" buttons                                                                                                                                                      |
 
 #### Scenario: Element selected with animations on
 
@@ -205,6 +273,42 @@ In normal mode, the system MUST render children directly. In keyframe mode, the 
 
 The system MUST render element names from the document. Empty state MUST be shown when no elements exist. Clicking a layer MUST fire setActiveElement. Lock button MUST toggle lock. Visibility toggle MUST update element classes. Delete button MUST remove the element.
 
+**Layer Row Structure:**
+
+Each layer row MUST display:
+
+| Zone            | Content                                                                                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Left icon       | Element type icon (distinct per type: text → Type, image → Image, rectangle → Square, ellipse → Circle, path → PenTool, svg → FileCode2, qrcode → QrCode, group → Folder) |
+| Name            | Element name (double-click to rename inline)                                                                                                                              |
+| Visibility      | Eye icon toggle (show/hide element)                                                                                                                                       |
+| Lock            | Lock icon toggle (prevent editing)                                                                                                                                        |
+| Expand/Collapse | Chevron icon for groups with children                                                                                                                                     |
+| Delete          | Trash icon (visible on hover only)                                                                                                                                        |
+
+**Visual States:**
+
+| State     | Appearance                                            |
+| --------- | ----------------------------------------------------- |
+| Default   | Standard text on `--surface` background               |
+| Selected  | Highlighted background using `--surface-secondary`    |
+| Hovered   | Slightly lighter background                           |
+| Drag over | Drop indicator line (above, inside, or below the row) |
+
+**Hierarchy Indentation:**
+
+Child elements MUST be indented relative to their parent. Each nesting level MUST add consistent indentation. The layer list MUST use `overflow-y: auto` for scrolling when the element count exceeds visible area.
+
+**Drag and Drop Reorder:**
+
+Layer rows MUST support drag-and-drop reordering. During drag, a visual drop indicator MUST show the insertion position with three modes: before (insert above), inside (nest into group), and after (insert below). Dropping MUST update the element z-order in the document.
+
+**Multi-Selection:**
+
+- Click: select single element
+- Shift+Click: select range from last clicked to current
+- Ctrl/Cmd+Click: toggle individual element in selection
+
 #### Scenario: Layer click selects element
 
 - GIVEN elements in the document
@@ -228,6 +332,30 @@ The system MUST render element names from the document. Empty state MUST be show
 
 GeometryPanel MUST display and edit element position (x, y), size (width, height), and rotation. Changes MUST be committed to the store.
 
+**Fields:**
+
+| Field        | Input type   | Keyframeable | Notes                                            |
+| ------------ | ------------ | ------------ | ------------------------------------------------ |
+| Element name | text         | No           | Editable inline at the top of the panel          |
+| X            | numeric      | Yes          | Unit-switching (px / mm / in) via CssLengthInput |
+| Y            | numeric      | Yes          | Same unit set as X                               |
+| Width        | numeric      | Yes          | Same unit set                                    |
+| Height       | numeric      | Yes          | Same unit set                                    |
+| Rotation     | numeric (°)  | Yes          | Degrees                                          |
+| Anchor X     | toggle group | No           | left / right (determines transform origin)       |
+| Anchor Y     | toggle group | No           | top / bottom                                     |
+
+**3D Transform Fields (screen mode only, hidden in print mode):**
+
+| Field      | Input type   | Keyframeable | Notes                     |
+| ---------- | ------------ | ------------ | ------------------------- |
+| RotateX    | numeric (°)  | Yes          | 3D rotation around X axis |
+| RotateY    | numeric (°)  | Yes          | 3D rotation around Y axis |
+| RotateZ    | numeric (°)  | Yes          | 3D rotation around Z axis |
+| TranslateZ | numeric (px) | Yes          | Z-axis displacement       |
+
+Anchor toggles MUST use HeroUI `ButtonGroup`. Numeric fields MUST use `NumField` (HeroUI `NumberField` wrapper). Unit selection MUST be preserved within the editing session.
+
 #### Scenario: Edit element position
 
 - GIVEN a selected element at position (10, 20)
@@ -244,6 +372,21 @@ GeometryPanel MUST display and edit element position (x, y), size (width, height
 ### Requirement: Appearance Panel
 
 AppearancePanel MUST display and edit fill color, background gradient, border (width, color, style, radius), opacity, and blend mode for the selected element.
+
+**Fields:**
+
+| Field               | Input type          | Keyframeable | Notes                                                                                                                                                          |
+| ------------------- | ------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Background color    | ColorInput          | Yes          | Solid color picker                                                                                                                                             |
+| Background gradient | Gradient editor     | Yes          | Linear gradient with add/remove/reposition stops (screen only)                                                                                                 |
+| Opacity             | HeroUI Slider (0–1) | Yes          | Element-level transparency                                                                                                                                     |
+| Border color        | ColorInput          | No           | Stroke color                                                                                                                                                   |
+| Border width        | NumField (px)       | No           | Border thickness                                                                                                                                               |
+| Border style        | HeroUI Select       | No           | solid / dashed / dotted / double / groove / ridge / inset / outset / none                                                                                      |
+| Border radius       | 4× NumField + link  | Yes          | Individual corners; link toggle for uniform radius                                                                                                             |
+| Blend mode          | HeroUI Select       | No           | normal, multiply, screen, overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, color, luminosity |
+
+The gradient editor MUST allow adding, removing, and repositioning color stops along the gradient axis. A fill-type switcher MUST toggle between solid color and gradient modes (visible in screen mode only — hidden in print mode). The border-radius link toggle, when active, MUST synchronize all four corner values when any single corner is edited.
 
 #### Scenario: Change fill color
 
@@ -278,6 +421,22 @@ ImagePanel MUST display and edit image source URL and object-fit for image-type 
 ### Requirement: Path Properties Panel
 
 PathPropertiesPanel MUST display and edit SVG stroke, fill, stroke-width, dasharray, linecap, linejoin, and fill-rule for path and SVG elements.
+
+**Fields:**
+
+| Field            | Input type          | Notes                           |
+| ---------------- | ------------------- | ------------------------------- |
+| Stroke color     | ColorInput          | SVG stroke color                |
+| Stroke width     | NumField (px)       | SVG stroke-width                |
+| Stroke opacity   | HeroUI Slider (0–1) | Transparency of stroke          |
+| Fill color       | ColorInput          | SVG fill color                  |
+| Fill opacity     | HeroUI Slider (0–1) | Transparency of fill            |
+| Stroke dasharray | text input          | CSS dasharray pattern           |
+| Stroke linecap   | HeroUI Select       | butt / round / square           |
+| Stroke linejoin  | HeroUI Select       | miter / round / bevel           |
+| Fill rule        | HeroUI Select       | nonzero / evenodd               |
+| Edit path        | toggle button       | Activates point-editing mode    |
+| Draw path        | toggle button       | Activates freehand drawing mode |
 
 #### Scenario: Change stroke width
 
@@ -328,6 +487,26 @@ GroupPanel MUST display group-specific settings: clipChildren toggle and group n
 
 TextEffectsPanel MUST display and edit letter-spacing, line-height, word-spacing, and text-transform for text elements.
 
+**Fields:**
+
+| Field           | Input type          | Notes                                          |
+| --------------- | ------------------- | ---------------------------------------------- |
+| Font family     | HeroUI Select       | List from EditorConfig allowed fonts           |
+| Font size       | NumField            | Range approximately 6–200 pt                   |
+| Font color      | ColorInput          | Text color with transparency                   |
+| Text alignment  | ButtonGroup         | left / center / right / justify (segmented)    |
+| Font weight     | toggle + NumField   | Bold toggle (700) or custom range (100–900)    |
+| Font style      | toggle              | Italic on/off                                  |
+| Text decoration | independent toggles | Underline and line-through (separate controls) |
+| Text transform  | HeroUI Select       | none / uppercase / lowercase / capitalize      |
+| Line height     | CssLengthInput      | px / em / rem / %                              |
+| Letter spacing  | CssLengthInput      | px / em / rem / %                              |
+| Word spacing    | CssLengthInput      | px / em / rem / %                              |
+| Text stroke     | TextStrokeInput     | Width (px) + color                             |
+| Text shadow     | ShadowEditor        | Composable multi-layer shadow stack            |
+
+An "Advanced" toggle MUST reveal letter-spacing, word-spacing, text stroke, and text shadow fields — keeping the default view compact. All text-effect fields MUST only appear for text elements.
+
 #### Scenario: Change letter spacing
 
 - GIVEN a text element selected
@@ -344,6 +523,16 @@ TextEffectsPanel MUST display and edit letter-spacing, line-height, word-spacing
 ### Requirement: Spacing Panel
 
 SpacingPanel MUST display and edit padding values for the selected element.
+
+**Fields:**
+
+| Field   | Input type         | Notes                                                      |
+| ------- | ------------------ | ---------------------------------------------------------- |
+| Padding | 4× NumField + link | top / right / bottom / left; link toggle for uniform value |
+| Margin  | 4× NumField + link | top / right / bottom / left; link toggle for uniform value |
+| Gap     | NumField           | For flex / grid containers only                            |
+
+The link toggle, when active, MUST synchronize all four side values when any individual side is edited. Fields MUST be arranged in a 2×2 grid (top/bottom in one column, left/right in another) for spatial clarity.
 
 #### Scenario: Change padding
 

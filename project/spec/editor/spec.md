@@ -35,3 +35,53 @@ Defines the editor engine for broadset. The editor manages document state with u
 ## Cross-References
 
 - **Custom Component Plugin Lifecycle:** Registration in EditorConfig (→ `project/spec/model/config.md`), factory defaults (→ `editing.md`), canvas rendering (→ `project/spec/renderer/spec.md`), property panel (→ `project/spec/ui/panels.md`), capability gating (→ `project/spec/renderer/spec.md`), export (→ `project/spec/formats/`)
+
+---
+
+## Functional Test Requirements (Playwright CT)
+
+Unit tests verify pure logic in isolation. The following editor interactions involve DOM rendering, pointer events, and cross-layer integration that **cannot** be fully verified by unit tests alone. Each MUST have at least one Playwright Component Test (CT) that exercises the real behavior end-to-end in a browser.
+
+### Canvas interactions
+
+- [ ] **Click-to-select:** Clicking an element on the rendered canvas MUST select it in the store; clicking empty space MUST deselect.
+- [ ] **Marquee selection:** Dragging on the canvas background MUST draw a selection rectangle and select all intersecting elements.
+- [ ] **Zoom and pan:** Scroll-wheel zoom MUST update the viewport scale; drag-pan MUST translate the viewport origin.
+
+### Transform widget
+
+- [ ] **Widget visibility:** Selecting an element MUST display a transform widget with resize and rotation handles around the selection bounds.
+- [ ] **Drag translation:** Dragging a selected element MUST move it; the final position MUST be committed to the store on pointer-up.
+- [ ] **Resize via handles:** Dragging a resize handle MUST change the element's dimensions; corner handles MUST resize both axes, edge handles one axis.
+- [ ] **Rotation via handle:** Dragging the rotation handle MUST update the element's rotation.
+- [ ] **Snap guides:** During drag, visual snap guide lines MUST appear when the element aligns with other elements' edges or centers.
+
+### Canvas overlays
+
+- [ ] **Grid overlay:** Toggling grid visibility MUST show or hide the grid on the canvas.
+- [ ] **Ruler and guides:** Dragging from a ruler MUST create a guide line on the canvas.
+- [ ] **Safety boundary:** Enabling broadcast mode MUST display the safety-area overlay.
+
+### Inline text editing
+
+- [ ] **Text editing mode:** Double-clicking a text element MUST activate a contenteditable overlay at the element's position, zoom-compensated.
+
+### Keyboard integration
+
+- [ ] **Nudge:** Arrow keys MUST move the selected element by the nudge increment; Shift+arrow MUST move by the large increment.
+- [ ] **Undo/redo:** Ctrl+Z / Ctrl+Y MUST undo and redo the last committed operation.
+- [ ] **Delete:** Delete/Backspace MUST remove the selected element from the document.
+
+### Cross-layer integration flows
+
+In addition to the single-region tests above, every spec scenario where a user action in one UI region produces a visible outcome in a different region MUST have a CT test that verifies **all** affected regions. See `.github/instructions/testing.instructions.md` → "CT Derivation Rule" for the systematic method.
+
+The following are representative examples from this spec domain — the full set MUST be derived by scanning all GIVEN/WHEN/THEN blocks in the editor sub-specs:
+
+- [ ] **Select → widget + properties:** Clicking an element on the canvas MUST display the transform widget around it AND populate the properties panel with that element's position, size, rotation, and style fields.
+- [ ] **Select → deselect → panels clear:** Clicking empty canvas MUST hide the transform widget AND clear the properties panel (no stale values displayed).
+- [ ] **Transform → properties update:** Dragging a selected element to a new position MUST update the position fields in the properties panel in real time.
+- [ ] **Properties edit → canvas update:** Changing a value in the properties panel (e.g. width) MUST immediately update the element's rendered size on the canvas and the transform widget bounds.
+- [ ] **Multi-select → combined widget + mixed properties:** Selecting multiple elements via marquee MUST show a single transform widget around the combined bounds AND show common property values with "Mixed" indicators for differing values.
+
+These are acceptance gates — a feature is not shippable until its corresponding CT test passes. Spec gap entries in individual sub-specs that say "requires CT" reference this list.

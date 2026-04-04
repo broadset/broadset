@@ -28,6 +28,17 @@ The system MUST NOT render when closed. When open, it MUST render about content.
 
 The system MUST NOT render when closed. When open, it MUST display heading, section labels, document name, rulers switch, all three view mode buttons, perspective slider, grid controls (show/snap), and a Done button. All controls MUST fire their corresponding callbacks.
 
+**Field Layout:**
+
+| Section        | Fields                                                                                                                         |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Document       | Document name (HeroUI `Input`)                                                                                                 |
+| Canvas         | Show rulers (HeroUI `Switch`), Ruler units (HeroUI `Select`: px/mm/in), View mode (HeroUI `ButtonGroup`: none/broadcast/print) |
+| 3D Perspective | Perspective (HeroUI `Slider`, range ~100–5000 px)                                                                              |
+| Grid           | Show grid (HeroUI `Switch`), Grid size (NumField, in mm), Snap to grid (HeroUI `Switch`), Snap threshold (NumField, in px)     |
+
+All changes MUST fire immediately via callbacks — there is no draft/submit pattern. A Done button MUST close the modal.
+
 #### Scenario: Document name editing
 
 - GIVEN the modal is open with document name "My Doc"
@@ -58,6 +69,28 @@ The system MUST NOT render when closed. When open, it MUST display heading, sect
 
 The system MUST show only exporters enabled by feature flags. When submitted, it MUST pass the selected exporter, dynamic data, and snapshot document. User-selected exporter MUST be preserved when dynamic data props update.
 
+**Layout Structure:**
+
+| Zone                    | Content                                                                                                                                       |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Exporter selector       | Grid of export format option buttons grouped by category                                                                                      |
+| Format-specific options | Options panel that changes per selected exporter (e.g., PDF: base64 toggle; Video: FPS/resolution/bitrate; Raster: pixel ratio, JPEG quality) |
+| Dynamic data fields     | Text inputs for data substitution values (for template exports)                                                                               |
+| Preview                 | Embedded renderer preview showing current document with animations                                                                            |
+| Progress indicator      | HeroUI `Spinner` shown during long-running export operations                                                                                  |
+
+**Exporter Categories:**
+
+| Category  | Formats        |
+| --------- | -------------- |
+| Web       | HTML, SVG      |
+| Documents | PDF, PSD, PPTX |
+| Images    | PNG, JPEG      |
+| Video     | MP4, WebM      |
+| Broadcast | OGraf          |
+
+Only exporters that have their feature flag enabled MUST appear.
+
 #### Scenario: Feature-flagged exporters
 
 - GIVEN certain export features enabled
@@ -80,6 +113,17 @@ The system MUST show only exporters enabled by feature flags. When submitted, it
 ### Requirement: Media Library Modal
 
 The system MUST show empty state when no media source is configured. It MUST render all assets, support search filtering and category tabs. Selecting an asset and confirming MUST update the element. The Select button MUST be disabled when nothing is selected. Upload button MUST be visible only when `onUploadRequest` is provided.
+
+**Layout Structure:**
+
+| Zone             | Content                                                                     |
+| ---------------- | --------------------------------------------------------------------------- |
+| Search bar       | HeroUI `Input` for filtering assets by name                                 |
+| Category tabs    | HeroUI `Tabs` for filtering by media category                               |
+| Asset grid       | Thumbnail grid of available media assets                                    |
+| Selected preview | Shows the currently selected asset in a larger preview                      |
+| Upload button    | Conditionally visible (only when `mediaSource.onUploadRequest` is provided) |
+| Confirm button   | "Select" button — disabled until an asset is selected                       |
 
 #### Scenario: Search filtering
 
@@ -111,6 +155,15 @@ The system MUST show empty state when no media source is configured. It MUST ren
 
 The system MUST support category tabs for switching preset groups. Selecting a preset and clicking Create MUST create a document with the correct mode. Without a selection, Create MUST NOT fire. Custom presets MUST override built-in ones. Empty custom presets MUST fall back to built-in presets.
 
+**Layout Structure:**
+
+| Zone            | Content                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------ |
+| Category tabs   | HeroUI `Tabs` — one tab per preset category (Broadcast, Print, Social Media, Commercial, Large Format) |
+| Preset grid     | Grid of preset cards showing name and dimensions (W×H in target units)                                 |
+| Selected preset | Highlights selected card, shows confirmed dimensions below grid                                        |
+| Create button   | "Create Document" button — disabled until a preset is selected                                         |
+
 #### Scenario: Create from preset
 
 - GIVEN a selected screen preset
@@ -140,6 +193,15 @@ The system MUST support category tabs for switching preset groups. Selecting a p
 ### Requirement: Shortcut Help Modal
 
 The system MUST NOT render when closed. When open, it MUST display the heading, all five shortcut groups, human-readable action descriptions, and keyboard labels in `<kbd>` elements. Close button MUST call onClose.
+
+**Shortcut Groups (two-column layout):**
+
+| Column | Groups                                       |
+| ------ | -------------------------------------------- |
+| Left   | Clipboard & Selection, Nudge                 |
+| Right  | Layer Order, Grouping & Lock, Zoom & History |
+
+Each row MUST show the action description and the key binding rendered using HeroUI `Kbd` components. The modal MUST accept a `shortcuts` prop to allow the host to override default key bindings.
 
 #### Scenario: All shortcut groups visible
 

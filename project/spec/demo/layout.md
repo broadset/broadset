@@ -45,6 +45,10 @@ The center area MUST contain the EditorCanvas wrapped in a RulerSystem and an Ed
 
 A glass-morphism toolbar MUST float at the top-left of the canvas area (offset by ruler thickness). It MUST provide actions for: save, export, import, new document, canvas settings toggle, and debug snapshot download. The save toolbar button triggers the `EditorConfig.onSave` callback. If `onSave` is not configured, the save button MUST be hidden. In the demo app, `onSave` persists to localStorage (see state.md).
 
+**Toolbar Visual:**
+
+The toolbar MUST use a compact height (consistent with `sp-08` token). It MUST use glass-morphism styling: semi-transparent background with backdrop blur, and a subtle border on the bottom edge. All buttons MUST be `size="sm"` and icon-only with HeroUI `Tooltip` on hover.
+
 #### Scenario: Toolbar visible on load
 
 - GIVEN the demo app is loaded
@@ -62,6 +66,10 @@ A glass-morphism toolbar MUST float at the top-left of the canvas area (offset b
 ### Requirement: Element Toolbar
 
 A vertical element toolbar MUST render below the main toolbar in a single column listing all built-in element types and registered custom plugins. Each button MUST be icon-only with a tooltip and MUST enter placement mode for its type. The active placement type MUST be visually highlighted.
+
+**Visual:**
+
+The element toolbar MUST be a vertical strip of icon buttons positioned directly below the floating main toolbar, aligned to the left edge of the canvas. It MUST share the same glass-morphism treatment as the main toolbar. Buttons MUST be icon-only with HeroUI `Tooltip` on hover. The active placement button MUST use a highlighted/primary color variant to indicate it is active.
 
 #### Scenario: All element types listed
 
@@ -85,6 +93,33 @@ A vertical element toolbar MUST render below the main toolbar in a single column
 ### Requirement: Resizable Sidebar Drawer
 
 A right-side drawer MUST contain tabbed panels: Layers, Properties, Animation, Preflight. The drawer MUST be resizable by dragging its left edge (min 256px, max 800px). The drawer width MUST persist across sessions.
+
+**Sidebar Drawer Visual Structure:**
+
+The drawer MUST be fixed-positioned on the right edge of the viewport. When closed, it MUST slide off-screen to the right (via CSS transform) with `pointer-events: none`. When open, it MUST slide to its natural position with full interactivity. The slide animation MUST use the `--transition-panel` token.
+
+**Resize Handle:**
+
+The left edge of the drawer MUST contain a resize handle that:
+
+- Sets the cursor to `col-resize` on hover
+- Shows a thin vertical line with grip dots on hover (subtle visual affordance)
+- Supports click-and-drag to resize the drawer width
+- Constrains width within the 256–800px range
+- Provides feedback during drag (the line becomes more visible)
+
+**Tab Bar:**
+
+The tab bar MUST use HeroUI `Tabs` and be positioned at the top of the drawer. Tab items MUST use a pill/segment style: a shared background container with the active tab highlighted using `--surface-tertiary`. The four tabs MUST be:
+
+| Tab        | Icon         | Content panel     |
+| ---------- | ------------ | ----------------- |
+| Layers     | Layers       | LayersSidebar     |
+| Properties | Settings2    | PropertiesSidebar |
+| Animation  | Clapperboard | AnimationSidebar  |
+| Preflight  | CheckCircle  | PreflightPanel    |
+
+The sidebar MUST use glass-morphism styling with border-radius on the left corners only (the right side is flush with the viewport edge).
 
 #### Scenario: Sidebar tabs
 
@@ -187,6 +222,22 @@ When placement mode is active, a banner MUST appear at the top-center of the can
 
 ---
 
+### Requirement: Page Sorter Position
+
+The page sorter MUST float in the canvas area below the element toolbar, at the top-left. It MUST use glass-morphism styling consistent with the toolbars. It MUST NOT be placed in the bottom bar or the sidebar.
+
+#### Scenario: Page sorter visible
+
+- GIVEN a multi-page document
+- WHEN the canvas area renders
+- THEN the page sorter floats at the top-left below the element toolbar
+
+#### Acceptance Criteria
+
+- [ ] Given a multi-page document, the page sorter floats at the top-left of the canvas area
+
+---
+
 ### Requirement: Canvas Selection Indicator
 
 When one or more elements are selected on the canvas, a visible selection outline MUST appear around each selected element. The outline MUST match the element's position, size, and rotation. Clicking on an element MUST display the outline; clicking empty canvas space MUST clear it.
@@ -214,6 +265,34 @@ When one or more elements are selected on the canvas, a visible selection outlin
 ## Spec Gaps
 
 - [ ] **Floating Main Toolbar — save button visibility:** No automated test currently verifies that the save button is hidden when `onSave` is not configured. A test covering this acceptance criterion needs to be written.
+
+---
+
+## Layout Diagram
+
+For reference, the overall app layout MUST follow this spatial arrangement:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  [Main Toolbar]  (glass, floating top-left)             │
+│  [Element Toolbar] (vertical, below main toolbar)       │
+│                                                         │
+│  ┌──────┐                                   ┌─────────┐│
+│  │ Page │   Canvas Area                     │ Sidebar ││
+│  │Sorter│   (fills remaining space,         │ Drawer  ││
+│  │(float│    rulers on top & left edges)     │ (right, ││
+│  │ below│                                   │ resize- ││
+│  │ elem │                                   │ able,   ││
+│  │ tlbr)│                                   │ tabbed) ││
+│  └──────┘                                   └─────────┘│
+│                                                         │
+│  [Placement Banner]  (top-center, conditional)          │
+│                                                         │
+│  ┌─────────────────────────────────────────────────────┐│
+│  │ Timeline Bottom Panel  (slides up when editing)     ││
+│  └─────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────┘
+```
 
 ---
 

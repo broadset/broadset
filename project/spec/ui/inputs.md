@@ -12,6 +12,25 @@ Defines the behavioral contracts for reusable input components in the UI package
 
 The color input MUST provide a color picker with a saturation/brightness area and a hue slider, plus hex/rgba text input. It MUST accept and emit CSS color strings. Invalid color strings MUST NOT be submitted. The picker MUST also support alpha/opacity adjustment.
 
+**Picker Structure (popover on swatch click):**
+
+| Zone                  | Component               | Purpose                                                  |
+| --------------------- | ----------------------- | -------------------------------------------------------- |
+| Swatch button         | Clickable color preview | Opens popover; shows current color                       |
+| Preset swatches       | ColorSwatchPicker grid  | Quick-pick from default palette + user-saved colors      |
+| Color area            | HeroUI ColorArea (HSB)  | 2D saturation/brightness picker                          |
+| Hue slider            | HeroUI ColorSlider      | Select hue (0–360°)                                      |
+| Alpha slider          | HeroUI ColorSlider      | Select opacity / transparency (0–1)                      |
+| Format toggle         | Segmented control       | Switch display between HEX / RGB / HSL                   |
+| Text input            | Manual CSS color entry  | Accepts any valid CSS color string                       |
+| Add to palette button | Action button           | Saves current color to user palette (persisted in store) |
+
+The swatch button MUST show a checkerboard pattern behind the color to indicate transparency. The popover MUST close when clicking outside.
+
+**User Palette:**
+
+Users MUST be able to save colors to a persistent palette via the "Add to palette" button. Saved colors MUST appear in the preset swatch grid alongside the default palette colors.
+
 #### Scenario: Pick a color
 
 - GIVEN a color input with current value `'#ff0000'`
@@ -78,6 +97,30 @@ The text stroke input MUST provide width and color inputs for CSS text-stroke. I
 
 The filter editor MUST provide a stack editor for CSS filter functions. Supported functions: blur, brightness, contrast, grayscale, hue-rotate, invert, opacity, saturate, sepia. Filters MUST be ordered and individually configurable. Adding, removing, and reordering filters MUST be supported.
 
+**Per-Filter Fields:**
+
+| Filter function | Value range | Unit | Default |
+| --------------- | ----------- | ---- | ------- |
+| blur            | 0+          | px   | 0       |
+| brightness      | 0+          | none | 1       |
+| contrast        | 0+          | none | 1       |
+| grayscale       | 0–1         | none | 0       |
+| hue-rotate      | 0–360       | deg  | 0       |
+| invert          | 0–1         | none | 0       |
+| opacity         | 0–1         | none | 1       |
+| saturate        | 0+          | none | 1       |
+| sepia           | 0–1         | none | 0       |
+
+**Stack Controls:**
+
+| Action     | Behavior                                       |
+| ---------- | ---------------------------------------------- |
+| Add filter | HeroUI Select to choose function, then appends |
+| Remove     | Remove button per filter row                   |
+| Reorder    | Drag or up/down buttons to change filter order |
+
+The emitted value MUST be a space-separated list of filter functions in stack display order.
+
 #### Scenario: Add blur filter
 
 - GIVEN an empty filter stack
@@ -106,7 +149,28 @@ The filter editor MUST provide a stack editor for CSS filter functions. Supporte
 
 ### Requirement: Shadow Editor
 
-The shadow editor MUST provide inputs for box-shadow or text-shadow properties: offsetX, offsetY, blur radius, spread (box-shadow only), and color. It MUST support multiple shadow layers.
+The shadow editor MUST provide inputs for box-shadow or text-shadow properties: offsetX, offsetY, blur radius, spread (box-shadow only), and color. It MUST support multiple shadow layers. Inset toggle MUST be available for box-shadow mode only.
+
+**Layer Management:**
+
+| Action       | Behavior                                               |
+| ------------ | ------------------------------------------------------ |
+| Add layer    | Appends a new shadow with default values               |
+| Remove layer | Removes the selected shadow layer                      |
+| Reorder      | Layers MUST be reorderable via drag or up/down buttons |
+
+**Per-Layer Fields:**
+
+| Field    | Input type    | Available for           |
+| -------- | ------------- | ----------------------- |
+| Offset X | NumField (px) | box-shadow, text-shadow |
+| Offset Y | NumField (px) | box-shadow, text-shadow |
+| Blur     | NumField (px) | box-shadow, text-shadow |
+| Spread   | NumField (px) | box-shadow only         |
+| Color    | ColorInput    | box-shadow, text-shadow |
+| Inset    | HeroUI Switch | box-shadow only         |
+
+Multiple shadow layers MUST be emitted as a comma-separated CSS shadow string.
 
 #### Scenario: Single shadow
 

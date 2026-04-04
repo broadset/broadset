@@ -12,6 +12,36 @@ Defines the behavioral requirements for the toolbar, context menu, element libra
 
 The system MUST support JSON export from the document menu. The Export action MUST be visible only when export feature flags are enabled. Undo and Redo MUST call the temporal store. Alignment buttons MUST appear only for multi-selection (2+ elements). Distribute buttons MUST appear only for 3+ elements.
 
+**Toolbar Zone Layout:**
+
+The toolbar MUST organize its controls into distinct zones arranged left-to-right:
+
+| Zone                        | Controls                                                                                                                                                                                           |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Left**                    | Document menu dropdown (New, Open, Options, Debug, Save JSON, Export), Import button (hidden file input trigger), Settings toggle, Undo/Redo buttons                                               |
+| **Alignment** (conditional) | Align left / center-x / right, Align top / center-y / bottom (each as HeroUI `ButtonGroup`). Distribute horizontal / vertical (disabled if <3 elements). Group / Ungroup (disabled if <2 elements) |
+| **Centre**                  | Document name label, Resolution display (e.g., "1920×1080 — 16:9")                                                                                                                                 |
+| **Right**                   | Properties panel toggle, Preview button, Save button                                                                                                                                               |
+
+All buttons MUST be `size="sm"` for a compact toolbar. The alignment zone MUST only be visible when 2+ elements are selected. Each button's hover MUST show a HeroUI `Tooltip` with the action name.
+
+**Document Menu:**
+
+The document menu MUST use a HeroUI `Dropdown` with icon+label menu items:
+
+| Item           | Action                                 |
+| -------------- | -------------------------------------- |
+| New Document   | Opens NewDocumentModal                 |
+| Open           | Triggers file import dialog            |
+| Options        | Opens CanvasSettingsModal              |
+| Debug Snapshot | Downloads editor state as JSON         |
+| Save as JSON   | Downloads document as JSON file        |
+| Export         | Opens ExportModal (hidden if no flags) |
+
+**Import:**
+
+The import button MUST trigger a hidden file input accepting JSON and supported format files. On successful import, a success toast MUST appear. On validation failure, an error toast MUST show the error message.
+
 #### Scenario: JSON export
 
 - GIVEN the document menu
@@ -55,6 +85,28 @@ The system MUST support JSON export from the document menu. The Export action MU
 ### Requirement: Context Menu
 
 The system MUST NOT render before a right-click. After `contextmenu` event, the menu MUST appear at click coordinates with all standard items. Items MUST be disabled when no element is selected. Copy/Paste/Duplicate/Delete/Lock MUST call their respective store actions. Group/Ungroup MUST appear only for multi-selection. The menu MUST close after any action.
+
+**Menu Items:**
+
+The context menu MUST use HeroUI `Dropdown.Menu` and include items in this order:
+
+| Item           | Shortcut         | Enabled when          |
+| -------------- | ---------------- | --------------------- |
+| Copy           | Ctrl/Cmd+C       | Selection exists      |
+| Paste          | Ctrl/Cmd+V       | Clipboard has content |
+| Duplicate      | Ctrl/Cmd+D       | Selection exists      |
+| Delete         | Del/Backspace    | Selection exists      |
+| Lock / Unlock  | —                | Selection exists      |
+| _(separator)_  |                  |                       |
+| Bring Forward  | ]                | Selection exists      |
+| Send Backward  | [                | Selection exists      |
+| Bring to Front | —                | Selection exists      |
+| Send to Back   | —                | Selection exists      |
+| _(separator)_  |                  |                       |
+| Group          | Ctrl/Cmd+G       | 2+ elements selected  |
+| Ungroup        | Ctrl/Cmd+Shift+G | 2+ elements selected  |
+
+Disabled items MUST be visually dimmed and non-interactive. The menu MUST be dynamically positioned to stay within the visible container bounds (reflow if near edges).
 
 #### Scenario: Right-click opens at coordinates
 
@@ -107,6 +159,31 @@ The system MUST NOT render before a right-click. After `contextmenu` event, the 
 
 The system MUST render tiles for all 7 built-in element types with labels. Clicking a tile MUST call startPlacement with the type. Custom types from the registry MUST be included with their icons. Grid layout MUST use 2 columns.
 
+**Built-In Element Types and Icons:**
+
+Each element type MUST have a distinct `lucide-react` icon:
+
+| Type      | Icon name | Label     |
+| --------- | --------- | --------- |
+| text      | Type      | Text      |
+| image     | Image     | Image     |
+| rectangle | Square    | Rectangle |
+| ellipse   | Circle    | Ellipse   |
+| path      | PenTool   | Path      |
+| svg       | FileCode2 | SVG       |
+| qrcode    | QrCode    | QR Code   |
+
+Custom plugin types MUST appear after the built-in types. If a plugin provides an SVG icon, it MUST be rendered; otherwise a default fallback icon MUST be used.
+
+**Visual States:**
+
+| State              | Appearance                                                      |
+| ------------------ | --------------------------------------------------------------- |
+| Default            | Standard icon button                                            |
+| Hover              | Tooltip with type label                                         |
+| Active (placement) | Highlighted (primary variant) to indicate active placement mode |
+| Disabled           | Dimmed, non-interactive                                         |
+
 #### Scenario: Built-in types visible
 
 - GIVEN a default component registry
@@ -129,6 +206,18 @@ The system MUST render tiles for all 7 built-in element types with labels. Click
 ### Requirement: Page Sorter
 
 The system MUST render page tabs matching the number of pages. Clicking a tab MUST switch pages. Add and remove actions MUST work. The remove button MUST be hidden when only one page exists.
+
+**Layout:**
+
+The page sorter MUST render as a floating component positioned at the top-left of the canvas area (below the element toolbar). It MUST use glass-morphism styling consistent with the main toolbar. Tab labels MUST read "Page 1", "Page 2", etc. The orientation MUST be configurable as horizontal or vertical.
+
+**Controls:**
+
+| Control       | Appearance                                 | Action                      |
+| ------------- | ------------------------------------------ | --------------------------- |
+| Page tabs     | HeroUI `Tabs` with numbered labels         | Switch active page on click |
+| Add button    | Icon button (Plus icon)                    | Creates new page at the end |
+| Remove button | Icon button (Trash icon), hidden if 1 page | Removes current page        |
 
 #### Scenario: Page switching and management
 
