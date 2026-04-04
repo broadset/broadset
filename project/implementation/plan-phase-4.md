@@ -40,12 +40,12 @@ Groups 4-A and 4-B were implemented with raw HTML elements instead of
 `@heroui/react` components. Before proceeding to 4-C, the existing UI files
 **MUST** be refactored to use HeroUI:
 
-- [ ] Add `@heroui/react` to `packages/ui/package.json` peerDependencies
-- [ ] `toolbar-nav.tsx`: replace raw `<button>` with HeroUI `Button`, `Tabs` for page sorter
-- [ ] `panels.tsx`: replace `CollapsibleSection` with HeroUI `Accordion`, raw `<button>` with `Button`
-- [ ] `inputs.tsx`: replace raw `<input>` with HeroUI `Input`/`Select` where applicable
-- [ ] Update corresponding tests to render with HeroUI provider if needed
-- [ ] Verify: `grep -rn '<button\|<input\|<select\|<textarea' packages/ui/src/ --include='*.tsx'` returns zero matches outside test mocks
+- [x] Add `@heroui/react` to `packages/ui/package.json` peerDependencies
+- [x] `toolbar-nav.tsx`: replace raw `<button>` with HeroUI `Button`, `Tabs` for page sorter
+- [x] `panels.tsx`: replace `CollapsibleSection` with HeroUI `Accordion`, raw `<button>` with `Button`
+- [x] `inputs.tsx`: replace raw `<input>` with HeroUI `Input`/`Select` where applicable
+- [x] Update corresponding tests to render with HeroUI provider if needed
+- [x] Verify: `grep -rn '<button\|<input\|<select\|<textarea' packages/ui/src/ --include='*.tsx'` returns zero matches outside test mocks
 
 ---
 
@@ -101,7 +101,7 @@ _UI specs:_ `ui/timeline.md` (timeline editor + bottom panel),
 - [x] tests: red — ui/timeline
 - [x] tests: red — ui/panels (animation sidebar + keyframe properties)
 - [x] impl: green — all
-- [ ] **HeroUI verified** — no raw HTML elements in ui/ files
+- [x] **HeroUI verified** — no raw HTML elements in ui/ files
 - [x] demo milestone: select an element → open animation sidebar → add keyframe
       in timeline editor → hit play → see the animation running in the demo
 
@@ -113,7 +113,7 @@ editing/drawing modes)
 - [x] tests: red — editor/path-geometry
 - [x] tests: red — editor/editing (path editing + drawing)
 - [x] impl: green — all
-- [ ] demo milestone: select a path element → enter path editing mode → drag
+- [x] demo milestone: select a path element → enter path editing mode → drag
       handles; use draw tool to sketch a new path point-by-point; Escape commits,
       Enter closes path
 
