@@ -35,6 +35,22 @@ Agents may update specs in `project/spec/` during implementation, but only as **
 
 If you believe a spec is genuinely wrong, **stop and report it** — do not change it yourself.
 
+## HeroUI mandate — `packages/ui` and `packages/demo`
+
+The `packages/ui` package and any user-facing React components in `packages/demo` **MUST** use `@heroui/react` components for all UI chrome (toolbars, sidebars, panels, modals, inputs, toggles, tabs, accordions). Building custom equivalents with raw `<button>`, `<div>`, `<input>` etc. when a HeroUI component exists is **forbidden**.
+
+Before committing any file under `packages/ui/src/` or any React component in `packages/demo/src/`, verify:
+
+- No raw `<button>` where HeroUI `Button` should be used
+- No raw `<input>` / `<select>` / `<textarea>` where HeroUI `Input`, `Select`, `Textarea` should be used
+- No hand-rolled collapsible sections — use HeroUI `Accordion`
+- No custom tab bars — use HeroUI `Tabs`
+- No custom modal/dialog — use HeroUI `Modal`
+- No custom toggle/switch — use HeroUI `Switch`
+- `@heroui/react` is listed in the package's `peerDependencies` or `dependencies`
+
+See `.github/instructions/heroui.instructions.md` for the full component mapping and design token rules.
+
 ## References
 
 - `README.md` — project overview

@@ -13,6 +13,9 @@ import { temporal } from 'zundo';
 import type { StoreApi, StoreMutatorIdentifier } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
+import type { UIActionsState } from './store-ui-actions';
+import { createUIActionsSlice } from './store-ui-actions';
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -77,7 +80,7 @@ interface PartializedState {
   readonly featureConfig: EditorFeatureConfig;
 }
 
-export interface EditorState {
+export interface EditorState extends UIActionsState {
   readonly document: EditorDocument;
   readonly documentMode: 'screen' | 'print';
   readonly featureConfig: EditorFeatureConfig;
@@ -201,6 +204,11 @@ export function createEditorStore(options?: CreateEditorStoreOptions): EditorSto
         activeElementIds: [],
         editingMode: { type: 'none' } as EditingMode,
         activePageIndex: 0,
+
+        // --- UI actions slice (pages, canvas settings, guides, palette) ---
+        ...createUIActionsSlice((updater) => {
+          set(updater);
+        }, options?.config),
 
         // --- Document lifecycle ---
 

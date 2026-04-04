@@ -1,16 +1,17 @@
 ---
-description: 'Use when building or editing the HeroUI v3 host package — sidebars, toolbars, modals, form controls, layout, theming, and accessibility.'
-applyTo: 'packages/ui/src/**'
+description: 'BLOCKING — Use when building or editing the HeroUI v3 host package — sidebars, toolbars, modals, form controls, layout, theming, and accessibility.'
+applyTo: 'packages/ui/src/**,packages/demo/src/**'
 ---
 
 # HeroUI Host Package Rules (`@broadset/ui`)
 
-> The `packages/ui/` directory contains the **`@broadset/ui`** package — a full-featured UI layer that consumes the headless engine via `useEditorStore` and provides the complete editor experience (sidebars, toolbars, property panels, animation controls) using HeroUI v3 components.
+> **HARD REQUIREMENT:** The `packages/ui/` and `packages/demo/` directories use `@heroui/react` for **all** UI chrome. Using raw HTML elements (`<button>`, `<input>`, `<select>`, `<div>` with manual expand/collapse, etc.) when a HeroUI component exists is **forbidden**. This rule is non-negotiable. See also `AGENTS.md` → "HeroUI mandate" and `CONTRIBUTING.md` → "HeroUI Compliance Gate".
 
 ## Component Usage
 
 - Use `@heroui/react` for **everything** outside the raw canvas. Never build custom dropdowns, toggles, or modals when a HeroUI equivalent exists.
-- Use HeroUI `Accordion` for collapsible property panels, `Tabs` for sidebar sections, `Modal` for dialogs, `Select` for selections, `Switch` for boolean toggles, `TextField`/`NumberField`/`TextArea` for form fields.
+- Use HeroUI `Accordion` for collapsible property panels, `Tabs` for sidebar sections, `Modal` for dialogs, `Select` for selections, `Switch` for boolean toggles, `Input`/`Textarea` for form fields, `Button` for all interactive buttons.
+- **Verification before commit:** grep for raw `<button`, `<input`, `<select`, `<textarea` in `packages/ui/src/` — if any appear outside test mocks, the commit MUST NOT proceed.
 
 ## Styling & Tokens
 

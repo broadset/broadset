@@ -14,6 +14,41 @@ Each group lists its editor spec units, its UI spec units, and a concrete
 
 ---
 
+### ⚠️ MANDATORY — HeroUI component library
+
+All UI units in this phase (`ui/*`) **MUST** be built with `@heroui/react` components — **not** raw HTML elements. This is a hard architectural requirement, not a nice-to-have.
+
+| Instead of                      | Use                          |
+| ------------------------------- | ---------------------------- |
+| Raw `<button>`                  | HeroUI `Button`              |
+| Raw `<input>` / `<textarea>`    | HeroUI `Input` / `Textarea`  |
+| Raw `<select>`                  | HeroUI `Select`              |
+| Hand-rolled collapsible `<div>` | HeroUI `Accordion`           |
+| Custom tab bar                  | HeroUI `Tabs`                |
+| Custom modal / dialog           | HeroUI `Modal`               |
+| Custom toggle / checkbox        | HeroUI `Switch` / `Checkbox` |
+
+`@heroui/react` **MUST** be in the package's `peerDependencies` before any UI unit is marked green.
+
+See `AGENTS.md`, `CONTRIBUTING.md`, and `.github/instructions/heroui.instructions.md`.
+
+---
+
+## Remediation: HeroUI compliance for completed units
+
+Groups 4-A and 4-B were implemented with raw HTML elements instead of
+`@heroui/react` components. Before proceeding to 4-C, the existing UI files
+**MUST** be refactored to use HeroUI:
+
+- [ ] Add `@heroui/react` to `packages/ui/package.json` peerDependencies
+- [ ] `toolbar-nav.tsx`: replace raw `<button>` with HeroUI `Button`, `Tabs` for page sorter
+- [ ] `panels.tsx`: replace `CollapsibleSection` with HeroUI `Accordion`, raw `<button>` with `Button`
+- [ ] `inputs.tsx`: replace raw `<input>` with HeroUI `Input`/`Select` where applicable
+- [ ] Update corresponding tests to render with HeroUI provider if needed
+- [ ] Verify: `grep -rn '<button\|<input\|<select\|<textarea' packages/ui/src/ --include='*.tsx'` returns zero matches outside test mocks
+
+---
+
 ## Feature Group 4-A: Core editing scaffold
 
 _Editor specs:_ `editor/store-actions.md` (doc init, element CRUD, selection),
@@ -50,6 +85,7 @@ _UI specs:_ `ui/toolbar-nav.md` (undo/redo buttons, updated page sorter)
 - [ ] tests: red — editor/store-ui-actions
 - [ ] tests: red — editor/canvas
 - [ ] impl: green — all
+- [ ] **HeroUI verified** — no raw HTML elements in ui/ files
 - [ ] demo milestone: add/remove pages; undo/redo buttons work; zoom and pan
       canvas; grid visible; rulers rendered; drag from ruler creates a guide;
       safety overlay visible in broadcast mode
@@ -65,6 +101,7 @@ _UI specs:_ `ui/timeline.md` (timeline editor + bottom panel),
 - [ ] tests: red — ui/timeline
 - [ ] tests: red — ui/panels (animation sidebar + keyframe properties)
 - [ ] impl: green — all
+- [ ] **HeroUI verified** — no raw HTML elements in ui/ files
 - [ ] demo milestone: select an element → open animation sidebar → add keyframe
       in timeline editor → hit play → see the animation running in the demo
 
@@ -96,6 +133,7 @@ _UI specs:_ `ui/modals.md`
 
 - [ ] tests: red
 - [ ] impl: green
+- [ ] **HeroUI verified** — no raw HTML elements in ui/ files
 - [ ] demo milestone: all 6 modals open/close correctly — About, Canvas Settings
       (updates take effect), Export (feature-gated exporters), Media Library (assets
       browsable), New Document (presets create correct canvas), Shortcut Help

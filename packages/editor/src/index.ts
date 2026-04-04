@@ -11,3 +11,4 @@ export type {
   ReorderDirection,
 } from './store-actions';
 export { createEditorStore, createEmptyEditorDocument } from './store-actions';
+export type { UIActionsState } from './store-ui-actions';
