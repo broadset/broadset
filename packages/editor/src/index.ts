@@ -22,7 +22,18 @@ export {
   computeSafetyBoundaries,
 } from './canvas';
 export type { ElementDefaults, PluginDefaults } from './editing';
-export { cancelPlacement, getElementDefaults, placeElement, startPlacement, validateEditorConfig } from './editing';
+export {
+  appendPathPoint,
+  cancelPlacement,
+  getElementDefaults,
+  placeElement,
+  startPathDrawing,
+  startPathEditing,
+  startPlacement,
+  stopPathDrawing,
+  stopPathEditing,
+  validateEditorConfig,
+} from './editing';
 export {
   alignElements,
   collectDescendants,

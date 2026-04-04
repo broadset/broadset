@@ -110,7 +110,7 @@ _UI specs:_ `ui/timeline.md` (timeline editor + bottom panel),
 _Editor specs:_ `editor/path-geometry.md`, `editor/editing.md` (path
 editing/drawing modes)
 
-- [ ] tests: red — editor/path-geometry
+- [x] tests: red — editor/path-geometry
 - [ ] tests: red — editor/editing (path editing + drawing)
 - [ ] impl: green — all
 - [ ] demo milestone: select a path element → enter path editing mode → drag

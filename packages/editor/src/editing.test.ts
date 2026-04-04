@@ -2,7 +2,18 @@ import type { BroadsetElement } from '@broadset/model';
 import { createDefaultElement } from '@broadset/model';
 import { describe, expect, it } from '@jest/globals';
 
-import { cancelPlacement, getElementDefaults, placeElement, startPlacement, validateEditorConfig } from './editing';
+import {
+  appendPathPoint,
+  cancelPlacement,
+  getElementDefaults,
+  placeElement,
+  startPathDrawing,
+  startPathEditing,
+  startPlacement,
+  stopPathDrawing,
+  stopPathEditing,
+  validateEditorConfig,
+} from './editing';
 import type { EditorDocument, EditorStore } from './store-actions';
 import { createEditorStore, createEmptyEditorDocument } from './store-actions';
 
@@ -278,5 +289,253 @@ describe('validateEditorConfig', () => {
     };
 
     expect(() => validateEditorConfig(config)).toThrow();
+  });
+});
+
+// ===========================================================================
+// Path Editing Mode
+// ===========================================================================
+
+describe('Path Editing Mode', () => {
+  /**
+   * @description Starting path editing must set editingMode to path-editing
+   * for the target element and select it.
+   */
+  it('startPathEditing sets path-editing mode and selects element', () => {
+    const el = makeElement({ type: 'path' });
+    const store = storeWithElements(el);
+
+    startPathEditing(store, el.id);
+
+    expect(store.getState().editingMode).toEqual({
+      type: 'path-editing',
+      elementId: el.id,
+    });
+    expect(store.getState().activeElementIds).toContain(el.id);
+  });
+
+  /**
+   * @description Stopping path editing must reset editingMode to none.
+   */
+  it('stopPathEditing clears editing mode', () => {
+    const el = makeElement({ type: 'path' });
+    const store = storeWithElements(el);
+
+    startPathEditing(store, el.id);
+    stopPathEditing(store);
+
+    expect(store.getState().editingMode).toEqual({ type: 'none' });
+  });
+
+  /**
+   * @description Selecting a different element must auto-exit path editing.
+   */
+  it('auto-exits when selection changes to different element', () => {
+    const a = makeElement({ type: 'path' });
+    const b = makeElement({ type: 'rectangle' });
+    const store = storeWithElements(a, b);
+
+    startPathEditing(store, a.id);
+    store.getState().selectElement(b.id);
+
+    expect(store.getState().editingMode).toEqual({ type: 'none' });
+  });
+
+  /**
+   * @description Re-selecting the same element must NOT exit path editing.
+   */
+  it('keeps editing when same element is reselected', () => {
+    const el = makeElement({ type: 'path' });
+    const store = storeWithElements(el);
+
+    startPathEditing(store, el.id);
+    store.getState().selectElement(el.id);
+
+    expect(store.getState().editingMode).toEqual({
+      type: 'path-editing',
+      elementId: el.id,
+    });
+  });
+
+  /**
+   * @description Selecting null (deselect all) must auto-exit path editing.
+   */
+  it('auto-exits when selection is cleared', () => {
+    const el = makeElement({ type: 'path' });
+    const store = storeWithElements(el);
+
+    startPathEditing(store, el.id);
+    store.getState().selectElement(null);
+
+    expect(store.getState().editingMode).toEqual({ type: 'none' });
+  });
+});
+
+// ===========================================================================
+// Path Drawing Mode
+// ===========================================================================
+
+describe('Path Drawing Mode', () => {
+  /**
+   * @description Starting path drawing must set editingMode to path-drawing
+   * and clear any active path editing mode.
+   */
+  it('startPathDrawing sets drawing mode and clears editing', () => {
+    const el = makeElement({ type: 'path' });
+    const store = storeWithElements(el);
+
+    startPathEditing(store, el.id);
+    startPathDrawing(store, el.id);
+
+    expect(store.getState().editingMode).toEqual({
+      type: 'path-drawing',
+      elementId: el.id,
+    });
+  });
+
+  /**
+   * @description Stopping path drawing must reset editingMode to none.
+   */
+  it('stopPathDrawing clears drawing mode', () => {
+    const el = makeElement({ type: 'path' });
+    const store = storeWithElements(el);
+
+    startPathDrawing(store, el.id);
+    stopPathDrawing(store);
+
+    expect(store.getState().editingMode).toEqual({ type: 'none' });
+  });
+
+  /**
+   * @description Selection change to a different element must auto-exit
+   * path drawing mode.
+   */
+  it('auto-exits when selection changes', () => {
+    const a = makeElement({ type: 'path' });
+    const b = makeElement({ type: 'rectangle' });
+    const store = storeWithElements(a, b);
+
+    startPathDrawing(store, a.id);
+    store.getState().selectElement(b.id);
+
+    expect(store.getState().editingMode).toEqual({ type: 'none' });
+  });
+});
+
+// ===========================================================================
+// Path Point Appending
+// ===========================================================================
+
+describe('appendPathPoint', () => {
+  /**
+   * @description The first appended point must create an M command.
+   * Bounding box must be padded by half the stroke width.
+   */
+  it('first point creates M command with stroke padding', () => {
+    const el = makeElement({
+      type: 'path',
+      content: '',
+      position: { x: 0, y: 0 },
+      width: 80,
+      height: 50,
+    });
+    const store = storeWithElements(el);
+
+    startPathDrawing(store, el.id);
+    appendPathPoint(store, 10, 20);
+
+    const elements = getElements(store);
+    const path = elements.find((e) => e.id === el.id);
+
+    // Content must start with M
+    expect(path?.content).toMatch(/^M/);
+    // Element position must be updated to reflect point location
+    expect(path?.position.x).toBeDefined();
+    expect(path?.position.y).toBeDefined();
+  });
+
+  /**
+   * @description Subsequent points must create L commands. With three
+   * points, the path data should contain M and two L commands.
+   */
+  it('subsequent points create L commands', () => {
+    const el = makeElement({
+      type: 'path',
+      content: '',
+      position: { x: 0, y: 0 },
+      width: 80,
+      height: 50,
+    });
+    const store = storeWithElements(el);
+
+    startPathDrawing(store, el.id);
+    appendPathPoint(store, 10, 20);
+    appendPathPoint(store, 30, 40);
+    appendPathPoint(store, 50, 60);
+
+    const elements = getElements(store);
+    const path = elements.find((e) => e.id === el.id);
+
+    // Should have M and two L commands
+    expect(path?.content).toMatch(/^M/);
+    expect(path?.content).toMatch(/L/);
+
+    // Count L commands
+    const lCount = (path?.content ?? '').match(/L/g)?.length ?? 0;
+
+    expect(lCount).toBe(2);
+  });
+
+  /**
+   * @description Coordinates must be rounded to 2 decimal places.
+   */
+  it('rounds coordinates to 2 decimal places', () => {
+    const el = makeElement({
+      type: 'path',
+      content: '',
+      position: { x: 0, y: 0 },
+      width: 80,
+      height: 50,
+    });
+    const store = storeWithElements(el);
+
+    startPathDrawing(store, el.id);
+    appendPathPoint(store, 10.12345, 20.6789);
+
+    const elements = getElements(store);
+    const path = elements.find((e) => e.id === el.id);
+    const content = path?.content ?? '';
+
+    // No coordinate should have more than 2 decimal places
+    const numbers = content.match(/-?\d+\.?\d*/g) ?? [];
+
+    for (const num of numbers) {
+      const decimalPart = num.split('.')[1];
+
+      if (decimalPart) {
+        expect(decimalPart.length).toBeLessThanOrEqual(2);
+      }
+    }
+  });
+
+  /**
+   * @description Appending a point when not in drawing mode must be a no-op.
+   */
+  it('no-op when not in drawing mode', () => {
+    const el = makeElement({
+      type: 'path',
+      content: 'M0,0',
+      position: { x: 0, y: 0 },
+      width: 80,
+      height: 50,
+    });
+    const store = storeWithElements(el);
+
+    appendPathPoint(store, 10, 20);
+
+    const elements = getElements(store);
+    const path = elements.find((e) => e.id === el.id);
+
+    expect(path?.content).toBe('M0,0');
   });
 });

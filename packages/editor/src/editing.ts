@@ -125,6 +125,130 @@ export function placeElement(
 }
 
 // ---------------------------------------------------------------------------
+// Path Editing Mode
+// ---------------------------------------------------------------------------
+
+export function startPathEditing(store: EditorStore, elementId: string): void {
+  store.setState({
+    editingMode: { type: 'path-editing' as const, elementId },
+    activeElementIds: [elementId],
+  });
+}
+
+export function stopPathEditing(store: EditorStore): void {
+  store.setState({
+    editingMode: { type: 'none' as const },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Path Drawing Mode
+// ---------------------------------------------------------------------------
+
+export function startPathDrawing(store: EditorStore, elementId: string): void {
+  store.setState({
+    editingMode: { type: 'path-drawing' as const, elementId },
+    activeElementIds: [elementId],
+  });
+}
+
+export function stopPathDrawing(store: EditorStore): void {
+  store.setState({
+    editingMode: { type: 'none' as const },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Path Point Appending
+// ---------------------------------------------------------------------------
+
+const COORD_PRECISION = 2;
+
+function roundCoord(n: number): number {
+  const factor = 10 ** COORD_PRECISION;
+
+  return Math.round(n * factor) / factor;
+}
+
+export function appendPathPoint(store: EditorStore, canvasX: number, canvasY: number): void {
+  const state = store.getState();
+
+  if (state.editingMode.type !== 'path-drawing') return;
+
+  const elementId = state.editingMode.elementId;
+  const page = state.document.pages[state.activePageIndex];
+
+  if (!page) return;
+
+  const elementIndex = page.elements.findIndex((e) => e.id === elementId);
+
+  if (elementIndex === -1) return;
+
+  const element = page.elements[elementIndex];
+
+  if (!element) return;
+
+  const existingContent = element.content;
+  const strokeWidth = element.style.strokeWidth ?? 1;
+  const padding = strokeWidth / 2;
+
+  // Parse existing points to compute bounding box
+  const pointRe = /([ML])\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/g;
+  const existingPoints: Array<{ x: number; y: number }> = [];
+
+  for (const m of existingContent.matchAll(pointRe)) {
+    const px = parseFloat(m[2] ?? '0');
+    const py = parseFloat(m[3] ?? '0');
+
+    existingPoints.push({
+      x: element.position.x + px,
+      y: element.position.y + py,
+    });
+  }
+
+  // Add the new point in canvas coordinates
+  const allPoints = [...existingPoints, { x: canvasX, y: canvasY }];
+
+  // Compute bounding box with stroke padding
+  const minX = Math.min(...allPoints.map((p) => p.x)) - padding;
+  const minY = Math.min(...allPoints.map((p) => p.y)) - padding;
+  const maxX = Math.max(...allPoints.map((p) => p.x)) + padding;
+  const maxY = Math.max(...allPoints.map((p) => p.y)) + padding;
+
+  const newWidth = roundCoord(maxX - minX);
+  const newHeight = roundCoord(maxY - minY);
+
+  // Build path data with coordinates relative to the new bounding box origin
+  const pathCommands = allPoints.map((p, i) => {
+    const relX = roundCoord(p.x - minX);
+    const relY = roundCoord(p.y - minY);
+
+    return i === 0 ? `M${String(relX)},${String(relY)}` : `L${String(relX)},${String(relY)}`;
+  });
+
+  const newContent = pathCommands.join(' ');
+
+  const updatedElement = {
+    ...element,
+    position: { x: roundCoord(minX), y: roundCoord(minY) },
+    width: newWidth,
+    height: newHeight,
+    content: newContent,
+  };
+
+  const updatedElements = page.elements.map((e, idx) => (idx === elementIndex ? updatedElement : e));
+
+  store.setState({
+    document: {
+      ...state.document,
+      pages: state.document.pages.map((p, i) =>
+        i === state.activePageIndex ? { ...p, elements: updatedElements } : p,
+      ),
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Config Validation
 // ---------------------------------------------------------------------------
 
