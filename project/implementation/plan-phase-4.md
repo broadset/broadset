@@ -33,7 +33,7 @@ _Editor specs:_ `editor/transforms.md`
 _UI specs:_ `ui/utilities.md` (CSS parsers), `ui/inputs.md` (input components),
 `ui/panels.md` (properties sidebar — basic style fields)
 
-- [ ] tests: red — editor/transforms
+- [x] tests: red — editor/transforms
 - [ ] tests: red — ui/utilities
 - [ ] tests: red — ui/inputs
 - [ ] tests: red — ui/panels (properties sidebar)
