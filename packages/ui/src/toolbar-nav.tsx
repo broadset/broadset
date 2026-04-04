@@ -1,4 +1,5 @@
-import type { JSX } from 'react';
+import { Button, Tabs } from '@heroui/react';
+import type { JSX, Key } from 'react';
 
 // ---------------------------------------------------------------------------
 // Element Library
@@ -19,15 +20,16 @@ export function ElementLibrary({ elementTypes, onSelect }: ElementLibraryProps):
   return (
     <div role="group" aria-label="Element library">
       {elementTypes.map((info) => (
-        <button
+        <Button
           key={info.type}
-          type="button"
-          onClick={() => {
+          size="sm"
+          variant="ghost"
+          onPress={() => {
             onSelect(info.type);
           }}
         >
           {info.label}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -57,39 +59,43 @@ export function PageSorter({
   onPageRemove,
 }: PageSorterProps): JSX.Element {
   return (
-    <div role="tablist" aria-label="Pages">
-      {pages.map((page, index) => (
-        <button
-          key={page.id}
-          role="tab"
-          type="button"
-          aria-selected={index === activePageIndex}
-          onClick={() => {
-            onPageSelect(index);
-          }}
-        >
-          Page {index + 1}
-        </button>
-      ))}
-      <button
-        type="button"
+    <div aria-label="Pages">
+      <Tabs
+        aria-label="Pages"
+        selectedKey={String(activePageIndex)}
+        onSelectionChange={(key: Key) => {
+          onPageSelect(Number(key));
+        }}
+      >
+        <Tabs.List>
+          {pages.map((page, index) => (
+            <Tabs.Tab key={page.id} id={String(index)}>
+              Page {index + 1}
+            </Tabs.Tab>
+          ))}
+        </Tabs.List>
+      </Tabs>
+      <Button
+        size="sm"
+        variant="ghost"
         aria-label="Add page"
-        onClick={() => {
+        onPress={() => {
           onPageAdd();
         }}
       >
         +
-      </button>
+      </Button>
       {pages.length > 1 && (
-        <button
-          type="button"
+        <Button
+          size="sm"
+          variant="ghost"
           aria-label="Remove page"
-          onClick={() => {
+          onPress={() => {
             onPageRemove(activePageIndex);
           }}
         >
           −
-        </button>
+        </Button>
       )}
     </div>
   );

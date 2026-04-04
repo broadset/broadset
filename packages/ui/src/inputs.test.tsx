@@ -78,10 +78,15 @@ describe('CssLengthInput', () => {
 
     render(<CssLengthInput value={96} unit="px" onChange={onChange} label="Width" />);
 
-    // Find and change the unit selector
-    const unitSelect = screen.getByRole('combobox', { name: /unit/i });
+    // HeroUI Select renders a button trigger; click to open, then select option
+    const trigger = screen.getByRole('button', { name: /unit/i });
 
-    fireEvent.change(unitSelect, { target: { value: 'mm' } });
+    fireEvent.click(trigger);
+
+    // React Aria Select opens a listbox; select "mm"
+    const mmOption = screen.getByRole('option', { name: 'mm' });
+
+    fireEvent.click(mmOption);
 
     // 96px = 25.4mm
     expect(onChange).toHaveBeenCalledWith(expect.closeTo(25.4, 1), 'mm');
@@ -95,9 +100,12 @@ describe('CssLengthInput', () => {
 
     render(<CssLengthInput value={50} unit="px" onChange={onChange} label="Width" />);
 
-    const input = screen.getByRole('spinbutton', { name: /width/i });
+    const input = screen.getByRole('textbox', { name: /width/i });
 
+    // React Aria NumberField commits on blur; simulate typing + blur
+    fireEvent.focus(input);
     fireEvent.change(input, { target: { value: '100' } });
+    fireEvent.blur(input);
 
     expect(onChange).toHaveBeenCalledWith(100, 'px');
   });
@@ -117,9 +125,12 @@ describe('TextStrokeInput', () => {
 
     render(<TextStrokeInput width={2} color="#000000" onChange={onChange} label="Stroke" />);
 
-    const widthInput = screen.getByRole('spinbutton', { name: /width/i });
+    const widthInput = screen.getByRole('textbox', { name: /width/i });
 
+    // React Aria NumberField commits on blur; simulate typing + blur
+    fireEvent.focus(widthInput);
     fireEvent.change(widthInput, { target: { value: '3' } });
+    fireEvent.blur(widthInput);
 
     expect(onChange).toHaveBeenCalledWith(expect.stringContaining('px'));
   });
@@ -234,7 +245,7 @@ describe('WCAG AA Input Accessibility', () => {
   it('sets aria-invalid for invalid input', () => {
     render(<CssLengthInput value={NaN} unit="px" onChange={jest.fn()} label="Width" />);
 
-    const input = screen.getByRole('spinbutton', { name: /width/i });
+    const input = screen.getByRole('textbox', { name: /width/i });
 
     expect(input).toHaveAttribute('aria-invalid', 'true');
   });

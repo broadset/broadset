@@ -1,3 +1,4 @@
+import { Button } from '@heroui/react';
 import type { JSX, ReactNode } from 'react';
 import { createContext, useContext } from 'react';
 
@@ -150,24 +151,26 @@ export function PropertyField({ propertyKey, defaultValue, children }: PropertyF
     <div>
       {children}
       {included ?
-        <button
-          type="button"
+        <Button
+          size="sm"
+          variant="ghost"
           aria-label="Remove property"
-          onClick={() => {
+          onPress={() => {
             adapter.toggleProperty(propertyKey, false, defaultValue);
           }}
         >
           Remove
-        </button>
-      : <button
-          type="button"
+        </Button>
+      : <Button
+          size="sm"
+          variant="ghost"
           aria-label="Include property"
-          onClick={() => {
+          onPress={() => {
             adapter.toggleProperty(propertyKey, true, defaultValue);
           }}
         >
           Include
-        </button>
+        </Button>
       }
     </div>
   );

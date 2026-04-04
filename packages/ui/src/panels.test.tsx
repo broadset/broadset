@@ -99,7 +99,10 @@ describe('GeometryPanel', () => {
 
     const xInput = screen.getByLabelText(/^x$/i);
 
+    // React Aria NumberField commits on blur
+    fireEvent.focus(xInput);
     fireEvent.change(xInput, { target: { value: '50' } });
+    fireEvent.blur(xInput);
 
     expect(onUpdate).toHaveBeenCalledWith('x', 50);
   });
@@ -154,7 +157,10 @@ describe('AppearancePanel', () => {
 
     const opacityInput = screen.getByLabelText(/opacity/i);
 
+    // React Aria NumberField commits on blur
+    fireEvent.focus(opacityInput);
     fireEvent.change(opacityInput, { target: { value: '0.5' } });
+    fireEvent.blur(opacityInput);
 
     expect(onUpdate).toHaveBeenCalledWith('opacity', 0.5);
   });

@@ -111,8 +111,8 @@ _Editor specs:_ `editor/path-geometry.md`, `editor/editing.md` (path
 editing/drawing modes)
 
 - [x] tests: red — editor/path-geometry
-- [ ] tests: red — editor/editing (path editing + drawing)
-- [ ] impl: green — all
+- [x] tests: red — editor/editing (path editing + drawing)
+- [x] impl: green — all
 - [ ] demo milestone: select a path element → enter path editing mode → drag
       handles; use draw tool to sketch a new path point-by-point; Escape commits,
       Enter closes path

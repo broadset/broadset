@@ -1,4 +1,5 @@
-import type { JSX } from 'react';
+import { Accordion, Button, Input, ListBox, ListBoxItem, NumberField, Select, TextField } from '@heroui/react';
+import type { JSX, Key } from 'react';
 import { useCallback, useState } from 'react';
 
 // ---------------------------------------------------------------------------
@@ -32,34 +33,7 @@ export interface LayerInfo {
 
 type CustomPanelComponent = (props: Record<string, unknown>) => JSX.Element;
 
-// ---------------------------------------------------------------------------
-// CollapsibleSection — shared helper
-// ---------------------------------------------------------------------------
-
-interface CollapsibleSectionProps {
-  readonly label: string;
-  readonly defaultExpanded?: boolean;
-  readonly children: React.ReactNode;
-}
-
-function CollapsibleSection({ label, defaultExpanded, children }: CollapsibleSectionProps): JSX.Element {
-  const [expanded, setExpanded] = useState(defaultExpanded ?? true);
-
-  return (
-    <div>
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={() => {
-          setExpanded((prev) => !prev);
-        }}
-      >
-        {label}
-      </button>
-      {expanded ? children : null}
-    </div>
-  );
-}
+// CollapsibleSection replaced by HeroUI Accordion — see PropertiesSidebar
 
 // ---------------------------------------------------------------------------
 // GeometryPanel
@@ -93,17 +67,18 @@ export function GeometryPanel({ x, y, width, height, rotation, onUpdate }: Geome
   return (
     <section role="region" aria-label="Geometry">
       {GEOMETRY_FIELDS.map((field) => (
-        <label key={field.key}>
-          {field.label}
-          <input
-            type="number"
-            aria-label={field.label}
-            value={values[field.key] ?? 0}
-            onChange={(e) => {
-              onUpdate(field.key, parseFloat(e.target.value));
-            }}
-          />
-        </label>
+        <NumberField
+          key={field.key}
+          aria-label={field.label}
+          value={values[field.key] ?? 0}
+          onChange={(v: number) => {
+            onUpdate(field.key, v);
+          }}
+        >
+          <NumberField.Group>
+            <NumberField.Input />
+          </NumberField.Group>
+        </NumberField>
       ))}
     </section>
   );
@@ -134,96 +109,106 @@ export function AppearancePanel({
   blendMode,
   onUpdate,
 }: AppearancePanelProps): JSX.Element {
+  const handleBorderStyleChange = useCallback(
+    (key: Key | null): void => {
+      if (key === null) return;
+
+      onUpdate('borderStyle', String(key));
+    },
+    [onUpdate],
+  );
+
+  const handleBlendModeChange = useCallback(
+    (key: Key | null): void => {
+      if (key === null) return;
+
+      onUpdate('blendMode', String(key));
+    },
+    [onUpdate],
+  );
+
   return (
     <section role="region" aria-label="Appearance">
-      <label>
-        Fill color
-        <input
-          type="text"
-          aria-label="Fill color"
-          value={backgroundColor}
-          onChange={(e) => {
-            onUpdate('backgroundColor', e.target.value);
-          }}
-        />
-      </label>
-      <label>
-        Border width
-        <input
-          type="number"
-          aria-label="Border width"
-          value={borderWidth}
-          onChange={(e) => {
-            onUpdate('borderWidth', parseFloat(e.target.value));
-          }}
-        />
-      </label>
-      <label>
-        Border color
-        <input
-          type="text"
-          aria-label="Border color"
-          value={borderColor}
-          onChange={(e) => {
-            onUpdate('borderColor', e.target.value);
-          }}
-        />
-      </label>
-      <label>
-        Border style
-        <select
-          aria-label="Border style"
-          value={borderStyle}
-          onChange={(e) => {
-            onUpdate('borderStyle', e.target.value);
-          }}
-        >
-          <option value="none">none</option>
-          <option value="solid">solid</option>
-          <option value="dashed">dashed</option>
-          <option value="dotted">dotted</option>
-        </select>
-      </label>
-      <label>
-        Border radius
-        <input
-          type="number"
-          aria-label="Border radius"
-          value={borderRadius}
-          onChange={(e) => {
-            onUpdate('borderRadius', parseFloat(e.target.value));
-          }}
-        />
-      </label>
-      <label>
-        Opacity
-        <input
-          type="number"
-          aria-label="Opacity"
-          step={0.1}
-          min={0}
-          max={1}
-          value={opacity}
-          onChange={(e) => {
-            onUpdate('opacity', parseFloat(e.target.value));
-          }}
-        />
-      </label>
-      <label>
-        Blend mode
-        <select
-          aria-label="Blend mode"
-          value={blendMode}
-          onChange={(e) => {
-            onUpdate('blendMode', e.target.value);
-          }}
-        >
-          <option value="normal">normal</option>
-          <option value="multiply">multiply</option>
-          <option value="screen">screen</option>
-          <option value="overlay">overlay</option>
-        </select>
-      </label>
+      <TextField
+        aria-label="Fill color"
+        value={backgroundColor}
+        onChange={(v: string) => {
+          onUpdate('backgroundColor', v);
+        }}
+      >
+        <Input />
+      </TextField>
+      <NumberField
+        aria-label="Border width"
+        value={borderWidth}
+        onChange={(v: number) => {
+          onUpdate('borderWidth', v);
+        }}
+      >
+        <NumberField.Group>
+          <NumberField.Input />
+        </NumberField.Group>
+      </NumberField>
+      <TextField
+        aria-label="Border color"
+        value={borderColor}
+        onChange={(v: string) => {
+          onUpdate('borderColor', v);
+        }}
+      >
+        <Input />
+      </TextField>
+      <Select aria-label="Border style" value={borderStyle} onChange={handleBorderStyleChange}>
+        <Select.Trigger>
+          <Select.Value />
+        </Select.Trigger>
+        <Select.Popover>
+          <ListBox>
+            <ListBoxItem id="none">none</ListBoxItem>
+            <ListBoxItem id="solid">solid</ListBoxItem>
+            <ListBoxItem id="dashed">dashed</ListBoxItem>
+            <ListBoxItem id="dotted">dotted</ListBoxItem>
+          </ListBox>
+        </Select.Popover>
+      </Select>
+      <NumberField
+        aria-label="Border radius"
+        value={borderRadius}
+        onChange={(v: number) => {
+          onUpdate('borderRadius', v);
+        }}
+      >
+        <NumberField.Group>
+          <NumberField.Input />
+        </NumberField.Group>
+      </NumberField>
+      <NumberField
+        aria-label="Opacity"
+        step={0.1}
+        minValue={0}
+        maxValue={1}
+        value={opacity}
+        onChange={(v: number) => {
+          onUpdate('opacity', v);
+        }}
+      >
+        <NumberField.Group>
+          <NumberField.Input />
+        </NumberField.Group>
+      </NumberField>
+      <Select aria-label="Blend mode" value={blendMode} onChange={handleBlendModeChange}>
+        <Select.Trigger>
+          <Select.Value />
+        </Select.Trigger>
+        <Select.Popover>
+          <ListBox>
+            <ListBoxItem id="normal">normal</ListBoxItem>
+            <ListBoxItem id="multiply">multiply</ListBoxItem>
+            <ListBoxItem id="screen">screen</ListBoxItem>
+            <ListBoxItem id="overlay">overlay</ListBoxItem>
+          </ListBox>
+        </Select.Popover>
+      </Select>
     </section>
   );
 }
@@ -258,35 +243,54 @@ export function PropertiesSidebar({
 
   const isScreen = documentMode === 'screen';
 
+  const defaultKeys = isScreen ? ['geometry', 'appearance', 'gradient'] : ['geometry', 'appearance'];
+
   return (
     <aside role="region" aria-label="Properties">
-      <CollapsibleSection label="Geometry">
-        <GeometryPanel
-          x={element.x}
-          y={element.y}
-          width={element.width}
-          height={element.height}
-          rotation={element.rotation}
-          onUpdate={onUpdate}
-        />
-      </CollapsibleSection>
-      <CollapsibleSection label="Appearance">
-        <AppearancePanel
-          backgroundColor={element.backgroundColor}
-          borderWidth={element.borderWidth}
-          borderColor={element.borderColor}
-          borderStyle={element.borderStyle}
-          borderRadius={element.borderRadius}
-          opacity={element.opacity}
-          blendMode={element.blendMode}
-          onUpdate={onUpdate}
-        />
-      </CollapsibleSection>
-      {isScreen ?
-        <CollapsibleSection label="Gradient fill">
-          <p>Gradient controls here</p>
-        </CollapsibleSection>
-      : null}
+      <Accordion defaultExpandedKeys={defaultKeys} allowsMultipleExpanded>
+        <Accordion.Item id="geometry">
+          <Accordion.Heading>
+            <Accordion.Trigger>Geometry</Accordion.Trigger>
+          </Accordion.Heading>
+          <Accordion.Panel>
+            <GeometryPanel
+              x={element.x}
+              y={element.y}
+              width={element.width}
+              height={element.height}
+              rotation={element.rotation}
+              onUpdate={onUpdate}
+            />
+          </Accordion.Panel>
+        </Accordion.Item>
+        <Accordion.Item id="appearance">
+          <Accordion.Heading>
+            <Accordion.Trigger>Appearance</Accordion.Trigger>
+          </Accordion.Heading>
+          <Accordion.Panel>
+            <AppearancePanel
+              backgroundColor={element.backgroundColor}
+              borderWidth={element.borderWidth}
+              borderColor={element.borderColor}
+              borderStyle={element.borderStyle}
+              borderRadius={element.borderRadius}
+              opacity={element.opacity}
+              blendMode={element.blendMode}
+              onUpdate={onUpdate}
+            />
+          </Accordion.Panel>
+        </Accordion.Item>
+        {isScreen ?
+          <Accordion.Item id="gradient">
+            <Accordion.Heading>
+              <Accordion.Trigger>Gradient fill</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <p>Gradient controls here</p>
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+      </Accordion>
     </aside>
   );
 }
@@ -343,21 +347,24 @@ export function LayersSidebar({ layers, onSelect, onToggleLock, onDelete, onRena
         {layers.map((layer) => (
           <li key={layer.id}>
             {editingId === layer.id ?
-              <input
-                type="text"
+              <TextField
+                aria-label="Rename layer"
                 value={editValue}
-                onChange={(e) => {
-                  setEditValue(e.target.value);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    commitRename(layer.id);
-                  } else if (e.key === 'Escape') {
-                    cancelRename();
-                  }
+                onChange={(v: string) => {
+                  setEditValue(v);
                 }}
                 autoFocus
-              />
+              >
+                <Input
+                  onKeyDown={(e: React.KeyboardEvent) => {
+                    if (e.key === 'Enter') {
+                      commitRename(layer.id);
+                    } else if (e.key === 'Escape') {
+                      cancelRename();
+                    }
+                  }}
+                />
+              </TextField>
             : <span
                 role="button"
                 tabIndex={0}
@@ -376,24 +383,26 @@ export function LayersSidebar({ layers, onSelect, onToggleLock, onDelete, onRena
                 {layer.name}
               </span>
             }
-            <button
-              type="button"
+            <Button
+              size="sm"
+              variant="ghost"
               aria-label={`Toggle lock ${layer.name}`}
-              onClick={() => {
+              onPress={() => {
                 onToggleLock(layer.id);
               }}
             >
               {layer.locked ? 'Unlock' : 'Lock'}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
               aria-label={`Delete ${layer.name}`}
-              onClick={() => {
+              onPress={() => {
                 onDelete(layer.id);
               }}
             >
               Delete
-            </button>
+            </Button>
           </li>
         ))}
       </ul>

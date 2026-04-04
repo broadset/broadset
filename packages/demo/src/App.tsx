@@ -1,28 +1,25 @@
-import type { EditorStore } from '@broadset/editor';
-import { computeGridLines, computeSafetyBoundaries, createEditorStore } from '@broadset/editor';
+import type { EditingMode, EditorStore } from '@broadset/editor';
+import {
+  appendPathPoint,
+  createEditorStore,
+  startPathDrawing,
+  startPathEditing,
+  stopPathDrawing,
+  stopPathEditing,
+} from '@broadset/editor';
 import type { BroadsetElementStyle } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { DocumentRenderer } from '@broadset/renderer';
 import type { ElementTypeInfo } from '@broadset/ui';
-import {
-  AnimationSidebar,
-  ElementLibrary,
-  LayersSidebar,
-  PageSorter,
-  PropertiesSidebar,
-  TimelineBottomPanel,
-} from '@broadset/ui';
+import { AnimationSidebar, ElementLibrary, LayersSidebar, PropertiesSidebar, TimelineBottomPanel } from '@broadset/ui';
 import type { JSX, MouseEvent, WheelEvent } from 'react';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { createDemoController } from './animationSetup';
+import { BottomBar } from './BottomBar';
+import { CanvasOverlays } from './CanvasOverlays';
 import { elementsToLayers, elementToPanelElement, sampleToEditorDocument, toRendererDoc } from './converters';
-
-// ---------------------------------------------------------------------------
-// Shared styles
-// ---------------------------------------------------------------------------
-
-const BUTTON_STYLE = { padding: '8px 16px', fontSize: 14, cursor: 'pointer' } as const;
+import { PathToolsPanel } from './PathToolsPanel';
 
 // ---------------------------------------------------------------------------
 // Element type registry for the toolbar
@@ -69,6 +66,8 @@ export default function App(): JSX.Element {
   const featureConfig = useSyncExternalStore(store.subscribe, () => store.getState().featureConfig);
 
   const animationRegistry = useSyncExternalStore(store.subscribe, () => store.getState().document.animationRegistry);
+
+  const editingMode: EditingMode = useSyncExternalStore(store.subscribe, () => store.getState().editingMode);
 
   // --- Refs ---
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -138,6 +137,32 @@ export default function App(): JSX.Element {
   // --- Delete key handler ---
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
+      const mode = store.getState().editingMode;
+
+      // Escape: commit and exit path editing/drawing
+      if (e.key === 'Escape') {
+        if (mode.type === 'path-drawing') {
+          stopPathDrawing(store);
+
+          return;
+        }
+
+        if (mode.type === 'path-editing') {
+          stopPathEditing(store);
+
+          return;
+        }
+      }
+
+      // Enter: close path (connect last to first) and exit drawing
+      if (e.key === 'Enter' && mode.type === 'path-drawing') {
+        // Close the path by appending a Z command would require direct content manipulation
+        // For now, just exit drawing mode (same as Escape)
+        stopPathDrawing(store);
+
+        return;
+      }
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const state = store.getState();
 
@@ -181,6 +206,23 @@ export default function App(): JSX.Element {
 
   const handleCanvasClick = useCallback(
     (e: MouseEvent<HTMLDivElement>): void => {
+      // In path drawing mode, clicks append points instead of selecting elements
+      if (editingMode.type === 'path-drawing') {
+        const canvasEl = canvasRef.current;
+
+        if (canvasEl !== null) {
+          const rect = canvasEl.getBoundingClientRect();
+
+          appendPathPoint(
+            store,
+            (e.clientX - rect.left) / canvasSettings.zoom,
+            (e.clientY - rect.top) / canvasSettings.zoom,
+          );
+        }
+
+        return;
+      }
+
       if (!(e.target instanceof HTMLElement)) {
         return;
       }
@@ -190,7 +232,7 @@ export default function App(): JSX.Element {
 
       store.getState().selectElement(elementId);
     },
-    [store],
+    [store, editingMode.type, canvasSettings.zoom],
   );
 
   const handlePageSelect = useCallback(
@@ -300,6 +342,28 @@ export default function App(): JSX.Element {
   const activePage = editorDoc.pages[activePageIndex];
   const activeElements = activePage?.elements ?? [];
   const firstActiveId = activeElementIds[0];
+
+  // --- Path editing/drawing handlers ---
+
+  const handleEnterPathEditing = useCallback((): void => {
+    if (firstActiveId !== undefined) {
+      startPathEditing(store, firstActiveId);
+    }
+  }, [store, firstActiveId]);
+
+  const handleExitPathEditing = useCallback((): void => {
+    stopPathEditing(store);
+  }, [store]);
+
+  const handleEnterPathDrawing = useCallback((): void => {
+    if (firstActiveId !== undefined) {
+      startPathDrawing(store, firstActiveId);
+    }
+  }, [store, firstActiveId]);
+
+  const handleExitPathDrawing = useCallback((): void => {
+    stopPathDrawing(store);
+  }, [store]);
   const selectedElement =
     firstActiveId !== undefined ? activeElements.find((el) => el.id === firstActiveId) : undefined;
   const panelElement = selectedElement !== undefined ? elementToPanelElement(selectedElement) : undefined;
@@ -367,6 +431,27 @@ export default function App(): JSX.Element {
           }}
           onWheel={handleWheel}
         >
+          {/* Path mode indicator */}
+          {editingMode.type === 'path-editing' || editingMode.type === 'path-drawing' ?
+            <div
+              data-testid="path-mode-indicator"
+              style={{
+                position: 'absolute',
+                top: 8,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                backgroundColor: editingMode.type === 'path-drawing' ? '#2196F3' : '#FF9800',
+                color: '#fff',
+                padding: '4px 12px',
+                borderRadius: 4,
+                fontSize: 12,
+                fontWeight: 600,
+                zIndex: 10,
+              }}
+            >
+              {editingMode.type === 'path-drawing' ? 'Drawing Path' : 'Editing Path'}
+            </div>
+          : null}
           <div
             style={{
               position: 'relative',
@@ -376,62 +461,14 @@ export default function App(): JSX.Element {
           >
             <div ref={canvasRef} onClick={handleCanvasClick} />
 
-            {/* Grid overlay */}
-            {gridSettings.showGrid ?
-              <svg
-                data-testid="grid-overlay"
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-              >
-                {computeGridLines({
-                  canvasWidth: editorDoc.canvas.width,
-                  canvasHeight: editorDoc.canvas.height,
-                  gridSize: gridSettings.gridSize,
-                  zoom: 1,
-                }).map((line) =>
-                  line.axis === 'v' ?
-                    <line
-                      key={`v-${String(line.position)}`}
-                      x1={line.position}
-                      y1={0}
-                      x2={line.position}
-                      y2={editorDoc.canvas.height}
-                      stroke="rgba(0,0,0,0.1)"
-                      strokeWidth={0.5}
-                    />
-                  : <line
-                      key={`h-${String(line.position)}`}
-                      x1={0}
-                      y1={line.position}
-                      x2={editorDoc.canvas.width}
-                      y2={line.position}
-                      stroke="rgba(0,0,0,0.1)"
-                      strokeWidth={0.5}
-                    />,
-                )}
-              </svg>
-            : null}
-
-            {/* Safety boundaries */}
-            {computeSafetyBoundaries({
-              canvasWidth: editorDoc.canvas.width,
-              canvasHeight: editorDoc.canvas.height,
-              padding: editorDoc.canvas.padding,
-              viewMode: canvasSettings.viewMode,
-            }).map((rect, idx) => (
-              <div
-                key={`safety-${String(idx)}`}
-                data-testid="safety-boundary"
-                style={{
-                  position: 'absolute',
-                  left: rect.x,
-                  top: rect.y,
-                  width: rect.width,
-                  height: rect.height,
-                  backgroundColor: 'rgba(255,0,0,0.08)',
-                  pointerEvents: 'none',
-                }}
-              />
-            ))}
+            <CanvasOverlays
+              showGrid={gridSettings.showGrid}
+              gridSize={gridSettings.gridSize}
+              canvasWidth={editorDoc.canvas.width}
+              canvasHeight={editorDoc.canvas.height}
+              padding={editorDoc.canvas.padding}
+              viewMode={canvasSettings.viewMode}
+            />
           </div>
         </div>
 
@@ -447,6 +484,16 @@ export default function App(): JSX.Element {
             }}
           >
             <PropertiesSidebar element={panelElement} documentMode={documentMode} onUpdate={handlePropertyUpdate} />
+            {/* Path editing controls */}
+            {selectedElement?.type === 'path' ?
+              <PathToolsPanel
+                editingMode={editingMode}
+                onEnterEditing={handleEnterPathEditing}
+                onExitEditing={handleExitPathEditing}
+                onEnterDrawing={handleEnterPathDrawing}
+                onExitDrawing={handleExitPathDrawing}
+              />
+            : null}
             {featureConfig.animations && selectedAnimConfig !== undefined ?
               <AnimationSidebar
                 elementId={firstActiveId ?? null}
@@ -485,64 +532,25 @@ export default function App(): JSX.Element {
         onPlayTimeline={handlePlayPause}
       />
 
-      {/* Bottom Controls */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 16,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          gap: 16,
-          alignItems: 'center',
+      <BottomBar
+        pages={pages}
+        activePageIndex={activePageIndex}
+        onPageSelect={handlePageSelect}
+        onPageAdd={handlePageAdd}
+        onPageRemove={handlePageRemove}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        showGrid={gridSettings.showGrid}
+        onToggleGrid={handleToggleGrid}
+        zoom={canvasSettings.zoom}
+        isPlaying={isPlaying}
+        onPlayPause={handlePlayPause}
+        onReset={handleReset}
+        timelineOpen={timelineOpen}
+        onToggleTimeline={() => {
+          setTimelineOpen((prev) => !prev);
         }}
-      >
-        <PageSorter
-          pages={pages}
-          activePageIndex={activePageIndex}
-          onPageSelect={handlePageSelect}
-          onPageAdd={handlePageAdd}
-          onPageRemove={handlePageRemove}
-        />
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button data-testid="undo-button" onClick={handleUndo} type="button" style={BUTTON_STYLE}>
-            Undo
-          </button>
-          <button data-testid="redo-button" onClick={handleRedo} type="button" style={BUTTON_STYLE}>
-            Redo
-          </button>
-          <button data-testid="grid-toggle" onClick={handleToggleGrid} type="button" style={BUTTON_STYLE}>
-            {gridSettings.showGrid ? 'Hide Grid' : 'Show Grid'}
-          </button>
-          <span style={{ fontSize: 12, display: 'flex', alignItems: 'center' }}>
-            Zoom: {Math.round(canvasSettings.zoom * 100)}%
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            data-testid="play-button"
-            data-playing={String(isPlaying)}
-            onClick={handlePlayPause}
-            type="button"
-            style={BUTTON_STYLE}
-          >
-            {isPlaying ? 'Pause' : 'Play'}
-          </button>
-          <button data-testid="reset-button" onClick={handleReset} type="button" style={BUTTON_STYLE}>
-            Reset
-          </button>
-          <button
-            data-testid="timeline-toggle"
-            onClick={() => {
-              setTimelineOpen((prev) => !prev);
-            }}
-            type="button"
-            style={BUTTON_STYLE}
-          >
-            {timelineOpen ? 'Close Timeline' : 'Open Timeline'}
-          </button>
-        </div>
-      </div>
+      />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { Button } from '@heroui/react';
 import type { JSX, ReactNode } from 'react';
 import { createContext, useCallback, useContext, useState } from 'react';
 
@@ -117,9 +118,9 @@ export function TimelineEditor({
     return (
       <div data-testid="timeline-editor">
         <p>No keyframes</p>
-        <button type="button" aria-label="Add keyframe" onClick={onAddKeyframe}>
+        <Button size="sm" variant="ghost" aria-label="Add keyframe" onPress={onAddKeyframe}>
           +
-        </button>
+        </Button>
       </div>
     );
   }
@@ -131,9 +132,10 @@ export function TimelineEditor({
           const left = durationMs > 0 ? (kf.offsetMs / durationMs) * 100 : 0;
 
           return (
-            <button
+            <Button
               key={idx}
-              type="button"
+              isIconOnly
+              size="sm"
               aria-label={`Keyframe at ${String(kf.offsetMs)}ms`}
               aria-pressed={idx === selectedIndex}
               style={{
@@ -141,13 +143,15 @@ export function TimelineEditor({
                 left: `${String(left)}%`,
                 width: 12,
                 height: 12,
+                minWidth: 12,
                 borderRadius: '50%',
                 backgroundColor: idx === selectedIndex ? '#2563eb' : '#94a3b8',
                 border: 'none',
                 cursor: 'pointer',
                 transform: 'translateX(-50%)',
+                padding: 0,
               }}
-              onClick={() => {
+              onPress={() => {
                 onSelectKeyframe(idx);
               }}
             />
@@ -162,18 +166,19 @@ export function TimelineEditor({
       : null}
 
       <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
-        <button type="button" aria-label="Add keyframe" onClick={onAddKeyframe}>
+        <Button size="sm" variant="ghost" aria-label="Add keyframe" onPress={onAddKeyframe}>
           +
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
           aria-label="Play timeline"
-          onClick={() => {
+          onPress={() => {
             onPlayTimeline();
           }}
         >
           Play
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -214,9 +219,9 @@ export function TimelineBottomPanel({
       style={{ height: height ?? 200, borderTop: '1px solid #ccc' }}
     >
       <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 4 }}>
-        <button type="button" aria-label="Close timeline" onClick={onClose}>
+        <Button size="sm" variant="ghost" aria-label="Close timeline" onPress={onClose}>
           Close
-        </button>
+        </Button>
       </div>
       <TimelineEditor
         keyframes={keyframes ?? []}
@@ -252,15 +257,16 @@ export function AnimationBindingSections({
               <li key={binding.stateName} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
                 <span>{binding.stateName}</span>
                 <span>{binding.timelineName}</span>
-                <button
-                  type="button"
+                <Button
+                  size="sm"
+                  variant="ghost"
                   aria-label={`Remove ${binding.stateName}`}
-                  onClick={() => {
+                  onPress={() => {
                     onRemoveStateBinding(binding.stateName);
                   }}
                 >
                   Remove
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -283,9 +289,9 @@ export function AnimationBindingSections({
             ))}
           </ul>
         }
-        <button type="button" aria-label="Add modifier" onClick={onAddModifier}>
+        <Button size="sm" variant="ghost" aria-label="Add modifier" onPress={onAddModifier}>
           Add Modifier
-        </button>
+        </Button>
       </section>
     </div>
   );

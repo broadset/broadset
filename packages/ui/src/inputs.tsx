@@ -1,4 +1,5 @@
-import type { JSX } from 'react';
+import { Button, Input, ListBox, ListBoxItem, NumberField, Select, Slider, TextField } from '@heroui/react';
+import type { JSX, Key } from 'react';
 import { useCallback, useId } from 'react';
 
 // ---------------------------------------------------------------------------
@@ -145,16 +146,16 @@ export function ColorInput({ value, onChange, label }: ColorInputProps): JSX.Ele
   const hsl = value.startsWith('#') ? hexToHsl(value) : { h: 0, s: 0, l: 0, a: alpha };
 
   const handleHexChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>): void => {
-      onChange(e.target.value);
+    (newValue: string): void => {
+      onChange(newValue);
     },
     [onChange],
   );
 
   const handleHueChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>): void => {
-      const hue = parseInt(e.target.value, 10);
-      // Emit a rough hex from hue (simplified — full impl would preserve saturation)
+    (hue: number | number[]): void => {
+      if (Array.isArray(hue)) return;
+
       const c = Math.round((hue / HUE_MAX) * 255);
       const hex = `#${c.toString(16).padStart(2, '0')}0000`;
 
@@ -163,23 +164,11 @@ export function ColorInput({ value, onChange, label }: ColorInputProps): JSX.Ele
     [onChange],
   );
 
-  const handleHueKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>): void => {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-        const delta = e.key === 'ArrowRight' ? HUE_STEP : -HUE_STEP;
-        const newHue = Math.max(0, Math.min(HUE_MAX, Math.round(hsl.h) + delta));
-        const c = Math.round((newHue / HUE_MAX) * 255);
-        const hex = `#${c.toString(16).padStart(2, '0')}0000`;
-
-        onChange(hex);
-      }
-    },
-    [onChange, hsl.h],
-  );
-
   const handleAlphaChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>): void => {
-      const a = parseInt(e.target.value, 10) / ALPHA_MAX;
+    (alphaValue: number | number[]): void => {
+      if (Array.isArray(alphaValue)) return;
+
+      const a = alphaValue / ALPHA_MAX;
       const parsed = value.startsWith('rgba') ? parseRgba(value) : undefined;
       const r = parsed?.r ?? 0;
       const g = parsed?.g ?? 0;
@@ -192,26 +181,34 @@ export function ColorInput({ value, onChange, label }: ColorInputProps): JSX.Ele
 
   return (
     <div>
-      <input id={`${id}-hex`} type="text" aria-label={label} value={value} onChange={handleHexChange} />
-      <input
-        type="range"
-        role="slider"
+      <TextField aria-label={label} value={value} onChange={handleHexChange}>
+        <Input id={`${id}-hex`} />
+      </TextField>
+      <Slider
         aria-label="Hue"
-        min={0}
-        max={HUE_MAX}
+        minValue={0}
+        maxValue={HUE_MAX}
+        step={HUE_STEP}
         value={Math.round(hsl.h)}
         onChange={handleHueChange}
-        onKeyDown={handleHueKeyDown}
-      />
-      <input
-        type="range"
-        role="slider"
+      >
+        <Slider.Track>
+          <Slider.Fill />
+          <Slider.Thumb />
+        </Slider.Track>
+      </Slider>
+      <Slider
         aria-label="Alpha / Opacity"
-        min={0}
-        max={ALPHA_MAX}
+        minValue={0}
+        maxValue={ALPHA_MAX}
         value={Math.round(alpha * ALPHA_MAX)}
         onChange={handleAlphaChange}
-      />
+      >
+        <Slider.Track>
+          <Slider.Fill />
+          <Slider.Thumb />
+        </Slider.Track>
+      </Slider>
     </div>
   );
 }
@@ -232,17 +229,17 @@ export function CssLengthInput({ value, unit, onChange, label }: CssLengthInputP
   const isInvalid = Number.isNaN(value);
 
   const handleValueChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>): void => {
-      const num = parseFloat(e.target.value);
-
+    (num: number): void => {
       onChange(num, unit);
     },
     [onChange, unit],
   );
 
   const handleUnitChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>): void => {
-      const raw = e.target.value;
+    (key: Key | null): void => {
+      if (key === null) return;
+
+      const raw = String(key);
 
       if (!isCssUnit(raw)) return;
 
@@ -256,22 +253,31 @@ export function CssLengthInput({ value, unit, onChange, label }: CssLengthInputP
 
   return (
     <div>
-      <input
+      <NumberField
         id={`${id}-value`}
-        type="number"
-        role="spinbutton"
         aria-label={label}
-        aria-invalid={isInvalid ? 'true' : undefined}
-        value={isInvalid ? '' : value}
+        isInvalid={isInvalid}
+        value={isInvalid ? 0 : value}
         onChange={handleValueChange}
-      />
-      <select id={`${id}-unit`} role="combobox" aria-label="Unit" value={unit} onChange={handleUnitChange}>
-        {SUPPORTED_UNITS.map((u) => (
-          <option key={u} value={u}>
-            {u}
-          </option>
-        ))}
-      </select>
+      >
+        <NumberField.Group>
+          <NumberField.Input />
+        </NumberField.Group>
+      </NumberField>
+      <Select id={`${id}-unit`} aria-label="Unit" value={unit} onChange={handleUnitChange}>
+        <Select.Trigger>
+          <Select.Value />
+        </Select.Trigger>
+        <Select.Popover>
+          <ListBox>
+            {SUPPORTED_UNITS.map((u) => (
+              <ListBoxItem key={u} id={u}>
+                {u}
+              </ListBoxItem>
+            ))}
+          </ListBox>
+        </Select.Popover>
+      </Select>
     </div>
   );
 }
@@ -291,9 +297,7 @@ export function TextStrokeInput({ width, color, onChange, label }: TextStrokeInp
   const id = useId();
 
   const handleWidthChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>): void => {
-      const w = parseFloat(e.target.value);
-
+    (w: number): void => {
       onChange(`${String(w)}px ${color}`);
     },
     [onChange, color],
@@ -301,15 +305,14 @@ export function TextStrokeInput({ width, color, onChange, label }: TextStrokeInp
 
   return (
     <fieldset aria-label={label}>
-      <input
-        id={`${id}-width`}
-        type="number"
-        role="spinbutton"
-        aria-label="Stroke width"
-        value={width}
-        onChange={handleWidthChange}
-      />
-      <input id={`${id}-color`} type="text" aria-label="Stroke color" value={color} readOnly />
+      <NumberField id={`${id}-width`} aria-label="Stroke width" value={width} onChange={handleWidthChange}>
+        <NumberField.Group>
+          <NumberField.Input />
+        </NumberField.Group>
+      </NumberField>
+      <TextField id={`${id}-color`} aria-label="Stroke color" value={color} isReadOnly>
+        <Input />
+      </TextField>
     </fieldset>
   );
 }
@@ -369,15 +372,16 @@ export function FilterEditor({ value, onChange, label }: FilterEditorProps): JSX
           <li key={`${f.name}-${String(i)}`}>
             <span>{f.name}</span>
             <span>({f.args})</span>
-            <button
-              type="button"
+            <Button
+              size="sm"
+              variant="ghost"
               aria-label={`Remove ${f.name}`}
-              onClick={() => {
+              onPress={() => {
                 handleRemove(i);
               }}
             >
               Remove
-            </button>
+            </Button>
           </li>
         ))}
       </ul>
@@ -422,38 +426,42 @@ export function ShadowEditor({ value, onChange, label }: ShadowEditorProps): JSX
     <div aria-label={label}>
       {layers.map((layer, i) => (
         <fieldset key={String(i)} role="group" aria-label={`Shadow layer ${String(i + 1)}`}>
-          <input
-            type="text"
+          <TextField
             aria-label={`Offset X (layer ${String(i + 1)})`}
             value={layer.offsetX}
             onChange={() => {
               onChange(value);
             }}
-          />
-          <input
-            type="text"
+          >
+            <Input />
+          </TextField>
+          <TextField
             aria-label={`Offset Y (layer ${String(i + 1)})`}
             value={layer.offsetY}
             onChange={() => {
               onChange(value);
             }}
-          />
-          <input
-            type="text"
+          >
+            <Input />
+          </TextField>
+          <TextField
             aria-label={`Blur radius (layer ${String(i + 1)})`}
             value={layer.blur}
             onChange={() => {
               onChange(value);
             }}
-          />
-          <input
-            type="text"
+          >
+            <Input />
+          </TextField>
+          <TextField
             aria-label={`Color (layer ${String(i + 1)})`}
             value={layer.color}
             onChange={() => {
               onChange(value);
             }}
-          />
+          >
+            <Input />
+          </TextField>
         </fieldset>
       ))}
     </div>
