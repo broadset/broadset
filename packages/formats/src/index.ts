@@ -43,3 +43,7 @@ export {
   resolveFonts,
   wrapText,
 } from './pdf';
+
+// PPTX export/import
+export type { ImportedPptxElement } from './pptx';
+export { exportPptx, importPptx } from './pptx';

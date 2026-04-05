@@ -71,3 +71,33 @@ Non-trivial judgment calls made during implementation. See each unit for context
 **Alternatives considered:** (a) Deep recursive property-level diffs producing granular changes like `style.opacity` — much more complex to implement, harder to roundtrip, and the collaboration spec doesn't require sub-property granularity. (b) Using a third-party diff library like `deep-diff` — adds dependency for a straightforward feature.
 
 **Rationale:** The spec defines change types as `element:update` with a `path` field. Shallow comparison at the top-level property level (position, style, screen) is sufficient for the change stream's primary purpose of logging and remote synchronization. A host that needs deeper granularity can diff the old/new values in the change payload itself.
+
+---
+
+### Unit 5.4 — @libpdf/core API is mostly synchronous
+
+**Decision:** Discovered that `@libpdf/core` v0.3 has synchronous `PDF.create()`, `addPage()`, `embedPng()`, `embedJpeg()`, and `embedFont()` — only `save()` is async. Initially wrote all calls with `await`; corrected after lint caught `@typescript-eslint/await-thenable`.
+
+**Alternatives considered:** None — this was a correction based on the actual type signatures.
+
+**Rationale:** The library documentation examples show `await` for everything, but the TypeScript types are authoritative. Using unnecessary `await` on sync calls is harmless at runtime but violates lint rules.
+
+---
+
+### Unit 5.4 — SVG-to-PDF rendering falls back to placeholder
+
+**Decision:** SVG element rendering in PDF attempts `embedPng(svgBytes)` which always fails (PNG decoder rejects SVG XML), then draws a placeholder rectangle. This is deliberate graceful degradation rather than a bug.
+
+**Alternatives considered:** (a) Server-side SVG-to-PNG rasterization — requires a headless browser or canvas API not available in the library. (b) SVG-to-PDF path conversion — extremely complex, essentially reimplementing an SVG renderer. (c) Using a dedicated SVG-to-PDF library — no suitable library found in the ecosystem.
+
+**Rationale:** The spec requires SVG elements to be "exported" in PDF. A placeholder that doesn't crash is acceptable for the initial implementation. Full SVG fidelity in PDF would require significant infrastructure (e.g., a canvas-based rasterizer or an SVG-to-PDF path converter) that's out of scope for this unit.
+
+---
+
+### Unit 5.5 — Regex-based XML parsing for PPTX import
+
+**Decision:** Used regex patterns to extract elements from OOXML slide XML instead of a full XML/DOM parser.
+
+**Alternatives considered:** (a) `fast-xml-parser` — adds another dependency, OOXML namespaces make it complex to configure. (b) `DOMParser` via jsdom — available in test but not guaranteed in all target environments. (c) Writing a minimal SAX parser — over-engineering for the subset of OOXML we need to parse.
+
+**Rationale:** The import only needs to extract `p:sp`, `pic:pic`, `p:grpSp` elements and their `a:xfrm` bounds. Regex is sufficient for this well-structured, machine-generated XML. The patterns are simple and testable via round-trip. If import fidelity ever needs to handle arbitrary PPTX files (not just our own exports), a proper XML parser would be warranted.

@@ -25,6 +25,7 @@
     "@libpdf/core": "^0.3.4",
     "html-to-image": "^1.11.13",
     "jszip": "^3.10.1",
+    "pizzip": "^3.2.0",
     "qrcode-generator": "^2.0.4"
   }
 }

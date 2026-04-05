@@ -43,8 +43,8 @@ embedded playback runtime.
 
 ### 5.4 PDF export (`formats/pdf.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/formats/pdf.md`
 _What to cover:_ PDF generation; color parsing; font embedding; text wrapping;

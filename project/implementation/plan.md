@@ -31,8 +31,8 @@ its package.
 ## Current Status
 
 - **Active Phase:** Phase 5 — Formats
-- **In Progress:** 5.4 (PDF export)
-- **Last Merged:** 5.3 Web vector export
+- **In Progress:** 5.5 (PPTX export/import)
+- **Last Merged:** 5.4 PDF export
 
 ---
 
