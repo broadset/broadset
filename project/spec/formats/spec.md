@@ -25,3 +25,22 @@ Defines all export and import format converters for broadset. Each format conver
 - Animation engine → see `project/spec/playback/spec.md`
 - DOM rendering → see `project/spec/renderer/spec.md`
 - Editor state management → see `project/spec/editor/spec.md`
+
+---
+
+## Cross-Cutting Principles
+
+### Import scope: arbitrary external files
+
+All importers (PPTX, PSD, SVG, etc.) MUST support **arbitrary external files** created by any tool — not only files previously exported from Broadset. The goal is best-effort conversion: map as much of the external file's content as possible to BroadsetDocument elements, and gracefully handle anything that cannot be mapped.
+
+Specifically:
+
+- **Best-effort mapping.** When an external file contains content that has an approximate equivalent in the Broadset model, the importer MUST map it — even if the mapping is lossy. A lossy import is better than a dropped element.
+- **Graceful degradation.** Content that cannot be mapped to any Broadset element type MUST be preserved as a fallback representation (e.g., SVG payload, raster image) rather than silently dropped.
+- **No silent data loss.** If the importer skips content, it MUST report warnings describing what was skipped and why.
+- **Round-trip fidelity is a bonus, not the scope.** Re-importing a Broadset-exported file should round-trip cleanly, but this is a secondary goal. The primary goal is useful import of files the user already has.
+
+### Export: maximise external tool compatibility
+
+All exporters MUST produce files that open correctly in the canonical external tool (PowerPoint for PPTX, Photoshop for PSD, browsers for SVG/HTML, etc.) — not just files that re-import cleanly into Broadset.

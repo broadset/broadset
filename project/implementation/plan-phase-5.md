@@ -52,8 +52,8 @@ QR code rendering.
 
 ### 5.5 PPTX export/import (`formats/pptx.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/formats/pptx.md`
 _What to cover:_ PPTX export with SVG fallback; import with path recovery;

@@ -47,3 +47,7 @@ export {
 // PPTX export/import
 export type { ImportedPptxElement } from './pptx';
 export { exportPptx, importPptx } from './pptx';
+
+// PSD export/import
+export type { ImportedPsdDocument, ImportedPsdElement, ImportedPsdPage } from './psd';
+export { exportPsd, importPsd, svgPathToPsdVectorMask } from './psd';

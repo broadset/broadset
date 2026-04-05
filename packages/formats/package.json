@@ -23,6 +23,7 @@
     "@broadset/model": "^0.1.0",
     "@broadset/playback": "^0.1.0",
     "@libpdf/core": "^0.3.4",
+    "ag-psd": "^30.1.0",
     "html-to-image": "^1.11.13",
     "jszip": "^3.10.1",
     "pizzip": "^3.2.0",
