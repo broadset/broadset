@@ -31,8 +31,8 @@ its package.
 ## Current Status
 
 - **Active Phase:** Phase 5 — Formats
-- **In Progress:** 5.6 (PSD export/import)
-- **Last Merged:** 5.5 PPTX export/import
+- **In Progress:** Phase 5 complete
+- **Last Merged:** 5.6 PSD export/import
 
 ---
 

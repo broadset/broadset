@@ -61,8 +61,8 @@ round-trip fidelity requirements.
 
 ### 5.6 PSD export/import (`formats/psd.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/formats/psd.md`
 _What to cover:_ PSD export (layers, masks, effects, artboards); import; path
