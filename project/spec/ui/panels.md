@@ -347,14 +347,14 @@ The system MUST render element names from the document. Empty state MUST be show
 
 Each layer row MUST display:
 
-| Zone            | Content                                                                                                                                                                   |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Left icon       | Element type icon (distinct per type: text → Type, image → Image, rectangle → Square, ellipse → Circle, path → PenTool, svg → FileCode2, qrcode → QrCode, group → Folder) |
-| Name            | Element name (double-click to rename inline)                                                                                                                              |
-| Visibility      | Eye icon toggle (show/hide element)                                                                                                                                       |
-| Lock            | Lock icon toggle (prevent editing)                                                                                                                                        |
-| Expand/Collapse | Chevron icon for groups with children                                                                                                                                     |
-| Delete          | Trash icon (visible on hover only)                                                                                                                                        |
+| Zone            | Content                                                                                                                                                                                                                      |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Left icon       | Element type icon (distinct per type: text → Type, image → Image, rectangle → Square, ellipse → Circle, path → PenTool, svg → FileCode2, qrcode → QrCode, group → Folder, video → Video, clock → Clock, ticker → LetterText) |
+| Name            | Element name (double-click to rename inline)                                                                                                                                                                                 |
+| Visibility      | Eye icon toggle (show/hide element)                                                                                                                                                                                          |
+| Lock            | Lock icon toggle (prevent editing)                                                                                                                                                                                           |
+| Expand/Collapse | Chevron icon for groups with children                                                                                                                                                                                        |
+| Delete          | Trash icon (visible on hover only)                                                                                                                                                                                           |
 
 **Visual States:**
 
@@ -843,11 +843,215 @@ All panels (Properties, Layers, Animation, Preflight) MUST conform to WCAG 2.1 A
 
 ---
 
+### Requirement: Variable Font Axis Controls
+
+When the selected text element uses a variable font (indicated by `variableAxes` in the font's `EditorConfig.allowedFonts` entry), the Text Effects panel MUST display axis slider controls below the font family selector. Each variable axis MUST render as a labeled HeroUI Slider with the axis name (e.g., "Weight", "Width", "Italic"), the axis tag (e.g., `wght`, `wdth`), and the min/max range from the font metadata. Moving a slider MUST update the element's `fontVariationSettings` style value in real time. When multiple axes are available, all MUST be shown simultaneously. When the selected font is not a variable font (no `variableAxes`), the axis controls MUST be hidden. The standard Font Weight control (bold toggle or weight range) MUST remain available alongside the axis controls — the axis slider takes precedence when a `wght` axis exists.
+
+#### Scenario: Show axis sliders for variable font
+
+- GIVEN a text element using a variable font with `variableAxes: [{ tag: 'wght', name: 'Weight', min: 100, max: 900 }]`
+- WHEN the Text Effects panel renders
+- THEN a "Weight" slider is shown with range 100–900
+
+#### Scenario: Slider updates fontVariationSettings
+
+- GIVEN a Weight axis slider at value 450
+- WHEN the user drags the slider to 600
+- THEN `fontVariationSettings` updates to include `'wght' 600`
+
+#### Scenario: Non-variable font hides axis controls
+
+- GIVEN a text element using a font with no `variableAxes`
+- WHEN the Text Effects panel renders
+- THEN no axis slider controls are shown
+
+#### Acceptance Criteria
+
+- [ ] Given a variable font with axes, sliders are shown for each axis with correct ranges
+- [ ] Given a slider drag, `fontVariationSettings` updates in real time
+- [ ] Given a non-variable font, axis controls are hidden
+- [ ] Given both `wght` axis and bold toggle, both remain accessible
+
+---
+
+### Requirement: Auto-Size Mode Controls
+
+The Geometry panel MUST display an auto-size mode selector for text elements. The control MUST be a segmented button group (HeroUI ButtonGroup) with three options: **Fixed** (icon: lock), **Auto Height** (icon: vertical arrows), **Shrink to Fit** (icon: compress). The current `autoSize` value determines which segment is active. Clicking a segment MUST update the element's `autoSize` field. When `autoSize` is `'auto-height'`, the height field in the Geometry panel MUST be disabled (greyed out) since height is computed. When `autoSize` is `'shrink-to-fit'`, both width and height remain editable (they define the constraint box). For non-text elements, the auto-size control MUST be hidden.
+
+#### Scenario: Show auto-size for text element
+
+- GIVEN a text element selected
+- WHEN the Geometry panel renders
+- THEN the auto-size segmented control is visible with the current mode active
+
+#### Scenario: Switch to auto-height disables height field
+
+- GIVEN a text element with `autoSize: 'fixed'`
+- WHEN the user clicks "Auto Height"
+- THEN `autoSize` is set to `'auto-height'` and the height field becomes disabled
+
+#### Scenario: Hidden for non-text elements
+
+- GIVEN a rectangle element selected
+- WHEN the Geometry panel renders
+- THEN no auto-size control is shown
+
+#### Acceptance Criteria
+
+- [ ] Given a text element, the auto-size segmented control appears in the Geometry panel
+- [ ] Given Auto Height selected, the height field is disabled
+- [ ] Given Shrink to Fit selected, both width and height remain editable
+- [ ] Given a non-text element, the auto-size control is hidden
+
+---
+
+### Requirement: Video Element Panel
+
+VideoPanel MUST appear for video-type elements and display controls for `typeConfig` properties:
+
+| Field      | Input type    | Notes                                                   |
+| ---------- | ------------- | ------------------------------------------------------- |
+| Source URL | Text input    | The video content URL (edits element `content`)         |
+| Autoplay   | HeroUI Switch | Whether video autoplays on visibility                   |
+| Loop       | HeroUI Switch | Whether video loops                                     |
+| Muted      | HeroUI Switch | Whether audio is muted                                  |
+| Start time | NumField (s)  | Playback start position in seconds (min 0)              |
+| End time   | NumField (s)  | Playback end position in seconds (empty = end of video) |
+
+A video preview thumbnail SHOULD be displayed when the source URL is valid. Changes to switch values MUST be committed immediately. Changes to numeric fields MUST be committed on blur or Enter.
+
+#### Scenario: Edit video source
+
+- GIVEN a video element selected
+- WHEN the source URL is changed
+- THEN the element's content is updated
+
+#### Scenario: Toggle autoplay
+
+- GIVEN a video element with `typeConfig.autoplay: true`
+- WHEN the Autoplay switch is toggled off
+- THEN `typeConfig.autoplay` is set to `false`
+
+#### Acceptance Criteria
+
+- [ ] Given a video element, the VideoPanel appears with source URL, autoplay, loop, muted, start/end time controls
+- [ ] Given a non-video element, the VideoPanel does not appear
+- [ ] Given a switch toggle, the corresponding typeConfig property is updated
+
+---
+
+### Requirement: Clock Element Panel
+
+ClockPanel MUST appear for clock-type elements and display controls for the format pattern and `typeConfig` properties:
+
+| Field        | Input type    | Notes                                                                                                                       |
+| ------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Format       | Text input    | Time format pattern (edits element `content`, e.g., `HH:mm:ss`)                                                             |
+| Mode         | HeroUI Select | `realtime`, `countdown`, `countup`, `stopwatch`                                                                             |
+| Start value  | Text input    | Start time for countdown/countup (shown only in those modes)                                                                |
+| Target value | Text input    | Target time for countdown (shown only in countdown mode when `countdownTo` is empty)                                        |
+| Countdown to | Text input    | ISO 8601 datetime for absolute countdown (shown only in countdown mode). When set, Start value and Target value are hidden. |
+
+Mode-dependent fields MUST be shown/hidden dynamically: Start value appears for `countdown`, `countup`, and `stopwatch` modes. Target value appears only for `countdown` mode when `countdownTo` is empty. Countdown to appears only for `countdown` mode.
+
+#### Scenario: Switch clock mode
+
+- GIVEN a clock element with `typeConfig.mode: 'realtime'`
+- WHEN the Mode select is changed to `countdown`
+- THEN Start value, Target value, and Countdown to fields appear
+
+#### Scenario: Set absolute countdown
+
+- GIVEN a clock element with `typeConfig.mode: 'countdown'`
+- WHEN the Countdown to field is set to `2026-04-05T15:00:00Z`
+- THEN Start value and Target value fields are hidden
+
+#### Scenario: Edit format pattern
+
+- GIVEN a clock element
+- WHEN the format is changed to `mm:ss`
+- THEN the element's content is updated to `mm:ss`
+
+#### Acceptance Criteria
+
+- [ ] Given a clock element, the ClockPanel appears with format, mode, and mode-dependent fields
+- [ ] Given mode change to countdown, start value, target value, and countdown to fields appear
+- [ ] Given mode change to realtime, start value, target value, and countdown to fields are hidden
+- [ ] Given countdown mode with `countdownTo` set, start value and target value fields are hidden
+- [ ] Given a non-clock element, the ClockPanel does not appear
+
+---
+
+### Requirement: Ticker Element Panel
+
+TickerPanel MUST appear for ticker-type elements and display controls for ticker items and `typeConfig` properties:
+
+| Field     | Input type      | Notes                                                |
+| --------- | --------------- | ---------------------------------------------------- |
+| Items     | Editable list   | JSON array of text strings; add/remove/reorder items |
+| Speed     | NumField (px/s) | Scroll speed in pixels per second (1–2000)           |
+| Direction | HeroUI Select   | `left`, `right`, `up`, `down`                        |
+| Gap       | NumField (px)   | Gap between items in pixels (≥ 0)                    |
+| Paused    | HeroUI Switch   | Whether scrolling is paused                          |
+
+The items list MUST support adding new text items, removing items (minimum 1 item), and drag-to-reorder. Each item is a text input. Adding an item appends to the end with placeholder text "New item".
+
+#### Scenario: Add ticker item
+
+- GIVEN a ticker element with 2 items
+- WHEN the user clicks "Add Item"
+- THEN a new item "New item" is appended to the items list
+
+#### Scenario: Change scroll direction
+
+- GIVEN a ticker element with `typeConfig.direction: 'left'`
+- WHEN direction is changed to `up`
+- THEN `typeConfig.direction` is updated to `up`
+
+#### Acceptance Criteria
+
+- [ ] Given a ticker element, the TickerPanel appears with items list, speed, direction, gap, and paused controls
+- [ ] Given add item, a new item is appended
+- [ ] Given remove item (not the last), the item is removed
+- [ ] Given a non-ticker element, the TickerPanel does not appear
+
+---
+
+### Requirement: Scenes Terminology in Layers Panel
+
+The Layers sidebar MUST use the label **"Scenes"** instead of "Pages" for all user-facing text related to page navigation and management. This includes the scene tab labels, the "Add Scene" button, and any tooltips or context menu items that reference pages. The underlying data model continues to use `pages` — only the UI presentation layer uses "Scenes" to align with broadcast industry terminology (matching Vizrt Viz Artist and similar broadcast graphics tools). This label MUST be consistent across the Layers sidebar, the bottom bar page indicator, and any modal or menu that references page navigation.
+
+#### Scenario: Layers sidebar shows Scenes label
+
+- GIVEN the layers sidebar is rendered
+- WHEN the page navigation section is visible
+- THEN tabs or headers read "Scene 1", "Scene 2", etc. (not "Page 1")
+
+#### Scenario: Add scene button
+
+- GIVEN the layers sidebar is rendered
+- WHEN the user looks for a new page button
+- THEN the button reads "Add Scene" (not "Add Page")
+
+#### Acceptance Criteria
+
+- [ ] Given the layers sidebar, page navigation uses "Scenes" / "Scene N" labels
+- [ ] Given the add-page button, it reads "Add Scene"
+- [ ] Given tooltips and context menus referencing pages, they use "Scene" terminology
+- [ ] Given the data model, `pages` field remains unchanged (UI label only)
+
+---
+
 ## Spec Gaps
 
 - [ ] **Multi-Element Property Display:** No automated tests cover common-value display, "Mixed" placeholder, or multi-select edit propagation — component tests needed for the properties panel in multi-selection mode.
 - [ ] **Element Rename in Layers Panel:** No automated tests cover inline rename activation, commit on Enter, cancel on Escape, or empty-name rejection — component tests needed for the layers sidebar rename flow.
 - [ ] **WCAG AA Panel Accessibility:** No automated tests verify ARIA roles, aria-expanded state, tab order, focus rings, or label associations — accessibility-focused component tests are needed for all panels.
+- [ ] **Variable Font Axis Controls:** No automated tests cover axis slider rendering, `fontVariationSettings` updates, or hiding for non-variable fonts — requires CT.
+- [ ] **Auto-Size Mode Controls:** No automated tests cover segmented control rendering, height field disabling, or hiding for non-text elements — requires CT.
+- [ ] **Video Element Panel:** No automated tests cover VideoPanel rendering or typeConfig property updates — requires CT.
+- [ ] **Clock Element Panel:** No automated tests cover ClockPanel rendering, mode-dependent field visibility, or typeConfig updates — requires CT.
+- [ ] **Ticker Element Panel:** No automated tests cover TickerPanel rendering, item list management, or typeConfig updates — requires CT.
 
 ---
 

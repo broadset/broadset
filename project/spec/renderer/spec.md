@@ -252,7 +252,7 @@ The system MUST render supported built-in element kinds and unknown kinds with s
 
 #### Scenario: Supported built-in element kinds render expected output
 
-- GIVEN document elements for text, image, svg, path, rectangle, ellipse, qrcode, and group kinds
+- GIVEN document elements for text, image, svg, path, rectangle, ellipse, qrcode, group, video, clock, and ticker kinds
 - WHEN rendering occurs
 - THEN each kind produces its expected visible output contract
 
@@ -264,7 +264,7 @@ The system MUST render supported built-in element kinds and unknown kinds with s
 
 #### Acceptance Criteria
 
-- [ ] Given document elements for text, image, svg, path, rectangle, ellipse, qrcode, and group kinds, each kind produces its expected visible output contract
+- [ ] Given document elements for text, image, svg, path, rectangle, ellipse, qrcode, group, video, clock, and ticker kinds, each kind produces its expected visible output contract
 - [ ] Given an element with an unknown kind, fallback output is rendered instead of failure
 
 ---
@@ -346,11 +346,11 @@ Elements with rotateX, rotateY, rotateZ, or translateZ screen properties MUST re
 
 ### Requirement: Z-Order by Document Order
 
-Element z-order MUST be determined solely by position in the `pages[].elements[]` array. Elements later in the array render on top. No explicit z-index property exists. The renderer MUST append DOM nodes in array order so that natural DOM stacking produces correct layering.
+Element z-order MUST be determined solely by position in the document's `elements` array. Elements later in the array render on top. No explicit z-index property exists. The renderer MUST append DOM nodes in array order so that natural DOM stacking produces correct layering.
 
 #### Scenario: Later elements render on top
 
-- GIVEN elements `[A, B, C]` in the page array
+- GIVEN elements `[A, B, C]` in the document's elements array
 - WHEN the scene is rendered
 - THEN C renders on top of B, which renders on top of A
 
@@ -523,6 +523,151 @@ Dynamic data tokens in element content MUST use the format `{{key}}` where `key`
 - [ ] Given a token matching a data store key, the token is replaced with the resolved data value
 - [ ] Given a token with no matching data store key, the literal token string is rendered
 - [ ] Given nested dot-notation keys, the correct nested value is resolved
+
+---
+
+### Requirement: Video Element Rendering
+
+Video elements MUST render a `<video>` tag within the element wrapper. The `src` attribute MUST be set to the element's `content` (video URL). The video element MUST NOT show browser-native controls (`controls` attribute MUST be absent). The `typeConfig` properties MUST map to video attributes: `loop` → `loop` attribute, `muted` → `muted` attribute, `autoplay` → `autoplay` attribute. The `data-element-content` marker MUST be placed on the `<video>` tag. When `typeConfig.startTimeS` is set, the video's `currentTime` MUST be set to the start time on load. When `typeConfig.endTimeS` is set, the video MUST pause or loop when reaching the end time. Object-fit MUST be applied via CSS on the `<video>` element. The video element MUST respect standard element styling (border-radius, box effects, clip-path, opacity).
+
+#### Scenario: Video element renders video tag
+
+- GIVEN a video element with `content: 'https://example.com/video.mp4'` and `typeConfig: { muted: true, autoplay: true }`
+- WHEN the element is rendered
+- THEN a `<video>` tag is output with `src`, `muted`, and `autoplay` attributes; no `controls` attribute
+
+#### Scenario: Video with start time
+
+- GIVEN a video element with `typeConfig: { startTimeS: 5 }`
+- WHEN the video loads
+- THEN `currentTime` is set to 5
+
+#### Scenario: Video with object-fit
+
+- GIVEN a video element with style `objectFit: 'cover'`
+- WHEN rendered
+- THEN the `<video>` tag has CSS `object-fit: cover`
+
+#### Acceptance Criteria
+
+- [ ] Given a video element, a `<video>` tag is rendered with the content as `src`
+- [ ] Given a video element, native controls are not shown
+- [ ] Given `typeConfig.muted: true`, the `muted` attribute is present
+- [ ] Given `typeConfig.startTimeS`, the video starts at the specified time
+- [ ] Given standard element styling, video elements respect border-radius, opacity, and clip-path
+
+---
+
+### Requirement: Clock Element Rendering
+
+Clock elements MUST render a text display showing formatted time according to the element's `content` format pattern and `typeConfig.mode`. In `'realtime'` mode, the display MUST update every second (or fraction indicated by the format) showing the current local time. In `'countdown'` mode, the display MUST count down from `typeConfig.startValue` toward `typeConfig.targetValue`. In `'countup'` mode, the display counts up from `typeConfig.startValue`. In `'stopwatch'` mode, the display shows elapsed time from when the element's visibility became `'onscreen'` (derived from animation state). When `typeConfig.countdownTo` is set (ISO 8601 datetime), the clock MUST display remaining time until the target datetime, updating every second; when the target is in the past, the display MUST show `00:00:00` (formatted per the element's format pattern). The `countdownTo` field overrides `startValue`/`targetValue` when present. The format pattern uses `HH` (hours), `mm` (minutes), `ss` (seconds), `S` (tenths), `SS` (hundredths), `SSS` (milliseconds). The rendered output MUST use the same DOM structure as text elements (span with text content) and MUST respect typography capabilities (font, size, color, alignment). The `data-element-content` marker MUST be on the text span.
+
+#### Scenario: Realtime clock
+
+- GIVEN a clock element with `content: 'HH:mm:ss'` and `typeConfig: { mode: 'realtime' }`
+- WHEN rendered at 14:30:05 local time
+- THEN the display shows `14:30:05` and updates every second
+
+#### Scenario: Countdown clock
+
+- GIVEN a clock element with `typeConfig: { mode: 'countdown', startValue: '00:10:00', targetValue: '00:00:00' }`
+- WHEN rendered
+- THEN the display counts down from 10 minutes to zero
+
+#### Scenario: Absolute datetime countdown
+
+- GIVEN a clock element with `content: 'HH:mm:ss'` and `typeConfig: { mode: 'countdown', countdownTo: '2026-04-05T15:00:00Z' }`
+- WHEN rendered at 2026-04-05T14:58:30Z
+- THEN the display shows `00:01:30` and updates every second
+
+#### Scenario: Absolute countdown past target
+
+- GIVEN a clock element with `typeConfig: { mode: 'countdown', countdownTo: '2026-04-05T12:00:00Z' }`
+- WHEN rendered at 2026-04-05T14:00:00Z (target is in the past)
+- THEN the display shows `00:00:00`
+
+#### Scenario: Stopwatch mode
+
+- GIVEN a clock element with `typeConfig: { mode: 'stopwatch' }`
+- WHEN the element transitions to visible
+- THEN the stopwatch starts from 00:00:00 and counts up
+
+#### Acceptance Criteria
+
+- [ ] Given a realtime clock, the display updates with current local time at the appropriate interval
+- [ ] Given a countdown clock, the display counts down from startValue to targetValue
+- [ ] Given a countdown clock with `countdownTo` set, the display shows remaining time until the target datetime
+- [ ] Given a `countdownTo` target in the past, the display shows zero
+- [ ] Given a stopwatch clock, the timer starts when the element becomes visible
+- [ ] Given a clock element, typography styling (font, size, color) is applied
+
+---
+
+### Requirement: Ticker Element Rendering
+
+Ticker elements MUST render a continuously scrolling container of text items. Each item in the `content` JSON array MUST be rendered as an individual text span. Items scroll in the direction specified by `typeConfig.direction` at the speed of `typeConfig.speed` pixels per second with `typeConfig.gap` pixels between consecutive items. When the leading item fully scrolls out of view, it MUST be recycled to the trailing end, creating an infinite scroll effect. When `typeConfig.paused` is `true`, scrolling MUST stop at the current position. The ticker container MUST clip overflow content. The ticker MUST respect typography capabilities (font, size, color). Scrolling MUST use CSS transforms (translateX/translateY) animated via `requestAnimationFrame` for smooth, GPU-accelerated motion.
+
+#### Scenario: Left-scrolling ticker
+
+- GIVEN a ticker element with `content: '["Breaking: Storm Warning", "Sports: Final Score 3-2"]'` and `typeConfig: { direction: 'left', speed: 60 }`
+- WHEN rendered
+- THEN items scroll leftward at 60px/s with gap between them
+
+#### Scenario: Ticker paused
+
+- GIVEN a ticker element with `typeConfig: { paused: true }`
+- WHEN rendered
+- THEN items are visible but stationary
+
+#### Scenario: Item recycling
+
+- GIVEN a ticker with 3 items scrolling left
+- WHEN the first item fully exits the left edge
+- THEN it is repositioned after the last item on the right
+
+#### Scenario: Vertical ticker
+
+- GIVEN a ticker element with `typeConfig: { direction: 'up', speed: 40 }`
+- WHEN rendered
+- THEN items scroll upward at 40px/s
+
+#### Acceptance Criteria
+
+- [ ] Given a ticker element, items scroll in the specified direction at the specified speed
+- [ ] Given `typeConfig.paused: true`, scrolling stops
+- [ ] Given items scrolling out of view, they are recycled to create infinite scroll
+- [ ] Given a ticker, overflow content is clipped to the element bounds
+- [ ] Given a ticker, typography styling is applied to individual items
+
+---
+
+### Requirement: Alpha Background Rendering Mode
+
+The renderer MUST support a transparent background mode for alpha-channel export. When the canvas element has `background: 'transparent'` or when an export requests alpha output, the canvas background MUST render with no background color (CSS `background: transparent` or equivalent). All elements MUST render with their specified opacity and backgrounds preserved — only the canvas root background is made transparent. This enables compositing the rendered output over external video feeds or other graphics layers. The alpha background mode MUST NOT affect element rendering, z-order, or any other visual behavior.
+
+#### Scenario: Transparent canvas background
+
+- GIVEN a canvas with `background: 'transparent'`
+- WHEN the scene is rendered
+- THEN the root canvas element has no visible background
+
+#### Scenario: Elements retain their backgrounds
+
+- GIVEN a transparent canvas background and elements with solid background colors
+- WHEN the scene is rendered
+- THEN individual elements render their backgrounds normally against the transparent canvas
+
+#### Scenario: Normal background unchanged
+
+- GIVEN a canvas with `background: '#ffffff'`
+- WHEN the scene is rendered
+- THEN the canvas has a white background (existing behavior)
+
+#### Acceptance Criteria
+
+- [ ] Given `background: 'transparent'`, the canvas root has no visible background
+- [ ] Given transparent canvas, elements retain their own background colors and opacity
+- [ ] Given a normal (non-transparent) background value, existing behavior is unchanged
 
 ---
 

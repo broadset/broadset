@@ -1,10 +1,10 @@
-# Model Specification
+# Model — Document Specification
 
 ## Purpose
 
-Defines the structural rules and invariants for `BroadsetDocument` — the root data type of the
-broadset document model. All consumers (validators, serializers, mutation operations,
-renderers) MUST preserve every requirement in this spec.
+Defines the structural rules and invariants for `BroadsetDocument` — a single template or graphic within a `BroadsetProject`. A document contains the element layout, animation definitions, data schema, optional output specification, and pages (data override layers). All consumers (validators, serializers, renderers, playout systems) MUST preserve every requirement in this spec.
+
+For the project-level container that holds documents, see [project.md](project.md).
 
 ---
 
@@ -12,15 +12,19 @@ renderers) MUST preserve every requirement in this spec.
 
 ### Requirement: Document Identity
 
-The system MUST assign a non-empty string `id` to every document, and `documentMode` MUST
-be either `'screen'` or `'print'`.
+Every document MUST have a non-empty string `id`, a `name` string, and `documentMode` MUST be either `'screen'` or `'print'`.
 
-#### Scenario: Empty document creation
+#### Scenario: Valid document
 
-- GIVEN a call to `createEmptyBroadsetDocument()`
-- WHEN the result is inspected
-- THEN `id` is a non-empty string
-- AND `documentMode` is `'screen'`
+- GIVEN a document with `id: 'doc-001'`, `name: 'Scorebug'`, `documentMode: 'screen'`
+- WHEN the document is validated
+- THEN validation succeeds
+
+#### Scenario: Empty ID rejected
+
+- GIVEN a document with `id: ''`
+- WHEN the document is validated
+- THEN validation fails
 
 #### Scenario: Invalid document mode rejected
 
@@ -30,20 +34,15 @@ be either `'screen'` or `'print'`.
 
 #### Acceptance Criteria
 
-- [ ] Given a call to `createEmptyBroadsetDocument()`, `id` is a non-empty string and `documentMode` is `'screen'`
-- [ ] Given a document with `documentMode: 'web'`, validation fails
+- [ ] Given a valid document with id, name, and valid documentMode, validation succeeds
+- [ ] Given a document with empty id, validation fails
+- [ ] Given a document with invalid documentMode, validation fails
 
 ---
 
 ### Requirement: Document Mode Immutability
 
-The system MUST NOT allow `documentMode` to be mutated after document creation.
-
-#### Scenario: Mutation is prevented at the type and runtime level
-
-- GIVEN a `BroadsetDocument` instance
-- WHEN a developer attempts to reassign `documentMode` on an existing document
-- THEN the mode value MUST NOT be changed after document creation. Implementations SHOULD enforce this via the type system (e.g., `readonly`) and MUST reject any runtime attempt to mutate the mode.
+The system MUST NOT allow `documentMode` to be mutated after document creation. Implementations SHOULD enforce this via the type system (`readonly`) and MUST reject any runtime mutation attempt.
 
 #### Acceptance Criteria
 
@@ -51,14 +50,30 @@ The system MUST NOT allow `documentMode` to be mutated after document creation.
 
 ---
 
-### Requirement: Canvas Dimensions
+### Requirement: Canvas
 
-The system MUST reject canvas `width` or `height` values that are zero, negative, or
-non-finite. All spatial values MUST be expressed in millimeters.
+Every document MUST have a `canvas` with:
 
-#### Scenario: Positive dimensions accepted
+- `width`: positive number (> 0)
+- `height`: positive number (> 0)
+- `unit`: `'px'` | `'mm'` | `'in'` — declares the unit for all spatial values in the document
+- `dpi`: positive number — default `96` for screen mode, `300` for print mode
+- `padding`: 4-tuple `[top, right, bottom, left]` of non-negative numbers
+- `backgroundColor` (optional): CSS color string for canvas background
+- `backgroundMode`: `'transparent'` | `'solid'` — default `'transparent'` for screen, `'solid'` for print
+- `safeAreas` (optional): action-safe and title-safe insets (see Safe Areas below)
 
-- GIVEN a canvas with `width: 508` and `height: 285.75`
+Screen-mode documents SHOULD use `unit: 'px'` with pixel dimensions (e.g., `1920 × 1080`). Print-mode documents SHOULD use `unit: 'mm'` or `unit: 'in'` with physical dimensions (e.g., `210 × 297 mm`).
+
+#### Scenario: Screen-mode canvas in pixels
+
+- GIVEN a canvas with `width: 1920`, `height: 1080`, `unit: 'px'`, `dpi: 96`
+- WHEN the document is validated
+- THEN validation succeeds
+
+#### Scenario: Print-mode canvas in millimeters
+
+- GIVEN a canvas with `width: 210`, `height: 297`, `unit: 'mm'`, `dpi: 300`
 - WHEN the document is validated
 - THEN validation succeeds
 
@@ -68,107 +83,110 @@ non-finite. All spatial values MUST be expressed in millimeters.
 - WHEN the document is validated
 - THEN validation fails
 
-#### Scenario: mm unit convention
+#### Scenario: Transparent background default
 
-- GIVEN the sample document `sampleDocument.ts`
-- WHEN canvas dimensions are converted to pixels at 96 dpi
-- THEN `508 mm × 285.75 mm` equals `1920 px × 1080 px`
+- GIVEN a screen-mode document with no `backgroundMode` set
+- WHEN defaults are applied
+- THEN `backgroundMode` is `'transparent'`
 
 #### Acceptance Criteria
 
-- [ ] Given a canvas with `width: 508` and `height: 285.75`, validation succeeds
-- [ ] Given a canvas with `width: 0`, validation fails
-- [ ] Given the sample document `sampleDocument.ts`, `508 mm × 285.75 mm` equals `1920 px × 1080 px`
+- [ ] Given a canvas with positive width, height, valid unit, and valid dpi, validation succeeds
+- [ ] Given a canvas with zero or negative dimensions, validation fails
+- [ ] Given a canvas with `unit: 'px'`, all spatial values are in pixels
+- [ ] Given a canvas with `unit: 'mm'`, all spatial values are in millimeters
+- [ ] Given a screen-mode document, default backgroundMode is `'transparent'`
+- [ ] Given a print-mode document, default backgroundMode is `'solid'`
 
 ---
 
-### Requirement: Canvas Padding
+### Requirement: Safe Areas
 
-The system MUST store canvas padding as a 4-tuple `[top, right, bottom, left]` of
-non-negative finite numbers.
+The canvas MAY declare safe areas as percentage insets (0–50):
 
-#### Scenario: Valid padding accepted
+- `actionSafe`: EBU R95 default 3.5% or SMPTE RP 218 5%
+- `titleSafe`: EBU R95 default 5% or SMPTE RP 218 10%
+- `custom`: array of named safe areas (e.g., `'lower-third-zone'`, `'bug-area'`)
 
-- GIVEN a canvas padding of `[10, 10, 10, 10]`
+Each inset is a 4-tuple `[top, right, bottom, left]` as percentage of canvas dimension.
+
+#### Scenario: Standard safe areas
+
+- GIVEN a canvas with `safeAreas: { actionSafe: [3.5, 3.5, 3.5, 3.5], titleSafe: [5, 5, 5, 5] }`
 - WHEN the document is validated
 - THEN validation succeeds
 
-#### Scenario: Invalid tuple length rejected
+#### Scenario: Custom safe area
 
-- GIVEN a canvas padding of `[10, 10]`
+- GIVEN a canvas with `safeAreas: { custom: [{ name: 'bug-area', insets: [5, 5, 90, 80] }] }`
 - WHEN the document is validated
-- THEN validation fails
+- THEN validation succeeds
 
 #### Acceptance Criteria
 
-- [ ] Given a canvas padding of `[10, 10, 10, 10]`, validation succeeds
-- [ ] Given a canvas padding of `[10, 10]`, validation fails
+- [ ] Given valid percentage insets (0–50), safe area validation succeeds
+- [ ] Given insets outside 0–50 range, validation fails
+- [ ] Given custom named safe areas, they are preserved on round-trip
 
 ---
 
-### Requirement: Non-Empty Pages
+### Requirement: Document-Level Elements
 
-The system MUST maintain at least one page in a document at all times. An empty `pages`
-array is invalid.
+Elements are defined at the document level as a flat array. This is the single element set for the template. Pages do NOT carry independent element arrays — they carry override layers that reference document-level elements by `elementId`.
 
-#### Scenario: Document starts with one page
+#### Scenario: Elements on the document
 
-- GIVEN a call to `createEmptyBroadsetDocument()`
-- WHEN the result is inspected
-- THEN `pages.length` equals `1`
-- AND `pages[0].elements` is an empty array
+- GIVEN a document with `elements: [{ id: 'el-1', ... }, { id: 'el-2', ... }]`
+- WHEN the document is inspected
+- THEN the element set is defined on the document, not on pages
 
-#### Scenario: Empty pages array rejected
+#### Scenario: Element IDs unique within document
 
-- GIVEN a document with `pages: []`
+- GIVEN a document with two elements both having `id: 'el-dup'`
 - WHEN the document is validated
 - THEN validation fails
 
 #### Acceptance Criteria
 
-- [ ] Given a call to `createEmptyBroadsetDocument()`, `pages.length` equals `1` and `pages[0].elements` is an empty array
-- [ ] Given a document with `pages: []`, validation fails
+- [ ] Given a document with elements, they are stored as a flat array on the document
+- [ ] Given duplicate element IDs within a document, validation fails
 
 ---
 
 ### Requirement: Flat Element Tree
 
-The system MUST store elements as a flat array per page. Elements MUST NOT be structurally
-nested; parent-child relationships MUST be expressed via `parentId` references.
+Elements MUST be stored as a flat array. Parent-child relationships MUST be expressed via `parentId` references, not structural nesting. The `parentId` graph MUST be acyclic and all references MUST point to elements within the same document.
 
-#### Scenario: Page structure is a flat array
+#### Scenario: Flat array structure
 
-- GIVEN a page with parent and child elements
-- WHEN the page structure is inspected
-- THEN elements are stored as a flat array with no recursive nesting
+- GIVEN a document with parent and child elements
+- WHEN the element array is inspected
+- THEN elements are stored flat with parentId references
 
-#### Acceptance Criteria
+#### Scenario: Circular parentId rejected
 
-- [ ] Given a page with parent and child elements, elements are stored as a flat array with no recursive nesting
-
----
-
-### Requirement: Element Identity and Uniqueness
-
-The system MUST give every element a non-empty string `id`. Element `id` values MUST be
-unique within their page.
-
-#### Scenario: Duplicate IDs on the same page are rejected
-
-- GIVEN two elements with `id: 'a'` on the same page
-- WHEN the document is passed to the validator
+- GIVEN element A with `parentId: 'B'` and element B with `parentId: 'A'`
+- WHEN the document is validated
 - THEN validation fails
 
+#### Scenario: Deleting a parent removes all descendants
+
+- GIVEN a parent element with two child elements
+- WHEN the parent is deleted via the editor store
+- THEN the document contains neither the parent nor its children
+
 #### Acceptance Criteria
 
-- [ ] Given two elements with `id: 'a'` on the same page, validation fails
+- [ ] Given parent-child elements, they are stored flat with parentId references
+- [ ] Given circular parentId references, validation fails
+- [ ] Given a parentId referencing a non-existent element, validation fails
+- [ ] Given a parent deletion, all descendants are also removed
 
 ---
 
 ### Requirement: Element Dimensions
 
-The system MUST reject element `width` or `height` values that are zero, negative, or
-non-finite.
+The system MUST reject element `width` or `height` values that are zero, negative, or non-finite.
 
 #### Scenario: Zero width rejected
 
@@ -178,62 +196,131 @@ non-finite.
 
 #### Acceptance Criteria
 
-- [ ] Given an element with `width: 0`, validation fails
+- [ ] Given an element with zero or negative width/height, validation fails
+- [ ] Given an element with NaN or Infinity dimensions, validation fails
 
 ---
 
-### Requirement: Parent-Child Integrity
+### Requirement: Document Animations
 
-The system MUST enforce that `parentId` references are intra-page only, and the `parentId`
-graph MUST be acyclic.
+Animation definitions are stored at the document level as a flat array, each pairing an `elementId` with animation configuration. At most one animation definition per element ID. Stale entries (referencing deleted elements) MUST be silently ignored by all consumers. See [animation.md](animation.md) for the animation type contracts.
 
-#### Scenario: Cross-page parentId rejected
+#### Scenario: Duplicate elementId rejected
 
-- GIVEN element A on page 0 with `parentId` pointing to an element on page 1
+- GIVEN two animation definitions both targeting `elementId: 'el-1'`
 - WHEN the document is validated
 - THEN validation fails
 
-#### Scenario: Circular parentId rejected
+#### Scenario: Stale animation entry does not throw
 
-- GIVEN element A with `parentId: 'b'` and element B with `parentId: 'a'` on the same page
-- WHEN the document is validated
-- THEN validation fails
-
-#### Scenario: Deleting a parent removes all descendants
-
-- GIVEN a parent element with two child elements
-- WHEN the parent is deleted via the editor store
-- THEN the page contains neither the parent nor its children
-
-#### Acceptance Criteria
-
-- [ ] Given element A on page 0 with `parentId` pointing to an element on page 1, validation fails
-- [ ] Given element A with `parentId: 'b'` and element B with `parentId: 'a'` on the same page, validation fails
-- [ ] Given a parent element with two child elements, the page contains neither the parent nor its children
-
----
-
-### Requirement: Animation Registry Integrity
-
-The system MUST store at most one registry entry per element `id`. Stale entries
-(referencing deleted elements) MUST be silently ignored by all consumers.
-
-#### Scenario: Duplicate registry entries rejected
-
-- GIVEN two `animationRegistry` entries with the same element `id`
-- WHEN the document is validated
-- THEN validation fails
-
-#### Scenario: Stale registry entry does not throw
-
-- GIVEN a document with an `animationRegistry` entry for a deleted element
+- GIVEN a document with an animation entry for a deleted element
 - WHEN the playback controller processes the document
 - THEN no error is thrown
 
 #### Acceptance Criteria
 
-- [ ] Given two `animationRegistry` entries with the same element `id`, validation fails
-- [ ] Given a document with an `animationRegistry` entry for a deleted element, no error is thrown
+- [ ] Given a document with animations, they are stored as a flat array on the document
+- [ ] Given duplicate elementId in animations, validation fails
+- [ ] Given an animation referencing a deleted element, no error is thrown
+
+---
+
+### Requirement: Pages as Data Override Layers
+
+Pages are lightweight data override layers. Each page has:
+
+- `id`: non-empty string, unique within the document
+- `name`: human-readable string
+- `overrides`: array of `ElementOverride`, each referencing an element by `elementId`
+- `locale` (optional): BCP 47 language tag for localization
+- `extensions` (optional): vendor extension data
+
+A document MUST have at least one page. The first page with an empty overrides array represents the template's default state.
+
+#### Scenario: Page with data overrides
+
+- GIVEN a page with overrides changing content of two text elements
+- WHEN the page is applied
+- THEN element content is replaced with override values
+
+#### Scenario: Override references valid element
+
+- GIVEN a page override with `elementId: 'el-999'` referencing a non-existent element
+- WHEN the document is validated
+- THEN validation fails (or the override is silently ignored)
+
+#### Scenario: Element visibility override
+
+- GIVEN a page override with `{ elementId: 'el-subtitle', visible: false }`
+- WHEN the page is applied
+- THEN the element is hidden on this page
+
+#### Scenario: Style override
+
+- GIVEN a page override with `{ elementId: 'el-title', style: { fontColor: '#ff0000' } }`
+- WHEN the page is applied
+- THEN the element's fontColor is overridden to red; all other styles remain as defined
+
+#### Acceptance Criteria
+
+- [ ] Given a document, it has at least one page
+- [ ] Given a page with content overrides, the element content is replaced
+- [ ] Given a page with visibility override false, the element is hidden
+- [ ] Given a page with partial style override, only the specified style properties change
+- [ ] Given a page override referencing a non-existent element, validation fails or it is ignored
+- [ ] Given duplicate page IDs within a document, validation fails
+
+---
+
+### Requirement: Data Schema
+
+Every document MUST have a `dataSchema` declaring the template's data contract. See [data-schema.md](data-schema.md) for the full specification. The data schema defines what external data the template accepts — operators, playout automation, and live data feeds enumerate fields from the schema.
+
+#### Acceptance Criteria
+
+- [ ] Given a document, it has a dataSchema (which may have an empty fields array)
+- [ ] Given element dataField.fieldName values, each must match a dataSchema field
+
+---
+
+### Requirement: Output Specification (Optional)
+
+A document MAY carry an `output` object specifying broadcast output constraints. See [output-spec.md](output-spec.md) for the full specification.
+
+When absent, the consumer picks its own output profile. When present, animation timing SHOULD be quantized to the specified frame rate.
+
+#### Acceptance Criteria
+
+- [ ] Given a valid output spec with supported frame rate and color space, validation succeeds
+- [ ] Given no output spec, the document is still valid
+
+---
+
+### Requirement: No Hard Page or Element Limits
+
+The document model MUST NOT impose hard upper limits on the number of pages per document or elements per document. However, implementations SHOULD document that the renderer targets 60fps performance with up to 100 visible elements. Exceeding this count MAY degrade rendering performance.
+
+#### Acceptance Criteria
+
+- [ ] Given a document with more than 100 pages, validation succeeds
+- [ ] Given a document with more than 100 elements, validation succeeds
+
+---
+
+### Requirement: Extension Points
+
+Every document and every page MAY carry an `extensions` property — a `Record<string, unknown>` keyed by reverse-domain vendor prefix. The core model MUST preserve but MUST NOT interpret extensions.
+
+#### Scenario: Round-trip preservation
+
+- GIVEN a document with `extensions: { "com.example.analytics": { views: 42 } }`
+- WHEN the document is serialized and deserialized
+- THEN the extensions object is preserved exactly
+
+#### Acceptance Criteria
+
+- [ ] Given a document with extensions, they are preserved on round-trip
+- [ ] Given unknown extension keys, the model does not reject or modify them
 
 ---
 
@@ -241,38 +328,18 @@ The system MUST store at most one registry entry per element `id`. Stale entries
 
 | Sub-Spec                                   | Scope                                                                                     |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| [element.md](element.md)                   | Element data contract — type vocabulary, geometry, content, hierarchy                     |
-| [style.md](style.md)                       | Element style contract — typography, backgrounds, borders, effects, SVG                   |
-| [screen.md](screen.md)                     | Screen properties — anchors, visibility, states, modifiers, 3D, masking                   |
-| [animation.md](animation.md)               | Animation types — registry, timelines, keyframes, state/modifier bindings                 |
+| [project.md](project.md)                   | Project container — settings, assets, document collection                                 |
+| [element.md](element.md)                   | Element data contract — type vocabulary, geometry, content, hierarchy, data binding       |
+| [style.md](style.md)                       | Element style contract — typography, backgrounds, borders, effects, masking, 3D, SVG      |
+| [animation.md](animation.md)               | Animation types — definitions, timelines, keyframes, state/modifier bindings              |
+| [data-schema.md](data-schema.md)           | Data schema — field definitions, constraints, overflow, repeaters, conditional visibility |
+| [output-spec.md](output-spec.md)           | Output specification — frame rate, color space, dynamic range, timecode                   |
+| [assets.md](assets.md)                     | Asset library — asset kinds, sources, ZIP packaging                                       |
 | [changes.md](changes.md)                   | Change stream types — discriminated mutation events for collaboration                     |
 | [config.md](config.md)                     | Configuration types — editor config, features, canvas, plugins, media                     |
 | [utilities.md](utilities.md)               | Utilities — document clone, clip-path normalization, unit conversion                      |
 | [capabilities.md](capabilities.md)         | Element capability matrix — per-type editing feature flags                                |
-| [format-reference.md](format-reference.md) | Full BroadsetDocument JSON format — field shapes, constraints, examples, unit conversions |
-
----
-
-### Requirement: No Hard Page or Element Limits
-
-The document model MUST NOT impose hard upper limits on the number of pages per document or elements per page. However, implementations SHOULD document that the renderer targets 60fps performance with up to 100 visible elements per page. Exceeding this count MAY degrade rendering performance.
-
-#### Scenario: Document with many pages
-
-- GIVEN a document with 500 pages
-- WHEN validation runs
-- THEN the document is valid
-
-#### Scenario: Page with many elements
-
-- GIVEN a page with 1000 elements
-- WHEN validation runs
-- THEN the page is valid
-
-#### Acceptance Criteria
-
-- [ ] Given a document with more than 100 pages, validation succeeds
-- [ ] Given a page with more than 100 elements, validation succeeds
+| [format-reference.md](format-reference.md) | Full BroadsetProject JSON format — field shapes, constraints, examples                    |
 
 ---
 
@@ -288,3 +355,6 @@ _None — all requirements have acceptance criteria._
 - Rendering behavior → see `project/spec/renderer/spec.md`
 - Animation playback semantics → see `project/spec/playback/spec.md`
 - Mutation operations → see `project/spec/editor/spec.md`
+- Alpha/keying model → deferred to future phase
+- Playout control protocol → deferred to future phase
+- Page transitions → deferred to future phase

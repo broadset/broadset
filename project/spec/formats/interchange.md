@@ -10,11 +10,11 @@ Defines JSON document export, OGraf broadcast package generation, video export, 
 
 ### Requirement: JSON Document Export
 
-The system MUST export a valid JSON representation of a `BroadsetDocument` preserving schema, animation config, multi-page structure, and all supported element types. Round-trips (export→parse→validate) MUST preserve data without loss for any valid document, including empty documents and large documents.
+The system MUST export a valid JSON representation of a `BroadsetProject` preserving schema, animation config, multi-document structure, and all supported element types. Round-trips (export→parse→validate) MUST preserve data without loss for any valid project, including empty documents and large documents.
 
 #### Scenario: Schema and animation preserved
 
-- GIVEN a document with animation registry
+- GIVEN a document with animations
 - WHEN exported and re-parsed
 - THEN the JSON is valid and animation config is intact
 
@@ -26,7 +26,7 @@ The system MUST export a valid JSON representation of a `BroadsetDocument` prese
 
 #### Scenario: All element types round-trip
 
-- GIVEN a document with text, image, rectangle, path, ellipse, svg, qrcode, and group elements
+- GIVEN a document with text, image, rectangle, path, ellipse, svg, qrcode, group, video, clock, and ticker elements
 - WHEN round-tripped through JSON
 - THEN all types are preserved
 
@@ -44,15 +44,15 @@ The system MUST export a valid JSON representation of a `BroadsetDocument` prese
 
 #### Scenario: Download utility
 
-- GIVEN a document
+- GIVEN a project
 - WHEN exported via download utility
-- THEN the payload is valid BroadsetDocument JSON
+- THEN the payload is valid BroadsetProject JSON
 
 #### Acceptance Criteria
 
-- [ ] Given a document with animation registry, the JSON is valid and animation config is intact
+- [ ] Given a document with animations, the JSON is valid and animation config is intact
 - [ ] Given a multi-page document, all pages are present in the JSON
-- [ ] Given a document with text, image, rectangle, path, ellipse, svg, qrcode, and group elements, all types are preserved
+- [ ] Given a document with text, image, rectangle, path, ellipse, svg, qrcode, group, video, clock, and ticker elements, all types are preserved
 - [ ] Given an empty document, structure is preserved
 - [ ] Given a document with 100 elements, no data loss occurs
 - [ ] Given a document, the payload is valid BroadsetDocument JSON

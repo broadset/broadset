@@ -2,7 +2,9 @@
 
 ## Purpose
 
-Defines the structural shape and invariant rules for `BroadsetElement` — the fundamental building block of every page. Every element carries geometry, content, visual style, screen properties, and hierarchy references. This spec ensures any consumer can reconstruct the element data layer from these contracts alone. It does NOT cover element mutation operations (→ `project/spec/editor/`) or visual rendering (→ `project/spec/renderer/`). See [conventions](../../README.md).
+Defines the structural shape and invariant rules for `BroadsetElement` — the fundamental building block of every document. Every element carries identity, geometry, content, visual style, hierarchy references, and optional data binding / type-specific configuration. This spec ensures any consumer can reconstruct the element data layer from these contracts alone. It does NOT cover element mutation operations (→ `project/spec/editor/`) or visual rendering (→ `project/spec/renderer/`). See [conventions](../../README.md).
+
+**Key structural change:** Elements no longer carry a `screen` property. All visual properties formerly on `screen` (maskType, customClipPath, clipChildren, rotateX/Y/Z, translateZ) have moved to `style`. The `name` and `locked` fields are now top-level on the element. Playback state (visibility, activeState, modifiers) is runtime-only — never serialized.
 
 ---
 
@@ -10,7 +12,7 @@ Defines the structural shape and invariant rules for `BroadsetElement` — the f
 
 ### Requirement: Element Type Vocabulary
 
-The system MUST support exactly these built-in element types: `text`, `image`, `svg`, `path`, `rectangle`, `ellipse`, `qrcode`, `group`. Additional types MAY be registered via the component plugin system.
+The system MUST support exactly these built-in element types: `text`, `image`, `svg`, `path`, `rectangle`, `ellipse`, `qrcode`, `group`, `video`, `clock`, `ticker`. Additional types MAY be registered via the component plugin system.
 
 #### Scenario: All built-in types are accepted
 
@@ -26,14 +28,43 @@ The system MUST support exactly these built-in element types: `text`, `image`, `
 
 #### Acceptance Criteria
 
-- [ ] Given an element with any of text, image, svg, path, rectangle, ellipse, qrcode, or group as its type, the system accepts it
+- [ ] Given an element with any of text, image, svg, path, rectangle, ellipse, qrcode, group, video, clock, or ticker as its type, the system accepts it
 - [ ] Given a registered component plugin with a custom type, elements of that type are accepted
+
+---
+
+### Requirement: Element Identity and Naming
+
+Every element MUST have:
+
+- `id`: non-empty string, unique within the document
+- `type`: one of the built-in types or a registered plugin type
+- `name`: human-readable display name (string, may be empty)
+- `locked`: boolean indicating whether the element is locked from editing (default `false`)
+
+#### Scenario: Valid element identity
+
+- GIVEN an element with `id: 'el-1'`, `type: 'text'`, `name: 'Title'`, `locked: false`
+- WHEN the document is validated
+- THEN validation succeeds
+
+#### Scenario: Empty id rejected
+
+- GIVEN an element with `id: ''`
+- WHEN the document is validated
+- THEN validation fails
+
+#### Acceptance Criteria
+
+- [ ] Given an element with valid id, type, name, and locked, validation succeeds
+- [ ] Given an element with empty id, validation fails
+- [ ] Given duplicate element IDs within a document, validation fails
 
 ---
 
 ### Requirement: Element Position and Dimensions
 
-Every element MUST have a position with numeric `x` and `y` coordinates, numeric `width` (> 0), `height` (> 0), and `rotation` in degrees. All spatial values are in millimeters.
+Every element MUST have a position with numeric `x` and `y` coordinates, numeric `width` (> 0), `height` (> 0), and `rotation` in degrees. All spatial values are in the document's canvas unit (px, mm, or in).
 
 #### Scenario: Valid geometry accepted
 
@@ -66,10 +97,13 @@ Every element MUST have a position with numeric `x` and `y` coordinates, numeric
 The `content` field carries type-specific payload data. The system MUST interpret content according to the element type:
 
 - `text` → display text (rich text HTML or plain text)
-- `image` → image source URL
+- `image` → image source URL (or empty for placeholder)
 - `svg` → inline SVG markup
 - `path` → SVG path `d` attribute data
 - `qrcode` → string to encode as QR code
+- `video` → video source URL
+- `clock` → time format pattern (e.g., `'HH:mm:ss'`, `'mm:ss.S'`)
+- `ticker` → ticker items as JSON array of strings (e.g., `'["Breaking News", "Weather Update"]'`)
 - `rectangle`, `ellipse`, `group` → content is empty or ignored
 
 #### Scenario: Text element carries display text
@@ -92,15 +126,32 @@ The `content` field carries type-specific payload data. The system MUST interpre
 
 ---
 
+### Requirement: Asset Reference
+
+Elements MAY carry an optional `assetId` field referencing an asset in the project's centralized asset library. When `assetId` is present, the element's content is resolved from the asset. See [assets.md](assets.md).
+
+#### Scenario: Image element with asset reference
+
+- GIVEN an image element with `assetId: 'asset-logo-001'`
+- WHEN the element is rendered
+- THEN the image source is resolved from the asset library
+
+#### Acceptance Criteria
+
+- [ ] Given an element with a valid assetId, the content is resolved from the asset library
+- [ ] Given an element with an assetId referencing a non-existent asset, validation fails or a fallback is used
+
+---
+
 ### Requirement: Element Hierarchy
 
-Elements use `parentId` and `groupId` to express hierarchy. `parentId` references a group-type element on the same page (or `null` for root elements). `groupId` identifies visual group membership for multi-select operations.
+Elements use `parentId` and `groupId` to express hierarchy. `parentId` references a group-type element in the same document (or `null` for root elements). `groupId` identifies visual group membership for multi-select operations.
 
 #### Scenario: Root element has null parentId
 
 - GIVEN an element with `parentId: null`
 - WHEN the document structure is inspected
-- THEN the element is a root-level element on its page
+- THEN the element is a root-level element
 
 #### Scenario: Child element references a parent
 
@@ -122,50 +173,9 @@ Elements use `parentId` and `groupId` to express hierarchy. `parentId` reference
 
 ---
 
-### Requirement: Element Default Values
-
-Newly created elements MUST have deterministic default values for screen properties and style. Screen defaults MUST include: anchorX `'left'`, anchorY `'top'`, visibility `'onscreen'`, locked `false`, maskType `'none'`, all 3D rotations `0`, clipChildren `false`. Style defaults MUST include opacity `1`.
-
-#### Scenario: Default screen properties
-
-- GIVEN a newly created element
-- WHEN its screen properties are inspected
-- THEN anchorX is `'left'`, anchorY is `'top'`, visibility is `'onscreen'`, locked is `false`, maskType is `'none'`
-
-#### Scenario: Default style properties
-
-- GIVEN a newly created element
-- WHEN its style is inspected
-- THEN opacity is `1`
-
-#### Acceptance Criteria
-
-- [ ] Given a newly created element, screen properties match the documented defaults
-- [ ] Given a newly created element, style opacity is 1
-
----
-
 ### Requirement: parentId and groupId Independence
 
-`parentId` and `groupId` are independent axes. An element MAY have both a `parentId` (placing it in a parent-child hierarchy under a group-type element) and a `groupId` (placing it in a visual multi-select group) simultaneously. The two fields serve different purposes: `parentId` defines structural hierarchy, `groupId` defines ephemeral selection grouping.
-
-#### Scenario: Both fields coexist on the same element
-
-- GIVEN an element with `parentId` referencing a group element AND `groupId` referencing a different visual group
-- WHEN validation runs
-- THEN both fields are accepted as valid
-
-#### Scenario: Only parentId set
-
-- GIVEN an element with only `parentId` set
-- WHEN validation runs
-- THEN the element is valid
-
-#### Scenario: Only groupId set
-
-- GIVEN an element with only `groupId` set
-- WHEN validation runs
-- THEN the element is valid
+`parentId` and `groupId` are independent axes. An element MAY have both a `parentId` (structural hierarchy under a group-type element) and a `groupId` (visual multi-select group) simultaneously.
 
 #### Acceptance Criteria
 
@@ -175,65 +185,36 @@ Newly created elements MUST have deterministic default values for screen propert
 
 ---
 
+### Requirement: Element Default Values
+
+Newly created elements MUST have deterministic default values. Defaults MUST include: `name: ''`, `locked: false`, `rotation: 0`, `parentId: null`, `groupId: null`. Style defaults MUST include `opacity: 1`.
+
+#### Acceptance Criteria
+
+- [ ] Given a newly created element, name is empty string and locked is false
+- [ ] Given a newly created element, style opacity is 1
+
+---
+
 ### Requirement: Rotation Normalization
 
-The `rotate` field accepts any finite numeric value in degrees. Negative values and values exceeding 360 are valid inputs. Implementations SHOULD normalize rotation to the [0, 360) range for display purposes but MUST preserve the original value in the document model.
-
-#### Scenario: Negative rotation is preserved
-
-- GIVEN an element with `rotate: -90`
-- WHEN stored in the document
-- THEN the value -90 is preserved
-
-#### Scenario: Rotation exceeding 360 is preserved
-
-- GIVEN an element with `rotate: 450`
-- WHEN stored in the document
-- THEN the value 450 is preserved
-
-#### Scenario: NaN rotation is rejected
-
-- GIVEN an element with `rotate: NaN`
-- WHEN validation runs
-- THEN validation fails
+The `rotation` field accepts any finite numeric value in degrees. Negative values and values exceeding 360 are valid inputs. Implementations SHOULD normalize rotation to the [0, 360) range for display purposes but MUST preserve the original value in the document model.
 
 #### Acceptance Criteria
 
 - [ ] Given a rotation of -90, the value is stored as-is in the document
 - [ ] Given a rotation of 450, the value is stored as-is in the document
-- [ ] Given a rotation of NaN, validation rejects the element
-- [ ] Given a rotation of Infinity, validation rejects the element
+- [ ] Given a rotation of NaN or Infinity, validation rejects the element
 
 ---
 
 ### Requirement: Position Finite Validation
 
-Element position fields `x` and `y` MUST be finite numbers. `NaN` and `Infinity` values MUST be rejected by validation.
-
-#### Scenario: NaN x is rejected
-
-- GIVEN an element with `x: NaN`
-- WHEN validation runs
-- THEN validation fails
-
-#### Scenario: Infinite y is rejected
-
-- GIVEN an element with `y: Infinity`
-- WHEN validation runs
-- THEN validation fails
-
-#### Scenario: Negative coordinates are valid
-
-- GIVEN an element with `x: -500, y: -200`
-- WHEN validation runs
-- THEN validation succeeds (negative positions are valid)
+Element position fields `x` and `y` MUST be finite numbers. `NaN` and `Infinity` values MUST be rejected. Negative coordinates are valid (elements may be positioned off-canvas).
 
 #### Acceptance Criteria
 
-- [ ] Given x set to NaN, validation rejects the element
-- [ ] Given y set to NaN, validation rejects the element
-- [ ] Given x set to Infinity, validation rejects the element
-- [ ] Given y set to -Infinity, validation rejects the element
+- [ ] Given x or y set to NaN or Infinity, validation rejects the element
 - [ ] Given negative x and y values, validation succeeds
 
 ---
@@ -249,36 +230,6 @@ Element content MUST be validated at the model boundary based on the element's t
 - **qrcode**: content MUST be a non-empty string (the data to encode).
 - **rectangle**, **ellipse**, **group**: content SHOULD be empty or undefined.
 
-#### Scenario: Text content is sanitized
-
-- GIVEN a text element with content `<script>alert('xss')</script>Hello`
-- WHEN validation runs
-- THEN content is sanitized to `Hello`
-
-#### Scenario: Image content with valid URL
-
-- GIVEN an image element with content `https://example.com/img.png`
-- WHEN validation runs
-- THEN content is accepted
-
-#### Scenario: Path element with valid SVG d attribute
-
-- GIVEN a path element with content `M 0 0 L 10 10`
-- WHEN validation runs
-- THEN content is accepted
-
-#### Scenario: Path element with invalid d attribute
-
-- GIVEN a path element with content `not a path`
-- WHEN validation runs
-- THEN validation fails
-
-#### Scenario: QR code with empty content
-
-- GIVEN a qrcode element with empty content
-- WHEN validation runs
-- THEN validation fails
-
 #### Acceptance Criteria
 
 - [ ] Given a text element with script tags in content, the tags are stripped during validation
@@ -287,6 +238,234 @@ Element content MUST be validated at the model boundary based on the element's t
 - [ ] Given a path element with valid SVG d attribute syntax, validation succeeds
 - [ ] Given a path element with invalid d attribute syntax, validation fails
 - [ ] Given a qrcode element with empty content, validation fails
+
+---
+
+### Requirement: Data Field Binding
+
+Elements MAY carry an optional `dataField` that binds the element to a field in the document's `dataSchema`. See [data-schema.md](data-schema.md) for field definition and constraints. The `dataField` object contains:
+
+- `fieldName`: references a field in the document's `dataSchema.fields` array
+- `overflow`: `'clip'` | `'ellipsis'` | `'shrink'` | `'scroll'` — behavior when data exceeds bounds
+- `prefix` (optional): string prepended to the data value
+- `suffix` (optional): string appended to the data value
+- `formatPattern` (optional): format string (e.g., date/number format)
+
+#### Scenario: Text element bound to data field
+
+- GIVEN a text element with `dataField: { fieldName: 'playerName', overflow: 'ellipsis' }`
+- WHEN live data provides `playerName: 'John Smith'`
+- THEN the element content is updated to `'John Smith'`
+
+#### Acceptance Criteria
+
+- [ ] Given an element with dataField.fieldName, it must match a field in dataSchema
+- [ ] Given data that overflows element bounds, the specified overflow behavior is applied
+
+---
+
+### Requirement: Conditional Visibility
+
+Elements MAY carry an optional `visibleWhen` string containing a boolean expression over data schema fields. When the expression evaluates to `false`, the element is hidden. When absent or evaluating to `true`, the element is visible.
+
+Expression syntax supports: field references, comparison operators (`==`, `!=`, `>`, `<`, `>=`, `<=`), logical operators (`&&`, `||`, `!`), and parentheses for grouping.
+
+#### Scenario: Element hidden when condition is false
+
+- GIVEN an element with `visibleWhen: 'showSubtitle == true'`
+- WHEN data provides `showSubtitle: false`
+- THEN the element is hidden
+
+#### Acceptance Criteria
+
+- [ ] Given visibleWhen evaluating to false, the element is hidden
+- [ ] Given visibleWhen evaluating to true or absent, the element is visible
+- [ ] Given an invalid expression, validation fails
+
+---
+
+### Requirement: Repeater Configuration
+
+Elements MAY carry an optional `repeater` object that causes the element to be repeated for each item in a data array field. The repeater contains:
+
+- `dataArrayField`: references an array-type field in `dataSchema`
+- `direction`: `'horizontal'` | `'vertical'` | `'grid'`
+- `gap`: spacing between repeated instances (in canvas units)
+- `maxItems` (optional): maximum number of visible instances
+
+#### Scenario: Repeating element for standings data
+
+- GIVEN a group element with `repeater: { dataArrayField: 'standings', direction: 'vertical', gap: 4 }`
+- WHEN data provides `standings` with 10 items
+- THEN 10 instances of the element are rendered vertically with 4-unit gaps
+
+#### Acceptance Criteria
+
+- [ ] Given a repeater referencing a valid array field, instances are generated per data item
+- [ ] Given maxItems set, instances are capped at that count
+
+---
+
+### Requirement: Component Reference
+
+Elements MAY carry an optional `componentRef` linking to a reusable component definition. The component reference contains:
+
+- `componentId`: references a shared component by ID
+- `overrides` (optional): property overrides applied on top of the component definition
+
+This enables instanced component patterns where a single component definition is shared across multiple elements.
+
+#### Acceptance Criteria
+
+- [ ] Given a componentRef with valid componentId, the element renders as an instance of that component
+- [ ] Given property overrides in componentRef, they are applied on top of the component defaults
+
+---
+
+### Requirement: Element Auto-Sizing Mode
+
+Text elements MUST support an optional `autoSize` field with values `'fixed'` (default — element bounds are explicit width × height), `'auto-height'` (width is fixed, height grows to fit text content), or `'shrink-to-fit'` (font size reduces proportionally until all text fits within the explicit bounds). When `autoSize` is `'auto-height'`, the element's rendered height is determined by the text content and typography settings — the stored `height` value serves as the minimum. When `autoSize` is `'shrink-to-fit'`, the renderer reduces the effective font size in steps until the text fits within width × height, with a minimum effective size of 6pt. Non-text elements MUST ignore this field. Default: `'fixed'`.
+
+#### Acceptance Criteria
+
+- [ ] Given a text element with `autoSize: 'fixed'` or absent, text is clipped to explicit bounds
+- [ ] Given a text element with `autoSize: 'auto-height'`, the rendered height grows to fit content
+- [ ] Given a text element with `autoSize: 'shrink-to-fit'`, font size reduces to fit bounds with a 6pt minimum
+- [ ] Given a non-text element with any `autoSize` value, the field has no effect
+
+---
+
+### Requirement: Type-Specific Configuration
+
+Elements with types `video`, `clock`, and `ticker` MUST support an optional `typeConfig` field containing type-specific behavior configuration. The shape of `typeConfig` is determined by the element type:
+
+**Video typeConfig:**
+
+| Field      | Type           | Default | Description                                         |
+| ---------- | -------------- | ------- | --------------------------------------------------- |
+| loop       | boolean        | false   | Whether the video loops on completion               |
+| autoplay   | boolean        | true    | Whether the video plays automatically on visibility |
+| muted      | boolean        | true    | Whether audio is muted                              |
+| startTimeS | number         | 0       | Playback start position in seconds                  |
+| endTimeS   | number \| null | null    | Playback end position (null = end of video)         |
+
+**Clock typeConfig:**
+
+| Field       | Type           | Default      | Description                                                                                                                                                                           |
+| ----------- | -------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| mode        | string         | `'realtime'` | `'realtime'`, `'countdown'`, `'countup'`, `'stopwatch'`                                                                                                                               |
+| startValue  | string \| null | null         | Duration or time for countdown/countup start (e.g., `'00:10:00'`, `'600'`)                                                                                                            |
+| targetValue | string \| null | null         | Duration or time for countdown end (e.g., `'00:00:00'`)                                                                                                                               |
+| countdownTo | string \| null | null         | ISO 8601 datetime for absolute countdown (e.g., `'2026-04-05T15:00:00Z'`). When set, overrides `startValue`/`targetValue` — the clock shows remaining time until the target datetime. |
+
+When `countdownTo` is set and the target datetime is in the past, the clock MUST display `00:00:00` (or the equivalent in the element's format pattern). When the target is in the future, the clock MUST show the remaining time and update every second (or fraction indicated by the format). The `countdownTo` field MUST be a valid ISO 8601 datetime string with timezone; validation MUST reject non-ISO-8601 values.
+
+**Ticker typeConfig:**
+
+| Field     | Type    | Default  | Description                                                                              |
+| --------- | ------- | -------- | ---------------------------------------------------------------------------------------- |
+| speed     | number  | 60       | Scroll speed in pixels per second. MUST be a positive finite number in the range 1–2000. |
+| direction | string  | `'left'` | `'left'`, `'right'`, `'up'`, or `'down'`                                                 |
+| gap       | number  | 40       | Gap in pixels between consecutive items. MUST be a non-negative finite number.           |
+| paused    | boolean | false    | Whether ticker scrolling is paused                                                       |
+
+Validation MUST reject `typeConfig` fields that do not match the expected shape for the element type. Elements of other types MUST ignore `typeConfig`.
+
+#### Acceptance Criteria
+
+- [ ] Given a video element with valid video typeConfig, validation succeeds
+- [ ] Given a clock element with valid clock typeConfig, validation succeeds
+- [ ] Given a ticker element with valid ticker typeConfig, validation succeeds
+- [ ] Given a typeConfig shape that does not match the element type, validation fails
+- [ ] Given a non-media element with typeConfig, the field is ignored
+- [ ] Given a clock with `countdownTo` set to a valid ISO 8601 datetime, validation succeeds
+- [ ] Given a clock with `countdownTo` set to a non-ISO-8601 string, validation fails
+- [ ] Given a ticker with `speed: 0`, validation fails
+- [ ] Given a ticker with `speed: 2001`, validation fails
+- [ ] Given a ticker with `speed: 120`, validation succeeds
+- [ ] Given a ticker with `gap: -1`, validation fails
+
+---
+
+### Requirement: Text Path Binding
+
+Text elements MAY reference a path element in the same document via an optional `textPathElementId` field. When present and referencing a valid path element, the text MUST render along the path shape. When the referenced element does not exist or is not a path-type element, `textPathElementId` is ignored and text renders normally.
+
+#### Acceptance Criteria
+
+- [ ] Given a valid `textPathElementId`, text renders along the referenced path shape
+- [ ] Given an invalid or missing `textPathElementId`, text renders normally
+- [ ] Given a text-on-path element, typography settings are still applied
+
+---
+
+### Requirement: Boolean Shape Operations
+
+Group elements MAY carry an optional `booleanOperation` field that combines the shapes of child elements using a boolean path operation. When present, the group's visual output is the computed result of applying the boolean operation to its children's paths, rendered as a single combined path.
+
+Valid values: `'union'` | `'subtract'` | `'intersect'` | `'exclude'`
+
+- `union`: The combined area of all children (OR). AKA "add"
+- `subtract`: The first child's area minus all subsequent children (first − rest). AKA "minus front"
+- `intersect`: Only the area shared by all children (AND)
+- `exclude`: The area belonging to exactly one child, excluding overlaps (XOR)
+
+Children are processed in document order (element array position). The resulting path inherits the first child's stroke/fill styling. Non-group elements MUST ignore this field. Groups with fewer than 2 children MUST render normally (operation requires at least 2 shapes).
+
+When `booleanOperation` is `null` or absent, the group renders normally (children stacked visually).
+
+#### Scenario: Union of two rectangles
+
+- GIVEN a group with `booleanOperation: 'union'` containing two overlapping rectangle children
+- WHEN the group is rendered
+- THEN the output is a single path representing the combined area of both rectangles
+
+#### Scenario: Subtract creates a cutout
+
+- GIVEN a group with `booleanOperation: 'subtract'` where the first child is a large circle and the second is a small circle inside it
+- WHEN the group is rendered
+- THEN the output is a donut shape (large circle with small circle cut out)
+
+#### Scenario: Intersect shows overlap only
+
+- GIVEN a group with `booleanOperation: 'intersect'` containing two partially overlapping ellipses
+- WHEN the group is rendered
+- THEN only the overlapping region is visible
+
+#### Scenario: Fewer than 2 children renders normally
+
+- GIVEN a group with `booleanOperation: 'union'` containing only 1 child element
+- WHEN the group is rendered
+- THEN the single child renders normally (no boolean operation applied)
+
+#### Scenario: Non-group element ignores booleanOperation
+
+- GIVEN a rectangle element with `booleanOperation: 'union'`
+- WHEN the element is validated
+- THEN the field is ignored (only group elements support boolean operations)
+
+#### Acceptance Criteria
+
+- [ ] Given a group with `booleanOperation: 'union'` and 2+ children, the visual output is the union of child shapes
+- [ ] Given `booleanOperation: 'subtract'`, the first child's area minus subsequent children is rendered
+- [ ] Given `booleanOperation: 'intersect'`, only the overlapping region is visible
+- [ ] Given `booleanOperation: 'exclude'`, only the non-overlapping regions are visible
+- [ ] Given a group with fewer than 2 children and a booleanOperation, the group renders normally
+- [ ] Given `booleanOperation` as null or absent, the group renders normally
+- [ ] Given `booleanOperation` as an invalid string, validation fails
+- [ ] Given `booleanOperation` on a non-group element, the field is ignored
+- [ ] Given a boolean group, the resulting path inherits stroke/fill styling from the first child
+
+---
+
+### Requirement: Extension Points
+
+Every element MAY carry an `extensions` property — a `Record<string, unknown>` keyed by reverse-domain vendor prefix. The core model MUST preserve but MUST NOT interpret extensions.
+
+#### Acceptance Criteria
+
+- [ ] Given an element with extensions, they are preserved on round-trip
+- [ ] Given unknown extension keys, the model does not reject or modify them
 
 ---
 
@@ -301,4 +480,5 @@ _None — all requirements have acceptance criteria._
 - Element mutation operations → see `project/spec/editor/spec.md`
 - Element rendering → see `project/spec/renderer/spec.md`
 - Style property details → see [style.md](style.md)
-- Screen property details → see [screen.md](screen.md)
+- Animation configuration → see [animation.md](animation.md)
+- Data schema field definitions → see [data-schema.md](data-schema.md)

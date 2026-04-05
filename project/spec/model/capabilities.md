@@ -172,6 +172,57 @@ Unknown element types MUST resolve to a capability profile with all flags disabl
 
 ---
 
+### Requirement: Video Element Capabilities
+
+Video elements MUST enable: borderRadius, appearance, boxEffects, clipPath, objectFit. All other flags MUST be disabled.
+
+#### Scenario: Video capabilities
+
+- GIVEN an element of type `video`
+- WHEN its capability profile is resolved
+- THEN borderRadius, appearance, boxEffects, clipPath, objectFit are true; all others are false
+
+#### Acceptance Criteria
+
+- [ ] Given a video element, borderRadius, appearance, boxEffects, clipPath, and objectFit are enabled
+- [ ] Given a video element, typography, svgStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
+
+---
+
+### Requirement: Clock Element Capabilities
+
+Clock elements MUST enable: typography, appearance, boxEffects. All other flags MUST be disabled.
+
+#### Scenario: Clock capabilities
+
+- GIVEN an element of type `clock`
+- WHEN its capability profile is resolved
+- THEN typography, appearance, boxEffects are true; all others are false
+
+#### Acceptance Criteria
+
+- [ ] Given a clock element, typography, appearance, and boxEffects are enabled
+- [ ] Given a clock element, borderRadius, clipPath, objectFit, svgStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
+
+---
+
+### Requirement: Ticker Element Capabilities
+
+Ticker elements MUST enable: typography, appearance, boxEffects. All other flags MUST be disabled.
+
+#### Scenario: Ticker capabilities
+
+- GIVEN an element of type `ticker`
+- WHEN its capability profile is resolved
+- THEN typography, appearance, boxEffects are true; all others are false
+
+#### Acceptance Criteria
+
+- [ ] Given a ticker element, typography, appearance, and boxEffects are enabled
+- [ ] Given a ticker element, borderRadius, clipPath, objectFit, svgStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
+
+---
+
 ## Spec Gaps
 
 _None — all requirements have acceptance criteria._

@@ -8,6 +8,28 @@ Defines how the system drives timeline playback in the browser, applies computed
 
 ## Requirements
 
+### Requirement: Timeline State Determinism Guarantee
+
+At any time T on any timeline, the complete state of every element — interpolated properties, `activeState`, `modifiers`, and `visibility` — MUST be a **deterministic pure function** of the animation data alone. No playback history, no seek direction, no previously "fired" events, and no external mutable state may influence the result.
+
+This means:
+
+1. **Seeking to time T** produces the exact same element state whether T was reached by direct seek, forward playback from 0, backward seek from the end, or any arbitrary sequence of seeks.
+2. **Scrubbing** (rapid seeks to arbitrary times) produces correct state at every position without gaps, glitches, or accumulated drift.
+3. **Resuming from a paused state** at time T produces the same result as a cold start that seeks directly to T.
+4. **State derivation is not event dispatch.** Keyframe action markers (`setState`, `addModifier`, `removeModifier`) are evaluated as declarative state declarations, not imperative triggers. The system evaluates all markers from t=0 to T to derive the current state — it does not "fire" events that can be missed or double-counted.
+
+The implementation layer (Playback Handle) MAY track which markers have been processed for performance optimization during continuous forward playback, but this is strictly an optimization — the logical model MUST remain equivalent to full replay from t=0.
+
+#### Acceptance Criteria
+
+- [ ] Given any time T and any sequence of seeks to reach T, element state is always identical
+- [ ] Given a scrub across the full timeline, every sampled position produces correct state
+- [ ] Given a pause and resume at time T, the state matches a fresh seek to T
+- [ ] Given identical animation data and time T, two independent playback instances produce identical state
+
+---
+
 ### Requirement: Playback Handle Lifecycle
 
 The system MUST provide a playback handle that drives a single timeline with frame-based scheduling. The handle MUST support play, pause, seek, setSpeed, and cancel. Seek MUST clamp to `[0, durationMs]`. Cancel MUST make subsequent play calls a no-op. When playback reaches the end of the timeline (non-looping), the handle MUST invoke an optional `onComplete` callback before becoming inactive.
@@ -25,24 +47,26 @@ The system MUST provide a playback handle that drives a single timeline with fra
 - WHEN play is called
 - THEN isActive remains `false`
 
-#### Scenario: Seek fires cumulative actions
+#### Scenario: Seek derives state from all markers up to seek point
 
 - GIVEN a timeline with setState at 100ms and addModifier at 300ms
 - WHEN seeked to 400ms
-- THEN both actions are fired in order
+- THEN element state reflects both markers: activeState is set and modifier is present
 
-#### Scenario: Forward seek fires only unfired actions
+#### Scenario: Forward seek applies only new state transitions to DOM
 
-- GIVEN a timeline with actions at 100ms, 200ms, and 300ms
+- GIVEN a timeline with action markers at 100ms, 200ms, and 300ms
 - WHEN seeked forward from 0ms to 150ms, then seeked forward from 150ms to 250ms
-- THEN the first seek fires only the 100ms action, and the second seek fires only the 200ms action
-- AND the 300ms action is NOT fired in either seek
+- THEN the first seek applies the 100ms marker's DOM side effects, and the second seek applies only the 200ms marker's DOM side effects
+- AND the 300ms marker is NOT applied in either seek
 
-#### Scenario: Backward seek resets action tracking
+> **Note:** This forward-only optimization avoids redundant DOM mutations. The derived state at any point is still equivalent to a full replay from t=0 (see Timeline State Determinism Guarantee).
 
-- GIVEN a timeline where actions at 100ms and 200ms have already been fired by a forward seek to 250ms
+#### Scenario: Backward seek re-derives state from scratch
+
+- GIVEN a timeline where markers at 100ms and 200ms have been applied by a forward seek to 250ms
 - WHEN seeked backward to 50ms, then seeked forward again to 250ms
-- THEN the forward seek fires the 100ms and 200ms actions again
+- THEN state is re-derived from t=0 at each seek position, producing the same result as a cold start
 
 #### Scenario: Seek applies styles to DOM
 
@@ -67,9 +91,9 @@ The system MUST provide a playback handle that drives a single timeline with fra
 
 - [ ] Given a timeline with duration 800ms, currentTimeMs is `0` and when seeked to 99999 then currentTimeMs is `800`
 - [ ] Given a cancelled handle, isActive remains `false`
-- [ ] Given a timeline with setState at 100ms and addModifier at 300ms, both actions are fired in order
-- [ ] Given sequential forward seeks, each seek fires only the actions between the previous and current position
-- [ ] Given a backward seek followed by a forward seek, previously fired actions are fired again
+- [ ] Given a timeline with setState at 100ms and addModifier at 300ms, seeking to 400ms reflects both markers in element state
+- [ ] Given sequential forward seeks, each seek applies only the markers between the previous and current position to the DOM
+- [ ] Given a backward seek followed by a forward seek, state is re-derived from t=0 producing identical results to a cold start
 - [ ] Given a timeline with opacity keyframes, seeking to the end results in the target element's inline style reflecting the final opacity value
 - [ ] Given a non-looping handle with onComplete, the callback fires exactly once when playback reaches durationMs
 - [ ] Given a cancelled handle with onComplete, the callback is NOT invoked
@@ -117,7 +141,7 @@ The style writer MUST NOT re-query the DOM for sub-targets (content element, opa
 
 ### Requirement: Playback Controller DOM Observation
 
-The system MUST observe DOM mutations on attached elements and trigger state/visibility/modifier transitions. Elements starting `offscreen` MUST be hidden. The controller MUST support attach, detach, play, pause, seek, setSpeed, and destroy.
+The system MUST observe DOM mutations on attached elements and initiate state/visibility/modifier transitions based on derived state. Elements starting `offscreen` MUST be hidden. The controller MUST support attach, detach, play, pause, seek, setSpeed, and destroy.
 
 #### Scenario: Offscreen element is hidden on attach
 
@@ -230,7 +254,7 @@ The system MUST play modifier in-timelines when added and out-timelines when rem
 
 ### Requirement: State and Modifier Timeline Resolution
 
-The system MUST resolve state and modifier timelines from the animation registry using a two-step lookup:
+The system MUST resolve state and modifier timelines from the animations array using a two-step lookup:
 
 1. **Find binding by name:** Match the requested state/modifier name against the binding's `stateName` or `modifierName`.
 2. **Find timeline by ID:** Use the binding's `timelineId` to locate the timeline, matching against both `id` and `name` fields.
@@ -268,32 +292,58 @@ For modifier bindings, the system MUST support separate `inTimeline` and `outTim
 
 ### Requirement: Keyframe Action Discrimination
 
-The system MUST support three keyframe action types that modify element screen state during playback:
+The system MUST support three keyframe action types as **declarative state markers** that define element runtime state at points along the timeline:
 
-- **setState:** Sets `screen.activeState` to the action's payload string (or null if no payload).
-- **addModifier:** Adds the payload string to `screen.modifiers`.
-- **removeModifier:** Removes the payload string from `screen.modifiers`.
+- **setState:** Declares the element's runtime `activeState` as the action's payload string (or null if no payload) from this point forward.
+- **addModifier:** Declares the payload string as present in the element's runtime `modifiers` set from this point forward.
+- **removeModifier:** Declares the payload string as absent from the element's runtime `modifiers` set from this point forward.
 
-When seeking to a time position, the system MUST evaluate all keyframe actions from t=0 to the seek point in chronological order, accumulating the resulting `activeState` and `modifiers` set.
+When seeking to a time position, the system MUST derive the element's state by evaluating all action markers from t=0 to the seek point in chronological order. This is a pure derivation — not event dispatch. See the Timeline State Determinism Guarantee.
 
-#### Scenario: setState applies payload as active state
+#### Scenario: setState declares active state
 
 - GIVEN a keyframe at 500ms with action `setState` and payload `highlighted`
-- WHEN playback reaches 500ms
-- THEN `screen.activeState` is set to `highlighted`
+- WHEN state is derived at 500ms or later
+- THEN the element's runtime `activeState` is `highlighted`
 
-#### Scenario: Accumulated state across multiple actions
+#### Scenario: State derived from multiple markers
 
 - GIVEN keyframes: `addModifier('pulse')` at 0ms, `setState('active')` at 500ms, `removeModifier('pulse')` at 1000ms
-- WHEN seeking to 750ms
+- WHEN state is derived at 750ms
 - THEN `activeState` is `active` and `modifiers` contains `pulse`
 
 #### Acceptance Criteria
 
-- [ ] Given a setState action, screen.activeState is set to the payload
-- [ ] Given an addModifier action, the payload is added to screen.modifiers
-- [ ] Given a removeModifier action, the payload is removed from screen.modifiers
-- [ ] Given a seek to a time point, all actions from t=0 to the seek point are evaluated in order
+- [ ] Given a setState marker, the element's runtime activeState is set to the payload from that point forward
+- [ ] Given an addModifier marker, the payload is present in the element's runtime modifiers from that point forward
+- [ ] Given a removeModifier marker, the payload is absent from the element's runtime modifiers from that point forward
+- [ ] Given a seek to a time point, all markers from t=0 to the seek point are evaluated in chronological order
+
+---
+
+### Requirement: State Transition Anti-Cascade
+
+When a state or modifier change triggers a bound timeline (e.g., the IN timeline plays when an element becomes visible), that triggered timeline MUST NOT contain keyframe action markers (`setState`, `addModifier`, `removeModifier`) that target the same element. This prevents recursive state transitions and ensures the state derivation remains a simple linear scan with no cascading side effects.
+
+Cross-element targeting (a keyframe with an explicit `target` pointing to a different element) is permitted in triggered timelines, as it does not create recursion.
+
+#### Scenario: Triggered timeline with self-targeting action marker rejected
+
+- GIVEN a state-triggered timeline containing a `setState` action marker targeting the owner element
+- WHEN the animation data is validated
+- THEN validation fails with an error identifying the circular dependency
+
+#### Scenario: Cross-element action markers in triggered timelines allowed
+
+- GIVEN a state-triggered timeline containing a `setState` action marker targeting a different element
+- WHEN the animation data is validated
+- THEN validation succeeds
+
+#### Acceptance Criteria
+
+- [ ] Given a state-triggered timeline with a self-targeting action marker, validation fails
+- [ ] Given a state-triggered timeline with a cross-element action marker, validation succeeds
+- [ ] Given a modifier-triggered timeline with a self-targeting action marker, validation fails
 
 ---
 
@@ -394,12 +444,12 @@ The system MUST scale playback progression rate by the configured speed factor. 
 
 ### Requirement: Simultaneous Timeline Playback
 
-Multiple timelines MAY play simultaneously on different elements. However, only one timeline MAY be active on a given element at any time. If a new timeline is triggered on an element that already has an active timeline, the existing timeline MUST be cancelled before the new one begins. The cancellation MUST invoke the cancelled timeline's cleanup, removing applied styles and restoring defaults.
+Multiple timelines MAY play simultaneously on different elements. However, only one timeline MAY be active on a given element at any time. If a new timeline starts on an element that already has an active timeline, the existing timeline MUST be cancelled before the new one begins. The cancellation MUST invoke the cancelled timeline's cleanup, removing applied styles and restoring defaults.
 
 #### Scenario: New timeline cancels existing timeline on same element
 
 - GIVEN element A is playing timeline X
-- WHEN timeline Y is triggered on element A
+- WHEN timeline Y starts on element A
 - THEN timeline X is cancelled and timeline Y begins
 
 #### Scenario: Timelines on different elements are independent
@@ -411,14 +461,58 @@ Multiple timelines MAY play simultaneously on different elements. However, only 
 #### Scenario: Cancelled timeline cleanup is invoked
 
 - GIVEN element A is playing timeline X with applied styles
-- WHEN timeline Y is triggered on element A and timeline X is cancelled
+- WHEN timeline Y starts on element A and timeline X is cancelled
 - THEN timeline X's applied styles are removed before timeline Y begins
 
 #### Acceptance Criteria
 
-- [ ] Given a new timeline triggered on an element with an active timeline, the existing timeline is cancelled first
+- [ ] Given a new timeline starting on an element with an active timeline, the existing timeline is cancelled first
 - [ ] Given timelines on different elements, they play independently without interference
 - [ ] Given a cancelled timeline, applied styles are cleaned up before the new timeline starts
+
+---
+
+### Requirement: Loop and Ping-Pong Playback
+
+When a timeline with `loop: 'loop'` or `loop: 'ping-pong'` is playing, the playback engine MUST continue advancing past the base duration according to the loop mode. On each animation frame, the playback engine maps the elapsed time to the effective position within the current loop iteration (see timeline computation spec). When the loop `loopCount` is reached, the playback handle MUST fire its `onComplete` callback and stop. When `loopCount` is `null` (infinite), the playback continues until explicitly cancelled. In `'ping-pong'` mode, the style writer MUST reverse the interpolation direction on odd iterations — all animated properties smoothly reverse. The settle timer MUST NOT fire between loop iterations; it fires only after the final iteration completes (or not at all for infinite loops).
+
+#### Scenario: Loop restarts seamlessly
+
+- GIVEN a playing timeline with `loop: 'loop'` and `loopCount: 2`
+- WHEN the first iteration completes
+- THEN the timeline immediately restarts from offset 0 without a visible gap
+
+#### Scenario: Ping-pong reverses smoothly
+
+- GIVEN a playing timeline with `loop: 'ping-pong'` and `loopCount: 2`
+- WHEN the first forward pass completes
+- THEN the second iteration plays in reverse (properties animate from end values back to start values)
+
+#### Scenario: Finite loop completion
+
+- GIVEN a playing timeline with `loop: 'loop'` and `loopCount: 3`
+- WHEN all 3 iterations complete
+- THEN the `onComplete` callback fires and playback stops
+
+#### Scenario: Infinite loop never auto-completes
+
+- GIVEN a playing timeline with `loop: 'loop'` and `loopCount: null`
+- WHEN playback has run for 100 iterations
+- THEN playback continues; `onComplete` has not fired
+
+#### Scenario: Settle timer on loop completion
+
+- GIVEN a playing timeline with `loop: 'loop'` and `loopCount: 2`
+- WHEN both iterations complete
+- THEN the settle timer fires after the final iteration (not between iterations)
+
+#### Acceptance Criteria
+
+- [ ] Given loop mode with finite count, playback restarts seamlessly between iterations
+- [ ] Given ping-pong mode, odd iterations reverse the interpolation direction
+- [ ] Given `loopCount: N`, `onComplete` fires exactly once after N iterations
+- [ ] Given `loopCount: null`, playback continues indefinitely until cancelled
+- [ ] Given a looping timeline, the settle timer fires only after the final iteration
 
 ---
 

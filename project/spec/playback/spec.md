@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the animation and interpolation engine for broadset. The playback domain computes interpolated property values at arbitrary points in time, applies easing curves, manages timeline playback, and drives DOM style updates for element state transitions. It operates on the `AnimationRegistry` from the model domain and is consumed by the renderer and editor. It does NOT own the document model, render DOM structure, or manage editor state. See [conventions](../../README.md).
+Defines the animation and interpolation engine for broadset. The playback domain computes interpolated property values at arbitrary points in time, applies easing curves, manages timeline playback, and drives DOM style updates for element state transitions. It operates on the `animations` array from the model domain and is consumed by the renderer and editor. It does NOT own the document model, render DOM structure, or manage editor state. See [conventions](../../README.md).
 
 ---
 

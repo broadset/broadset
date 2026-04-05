@@ -16,7 +16,7 @@
 2. [Document Model](#2-document-model)
 3. [Elements](#3-elements)
 4. [Element Styling](#4-element-styling)
-5. [Screen Properties](#5-screen-properties)
+5. [Element Properties](#5-element-properties)
 6. [Animation Data Model](#6-animation-data-model)
 7. [Playback Engine](#7-playback-engine)
 8. [Renderer](#8-renderer)
@@ -69,42 +69,106 @@ demo app, which serves as the integration validation surface.
 
 ## 2. Document Model
 
-<!-- Source: project/spec/model/spec.md -->
+<!-- Source: project/spec/model/spec.md, project/spec/model/project.md -->
 
-A `BroadsetDocument` is the root data type. Every document carries:
+### BroadsetProject (Root Container)
+
+<!-- Source: project/spec/model/project.md -->
+
+A `BroadsetProject` is the root container carrying:
+
+- **schemaVersion**: positive integer (currently `1`). Consumers
+  reject unrecognized versions.
+- **id**, **name**: non-empty string project identity.
+- **createdAt**, **updatedAt**: ISO 8601 timestamps.
+- **settings**: project-wide configuration (fonts, palette,
+  `defaultDocumentMode`). Font definitions carry `family`, `variants`
+  (weight 100–900, style normal/italic), and optional `source`
+  (`{ kind: 'system' }`, `{ kind: 'url', url }`, or
+  `{ kind: 'assetId', assetId }`).
+- **assets**: centralized asset library (see §2a).
+- **documents**: one or more `BroadsetDocument` instances.
+- **templateGroups** (optional): multi-format variant links (see §2b).
+- **extensions** (optional): `Record<string, unknown>` keyed by
+  reverse-domain vendor prefix — preserved but not interpreted.
+
+### BroadsetDocument
+
+Each `BroadsetDocument` carries:
 
 - A non-empty string **id**.
 - A **documentMode** of `'screen'` or `'print'`, immutable after
   creation. Implementations enforce this via the type system and reject
   runtime mutation attempts.
-- **Canvas dimensions** (width × height) in millimeters, both positive
-  and finite. The sample document uses 508 mm × 285.75 mm, which
-  equals 1920 px × 1080 px at 96 DPI.
-- **Canvas padding** as a 4-tuple `[top, right, bottom, left]` of
-  non-negative finite numbers.
+- A **canvas** with `width`, `height` (positive, finite), `unit`
+  (`'px'`/`'mm'`/`'in'`), `dpi` (default 96 for screen, 300 for
+  print), `padding` as a 4-tuple `[top, right, bottom, left]`,
+  optional `backgroundColor`, `backgroundMode`
+  (`'transparent'`/`'solid'`), and optional `safeAreas` (see below).
+- **elements**: a flat array of elements defined at the document level
+  (not on pages). Parent-child relationships are expressed via
+  `parentId` references.
 - A **pages** array that always contains at least one page.
-- An **animation registry** — a flat array keyed by element ID.
+- An **animations** array — a flat array of animation definitions
+  keyed by element ID.
+- A **dataSchema** declaring the template's data contract (see §2c).
+- An optional **output** specification for broadcast constraints
+  (see §2d).
+- Optional **extensions** — vendor data preserved on round-trip.
 
-### Pages and Element Storage
+Screen-mode documents default to `unit: 'px'` with pixel dimensions
+(e.g., 1920 × 1080). Print-mode documents default to `unit: 'mm'`
+or `'in'` with physical dimensions (e.g., 210 × 297 mm).
 
-<!-- Source: project/spec/model/spec.md — Flat Element Tree, Non-Empty Pages -->
+### Safe Areas
 
-Pages store elements as a flat array. There is no recursive DOM-like
-nesting. Parent-child relationships are expressed via `parentId`
-references. This flat structure simplifies serialization, diffing, and
-collaboration.
+<!-- Source: project/spec/model/spec.md — Safe Areas -->
+
+The canvas MAY declare safe areas as percentage insets (0–50):
+
+- **actionSafe**: EBU R95 default 3.5%.
+- **titleSafe**: EBU R95 default 5%.
+- **custom**: array of named safe areas (e.g., `'lower-third-zone'`,
+  `'bug-area'`), each a 4-tuple `[top, right, bottom, left]` as
+  percentage of canvas dimension.
+
+### Elements on the Document
+
+<!-- Source: project/spec/model/spec.md — Document-Level Elements, Flat Element Tree -->
+
+Elements are stored as a flat array on the **document**, not on pages.
+There is no recursive DOM-like nesting. Parent-child relationships are
+expressed via `parentId` references. This flat structure simplifies
+serialization, diffing, and collaboration.
+
+### Pages as Override Layers
+
+<!-- Source: project/spec/model/spec.md — Pages as Data Override Layers -->
+
+Pages are lightweight data override layers — they do NOT carry
+independent element arrays. Each page has:
+
+- **id**, **name**: identity.
+- **overrides**: array of `ElementOverride`, each referencing an
+  element by `elementId` with optional `content`, `style`, `visible`,
+  and `assetId` overrides.
+- **locale** (optional): BCP 47 language tag.
+- **extensions** (optional): vendor data.
+
+The first page with empty overrides represents the template's default
+state.
 
 ### Validation Invariants
 
 <!-- Source: project/spec/model/spec.md — Element Identity, Dimensions, Parent-Child -->
 
-- Element IDs are non-empty strings, unique within their page.
+- Element IDs are non-empty strings, unique within their document.
 - Element width and height must be positive and finite.
-- `parentId` references must point to elements on the same page.
+- `parentId` references must point to elements in the same document.
 - The `parentId` graph must be acyclic.
 - Deleting a parent removes all descendants (with special handling for
   required elements — see §9).
-- Animation registry entries must not duplicate element IDs. Stale
+- Animation entries must not duplicate element IDs. Stale
   entries (referencing deleted elements) are silently ignored.
 
 ### No Hard Limits
@@ -112,8 +176,93 @@ collaboration.
 <!-- Source: project/spec/model/spec.md — No Hard Page or Element Limits -->
 
 The document model imposes no upper limit on pages per document or
-elements per page. The renderer targets 60fps with up to 100 visible
-elements, but exceeding this is valid — it may degrade performance.
+elements per document. The renderer targets 60fps with up to 100
+visible elements, but exceeding this is valid — it may degrade
+performance.
+
+### 2a. Asset Library
+
+<!-- Source: project/spec/model/assets.md -->
+
+The `BroadsetProject` carries a centralized `assets` array. Each
+asset has:
+
+- **id**, **name**, **kind** (`'image'`/`'video'`/`'font'`/
+  `'audio'`/`'data'`), **mimeType**.
+- **source**: discriminated union —
+  `{ type: 'url', url }` (CDN-hosted),
+  `{ type: 'embedded', dataUri }` (base64 data URI), or
+  `{ type: 'file', path }` (relative path within a `.bsp` ZIP
+  package).
+
+Elements reference assets via the optional `assetId` field. When
+`assetId` points to a missing asset, the element's `content` field
+serves as fallback.
+
+**ZIP packaging (.bsp)**: A `.bsp` file may be either plain JSON or a
+ZIP archive containing `project.json` at the root and an `assets/`
+directory for embedded files. Path traversal (`../`) is forbidden.
+Detection: ZIP starts with `PK` magic bytes; plain JSON starts with
+`{`.
+
+### 2b. Template Groups
+
+<!-- Source: project/spec/model/project.md — Template Groups -->
+
+A project MAY contain a `templateGroups` array linking related
+documents that represent the same graphic for different output
+formats. Each `TemplateGroup` carries:
+
+- **groupId**, **name**: identity.
+- **members**: array of `{ documentId, role, label? }` where role is
+  `'16:9'`/`'9:16'`/`'1:1'`/`'4:3'`/`'custom'`.
+
+Template groups are metadata — they do not affect rendering or
+validation.
+
+### 2c. Data Schema and Data Binding
+
+<!-- Source: project/spec/model/data-schema.md -->
+
+Every document has a `dataSchema` declaring the template's data
+contract. The schema contains:
+
+- **fields**: array of `DataSchemaField` (may be empty). Each field
+  has `name`, `type` (`'string'`/`'number'`/`'boolean'`/`'image'`/
+  `'color'`/`'date'`/`'array'`), optional `label`, `defaultValue`,
+  and `constraints` (`required`, `minLength`, `maxLength`, `min`,
+  `max`, `pattern`, `enum`). Array fields require `arrayItemSchema`.
+
+**Element binding**: Elements bind via `dataField` with `fieldName`
+(references a schema field), `overflow` (`'clip'`/`'ellipsis'`/
+`'shrink'`/`'scroll'`), optional `prefix`, `suffix`, and
+`formatPattern` (e.g., `'##,###'` for numbers, `'MMM dd'` for dates).
+
+**Conditional visibility**: `visibleWhen` carries a boolean expression
+over schema fields (operators: `==`, `!=`, `>`, `<`, `>=`, `<=`,
+`&&`, `||`, `!`). Invalid expressions or unknown field references
+fail validation.
+
+**Repeater binding**: The `repeater` field replicates an element for
+each item in an array data field. Configuration: `dataArrayField`,
+`direction` (`'horizontal'`/`'vertical'`/`'grid'`), `gap`,
+optional `maxItems`.
+
+### 2d. Output Specification
+
+<!-- Source: project/spec/model/output-spec.md -->
+
+A document MAY carry an `output` object specifying broadcast output
+constraints:
+
+- **frameRate**: `23.976`/`24`/`25`/`29.97`/`30`/`50`/`59.94`/`60`.
+- **colorSpace**: `'rec709'`/`'rec2020'`/`'srgb'`.
+- **dynamicRange**: `'sdr'`/`'hlg'`/`'pq'`.
+
+When present, keyframe offsets SHOULD be quantized to frame boundaries
+on export. Timecode annotations (SMPTE `HH:MM:SS:FF`) may be attached
+to keyframes for broadcast synchronization. When `output` is absent,
+the consumer picks its own profile.
 
 ---
 
@@ -129,16 +278,18 @@ hierarchy references.
 
 <!-- Source: project/spec/model/element.md — Element Type Vocabulary -->
 
-Eight built-in element types: `text`, `image`, `svg`, `path`,
-`rectangle`, `ellipse`, `qrcode`, `group`. Additional types may be
-registered via the component plugin system.
+Eleven built-in element types: `text`, `image`, `svg`, `path`,
+`rectangle`, `ellipse`, `qrcode`, `group`, `video`, `clock`,
+`ticker`. Additional types may be registered via the component
+plugin system.
 
 ### Geometry
 
 <!-- Source: project/spec/model/element.md — Position and Dimensions, Rotation, Position Validation -->
 
-- Position: `x` and `y` in millimeters. Both must be finite numbers.
-  Negative positions are valid (elements may be off-canvas).
+- Position: `x` and `y` in the document's canvas units. Both must be
+  finite numbers. Negative positions are valid (elements may be
+  off-canvas).
 - Dimensions: `width` and `height`, both positive and finite.
 - Rotation: in degrees. Any finite value is accepted — negative values
   and values exceeding 360° are preserved as-is in the document. NaN
@@ -157,6 +308,9 @@ The `content` field carries type-specific payload:
 | `svg`       | Inline SVG markup             | Must be well-formed SVG                                                                |
 | `path`      | SVG path `d` attribute data   | Must be syntactically valid SVG path                                                   |
 | `qrcode`    | String to encode as QR code   | Must be non-empty                                                                      |
+| `video`     | Video source URL              | Must be a valid URL or empty string                                                    |
+| `clock`     | Time format pattern           | e.g., `HH:mm:ss`; configurable mode in typeConfig                                      |
+| `ticker`    | Ticker items (JSON array)     | JSON array of strings                                                                  |
 | `rectangle` | Empty or ignored              | —                                                                                      |
 | `ellipse`   | Empty or ignored              | —                                                                                      |
 | `group`     | Empty or ignored              | —                                                                                      |
@@ -196,18 +350,18 @@ New elements receive deterministic defaults: `anchorX: 'left'`,
 Every element type resolves to a 10-flag capability profile that
 controls which editing features are available:
 
-| Flag              | text | rect | ellipse | image | svg | path | qrcode | group |
-| ----------------- | ---- | ---- | ------- | ----- | --- | ---- | ------ | ----- |
-| borderRadius      | ✓    | ✓    |         | ✓     | ✓   |      |        |       |
-| typography        | ✓    |      |         |       |     |      |        |       |
-| appearance        | ✓    | ✓    | ✓       | ✓     | ✓   |      |        | ✓     |
-| boxEffects        | ✓    | ✓    | ✓       | ✓     | ✓   |      |        |       |
-| clipPath          |      | ✓    | ✓       | ✓     | ✓   |      |        | ✓     |
-| objectFit         |      |      |         | ✓     | ✓   |      |        |       |
-| svgStrokeFill     |      |      |         |       |     | ✓    |        |       |
-| pathEditing       |      |      |         |       |     | ✓    |        |       |
-| squareConstrained |      |      |         |       |     |      | ✓      |       |
-| instantPlace      |      |      |         |       |     | ✓    |        |       |
+| Flag              | text | rect | ellipse | image | svg | path | qrcode | group | video | clock | ticker |
+| ----------------- | ---- | ---- | ------- | ----- | --- | ---- | ------ | ----- | ----- | ----- | ------ |
+| borderRadius      | ✓    | ✓    |         | ✓     | ✓   |      |        |       | ✓     |       |        |
+| typography        | ✓    |      |         |       |     |      |        |       |       | ✓     | ✓      |
+| appearance        | ✓    | ✓    | ✓       | ✓     | ✓   |      |        | ✓     | ✓     | ✓     | ✓      |
+| boxEffects        | ✓    | ✓    | ✓       | ✓     | ✓   |      |        |       | ✓     | ✓     | ✓      |
+| clipPath          |      | ✓    | ✓       | ✓     | ✓   |      |        | ✓     | ✓     |       |        |
+| objectFit         |      |      |         | ✓     | ✓   |      |        |       | ✓     |       |        |
+| svgStrokeFill     |      |      |         |       |     | ✓    |        |       |       |       |        |
+| pathEditing       |      |      |         |       |     | ✓    |        |       |       |       |        |
+| squareConstrained |      |      |         |       |     |      | ✓      |       |       |       |        |
+| instantPlace      |      |      |         |       |     | ✓    |        |       |       |       |        |
 
 Unknown element types resolve to all flags disabled. Plugins may
 override capabilities.
@@ -230,8 +384,11 @@ text-shadow.
 
 ### Backgrounds
 
-`backgroundColor` (CSS color) and `backgroundGradient` (CSS gradient).
-When both are set, gradient takes visual precedence.
+`backgroundColor` (CSS color) and `backgroundGradient` (CSS gradient
+string or structured `BroadsetGradient` object with typed stops, angle,
+and center). The structured gradient format enables visual editing
+without CSS parsing. When both color and gradient are set, gradient
+takes visual precedence.
 
 ### Borders
 
@@ -255,13 +412,38 @@ fill, fill-opacity, fill-rule.
 Padding (CSS shorthand, non-negative values only) and object-fit.
 Negative padding values are rejected by validation.
 
+### Variable Fonts
+
+`fontVariationSettings` (CSS font-variation-settings) enables
+fine-grained control over variable font axes. Gated by the
+`typography` capability flag.
+
+### Text Writing Mode and Vertical Alignment
+
+`writingMode` supports horizontal-tb (default), vertical-rl, and
+vertical-lr for CJK and creative vertical text layouts. Gated by
+the `typography` capability flag.
+
+`verticalAlignment` (`top`/`middle`/`bottom`) controls vertical
+positioning of text within element bounds.
+
+### Trim Path Properties
+
+<!-- Source: project/spec/model/style.md — Trim Path Properties -->
+
+Path and SVG elements support `trimStart`, `trimEnd` (0–1 fraction
+of path length), and `trimOffset` (0–1 rotation of the visible
+segment). Implemented via `strokeDasharray`/`strokeDashoffset` CSS
+properties. Enables animated line-draw reveal effects. Gated by the
+`svgStrokeFill` capability flag.
+
 ---
 
-## 5. Screen Properties
+## 5. Element Properties
 
-<!-- Source: project/spec/model/screen.md -->
+<!-- Source: project/spec/model/element.md, project/spec/model/style.md -->
 
-`BroadsetScreenProps` controls broadcast and layout behavior:
+Element properties control naming, layout behavior, animation state, and visual transforms. These are split between top-level element fields and the `style` object.
 
 ### Naming and Anchoring
 
@@ -269,12 +451,12 @@ Each element has a `name` (display label) and anchor edges (`anchorX`:
 left/right, `anchorY`: top/bottom) that determine which canvas edge
 the position is measured from.
 
-### Visibility and State
+### Runtime Animation State (playback-only, not serialized)
 
 - **visibility**: `'onscreen'` (visible, animated in) or `'offscreen'`
   (hidden, animated out). Drives CSS class assignment.
 - **activeState**: An exclusive named state (only one at a time, or
-  null). State changes trigger animation transitions.
+  null). Derived deterministically from keyframe action markers.
 - **modifiers**: Additive list of modifier names, independently
   toggleable. Each modifier can have in/out animation timelines.
 
@@ -284,23 +466,35 @@ When `locked` is true, the element resists all UI interactions (drag,
 resize, delete). Programmatic modifications via store actions are still
 permitted.
 
-### Masking
+### Masking (style property)
 
 Six mask types: `none`, `circle`, `squircle`, `triangle`, `star`,
 `custom`. The `custom` type uses the `customClipPath` string, which
 must be a valid CSS clip-path value. Malformed values are rejected.
 
-### 3D Transforms
+### 3D Transforms (style property)
 
 `rotateX`, `rotateY`, `rotateZ` (degrees) and `translateZ` (px)
 define CSS 3D transforms. These are independent of the 2D rotation
 in element geometry. Combined with a perspective value from canvas
 settings.
 
-### Child Clipping
+### Child Clipping (style property)
 
 `clipChildren` controls whether a parent clips its children's overflow
 (CSS `overflow: hidden`).
+
+### Anchor Constraints (Responsive Positioning)
+
+Optional `constraints` object pins element edges to canvas edges on
+resize. Opposing pins cause stretching. Center flags maintain
+proportional positioning. Default: no constraints (absolute layout).
+
+### Alpha Matte Masking (style property)
+
+`maskSourceId` and `maskMode` (`alpha` or `luminance`) use another
+element's rendered output as a mask. The mask source element is hidden
+from normal rendering. Independent of clip-path masking.
 
 ---
 
@@ -310,7 +504,7 @@ settings.
 
 ### Registry
 
-The animation registry is a flat array pairing element IDs with
+The animations array is a flat array pairing element IDs with
 `ElementAnimationConfig` objects. One entry per element maximum.
 
 ### Animation Config
@@ -336,18 +530,73 @@ Each keyframe carries:
 
 - `name` — human-readable label.
 - `action` — `'none'`, `'setState'`, `'addModifier'`, or
-  `'removeModifier'`.
+  `'removeModifier'`. Actions are **declarative state markers** — they
+  declare "from this offset forward, the element IS in this state" —
+  not imperative triggers. State at any time T is derived by evaluating
+  all markers from t=0 to T (a pure function of animation data).
 - `offsetMs` — milliseconds from timeline start.
-- `properties` — map of CSS property name to value + interpolation mode.
+- `properties` — map of CSS property name to `KeyframeValue`
+  (discriminated union with type tag + easing).
 - Optional `payload` (action parameter) and `target` (element ID).
 
-### Interpolation Modes
+### Easing Modes
 
 Supported: `linear`, `ease-in`, `ease-out`, `ease-in-out`,
-`cubic-bezier(x1, y1, x2, y2)`, and `step`.
+`cubic-bezier(x1, y1, x2, y2)`, `step`, `spring(stiffness, damping,
+mass)`, and three named spring presets (`spring-gentle`,
+`spring-bouncy`, `spring-stiff`).
 
 For cubic-bezier: x1 and x2 must be in [0, 1]; y1 and y2 may exceed
 this range for overshoot/bounce effects. All four values must be finite.
+Spring easing produces bounded decay curves with optional overshoot.
+
+### Timeline Loop Mode
+
+Timelines support `loop` modes: `'none'` (default), `'loop'`
+(restart), `'ping-pong'` (alternate direction). Optional `loopCount`
+for finite repetition; `null` for infinite.
+
+### Explicit Timeline Duration
+
+Optional `durationMs` overrides the computed duration. Must not be
+shorter than the maximum keyframe offset.
+
+### Child Timeline Stagger
+
+Automatically offsets child start times to create cascading sequences.
+Configurable delay, direction (normal, reverse, center).
+
+### Motion Path Animation
+
+Keyframes may include a `motionPath` SVG path for curve-based
+position interpolation with uniform arc-length sampling. Optional
+`motionRotate` auto-orients the element along the path tangent.
+
+### Per-Character Text Animation
+
+<!-- Source: project/spec/model/animation.md — Per-Character Text Animation -->
+
+Text elements may carry an optional `textAnimator` within their
+`ElementAnimationConfig`. A `TextAnimator` applies keyframes
+per-character, per-word, or per-line with staggered offsets:
+
+- **rangeMode**: `'characters'`/`'words'`/`'lines'`.
+- **staggerDelayMs**: offset between each unit's animation start.
+- **randomOrder**: boolean for randomized stagger.
+- **timelineId**: references a timeline whose keyframes are applied
+  to each unit independently.
+
+Enables typewriter reveals, wave effects, and per-glyph transitions.
+Ignored on non-text element types.
+
+### Timecode Annotations
+
+<!-- Source: project/spec/model/animation.md, output-spec.md -->
+
+Keyframes may carry `timecodeAnnotation` objects for broadcast
+synchronization. Format is SMPTE: `HH:MM:SS:FF` (frames depend on
+the document's output frame rate). Timecode is metadata — it does not
+override `offsetMs` for playback.
 
 ---
 
@@ -362,11 +611,20 @@ The playback package provides the runtime animation engine.
 <!-- Source: project/spec/playback/interpolation.md -->
 
 Four named presets (linear, ease-in, ease-out, ease-in-out) plus custom
-cubic-bezier. The solver should use an efficient curve algorithm
-(tolerance 1e-6); no specific algorithm is mandated.
+cubic-bezier and spring-based easing. The solver should use an efficient
+curve algorithm (tolerance 1e-6); no specific algorithm is mandated.
+
+Spring easing uses a harmonic oscillator model with configurable
+stiffness, damping, and mass parameters. Three named presets:
+spring-gentle (smooth deceleration), spring-bouncy (visible overshoot),
+spring-stiff (fast settle).
 
 Step easing: at `t < 1.0` returns the source value; at exactly
 `t = 1.0` snaps to the target value.
+
+Counting text interpolation: `'counting'` mode linearly interpolates
+numeric strings with configurable formatting (decimal places,
+thousands separator, prefix, suffix).
 
 ### Color Interpolation
 
@@ -389,9 +647,32 @@ and target paths. Mismatched counts prevent interpolation.
 <!-- Source: project/spec/playback/timeline.md -->
 
 Timeline duration equals the maximum keyframe offset plus a default
-tween duration of 300ms. This is a compile-time constant, not
-configurable per-timeline or per-document. Child timelines compose
-relative to the parent's trigger offset.
+tween duration of 300ms. An optional explicit `durationMs` overrides
+this computed value. Child timelines compose relative to the parent's
+start offset, with optional stagger delays for cascading sequences.
+Loop modes extend the effective duration for repeated playback.
+Motion paths use arc-length sampling for uniform-speed curve
+interpolation.
+
+### Deterministic State Derivation
+
+<!-- Source: project/spec/playback/timeline.md -->
+
+Element state (`activeState`, `modifiers`) at any time T is derived
+as a **pure function** of the animation data — not accumulated from
+events. The system evaluates all keyframe action markers from t=0 to T
+in chronological order. The result is identical regardless of how T was
+reached (direct seek, forward playback, backward seek, scrub). There
+is no concept of "fired" or "unfired" actions at the derivation layer.
+
+### Anti-Cascade Constraint
+
+<!-- Source: project/spec/playback/playback.md -->
+
+State-triggered timelines (e.g., the IN timeline that plays when
+visibility becomes onscreen) MUST NOT contain action markers targeting
+the same element. This prevents recursive state transitions and
+ensures state derivation remains a simple linear scan.
 
 ### Playback
 
@@ -415,7 +696,7 @@ arrives during the settle window, the timer resets.
 
 **Simultaneous playback**: Multiple timelines may run on different
 elements concurrently. On a single element, only one timeline may be
-active. Triggering a new timeline on an element cancels the active one
+active. Starting a new timeline on an element cancels the active one
 first, cleaning up applied styles.
 
 **Suppress transitions mode** enables instant snapshots by bypassing
@@ -469,6 +750,19 @@ Each element type has a defined output contract:
   attribute survive.
 - **Image elements** show a visible broken-image placeholder when the
   URL fails to load. No JavaScript error is thrown.
+- **Video elements** render as an HTML `<video>` tag with
+  `playsinline`, `disablepictureinpicture`, and no native controls.
+  `objectFit` maps to CSS `object-fit`. Autoplay, loop, and muted
+  derive from `typeConfig.video`.
+- **Clock elements** render formatted time strings. Countdown mode
+  displays remaining time toward a target (relative via `startValue`/`targetValue`,
+  or absolute via `countdownTo` with an ISO 8601 datetime — e.g.,
+  countdown to kickoff). When the target datetime is in the past, the
+  clock shows zero. Stopwatch starts from 00:00:00; realtime shows
+  live wall-clock time.
+- **Ticker elements** render horizontally or vertically scrolling text
+  items using CSS translate/rAF animation. Speed (1–2000 px/s),
+  direction, gap, and pause state derive from `typeConfig.ticker`.
 
 ### Dynamic Data Tokens
 
@@ -486,6 +780,15 @@ The renderer should sustain 60fps with up to 100 elements on reference
 hardware. Implementations must not introduce O(n²) or worse rendering
 complexity. Performance testing should measure frame duration rather
 than absolute FPS.
+
+### Alpha Background Rendering
+
+<!-- Source: project/spec/renderer/spec.md -->
+
+An `alphaBackground` flag renders the canvas with a transparent
+background for compositing over external video feeds. Replaces the
+document background color with `transparent` and overrides page
+background rendering.
 
 ### Z-Order
 
@@ -705,6 +1008,39 @@ alignment.
 
 Grid snapping quantizes position to the nearest grid intersection.
 
+### Motion Path Editing Mode
+
+<!-- Source: project/spec/editor/editing.md -->
+
+When an element has a `motionPath`, the editor overlays a visual
+Bézier path with draggable control points. A ghost preview shows the
+element at the path endpoint. Edits to the path update the animation
+keyframe's `motionPath` value.
+
+### Inline Text Formatting Toolbar
+
+<!-- Source: project/spec/editor/editing.md -->
+
+During inline text editing, a floating toolbar appears near the text
+selection with bold, italic, underline, text color, and font size
+controls. Disappears when text is deselected or editing mode exits.
+
+### Named Snapshots
+
+<!-- Source: project/spec/editor/store-actions.md -->
+
+Up to 20 named document snapshots. Restoring a snapshot is an undoable
+action. Snapshots serialize with the document for persistence.
+
+### System Clipboard Integration
+
+<!-- Source: project/spec/editor/store-actions.md -->
+
+Copy/paste uses the Clipboard API as the primary transport, with an
+internal clipboard as fallback when Clipboard API is unavailable.
+Broadset data travels as a custom MIME type; plain text fallback is
+included for cross-application pasting.
+
 ### Keyboard Shortcuts
 
 <!-- Source: project/spec/editor/keyboard.md -->
@@ -714,13 +1050,13 @@ shortcut map is host-configurable.
 
 - **Nudge**: Arrow key moves selected elements by 1mm. Shift+Arrow
   moves by 10mm.
-- **Clipboard**: Copy and paste use an internal clipboard scoped to
-  the editor instance (not the system clipboard). Paste places
-  elements at their original position with zero offset. Paste works
-  across pages within the same editor.
+- **Clipboard**: Copy/paste use the system clipboard with Clipboard
+  API, falling back to an internal clipboard when unavailable. Paste
+  places elements at their original position with zero offset. Paste
+  works across pages within the same editor.
 - **Delete**: Removes selected elements (respecting required element
   rules).
-- **Select all**: Selects all elements on the active page.
+- **Select all**: Selects all unlocked elements in the active document.
 - **Lock toggle**: Toggles locked state on selection.
 - **Layer reorder**: Move elements forward, backward, to front, to back.
 - **Undo/redo**: Full document undo regardless of active page.
@@ -815,6 +1151,14 @@ Canvas-based rendering to PNG or JPEG. Supports pixel-ratio scaling
 for high-DPI output. JPEG accepts an optional quality parameter
 (0–1, default 0.92). PNG ignores quality (always lossless).
 
+### WebM Alpha Video Export
+
+<!-- Source: project/spec/formats/raster.md -->
+
+VP9 codec with alpha channel for broadcast overlay compositing.
+Configurable frame rate and duration. Produces a transparent-
+background video suitable for layering over live feeds.
+
 ### Video (MP4/WebM)
 
 <!-- Source: project/spec/formats/interchange.md -->
@@ -877,6 +1221,21 @@ elements.
 intercepts edits and routes them to keyframe values. Properties not
 in the keyframe render as disabled.
 
+**Type-specific panels**: Video (source URL, autoplay, loop, muted,
+start/end time), Clock (format, mode, target time, autostart),
+Ticker (items list, speed, direction, gap, paused). Each panel only
+appears when the corresponding element type is selected.
+
+**Variable font axis controls**: When a variable font is active, per-
+axis sliders (weight, width, slant, etc.) control
+`fontVariationSettings`.
+
+**Auto-size mode controls**: Segmented button group (Fixed, Auto-
+Height, Shrink-to-Fit) in the Geometry panel.
+
+**Scenes terminology**: The Layers panel uses "Scenes" instead of
+"Pages" in all user-facing labels.
+
 ### Layers Panel
 
 <!-- Source: project/spec/ui/panels.md -->
@@ -910,6 +1269,9 @@ severity-classified issues.
 - **Canvas settings modal**: Units, grid, rulers, perspective.
 - **Shortcuts modal**: Displays configured keyboard shortcuts.
 - **About modal**: Application information.
+- **Template browser modal**: Categorized, searchable grid of content
+  templates from `EditorConfig.templates`. Responsive layout,
+  thumbnail previews, loads selected template as a new document.
 
 ### Toolbar and Navigation
 
@@ -917,8 +1279,8 @@ severity-classified issues.
 
 Floating toolbar with action buttons (undo, redo, save, zoom, grid
 toggle, guide toggle, element tools). Context menu for right-click
-operations. Element library for adding new elements. Page sorter for
-multi-page navigation.
+operations. Element library for adding new elements. Scene sorter for
+multi-scene navigation.
 
 **Undo/redo button states**: Disabled when no history is available.
 Updated immediately after every store action.
@@ -934,6 +1296,15 @@ Bottom panel for timeline editing. Supports keyframe add, select,
 drag (reposition in time), and **delete** (via Delete key or
 right-click context menu). Deleting the last keyframe in a timeline
 removes the timeline entry. All keyframe operations are undoable.
+
+**Visual Easing Graph Editor**: Inline easing curve editor with preset
+chips (linear, ease-in, ease-out, ease-in-out, spring presets) and
+draggable cubic-bezier control handles. A preview dot animates along
+the curve.
+
+**Per-Property Keyframe Lanes**: Each element expands to show
+individual property tracks (x, y, opacity, rotation, etc.) enabling
+fine-grained keyframe management per animated property.
 
 ### Custom Inputs
 
@@ -1097,7 +1468,13 @@ fonts: Arial, Courier New, Times New Roman, Georgia.
 
 ### Feature Configuration
 
-Boolean flags gate features by document mode:
+Seventeen boolean flags gate features by document mode:
+
+`transforms3d`, `clipChildren`, `animations`, `importSvg`,
+`importPsd`, `importPptx`, `exportHtml`, `exportSvg`, `exportPdf`,
+`exportPsd`, `exportPptx`, `exportPng`, `exportJpeg`,
+`exportSvgEmbedded`, `exportOgraf`, `exportMp4`, `exportWebm`,
+`broadcastPreview`.
 
 - **Screen mode** enables: animations, 3D transforms, broadcast
   preview.
@@ -1142,6 +1519,38 @@ pan=0, perspective=1000.
 Default grid: gridSize=5mm, showGrid=false, snapToGrid=false,
 snapThreshold=5px.
 
+### Frame Rate Configuration
+
+<!-- Source: project/spec/model/config.md -->
+
+Default frame rate: 50fps (PAL). Standard broadcast rates (23.976,
+24, 25, 29.97, 30, 50, 59.94, 60) are supported and validated.
+See also §2d Output Specification for document-level output
+constraints.
+
+### Safe Zone Configuration
+
+<!-- Source: project/spec/model/config.md -->
+
+Title-safe and action-safe insets default to EBU R95 standards
+(5% and 3.5% respectively). Custom values are host-configurable.
+See also §2 Safe Areas for the document-level safe area model.
+
+### Content Template Configuration
+
+<!-- Source: project/spec/model/config.md -->
+
+`templates[]` defines categorized document templates with thumbnails.
+The template browser modal presents these for document creation.
+
+### Linked Group Identity
+
+<!-- Source: project/spec/model/config.md -->
+
+`componentId` and `instanceOf` enable linked groups: changing the
+master component propagates to all instances. Instances may override
+content values while inheriting structure and style.
+
 ### Save Callback
 
 <!-- Source: project/spec/model/config.md — Host-Provided Save Callback -->
@@ -1157,28 +1566,35 @@ BroadsetDocument. When absent, save is a no-op and save UI is hidden.
 
 <!-- Source: project/spec/model/changes.md -->
 
-Eight discriminated variants enable collaboration, undo/redo, and
+Multiple discriminated variants enable collaboration, undo/redo, and
 sync:
 
-| Variant            | Payload                                            |
-| ------------------ | -------------------------------------------------- |
-| `element:add`      | pageIndex, elementId, full element data            |
-| `element:remove`   | pageIndex, elementId, full element data (for undo) |
-| `element:update`   | pageIndex, elementId, path, oldValue, newValue     |
-| `element:reorder`  | pageIndex, elementId, fromIndex, toIndex           |
-| `animation:update` | elementId, path, oldValue, newValue                |
-| `page:add`         | pageIndex                                          |
-| `page:remove`      | pageIndex                                          |
-| `settings:update`  | path, oldValue, newValue                           |
+| Variant                   | Payload                                             |
+| ------------------------- | --------------------------------------------------- |
+| `element:add`             | documentId, elementId, full element data            |
+| `element:remove`          | documentId, elementId, full element data (for undo) |
+| `element:update`          | documentId, elementId, path, oldValue, newValue     |
+| `element:reorder`         | documentId, elementId, fromIndex, toIndex           |
+| `animation:update`        | elementId, path, oldValue, newValue                 |
+| `page:add`                | pageIndex                                           |
+| `page:remove`             | pageIndex                                           |
+| `page:override:update`    | pageIndex, elementId, path, oldValue, newValue      |
+| `dataSchema:update`       | path, oldValue, newValue                            |
+| `asset:add`               | assetId, asset data                                 |
+| `asset:remove`            | assetId                                             |
+| `asset:update`            | assetId, path, oldValue, newValue                   |
+| `project:settings:update` | path, oldValue, newValue                            |
+| `settings:update`         | path, oldValue, newValue                            |
 
 ### Unit System
 
 <!-- Source: project/spec/model/utilities.md, config.md -->
 
-- Document spatial values: millimeters (mm).
+- Document spatial values are in the unit declared by `canvas.unit`
+  (`'px'`, `'mm'`, or `'in'`).
 - Font size: pixels (px).
 - Screen/pointer coordinates: pixels (px).
-- Conversion: 1 px = 25.4/96 mm at 96 DPI standard.
+- Conversion: px × (25.4 / dpi) = mm; mm × (dpi / 25.4) = px.
 - Canvas settings support units switching (px/mm/in) for display.
 
 ### Anchor Inference
@@ -1239,9 +1655,9 @@ During playback, keyframe actions invoke callbacks:
 
 - `setState` → resolves state timeline binding, plays the timeline.
 - `addModifier` / `removeModifier` → toggles modifier in element
-  screen state.
+  runtime animation state.
 
-Screen state changes during playback are ephemeral — excluded from
+Runtime animation state changes during playback are ephemeral — excluded from
 collaboration diffs.
 
 ### Export Function Variance
@@ -1269,10 +1685,14 @@ be reflected in the corresponding spec, and vice versa.
 | Summary Section            | Source Spec(s)                                                   |
 | -------------------------- | ---------------------------------------------------------------- |
 | §1 Product Overview        | config.yaml, architecture.md §1–§4                               |
-| §2 Document Model          | project/spec/model/spec.md                                       |
+| §2 Document Model          | project/spec/model/spec.md, project.md                           |
+| §2a Asset Library          | project/spec/model/assets.md                                     |
+| §2b Template Groups        | project/spec/model/project.md                                    |
+| §2c Data Schema            | project/spec/model/data-schema.md                                |
+| §2d Output Specification   | project/spec/model/output-spec.md                                |
 | §3 Elements                | project/spec/model/element.md, capabilities.md                   |
 | §4 Element Styling         | project/spec/model/style.md                                      |
-| §5 Screen Properties       | project/spec/model/screen.md                                     |
+| §5 Element Properties      | project/spec/model/element.md, style.md                          |
 | §6 Animation Data Model    | project/spec/model/animation.md                                  |
 | §7 Playback Engine         | project/spec/playback/interpolation.md, timeline.md, playback.md |
 | §8 Renderer                | project/spec/renderer/spec.md                                    |

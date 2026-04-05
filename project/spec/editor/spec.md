@@ -13,9 +13,9 @@ Defines the editor engine for broadset. The editor manages document state with u
 | [store-actions.md](store-actions.md)                   | Core store actions — document lifecycle, element CRUD, selection, undo/redo, grouping               |
 | [store-ui-actions.md](store-ui-actions.md)             | Workspace actions — pages, canvas settings, guides, palette, fonts, media                           |
 | [data-store.md](data-store.md)                         | Runtime data injection store (BroadsetDataStore) — CRUD, bulk ops, selector isolation               |
-| [collaboration.md](collaboration.md)                   | Document diffing, animation registry diffing, change stream, remote change application              |
+| [collaboration.md](collaboration.md)                   | Document diffing, animation diffing, change stream, remote change application                       |
 | [editing.md](editing.md)                               | Path editing, path drawing, clip-path editing, element placement, factory, validation, capabilities |
-| [animation-state.md](animation-state.md)               | Animation config timeline/state/modifier mutations and screen-state updates                         |
+| [animation-state.md](animation-state.md)               | Animation config timeline/state/modifier mutations and runtime animation state updates              |
 | [timeline-playback.md](timeline-playback.md)           | Editor timeline playback orchestration with snapshot restore                                        |
 | [react-data-integration.md](react-data-integration.md) | Provider context, error boundary, playback controller, data subscriptions                           |
 | [path-geometry.md](path-geometry.md)                   | Path parsing/serialization, handle extraction, and geometry refit behavior                          |

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines editor behavior for animation configuration mutations and screen-state updates applied to document elements. This includes timeline assignment, state/modifier bindings, and element state/modifier transitions reflected in document screen properties. It does NOT define playback interpolation or timeline playback math. See [conventions](../../README.md).
+Defines editor behavior for animation configuration mutations and runtime animation state updates applied to document elements. This includes timeline assignment, state/modifier bindings, and element state/modifier transitions reflected in runtime animation properties. It does NOT define playback interpolation or timeline playback math. See [conventions](../../README.md).
 
 ---
 
@@ -93,11 +93,11 @@ The system MUST set and remove modifier timeline bindings by modifier name witho
 
 ### Requirement: Element State Visibility Mapping
 
-The system MUST map element state activation to screen visibility semantics and propagate offscreen/onscreen transitions to descendants only when descendant animation state definitions exist.
+The system MUST map element state activation to visibility semantics and propagate offscreen/onscreen transitions to descendants only when descendant animation state definitions exist.
 
 #### Scenario: Entry and exit states map to onscreen/offscreen visibility
 
-- GIVEN an element with screen state data
+- GIVEN an element with runtime animation state data
 - WHEN entry then exit state is applied
 - THEN visibility is set to onscreen for entry and offscreen for exit
 
@@ -109,7 +109,7 @@ The system MUST map element state activation to screen visibility semantics and 
 
 #### Acceptance Criteria
 
-- [ ] Given an element with screen state data, visibility is set to onscreen for entry and offscreen for exit
+- [ ] Given an element with runtime animation state data, visibility is set to onscreen for entry and offscreen for exit
 - [ ] Given a parent with multiple descendants, only descendants with corresponding animation state definitions receive propagated visibility changes
 
 ---

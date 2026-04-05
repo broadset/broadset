@@ -164,7 +164,7 @@ Style updates MUST be tracked by undo/redo.
 
 ### Requirement: Layer Reordering
 
-The system MUST reorder elements in the page's element array by direction: `forward` (+1), `backward` (−1), `front` (last), `back` (first).
+The system MUST reorder elements in the document's element array by direction: `forward` (+1), `backward` (− 1), `front` (last), `back` (first).
 
 #### Scenario: Move element forward
 
@@ -224,7 +224,7 @@ Adding an element by type MUST use factory defaults for dimensions and content. 
 
 ### Requirement: Undo and Redo
 
-The system MUST track committed changes and support undo/redo. Temporal state MUST cover document, documentMode, featureConfig, and animationRegistry. Ephemeral updates and selection changes MUST be excluded from history. History size MUST be bounded by `maxUndoSteps` (default 50).
+The system MUST track committed changes and support undo/redo. Temporal state MUST cover document, documentMode, featureConfig, and animations. Ephemeral updates and selection changes MUST be excluded from history. History size MUST be bounded by `maxUndoSteps` (default 50).
 
 #### Scenario: Undo reverts last committed change
 
@@ -334,7 +334,7 @@ The system MUST distribute selected elements evenly along a specified axis. Supp
 
 ### Requirement: Element Reordering (Z-Order)
 
-The system MUST support reordering a single element within the page's element array. Supported directions: `forward` (one position toward the end), `backward` (one position toward the start), `front` (move to end of array), `back` (move to start of array). Reordering MUST be undoable. Elements at the boundary (already at front/back) MUST remain in place.
+The system MUST support reordering a single element within the document's element array. Supported directions: `forward` (one position toward the end), `backward` (one position toward the start), `front` (move to end of array), `back` (move to start of array). Reordering MUST be undoable. Elements at the boundary (already at front/back) MUST remain in place.
 
 #### Scenario: Send forward
 
@@ -428,10 +428,114 @@ Undo and redo operations apply to the full document regardless of the currently 
 
 ---
 
+### Requirement: Named Snapshots
+
+The editor MUST support saving named snapshots of the current document state, independent of the undo/redo history. A snapshot stores a full deep clone of the `BroadsetDocument`, a user-provided name (non-empty string), and a creation timestamp (ISO 8601). The system MUST support at most 20 snapshots per document — creating a 21st MUST fail with an error. Users can restore, rename, and delete snapshots. Restoring a snapshot replaces the current document state with the snapshot's stored document and pushes the replacement onto the undo stack (so the restoration itself is undoable). Deleting a snapshot removes it permanently. Snapshots MUST persist across document serialization — they are stored alongside the document as a `snapshots` array. Snapshot names MUST be unique within a document.
+
+#### Scenario: Create snapshot
+
+- GIVEN a document with unsaved changes
+- WHEN the user creates a snapshot named "Before animation"
+- THEN a snapshot entry is stored with the current document state, name, and timestamp
+
+#### Scenario: Restore snapshot
+
+- GIVEN a snapshot "Before animation" and a subsequently modified document
+- WHEN the user restores the snapshot
+- THEN the document reverts to the snapshot's stored state and the restoration is pushed to the undo stack
+
+#### Scenario: Undo snapshot restoration
+
+- GIVEN a snapshot was just restored
+- WHEN the user triggers undo
+- THEN the document reverts to the state before restoration
+
+#### Scenario: Delete snapshot
+
+- GIVEN 3 snapshots exist
+- WHEN the user deletes "Before animation"
+- THEN the snapshot is removed and 2 remain
+
+#### Scenario: Snapshot limit enforced
+
+- GIVEN 20 snapshots exist
+- WHEN the user attempts to create a 21st
+- THEN the operation fails with an error
+
+#### Scenario: Duplicate name rejected
+
+- GIVEN a snapshot named "Checkpoint" exists
+- WHEN the user creates another snapshot named "Checkpoint"
+- THEN the operation fails — names must be unique
+
+#### Acceptance Criteria
+
+- [ ] Given a create snapshot action, a snapshot with name, timestamp, and full document clone is stored
+- [ ] Given a restore snapshot action, the document is replaced and the restoration is undoable via undo
+- [ ] Given a delete snapshot action, the snapshot is removed
+- [ ] Given 20 existing snapshots, creating a new one fails
+- [ ] Given a duplicate name, creation fails
+- [ ] Given serialization and deserialization, snapshots round-trip without loss
+
+---
+
+### Requirement: System Clipboard Integration
+
+Copy and paste operations MUST use the system clipboard (Clipboard API) when available, enabling cross-document and cross-tab element transfer. On copy or cut, the selected elements MUST be serialized as a JSON string and written to the system clipboard using a Broadset-specific MIME type (`application/x-broadset-elements`). On paste, the system MUST read the clipboard and detect whether it contains Broadset element JSON. If Broadset data is found, the elements are deserialized, assigned new unique IDs, and placed at the center of the current viewport. If the clipboard contains plain text (no Broadset JSON detected), it MUST be pasted as a new text element at the viewport center with default text element styling. If the clipboard contains an image data URL, it MUST be pasted as a new image element. When the Clipboard API is unavailable (e.g., denied permission, insecure context), the system MUST fall back to an internal in-memory clipboard that works within the current editor session. Cut MUST copy elements to clipboard and then delete them from the document (as an atomic undoable action).
+
+#### Scenario: Copy elements to system clipboard
+
+- GIVEN 2 elements are selected
+- WHEN the user triggers copy (Cmd+C / Ctrl+C)
+- THEN the elements are serialized as JSON and written to the system clipboard
+
+#### Scenario: Paste elements from another tab
+
+- GIVEN elements were copied in another Broadset tab
+- WHEN the user triggers paste (Cmd+V / Ctrl+V) in this tab
+- THEN the elements are deserialized with new IDs and placed at the viewport center
+
+#### Scenario: Paste plain text as text element
+
+- GIVEN the system clipboard contains plain text "Hello World"
+- WHEN the user triggers paste
+- THEN a new text element with content "Hello World" is created at the viewport center
+
+#### Scenario: Clipboard API unavailable fallback
+
+- GIVEN the Clipboard API is not available
+- WHEN the user copies and pastes
+- THEN the internal in-memory clipboard is used (works within current tab only)
+
+#### Scenario: Cut removes originals
+
+- GIVEN 2 elements are selected
+- WHEN the user triggers cut (Cmd+X / Ctrl+X)
+- THEN elements are written to clipboard and deleted from the document as one undoable action
+
+#### Scenario: Pasted elements get new IDs
+
+- GIVEN elements are pasted from clipboard
+- WHEN they are inserted into the document
+- THEN each pasted element receives a new unique ID (no ID collision with existing elements)
+
+#### Acceptance Criteria
+
+- [ ] Given selected elements and Clipboard API available, copy writes serialized JSON to system clipboard
+- [ ] Given Broadset JSON in the clipboard, paste deserializes elements with new unique IDs
+- [ ] Given plain text in the clipboard, paste creates a new text element
+- [ ] Given Clipboard API unavailable, copy/paste falls back to internal in-memory clipboard
+- [ ] Given cut, elements are copied to clipboard and deleted as an atomic undoable action
+- [ ] Given pasted elements, all receive new unique IDs to prevent collisions
+
+---
+
 ## Spec Gaps
 
 - [ ] **Required Element Promotion on Parent Deletion:** No automated tests verify promotion of required descendants on parent deletion or absolute position preservation.
 - [ ] **Cross-Page Undo Visibility:** No automated tests verify that undo/redo does not change the active page.
+- [ ] **Named Snapshots:** No automated tests cover snapshot creation, restoration with undo integration, deletion, limit enforcement, or serialization round-trip.
+- [ ] **System Clipboard Integration:** No automated tests cover Clipboard API write/read, Broadset JSON detection, plain text pasting, ID reassignment, or internal fallback behavior.
 
 ---
 

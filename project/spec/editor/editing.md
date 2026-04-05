@@ -433,7 +433,7 @@ The system MUST create path elements with default dimensions (80×50), empty con
 
 ### Requirement: Element Factory Defaults
 
-Creating an element by type MUST use predefined default dimensions and content per type. The system MUST support: text (80×20, `'New Text'`), image (60×60, empty), svg (60×60, empty), path (80×50, empty), rectangle (80×50, empty), ellipse (50×50, empty), qrcode (40×40, `'https://example.com'`), group (120×80, empty). Custom types MUST fall back to plugin-provided defaults or system fallbacks (80×50, empty).
+Creating an element by type MUST use predefined default dimensions and content per type. The system MUST support: text (80×20, `'New Text'`), image (60×60, empty), svg (60×60, empty), path (80×50, empty), rectangle (80×50, empty), ellipse (50×50, empty), qrcode (40×40, `'https://example.com'`), group (120×80, empty), video (120×68, empty), clock (160×50, `'HH:mm:ss'`), ticker (400×40, `'["Item 1"]'`). Custom types MUST fall back to plugin-provided defaults or system fallbacks (80×50, empty).
 
 #### Scenario: Text factory defaults
 
@@ -458,7 +458,7 @@ Creating an element by type MUST use predefined default dimensions and content p
 - [ ] Given element type text, factory produces width 80, height 20, content 'New Text'
 - [ ] Given a plugin with defaults, factory uses the plugin's default dimensions and content
 - [ ] Given a plugin without defaults, factory uses system fallback dimensions
-- [ ] Given each built-in element type (image, svg, rectangle, ellipse, qrcode, group), the factory produces the type-specific default dimensions and content
+- [ ] Given each built-in element type (image, svg, rectangle, ellipse, qrcode, group, video, clock, ticker), the factory produces the type-specific default dimensions and content
 
 ---
 
@@ -650,10 +650,119 @@ The preflight system MUST include a `missing-font` diagnostic rule. This rule ch
 
 ---
 
+### Requirement: Motion Path Editing Mode
+
+The editor MUST provide a motion path editing mode for visually authoring the Bézier curve used in motion path animation. When activated (via the timeline or animation panel), the editor MUST render a non-printing overlay on the canvas showing:
+
+1. **The motion path curve** as a dashed line from the element's start position to its end position, following the SVG path shape
+2. **Control points** (Bézier handles) as draggable circles along the curve
+3. **The element's preview position** as a semi-transparent ghost at the current scrub time, positioned on the path
+
+Dragging control points MUST update the `motionPath` SVG `d` string in real time. The path overlay MUST be zoom-compensated (constant visual size regardless of canvas zoom). Double-clicking the path MUST insert a new control point at the clicked arc position. Selecting a control point and pressing Delete MUST remove it (minimum 2 anchor points: start and end). Escape or clicking outside the path MUST exit motion path editing mode and commit changes. The motion path overlay MUST render above all elements but below the transform widget. Entry and exit follow the same mutex rules as path editing and clip-path editing — only one overlay mode can be active at a time.
+
+#### Scenario: Enter motion path editing
+
+- GIVEN an element with a motion path animation configured
+- WHEN the user activates motion path editing from the timeline panel
+- THEN the canvas renders the path curve, control points, and element ghost
+
+#### Scenario: Drag control point updates path
+
+- GIVEN motion path editing is active with a visible Bézier curve
+- WHEN the user drags a control point
+- THEN the path curve and the `motionPath` value update in real time
+
+#### Scenario: Add control point by double-click
+
+- GIVEN motion path editing is active
+- WHEN the user double-clicks on the path curve
+- THEN a new control point is inserted at the clicked position on the arc
+
+#### Scenario: Exit motion path editing
+
+- GIVEN motion path editing is active
+- WHEN the user presses Escape
+- THEN motion path editing exits, the overlay is removed, and changes are committed
+
+#### Scenario: Mutex with other overlay modes
+
+- GIVEN path point editing is active on another element
+- WHEN the user enters motion path editing
+- THEN path point editing is exited before motion path editing activates
+
+#### Acceptance Criteria
+
+- [ ] Given an element with motion path animation, entering motion path editing renders the path curve, control points, and element ghost
+- [ ] Given a control point drag, the motionPath SVG `d` string updates in real time
+- [ ] Given a double-click on the path, a new control point is inserted
+- [ ] Given Escape pressed, motion path editing exits and changes are committed
+- [ ] Given another overlay mode active, entering motion path editing exits the previous mode first
+- [ ] Given the canvas is zoomed, the path overlay is zoom-compensated
+
+---
+
+### Requirement: Inline Text Formatting Toolbar
+
+When inline text editing is active (double-click on text element) and the user selects a text range, the editor MUST display a floating formatting toolbar positioned above the selection (or below if insufficient space above). The toolbar MUST offer these formatting controls:
+
+| Control    | Type          | Action                                            |
+| ---------- | ------------- | ------------------------------------------------- |
+| Bold       | Toggle button | Wraps/unwraps selection in `<strong>` tags        |
+| Italic     | Toggle button | Wraps/unwraps selection in `<em>` tags            |
+| Underline  | Toggle button | Wraps/unwraps selection in `<u>` tags             |
+| Text color | Color swatch  | Wraps selection in `<span style="color:...">` tag |
+| Font size  | NumField      | Wraps selection in `<span style="font-size:...">` |
+
+Toggle buttons MUST reflect the current formatting state of the selection (pressed if all selected text has that format). When the selection is collapsed (cursor only, no range), the toolbar MUST be hidden. Applying a format MUST modify the element's `content` HTML using only the allowed rich text tags (b, i, u, br, span, strong, em). The toolbar MUST be zoom-compensated so it remains readable at any canvas zoom level. Clicking a toolbar control MUST NOT exit inline editing mode. The toolbar MUST use pointer-events to prevent accidental text deselection when clicking controls.
+
+#### Scenario: Show toolbar on text selection
+
+- GIVEN inline text editing is active on a text element
+- WHEN the user selects a range of text
+- THEN a floating formatting toolbar appears above the selection
+
+#### Scenario: Apply bold to selection
+
+- GIVEN the formatting toolbar is visible with text selected
+- WHEN the user clicks Bold
+- THEN the selected text is wrapped in `<strong>` tags in the element content
+
+#### Scenario: Apply color to selection
+
+- GIVEN the formatting toolbar is visible with text selected
+- WHEN the user picks a color from the color swatch
+- THEN the selected text is wrapped in `<span style="color:#chosen">` in the element content
+
+#### Scenario: Toolbar hidden when selection collapses
+
+- GIVEN the formatting toolbar is visible
+- WHEN the user clicks to collapse the selection to a cursor
+- THEN the formatting toolbar is hidden
+
+#### Scenario: Toggle reflects current state
+
+- GIVEN the selection contains only bold text
+- WHEN the toolbar renders
+- THEN the Bold toggle is in the pressed/active state
+
+#### Acceptance Criteria
+
+- [ ] Given a text selection during inline editing, the formatting toolbar appears
+- [ ] Given Bold clicked, the selection is wrapped in `<strong>` tags
+- [ ] Given Italic clicked, the selection is wrapped in `<em>` tags
+- [ ] Given a color selection, the text is wrapped in `<span style="color:...">` tag
+- [ ] Given the selection collapses, the toolbar is hidden
+- [ ] Given the toolbar is clicked, inline editing mode is not exited
+- [ ] Given selected text already formatted, the corresponding toggle is in pressed state
+
+---
+
 ## Spec Gaps
 
 - [ ] **In-Place Text Editing:** No automated tests verify inline editing activation, commit-on-Escape, commit-on-click-outside, drag suppression, or Enter line-break insertion.
 - [ ] **Missing Font Preflight Rule:** No automated tests verify the `missing-font` preflight rule or its interaction with `allowedFonts` and system font fallbacks.
+- [ ] **Motion Path Editing Mode:** No automated tests cover motion path overlay rendering, control point dragging, or overlay mutex behavior — requires CT.
+- [ ] **Inline Text Formatting Toolbar:** No automated tests cover toolbar appearance, formatting application, or toolbar position — requires CT.
 
 ---
 

@@ -22,7 +22,7 @@ The following components MUST apply glass-morphism with the specified background
 | Floating toolbar | `rgba(28, 28, 28, 0.85)`  | `blur(8px)`     | `border: 1px solid var(--border)`, `box-shadow: 0 2px 8px rgba(0,0,0,0.4)`                       |
 | Element toolbar  | `rgba(28, 28, 28, 0.85)`  | `blur(8px)`     | Same as floating toolbar                                                                         |
 | Sidebar drawer   | `var(--surface)` (opaque) | None            | `border-radius` on left corners only (right flush with viewport edge)                            |
-| Page sorter      | `rgba(28, 28, 28, 0.85)`  | `blur(8px)`     | Same as toolbars                                                                                 |
+| Scene sorter     | `rgba(28, 28, 28, 0.85)`  | `blur(8px)`     | Same as toolbars                                                                                 |
 | Bottom panel     | `var(--surface)` (opaque) | None            | `border-radius` on top corners only, `box-shadow: var(--overlay-shadow)`                         |
 | Modal overlays   | Semi-transparent dark bg  | `blur(8px)`     |                                                                                                  |
 
@@ -82,13 +82,13 @@ Element types, sidebar tabs, and toolbar actions MUST use consistent iconography
 
 **Toolbar Action Icon Mapping:**
 
-Toolbar dropdown menus (File, View, Pages, Help) MUST use text labels on their trigger buttons — they are NOT icon-only. Within dropdown menus, each item MUST have a `lucide-react` icon alongside its label (see `project/spec/ui/toolbar-nav.md` for the full icon mapping per menu item). Standalone toolbar buttons (Undo, Redo, alignment actions) MUST be icon-only with `aria-label` and HeroUI `Tooltip`.
+Toolbar dropdown menus (File, View, Scenes, Help) MUST use text labels on their trigger buttons — they are NOT icon-only. Within dropdown menus, each item MUST have a `lucide-react` icon alongside its label (see `project/spec/ui/toolbar-nav.md` for the full icon mapping per menu item). Standalone toolbar buttons (Undo, Redo, alignment actions) MUST be icon-only with `aria-label` and HeroUI `Tooltip`.
 
 #### Scenario: Element type icons
 
 - GIVEN the element toolbar renders
 - WHEN all built-in element types are listed
-- THEN each type (text, image, svg, path, rectangle, ellipse, qrcode, group) has a distinct icon
+- THEN each type (text, image, svg, path, rectangle, ellipse, qrcode, group, video, clock, ticker) has a distinct icon
 
 #### Scenario: Toolbar menu items have icons
 
@@ -108,7 +108,7 @@ Toolbar dropdown menus (File, View, Pages, Help) MUST use text labels on their t
 - [ ] Given dropdown menu items, each item has a corresponding icon alongside its label
 - [ ] Given a plugin without an icon, a default fallback icon is used
 - [ ] Given icon-only buttons (Undo, Redo, alignment), each has an aria-label and tooltip
-- [ ] Given dropdown trigger buttons (File, View, Pages, Help), they display text labels
+- [ ] Given dropdown trigger buttons (File, View, Scenes, Help), they display text labels
 
 ---
 

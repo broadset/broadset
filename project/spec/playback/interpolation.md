@@ -201,6 +201,87 @@ Color interpolation functions MUST accept only hexadecimal color strings (`#RGB`
 
 ---
 
+### Requirement: Spring Easing Function
+
+The interpolation system MUST evaluate spring-based easing curves for the `'spring(stiffness, damping, mass)'` interpolation mode and the named spring presets (`'spring-gentle'`, `'spring-bouncy'`, `'spring-stiff'`). The spring function MUST produce a normalized progress value (0 to ~1, with possible overshoot) for a given time fraction `t` (0–1). The spring simulation models a critically/under-damped harmonic oscillator: `x(t) = 1 - e^(-damping*t/2mass) * cos(ωt)` where `ω = sqrt(stiffness/mass - (damping/2mass)^2)`. The function MUST settle to the target value (within 0.001 tolerance) by `t=1`. Named presets resolve to fixed parameter values:
+
+| Preset          | Stiffness | Damping | Mass |
+| --------------- | --------- | ------- | ---- |
+| `spring-gentle` | 100       | 20      | 1    |
+| `spring-bouncy` | 400       | 10      | 1    |
+| `spring-stiff`  | 500       | 30      | 1    |
+
+#### Scenario: Spring-bouncy produces overshoot
+
+- GIVEN interpolation mode `'spring-bouncy'` and numeric values 0 → 100
+- WHEN interpolated at t=0.3
+- THEN the result exceeds 100 (overshoot due to low damping)
+
+#### Scenario: Spring-stiff settles quickly
+
+- GIVEN interpolation mode `'spring-stiff'` and numeric values 0 → 100
+- WHEN interpolated at t=0.8
+- THEN the result is within 1 unit of 100 (fast settle)
+
+#### Scenario: Spring-gentle smooth deceleration
+
+- GIVEN interpolation mode `'spring-gentle'` and numeric values 0 → 100
+- WHEN interpolated at t=0.5
+- THEN the result is between 0 and 100 with no overshoot (high damping)
+
+#### Scenario: Custom spring parameters
+
+- GIVEN interpolation mode `'spring(300, 15, 1)'` and numeric values 0 → 200
+- WHEN interpolated at t=1.0
+- THEN the result is within 0.2 units of 200 (settled)
+
+#### Acceptance Criteria
+
+- [ ] Given `'spring-bouncy'`, interpolation exhibits overshoot past the target value
+- [ ] Given `'spring-stiff'`, interpolation settles to within tolerance of the target by t=0.8
+- [ ] Given `'spring-gentle'`, interpolation progresses smoothly without overshoot
+- [ ] Given custom spring parameters, the decay curve matches the harmonic oscillator model
+- [ ] Given any spring mode at t=1.0, the result is within 0.001 of the target value
+
+---
+
+### Requirement: Counting Text Interpolation
+
+The interpolation system MUST support a `'counting'` interpolation mode for keyframe properties where both the `from` and `to` values are numeric strings. When `'counting'` mode is active, the system MUST parse both values as numbers, linearly interpolate the numeric value, and format the result back as a string. An optional `countingFormat` on the keyframe property specifies formatting: `decimalPlaces` (integer ≥ 0, default 0), `thousandsSeparator` (string, default `''`), `prefix` (string, default `''`), and `suffix` (string, default `''`). When either `from` or `to` is not a valid numeric string, the system MUST fall back to discrete value switching (from value until t≥1, then to value).
+
+#### Scenario: Integer counting
+
+- GIVEN `from: '0'`, `to: '100'`, interpolation mode `'counting'` with default format
+- WHEN interpolated at t=0.5
+- THEN the result is `'50'`
+
+#### Scenario: Counting with decimal places
+
+- GIVEN `from: '0'`, `to: '99.9'`, mode `'counting'`, `countingFormat: { decimalPlaces: 1 }`
+- WHEN interpolated at t=0.5
+- THEN the result is `'50.0'`
+
+#### Scenario: Counting with prefix and suffix
+
+- GIVEN `from: '0'`, `to: '1000'`, mode `'counting'`, `countingFormat: { prefix: '$', suffix: 'k', thousandsSeparator: ',' }`
+- WHEN interpolated at t=0.5
+- THEN the result is `'$500k'`
+
+#### Scenario: Non-numeric fallback to discrete
+
+- GIVEN `from: 'Hello'`, `to: 'World'`, mode `'counting'`
+- WHEN interpolated at t=0.5
+- THEN the result is `'Hello'` (discrete — from value until t≥1)
+
+#### Acceptance Criteria
+
+- [ ] Given two numeric strings with `'counting'` mode, the interpolated value is a formatted numeric string
+- [ ] Given `decimalPlaces: 2`, the result has exactly 2 decimal places
+- [ ] Given prefix and suffix in countingFormat, they are prepended and appended to the result
+- [ ] Given non-numeric from or to value, counting falls back to discrete switching
+
+---
+
 ## Spec Gaps
 
 - [x] **Hex-Only Color Input Guarantee:** Test coverage exists — `returns from value unchanged for non-hex input` and `returns from value unchanged for named colors` in `interpolation.test.ts`.

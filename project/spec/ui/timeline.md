@@ -263,7 +263,7 @@ When a keyframe is selected in the timeline, property panels MUST switch to keyf
 
 ### Requirement: Keyframe Deletion
 
-Selected keyframes MUST be deletable via the Delete/Backspace key or a right-click context menu. Deleting a keyframe MUST remove it from the timeline and update the animation registry. If the deleted keyframe is the only keyframe in a timeline, the entire timeline entry MUST be removed. Keyframe deletion MUST be undoable.
+Selected keyframes MUST be deletable via the Delete/Backspace key or a right-click context menu. Deleting a keyframe MUST remove it from the timeline and update the animations array. If the deleted keyframe is the only keyframe in a timeline, the entire timeline entry MUST be removed. Keyframe deletion MUST be undoable.
 
 #### Scenario: Delete key removes selected keyframe
 
@@ -298,9 +298,101 @@ Selected keyframes MUST be deletable via the Delete/Backspace key or a right-cli
 
 ---
 
+### Requirement: Visual Easing Graph Editor
+
+The timeline editor MUST provide a visual easing curve editor for authoring and previewing interpolation curves. When a keyframe tween is selected (click on the segment between two keyframes), a graph editor panel MUST appear inline below the timeline ruler. The graph editor displays a unit square (0,0 → 1,1) with the current easing curve plotted as a line. For cubic-bezier curves, two control point handles MUST be draggable to modify the curve shape in real time. For named presets (ease, ease-in, ease-out, ease-in-out), the curve MUST display as read-only — the user can switch to custom cubic-bezier to make it editable. For spring presets, the graph MUST show the spring decay curve as read-only with the overshoot visible. The graph editor MUST include a row of preset chips above the curve: `linear`, `ease`, `ease-in`, `ease-out`, `ease-in-out`, `spring-gentle`, `spring-bouncy`, `spring-stiff`. Clicking a preset chip MUST apply it immediately and update the curve visualization. A real-time animation preview dot MUST travel along the curve while the timeline is scrubbing or playing. The graph editor closes when clicking outside it or selecting a different keyframe.
+
+#### Scenario: Open graph editor for tween segment
+
+- GIVEN two keyframes with a tween segment between them
+- WHEN the user clicks the tween segment
+- THEN the graph editor panel appears below the timeline ruler showing the current easing curve
+
+#### Scenario: Drag cubic-bezier control handles
+
+- GIVEN the graph editor is open with a custom cubic-bezier curve
+- WHEN the user drags a control point handle
+- THEN the curve updates in real time and the keyframe's interpolation mode value is updated
+
+#### Scenario: Apply preset chip
+
+- GIVEN the graph editor is open
+- WHEN the user clicks the `ease-in-out` preset chip
+- THEN the interpolation mode is set to `ease-in-out` and the curve visualization updates
+
+#### Scenario: Spring preset displays decay curve
+
+- GIVEN the graph editor is open with interpolation mode `spring-bouncy`
+- WHEN the graph renders
+- THEN the curve shows the spring decay with visible overshoot (values above 1.0)
+
+#### Scenario: Preview dot during playback
+
+- GIVEN the graph editor is open and the timeline is playing
+- WHEN the playhead advances
+- THEN a dot travels along the curve in sync with the playback position
+
+#### Acceptance Criteria
+
+- [ ] Given a tween segment click, the graph editor appears with the current easing curve
+- [ ] Given a cubic-bezier curve, control handles are draggable and update the interpolation mode
+- [ ] Given a preset chip click, the interpolation mode and visualization update immediately
+- [ ] Given a spring easing, the curve shows the decay with overshoot
+- [ ] Given playback or scrubbing, a preview dot travels along the curve
+- [ ] Given a click outside the graph editor, it closes
+
+---
+
+### Requirement: Per-Property Keyframe Lanes
+
+The timeline editor MUST support an expandable per-property view that displays individual property tracks for the selected element's animation. When the user clicks an expand toggle on an element's timeline row, the row expands to show one horizontal lane per animated property (e.g., `x`, `y`, `opacity`, `backgroundColor`). Each lane shows diamond keyframe markers at the offsets where that specific property has values. Users can add keyframes to individual property lanes by double-clicking at the desired offset — this creates or updates a keyframe at that offset for only that property. Users can drag a property-specific keyframe marker to a different offset — this moves that property's value out of the source keyframe and into a new or existing keyframe at the target offset. The expanded view MUST group properties by category: Geometry (x, y, width, height, rotation), Appearance (opacity, backgroundColor, borderColor, etc.), and Typography (fontSize, color, etc.). When the expand toggle is collapsed, the view returns to the standard monolithic keyframe display. Only one element's properties can be expanded at a time.
+
+#### Scenario: Expand property lanes
+
+- GIVEN an element row in the timeline with animated properties `x`, `opacity`, and `backgroundColor`
+- WHEN the user clicks the expand toggle
+- THEN three property lanes appear, each showing keyframe markers at the relevant offsets
+
+#### Scenario: Add keyframe to single property lane
+
+- GIVEN the property lanes are expanded for `opacity`
+- WHEN the user double-clicks at offset 500ms on the `opacity` lane
+- THEN a keyframe is created (or updated) at 500ms with the current opacity value
+
+#### Scenario: Drag property keyframe to different offset
+
+- GIVEN a keyframe at 300ms with properties `x: 100` and `opacity: 0.5`
+- WHEN the user drags the `opacity` marker from 300ms to 600ms on the opacity lane
+- THEN `opacity: 0.5` is removed from the 300ms keyframe and placed in a keyframe at 600ms; `x: 100` remains at 300ms
+
+#### Scenario: Collapse back to monolithic view
+
+- GIVEN property lanes are expanded
+- WHEN the user clicks the collapse toggle
+- THEN lanes collapse back to the single-row monolithic keyframe display
+
+#### Scenario: Property categories
+
+- GIVEN an element with animated `x`, `y`, `opacity`, and `fontSize`
+- WHEN property lanes are expanded
+- THEN lanes are grouped: Geometry (x, y), Appearance (opacity), Typography (fontSize)
+
+#### Acceptance Criteria
+
+- [ ] Given the expand toggle, property lanes are shown with per-property keyframe markers
+- [ ] Given a double-click on a property lane, a property-specific keyframe is created at that offset
+- [ ] Given a property keyframe drag, that property value moves to the target offset independently
+- [ ] Given the collapse toggle, the view returns to monolithic keyframe display
+- [ ] Given animated properties, they are grouped by category (Geometry, Appearance, Typography)
+- [ ] Given multiple elements, only one element's properties can be expanded at a time
+
+---
+
 ## Spec Gaps
 
 - [ ] **Keyframe Deletion:** No automated tests cover Delete/Backspace key handling, context-menu delete, last-keyframe timeline removal, or undo of deletion — component tests needed for the timeline editor keyframe deletion flow.
+- [ ] **Visual Easing Graph Editor:** No automated tests cover graph editor appearance, control handle interaction, preset application, or preview dot behavior — requires CT.
+- [ ] **Per-Property Keyframe Lanes:** No automated tests cover lane expansion, per-property keyframe creation, property value migration between offsets, or category grouping — requires CT.
 
 ---
 

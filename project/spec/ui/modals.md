@@ -326,9 +326,55 @@ All modals MUST conform to WCAG 2.1 AA standards. Modal containers MUST use `rol
 
 ---
 
+### Requirement: Template Browser Modal
+
+When content templates are configured (via `EditorConfig.templates`), the New Document flow MUST include a template browser section. The template browser MUST display templates grouped by `category` with alphabetically sorted category headers. Each template MUST show a `thumbnail` image and `name` label. Selecting a template MUST highlight it with a visible selection ring. Confirming the selection (double-click or "Create" button) MUST load the template's stored `BroadsetDocument` as a new document, replacing the current document (with confirmation if the current document has unsaved changes). The browser MUST include a search input that filters templates by name (case-insensitive substring match). When no templates match the search, a "No templates found" message MUST appear. When `EditorConfig.templates` is empty or absent, the template browser section MUST NOT appear in the New Document modal — only blank document size presets are shown. The template browser MUST use a responsive grid layout (minimum 3 columns, maximum 5) with thumbnail cards.
+
+#### Scenario: Browse templates by category
+
+- GIVEN templates in categories "Lower Thirds" and "Full Screen"
+- WHEN the template browser renders
+- THEN templates are grouped under "Full Screen" and "Lower Thirds" headers (alphabetical)
+
+#### Scenario: Search filters templates
+
+- GIVEN 10 templates and a search input with "news"
+- WHEN the user types "news"
+- THEN only templates whose name contains "news" (case-insensitive) are shown
+
+#### Scenario: Select and create from template
+
+- GIVEN a template "Sports Score" is selected
+- WHEN the user clicks "Create"
+- THEN the template's stored document is loaded as a new document
+
+#### Scenario: No templates configured
+
+- GIVEN `EditorConfig.templates` is empty
+- WHEN the New Document modal opens
+- THEN no template browser section is shown
+
+#### Scenario: Unsaved changes confirmation
+
+- GIVEN the current document has unsaved changes
+- WHEN the user selects a template and clicks "Create"
+- THEN a confirmation dialog asks whether to discard unsaved changes before proceeding
+
+#### Acceptance Criteria
+
+- [ ] Given templates, they are displayed grouped by category with alphabetical category sorting
+- [ ] Given a search query, templates are filtered by name substring match
+- [ ] Given a template selection and confirmation, the template document is loaded as a new document
+- [ ] Given no templates configured, the template browser section is not shown
+- [ ] Given unsaved changes, a confirmation dialog appears before replacing the document
+- [ ] Given the template browser, a responsive grid with 3–5 columns is used
+
+---
+
 ## Spec Gaps
 
 - [ ] **WCAG AA Modal Accessibility:** No automated tests verify focus trapping, focus restoration on close, Escape-to-close behavior, or ARIA attribute presence on modal containers — accessibility-focused component tests are needed for all modal dialogs.
+- [ ] **Template Browser Modal:** No automated tests cover category grouping, search filtering, template loading, or unsaved changes confirmation — requires CT.
 
 ---
 

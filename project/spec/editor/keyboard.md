@@ -71,7 +71,7 @@ Arrow keys MUST move selected elements by a small step of **1mm** in canvas unit
 
 ### Requirement: Clipboard Copy and Paste
 
-Copy MUST capture the currently selected elements. Pasted elements MUST be placed at the same position as the originals (zero offset) — the user repositions duplicates manually. Duplicate MUST perform a combined copy+paste in one operation and likewise places the new elements at the originals' positions.
+Copy MUST capture the currently selected elements. Copy and paste MUST use the Clipboard API as the primary transport, with an internal clipboard as fallback when the Clipboard API is unavailable or denied. Pasted elements MUST be placed at the same position as the originals (zero offset) — the user repositions duplicates manually. Duplicate MUST perform a combined copy+paste in one operation and likewise places the new elements at the originals' positions.
 
 #### Scenario: Copy and paste
 
@@ -166,7 +166,7 @@ Ctrl+G MUST group all multi-selected elements (assign shared groupId). Ctrl+Shif
 
 ### Requirement: Clipboard Scope
 
-Copy and paste operations use an internal clipboard scoped to the editor instance. The clipboard does NOT interact with the system clipboard. Copied elements are stored in memory and persist until the editor is destroyed or new elements are copied. Paste is valid across pages within the same editor instance.
+Copy and paste operations use the system Clipboard API as the primary transport, with an internal clipboard as fallback when the Clipboard API is unavailable or permission is denied. Copied elements are stored until the editor is destroyed or new elements are copied. Paste is valid across pages within the same editor instance.
 
 #### Scenario: Paste on a different page
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines editor-side timeline playback coordination between editing context state and playback controls. The editor MUST restore captured screen state snapshots before seek/play and when editing closes, while delegating timeline playback actions to the playback controller. It does NOT define interpolation or timeline frame computation. See [conventions](../../README.md).
+Defines editor-side timeline playback coordination between editing context state and playback controls. The editor MUST restore captured runtime animation state snapshots before seek/play and when editing closes, while delegating timeline playback actions to the playback controller. It does NOT define interpolation or timeline frame computation. See [conventions](../../README.md).
 
 ---
 
@@ -26,24 +26,24 @@ The system MUST retain the active playback controller reference when a controlle
 
 ### Requirement: Snapshot Restore Before Play and Seek
 
-The system MUST restore the captured screen snapshot before play or seek operations and then delegate the requested action to the playback controller.
+The system MUST restore the captured animation state snapshot before play or seek operations and then delegate the requested action to the playback controller.
 
 #### Scenario: Play restores snapshot before timeline play
 
 - GIVEN an editing snapshot and a registered playback controller
 - WHEN timeline play is requested
-- THEN the element screen state is restored from the snapshot and timeline play is delegated
+- THEN the element runtime animation state is restored from the snapshot and timeline play is delegated
 
 #### Scenario: Seek restores snapshot before timeline seek
 
 - GIVEN an editing snapshot and a registered playback controller
 - WHEN timeline seek is requested
-- THEN the element screen state is restored from the snapshot and timeline seek is delegated
+- THEN the element runtime animation state is restored from the snapshot and timeline seek is delegated
 
 #### Acceptance Criteria
 
-- [ ] Given an editing snapshot and a registered playback controller, the element screen state is restored from the snapshot and timeline play is delegated
-- [ ] Given an editing snapshot and a registered playback controller, the element screen state is restored from the snapshot and timeline seek is delegated
+- [ ] Given an editing snapshot and a registered playback controller, the element runtime animation state is restored from the snapshot and timeline play is delegated
+- [ ] Given an editing snapshot and a registered playback controller, the element runtime animation state is restored from the snapshot and timeline seek is delegated
 
 ---
 
@@ -65,7 +65,7 @@ The system MUST delegate explicit stop requests to the playback controller for t
 
 ### Requirement: Editing-Close Restoration
 
-When timeline editing closes, the system MUST stop the previously edited timeline and restore the captured screen snapshot.
+When timeline editing closes, the system MUST stop the previously edited timeline and restore the captured animation state snapshot.
 
 #### Scenario: Closing editing restores snapshot and stops timeline
 
@@ -81,7 +81,7 @@ When timeline editing closes, the system MUST stop the previously edited timelin
 
 ### Requirement: Graceful No-Controller Behavior
 
-The system MUST no-op playback actions when no playback controller is registered and MUST NOT mutate element screen state in that case.
+The system MUST no-op playback actions when no playback controller is registered and MUST NOT mutate element runtime animation state in that case.
 
 #### Scenario: Play with no controller does nothing
 
@@ -128,4 +128,4 @@ _None — all requirements have acceptance criteria._
 
 - Playback timeline semantics and easing math → see `project/spec/playback/spec.md`
 - Timeline editing panel behavior and UX controls → see `project/spec/ui/timeline.md`
-- Animation registry mutation rules → see [animation-state.md](animation-state.md)
+- Animation mutation rules → see [animation-state.md](animation-state.md)

@@ -187,31 +187,32 @@ A `ComponentPlugin` MUST provide: `type` (unique identifier string), `label` (di
 
 ### Requirement: Unit Conversion
 
-The system MUST provide bidirectional conversion between pixels and millimeters using the standard 96 DPI web convention: `1 px = 25.4/96 mm`. Anchor edge calculation MUST determine anchorX and anchorY based on which canvas quadrant the element center occupies.
+The system MUST provide bidirectional conversion between pixels, millimeters, and inches using the document's `canvas.dpi` value (default 96 for screen, 300 for print). Conversion formulas: `px → mm = px × 25.4 / dpi`, `mm → px = mm × dpi / 25.4`, `px → in = px / dpi`, `in → px = in × dpi`. See [format-reference.md](format-reference.md) §16 for the full conversion table.
 
-#### Scenario: Pixel to millimeter conversion
+#### Scenario: Pixel to millimeter conversion at 96 DPI
 
-- GIVEN a value of 96 pixels
+- GIVEN a value of 96 pixels and `canvas.dpi: 96`
 - WHEN converted to millimeters
 - THEN the result is 25.4 mm
 
-#### Scenario: Millimeter to pixel conversion
+#### Scenario: Millimeter to pixel conversion at 96 DPI
 
-- GIVEN a value of 25.4 millimeters
+- GIVEN a value of 25.4 millimeters and `canvas.dpi: 96`
 - WHEN converted to pixels
 - THEN the result is 96 px
 
-#### Scenario: Anchor calculation from position
+#### Scenario: Pixel to millimeter conversion at 300 DPI
 
-- GIVEN an element centered in the left-top quadrant of a canvas
-- WHEN edge anchors are calculated
-- THEN anchorX is `'left'` and anchorY is `'top'`
+- GIVEN a value of 300 pixels and `canvas.dpi: 300`
+- WHEN converted to millimeters
+- THEN the result is 25.4 mm
 
 #### Acceptance Criteria
 
-- [ ] Given 96 pixels, conversion to millimeters yields 25.4
-- [ ] Given 25.4 millimeters, conversion to pixels yields 96
-- [ ] Given an element centered in the left-top quadrant, anchor calculation returns left/top
+- [ ] Given 96 pixels at 96 DPI, conversion to millimeters yields 25.4
+- [ ] Given 25.4 millimeters at 96 DPI, conversion to pixels yields 96
+- [ ] Given 300 pixels at 300 DPI, conversion to millimeters yields 25.4
+- [ ] Given a document's canvas.dpi, conversions use that value instead of hardcoded 96
 
 ---
 
@@ -290,13 +291,13 @@ The system MUST support enabling experimental features via a `?experimental=true
 
 ### Requirement: Host-Provided Save Callback
 
-`EditorConfig` MUST support an optional `onSave` callback field. When provided, the save action invokes this callback with the current `BroadsetDocument` as its argument. When `onSave` is not provided, the save action MUST be a no-op and save-related UI controls SHOULD be hidden or disabled.
+`EditorConfig` MUST support an optional `onSave` callback field. When provided, the save action invokes this callback with the current `BroadsetProject` as its argument. When `onSave` is not provided, the save action MUST be a no-op and save-related UI controls SHOULD be hidden or disabled.
 
 #### Scenario: Save with onSave callback
 
 - GIVEN an EditorConfig with `onSave` defined
 - WHEN the user triggers save
-- THEN the callback is invoked with the current document
+- THEN the callback is invoked with the current BroadsetProject
 
 #### Scenario: No onSave in config
 
@@ -306,7 +307,7 @@ The system MUST support enabling experimental features via a `?experimental=true
 
 #### Acceptance Criteria
 
-- [ ] Given onSave callback in config, triggering save invokes the callback with the current BroadsetDocument
+- [ ] Given onSave callback in config, triggering save invokes the callback with the current BroadsetProject
 - [ ] Given no onSave callback in config, save UI controls are hidden or disabled
 
 ---
@@ -354,6 +355,156 @@ All color values entering the document model MUST be normalized to 6-digit or 8-
 - [ ] Given a 4-digit hex color, it is expanded to 8-digit hex
 - [ ] Given a 6-digit hex color, it is stored unchanged
 - [ ] Given an 8-digit hex color, it is stored unchanged
+
+---
+
+### Requirement: Frame Rate Configuration
+
+The document's output specification (`output.frameRate`) defines the frame rate. See [output-spec.md](output-spec.md). Valid values are standard broadcast and cinema rates: `23.976`, `24`, `25`, `29.97`, `30`, `50`, `59.94`, `60`. Default: `50` (PAL broadcast standard). The editor canvas settings MAY cache the active document's frame rate for timeline display and keyframe snapping. When the timeline UI displays time positions, it MUST offer a frame-number display mode alongside milliseconds (e.g., frame 25 at 50fps = 500ms). Keyframe offsets MAY be snapped to frame boundaries: `offset = round(offset / (1000 / frameRate)) * (1000 / frameRate)`.
+
+#### Scenario: Default frame rate
+
+- GIVEN canvas settings with no `frameRate` field
+- WHEN the frame rate is resolved
+- THEN the default is `50` fps
+
+#### Scenario: Valid frame rate accepted
+
+- GIVEN canvas settings with `frameRate: 29.97`
+- WHEN validation runs
+- THEN the value is accepted
+
+#### Scenario: Non-standard frame rate rejected
+
+- GIVEN canvas settings with `frameRate: 33`
+- WHEN validation runs
+- THEN validation fails — only standard broadcast/cinema rates are accepted
+
+#### Scenario: Frame-to-millisecond conversion
+
+- GIVEN `frameRate: 25`
+- WHEN frame 10 is converted to milliseconds
+- THEN the result is 400ms
+
+#### Acceptance Criteria
+
+- [ ] Given no `frameRate`, the default is 50 fps
+- [ ] Given a standard frame rate value (23.976, 24, 25, 29.97, 30, 50, 59.94, 60), validation succeeds
+- [ ] Given a non-standard frame rate, validation fails
+- [ ] Given a frame rate and frame number, the millisecond conversion is accurate
+
+---
+
+### Requirement: Safe Area Configuration
+
+The document canvas MUST support a `safeAreas` object defining broadcast safety regions. The shape MUST match the document model defined in [format-reference.md](format-reference.md) §5: `actionSafe` (4-element percentage tuple `[top, right, bottom, left]`), `titleSafe` (4-element percentage tuple), and optional `custom` (array of named safe areas with per-side insets). Each percentage value MUST be in the range 0–50. Default safe areas when none are configured:
+
+| Name        | Insets (%)           | Standard |
+| ----------- | -------------------- | -------- |
+| Action Safe | [3.5, 3.5, 3.5, 3.5] | EBU R95  |
+| Title Safe  | [5, 5, 5, 5]         | EBU R95  |
+
+Safe area overlays are rendered by the editor canvas as non-printing guides. The preflight `title-safe` rule MUST use the `titleSafe` inset values (or 5% default) for its boundary check.
+
+#### Scenario: Default safe areas
+
+- GIVEN a canvas with no `safeAreas` object
+- WHEN safe areas are resolved
+- THEN two default areas are provided: Action Safe ([3.5, 3.5, 3.5, 3.5]) and Title Safe ([5, 5, 5, 5])
+
+#### Scenario: Custom safe areas
+
+- GIVEN a canvas with `safeAreas.custom: [{ name: 'Graphics Safe', insets: [5, 5, 90, 80] }]`
+- WHEN safe areas are resolved
+- THEN the custom safe area is available alongside actionSafe and titleSafe
+
+#### Scenario: Inset validation
+
+- GIVEN a safe area with an inset value of 60
+- WHEN validation runs
+- THEN validation fails — each inset must be 0–50
+
+#### Acceptance Criteria
+
+- [ ] Given no `safeAreas`, default Action Safe and Title Safe are provided
+- [ ] Given custom safe areas, they appear alongside the standard areas
+- [ ] Given a safe area inset outside 0–50, validation fails
+- [ ] Given safe areas, overlays are rendered as non-printing guides on the editor canvas
+
+---
+
+### Requirement: Content Template Configuration
+
+The editor config MUST support an optional `templates` array providing pre-built document templates. Each template entry MUST contain `id` (unique string), `name` (display name), `category` (string for grouping, e.g., `'Lower Thirds'`, `'Full Screen'`, `'Tickers'`), `thumbnail` (URL string for preview image), and `document` (a complete `BroadsetDocument` object ready to load). Templates are presented in the New Document flow and allow users to start from professionally designed layouts. The template system is read-only — users cannot modify the template library from within the editor. Categories MUST be sorted alphabetically, and templates within a category MUST maintain their array order.
+
+#### Scenario: Templates available in new document flow
+
+- GIVEN an editor config with `templates: [{ id: 't1', name: 'News Lower Third', category: 'Lower Thirds', thumbnail: '...', document: {...} }]`
+- WHEN the user creates a new document
+- THEN the "News Lower Third" template is available for selection
+
+#### Scenario: Templates grouped by category
+
+- GIVEN templates with categories `'Lower Thirds'` and `'Full Screen'`
+- WHEN the template list is displayed
+- THEN templates are grouped by category with categories sorted alphabetically
+
+#### Scenario: No templates configured
+
+- GIVEN an editor config with no `templates` array
+- WHEN the user creates a new document
+- THEN only blank document sizes are available (no template section shown)
+
+#### Acceptance Criteria
+
+- [ ] Given templates in config, they are available in the new document flow
+- [ ] Given templates with categories, they are grouped and categories are alphabetically sorted
+- [ ] Given no templates, the template section is not shown in new document flow
+- [ ] Given a template selection, the template's complete document is loaded as a new document
+
+---
+
+### Requirement: Component Linking
+
+Elements MAY participate in a component relationship via the `componentRef` field (see [element.md](element.md)). A `componentRef` contains `componentId` (string — the master component's ID) and `instanceId` (string — this instance's unique ID). The master element is the authoritative source for structure, styles, and animation. Instance elements inherit the master's children structure, element styles, and animation bindings. Instance elements MAY override `content` and `style` fields on individual child elements — these overrides are stored as page-level `ElementOverride` entries. Structure changes to the master (adding/removing children, reordering, resizing) propagate to all instances. Style changes to the master propagate unless the instance has a local override for that property. An instance can be "unlinked" by clearing its `componentRef` field, which makes it an independent element retaining its current structure and overrides.
+
+#### Scenario: Create component from group
+
+- GIVEN a group element with children
+- WHEN the element is designated as a component master
+- THEN it receives a unique `componentId` and can be instantiated
+
+#### Scenario: Create instance
+
+- GIVEN a component master with `componentId: 'cmp-1'`
+- WHEN a new element is created with `componentRef: { componentId: 'cmp-1', instanceId: 'inst-1' }`
+- THEN the new element inherits the master's children structure and styles
+
+#### Scenario: Content override on instance
+
+- GIVEN an instance element with a child text element
+- WHEN the instance's text content is changed
+- THEN the change is stored as a local override and does not affect the master
+
+#### Scenario: Master structure change propagates
+
+- GIVEN a master element that adds a new child element
+- WHEN instances are resolved
+- THEN all instances gain the new child element
+
+#### Scenario: Unlink instance
+
+- GIVEN an instance element with `componentRef`
+- WHEN `componentRef` is cleared (set to `null`)
+- THEN the element becomes independent with its current structure preserved
+
+#### Acceptance Criteria
+
+- [ ] Given a component master, it is recognized and can be instantiated
+- [ ] Given an element with `componentRef` referencing a valid component, it inherits the master's structure
+- [ ] Given an instance with content overrides, the overrides do not affect the master
+- [ ] Given a structure change on the master, all instances reflect the change
+- [ ] Given an unlinked instance, it becomes independent with current structure preserved
 
 ---
 

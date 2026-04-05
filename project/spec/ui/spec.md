@@ -12,7 +12,7 @@ Defines the React-based editor UI for broadset. The ui package provides property
 | -------------------------------- | ------------------------------------------------------------------------------- |
 | [panels.md](panels.md)           | Property sidebars, box effects, clip-path, preflight, animation sidebar, layers |
 | [modals.md](modals.md)           | About, canvas settings, export, media library, new document, shortcut help      |
-| [toolbar-nav.md](toolbar-nav.md) | Toolbar, context menu, element library, page sorter                             |
+| [toolbar-nav.md](toolbar-nav.md) | Toolbar, context menu, element library, scene sorter                            |
 | [timeline.md](timeline.md)       | Timeline editor, bottom panel, editing context                                  |
 | [inputs.md](inputs.md)           | Color picker, CSS length, text stroke, filter editor, shadow editor inputs      |
 | [utilities.md](utilities.md)     | CSS value parsers, animation binding helpers, keyframe value hooks, wheel input |
@@ -112,7 +112,7 @@ Every spec scenario where a user action in one UI region produces a visible outc
 
 - [ ] **Undo/redo button states:** Undo MUST be disabled when history is empty; redo MUST be disabled when there is nothing to redo.
 - [ ] **Element placement flow:** Clicking an element type in the toolbar MUST enter placement mode; clicking the canvas MUST create the element.
-- [ ] **Page sorter interaction:** Clicking a page tab MUST switch the active page; reordering tabs MUST update page order.
+- [ ] **Scene sorter interaction:** Clicking a scene tab MUST switch the active scene; reordering tabs MUST update scene order.
 
 ### Property panels
 

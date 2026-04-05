@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the behavioral requirements for the toolbar, context menu, element library, and page sorter — the primary navigation and command controls in the editor UI.
+Defines the behavioral requirements for the toolbar, context menu, element library, and scene sorter — the primary navigation and command controls in the editor UI.
 
 ---
 
@@ -18,13 +18,13 @@ The toolbar MUST arrange controls left-to-right in these zones:
 
 | Zone                        | Controls                                                             |
 | --------------------------- | -------------------------------------------------------------------- |
-| **Menus**                   | File dropdown, View dropdown, Pages dropdown, Help dropdown          |
+| **Menus**                   | File dropdown, View dropdown, Scenes dropdown, Help dropdown         |
 | **Undo / Redo**             | Undo button, Redo button (always visible, disabled when unavailable) |
 | **Alignment** (conditional) | Visible only when 2+ elements selected — see Alignment zone below    |
 | **Centre**                  | Document name label, Resolution display (e.g., "1920×1080 — 16:9")   |
 | **Right**                   | Zoom level display (e.g., "100%")                                    |
 
-All interactive controls MUST be `size="sm"`. Dropdown triggers MUST be HeroUI `Button` with a label (not icon-only) — e.g., "File", "View", "Pages", "Help". Undo/Redo and alignment buttons MUST be icon-only with HeroUI `Tooltip`. Each dropdown MUST use HeroUI `Dropdown` + `Dropdown.Menu`.
+All interactive controls MUST be `size="sm"`. Dropdown triggers MUST be HeroUI `Button` with a label (not icon-only) — e.g., "File", "View", "Scenes", "Help". Undo/Redo and alignment buttons MUST be icon-only with HeroUI `Tooltip`. Each dropdown MUST use HeroUI `Dropdown` + `Dropdown.Menu`.
 
 **Alignment Zone (conditional):**
 
@@ -69,16 +69,16 @@ Visible only when 2+ elements are selected. Contains:
 
 Toggle items MUST show a checkmark (✓) or check icon when the setting is active. Submenus MUST show the currently selected option with a checkmark.
 
-**Pages Menu:**
+**Scenes Menu:**
 
-| Item          | Icon    | Action                      | Notes                          |
-| ------------- | ------- | --------------------------- | ------------------------------ |
-| Page 1        | —       | Switch to page 1            | Checkmark on active page       |
-| Page 2        | —       | Switch to page 2            | Checkmark on active page       |
-| …             | —       | (one item per page)         |                                |
-| _(separator)_ |         |                             |                                |
-| Add Page      | `Plus`  | Creates new page at the end |                                |
-| Remove Page   | `Trash` | Removes current page        | Disabled if only 1 page exists |
+| Item          | Icon    | Action                       | Notes                           |
+| ------------- | ------- | ---------------------------- | ------------------------------- |
+| Scene 1       | —       | Switch to scene 1            | Checkmark on active scene       |
+| Scene 2       | —       | Switch to scene 2            | Checkmark on active scene       |
+| …             | —       | (one item per scene)         |                                 |
+| _(separator)_ |         |                              |                                 |
+| Add Scene     | `Plus`  | Creates new scene at the end |                                 |
+| Remove Scene  | `Trash` | Removes current scene        | Disabled if only 1 scene exists |
 
 **Help Menu:**
 
@@ -115,11 +115,11 @@ The File → Import and File → Open items MUST trigger a hidden file input acc
 - WHEN the View menu renders
 - THEN the Show Rulers item has a checkmark
 
-#### Scenario: Pages menu lists all pages
+#### Scenario: Scenes menu lists all scenes
 
-- GIVEN a 3-page document on page 2
-- WHEN the Pages menu renders
-- THEN Page 1, Page 2 (checked), Page 3, Add Page, and Remove Page items are visible
+- GIVEN a 3-scene document on scene 2
+- WHEN the Scenes menu renders
+- THEN Scene 1, Scene 2 (checked), Scene 3, Add Scene, and Remove Scene items are visible
 
 #### Scenario: Help menu opens modals
 
@@ -152,8 +152,8 @@ The File → Import and File → Open items MUST trigger a hidden file input acc
 - [ ] Given no export feature flags, the Export item is hidden from File menu
 - [ ] Given the View menu, toggle items show checkmarks reflecting current state
 - [ ] Given the View menu Units submenu, the active unit has a checkmark
-- [ ] Given the Pages menu, all pages are listed with the active page checked
-- [ ] Given the Pages menu, Add Page creates a page and Remove Page is disabled for single-page documents
+- [ ] Given the Scenes menu, all scenes are listed with the active scene checked
+- [ ] Given the Scenes menu, Add Scene creates a scene and Remove Scene is disabled for single-scene documents
 - [ ] Given the Help menu, Keyboard Shortcuts opens ShortcutHelpModal and About opens AboutModal
 - [ ] Given undo/redo buttons, temporal store undo/redo is called
 - [ ] Given 2+ elements selected, alignment buttons are visible and fire alignElements
@@ -311,21 +311,24 @@ Disabled items MUST be visually dimmed and non-interactive.
 
 ### Requirement: Element Library
 
-The system MUST render tiles for all 7 built-in element types with labels. Clicking a tile MUST call startPlacement with the type. Custom types from the registry MUST be included with their icons. Grid layout MUST use 2 columns.
+The system MUST render tiles for all 11 built-in element types with labels. Clicking a tile MUST call startPlacement with the type. Custom types from the registry MUST be included with their icons. Grid layout MUST use 2 columns.
 
 **Built-In Element Types and Icons:**
 
 Each element type MUST have a distinct `lucide-react` icon:
 
-| Type      | Icon name | Label     |
-| --------- | --------- | --------- |
-| text      | Type      | Text      |
-| image     | Image     | Image     |
-| rectangle | Square    | Rectangle |
-| ellipse   | Circle    | Ellipse   |
-| path      | PenTool   | Path      |
-| svg       | FileCode2 | SVG       |
-| qrcode    | QrCode    | QR Code   |
+| Type      | Icon name  | Label     |
+| --------- | ---------- | --------- |
+| text      | Type       | Text      |
+| image     | Image      | Image     |
+| rectangle | Square     | Rectangle |
+| ellipse   | Circle     | Ellipse   |
+| path      | PenTool    | Path      |
+| svg       | FileCode2  | SVG       |
+| qrcode    | QrCode     | QR Code   |
+| video     | Video      | Video     |
+| clock     | Clock      | Clock     |
+| ticker    | LetterText | Ticker    |
 
 Custom plugin types MUST appear after the built-in types. If a plugin provides an SVG icon, it MUST be rendered; otherwise a default fallback icon MUST be used.
 
@@ -342,7 +345,7 @@ Custom plugin types MUST appear after the built-in types. If a plugin provides a
 
 - GIVEN a default component registry
 - WHEN the library renders
-- THEN 7 built-in element tiles with labels are shown
+- THEN 11 built-in element tiles with labels are shown
 
 #### Scenario: Custom type tile
 
@@ -352,43 +355,43 @@ Custom plugin types MUST appear after the built-in types. If a plugin provides a
 
 #### Acceptance Criteria
 
-- [ ] Given a default component registry, 7 built-in element tiles with labels are shown
+- [ ] Given a default component registry, 11 built-in element tiles with labels are shown
 - [ ] Given a registry with a custom `countdown` type, a countdown tile is shown and clicking it calls startPlacement
 
 ---
 
-### Requirement: Page Sorter
+### Requirement: Scene Sorter
 
-The system MUST render page tabs matching the number of pages. Clicking a tab MUST switch pages. Add and remove actions MUST work. The remove button MUST be hidden when only one page exists.
+The system MUST render scene tabs matching the number of scenes. Clicking a tab MUST switch scenes. Add and remove actions MUST work. The remove button MUST be hidden when only one scene exists.
 
 **Layout:**
 
-The page sorter MUST render as a floating component positioned at the top-left of the canvas area (below the element toolbar). It MUST use glass-morphism styling consistent with the main toolbar. Tab labels MUST read "Page 1", "Page 2", etc. The orientation MUST be configurable as horizontal or vertical.
+The scene sorter MUST render as a floating component positioned at the top-left of the canvas area (below the element toolbar). It MUST use glass-morphism styling consistent with the main toolbar. Tab labels MUST read "Scene 1", "Scene 2", etc. The orientation MUST be configurable as horizontal or vertical.
 
 **Controls:**
 
-| Control       | Appearance                                 | Action                      |
-| ------------- | ------------------------------------------ | --------------------------- |
-| Page tabs     | HeroUI `Tabs` with numbered labels         | Switch active page on click |
-| Add button    | Icon button (Plus icon)                    | Creates new page at the end |
-| Remove button | Icon button (Trash icon), hidden if 1 page | Removes current page        |
+| Control       | Appearance                                  | Action                       |
+| ------------- | ------------------------------------------- | ---------------------------- |
+| Scene tabs    | HeroUI `Tabs` with numbered labels          | Switch active scene on click |
+| Add button    | Icon button (Plus icon)                     | Creates new scene at the end |
+| Remove button | Icon button (Trash icon), hidden if 1 scene | Removes current scene        |
 
-#### Scenario: Page switching and management
+#### Scenario: Scene switching and management
 
-- GIVEN a 3-page document
-- WHEN tabs are clicked and pages added/removed
-- THEN page switching and add/remove work correctly
+- GIVEN a 3-scene document
+- WHEN tabs are clicked and scenes added/removed
+- THEN scene switching and add/remove work correctly
 
-#### Scenario: Single page hides remove
+#### Scenario: Single scene hides remove
 
-- GIVEN a 1-page document
+- GIVEN a 1-scene document
 - WHEN the sorter renders
 - THEN the remove button is hidden
 
 #### Acceptance Criteria
 
-- [ ] Given a 3-page document, page switching and add/remove work correctly
-- [ ] Given a 1-page document, the remove button is hidden
+- [ ] Given a 3-scene document, scene switching and add/remove work correctly
+- [ ] Given a 1-scene document, the remove button is hidden
 
 ---
 

@@ -100,31 +100,38 @@ The system MUST parse and serialize CSS `path(...)` clip values consistently, an
 
 ### Requirement: Pixel–Millimetre Unit Conversion
 
-The system MUST convert between pixels and millimetres using 96 DPI as the standard web resolution. Pixel-to-millimetre conversion MUST use the formula `px × (25.4 / 96)`. Millimetre-to-pixel conversion MUST use the formula `mm × (96 / 25.4)`.
+The system MUST convert between pixels and millimetres using the document's `canvas.dpi` value (default 96 for screen, 300 for print). Pixel-to-millimetre conversion MUST use the formula `px × (25.4 / dpi)`. Millimetre-to-pixel conversion MUST use the formula `mm × (dpi / 25.4)`. See [format-reference.md](format-reference.md) §16 for the full conversion table.
 
-#### Scenario: px to mm
+#### Scenario: px to mm at 96 DPI
 
-- GIVEN a pixel value of 96
+- GIVEN a pixel value of 96 and `canvas.dpi: 96`
 - WHEN converted to millimetres
 - THEN the result is 25.4
 
-#### Scenario: mm to px
+#### Scenario: mm to px at 96 DPI
 
-- GIVEN a millimetre value of 25.4
+- GIVEN a millimetre value of 25.4 and `canvas.dpi: 96`
 - WHEN converted to pixels
 - THEN the result is 96
 
+#### Scenario: px to mm at 300 DPI
+
+- GIVEN a pixel value of 300 and `canvas.dpi: 300`
+- WHEN converted to millimetres
+- THEN the result is 25.4
+
 #### Acceptance Criteria
 
-- [ ] Given 96 pixels, the millimetre result is 25.4
-- [ ] Given 25.4 millimetres, the pixel result is 96
+- [ ] Given 96 pixels at 96 DPI, the millimetre result is 25.4
+- [ ] Given 25.4 millimetres at 96 DPI, the pixel result is 96
 - [ ] Given 0 pixels, the millimetre result is 0
+- [ ] Given 300 pixels at 300 DPI, the millimetre result is 25.4
 
 ---
 
 ### Requirement: Edge Anchor Inference
 
-The system MUST compute anchorX (`left` or `right`) and anchorY (`top` or `bottom`) by comparing the element's center-point to the canvas center-point. If the element center is left of the canvas center, anchorX MUST be `left`; otherwise `right`. If the element center is above the canvas center, anchorY MUST be `top`; otherwise `bottom`.
+The system MUST compute anchorX (`left` or `right`) and anchorY (`top` or `bottom`) by comparing the element's center-point to the canvas center-point. This is a **runtime-only** helper used by the editor for responsive positioning — anchor values are NOT serialized in the document model (the `screen` object no longer exists). If the element center is left of the canvas center, anchorX MUST be `left`; otherwise `right`. If the element center is above the canvas center, anchorY MUST be `top`; otherwise `bottom`.
 
 #### Scenario: Element in top-left quadrant
 

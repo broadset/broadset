@@ -145,7 +145,7 @@ The NewDocumentModal MUST create a fresh document with the selected preset dimen
 
 ### Requirement: Sample Document
 
-The demo MUST load a sample document on startup that exercises key features: multiple element types (text, rectangle, image, path at minimum), elements with animation bindings, and elements bound to live data keys.
+The demo MUST load a sample document on startup that exercises key features: multiple element types (text, rectangle, image, path, video, clock, ticker at minimum), elements with animation bindings, and elements bound to live data keys.
 
 #### Scenario: Sample document loaded
 
@@ -156,7 +156,7 @@ The demo MUST load a sample document on startup that exercises key features: mul
 #### Acceptance Criteria
 
 - [ ] Given app initialization, a sample document is loaded automatically
-- [ ] Given the sample document, it includes at least text, rectangle, image, and path elements
+- [ ] Given the sample document, it includes at least text, rectangle, image, path, video, clock, and ticker elements
 - [ ] Given the sample document, it includes elements with animation bindings and live data keys
 - [ ] Given the sample document, at least one element has `transform` keyframes (e.g. translateX)
 - [ ] Given the sample document, at least one element has both IN and OUT state bindings

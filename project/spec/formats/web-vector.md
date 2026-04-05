@@ -127,13 +127,13 @@ The system MUST convert native SVG primitives (rect, path) to native element typ
 
 ### Requirement: HTML Standalone Export
 
-The system MUST generate a self-contained HTML document that embeds the playback runtime, serialized animation registry, and element markup. Elements MUST have `data-element-id` attributes for animation targeting. The HTML shell MUST include a `#canvas` container positioned with `transform-origin: top left`, and the runtime MUST scale the canvas to fit the viewport on load and on window resize by computing `Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight)` and applying it as a CSS scale transform. The document MUST use `overflow: hidden` on the body to prevent scrollbars.
+The system MUST generate a self-contained HTML document that embeds the playback runtime, serialized animations, and element markup. Elements MUST have `data-element-id` attributes for animation targeting. The HTML shell MUST include a `#canvas` container positioned with `transform-origin: top left`, and the runtime MUST scale the canvas to fit the viewport on load and on window resize by computing `Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight)` and applying it as a CSS scale transform. The document MUST use `overflow: hidden` on the body to prevent scrollbars.
 
 #### Scenario: Animation runtime embedded
 
-- GIVEN a document with animation registry
+- GIVEN a document with animations
 - WHEN exported to HTML
-- THEN output contains `requestAnimationFrame`, easing functions, and serialized registry JSON
+- THEN output contains `requestAnimationFrame`, easing functions, and serialized animations JSON
 
 #### Scenario: Element IDs for targeting
 
@@ -155,7 +155,7 @@ The system MUST generate a self-contained HTML document that embeds the playback
 
 #### Acceptance Criteria
 
-- [ ] Given a document with animation registry, output contains `requestAnimationFrame`, easing functions, and serialized registry JSON
+- [ ] Given a document with animations, output contains `requestAnimationFrame`, easing functions, and serialized animations JSON
 - [ ] Given a document with elements, output contains `data-element-id=` attributes
 - [ ] Given SVG and path elements with clip-path styles, inline SVG markup is rendered and clip-path styles are applied
 - [ ] Given rotated and 3D-transformed group elements, group hierarchy and transform styles are preserved
@@ -167,7 +167,7 @@ The system MUST generate a self-contained HTML document that embeds the playback
 
 ### Requirement: HTML Runtime Feature Parity
 
-The embedded HTML runtime MUST include OKLab color interpolation, SVG path morphing with command coordinate lookup, action state support (setState, addModifier, removeModifier), cubic-bezier and step easing, from-keyframe interpolation direction, and serialized animation registry with base width.
+The embedded HTML runtime MUST include OKLab color interpolation, SVG path morphing with command coordinate lookup, action state support (setState, addModifier, removeModifier), cubic-bezier and step easing, from-keyframe interpolation direction, and serialized animations with base width.
 
 #### Scenario: OKLab color pipeline
 

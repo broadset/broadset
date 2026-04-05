@@ -43,7 +43,7 @@ The center area MUST contain the EditorCanvas wrapped in a RulerSystem and an Ed
 
 ### Requirement: Floating Main Toolbar
 
-A glass-morphism toolbar MUST float at the top-left of the canvas area (offset by ruler thickness + gap = 28px from top and left edges). It MUST use a menu-bar–style layout with dropdown menus (File, View, Pages, Help), standalone Undo/Redo buttons, conditional alignment/distribute/group buttons, and a centre document info section.
+A glass-morphism toolbar MUST float at the top-left of the canvas area (offset by ruler thickness + gap = 28px from top and left edges). It MUST use a menu-bar–style layout with dropdown menus (File, View, Scenes, Help), standalone Undo/Redo buttons, conditional alignment/distribute/group buttons, and a centre document info section.
 
 See `project/spec/ui/toolbar-nav.md` → Toolbar Actions for the complete menu item definitions.
 
@@ -55,12 +55,12 @@ The toolbar MUST use a compact height (consistent with `sp-08` token). It MUST u
 
 - GIVEN the demo app is loaded
 - WHEN the main toolbar renders
-- THEN File, View, Pages, Help dropdown menus and Undo/Redo buttons are available
+- THEN File, View, Scenes, Help dropdown menus and Undo/Redo buttons are available
 
 #### Acceptance Criteria
 
 - [ ] Given the demo app is loaded, the main toolbar floats at the top-left over the canvas
-- [ ] Given the toolbar, File/View/Pages/Help dropdown menus are available
+- [ ] Given the toolbar, File/View/Scenes/Help dropdown menus are available
 - [ ] Given the toolbar, Undo/Redo buttons are available as icon-only buttons
 - [ ] Given `onSave` is not configured, the Save item is hidden from the File menu
 
@@ -78,7 +78,7 @@ The element toolbar MUST be a vertical strip of icon buttons positioned directly
 
 - GIVEN the demo app with a custom countdown plugin
 - WHEN the element toolbar renders
-- THEN buttons for text, rectangle, ellipse, image, svg, path, qrcode, group, and countdown are visible
+- THEN buttons for text, rectangle, ellipse, image, svg, path, qrcode, group, video, clock, ticker, and countdown are visible
 
 #### Scenario: Placement mode activation
 
@@ -337,7 +337,7 @@ The context menu MUST display only:
 
 ### Requirement: Timeline Panel
 
-The bottom area of the canvas MUST contain only the timeline. When no timeline is being edited, a single toggle button MUST be visible to open the timeline. When a timeline is opened, the TimelineBottomPanel MUST render at the bottom of the canvas area. It MUST receive play, seek, and stop callbacks from the timeline playback hook. No other controls (undo/redo, page sorter, grid toggle, zoom, playback) belong in the bottom bar — these MUST be located in the floating main toolbar or sidebar.
+The bottom area of the canvas MUST contain only the timeline. When no timeline is being edited, a single toggle button MUST be visible to open the timeline. When a timeline is opened, the TimelineBottomPanel MUST render at the bottom of the canvas area. It MUST receive play, seek, and stop callbacks from the timeline playback hook. No other controls (undo/redo, scene sorter, grid toggle, zoom, playback) belong in the bottom bar — these MUST be located in the floating main toolbar or sidebar.
 
 **Timeline Panel Positioning:**
 
@@ -380,7 +380,7 @@ When closed, the panel MUST be off-screen via `translateY(100%)` with `pointer-e
 
 - [ ] Given no timeline being edited, only a timeline toggle button is visible at the bottom
 - [ ] Given a timeline being edited, the TimelineBottomPanel is visible at the bottom
-- [ ] Given the bottom area, no undo/redo, page sorter, grid, zoom, or playback buttons are present
+- [ ] Given the bottom area, no undo/redo, scene sorter, grid, zoom, or playback buttons are present
 - [ ] Given the timeline panel is open, it is fixed-positioned at bottom:0, left:28px, right:28px
 - [ ] Given the timeline panel, its default height is 240px
 
@@ -403,19 +403,19 @@ When placement mode is active, a banner MUST appear at the top-center of the can
 
 ---
 
-### Requirement: Page Sorter Position
+### Requirement: Scene Sorter Position
 
-The page sorter MUST float in the canvas area below the element toolbar, at the top-left. It MUST use glass-morphism styling consistent with the toolbars. It MUST NOT be placed in the bottom bar or the sidebar.
+The scene sorter MUST float in the canvas area below the element toolbar, at the top-left. It MUST use glass-morphism styling consistent with the toolbars. It MUST NOT be placed in the bottom bar or the sidebar.
 
-#### Scenario: Page sorter visible
+#### Scenario: Scene sorter visible
 
-- GIVEN a multi-page document
+- GIVEN a multi-scene document
 - WHEN the canvas area renders
-- THEN the page sorter floats at the top-left below the element toolbar
+- THEN the scene sorter floats at the top-left below the element toolbar
 
 #### Acceptance Criteria
 
-- [ ] Given a multi-page document, the page sorter floats at the top-left of the canvas area
+- [ ] Given a multi-scene document, the scene sorter floats at the top-left of the canvas area
 
 ---
 

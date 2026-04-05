@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the document diffing engine, animation registry diffing, change stream controller, and remote change application. These mechanisms enable real-time collaboration by detecting local changes, broadcasting them, and applying incoming remote changes without re-emitting them.
+Defines the document diffing engine, animation diffing, change stream controller, and remote change application. These mechanisms enable real-time collaboration by detecting local changes, broadcasting them, and applying incoming remote changes without re-emitting them.
 
 ---
 
@@ -10,7 +10,7 @@ Defines the document diffing engine, animation registry diffing, change stream c
 
 ### Requirement: Document Element Diffing
 
-The system MUST detect element additions, removals, property updates (including nested paths), and reorder changes between two document snapshots. Identical documents MUST produce an empty diff. Runtime animation fields (`screen.visibility`, `screen.activeState`, `screen.modifiers`) MUST be excluded from diffs.
+The system MUST detect element additions, removals, property updates (including nested paths), and reorder changes between two document snapshots. Identical documents MUST produce an empty diff. Runtime animation state (visibility, activeState, modifiers — which are playback-only, not serialized in the document model) MUST be excluded from diffs.
 
 #### Scenario: Element add detected
 
@@ -38,7 +38,7 @@ The system MUST detect element additions, removals, property updates (including 
 
 #### Scenario: Runtime animation fields excluded
 
-- GIVEN only `screen.visibility`, `screen.activeState`, and `screen.modifiers` changed
+- GIVEN only runtime animation state (visibility, activeState, modifiers) changed
 - WHEN diffed
 - THEN no update changes are produced for those fields
 
@@ -54,7 +54,7 @@ The system MUST detect element additions, removals, property updates (including 
 - [ ] Given prev has `el-1` and next is empty, the result contains an `element:remove` change for `el-1`
 - [ ] Given `el-1` position changes from `x=0` to `x=100`, the result contains an `element:update` change with a position path
 - [ ] Given elements `[el-1, el-2]` reordered to `[el-2, el-1]`, two `element:reorder` changes are produced
-- [ ] Given only `screen.visibility`, `screen.activeState`, and `screen.modifiers` changed, no update changes are produced for those fields
+- [ ] Given only runtime animation state (visibility, activeState, modifiers) changed, no update changes are produced for those fields
 - [ ] Given the same document reference, the result is empty
 
 ---
@@ -82,9 +82,9 @@ The system MUST detect page additions, page removals, and canvas settings change
 
 ---
 
-### Requirement: Animation Registry Diffing
+### Requirement: Animation Diffing
 
-The system MUST detect animation config additions, removals, and per-field changes (timelines, stateTimelineBindings, modifierTimelineBindings). Same-reference registries MUST produce an empty diff.
+The system MUST detect animation config additions, removals, and per-field changes (timelines, stateTimelineBindings, modifierTimelineBindings). Same-reference animations arrays MUST produce an empty diff.
 
 #### Scenario: Config added
 
@@ -170,20 +170,20 @@ The system MUST apply incoming remote changes without re-emitting them through t
 
 #### Scenario: Runtime animation fields ignored in apply
 
-- GIVEN a remote `element:update` for `screen.activeState`
+- GIVEN a remote `element:update` for runtime `activeState`
 - WHEN applied
-- THEN the local element's `activeState` is unchanged
+- THEN the local element's runtime `activeState` is unchanged
 
 #### Acceptance Criteria
 
 - [ ] Given a change stream listener, the element exists in the document but no changes are emitted
-- [ ] Given a remote `element:update` for `screen.activeState`, the local element's `activeState` is unchanged
+- [ ] Given a remote `element:update` for runtime `activeState`, the local element's runtime `activeState` is unchanged
 
 ---
 
 ### Requirement: Change Round-Trip Fidelity
 
-Diffing two documents and applying the resulting changes to the first document MUST produce a state equivalent to the second document. This MUST hold for element add, remove, update, nested property update, animation registry changes, settings changes, and page operations.
+Diffing two documents and applying the resulting changes to the first document MUST produce a state equivalent to the second document. This MUST hold for element add, remove, update, nested property update, animation changes, settings changes, and page operations.
 
 #### Scenario: Element add round-trip
 

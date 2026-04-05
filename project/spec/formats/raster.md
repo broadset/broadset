@@ -148,9 +148,48 @@ Raster export to JPEG format MUST accept an optional quality parameter in the ra
 
 ---
 
+### Requirement: WebM Alpha Video Export
+
+The system MUST support exporting an animated canvas sequence as a WebM video file with VP9 codec and alpha channel transparency. The export MUST accept an `alpha: boolean` option (default `false`). When `alpha` is `true`, the renderer MUST use transparent background mode (no canvas background fill), and the video encoder MUST preserve the alpha channel in the VP9 bitstream within a WebM container. When `alpha` is `false`, the video MUST be encoded with the canvas background composited (standard opaque output). The export MUST also accept `frameRate` (from canvas settings, default 50fps), `durationMs` (total export duration), and `quality` (0–1, default 0.8). Frames MUST be captured at the specified frame rate using the canvas rendering pipeline and composed into the video sequentially. The resulting WebM file MUST be downloadable via the same download wrapper pattern as raster exports.
+
+#### Scenario: WebM export with alpha channel
+
+- GIVEN a canvas with transparent background and `alpha: true`
+- WHEN WebM export runs
+- THEN the output WebM file preserves alpha transparency in the VP9 stream
+
+#### Scenario: WebM export without alpha
+
+- GIVEN a canvas with white background and `alpha: false`
+- WHEN WebM export runs
+- THEN the output WebM file has an opaque white background
+
+#### Scenario: Frame rate from canvas settings
+
+- GIVEN canvas settings with `frameRate: 25`
+- WHEN WebM export runs with default settings
+- THEN the output video has 25 frames per second
+
+#### Scenario: Export duration
+
+- GIVEN `durationMs: 5000` and `frameRate: 50`
+- WHEN WebM export runs
+- THEN the output video has 250 frames (5 seconds × 50fps)
+
+#### Acceptance Criteria
+
+- [ ] Given `alpha: true`, the WebM output preserves alpha channel transparency
+- [ ] Given `alpha: false`, the WebM output has an opaque background
+- [ ] Given a frame rate, the output video uses that frame rate
+- [ ] Given a duration, the correct number of frames are captured
+- [ ] Given the export completes, the file is downloadable via the download wrapper
+
+---
+
 ## Spec Gaps
 
 - [ ] **JPEG Quality Parameter:** No automated tests verify that the explicit quality parameter is applied to JPEG output, that the default is 0.92, or that PNG export ignores the quality parameter.
+- [ ] **WebM Alpha Video Export:** No automated tests verify VP9 alpha encoding, frame capture at specified rates, or duration-based frame count — integration tests with video encoding are needed.
 
 ---
 
