@@ -66,7 +66,7 @@ export function elementToPanelElement(el: BroadsetElement): PanelElement {
   return {
     id: el.id,
     type: el.type,
-    name: el.content || el.id,
+    name: el.screen.name || el.id,
     x: el.position.x,
     y: el.position.y,
     width: el.width,
@@ -90,7 +90,7 @@ export function elementsToLayers(elements: readonly BroadsetElement[]): readonly
   return elements.map((el) => ({
     id: el.id,
     type: el.type,
-    name: el.content || el.id,
+    name: el.screen.name || el.id,
     locked: el.screen.locked,
     visible: el.screen.visibility !== 'offscreen',
   }));
