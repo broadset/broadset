@@ -10,49 +10,122 @@ Defines the behavioral requirements for the toolbar, context menu, element libra
 
 ### Requirement: Toolbar Actions
 
-The system MUST support JSON export from the document menu. The Export action MUST be visible only when export feature flags are enabled. Undo and Redo MUST call the temporal store. Alignment buttons MUST appear only for multi-selection (2+ elements). Distribute buttons MUST appear only for 3+ elements.
+The main toolbar MUST organize its controls into a menu-bar–style layout with dropdown menus, standalone buttons, and conditional action groups. This avoids overwhelming the user with a flat row of many icon buttons.
 
 **Toolbar Zone Layout:**
 
-The toolbar MUST organize its controls into distinct zones arranged left-to-right:
+The toolbar MUST arrange controls left-to-right in these zones:
 
-| Zone                        | Controls                                                                                                                                                                                           |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Left**                    | Document menu dropdown (New, Open, Options, Debug, Save JSON, Export), Import button (hidden file input trigger), Settings toggle, Undo/Redo buttons                                               |
-| **Alignment** (conditional) | Align left / center-x / right, Align top / center-y / bottom (each as HeroUI `ButtonGroup`). Distribute horizontal / vertical (disabled if <3 elements). Group / Ungroup (disabled if <2 elements) |
-| **Centre**                  | Document name label, Resolution display (e.g., "1920×1080 — 16:9")                                                                                                                                 |
-| **Right**                   | Properties panel toggle, Preview button, Save button                                                                                                                                               |
+| Zone                        | Controls                                                             |
+| --------------------------- | -------------------------------------------------------------------- |
+| **Menus**                   | File dropdown, View dropdown, Pages dropdown, Help dropdown          |
+| **Undo / Redo**             | Undo button, Redo button (always visible, disabled when unavailable) |
+| **Alignment** (conditional) | Visible only when 2+ elements selected — see Alignment zone below    |
+| **Centre**                  | Document name label, Resolution display (e.g., "1920×1080 — 16:9")   |
+| **Right**                   | Zoom level display (e.g., "100%")                                    |
 
-All buttons MUST be `size="sm"` for a compact toolbar. The alignment zone MUST only be visible when 2+ elements are selected. Each button's hover MUST show a HeroUI `Tooltip` with the action name.
+All interactive controls MUST be `size="sm"`. Dropdown triggers MUST be HeroUI `Button` with a label (not icon-only) — e.g., "File", "View", "Pages", "Help". Undo/Redo and alignment buttons MUST be icon-only with HeroUI `Tooltip`. Each dropdown MUST use HeroUI `Dropdown` + `Dropdown.Menu`.
 
-**Document Menu:**
+**Alignment Zone (conditional):**
 
-The document menu MUST use a HeroUI `Dropdown` with icon+label menu items:
+Visible only when 2+ elements are selected. Contains:
 
-| Item           | Action                                 |
-| -------------- | -------------------------------------- |
-| New Document   | Opens NewDocumentModal                 |
-| Open           | Triggers file import dialog            |
-| Options        | Opens CanvasSettingsModal              |
-| Debug Snapshot | Downloads editor state as JSON         |
-| Save as JSON   | Downloads document as JSON file        |
-| Export         | Opens ExportModal (hidden if no flags) |
+- Align left / center-x / right (each as HeroUI `ButtonGroup`)
+- Align top / center-y / bottom (each as HeroUI `ButtonGroup`)
+- Distribute horizontal / vertical (disabled if < 3 elements)
+- Group / Ungroup (disabled if < 2 elements)
 
-**Import:**
+**File Menu:**
 
-The import button MUST trigger a hidden file input accepting JSON and supported format files. On successful import, a success toast MUST appear. On validation failure, an error toast MUST show the error message.
+| Item              | Icon         | Shortcut   | Action                                                 | Notes                             |
+| ----------------- | ------------ | ---------- | ------------------------------------------------------ | --------------------------------- |
+| New Document      | `FilePlus`   | —          | Opens NewDocumentModal                                 |                                   |
+| Open              | `FolderOpen` | Ctrl/Cmd+O | Triggers hidden file input dialog                      |                                   |
+| _(separator)_     |              |            |                                                        |                                   |
+| Save              | `Save`       | Ctrl/Cmd+S | Calls `EditorConfig.onSave`                            | Hidden if `onSave` not configured |
+| Save as JSON      | `Download`   | —          | Downloads document as JSON file                        |                                   |
+| Import            | `Upload`     | —          | Triggers file import (JSON + formats)                  |                                   |
+| Export            | `FileOutput` | —          | Opens ExportModal                                      | Hidden if no export flags         |
+| _(separator)_     |              |            |                                                        |                                   |
+| Document Settings | `Settings`   | —          | Opens CanvasSettingsModal (document name, perspective) |                                   |
+| Debug Snapshot    | `Bug`        | —          | Downloads editor state as JSON                         |                                   |
 
-#### Scenario: JSON export
+**View Menu:**
 
-- GIVEN the document menu
-- WHEN export JSON is clicked
-- THEN native document JSON is exported
+| Item           | Icon       | Action                                                             | Type    | Notes                    |
+| -------------- | ---------- | ------------------------------------------------------------------ | ------- | ------------------------ |
+| Show Rulers    | `Ruler`    | Toggles `canvasSettings.showRulers`                                | Toggle  | Checkmark when active    |
+| Show Grid      | `Grid3X3`  | Toggles `canvasSettings.grid.showGrid`                             | Toggle  | Checkmark when active    |
+| Snap to Grid   | `Magnet`   | Toggles `canvasSettings.grid.snapToGrid`                           | Toggle  | Checkmark when active    |
+| _(separator)_  |            |                                                                    |         |                          |
+| Units          | —          | Submenu: px, mm, in                                                | Submenu | Checkmark on active unit |
+| View Mode      | —          | Submenu: None, Broadcast, Print                                    | Submenu | Checkmark on active mode |
+| _(separator)_  |            |                                                                    |         |                          |
+| Grid Size      | `Hash`     | Opens inline input or Grid Settings section of CanvasSettingsModal | Action  |                          |
+| Snap Threshold | —          | Opens inline input or Grid Settings section of CanvasSettingsModal | Action  |                          |
+| _(separator)_  |            |                                                                    |         |                          |
+| Zoom to Fit    | `Maximize` | Zoom-to-fit action                                                 | Action  |                          |
+| Reset Zoom     | —          | Sets zoom to 100%, resets pan                                      | Action  |                          |
 
-#### Scenario: Export visibility by feature flag
+Toggle items MUST show a checkmark (✓) or check icon when the setting is active. Submenus MUST show the currently selected option with a checkmark.
+
+**Pages Menu:**
+
+| Item          | Icon    | Action                      | Notes                          |
+| ------------- | ------- | --------------------------- | ------------------------------ |
+| Page 1        | —       | Switch to page 1            | Checkmark on active page       |
+| Page 2        | —       | Switch to page 2            | Checkmark on active page       |
+| …             | —       | (one item per page)         |                                |
+| _(separator)_ |         |                             |                                |
+| Add Page      | `Plus`  | Creates new page at the end |                                |
+| Remove Page   | `Trash` | Removes current page        | Disabled if only 1 page exists |
+
+**Help Menu:**
+
+| Item               | Icon       | Action                  |
+| ------------------ | ---------- | ----------------------- |
+| Keyboard Shortcuts | `Keyboard` | Opens ShortcutHelpModal |
+| About              | `Info`     | Opens AboutModal        |
+
+**Import Behavior:**
+
+The File → Import and File → Open items MUST trigger a hidden file input accepting JSON and supported format files. On successful import, a success toast MUST appear. On validation failure, an error toast MUST show the error message.
+
+#### Scenario: File menu actions
+
+- GIVEN the File dropdown is opened
+- WHEN the user clicks New Document
+- THEN the NewDocumentModal opens
+
+#### Scenario: Save hidden without onSave
+
+- GIVEN `onSave` is not configured
+- WHEN the File menu renders
+- THEN the Save item is hidden
+
+#### Scenario: Export hidden without feature flags
 
 - GIVEN no export feature flags enabled
-- WHEN the toolbar renders
-- THEN the Export action is hidden
+- WHEN the File menu renders
+- THEN the Export item is hidden
+
+#### Scenario: View toggles reflect state
+
+- GIVEN Show Rulers is active
+- WHEN the View menu renders
+- THEN the Show Rulers item has a checkmark
+
+#### Scenario: Pages menu lists all pages
+
+- GIVEN a 3-page document on page 2
+- WHEN the Pages menu renders
+- THEN Page 1, Page 2 (checked), Page 3, Add Page, and Remove Page items are visible
+
+#### Scenario: Help menu opens modals
+
+- GIVEN the Help dropdown is opened
+- WHEN the user clicks Keyboard Shortcuts
+- THEN the ShortcutHelpModal opens
 
 #### Scenario: Undo/Redo
 
@@ -74,8 +147,14 @@ The import button MUST trigger a hidden file input accepting JSON and supported 
 
 #### Acceptance Criteria
 
-- [ ] Given the document menu, native document JSON is exported
-- [ ] Given no export feature flags enabled, the Export action is hidden
+- [ ] Given the File menu, New/Open/Save/Import/Export/Settings/Debug items are available
+- [ ] Given `onSave` not configured, the Save item is hidden from File menu
+- [ ] Given no export feature flags, the Export item is hidden from File menu
+- [ ] Given the View menu, toggle items show checkmarks reflecting current state
+- [ ] Given the View menu Units submenu, the active unit has a checkmark
+- [ ] Given the Pages menu, all pages are listed with the active page checked
+- [ ] Given the Pages menu, Add Page creates a page and Remove Page is disabled for single-page documents
+- [ ] Given the Help menu, Keyboard Shortcuts opens ShortcutHelpModal and About opens AboutModal
 - [ ] Given undo/redo buttons, temporal store undo/redo is called
 - [ ] Given 2+ elements selected, alignment buttons are visible and fire alignElements
 - [ ] Given 3+ elements selected, distribute buttons are visible and fire distributeElements
@@ -84,29 +163,52 @@ The import button MUST trigger a hidden file input accepting JSON and supported 
 
 ### Requirement: Context Menu
 
-The system MUST NOT render before a right-click. After `contextmenu` event, the menu MUST appear at click coordinates with all standard items. Items MUST be disabled when no element is selected. Copy/Paste/Duplicate/Delete/Lock MUST call their respective store actions. Group/Ungroup MUST appear only for multi-selection. The menu MUST close after any action.
+The system MUST NOT render before a right-click. After `contextmenu` event, the menu MUST appear at click coordinates with all standard items. The menu MUST be clamped to remain fully visible within the canvas container — if it would overflow the right or bottom edge, it MUST reflow to stay within bounds.
+
+**When right-clicking an element:**
+
+Items MUST be disabled when no element is selected. The menu MUST close after any action, when clicking outside, or when pressing Escape.
 
 **Menu Items:**
 
 The context menu MUST use HeroUI `Dropdown.Menu` and include items in this order:
 
-| Item           | Shortcut         | Enabled when          |
-| -------------- | ---------------- | --------------------- |
-| Copy           | Ctrl/Cmd+C       | Selection exists      |
-| Paste          | Ctrl/Cmd+V       | Clipboard has content |
-| Duplicate      | Ctrl/Cmd+D       | Selection exists      |
-| Delete         | Del/Backspace    | Selection exists      |
-| Lock / Unlock  | —                | Selection exists      |
-| _(separator)_  |                  |                       |
-| Bring Forward  | ]                | Selection exists      |
-| Send Backward  | [                | Selection exists      |
-| Bring to Front | —                | Selection exists      |
-| Send to Back   | —                | Selection exists      |
-| _(separator)_  |                  |                       |
-| Group          | Ctrl/Cmd+G       | 2+ elements selected  |
-| Ungroup        | Ctrl/Cmd+Shift+G | 2+ elements selected  |
+| Item             | Shortcut         | Enabled when                               | Style  |
+| ---------------- | ---------------- | ------------------------------------------ | ------ |
+| Cut              | Ctrl/Cmd+X       | Selection exists and not locked            |        |
+| Copy             | Ctrl/Cmd+C       | Selection exists                           |        |
+| Paste            | Ctrl/Cmd+V       | Clipboard has content                      |        |
+| Duplicate        | Ctrl/Cmd+D       | Selection exists and not locked            |        |
+| _(separator)_    |                  |                                            |        |
+| Delete           | Del/Backspace    | Selection exists, not locked, not required | danger |
+| _(separator)_    |                  |                                            |        |
+| Bring to Front   | —                | Selection exists                           |        |
+| Bring Forward    | ]                | Selection exists, not already at front     |        |
+| Send Backward    | [                | Selection exists, not already at back      |        |
+| Send to Back     | —                | Selection exists                           |        |
+| _(separator)_    |                  |                                            |        |
+| Group            | Ctrl/Cmd+G       | 2+ elements selected                       |        |
+| Ungroup          | Ctrl/Cmd+Shift+G | Selected element(s) have a groupId         |        |
+| _(separator)_    |                  |                                            |        |
+| Lock / Unlock    | Ctrl/Cmd+L       | Selection exists                           |        |
+| Edit Clip Path   | —                | Element has `clipPath` capability          |        |
+| Edit Path Points | —                | Element type is `path`                     |        |
 
-Disabled items MUST be visually dimmed and non-interactive. The menu MUST be dynamically positioned to stay within the visible container bounds (reflow if near edges).
+**Delete** MUST use the HeroUI `color="danger"` variant, rendering the item in the theme's danger color (red text).
+
+**Lock / Unlock** MUST display a dynamic label: "Lock" when the element is currently unlocked, "Unlock" when the element is currently locked.
+
+**Group / Ungroup** MUST only be rendered (not just disabled) when 2+ elements are selected. They MUST be completely absent from the menu for single-element selections.
+
+**When right-clicking empty canvas:**
+
+The context menu MUST display only:
+
+| Item  | Shortcut   | Enabled when          |
+| ----- | ---------- | --------------------- |
+| Paste | Ctrl/Cmd+V | Clipboard has content |
+
+Disabled items MUST be visually dimmed and non-interactive.
 
 #### Scenario: Right-click opens at coordinates
 
@@ -120,6 +222,18 @@ Disabled items MUST be visually dimmed and non-interactive. The menu MUST be dyn
 - WHEN the menu opens
 - THEN editing items are disabled
 
+#### Scenario: Right-click on empty canvas
+
+- GIVEN no element under the pointer
+- WHEN the user right-clicks on the canvas
+- THEN a context menu with only the Paste action appears
+
+#### Scenario: Cut removes and copies element
+
+- GIVEN an element selected
+- WHEN Cut is clicked
+- THEN the element is removed from the page and placed in the clipboard
+
 #### Scenario: Copy then Paste workflow
 
 - GIVEN elements are copied
@@ -132,11 +246,23 @@ Disabled items MUST be visually dimmed and non-interactive. The menu MUST be dyn
 - WHEN Delete is clicked
 - THEN removeElement is called for each
 
+#### Scenario: Locked element disables destructive actions
+
+- GIVEN a locked element selected
+- WHEN the menu opens
+- THEN Cut, Duplicate, and Delete are disabled
+
 #### Scenario: Group/Ungroup for multi-select
 
 - GIVEN 2+ elements selected
 - WHEN the menu opens
 - THEN Group and Ungroup items are visible
+
+#### Scenario: Single selection hides Group/Ungroup
+
+- GIVEN 1 element selected
+- WHEN the menu opens
+- THEN Group and Ungroup items are not rendered
 
 #### Scenario: Layer reorder actions
 
@@ -144,14 +270,42 @@ Disabled items MUST be visually dimmed and non-interactive. The menu MUST be dyn
 - WHEN Bring Forward/Send Backward/Bring to Front/Send to Back is clicked
 - THEN reorderElement is called with the correct direction
 
+#### Scenario: Lock/Unlock toggles label
+
+- GIVEN an unlocked element selected
+- WHEN the menu opens
+- THEN the item label shows "Lock"
+- AND after clicking Lock, re-opening shows "Unlock"
+
+#### Scenario: Edit Path Points on path element
+
+- GIVEN a path element selected
+- WHEN "Edit Path Points" is clicked
+- THEN path editing mode is entered
+
+#### Scenario: Bounds-checking near edge
+
+- GIVEN the context menu would overflow the container's right edge
+- WHEN the menu opens
+- THEN it repositions to stay within the visible bounds
+
 #### Acceptance Criteria
 
 - [ ] Given no menu visible, the menu appears positioned at those coordinates
 - [ ] Given no active element, editing items are disabled
+- [ ] Given no element under the pointer, only Paste is shown
 - [ ] Given elements are copied, pasteElements is called
+- [ ] Given Cut is selected, the element is removed and placed in the clipboard
 - [ ] Given multiple elements selected, removeElement is called for each
+- [ ] Given a locked element, Cut, Duplicate, and Delete are disabled
 - [ ] Given 2+ elements selected, Group and Ungroup items are visible
+- [ ] Given 1 element selected, Group and Ungroup items are not rendered
 - [ ] Given an element selected, reorderElement is called with the correct direction
+- [ ] Given Lock/Unlock is clicked, the element's locked state toggles and the label updates
+- [ ] Given Edit Clip Path on an element with clipPath capability, clip-path editing activates
+- [ ] Given Edit Path Points on a path element, path editing mode activates
+- [ ] Given Delete item, it renders with danger color (red text)
+- [ ] Given the menu would overflow the container edge, it repositions within bounds
 
 ---
 

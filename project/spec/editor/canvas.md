@@ -98,15 +98,58 @@ Dragging on the canvas background MUST create a selection rectangle. All element
 
 The canvas MUST support zoom (via scroll wheel or pinch gesture) and pan (via background drag or modifier key). Zoom and pan values MUST be reflected in CanvasSettings.
 
-Zoom MUST be clamped to a range of **0.1** (10%) to **4.0** (400%). Each scroll-wheel tick MUST change the zoom by **0.1** (10 percentage points). Zoom MUST be centered on the pointer position so the point under the cursor remains stationary. The editor MUST provide a **zoom-to-fit** action that scales and pans the viewport so the full document fits within the visible canvas area with a small margin.
+Zoom MUST be clamped to a range of **0.1** (10%) to **4.0** (400%). Each scroll-wheel tick MUST change the zoom by **0.1** (10 percentage points). The editor MUST provide a **zoom-to-fit** action that scales and pans the viewport so the full document fits within the visible canvas area with a small margin.
 
 The current zoom level MUST be displayed in the toolbar as a percentage (e.g. "100%").
+
+**Cursor-Locked Zoom:**
+
+Zoom MUST be centered on the pointer position (not the screen center). The world-coordinate point under the cursor MUST remain stationary after zoom. This means the pan offset MUST be recalculated on each zoom step:
+
+1. Compute cursor position relative to the canvas container (`cursorX = event.clientX − rect.left`, `cursorY = event.clientY − rect.top`)
+2. Compute the world point under the cursor: `worldX = (cursorX − panX) / oldZoom`, `worldY = (cursorY − panY) / oldZoom`
+3. After applying the new zoom, set: `panX = cursorX − worldX × newZoom`, `panY = cursorY − worldY × newZoom`
+
+**Wheel and Trackpad Gesture Intent Resolution:**
+
+The canvas MUST distinguish between different input devices and modifier keys to resolve the user's intended action from `wheel` events. The wheel event listener MUST use `{ passive: false }` to allow `preventDefault()`.
+
+| Intent                   | Detection                                                                                   | Action                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Trackpad pan             | `deltaMode === 0` (pixel), no `ctrlKey`/`altKey`, `deltaX > 0` OR small/fractional `deltaY` | Pan canvas by `(deltaX, deltaY)`          |
+| Trackpad pinch-to-zoom   | `deltaMode === 0` (pixel) AND `ctrlKey` (browsers synthesize `ctrlKey` for trackpad pinch)  | Zoom at cursor, delta `= −deltaY × 0.002` |
+| Trackpad Alt+scroll zoom | `deltaMode === 0` (pixel) AND `altKey`                                                      | Zoom at cursor (alternate method)         |
+| Mouse wheel zoom         | `deltaMode !== 0` (line/page steps, typically 120-unit increments), no modifiers            | Zoom at cursor                            |
+| Mouse wheel + Ctrl pan   | `deltaMode !== 0` AND (`ctrlKey` OR `metaKey`)                                              | Horizontal pan                            |
+| Mouse wheel + Alt pan    | `deltaMode !== 0` AND `altKey` AND NOT `ctrlKey`                                            | Vertical pan                              |
+
+**Trackpad Detection Heuristic:**
+
+To distinguish trackpad from mouse wheel: if `deltaMode === 0` AND (`deltaX > 0` OR `|deltaY| < 80` OR `deltaY` is fractional), the input is likely a trackpad. Mouse wheels typically produce `deltaMode === 1` (line) or large integer pixel deltas.
 
 #### Scenario: Zoom changes viewport scale
 
 - GIVEN zoom at 1.0
 - WHEN the user zooms in to 2.0
 - THEN canvasSettings.zoom is 2.0 and elements appear at double size
+
+#### Scenario: Zoom centers on cursor
+
+- GIVEN the cursor is at position (300, 200) on the canvas
+- WHEN the user scrolls to zoom in
+- THEN the world point under (300, 200) remains at the same screen position
+
+#### Scenario: Trackpad two-finger pan
+
+- GIVEN a trackpad generating smooth pixel-mode wheel events
+- WHEN the user performs a two-finger drag (no modifier keys)
+- THEN the canvas pans by the delta amounts
+
+#### Scenario: Trackpad pinch-to-zoom
+
+- GIVEN a trackpad generating ctrlKey + pixel-mode wheel events
+- WHEN the user pinches on the trackpad
+- THEN the canvas zooms centered on the cursor position
 
 #### Scenario: Pan offsets the viewport
 
@@ -139,7 +182,10 @@ The current zoom level MUST be displayed in the toolbar as a percentage (e.g. "1
 - [ ] Given zoom at 4.0, further zoom-in is clamped
 - [ ] Given zoom at 0.1, further zoom-out is clamped
 - [ ] Given scroll-wheel zoom, the zoom changes by 0.1 per tick
-- [ ] Given scroll-wheel zoom, the zoom centers on the pointer position
+- [ ] Given scroll-wheel zoom, the zoom centers on the pointer position (cursor-locked)
+- [ ] Given trackpad two-finger drag, the canvas pans smoothly
+- [ ] Given trackpad pinch gesture, the canvas zooms centered on the cursor
+- [ ] Given trackpad Alt+scroll, the canvas zooms (alternate zoom method)
 - [ ] Given zoom-to-fit, the viewport scales and pans to show the full document
 
 ---
@@ -169,7 +215,37 @@ The grid overlay MUST render grid lines at intervals determined by the grid sett
 
 ### Requirement: Ruler System
 
-Rulers MUST render along the top and left edges of the canvas with tick marks in the current unit system (px, mm, or in). Guides MUST be draggable from the rulers onto the canvas.
+Rulers MUST render along the **top and left edges only** of the canvas — a horizontal ruler on top and a vertical ruler on the left. There is no right ruler or bottom ruler. A small origin square MUST appear at the top-left corner where the two rulers meet. Tick marks MUST use the current unit system (px, mm, or in). Guides MUST be draggable from the rulers onto the canvas.
+
+**Ruler Size:** Each ruler MUST be `20px` thick (`RULER_SIZE`).
+
+**Ruler Layout within RulerSystem:**
+
+The RulerSystem MUST be the outermost positioning container for the canvas area. The layout MUST be:
+
+- **Origin square:** `20px × 20px` at top-left corner (position: absolute, top: 0, left: 0)
+- **Horizontal ruler:** Full remaining width, `20px` height, positioned at top from `left: 20px` to `right: 0`
+- **Vertical ruler:** `20px` width, full remaining height, positioned at `left: 0` from `top: 20px` to `bottom: 0`
+- **Canvas content:** The actual canvas element MUST be inset by `20px` from the top and `20px` from the left, filling the remaining space
+
+The vertical ruler MUST render its full `20px` width — not be clipped or partially hidden. The container holding the vertical ruler MUST have `overflow: hidden` to clip the canvas drawing but the ruler container itself MUST be fully visible within the RulerSystem bounds.
+
+**Zoom and Pan Awareness:**
+
+Ruler tick marks and labels MUST account for the current zoom level and pan offset. The ruler origin (the position where "0" is displayed) MUST be calculated as:
+
+- Horizontal ruler: `originX = unitToPx(documentOriginX, units) × zoom − panX`
+- Vertical ruler: `originY = unitToPx(documentOriginY, units) × zoom − panY`
+
+Tick spacing MUST adapt to the zoom level using a nice-step algorithm (e.g., choosing the nearest round interval from `[1, 2, 5, 10, 20, 50, 100, …]` that keeps ticks visually readable at the current zoom). At high zoom, smaller intervals appear; at low zoom, larger intervals are used.
+
+**Ruler Visual:**
+
+Rulers MUST use a glass-morphism background: `rgba(20, 20, 20, 0.72)` with `backdrop-filter: blur(6px)`. Tick strokes MUST use `rgba(255, 255, 255, 0.45)`. Labels MUST use `rgba(255, 255, 255, 0.65)` and font `9px IBM Plex Mono, monospace` (or equivalent monospace).
+
+**Guides from Ruler Drag:**
+
+When the user drags from a ruler onto the canvas, a guide line MUST be created at the drop position. The guide position MUST account for the current zoom and pan offsets — i.e., the guide is placed in document coordinates, not screen coordinates.
 
 #### Scenario: Rulers display with current units
 
@@ -177,16 +253,26 @@ Rulers MUST render along the top and left edges of the canvas with tick marks in
 - WHEN the canvas is rendered
 - THEN horizontal and vertical rulers display with millimeter markings
 
+#### Scenario: Rulers account for zoom and pan
+
+- GIVEN the canvas is zoomed to 200% and panned 100px right
+- WHEN the rulers render
+- THEN tick marks and labels shift to reflect the current document position under the viewport
+
 #### Scenario: Drag guide from ruler
 
 - GIVEN the ruler system is visible
 - WHEN the user drags from the horizontal ruler onto the canvas
-- THEN a new horizontal guide is created at the drop position
+- THEN a new horizontal guide is created at the drop position in document coordinates
 
 #### Acceptance Criteria
 
 - [ ] Given showRulers true, rulers display with the current unit markings
-- [ ] Given a drag from the ruler, a new guide is created
+- [ ] Given rulers, only top (horizontal) and left (vertical) rulers are rendered — no right or bottom ruler
+- [ ] Given the vertical ruler, it renders at its full 20px width (not clipped or half-visible)
+- [ ] Given zoom/pan changes, ruler tick marks and labels update to reflect the current viewport position
+- [ ] Given a drag from the ruler, a new guide is created at the correct document coordinate
+- [ ] Given the rulers, they use glass-morphism background with 9px monospace labels
 
 ---
 

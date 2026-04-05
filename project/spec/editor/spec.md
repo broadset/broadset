@@ -8,20 +8,20 @@ Defines the editor engine for broadset. The editor manages document state with u
 
 ## Sub-Specs
 
-| Sub-Spec                                               | Scope                                                                                  |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| [store-actions.md](store-actions.md)                   | Core store actions — document lifecycle, element CRUD, selection, undo/redo, grouping  |
-| [store-ui-actions.md](store-ui-actions.md)             | Workspace actions — pages, canvas settings, guides, palette, fonts, media              |
-| [data-store.md](data-store.md)                         | Runtime data injection store (BroadsetDataStore) — CRUD, bulk ops, selector isolation  |
-| [collaboration.md](collaboration.md)                   | Document diffing, animation registry diffing, change stream, remote change application |
-| [editing.md](editing.md)                               | Path editing, path drawing, element placement, factory, validation, capabilities       |
-| [animation-state.md](animation-state.md)               | Animation config timeline/state/modifier mutations and screen-state updates            |
-| [timeline-playback.md](timeline-playback.md)           | Editor timeline playback orchestration with snapshot restore                           |
-| [react-data-integration.md](react-data-integration.md) | Provider context, error boundary, playback controller, data subscriptions              |
-| [path-geometry.md](path-geometry.md)                   | Path parsing/serialization, handle extraction, and geometry refit behavior             |
-| [canvas.md](canvas.md)                                 | Canvas rendering, selection, zoom/pan, grid, rulers, safety boundaries                 |
-| [transforms.md](transforms.md)                         | Drag, resize, rotate, snapping, anchor auto-assignment, 3D persistence                 |
-| [keyboard.md](keyboard.md)                             | Shortcut resolution, nudge, clipboard, delete, select-all, group/ungroup               |
+| Sub-Spec                                               | Scope                                                                                               |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| [store-actions.md](store-actions.md)                   | Core store actions — document lifecycle, element CRUD, selection, undo/redo, grouping               |
+| [store-ui-actions.md](store-ui-actions.md)             | Workspace actions — pages, canvas settings, guides, palette, fonts, media                           |
+| [data-store.md](data-store.md)                         | Runtime data injection store (BroadsetDataStore) — CRUD, bulk ops, selector isolation               |
+| [collaboration.md](collaboration.md)                   | Document diffing, animation registry diffing, change stream, remote change application              |
+| [editing.md](editing.md)                               | Path editing, path drawing, clip-path editing, element placement, factory, validation, capabilities |
+| [animation-state.md](animation-state.md)               | Animation config timeline/state/modifier mutations and screen-state updates                         |
+| [timeline-playback.md](timeline-playback.md)           | Editor timeline playback orchestration with snapshot restore                                        |
+| [react-data-integration.md](react-data-integration.md) | Provider context, error boundary, playback controller, data subscriptions                           |
+| [path-geometry.md](path-geometry.md)                   | Path parsing/serialization, handle extraction, and geometry refit behavior                          |
+| [canvas.md](canvas.md)                                 | Canvas rendering, selection, zoom/pan, grid, rulers, safety boundaries                              |
+| [transforms.md](transforms.md)                         | Drag, resize, rotate, snapping, anchor auto-assignment, 3D persistence                              |
+| [keyboard.md](keyboard.md)                             | Shortcut resolution, nudge, clipboard, delete, select-all, group/ungroup                            |
 
 ---
 
@@ -65,6 +65,30 @@ Unit tests verify pure logic in isolation. The following editor interactions inv
 ### Inline text editing
 
 - [ ] **Text editing mode:** Double-clicking a text element MUST activate a contenteditable overlay at the element's position, zoom-compensated.
+
+### Clip-path editing
+
+- [ ] **Enter clip-path editing:** Clicking "Edit Clip Path" in the Clip Path panel MUST render an SVG overlay on the canvas with anchor handles at each clip-path control point.
+- [ ] **Handle drag:** Dragging a clip-path anchor handle MUST update the clip-path shape in real time on the canvas and commit on pointer-up.
+- [ ] **Point insertion:** Clicking a midpoint handle MUST insert a new control point and begin dragging it.
+- [ ] **Point deletion:** Double-clicking a handle with > 3 points MUST remove that point; with exactly 3 points MUST be a no-op.
+- [ ] **Exit editing:** Pressing Escape or clicking outside the element MUST exit clip-path editing mode and commit changes.
+
+### Path editing
+
+- [ ] **Enter path editing:** Clicking "Edit Path Points" in the Path Properties panel MUST render an SVG overlay with anchor and control handles on the path.
+- [ ] **Handle drag:** Dragging an anchor or control handle MUST update the path `d` attribute in real time and commit on pointer-up.
+- [ ] **Axis constraints:** H-command handles MUST constrain to horizontal movement only; V-command handles to vertical only.
+- [ ] **Bounds refit:** When path editing mode is exited, the element's bounding box MUST be refitted via SVG getBBox().
+- [ ] **Exit editing:** Pressing Escape, clicking outside the element, or clicking "Done Editing Points" MUST exit path editing mode.
+
+### Path drawing
+
+- [ ] **Enter drawing:** Creating a new path element MUST auto-enter drawing mode; clicking "Draw Path" on an existing path also enters drawing mode.
+- [ ] **Click-to-place:** Each click on the canvas MUST append a point (M for first, L for subsequent). The path MUST visually update immediately.
+- [ ] **Close path:** Pressing Enter MUST append a Z command and exit drawing mode.
+- [ ] **Commit path:** Pressing Escape MUST commit the current path as-is and exit drawing mode.
+- [ ] **Coordinate conversion:** Clicks MUST be correctly converted from screen coordinates to element-local coordinates accounting for zoom and pan.
 
 ### Keyboard integration
 

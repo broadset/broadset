@@ -244,7 +244,7 @@ Element content MUST be validated at the model boundary based on the element's t
 
 - **text**: content MUST be sanitized to strip disallowed HTML tags. Allowed tags: `<b>`, `<i>`, `<u>`, `<br>`, `<span>`, `<strong>`, `<em>`. All other tags and all attributes except `style` MUST be stripped.
 - **image**: content MUST be a valid URL string (absolute or relative path). Empty string is allowed (placeholder image).
-- **path**: content MUST be a syntactically valid SVG path `d` attribute string. An empty string produces an empty path.
+- **path**: content MUST be a syntactically valid SVG path `d` attribute string. An empty string produces an empty path. Non-empty paths MUST begin with an `M` or `m` command. The valid command set is: `M`, `m`, `L`, `l`, `H`, `h`, `V`, `v`, `C`, `c`, `S`, `s`, `Q`, `q`, `T`, `t`, `A`, `a`, `Z`, `z`. Any non-numeric token that is not in the valid command set MUST cause validation to fail.
 - **svg**: content MUST be well-formed SVG markup.
 - **qrcode**: content MUST be a non-empty string (the data to encode).
 - **rectangle**, **ellipse**, **group**: content SHOULD be empty or undefined.

@@ -174,17 +174,21 @@ Each filter function MUST appear at most once in the stack. The "Add filter" dro
 
 **Per-Filter Fields:**
 
-| Filter function | Value range | Unit | Default |
-| --------------- | ----------- | ---- | ------- |
-| blur            | 0+          | px   | 0       |
-| brightness      | 0+          | none | 1       |
-| contrast        | 0+          | none | 1       |
-| grayscale       | 0–1         | none | 0       |
-| hue-rotate      | 0–360       | deg  | 0       |
-| invert          | 0–1         | none | 0       |
-| opacity         | 0–1         | none | 1       |
-| saturate        | 0+          | none | 1       |
-| sepia           | 0–1         | none | 0       |
+Each filter value MUST be edited via a **HeroUI `Slider`** with appropriate min/max/step constraints — NOT a plain text or numeric input. Sliders provide immediate visual feedback for bounded ranges.
+
+| Filter function | Input type    | Value range | Unit | Default | Step |
+| --------------- | ------------- | ----------- | ---- | ------- | ---- |
+| blur            | HeroUI Slider | 0–100       | px   | 0       | 1    |
+| brightness      | HeroUI Slider | 0–3         | none | 1       | 0.01 |
+| contrast        | HeroUI Slider | 0–3         | none | 1       | 0.01 |
+| grayscale       | HeroUI Slider | 0–1         | none | 0       | 0.01 |
+| hue-rotate      | HeroUI Slider | 0–360       | deg  | 0       | 1    |
+| invert          | HeroUI Slider | 0–1         | none | 0       | 0.01 |
+| opacity         | HeroUI Slider | 0–1         | none | 1       | 0.01 |
+| saturate        | HeroUI Slider | 0–3         | none | 1       | 0.01 |
+| sepia           | HeroUI Slider | 0–1         | none | 0       | 0.01 |
+
+Each filter row MUST display the filter name label, the slider, the current numeric value (read-only), and a remove button.
 
 **Stack Controls:**
 
@@ -241,14 +245,14 @@ The shadow editor MUST include a top-level HeroUI `Switch` to enable or disable 
 
 **Per-Layer Fields:**
 
-| Field    | Input type    | Available for           |
-| -------- | ------------- | ----------------------- |
-| Offset X | NumField (px) | box-shadow, text-shadow |
-| Offset Y | NumField (px) | box-shadow, text-shadow |
-| Blur     | NumField (px) | box-shadow, text-shadow |
-| Spread   | NumField (px) | box-shadow only         |
-| Color    | ColorInput    | box-shadow, text-shadow |
-| Inset    | HeroUI Switch | box-shadow only         |
+| Field    | Input type               | Available for           | Notes                          |
+| -------- | ------------------------ | ----------------------- | ------------------------------ |
+| Offset X | NumField (px)            | box-shadow, text-shadow | Range -100 to +100             |
+| Offset Y | NumField (px)            | box-shadow, text-shadow | Range -100 to +100             |
+| Blur     | HeroUI Slider (0–100px)  | box-shadow, text-shadow | Slider for visual feedback     |
+| Spread   | HeroUI Slider (-50–50px) | box-shadow only         | Slider; negative values shrink |
+| Color    | ColorInput               | box-shadow, text-shadow |                                |
+| Inset    | HeroUI Switch            | box-shadow only         |                                |
 
 Multiple shadow layers MUST be emitted as a comma-separated CSS shadow string.
 

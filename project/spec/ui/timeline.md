@@ -155,9 +155,11 @@ The system MUST render with `aria-hidden` when no timeline is being edited. When
 
 **Visual Behavior:**
 
-The bottom panel MUST slide up from the bottom edge of the canvas area using a CSS transform transition. When closed, it MUST be translated off-screen (`translateY(100%)`) with `pointer-events: none` to avoid blocking canvas interaction. When open, it MUST translate to its natural position (`translateY(0)`) with full interactivity.
+The bottom panel MUST be fixed-positioned at the bottom of the viewport, spanning nearly the full width — inset on each side by `28px` (ruler thickness + gap) to align with the canvas area. See `project/spec/demo/layout.md` → Timeline Panel for the full positioning table.
 
-The panel MUST have a glass-morphism background consistent with the sidebar, with top border-radius for visual distinction from the canvas. A close button (X icon) MUST be visible in the panel header to close the timeline editor.
+The panel MUST slide up from the bottom edge using a CSS transform transition. When closed, it MUST be translated off-screen (`translateY(100%)`) with `pointer-events: none` to avoid blocking canvas interaction. When open, it MUST translate to its natural position (`translateY(0)`) with full interactivity.
+
+The panel MUST have a `var(--surface)` background with top border-radius for visual distinction from the canvas. A close button (X icon) MUST be visible in the panel header to close the timeline editor.
 
 #### Scenario: Hidden when no timeline
 

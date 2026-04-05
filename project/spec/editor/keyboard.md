@@ -10,7 +10,7 @@ Defines the behavioral contracts for keyboard shortcut dispatch, nudge operation
 
 ### Requirement: Shortcut Binding Resolution
 
-Each `ShortcutAction` MUST map to a key + modifier combination via the shortcut map. The host MAY override individual bindings via `EditorConfig.shortcuts`. Overrides MUST merge with defaults — only the overridden actions change.
+Each `ShortcutAction` MUST map to a key + modifier combination via the shortcut map. The host MAY override individual bindings via `EditorConfig.shortcuts`. Overrides MUST merge with defaults — only the overridden actions change. Shortcut matching MUST use exact modifier comparison: all specified modifiers (ctrl, shift, alt, meta) must be active, and no unspecified modifiers may be active. For example, a binding for Ctrl+Z MUST NOT trigger when Ctrl+Shift+Z is pressed.
 
 #### Scenario: Default binding matches
 

@@ -12,6 +12,17 @@ Defines the behavioral requirements for all modal dialogs: About, Canvas Setting
 
 The system MUST NOT render when closed. When open, it MUST render about content. Clicking close MUST call the onClose callback.
 
+**Content:**
+
+| Zone        | Content                                                                                |
+| ----------- | -------------------------------------------------------------------------------------- |
+| Title       | Application name ("Broadset")                                                          |
+| Description | One-paragraph summary of the application                                               |
+| Stack info  | Definition list (`<dl>`) showing: Stack (React, Zustand, HeroUI v3), Renderer, Exports |
+| Version     | Current application version number                                                     |
+
+The modal MUST use HeroUI `Modal` (size `md`), with a close button (X icon) in the header.
+
 #### Scenario: Open and close
 
 - GIVEN the modal is open
@@ -91,6 +102,30 @@ The system MUST show only exporters enabled by feature flags. When submitted, it
 
 Only exporters that have their feature flag enabled MUST appear.
 
+**Format-Specific Options:**
+
+When an exporter is selected, the options panel MUST display controls specific to that format:
+
+| Format   | Options                                                                                                                                                                           |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PDF      | Base64-embed assets toggle (HeroUI `Switch`)                                                                                                                                      |
+| PSD      | (no extra options)                                                                                                                                                                |
+| PPTX     | (no extra options)                                                                                                                                                                |
+| PNG      | Pixel ratio (NumField, 1–4), Background color (ColorInput)                                                                                                                        |
+| JPEG     | Pixel ratio (NumField, 1–4), Quality (HeroUI `Slider`, 0–1), Background color (ColorInput)                                                                                        |
+| MP4/WebM | FPS (HeroUI `Select`: 24/25/30/50/60 or custom NumField), Resolution W×H (NumField pair), Bitrate (NumField, kbps), Timeline selector (HeroUI `Select` listing element timelines) |
+| OGraf    | ID prefix (HeroUI `Input`)                                                                                                                                                        |
+| HTML     | (no extra options)                                                                                                                                                                |
+| SVG      | (no extra options)                                                                                                                                                                |
+
+**Renderer Preview:**
+
+The export modal MUST include an embedded renderer preview showing the current document. For animated formats (MP4, WebM, OGraf), the preview MUST play the selected timeline animation. The preview MUST update when dynamic data fields change.
+
+**Export Progress:**
+
+During export, a HeroUI `Progress` bar MUST replace the submit button area, showing progress as a percentage. The modal MUST NOT be closeable during active export.
+
 #### Scenario: Feature-flagged exporters
 
 - GIVEN certain export features enabled
@@ -116,14 +151,19 @@ The system MUST show empty state when no media source is configured. It MUST ren
 
 **Layout Structure:**
 
-| Zone             | Content                                                                     |
-| ---------------- | --------------------------------------------------------------------------- |
-| Search bar       | HeroUI `Input` for filtering assets by name                                 |
-| Category tabs    | HeroUI `Tabs` for filtering by media category                               |
-| Asset grid       | Thumbnail grid of available media assets                                    |
-| Selected preview | Shows the currently selected asset in a larger preview                      |
-| Upload button    | Conditionally visible (only when `mediaSource.onUploadRequest` is provided) |
-| Confirm button   | "Select" button — disabled until an asset is selected                       |
+| Zone             | Content                                                                                        |
+| ---------------- | ---------------------------------------------------------------------------------------------- |
+| Search bar       | HeroUI `Input` for filtering assets by name                                                    |
+| Category tabs    | HeroUI `Tabs` for filtering by media category ("All" tab always first, then custom categories) |
+| Asset grid       | 3-column scrollable grid of asset thumbnails (max-height 400px, `overflow-y: auto`)            |
+| Selected preview | Highlighted border on the selected thumbnail                                                   |
+| Upload button    | Conditionally visible; triggers hidden `<input type="file" accept="image/*">` via ref          |
+| Upload progress  | HeroUI `Spinner` shown during upload, replacing the upload button                              |
+| Confirm button   | "Select" button (HeroUI `Button`, primary) — disabled until an asset is selected               |
+
+**Asset Thumbnails:**
+
+Each asset MUST render as a clickable thumbnail button showing the image preview. Clicking MUST select the asset (highlighted border). Double-clicking MUST select and confirm in one action. The asset name MUST be displayed below or overlaid on the thumbnail.
 
 #### Scenario: Search filtering
 
@@ -160,9 +200,13 @@ The system MUST support category tabs for switching preset groups. Selecting a p
 | Zone            | Content                                                                                                |
 | --------------- | ------------------------------------------------------------------------------------------------------ |
 | Category tabs   | HeroUI `Tabs` — one tab per preset category (Broadcast, Print, Social Media, Commercial, Large Format) |
-| Preset grid     | Grid of preset cards showing name and dimensions (W×H in target units)                                 |
-| Selected preset | Highlights selected card, shows confirmed dimensions below grid                                        |
-| Create button   | "Create Document" button — disabled until a preset is selected                                         |
+| Preset table    | HeroUI `Table` with columns: Name, Dimensions (formatted as `W × H unit`), Mode                        |
+| Selected preset | Highlighted table row for the selected preset                                                          |
+| Footer buttons  | Cancel (ghost) and Create Document (primary) — Create disabled until a preset is selected              |
+
+**Preset Table:**
+
+Presets MUST be displayed in a HeroUI `Table` (not a card grid) for scannable comparison. Each row MUST show the preset name, formatted dimensions (e.g. `1920 × 1080 px`, `210 × 297 mm`), and document mode. Clicking a row MUST select that preset. The selected row MUST be visually highlighted.
 
 #### Scenario: Create from preset
 
@@ -212,6 +256,41 @@ Each row MUST show the action description and the key binding rendered using Her
 #### Acceptance Criteria
 
 - [ ] Given the modal is open, all five shortcut groups with descriptions and kbd elements are shown
+
+---
+
+### Requirement: Guide Position Modal
+
+The system MUST display a small modal when the user double-clicks a ruler guide. The modal MUST allow editing the exact position of the guide and deleting it.
+
+**Layout Structure:**
+
+| Zone           | Content                                                                  |
+| -------------- | ------------------------------------------------------------------------ |
+| Position input | NumField showing the guide position in the current ruler unit (mm/px/in) |
+| Delete button  | HeroUI `Button` (danger variant) — removes the guide                     |
+| Apply button   | HeroUI `Button` (primary variant) — commits the new position             |
+
+The modal MUST use HeroUI `Modal` (size `sm`). Pressing Enter MUST apply the new position. Pressing Escape MUST close without changes.
+
+#### Scenario: Edit guide position
+
+- GIVEN a guide at 50mm
+- WHEN the user changes the position to 75mm and clicks Apply
+- THEN the guide is repositioned to 75mm
+
+#### Scenario: Delete guide
+
+- GIVEN a guide at 50mm
+- WHEN the user clicks Delete
+- THEN the guide is removed
+
+#### Acceptance Criteria
+
+- [ ] Given a guide position change and Apply, the guide is repositioned
+- [ ] Given Delete clicked, the guide is removed
+- [ ] Given Enter key, the position is applied
+- [ ] Given Escape key, the modal closes without changes
 
 ---
 

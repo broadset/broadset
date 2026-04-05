@@ -26,7 +26,7 @@ The app MUST occupy the full browser viewport (100vw × 100vh) with no page-leve
 
 ### Requirement: Canvas Area
 
-The center area MUST contain the EditorCanvas wrapped in a RulerSystem and an EditorErrorBoundary. The canvas area MUST fill all available space not occupied by toolbars or the sidebar.
+The center area MUST contain the EditorCanvas wrapped in a RulerSystem and an EditorErrorBoundary. The canvas area MUST fill all available space not occupied by toolbars or the sidebar. The RulerSystem MUST render rulers along the **top and left edges only** (horizontal ruler on top, vertical ruler on the left). There is no right ruler or bottom ruler. A small origin square MUST appear at the top-left corner where the two rulers meet.
 
 #### Scenario: Canvas renders with rulers and error boundary
 
@@ -43,23 +43,26 @@ The center area MUST contain the EditorCanvas wrapped in a RulerSystem and an Ed
 
 ### Requirement: Floating Main Toolbar
 
-A glass-morphism toolbar MUST float at the top-left of the canvas area (offset by ruler thickness). It MUST provide actions for: save, export, import, new document, canvas settings toggle, and debug snapshot download. The save toolbar button triggers the `EditorConfig.onSave` callback. If `onSave` is not configured, the save button MUST be hidden. In the demo app, `onSave` persists to localStorage (see state.md).
+A glass-morphism toolbar MUST float at the top-left of the canvas area (offset by ruler thickness + gap = 28px from top and left edges). It MUST use a menu-bar–style layout with dropdown menus (File, View, Pages, Help), standalone Undo/Redo buttons, conditional alignment/distribute/group buttons, and a centre document info section.
+
+See `project/spec/ui/toolbar-nav.md` → Toolbar Actions for the complete menu item definitions.
 
 **Toolbar Visual:**
 
-The toolbar MUST use a compact height (consistent with `sp-08` token). It MUST use glass-morphism styling: semi-transparent background with backdrop blur, and a subtle border on the bottom edge. All buttons MUST be `size="sm"` and icon-only with HeroUI `Tooltip` on hover.
+The toolbar MUST use a compact height (consistent with `sp-08` token). It MUST use glass-morphism styling: `rgba(28, 28, 28, 0.85)` background with `backdrop-filter: blur(8px)`, `border: 1px solid var(--border)`, and `box-shadow: 0 2px 8px rgba(0,0,0,0.4)`. Dropdown trigger buttons MUST show text labels (e.g., "File", "View"). Undo/Redo and alignment buttons MUST be icon-only with HeroUI `Tooltip` on hover. All interactive controls MUST be `size="sm"`.
 
 #### Scenario: Toolbar visible on load
 
 - GIVEN the demo app is loaded
 - WHEN the main toolbar renders
-- THEN save, export, import, new document, settings, and debug snapshot actions are available
+- THEN File, View, Pages, Help dropdown menus and Undo/Redo buttons are available
 
 #### Acceptance Criteria
 
 - [ ] Given the demo app is loaded, the main toolbar floats at the top-left over the canvas
-- [ ] Given the toolbar, save/export/import/new/settings/debug actions are available
-- [ ] Given `onSave` is not configured, the save button is hidden
+- [ ] Given the toolbar, File/View/Pages/Help dropdown menus are available
+- [ ] Given the toolbar, Undo/Redo buttons are available as icon-only buttons
+- [ ] Given `onSave` is not configured, the Save item is hidden from the File menu
 
 ---
 
@@ -98,6 +101,17 @@ A right-side drawer MUST contain tabbed panels: Layers, Properties, Animation, P
 
 The drawer MUST be fixed-positioned on the right edge of the viewport. When closed, it MUST slide off-screen to the right (via CSS transform) with `pointer-events: none`. When open, it MUST slide to its natural position with full interactivity. The slide animation MUST use the `--transition-panel` token.
 
+**Sidebar Vertical Positioning:**
+
+The drawer MUST NOT extend to the full viewport height. It MUST be inset equally from the top and bottom of the viewport:
+
+| Edge     | Inset value | Breakdown                                                    |
+| -------- | ----------- | ------------------------------------------------------------ |
+| `top`    | `72px`      | `RULER_SIZE (20px) + gap (8px) + toolbar (36px) + gap (8px)` |
+| `bottom` | `72px`      | Same inset as top — symmetrical                              |
+
+This ensures the sidebar aligns vertically with the canvas area, sitting below the ruler + toolbar zone and above the bottom ruler + timeline zone.
+
 **Resize Handle:**
 
 The left edge of the drawer MUST contain a resize handle that:
@@ -108,24 +122,13 @@ The left edge of the drawer MUST contain a resize handle that:
 - Constrains width within the 256–800px range
 - Provides feedback during drag (the line becomes more visible)
 
-**Tab Bar:**
+The sidebar MUST use a `var(--surface)` opaque background with `border-radius` on the left corners only (the right side is flush with the viewport edge). The sidebar MUST NOT use glass-morphism — it is an opaque surface panel. The sidebar body MUST scroll internally when content overflows.
 
-The tab bar MUST use HeroUI `Tabs` and be positioned at the top of the drawer. Tab items MUST use a pill/segment style: a shared background container with the active tab highlighted using `--surface-tertiary`. The four tabs MUST be:
-
-| Tab        | Icon         | Content panel     |
-| ---------- | ------------ | ----------------- |
-| Layers     | Layers       | LayersSidebar     |
-| Properties | Settings2    | PropertiesSidebar |
-| Animation  | Clapperboard | AnimationSidebar  |
-| Preflight  | CheckCircle  | PreflightPanel    |
-
-The sidebar MUST use glass-morphism styling with border-radius on the left corners only (the right side is flush with the viewport edge).
-
-#### Scenario: Sidebar tabs
+#### Scenario: Sidebar visible and correctly inset
 
 - GIVEN the demo app with the sidebar open
 - WHEN the sidebar renders
-- THEN Layers, Properties, Animation, and Preflight tabs are available
+- THEN it is inset 72px from the top and 72px from the bottom of the viewport
 
 #### Scenario: Sidebar resize
 
@@ -135,15 +138,67 @@ The sidebar MUST use glass-morphism styling with border-radius on the left corne
 
 #### Acceptance Criteria
 
-- [ ] Given the sidebar, Layers/Properties/Animation/Preflight tabs are available
+- [ ] Given the sidebar is open, it is inset 72px from the top and 72px from the bottom
 - [ ] Given a resize drag, the sidebar width stays within 256–800px bounds
 - [ ] Given a width change, the new width persists across page reloads
 
 ---
 
+### Requirement: Sidebar Toolbar
+
+The sidebar MUST be controlled by a **separate floating toolbar** positioned at the top-right of the canvas area (inset by `RULER_SIZE + 8px = 28px` from the right and top edges). This toolbar MUST use the same glass-morphism styling as the main toolbar (`rgba(28, 28, 28, 0.85)` + `backdrop-filter: blur(8px)`).
+
+**Toolbar Structure:**
+
+The toolbar MUST be a horizontal row of icon-only HeroUI `Button` components (`size="sm"`, `isIconOnly`) with `Tooltip` on hover. It MUST contain:
+
+1. **Close button** (first position) — visible **only** when the sidebar is open. Uses the `X` (lucide-react) icon. Pressing it closes the sidebar. After the close button, a vertical divider line (`1px width, 18px height, var(--border) color`) MUST separate it from the tab buttons.
+
+2. **Tab buttons** (4 buttons):
+
+| Tab        | Icon (lucide-react) | Tooltip text | Disabled when       |
+| ---------- | ------------------- | ------------ | ------------------- |
+| Layers     | `Layers`            | Layers       | Never               |
+| Properties | `Sliders`           | Properties   | No element selected |
+| Animation  | `Workflow`          | Animation    | No element selected |
+| Preflight  | `ShieldCheck`       | Pre-flight   | Never               |
+
+**Active State:** The active tab button MUST use HeroUI `variant="primary"`. Inactive tab buttons MUST use `variant="ghost"`.
+
+**Tab Toggle Behavior:** Clicking an inactive tab opens the sidebar to that tab. Clicking the already-active tab closes the sidebar (same as clicking the close button). See "Sidebar Tab Switching" requirement for full behavior.
+
+#### Scenario: Sidebar toolbar renders at top-right
+
+- GIVEN the demo app is loaded
+- WHEN the sidebar toolbar renders
+- THEN it floats at the top-right of the canvas (inset by 28px from right and top edges)
+
+#### Scenario: Close button visibility
+
+- GIVEN the sidebar is closed
+- WHEN the sidebar toolbar renders
+- THEN only the 4 tab buttons are visible (no close button)
+
+#### Scenario: Close button appears when open
+
+- GIVEN the sidebar is open
+- WHEN the sidebar toolbar renders
+- THEN the close button (X icon) appears as the first button, followed by a divider, then the tab buttons
+
+#### Acceptance Criteria
+
+- [ ] Given the demo app, the sidebar toolbar floats at the top-right with glass-morphism styling
+- [ ] Given the sidebar is closed, the close button is not visible
+- [ ] Given the sidebar is open, the close button is visible as the first toolbar button
+- [ ] Given tab buttons, each is icon-only with a tooltip on hover
+- [ ] Given the active tab, its button uses variant="primary"; others use variant="ghost"
+- [ ] Given no element selected, Properties and Animation tab buttons are disabled
+
+---
+
 ### Requirement: Sidebar Tab Switching
 
-Clicking the active tab MUST close the sidebar. Clicking an inactive tab MUST open or switch to it. When no element is selected and the active tab is Properties or Animation, the sidebar MUST auto-switch to Layers.
+Clicking the active tab button in the sidebar toolbar MUST close the sidebar. Clicking an inactive tab button MUST open or switch to it. When no element is selected and the active tab is Properties or Animation, the sidebar MUST auto-switch to Layers.
 
 #### Scenario: Toggle active tab closes sidebar
 
@@ -167,23 +222,141 @@ Clicking the active tab MUST close the sidebar. Clicking an inactive tab MUST op
 
 ### Requirement: Context Menu
 
-A right-click context menu MUST be available on the canvas area, providing element-contextual actions.
+A right-click context menu MUST be available on the canvas area, providing element-contextual actions. The browser's default context menu MUST be suppressed on the canvas area.
 
-#### Scenario: Right-click opens context menu
+**When right-clicking an element:**
+
+The context menu MUST display these actions in order. Actions MUST be enabled or disabled based on the current state:
+
+| Action           | Shortcut label | Enabled when                               | Style  |
+| ---------------- | -------------- | ------------------------------------------ | ------ |
+| Cut              | Ctrl+X         | Element selected and not locked            |        |
+| Copy             | Ctrl+C         | Element selected                           |        |
+| Paste            | Ctrl+V         | Clipboard is non-empty                     |        |
+| Duplicate        | Ctrl+D         | Element selected and not locked            |        |
+| — separator —    |                |                                            |        |
+| Delete           | Del            | Element selected, not locked, not required | danger |
+| — separator —    |                |                                            |        |
+| Bring to Front   |                | Element selected                           |        |
+| Bring Forward    | ]              | Element selected and not already at front  |        |
+| Send Backward    | [              | Element selected and not already at back   |        |
+| Send to Back     |                | Element selected                           |        |
+| — separator —    |                |                                            |        |
+| Group            | Ctrl+G         | 2+ elements selected                       |        |
+| Ungroup          | Ctrl+Shift+G   | Selected element(s) have a groupId         |        |
+| — separator —    |                |                                            |        |
+| Lock / Unlock    | Ctrl+L         | Element selected                           |        |
+| Edit Clip Path   |                | Element has `clipPath` capability          |        |
+| Edit Path Points |                | Element type is `path`                     |        |
+
+**Delete** MUST use the HeroUI `color="danger"` variant, rendering the item in the theme's danger color (red text).
+
+**Lock / Unlock** MUST display a dynamic label: "Lock" when the element is currently unlocked, "Unlock" when the element is currently locked.
+
+**Group / Ungroup** MUST only be rendered (not just disabled) when 2+ elements are selected. They MUST be completely absent from the menu for single-element selections.
+
+**When right-clicking empty canvas:**
+
+The context menu MUST display only:
+
+| Action | Shortcut label | Enabled when           |
+| ------ | -------------- | ---------------------- |
+| Paste  | Ctrl+V         | Clipboard is non-empty |
+
+**Menu component:** The context menu MUST use a HeroUI `Dropdown` with `DropdownMenu` and `DropdownItem` components. Separator lines MUST use `DropdownSection` boundaries. Disabled items MUST use the `isDisabled` prop. Shortcut labels MUST be shown as `shortcut` prop on each item.
+
+**Positioning:** The context menu MUST appear at the pointer coordinates, but MUST be clamped to remain fully visible within the canvas container. If the menu would overflow the right or bottom edge, it MUST reflow to stay within bounds.
+
+**Dismiss behavior:** The context menu MUST close when an action is selected, when the user clicks outside the menu, or when the user presses Escape.
+
+#### Scenario: Right-click on element opens context menu
 
 - GIVEN an element selected on the canvas
+- WHEN the user right-clicks the element
+- THEN a context menu with element actions appears at the pointer position
+
+#### Scenario: Right-click on empty canvas
+
+- GIVEN no element under the pointer
+- WHEN the user right-clicks on the canvas
+- THEN a context menu with only the Paste action appears
+
+#### Scenario: Cut removes and copies element
+
+- GIVEN an element selected on the canvas
+- WHEN the user selects "Cut" from the context menu
+- THEN the element is removed from the page and placed in the clipboard
+
+#### Scenario: Locked element disables destructive actions
+
+- GIVEN a locked element selected on the canvas
 - WHEN the user right-clicks
-- THEN a context menu with element actions appears
+- THEN Cut, Duplicate, and Delete are disabled
+
+#### Scenario: Layer reordering via context menu
+
+- GIVEN elements [A, B, C] and B is selected
+- WHEN the user selects "Bring to Front" from the context menu
+- THEN the order becomes [A, C, B]
+
+#### Scenario: Edit Clip Path opens clip-path editing
+
+- GIVEN a rectangle element selected
+- WHEN the user selects "Edit Clip Path" from the context menu
+- THEN clip-path editing mode is entered for that element
+
+#### Scenario: Edit Path Points opens path editing
+
+- GIVEN a path element selected
+- WHEN the user selects "Edit Path Points" from the context menu
+- THEN path editing mode is entered for that element
 
 #### Acceptance Criteria
 
-- [ ] Given a right-click on the canvas area, the context menu appears
+- [ ] Given a right-click on a selected element, the context menu appears with all element actions
+- [ ] Given a right-click on empty canvas, the context menu appears with only Paste
+- [ ] Given a locked element, Cut, Duplicate, and Delete are disabled in the menu
+- [ ] Given a required element, Delete is disabled in the menu
+- [ ] Given Cut is selected, the element is removed and placed in the clipboard
+- [ ] Given Copy is selected, the element is placed in the clipboard
+- [ ] Given Paste is selected, the clipboard element is pasted onto the active page
+- [ ] Given Duplicate is selected, a copy of the element is created
+- [ ] Given a layer reorder action, the element z-order updates accordingly
+- [ ] Given Group with 2+ elements selected, elements are grouped
+- [ ] Given Ungroup with grouped elements, elements are ungrouped
+- [ ] Given Lock/Unlock, the element's locked state toggles
+- [ ] Given Edit Clip Path on an element with clipPath capability, clip-path editing activates
+- [ ] Given Edit Path Points on a path element, path editing mode activates
+- [ ] Given Delete item, it renders with danger color (red text)
+- [ ] Given a locked element, Lock/Unlock label shows "Unlock"; given an unlocked element, it shows "Lock"
+- [ ] Given a single element selected, Group and Ungroup are not rendered in the menu
+- [ ] Given the menu would overflow the container edge, it repositions to stay within bounds
+- [ ] Given clicking outside the menu or pressing Escape, the menu closes
 
 ---
 
 ### Requirement: Timeline Panel
 
 The bottom area of the canvas MUST contain only the timeline. When no timeline is being edited, a single toggle button MUST be visible to open the timeline. When a timeline is opened, the TimelineBottomPanel MUST render at the bottom of the canvas area. It MUST receive play, seek, and stop callbacks from the timeline playback hook. No other controls (undo/redo, page sorter, grid toggle, zoom, playback) belong in the bottom bar — these MUST be located in the floating main toolbar or sidebar.
+
+**Timeline Panel Positioning:**
+
+The timeline panel MUST be fixed-positioned at the bottom of the viewport. It MUST span nearly the full viewport width, inset on each side by the ruler thickness plus a gap (`RULER_SIZE + 8px = 28px`). This ensures it aligns with the canvas area between the rulers.
+
+| Property        | Value                                       |
+| --------------- | ------------------------------------------- |
+| `position`      | `fixed`                                     |
+| `bottom`        | `0`                                         |
+| `left`          | `28px` (ruler thickness + gap)              |
+| `right`         | `28px` (ruler thickness + gap)              |
+| Default height  | `240px`                                     |
+| `z-index`       | Above canvas overlays (e.g., `8000`)        |
+| `background`    | `var(--surface)`                            |
+| `border`        | `1px solid var(--border)`, no bottom border |
+| `border-radius` | Top corners only (bottom flush with edge)   |
+| `box-shadow`    | `var(--overlay-shadow)`                     |
+
+When closed, the panel MUST be off-screen via `translateY(100%)` with `pointer-events: none`. When open, it MUST slide to `translateY(0)` using the `--transition-panel` token.
 
 #### Scenario: Timeline toggle when closed
 
@@ -197,11 +370,19 @@ The bottom area of the canvas MUST contain only the timeline. When no timeline i
 - WHEN the panel renders
 - THEN the TimelineBottomPanel is visible at the bottom with playback controls
 
+#### Scenario: Timeline panel spans canvas width
+
+- GIVEN a timeline is opened for editing
+- WHEN the panel renders
+- THEN it is fixed at the bottom, inset left and right by 28px (ruler + gap)
+
 #### Acceptance Criteria
 
 - [ ] Given no timeline being edited, only a timeline toggle button is visible at the bottom
 - [ ] Given a timeline being edited, the TimelineBottomPanel is visible at the bottom
 - [ ] Given the bottom area, no undo/redo, page sorter, grid, zoom, or playback buttons are present
+- [ ] Given the timeline panel is open, it is fixed-positioned at bottom:0, left:28px, right:28px
+- [ ] Given the timeline panel, its default height is 240px
 
 ---
 
@@ -273,25 +454,43 @@ When one or more elements are selected on the canvas, a visible selection outlin
 For reference, the overall app layout MUST follow this spatial arrangement:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  [Main Toolbar]  (glass, floating top-left)             │
-│  [Element Toolbar] (vertical, below main toolbar)       │
-│                                                         │
-│  ┌──────┐                                   ┌─────────┐│
-│  │ Page │   Canvas Area                     │ Sidebar ││
-│  │Sorter│   (fills remaining space,         │ Drawer  ││
-│  │(float│    rulers on top & left edges)     │ (right, ││
-│  │ below│                                   │ resize- ││
-│  │ elem │                                   │ able,   ││
-│  │ tlbr)│                                   │ tabbed) ││
-│  └──────┘                                   └─────────┘│
-│                                                         │
-│  [Placement Banner]  (top-center, conditional)          │
-│                                                         │
-│  ┌─────────────────────────────────────────────────────┐│
-│  │ Timeline Bottom Panel  (slides up when editing)     ││
-│  └─────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────┘
+┌──┬──────────────────────────────────────────────────────┐
+│▪ │  [Horizontal Ruler — top edge, 20px]                 │
+├──┤──────────────────────────────────────────────────────┤
+│  │  [Main Toolbar]  (glass, floating   [Sidebar Toolbar]│
+│V │      top-left)                      (glass, floating │
+│e │  [Element Toolbar] (vertical,        top-right, icon │
+│r │      below main toolbar)             buttons+close)  │
+│t │                                                      │
+│i │  ┌──────┐                                ┌──────────┐│
+│c │  │ Page │   Canvas Area                  │ Sidebar  ││
+│a │  │Sorter│   (fills remaining space)      │ Drawer   ││
+│l │  │(float│                                │ (right,  ││
+│  │  │ below│                                │ 72px top ││
+│R │  │ elem │                                │ & bottom ││
+│u │  │ tlbr)│                                │ inset,   ││
+│l │  └──────┘                                │ opaque)  ││
+│e │                                          └──────────┘│
+│r │  [Placement Banner]  (top-center, conditional)       │
+│  │                                                      │
+│20│  ┌──────────────────────────────────────────────────┐│
+│px│  │ Timeline Bottom Panel  (fixed bottom,            ││
+│  │  │  left:28px, right:28px, slides up when editing)  ││
+│  │  └──────────────────────────────────────────────────┘│
+└──┴──────────────────────────────────────────────────────┘
+      ← 28px →                                  ← 28px →
+      (ruler+gap insets)
+```
+
+**Layout Constants:**
+
+| Constant      | Value  | Usage                                                         |
+| ------------- | ------ | ------------------------------------------------------------- |
+| `RULER_SIZE`  | `20px` | Thickness of horizontal and vertical rulers                   |
+| Ruler gap     | `8px`  | Space between ruler and adjacent floating panels              |
+| Toolbar inset | `28px` | `RULER_SIZE + gap` — toolbar/timeline offset from edges       |
+| Sidebar inset | `72px` | `RULER_SIZE + gap + toolbar + gap` — sidebar top/bottom inset |
+
 ```
 
 ---
@@ -302,3 +501,4 @@ For reference, the overall app layout MUST follow this spatial arrangement:
 - Toolbar component behavior → see `project/spec/ui/toolbar-nav.md`
 - Sidebar panel component behavior → see `project/spec/ui/panels.md`
 - Timeline editor component → see `project/spec/ui/timeline.md`
+```

@@ -14,16 +14,17 @@ The demo MUST use a dark color scheme. Floating panels (toolbar, sidebar, modals
 
 **Glass-Morphism Application:**
 
-The following components MUST apply glass-morphism:
+The following components MUST apply glass-morphism with the specified background values:
 
-| Component        | Treatment                                                                     |
-| ---------------- | ----------------------------------------------------------------------------- |
-| Floating toolbar | Semi-transparent dark bg, backdrop blur, bottom border                        |
-| Element toolbar  | Same as floating toolbar                                                      |
-| Sidebar drawer   | Semi-transparent dark bg, backdrop blur, left border-radius, elevation shadow |
-| Page sorter      | Semi-transparent dark bg, backdrop blur                                       |
-| Bottom panel     | Semi-transparent dark bg, backdrop blur, top border-radius                    |
-| Modal overlays   | Semi-transparent dark bg, backdrop blur                                       |
+| Component        | Background                | Backdrop filter | Additional                                                                                       |
+| ---------------- | ------------------------- | --------------- | ------------------------------------------------------------------------------------------------ |
+| Rulers           | `rgba(20, 20, 20, 0.72)`  | `blur(6px)`     | Tick strokes `rgba(255,255,255,0.45)`, labels `rgba(255,255,255,0.65)`, font `9px IBM Plex Mono` |
+| Floating toolbar | `rgba(28, 28, 28, 0.85)`  | `blur(8px)`     | `border: 1px solid var(--border)`, `box-shadow: 0 2px 8px rgba(0,0,0,0.4)`                       |
+| Element toolbar  | `rgba(28, 28, 28, 0.85)`  | `blur(8px)`     | Same as floating toolbar                                                                         |
+| Sidebar drawer   | `var(--surface)` (opaque) | None            | `border-radius` on left corners only (right flush with viewport edge)                            |
+| Page sorter      | `rgba(28, 28, 28, 0.85)`  | `blur(8px)`     | Same as toolbars                                                                                 |
+| Bottom panel     | `var(--surface)` (opaque) | None            | `border-radius` on top corners only, `box-shadow: var(--overlay-shadow)`                         |
+| Modal overlays   | Semi-transparent dark bg  | `blur(8px)`     |                                                                                                  |
 
 Non-floating surfaces (e.g., accordion panels within the sidebar, property fields) MUST use opaque `--surface` backgrounds — glass-morphism applies only to top-level floating containers.
 
@@ -81,7 +82,7 @@ Element types, sidebar tabs, and toolbar actions MUST use consistent iconography
 
 **Toolbar Action Icon Mapping:**
 
-Toolbar action buttons MUST each have a distinct icon from `lucide-react`. The specific icon per action is an implementation choice, but each action MUST be visually distinguishable from others.
+Toolbar dropdown menus (File, View, Pages, Help) MUST use text labels on their trigger buttons — they are NOT icon-only. Within dropdown menus, each item MUST have a `lucide-react` icon alongside its label (see `project/spec/ui/toolbar-nav.md` for the full icon mapping per menu item). Standalone toolbar buttons (Undo, Redo, alignment actions) MUST be icon-only with `aria-label` and HeroUI `Tooltip`.
 
 #### Scenario: Element type icons
 
@@ -89,11 +90,11 @@ Toolbar action buttons MUST each have a distinct icon from `lucide-react`. The s
 - WHEN all built-in element types are listed
 - THEN each type (text, image, svg, path, rectangle, ellipse, qrcode, group) has a distinct icon
 
-#### Scenario: Toolbar action icons
+#### Scenario: Toolbar menu items have icons
 
-- GIVEN the floating toolbar renders
-- WHEN action buttons are displayed
-- THEN each action (save, export, import, new, settings, debug) has a corresponding icon
+- GIVEN the File dropdown menu is opened
+- WHEN menu items are displayed
+- THEN each item (New, Open, Save, Import, Export, Settings, Debug) has a corresponding icon
 
 #### Scenario: Plugin icon fallback
 
@@ -104,10 +105,10 @@ Toolbar action buttons MUST each have a distinct icon from `lucide-react`. The s
 #### Acceptance Criteria
 
 - [ ] Given built-in element types, each type has a distinct icon in the element toolbar
-- [ ] Given toolbar actions, each action button has a corresponding icon
+- [ ] Given dropdown menu items, each item has a corresponding icon alongside its label
 - [ ] Given a plugin without an icon, a default fallback icon is used
-- [ ] Given any toolbar or element toolbar button, it is icon-only with an aria-label
-- [ ] Given hovering over an icon-only button, a tooltip with the action name appears
+- [ ] Given icon-only buttons (Undo, Redo, alignment), each has an aria-label and tooltip
+- [ ] Given dropdown trigger buttons (File, View, Pages, Help), they display text labels
 
 ---
 

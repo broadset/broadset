@@ -110,7 +110,7 @@ The system MUST support `borderWidth` (numeric, in px), `borderColor` (CSS color
 
 ### Requirement: Visual Effect Properties
 
-The system MUST support `boxShadow` (CSS box-shadow), `filter` (CSS filter function list), `backdropFilter` (CSS backdrop-filter), `mixBlendMode` (CSS mix-blend-mode), `isolation` (CSS isolation), and `opacity` (number 0–1, required). All except opacity are optional strings.
+The system MUST support `boxShadow` (CSS box-shadow), `filter` (CSS filter function list), `backdropFilter` (CSS backdrop-filter), `mixBlendMode` (CSS mix-blend-mode), `isolation` (CSS isolation), and `opacity` (number 0–1 inclusive, required). Opacity values outside the [0, 1] range MUST be rejected by validation. All except opacity are optional strings.
 
 #### Scenario: Opacity is required
 

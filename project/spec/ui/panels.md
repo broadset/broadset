@@ -16,22 +16,22 @@ The system MUST render the selected element from the native document. In screen 
 
 The Properties sidebar MUST present accordion sections in this order. Each section MUST use a HeroUI `Accordion` panel with an icon next to the section title. Sections MUST only appear when relevant to the selected element type and document mode:
 
-| #   | Section           | Shown for                          | Hidden in print mode |
-| --- | ----------------- | ---------------------------------- | -------------------- |
-| 1   | Geometry          | All elements                       | 3D fields only       |
-| 2   | Appearance        | All elements                       | Gradient fill        |
-| 3   | Typography        | Text elements                      | No                   |
-| 4   | Text Effects      | Text elements                      | No                   |
-| 5   | Spacing           | Text and group elements            | No                   |
-| 6   | Box Effects       | All elements                       | Partially            |
-| 7   | Clip Path         | All elements                       | No                   |
-| 8   | Path Properties   | Path and SVG elements              | No                   |
-| 9   | Image             | Image elements                     | No                   |
-| 10  | Object Fit        | Elements with objectFit capability | No                   |
-| 11  | QR Code           | QR code elements                   | No                   |
-| 12  | Group             | Group elements                     | No                   |
-| 13  | Animation Builder | All elements (if enabled)          | No                   |
-| 14  | Custom Panel      | Custom plugin types                | No                   |
+| #   | Section           | Shown for                           | Hidden in print mode |
+| --- | ----------------- | ----------------------------------- | -------------------- |
+| 1   | Geometry          | All elements                        | 3D fields only       |
+| 2   | Appearance        | All elements                        | Gradient fill        |
+| 3   | Typography        | Text elements                       | No                   |
+| 4   | Text Effects      | Text elements                       | No                   |
+| 5   | Spacing           | Text and group elements             | No                   |
+| 6   | Box Effects       | All elements                        | Partially            |
+| 7   | Clip Path         | Elements with `clipPath` capability | No                   |
+| 8   | Path Properties   | Path and SVG elements               | No                   |
+| 9   | Image             | Image elements                      | No                   |
+| 10  | Object Fit        | Elements with objectFit capability  | No                   |
+| 11  | QR Code           | QR code elements                    | No                   |
+| 12  | Group             | Group elements                      | No                   |
+| 13  | Animation Builder | All elements (if enabled)           | No                   |
+| 14  | Custom Panel      | Custom plugin types                 | No                   |
 
 **Empty State:**
 
@@ -140,7 +140,9 @@ The panel MUST use HeroUI `Accordion` sections to group shadow, filter, backdrop
 
 ### Requirement: Clip-Path Panel
 
-The system MUST show a start button for custom mask editing when not in editing mode. When editing starts, a default path MUST be seeded if the clip-path is empty. A stop button MUST be shown while editing.
+The Clip Path accordion section MUST only appear when the selected element has the `clipPath` capability flag enabled (rectangle, ellipse, image, svg, group). It MUST NOT appear for text, path, or qrcode elements.
+
+The panel MUST show the current mask type and provide controls for selecting and editing clip-path shapes.
 
 **Preset Clip Shapes:**
 
@@ -153,19 +155,87 @@ The panel MUST provide a selector with built-in clip-path presets:
 | Squircle | smooth rounded-rectangle path |
 | Triangle | 3-point polygon               |
 | Star     | 5-point star polygon          |
-| Custom   | opens inline SVG path editor  |
+| Custom   | opens visual clip-path editor |
 
-Selecting a preset MUST immediately apply the clip-path and update the element's style. Custom mode MUST allow editing the raw SVG path coordinate string inline.
+Selecting a preset MUST immediately apply the clip-path to the element's `customClipPath` screen property, set `maskType` to `'custom'` (or `'none'` for the None preset), and update the canvas in real time.
+
+**Custom Clip-Path Editor Widget:**
+
+When the user selects the "Custom" preset or clicks "Edit Clip Path" on an element already using a custom clip-path, the system MUST enter clip-path editing mode. This mode MUST:
+
+1. **Show a start/stop toggle** — a Button in the panel to enter and exit editing mode. When editing starts, if the clip-path is empty, a default rectangular path (matching the element bounds) MUST be seeded.
+2. **Render an SVG overlay on the canvas** — an interactive clip-path outline drawn on top of the selected element, showing:
+   - **Anchor handles** (filled circles) at each control point of the clip-path polygon/path
+   - **Midpoint handles** (smaller, hollow circles) on each edge segment, for inserting new points
+   - The clip-path outline itself as a semi-transparent stroke
+3. **Support handle drag** — dragging an anchor handle MUST update the corresponding clip-path coordinate in real time (ephemeral updates). On mouseup, the change MUST be committed to the store.
+4. **Support point insertion** — clicking a midpoint handle MUST insert a new anchor point at that position and enter drag mode for it immediately.
+5. **Support point deletion** — double-clicking an anchor handle (or pressing Delete with a handle focused) MUST remove that point from the clip-path. A clip-path MUST retain at least 3 points.
+6. **Raw CSS input** — the panel MUST also provide a text input field showing the raw `customClipPath` CSS value. Editing this field MUST validate the input and apply it live. Invalid values MUST show a validation error and not be committed.
+7. **Coordinate system** — all handle coordinates MUST be in element-relative percentages (0%–100%), matching CSS clip-path conventions.
+8. **Exit behavior** — clicking outside the element, selecting a different element, or pressing Escape MUST exit clip-path editing mode and commit any pending changes.
 
 #### Scenario: Start editing seeds default path
 
 - GIVEN an element with an empty clip-path
 - WHEN clip-path editing starts
-- THEN a default path is seeded
+- THEN a default rectangular path is seeded matching the element bounds
+
+#### Scenario: Preset applies immediately
+
+- GIVEN a rectangle element selected
+- WHEN the "Circle" preset is selected in the Clip Path panel
+- THEN `maskType` is set to `'custom'` and `customClipPath` is set to `circle(50%)`
+
+#### Scenario: Handle drag updates clip-path
+
+- GIVEN clip-path editing mode is active with a polygon clip-path
+- WHEN the user drags an anchor handle
+- THEN the clip-path updates in real time on the canvas
+
+#### Scenario: Point insertion via midpoint handle
+
+- GIVEN clip-path editing mode is active with a triangle (3 points)
+- WHEN the user clicks a midpoint handle
+- THEN a new point is inserted at the midpoint, creating a 4-point polygon
+
+#### Scenario: Point deletion minimum enforced
+
+- GIVEN clip-path editing mode with exactly 3 points
+- WHEN the user attempts to delete a point
+- THEN the deletion is rejected (minimum 3 points)
+
+#### Scenario: Raw CSS input validation
+
+- GIVEN clip-path editing mode is active
+- WHEN the user types `polygon(50% 0%, 100% 100%, 0% 100%)` in the raw input
+- THEN the clip-path is applied and the canvas overlay updates
+
+#### Scenario: Invalid raw input shows error
+
+- GIVEN clip-path editing mode is active
+- WHEN the user types `not-valid-css` in the raw input
+- THEN a validation error is shown and the clip-path is not changed
+
+#### Scenario: None preset removes clip-path
+
+- GIVEN an element with a custom clip-path applied
+- WHEN the "None" preset is selected
+- THEN `maskType` is set to `'none'` and `customClipPath` is cleared
 
 #### Acceptance Criteria
 
-- [ ] Given an element with an empty clip-path, a default path is seeded
+- [ ] Given an element with an empty clip-path, a default rectangular path is seeded matching element bounds
+- [ ] Given a preset selection (Circle, Triangle, Star, Squircle), the clip-path is applied immediately to the element
+- [ ] Given the None preset, maskType is set to 'none' and customClipPath is cleared
+- [ ] Given clip-path editing mode, anchor handles are rendered on the canvas overlay at each control point
+- [ ] Given a handle drag, the clip-path updates in real time
+- [ ] Given a midpoint handle click, a new point is inserted into the clip-path
+- [ ] Given a point deletion attempt with > 3 points, the point is removed
+- [ ] Given a point deletion attempt with exactly 3 points, the deletion is rejected
+- [ ] Given valid raw CSS input, the clip-path is applied and canvas overlay updates
+- [ ] Given invalid raw CSS input, a validation error is shown
+- [ ] Given exit actions (Escape, click-outside, selection change), editing mode exits and changes are committed
 
 ---
 
@@ -474,23 +544,47 @@ ImagePanel MUST display and edit image source URL and object-fit for image-type 
 
 ### Requirement: Path Properties Panel
 
-PathPropertiesPanel MUST display and edit SVG stroke, fill, stroke-width, dasharray, linecap, linejoin, and fill-rule for path and SVG elements.
+PathPropertiesPanel MUST display and edit SVG stroke, fill, stroke-width, dasharray, dashoffset, linecap, linejoin, and fill-rule for path and SVG elements.
 
 **Fields:**
 
-| Field            | Input type          | Notes                           |
-| ---------------- | ------------------- | ------------------------------- |
-| Stroke color     | ColorInput          | SVG stroke color                |
-| Stroke width     | NumField (px)       | SVG stroke-width                |
-| Stroke opacity   | HeroUI Slider (0–1) | Transparency of stroke          |
-| Fill color       | ColorInput          | SVG fill color                  |
-| Fill opacity     | HeroUI Slider (0–1) | Transparency of fill            |
-| Stroke dasharray | text input          | CSS dasharray pattern           |
-| Stroke linecap   | HeroUI Select       | butt / round / square           |
-| Stroke linejoin  | HeroUI Select       | miter / round / bevel           |
-| Fill rule        | HeroUI Select       | nonzero / evenodd               |
-| Edit path        | toggle button       | Activates point-editing mode    |
-| Draw path        | toggle button       | Activates freehand drawing mode |
+| Field             | Input type                 | Notes                                                                                         |
+| ----------------- | -------------------------- | --------------------------------------------------------------------------------------------- |
+| Stroke color      | ColorInput                 | SVG stroke color                                                                              |
+| Stroke width      | NumField (min 0, step 0.5) | SVG stroke-width                                                                              |
+| Stroke opacity    | HeroUI Slider (0–1)        | Transparency of stroke                                                                        |
+| Stroke dasharray  | text input                 | CSS dasharray pattern                                                                         |
+| Stroke dashoffset | HeroUI Slider              | Dash offset (animatable)                                                                      |
+| Stroke linecap    | HeroUI Select              | butt / round / square                                                                         |
+| Stroke linejoin   | HeroUI Select              | miter / round / bevel                                                                         |
+| Fill color        | ColorInput                 | SVG fill color (or "none")                                                                    |
+| Fill opacity      | HeroUI Slider (0–1)        | Transparency of fill                                                                          |
+| Fill rule         | HeroUI Select              | nonzero / evenodd                                                                             |
+| Draw Path         | toggle button              | Activates click-to-place drawing mode                                                         |
+| Edit Path Points  | toggle button              | Activates point-editing overlay. Only enabled when path has content (non-empty `d` attribute) |
+
+**Factory Defaults for New Path Elements:**
+
+New path elements MUST be created with these style defaults:
+
+| Property         | Default value |
+| ---------------- | ------------- |
+| stroke           | `#000000`     |
+| strokeWidth      | `2`           |
+| fill             | `none`        |
+| fillOpacity      | `1`           |
+| strokeOpacity    | `1`           |
+| strokeLinecap    | `round`       |
+| strokeLinejoin   | `round`       |
+| strokeDasharray  | (empty)       |
+| strokeDashoffset | `0`           |
+| fillRule         | `nonzero`     |
+
+**Toggle Button Behavior:**
+
+- **Draw Path:** Pressing toggles between `startPathDrawing(elementId)` and `stopPathDrawing()`. Button label MUST change to "Done Drawing" when active.
+- **Edit Path Points:** Pressing toggles between `startPathEditing(elementId)` and `stopPathEditing()`. Button label MUST change to "Done Editing Points" when active. This button MUST be disabled when the path's content is empty (nothing to edit).
+- Only one mode can be active at a time — entering one MUST exit the other (see editor/editing.md for state rules).
 
 #### Scenario: Change stroke width
 
@@ -498,9 +592,17 @@ PathPropertiesPanel MUST display and edit SVG stroke, fill, stroke-width, dashar
 - WHEN stroke-width is changed to 3
 - THEN the element's stroke-width style is updated
 
+#### Scenario: Edit path toggle disabled for empty path
+
+- GIVEN a path element with empty content
+- WHEN the Path Properties panel renders
+- THEN the "Edit Path Points" button is disabled
+
 #### Acceptance Criteria
 
 - [ ] Given a path element, SVG stroke and fill properties are editable
+- [ ] Given a path element, draw path and edit path point toggle buttons are available
+- [ ] Given a path element with empty content, the edit path points button is disabled
 - [ ] Given a non-path/SVG element, path properties do not appear
 
 ---

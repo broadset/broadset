@@ -104,7 +104,7 @@ The system MUST interpolate values based on their type: numbers via linear lerp,
 
 ### Requirement: OKLab Color Interpolation
 
-The system MUST interpolate hex colors in the OKLab perceptual color space. It MUST support 3, 4, 6, and 8-digit hex formats. Alpha channels MUST be interpolated linearly. Gamut boundary values MUST be clamped — no `NaN` digits in output.
+The system MUST interpolate hex colors in the OKLab perceptual color space. It MUST support 3, 4, 6, and 8-digit hex formats. Alpha channels MUST be interpolated linearly. After OKLab→RGB conversion, output RGB channel values MUST be clamped to the [0, 255] integer range to prevent NaN or out-of-gamut hex digits in output.
 
 #### Scenario: Identical colors round-trip
 
