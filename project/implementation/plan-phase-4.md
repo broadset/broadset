@@ -1,22 +1,20 @@
-# Phase 4 — Editor + UI (feature by feature)
+# Phase 4 — Editor MVP: Core Editing & Canvas
 
-**Packages:** `packages/editor`, `packages/ui`, `packages/demo` (ongoing)
+**Packages:** `packages/editor`, `packages/ui`, `packages/demo`
 **Depends on:** Phase 1 (model), Phase 2 (renderer), Phase 3 (playback)
 **Index:** [plan.md](plan.md)
 
-**Approach:** Each feature group (A–I) lands end-to-end in the running demo.
-Complete one group fully — tests red → green, demo updated — before starting
-the next. The demo grows feature by feature rather than having a big-bang
-integration at the end.
-
-Each group lists its editor spec units, its UI spec units, and a concrete
-**demo milestone** — the observable proof that the feature works.
+**Goal by end of phase:** A functional editor MVP. Users can add elements from a
+toolbar, select them, drag/resize/rotate on canvas, switch scenes, undo/redo,
+zoom/pan, and see a grid and rulers. The demo looks professional with dark theme
+and glass-morphism. This is the "it’s a real editor" moment.
 
 ---
 
 ### ⚠️ MANDATORY — HeroUI component library
 
-All UI units in this phase (`ui/*`) **MUST** be built with `@heroui/react` components — **not** raw HTML elements. This is a hard architectural requirement, not a nice-to-have.
+All UI components in this phase **MUST** be built with `@heroui/react` — not raw
+HTML elements. See `AGENTS.md` and `.github/instructions/heroui.instructions.md`.
 
 | Instead of                      | Use                          |
 | ------------------------------- | ---------------------------- |
@@ -28,153 +26,105 @@ All UI units in this phase (`ui/*`) **MUST** be built with `@heroui/react` compo
 | Custom modal / dialog           | HeroUI `Modal`               |
 | Custom toggle / checkbox        | HeroUI `Switch` / `Checkbox` |
 
-`@heroui/react` **MUST** be in the package's `peerDependencies` before any UI unit is marked green.
-
-See `AGENTS.md`, `CONTRIBUTING.md`, and `.github/instructions/heroui.instructions.md`.
-
----
-
-## Remediation: HeroUI compliance for completed units
-
-Groups 4-A and 4-B were implemented with raw HTML elements instead of
-`@heroui/react` components. Before proceeding to 4-C, the existing UI files
-**MUST** be refactored to use HeroUI:
-
-- [x] Add `@heroui/react` to `packages/ui/package.json` peerDependencies
-- [x] `toolbar-nav.tsx`: replace raw `<button>` with HeroUI `Button`, `Tabs` for page sorter
-- [x] `panels.tsx`: replace `CollapsibleSection` with HeroUI `Accordion`, raw `<button>` with `Button`
-- [x] `inputs.tsx`: replace raw `<input>` with HeroUI `Input`/`Select` where applicable
-- [x] Update corresponding tests to render with HeroUI provider if needed
-- [x] Verify: `grep -rn '<button\|<input\|<select\|<textarea' packages/ui/src/ --include='*.tsx'` returns zero matches outside test mocks
+`@heroui/react` **MUST** be in the package’s `peerDependencies` before any UI
+unit is marked green.
 
 ---
 
-## Feature Group 4-A: Core editing scaffold
+## Feature Group 4-A: Store scaffold + element placement
 
-_Editor specs:_ `editor/store-actions.md` (doc init, element CRUD, selection),
-`editor/editing.md` (element placement mode)
-_UI specs:_ `ui/toolbar-nav.md` (element library tiles, page sorter)
+_Editor specs:_ `editor/store-actions.md` (document init — replace + reset undo;
+element CRUD — add with factory defaults, update partial merge, remove cascading,
+reorder within page; selection — single/multi/toggle/clear, clears on page
+switch, exits editing modes; undo/redo — full-snapshot cycle, configurable limit
+default 50; ephemeral vs committed — ephemeral untracked, pointer-up commits;
+grouping — group multi-selection, ungroup promotes children),
+`editor/editing.md` (element placement mode — start/cancel/place with click
+position centering, per-type defaults, no pending = no-op; placement vs
+instant-place distinction),
+`editor/react-data-integration.md` (EditorProvider context — store + component
+registry; EditorErrorBoundary — catches render errors, fallback UI)
 
-- [x] tests: red — editor/store-actions
-- [x] tests: red — editor/editing (placement)
-- [x] tests: red — ui/toolbar-nav (element library + page sorter)
-- [x] impl: green — all three
-- [x] demo milestone: click element type in toolbar → element appears on canvas;
-      click to select; Delete key removes it; page tabs visible and switching works
+- [ ] tests: red — editor/store-actions (init, CRUD, selection, undo/redo, grouping)
+- [ ] tests: red — editor/editing (placement mode + factory)
+- [ ] tests: red — editor/react-data-integration (EditorProvider + error boundary)
+- [ ] impl: green — all three
+- [ ] demo milestone: EditorProvider wraps app; click element type in toolbar →
+      element appears on canvas; click to select; Delete key removes it; undo/redo
+      works; group/ungroup via multi-select
 
-## Feature Group 4-B: Transforms + Properties panel
+## Feature Group 4-B: Transforms + canvas
 
-_Editor specs:_ `editor/transforms.md`
-_UI specs:_ `ui/utilities.md` (CSS parsers), `ui/inputs.md` (input components),
-`ui/panels.md` (properties sidebar — basic style fields)
+_Editor specs:_ `editor/transforms.md` (drag — ephemeral during, committed on
+drop; 8 resize handles — corners both axes, edges one axis; rotation handle;
+anchor auto-assignment — quadrant-based anchorX/Y after translation; zoom
+compensation — deltas ÷ zoom; 3D field persistence; border radius handles —
+rectangle only; smart snapping — page center → page edge → element center →
+element edge, 5px threshold; grid snapping — quantize to grid intersections),
+`editor/canvas.md` (viewport zoom — scroll/pinch, pan — background drag;
+click selection — element → select, void → deselect all; marquee selection —
+intersecting rect → selected; grid visibility and snap; ruler ticks; guide
+dragging from rulers; safety overlay — broadcast/print/none; smart guides —
+5px threshold, center/edge precedence)
 
-- [x] tests: red — editor/transforms
-- [x] tests: red — ui/utilities
-- [x] tests: red — ui/inputs
-- [x] tests: red — ui/panels (properties sidebar)
-- [x] impl: green — all
-- [x] demo milestone: select an element → drag it, resize via handles, rotate;
-      properties sidebar shows style fields; changing color/opacity updates the canvas
+- [ ] tests: red — editor/transforms
+- [ ] tests: red — editor/canvas
+- [ ] impl: green — all
+- [ ] demo milestone: select element → drag, resize via 8 handles, rotate via
+      handle; zoom (scroll/pinch), pan (drag background); grid toggleable; rulers
+      visible; drag from ruler creates guide; safety overlay in broadcast mode;
+      smart guides snap elements to each other
 
-## Feature Group 4-C: Undo/redo, page management, canvas
+## Feature Group 4-C: Pages + canvas settings + basic toolbar
 
-_Editor specs:_ `editor/store-ui-actions.md` (pages, canvas settings, guides),
-`editor/canvas.md`
-_UI specs:_ `ui/toolbar-nav.md` (undo/redo buttons, updated page sorter)
+_Editor specs:_ `editor/store-ui-actions.md` (page navigation — out-of-range
+ignored, clears selection; page add/remove — ≥1 page invariant, active index
+adjustment; canvas settings merge — NOT tracked by undo; guide CRUD — h/v type,
+mm position, locked flag; color palette — reject duplicates, remove by index;
+fonts/media CRUD)
+_UI specs:_ `ui/toolbar-nav.md` (floating toolbar — undo/redo buttons disabled
+when unavailable, save button, zoom controls, grid toggle, guide toggle;
+element library — 11 built-in tiles + custom plugins with icons, startPlacement
+on click, 2-column grid; scene sorter — tabs match scene count, switching, add/
+remove, remove hidden at 1 scene),
+`ui/utilities.md` (CSS parsers needed for property panels),
+`ui/panels.md` (basic properties — position/size/rotation/opacity fields only)
 
-- [x] tests: red — editor/store-ui-actions
-- [x] tests: red — editor/canvas
-- [x] impl: green — all
-- [x] **HeroUI verified** — no raw HTML elements in ui/ files
-- [x] demo milestone: add/remove pages; undo/redo buttons work; zoom and pan
-      canvas; grid visible; rulers rendered; drag from ruler creates a guide;
-      safety overlay visible in broadcast mode
+- [ ] tests: red — editor/store-ui-actions
+- [ ] tests: red — ui/toolbar-nav (toolbar + element library + scene sorter)
+- [ ] tests: red — ui/utilities (CSS parsers)
+- [ ] tests: red — ui/panels (basic position/size/rotation/opacity)
+- [ ] impl: green — all
+- [ ] **HeroUI verified** — no raw HTML elements in ui/ files
+- [ ] demo milestone: scene tabs visible, switching works, add/remove scenes;
+      undo/redo buttons in toolbar; element library with 11 types; basic property
+      fields (position, size, rotation, opacity) update canvas in real-time
 
-## Feature Group 4-D: Animation state editing + Timeline UI
+## Feature Group 4-D: Demo shell polish
 
-_Editor specs:_ `editor/animation-state.md`, `editor/timeline-playback.md`
-_UI specs:_ `ui/timeline.md` (timeline editor + bottom panel),
-`ui/panels.md` (animation sidebar)
+_Demo specs:_ `demo/layout.md` (full-viewport 100vw × 100vh, overflow hidden;
+floating main toolbar top-left above ruler offset; canvas area fills remaining
+space; placement mode banner when active),
+`demo/visual.md` (dark theme enforced — `class="dark" data-theme="dark"`;
+glass-morphism — semi-transparent panels with backdrop blur; Lucide icons
+throughout; responsive canvas — fills available space, no scrollbars on resize),
+`demo/state.md` (browser zoom prevention — pinch, Ctrl+scroll, Ctrl+±/0, Safari
+gesture; overflow lock on mount/unmount)
 
-- [x] tests: red — editor/animation-state
-- [x] tests: red — editor/timeline-playback
-- [x] tests: red — ui/timeline
-- [x] tests: red — ui/panels (animation sidebar + keyframe properties)
-- [x] impl: green — all
-- [x] **HeroUI verified** — no raw HTML elements in ui/ files
-- [x] demo milestone: select an element → open animation sidebar → add keyframe
-      in timeline editor → hit play → see the animation running in the demo
-
-## Feature Group 4-E: Path editing
-
-_Editor specs:_ `editor/path-geometry.md`, `editor/editing.md` (path
-editing/drawing modes)
-
-- [x] tests: red — editor/path-geometry
-- [x] tests: red — editor/editing (path editing + drawing)
-- [x] impl: green — all
-- [x] demo milestone: select a path element → enter path editing mode → drag
-      handles; use draw tool to sketch a new path point-by-point; Escape commits,
-      Enter closes path
-
-## Feature Group 4-F: Keyboard shortcuts
-
-_Editor specs:_ `editor/keyboard.md`
-
-- [x] tests: red
-- [x] impl: green
-- [x] demo milestone: arrow nudge moves selected element 1 mm; Shift+arrow moves
-      10 mm; Ctrl+Z/Y undo/redo; Ctrl+C/V copy/paste; Delete removes; Ctrl+G groups;
-      Ctrl+A selects all
-
-## Feature Group 4-G: Modals
-
-_UI specs:_ `ui/modals.md`
-
-- [x] tests: red
-- [x] impl: green
-- [x] **HeroUI verified** — no raw HTML elements in ui/ files
-- [x] demo milestone: all 6 modals open/close correctly — About, Canvas Settings
-      (updates take effect), Export (feature-gated exporters), Media Library (assets
-      browsable), New Document (presets create correct canvas), Shortcut Help
-
-## Feature Group 4-H: Runtime data store + React integration
-
-_Editor specs:_ `editor/data-store.md`, `editor/react-data-integration.md`
-_Demo:_ `demo/data-integration.md` (live data section)
-
-- [x] tests: red — editor/data-store
-- [x] tests: red — editor/react-data-integration
-- [x] impl: green — all
-- [x] demo milestone: live data placeholders (scores, clock, ticker) update on
-      a timer and are reflected in the rendered output without a full re-render of
-      the canvas; EditorProvider error boundary shows fallback on deliberate throw
-
-## Feature Group 4-I: Collaboration / change stream + full demo config
-
-_Editor specs:_ `editor/collaboration.md`
-_Demo:_ `demo/config.md`, `demo/state.md` (provider wiring, persistence,
-toasts, fullscreen)
-
-- [x] tests: red — editor/collaboration
-- [x] impl: green
-- [x] demo milestone: change stream logs batches to console with cumulative
-      count; sidebar width and active tab persist across page reload; export/import
-      toasts appear; fullscreen toggle works; ≥5 fonts, ≥8 palette colors, ≥1
-      custom plugin, ≥1 required element all configured
+- [ ] tests: red (Playwright CT)
+- [ ] impl: green
+- [ ] demo milestone: 100vw × 100vh dark-themed layout with glass-morphism panels;
+      responsive canvas fills available space; Lucide icons throughout; placement
+      mode banner when active; browser zoom prevented; the app looks and feels
+      like a professional design tool
 
 ---
 
 ## Progress
 
-| Group                           | Spec(s)                                                    | Red | Green | Demo live |
-| ------------------------------- | ---------------------------------------------------------- | --- | ----- | --------- |
-| 4-A core editing scaffold       | store-actions, editing (placement), ui/toolbar-nav         | ☐   | ☐     | ☐         |
-| 4-B transforms + properties     | transforms, ui/utilities, ui/inputs, ui/panels             | ☐   | ☐     | ☐         |
-| 4-C undo / pages / canvas       | store-ui-actions, canvas, ui/toolbar-nav                   | ☐   | ☐     | ☐         |
-| 4-D animation editing           | animation-state, timeline-playback, ui/timeline, ui/panels | ☐   | ☐     | ☐         |
-| 4-E path editing                | path-geometry, editing (paths)                             | ☐   | ☐     | ☐         |
-| 4-F keyboard shortcuts          | keyboard                                                   | ☐   | ☐     | ☐         |
-| 4-G modals                      | ui/modals                                                  | ☐   | ☐     | ☐         |
-| 4-H data store + React          | data-store, react-data-integration                         | ☐   | ☐     | ☐         |
-| 4-I change stream + full config | collaboration, demo/config, demo/state                     | ☐   | ☐     | ☐         |
+| Group                             | Red | Green | Demo |
+| --------------------------------- | --- | ----- | ---- |
+| 4-A store + placement             | ☐   | ☐     | ☐    |
+| 4-B transforms + canvas           | ☐   | ☐     | ☐    |
+| 4-C pages + toolbar + basic props | ☐   | ☐     | ☐    |
+| 4-D demo shell polish             | ☐   | ☐     | ☐    |

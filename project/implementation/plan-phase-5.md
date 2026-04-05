@@ -1,82 +1,108 @@
-# Phase 5 — Formats
+# Phase 5 — Rich Properties & Layers
 
-**Package:** `packages/formats`
-**Depends on:** Phase 1 (model); independent of editor
-**Parallelisable:** Can be started any time after Phase 1 is complete, in
-parallel with Phases 2–4.
+**Packages:** `packages/ui`, `packages/editor`, `packages/demo`
+**Depends on:** Phase 4 (editor MVP)
 **Index:** [plan.md](plan.md)
 
-Can be developed in parallel with Phase 4 (editor). Each sub-spec is
-independent of the others; implement in order of increasing complexity.
+**Goal by end of phase:** Full visual property editing. Every style field is
+editable through polished input components. Layers panel provides element
+management. Type-specific panels configure video, clock, and ticker elements.
+The demo showcases rich visual editing with capability-driven panel visibility.
 
 ---
 
-## Units
+### ⚠️ MANDATORY — HeroUI component library
 
-### 5.1 JSON interchange and utilities (`formats/interchange.md`)
+All UI components **MUST** use `@heroui/react`. See `AGENTS.md` and
+`.github/instructions/heroui.instructions.md`.
 
-- [x] tests: red
-- [x] impl: green
+---
 
-_Spec:_ `project/spec/formats/interchange.md`
-_What to cover:_ JSON export/import round-trip (BroadsetDocument ↔ JSON string);
-OGraf package creation; QR SVG generation; filename sanitization; stress tests
-(large documents, deeply nested elements).
+## Feature Group 5-A: Input components
 
-### 5.2 Raster export (`formats/raster.md`)
+_UI specs:_ `ui/inputs.md` (color picker — saturation/brightness area + hue
+slider, hex/rgba text input, invalid strings not submitted, alpha support;
+gradient editing via fill type switcher — solid/linear/radial/conic; CSS length
+input — numeric value + unit switching with auto-convert; text stroke input —
+width + color → text-stroke shorthand; filter editor — stack CRUD with ordered
+individually configurable filter functions; shadow editor — box-shadow/
+text-shadow builder),
+`ui/utilities.md` (CSS parsers — shadow parse/build, filter parse/build, CSS
+length parse, animation binding normalization, timeline/state resolution,
+keyframe value resolution)
 
-- [x] tests: red
-- [x] impl: green
+- [ ] tests: red — ui/utilities (CSS parsers)
+- [ ] tests: red — ui/inputs (all 5 input components)
+- [ ] impl: green — all
+- [ ] **HeroUI verified**
+- [ ] demo milestone: color picker shows saturation/brightness area + hue slider;
+      gradient editing via fill type switcher; filter and shadow editors allow
+      stacking multiple effects; color values normalized to hex
 
-_Spec:_ `project/spec/formats/raster.md`
-_What to cover:_ PNG/JPEG export; pixel-ratio behaviour (1x, 2x); canvas
-discovery from rendered DOM.
+## Feature Group 5-B: Full properties panel
 
-### 5.3 Web vector (SVG / HTML) (`formats/web-vector.md`)
+_UI specs:_ `ui/panels.md` (properties sidebar — all style fields organized by
+capability: typography block for text elements — fontFamily, fontSize, fontColor,
+fontWeight 100–900 numeric, fontStyle, textAlignment, textDecoration,
+textTransform, letterSpacing, lineHeight, wordSpacing, textShadow, textStroke,
+writingMode; appearance block — backgroundColor, backgroundGradient, opacity;
+border block — borderWidth, borderColor, borderRadius, borderStyle, padding;
+box effects — boxShadow, filter, backdropFilter, mixBlendMode, isolation;
+SVG stroke/fill — stroke, strokeWidth, strokeDasharray, strokeDashoffset,
+strokeLinecap, strokeLinejoin, strokeOpacity, fill, fillOpacity, fillRule;
+3D transforms — rotateX/Y/Z, translateZ; masking — maskType, customClipPath,
+clipChildren; objectFit for media; capability-driven visibility — panels shown
+based on element’s capability profile; screen vs print mode — print hides
+gradient/3D/clip; multi-element editing — common values shown, “Mixed” for
+differing values; animation mode adapter — keyframe selection routes edits to
+keyframe values)
 
-- [x] tests: red
-- [x] impl: green
+- [ ] tests: red — ui/panels (full properties panel)
+- [ ] impl: green
+- [ ] **HeroUI verified**
+- [ ] demo milestone: select element → all applicable style fields visible based
+      on element type capabilities; select multiple → common values shown, differing
+      show “Mixed”; print mode hides gradient/3D/clip fields; changing any property
+      updates canvas in real-time
 
-_Spec:_ `project/spec/formats/web-vector.md`
-_What to cover:_ SVG export/import round-trip; HTML standalone export with
-embedded playback runtime.
+## Feature Group 5-C: Layers panel
 
-### 5.4 PDF export (`formats/pdf.md`)
+_UI specs:_ `ui/panels.md` (layers panel — list with per-element lock toggle,
+visibility toggle, delete button; inline rename via double-click, Enter commits,
+Escape cancels, empty rejected; “Scenes” terminology in UI labels not “Pages”;
+drag-to-reorder elements)
 
-- [x] tests: red
-- [x] impl: green
+- [ ] tests: red — ui/panels (layers panel)
+- [ ] impl: green
+- [ ] **HeroUI verified**
+- [ ] demo milestone: layers tab shows all elements with lock/visibility/delete
+      controls; double-click to rename element; reorder by dragging; “Scenes”
+      label used throughout
 
-_Spec:_ `project/spec/formats/pdf.md`
-_What to cover:_ PDF generation; color parsing; font embedding; text wrapping;
-QR code rendering.
+## Feature Group 5-D: Type-specific panels + auto-size
 
-### 5.5 PPTX export/import (`formats/pptx.md`)
+_UI specs:_ `ui/panels.md` (video panel — source URL, autoplay, loop, muted,
+start/end time; clock panel — format pattern, mode selector, start value, target
+value, countdownTo for absolute datetime countdown; ticker panel — items array,
+speed 1–2000 px/s, direction left/right/up/down, gap, paused toggle),
+`ui/panels.md` (auto-size mode — segmented button: fixed/auto-height/
+shrink-to-fit with minimum 6pt)
 
-- [x] tests: red
-- [x] impl: green
-
-_Spec:_ `project/spec/formats/pptx.md`
-_What to cover:_ PPTX export with SVG fallback; import with path recovery;
-round-trip fidelity requirements.
-
-### 5.6 PSD export/import (`formats/psd.md`)
-
-- [x] tests: red
-- [x] impl: green
-
-_Spec:_ `project/spec/formats/psd.md`
-_What to cover:_ PSD export (layers, masks, effects, artboards); import; path
-vector conversion.
+- [ ] tests: red — ui/panels (type-specific panels + auto-size)
+- [ ] impl: green
+- [ ] **HeroUI verified**
+- [ ] demo milestone: select video element → source URL + playback controls shown;
+      select clock → format pattern + mode selector; select ticker → items list +
+      speed/direction; text elements show auto-size toggle (fixed/auto-height/
+      shrink-to-fit)
 
 ---
 
 ## Progress
 
-| Unit                      | Red | Green |
-| ------------------------- | --- | ----- |
-| 5.1 JSON interchange      | ☐   | ☐     |
-| 5.2 raster export         | ☐   | ☐     |
-| 5.3 web vector (SVG/HTML) | ☐   | ☐     |
-| 5.4 PDF export            | ☐   | ☐     |
-| 5.5 PPTX export/import    | ☐   | ☐     |
-| 5.6 PSD export/import     | ☐   | ☐     |
+| Group                         | Red | Green | Demo |
+| ----------------------------- | --- | ----- | ---- |
+| 5-A input components          | ☐   | ☐     | ☐    |
+| 5-B full properties panel     | ☐   | ☐     | ☐    |
+| 5-C layers panel              | ☐   | ☐     | ☐    |
+| 5-D type-specific + auto-size | ☐   | ☐     | ☐    |
