@@ -30,9 +30,9 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 1 — Model
-- **In Progress:** —
-- **Last Merged:** —
+- **Active Phase:** Phase 2 — Renderer + Demo shell
+- **In Progress:** 2.1 Renderer core
+- **Last Merged:** 1.10 JSON format reference / Zod schema
 
 ---
 
@@ -62,8 +62,8 @@ Phase 11 — Advanced Features     → trim path, boolean ops, text animation, a
 
 | Phase | File                                 | Packages                              | Status      |
 | ----- | ------------------------------------ | ------------------------------------- | ----------- |
-| 1     | [plan-phase-1.md](plan-phase-1.md)   | `model`                               | not started |
-| 2     | [plan-phase-2.md](plan-phase-2.md)   | `renderer` + `demo` shell             | not started |
+| 1     | [plan-phase-1.md](plan-phase-1.md)   | `model`                               | complete    |
+| 2     | [plan-phase-2.md](plan-phase-2.md)   | `renderer` + `demo` shell             | in progress |
 | 3     | [plan-phase-3.md](plan-phase-3.md)   | `playback` + `demo` animated          | not started |
 | 4     | [plan-phase-4.md](plan-phase-4.md)   | `editor` + `ui` + `demo` (MVP)        | not started |
 | 5     | [plan-phase-5.md](plan-phase-5.md)   | `ui` + `editor` + `demo` (properties) | not started |
