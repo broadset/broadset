@@ -309,8 +309,13 @@ export function importSvg(svgString: string): SvgImportResult {
       const viewBox = viewBoxStr.split(/[\s,]+/);
 
       if (viewBox.length >= 4) {
-        width = parseFloat(viewBox[2] ?? '0');
-        height = parseFloat(viewBox[3] ?? '0');
+        const vbW = parseFloat(viewBox[2] ?? '0');
+        const vbH = parseFloat(viewBox[3] ?? '0');
+
+        if (!Number.isNaN(vbW) && !Number.isNaN(vbH) && vbW > 0 && vbH > 0) {
+          width = vbW;
+          height = vbH;
+        }
       }
     }
   }

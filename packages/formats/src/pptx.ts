@@ -89,6 +89,67 @@ function escapeXml(text: string): string {
     .replace(/'/g, '&apos;');
 }
 
+interface GradientStop {
+  readonly offset: string;
+  readonly color: string;
+}
+
+/**
+ * Parse CSS linear-gradient() string into SVG-compatible color stops.
+ * Handles common forms: linear-gradient(angle, color1, color2, ...)
+ */
+function parseCssGradientStops(gradient: string): readonly GradientStop[] {
+  const match = /linear-gradient\(([^)]+)\)/.exec(gradient);
+
+  if (!match) {
+    return [];
+  }
+
+  const args = match[1] ?? '';
+  // Split by commas, but preserve commas inside rgb()/rgba() functions
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+
+  for (const ch of args) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+
+    if (ch === ',' && depth === 0) {
+      parts.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+
+  if (current.trim().length > 0) {
+    parts.push(current.trim());
+  }
+
+  // Skip the first part if it's an angle/direction
+  let startIdx = 0;
+
+  if (parts.length > 0) {
+    const first = parts[0] ?? '';
+
+    if (/^\d+deg$|^to\s/i.test(first)) {
+      startIdx = 1;
+    }
+  }
+
+  const colorParts = parts.slice(startIdx);
+
+  if (colorParts.length === 0) {
+    return [];
+  }
+
+  return colorParts.map((part, i) => ({
+    offset: `${String(Math.round((i / Math.max(colorParts.length - 1, 1)) * 100))}%`,
+    color: part.trim(),
+  }));
+}
+
 /**
  * Build an SVG string representing a styled element for use as picture
  * fallback media in PPTX.
@@ -133,12 +194,16 @@ function buildElementSvg(el: PageElement): string {
   let rectFill = escapeXml(fill);
 
   if (typeof gradient === 'string' && gradient.length > 0) {
-    defs =
-      '<defs><linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%">' +
-      '<stop offset="0%" style="stop-color:red"/>' +
-      '<stop offset="100%" style="stop-color:blue"/>' +
-      '</linearGradient></defs>';
-    rectFill = 'url(#g1)';
+    const stops = parseCssGradientStops(gradient);
+
+    if (stops.length > 0) {
+      const stopsXml = stops
+        .map((s) => `<stop offset="${s.offset}" style="stop-color:${escapeXml(s.color)}"/>`)
+        .join('');
+
+      defs = `<defs><linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%">${stopsXml}</linearGradient></defs>`;
+      rectFill = 'url(#g1)';
+    }
   }
 
   return (
