@@ -34,8 +34,8 @@ discovery from rendered DOM.
 
 ### 5.3 Web vector (SVG / HTML) (`formats/web-vector.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/formats/web-vector.md`
 _What to cover:_ SVG export/import round-trip; HTML standalone export with

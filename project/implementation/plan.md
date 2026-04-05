@@ -31,8 +31,8 @@ its package.
 ## Current Status
 
 - **Active Phase:** Phase 5 — Formats
-- **In Progress:** 5.3 (web vector export)
-- **Last Merged:** 5.2 Raster export
+- **In Progress:** 5.4 (PDF export)
+- **Last Merged:** 5.3 Web vector export
 
 ---
 

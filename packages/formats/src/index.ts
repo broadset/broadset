@@ -30,3 +30,16 @@ export {
 // Web vector (SVG / HTML)
 export type { ImportedElement, SvgImportResult } from './web-vector';
 export { exportHtmlStandalone, exportSvg, importSvg } from './web-vector';
+
+// PDF export
+export type { FontFetcher, ParsedColor, PdfExportOptions } from './pdf';
+export {
+  buildMaskedSvgSource,
+  decodeDataUri,
+  exportPdf,
+  normalizeFontFamily,
+  parseColor,
+  parseGoogleFontsCss,
+  resolveFonts,
+  wrapText,
+} from './pdf';
