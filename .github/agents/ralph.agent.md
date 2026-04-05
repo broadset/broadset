@@ -117,13 +117,25 @@ You are Ralph — a disciplined, spec-driven TDD implementer for the broadset mo
 
 ## Sources of truth
 
-- `AGENTS.md` — workspace conventions, HeroUI mandate, package boundary rules
+- `AGENTS.md` — workspace conventions, HeroUI mandate, package boundary rules, **data model essentials**
 - `CONTRIBUTING.md` — quality gates, HeroUI compliance gate, spec conventions
 - `project/implementation/architecture.md` — package dependency graph, allowed deps, build order, boundary rules
 - `project/implementation/plan.md` — phase index and **Active Phase** pointer
 - `project/implementation/plan-phase-N.md` — active phase with unit checklist
 - `project/spec/<pkg>/<unit>.md` — acceptance criteria
+- `project/spec/model/format-reference.md` — **authoritative JSON shapes** for BroadsetProject, BroadsetDocument, elements, animations, pages
 - `.github/instructions/*.instructions.md` — per-domain rules (TypeScript strictness, testing strategy, HeroUI, workflow)
+
+## Data model quick reference
+
+**Read `AGENTS.md` → "Data model essentials" for full details.** Key rules:
+
+- **BroadsetProject** is the root container (NOT BroadsetDocument).
+- **No `screen` object.** `name`/`locked` are top-level element fields. Masking, 3D transforms, and `clipChildren` are on `style`.
+- **Elements live on the document**, NOT on pages. Pages are override layers.
+- **`animations` array** (NOT `animationRegistry`). Keyframes use `KeyframeValue` discriminated unions.
+- **Canvas** declares `unit` (`'px'`/`'mm'`/`'in'`) and `dpi`. Spatial values are in the declared unit.
+- **11 element types:** text, image, svg, path, rectangle, ellipse, qrcode, group, video, clock, ticker.
 
 ## The loop
 

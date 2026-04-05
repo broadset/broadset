@@ -81,6 +81,21 @@ Before committing any file under `packages/ui/src/` or any React component in `p
 
 See `.github/instructions/heroui.instructions.md` for the full component mapping and design token rules.
 
+## Data model essentials
+
+The document format uses **BroadsetProject** as the root container type. Key structural rules:
+
+- **BroadsetProject** contains `settings`, `assets`, and one or more `documents` (BroadsetDocument).
+- **Elements** live on the **document**, NOT on pages. There is no `screen` object — `name`/`locked` are top-level element fields; masking, 3D transforms, and `clipChildren` are on `style`.
+- **Pages** are lightweight **override layers** — they carry per-element `content`, `style`, `visible`, and `assetId` overrides, not independent element arrays.
+- **Animations** are stored as an `animations` array on the document (NOT `animationRegistry`). Keyframes use `KeyframeValue` discriminated unions (`type: 'number'|'color'|'string'|'tuple'` + `easing`), NOT untyped `{ value: string, interpolation: string }`.
+- **Canvas** declares `unit` (`'px'`/`'mm'`/`'in'`) and `dpi` — spatial values are in the declared unit, not millimeters.
+- **Data binding** uses `dataSchema` (document-level), `dataField`/`visibleWhen`/`repeater` (element-level).
+- **11 element types:** text, image, svg, path, rectangle, ellipse, qrcode, group, video, clock, ticker.
+- **File format:** `.bsp` extension, `application/vnd.broadset.project+json` MIME.
+
+Authoritative references: `project/spec/model/format-reference.md` (JSON shapes), `project/spec/model/spec.md` (invariants), `project/spec/model/element.md` (element contract).
+
 ## References
 
 - `README.md` — project overview
