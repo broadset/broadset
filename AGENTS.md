@@ -25,6 +25,19 @@ When a quality gate, lint rule, typecheck, or CI check fails, **always fix the r
 
 If you believe a rule or config is genuinely wrong, **stop and report it** — do not change it yourself.
 
+## Interpret specs for maximum user value
+
+When a spec is ambiguous or silent on scope, **always resolve the ambiguity in favor of the end user**, not in favor of less work. This is a design tool — users expect features that work with real-world content, not just content produced by Broadset itself.
+
+Concrete examples of this principle:
+
+- **Import = arbitrary external files.** An importer for PPTX, PSD, SVG, etc. must handle files created by _any_ tool (PowerPoint, Photoshop, Illustrator, Figma exports, etc.), not just re-importing Broadset-exported files. Map as much content as possible to Broadset elements; preserve the rest as fallback.
+- **Export = real-world compatibility.** An exporter must produce files that open correctly in the canonical external tool, not just files that re-import into Broadset.
+- **"Support X" means broadly.** If a spec says "support gradients," that means CSS linear, radial, and conic gradients — not just `linear-gradient(red, blue)`.
+- **Edge cases are real cases.** If users will encounter it, it's in scope — even if the spec doesn't enumerate it.
+
+If you catch yourself picking the narrower, easier interpretation, that's a signal you're cutting corners.
+
 ## Spec updates — additive only
 
 Agents may update specs in `project/spec/` during implementation, but only as **additive refinements** — never behavioral changes.

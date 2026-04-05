@@ -178,7 +178,9 @@ Use the Explore subagent to check whether the production file already exists in 
 
 ### Step 3 — Read the spec
 
-Read the spec file linked in the unit entry. Derive acceptance criteria from it.
+Read the spec file linked in the unit entry. Also read the **parent `spec.md`** in the same folder for cross-cutting principles that apply to all units in this domain. Derive acceptance criteria from both.
+
+**Interpret for maximum user value.** When the spec is ambiguous or silent on scope, always resolve in favor of the end user — not in favor of less work. See `AGENTS.md` → "Interpret specs for maximum user value" for concrete examples. If you catch yourself picking the narrower, easier interpretation, that's a signal you're cutting corners.
 
 ### Step 3b — Refine the spec (if needed)
 
@@ -208,7 +210,14 @@ Confirm they fail before continuing. If they all pass already, the unit is alrea
 
 ### Step 5 — Green phase
 
-Write the minimum **real** implementation to make tests pass. Only touch files inside `packages/<pkg>/` — the package the current unit belongs to. Do not edit other packages to fix regressions; if another package breaks, note it and fix it by running its own quality check before committing.
+Write a **complete, professional, production-quality** implementation that makes all tests pass. Only touch files inside `packages/<pkg>/` — the package the current unit belongs to. Do not edit other packages to fix regressions; if another package breaks, note it and fix it by running its own quality check before committing.
+
+**When in doubt, choose the better path.** In every ambiguous decision — API design, error handling, edge-case coverage, data mapping, UX behavior — always favor the option that delivers better user experience, higher code quality, and more resilient behavior. Never minimize work at the expense of quality. Specifically:
+
+- Handle edge cases and malformed input gracefully, even if the spec doesn't enumerate every scenario.
+- Prefer robust error handling over optimistic happy-path-only code.
+- Choose the more thorough mapping/conversion over a narrow shortcut.
+- Write code you'd be proud to defend in a code review.
 
 - No `TODO` stubs or placeholder `throw`s.
 - No `any` types. Strict TypeScript throughout.
@@ -237,34 +246,45 @@ npm run quality
 
 Run from the **repository root** (not from `packages/`). This executes lint, typecheck, and tests across active packages. All must stay green. Fix regressions (they count toward the retry limit too). Do not commit until quality passes.
 
-### Step 7 — PR Review (fresh-eye, zero-context)
+### Step 7 — Independent Review (separate agent, zero shared context)
 
-Before committing, perform a ruthless self-review of every changed file as if you are a senior reviewer seeing this code for the first time with zero context.
+**You MUST NOT review your own code.** Use the Explore subagent as an independent reviewer with zero context about your implementation decisions. The reviewer has never seen your code and will judge it purely against the spec and codebase standards.
 
-1. Stage all changes and inspect the full diff:
+1. Stage all changes:
 
 ```bash
 git add -A
-git diff --cached
 ```
 
-2. Review every hunk against **all** of these criteria:
-   - **Correctness** — Does the logic actually do what the spec requires? Are there off-by-one errors, wrong comparisons, missing edge cases, or silent failures?
-   - **Spec completeness** — Does the implementation address **all** spec requirements for this unit — including layout, visual, spatial, theming, and UX criteria? A unit that only does "click X → Y" while ignoring positioning, styling, or interaction-design requirements from the spec is **incomplete**.
-   - **Type safety** — Are types precise? No `any`, no unsafe casts, no unnecessary type assertions? Are generics constrained properly?
-   - **Package boundaries** — Does every import respect the dependency graph in `architecture.md`? (e.g., `model` MUST NOT import other packages; `renderer` MUST only import `model` and `playback`.) Are required external dependencies (e.g., `@heroui/react`, `zod`) actually listed in the package's `package.json`?
-   - **Barrel exports** — Are all new public types, functions, and components exported from the package's `index.ts`? Consumers must import from the package root, never from internal paths.
-   - **HeroUI compliance** — If any file under `packages/ui/src/` or `packages/demo/src/` was changed, verify: no raw `<button>`, `<input>`, `<select>`, `<textarea>` where HeroUI equivalents exist. See `AGENTS.md` → "HeroUI mandate".
-   - **File size** — Does any changed file exceed the soft limit of 500 non-empty lines? If so, split it.
-   - **Performance** — No unnecessary allocations, redundant iterations, expensive operations inside loops, or O(n²) where O(n) is possible?
-   - **Code smells** — No dead code, unused imports, magic numbers, copy-pasted blocks, overly clever one-liners, or misleading names?
-   - **Shortcuts & suppressions** — No `// eslint-disable`, `@ts-ignore`, `TODO`, placeholder throws, hardcoded values that should be constants, or weakened configs?
-   - **Production readiness** — Would you ship this to thousands of users tomorrow? Is error handling appropriate? Are invariants enforced?
-   - **Test quality** — Do tests assert behavior (not implementation)? Are edge cases covered? Are test descriptions clear? No snapshot-only tests without behavioral assertions?
+2. Invoke the Explore subagent with the following prompt (fill in the placeholders):
 
-3. If **any** issue is found: fix it, rerun `npm run quality` (Step 6), and repeat this review from scratch on the new diff. Do not commit until the diff is clean.
+> **Thorough review.** You are a ruthless, adversarial code reviewer. You have zero context about the implementation — you are seeing this code for the first time.
+>
+> **Task:** Review the staged changes for unit `<N.M>` in `packages/<pkg>/` against the spec at `project/spec/<pkg>/<unit>.md`. Also read the parent `project/spec/<pkg>/spec.md` for cross-cutting principles.
+>
+> **Check every item below. Report ALL violations — do not summarize or soften.**
+>
+> 1. **Spec compliance** — Read every `#### Acceptance Criteria` checkbox in the spec. For each one, find the corresponding test AND implementation. Flag any criterion that is missing a test, has a test but no real implementation, or is implemented differently than the spec requires.
+> 2. **Component compliance** — If the spec names specific components (HeroUI NumberField, ColorArea, Slider, Select, etc.), verify the implementation actually uses those exact components — not raw HTML elements or custom substitutes. Grep for `<input`, `<button`, `<select`, `<textarea` in changed files under `packages/ui/` and `packages/demo/` — any hits are violations.
+> 3. **Layout/visual/UX compliance** — If the spec defines positioning, sizing, theming, spacing, responsive behavior, or interaction patterns, verify the implementation matches — not just the functional behavior.
+> 4. **Code quality** — No `any`, no unsafe `as` casts, no magic numbers, no dead code, no copy-paste, no grab-bag files, no functions doing multiple unrelated things. All types `readonly`. Barrel exports updated.
+> 5. **Test quality** — Tests assert behavior, cover edge cases, have clear descriptions. No snapshot-only tests.
+> 6. **Shortcuts** — No `// eslint-disable`, `@ts-ignore`, `TODO`, placeholder throws, hardcoded values that should be constants, weakened configs, or suppressed errors.
+>
+> **Output format:** For each finding, use:
+>
+> ```
+> [🔴 BUG | 🟠 SMELL | 🟡 STYLE | 🔵 NIT] file.ts:L<line> — <one-line summary>
+> <what's wrong, what the spec requires, and the concrete fix>
+> ```
+>
+> If there are zero findings, say "LGTM — no issues found."
 
-4. Only proceed to Step 8 when the diff passes review with zero findings.
+3. **Read the Explore subagent's report.** Fix every 🔴 BUG and 🟠 SMELL finding. For each fix, rerun `npm run quality` (Step 6).
+
+4. After fixing, if you made changes, invoke the Explore subagent again with the same prompt to re-review the new diff. Repeat until the report comes back clean (zero 🔴 and 🟠 findings).
+
+5. Only proceed to Step 8 when the independent review passes. Include the final review report verbatim in your session output so the user can see the 🟡 and 🔵 items.
 
 ### Step 8 — Commit (only after quality + review are clean)
 
@@ -326,76 +346,71 @@ When you stop (for any reason other than phase complete), report:
 
 A healthy session shows test count growing and pass rate near 100% for each completed unit. If a unit's pass rate plateaued below 100%, that is a **fixpoint signal** — the spec likely needs clarification before the next session.
 
-### Step 12 — End-of-Phase Review
+### Step 12 — End-of-Phase Review (independent agent)
 
 **Trigger:** Run this step only when all units in the current phase are checked off.
 
-This is a full-branch, zero-context, adversarial code review. You are no longer the author — you are a hostile reviewer who assumes every line is guilty until proven innocent.
+This is a full-branch adversarial review performed by the **Explore subagent** — not by you. You wrote this code; you are not qualified to judge it objectively.
 
-1. **Diff the full branch against main:**
+1. **Prepare the diff list:**
 
 ```bash
 git diff main --stat
-git diff main
 ```
 
-2. **Re-read the phase plan** (`project/implementation/plan-phase-N.md`). For every unit listed, verify:
-   - Was it actually implemented (not just marked `[x]`)?
-   - Do the tests cover the acceptance criteria from the spec?
-   - Is anything partially done, stubbed, or suspiciously thin?
-   - Were **all** spec requirements addressed — including layout, visual, spatial, theming, and UX criteria? Flag any unit that only implements functional behavior ("click X → Y") while ignoring the spec's non-functional requirements.
+2. **For each unit in the phase**, invoke the Explore subagent with:
 
-3. **Review every file in the diff.** For each one, evaluate ruthlessly:
-   - **Architecture** — Does this file belong in this package? Is the logic in the right layer? Are there misplaced utilities dumped into unrelated files?
-   - **Package boundaries** — Do all imports respect the dependency graph in `architecture.md`? Are required external deps actually in `package.json`?
-   - **Barrel exports** — Are all new public symbols exported from `index.ts`?
-   - **HeroUI compliance** — If `packages/ui/` or `packages/demo/` files are in the diff, grep for raw `<button`, `<input`, `<select`, `<textarea` — any hits (outside test mocks) are violations.
-   - **Correctness** — Are there off-by-one errors, wrong comparisons, missing edge cases, silent failures, or logic that only works for happy paths?
-   - **Type safety** — Any `any`, unsafe casts, overly permissive generics, or types that should be narrower?
-   - **File size** — Any file exceeding 500 non-empty lines? Split it.
-   - **Code smells** — Dead code, copy-paste duplication, magic numbers, overly clever code, misleading names, grab-bag files, functions doing too many things?
-   - **Shortcuts** — Suppression comments, TODO stubs, hardcoded values that should be constants, weakened configs, placeholder implementations?
-   - **Performance** — Unnecessary allocations in hot paths, O(n²) where O(n) is possible, redundant iterations, expensive operations inside loops?
-   - **Test quality** — Do tests assert behavior or just implementation details? Are edge cases covered? Are descriptions clear? Any snapshot-only tests?
-   - **Missing pieces** — Are there spec requirements with no corresponding test? Features with no barrel export? Types that should be reused but aren't?
+> **Thorough review.** You are a ruthless, adversarial code reviewer with zero context about the implementation.
+>
+> **Task:** Review the implementation of unit `<N.M>` (`<unit title>`) in `packages/<pkg>/` against the spec at `project/spec/<pkg>/<unit>.md` and the parent `project/spec/<pkg>/spec.md`.
+>
+> Read the spec first, then read the implementation files, then read the test files. Check:
+>
+> 1. **Every acceptance criterion** (`- [ ]`) in the spec — is it tested AND implemented? Flag any that are missing.
+> 2. **Component compliance** — If the spec names specific components (HeroUI NumberField, ColorArea, Slider, Select, etc.), does the code actually use them? Grep for raw `<input`, `<button`, `<select`, `<textarea` in `packages/ui/src/` and `packages/demo/src/`.
+> 3. **Layout/visual/UX** — If the spec defines positioning, sizing, theming, spacing, or interaction patterns, does the implementation match?
+> 4. **Code quality** — No `any`, no unsafe casts, no magic numbers, no dead code, no grab-bag files, all types readonly, barrel exports updated.
+> 5. **Import scope** — For importers: does it handle arbitrary external files (from any tool), not just Broadset round-trips? For exporters: will the output open correctly in the canonical external tool?
+> 6. **Shortcuts** — Suppression comments, TODO stubs, weakened configs, placeholder implementations?
+>
+> **Output format:** For each finding:
+>
+> ```
+> [🔴 BUG | 🟠 SMELL | 🟡 STYLE | 🔵 NIT] file.ts:L<line> — <summary>
+> <what's wrong, what the spec requires, concrete fix>
+> ```
+>
+> End with a summary: total findings by severity, overall assessment (PASS / NEEDS WORK / FAIL).
 
-4. **Write up findings** in a structured review report. For each finding use:
-
-```
-#### [severity] file.ts:L<line> — <one-line summary>
-<what's wrong and why it matters>
-**Fix:** <concrete action>
-```
-
-Severity levels: `🔴 BUG`, `🟠 SMELL`, `🟡 STYLE`, `🔵 NIT`
-
-5. **Fix every 🔴 BUG and 🟠 SMELL finding.** For each fix: make the change, rerun `npm run quality:all`, and verify tests still pass. Commit fixes as:
+3. **Collect all findings** across units. Fix every 🔴 BUG and 🟠 SMELL. For each fix, rerun `npm run quality:all` and verify tests pass. Commit fixes as:
 
 ```bash
 git commit -m "fix(<pkg>): phase N review — <description>"
 ```
 
-6. **Include the full review report** (including 🟡 and 🔵 items left unfixed) in your final stop report so the user can review remaining style/nit items and decide whether to act on them.
+4. **After fixing**, re-invoke the Explore subagent on any unit that had 🔴 or 🟠 findings to confirm the fixes resolved them.
+
+5. **Include the full review report** (including unfixed 🟡 and 🔵 items) in your final stop report so the user can decide whether to act on remaining items.
 
 ## Hard constraints
 
-| Constraint              | Rule                                                                                      |
-| ----------------------- | ----------------------------------------------------------------------------------------- |
-| Same phase only         | Never jump to the next phase file                                                         |
-| Tests first             | Always write and run failing tests before any implementation                              |
-| Iterate on failures     | Read error, fix, rerun — no permission needed                                             |
-| Retry limit             | Stop after 15 attempts with **no new test passing** (progress-based, not attempt-based)   |
-| No placeholders         | `TODO` stubs and un-implemented `throw`s are forbidden                                    |
-| JSDoc on every test     | Future loops need the reasoning                                                           |
-| Quality before commit   | `npm run quality` must be green before `git commit`                                       |
-| PR Review before commit | Ruthless zero-context review of `git diff --cached` — fix all findings before committing  |
-| Package boundaries      | Imports must respect `architecture.md` dependency graph — never import across boundaries  |
-| Barrel exports          | Every new public symbol must be exported from the package's `index.ts`                    |
-| HeroUI compliance       | No raw HTML elements in `packages/ui/` or `packages/demo/` when HeroUI equivalents exist  |
-| Commit after every unit | A bad loop is cheap to recover with `git reset --hard`                                    |
-| End-of-phase review     | Full-branch adversarial review against main — fix all bugs and smells before reporting    |
-| No permission-seeking   | Never ask "should I continue?" — just proceed                                             |
-| **No cutting corners**  | **NEVER weaken quality checks to make them pass — always fix the root cause (see below)** |
+| Constraint              | Rule                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------ |
+| Same phase only         | Never jump to the next phase file                                                          |
+| Tests first             | Always write and run failing tests before any implementation                               |
+| Iterate on failures     | Read error, fix, rerun — no permission needed                                              |
+| Retry limit             | Stop after 15 attempts with **no new test passing** (progress-based, not attempt-based)    |
+| No placeholders         | `TODO` stubs and un-implemented `throw`s are forbidden                                     |
+| JSDoc on every test     | Future loops need the reasoning                                                            |
+| Quality before commit   | `npm run quality` must be green before `git commit`                                        |
+| Independent review      | Explore subagent reviews every unit — you MUST NOT review your own code                    |
+| Package boundaries      | Imports must respect `architecture.md` dependency graph — never import across boundaries   |
+| Barrel exports          | Every new public symbol must be exported from the package's `index.ts`                     |
+| HeroUI compliance       | No raw HTML elements in `packages/ui/` or `packages/demo/` when HeroUI equivalents exist   |
+| Commit after every unit | A bad loop is cheap to recover with `git reset --hard`                                     |
+| End-of-phase review     | Per-unit Explore subagent review of full branch — fix all bugs and smells before reporting |
+| No permission-seeking   | Never ask "should I continue?" — just proceed                                              |
+| **No cutting corners**  | **NEVER weaken quality checks to make them pass — always fix the root cause (see below)**  |
 
 ## No cutting corners — ABSOLUTE rule
 
