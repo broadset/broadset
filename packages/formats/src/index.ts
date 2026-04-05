@@ -26,3 +26,7 @@ export {
   exportPngBlob,
   findCanvasElement,
 } from './raster';
+
+// Web vector (SVG / HTML)
+export type { ImportedElement, SvgImportResult } from './web-vector';
+export { exportHtmlStandalone, exportSvg, importSvg } from './web-vector';
