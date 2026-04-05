@@ -14,7 +14,7 @@ import {
   stopPathEditing,
   upsertTimeline,
 } from '@broadset/editor';
-import type { BroadsetElementStyle, ElementAnimationConfig, Keyframe } from '@broadset/model';
+import type { BroadsetElement, BroadsetElementStyle, ElementAnimationConfig, Guide, Keyframe } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { DocumentRenderer } from '@broadset/renderer';
 import {
@@ -46,6 +46,7 @@ import {
   Redo2,
   RotateCcw,
   Save,
+  Scan,
   Settings,
   Timer,
   Undo2,
@@ -58,8 +59,16 @@ import { createDemoController } from './animationSetup';
 import { CanvasOverlays } from './CanvasOverlays';
 import { elementsToLayers, elementToPanelElement, sampleToEditorDocument, toRendererDoc } from './converters';
 import { createDemoConfig, DEMO_MEDIA_SOURCE, loadSavedDocument } from './demoConfig';
-import { lockViewportOverflow, preventBrowserZoom, readSidebarPreferences, saveSidebarPreferences } from './demoState';
+import type { Toast } from './demoState';
+import {
+  createToastController,
+  lockViewportOverflow,
+  preventBrowserZoom,
+  readSidebarPreferences,
+  saveSidebarPreferences,
+} from './demoState';
 import { PathToolsPanel } from './PathToolsPanel';
+import { Rulers } from './Rulers';
 import {
   ELEMENT_FALLBACK_ICON,
   ELEMENT_ICON_MAP,
@@ -75,6 +84,32 @@ import { useMockLiveData } from './useMockLiveData';
 // ---------------------------------------------------------------------------
 
 type ModalName = 'about' | 'canvasSettings' | 'export' | 'mediaLibrary' | 'newDocument' | 'shortcutHelp';
+
+// ---------------------------------------------------------------------------
+// Absolute position helper
+// ---------------------------------------------------------------------------
+
+/** Walk the parentId chain to compute canvas-space absolute position. */
+function computeAbsolutePosition(
+  element: BroadsetElement,
+  allElements: readonly BroadsetElement[],
+): { readonly x: number; readonly y: number } {
+  let x = element.position.x;
+  let y = element.position.y;
+  let current = element;
+
+  while (current.parentId !== null) {
+    const parent = allElements.find((el) => el.id === current.parentId);
+
+    if (parent === undefined) break;
+
+    x += parent.position.x;
+    y += parent.position.y;
+    current = parent;
+  }
+
+  return { x, y };
+}
 
 // ---------------------------------------------------------------------------
 // App component
@@ -152,6 +187,18 @@ export default function App(): JSX.Element {
   const SIDEBAR_MIN = 256;
   const SIDEBAR_MAX = 800;
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // --- Toast controller (created once) ---
+  const toastRef = useRef(createToastController());
+  const [toasts, setToasts] = useState<readonly Toast[]>([]);
+
+  useEffect(() => {
+    const tc = toastRef.current;
+
+    return tc.subscribe((t) => {
+      setToasts(t);
+    });
+  }, []);
 
   // --- Lock viewport overflow (runs once) ---
   useEffect(() => lockViewportOverflow(), []);
@@ -487,17 +534,108 @@ export default function App(): JSX.Element {
     store.getState().redo();
   }, [store]);
 
+  // --- Pan state ---
+  const panRef = useRef<{ startX: number; startY: number; origPanX: number; origPanY: number } | null>(null);
+  const [spaceHeld, setSpaceHeld] = useState(false);
+
+  // Track space key for space-drag panning
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.code === 'Space' && !e.repeat) {
+        setSpaceHeld(true);
+      }
+    };
+
+    const onKeyUp = (e: KeyboardEvent): void => {
+      if (e.code === 'Space') {
+        setSpaceHeld(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+
+    return (): void => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
+
   const handleWheel = useCallback(
     (e: WheelEvent<HTMLDivElement>): void => {
       e.preventDefault();
 
       const state = store.getState();
-      const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      const newZoom = Math.max(0.1, Math.min(10, state.canvasSettings.zoom * delta));
+      const oldZoom = state.canvasSettings.zoom;
+      const step = e.deltaY > 0 ? -0.1 : 0.1;
+      const newZoom = Math.max(0.1, Math.min(4.0, oldZoom + step));
+      const roundedZoom = Math.round(newZoom * 100) / 100;
 
-      state.updateCanvasSettings({ zoom: newZoom });
+      if (roundedZoom === oldZoom) return;
+
+      // Pointer-centric zoom: keep the point under the cursor stationary
+      const canvasArea = e.currentTarget;
+      const rect = canvasArea.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+
+      // Pointer position relative to center of canvas area
+      const pointerX = e.clientX - rect.left - centerX;
+      const pointerY = e.clientY - rect.top - centerY;
+
+      // Adjust pan so the world point under the pointer stays stationary
+      const cs = state.canvasSettings;
+      const scale = roundedZoom / oldZoom;
+      const newPanX = pointerX - scale * (pointerX - cs.panX);
+      const newPanY = pointerY - scale * (pointerY - cs.panY);
+
+      state.updateCanvasSettings({
+        zoom: roundedZoom,
+        panX: Math.round(newPanX),
+        panY: Math.round(newPanY),
+      });
     },
     [store],
+  );
+
+  const handleCanvasAreaMouseDown = useCallback(
+    (e: MouseEvent<HTMLDivElement>): void => {
+      // Middle-mouse button or space+left-click starts panning
+      const isPanGesture = e.button === 1 || (e.button === 0 && spaceHeld);
+
+      if (!isPanGesture) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const cs = store.getState().canvasSettings;
+
+      panRef.current = { startX: e.clientX, startY: e.clientY, origPanX: cs.panX, origPanY: cs.panY };
+
+      const onMove = (ev: globalThis.MouseEvent): void => {
+        const pan = panRef.current;
+
+        if (pan === null) return;
+
+        const dx = ev.clientX - pan.startX;
+        const dy = ev.clientY - pan.startY;
+
+        store.getState().updateCanvasSettings({
+          panX: pan.origPanX + dx,
+          panY: pan.origPanY + dy,
+        });
+      };
+
+      const onUp = (): void => {
+        panRef.current = null;
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      };
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+    [store, spaceHeld],
   );
 
   // --- Context menu handler ---
@@ -511,6 +649,32 @@ export default function App(): JSX.Element {
 
     store.getState().updateGridSettings({ showGrid: !gs.showGrid });
   }, [store]);
+
+  const handleZoomToFit = useCallback((): void => {
+    const canvasArea = document.querySelector('[data-canvas-area]');
+
+    if (canvasArea === null) return;
+
+    const areaRect = canvasArea.getBoundingClientRect();
+    const margin = 60; // px padding around the fitted doc
+    const doc = store.getState().document;
+    const availW = areaRect.width - margin * 2;
+    const availH = areaRect.height - margin * 2;
+
+    if (availW <= 0 || availH <= 0) return;
+
+    const fitZoom = Math.min(availW / doc.canvas.width, availH / doc.canvas.height, 4.0);
+    const clampedZoom = Math.max(0.1, Math.round(fitZoom * 100) / 100);
+
+    store.getState().updateCanvasSettings({ zoom: clampedZoom, panX: 0, panY: 0 });
+  }, [store]);
+
+  const handleAddGuide = useCallback(
+    (guide: Omit<Guide, 'id'>): void => {
+      store.getState().addGuide(guide);
+    },
+    [store],
+  );
 
   // --- Derived data ---
 
@@ -642,16 +806,34 @@ export default function App(): JSX.Element {
       <BroadsetDataStoreProvider store={dataStore}>
         <div className="relative h-screen w-screen overflow-hidden">
           {/* ---- Canvas area (fills entire viewport) ---- */}
-          <div className="absolute inset-0" onWheel={handleWheel} onContextMenu={handleContextMenu}>
+          <div
+            data-canvas-area
+            className="absolute inset-0"
+            style={{
+              backgroundColor: 'hsl(var(--heroui-default-100))',
+              cursor: spaceHeld ? 'grab' : undefined,
+            }}
+            onWheel={handleWheel}
+            onMouseDown={handleCanvasAreaMouseDown}
+            onContextMenu={handleContextMenu}
+          >
             <div className="flex h-full w-full items-center justify-center">
               <div
                 style={{
                   position: 'relative',
-                  transform: `scale(${String(canvasSettings.zoom)})`,
+                  transform: `translate(${String(canvasSettings.panX)}px, ${String(canvasSettings.panY)}px) scale(${String(canvasSettings.zoom)})`,
                   transformOrigin: 'center center',
                 }}
               >
-                <div ref={canvasRef} onClick={handleCanvasClick} />
+                <div
+                  ref={canvasRef}
+                  onClick={handleCanvasClick}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    boxShadow: '0 2px 16px rgba(0,0,0,0.15)',
+                    border: '1px solid hsl(var(--heroui-default-200))',
+                  }}
+                />
 
                 <CanvasOverlays
                   showGrid={gridSettings.showGrid}
@@ -660,17 +842,43 @@ export default function App(): JSX.Element {
                   canvasHeight={editorDoc.canvas.height}
                   padding={editorDoc.canvas.padding}
                   viewMode={canvasSettings.viewMode}
+                  guides={canvasSettings.guides}
                 />
 
                 {/* Transform widget — interactive handles for active elements */}
                 {activeElements
                   .filter((el) => activeElementIds.includes(el.id))
-                  .map((el) => (
-                    <TransformWidget key={`tw-${el.id}`} element={el} zoom={canvasSettings.zoom} store={store} />
-                  ))}
+                  .map((el) => {
+                    const absPos = computeAbsolutePosition(el, activeElements);
+
+                    return (
+                      <TransformWidget
+                        key={`tw-${el.id}`}
+                        element={el}
+                        absoluteX={absPos.x}
+                        absoluteY={absPos.y}
+                        zoom={canvasSettings.zoom}
+                        store={store}
+                      />
+                    );
+                  })}
               </div>
             </div>
           </div>
+
+          {/* ---- Rulers (viewport-level, above canvas) ---- */}
+          <Rulers
+            canvasWidth={editorDoc.canvas.width}
+            canvasHeight={editorDoc.canvas.height}
+            zoom={canvasSettings.zoom}
+            panX={canvasSettings.panX}
+            panY={canvasSettings.panY}
+            units={canvasSettings.units}
+            originX={canvasSettings.originX}
+            originY={canvasSettings.originY}
+            showRulers={canvasSettings.showRulers}
+            onAddGuide={handleAddGuide}
+          />
 
           {/* ---- Placement mode banner (top-center) ---- */}
           {editingMode.type === 'placement' ?
@@ -725,6 +933,7 @@ export default function App(): JSX.Element {
 
                 if (config !== null && typeof config.onSave === 'function') {
                   (config.onSave as (doc: unknown) => void)(doc);
+                  toastRef.current.show('success', 'Document saved');
                 }
               }}
             />
@@ -749,8 +958,9 @@ export default function App(): JSX.Element {
                       const doc = JSON.parse(reader.result as string) as ReturnType<typeof sampleToEditorDocument>;
 
                       store.getState().loadTemplate(doc);
+                      toastRef.current.show('success', 'Document imported successfully');
                     } catch {
-                      // Silently ignore malformed JSON
+                      toastRef.current.show('error', 'Import failed — invalid JSON file');
                     }
                   };
 
@@ -797,6 +1007,7 @@ export default function App(): JSX.Element {
                 setActiveModal('canvasSettings');
               }}
             />
+            <ToolbarButton icon={Scan} label="Zoom to Fit" onPress={handleZoomToFit} data-testid="zoom-to-fit" />
 
             <div className="mx-1 h-5 w-px bg-divider" />
 
@@ -1101,6 +1312,7 @@ export default function App(): JSX.Element {
               a.click();
               URL.revokeObjectURL(url);
               setActiveModal(null);
+              toastRef.current.show('success', `Exported as ${format} successfully`);
             }}
           />
 
@@ -1152,6 +1364,66 @@ export default function App(): JSX.Element {
               setActiveModal(null);
             }}
           />
+
+          {/* ---- Toast notifications (bottom-right) ---- */}
+          {toasts.length > 0 ?
+            <div
+              data-testid="toast-container"
+              style={{
+                position: 'fixed',
+                bottom: 16,
+                right: 16,
+                zIndex: 9999,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+              }}
+            >
+              {toasts.map((toast) => (
+                <div
+                  key={toast.id}
+                  data-testid="toast"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '10px 16px',
+                    borderRadius: 8,
+                    backgroundColor: 'hsl(var(--heroui-content1))',
+                    borderLeft: `3px solid ${
+                      toast.severity === 'success' ? 'hsl(var(--heroui-success))'
+                      : toast.severity === 'error' ? 'hsl(var(--heroui-danger))'
+                      : 'hsl(var(--heroui-primary))'
+                    }`,
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+                    fontSize: 13,
+                    minWidth: 240,
+                    animation: 'slideInRight 0.15s ease-out',
+                  }}
+                >
+                  <span>
+                    {toast.severity === 'success' ?
+                      '✓'
+                    : toast.severity === 'error' ?
+                      '⚠'
+                    : 'ℹ'}
+                  </span>
+                  <span style={{ flex: 1 }}>{toast.message}</span>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    aria-label="Dismiss"
+                    onPress={() => {
+                      toastRef.current.dismiss(toast.id);
+                    }}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              ))}
+            </div>
+          : null}
         </div>
       </BroadsetDataStoreProvider>
     </EditorErrorBoundary>

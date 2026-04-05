@@ -1,4 +1,4 @@
-import { Accordion, Button, Input, ListBox, ListBoxItem, NumberField, Select, TextField } from '@heroui/react';
+import { Accordion, Button, Input, Label, ListBox, ListBoxItem, NumberField, Select, TextField } from '@heroui/react';
 import type { LucideIcon } from 'lucide-react';
 import { Circle, Code, Eye, EyeOff, Folder, Image, Lock, PenTool, QrCode, Square, Type, Unlock } from 'lucide-react';
 import type { JSX, Key } from 'react';
@@ -84,7 +84,7 @@ export function GeometryPanel({ x, y, width, height, rotation, onUpdate }: Geome
   const values: Record<string, number> = { x, y, width, height, rotation };
 
   return (
-    <section role="region" aria-label="Geometry">
+    <section role="region" aria-label="Geometry" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
       {GEOMETRY_FIELDS.map((field) => (
         <NumberField
           key={field.key}
@@ -94,6 +94,7 @@ export function GeometryPanel({ x, y, width, height, rotation, onUpdate }: Geome
             onUpdate(field.key, v);
           }}
         >
+          <Label>{field.label}</Label>
           <NumberField.Group>
             <NumberField.Input />
           </NumberField.Group>
@@ -147,7 +148,7 @@ export function AppearancePanel({
   );
 
   return (
-    <section role="region" aria-label="Appearance">
+    <section role="region" aria-label="Appearance" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <TextField
         aria-label="Fill color"
         value={backgroundColor}
@@ -155,19 +156,35 @@ export function AppearancePanel({
           onUpdate('backgroundColor', v);
         }}
       >
+        <Label>Fill Color</Label>
         <Input />
       </TextField>
-      <NumberField
-        aria-label="Border width"
-        value={borderWidth}
-        onChange={(v: number) => {
-          onUpdate('borderWidth', v);
-        }}
-      >
-        <NumberField.Group>
-          <NumberField.Input />
-        </NumberField.Group>
-      </NumberField>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <NumberField
+          aria-label="Border width"
+          value={borderWidth}
+          onChange={(v: number) => {
+            onUpdate('borderWidth', v);
+          }}
+        >
+          <Label>Border Width</Label>
+          <NumberField.Group>
+            <NumberField.Input />
+          </NumberField.Group>
+        </NumberField>
+        <NumberField
+          aria-label="Border radius"
+          value={borderRadius}
+          onChange={(v: number) => {
+            onUpdate('borderRadius', v);
+          }}
+        >
+          <Label>Border Radius</Label>
+          <NumberField.Group>
+            <NumberField.Input />
+          </NumberField.Group>
+        </NumberField>
+      </div>
       <TextField
         aria-label="Border color"
         value={borderColor}
@@ -175,9 +192,11 @@ export function AppearancePanel({
           onUpdate('borderColor', v);
         }}
       >
+        <Label>Border Color</Label>
         <Input />
       </TextField>
       <Select aria-label="Border style" value={borderStyle} onChange={handleBorderStyleChange}>
+        <Label>Border Style</Label>
         <Select.Trigger>
           <Select.Value />
         </Select.Trigger>
@@ -191,17 +210,6 @@ export function AppearancePanel({
         </Select.Popover>
       </Select>
       <NumberField
-        aria-label="Border radius"
-        value={borderRadius}
-        onChange={(v: number) => {
-          onUpdate('borderRadius', v);
-        }}
-      >
-        <NumberField.Group>
-          <NumberField.Input />
-        </NumberField.Group>
-      </NumberField>
-      <NumberField
         aria-label="Opacity"
         step={0.1}
         minValue={0}
@@ -211,11 +219,13 @@ export function AppearancePanel({
           onUpdate('opacity', v);
         }}
       >
+        <Label>Opacity</Label>
         <NumberField.Group>
           <NumberField.Input />
         </NumberField.Group>
       </NumberField>
       <Select aria-label="Blend mode" value={blendMode} onChange={handleBlendModeChange}>
+        <Label>Blend Mode</Label>
         <Select.Trigger>
           <Select.Value />
         </Select.Trigger>
@@ -264,9 +274,29 @@ export function PropertiesSidebar({
 
   const defaultKeys = isScreen ? ['geometry', 'appearance', 'gradient', 'boxEffects'] : ['geometry', 'appearance'];
 
+  const ElementIcon = LAYER_ICON_MAP[element.type] ?? Square;
+
   return (
-    <aside role="region" aria-label="Properties">
-      {/* Empty state */}
+    <aside role="region" aria-label="Properties" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Element info header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0 8px' }}>
+        <ElementIcon size={16} style={{ opacity: 0.6, flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {element.name}
+          </div>
+          <div style={{ fontSize: 11, opacity: 0.5 }}>{element.type}</div>
+        </div>
+      </div>
+
       <Accordion defaultExpandedKeys={defaultKeys} allowsMultipleExpanded>
         <Accordion.Item id="geometry">
           <Accordion.Heading>
@@ -313,6 +343,7 @@ export function PropertiesSidebar({
                   onUpdate('backgroundGradient', v);
                 }}
               >
+                <Label>CSS Gradient</Label>
                 <Input placeholder="e.g. linear-gradient(90deg, #ff0000, #0000ff)" />
               </TextField>
             </Accordion.Panel>
@@ -323,35 +354,40 @@ export function PropertiesSidebar({
             <Accordion.Trigger>Box Effects</Accordion.Trigger>
           </Accordion.Heading>
           <Accordion.Panel>
-            <TextField
-              aria-label="Box shadow"
-              value={element.boxShadow}
-              onChange={(v: string) => {
-                onUpdate('boxShadow', v);
-              }}
-            >
-              <Input placeholder="e.g. 2px 4px 8px rgba(0,0,0,0.3)" />
-            </TextField>
-            <TextField
-              aria-label="CSS Filter"
-              value={element.filter}
-              onChange={(v: string) => {
-                onUpdate('filter', v);
-              }}
-            >
-              <Input placeholder="e.g. blur(4px) brightness(1.2)" />
-            </TextField>
-            {isScreen ?
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <TextField
-                aria-label="Backdrop filter"
-                value={element.backdropFilter}
+                aria-label="Box shadow"
+                value={element.boxShadow}
                 onChange={(v: string) => {
-                  onUpdate('backdropFilter', v);
+                  onUpdate('boxShadow', v);
                 }}
               >
-                <Input placeholder="e.g. blur(10px)" />
+                <Label>Box Shadow</Label>
+                <Input placeholder="e.g. 2px 4px 8px rgba(0,0,0,0.3)" />
               </TextField>
-            : null}
+              <TextField
+                aria-label="CSS Filter"
+                value={element.filter}
+                onChange={(v: string) => {
+                  onUpdate('filter', v);
+                }}
+              >
+                <Label>Filter</Label>
+                <Input placeholder="e.g. blur(4px) brightness(1.2)" />
+              </TextField>
+              {isScreen ?
+                <TextField
+                  aria-label="Backdrop filter"
+                  value={element.backdropFilter}
+                  onChange={(v: string) => {
+                    onUpdate('backdropFilter', v);
+                  }}
+                >
+                  <Label>Backdrop Filter</Label>
+                  <Input placeholder="e.g. blur(10px)" />
+                </TextField>
+              : null}
+            </div>
           </Accordion.Panel>
         </Accordion.Item>
       </Accordion>

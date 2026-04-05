@@ -1,4 +1,5 @@
 import { computeGridLines, computeSafetyBoundaries } from '@broadset/editor';
+import type { Guide } from '@broadset/model';
 import type { JSX } from 'react';
 
 interface CanvasOverlaysProps {
@@ -8,6 +9,7 @@ interface CanvasOverlaysProps {
   readonly canvasHeight: number;
   readonly padding: readonly [number, number, number, number];
   readonly viewMode: 'broadcast' | 'none' | 'print';
+  readonly guides: readonly Guide[];
 }
 
 export function CanvasOverlays(props: CanvasOverlaysProps): JSX.Element {
@@ -69,6 +71,37 @@ export function CanvasOverlays(props: CanvasOverlaysProps): JSX.Element {
           }}
         />
       ))}
+
+      {/* Guide lines */}
+      {props.guides.map((guide) =>
+        guide.type === 'h' ?
+          <div
+            key={`guide-${guide.id}`}
+            data-testid="guide-line"
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: guide.pos,
+              width: '100%',
+              height: 0,
+              borderTop: `1px ${guide.locked ? 'solid' : 'dashed'} hsl(var(--heroui-primary) / 0.7)`,
+              pointerEvents: 'none',
+            }}
+          />
+        : <div
+            key={`guide-${guide.id}`}
+            data-testid="guide-line"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: guide.pos,
+              height: '100%',
+              width: 0,
+              borderLeft: `1px ${guide.locked ? 'solid' : 'dashed'} hsl(var(--heroui-primary) / 0.7)`,
+              pointerEvents: 'none',
+            }}
+          />,
+      )}
     </>
   );
 }

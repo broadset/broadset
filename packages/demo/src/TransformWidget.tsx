@@ -37,6 +37,8 @@ const RESIZE_HANDLES: readonly HandleDef[] = [
 
 interface TransformWidgetProps {
   readonly element: BroadsetElement;
+  readonly absoluteX: number;
+  readonly absoluteY: number;
   readonly zoom: number;
   readonly store: EditorStore;
 }
@@ -45,7 +47,7 @@ interface TransformWidgetProps {
 // Component
 // ---------------------------------------------------------------------------
 
-export function TransformWidget({ element, zoom, store }: TransformWidgetProps): JSX.Element {
+export function TransformWidget({ element, absoluteX, absoluteY, zoom, store }: TransformWidgetProps): JSX.Element {
   const dragRef = useRef<{
     startX: number;
     startY: number;
@@ -169,9 +171,6 @@ export function TransformWidget({ element, zoom, store }: TransformWidgetProps):
       e.stopPropagation();
       e.preventDefault();
 
-      const centerX = element.position.x + element.width / 2;
-      const centerY = element.position.y + element.height / 2;
-
       dragRef.current = {
         startX: e.clientX,
         startY: e.clientY,
@@ -182,16 +181,18 @@ export function TransformWidget({ element, zoom, store }: TransformWidgetProps):
         handle: 'rotate',
       };
 
-      const canvasEl = (e.target as HTMLElement).closest('[data-transform-root]');
-      const canvasRect = canvasEl?.getBoundingClientRect();
+      // Use the widget's own screen-space center for rotation calculation.
+      // This avoids coordinate-system mismatches between canvas-space and screen-space.
+      const widgetEl = (e.target as HTMLElement).closest('[data-transform-root]');
+      const widgetRect = widgetEl?.getBoundingClientRect();
+
+      if (widgetRect === undefined) return;
+
+      const centerScreenX = widgetRect.left + widgetRect.width / 2;
+      const centerScreenY = widgetRect.top + widgetRect.height / 2;
 
       const onMove = (ev: globalThis.MouseEvent): void => {
-        if (canvasRect === undefined) return;
-
-        const mouseCanvasX = (ev.clientX - canvasRect.left) * invZoom;
-        const mouseCanvasY = (ev.clientY - canvasRect.top) * invZoom;
-
-        const angle = Math.atan2(mouseCanvasY - centerY, mouseCanvasX - centerX);
+        const angle = Math.atan2(ev.clientY - centerScreenY, ev.clientX - centerScreenX);
         // atan2 gives radians from east; convert to degrees from north
         const degrees = ((angle * 180) / Math.PI + 90 + 360) % 360;
 
@@ -201,17 +202,12 @@ export function TransformWidget({ element, zoom, store }: TransformWidgetProps):
       };
 
       const onUp = (ev: globalThis.MouseEvent): void => {
-        if (canvasRect !== undefined) {
-          const mouseCanvasX = (ev.clientX - canvasRect.left) * invZoom;
-          const mouseCanvasY = (ev.clientY - canvasRect.top) * invZoom;
+        const angle = Math.atan2(ev.clientY - centerScreenY, ev.clientX - centerScreenX);
+        const degrees = ((angle * 180) / Math.PI + 90 + 360) % 360;
 
-          const angle = Math.atan2(mouseCanvasY - centerY, mouseCanvasX - centerX);
-          const degrees = ((angle * 180) / Math.PI + 90 + 360) % 360;
-
-          store.getState().commitElementUpdate(element.id, {
-            rotation: Math.round(degrees),
-          });
-        }
+        store.getState().commitElementUpdate(element.id, {
+          rotation: Math.round(degrees),
+        });
 
         dragRef.current = null;
         window.removeEventListener('mousemove', onMove);
@@ -230,8 +226,8 @@ export function TransformWidget({ element, zoom, store }: TransformWidgetProps):
       data-transform-root=""
       style={{
         position: 'absolute',
-        left: element.position.x,
-        top: element.position.y,
+        left: absoluteX,
+        top: absoluteY,
         width: element.width,
         height: element.height,
         transform: element.rotation !== 0 ? `rotate(${String(element.rotation)}deg)` : undefined,
