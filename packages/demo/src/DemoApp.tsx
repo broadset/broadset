@@ -1,9 +1,11 @@
 import { type BroadsetDocument, broadsetDocumentSchema } from '@broadset/model';
-import { createScreenRenderer } from '@broadset/renderer';
+import { createScreenRenderer, type ScreenRendererController } from '@broadset/renderer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Chip, Separator } from '@heroui/react';
 import { useEffect, useRef } from 'react';
 
 import { SAMPLE_DOCUMENT, SAMPLE_PROJECT } from './sampleDocument';
+
+const DEMO_DOCUMENT = broadsetDocumentSchema.parse(SAMPLE_DOCUMENT);
 
 interface ScreenPreviewProps {
   readonly documentData: BroadsetDocument;
@@ -11,6 +13,7 @@ interface ScreenPreviewProps {
 
 function ScreenPreview({ documentData }: ScreenPreviewProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const controllerRef = useRef<ScreenRendererController | null>(null);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -19,14 +22,18 @@ function ScreenPreview({ documentData }: ScreenPreviewProps): React.JSX.Element 
       return undefined;
     }
 
-    const controller = createScreenRenderer({
-      host,
-      document: documentData,
-    });
+    const controller = createScreenRenderer({ host });
+
+    controllerRef.current = controller;
 
     return () => {
       controller.destroy();
+      controllerRef.current = null;
     };
+  }, []);
+
+  useEffect(() => {
+    controllerRef.current?.updateDocument(documentData);
   }, [documentData]);
 
   return (
@@ -40,7 +47,7 @@ function ScreenPreview({ documentData }: ScreenPreviewProps): React.JSX.Element 
 }
 
 export function DemoApp(): React.JSX.Element {
-  const documentData = broadsetDocumentSchema.parse(SAMPLE_DOCUMENT);
+  const documentData = DEMO_DOCUMENT;
   const projectDocuments = SAMPLE_PROJECT.documents.length;
   const totalElements = SAMPLE_PROJECT.documents.reduce((count, item) => count + item.elements.length, 0);
 
