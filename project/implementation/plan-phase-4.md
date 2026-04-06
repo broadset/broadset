@@ -45,10 +45,10 @@ instant-place distinction),
 `editor/react-data-integration.md` (EditorProvider context — store + component
 registry; EditorErrorBoundary — catches render errors, fallback UI)
 
-- [ ] tests: red — editor/store-actions (init, CRUD, selection, undo/redo, grouping)
-- [ ] tests: red — editor/editing (placement mode + factory)
-- [ ] tests: red — editor/react-data-integration (EditorProvider + error boundary)
-- [ ] impl: green — all three
+- [x] tests: red — editor/store-actions (init, CRUD, selection, undo/redo, grouping)
+- [x] tests: red — editor/editing (placement mode + factory)
+- [x] tests: red — editor/react-data-integration (EditorProvider + error boundary)
+- [x] impl: green — all three
 - [ ] demo milestone: EditorProvider wraps app; click element type in toolbar →
       element appears on canvas; click to select; Delete key removes it; undo/redo
       works; group/ungroup via multi-select
@@ -124,7 +124,7 @@ gesture; overflow lock on mount/unmount)
 
 | Group                             | Red | Green | Demo |
 | --------------------------------- | --- | ----- | ---- |
-| 4-A store + placement             | ☐   | ☐     | ☐    |
+| 4-A store + placement             | ☑   | ☑     | ☐    |
 | 4-B transforms + canvas           | ☐   | ☐     | ☐    |
 | 4-C pages + toolbar + basic props | ☐   | ☐     | ☐    |
 | 4-D demo shell polish             | ☐   | ☐     | ☐    |
