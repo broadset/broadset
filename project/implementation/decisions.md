@@ -15,3 +15,9 @@ Non-trivial judgment calls made during implementation. See each unit for context
 **Decision:** Reject impossible alpha/color ranges at the model boundary and sanitize inline rich-text styles through a safe allowlist instead of preserving raw `style="..."` strings.
 **Alternatives considered:** Continue clamping invalid RGBA/HSLA values and keep verbatim inline styles after tag stripping.
 **Rationale:** Silent clamping and raw inline-style preservation hide bad data and leave brittle edge cases behind; explicit rejection plus safe-style filtering keeps the model contract predictable and safer.
+
+### Unit 3.4 — Drive the demo from real document animations
+
+**Decision:** Wire `createPlaybackController` directly to the existing renderer host and extend the sample document with three real animation cases: a looping transform/opacity pulse, a counting score text animation, and an `IN`/`OUT` state-bound promo panel.
+**Alternatives considered:** Fake the preview with CSS-only animation or add a heavier timeline UI before the playback slice was proven.
+**Rationale:** Using the real playback engine in the demo proves the Phase 3 contract end to end with minimal UI, while the mixed sample animations cover the spec’s transform, counting, and state-binding requirements in one visible slice.

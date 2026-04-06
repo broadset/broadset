@@ -804,7 +804,183 @@ export const SAMPLE_DOCUMENT = {
       },
     },
   ],
-  animations: [],
+  animations: [
+    {
+      elementId: 'el-hero-badge',
+      config: {
+        timelines: [
+          {
+            id: 'tl-hero-pulse',
+            name: 'Hero Pulse',
+            durationMs: 1800,
+            loop: 'ping-pong',
+            loopCount: null,
+            keyframes: [
+              {
+                name: 'hero-start',
+                action: 'none',
+                offsetMs: 0,
+                properties: {
+                  opacity: { type: 'number', value: 0.45, easing: 'linear' },
+                  scale: { type: 'number', value: 0.82, easing: 'spring-gentle' },
+                  translateX: { type: 'number', value: 0, easing: 'ease-in-out' },
+                },
+              },
+              {
+                name: 'hero-peak',
+                action: 'none',
+                offsetMs: 900,
+                properties: {
+                  opacity: { type: 'number', value: 1, easing: 'linear' },
+                  scale: { type: 'number', value: 1.18, easing: 'spring-bouncy' },
+                  translateX: { type: 'number', value: 96, easing: 'ease-in-out' },
+                },
+              },
+              {
+                name: 'hero-end',
+                action: 'none',
+                offsetMs: 1800,
+                properties: {
+                  opacity: { type: 'number', value: 0.7, easing: 'linear' },
+                  scale: { type: 'number', value: 0.92, easing: 'spring-stiff' },
+                  translateX: { type: 'number', value: 36, easing: 'ease-in-out' },
+                },
+              },
+            ],
+            childTimelines: [],
+            audioCues: [],
+          },
+        ],
+        stateTimelineBindings: [],
+        modifierTimelineBindings: [],
+        textAnimator: null,
+      },
+    },
+    {
+      elementId: 'el-home-score',
+      config: {
+        timelines: [
+          {
+            id: 'tl-home-score-count',
+            name: 'Home Score Count',
+            durationMs: 1200,
+            loop: 'none',
+            loopCount: null,
+            keyframes: [
+              {
+                name: 'score-start',
+                action: 'none',
+                offsetMs: 0,
+                properties: {
+                  textContent: {
+                    type: 'string',
+                    value: '0',
+                    easing: 'counting',
+                    countingFormat: { decimalPlaces: 0 },
+                  },
+                  opacity: { type: 'number', value: 0.55, easing: 'linear' },
+                },
+              },
+              {
+                name: 'score-finish',
+                action: 'none',
+                offsetMs: 1200,
+                properties: {
+                  textContent: {
+                    type: 'string',
+                    value: '2',
+                    easing: 'counting',
+                    countingFormat: { decimalPlaces: 0 },
+                  },
+                  opacity: { type: 'number', value: 1, easing: 'linear' },
+                },
+              },
+            ],
+            childTimelines: [],
+            audioCues: [],
+          },
+        ],
+        stateTimelineBindings: [],
+        modifierTimelineBindings: [],
+        textAnimator: null,
+      },
+    },
+    {
+      elementId: 'el-promo-panel',
+      config: {
+        timelines: [
+          {
+            id: 'tl-promo-in',
+            name: 'Promo In',
+            durationMs: 900,
+            loop: 'none',
+            loopCount: null,
+            keyframes: [
+              {
+                name: 'promo-hidden',
+                action: 'none',
+                offsetMs: 0,
+                properties: {
+                  opacity: { type: 'number', value: 0, easing: 'linear' },
+                  translateY: { type: 'number', value: 28, easing: 'ease-out' },
+                  scale: { type: 'number', value: 0.94, easing: 'ease-out' },
+                },
+              },
+              {
+                name: 'promo-visible',
+                action: 'none',
+                offsetMs: 900,
+                properties: {
+                  opacity: { type: 'number', value: 1, easing: 'linear' },
+                  translateY: { type: 'number', value: 0, easing: 'spring-gentle' },
+                  scale: { type: 'number', value: 1, easing: 'spring-gentle' },
+                },
+              },
+            ],
+            childTimelines: [],
+            audioCues: [],
+          },
+          {
+            id: 'tl-promo-out',
+            name: 'Promo Out',
+            durationMs: 600,
+            loop: 'none',
+            loopCount: null,
+            keyframes: [
+              {
+                name: 'promo-start',
+                action: 'none',
+                offsetMs: 0,
+                properties: {
+                  opacity: { type: 'number', value: 1, easing: 'linear' },
+                  translateY: { type: 'number', value: 0, easing: 'ease-in' },
+                  scale: { type: 'number', value: 1, easing: 'ease-in' },
+                },
+              },
+              {
+                name: 'promo-end',
+                action: 'none',
+                offsetMs: 600,
+                properties: {
+                  opacity: { type: 'number', value: 0, easing: 'linear' },
+                  translateY: { type: 'number', value: 36, easing: 'ease-in' },
+                  scale: { type: 'number', value: 0.9, easing: 'ease-in' },
+                },
+              },
+            ],
+            childTimelines: [],
+            audioCues: [],
+          },
+        ],
+        stateTimelineBindings: [
+          { stateName: 'IN', timelineId: 'tl-promo-in' },
+          { stateName: 'OUT', timelineId: 'tl-promo-out' },
+        ],
+        modifierTimelineBindings: [],
+        textAnimator: null,
+      },
+    },
+  ],
   pages: [
     {
       id: 'page-live',

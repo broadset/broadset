@@ -9,6 +9,7 @@ const EASING_PRESETS = new Set([
   'ease-out',
   'ease-in-out',
   'step',
+  'counting',
   'spring-gentle',
   'spring-bouncy',
   'spring-stiff',
@@ -24,6 +25,7 @@ export type EasingMode =
   | 'ease-out'
   | 'ease-in-out'
   | 'step'
+  | 'counting'
   | 'spring-gentle'
   | 'spring-bouncy'
   | 'spring-stiff'
@@ -91,10 +93,18 @@ export interface ColorKeyframeValue {
   readonly easing: EasingMode;
 }
 
+export interface CountingFormat {
+  readonly decimalPlaces?: number | undefined;
+  readonly thousandsSeparator?: string | undefined;
+  readonly prefix?: string | undefined;
+  readonly suffix?: string | undefined;
+}
+
 export interface StringKeyframeValue {
   readonly type: 'string';
   readonly value: string;
   readonly easing: EasingMode;
+  readonly countingFormat?: CountingFormat | undefined;
 }
 
 export interface TupleKeyframeValue {
@@ -180,10 +190,22 @@ const timecodeAnnotationSchema = z.object({
   frameRate: z.number().positive(),
 });
 
+const countingFormatSchema = z.object({
+  decimalPlaces: z.number().int().nonnegative().optional(),
+  thousandsSeparator: z.string().optional(),
+  prefix: z.string().optional(),
+  suffix: z.string().optional(),
+});
+
 const keyframePropertySchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('number'), value: z.number(), easing: easingModeSchema }),
   z.object({ type: z.literal('color'), value: z.string(), easing: easingModeSchema }),
-  z.object({ type: z.literal('string'), value: z.string(), easing: easingModeSchema }),
+  z.object({
+    type: z.literal('string'),
+    value: z.string(),
+    easing: easingModeSchema,
+    countingFormat: countingFormatSchema.optional(),
+  }),
   z.object({ type: z.literal('tuple'), value: z.array(z.number()), easing: easingModeSchema }),
 ]);
 

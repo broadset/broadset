@@ -30,9 +30,9 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 2 — Renderer + Demo shell
-- **In Progress:** 2.1 Renderer core
-- **Last Merged:** 1.10 JSON format reference / Zod schema
+- **Active Phase:** Phase 4 — Editor MVP: Core Editing & Canvas
+- **In Progress:** 4-A Store scaffold + element placement
+- **Last Merged:** 3.4 Demo: animated sample content + play/pause control
 
 ---
 
@@ -63,9 +63,9 @@ Phase 11 — Advanced Features     → trim path, boolean ops, text animation, a
 | Phase | File                                 | Packages                              | Status      |
 | ----- | ------------------------------------ | ------------------------------------- | ----------- |
 | 1     | [plan-phase-1.md](plan-phase-1.md)   | `model`                               | complete    |
-| 2     | [plan-phase-2.md](plan-phase-2.md)   | `renderer` + `demo` shell             | in progress |
-| 3     | [plan-phase-3.md](plan-phase-3.md)   | `playback` + `demo` animated          | not started |
-| 4     | [plan-phase-4.md](plan-phase-4.md)   | `editor` + `ui` + `demo` (MVP)        | not started |
+| 2     | [plan-phase-2.md](plan-phase-2.md)   | `renderer` + `demo` shell             | complete    |
+| 3     | [plan-phase-3.md](plan-phase-3.md)   | `playback` + `demo` animated          | complete    |
+| 4     | [plan-phase-4.md](plan-phase-4.md)   | `editor` + `ui` + `demo` (MVP)        | in progress |
 | 5     | [plan-phase-5.md](plan-phase-5.md)   | `ui` + `editor` + `demo` (properties) | not started |
 | 6     | [plan-phase-6.md](plan-phase-6.md)   | `editor` + `ui` + `demo` (polish)     | not started |
 | 7     | [plan-phase-7.md](plan-phase-7.md)   | `editor` + `ui` + `demo` (animation)  | not started |

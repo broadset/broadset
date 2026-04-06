@@ -12,8 +12,8 @@ modifiers. A play/pause control proves the playback controller is wired up.
 
 ## 3.1 Interpolation engine (`playback/interpolation.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/playback/interpolation.md`
 _What to cover:_ All 5 easing presets plus spring easing (harmonic oscillator
@@ -26,8 +26,8 @@ color contract.
 
 ## 3.2 Timeline computation (`playback/timeline.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/playback/timeline.md`
 _What to cover:_ Duration (max offset + 300ms, explicit durationMs override,
@@ -42,8 +42,8 @@ named timelines.
 
 ## 3.3 Playback controller (`playback/playback.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/playback/playback.md`
 _What to cover:_ PlaybackHandle API (play/pause/seek/setSpeed/cancel; cancelled
@@ -58,8 +58,8 @@ visibility:hidden + pointer-events:none; transition suppression flag.
 
 ## 3.4 Demo: animated sample content + play/pause control
 
-- [ ] tests: red (Playwright CT)
-- [ ] impl: green
+- [x] tests: red (Playwright CT)
+- [x] impl: green
 
 _Spec:_ `project/spec/demo/data-integration.md`, `project/spec/demo/state.md`
 _What to cover:_
@@ -79,7 +79,7 @@ _What to cover:_
 
 | Unit                      | Red | Green |
 | ------------------------- | --- | ----- |
-| 3.1 interpolation engine  | ☐   | ☐     |
-| 3.2 timeline computation  | ☐   | ☐     |
-| 3.3 playback controller   | ☐   | ☐     |
-| 3.4 demo animated content | ☐   | ☐     |
+| 3.1 interpolation engine  | ☒   | ☒     |
+| 3.2 timeline computation  | ☒   | ☒     |
+| 3.3 playback controller   | ☒   | ☒     |
+| 3.4 demo animated content | ☒   | ☒     |

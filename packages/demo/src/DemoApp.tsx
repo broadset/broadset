@@ -1,7 +1,9 @@
 import { type BroadsetDocument, broadsetDocumentSchema } from '@broadset/model';
+import { createPlaybackController, type PlaybackController } from '@broadset/playback';
 import { createScreenRenderer, type ScreenRendererController } from '@broadset/renderer';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, Chip, Separator } from '@heroui/react';
-import { useEffect, useRef } from 'react';
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Chip, Separator } from '@heroui/react';
+import { Pause, Play, RotateCcw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 import { SAMPLE_DOCUMENT, SAMPLE_PROJECT } from './sampleDocument';
 
@@ -9,11 +11,14 @@ const DEMO_DOCUMENT = broadsetDocumentSchema.parse(SAMPLE_DOCUMENT);
 
 interface ScreenPreviewProps {
   readonly documentData: BroadsetDocument;
+  readonly isPlaying: boolean;
+  readonly resetToken: number;
 }
 
-function ScreenPreview({ documentData }: ScreenPreviewProps): React.JSX.Element {
+function ScreenPreview({ documentData, isPlaying, resetToken }: ScreenPreviewProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const controllerRef = useRef<ScreenRendererController | null>(null);
+  const rendererRef = useRef<ScreenRendererController | null>(null);
+  const playbackRef = useRef<PlaybackController | null>(null);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -22,19 +27,49 @@ function ScreenPreview({ documentData }: ScreenPreviewProps): React.JSX.Element 
       return undefined;
     }
 
-    const controller = createScreenRenderer({ host });
+    const rendererController = createScreenRenderer({ host });
+    const playbackController = createPlaybackController({ root: host, registry: documentData.animations });
 
-    controllerRef.current = controller;
+    rendererRef.current = rendererController;
+    playbackRef.current = playbackController;
+
+    rendererController.updateDocument(documentData);
+    playbackController.attach();
+    playbackController.seek(0);
 
     return () => {
-      controller.destroy();
-      controllerRef.current = null;
+      playbackController.destroy();
+      rendererController.destroy();
+      playbackRef.current = null;
+      rendererRef.current = null;
     };
   }, []);
 
   useEffect(() => {
-    controllerRef.current?.updateDocument(documentData);
+    rendererRef.current?.updateDocument(documentData);
+    playbackRef.current?.setRegistry(documentData.animations);
+    playbackRef.current?.pause();
+    playbackRef.current?.seek(0);
   }, [documentData]);
+
+  useEffect(() => {
+    if (resetToken < 0) {
+      return;
+    }
+
+    playbackRef.current?.pause();
+    playbackRef.current?.seek(0);
+  }, [resetToken]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      playbackRef.current?.play();
+
+      return;
+    }
+
+    playbackRef.current?.pause();
+  }, [isPlaying]);
 
   return (
     <div
@@ -50,22 +85,90 @@ export function DemoApp(): React.JSX.Element {
   const documentData = DEMO_DOCUMENT;
   const projectDocuments = SAMPLE_PROJECT.documents.length;
   const totalElements = SAMPLE_PROJECT.documents.reduce((count, item) => count + item.elements.length, 0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [resetToken, setResetToken] = useState(0);
 
   useEffect(() => {
+    const rootElement = document.getElementById('root');
     const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousHtmlHeight = document.documentElement.style.height;
     const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyHeight = document.body.style.height;
     const previousBodyMargin = document.body.style.margin;
+    const previousRootOverflow = rootElement?.style.overflow ?? '';
+    const previousRootHeight = rootElement?.style.height ?? '';
+    const preventZoomOnWheel = (event: WheelEvent): void => {
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+      }
+    };
+    const preventZoomOnKeydown = (event: KeyboardEvent): void => {
+      if (!(event.ctrlKey || event.metaKey)) {
+        return;
+      }
+
+      const normalizedKey = event.key.toLowerCase();
+
+      if (normalizedKey === '+' || normalizedKey === '-' || normalizedKey === '=' || normalizedKey === '0') {
+        event.preventDefault();
+      }
+    };
+    const preventMultiTouchZoom: EventListener = (event): void => {
+      if (event instanceof TouchEvent && event.touches.length > 1) {
+        event.preventDefault();
+      }
+    };
+    const preventSafariGesture: EventListener = (event): void => {
+      event.preventDefault();
+    };
 
     document.documentElement.style.overflow = 'hidden';
+    document.documentElement.style.height = '100%';
     document.body.style.overflow = 'hidden';
+    document.body.style.height = '100%';
     document.body.style.margin = '0';
+
+    if (rootElement !== null) {
+      rootElement.style.overflow = 'hidden';
+      rootElement.style.height = '100%';
+    }
+
+    window.addEventListener('wheel', preventZoomOnWheel, { passive: false });
+    window.addEventListener('keydown', preventZoomOnKeydown);
+    window.addEventListener('touchmove', preventMultiTouchZoom, { passive: false });
+    window.addEventListener('gesturestart', preventSafariGesture);
+    window.addEventListener('gesturechange', preventSafariGesture);
+    window.addEventListener('gestureend', preventSafariGesture);
 
     return () => {
       document.documentElement.style.overflow = previousHtmlOverflow;
+      document.documentElement.style.height = previousHtmlHeight;
       document.body.style.overflow = previousBodyOverflow;
+      document.body.style.height = previousBodyHeight;
       document.body.style.margin = previousBodyMargin;
+
+      if (rootElement !== null) {
+        rootElement.style.overflow = previousRootOverflow;
+        rootElement.style.height = previousRootHeight;
+      }
+
+      window.removeEventListener('wheel', preventZoomOnWheel);
+      window.removeEventListener('keydown', preventZoomOnKeydown);
+      window.removeEventListener('touchmove', preventMultiTouchZoom);
+      window.removeEventListener('gesturestart', preventSafariGesture);
+      window.removeEventListener('gesturechange', preventSafariGesture);
+      window.removeEventListener('gestureend', preventSafariGesture);
     };
   }, []);
+
+  function handleTogglePlayback(): void {
+    setIsPlaying((currentValue) => !currentValue);
+  }
+
+  function handleResetPlayback(): void {
+    setIsPlaying(false);
+    setResetToken((currentValue) => currentValue + 1);
+  }
 
   return (
     <main className="fixed inset-0 overflow-hidden bg-background text-foreground" data-testid="demo-shell">
@@ -78,13 +181,17 @@ export function DemoApp(): React.JSX.Element {
                   Broadset Demo
                 </Chip>
                 <Chip color="success" size="sm" variant="soft">
-                  Phase 2
+                  Phase 3
+                </Chip>
+                <Chip color="warning" size="sm" variant="soft">
+                  Animated Preview
                 </Chip>
               </div>
               <div>
                 <CardTitle>{documentData.name}</CardTitle>
                 <CardDescription>
-                  Static renderer preview of the hard-coded sample package, mounted inside a full-viewport shell.
+                  Animated renderer preview with a minimal play/pause control proving the playback controller is wired
+                  up.
                 </CardDescription>
               </div>
             </CardHeader>
@@ -102,8 +209,37 @@ export function DemoApp(): React.JSX.Element {
                 <Chip color="warning" size="sm" variant="soft">
                   {totalElements} elements
                 </Chip>
+                <Chip color="accent" size="sm" variant="soft">
+                  {documentData.animations.length} animated elements
+                </Chip>
               </div>
               <Separator />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  aria-label={isPlaying ? 'Pause demo playback' : 'Play demo playback'}
+                  data-testid="demo-playback-toggle"
+                  onPress={handleTogglePlayback}
+                  variant="primary"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    {isPlaying ?
+                      <Pause size={16} />
+                    : <Play size={16} />}
+                    {isPlaying ? 'Pause' : 'Play'}
+                  </span>
+                </Button>
+                <Button
+                  aria-label="Reset demo playback"
+                  data-testid="demo-playback-reset"
+                  onPress={handleResetPlayback}
+                  variant="outline"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <RotateCcw size={16} />
+                    Reset
+                  </span>
+                </Button>
+              </div>
               <p className="text-sm text-default-500">
                 Canvas: {documentData.canvas.width}×{documentData.canvas.height}
                 {documentData.canvas.unit}
@@ -115,7 +251,7 @@ export function DemoApp(): React.JSX.Element {
         <section className="flex min-h-0 flex-1 overflow-hidden p-4 pt-28">
           <Card className="h-full w-full bg-content1/10 backdrop-blur-sm" variant="secondary">
             <CardContent className="h-full p-3">
-              <ScreenPreview documentData={documentData} />
+              <ScreenPreview documentData={documentData} isPlaying={isPlaying} resetToken={resetToken} />
             </CardContent>
           </Card>
         </section>
