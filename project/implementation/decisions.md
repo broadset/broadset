@@ -27,3 +27,9 @@ Non-trivial judgment calls made during implementation. See each unit for context
 **Decision:** Track `pendingPlacementType`, `pathEditingElementId`, and `pathDrawingElementId` explicitly in the editor store while deriving the public `editingMode` snapshot from those fields through a shared helper.
 **Alternatives considered:** Store only a single `editingMode` union, or only the raw per-mode IDs with no unified view.
 **Rationale:** The Phase 4 specs assert the explicit IDs directly, while the editor API and future UI integrations benefit from a single mode union. Keeping the raw fields authoritative and deriving the union avoids desynchronization while satisfying both contracts.
+
+### Unit 4-B — Let snap guides carry explicit precedence
+
+**Decision:** Extend `SnapGuide` with an optional explicit `priority` tier and export the page/element precedence constants so the transform math can honor the spec’s page-center → page-edge → element-center → element-edge ordering.
+**Alternatives considered:** Hard-code all guide categories inside the snapping function or rely only on distance without exposing precedence at the API level.
+**Rationale:** The snapping spec requires deterministic precedence when multiple guides are equally close. Carrying the priority with each guide keeps the math pure, testable, and ready for future canvas/UI layers that generate different guide categories.

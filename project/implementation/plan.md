@@ -31,7 +31,7 @@ its package.
 ## Current Status
 
 - **Active Phase:** Phase 4 — Editor MVP: Core Editing & Canvas
-- **In Progress:** 4-B Transforms + canvas
+- **In Progress:** 4-C Pages + canvas settings + basic toolbar
 - **Last Merged:** 3.4 Demo: animated sample content + play/pause control
 
 ---

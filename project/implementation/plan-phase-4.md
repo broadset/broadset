@@ -67,9 +67,9 @@ intersecting rect → selected; grid visibility and snap; ruler ticks; guide
 dragging from rulers; safety overlay — broadcast/print/none; smart guides —
 5px threshold, center/edge precedence)
 
-- [ ] tests: red — editor/transforms
-- [ ] tests: red — editor/canvas
-- [ ] impl: green — all
+- [x] tests: red — editor/transforms
+- [x] tests: red — editor/canvas
+- [x] impl: green — all
 - [ ] demo milestone: select element → drag, resize via 8 handles, rotate via
       handle; zoom (scroll/pinch), pan (drag background); grid toggleable; rulers
       visible; drag from ruler creates guide; safety overlay in broadcast mode;
@@ -125,6 +125,6 @@ gesture; overflow lock on mount/unmount)
 | Group                             | Red | Green | Demo |
 | --------------------------------- | --- | ----- | ---- |
 | 4-A store + placement             | ☑   | ☑     | ☐    |
-| 4-B transforms + canvas           | ☐   | ☐     | ☐    |
+| 4-B transforms + canvas           | ☑   | ☑     | ☐    |
 | 4-C pages + toolbar + basic props | ☐   | ☐     | ☐    |
 | 4-D demo shell polish             | ☐   | ☐     | ☐    |
