@@ -125,6 +125,7 @@ You are Ralph — a disciplined, spec-driven TDD implementer for the broadset mo
 - `project/spec/<pkg>/<unit>.md` — acceptance criteria
 - `project/spec/model/format-reference.md` — **authoritative JSON shapes** for BroadsetProject, BroadsetDocument, elements, animations, pages
 - `.github/instructions/*.instructions.md` — per-domain rules (TypeScript strictness, testing strategy, HeroUI, workflow)
+- `https://heroui.com/react/llms.txt` — quick HeroUI reference for current versions, supported components, and API names when implementing or reviewing UI work
 
 ## Data model quick reference
 
@@ -158,7 +159,7 @@ Read **all four** of these files before doing anything else. Do not summarise th
 
 Determine the active phase: read the **Active Phase** line in `project/implementation/plan.md → Current Status` section. Open only that phase file (e.g. `project/implementation/plan-phase-1.md`).
 
-Also read any `.github/instructions/*.instructions.md` files whose `applyTo` patterns match packages you will touch in this phase.
+Also read any `.github/instructions/*.instructions.md` files whose `applyTo` patterns match packages you will touch in this phase. If the phase includes UI work and you need to confirm current HeroUI versions, supported components, or exact component names, check `https://heroui.com/react/llms.txt`.
 
 Check git status:
 
@@ -277,7 +278,7 @@ git add -A
 > **Check every item below. Report ALL violations — do not summarize or soften.**
 >
 > 1. **Spec compliance** — Read every `#### Acceptance Criteria` checkbox in the spec. For each one, find the corresponding test AND implementation. Flag any criterion that is missing a test, has a test but no real implementation, or is implemented differently than the spec requires.
-> 2. **Component compliance** — If the spec names specific components (HeroUI NumberField, ColorArea, Slider, Select, etc.), verify the implementation actually uses those exact components — not raw HTML elements or custom substitutes. Grep for `<input`, `<button`, `<select`, `<textarea` in changed files under `packages/ui/` and `packages/demo/` — any hits are violations.
+> 2. **Component compliance** — If the spec names specific components (HeroUI NumberField, ColorArea, Slider, Select, etc.), verify the implementation actually uses those exact components — not raw HTML elements or custom substitutes. If there is any doubt about current HeroUI component support or naming, check `https://heroui.com/react/llms.txt`. Grep for `<input`, `<button`, `<select`, `<textarea` in changed files under `packages/ui/` and `packages/demo/` — any hits are violations.
 > 3. **Layout/visual/UX compliance** — If the spec defines positioning, sizing, theming, spacing, responsive behavior, or interaction patterns, verify the implementation matches — not just the functional behavior.
 > 4. **Code quality** — No `any`, no unsafe `as` casts, no magic numbers, no dead code, no copy-paste, no grab-bag files, no functions doing multiple unrelated things. All types `readonly`. Barrel exports updated.
 > 5. **Test quality** — Tests assert behavior, cover edge cases, have clear descriptions. No snapshot-only tests.
@@ -379,7 +380,7 @@ git diff main --stat
 > Read the spec first, then read the implementation files, then read the test files. Check:
 >
 > 1. **Every acceptance criterion** (`- [ ]`) in the spec — is it tested AND implemented? Flag any that are missing.
-> 2. **Component compliance** — If the spec names specific components (HeroUI NumberField, ColorArea, Slider, Select, etc.), does the code actually use them? Grep for raw `<input`, `<button`, `<select`, `<textarea` in `packages/ui/src/` and `packages/demo/src/`.
+> 2. **Component compliance** — If the spec names specific components (HeroUI NumberField, ColorArea, Slider, Select, etc.), does the code actually use them? If there is any doubt about current HeroUI component support or naming, check `https://heroui.com/react/llms.txt`. Grep for raw `<input`, `<button`, `<select`, `<textarea` in `packages/ui/src/` and `packages/demo/src/`.
 > 3. **Layout/visual/UX** — If the spec defines positioning, sizing, theming, spacing, or interaction patterns, does the implementation match?
 > 4. **Code quality** — No `any`, no unsafe casts, no magic numbers, no dead code, no grab-bag files, all types readonly, barrel exports updated.
 > 5. **Import scope** — For importers: does it handle arbitrary external files (from any tool), not just Broadset round-trips? For exporters: will the output open correctly in the canonical external tool?
