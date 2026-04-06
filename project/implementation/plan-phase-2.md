@@ -10,10 +10,10 @@ controls. No animations. Just pixels on screen proving the renderer works.
 
 ---
 
-## 2.1 Renderer core (`renderer/spec.md`)
+## 2.1 Renderer core (`renderer/spec.md`) [DONE]
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/renderer/spec.md`
 _What to cover:_ All 4 data-attribute contracts (`data-element-id`,
@@ -23,10 +23,10 @@ order); background style (gradient clears solid; solid clears gradient);
 capability resolution order (plugin > built-in > all-false); renderer lifecycle
 (mount, remount on type change, destroy clears host).
 
-## 2.2 Sample document fixture
+## 2.2 Sample document fixture [DONE]
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/demo/data-integration.md` (sample document section)
 _What to cover:_ A hard-coded `BroadsetDocument` exercising all 11 built-in
@@ -34,10 +34,10 @@ element types, at least 2 pages, valid canvas dimensions, no animations yet.
 Exported as a constant from `packages/demo/src/sampleDocument.ts`. Tests verify
 it passes the Phase 1 Zod schema.
 
-## 2.3 Demo shell: mount renderer
+## 2.3 Demo shell: mount renderer [DONE]
 
-- [ ] tests: red (Playwright CT)
-- [ ] impl: green
+- [x] tests: red (Playwright CT)
+- [x] impl: green
 
 _Spec:_ `project/spec/demo/layout.md`, `project/spec/demo/visual.md`
 _What to cover:_
@@ -53,6 +53,6 @@ _What to cover:_
 
 | Unit                        | Red | Green |
 | --------------------------- | --- | ----- |
-| 2.1 renderer core           | ☐   | ☐     |
-| 2.2 sample document fixture | ☐   | ☐     |
-| 2.3 demo shell              | ☐   | ☐     |
+| 2.1 renderer core           | ✔   | ✔     |
+| 2.2 sample document fixture | ✔   | ✔     |
+| 2.3 demo shell              | ✔   | ✔     |

@@ -23,6 +23,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@broadset/model": "^0.1.0",
+    "@broadset/renderer": "^0.1.0",
     "@heroui/react": "^3.0.2",
     "@heroui/styles": "^3.0.2",
     "lucide-react": "^1.7.0",

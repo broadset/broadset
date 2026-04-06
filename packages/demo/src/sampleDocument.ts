@@ -102,9 +102,9 @@ export const SAMPLE_DOCUMENT = {
       actionSafe: [3.5, 3.5, 3.5, 3.5] as const,
       titleSafe: [5, 5, 5, 5] as const,
       custom: [
-        { name: 'lower-third-zone', insets: [67, 3.5, 3.5, 3.5] as const },
-        { name: 'scorebug-zone', insets: [4, 74, 82, 4] as const },
-        { name: 'promo-zone', insets: [8, 4, 58, 72] as const },
+        { name: 'lower-third-zone', insets: [24, 3.5, 3.5, 3.5] as const },
+        { name: 'scorebug-zone', insets: [4, 28, 32, 4] as const },
+        { name: 'promo-zone', insets: [8, 4, 26, 28] as const },
       ],
     },
   },
@@ -804,158 +804,7 @@ export const SAMPLE_DOCUMENT = {
       },
     },
   ],
-  animations: [
-    {
-      elementId: 'el-show-title',
-      config: {
-        timelines: [
-          {
-            id: 'tl-title-in',
-            name: 'Title In',
-            durationMs: 650,
-            loop: 'none',
-            loopCount: null,
-            keyframes: [
-              {
-                name: 'start',
-                action: 'none',
-                offsetMs: 0,
-                properties: {
-                  opacity: { type: 'number', value: 0, easing: 'linear' },
-                  transform: { type: 'string', value: 'translateY(24px)', easing: 'ease-out' },
-                },
-                timecodeAnnotation: { timecode: '01:00:00:00', frameRate: 25 },
-              },
-              {
-                name: 'end',
-                action: 'none',
-                offsetMs: 650,
-                properties: {
-                  opacity: { type: 'number', value: 1, easing: 'ease-out' },
-                  transform: { type: 'string', value: 'translateY(0px)', easing: 'ease-out' },
-                },
-              },
-            ],
-            childTimelines: {},
-            audioCues: [{ assetId: 'asset-audio-whoosh', offsetMs: 0, volume: 0.75, loop: false }],
-          },
-          {
-            id: 'tl-title-out',
-            name: 'Title Out',
-            durationMs: 300,
-            loop: 'none',
-            loopCount: null,
-            keyframes: [
-              {
-                name: 'start',
-                action: 'none',
-                offsetMs: 0,
-                properties: {
-                  opacity: { type: 'number', value: 1, easing: 'linear' },
-                  transform: { type: 'string', value: 'translateY(0px)', easing: 'ease-in' },
-                },
-              },
-              {
-                name: 'end',
-                action: 'none',
-                offsetMs: 300,
-                properties: {
-                  opacity: { type: 'number', value: 0, easing: 'ease-in' },
-                  transform: { type: 'string', value: 'translateY(-12px)', easing: 'ease-in' },
-                },
-              },
-            ],
-            childTimelines: {},
-          },
-        ],
-        stateTimelineBindings: [
-          { stateName: 'IN', timelineId: 'tl-title-in' },
-          { stateName: 'OUT', timelineId: 'tl-title-out' },
-        ],
-        modifierTimelineBindings: [],
-        textAnimator: {
-          rangeMode: 'characters',
-          staggerDelayMs: 24,
-          randomOrder: false,
-          timelineId: 'tl-title-in',
-        },
-      },
-    },
-    {
-      elementId: 'el-scorebug',
-      config: {
-        timelines: [
-          {
-            id: 'tl-scorebug-in',
-            name: 'Scorebug In',
-            durationMs: 500,
-            loop: 'none',
-            loopCount: null,
-            keyframes: [
-              {
-                name: 'start',
-                action: 'none',
-                offsetMs: 0,
-                properties: {
-                  opacity: { type: 'number', value: 0, easing: 'linear' },
-                  transform: { type: 'string', value: 'translateY(36px)', easing: 'ease-out' },
-                },
-              },
-              {
-                name: 'end',
-                action: 'none',
-                offsetMs: 500,
-                properties: {
-                  opacity: { type: 'number', value: 1, easing: 'ease-out' },
-                  transform: { type: 'string', value: 'translateY(0px)', easing: 'spring-gentle' },
-                },
-              },
-            ],
-            childTimelines: {},
-          },
-        ],
-        stateTimelineBindings: [{ stateName: 'IN', timelineId: 'tl-scorebug-in' }],
-        modifierTimelineBindings: [],
-      },
-    },
-    {
-      elementId: 'el-promo-panel',
-      config: {
-        timelines: [
-          {
-            id: 'tl-promo-in',
-            name: 'Promo Panel In',
-            durationMs: 420,
-            loop: 'none',
-            loopCount: null,
-            keyframes: [
-              {
-                name: 'start',
-                action: 'none',
-                offsetMs: 0,
-                properties: {
-                  opacity: { type: 'number', value: 0, easing: 'linear' },
-                  transform: { type: 'string', value: 'translateX(18px) scale(0.96)', easing: 'ease-out' },
-                },
-              },
-              {
-                name: 'end',
-                action: 'none',
-                offsetMs: 420,
-                properties: {
-                  opacity: { type: 'number', value: 1, easing: 'ease-out' },
-                  transform: { type: 'string', value: 'translateX(0px) scale(1)', easing: 'spring-bouncy' },
-                },
-              },
-            ],
-            childTimelines: {},
-          },
-        ],
-        stateTimelineBindings: [{ stateName: 'IN', timelineId: 'tl-promo-in' }],
-        modifierTimelineBindings: [],
-      },
-    },
-  ],
+  animations: [],
   pages: [
     {
       id: 'page-live',
