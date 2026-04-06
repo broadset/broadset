@@ -233,6 +233,19 @@ describe('Content validation by element type', () => {
     expect(attributeResult).not.toContain('onclick');
     expect(attributeResult).not.toContain('class=');
     expect(attributeResult).toContain('style="color: red"');
+
+    const unsafeStyleResult = sanitizeTextContent(
+      '<span style="color: red; background-image: url(javascript:alert(1)); position: fixed">text</span>',
+    );
+
+    expect(unsafeStyleResult).toContain('style="color: red"');
+    expect(unsafeStyleResult).not.toContain('background-image');
+    expect(unsafeStyleResult).not.toContain('javascript:');
+    expect(unsafeStyleResult).not.toContain('position: fixed');
+
+    const quotedStyleResult = sanitizeTextContent(`<span style='color: "red"'>text</span>`);
+
+    expect(quotedStyleResult).toContain('style="color: &quot;red&quot;"');
   });
 
   /** @description Image placeholders, valid path data, and QR-code payload requirements must all validate correctly. */

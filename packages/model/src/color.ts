@@ -26,6 +26,10 @@ function clampByte(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
 }
 
+function isFiniteInRange(value: number, min: number, max: number): boolean {
+  return Number.isFinite(value) && value >= min && value <= max;
+}
+
 function byteToHex(value: number): string {
   return clampByte(value).toString(16).padStart(2, '0');
 }
@@ -81,6 +85,10 @@ export function normalizeColor(input: string): string {
   if (trimmed.startsWith('#')) {
     const hex = trimmed.slice(1);
 
+    if (!/^[0-9a-f]+$/i.test(hex)) {
+      throw new Error(`Unable to normalize color: "${input}"`);
+    }
+
     if (hex.length === 3 || hex.length === 4) {
       const expanded = hex
         .split('')
@@ -102,6 +110,16 @@ export function normalizeColor(input: string): string {
     const green = Number(rgbMatch[2]);
     const blue = Number(rgbMatch[3]);
     const alpha = rgbMatch[4] === undefined ? undefined : Number(rgbMatch[4]);
+
+    if (
+      !isFiniteInRange(red, 0, 255) ||
+      !isFiniteInRange(green, 0, 255) ||
+      !isFiniteInRange(blue, 0, 255) ||
+      (alpha !== undefined && !isFiniteInRange(alpha, 0, 1))
+    ) {
+      throw new Error(`Unable to normalize color: "${input}"`);
+    }
+
     const hex = `#${byteToHex(red)}${byteToHex(green)}${byteToHex(blue)}`;
 
     return alpha === undefined ? hex : `${hex}${byteToHex(alpha * 255)}`;
@@ -114,6 +132,15 @@ export function normalizeColor(input: string): string {
     const saturation = Number(hslMatch[2]);
     const lightness = Number(hslMatch[3]);
     const alpha = hslMatch[4] === undefined ? undefined : Number(hslMatch[4]);
+
+    if (
+      !isFiniteInRange(saturation, 0, 100) ||
+      !isFiniteInRange(lightness, 0, 100) ||
+      (alpha !== undefined && !isFiniteInRange(alpha, 0, 1))
+    ) {
+      throw new Error(`Unable to normalize color: "${input}"`);
+    }
+
     const [red, green, blue] = hslToRgb(hue, saturation, lightness);
     const hex = `#${byteToHex(red)}${byteToHex(green)}${byteToHex(blue)}`;
 

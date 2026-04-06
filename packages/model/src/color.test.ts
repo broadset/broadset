@@ -42,6 +42,13 @@ describe('Color normalization', () => {
     expect(result).toBe('#ff800080');
   });
 
+  /** @description Impossible alpha values must be rejected rather than silently clamped. */
+  it('throws on out-of-range rgba/hsla alpha values', () => {
+    expect(() => normalizeColor('rgba(255, 128, 0, 1.5)')).toThrow('Unable to normalize color');
+    expect(() => normalizeColor('rgba(255, 128, 0, -0.2)')).toThrow('Unable to normalize color');
+    expect(() => normalizeColor('hsla(120, 100%, 50%, 2)')).toThrow('Unable to normalize color');
+  });
+
   /** @description Unrecognized color strings must fail loudly instead of silently passing through. */
   it('throws on unrecognized color input', () => {
     expect(() => normalizeColor('rainbow')).toThrow('Unable to normalize color');

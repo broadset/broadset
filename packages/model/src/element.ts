@@ -106,6 +106,47 @@ export type ElementOverrides = Readonly<
 >;
 
 const ALLOWED_TAGS = new Set(['b', 'i', 'u', 'br', 'span', 'strong', 'em']);
+const ALLOWED_INLINE_STYLE_PROPERTIES = new Set([
+  'color',
+  'background-color',
+  'font-weight',
+  'font-style',
+  'text-decoration',
+]);
+
+function sanitizeInlineStyle(styleValue: string): string {
+  const declarations = styleValue.split(';');
+  const safeDeclarations: string[] = [];
+
+  for (const declaration of declarations) {
+    const trimmed = declaration.trim();
+
+    if (trimmed === '') {
+      continue;
+    }
+
+    const separatorIndex = trimmed.indexOf(':');
+
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const property = trimmed.slice(0, separatorIndex).trim().toLowerCase();
+    const value = trimmed.slice(separatorIndex + 1).trim();
+
+    if (!ALLOWED_INLINE_STYLE_PROPERTIES.has(property) || value === '') {
+      continue;
+    }
+
+    if (/[<>`]/.test(value) || /expression\s*\(|url\s*\(|javascript:|data:/i.test(value)) {
+      continue;
+    }
+
+    safeDeclarations.push(`${property}: ${value}`);
+  }
+
+  return safeDeclarations.join('; ');
+}
 
 export function sanitizeTextContent(html: string): string {
   let result = html.replace(/<(script|style|iframe|object|embed|form)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
@@ -123,9 +164,10 @@ export function sanitizeTextContent(html: string): string {
       return `</${lower}>`;
     }
 
-    const styleMatch = /\bstyle\s*=\s*"([^"]*)"/.exec(String(attrs));
-    const styleValue = styleMatch?.[1] ?? '';
-    const styleAttribute = styleMatch === null ? '' : ` style="${styleValue}"`;
+    const styleMatch = /\bstyle\s*=\s*(['"])(.*?)\1/i.exec(String(attrs));
+    const safeStyleValue = styleMatch === null ? '' : sanitizeInlineStyle(styleMatch[2] ?? '');
+    const escapedStyleValue = safeStyleValue.replace(/"/g, '&quot;');
+    const styleAttribute = escapedStyleValue === '' ? '' : ` style="${escapedStyleValue}"`;
 
     return `<${lower}${styleAttribute}>`;
   });
