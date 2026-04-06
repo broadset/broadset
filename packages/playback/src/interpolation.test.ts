@@ -47,6 +47,19 @@ describe('applyEasing', () => {
 
     expect(gentle).toBeGreaterThan(0);
     expect(gentle).toBeLessThanOrEqual(1);
+
+    const progress = 0.4;
+    const dampingRatio = 15 / (2 * Math.sqrt(300));
+    const omega = Math.sqrt(300 - (15 / 2) ** 2);
+    const settlingTime = 2.6 / (15 / 2);
+    const physicalTime = progress * settlingTime;
+    const expected =
+      1 -
+      Math.exp(-((15 * physicalTime) / 2)) *
+        (Math.cos(omega * physicalTime) +
+          (dampingRatio / Math.sqrt(1 - dampingRatio ** 2)) * Math.sin(omega * physicalTime));
+
+    expect(applyEasing('spring(300, 15, 1)', progress)).toBeCloseTo(expected, 6);
     expect(applyEasing('spring(300, 15, 1)', 1)).toBeCloseTo(1, 3);
   });
 });

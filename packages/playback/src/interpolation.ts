@@ -7,6 +7,7 @@ const NUMERIC_STRING_RE = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
 const EPSILON = 1e-6;
 const MAX_NEWTON_ITERATIONS = 8;
 const MAX_BINARY_SEARCH_ITERATIONS = 20;
+const SPRING_SETTLING_MULTIPLIER = 2.6;
 
 const CUBIC_PRESETS: Readonly<Record<string, readonly [number, number, number, number]>> = {
   ease: [0.25, 0.1, 0.25, 1],
@@ -208,17 +209,21 @@ function evaluateSpring(progress: number, stiffness: number, damping: number, ma
   }
 
   const normalizedTime = clampUnitInterval(progress);
-  const omega0 = Math.sqrt(stiffness / mass);
-  const zeta = damping / (2 * Math.sqrt(stiffness * mass));
+  const decayRate = damping / (2 * mass);
+  const settlingTime = SPRING_SETTLING_MULTIPLIER / Math.max(decayRate, EPSILON);
+  const physicalTime = normalizedTime * settlingTime;
+  const angularFrequencySquared = stiffness / mass - decayRate ** 2;
 
-  if (zeta >= 1) {
-    return 1 - Math.exp(-((damping / (2 * mass)) * normalizedTime * 1.5));
+  if (angularFrequencySquared <= EPSILON) {
+    return 1 - Math.exp(-(decayRate * physicalTime)) * (1 + decayRate * physicalTime);
   }
 
-  const envelope = Math.exp(-((damping / (2 * mass)) * normalizedTime));
-  const oscillation = Math.cos((omega0 * normalizedTime) / 2);
+  const omega = Math.sqrt(angularFrequencySquared);
+  const dampingRatio = damping / (2 * Math.sqrt(stiffness * mass));
+  const oscillationScale = dampingRatio / Math.sqrt(Math.max(1 - dampingRatio ** 2, EPSILON));
+  const envelope = Math.exp(-(decayRate * physicalTime));
 
-  return 1 - envelope * oscillation;
+  return 1 - envelope * (Math.cos(omega * physicalTime) + oscillationScale * Math.sin(omega * physicalTime));
 }
 
 export function applyEasing(mode: string, progress: number): number {

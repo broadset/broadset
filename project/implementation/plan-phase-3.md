@@ -62,6 +62,7 @@ visibility:hidden + pointer-events:none; transition suppression flag.
 - [x] impl: green
 
 _Spec:_ `project/spec/demo/data-integration.md`, `project/spec/demo/state.md`
+_Scope note:_ This unit covers only the Phase 3 animated-preview slice of those specs: sample animated content, minimal playback controls, browser zoom prevention, and viewport overflow lock. Full provider wiring, persisted app state, fullscreen, toast orchestration, import/export flows, and debug snapshots are scheduled in Phases 9–10.
 _What to cover:_
 
 - Extend the sample document with `animations` entries: at minimum one

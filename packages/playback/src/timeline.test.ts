@@ -295,6 +295,37 @@ describe('computeTimelineFrame', () => {
     expect(Number(pathFrame.properties['y'])).toBeGreaterThan(40);
     expect(typeof pathFrame.properties['rotation']).toBe('number');
   });
+
+  it('adds motion-path tangent rotation on top of the timeline rotation value', () => {
+    const motionPath = createTimeline({
+      id: 'path-with-rotation',
+      name: 'Path With Rotation',
+      keyframes: [
+        createKeyframe({
+          name: 'start',
+          offsetMs: 0,
+          properties: {
+            motionPath: { type: 'string', value: 'M 0 0 L 100 100', easing: 'linear' },
+            motionRotate: { type: 'string', value: 'true', easing: 'step' },
+            rotation: { type: 'number', value: 15, easing: 'linear' },
+          },
+        }),
+        createKeyframe({
+          name: 'end',
+          offsetMs: 1000,
+          properties: {
+            motionPath: { type: 'string', value: 'M 0 0 L 100 100', easing: 'linear' },
+            motionRotate: { type: 'string', value: 'true', easing: 'step' },
+            rotation: { type: 'number', value: 15, easing: 'linear' },
+          },
+        }),
+      ],
+    });
+
+    const frame = computeTimelineFrame({ timeline: motionPath, timeMs: 500 });
+
+    expect(Number(frame.properties['rotation'])).toBeCloseTo(60, 0);
+  });
 });
 
 describe('computeElementTimelineFrames', () => {

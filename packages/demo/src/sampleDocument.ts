@@ -4,6 +4,11 @@
  * The goal of this file is to demonstrate what the current BroadsetProject
  * and BroadsetDocument specifications allow, using a polished broadcast-package
  * example rather than a legacy runtime-oriented mock.
+ *
+ * NOTE: This fixture is intentionally large and representative. Its size is a
+ * feature, not a maintenance problem: it acts as a high-coverage sample corpus
+ * for renderer, playback, and format work, so it should not be split merely to
+ * chase file-length metrics.
  */
 
 const ISO_TIMESTAMP = '2026-04-06T12:00:00Z';

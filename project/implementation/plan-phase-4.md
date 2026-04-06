@@ -88,7 +88,7 @@ element library — 11 built-in tiles + custom plugins with icons, startPlacemen
 on click, 2-column grid; scene sorter — tabs match scene count, switching, add/
 remove, remove hidden at 1 scene),
 `ui/utilities.md` (CSS parsers needed for property panels),
-`ui/panels.md` (basic properties — position/size/rotation/opacity fields only)
+`ui/panels.md` (basic properties — position/size/rotation/opacity fields only). Remember to use HeroUI Toolbar component for the toolbars!
 
 - [ ] tests: red — editor/store-ui-actions
 - [ ] tests: red — ui/toolbar-nav (toolbar + element library + scene sorter)

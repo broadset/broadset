@@ -357,4 +357,118 @@ describe('createPlaybackController', () => {
 
     expect(opacityTarget.style.opacity).toBe('1');
   });
+
+  it('resumes paused default timelines from the paused position instead of restarting them', () => {
+    jest.useFakeTimers();
+
+    try {
+      const { opacityTarget, root } = createHostElement('hero');
+      const animations: readonly AnimationDefinition[] = [
+        {
+          elementId: 'hero',
+          config: createConfig({
+            timelines: [
+              createTimeline({
+                id: 'tl-default',
+                name: 'Default',
+                durationMs: 1000,
+                keyframes: [
+                  createKeyframe({
+                    name: 'start',
+                    offsetMs: 0,
+                    properties: { opacity: { type: 'number', value: 0, easing: 'linear' } },
+                  }),
+                  createKeyframe({
+                    name: 'end',
+                    offsetMs: 1000,
+                    properties: { opacity: { type: 'number', value: 1, easing: 'linear' } },
+                  }),
+                ],
+              }),
+            ],
+          }),
+        },
+      ];
+
+      const controller = createPlaybackController({ root, registry: animations });
+
+      controller.attach();
+      controller.play();
+      jest.advanceTimersByTime(250);
+
+      const pausedOpacity = Number(opacityTarget.style.opacity);
+
+      controller.pause();
+      jest.advanceTimersByTime(150);
+
+      expect(Number(opacityTarget.style.opacity)).toBeCloseTo(pausedOpacity, 3);
+
+      controller.play();
+      jest.advanceTimersByTime(150);
+
+      expect(Number(opacityTarget.style.opacity)).toBeGreaterThan(pausedOpacity);
+
+      controller.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('restores baseline styles when a state timeline is cleared back to null', async () => {
+    const { contentTarget, host, opacityTarget, root } = createHostElement('hero');
+
+    opacityTarget.style.opacity = '0.6';
+    contentTarget.style.transform = 'scale(1.1)';
+
+    const animations: readonly AnimationDefinition[] = [
+      {
+        elementId: 'hero',
+        config: createConfig({
+          timelines: [
+            createTimeline({
+              id: 'tl-active',
+              name: 'Active',
+              durationMs: 300,
+              keyframes: [
+                createKeyframe({
+                  name: 'start',
+                  offsetMs: 0,
+                  properties: {
+                    opacity: { type: 'number', value: 0.2, easing: 'linear' },
+                    translateX: { type: 'number', value: 12, easing: 'linear' },
+                  },
+                }),
+                createKeyframe({
+                  name: 'end',
+                  offsetMs: 300,
+                  properties: {
+                    opacity: { type: 'number', value: 1, easing: 'linear' },
+                    translateX: { type: 'number', value: 48, easing: 'linear' },
+                  },
+                }),
+              ],
+            }),
+          ],
+          stateTimelineBindings: [{ stateName: 'active', timelineId: 'tl-active' }],
+        }),
+      },
+    ];
+
+    const controller = createPlaybackController({ root, registry: animations, suppressTransitions: true });
+
+    controller.attach();
+    host.classList.add('active');
+    await Promise.resolve();
+
+    expect(opacityTarget.style.opacity).toBe('1');
+    expect(contentTarget.style.transform).toContain('translate(');
+
+    host.classList.remove('active');
+    await Promise.resolve();
+
+    expect(opacityTarget.style.opacity).toBe('0.6');
+    expect(contentTarget.style.transform).toBe('scale(1.1)');
+
+    controller.destroy();
+  });
 });
