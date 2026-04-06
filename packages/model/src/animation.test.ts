@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import {
-  animationRegistrySchema,
+  animationsSchema,
   createDefaultAnimationConfig,
   elementAnimationConfigSchema,
   isValidInterpolationMode,
@@ -18,7 +18,7 @@ describe('Animation registry structure', () => {
       { elementId: 'e1', config: createDefaultAnimationConfig() },
       { elementId: 'e2', config: createDefaultAnimationConfig() },
     ];
-    const result = animationRegistrySchema.safeParse(entries);
+    const result = animationsSchema.safeParse(entries);
 
     expect(result.success).toBe(true);
   });
@@ -29,7 +29,7 @@ describe('Animation registry structure', () => {
       { elementId: 'e1', config: createDefaultAnimationConfig() },
       { elementId: 'e1', config: createDefaultAnimationConfig() },
     ];
-    const result = animationRegistrySchema.safeParse(entries);
+    const result = animationsSchema.safeParse(entries);
 
     expect(result.success).toBe(false);
   });
@@ -190,7 +190,7 @@ describe('Keyframe structure', () => {
       action: 'none',
       offsetMs: 0,
       properties: {
-        display: { value: 'block', interpolation: 'step' },
+        display: { type: 'string', value: 'block', easing: 'step' },
       },
     };
     const result = keyframeSchema.safeParse(keyframe);

@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { screenPropsSchema } from './screen';
 import { type BroadsetElementStyle, createDefaultStyle, styleSchema } from './style';
 
 export const BUILT_IN_ELEMENT_TYPES = [
@@ -419,8 +418,6 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
     textPathElementId: z.string().nullable().optional(),
     booleanOperation: z.enum(['union', 'subtract', 'intersect', 'exclude']).nullable().optional(),
     extensions: z.record(z.string(), z.unknown()).optional(),
-    // Legacy compatibility input only; normalized into current top-level/style fields during transform.
-    screen: z.record(z.string(), z.unknown()).optional(),
   })
   .superRefine((value, context) => {
     const normalizedStyleResult = styleSchema.safeParse({
@@ -434,19 +431,6 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
           ...issue,
           path: ['style', ...issue.path],
         });
-      }
-    }
-
-    if (value.screen !== undefined && Object.keys(value.screen).length > 0) {
-      const screenResult = screenPropsSchema.safeParse(value.screen);
-
-      if (!screenResult.success) {
-        for (const issue of screenResult.error.issues) {
-          context.addIssue({
-            ...issue,
-            path: ['screen', ...issue.path],
-          });
-        }
       }
     }
 
@@ -491,32 +475,16 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
     }
   })
   .transform((value): BroadsetElement => {
-    const parsedLegacyScreen =
-      value.screen !== undefined && Object.keys(value.screen).length > 0 ?
-        screenPropsSchema.safeParse(value.screen)
-      : null;
-    const legacyScreen = parsedLegacyScreen?.success === true ? parsedLegacyScreen.data : undefined;
     const normalizedStyle = styleSchema.safeParse({
       ...createDefaultStyle(),
-      ...(legacyScreen === undefined ?
-        {}
-      : {
-          maskType: legacyScreen.maskType,
-          customClipPath: legacyScreen.customClipPath,
-          clipChildren: legacyScreen.clipChildren,
-          rotateX: legacyScreen.rotateX,
-          rotateY: legacyScreen.rotateY,
-          rotateZ: legacyScreen.rotateZ,
-          translateZ: legacyScreen.translateZ,
-        }),
       ...(value.style ?? {}),
     });
 
     return {
       id: value.id,
       type: value.type,
-      name: value.name !== '' ? value.name : (legacyScreen?.name ?? ''),
-      locked: value.locked || (legacyScreen?.locked ?? false),
+      name: value.name,
+      locked: value.locked,
       position: value.position,
       width: value.width,
       height: value.height,

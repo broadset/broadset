@@ -30,7 +30,7 @@ describe('Document clone fidelity', () => {
     expect(cloned).not.toBe(original);
     expect(cloned.pages).not.toBe(original.pages);
     expect(cloned.canvas).not.toBe(original.canvas);
-    expect(cloned.animationRegistry).not.toBe(original.animationRegistry);
+    expect(cloned.animations).not.toBe(original.animations);
   });
 });
 

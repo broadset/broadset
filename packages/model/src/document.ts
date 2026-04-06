@@ -46,8 +46,6 @@ export interface Page {
   readonly overrides: readonly ElementOverride[];
   readonly locale: string | null;
   readonly extensions: Readonly<Record<string, unknown>>;
-  /** Legacy compatibility field. New documents should use `document.elements`. */
-  readonly elements?: readonly BroadsetElement[] | undefined;
 }
 
 export interface DataSchemaField {
@@ -71,8 +69,6 @@ export interface BroadsetDocument {
   readonly canvas: Canvas;
   readonly elements: readonly BroadsetElement[];
   readonly animations: readonly AnimationDefinition[];
-  /** Legacy alias retained for compatibility with earlier phase fixtures. */
-  readonly animationRegistry?: readonly AnimationDefinition[] | undefined;
   readonly pages: readonly Page[];
   readonly dataSchema: DataSchema;
   readonly output?: Readonly<Record<string, unknown>> | undefined;
@@ -131,12 +127,6 @@ const pageSchema: z.ZodType<Page> = z.object({
   overrides: z.array(elementOverrideSchema),
   locale: z.string().nullable().default(null),
   extensions: z.record(z.string(), z.unknown()).default({}),
-  elements: z.array(elementSchema).optional(),
-});
-
-const legacyPageSchema = z.object({
-  id: z.string().min(1),
-  elements: z.array(elementSchema),
 });
 
 const dataSchemaFieldSchema: z.ZodType<DataSchemaField> = z.object({
@@ -169,52 +159,21 @@ function defaultCanvasForMode(mode: 'screen' | 'print', canvas: z.infer<typeof c
   };
 }
 
-function normalizePages(rawPages: readonly (Page | z.infer<typeof legacyPageSchema>)[]): readonly Page[] {
-  return rawPages.map((page) => {
-    if ('overrides' in page) {
-      return {
-        id: page.id,
-        name: page.name,
-        overrides: page.overrides,
-        locale: page.locale ?? null,
-        extensions: page.extensions,
-        elements: page.elements ?? [],
-      };
-    }
-
-    return {
-      id: page.id,
-      name: page.id,
-      overrides: [],
-      locale: null,
-      extensions: {},
-      elements: page.elements,
-    };
-  });
-}
-
-function getLegacyElements(rawPages: readonly (Page | z.infer<typeof legacyPageSchema>)[]): readonly BroadsetElement[] {
-  const firstLegacyPage = rawPages.find((page): page is z.infer<typeof legacyPageSchema> => 'elements' in page);
-
-  return firstLegacyPage === undefined ? [] : firstLegacyPage.elements;
-}
-
 export const broadsetDocumentSchema: z.ZodType<BroadsetDocument> = z
   .object({
     id: z.string().min(1),
     name: z.string().default('Untitled Document'),
     documentMode: z.enum(['screen', 'print']),
     canvas: canvasSchema,
-    elements: z.array(elementSchema).optional(),
-    pages: z.array(z.union([pageSchema, legacyPageSchema])).min(1),
-    animations: animationsSchema.optional(),
-    animationRegistry: animationsSchema.optional(),
-    dataSchema: dataSchemaSchema.optional(),
+    elements: z.array(elementSchema),
+    pages: z.array(pageSchema).min(1),
+    animations: animationsSchema,
+    dataSchema: dataSchemaSchema,
     output: z.record(z.string(), z.unknown()).optional(),
     extensions: z.record(z.string(), z.unknown()).optional(),
   })
   .superRefine((value, context) => {
-    const effectiveElements = value.elements ?? getLegacyElements(value.pages);
+    const effectiveElements = value.elements;
 
     if (!hasUniqueElementIds(effectiveElements)) {
       context.addIssue({
@@ -240,9 +199,7 @@ export const broadsetDocumentSchema: z.ZodType<BroadsetDocument> = z
       });
     }
 
-    const normalizedPages = normalizePages(value.pages);
-
-    if (!hasValidPageOverrideReferences({ elements: effectiveElements, pages: normalizedPages })) {
+    if (!hasValidPageOverrideReferences({ elements: effectiveElements, pages: value.pages })) {
       context.addIssue({
         code: 'custom',
         message: 'Page overrides must reference elements defined on the document',
@@ -256,11 +213,10 @@ export const broadsetDocumentSchema: z.ZodType<BroadsetDocument> = z
       name: value.name,
       documentMode: value.documentMode,
       canvas: defaultCanvasForMode(value.documentMode, value.canvas),
-      elements: value.elements ?? getLegacyElements(value.pages),
-      animations: value.animations ?? value.animationRegistry ?? [],
-      animationRegistry: value.animations ?? value.animationRegistry ?? [],
-      pages: normalizePages(value.pages),
-      dataSchema: value.dataSchema ?? { fields: [] },
+      elements: value.elements,
+      animations: value.animations,
+      pages: value.pages,
+      dataSchema: value.dataSchema,
       output: value.output,
       extensions: value.extensions,
     }),
@@ -280,7 +236,6 @@ export function createEmptyBroadsetDocument(): BroadsetDocument {
     },
     elements: [],
     animations: [],
-    animationRegistry: [],
     pages: [
       {
         id: 'page-1',
@@ -288,7 +243,6 @@ export function createEmptyBroadsetDocument(): BroadsetDocument {
         overrides: [],
         locale: null,
         extensions: {},
-        elements: [],
       },
     ],
     dataSchema: { fields: [] },

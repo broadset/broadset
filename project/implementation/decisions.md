@@ -4,8 +4,8 @@ Non-trivial judgment calls made during implementation. See each unit for context
 
 ---
 
-### Unit 1.3 / 1.10 — Normalize legacy model shapes at the schema boundary
+### Unit 1.3 / 1.10 — Reject Broadset-owned legacy model shapes
 
-**Decision:** Accept legacy serialized fields like `screen`, `animationRegistry`, and timeline `entries` at parse time, but normalize them into the current model output (`name`/`locked` on the element, masking and 3D fields on `style`, `animations`, and timeline `keyframes`).
-**Alternatives considered:** Reject legacy shapes outright, or keep the legacy fields in the public output types.
-**Rationale:** This preserves compatibility for older documents and fixtures while keeping the exported Phase 1 model aligned with the current Broadset spec.
+**Decision:** Remove support for old Broadset-owned fields like `screen`, `animationRegistry`, and timeline `entries`, and validate only the current documented model shape.
+**Alternatives considered:** Continue normalizing old serialized shapes at load time.
+**Rationale:** Broadset is a greenfield project, so the cleanest current contract is more valuable than compatibility shims for our own data.

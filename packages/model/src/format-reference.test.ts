@@ -1,142 +1,110 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { COMMON_CANVAS_SIZES, fullDocumentSchema } from './index';
-
-type LegacyElement = {
-  id: string;
-  type: string;
-  position: { x: number; y: number };
-  width: number;
-  height: number;
-  rotation: number;
-  content: string;
-  style: Record<string, unknown>;
-  screen: Record<string, unknown>;
-  parentId: string | null;
-  groupId: string | null;
-};
+import { broadsetProjectSchema, COMMON_CANVAS_SIZES, createDefaultElement, fullDocumentSchema } from './index';
 
 type MinimalDocument = {
   id?: string;
+  name: string;
   documentMode: 'screen';
   canvas: {
     width: number;
     height: number;
+    unit: 'px' | 'mm' | 'in';
+    dpi: number;
     padding: [number, number, number, number];
+    backgroundMode: 'transparent' | 'solid';
   };
+  elements: Array<ReturnType<typeof createDefaultElement>>;
+  animations: [];
   pages: Array<{
     id: string;
-    elements: LegacyElement[];
-  }>;
-  animationRegistry: [];
-  metadata?: {
     name: string;
-    createdAtIso: string;
-    updatedAtIso: string;
-  };
+    overrides: Array<{ elementId: string; content?: string }>;
+    locale: null;
+    extensions: Record<string, unknown>;
+  }>;
+  dataSchema: { fields: [] };
+  extensions: Record<string, unknown>;
 };
 
-/** @description Helper to build the minimal valid document from the spec example */
+/** @description Helper to build a minimal valid current-format document from the spec example. */
 function minimalDoc(): MinimalDocument {
   return {
     id: 'minimal-template',
+    name: 'Minimal Template',
     documentMode: 'screen',
-    canvas: { width: 508, height: 285.75, padding: [0, 0, 0, 0] },
+    canvas: {
+      width: 1920,
+      height: 1080,
+      unit: 'px',
+      dpi: 96,
+      padding: [0, 0, 0, 0],
+      backgroundMode: 'transparent',
+    },
+    elements: [
+      createDefaultElement('text', {
+        id: 'title',
+        name: 'Title',
+        position: { x: 100, y: 120 },
+        width: 300,
+        height: 50,
+        content: 'Hello World',
+        style: {
+          opacity: 1,
+          fontFamily: 'Arial',
+          fontSize: 36,
+          fontColor: '#ffffff',
+          textAlignment: 'center',
+        },
+      }),
+    ],
+    animations: [],
     pages: [
       {
         id: 'page-1',
-        elements: [
-          {
-            id: 'title',
-            type: 'text',
-            position: { x: 100, y: 120 },
-            width: 300,
-            height: 50,
-            rotation: 0,
-            content: 'Hello World',
-            style: {
-              opacity: 1,
-              fontFamily: 'Arial',
-              fontSize: 36,
-              fontColor: '#ffffff',
-              textAlignment: 'center',
-            },
-            screen: {
-              name: 'Title',
-              anchorX: 'left',
-              anchorY: 'top',
-              visibility: 'onscreen',
-              activeState: null,
-              modifiers: [],
-              locked: false,
-              maskType: 'none',
-              rotateX: 0,
-              rotateY: 0,
-              rotateZ: 0,
-              translateZ: 0,
-              clipChildren: false,
-              customClipPath: '',
-            },
-            parentId: null,
-            groupId: null,
-          },
-        ],
+        name: 'Default',
+        overrides: [],
+        locale: null,
+        extensions: {},
       },
     ],
-    animationRegistry: [],
+    dataSchema: { fields: [] },
+    extensions: {},
   };
 }
 
-/** @description Helper to get the first element from the first page for mutation tests */
-function getFirstElement(doc: MinimalDocument): LegacyElement {
-  const firstPage = doc.pages[0];
-
-  if (firstPage === undefined || !('elements' in firstPage)) {
-    throw new Error('Expected a legacy page with inline elements');
-  }
-
-  const firstElement = firstPage.elements[0];
+/** @description Helper to get the first document-level element for mutation tests. */
+function getFirstElement(doc: MinimalDocument): ReturnType<typeof createDefaultElement> {
+  const firstElement = doc.elements[0];
 
   if (firstElement === undefined) {
-    throw new Error('Expected at least one element on the first page');
+    throw new Error('Expected at least one element in the document');
   }
 
   return firstElement;
 }
 
-/** @description Common canvas sizes from the spec must all validate correctly */
+/** @description Helper to build a minimal valid project using the current format reference. */
+function minimalProject() {
+  return {
+    schemaVersion: 1 as const,
+    id: 'project-1',
+    name: 'My Show',
+    createdAt: '2026-04-05T12:00:00Z',
+    updatedAt: '2026-04-05T12:00:00Z',
+    settings: {
+      fonts: [],
+      palette: [],
+      defaultDocumentMode: 'screen' as const,
+    },
+    assets: [],
+    documents: [minimalDoc()],
+  };
+}
+
+/** @description Common canvas sizes from the spec must all validate correctly. */
 describe('Common canvas sizes', () => {
-  /** @description Full HD (1920×1080) → 508mm × 285.75mm validates */
-  it('validates Full HD canvas size', () => {
-    const doc: MinimalDocument = {
-      ...minimalDoc(),
-      canvas: { width: 508, height: 285.75, padding: [0, 0, 0, 0] },
-    };
-
-    expect(fullDocumentSchema.safeParse(doc).success).toBe(true);
-  });
-
-  /** @description 4K UHD (3840×2160) → 1016mm × 571.5mm validates */
-  it('validates 4K UHD canvas size', () => {
-    const doc: MinimalDocument = {
-      ...minimalDoc(),
-      canvas: { width: 1016, height: 571.5, padding: [0, 0, 0, 0] },
-    };
-
-    expect(fullDocumentSchema.safeParse(doc).success).toBe(true);
-  });
-
-  /** @description A4 portrait (210×297mm) validates */
-  it('validates A4 portrait canvas size', () => {
-    const doc: MinimalDocument = {
-      ...minimalDoc(),
-      canvas: { width: 210, height: 297, padding: [0, 0, 0, 0] },
-    };
-
-    expect(fullDocumentSchema.safeParse(doc).success).toBe(true);
-  });
-
-  /** @description COMMON_CANVAS_SIZES has entries for the documented sizes */
+  /** @description The exported preset list must include the documented screen and print sizes. */
   it('includes documented canvas size presets', () => {
     expect(COMMON_CANVAS_SIZES.length).toBeGreaterThanOrEqual(4);
 
@@ -145,21 +113,42 @@ describe('Common canvas sizes', () => {
     expect(labels).toContain('Full HD (1920×1080)');
     expect(labels).toContain('A4 Portrait');
   });
+
+  /** @description Representative screen and print presets must validate when used in a current-format document. */
+  it.each([
+    ['Full HD (1920×1080)', { width: 1920, height: 1080, unit: 'px' as const, dpi: 96 }],
+    ['4K UHD (3840×2160)', { width: 3840, height: 2160, unit: 'px' as const, dpi: 96 }],
+    ['A4 Portrait', { width: 210, height: 297, unit: 'mm' as const, dpi: 300 }],
+  ])('validates %s canvas size', (_label, canvas) => {
+    const doc: MinimalDocument = {
+      ...minimalDoc(),
+      canvas: { ...minimalDoc().canvas, ...canvas },
+    };
+
+    expect(fullDocumentSchema.safeParse(doc).success).toBe(true);
+  });
 });
 
-/** @description The minimal example from the spec format reference must be accepted */
-describe('Complete minimal example', () => {
-  /** @description Minimal doc with one text element validates */
-  it('accepts the minimal spec example', () => {
+/** @description The minimal examples from the format reference must be accepted in the current document and project shapes. */
+describe('Complete minimal examples', () => {
+  /** @description A minimal document with one text element validates. */
+  it('accepts the minimal document example', () => {
     const result = fullDocumentSchema.safeParse(minimalDoc());
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description A minimal project with one document validates against the project root schema. */
+  it('accepts the minimal project example', () => {
+    const result = broadsetProjectSchema.safeParse(minimalProject());
 
     expect(result.success).toBe(true);
   });
 });
 
-/** @description Invalid documents are rejected with structured errors */
+/** @description Invalid current-format documents and projects are rejected with structured errors. */
 describe('Structured error rejection', () => {
-  /** @description Missing id is rejected */
+  /** @description Missing id is rejected. */
   it('rejects document without id', () => {
     const doc = minimalDoc() as MinimalDocument & { id?: string };
 
@@ -170,14 +159,15 @@ describe('Structured error rejection', () => {
     expect(result.success).toBe(false);
   });
 
-  /** @description Invalid element style (opacity > 1) is rejected */
+  /** @description Invalid element style (opacity > 1) is rejected. */
   it('rejects element with invalid opacity', () => {
     const doc = minimalDoc();
     const element = getFirstElement(doc);
 
-    element.style = { opacity: 2 };
-
-    const result = fullDocumentSchema.safeParse(doc);
+    const result = fullDocumentSchema.safeParse({
+      ...doc,
+      elements: [{ ...element, style: { opacity: 2 } }],
+    });
 
     expect(result.success).toBe(false);
   });
@@ -187,47 +177,60 @@ describe('Structured error rejection', () => {
     const doc = minimalDoc();
     const element = getFirstElement(doc);
 
-    element.style = {
-      ...element.style,
-      customClipPath: 'not a path',
-    };
-
-    const result = fullDocumentSchema.safeParse(doc);
+    const result = fullDocumentSchema.safeParse({
+      ...doc,
+      elements: [
+        {
+          ...element,
+          style: {
+            ...element.style,
+            customClipPath: 'not a path',
+          },
+        },
+      ],
+    });
 
     expect(result.success).toBe(false);
   });
 
-  /** @description Negative element width is rejected */
+  /** @description Negative element width is rejected. */
   it('rejects element with negative width', () => {
     const doc = minimalDoc();
     const element = getFirstElement(doc);
 
-    element.width = -10;
-
-    const result = fullDocumentSchema.safeParse(doc);
+    const result = fullDocumentSchema.safeParse({
+      ...doc,
+      elements: [{ ...element, width: -10 }],
+    });
 
     expect(result.success).toBe(false);
   });
 
-  /** @description Duplicate element IDs are rejected */
-  it('rejects duplicate element IDs on a page', () => {
+  /** @description Duplicate document-level element ids are rejected. */
+  it('rejects duplicate element IDs in the document', () => {
     const doc = minimalDoc();
-    const firstPage = doc.pages[0];
     const element = getFirstElement(doc);
 
-    if (firstPage === undefined || !('elements' in firstPage)) {
-      throw new Error('Expected a legacy page with inline elements');
-    }
-
-    firstPage.elements = [element, element];
+    doc.elements = [element, element];
 
     const result = fullDocumentSchema.safeParse(doc);
 
     expect(result.success).toBe(false);
   });
 
-  /** @description Error result includes issue details */
-  it('returns structured error with issue details', () => {
+  /** @description Invalid project timestamps are rejected at the project root. */
+  it('rejects projects with malformed timestamps', () => {
+    const project = {
+      ...minimalProject(),
+      createdAt: 'not-a-date',
+    };
+    const result = broadsetProjectSchema.safeParse(project);
+
+    expect(result.success).toBe(false);
+  });
+
+  /** @description Error results must expose issue details for debugging and UI display. */
+  it('returns structured error details', () => {
     const result = fullDocumentSchema.safeParse({});
 
     expect(result.success).toBe(false);
@@ -235,31 +238,5 @@ describe('Structured error rejection', () => {
     if (!result.success) {
       expect(result.error.issues.length).toBeGreaterThan(0);
     }
-  });
-});
-
-/** @description Metadata is optional */
-describe('Metadata support', () => {
-  /** @description Document with metadata validates */
-  it('accepts document with metadata', () => {
-    const doc: MinimalDocument = {
-      ...minimalDoc(),
-      metadata: {
-        name: 'My Template',
-        createdAtIso: '2026-01-15T10:30:00Z',
-        updatedAtIso: '2026-03-17T14:00:00Z',
-      },
-    };
-
-    const result = fullDocumentSchema.safeParse(doc);
-
-    expect(result.success).toBe(true);
-  });
-
-  /** @description Document without metadata validates */
-  it('accepts document without metadata', () => {
-    const result = fullDocumentSchema.safeParse(minimalDoc());
-
-    expect(result.success).toBe(true);
   });
 });

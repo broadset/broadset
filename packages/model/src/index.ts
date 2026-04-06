@@ -7,6 +7,5 @@ export * from './document';
 export * from './element';
 export * from './format-reference';
 export * from './page-validation';
-export * from './screen';
 export * from './style';
 export * from './utilities';

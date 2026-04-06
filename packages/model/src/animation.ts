@@ -165,45 +165,9 @@ export interface ElementAnimationConfig {
   readonly textAnimator: TextAnimator | null;
 }
 
-export interface AnimationRegistryEntry {
+export interface AnimationDefinition {
   readonly elementId: string;
   readonly config: ElementAnimationConfig;
-}
-
-export type AnimationDefinition = AnimationRegistryEntry;
-
-function stringifyLegacyValue(value: unknown): string {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
-    return String(value);
-  }
-
-  if (value === null || value === undefined) {
-    return '';
-  }
-
-  const serialized = JSON.stringify(value);
-
-  return serialized;
-}
-
-function inferLegacyValueType(value: unknown): KeyframeValue['type'] {
-  if (typeof value === 'number') {
-    return 'number';
-  }
-
-  if (Array.isArray(value) && value.every((item) => typeof item === 'number')) {
-    return 'tuple';
-  }
-
-  if (typeof value === 'string' && (/^#/.test(value) || /^rgba?\(/.test(value) || /^hsla?\(/.test(value))) {
-    return 'color';
-  }
-
-  return 'string';
 }
 
 const easingModeSchema = z
@@ -216,41 +180,12 @@ const timecodeAnnotationSchema = z.object({
   frameRate: z.number().positive(),
 });
 
-const keyframeValueSchema = z.discriminatedUnion('type', [
+const keyframePropertySchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('number'), value: z.number(), easing: easingModeSchema }),
   z.object({ type: z.literal('color'), value: z.string(), easing: easingModeSchema }),
   z.object({ type: z.literal('string'), value: z.string(), easing: easingModeSchema }),
   z.object({ type: z.literal('tuple'), value: z.array(z.number()), easing: easingModeSchema }),
 ]);
-
-const legacyKeyframeValueSchema = z
-  .object({
-    value: z.unknown(),
-    interpolation: z.string().refine(isValidInterpolationMode),
-  })
-  .transform(({ value, interpolation }): KeyframeValue => {
-    const inferredType = inferLegacyValueType(value);
-
-    if (inferredType === 'tuple' && Array.isArray(value)) {
-      return {
-        type: 'tuple',
-        value: value.filter((item): item is number => typeof item === 'number'),
-        easing: interpolation as EasingMode,
-      };
-    }
-
-    if (inferredType === 'number' && typeof value === 'number') {
-      return { type: 'number', value, easing: interpolation as EasingMode };
-    }
-
-    if (inferredType === 'color' && typeof value === 'string') {
-      return { type: 'color', value, easing: interpolation as EasingMode };
-    }
-
-    return { type: 'string', value: stringifyLegacyValue(value), easing: interpolation as EasingMode };
-  });
-
-const keyframePropertySchema = z.union([keyframeValueSchema, legacyKeyframeValueSchema]);
 
 export const keyframeSchema: z.ZodType<Keyframe> = z
   .object({
@@ -308,8 +243,7 @@ export const timelineSchema: z.ZodType<Timeline> = z.lazy(() => {
     .object({
       id: z.string().min(1),
       name: z.string(),
-      keyframes: z.array(keyframeSchema).optional(),
-      entries: z.array(keyframeSchema).optional(),
+      keyframes: z.array(keyframeSchema),
       loop: z.enum(['none', 'loop', 'ping-pong']).optional(),
       loopCount: z.number().int().positive().nullable().optional(),
       durationMs: z.number().positive().optional(),
@@ -317,11 +251,7 @@ export const timelineSchema: z.ZodType<Timeline> = z.lazy(() => {
       audioCues: z.array(audioCueSchema).optional(),
     })
     .superRefine((value, context) => {
-      const effectiveKeyframes = value.keyframes ?? value.entries ?? [];
-      const maxOffsetMs = effectiveKeyframes.reduce(
-        (currentMax, keyframe) => Math.max(currentMax, keyframe.offsetMs),
-        0,
-      );
+      const maxOffsetMs = value.keyframes.reduce((currentMax, keyframe) => Math.max(currentMax, keyframe.offsetMs), 0);
 
       if (value.durationMs !== undefined && value.durationMs < maxOffsetMs) {
         context.addIssue({
@@ -335,7 +265,7 @@ export const timelineSchema: z.ZodType<Timeline> = z.lazy(() => {
       (value): Timeline => ({
         id: value.id,
         name: value.name,
-        keyframes: value.keyframes ?? value.entries ?? [],
+        keyframes: value.keyframes,
         loop: value.loop ?? 'none',
         loopCount: value.loopCount ?? null,
         durationMs: value.durationMs,
@@ -407,12 +337,12 @@ export function createDefaultAnimationConfig(): ElementAnimationConfig {
   };
 }
 
-const animationRegistryEntrySchema = z.object({
+const animationDefinitionSchema: z.ZodType<AnimationDefinition> = z.object({
   elementId: z.string().min(1),
   config: elementAnimationConfigSchema,
 });
 
-export const animationRegistrySchema = z.array(animationRegistryEntrySchema).refine(
+export const animationsSchema = z.array(animationDefinitionSchema).refine(
   (entries) => {
     const seenIds = new Set<string>();
 
@@ -428,5 +358,3 @@ export const animationRegistrySchema = z.array(animationRegistryEntrySchema).ref
   },
   { message: 'Duplicate element IDs in animations' },
 );
-
-export const animationsSchema = animationRegistrySchema;

@@ -1,4 +1,5 @@
-import type { AnchorX, AnchorY } from './screen';
+export type AnchorX = 'left' | 'right';
+export type AnchorY = 'top' | 'bottom';
 
 const MILLIMETRES_PER_INCH = 25.4;
 const DEFAULT_DPI = 96;

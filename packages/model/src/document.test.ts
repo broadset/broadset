@@ -1,19 +1,27 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { broadsetDocumentSchema, createEmptyBroadsetDocument } from './index';
+import {
+  broadsetDocumentSchema,
+  createDefaultAnimationConfig,
+  createDefaultElement,
+  createEmptyBroadsetDocument,
+} from './index';
 
-/** @description Helper to build a minimal valid document for mutation tests. */
+/** @description Helper to build a minimal valid current-format document for mutation tests. */
 function makeValidDoc(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   const base = createEmptyBroadsetDocument();
-  const plain = {
+
+  return {
     id: base.id,
+    name: base.name,
     documentMode: base.documentMode,
     canvas: { ...base.canvas },
-    pages: base.pages.map((page) => ({ ...page, elements: [...(page.elements ?? [])] })),
-    animationRegistry: [...(base.animationRegistry ?? [])],
+    elements: [...base.elements],
+    animations: [...base.animations],
+    pages: base.pages.map((page) => ({ ...page, overrides: [...page.overrides] })),
+    dataSchema: { ...base.dataSchema, fields: [...base.dataSchema.fields] },
+    ...overrides,
   };
-
-  return { ...plain, ...overrides };
 }
 
 /** @description Document identity requires a non-empty id and a valid document mode. */
@@ -41,7 +49,7 @@ describe('Canvas validation', () => {
   it('accepts positive dimensions', () => {
     const result = broadsetDocumentSchema.safeParse(
       makeValidDoc({
-        canvas: { width: 508, height: 285.75, padding: [0, 0, 0, 0] },
+        canvas: { width: 508, height: 285.75, unit: 'mm', dpi: 96, padding: [0, 0, 0, 0] },
       }),
     );
 
@@ -53,7 +61,7 @@ describe('Canvas validation', () => {
     expect(
       broadsetDocumentSchema.safeParse(
         makeValidDoc({
-          canvas: { width: 0, height: 285.75, padding: [0, 0, 0, 0] },
+          canvas: { width: 0, height: 285.75, unit: 'mm', dpi: 96, padding: [0, 0, 0, 0] },
         }),
       ).success,
     ).toBe(false);
@@ -61,7 +69,7 @@ describe('Canvas validation', () => {
     expect(
       broadsetDocumentSchema.safeParse(
         makeValidDoc({
-          canvas: { width: 508, height: -10, padding: [0, 0, 0, 0] },
+          canvas: { width: 508, height: -10, unit: 'mm', dpi: 96, padding: [0, 0, 0, 0] },
         }),
       ).success,
     ).toBe(false);
@@ -69,7 +77,7 @@ describe('Canvas validation', () => {
     expect(
       broadsetDocumentSchema.safeParse(
         makeValidDoc({
-          canvas: { width: Number.NaN, height: 285.75, padding: [0, 0, 0, 0] },
+          canvas: { width: Number.NaN, height: 285.75, unit: 'mm', dpi: 96, padding: [0, 0, 0, 0] },
         }),
       ).success,
     ).toBe(false);
@@ -80,7 +88,7 @@ describe('Canvas validation', () => {
     expect(
       broadsetDocumentSchema.safeParse(
         makeValidDoc({
-          canvas: { width: 508, height: 285.75, padding: [10, 10, 10, 10] },
+          canvas: { width: 508, height: 285.75, unit: 'mm', dpi: 96, padding: [10, 10, 10, 10] },
         }),
       ).success,
     ).toBe(true);
@@ -88,7 +96,7 @@ describe('Canvas validation', () => {
     expect(
       broadsetDocumentSchema.safeParse(
         makeValidDoc({
-          canvas: { width: 508, height: 285.75, padding: [10, 10] },
+          canvas: { width: 508, height: 285.75, unit: 'mm', dpi: 96, padding: [10, 10] },
         }),
       ).success,
     ).toBe(false);
@@ -96,66 +104,31 @@ describe('Canvas validation', () => {
     expect(
       broadsetDocumentSchema.safeParse(
         makeValidDoc({
-          canvas: { width: 508, height: 285.75, padding: [10, -5, 10, 10] },
+          canvas: { width: 508, height: 285.75, unit: 'mm', dpi: 96, padding: [10, -5, 10, 10] },
         }),
       ).success,
     ).toBe(false);
   });
-
-  /** @description The documented 508mm × 285.75mm canvas matches 1920 × 1080 at 96 DPI. */
-  it('supports the documented millimetre-to-pixel convention', () => {
-    const pxWidth = 508 / (25.4 / 96);
-    const pxHeight = 285.75 / (25.4 / 96);
-
-    expect(pxWidth).toBeCloseTo(1920, 0);
-    expect(pxHeight).toBeCloseTo(1080, 0);
-  });
 });
 
-/** @description Documents must always contain at least one page and use a flat per-page element list. */
+/** @description Documents must always contain at least one page and keep elements on the document itself. */
 describe('Page and element structure', () => {
-  /** @description New documents start with one page and validation rejects an empty page list. */
+  /** @description New documents start with one default page and an empty document-level element array. */
   it('requires at least one page', () => {
     const doc = createEmptyBroadsetDocument();
 
     expect(doc.pages).toHaveLength(1);
-    expect(doc.pages[0]?.elements).toEqual([]);
+    expect(doc.pages[0]?.overrides).toEqual([]);
+    expect(doc.elements).toEqual([]);
     expect(broadsetDocumentSchema.safeParse(makeValidDoc({ pages: [] })).success).toBe(false);
   });
 
-  /** @description Parent/child relationships still live inside a flat array of elements on the page. */
-  it('accepts a flat element tree with parent-child references', () => {
+  /** @description Parent/child relationships must live in the flat document element array via parentId references. */
+  it('accepts a flat document-level element tree with parent-child references', () => {
     const doc = makeValidDoc({
-      pages: [
-        {
-          id: 'p1',
-          elements: [
-            {
-              id: 'parent',
-              type: 'rectangle',
-              position: { x: 0, y: 0 },
-              width: 100,
-              height: 100,
-              rotation: 0,
-              content: '',
-              parentId: null,
-              groupId: null,
-              style: {},
-            },
-            {
-              id: 'child',
-              type: 'text',
-              position: { x: 10, y: 10 },
-              width: 50,
-              height: 30,
-              rotation: 0,
-              content: 'hello',
-              parentId: 'parent',
-              groupId: null,
-              style: {},
-            },
-          ],
-        },
+      elements: [
+        createDefaultElement('group', { id: 'parent' }),
+        createDefaultElement('text', { id: 'child', parentId: 'parent', content: 'hello' }),
       ],
     });
     const result = broadsetDocumentSchema.safeParse(doc);
@@ -164,25 +137,14 @@ describe('Page and element structure', () => {
   });
 });
 
-/** @description Element ids, geometry, and parent references must remain internally consistent. */
+/** @description Element ids, geometry, and page override references must remain internally consistent. */
 describe('Element integrity rules', () => {
-  /** @description Duplicate ids on the same page must be rejected. */
-  it('rejects duplicate element IDs on the same page', () => {
-    const element = {
-      id: 'a',
-      type: 'rectangle',
-      position: { x: 0, y: 0 },
-      width: 100,
-      height: 100,
-      rotation: 0,
-      content: '',
-      parentId: null,
-      groupId: null,
-      style: {},
-    };
+  /** @description Duplicate ids in the document-level element array must be rejected. */
+  it('rejects duplicate element IDs in the document', () => {
+    const element = createDefaultElement('rectangle', { id: 'a' });
     const result = broadsetDocumentSchema.safeParse(
       makeValidDoc({
-        pages: [{ id: 'p1', elements: [element, element] }],
+        elements: [element, element],
       }),
     );
 
@@ -193,66 +155,21 @@ describe('Element integrity rules', () => {
   it('rejects elements with zero width', () => {
     const result = broadsetDocumentSchema.safeParse(
       makeValidDoc({
-        pages: [
-          {
-            id: 'p1',
-            elements: [
-              {
-                id: 'e1',
-                type: 'rectangle',
-                position: { x: 0, y: 0 },
-                width: 0,
-                height: 100,
-                rotation: 0,
-                content: '',
-                parentId: null,
-                groupId: null,
-                style: {},
-              },
-            ],
-          },
-        ],
+        elements: [createDefaultElement('rectangle', { id: 'e1', width: 0 })],
       }),
     );
 
     expect(result.success).toBe(false);
   });
 
-  /** @description Parent references must be acyclic and stay within the same page. */
-  it('rejects circular and cross-page parentId references', () => {
+  /** @description Parent references must be acyclic and stay within the same document element set. */
+  it('rejects circular and missing parentId references', () => {
     expect(
       broadsetDocumentSchema.safeParse(
         makeValidDoc({
-          pages: [
-            {
-              id: 'p1',
-              elements: [
-                {
-                  id: 'a',
-                  type: 'rectangle',
-                  position: { x: 0, y: 0 },
-                  width: 100,
-                  height: 100,
-                  rotation: 0,
-                  content: '',
-                  parentId: 'b',
-                  groupId: null,
-                  style: {},
-                },
-                {
-                  id: 'b',
-                  type: 'rectangle',
-                  position: { x: 0, y: 0 },
-                  width: 100,
-                  height: 100,
-                  rotation: 0,
-                  content: '',
-                  parentId: 'a',
-                  groupId: null,
-                  style: {},
-                },
-              ],
-            },
+          elements: [
+            createDefaultElement('rectangle', { id: 'a', parentId: 'b' }),
+            createDefaultElement('rectangle', { id: 'b', parentId: 'a' }),
           ],
         }),
       ).success,
@@ -261,45 +178,30 @@ describe('Element integrity rules', () => {
     expect(
       broadsetDocumentSchema.safeParse(
         makeValidDoc({
-          pages: [
-            {
-              id: 'p1',
-              elements: [
-                {
-                  id: 'a',
-                  type: 'rectangle',
-                  position: { x: 0, y: 0 },
-                  width: 100,
-                  height: 100,
-                  rotation: 0,
-                  content: '',
-                  parentId: 'on-page-2',
-                  groupId: null,
-                  style: {},
-                },
-              ],
-            },
-            {
-              id: 'p2',
-              elements: [
-                {
-                  id: 'on-page-2',
-                  type: 'rectangle',
-                  position: { x: 0, y: 0 },
-                  width: 100,
-                  height: 100,
-                  rotation: 0,
-                  content: '',
-                  parentId: null,
-                  groupId: null,
-                  style: {},
-                },
-              ],
-            },
-          ],
+          elements: [createDefaultElement('rectangle', { id: 'a', parentId: 'missing-parent' })],
         }),
       ).success,
     ).toBe(false);
+  });
+
+  /** @description Page overrides must reference existing document-level elements. */
+  it('rejects page overrides for missing elements', () => {
+    const result = broadsetDocumentSchema.safeParse(
+      makeValidDoc({
+        elements: [createDefaultElement('text', { id: 'title' })],
+        pages: [
+          {
+            id: 'page-1',
+            name: 'Default',
+            overrides: [{ elementId: 'subtitle', content: 'Hidden' }],
+            locale: null,
+            extensions: {},
+          },
+        ],
+      }),
+    );
+
+    expect(result.success).toBe(false);
   });
 });
 
@@ -309,7 +211,10 @@ describe('No hard page or element limits', () => {
   it('accepts a document with 200 pages', () => {
     const pages = Array.from({ length: 200 }, (_, index) => ({
       id: `p${String(index)}`,
-      elements: [],
+      name: `Page ${String(index + 1)}`,
+      overrides: [],
+      locale: null,
+      extensions: {},
     }));
     const result = broadsetDocumentSchema.safeParse(makeValidDoc({ pages }));
 
@@ -317,21 +222,17 @@ describe('No hard page or element limits', () => {
   });
 });
 
-/** @description The legacy animation registry still requires unique element ids for deterministic lookup. */
-describe('Animation registry integrity', () => {
+/** @description Animation definitions are stored as a flat document-level array keyed by elementId. */
+describe('Document animations integrity', () => {
   /** @description Duplicate animation entries for the same element must be rejected. */
-  it('rejects duplicate elementId in animationRegistry', () => {
+  it('rejects duplicate elementId in animations', () => {
     const entry = {
       elementId: 'e1',
-      config: {
-        timelines: [],
-        stateTimelineBindings: [],
-        modifierTimelineBindings: [],
-      },
+      config: createDefaultAnimationConfig(),
     };
     const result = broadsetDocumentSchema.safeParse(
       makeValidDoc({
-        animationRegistry: [entry, entry],
+        animations: [entry, entry],
       }),
     );
 
