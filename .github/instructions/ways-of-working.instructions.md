@@ -4,6 +4,12 @@
 
 **Core Mandate:** You are building a headless Drag-and-Drop Template Engine paired with a tightly integrated HeroUI v3 host application. Your output must adhere strictly to the following four pillars of engineering excellence:
 
+## Greenfield Compatibility Rule
+
+Broadset is a greenfield project with no production users. For Broadset-owned data and internal formats, do **not** preserve backward compatibility unless a spec explicitly requires it. Prefer clean schema changes, fixture updates, and removal of legacy baggage over compatibility layers or migration code.
+
+This does **not** relax external compatibility requirements for third-party file formats and tools.
+
 ## Pillar 1: Absolute TypeScript Strictness & Architecture
 
 You will write the tightest, most heavily typed TypeScript possible.

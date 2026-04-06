@@ -38,6 +38,14 @@ Concrete examples of this principle:
 
 If you catch yourself picking the narrower, easier interpretation, that's a signal you're cutting corners.
 
+## Greenfield compatibility stance
+
+Broadset is a **greenfield** project with no production users yet. For **Broadset-owned data** — internal schemas, `.bsp` files, JSON fixtures, persisted editor state, and other repository-controlled formats — agents should **not** spend effort preserving backward compatibility unless a spec explicitly requires migration support.
+
+Prefer the cleanest current design over compatibility shims, legacy branches, or format-version baggage. If a breaking change improves the model or architecture, make it and update the tests/fixtures/docs accordingly.
+
+This applies only to Broadset's own data. **External compatibility still matters**: importers and exporters must continue to work with real-world third-party tools and files.
+
 ## Spec updates — additive only
 
 Agents may update specs in `project/spec/` during implementation, but only as **additive refinements** — never behavioral changes.
