@@ -135,10 +135,11 @@ export function EditorToolbar({
 
 export interface ElementLibraryProps {
   readonly elementTypes: readonly ElementTypeInfo[];
+  readonly activeType?: string | null | undefined;
   readonly onSelect: (type: string) => void;
 }
 
-export function ElementLibrary({ elementTypes, onSelect }: ElementLibraryProps): JSX.Element {
+export function ElementLibrary({ elementTypes, activeType = null, onSelect }: ElementLibraryProps): JSX.Element {
   return (
     <section aria-label="Element library" className="flex flex-col gap-2" style={glassPanelStyle()}>
       <div className="px-3 pt-3 text-sm font-semibold">Elements</div>
@@ -158,7 +159,7 @@ export function ElementLibrary({ elementTypes, onSelect }: ElementLibraryProps):
             aria-label={info.label}
             className="justify-start"
             size="sm"
-            variant="ghost"
+            variant={info.type === activeType ? 'primary' : 'ghost'}
             onPress={() => {
               onSelect(info.type);
             }}

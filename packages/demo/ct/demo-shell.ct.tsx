@@ -130,3 +130,78 @@ test('playback engine applies the sample promo panel IN and OUT visibility bindi
 
   expect(settledOpacity).toBeCloseTo(1, 1);
 });
+
+/**
+ * @description Validates the Phase 4 demo-shell layout and visual contracts from
+ * `project/spec/demo/layout.md` and `project/spec/demo/visual.md`.
+ */
+test('renders dark editor chrome with floating toolbars around the preview canvas', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  await expect(page.getByTestId('demo-main-toolbar')).toBeVisible();
+  await expect(page.getByTestId('demo-scene-sorter')).toBeVisible();
+  await expect(page.getByTestId('demo-element-library')).toBeVisible();
+  await expect(page.getByTestId('demo-properties-sidebar')).toBeVisible();
+  await expect(page.getByTestId('screen-renderer-host')).toBeVisible();
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('html')).toHaveClass(/dark/);
+});
+
+/**
+ * @description Verifies the Phase 4 shell keeps the sidebar inset correctly and clamps the canvas context menu within the viewport bounds.
+ */
+test('keeps the sidebar inset and the context menu within the visible viewport', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const sidebar = page.getByTestId('demo-properties-sidebar');
+
+  await expect(sidebar).toHaveCSS('top', '72px');
+  await expect(sidebar).toHaveCSS('bottom', '72px');
+
+  const preview = page.getByLabel(/screen preview for/i);
+  const previewBox = await preview.boundingBox();
+
+  await preview.click({
+    button: 'right',
+    position: {
+      x: Math.max((previewBox?.width ?? 12) - 4, 4),
+      y: Math.max((previewBox?.height ?? 12) - 4, 4),
+    },
+  });
+
+  const contextMenu = page.getByTestId('demo-context-menu');
+
+  await expect(contextMenu).toBeVisible();
+
+  const shell = page.getByTestId('demo-shell');
+  const shellRect = await shell.evaluate((element) => {
+    const { bottom, left, right, top } = element.getBoundingClientRect();
+
+    return { bottom, left, right, top };
+  });
+  const menuRect = await contextMenu.evaluate((element) => {
+    const { bottom, left, right, top } = element.getBoundingClientRect();
+
+    return { bottom, left, right, top };
+  });
+
+  expect(menuRect.left).toBeGreaterThanOrEqual(shellRect.left);
+  expect(menuRect.top).toBeGreaterThanOrEqual(shellRect.top);
+  expect(menuRect.right).toBeLessThanOrEqual(shellRect.right);
+  expect(menuRect.bottom).toBeLessThanOrEqual(shellRect.bottom);
+});
+
+/**
+ * @description Validates the Phase 4 placement-mode affordance from
+ * `project/spec/demo/layout.md` so activating a tool shows a clear banner and cancel path.
+ */
+test('shows a placement-mode banner when the user activates an element tool', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  await page.getByRole('button', { name: /rectangle/i }).click();
+  await expect(page.getByTestId('placement-mode-banner')).toContainText('Rectangle');
+
+  await page.getByRole('button', { name: /cancel placement/i }).click();
+  await expect(page.getByTestId('placement-mode-banner')).toBeHidden();
+});

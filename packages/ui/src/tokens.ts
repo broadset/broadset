@@ -24,7 +24,7 @@ const COLOR_TOKENS = {
   success: 'hsl(142 71% 45%)',
   'field-background': 'rgba(15, 23, 42, 0.72)',
   focus: 'hsl(217 91% 60%)',
-  'glass-bg': 'rgba(15, 23, 42, 0.78)',
+  'glass-bg': 'rgba(28, 28, 28, 0.85)',
 } as const;
 
 const FONT_TOKENS = {
@@ -54,8 +54,8 @@ export function glassPanelStyle(): CSSProperties {
   return {
     backgroundColor: color('glass-bg'),
     border: `1px solid ${color('border')}`,
-    backdropFilter: 'blur(var(--glass-blur, 18px))',
-    boxShadow: 'var(--overlay-shadow, 0 14px 40px rgba(15, 23, 42, 0.28))',
+    backdropFilter: 'blur(var(--glass-blur, 8px))',
+    boxShadow: 'var(--overlay-shadow, 0 2px 8px rgba(0, 0, 0, 0.4))',
     borderRadius: 'var(--radius-large, 1rem)',
   };
 }

@@ -49,7 +49,7 @@ registry; EditorErrorBoundary — catches render errors, fallback UI)
 - [x] tests: red — editor/editing (placement mode + factory)
 - [x] tests: red — editor/react-data-integration (EditorProvider + error boundary)
 - [x] impl: green — all three
-- [ ] demo milestone: EditorProvider wraps app; click element type in toolbar →
+- [x] demo milestone: EditorProvider wraps app; click element type in toolbar →
       element appears on canvas; click to select; Delete key removes it; undo/redo
       works; group/ungroup via multi-select
 
@@ -70,7 +70,7 @@ dragging from rulers; safety overlay — broadcast/print/none; smart guides —
 - [x] tests: red — editor/transforms
 - [x] tests: red — editor/canvas
 - [x] impl: green — all
-- [ ] demo milestone: select element → drag, resize via 8 handles, rotate via
+- [x] demo milestone: select element → drag, resize via 8 handles, rotate via
       handle; zoom (scroll/pinch), pan (drag background); grid toggleable; rulers
       visible; drag from ruler creates guide; safety overlay in broadcast mode;
       smart guides snap elements to each other
@@ -96,7 +96,7 @@ remove, remove hidden at 1 scene),
 - [x] tests: red — ui/panels (basic position/size/rotation/opacity)
 - [x] impl: green — all
 - [x] **HeroUI verified** — no raw HTML elements in ui/ files
-- [ ] demo milestone: scene tabs visible, switching works, add/remove scenes;
+- [x] demo milestone: scene tabs visible, switching works, add/remove scenes;
       undo/redo buttons in toolbar; element library with 11 types; basic property
       fields (position, size, rotation, opacity) update canvas in real-time
 
@@ -111,9 +111,9 @@ throughout; responsive canvas — fills available space, no scrollbars on resize
 `demo/state.md` (browser zoom prevention — pinch, Ctrl+scroll, Ctrl+±/0, Safari
 gesture; overflow lock on mount/unmount)
 
-- [ ] tests: red (Playwright CT)
-- [ ] impl: green
-- [ ] demo milestone: 100vw × 100vh dark-themed layout with glass-morphism panels;
+- [x] tests: red (Playwright CT)
+- [x] impl: green
+- [x] demo milestone: 100vw × 100vh dark-themed layout with glass-morphism panels;
       responsive canvas fills available space; Lucide icons throughout; placement
       mode banner when active; browser zoom prevented; the app looks and feels
       like a professional design tool
@@ -124,7 +124,7 @@ gesture; overflow lock on mount/unmount)
 
 | Group                             | Red | Green | Demo |
 | --------------------------------- | --- | ----- | ---- |
-| 4-A store + placement             | ☑   | ☑     | ☐    |
-| 4-B transforms + canvas           | ☑   | ☑     | ☐    |
-| 4-C pages + toolbar + basic props | ☑   | ☑     | ☐    |
-| 4-D demo shell polish             | ☐   | ☐     | ☐    |
+| 4-A store + placement             | ☑   | ☑     | ☑    |
+| 4-B transforms + canvas           | ☑   | ☑     | ☑    |
+| 4-C pages + toolbar + basic props | ☑   | ☑     | ☑    |
+| 4-D demo shell polish             | ☑   | ☑     | ☑    |
