@@ -90,12 +90,12 @@ remove, remove hidden at 1 scene),
 `ui/utilities.md` (CSS parsers needed for property panels),
 `ui/panels.md` (basic properties — position/size/rotation/opacity fields only). Remember to use HeroUI Toolbar component for the toolbars!
 
-- [ ] tests: red — editor/store-ui-actions
-- [ ] tests: red — ui/toolbar-nav (toolbar + element library + scene sorter)
-- [ ] tests: red — ui/utilities (CSS parsers)
-- [ ] tests: red — ui/panels (basic position/size/rotation/opacity)
-- [ ] impl: green — all
-- [ ] **HeroUI verified** — no raw HTML elements in ui/ files
+- [x] tests: red — editor/store-ui-actions
+- [x] tests: red — ui/toolbar-nav (toolbar + element library + scene sorter)
+- [x] tests: red — ui/utilities (CSS parsers)
+- [x] tests: red — ui/panels (basic position/size/rotation/opacity)
+- [x] impl: green — all
+- [x] **HeroUI verified** — no raw HTML elements in ui/ files
 - [ ] demo milestone: scene tabs visible, switching works, add/remove scenes;
       undo/redo buttons in toolbar; element library with 11 types; basic property
       fields (position, size, rotation, opacity) update canvas in real-time
@@ -126,5 +126,5 @@ gesture; overflow lock on mount/unmount)
 | --------------------------------- | --- | ----- | ---- |
 | 4-A store + placement             | ☑   | ☑     | ☐    |
 | 4-B transforms + canvas           | ☑   | ☑     | ☐    |
-| 4-C pages + toolbar + basic props | ☐   | ☐     | ☐    |
+| 4-C pages + toolbar + basic props | ☑   | ☑     | ☐    |
 | 4-D demo shell polish             | ☐   | ☐     | ☐    |

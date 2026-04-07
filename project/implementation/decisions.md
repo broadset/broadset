@@ -33,3 +33,9 @@ Non-trivial judgment calls made during implementation. See each unit for context
 **Decision:** Extend `SnapGuide` with an optional explicit `priority` tier and export the page/element precedence constants so the transform math can honor the spec’s page-center → page-edge → element-center → element-edge ordering.
 **Alternatives considered:** Hard-code all guide categories inside the snapping function or rely only on distance without exposing precedence at the API level.
 **Rationale:** The snapping spec requires deterministic precedence when multiple guides are equally close. Carrying the priority with each guide keeps the math pure, testable, and ready for future canvas/UI layers that generate different guide categories.
+
+### Unit 4-C — Build a token-backed HeroUI surface first
+
+**Decision:** Introduce a small `tokens.ts` helper layer and implement the Phase 4-C toolbar, panels, and utilities as typed HeroUI components in `packages/ui/src/` rather than copying legacy compiled output or mixing in raw HTML form controls.
+**Alternatives considered:** Continue relying on the old `dist` artifacts as pseudo-source, or postpone the token layer until later property-panel phases.
+**Rationale:** Phase 4-C is the first real UI slice in a greenfield package. Establishing typed, token-backed HeroUI primitives now keeps the MVP editor surface consistent with the repo’s UI mandate and makes the richer Phase 5 property work easier to extend cleanly.
