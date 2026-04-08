@@ -2,7 +2,7 @@
 
 import { createPlaybackController } from '@broadset/playback';
 import { createScreenRenderer } from '@broadset/renderer';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import * as React from 'react';
 
 import { DemoApp } from './DemoApp';
@@ -195,21 +195,128 @@ jest.mock(
       Popover: createWrapper(),
     });
 
+    const Kbd = Object.assign(createWrapper('kbd'), {
+      Abbr: createWrapper('abbr'),
+      Content: createWrapper('span'),
+    });
+
     const Modal = Object.assign(
       function ModalRoot(props: MockHeroUiProps): React.JSX.Element | null {
-        const { children, isOpen = true, ...restProps } = props;
+        const { children, ...restProps } = props;
 
-        if (isOpen === false) {
-          return null;
-        }
-
-        return ReactActual.createElement('div', { role: 'dialog', ...restProps }, children ?? null);
+        return ReactActual.createElement('div', restProps, children ?? null);
       },
       {
-        Content: createWrapper(),
-        Header: createWrapper('h2'),
+        Backdrop(props: MockHeroUiProps): React.JSX.Element | null {
+          const {
+            children,
+            isDismissable: _isDismissable,
+            isOpen = true,
+            onOpenChange: _onOpenChange,
+            ...restProps
+          } = props;
+
+          if (isOpen === false) {
+            return null;
+          }
+
+          return ReactActual.createElement('div', restProps, children ?? null);
+        },
+        Container: createWrapper(),
+        Dialog(props: MockHeroUiProps): React.JSX.Element {
+          const { children, ...restProps } = props;
+
+          return ReactActual.createElement('div', { role: 'dialog', ...restProps }, children ?? null);
+        },
+        Header: createWrapper(),
+        Heading: createWrapper('h2'),
         Body: createWrapper(),
         Footer: createWrapper(),
+        CloseTrigger: Button,
+      },
+    );
+
+    const toastSubscribers = new Set<() => void>();
+    let toastEntries: Array<{ id: string; readonly description?: React.ReactNode; readonly message: React.ReactNode }> =
+      [];
+
+    const emitToastChange = (): void => {
+      for (const subscriber of toastSubscribers) {
+        subscriber();
+      }
+    };
+
+    const addToast = (message: React.ReactNode, description?: React.ReactNode): string => {
+      const toastId = `toast-${String(toastEntries.length + 1)}`;
+
+      toastEntries = [{ description, id: toastId, message }, ...toastEntries];
+      emitToastChange();
+
+      return toastId;
+    };
+
+    const toastApi = {
+      clear: (): void => {
+        toastEntries = [];
+        emitToastChange();
+      },
+      close: (id: string): void => {
+        toastEntries = toastEntries.filter((entry) => entry.id !== id);
+        emitToastChange();
+      },
+      danger: (message: React.ReactNode, options?: { readonly description?: React.ReactNode }): string =>
+        addToast(message, options?.description),
+      info: (message: React.ReactNode, options?: { readonly description?: React.ReactNode }): string =>
+        addToast(message, options?.description),
+      pauseAll: (): void => undefined,
+      resumeAll: (): void => undefined,
+      success: (message: React.ReactNode, options?: { readonly description?: React.ReactNode }): string =>
+        addToast(message, options?.description),
+      warning: (message: React.ReactNode, options?: { readonly description?: React.ReactNode }): string =>
+        addToast(message, options?.description),
+    };
+
+    const ToastComponent = Object.assign(
+      function ToastRoot(props: MockHeroUiProps): React.JSX.Element {
+        const { children, ...restProps } = props;
+
+        return ReactActual.createElement('div', { role: 'status', ...restProps }, children ?? null);
+      },
+      {
+        Provider(props: MockHeroUiProps): React.JSX.Element {
+          const { children, ...restProps } = props;
+          const [entries, setEntries] = ReactActual.useState(toastEntries);
+
+          ReactActual.useEffect(() => {
+            const handleChange = (): void => {
+              setEntries([...toastEntries]);
+            };
+
+            toastSubscribers.add(handleChange);
+
+            return () => {
+              toastSubscribers.delete(handleChange);
+            };
+          }, []);
+
+          return ReactActual.createElement(
+            'div',
+            { ...restProps, 'data-testid': 'hero-toast-provider' },
+            children ?? null,
+            ...entries.map((entry) =>
+              ReactActual.createElement(
+                'div',
+                { key: entry.id, role: 'status' },
+                ReactActual.createElement('strong', null, entry.message),
+                entry.description === undefined ? null : ReactActual.createElement('span', null, entry.description),
+              ),
+            ),
+          );
+        },
+        Title: createWrapper('strong'),
+        Description: createWrapper('span'),
+        CloseButton: Button,
+        toast: toastApi,
       },
     );
 
@@ -223,6 +330,7 @@ jest.mock(
       CardHeader: createWrapper(),
       CardTitle: createWrapper('h2'),
       Chip: createWrapper('span'),
+      CloseButton: Button,
       Dropdown,
       Input(props: MockHeroUiProps): React.JSX.Element {
         const { onChange, value = '', ...restProps } = props;
@@ -235,11 +343,15 @@ jest.mock(
       },
       ListBox: createWrapper(),
       ListBoxItem: createWrapper(),
+      Kbd,
       Modal,
       NumberField,
+      ScrollShadow: createWrapper(),
       Select,
       Separator: createWrapper('hr'),
       Tabs,
+      Toast: ToastComponent,
+      toast: toastApi,
       Toolbar(props: MockHeroUiProps): React.JSX.Element {
         const { children, isAttached: _isAttached, ...restProps } = props;
 
@@ -262,6 +374,10 @@ jest.mock('@broadset/playback', () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   window.localStorage.clear();
+
+  const heroui: { readonly toast?: { readonly clear: () => void } } = jest.requireMock('@heroui/react');
+
+  heroui.toast?.clear();
 
   const rootElement = document.getElementById('root') ?? document.body.appendChild(document.createElement('div'));
 
@@ -419,7 +535,7 @@ describe('DemoApp playback shell lifecycle', () => {
   });
 
   /**
-   * @description Verifies the host save callback persists the current document and restores saved work on the next load.
+   * @description Verifies the host save callback persists the current document, restores saved work on the next load, and exposes action feedback through a HeroUI toast live region.
    */
   it('restores a saved document from localStorage and saves the current document through the File menu', () => {
     const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
@@ -460,6 +576,8 @@ describe('DemoApp playback shell lifecycle', () => {
     fireEvent.click(saveButton);
 
     expect(window.localStorage.getItem('broadset:demo-document:v1')).toContain('Recovered demo layout');
+    expect(screen.getByRole('status')).toBeTruthy();
+    expect(screen.getByText(/saved the demo document locally/i)).toBeTruthy();
   });
 
   /**
@@ -495,7 +613,7 @@ describe('DemoApp playback shell lifecycle', () => {
   });
 
   /**
-   * @description Prevents the shell from regressing back to oversized custom chrome by requiring HeroUI toolbar primitives and a square workarea that is not shrunk to make room for the sidebar.
+   * @description Prevents the shell from regressing back to oversized custom chrome by requiring HeroUI toolbar primitives, a square workarea, and a sidebar drawer that stays clear of the top-right toolbar.
    */
   it('uses compact toolbars and keeps the canvas workarea square beneath the floating sidebar', () => {
     const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
@@ -531,15 +649,150 @@ describe('DemoApp playback shell lifecycle', () => {
     const toolbarShell = screen.getByTestId('demo-main-toolbar').querySelector('.card');
     const elementShell = screen.getByTestId('demo-element-library').querySelector('.card');
     const sidebarShell = screen.getByRole('toolbar', { name: /sidebar toolbar/i }).closest('.card');
+    const sidebarStyle = sidebar.getAttribute('style') ?? '';
 
     expect(workarea.className).not.toContain('rounded');
     expect(shellSection?.style.paddingRight).not.toBe('332px');
-    expect(sidebar.getAttribute('style')).toContain('right: 28px');
+    expect(sidebarStyle).toContain('right: 0px');
+    expect(sidebarStyle).toContain('top: 72px');
+    expect(sidebarStyle).toContain('border-top-right-radius: 0');
+    expect(sidebarStyle).toContain('border-bottom-right-radius: 0');
     expect(toolbarStyle).not.toContain('justify-content: space-between');
     expect(toolbarStyle).not.toContain('width: 100%');
     expect(toolbarShell).toBeNull();
     expect(elementShell).toBeNull();
     expect(sidebarShell).toBeNull();
+  });
+
+  /**
+   * @description Keeps navigation first-class by exposing direct zoom controls in the visible toolbar rather than hiding all zoom actions inside menus.
+   */
+  it('shows direct zoom controls and updates the zoom level from the toolbar', () => {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    render(<DemoApp />);
+
+    const zoomLevel = screen.getByLabelText(/zoom level/i);
+
+    expect(zoomLevel.textContent).toBe('100%');
+
+    fireEvent.click(screen.getByRole('button', { name: /zoom in/i }));
+    expect(zoomLevel.textContent).toBe('110%');
+
+    fireEvent.click(screen.getByRole('button', { name: /zoom out/i }));
+    expect(zoomLevel.textContent).toBe('100%');
+  });
+
+  /**
+   * @description Keeps tooltip callouts readable by pointing them inward toward the working canvas rather than outward off the screen edges.
+   */
+  it('places toolbar tooltips inward toward the canvas center', () => {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    render(<DemoApp />);
+
+    const mainToolbar = screen.getByRole('toolbar', { name: /main editor toolbar/i });
+    const sidebarToolbar = screen.getByRole('toolbar', { name: /sidebar toolbar/i });
+    const elementToolbar = screen.getByRole('toolbar', { name: /element toolbar/i });
+
+    expect(
+      within(mainToolbar).getByRole('button', { name: /undo/i }).closest('div[data-placement="bottom"]'),
+    ).not.toBeNull();
+    expect(
+      within(elementToolbar)
+        .getByRole('button', { name: /^text$/i })
+        .closest('div[data-placement="right"]'),
+    ).not.toBeNull();
+    expect(
+      within(sidebarToolbar)
+        .getByRole('button', { name: /^layers$/i })
+        .closest('div[data-placement="left"]'),
+    ).not.toBeNull();
+  });
+
+  /**
+   * @description Prevents the horizontal ruler scale from drifting when the right sidebar is resized, since the top ruler must stay independent of sidebar width.
+   */
+  it('keeps the top ruler tick positions stable regardless of saved sidebar width', () => {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    window.localStorage.setItem(
+      'broadset:demo-sidebar-preferences:v1',
+      JSON.stringify({ isOpen: true, tab: 'properties', width: 256 }),
+    );
+
+    const { unmount } = render(<DemoApp />);
+    const narrowTickLeft = screen.getByText('1728').parentElement?.getAttribute('style') ?? '';
+
+    unmount();
+
+    window.localStorage.setItem(
+      'broadset:demo-sidebar-preferences:v1',
+      JSON.stringify({ isOpen: true, tab: 'properties', width: 800 }),
+    );
+
+    render(<DemoApp />);
+
+    const wideTickLeft = screen.getByText('1728').parentElement?.getAttribute('style') ?? '';
+
+    expect(wideTickLeft).toBe(narrowTickLeft);
   });
 
   /**
@@ -580,7 +833,7 @@ describe('DemoApp playback shell lifecycle', () => {
     expect(screen.queryByRole('button', { name: /hide rulers/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /hide grid/i })).toBeNull();
     expect(screen.getByRole('button', { name: /snap to grid/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /zoom to fit/i })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /zoom to fit/i }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('button', { name: /reset zoom/i })).toBeTruthy();
   });
 
@@ -646,6 +899,40 @@ describe('DemoApp playback shell lifecycle', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /about/i }));
     expect(screen.getByRole('dialog', { name: /about broadset demo/i })).toBeTruthy();
+  });
+
+  /**
+   * @description Locks the Help dialog to HeroUI's keyboard-shortcut presentation so the shortcuts are shown as real keycaps rather than plain text sentences.
+   */
+  it('renders keyboard shortcuts using keycap elements in the shortcuts dialog', () => {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    render(<DemoApp />);
+
+    fireEvent.click(screen.getByRole('button', { name: /keyboard shortcuts/i }));
+
+    const shortcutsDialog = screen.getByRole('dialog', { name: /keyboard shortcuts/i });
+
+    expect(shortcutsDialog.querySelectorAll('kbd').length).toBeGreaterThanOrEqual(8);
   });
 
   /**

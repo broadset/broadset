@@ -89,9 +89,9 @@ class DOMScreenRenderer implements ScreenRendererController {
     this.canvasRoot.style.position = 'relative';
     this.canvasRoot.style.transformOrigin = 'top left';
     this.canvasRoot.style.overflow = 'hidden';
-    this.canvasRoot.style.borderRadius = '16px';
-    this.canvasRoot.style.boxShadow = '0 24px 72px rgba(15, 23, 42, 0.45)';
-    this.canvasRoot.style.outline = '1px solid rgba(148, 163, 184, 0.2)';
+    this.canvasRoot.style.borderRadius = '0px';
+    this.canvasRoot.style.boxShadow = 'none';
+    this.canvasRoot.style.outline = 'none';
 
     this.canvasScaleShell.appendChild(this.canvasRoot);
     this.host.appendChild(this.canvasScaleShell);

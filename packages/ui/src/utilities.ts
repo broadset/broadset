@@ -282,17 +282,17 @@ export function classifyWheelInput(input: WheelInput): WheelAction {
     return 'none';
   }
 
-  if (input.ctrlKey) {
+  if (input.deltaMode !== 0) {
+    if (input.ctrlKey || input.altKey) {
+      return 'pan';
+    }
+
     return 'zoom';
   }
 
-  if (input.altKey && input.deltaMode === 0) {
+  if (input.ctrlKey || input.altKey) {
     return 'zoom';
   }
 
-  if (input.deltaMode === 0) {
-    return 'pan';
-  }
-
-  return 'none';
+  return 'pan';
 }

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the editor engine for broadset. The editor manages document state with undo/redo history, provides a real-time change stream for collaboration, applies remote document changes, and supports path editing/drawing and element placement modes. It does NOT render DOM, compute animations, or export documents. See [conventions](../../README.md).
+Defines the editor engine for broadset. The editor manages document state with undo/redo history, provides a real-time change stream for collaboration, applies remote document changes, supports path editing/drawing and element placement modes, and defines the direct-manipulation canvas contract: the editor canvas MUST be zoomable and pannable, and selecting an element on the canvas MUST surface a 2D transform widget for translate, rotate, and scale. It does NOT render DOM, compute animations, or export documents. See [conventions](../../README.md).
 
 ---
 
@@ -46,11 +46,11 @@ Unit tests verify pure logic in isolation. The following editor interactions inv
 
 - [ ] **Click-to-select:** Clicking an element on the rendered canvas MUST select it in the store; clicking empty space MUST deselect.
 - [ ] **Marquee selection:** Dragging on the canvas background MUST draw a selection rectangle and select all intersecting elements.
-- [ ] **Zoom and pan:** Scroll-wheel zoom MUST update the viewport scale; drag-pan MUST translate the viewport origin.
+- [ ] **Zoom and pan:** The editor canvas MUST be zoomable and pannable; scroll-wheel/pinch zoom MUST update the viewport scale, and drag-pan MUST translate the viewport origin.
 
 ### Transform widget
 
-- [ ] **Widget visibility:** Selecting an element MUST display a transform widget with resize and rotation handles around the selection bounds.
+- [ ] **Widget visibility:** Selecting an element on the canvas MUST display a 2D transform widget for translate, rotate, and scale around the selection bounds.
 - [ ] **Drag translation:** Dragging a selected element MUST move it; the final position MUST be committed to the store on pointer-up.
 - [ ] **Resize via handles:** Dragging a resize handle MUST change the element's dimensions; corner handles MUST resize both axes, edge handles one axis.
 - [ ] **Rotation via handle:** Dragging the rotation handle MUST update the element's rotation.

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the behavioral contracts for element transform interactions: drag translation, resize via handles, rotation, anchor auto-assignment, zoom compensation, 3D transform persistence, border-radius handles, smart guide snapping, grid snapping, and transform sequence stability. These are the canvas-level interactions that modify element geometry. See [conventions](../../README.md).
+Defines the behavioral contracts for element transform interactions: drag translation, resize via handles, rotation, anchor auto-assignment, zoom compensation, 3D transform persistence, border-radius handles, smart guide snapping, grid snapping, and transform sequence stability. These are the canvas-level interactions that modify element geometry and are exposed through the transform widget that appears whenever a canvas element is selected. See [conventions](../../README.md).
 
 ---
 

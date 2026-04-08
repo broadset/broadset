@@ -55,7 +55,7 @@ test('playback controls animate, pause, resume, and reset the demo content', asy
   const initialOpacity = Number(await heroOpacity.evaluate((element) => getComputedStyle(element).opacity));
 
   await toggle.click();
-  await expect(toggle).toContainText('Pause');
+  await expect(toggle).toHaveAttribute('aria-label', 'Pause playback');
   await page.waitForTimeout(350);
 
   const animatedOpacity = Number(await heroOpacity.evaluate((element) => getComputedStyle(element).opacity));
@@ -63,7 +63,7 @@ test('playback controls animate, pause, resume, and reset the demo content', asy
   expect(animatedOpacity).not.toBe(initialOpacity);
 
   await toggle.click();
-  await expect(toggle).toContainText('Play');
+  await expect(toggle).toHaveAttribute('aria-label', 'Play playback');
 
   const pausedOpacity = Number(await heroOpacity.evaluate((element) => getComputedStyle(element).opacity));
 
@@ -74,7 +74,7 @@ test('playback controls animate, pause, resume, and reset the demo content', asy
   expect(pausedOpacityAfterWait).toBe(pausedOpacity);
 
   await toggle.click();
-  await expect(toggle).toContainText('Pause');
+  await expect(toggle).toHaveAttribute('aria-label', 'Pause playback');
   await page.waitForTimeout(180);
 
   const resumedOpacity = Number(await heroOpacity.evaluate((element) => getComputedStyle(element).opacity));
@@ -149,6 +149,21 @@ test('renders dark editor chrome with floating toolbars around the preview canva
 });
 
 /**
+ * @description Validates the Phase 4 toolbar-chrome contract from
+ * `project/spec/demo/layout.md` and `project/spec/demo/visual.md` so the main toolbar uses icon-only controls with accessible labels rather than visible text buttons.
+ */
+test('uses icon-only main toolbar controls with accessible labels', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const toolbar = page.getByTestId('demo-main-toolbar');
+
+  for (const label of ['File', 'View', 'Scenes', 'Help']) {
+    await expect(toolbar.locator(`button[aria-label="${label}"]`).first()).toBeVisible();
+    await expect(toolbar.getByText(new RegExp(`^${label}$`))).toHaveCount(0);
+  }
+});
+
+/**
  * @description Verifies the Phase 4 shell keeps the sidebar inset correctly and clamps the canvas context menu within the viewport bounds.
  */
 test('keeps the sidebar inset and the context menu within the visible viewport', async ({ mount, page }) => {
@@ -199,9 +214,9 @@ test('keeps the sidebar inset and the context menu within the visible viewport',
 test('shows a placement-mode banner when the user activates an element tool', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  await page.getByRole('button', { name: /rectangle/i }).click();
+  await page.locator('button[aria-label="Rectangle"]').first().click();
   await expect(page.getByTestId('placement-mode-banner')).toContainText('Rectangle');
 
-  await page.getByRole('button', { name: /cancel placement/i }).click();
+  await page.locator('button[aria-label="Cancel placement"]').first().click();
   await expect(page.getByTestId('placement-mode-banner')).toBeHidden();
 });

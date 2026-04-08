@@ -17,6 +17,7 @@ import {
 import { createPlaybackController, type PlaybackController } from '@broadset/playback';
 import { createScreenRenderer, type ScreenRendererController } from '@broadset/renderer';
 import {
+  classifyWheelInput,
   color,
   DEFAULT_ELEMENT_TYPES,
   font,
@@ -29,9 +30,24 @@ import {
   sp,
   TimelineEditingProvider,
 } from '@broadset/ui';
-import { Button, ButtonGroup, Card, CardContent, Chip, Dropdown, Input, Toolbar, Tooltip } from '@heroui/react';
 import {
-  AlertTriangle,
+  Button,
+  ButtonGroup,
+  Card,
+  CardContent,
+  Chip,
+  CloseButton,
+  Dropdown,
+  Input,
+  Kbd,
+  Modal,
+  ScrollShadow,
+  Toast,
+  toast,
+  Toolbar,
+  Tooltip,
+} from '@heroui/react';
+import {
   Bug,
   CheckCircle2,
   Copy,
@@ -47,6 +63,7 @@ import {
   Magnet,
   Maximize2,
   Minimize2,
+  Minus,
   Pause,
   Play,
   Plus,
@@ -69,13 +86,17 @@ import { SAMPLE_DOCUMENT } from './sampleDocument';
 const DEMO_DOCUMENT = broadsetDocumentSchema.parse(SAMPLE_DOCUMENT);
 const DOCUMENT_STORAGE_KEY = 'broadset:demo-document:v1';
 const RULER_SIZE = 20;
-const FLOATING_OFFSET = RULER_SIZE + 8;
+const FLOATING_OFFSET = 8;
 const CONTEXT_MENU_WIDTH = 220;
 const CONTEXT_MENU_HEIGHT = 280;
 const SIDEBAR_EDGE_INSET = 72;
 const DEFAULT_SIDEBAR_WIDTH = 320;
 const MAX_SIDEBAR_WIDTH = 800;
 const MIN_SIDEBAR_WIDTH = 256;
+const SIDEBAR_TOP_OFFSET = 72;
+const MAX_CANVAS_ZOOM = 4;
+const MIN_CANVAS_ZOOM = 0.1;
+const ZOOM_STEP = 0.1;
 const SIDEBAR_STORAGE_KEY = 'broadset:demo-sidebar-preferences:v1';
 const TOAST_DISMISS_MS = {
   error: 5000,
@@ -86,6 +107,33 @@ const TOAST_DISMISS_MS = {
 const ELEMENT_TOOL_TYPES = [
   ...DEFAULT_ELEMENT_TYPES,
   { type: 'countdown', label: 'Countdown', icon: <span aria-hidden="true">⏱</span> },
+] as const;
+
+const KEYBOARD_SHORTCUTS: readonly ShortcutDefinition[] = [
+  {
+    description: 'Save',
+    primary: [{ label: '⌘', title: 'Command' }, { label: 'S' }],
+    secondary: [{ label: 'Ctrl' }, { label: 'S' }],
+  },
+  {
+    description: 'Undo',
+    primary: [{ label: '⌘', title: 'Command' }, { label: 'Z' }],
+    secondary: [{ label: 'Ctrl' }, { label: 'Z' }],
+  },
+  {
+    description: 'Redo',
+    primary: [{ label: '⌘', title: 'Command' }, { label: '⇧', title: 'Shift' }, { label: 'Z' }],
+    secondary: [{ label: 'Ctrl' }, { label: '⇧', title: 'Shift' }, { label: 'Z' }],
+  },
+  {
+    description: 'Remove selection',
+    primary: [{ label: 'Delete' }],
+    secondary: [{ label: 'Backspace' }],
+  },
+  {
+    description: 'Exit placement mode',
+    primary: [{ label: 'Escape' }],
+  },
 ] as const;
 
 type SidebarTab = 'layers' | 'properties' | 'animation' | 'preflight';
@@ -99,10 +147,15 @@ interface SidebarPreferences {
   readonly width: number;
 }
 
-interface ToastMessage {
-  readonly id: string;
-  readonly severity: ToastSeverity;
-  readonly message: string;
+interface ShortcutKey {
+  readonly label: string;
+  readonly title?: string | undefined;
+}
+
+interface ShortcutDefinition {
+  readonly description: string;
+  readonly primary: readonly ShortcutKey[];
+  readonly secondary?: readonly ShortcutKey[] | undefined;
 }
 
 interface ContextMenuState {
@@ -116,12 +169,24 @@ interface ScreenPreviewProps {
   readonly isPlaying: boolean;
   readonly resetToken: number;
   readonly cursor: 'crosshair' | 'default';
+  readonly panX: number;
+  readonly panY: number;
+  readonly zoom: number;
   readonly onCanvasClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   readonly onCanvasContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
+  readonly onViewportChange: (settings: {
+    readonly panX?: number;
+    readonly panY?: number;
+    readonly zoom?: number;
+  }) => void;
 }
 
 function clampSidebarWidth(width: number): number {
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width));
+}
+
+function clampCanvasZoom(zoom: number): number {
+  return Math.min(MAX_CANVAS_ZOOM, Math.max(MIN_CANVAS_ZOOM, Math.round(zoom * 100) / 100));
 }
 
 function loadSavedDocument(): BroadsetDocument {
@@ -331,18 +396,6 @@ function RulerStrip({
   );
 }
 
-function ToastIcon({ severity }: { readonly severity: ToastSeverity }): React.JSX.Element {
-  if (severity === 'success') {
-    return <CheckCircle2 size={16} />;
-  }
-
-  if (severity === 'error') {
-    return <AlertTriangle size={16} />;
-  }
-
-  return <Info size={16} />;
-}
-
 function greatestCommonDivisor(left: number, right: number): number {
   if (right === 0) {
     return left;
@@ -368,15 +421,28 @@ function hasDocumentsArray(value: unknown): value is { readonly documents: reado
 
 function ToolbarMenu({
   label,
+  icon,
   children,
+  tooltipPlacement = 'bottom',
 }: {
   readonly label: string;
+  readonly icon: React.ReactNode;
   readonly children: React.ReactNode;
+  readonly tooltipPlacement?: 'bottom' | 'left' | 'right' | 'top' | undefined;
 }): React.JSX.Element {
   return (
     <Dropdown>
-      <Dropdown.Trigger aria-label={label} className="button button--sm button--ghost">
-        {label}
+      <Dropdown.Trigger>
+        <div data-placement={tooltipPlacement} style={{ display: 'inline-flex' }}>
+          <Tooltip>
+            <Tooltip.Trigger>
+              <Button aria-label={label} isIconOnly size="sm" variant="ghost">
+                {icon}
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content placement={tooltipPlacement}>{label}</Tooltip.Content>
+          </Tooltip>
+        </div>
       </Dropdown.Trigger>
       <Dropdown.Popover>
         <Dropdown.Menu aria-label={`${label} menu`}>{children}</Dropdown.Menu>
@@ -395,28 +461,41 @@ function DialogPanel({
   readonly onClose: () => void;
 }): React.JSX.Element {
   return (
-    <div
-      className="absolute inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2, 6, 23, 0.56)' }}
-    >
-      <Card
-        aria-label={title}
-        aria-modal="true"
-        role="dialog"
-        style={{ ...glassPanelStyle(), maxWidth: 'min(520px, calc(100vw - 32px))', width: '100%' }}
-        variant="secondary"
+    <Modal>
+      <Modal.Backdrop
+        isDismissable
+        isOpen
+        variant="blur"
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            onClose();
+          }
+        }}
       >
-        <CardContent className="flex flex-col gap-3 p-4">
-          <div style={{ alignItems: 'center', display: 'flex', gap: sp('sp-02'), justifyContent: 'space-between' }}>
-            <h2 style={{ color: color('foreground'), fontSize: font('heading-sm'), fontWeight: 700 }}>{title}</h2>
-            <Button aria-label={`Close ${title}`} isIconOnly size="sm" variant="ghost" onPress={onClose}>
-              <X size={16} />
-            </Button>
-          </div>
-          {children}
-        </CardContent>
-      </Card>
-    </div>
+        <Modal.Container placement="center" scroll="inside" size="md">
+          <Modal.Dialog
+            aria-label={title}
+            style={{ ...glassPanelStyle(), maxWidth: 'min(520px, calc(100vw - 32px))', width: '100%' }}
+          >
+            <Modal.Header
+              style={{ alignItems: 'center', display: 'flex', gap: sp('sp-02'), justifyContent: 'space-between' }}
+            >
+              <Modal.Heading style={{ color: color('foreground'), fontSize: font('heading-sm'), fontWeight: 700 }}>
+                {title}
+              </Modal.Heading>
+              <CloseButton aria-label={`Close ${title}`} onPress={onClose} />
+            </Modal.Header>
+            <Modal.Body>
+              <ScrollShadow
+                style={{ display: 'grid', gap: sp('sp-03'), maxHeight: 'min(60vh, 520px)', paddingRight: sp('sp-01') }}
+              >
+                {children}
+              </ScrollShadow>
+            </Modal.Body>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
   );
 }
 
@@ -427,6 +506,7 @@ function IconToolButton({
   isDisabled = false,
   onPress,
   testId,
+  tooltipPlacement = 'bottom',
 }: {
   readonly label: string;
   readonly children: React.ReactNode;
@@ -434,24 +514,27 @@ function IconToolButton({
   readonly isDisabled?: boolean | undefined;
   readonly onPress: () => void;
   readonly testId?: string | undefined;
+  readonly tooltipPlacement?: 'bottom' | 'left' | 'right' | 'top' | undefined;
 }): React.JSX.Element {
   return (
-    <Tooltip>
-      <Tooltip.Trigger>
-        <Button
-          aria-label={label}
-          data-testid={testId}
-          isDisabled={isDisabled}
-          isIconOnly
-          size="sm"
-          variant={isActive ? 'primary' : 'ghost'}
-          onPress={onPress}
-        >
-          {children}
-        </Button>
-      </Tooltip.Trigger>
-      <Tooltip.Content>{label}</Tooltip.Content>
-    </Tooltip>
+    <div data-placement={tooltipPlacement} style={{ display: 'inline-flex' }}>
+      <Tooltip>
+        <Tooltip.Trigger>
+          <Button
+            aria-label={label}
+            data-testid={testId}
+            isDisabled={isDisabled}
+            isIconOnly
+            size="sm"
+            variant={isActive ? 'primary' : 'ghost'}
+            onPress={onPress}
+          >
+            {children}
+          </Button>
+        </Tooltip.Trigger>
+        <Tooltip.Content placement={tooltipPlacement}>{label}</Tooltip.Content>
+      </Tooltip>
+    </div>
   );
 }
 
@@ -460,12 +543,24 @@ function ScreenPreview({
   isPlaying,
   resetToken,
   cursor,
+  panX,
+  panY,
+  zoom,
   onCanvasClick,
   onCanvasContextMenu,
+  onViewportChange,
 }: ScreenPreviewProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<ScreenRendererController | null>(null);
   const playbackRef = useRef<PlaybackController | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+  const panGestureRef = useRef<{
+    readonly originPanX: number;
+    readonly originPanY: number;
+    readonly startX: number;
+    readonly startY: number;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -516,15 +611,150 @@ function ScreenPreview({
     playbackRef.current?.pause();
   }, [isPlaying]);
 
+  const handlePreviewClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>): void => {
+      if (suppressClickRef.current) {
+        suppressClickRef.current = false;
+        event.preventDefault();
+
+        return;
+      }
+
+      onCanvasClick(event);
+    },
+    [onCanvasClick],
+  );
+
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>): void => {
+      if (cursor === 'crosshair' || (!event.shiftKey && event.button !== 1)) {
+        return;
+      }
+
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      panGestureRef.current = {
+        originPanX: panX,
+        originPanY: panY,
+        startX: event.clientX,
+        startY: event.clientY,
+      };
+      setIsPanning(true);
+    },
+    [cursor, panX, panY],
+  );
+
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>): void => {
+      const gesture = panGestureRef.current;
+
+      if (gesture === null) {
+        return;
+      }
+
+      const deltaX = event.clientX - gesture.startX;
+      const deltaY = event.clientY - gesture.startY;
+
+      if (deltaX !== 0 || deltaY !== 0) {
+        suppressClickRef.current = true;
+      }
+
+      onViewportChange({
+        panX: gesture.originPanX + deltaX,
+        panY: gesture.originPanY + deltaY,
+      });
+    },
+    [onViewportChange],
+  );
+
+  const handlePointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>): void => {
+    if (panGestureRef.current === null) {
+      return;
+    }
+
+    panGestureRef.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    setIsPanning(false);
+  }, []);
+
+  const handleWheel = useCallback(
+    (event: React.WheelEvent<HTMLDivElement>): void => {
+      const intent = classifyWheelInput({
+        altKey: event.altKey,
+        ctrlKey: event.ctrlKey || event.metaKey,
+        deltaMode: event.deltaMode,
+        deltaX: event.deltaX,
+        deltaY: event.deltaY,
+      });
+
+      if (intent === 'none') {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (intent === 'pan') {
+        onViewportChange({
+          panX: panX - event.deltaX,
+          panY: panY - event.deltaY,
+        });
+
+        return;
+      }
+
+      const nextZoom =
+        event.deltaMode === 0 ?
+          clampCanvasZoom(zoom - event.deltaY * 0.002)
+        : clampCanvasZoom(zoom + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
+
+      if (nextZoom === zoom) {
+        return;
+      }
+
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const cursorX = event.clientX - bounds.left;
+      const cursorY = event.clientY - bounds.top;
+      const worldX = (cursorX - panX) / zoom;
+      const worldY = (cursorY - panY) / zoom;
+
+      onViewportChange({
+        panX: cursorX - worldX * nextZoom,
+        panY: cursorY - worldY * nextZoom,
+        zoom: nextZoom,
+      });
+    },
+    [onViewportChange, panX, panY, zoom],
+  );
+
   return (
     <div
+      aria-description="Scroll pans the canvas, pinch or wheel zooms, and Shift-drag pans the view."
       aria-label={`Screen preview for ${documentData.name}`}
       className="h-full w-full overflow-hidden"
-      onClick={onCanvasClick}
+      onClick={handlePreviewClick}
       onContextMenu={onCanvasContextMenu}
-      style={{ backgroundColor: color('surface-secondary'), cursor }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onWheel={handleWheel}
+      style={{
+        backgroundColor: color('surface-secondary'),
+        cursor: isPanning ? 'grabbing' : cursor,
+        touchAction: 'none',
+      }}
     >
-      <div ref={hostRef} className="h-full w-full overflow-hidden" data-testid="screen-renderer-host" />
+      <div
+        ref={hostRef}
+        className="h-full w-full overflow-hidden"
+        data-testid="screen-renderer-host"
+        style={{
+          transform: `translate(${String(panX)}px, ${String(panY)}px) scale(${String(zoom)})`,
+          transformOrigin: 'top left',
+          transition: isPanning ? 'none' : 'transform 120ms ease',
+          willChange: 'transform',
+        }}
+      />
     </div>
   );
 }
@@ -566,7 +796,6 @@ export function DemoApp(): React.JSX.Element {
   const placementLabel = getElementLabel(editorState.pendingPlacementType);
   const clipboardRef = useRef<readonly BroadsetElement[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const toastTimeoutIdsRef = useRef<number[]>([]);
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(
@@ -577,7 +806,6 @@ export function DemoApp(): React.JSX.Element {
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarPreferences.isOpen);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(initialSidebarPreferences.tab);
   const [sidebarWidth, setSidebarWidth] = useState(initialSidebarPreferences.width);
-  const [toasts, setToasts] = useState<readonly ToastMessage[]>([]);
   const [viewportSize, setViewportSize] = useState(() => ({
     height: typeof window === 'undefined' ? currentDocument.canvas.height : window.innerHeight,
     width: typeof window === 'undefined' ? currentDocument.canvas.width : window.innerWidth,
@@ -612,51 +840,57 @@ export function DemoApp(): React.JSX.Element {
     [activePage, currentDocument.elements],
   );
   const horizontalTicks = useMemo(() => {
-    const rulerLength = Math.max(viewportSize.width - sidebarWidth - FLOATING_OFFSET * 2, 320);
+    const rulerLength = Math.max(viewportSize.width - RULER_SIZE, 320);
 
     return Array.from({ length: 10 }, (_, index) => {
       const value = Math.round((currentDocument.canvas.width / 10) * index);
 
       return {
         label: String(value),
-        position: (rulerLength / 10) * index,
+        position: (rulerLength / 10) * index * editorState.canvasSettings.zoom + editorState.canvasSettings.panX,
       };
-    });
-  }, [currentDocument.canvas.width, sidebarWidth, viewportSize.width]);
+    }).filter((tick) => tick.position >= -40 && tick.position <= rulerLength + 40);
+  }, [
+    currentDocument.canvas.width,
+    editorState.canvasSettings.panX,
+    editorState.canvasSettings.zoom,
+    viewportSize.width,
+  ]);
   const verticalTicks = useMemo(() => {
-    const rulerLength = Math.max(viewportSize.height - FLOATING_OFFSET * 2, 240);
+    const rulerLength = Math.max(viewportSize.height - RULER_SIZE, 240);
 
     return Array.from({ length: 8 }, (_, index) => {
       const value = Math.round((currentDocument.canvas.height / 8) * index);
 
       return {
         label: String(value),
-        position: (rulerLength / 8) * index,
+        position: (rulerLength / 8) * index * editorState.canvasSettings.zoom + editorState.canvasSettings.panY,
       };
-    });
-  }, [currentDocument.canvas.height, viewportSize.height]);
+    }).filter((tick) => tick.position >= -40 && tick.position <= rulerLength + 40);
+  }, [
+    currentDocument.canvas.height,
+    editorState.canvasSettings.panY,
+    editorState.canvasSettings.zoom,
+    viewportSize.height,
+  ]);
 
-  const dismissToast = useCallback((toastId: string): void => {
-    setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
+  const pushToast = useCallback((severity: ToastSeverity, message: string): void => {
+    const options = { timeout: TOAST_DISMISS_MS[severity] };
+
+    if (severity === 'error') {
+      toast.danger(message, options);
+
+      return;
+    }
+
+    if (severity === 'success') {
+      toast.success(message, options);
+
+      return;
+    }
+
+    toast.info(message, options);
   }, []);
-
-  const pushToast = useCallback(
-    (severity: ToastSeverity, message: string): void => {
-      const nextToastId =
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto ?
-          crypto.randomUUID()
-        : `toast-${Math.random().toString(36).slice(2)}-${String(Date.now())}`;
-
-      setToasts((currentToasts) => [{ id: nextToastId, message, severity }, ...currentToasts]);
-
-      const timeoutId = window.setTimeout(() => {
-        dismissToast(nextToastId);
-      }, TOAST_DISMISS_MS[severity]);
-
-      toastTimeoutIdsRef.current.push(timeoutId);
-    },
-    [dismissToast],
-  );
 
   const handleSaveDocument = useCallback((): void => {
     try {
@@ -731,31 +965,29 @@ export function DemoApp(): React.JSX.Element {
     [editorStore, pushToast],
   );
 
-  const handleZoomToFit = useCallback((): void => {
-    const availableWidth = viewportSize.width - (isSidebarOpen ? sidebarWidth : 0) - 160;
-    const availableHeight = viewportSize.height - 160;
-    const fitZoom = Math.max(
-      0.25,
-      Math.min(
-        2,
-        Math.min(availableWidth / currentDocument.canvas.width, availableHeight / currentDocument.canvas.height),
-      ),
-    );
+  const handleZoomStep = useCallback(
+    (delta: number): void => {
+      const currentZoom = editorStore.getState().canvasSettings.zoom;
 
-    editorStore.getState().updateCanvasSettings({ panX: 0, panY: 0, zoom: fitZoom });
-  }, [
-    currentDocument.canvas.height,
-    currentDocument.canvas.width,
-    editorStore,
-    isSidebarOpen,
-    sidebarWidth,
-    viewportSize.height,
-    viewportSize.width,
-  ]);
+      editorStore.getState().updateCanvasSettings({ zoom: clampCanvasZoom(currentZoom + delta) });
+    },
+    [editorStore],
+  );
+
+  const handleZoomToFit = useCallback((): void => {
+    editorStore.getState().updateCanvasSettings({ panX: 0, panY: 0, zoom: 1 });
+  }, [editorStore]);
 
   const handleResetZoom = useCallback((): void => {
     editorStore.getState().updateCanvasSettings({ panX: 0, panY: 0, zoom: 1 });
   }, [editorStore]);
+
+  const handleCanvasViewportChange = useCallback(
+    (settings: { readonly panX?: number; readonly panY?: number; readonly zoom?: number }): void => {
+      editorStore.getState().updateCanvasSettings(settings);
+    },
+    [editorStore],
+  );
 
   const handleAlignSelection = useCallback(
     (action: AlignmentAction): void => {
@@ -892,11 +1124,7 @@ export function DemoApp(): React.JSX.Element {
 
   useEffect(() => {
     return () => {
-      for (const timeoutId of toastTimeoutIdsRef.current) {
-        window.clearTimeout(timeoutId);
-      }
-
-      toastTimeoutIdsRef.current = [];
+      toast.clear();
     };
   }, []);
 
@@ -1320,8 +1548,6 @@ export function DemoApp(): React.JSX.Element {
               void handleImportFileChange(event);
             }}
           />
-          <style>{`@keyframes demo-toast-slide-in { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }`}</style>
-
           {editorState.canvasSettings.showRulers ?
             <>
               <div
@@ -1400,7 +1626,7 @@ export function DemoApp(): React.JSX.Element {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      <ToolbarMenu label="File">
+                      <ToolbarMenu icon={<FolderOpen size={16} />} label="File">
                         <Dropdown.Item
                           key="new-document"
                           onAction={() => {
@@ -1466,7 +1692,7 @@ export function DemoApp(): React.JSX.Element {
                         </Dropdown.Item>
                       </ToolbarMenu>
 
-                      <ToolbarMenu label="View">
+                      <ToolbarMenu icon={<Grid3X3 size={16} />} label="View">
                         <Dropdown.Item
                           key="toggle-rulers"
                           onAction={() => {
@@ -1624,7 +1850,7 @@ export function DemoApp(): React.JSX.Element {
                         </Dropdown.Item>
                       </ToolbarMenu>
 
-                      <ToolbarMenu label="Scenes">
+                      <ToolbarMenu icon={<Layers size={16} />} label="Scenes">
                         {currentDocument.pages.map((page, index) => (
                           <Dropdown.Item
                             key={page.id}
@@ -1667,7 +1893,7 @@ export function DemoApp(): React.JSX.Element {
                         </Dropdown.Item>
                       </ToolbarMenu>
 
-                      <ToolbarMenu label="Help">
+                      <ToolbarMenu icon={<Info size={16} />} label="Help">
                         <Dropdown.Item
                           key="shortcuts-help"
                           onAction={() => {
@@ -1884,14 +2110,23 @@ export function DemoApp(): React.JSX.Element {
                       }}
                     >
                       <IconToolButton
-                        label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                        label="Zoom out"
                         onPress={() => {
-                          void handleToggleFullscreen();
+                          handleZoomStep(-ZOOM_STEP);
                         }}
                       >
-                        {isFullscreen ?
-                          <Minimize2 size={16} />
-                        : <Maximize2 size={16} />}
+                        <Minus size={16} />
+                      </IconToolButton>
+                      <IconToolButton label="Zoom to fit" onPress={handleZoomToFit}>
+                        <Maximize2 size={16} />
+                      </IconToolButton>
+                      <IconToolButton
+                        label="Zoom in"
+                        onPress={() => {
+                          handleZoomStep(ZOOM_STEP);
+                        }}
+                      >
+                        <Plus size={16} />
                       </IconToolButton>
                       <span
                         aria-label="Zoom level"
@@ -1904,6 +2139,16 @@ export function DemoApp(): React.JSX.Element {
                       >
                         {Math.round(editorState.canvasSettings.zoom * 100)}%
                       </span>
+                      <IconToolButton
+                        label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                        onPress={() => {
+                          void handleToggleFullscreen();
+                        }}
+                      >
+                        {isFullscreen ?
+                          <Minimize2 size={16} />
+                        : <Maximize2 size={16} />}
+                      </IconToolButton>
                     </div>
                   </Toolbar>
 
@@ -1930,6 +2175,7 @@ export function DemoApp(): React.JSX.Element {
                             key={elementType.type}
                             label={elementType.label}
                             isActive={editorState.pendingPlacementType === elementType.type}
+                            tooltipPlacement="right"
                             onPress={() => {
                               handleElementSelect(elementType.type);
                             }}
@@ -2006,22 +2252,24 @@ export function DemoApp(): React.JSX.Element {
                   >
                     {isSidebarOpen ?
                       <>
-                        <Tooltip>
-                          <Tooltip.Trigger>
-                            <Button
-                              aria-label="Close sidebar"
-                              isIconOnly
-                              size="sm"
-                              variant="ghost"
-                              onPress={() => {
-                                setIsSidebarOpen(false);
-                              }}
-                            >
-                              <X size={16} />
-                            </Button>
-                          </Tooltip.Trigger>
-                          <Tooltip.Content>Close sidebar</Tooltip.Content>
-                        </Tooltip>
+                        <div data-placement="left" style={{ display: 'inline-flex' }}>
+                          <Tooltip>
+                            <Tooltip.Trigger>
+                              <Button
+                                aria-label="Close sidebar"
+                                isIconOnly
+                                size="sm"
+                                variant="ghost"
+                                onPress={() => {
+                                  setIsSidebarOpen(false);
+                                }}
+                              >
+                                <X size={16} />
+                              </Button>
+                            </Tooltip.Trigger>
+                            <Tooltip.Content placement="left">Close sidebar</Tooltip.Content>
+                          </Tooltip>
+                        </div>
                         <span
                           aria-hidden="true"
                           style={{
@@ -2037,6 +2285,7 @@ export function DemoApp(): React.JSX.Element {
                     <IconToolButton
                       label="Layers"
                       isActive={isSidebarOpen && sidebarTab === 'layers'}
+                      tooltipPlacement="left"
                       onPress={() => {
                         handleSidebarTabToggle('layers');
                       }}
@@ -2047,6 +2296,7 @@ export function DemoApp(): React.JSX.Element {
                       label="Properties"
                       isActive={isSidebarOpen && sidebarTab === 'properties'}
                       isDisabled={selectedElement === null}
+                      tooltipPlacement="left"
                       onPress={() => {
                         handleSidebarTabToggle('properties');
                       }}
@@ -2057,6 +2307,7 @@ export function DemoApp(): React.JSX.Element {
                       label="Animation"
                       isActive={isSidebarOpen && sidebarTab === 'animation'}
                       isDisabled={selectedElement === null}
+                      tooltipPlacement="left"
                       onPress={() => {
                         handleSidebarTabToggle('animation');
                       }}
@@ -2066,6 +2317,7 @@ export function DemoApp(): React.JSX.Element {
                     <IconToolButton
                       label="Pre-flight"
                       isActive={isSidebarOpen && sidebarTab === 'preflight'}
+                      tooltipPlacement="left"
                       onPress={() => {
                         handleSidebarTabToggle('preflight');
                       }}
@@ -2089,8 +2341,12 @@ export function DemoApp(): React.JSX.Element {
                       cursor={editorState.pendingPlacementType === null ? 'default' : 'crosshair'}
                       documentData={currentDocument}
                       isPlaying={isPlaying}
+                      panX={editorState.canvasSettings.panX}
+                      panY={editorState.canvasSettings.panY}
+                      zoom={editorState.canvasSettings.zoom}
                       onCanvasClick={handleCanvasClick}
                       onCanvasContextMenu={handleCanvasContextMenu}
+                      onViewportChange={handleCanvasViewportChange}
                       resetToken={resetToken}
                     />
                   </div>
@@ -2103,13 +2359,17 @@ export function DemoApp(): React.JSX.Element {
                 style={{
                   backgroundColor: color('surface'),
                   border: `1px solid ${color('border')}`,
-                  borderRadius: '1rem',
+                  borderBottomLeftRadius: '1rem',
+                  borderBottomRightRadius: 0,
+                  borderRight: 'none',
+                  borderTopLeftRadius: '1rem',
+                  borderTopRightRadius: 0,
                   bottom: `${String(SIDEBAR_EDGE_INSET)}px`,
-                  boxShadow: 'var(--overlay-shadow, 0 14px 40px rgba(15, 23, 42, 0.28))',
+                  boxShadow: 'var(--overlay-shadow, 0 14px 40px rgba(15, 23, 42, 0.22))',
                   overflow: 'hidden',
                   pointerEvents: isSidebarOpen ? 'auto' : 'none',
-                  right: `${String(FLOATING_OFFSET)}px`,
-                  top: `${String(SIDEBAR_EDGE_INSET)}px`,
+                  right: '0px',
+                  top: `${String(SIDEBAR_TOP_OFFSET)}px`,
                   transform: isSidebarOpen ? 'translateX(0)' : `translateX(calc(100% + ${sp('sp-04')}))`,
                   transition: 'var(--transition-panel, transform 160ms ease)',
                   width: `${String(sidebarWidth)}px`,
@@ -2162,7 +2422,9 @@ export function DemoApp(): React.JSX.Element {
                   </div>
                 : null}
 
-                <div className="h-full overflow-auto pl-2">{sidebarPanel}</div>
+                <div className="h-full overflow-auto" style={{ padding: `${sp('sp-02')} ${sp('sp-03')}` }}>
+                  {sidebarPanel}
+                </div>
               </aside>
 
               {contextMenu !== null ?
@@ -2540,11 +2802,37 @@ export function DemoApp(): React.JSX.Element {
                       fontSize: font('body-compact'),
                     }}
                   >
-                    <li>⌘/Ctrl + S — Save</li>
-                    <li>⌘/Ctrl + Z — Undo</li>
-                    <li>⌘/Ctrl + Shift + Z — Redo</li>
-                    <li>Delete / Backspace — Remove selection</li>
-                    <li>Escape — Exit placement mode</li>
+                    {KEYBOARD_SHORTCUTS.map((shortcut) => (
+                      <li
+                        key={shortcut.description}
+                        style={{
+                          alignItems: 'center',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: sp('sp-02'),
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: sp('sp-01') }}>
+                          {shortcut.primary.map((key, index) => (
+                            <Kbd key={`${shortcut.description}-primary-${String(index)}`} title={key.title}>
+                              <Kbd.Content>{key.label}</Kbd.Content>
+                            </Kbd>
+                          ))}
+                          {shortcut.secondary !== undefined ?
+                            <>
+                              <span aria-hidden="true">/</span>
+                              {shortcut.secondary.map((key, index) => (
+                                <Kbd key={`${shortcut.description}-secondary-${String(index)}`} title={key.title}>
+                                  <Kbd.Content>{key.label}</Kbd.Content>
+                                </Kbd>
+                              ))}
+                            </>
+                          : null}
+                        </span>
+                        <span>{shortcut.description}</span>
+                      </li>
+                    ))}
                   </ul>
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <Button
@@ -2585,52 +2873,7 @@ export function DemoApp(): React.JSX.Element {
                 </DialogPanel>
               : null}
 
-              <div className="pointer-events-none absolute bottom-7 right-7 z-40 flex flex-col gap-2">
-                {toasts.map((toast) => (
-                  <Card
-                    key={toast.id}
-                    className="pointer-events-auto"
-                    style={{
-                      ...glassPanelStyle(),
-                      animation: 'demo-toast-slide-in 160ms ease',
-                      borderLeft: `3px solid ${
-                        toast.severity === 'success' ? color('success')
-                        : toast.severity === 'error' ? color('danger')
-                        : color('accent')
-                      }`,
-                      minWidth: '260px',
-                    }}
-                    variant="secondary"
-                  >
-                    <CardContent className="flex items-center gap-2 p-3">
-                      <span
-                        style={{
-                          color:
-                            toast.severity === 'success' ? color('success')
-                            : toast.severity === 'error' ? color('danger')
-                            : color('accent'),
-                        }}
-                      >
-                        <ToastIcon severity={toast.severity} />
-                      </span>
-                      <span style={{ color: color('foreground'), fontSize: font('body-compact'), flex: 1 }}>
-                        {toast.message}
-                      </span>
-                      <Button
-                        aria-label="Dismiss toast"
-                        isIconOnly
-                        size="sm"
-                        variant="ghost"
-                        onPress={() => {
-                          dismissToast(toast.id);
-                        }}
-                      >
-                        <X size={14} />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <Toast.Provider className="bottom-7 right-7 z-40" placement="bottom end" />
             </div>
           </EditorErrorBoundary>
         </main>

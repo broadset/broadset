@@ -1,3 +1,5 @@
+/** @jest-environment jsdom */
+
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 import { createDefaultStyle } from '@broadset/model';
 
@@ -137,6 +139,28 @@ describe('renderer core', () => {
       borderRadius: true,
       appearance: true,
     });
+  });
+
+  it('keeps the preview frame square without extra rounding or card chrome', () => {
+    const host = document.createElement('div');
+
+    host.style.width = '1280px';
+    host.style.height = '720px';
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument([createElement({ id: 'frame-1', type: 'rectangle' })]),
+    });
+
+    const canvasScaleShell = host.firstElementChild as HTMLDivElement | null;
+    const canvasRoot = canvasScaleShell?.firstElementChild as HTMLDivElement | null;
+
+    expect(canvasRoot).not.toBeNull();
+    expect(canvasRoot?.style.borderRadius).toBe('0px');
+    expect(canvasRoot?.style.boxShadow).toBe('none');
+    expect(canvasRoot?.style.outline).toBe('none');
+
+    controller.destroy();
   });
 
   it('remounts renderers on type changes and ignores updates after destroy', () => {

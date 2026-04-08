@@ -134,16 +134,22 @@ describe('EditorToolbar', () => {
     const toolbar = screen.getByRole('toolbar', { name: /editor toolbar/i });
     const undoButton = screen.getByRole('button', { name: /undo/i });
     const redoButton = screen.getByRole('button', { name: /redo/i });
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    const gridButton = screen.getByRole('button', { name: /toggle grid/i });
+    const guidesButton = screen.getByRole('button', { name: /toggle guides/i });
 
     expect(toolbar).not.toBeNull();
     expect(undoButton.hasAttribute('disabled')).toBe(true);
     expect(redoButton.hasAttribute('disabled')).toBe(false);
     expect(screen.getByText('125%').textContent).toBe('125%');
+    expect(saveButton.textContent.trim()).toBe('');
+    expect(gridButton.textContent.trim()).toBe('');
+    expect(guidesButton.textContent.trim()).toBe('');
 
     fireEvent.click(screen.getByRole('button', { name: /redo/i }));
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
-    fireEvent.click(screen.getByRole('button', { name: /toggle grid/i }));
-    fireEvent.click(screen.getByRole('button', { name: /toggle guides/i }));
+    fireEvent.click(saveButton);
+    fireEvent.click(gridButton);
+    fireEvent.click(guidesButton);
 
     expect(onUndo).not.toHaveBeenCalled();
     expect(onRedo).toHaveBeenCalledTimes(1);

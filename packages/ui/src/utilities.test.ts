@@ -145,11 +145,12 @@ describe('keyframe property resolution', () => {
 });
 
 describe('wheel input classification', () => {
-  /** @description Smooth trackpad gestures must classify into pan or zoom so the canvas can react correctly to natural scrolling and pinch-style interactions. */
+  /** @description Smooth trackpad gestures must classify into pan or zoom so the canvas can react correctly to natural scrolling, pinch gestures, and legacy mouse-wheel zooming. */
   it('classifies trackpad pan, alt-zoom, ctrl-pinch, and legacy wheel input', () => {
     expect(classifyWheelInput({ deltaX: 0, deltaY: 20, deltaMode: 0, ctrlKey: false, altKey: false })).toBe('pan');
     expect(classifyWheelInput({ deltaX: 0, deltaY: 20, deltaMode: 0, ctrlKey: false, altKey: true })).toBe('zoom');
     expect(classifyWheelInput({ deltaX: 0, deltaY: -12, deltaMode: 0, ctrlKey: true, altKey: false })).toBe('zoom');
-    expect(classifyWheelInput({ deltaX: 0, deltaY: 3, deltaMode: 1, ctrlKey: false, altKey: false })).toBe('none');
+    expect(classifyWheelInput({ deltaX: 0, deltaY: 3, deltaMode: 1, ctrlKey: false, altKey: false })).toBe('zoom');
+    expect(classifyWheelInput({ deltaX: 0, deltaY: 3, deltaMode: 1, ctrlKey: true, altKey: false })).toBe('pan');
   });
 });

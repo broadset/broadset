@@ -7,7 +7,9 @@ import {
   Grid3X3,
   Image,
   LetterText,
+  Minus,
   PenTool,
+  Plus,
   QrCode,
   Redo2,
   Save,
@@ -43,6 +45,33 @@ export const DEFAULT_ELEMENT_TYPES: readonly ElementTypeInfo[] = [
   { type: 'ticker', label: 'Ticker', icon: <LetterText size={ICON_SIZE} /> },
 ] as const;
 
+interface ToolbarIconButtonProps {
+  readonly label: string;
+  readonly children: ReactNode;
+  readonly isDisabled?: boolean | undefined;
+  readonly variant?: 'ghost' | 'outline' | 'primary';
+  readonly onPress: () => void;
+}
+
+function ToolbarIconButton({
+  label,
+  children,
+  isDisabled = false,
+  variant = 'ghost',
+  onPress,
+}: ToolbarIconButtonProps): JSX.Element {
+  return (
+    <Tooltip>
+      <Tooltip.Trigger>
+        <Button aria-label={label} isDisabled={isDisabled} isIconOnly size="sm" variant={variant} onPress={onPress}>
+          {children}
+        </Button>
+      </Tooltip.Trigger>
+      <Tooltip.Content>{label}</Tooltip.Content>
+    </Tooltip>
+  );
+}
+
 export interface EditorToolbarProps {
   readonly canUndo: boolean;
   readonly canRedo: boolean;
@@ -76,54 +105,34 @@ export function EditorToolbar({
     >
       <div className="flex items-center gap-2">
         {onSave !== undefined ?
-          <Button aria-label="Save" size="sm" variant="outline" onPress={onSave}>
-            <span className="inline-flex items-center gap-2">
-              <Save size={ICON_SIZE} />
-              Save
-            </span>
-          </Button>
+          <ToolbarIconButton label="Save" variant="outline" onPress={onSave}>
+            <Save size={ICON_SIZE} />
+          </ToolbarIconButton>
         : null}
 
-        <Tooltip>
-          <Tooltip.Trigger>
-            <Button aria-label="Undo" isDisabled={!canUndo} isIconOnly size="sm" variant="ghost" onPress={onUndo}>
-              <Undo2 size={ICON_SIZE} />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>Undo</Tooltip.Content>
-        </Tooltip>
+        <ToolbarIconButton isDisabled={!canUndo} label="Undo" onPress={onUndo}>
+          <Undo2 size={ICON_SIZE} />
+        </ToolbarIconButton>
 
-        <Tooltip>
-          <Tooltip.Trigger>
-            <Button aria-label="Redo" isDisabled={!canRedo} isIconOnly size="sm" variant="ghost" onPress={onRedo}>
-              <Redo2 size={ICON_SIZE} />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>Redo</Tooltip.Content>
-        </Tooltip>
+        <ToolbarIconButton isDisabled={!canRedo} label="Redo" onPress={onRedo}>
+          <Redo2 size={ICON_SIZE} />
+        </ToolbarIconButton>
       </div>
 
       <div className="flex items-center gap-2">
-        <Button aria-label="Toggle grid" size="sm" variant={showGrid ? 'primary' : 'ghost'} onPress={onToggleGrid}>
-          <span className="inline-flex items-center gap-2">
-            <Grid3X3 size={ICON_SIZE} />
-            Grid
-          </span>
-        </Button>
+        <ToolbarIconButton label="Toggle grid" variant={showGrid ? 'primary' : 'ghost'} onPress={onToggleGrid}>
+          <Grid3X3 size={ICON_SIZE} />
+        </ToolbarIconButton>
 
-        <Button
-          aria-label="Toggle guides"
-          size="sm"
+        <ToolbarIconButton
+          label="Toggle guides"
           variant={showGuides ? 'primary' : 'ghost'}
           onPress={() => {
             onToggleGuides?.();
           }}
         >
-          <span className="inline-flex items-center gap-2">
-            <Waypoints size={ICON_SIZE} />
-            Guides
-          </span>
-        </Button>
+          <Waypoints size={ICON_SIZE} />
+        </ToolbarIconButton>
 
         <Chip color="default" size="sm" variant="soft">
           {String(Math.round(zoomPercent))}%
@@ -213,22 +222,19 @@ export function PageSorter({
         </Tabs.List>
       </Tabs>
 
-      <Button aria-label="Add scene" isIconOnly size="sm" variant="ghost" onPress={onPageAdd}>
-        +
-      </Button>
+      <ToolbarIconButton label="Add scene" onPress={onPageAdd}>
+        <Plus size={ICON_SIZE} />
+      </ToolbarIconButton>
 
       {pages.length > 1 ?
-        <Button
-          aria-label="Remove scene"
-          isIconOnly
-          size="sm"
-          variant="ghost"
+        <ToolbarIconButton
+          label="Remove scene"
           onPress={() => {
             onPageRemove(activePageIndex);
           }}
         >
-          −
-        </Button>
+          <Minus size={ICON_SIZE} />
+        </ToolbarIconButton>
       : null}
     </section>
   );

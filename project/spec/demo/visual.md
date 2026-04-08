@@ -82,7 +82,7 @@ Element types, sidebar tabs, and toolbar actions MUST use consistent iconography
 
 **Toolbar Action Icon Mapping:**
 
-Toolbar dropdown menus (File, View, Scenes, Help) MUST use text labels on their trigger buttons — they are NOT icon-only. Within dropdown menus, each item MUST have a `lucide-react` icon alongside its label (see `project/spec/ui/toolbar-nav.md` for the full icon mapping per menu item). Standalone toolbar buttons (Undo, Redo, alignment actions) MUST be icon-only with `aria-label` and HeroUI `Tooltip`.
+Toolbar dropdown menus (File, View, Scenes, Help) MUST use icon-only trigger buttons with `aria-label` and HeroUI `Tooltip`; they MUST NOT render text labels on the clickable buttons themselves. Within dropdown menus, each item MUST have a `lucide-react` icon alongside its label (see `project/spec/ui/toolbar-nav.md` for the full icon mapping per menu item). Standalone toolbar buttons (Undo, Redo, alignment actions) MUST also be icon-only with `aria-label` and HeroUI `Tooltip`.
 
 #### Scenario: Element type icons
 
@@ -107,8 +107,8 @@ Toolbar dropdown menus (File, View, Scenes, Help) MUST use text labels on their 
 - [ ] Given built-in element types, each type has a distinct icon in the element toolbar
 - [ ] Given dropdown menu items, each item has a corresponding icon alongside its label
 - [ ] Given a plugin without an icon, a default fallback icon is used
-- [ ] Given icon-only buttons (Undo, Redo, alignment), each has an aria-label and tooltip
-- [ ] Given dropdown trigger buttons (File, View, Scenes, Help), they display text labels
+- [ ] Given icon-only buttons (Undo, Redo, alignment, and dropdown triggers), each has an aria-label and tooltip
+- [ ] Given dropdown trigger buttons (File, View, Scenes, Help), they render as icon-only controls without clickable text labels
 
 ---
 

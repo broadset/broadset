@@ -10,21 +10,21 @@ Defines the behavioral requirements for the toolbar, context menu, element libra
 
 ### Requirement: Toolbar Actions
 
-The main toolbar MUST organize its controls into a menu-bar–style layout with dropdown menus, standalone buttons, and conditional action groups. This avoids overwhelming the user with a flat row of many icon buttons.
+The main toolbar MUST organize its controls into a compact icon-driven layout with dropdown menus, standalone buttons, and conditional action groups. The toolbar MUST avoid text buttons in the chrome itself; every toolbar control is represented by an icon and explained via tooltip.
 
 **Toolbar Zone Layout:**
 
 The toolbar MUST arrange controls left-to-right in these zones:
 
-| Zone                        | Controls                                                             |
-| --------------------------- | -------------------------------------------------------------------- |
-| **Menus**                   | File dropdown, View dropdown, Scenes dropdown, Help dropdown         |
-| **Undo / Redo**             | Undo button, Redo button (always visible, disabled when unavailable) |
-| **Alignment** (conditional) | Visible only when 2+ elements selected — see Alignment zone below    |
-| **Centre**                  | Document name label, Resolution display (e.g., "1920×1080 — 16:9")   |
-| **Right**                   | Zoom level display (e.g., "100%")                                    |
+| Zone                        | Controls                                                                     |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| **Menus**                   | File dropdown, View dropdown, Scenes dropdown, Help dropdown (icon triggers) |
+| **Undo / Redo**             | Undo button, Redo button (always visible, disabled when unavailable)         |
+| **Alignment** (conditional) | Visible only when 2+ elements selected — see Alignment zone below            |
+| **Centre**                  | Document name label, Resolution display (e.g., "1920×1080 — 16:9")           |
+| **Right**                   | Zoom level display (e.g., "100%")                                            |
 
-All interactive controls MUST be `size="sm"`. Dropdown triggers MUST be HeroUI `Button` with a label (not icon-only) — e.g., "File", "View", "Scenes", "Help". Undo/Redo and alignment buttons MUST be icon-only with HeroUI `Tooltip`. Each dropdown MUST use HeroUI `Dropdown` + `Dropdown.Menu`.
+All interactive controls MUST be `size="sm"`. All toolbar buttons and dropdown triggers MUST be HeroUI `Button` components with `isIconOnly`, an `aria-label`, and a HeroUI `Tooltip` that shows the action name on hover. Text labels are allowed inside dropdown menu items and in the non-interactive centre document info, but MUST NOT appear as clickable toolbar button text. Each dropdown MUST use HeroUI `Dropdown` + `Dropdown.Menu`.
 
 **Alignment Zone (conditional):**
 
@@ -155,6 +155,7 @@ The File → Import and File → Open items MUST trigger a hidden file input acc
 - [ ] Given the Scenes menu, all scenes are listed with the active scene checked
 - [ ] Given the Scenes menu, Add Scene creates a scene and Remove Scene is disabled for single-scene documents
 - [ ] Given the Help menu, Keyboard Shortcuts opens ShortcutHelpModal and About opens AboutModal
+- [ ] Given every toolbar control, the trigger is icon-only and exposes its action name via tooltip and aria-label
 - [ ] Given undo/redo buttons, temporal store undo/redo is called
 - [ ] Given 2+ elements selected, alignment buttons are visible and fire alignElements
 - [ ] Given 3+ elements selected, distribute buttons are visible and fire distributeElements

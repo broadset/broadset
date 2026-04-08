@@ -49,7 +49,7 @@ See `project/spec/ui/toolbar-nav.md` → Toolbar Actions for the complete menu i
 
 **Toolbar Visual:**
 
-The toolbar MUST use a compact height (consistent with `sp-08` token). It MUST use glass-morphism styling: `rgba(28, 28, 28, 0.85)` background with `backdrop-filter: blur(8px)`, `border: 1px solid var(--border)`, and `box-shadow: 0 2px 8px rgba(0,0,0,0.4)`. Dropdown trigger buttons MUST show text labels (e.g., "File", "View"). Undo/Redo and alignment buttons MUST be icon-only with HeroUI `Tooltip` on hover. All interactive controls MUST be `size="sm"`.
+The toolbar MUST use a compact height (consistent with `sp-08` token). It MUST use glass-morphism styling: `rgba(28, 28, 28, 0.85)` background with `backdrop-filter: blur(8px)`, `border: 1px solid var(--border)`, and `box-shadow: 0 2px 8px rgba(0,0,0,0.4)`. All clickable toolbar controls — including dropdown triggers, Undo/Redo, and alignment actions — MUST be icon-only HeroUI buttons with tooltips on hover and accessible `aria-label`s. Text labels are reserved for dropdown menu items and the non-interactive document info only. All interactive controls MUST be `size="sm"`.
 
 #### Scenario: Toolbar visible on load
 
@@ -61,6 +61,7 @@ The toolbar MUST use a compact height (consistent with `sp-08` token). It MUST u
 
 - [ ] Given the demo app is loaded, the main toolbar floats at the top-left over the canvas
 - [ ] Given the toolbar, File/View/Scenes/Help dropdown menus are available
+- [ ] Given the toolbar, all clickable controls are icon-only and expose tooltips/aria-labels
 - [ ] Given the toolbar, Undo/Redo buttons are available as icon-only buttons
 - [ ] Given `onSave` is not configured, the Save item is hidden from the File menu
 

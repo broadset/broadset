@@ -56,7 +56,7 @@ Clicking an element on the canvas MUST select it in the store. Clicking empty ca
 
 ### Requirement: Transform Widget
 
-When one or more elements are selected, the canvas MUST display a transform widget around the selection bounds. The widget MUST provide visual handles for resize, rotate, and border-radius adjustment as defined in [transforms.md](transforms.md). Pointer interactions on these handles MUST initiate the corresponding transform operation, updating element geometry via ephemeral updates during drag and committing the final state on drop.
+When one or more elements are selected, the canvas MUST display a 2D transform widget around the selection bounds. This widget is the primary direct-manipulation affordance for 2D transforms on the canvas: dragging the element body MUST translate it, dragging resize handles MUST scale it on one or both axes, and dragging the rotation handle MUST rotate it. The widget MUST also provide border-radius adjustment handles where applicable, as defined in [transforms.md](transforms.md). Pointer interactions on these handles MUST initiate the corresponding transform operation, updating element geometry via ephemeral updates during drag and committing the final state on drop.
 
 #### Scenario: Widget appears on selection
 
@@ -72,7 +72,7 @@ When one or more elements are selected, the canvas MUST display a transform widg
 
 #### Acceptance Criteria
 
-- [ ] Given a selected element, a transform widget with handles is displayed around the element bounds
+- [ ] Given a selected element, a 2D transform widget for translate, rotate, and scale is displayed around the element bounds
 - [ ] Given a pointer drag on a widget handle, the corresponding transform operation from [transforms.md](transforms.md) is applied
 - [ ] Given a pointer drag on the element body, the element is translated following the drag
 
@@ -96,7 +96,7 @@ Dragging on the canvas background MUST create a selection rectangle. All element
 
 ### Requirement: Zoom and Pan
 
-The canvas MUST support zoom (via scroll wheel or pinch gesture) and pan (via background drag or modifier key). Zoom and pan values MUST be reflected in CanvasSettings.
+The canvas MUST be zoomable and pannable as a first-class navigation surface. It MUST support zoom (via scroll wheel or pinch gesture) and pan (via background drag or modifier key). Zoom and pan values MUST be reflected in CanvasSettings.
 
 Zoom MUST be clamped to a range of **0.1** (10%) to **4.0** (400%). Each scroll-wheel tick MUST change the zoom by **0.1** (10 percentage points). The editor MUST provide a **zoom-to-fit** action that scales and pans the viewport so the full document fits within the visible canvas area with a small margin.
 
