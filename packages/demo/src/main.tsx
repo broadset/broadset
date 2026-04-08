@@ -1,3 +1,5 @@
+import './index.css';
+
 import ReactDOM from 'react-dom/client';
 
 import { DemoApp } from './DemoApp';

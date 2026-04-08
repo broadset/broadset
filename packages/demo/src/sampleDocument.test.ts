@@ -20,4 +20,11 @@ describe('sample document fixture', () => {
 
     expect(renderedTypes).toEqual(new Set(BUILT_IN_ELEMENT_TYPES));
   });
+
+  /**
+   * @description Keeps the live demo shell polished by preventing placeholder example.com media URLs that render as broken assets in the browser preview.
+   */
+  it('does not rely on unresolved placeholder CDN assets', () => {
+    expect(JSON.stringify(SAMPLE_PROJECT)).not.toContain('https://cdn.example.com/');
+  });
 });

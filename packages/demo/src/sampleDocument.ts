@@ -12,6 +12,10 @@
  */
 
 const ISO_TIMESTAMP = '2026-04-06T12:00:00Z';
+const PARTNER_MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180"><defs><linearGradient id="partner-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#3da9fc"/><stop offset="100%" stop-color="#15c39a"/></linearGradient></defs><rect width="180" height="180" rx="36" fill="#08111f"/><path d="M38 118 73 55l22 36 18-28 29 55H38Z" fill="url(#partner-gradient)"/><circle cx="120" cy="57" r="10" fill="#ffcb47"/></svg>`;
+const PARTNER_MARK_DATA_URI = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(PARTNER_MARK_SVG)}`;
+const INLINE_VIDEO_PLACEHOLDER = '';
+const INLINE_MEDIA_URL = 'data:application/octet-stream;base64,';
 
 const BRAND = {
   ink: '#08111f',
@@ -203,7 +207,7 @@ export const SAMPLE_DOCUMENT = {
       width: 700,
       height: 394,
       rotation: 0,
-      content: 'https://cdn.example.com/broadset/stadium-loop.mp4',
+      content: INLINE_VIDEO_PLACEHOLDER,
       assetId: 'asset-hero-loop',
       typeConfig: {
         loop: true,
@@ -219,6 +223,47 @@ export const SAMPLE_DOCUMENT = {
         borderWidth: 2,
         borderColor: 'rgba(116, 217, 255, 0.4)',
         boxShadow: '0 18px 40px rgba(0, 0, 0, 0.28)',
+      },
+    },
+    {
+      ...BASE_ELEMENT,
+      id: 'el-video-wall-label',
+      type: 'text',
+      name: 'Hero Video Wall Label',
+      position: { x: 1240, y: 116 },
+      width: 520,
+      height: 42,
+      rotation: 0,
+      content: '<b>LIVE FEED READY</b>',
+      style: {
+        ...BASE_STYLE,
+        fontFamily: 'Inter',
+        fontSize: 22,
+        fontWeight: 800,
+        fontColor: BRAND.white,
+        textAlignment: 'center',
+        textTransform: 'uppercase',
+        letterSpacing: 1.8,
+      },
+    },
+    {
+      ...BASE_ELEMENT,
+      id: 'el-video-wall-caption',
+      type: 'text',
+      name: 'Hero Video Wall Caption',
+      position: { x: 1272, y: 164 },
+      width: 456,
+      height: 52,
+      rotation: 0,
+      content: 'Preview safe for sponsor stings, wipes, and halftime packages.',
+      style: {
+        ...BASE_STYLE,
+        fontFamily: 'Inter',
+        fontSize: 15,
+        fontWeight: 500,
+        fontColor: BRAND.slate,
+        lineHeight: 1.35,
+        textAlignment: 'center',
       },
     },
     {
@@ -282,7 +327,7 @@ export const SAMPLE_DOCUMENT = {
       width: 180,
       height: 180,
       rotation: 0,
-      content: 'https://cdn.example.com/broadset/partner-mark.svg',
+      content: PARTNER_MARK_DATA_URI,
       assetId: 'asset-sponsor-mark',
       visibleWhen: 'sponsorVisible == true',
       style: {
@@ -1310,7 +1355,7 @@ export const SAMPLE_PROJECT = {
           { weight: 600, style: 'normal' },
           { weight: 700, style: 'normal' },
         ],
-        source: { kind: 'url', url: 'https://cdn.example.com/fonts/barlow-condensed.woff2' },
+        source: { kind: 'system' },
       },
     ],
     palette: [BRAND.ink, BRAND.panel, BRAND.blue, BRAND.cyan, BRAND.mint, BRAND.gold, BRAND.coral, BRAND.white],
@@ -1322,7 +1367,7 @@ export const SAMPLE_PROJECT = {
       name: 'Partner Mark',
       kind: 'image',
       mimeType: 'image/svg+xml',
-      source: { type: 'url', url: 'https://cdn.example.com/broadset/partner-mark.svg' },
+      source: { type: 'url', url: PARTNER_MARK_DATA_URI },
       metadata: { usage: 'sponsor' },
     },
     {
@@ -1330,7 +1375,7 @@ export const SAMPLE_PROJECT = {
       name: 'Arena Crowd Loop',
       kind: 'video',
       mimeType: 'video/mp4',
-      source: { type: 'url', url: 'https://cdn.example.com/broadset/stadium-loop.mp4' },
+      source: { type: 'url', url: INLINE_MEDIA_URL },
       metadata: { durationSeconds: 18, loopable: true },
     },
     {
@@ -1338,7 +1383,7 @@ export const SAMPLE_PROJECT = {
       name: 'Broadcast Whoosh',
       kind: 'audio',
       mimeType: 'audio/mpeg',
-      source: { type: 'url', url: 'https://cdn.example.com/broadset/whoosh.mp3' },
+      source: { type: 'url', url: INLINE_MEDIA_URL },
       metadata: { usage: 'transition' },
     },
   ],

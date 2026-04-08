@@ -8,14 +8,17 @@ import {
   placeElement,
   startPlacement,
 } from '@broadset/editor';
-import { type BroadsetDocument, broadsetDocumentSchema, type BroadsetElement } from '@broadset/model';
+import {
+  type BroadsetDocument,
+  broadsetDocumentSchema,
+  type BroadsetElement,
+  createEmptyBroadsetDocument,
+} from '@broadset/model';
 import { createPlaybackController, type PlaybackController } from '@broadset/playback';
 import { createScreenRenderer, type ScreenRendererController } from '@broadset/renderer';
 import {
   color,
   DEFAULT_ELEMENT_TYPES,
-  EditorToolbar,
-  ElementLibrary,
   font,
   glassPanelStyle,
   type LayerInfo,
@@ -26,16 +29,22 @@ import {
   sp,
   TimelineEditingProvider,
 } from '@broadset/ui';
-import { Button, Card, CardContent, Chip, Dropdown, Tooltip } from '@heroui/react';
+import { Button, ButtonGroup, Card, CardContent, Chip, Dropdown, Input, Toolbar, Tooltip } from '@heroui/react';
 import {
   AlertTriangle,
+  Bug,
   CheckCircle2,
   Copy,
+  Download,
+  FileOutput,
+  FilePlus,
   FolderOpen,
   Grid3X3,
+  Hash,
   Info,
   Keyboard,
-  Layers3,
+  Layers,
+  Magnet,
   Maximize2,
   Minimize2,
   Pause,
@@ -45,21 +54,22 @@ import {
   Ruler,
   Save,
   Scissors,
+  Settings,
   ShieldCheck,
-  SlidersHorizontal,
-  Sparkles,
+  Sliders,
   Trash2,
+  Upload,
+  Workflow,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
-import { SAMPLE_DOCUMENT, SAMPLE_PROJECT } from './sampleDocument';
+import { SAMPLE_DOCUMENT } from './sampleDocument';
 
 const DEMO_DOCUMENT = broadsetDocumentSchema.parse(SAMPLE_DOCUMENT);
 const DOCUMENT_STORAGE_KEY = 'broadset:demo-document:v1';
 const RULER_SIZE = 20;
 const FLOATING_OFFSET = RULER_SIZE + 8;
-const ELEMENT_LIBRARY_WIDTH = 220;
 const CONTEXT_MENU_WIDTH = 220;
 const CONTEXT_MENU_HEIGHT = 280;
 const SIDEBAR_EDGE_INSET = 72;
@@ -73,8 +83,15 @@ const TOAST_DISMISS_MS = {
   success: 3000,
 } as const;
 
+const ELEMENT_TOOL_TYPES = [
+  ...DEFAULT_ELEMENT_TYPES,
+  { type: 'countdown', label: 'Countdown', icon: <span aria-hidden="true">⏱</span> },
+] as const;
+
 type SidebarTab = 'layers' | 'properties' | 'animation' | 'preflight';
 type ToastSeverity = keyof typeof TOAST_DISMISS_MS;
+type ActiveDialog = 'about' | 'export' | 'new-document' | 'settings' | 'shortcuts' | null;
+type AlignmentAction = 'bottom' | 'center-x' | 'center-y' | 'left' | 'right' | 'top';
 
 interface SidebarPreferences {
   readonly isOpen: boolean;
@@ -185,7 +202,21 @@ function getElementLabel(type: string | null): string {
     return 'Element';
   }
 
-  return DEFAULT_ELEMENT_TYPES.find((entry) => entry.type === type)?.label ?? type;
+  return ELEMENT_TOOL_TYPES.find((entry) => entry.type === type)?.label ?? type;
+}
+
+function downloadJsonFile(filename: string, payload: unknown): void {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  anchor.click();
+
+  window.setTimeout(() => {
+    URL.revokeObjectURL(objectUrl);
+  }, 0);
 }
 
 function toPanelElement(element: BroadsetElement): PanelElement {
@@ -312,6 +343,29 @@ function ToastIcon({ severity }: { readonly severity: ToastSeverity }): React.JS
   return <Info size={16} />;
 }
 
+function greatestCommonDivisor(left: number, right: number): number {
+  if (right === 0) {
+    return left;
+  }
+
+  return greatestCommonDivisor(right, left % right);
+}
+
+function formatResolutionLabel(width: number, height: number): string {
+  const divisor = greatestCommonDivisor(width, height);
+
+  return `${String(width)}×${String(height)} — ${String(width / divisor)}:${String(height / divisor)}`;
+}
+
+function hasDocumentsArray(value: unknown): value is { readonly documents: readonly unknown[] } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'documents' in value &&
+    Array.isArray((value as { readonly documents?: unknown }).documents)
+  );
+}
+
 function ToolbarMenu({
   label,
   children,
@@ -321,15 +375,83 @@ function ToolbarMenu({
 }): React.JSX.Element {
   return (
     <Dropdown>
-      <Dropdown.Trigger>
-        <Button aria-label={label} size="sm" variant="ghost">
-          {label}
-        </Button>
+      <Dropdown.Trigger aria-label={label} className="button button--sm button--ghost">
+        {label}
       </Dropdown.Trigger>
       <Dropdown.Popover>
         <Dropdown.Menu aria-label={`${label} menu`}>{children}</Dropdown.Menu>
       </Dropdown.Popover>
     </Dropdown>
+  );
+}
+
+function DialogPanel({
+  title,
+  children,
+  onClose,
+}: {
+  readonly title: string;
+  readonly children: React.ReactNode;
+  readonly onClose: () => void;
+}): React.JSX.Element {
+  return (
+    <div
+      className="absolute inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2, 6, 23, 0.56)' }}
+    >
+      <Card
+        aria-label={title}
+        aria-modal="true"
+        role="dialog"
+        style={{ ...glassPanelStyle(), maxWidth: 'min(520px, calc(100vw - 32px))', width: '100%' }}
+        variant="secondary"
+      >
+        <CardContent className="flex flex-col gap-3 p-4">
+          <div style={{ alignItems: 'center', display: 'flex', gap: sp('sp-02'), justifyContent: 'space-between' }}>
+            <h2 style={{ color: color('foreground'), fontSize: font('heading-sm'), fontWeight: 700 }}>{title}</h2>
+            <Button aria-label={`Close ${title}`} isIconOnly size="sm" variant="ghost" onPress={onClose}>
+              <X size={16} />
+            </Button>
+          </div>
+          {children}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function IconToolButton({
+  label,
+  children,
+  isActive = false,
+  isDisabled = false,
+  onPress,
+  testId,
+}: {
+  readonly label: string;
+  readonly children: React.ReactNode;
+  readonly isActive?: boolean | undefined;
+  readonly isDisabled?: boolean | undefined;
+  readonly onPress: () => void;
+  readonly testId?: string | undefined;
+}): React.JSX.Element {
+  return (
+    <Tooltip>
+      <Tooltip.Trigger>
+        <Button
+          aria-label={label}
+          data-testid={testId}
+          isDisabled={isDisabled}
+          isIconOnly
+          size="sm"
+          variant={isActive ? 'primary' : 'ghost'}
+          onPress={onPress}
+        >
+          {children}
+        </Button>
+      </Tooltip.Trigger>
+      <Tooltip.Content>{label}</Tooltip.Content>
+    </Tooltip>
   );
 }
 
@@ -397,12 +519,12 @@ function ScreenPreview({
   return (
     <div
       aria-label={`Screen preview for ${documentData.name}`}
-      className="h-full w-full overflow-hidden rounded-[24px]"
+      className="h-full w-full overflow-hidden"
       onClick={onCanvasClick}
       onContextMenu={onCanvasContextMenu}
       style={{ backgroundColor: color('surface-secondary'), cursor }}
     >
-      <div ref={hostRef} className="h-full w-full overflow-hidden rounded-[24px]" data-testid="screen-renderer-host" />
+      <div ref={hostRef} className="h-full w-full overflow-hidden" data-testid="screen-renderer-host" />
     </div>
   );
 }
@@ -435,8 +557,6 @@ export function DemoApp(): React.JSX.Element {
   const temporalState = editorStore.temporal.getState();
   const currentDocument = editorState.document;
   const initialSidebarPreferences = useMemo(() => loadSidebarPreferences(), []);
-  const projectDocuments = SAMPLE_PROJECT.documents.length;
-  const totalElements = currentDocument.elements.length;
   const selectedElementId = editorState.activeElementIds[0] ?? null;
   const selectedElement =
     selectedElementId === null ? null : (
@@ -445,7 +565,9 @@ export function DemoApp(): React.JSX.Element {
   const activePage = currentDocument.pages[editorState.activePageIndex] ?? currentDocument.pages[0];
   const placementLabel = getElementLabel(editorState.pendingPlacementType);
   const clipboardRef = useRef<readonly BroadsetElement[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const toastTimeoutIdsRef = useRef<number[]>([]);
+  const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(
     () => typeof document !== 'undefined' && document.fullscreenElement !== null,
@@ -466,6 +588,19 @@ export function DemoApp(): React.JSX.Element {
       (currentDocument.elements.find((element) => element.id === contextMenuElementId) ?? null)
     );
   const destructiveContextActionDisabled = contextMenuElement === null || contextMenuElement.locked;
+  const selectedElements = useMemo(
+    () => currentDocument.elements.filter((element) => editorState.activeElementIds.includes(element.id)),
+    [currentDocument.elements, editorState.activeElementIds],
+  );
+  const selectedMovableElements = useMemo(
+    () => selectedElements.filter((element) => !element.locked),
+    [selectedElements],
+  );
+  const hasGroupedSelection = selectedElements.some((element) => element.groupId !== null);
+  const resolutionLabel = useMemo(
+    () => formatResolutionLabel(currentDocument.canvas.width, currentDocument.canvas.height),
+    [currentDocument.canvas.height, currentDocument.canvas.width],
+  );
 
   const layers = useMemo(
     () =>
@@ -531,6 +666,175 @@ export function DemoApp(): React.JSX.Element {
       pushToast('error', 'Could not save the demo document.');
     }
   }, [currentDocument, pushToast]);
+
+  const handleOpenImportDialog = useCallback((): void => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleImportFileChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+      const file = event.currentTarget.files?.[0];
+
+      if (file === undefined) {
+        return;
+      }
+
+      try {
+        const text = await file.text();
+        const parsed: unknown = JSON.parse(text);
+        const candidate = hasDocumentsArray(parsed) ? parsed.documents[0] : parsed;
+        const nextDocument = broadsetDocumentSchema.parse(candidate);
+
+        editorStore.getState().loadTemplate(nextDocument);
+        pushToast('success', `Imported ${file.name}.`);
+      } catch {
+        pushToast('error', `Could not import ${file.name}.`);
+      } finally {
+        event.currentTarget.value = '';
+      }
+    },
+    [editorStore, pushToast],
+  );
+
+  const handleSaveAsJson = useCallback((): void => {
+    try {
+      downloadJsonFile(
+        `${currentDocument.name.replace(/\s+/g, '-').toLowerCase() || 'broadset-document'}.json`,
+        currentDocument,
+      );
+      pushToast('success', 'Downloaded the current document as JSON.');
+    } catch {
+      pushToast('error', 'Could not export the document JSON.');
+    }
+  }, [currentDocument, pushToast]);
+
+  const handleDebugSnapshotDownload = useCallback((): void => {
+    try {
+      downloadJsonFile('broadset-debug-snapshot.json', editorStore.getState());
+      pushToast('success', 'Downloaded a debug snapshot.');
+    } catch {
+      pushToast('error', 'Could not download a debug snapshot.');
+    }
+  }, [editorStore, pushToast]);
+
+  const handleCreateNewDocument = useCallback(
+    (mode: 'empty' | 'sample'): void => {
+      const nextDocument =
+        mode === 'empty' ? createEmptyBroadsetDocument() : (
+          broadsetDocumentSchema.parse(JSON.parse(JSON.stringify(DEMO_DOCUMENT)))
+        );
+
+      editorStore.getState().loadTemplate(nextDocument);
+      setActiveDialog(null);
+      pushToast('success', mode === 'empty' ? 'Started a new blank document.' : 'Loaded the sample document.');
+    },
+    [editorStore, pushToast],
+  );
+
+  const handleZoomToFit = useCallback((): void => {
+    const availableWidth = viewportSize.width - (isSidebarOpen ? sidebarWidth : 0) - 160;
+    const availableHeight = viewportSize.height - 160;
+    const fitZoom = Math.max(
+      0.25,
+      Math.min(
+        2,
+        Math.min(availableWidth / currentDocument.canvas.width, availableHeight / currentDocument.canvas.height),
+      ),
+    );
+
+    editorStore.getState().updateCanvasSettings({ panX: 0, panY: 0, zoom: fitZoom });
+  }, [
+    currentDocument.canvas.height,
+    currentDocument.canvas.width,
+    editorStore,
+    isSidebarOpen,
+    sidebarWidth,
+    viewportSize.height,
+    viewportSize.width,
+  ]);
+
+  const handleResetZoom = useCallback((): void => {
+    editorStore.getState().updateCanvasSettings({ panX: 0, panY: 0, zoom: 1 });
+  }, [editorStore]);
+
+  const handleAlignSelection = useCallback(
+    (action: AlignmentAction): void => {
+      if (selectedMovableElements.length < 2) {
+        return;
+      }
+
+      const left = Math.min(...selectedMovableElements.map((element) => element.position.x));
+      const right = Math.max(...selectedMovableElements.map((element) => element.position.x + element.width));
+      const top = Math.min(...selectedMovableElements.map((element) => element.position.y));
+      const bottom = Math.max(...selectedMovableElements.map((element) => element.position.y + element.height));
+      const centerX = left + (right - left) / 2;
+      const centerY = top + (bottom - top) / 2;
+
+      editorStore.getState().commitGroupMove(
+        selectedMovableElements.map((element) => ({
+          elementId: element.id,
+          position: {
+            x:
+              action === 'left' ? left
+              : action === 'center-x' ? centerX - element.width / 2
+              : action === 'right' ? right - element.width
+              : element.position.x,
+            y:
+              action === 'top' ? top
+              : action === 'center-y' ? centerY - element.height / 2
+              : action === 'bottom' ? bottom - element.height
+              : element.position.y,
+          },
+        })),
+      );
+      pushToast('success', 'Aligned the selected elements.');
+    },
+    [editorStore, pushToast, selectedMovableElements],
+  );
+
+  const handleDistributeSelection = useCallback(
+    (axis: 'horizontal' | 'vertical'): void => {
+      if (selectedMovableElements.length < 3) {
+        return;
+      }
+
+      const sortedElements = [...selectedMovableElements].sort((leftElement, rightElement) =>
+        axis === 'horizontal' ?
+          leftElement.position.x - rightElement.position.x
+        : leftElement.position.y - rightElement.position.y,
+      );
+      const firstElement = sortedElements[0];
+      const lastElement = sortedElements[sortedElements.length - 1];
+
+      if (firstElement === undefined || lastElement === undefined) {
+        return;
+      }
+
+      const totalSize = sortedElements.reduce(
+        (sum, element) => sum + (axis === 'horizontal' ? element.width : element.height),
+        0,
+      );
+      const span =
+        axis === 'horizontal' ?
+          lastElement.position.x + lastElement.width - firstElement.position.x
+        : lastElement.position.y + lastElement.height - firstElement.position.y;
+      const gap = (span - totalSize) / Math.max(sortedElements.length - 1, 1);
+      let cursor = axis === 'horizontal' ? firstElement.position.x : firstElement.position.y;
+
+      editorStore.getState().commitGroupMove(
+        sortedElements.map((element) => {
+          const nextPosition =
+            axis === 'horizontal' ? { x: cursor, y: element.position.y } : { x: element.position.x, y: cursor };
+
+          cursor += (axis === 'horizontal' ? element.width : element.height) + gap;
+
+          return { elementId: element.id, position: nextPosition };
+        }),
+      );
+      pushToast('success', `Distributed the selection ${axis}.`);
+    },
+    [editorStore, pushToast, selectedMovableElements],
+  );
 
   const pasteClipboardElements = useCallback((): void => {
     if (clipboardRef.current.length === 0) {
@@ -1007,6 +1311,15 @@ export function DemoApp(): React.JSX.Element {
           data-testid="demo-shell"
           style={{ backgroundColor: color('surface'), color: color('foreground') }}
         >
+          <input
+            ref={fileInputRef}
+            accept=".json,application/json"
+            hidden
+            type="file"
+            onChange={(event) => {
+              void handleImportFileChange(event);
+            }}
+          />
           <style>{`@keyframes demo-toast-slide-in { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }`}</style>
 
           {editorState.canvasSettings.showRulers ?
@@ -1051,7 +1364,7 @@ export function DemoApp(): React.JSX.Element {
                 className="relative h-full overflow-hidden"
                 style={{
                   padding: sp('sp-04'),
-                  paddingRight: isSidebarOpen ? `${String(sidebarWidth + FLOATING_OFFSET * 2)}px` : sp('sp-04'),
+                  paddingRight: sp('sp-04'),
                 }}
               >
                 <div
@@ -1059,267 +1372,580 @@ export function DemoApp(): React.JSX.Element {
                   data-testid="demo-main-toolbar"
                   style={{
                     left: `${String(FLOATING_OFFSET)}px`,
-                    right: `${String(FLOATING_OFFSET)}px`,
+                    maxWidth: `calc(100% - ${String(FLOATING_OFFSET * 2)}px)`,
                     top: `${String(FLOATING_OFFSET)}px`,
                   }}
                 >
-                  <Card className="pointer-events-auto" style={glassPanelStyle()} variant="secondary">
-                    <CardContent className="flex flex-col gap-2 p-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <ToolbarMenu label="File">
-                            <Dropdown.Item
-                              key="open-demo"
-                              onAction={() => {
-                                pushToast('info', 'Open/import is not wired in this MVP shell yet.');
-                              }}
-                            >
-                              <span className="inline-flex items-center gap-2">
-                                <FolderOpen size={14} />
-                                Open
-                              </span>
-                            </Dropdown.Item>
-                            <Dropdown.Item key="save-demo" onAction={handleSaveDocument}>
-                              <span className="inline-flex items-center gap-2">
-                                <Save size={14} />
-                                Save
-                              </span>
-                            </Dropdown.Item>
-                          </ToolbarMenu>
-
-                          <ToolbarMenu label="View">
-                            <Dropdown.Item
-                              key="toggle-rulers"
-                              onAction={() => {
-                                editorStore
-                                  .getState()
-                                  .updateCanvasSettings({ showRulers: !editorState.canvasSettings.showRulers });
-                              }}
-                            >
-                              <span className="inline-flex items-center gap-2">
-                                <Ruler size={14} />
-                                {editorState.canvasSettings.showRulers ? 'Hide rulers' : 'Show rulers'}
-                              </span>
-                            </Dropdown.Item>
-                            <Dropdown.Item
-                              key="toggle-grid"
-                              onAction={() => {
-                                editorStore
-                                  .getState()
-                                  .updateGridSettings({ showGrid: !editorState.gridSettings.showGrid });
-                              }}
-                            >
-                              <span className="inline-flex items-center gap-2">
-                                <Grid3X3 size={14} />
-                                {editorState.gridSettings.showGrid ? 'Hide grid' : 'Show grid'}
-                              </span>
-                            </Dropdown.Item>
-                          </ToolbarMenu>
-
-                          <ToolbarMenu label="Scenes">
-                            {currentDocument.pages.map((page, index) => (
-                              <Dropdown.Item
-                                key={page.id}
-                                onAction={() => {
-                                  editorStore.getState().switchPage(index);
-                                }}
-                              >
-                                <span className="inline-flex items-center gap-2">
-                                  {editorState.activePageIndex === index ?
-                                    <CheckCircle2 size={14} />
-                                  : <span aria-hidden="true" style={{ display: 'inline-block', width: '14px' }} />}
-                                  {page.name}
-                                </span>
-                              </Dropdown.Item>
-                            ))}
-                            <Dropdown.Item
-                              key="add-scene"
-                              onAction={() => {
-                                editorStore.getState().addPage();
-                                pushToast('success', 'Added a new scene.');
-                              }}
-                            >
-                              <span className="inline-flex items-center gap-2">
-                                <Plus size={14} />
-                                Add scene
-                              </span>
-                            </Dropdown.Item>
-                            <Dropdown.Item
-                              key="remove-scene"
-                              isDisabled={currentDocument.pages.length <= 1}
-                              onAction={() => {
-                                editorStore.getState().removePage(editorState.activePageIndex);
-                                pushToast('info', 'Removed the current scene.');
-                              }}
-                            >
-                              <span className="inline-flex items-center gap-2">
-                                <Trash2 size={14} />
-                                Remove scene
-                              </span>
-                            </Dropdown.Item>
-                          </ToolbarMenu>
-
-                          <ToolbarMenu label="Help">
-                            <Dropdown.Item
-                              key="shortcuts-help"
-                              onAction={() => {
-                                pushToast(
-                                  'info',
-                                  'Shortcuts: Cmd/Ctrl+S saves, Cmd/Ctrl+Z undoes, Delete removes, Esc exits placement.',
-                                );
-                              }}
-                            >
-                              <span className="inline-flex items-center gap-2">
-                                <Keyboard size={14} />
-                                Keyboard shortcuts
-                              </span>
-                            </Dropdown.Item>
-                            <Dropdown.Item
-                              key="about-demo"
-                              onAction={() => {
-                                pushToast(
-                                  'info',
-                                  'Broadset Phase 4 demo shell — dark editor chrome with live preview and placement mode.',
-                                );
-                              }}
-                            >
-                              <span className="inline-flex items-center gap-2">
-                                <Info size={14} />
-                                About
-                              </span>
-                            </Dropdown.Item>
-                          </ToolbarMenu>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Chip color="accent" size="sm" variant="soft">
-                            {currentDocument.name}
-                          </Chip>
-                          <Chip color="default" size="sm" variant="soft">
-                            {currentDocument.canvas.width}×{currentDocument.canvas.height}
-                          </Chip>
-                          <Chip color="success" size="sm" variant="soft">
-                            {projectDocuments} docs
-                          </Chip>
-                          <Chip color="warning" size="sm" variant="soft">
-                            {totalElements} elements
-                          </Chip>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            aria-label={isPlaying ? 'Pause demo playback' : 'Play demo playback'}
-                            data-testid="demo-playback-toggle"
-                            onPress={handleTogglePlayback}
-                            size="sm"
-                            variant="primary"
-                          >
-                            <span className="inline-flex items-center gap-2">
-                              {isPlaying ?
-                                <Pause size={16} />
-                              : <Play size={16} />}
-                              {isPlaying ? 'Pause' : 'Play'}
-                            </span>
-                          </Button>
-                          <Button
-                            aria-label="Reset demo playback"
-                            data-testid="demo-playback-reset"
-                            onPress={handleResetPlayback}
-                            size="sm"
-                            variant="outline"
-                          >
-                            <span className="inline-flex items-center gap-2">
-                              <RotateCcw size={16} />
-                              Reset
-                            </span>
-                          </Button>
-                          <Tooltip>
-                            <Tooltip.Trigger>
-                              <Button
-                                aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-                                isIconOnly
-                                size="sm"
-                                variant="ghost"
-                                onPress={() => {
-                                  void handleToggleFullscreen();
-                                }}
-                              >
-                                {isFullscreen ?
-                                  <Minimize2 size={16} />
-                                : <Maximize2 size={16} />}
-                              </Button>
-                            </Tooltip.Trigger>
-                            <Tooltip.Content>{isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}</Tooltip.Content>
-                          </Tooltip>
-                        </div>
-                      </div>
-
-                      <EditorToolbar
-                        canRedo={temporalState.futureStates.length > 0}
-                        canUndo={temporalState.pastStates.length > 0}
-                        onSave={handleSaveDocument}
-                        onRedo={() => {
-                          editorStore.getState().redo();
-                        }}
-                        onToggleGrid={() => {
-                          editorStore.getState().updateGridSettings({ showGrid: !editorState.gridSettings.showGrid });
-                        }}
-                        onToggleGuides={() => {
-                          const state = editorStore.getState();
-
-                          if (state.canvasSettings.guides.length > 0) {
-                            for (const guide of state.canvasSettings.guides) {
-                              state.removeGuide(guide.id);
-                            }
-
-                            return;
-                          }
-
-                          state.addGuide({ locked: false, pos: 120, type: 'h' });
-                          state.addGuide({ locked: false, pos: 240, type: 'v' });
-                        }}
-                        onUndo={() => {
-                          editorStore.getState().undo();
-                        }}
-                        showGrid={editorState.gridSettings.showGrid}
-                        showGuides={editorState.canvasSettings.guides.length > 0}
-                        zoomPercent={editorState.canvasSettings.zoom * 100}
-                      />
-                    </CardContent>
-                  </Card>
-
-                  <div className="pointer-events-none mt-3 flex items-start gap-4">
+                  <Toolbar
+                    aria-label="Main editor toolbar"
+                    className="pointer-events-auto"
+                    isAttached
+                    style={{
+                      ...glassPanelStyle(),
+                      alignItems: 'center',
+                      borderRadius: '0.75rem',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: sp('sp-02'),
+                      minHeight: '28px',
+                      padding: sp('sp-01'),
+                    }}
+                  >
                     <div
-                      className="pointer-events-auto"
-                      data-testid="demo-element-library"
-                      style={{ width: `${String(ELEMENT_LIBRARY_WIDTH)}px` }}
+                      style={{
+                        alignItems: 'center',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: sp('sp-01'),
+                        whiteSpace: 'nowrap',
+                      }}
                     >
-                      <ElementLibrary
-                        activeType={editorState.pendingPlacementType}
-                        elementTypes={DEFAULT_ELEMENT_TYPES}
-                        onSelect={handleElementSelect}
-                      />
+                      <ToolbarMenu label="File">
+                        <Dropdown.Item
+                          key="new-document"
+                          onAction={() => {
+                            setActiveDialog('new-document');
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <FilePlus size={14} />
+                            New Document
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item key="open-demo" onAction={handleOpenImportDialog}>
+                          <span className="inline-flex items-center gap-2">
+                            <FolderOpen size={14} />
+                            Open
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item key="save-demo" onAction={handleSaveDocument}>
+                          <span className="inline-flex items-center gap-2">
+                            <Save size={14} />
+                            Save
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item key="save-json" onAction={handleSaveAsJson}>
+                          <span className="inline-flex items-center gap-2">
+                            <Download size={14} />
+                            Save as JSON
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item key="import-demo" onAction={handleOpenImportDialog}>
+                          <span className="inline-flex items-center gap-2">
+                            <Upload size={14} />
+                            Import
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="export-demo"
+                          onAction={() => {
+                            setActiveDialog('export');
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <FileOutput size={14} />
+                            Export
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="document-settings"
+                          onAction={() => {
+                            setActiveDialog('settings');
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Settings size={14} />
+                            Document Settings
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item key="debug-snapshot" onAction={handleDebugSnapshotDownload}>
+                          <span className="inline-flex items-center gap-2">
+                            <Bug size={14} />
+                            Debug Snapshot
+                          </span>
+                        </Dropdown.Item>
+                      </ToolbarMenu>
 
-                      <div className="mt-3" data-testid="demo-scene-sorter">
-                        <PageSorter
-                          activePageIndex={editorState.activePageIndex}
-                          onPageAdd={() => {
+                      <ToolbarMenu label="View">
+                        <Dropdown.Item
+                          key="toggle-rulers"
+                          onAction={() => {
+                            editorStore
+                              .getState()
+                              .updateCanvasSettings({ showRulers: !editorState.canvasSettings.showRulers });
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Ruler size={14} />
+                            <span>Show rulers</span>
+                            {editorState.canvasSettings.showRulers ?
+                              <CheckCircle2 size={14} />
+                            : null}
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="toggle-grid"
+                          onAction={() => {
+                            editorStore.getState().updateGridSettings({ showGrid: !editorState.gridSettings.showGrid });
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Grid3X3 size={14} />
+                            <span>Show grid</span>
+                            {editorState.gridSettings.showGrid ?
+                              <CheckCircle2 size={14} />
+                            : null}
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="snap-to-grid"
+                          onAction={() => {
+                            editorStore
+                              .getState()
+                              .updateGridSettings({ snapToGrid: !editorState.gridSettings.snapToGrid });
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Magnet size={14} />
+                            <span>Snap to Grid</span>
+                            {editorState.gridSettings.snapToGrid ?
+                              <CheckCircle2 size={14} />
+                            : null}
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="unit-px"
+                          onAction={() => {
+                            editorStore.getState().updateCanvasSettings({ units: 'px' });
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            {editorState.canvasSettings.units === 'px' ?
+                              <CheckCircle2 size={14} />
+                            : <span aria-hidden="true">•</span>}
+                            Units: px
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="unit-mm"
+                          onAction={() => {
+                            editorStore.getState().updateCanvasSettings({ units: 'mm' });
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            {editorState.canvasSettings.units === 'mm' ?
+                              <CheckCircle2 size={14} />
+                            : <span aria-hidden="true">•</span>}
+                            Units: mm
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="unit-in"
+                          onAction={() => {
+                            editorStore.getState().updateCanvasSettings({ units: 'in' });
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            {editorState.canvasSettings.units === 'in' ?
+                              <CheckCircle2 size={14} />
+                            : <span aria-hidden="true">•</span>}
+                            Units: in
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="view-mode-none"
+                          onAction={() => {
+                            editorStore.getState().updateCanvasSettings({ viewMode: 'none' });
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            {editorState.canvasSettings.viewMode === 'none' ?
+                              <CheckCircle2 size={14} />
+                            : <span aria-hidden="true">•</span>}
+                            View Mode: None
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="view-mode-broadcast"
+                          onAction={() => {
+                            editorStore.getState().updateCanvasSettings({ viewMode: 'broadcast' });
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            {editorState.canvasSettings.viewMode === 'broadcast' ?
+                              <CheckCircle2 size={14} />
+                            : <span aria-hidden="true">•</span>}
+                            View Mode: Broadcast
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="view-mode-print"
+                          onAction={() => {
+                            editorStore.getState().updateCanvasSettings({ viewMode: 'print' });
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            {editorState.canvasSettings.viewMode === 'print' ?
+                              <CheckCircle2 size={14} />
+                            : <span aria-hidden="true">•</span>}
+                            View Mode: Print
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="grid-size"
+                          onAction={() => {
+                            setActiveDialog('settings');
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Hash size={14} />
+                            Grid Size
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="snap-threshold"
+                          onAction={() => {
+                            setActiveDialog('settings');
+                          }}
+                        >
+                          Snap Threshold
+                        </Dropdown.Item>
+                        <Dropdown.Item key="zoom-to-fit" onAction={handleZoomToFit}>
+                          <span className="inline-flex items-center gap-2">
+                            <Maximize2 size={14} />
+                            Zoom to Fit
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item key="reset-zoom" onAction={handleResetZoom}>
+                          <span className="inline-flex items-center gap-2">
+                            <RotateCcw size={14} />
+                            Reset Zoom
+                          </span>
+                        </Dropdown.Item>
+                      </ToolbarMenu>
+
+                      <ToolbarMenu label="Scenes">
+                        {currentDocument.pages.map((page, index) => (
+                          <Dropdown.Item
+                            key={page.id}
+                            onAction={() => {
+                              editorStore.getState().switchPage(index);
+                            }}
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              {editorState.activePageIndex === index ?
+                                <CheckCircle2 size={14} />
+                              : <span aria-hidden="true" style={{ display: 'inline-block', width: '14px' }} />}
+                              {page.name}
+                            </span>
+                          </Dropdown.Item>
+                        ))}
+                        <Dropdown.Item
+                          key="add-scene"
+                          onAction={() => {
                             editorStore.getState().addPage();
+                            pushToast('success', 'Added a new scene.');
                           }}
-                          onPageRemove={(index) => {
-                            editorStore.getState().removePage(index);
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Plus size={14} />
+                            Add scene
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="remove-scene"
+                          isDisabled={currentDocument.pages.length <= 1}
+                          onAction={() => {
+                            editorStore.getState().removePage(editorState.activePageIndex);
+                            pushToast('info', 'Removed the current scene.');
                           }}
-                          onPageSelect={(index) => {
-                            editorStore.getState().switchPage(index);
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Trash2 size={14} />
+                            Remove scene
+                          </span>
+                        </Dropdown.Item>
+                      </ToolbarMenu>
+
+                      <ToolbarMenu label="Help">
+                        <Dropdown.Item
+                          key="shortcuts-help"
+                          onAction={() => {
+                            setActiveDialog('shortcuts');
                           }}
-                          pages={currentDocument.pages}
-                        />
-                      </div>
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Keyboard size={14} />
+                            Keyboard shortcuts
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="about-demo"
+                          onAction={() => {
+                            setActiveDialog('about');
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Info size={14} />
+                            About
+                          </span>
+                        </Dropdown.Item>
+                      </ToolbarMenu>
                     </div>
 
-                    <div className="flex flex-1 justify-center">
+                    <div
+                      style={{
+                        alignItems: 'center',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: sp('sp-01'),
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <IconToolButton
+                        label="Undo"
+                        isDisabled={temporalState.pastStates.length === 0}
+                        onPress={() => {
+                          editorStore.getState().undo();
+                        }}
+                      >
+                        <RotateCcw size={16} />
+                      </IconToolButton>
+                      <IconToolButton
+                        label="Redo"
+                        isDisabled={temporalState.futureStates.length === 0}
+                        onPress={() => {
+                          editorStore.getState().redo();
+                        }}
+                      >
+                        <RotateCcw size={16} style={{ transform: 'scaleX(-1)' }} />
+                      </IconToolButton>
+                      <IconToolButton
+                        label={isPlaying ? 'Pause playback' : 'Play playback'}
+                        testId="demo-playback-toggle"
+                        onPress={handleTogglePlayback}
+                      >
+                        {isPlaying ?
+                          <Pause size={16} />
+                        : <Play size={16} />}
+                      </IconToolButton>
+                      <IconToolButton label="Reset playback" testId="demo-playback-reset" onPress={handleResetPlayback}>
+                        <RotateCcw size={16} />
+                      </IconToolButton>
+                    </div>
+
+                    {selectedElements.length >= 2 ?
+                      <div style={{ alignItems: 'center', display: 'flex', gap: sp('sp-02'), whiteSpace: 'nowrap' }}>
+                        <ButtonGroup size="sm" variant="ghost">
+                          <IconToolButton
+                            label="Align left"
+                            isDisabled={selectedMovableElements.length < 2}
+                            onPress={() => {
+                              handleAlignSelection('left');
+                            }}
+                          >
+                            <span aria-hidden="true">⇤</span>
+                          </IconToolButton>
+                          <IconToolButton
+                            label="Align center"
+                            isDisabled={selectedMovableElements.length < 2}
+                            onPress={() => {
+                              handleAlignSelection('center-x');
+                            }}
+                          >
+                            <span aria-hidden="true">↔</span>
+                          </IconToolButton>
+                          <IconToolButton
+                            label="Align right"
+                            isDisabled={selectedMovableElements.length < 2}
+                            onPress={() => {
+                              handleAlignSelection('right');
+                            }}
+                          >
+                            <span aria-hidden="true">⇥</span>
+                          </IconToolButton>
+                        </ButtonGroup>
+                        <ButtonGroup size="sm" variant="ghost">
+                          <IconToolButton
+                            label="Align top"
+                            isDisabled={selectedMovableElements.length < 2}
+                            onPress={() => {
+                              handleAlignSelection('top');
+                            }}
+                          >
+                            <span aria-hidden="true">⇡</span>
+                          </IconToolButton>
+                          <IconToolButton
+                            label="Align middle"
+                            isDisabled={selectedMovableElements.length < 2}
+                            onPress={() => {
+                              handleAlignSelection('center-y');
+                            }}
+                          >
+                            <span aria-hidden="true">↕</span>
+                          </IconToolButton>
+                          <IconToolButton
+                            label="Align bottom"
+                            isDisabled={selectedMovableElements.length < 2}
+                            onPress={() => {
+                              handleAlignSelection('bottom');
+                            }}
+                          >
+                            <span aria-hidden="true">⇣</span>
+                          </IconToolButton>
+                        </ButtonGroup>
+                        <ButtonGroup size="sm" variant="ghost">
+                          <IconToolButton
+                            label="Distribute horizontal"
+                            isDisabled={selectedMovableElements.length < 3}
+                            onPress={() => {
+                              handleDistributeSelection('horizontal');
+                            }}
+                          >
+                            <span aria-hidden="true">⇹</span>
+                          </IconToolButton>
+                          <IconToolButton
+                            label="Distribute vertical"
+                            isDisabled={selectedMovableElements.length < 3}
+                            onPress={() => {
+                              handleDistributeSelection('vertical');
+                            }}
+                          >
+                            <span aria-hidden="true">⇵</span>
+                          </IconToolButton>
+                        </ButtonGroup>
+                        <ButtonGroup size="sm" variant="ghost">
+                          <IconToolButton
+                            label="Group selection"
+                            onPress={() => {
+                              editorStore.getState().groupElements();
+                            }}
+                          >
+                            <span aria-hidden="true">⊡</span>
+                          </IconToolButton>
+                          <IconToolButton
+                            label="Ungroup selection"
+                            isDisabled={!hasGroupedSelection}
+                            onPress={() => {
+                              editorStore.getState().ungroupElements();
+                            }}
+                          >
+                            <span aria-hidden="true">⊟</span>
+                          </IconToolButton>
+                        </ButtonGroup>
+                      </div>
+                    : null}
+
+                    <div
+                      style={{
+                        alignItems: 'center',
+                        display: 'flex',
+                        gap: sp('sp-01'),
+                        maxWidth: '240px',
+                        minWidth: '0',
+                        overflow: 'hidden',
+                        paddingInline: sp('sp-01'),
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: color('foreground'),
+                          fontSize: font('label'),
+                          fontWeight: 600,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {currentDocument.name}
+                      </span>
+                      <span aria-hidden="true" style={{ color: color('muted') }}>
+                        •
+                      </span>
+                      <span
+                        style={{
+                          color: color('muted'),
+                          fontSize: font('label'),
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {resolutionLabel}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        alignItems: 'center',
+                        display: 'flex',
+                        gap: sp('sp-01'),
+                        paddingLeft: sp('sp-01'),
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <IconToolButton
+                        label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                        onPress={() => {
+                          void handleToggleFullscreen();
+                        }}
+                      >
+                        {isFullscreen ?
+                          <Minimize2 size={16} />
+                        : <Maximize2 size={16} />}
+                      </IconToolButton>
+                      <span
+                        aria-label="Zoom level"
+                        style={{
+                          color: color('muted'),
+                          fontSize: font('label'),
+                          minWidth: '3rem',
+                          textAlign: 'right',
+                        }}
+                      >
+                        {Math.round(editorState.canvasSettings.zoom * 100)}%
+                      </span>
+                    </div>
+                  </Toolbar>
+
+                  <div
+                    className="pointer-events-none"
+                    style={{ display: 'flex', gap: sp('sp-03'), marginTop: sp('sp-03') }}
+                  >
+                    <div className="pointer-events-auto" data-testid="demo-element-library">
+                      <Toolbar
+                        aria-label="Element toolbar"
+                        isAttached
+                        orientation="vertical"
+                        style={{
+                          ...glassPanelStyle(),
+                          borderRadius: '0.75rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: sp('sp-01'),
+                          padding: sp('sp-01'),
+                        }}
+                      >
+                        {ELEMENT_TOOL_TYPES.map((elementType) => (
+                          <IconToolButton
+                            key={elementType.type}
+                            label={elementType.label}
+                            isActive={editorState.pendingPlacementType === elementType.type}
+                            onPress={() => {
+                              handleElementSelect(elementType.type);
+                            }}
+                          >
+                            {elementType.icon ?? <Plus size={16} />}
+                          </IconToolButton>
+                        ))}
+                      </Toolbar>
+                    </div>
+
+                    <div
+                      className="pointer-events-auto"
+                      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: '0' }}
+                    >
                       <div data-testid="placement-mode-banner" hidden={editorState.pendingPlacementType === null}>
-                        <Card className="pointer-events-auto" style={glassPanelStyle()} variant="secondary">
+                        <Card style={glassPanelStyle()} variant="secondary">
                           <CardContent className="flex items-center gap-3 p-3">
                             <Chip color="warning" size="sm" variant="soft">
                               Placement mode
@@ -1341,6 +1967,22 @@ export function DemoApp(): React.JSX.Element {
                           </CardContent>
                         </Card>
                       </div>
+
+                      <div data-testid="demo-scene-sorter" style={{ maxWidth: '360px' }}>
+                        <PageSorter
+                          activePageIndex={editorState.activePageIndex}
+                          onPageAdd={() => {
+                            editorStore.getState().addPage();
+                          }}
+                          onPageRemove={(index) => {
+                            editorStore.getState().removePage(index);
+                          }}
+                          onPageSelect={(index) => {
+                            editorStore.getState().switchPage(index);
+                          }}
+                          pages={currentDocument.pages}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1349,121 +1991,109 @@ export function DemoApp(): React.JSX.Element {
                   className="pointer-events-none absolute z-30"
                   style={{ right: `${String(FLOATING_OFFSET)}px`, top: `${String(FLOATING_OFFSET)}px` }}
                 >
-                  <Card className="pointer-events-auto" style={glassPanelStyle()} variant="secondary">
-                    <CardContent className="flex items-center gap-2 p-2">
-                      {isSidebarOpen ?
-                        <>
-                          <Tooltip>
-                            <Tooltip.Trigger>
-                              <Button
-                                aria-label="Close sidebar"
-                                isIconOnly
-                                size="sm"
-                                variant="ghost"
-                                onPress={() => {
-                                  setIsSidebarOpen(false);
-                                }}
-                              >
-                                <X size={16} />
-                              </Button>
-                            </Tooltip.Trigger>
-                            <Tooltip.Content>Close sidebar</Tooltip.Content>
-                          </Tooltip>
-                          <span
-                            aria-hidden="true"
-                            style={{
-                              backgroundColor: color('border'),
-                              display: 'inline-block',
-                              height: '18px',
-                              width: '1px',
-                            }}
-                          />
-                        </>
-                      : null}
+                  <Toolbar
+                    aria-label="Sidebar toolbar"
+                    className="pointer-events-auto"
+                    isAttached
+                    style={{
+                      ...glassPanelStyle(),
+                      alignItems: 'center',
+                      borderRadius: '0.75rem',
+                      display: 'flex',
+                      gap: sp('sp-01'),
+                      padding: sp('sp-01'),
+                    }}
+                  >
+                    {isSidebarOpen ?
+                      <>
+                        <Tooltip>
+                          <Tooltip.Trigger>
+                            <Button
+                              aria-label="Close sidebar"
+                              isIconOnly
+                              size="sm"
+                              variant="ghost"
+                              onPress={() => {
+                                setIsSidebarOpen(false);
+                              }}
+                            >
+                              <X size={16} />
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Content>Close sidebar</Tooltip.Content>
+                        </Tooltip>
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            backgroundColor: color('border'),
+                            display: 'inline-block',
+                            height: '18px',
+                            width: '1px',
+                          }}
+                        />
+                      </>
+                    : null}
 
-                      <Tooltip>
-                        <Tooltip.Trigger>
-                          <Button
-                            aria-label="Layers"
-                            isIconOnly
-                            size="sm"
-                            variant={isSidebarOpen && sidebarTab === 'layers' ? 'primary' : 'ghost'}
-                            onPress={() => {
-                              handleSidebarTabToggle('layers');
-                            }}
-                          >
-                            <Layers3 size={16} />
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>Layers</Tooltip.Content>
-                      </Tooltip>
-                      <Tooltip>
-                        <Tooltip.Trigger>
-                          <Button
-                            aria-label="Properties"
-                            isDisabled={selectedElement === null}
-                            isIconOnly
-                            size="sm"
-                            variant={isSidebarOpen && sidebarTab === 'properties' ? 'primary' : 'ghost'}
-                            onPress={() => {
-                              handleSidebarTabToggle('properties');
-                            }}
-                          >
-                            <SlidersHorizontal size={16} />
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>Properties</Tooltip.Content>
-                      </Tooltip>
-                      <Tooltip>
-                        <Tooltip.Trigger>
-                          <Button
-                            aria-label="Animation"
-                            isDisabled={selectedElement === null}
-                            isIconOnly
-                            size="sm"
-                            variant={isSidebarOpen && sidebarTab === 'animation' ? 'primary' : 'ghost'}
-                            onPress={() => {
-                              handleSidebarTabToggle('animation');
-                            }}
-                          >
-                            <Sparkles size={16} />
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>Animation</Tooltip.Content>
-                      </Tooltip>
-                      <Tooltip>
-                        <Tooltip.Trigger>
-                          <Button
-                            aria-label="Pre-flight"
-                            isIconOnly
-                            size="sm"
-                            variant={isSidebarOpen && sidebarTab === 'preflight' ? 'primary' : 'ghost'}
-                            onPress={() => {
-                              handleSidebarTabToggle('preflight');
-                            }}
-                          >
-                            <ShieldCheck size={16} />
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>Pre-flight</Tooltip.Content>
-                      </Tooltip>
-                    </CardContent>
-                  </Card>
+                    <IconToolButton
+                      label="Layers"
+                      isActive={isSidebarOpen && sidebarTab === 'layers'}
+                      onPress={() => {
+                        handleSidebarTabToggle('layers');
+                      }}
+                    >
+                      <Layers size={16} />
+                    </IconToolButton>
+                    <IconToolButton
+                      label="Properties"
+                      isActive={isSidebarOpen && sidebarTab === 'properties'}
+                      isDisabled={selectedElement === null}
+                      onPress={() => {
+                        handleSidebarTabToggle('properties');
+                      }}
+                    >
+                      <Sliders size={16} />
+                    </IconToolButton>
+                    <IconToolButton
+                      label="Animation"
+                      isActive={isSidebarOpen && sidebarTab === 'animation'}
+                      isDisabled={selectedElement === null}
+                      onPress={() => {
+                        handleSidebarTabToggle('animation');
+                      }}
+                    >
+                      <Workflow size={16} />
+                    </IconToolButton>
+                    <IconToolButton
+                      label="Pre-flight"
+                      isActive={isSidebarOpen && sidebarTab === 'preflight'}
+                      onPress={() => {
+                        handleSidebarTabToggle('preflight');
+                      }}
+                    >
+                      <ShieldCheck size={16} />
+                    </IconToolButton>
+                  </Toolbar>
                 </div>
 
-                <div className="h-full w-full overflow-hidden" style={{ paddingTop: sp('sp-08') }}>
-                  <Card className="h-full w-full" style={glassPanelStyle()} variant="secondary">
-                    <CardContent className="h-full p-3" style={{ paddingLeft: sp('sp-08') }}>
-                      <ScreenPreview
-                        cursor={editorState.pendingPlacementType === null ? 'default' : 'crosshair'}
-                        documentData={currentDocument}
-                        isPlaying={isPlaying}
-                        onCanvasClick={handleCanvasClick}
-                        onCanvasContextMenu={handleCanvasContextMenu}
-                        resetToken={resetToken}
-                      />
-                    </CardContent>
-                  </Card>
+                <div className="h-full w-full overflow-hidden">
+                  <div
+                    className="h-full w-full overflow-hidden"
+                    data-testid="demo-canvas-workarea"
+                    style={{
+                      backgroundColor: color('surface-secondary'),
+                      border: `1px solid ${color('border')}`,
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                    }}
+                  >
+                    <ScreenPreview
+                      cursor={editorState.pendingPlacementType === null ? 'default' : 'crosshair'}
+                      documentData={currentDocument}
+                      isPlaying={isPlaying}
+                      onCanvasClick={handleCanvasClick}
+                      onCanvasContextMenu={handleCanvasContextMenu}
+                      resetToken={resetToken}
+                    />
+                  </div>
                 </div>
               </section>
 
@@ -1473,7 +2103,7 @@ export function DemoApp(): React.JSX.Element {
                 style={{
                   backgroundColor: color('surface'),
                   border: `1px solid ${color('border')}`,
-                  borderRadius: '1rem 0 0 1rem',
+                  borderRadius: '1rem',
                   bottom: `${String(SIDEBAR_EDGE_INSET)}px`,
                   boxShadow: 'var(--overlay-shadow, 0 14px 40px rgba(15, 23, 42, 0.28))',
                   overflow: 'hidden',
@@ -1735,7 +2365,227 @@ export function DemoApp(): React.JSX.Element {
                 </Card>
               : null}
 
-              <div className="pointer-events-none absolute bottom-[28px] right-[28px] z-40 flex flex-col gap-2">
+              {activeDialog === 'new-document' ?
+                <DialogPanel
+                  title="New Document"
+                  onClose={() => {
+                    setActiveDialog(null);
+                  }}
+                >
+                  <p style={{ color: color('muted'), fontSize: font('body-compact') }}>
+                    Start from a clean canvas or reload the sample broadcast layout.
+                  </p>
+                  <div style={{ display: 'flex', gap: sp('sp-02'), justifyContent: 'flex-end' }}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onPress={() => {
+                        setActiveDialog(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onPress={() => {
+                        handleCreateNewDocument('sample');
+                      }}
+                    >
+                      Load Sample
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onPress={() => {
+                        handleCreateNewDocument('empty');
+                      }}
+                    >
+                      Blank Document
+                    </Button>
+                  </div>
+                </DialogPanel>
+              : null}
+
+              {activeDialog === 'settings' ?
+                <DialogPanel
+                  title="Document Settings"
+                  onClose={() => {
+                    setActiveDialog(null);
+                  }}
+                >
+                  <Input
+                    aria-label="Document name"
+                    value={currentDocument.name}
+                    onChange={(event) => {
+                      editorStore.getState().loadTemplate({ ...currentDocument, name: event.currentTarget.value });
+                    }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02') }}>
+                    <span style={{ color: color('muted'), fontSize: font('label') }}>Units</span>
+                    <div style={{ display: 'flex', gap: sp('sp-02') }}>
+                      {(['px', 'mm', 'in'] as const).map((unit) => (
+                        <Button
+                          key={unit}
+                          size="sm"
+                          variant={editorState.canvasSettings.units === unit ? 'primary' : 'ghost'}
+                          onPress={() => {
+                            editorStore.getState().updateCanvasSettings({ units: unit });
+                          }}
+                        >
+                          {unit}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02') }}>
+                    <span style={{ color: color('muted'), fontSize: font('label') }}>View mode</span>
+                    <div style={{ display: 'flex', gap: sp('sp-02') }}>
+                      {(['none', 'broadcast', 'print'] as const).map((mode) => (
+                        <Button
+                          key={mode}
+                          size="sm"
+                          variant={editorState.canvasSettings.viewMode === mode ? 'primary' : 'ghost'}
+                          onPress={() => {
+                            editorStore.getState().updateCanvasSettings({ viewMode: mode });
+                          }}
+                        >
+                          {mode}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: sp('sp-02'), justifyContent: 'space-between' }}>
+                    <Button
+                      size="sm"
+                      variant={editorState.canvasSettings.showRulers ? 'primary' : 'ghost'}
+                      onPress={() => {
+                        editorStore
+                          .getState()
+                          .updateCanvasSettings({ showRulers: !editorState.canvasSettings.showRulers });
+                      }}
+                    >
+                      {editorState.canvasSettings.showRulers ? 'Hide rulers' : 'Show rulers'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={editorState.gridSettings.showGrid ? 'primary' : 'ghost'}
+                      onPress={() => {
+                        editorStore.getState().updateGridSettings({ showGrid: !editorState.gridSettings.showGrid });
+                      }}
+                    >
+                      {editorState.gridSettings.showGrid ? 'Hide grid' : 'Show grid'}
+                    </Button>
+                  </div>
+                  <div style={{ display: 'flex', gap: sp('sp-02'), justifyContent: 'flex-end' }}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onPress={() => {
+                        setActiveDialog(null);
+                      }}
+                    >
+                      Done
+                    </Button>
+                  </div>
+                </DialogPanel>
+              : null}
+
+              {activeDialog === 'export' ?
+                <DialogPanel
+                  title="Export"
+                  onClose={() => {
+                    setActiveDialog(null);
+                  }}
+                >
+                  <p style={{ color: color('muted'), fontSize: font('body-compact') }}>
+                    Export the current Phase 4 demo document as JSON for inspection or reuse.
+                  </p>
+                  <div style={{ display: 'flex', gap: sp('sp-02'), justifyContent: 'flex-end' }}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onPress={() => {
+                        setActiveDialog(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onPress={() => {
+                        handleSaveAsJson();
+                        setActiveDialog(null);
+                      }}
+                    >
+                      Download JSON
+                    </Button>
+                  </div>
+                </DialogPanel>
+              : null}
+
+              {activeDialog === 'shortcuts' ?
+                <DialogPanel
+                  title="Keyboard Shortcuts"
+                  onClose={() => {
+                    setActiveDialog(null);
+                  }}
+                >
+                  <ul
+                    style={{
+                      color: color('foreground'),
+                      display: 'grid',
+                      gap: sp('sp-02'),
+                      fontSize: font('body-compact'),
+                    }}
+                  >
+                    <li>⌘/Ctrl + S — Save</li>
+                    <li>⌘/Ctrl + Z — Undo</li>
+                    <li>⌘/Ctrl + Shift + Z — Redo</li>
+                    <li>Delete / Backspace — Remove selection</li>
+                    <li>Escape — Exit placement mode</li>
+                  </ul>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onPress={() => {
+                        setActiveDialog(null);
+                      }}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </DialogPanel>
+              : null}
+
+              {activeDialog === 'about' ?
+                <DialogPanel
+                  title="About Broadset Demo"
+                  onClose={() => {
+                    setActiveDialog(null);
+                  }}
+                >
+                  <p style={{ color: color('foreground'), fontSize: font('body-compact') }}>
+                    Broadset Phase 4 showcases the editor shell with floating toolbars, ruler-guided canvas work, a
+                    resizable sidebar, and live preview controls.
+                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onPress={() => {
+                        setActiveDialog(null);
+                      }}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </DialogPanel>
+              : null}
+
+              <div className="pointer-events-none absolute bottom-7 right-7 z-40 flex flex-col gap-2">
                 {toasts.map((toast) => (
                   <Card
                     key={toast.id}

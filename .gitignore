@@ -33,6 +33,10 @@ playwright-report/
 .playwright-mcp/
 .cache/
 
+# Local visual verification captures
+/demo-layout-*.png
+/demo-ui-*.png
+
 # Lint caches
 .eslintcache
 .stylelintcache

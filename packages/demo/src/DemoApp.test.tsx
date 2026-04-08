@@ -195,9 +195,28 @@ jest.mock(
       Popover: createWrapper(),
     });
 
+    const Modal = Object.assign(
+      function ModalRoot(props: MockHeroUiProps): React.JSX.Element | null {
+        const { children, isOpen = true, ...restProps } = props;
+
+        if (isOpen === false) {
+          return null;
+        }
+
+        return ReactActual.createElement('div', { role: 'dialog', ...restProps }, children ?? null);
+      },
+      {
+        Content: createWrapper(),
+        Header: createWrapper('h2'),
+        Body: createWrapper(),
+        Footer: createWrapper(),
+      },
+    );
+
     return {
       Accordion,
       Button,
+      ButtonGroup: createWrapper(),
       Card: createWrapper(),
       CardContent: createWrapper(),
       CardDescription: createWrapper('p'),
@@ -216,12 +235,13 @@ jest.mock(
       },
       ListBox: createWrapper(),
       ListBoxItem: createWrapper(),
+      Modal,
       NumberField,
       Select,
       Separator: createWrapper('hr'),
       Tabs,
       Toolbar(props: MockHeroUiProps): React.JSX.Element {
-        const { children, ...restProps } = props;
+        const { children, isAttached: _isAttached, ...restProps } = props;
 
         return ReactActual.createElement('div', { role: 'toolbar', ...restProps }, children ?? null);
       },
@@ -440,6 +460,192 @@ describe('DemoApp playback shell lifecycle', () => {
     fireEvent.click(saveButton);
 
     expect(window.localStorage.getItem('broadset:demo-document:v1')).toContain('Recovered demo layout');
+  });
+
+  /**
+   * @description Prevents the floating menu bar from nesting HeroUI trigger buttons inside other buttons, which breaks layout and accessibility in the real browser.
+   */
+  it('renders dropdown triggers without nested buttons in the floating toolbar', () => {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    render(<DemoApp />);
+
+    const toolbar = screen.getByTestId('demo-main-toolbar');
+
+    expect(toolbar.querySelector('button button')).toBeNull();
+  });
+
+  /**
+   * @description Prevents the shell from regressing back to oversized custom chrome by requiring HeroUI toolbar primitives and a square workarea that is not shrunk to make room for the sidebar.
+   */
+  it('uses compact toolbars and keeps the canvas workarea square beneath the floating sidebar', () => {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    render(<DemoApp />);
+
+    expect(screen.getAllByRole('toolbar').length).toBeGreaterThanOrEqual(3);
+
+    const mainToolbar = screen.getByRole('toolbar', { name: /main editor toolbar/i });
+    const workarea = screen.getByTestId('demo-canvas-workarea');
+    const shellSection = workarea.closest('section');
+    const sidebar = screen.getByTestId('demo-properties-sidebar');
+    const toolbarStyle = mainToolbar.getAttribute('style') ?? '';
+    const toolbarShell = screen.getByTestId('demo-main-toolbar').querySelector('.card');
+    const elementShell = screen.getByTestId('demo-element-library').querySelector('.card');
+    const sidebarShell = screen.getByRole('toolbar', { name: /sidebar toolbar/i }).closest('.card');
+
+    expect(workarea.className).not.toContain('rounded');
+    expect(shellSection?.style.paddingRight).not.toBe('332px');
+    expect(sidebar.getAttribute('style')).toContain('right: 28px');
+    expect(toolbarStyle).not.toContain('justify-content: space-between');
+    expect(toolbarStyle).not.toContain('width: 100%');
+    expect(toolbarShell).toBeNull();
+    expect(elementShell).toBeNull();
+    expect(sidebarShell).toBeNull();
+  });
+
+  /**
+   * @description Locks the Phase 4 menu-bar contract so the File and View menus expose the required editor actions instead of a trimmed subset.
+   */
+  it('renders the phase 4 file and view menu actions defined by the spec', () => {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    render(<DemoApp />);
+
+    expect(screen.getByRole('button', { name: /new document/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /save as json/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^import$/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^export$/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /document settings/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /debug snapshot/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /show rulers/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /show grid/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /hide rulers/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /hide grid/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /snap to grid/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /zoom to fit/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /reset zoom/i })).toBeTruthy();
+  });
+
+  /**
+   * @description Preserves the Phase 4 custom plugin contract so the countdown tool appears alongside the built-in element types in the vertical toolbar.
+   */
+  it('renders the countdown plugin in the element toolbar', () => {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    render(<DemoApp />);
+
+    expect(screen.getByRole('button', { name: /countdown/i })).toBeTruthy();
+  });
+
+  /**
+   * @description Ensures the Help menu opens actual modal dialogs instead of transient toasts so Phase 4 users can read shortcuts and About content without it disappearing.
+   */
+  it('opens help dialogs from the menu bar', () => {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    render(<DemoApp />);
+
+    fireEvent.click(screen.getByRole('button', { name: /keyboard shortcuts/i }));
+    expect(screen.getByRole('dialog', { name: /keyboard shortcuts/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /about/i }));
+    expect(screen.getByRole('dialog', { name: /about broadset demo/i })).toBeTruthy();
   });
 
   /**
