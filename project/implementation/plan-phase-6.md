@@ -57,8 +57,8 @@ system clipboard with custom MIME type `application/vnd.broadset.elements+json`
 
 - plain text fallback, cross-tab/cross-page paste, duplicate)
 
-* [ ] tests: red — editor/store-actions (alignment, distribution, reorder, lock, clipboard)
-* [ ] impl: green
+* [x] tests: red — editor/store-actions (alignment, distribution, reorder, lock, clipboard)
+* [x] impl: green
 * [ ] demo milestone: select ≥2 elements → alignment buttons align them;
       select ≥3 → distribute evenly; copy from one page, paste to another;
       required elements cannot be deleted

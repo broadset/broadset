@@ -1,4 +1,4 @@
-import { Button, Chip, Tabs, Toolbar, Tooltip } from '@heroui/react';
+import { Button, Chip, Dropdown, Kbd, Label, Separator, Tabs, Toolbar, Tooltip } from '@heroui/react';
 import {
   Circle,
   Clock3,
@@ -237,5 +237,214 @@ export function PageSorter({
         </ToolbarIconButton>
       : null}
     </section>
+  );
+}
+
+const MOD_KEY = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘' : 'Ctrl+';
+
+interface ContextMenuPosition {
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface CanvasContextMenuProps {
+  readonly isOpen: boolean;
+  readonly position: ContextMenuPosition;
+  readonly hasSelection: boolean;
+  readonly isLocked: boolean;
+  readonly isRequired: boolean;
+  readonly isMultiSelect: boolean;
+  readonly isGroupSelected: boolean;
+  readonly isPathElement: boolean;
+  readonly hasClipPathCapability: boolean;
+  readonly hasClipboard: boolean;
+  readonly onCut: () => void;
+  readonly onCopy: () => void;
+  readonly onPaste: () => void;
+  readonly onDuplicate: () => void;
+  readonly onDelete: () => void;
+  readonly onBringToFront: () => void;
+  readonly onBringForward: () => void;
+  readonly onSendBackward: () => void;
+  readonly onSendToBack: () => void;
+  readonly onGroup: () => void;
+  readonly onUngroup: () => void;
+  readonly onToggleLock: () => void;
+  readonly onEditClipPath: () => void;
+  readonly onEditPathPoints: () => void;
+  readonly onClose: () => void;
+}
+
+function computeDisabledKeys(props: CanvasContextMenuProps): readonly string[] {
+  const disabled: string[] = [];
+
+  if (!props.hasSelection) {
+    disabled.push(
+      'cut',
+      'copy',
+      'duplicate',
+      'delete',
+      'bring-to-front',
+      'bring-forward',
+      'send-backward',
+      'send-to-back',
+      'toggle-lock',
+    );
+  }
+
+  if (props.isLocked) {
+    disabled.push('cut', 'duplicate', 'delete');
+  }
+
+  if (props.isRequired) {
+    disabled.push('delete');
+  }
+
+  if (!props.hasClipboard) {
+    disabled.push('paste');
+  }
+
+  if (props.isMultiSelect && !props.isGroupSelected) {
+    disabled.push('ungroup');
+  }
+
+  return disabled;
+}
+
+const ACTION_MAP: Readonly<Record<string, keyof CanvasContextMenuProps>> = {
+  cut: 'onCut',
+  copy: 'onCopy',
+  paste: 'onPaste',
+  duplicate: 'onDuplicate',
+  delete: 'onDelete',
+  'bring-to-front': 'onBringToFront',
+  'bring-forward': 'onBringForward',
+  'send-backward': 'onSendBackward',
+  'send-to-back': 'onSendToBack',
+  group: 'onGroup',
+  ungroup: 'onUngroup',
+  'toggle-lock': 'onToggleLock',
+  'edit-clip-path': 'onEditClipPath',
+  'edit-path': 'onEditPathPoints',
+} as const;
+
+export function CanvasContextMenu(props: CanvasContextMenuProps): JSX.Element | null {
+  const disabledKeys = computeDisabledKeys(props);
+
+  function handleAction(key: string | number): void {
+    const callbackKey = ACTION_MAP[String(key)];
+
+    if (callbackKey !== undefined) {
+      const callback = props[callbackKey];
+
+      if (typeof callback === 'function') {
+        callback();
+      }
+    }
+
+    props.onClose();
+  }
+
+  const pasteOnlyMenu = (
+    <Dropdown.Menu aria-label="Context menu" disabledKeys={disabledKeys} onAction={handleAction}>
+      <Dropdown.Item id="paste" textValue="Paste">
+        <Label>Paste</Label>
+        <Kbd slot="keyboard">{MOD_KEY}V</Kbd>
+      </Dropdown.Item>
+    </Dropdown.Menu>
+  );
+
+  const fullMenu = (
+    <Dropdown.Menu aria-label="Context menu" disabledKeys={disabledKeys} onAction={handleAction}>
+      <Dropdown.Item id="cut" textValue="Cut">
+        <Label>Cut</Label>
+        <Kbd slot="keyboard">{MOD_KEY}X</Kbd>
+      </Dropdown.Item>
+      <Dropdown.Item id="copy" textValue="Copy">
+        <Label>Copy</Label>
+        <Kbd slot="keyboard">{MOD_KEY}C</Kbd>
+      </Dropdown.Item>
+      <Dropdown.Item id="paste" textValue="Paste">
+        <Label>Paste</Label>
+        <Kbd slot="keyboard">{MOD_KEY}V</Kbd>
+      </Dropdown.Item>
+      <Dropdown.Item id="duplicate" textValue="Duplicate">
+        <Label>Duplicate</Label>
+        <Kbd slot="keyboard">{MOD_KEY}D</Kbd>
+      </Dropdown.Item>
+
+      <Separator />
+
+      <Dropdown.Item id="delete" textValue="Delete" variant="danger">
+        <Label>Delete</Label>
+        <Kbd slot="keyboard">⌫</Kbd>
+      </Dropdown.Item>
+
+      <Separator />
+
+      <Dropdown.Item id="bring-to-front" textValue="Bring to Front">
+        <Label>Bring to Front</Label>
+      </Dropdown.Item>
+      <Dropdown.Item id="bring-forward" textValue="Bring Forward">
+        <Label>Bring Forward</Label>
+        <Kbd slot="keyboard">]</Kbd>
+      </Dropdown.Item>
+      <Dropdown.Item id="send-backward" textValue="Send Backward">
+        <Label>Send Backward</Label>
+        <Kbd slot="keyboard">[</Kbd>
+      </Dropdown.Item>
+      <Dropdown.Item id="send-to-back" textValue="Send to Back">
+        <Label>Send to Back</Label>
+      </Dropdown.Item>
+
+      {props.isMultiSelect ?
+        <>
+          <Separator />
+          <Dropdown.Item id="group" textValue="Group">
+            <Label>Group</Label>
+            <Kbd slot="keyboard">{MOD_KEY}G</Kbd>
+          </Dropdown.Item>
+          <Dropdown.Item id="ungroup" textValue="Ungroup">
+            <Label>Ungroup</Label>
+            <Kbd slot="keyboard">{MOD_KEY}⇧G</Kbd>
+          </Dropdown.Item>
+        </>
+      : null}
+
+      <Separator />
+
+      <Dropdown.Item id="toggle-lock" textValue={props.isLocked ? 'Unlock' : 'Lock'}>
+        <Label>{props.isLocked ? 'Unlock' : 'Lock'}</Label>
+        <Kbd slot="keyboard">{MOD_KEY}L</Kbd>
+      </Dropdown.Item>
+
+      {props.hasClipPathCapability ?
+        <Dropdown.Item id="edit-clip-path" textValue="Edit Clip Path">
+          <Label>Edit Clip Path</Label>
+        </Dropdown.Item>
+      : null}
+
+      {props.isPathElement ?
+        <Dropdown.Item id="edit-path" textValue="Edit Path Points">
+          <Label>Edit Path Points</Label>
+        </Dropdown.Item>
+      : null}
+    </Dropdown.Menu>
+  );
+
+  return (
+    <Dropdown
+      isOpen={props.isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          props.onClose();
+        }
+      }}
+    >
+      <Dropdown.Trigger>
+        <span style={{ position: 'fixed', left: props.position.x, top: props.position.y, width: 0, height: 0 }} />
+      </Dropdown.Trigger>
+      <Dropdown.Popover placement="bottom start">{props.hasSelection ? fullMenu : pasteOnlyMenu}</Dropdown.Popover>
+    </Dropdown>
   );
 }
