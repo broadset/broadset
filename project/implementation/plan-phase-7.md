@@ -68,10 +68,10 @@ animated preview dot showing curve behavior), `ui/timeline.md` (per-property
 keyframe lanes — expandable per-element property tracks for x, y, opacity,
 rotation, etc.)
 
-- [ ] tests: red — ui/timeline (easing graph + per-property lanes)
-- [ ] impl: green
-- [ ] **HeroUI verified**
-- [ ] demo milestone: click keyframe → easing graph opens with preset chips and
+- [x] tests: red — ui/timeline (easing graph + per-property lanes)
+- [x] impl: green
+- [x] **HeroUI verified**
+- [x] demo milestone: click keyframe → easing graph opens with preset chips and
       draggable bezier handles; expand element row → individual property tracks
       visible; animated preview dot shows easing curve behavior
 
@@ -98,5 +98,5 @@ integration)
 | 7-A animation state mutations | ☑   | ☑     | —    |
 | 7-B timeline playback         | ☑   | ☑     | —    |
 | 7-C timeline UI + bottom      | ☑   | ☑     | ☑    |
-| 7-D easing graph + lanes      | ☐   | ☐     | ☐    |
+| 7-D easing graph + lanes      | ☑   | ☑     | ☑    |
 | 7-E animation sidebar         | ☐   | ☐     | ☐    |
