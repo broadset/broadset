@@ -30,9 +30,9 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 6 — Interaction Polish
-- **In Progress:** 6-A keyboard shortcuts & focus management
-- **Last Merged:** 5-D type-specific panels + auto-size
+- **Active Phase:** Phase 7 — Animation Authoring
+- **In Progress:** 7-A timeline data model
+- **Last Merged:** 6-D context menu
 
 ---
 
