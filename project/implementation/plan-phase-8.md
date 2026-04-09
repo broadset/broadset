@@ -20,8 +20,8 @@ round-trip stable; extract editable handles for cubic C, smooth S, quadratic Q,
 horizontal H, vertical V, arc A; bounds refit with stroke padding; empty path
 no-op)
 
-- [ ] tests: red — editor/path-geometry
-- [ ] impl: green
+- [x] tests: red — editor/path-geometry
+- [x] impl: green
 
 ## Feature Group 8-B: Path editing + drawing modes
 
@@ -69,7 +69,7 @@ draggable control points, ghost preview at endpoint, start/stop editing mode)
 
 | Group                      | Red | Green | Demo |
 | -------------------------- | --- | ----- | ---- |
-| 8-A path geometry          | ☐   | ☐     | ☐    |
+| 8-A path geometry          | ✅  | ✅    | ☐    |
 | 8-B path editing + drawing | ☐   | ☐     | ☐    |
 | 8-C clip-path editing      | ☐   | ☐     | ☐    |
 | 8-D motion path editor     | ☐   | ☐     | ☐    |

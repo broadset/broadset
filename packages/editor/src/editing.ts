@@ -131,6 +131,38 @@ export function stopPathDrawing(store: EditorStore): void {
   });
 }
 
+/**
+ * Close the drawing path by appending Z and exit drawing mode (Enter behavior).
+ */
+export function closeAndStopPathDrawing(store: EditorStore): void {
+  const state = store.getState();
+  const drawingElementId = state.pathDrawingElementId;
+
+  if (drawingElementId !== null) {
+    const element = state.document.elements.find((candidate) => candidate.id === drawingElementId);
+
+    if (element !== undefined && element.content.length > 0) {
+      store.setState({
+        document: {
+          ...state.document,
+          elements: state.document.elements.map((candidate) =>
+            candidate.id === drawingElementId ? { ...candidate, content: `${candidate.content} Z` } : candidate,
+          ),
+        },
+      });
+    }
+  }
+
+  stopPathDrawing(store);
+}
+
+/**
+ * Commit the current drawing path as-is and exit drawing mode (Escape behavior).
+ */
+export function commitAndStopPathDrawing(store: EditorStore): void {
+  stopPathDrawing(store);
+}
+
 export function appendPathPoint(store: EditorStore, canvasX: number, canvasY: number): void {
   const state = store.getState();
   const drawingElementId = state.pathDrawingElementId;
