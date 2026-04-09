@@ -29,9 +29,9 @@ component registry, error boundary with fallback UI + rest of app continues,
 selector render isolation, provider boundary enforcement — error outside
 provider, reactive propagation)
 
-- [ ] tests: red — editor/data-store
-- [ ] tests: red — editor/react-data-integration (full coverage)
-- [ ] impl: green — all
+- [x] tests: red — editor/data-store
+- [x] tests: red — editor/react-data-integration (full coverage)
+- [x] impl: green — all
 - [ ] demo milestone: EditorProvider error boundary catches errors and shows
       recovery UI; data subscriptions trigger selective re-renders
 
@@ -136,7 +136,7 @@ NewDocumentModal preset; sample document on startup)
 
 | Group                              | Red | Green | Demo |
 | ---------------------------------- | --- | ----- | ---- |
-| 9-A data store + React integration | ☐   | ☐     | ☐    |
+| 9-A data store + React integration | ✅  | ✅    | ☐    |
 | 9-B live data binding              | ☐   | ☐     | ☐    |
 | 9-C collaboration / change stream  | ☐   | ☐     | ☐    |
 | 9-D modal dialogs                  | ☐   | ☐     | ☐    |

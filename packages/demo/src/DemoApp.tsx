@@ -87,6 +87,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { SAMPLE_DOCUMENT } from './sampleDocument';
+import { useLiveData } from './useLiveData';
 
 const DEMO_DOCUMENT = broadsetDocumentSchema.parse(SAMPLE_DOCUMENT);
 const DOCUMENT_STORAGE_KEY = 'broadset:demo-document:v1';
@@ -1234,6 +1235,9 @@ export function DemoApp(): React.JSX.Element {
 
   const editorStore = storeRef.current;
   const dataStore = dataStoreRef.current;
+
+  useLiveData(dataStore);
+
   const editorState = useEditorSnapshot(editorStore);
   const temporalState = editorStore.temporal.getState();
   const currentDocument = editorState.document;
