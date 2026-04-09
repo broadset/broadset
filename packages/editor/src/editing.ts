@@ -194,25 +194,18 @@ function parsePolygonPoints(clipPath: string): { readonly x: number; readonly y:
 
   const body = polygonMatch[1];
   const points: { readonly x: number; readonly y: number }[] = [];
-  let match = POLYGON_POINT_PATTERN.exec(body);
 
-  while (match !== null) {
+  for (const match of body.matchAll(POLYGON_POINT_PATTERN)) {
     const xStr = match[1];
     const yStr = match[2];
 
-    if (xStr === undefined || yStr === undefined) {
-      match = POLYGON_POINT_PATTERN.exec(body);
-      continue;
+    if (xStr !== undefined && yStr !== undefined) {
+      points.push({
+        x: Number.parseFloat(xStr.replace('%', '')),
+        y: Number.parseFloat(yStr.replace('%', '')),
+      });
     }
-
-    points.push({
-      x: Number.parseFloat(xStr.replace('%', '')),
-      y: Number.parseFloat(yStr.replace('%', '')),
-    });
-    match = POLYGON_POINT_PATTERN.exec(body);
   }
-
-  POLYGON_POINT_PATTERN.lastIndex = 0;
 
   return points;
 }

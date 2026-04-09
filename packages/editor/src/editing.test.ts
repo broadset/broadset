@@ -63,9 +63,9 @@ describe('getElementDefaults', () => {
   /** @description The placement tool must use per-type defaults so every inserted built-in element starts with sensible dimensions and starter content. */
   it('returns the expected defaults for built-in and plugin types', () => {
     expect(getElementDefaults('text')).toEqual({ width: 80, height: 20, content: 'New Text' });
-    expect(getElementDefaults('image')).toEqual({ width: 120, height: 90, content: '' });
+    expect(getElementDefaults('image')).toEqual({ width: 60, height: 60, content: '' });
     expect(getElementDefaults('path')).toEqual({ width: 80, height: 50, content: '' });
-    expect(getElementDefaults('ticker')).toEqual({ width: 320, height: 48, content: '[]' });
+    expect(getElementDefaults('ticker')).toEqual({ width: 400, height: 40, content: '["Item 1"]' });
 
     expect(
       getElementDefaults('custom-card', [

@@ -30,9 +30,9 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 8 — Path & Vector Tools
-- **In Progress:** 8-A path geometry engine
-- **Last Merged:** 7-E animation sidebar
+- **Active Phase:** Phase 9 — Data & Collaboration
+- **In Progress:** 9-A (first unit of phase 9)
+- **Last Merged:** 8-D motion path editor
 
 ---
 
@@ -66,10 +66,10 @@ Phase 11 — Advanced Features     → trim path, boolean ops, text animation, a
 | 2     | [plan-phase-2.md](plan-phase-2.md)   | `renderer` + `demo` shell             | complete    |
 | 3     | [plan-phase-3.md](plan-phase-3.md)   | `playback` + `demo` animated          | complete    |
 | 4     | [plan-phase-4.md](plan-phase-4.md)   | `editor` + `ui` + `demo` (MVP)        | complete    |
-| 5     | [plan-phase-5.md](plan-phase-5.md)   | `ui` + `editor` + `demo` (properties) | not started |
-| 6     | [plan-phase-6.md](plan-phase-6.md)   | `editor` + `ui` + `demo` (polish)     | not started |
-| 7     | [plan-phase-7.md](plan-phase-7.md)   | `editor` + `ui` + `demo` (animation)  | not started |
-| 8     | [plan-phase-8.md](plan-phase-8.md)   | `editor` + `ui` + `demo` (paths)      | not started |
+| 5     | [plan-phase-5.md](plan-phase-5.md)   | `ui` + `editor` + `demo` (properties) | complete    |
+| 6     | [plan-phase-6.md](plan-phase-6.md)   | `editor` + `ui` + `demo` (polish)     | complete    |
+| 7     | [plan-phase-7.md](plan-phase-7.md)   | `editor` + `ui` + `demo` (animation)  | complete    |
+| 8     | [plan-phase-8.md](plan-phase-8.md)   | `editor` + `ui` + `demo` (paths)      | complete    |
 | 9     | [plan-phase-9.md](plan-phase-9.md)   | `editor` + `ui` + `demo` (data)       | not started |
 | 10    | [plan-phase-10.md](plan-phase-10.md) | `formats` + `demo`                    | not started |
 | 11    | [plan-phase-11.md](plan-phase-11.md) | cross-cutting (all packages)          | not started |

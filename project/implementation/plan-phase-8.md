@@ -57,8 +57,8 @@ path seeding)
 _Editor specs:_ `editor/editing.md` (motion path editing — visual Bézier overlay,
 draggable control points, ghost preview at endpoint, start/stop editing mode)
 
-- [ ] tests: red — editor/editing (motion path editing)
-- [ ] impl: green
+- [x] tests: red — editor/editing (motion path editing)
+- [x] impl: green
 - [ ] demo milestone: select element with motion path animation → enter motion
       path edit mode → Bézier curve overlay with control points → drag to reshape
       path → ghost preview shows element at path endpoint
@@ -72,4 +72,4 @@ draggable control points, ghost preview at endpoint, start/stop editing mode)
 | 8-A path geometry          | ✅  | ✅    | ☐    |
 | 8-B path editing + drawing | ✅  | ✅    | ✅   |
 | 8-C clip-path editing      | ✅  | ✅    | ✅   |
-| 8-D motion path editor     | ☐   | ☐     | ☐    |
+| 8-D motion path editor     | ✅  | ✅    | ☐    |

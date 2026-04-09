@@ -101,17 +101,9 @@ const COORD_COUNTS: Readonly<Record<string, number>> = {
  * and number tokens.
  */
 function tokenize(d: string): readonly string[] {
-  const tokens: string[] = [];
-  // Match command letters OR signed floating-point numbers
   const re = /[a-zA-Z]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g;
-  let match: RegExpExecArray | null = re.exec(d);
 
-  while (match !== null) {
-    tokens.push(match[0]);
-    match = re.exec(d);
-  }
-
-  return tokens;
+  return Array.from(d.matchAll(re), (match) => match[0]);
 }
 
 /**
