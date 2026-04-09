@@ -41,8 +41,8 @@ zoom-compensated positioning, respects font/color/alignment, Escape/click-outsid
 commits; inline text formatting toolbar — floating bold/italic/underline/color/
 size controls during text selection)
 
-- [ ] tests: red — editor/editing (inline text editing + formatting toolbar)
-- [ ] impl: green
+- [x] tests: red — editor/editing (inline text editing + formatting toolbar)
+- [x] impl: green
 - [ ] demo milestone: double-click text element → inline editing with cursor;
       select text → floating toolbar with B/I/U/color/size; Escape commits
 
@@ -85,6 +85,6 @@ closes after action)
 | Group                     | Red | Green | Demo |
 | ------------------------- | --- | ----- | ---- |
 | 6-A keyboard shortcuts    | ☑   | ☑     | ☐    |
-| 6-B inline text + toolbar | ☐   | ☐     | ☐    |
+| 6-B inline text + toolbar | ☑   | ☑     | ☐    |
 | 6-C element operations    | ☐   | ☐     | ☐    |
 | 6-D context menu          | ☐   | ☐     | ☐    |

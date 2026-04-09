@@ -338,10 +338,7 @@ export function createKeyboardHandler(store: EditorStore, config: KeyboardHandle
 
     switch (action) {
       case 'delete': {
-        for (const elementId of state.activeElementIds) {
-          state.removeElement(elementId);
-        }
-
+        state.removeElements([...state.activeElementIds]);
         state.selectElement(null);
         break;
       }
@@ -378,10 +375,7 @@ export function createKeyboardHandler(store: EditorStore, config: KeyboardHandle
         clipboard = state.document.elements.filter((element) => selectedIds.has(element.id));
         void writeToSystemClipboard(clipboard);
 
-        for (const elementId of state.activeElementIds) {
-          state.removeElement(elementId);
-        }
-
+        state.removeElements([...state.activeElementIds]);
         state.selectElement(null);
         break;
       }

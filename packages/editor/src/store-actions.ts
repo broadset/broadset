@@ -69,6 +69,7 @@ export interface EditorState extends UIActionsState {
   readonly reorderElement: (elementId: string, direction: ReorderDirection) => void;
   readonly addElement: (typeOrElement: string | BroadsetElement) => string;
   readonly removeElement: (elementId: string) => void;
+  readonly removeElements: (elementIds: readonly string[]) => void;
   readonly undo: () => void;
   readonly redo: () => void;
   readonly groupElements: () => void;
@@ -528,6 +529,70 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
               : state.pathDrawingElementId;
             const nextInlineTextEditingElementId =
               state.inlineTextEditingElementId !== null && deletedIds.has(state.inlineTextEditingElementId) ?
+                null
+              : state.inlineTextEditingElementId;
+
+            return {
+              document: nextDocument,
+              ...createInteractionState(
+                nextActiveElementIds,
+                state.pendingPlacementType,
+                nextPathEditingElementId,
+                nextPathDrawingElementId,
+                nextInlineTextEditingElementId,
+              ),
+            };
+          });
+        },
+        removeElements(elementIds: readonly string[]): void {
+          const removableIds = elementIds.filter((elementId) => !requiredElementIds.has(elementId));
+
+          if (removableIds.length === 0) {
+            return;
+          }
+
+          set((state) => {
+            const allDeletedIds = new Set<string>();
+
+            for (const elementId of removableIds) {
+              const descendants = collectDescendantIds(state.document, elementId);
+
+              for (const descendantId of descendants) {
+                if (!requiredElementIds.has(descendantId)) {
+                  allDeletedIds.add(descendantId);
+                }
+              }
+            }
+
+            const nextDocument: BroadsetDocument = {
+              ...state.document,
+              elements: state.document.elements
+                .filter((element) => !allDeletedIds.has(element.id))
+                .map((element) =>
+                  (
+                    requiredElementIds.has(element.id) &&
+                    element.parentId !== null &&
+                    allDeletedIds.has(element.parentId)
+                  ) ?
+                    { ...element, parentId: null }
+                  : element,
+                ),
+              pages: state.document.pages.map((page) => ({
+                ...page,
+                overrides: page.overrides.filter((override) => !allDeletedIds.has(override.elementId)),
+              })),
+            };
+            const nextActiveElementIds = state.activeElementIds.filter((activeId) => !allDeletedIds.has(activeId));
+            const nextPathEditingElementId =
+              state.pathEditingElementId !== null && allDeletedIds.has(state.pathEditingElementId) ?
+                null
+              : state.pathEditingElementId;
+            const nextPathDrawingElementId =
+              state.pathDrawingElementId !== null && allDeletedIds.has(state.pathDrawingElementId) ?
+                null
+              : state.pathDrawingElementId;
+            const nextInlineTextEditingElementId =
+              state.inlineTextEditingElementId !== null && allDeletedIds.has(state.inlineTextEditingElementId) ?
                 null
               : state.inlineTextEditingElementId;
 
