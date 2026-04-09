@@ -1,4 +1,15 @@
-import React, { Component, createContext, type ReactNode, useContext, useSyncExternalStore } from 'react';
+import React, {
+  Component,
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 
 import type { BroadsetDataStore, ElementData } from './data-store';
 import type { EditorStore } from './store-actions';
@@ -96,6 +107,103 @@ export function useComponentRegistry(): ReadonlyArray<{
   }
 
   return contextValue.components;
+}
+
+export interface PlaybackState {
+  readonly isPlaying: boolean;
+  readonly currentTime: number;
+  readonly speed: number;
+  readonly play: () => void;
+  readonly pause: () => void;
+  readonly seek: (timeMs: number) => void;
+  readonly stop: () => void;
+}
+
+const PlaybackContext = createContext<PlaybackState | null>(null);
+
+/** Provider that manages timeline playback state for descendant components. */
+export function PlaybackProvider({ children }: { readonly children: ReactNode }): React.JSX.Element {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const speedRef = useRef(1);
+  const rafRef = useRef<number | null>(null);
+  const lastFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      lastFrameRef.current = null;
+
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+
+      return;
+    }
+
+    const tick = (now: number): void => {
+      if (lastFrameRef.current !== null) {
+        const delta = (now - lastFrameRef.current) * speedRef.current;
+
+        setCurrentTime((prev) => prev + delta);
+      }
+
+      lastFrameRef.current = now;
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [isPlaying]);
+
+  const play = useCallback(() => {
+    setIsPlaying(true);
+  }, []);
+
+  const pause = useCallback(() => {
+    setIsPlaying(false);
+  }, []);
+
+  const seek = useCallback((timeMs: number) => {
+    setCurrentTime(timeMs);
+  }, []);
+
+  const stop = useCallback(() => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+  }, []);
+
+  const state: PlaybackState = useMemo(
+    () => ({
+      isPlaying,
+      currentTime,
+      speed: speedRef.current,
+      play,
+      pause,
+      seek,
+      stop,
+    }),
+    [isPlaying, currentTime, play, pause, seek, stop],
+  );
+
+  return <PlaybackContext.Provider value={state}>{children}</PlaybackContext.Provider>;
+}
+
+/** Returns playback state and controls. Must be used inside a PlaybackProvider. */
+export function usePlayback(): PlaybackState {
+  const context = useContext(PlaybackContext);
+
+  if (context === null) {
+    throw new Error('usePlayback must be used inside a PlaybackProvider');
+  }
+
+  return context;
 }
 
 interface ErrorBoundaryProps {

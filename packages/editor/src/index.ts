@@ -9,4 +9,5 @@ export * from './keyboard';
 export * from './react-data-integration';
 export * from './store-actions';
 export * from './store-ui-actions';
+export * from './timeline-playback';
 export * from './transforms';

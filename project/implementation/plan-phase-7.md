@@ -27,8 +27,8 @@ modifier bindings — replace same-name; element state → visibility mapping �
 entry=onscreen, exit=offscreen; descendant propagation; modifier deduplication;
 custom clip-path persistence)
 
-- [ ] tests: red — editor/animation-state
-- [ ] impl: green
+- [x] tests: red — editor/animation-state
+- [x] impl: green
 
 ## Feature Group 7-B: Timeline playback in editor
 
@@ -95,7 +95,7 @@ integration)
 
 | Group                         | Red | Green | Demo |
 | ----------------------------- | --- | ----- | ---- |
-| 7-A animation state mutations | ☐   | ☐     | ☐    |
+| 7-A animation state mutations | ☑   | ☑     | —    |
 | 7-B timeline playback         | ☐   | ☐     | ☐    |
 | 7-C timeline UI + bottom      | ☐   | ☐     | ☐    |
 | 7-D easing graph + lanes      | ☐   | ☐     | ☐    |

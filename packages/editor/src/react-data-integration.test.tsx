@@ -10,10 +10,13 @@ import {
   BroadsetDataStoreProvider,
   EditorErrorBoundary,
   EditorProvider,
+  PlaybackProvider,
+  type PlaybackState,
   useComponentRegistry,
   useDataStoreApi,
   useEditorStore,
   useElementData,
+  usePlayback,
 } from './react-data-integration';
 import { createEditorStore } from './store-actions';
 
@@ -218,5 +221,222 @@ describe('editor provider and error boundary', () => {
     expect(spy).toHaveBeenCalled();
 
     spy.mockRestore();
+  });
+});
+
+describe('usePlayback hook', () => {
+  function requireResult(value: PlaybackState | null): PlaybackState {
+    if (value === null) {
+      throw new Error('Expected PlaybackState to be set by render');
+    }
+
+    return value;
+  }
+
+  function lastRafCallback(callbacks: ReadonlyArray<(time: number) => void>): (time: number) => void {
+    const cb = callbacks[callbacks.length - 1];
+
+    if (cb === undefined) {
+      throw new Error('No RAF callback registered');
+    }
+
+    return cb;
+  }
+
+  /** @description The playback hook must provide play, pause, seek, stop, and currentTime for timeline preview. */
+  it('provides playback control methods inside PlaybackProvider', () => {
+    let hookResult: PlaybackState | null = null;
+
+    function Consumer(): React.JSX.Element {
+      hookResult = usePlayback();
+
+      return <span>ok</span>;
+    }
+
+    render(
+      <PlaybackProvider>
+        <Consumer />
+      </PlaybackProvider>,
+    );
+
+    expect(hookResult).not.toBeNull();
+
+    const result = requireResult(hookResult);
+
+    expect(typeof result.play).toBe('function');
+    expect(typeof result.pause).toBe('function');
+    expect(typeof result.seek).toBe('function');
+    expect(typeof result.stop).toBe('function');
+    expect(typeof result.currentTime).toBe('number');
+    expect(typeof result.speed).toBe('number');
+    expect(typeof result.isPlaying).toBe('boolean');
+  });
+
+  /** @description usePlayback must throw outside its provider to fail fast on integration mistakes. */
+  it('throws when used outside PlaybackProvider', () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    function BadConsumer(): React.JSX.Element {
+      usePlayback();
+
+      return <span>bad</span>;
+    }
+
+    expect(() => render(<BadConsumer />)).toThrow(/provider/i);
+    spy.mockRestore();
+  });
+
+  /** @description Play should set isPlaying to true and advance currentTime from 0. */
+  it('play sets isPlaying to true and advances currentTime', () => {
+    let hookResult: PlaybackState | null = null;
+    const rafCallbacks: Array<(time: number) => void> = [];
+    const rafSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      rafCallbacks.push(cb as (time: number) => void);
+
+      return rafCallbacks.length;
+    });
+    const cafSpy = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+
+    function Consumer(): React.JSX.Element {
+      hookResult = usePlayback();
+
+      return <span>{hookResult.isPlaying ? 'playing' : 'stopped'}</span>;
+    }
+
+    render(
+      <PlaybackProvider>
+        <Consumer />
+      </PlaybackProvider>,
+    );
+
+    expect(requireResult(hookResult).isPlaying).toBe(false);
+    expect(requireResult(hookResult).currentTime).toBe(0);
+
+    act(() => {
+      requireResult(hookResult).play();
+    });
+
+    expect(requireResult(hookResult).isPlaying).toBe(true);
+
+    // First RAF frame sets lastFrame timestamp (no delta yet)
+    act(() => {
+      lastRafCallback(rafCallbacks)(100);
+    });
+
+    // Second frame advances by delta (200 - 100 = 100ms)
+    act(() => {
+      lastRafCallback(rafCallbacks)(200);
+    });
+
+    expect(requireResult(hookResult).currentTime).toBe(100);
+
+    rafSpy.mockRestore();
+    cafSpy.mockRestore();
+  });
+
+  /** @description Pause should stop advancing currentTime at the current position. */
+  it('pause stops playback and preserves currentTime', () => {
+    let hookResult: PlaybackState | null = null;
+    const rafCallbacks: Array<(time: number) => void> = [];
+    const rafSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      rafCallbacks.push(cb as (time: number) => void);
+
+      return rafCallbacks.length;
+    });
+    const cafSpy = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+
+    function Consumer(): React.JSX.Element {
+      hookResult = usePlayback();
+
+      return <span>ok</span>;
+    }
+
+    render(
+      <PlaybackProvider>
+        <Consumer />
+      </PlaybackProvider>,
+    );
+
+    act(() => {
+      requireResult(hookResult).play();
+    });
+
+    // Advance time by 50ms (two frames: 0→100, 100→150)
+    act(() => {
+      lastRafCallback(rafCallbacks)(100);
+    });
+
+    act(() => {
+      lastRafCallback(rafCallbacks)(150);
+    });
+
+    const timeBeforePause = requireResult(hookResult).currentTime;
+
+    expect(timeBeforePause).toBe(50);
+
+    act(() => {
+      requireResult(hookResult).pause();
+    });
+
+    expect(requireResult(hookResult).isPlaying).toBe(false);
+    expect(requireResult(hookResult).currentTime).toBe(timeBeforePause);
+
+    rafSpy.mockRestore();
+    cafSpy.mockRestore();
+  });
+
+  /** @description Seek should set currentTime to the requested offset. */
+  it('seek sets currentTime to the specified offset', () => {
+    let hookResult: PlaybackState | null = null;
+
+    function Consumer(): React.JSX.Element {
+      hookResult = usePlayback();
+
+      return <span>{hookResult.currentTime}</span>;
+    }
+
+    render(
+      <PlaybackProvider>
+        <Consumer />
+      </PlaybackProvider>,
+    );
+
+    act(() => {
+      requireResult(hookResult).seek(1500);
+    });
+
+    expect(requireResult(hookResult).currentTime).toBe(1500);
+  });
+
+  /** @description Stop must halt playback and reset currentTime to zero, not just pause at the current position. */
+  it('stop halts playback and resets currentTime to zero', () => {
+    let hookResult: PlaybackState | null = null;
+
+    function Consumer(): React.JSX.Element {
+      hookResult = usePlayback();
+
+      return <span>ok</span>;
+    }
+
+    render(
+      <PlaybackProvider>
+        <Consumer />
+      </PlaybackProvider>,
+    );
+
+    act(() => {
+      requireResult(hookResult).seek(500);
+    });
+
+    act(() => {
+      requireResult(hookResult).play();
+    });
+
+    act(() => {
+      requireResult(hookResult).stop();
+    });
+
+    expect(requireResult(hookResult).isPlaying).toBe(false);
+    expect(requireResult(hookResult).currentTime).toBe(0);
   });
 });
