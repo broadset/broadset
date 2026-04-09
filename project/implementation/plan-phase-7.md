@@ -39,9 +39,9 @@ controller; transition suppression window timing),
 `editor/react-data-integration.md` (usePlayback hook — play/pause/seek/stop/
 currentTime/speed)
 
-- [ ] tests: red — editor/timeline-playback
-- [ ] tests: red — editor/react-data-integration (usePlayback hook)
-- [ ] impl: green
+- [x] tests: red — editor/timeline-playback
+- [x] tests: red — editor/react-data-integration (usePlayback hook)
+- [x] impl: green
 
 ## Feature Group 7-C: Timeline UI + bottom panel
 
@@ -96,7 +96,7 @@ integration)
 | Group                         | Red | Green | Demo |
 | ----------------------------- | --- | ----- | ---- |
 | 7-A animation state mutations | ☑   | ☑     | —    |
-| 7-B timeline playback         | ☐   | ☐     | ☐    |
+| 7-B timeline playback         | ☑   | ☑     | —    |
 | 7-C timeline UI + bottom      | ☐   | ☐     | ☐    |
 | 7-D easing graph + lanes      | ☐   | ☐     | ☐    |
 | 7-E animation sidebar         | ☐   | ☐     | ☐    |
