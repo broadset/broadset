@@ -82,10 +82,10 @@ animations enabled guard, empty/disabled states, lock helper, keyframe property
 fields integrating with animation mode adapter, property field keyframe
 integration)
 
-- [ ] tests: red — ui/panels (animation sidebar)
-- [ ] impl: green
-- [ ] **HeroUI verified**
-- [ ] demo milestone: select element → open animation tab → add timeline → add
+- [x] tests: red — ui/panels (animation sidebar)
+- [x] impl: green
+- [x] **HeroUI verified**
+- [x] demo milestone: select element → open animation tab → add timeline → add
       keyframes in timeline editor → configure properties in animation sidebar →
       hit play → animation runs in real-time on canvas
 
@@ -99,4 +99,4 @@ integration)
 | 7-B timeline playback         | ☑   | ☑     | —    |
 | 7-C timeline UI + bottom      | ☑   | ☑     | ☑    |
 | 7-D easing graph + lanes      | ☑   | ☑     | ☑    |
-| 7-E animation sidebar         | ☐   | ☐     | ☐    |
+| 7-E animation sidebar         | ☑   | ☑     | ☑    |

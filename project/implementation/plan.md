@@ -30,9 +30,9 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 7 — Animation Authoring
-- **In Progress:** 7-A timeline data model
-- **Last Merged:** 6-D context menu
+- **Active Phase:** Phase 8 — File Format & I/O
+- **In Progress:** 8-A BSP serialization
+- **Last Merged:** 7-E animation sidebar
 
 ---
 
