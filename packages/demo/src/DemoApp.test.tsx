@@ -2,7 +2,7 @@
 
 import { createPlaybackController } from '@broadset/playback';
 import { createScreenRenderer } from '@broadset/renderer';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import * as React from 'react';
 
 import { DemoApp } from './DemoApp';
@@ -1262,5 +1262,99 @@ describe('DemoApp playback shell lifecycle', () => {
       expect(document.exitFullscreen).toHaveBeenCalledTimes(1);
       expect(screen.getByRole('button', { name: /enter fullscreen/i })).toBeTruthy();
     });
+  });
+
+  /**
+   * @description 9-A demo milestone: EditorErrorBoundary catches child errors and shows a recovery UI with reload option.
+   */
+  it('shows recovery UI when the editor canvas subtree throws', () => {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    // Spy on console.error to suppress the expected error boundary output
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    // Override the renderer to throw during render — simulates a downstream crash
+    mockedCreateScreenRenderer.mockImplementation(() => {
+      throw new Error('Canvas renderer exploded');
+    });
+
+    render(<DemoApp />);
+
+    // The error boundary should catch the error and show recovery UI
+    expect(screen.getByText(/something went wrong/i)).toBeTruthy();
+    expect(screen.getByText('Canvas renderer exploded')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /reload/i })).toBeTruthy();
+
+    // React logs the error with a component stack via console.error
+    expect(consoleSpy).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+  });
+
+  /**
+   * @description 9-C demo milestone: change stream subscription logs batches to console with a cumulative count.
+   */
+  it('logs change stream batches to the console with a cumulative count', () => {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    const consoleSpy = jest.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    render(<DemoApp />);
+
+    // Trigger a document mutation by dispatching Delete via the global keydown handler.
+    // The sample document's initialisation pre-selects an unlocked element.
+    // We wrap in act() to ensure React processes the resulting state update.
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Delete' }));
+    });
+
+    // The change stream should have logged at least one batch
+    const changeLogCalls = consoleSpy.mock.calls.filter(
+      (args) => typeof args[0] === 'string' && args[0].includes('Change batch'),
+    );
+
+    expect(changeLogCalls.length).toBeGreaterThanOrEqual(1);
+    // First batch should be numbered #1
+    expect(changeLogCalls[0]?.[0]).toMatch(/Change batch #\d+/);
+
+    consoleSpy.mockRestore();
   });
 });

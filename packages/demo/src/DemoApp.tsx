@@ -3,8 +3,11 @@ import {
   applyResize,
   applyRotation,
   cancelPlacement,
+  type ChangeStream,
+  createChangeStream,
   createDataStore,
   createEditorStore,
+  diffDocuments,
   EditorErrorBoundary,
   EditorProvider,
   type EditorStore,
@@ -1199,6 +1202,7 @@ function ScreenPreview({
 export function DemoApp(): React.JSX.Element {
   const storeRef = useRef<EditorStore | null>(null);
   const dataStoreRef = useRef<ReturnType<typeof createDataStore> | null>(null);
+  const changeStreamRef = useRef<ChangeStream | null>(null);
 
   if (storeRef.current === null) {
     const store = createEditorStore();
@@ -1218,10 +1222,44 @@ export function DemoApp(): React.JSX.Element {
     dataStoreRef.current = createDataStore();
   }
 
+  if (changeStreamRef.current === null) {
+    changeStreamRef.current = createChangeStream();
+  }
+
   const editorStore = storeRef.current;
   const dataStore = dataStoreRef.current;
+  const changeStream = changeStreamRef.current;
 
   useLiveData(dataStore);
+
+  // Subscribe the editor store to the change stream — diff documents and emit changes on each state update
+  useEffect(() => {
+    let prevDoc = editorStore.getState().document;
+
+    const unsubscribeStore = editorStore.subscribe((state) => {
+      const nextDoc = state.document;
+
+      if (nextDoc !== prevDoc) {
+        const changes = diffDocuments(prevDoc, nextDoc);
+
+        changeStream.emit(changes);
+        prevDoc = nextDoc;
+      }
+    });
+
+    // Subscribe a console logger to the change stream with a cumulative batch count
+    let batchCount = 0;
+
+    const unsubscribeStream = changeStream.subscribe((changes) => {
+      batchCount += 1;
+      console.info(`Change batch #${String(batchCount)}:`, changes.length, 'changes', changes);
+    });
+
+    return () => {
+      unsubscribeStore();
+      unsubscribeStream();
+    };
+  }, [editorStore, changeStream]);
 
   const editorState = useEditorSnapshot(editorStore);
   const temporalState = editorStore.temporal.getState();

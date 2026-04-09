@@ -58,8 +58,8 @@ suppress flag, empty arrays not emitted; ephemeral vs committed — only committ
 emitted, commit after ephemeral emits full diff from last committed state;
 echo-loop prevention)
 
-- [ ] tests: red — editor/collaboration
-- [ ] impl: green
+- [x] tests: red — editor/collaboration
+- [x] impl: green
 - [ ] demo milestone: change stream logs batches to console with cumulative count
 
 ## Feature Group 9-D: All modal dialogs
@@ -73,9 +73,9 @@ built-in; Shortcut Help — 5 groups, kbd elements, close; Template Browser moda
 — categorized grid, search/filter, responsive layout, thumbnail previews, loads
 selected template as new document)
 
-- [ ] tests: red — ui/modals (all 7 modal types)
-- [ ] impl: green
-- [ ] **HeroUI verified**
+- [x] tests: red — ui/modals (all 7 modal types)
+- [x] impl: green
+- [x] **HeroUI verified**
 - [ ] demo milestone: all modals open/close correctly; Canvas Settings changes
       take effect; Export shows feature-gated formats; New Document presets create
       correct canvas; Template Browser with categories, search, thumbnails
@@ -138,8 +138,8 @@ NewDocumentModal preset; sample document on startup)
 | ---------------------------------- | --- | ----- | ---- |
 | 9-A data store + React integration | ✅  | ✅    | ☐    |
 | 9-B live data binding              | ✅  | ✅    | ✅   |
-| 9-C collaboration / change stream  | ☐   | ☐     | ☐    |
-| 9-D modal dialogs                  | ☐   | ☐     | ☐    |
+| 9-C collaboration / change stream  | ✅  | ✅    | ☐    |
+| 9-D modal dialogs                  | ✅  | ✅    | ☐    |
 | 9-E named snapshots                | ☐   | ☐     | ☐    |
 | 9-F preflight diagnostics          | ☐   | ☐     | ☐    |
 | 9-G demo config + persistence      | ☐   | ☐     | ☐    |
