@@ -72,10 +72,10 @@ visibility toggle, delete button; inline rename via double-click, Enter commits,
 Escape cancels, empty rejected; “Scenes” terminology in UI labels not “Pages”;
 drag-to-reorder elements)
 
-- [ ] tests: red — ui/panels (layers panel)
-- [ ] impl: green
-- [ ] **HeroUI verified**
-- [ ] demo milestone: layers tab shows all elements with lock/visibility/delete
+- [x] tests: red — ui/panels (layers panel)
+- [x] impl: green
+- [x] **HeroUI verified**
+- [x] demo milestone: layers tab shows all elements with lock/visibility/delete
       controls; double-click to rename element; reorder by dragging; “Scenes”
       label used throughout
 
@@ -104,5 +104,5 @@ shrink-to-fit with minimum 6pt)
 | ----------------------------- | --- | ----- | ---- |
 | 5-A input components          | ☐   | ☐     | ☐    |
 | 5-B full properties panel     | ☐   | ☐     | ☐    |
-| 5-C layers panel              | ☐   | ☐     | ☐    |
+| 5-C layers panel              | ☒   | ☒     | ☒    |
 | 5-D type-specific + auto-size | ☐   | ☐     | ☐    |

@@ -1,6 +1,18 @@
 import { getCapabilityProfile } from '@broadset/model';
-import { Accordion, Button, Input, ListBox, ListBoxItem, NumberField, Select, Slider, Switch } from '@heroui/react';
 import {
+  Accordion,
+  Button,
+  ButtonGroup,
+  Input,
+  ListBox,
+  ListBoxItem,
+  NumberField,
+  Select,
+  Slider,
+  Switch,
+} from '@heroui/react';
+import {
+  ArrowDownUp,
   ChevronDown,
   ChevronRight,
   Circle,
@@ -14,7 +26,9 @@ import {
   LetterText,
   Link2,
   Lock,
+  Minimize2,
   PenTool,
+  Plus,
   QrCode,
   Square,
   Trash2,
@@ -23,7 +37,7 @@ import {
   Unlock,
   Video,
 } from 'lucide-react';
-import type { JSX, ReactNode } from 'react';
+import type { DragEvent as ReactDragEvent, JSX, ReactNode } from 'react';
 import { createContext, useCallback, useContext, useState } from 'react';
 
 import { ColorInput, CssLengthInput, FilterEditor, NumField, ShadowEditor, TextStrokeInput } from './inputs';
@@ -183,6 +197,20 @@ export interface PanelElement {
   readonly errorCorrection: string;
   readonly qrForegroundColor: string;
   readonly qrBackgroundColor: string;
+  readonly videoAutoplay?: boolean | undefined;
+  readonly videoLoop?: boolean | undefined;
+  readonly videoMuted?: boolean | undefined;
+  readonly videoStartTime?: number | undefined;
+  readonly videoEndTime?: number | undefined;
+  readonly clockMode?: string | undefined;
+  readonly clockStartValue?: string | undefined;
+  readonly clockTargetValue?: string | undefined;
+  readonly clockCountdownTo?: string | undefined;
+  readonly tickerItems?: readonly string[] | undefined;
+  readonly tickerSpeed?: number | undefined;
+  readonly tickerDirection?: string | undefined;
+  readonly tickerGap?: number | undefined;
+  readonly tickerPaused?: boolean | undefined;
 }
 
 export interface LayerInfo {
@@ -233,6 +261,7 @@ function NumericField({
   step,
   minValue,
   maxValue,
+  isDisabled,
 }: {
   readonly label: string;
   readonly value: number;
@@ -240,11 +269,13 @@ function NumericField({
   readonly step?: number | undefined;
   readonly minValue?: number | undefined;
   readonly maxValue?: number | undefined;
+  readonly isDisabled?: boolean | undefined;
 }): JSX.Element {
   return (
     <FieldShell label={label}>
       <NumberField
         aria-label={label}
+        isDisabled={isDisabled ?? false}
         value={value}
         onChange={(nextValue) => {
           onValueChange(typeof nextValue === 'number' ? nextValue : Number(nextValue));
@@ -358,6 +389,8 @@ export interface GeometryPanelProps {
   readonly anchorY?: 'top' | 'bottom' | undefined;
   readonly canvasWidth?: number | undefined;
   readonly canvasHeight?: number | undefined;
+  readonly autoSize?: string | undefined;
+  readonly elementType?: string | undefined;
   readonly onUpdate: (key: string, value: string | number) => void;
   readonly documentMode: 'screen' | 'print';
 }
@@ -376,6 +409,8 @@ export function GeometryPanel({
   anchorY = 'top',
   canvasWidth = 1920,
   canvasHeight = 1080,
+  autoSize,
+  elementType,
   onUpdate,
   documentMode,
 }: GeometryPanelProps): JSX.Element {
@@ -387,6 +422,9 @@ export function GeometryPanel({
   const show3D =
     isScreenMode &&
     (rotateX !== undefined || rotateY !== undefined || rotateZ !== undefined || translateZ !== undefined);
+
+  const showAutoSize = elementType === 'text';
+  const isAutoHeight = autoSize === 'auto-height';
 
   return (
     <section aria-label="Geometry" role="region" className="grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -413,6 +451,7 @@ export function GeometryPanel({
         }}
       />
       <NumericField
+        isDisabled={isAutoHeight}
         label="Height"
         value={displayHeight}
         minValue={0.1}
@@ -427,6 +466,42 @@ export function GeometryPanel({
           onUpdate('rotation', v);
         }}
       />
+      {showAutoSize ?
+        <div className="col-span-full" style={{ marginTop: sp('sp-02') }}>
+          <ButtonGroup aria-label="Auto-size mode">
+            <Button
+              aria-label="Fixed"
+              size="sm"
+              variant={autoSize === 'fixed' || autoSize === undefined ? 'secondary' : 'ghost'}
+              onPress={() => {
+                onUpdate('autoSize', 'fixed');
+              }}
+            >
+              <Lock size={ICON_SIZE} /> Fixed
+            </Button>
+            <Button
+              aria-label="Auto Height"
+              size="sm"
+              variant={autoSize === 'auto-height' ? 'secondary' : 'ghost'}
+              onPress={() => {
+                onUpdate('autoSize', 'auto-height');
+              }}
+            >
+              <ArrowDownUp size={ICON_SIZE} /> Auto Height
+            </Button>
+            <Button
+              aria-label="Shrink to Fit"
+              size="sm"
+              variant={autoSize === 'shrink-to-fit' ? 'secondary' : 'ghost'}
+              onPress={() => {
+                onUpdate('autoSize', 'shrink-to-fit');
+              }}
+            >
+              <Minimize2 size={ICON_SIZE} /> Shrink to Fit
+            </Button>
+          </ButtonGroup>
+        </div>
+      : null}
       {show3D ?
         <>
           <NumericField
@@ -1409,6 +1484,332 @@ export function AnimationModePropertiesPanel({
 }
 
 /* ------------------------------------------------------------------ */
+/*  VideoPanel — source URL, autoplay, loop, muted, start/end time     */
+/* ------------------------------------------------------------------ */
+
+export interface VideoPanelProps {
+  readonly sourceUrl: string;
+  readonly autoplay: boolean;
+  readonly loop: boolean;
+  readonly muted: boolean;
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly onUpdate: (key: string, value: string | number | boolean) => void;
+}
+
+export function VideoPanel({
+  sourceUrl,
+  autoplay,
+  loop,
+  muted,
+  startTime,
+  endTime,
+  onUpdate,
+}: VideoPanelProps): JSX.Element {
+  return (
+    <section aria-label="Video" role="region" className="grid grid-cols-1 gap-2">
+      <FieldShell label="Source URL">
+        <Input
+          aria-label="Source URL"
+          value={sourceUrl}
+          onChange={(e) => {
+            onUpdate('content', e.currentTarget.value);
+          }}
+        />
+      </FieldShell>
+      <Switch
+        aria-label="Autoplay"
+        isSelected={autoplay}
+        onChange={(v) => {
+          onUpdate('autoplay', v);
+        }}
+      >
+        Autoplay
+      </Switch>
+      <Switch
+        aria-label="Loop"
+        isSelected={loop}
+        onChange={(v) => {
+          onUpdate('loop', v);
+        }}
+      >
+        Loop
+      </Switch>
+      <Switch
+        aria-label="Muted"
+        isSelected={muted}
+        onChange={(v) => {
+          onUpdate('muted', v);
+        }}
+      >
+        Muted
+      </Switch>
+      <NumericField
+        label="Start Time (s)"
+        minValue={0}
+        value={startTime}
+        onValueChange={(v) => {
+          onUpdate('startTime', v);
+        }}
+      />
+      <NumericField
+        label="End Time (s)"
+        minValue={0}
+        value={endTime}
+        onValueChange={(v) => {
+          onUpdate('endTime', v);
+        }}
+      />
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  ClockPanel — format, mode, mode-dependent fields                   */
+/* ------------------------------------------------------------------ */
+
+const CLOCK_MODES = ['realtime', 'countdown', 'countup', 'stopwatch'] as const;
+
+export interface ClockPanelProps {
+  readonly format: string;
+  readonly mode: string;
+  readonly startValue: string;
+  readonly targetValue: string;
+  readonly countdownTo: string;
+  readonly onUpdate: (key: string, value: string) => void;
+}
+
+export function ClockPanel({
+  format,
+  mode,
+  startValue,
+  targetValue,
+  countdownTo,
+  onUpdate,
+}: ClockPanelProps): JSX.Element {
+  const isCountdown = mode === 'countdown';
+  const isCountdownOrCountup = mode === 'countdown' || mode === 'countup' || mode === 'stopwatch';
+  const hasAbsoluteCountdown = isCountdown && countdownTo !== '';
+
+  return (
+    <section aria-label="Clock" role="region" className="grid grid-cols-1 gap-2">
+      <FieldShell label="Format">
+        <Input
+          aria-label="Format"
+          value={format}
+          onChange={(e) => {
+            onUpdate('content', e.currentTarget.value);
+          }}
+        />
+      </FieldShell>
+      <SelectField
+        label="Mode"
+        options={CLOCK_MODES as unknown as readonly string[]}
+        updateKey="mode"
+        value={mode}
+        onUpdate={(_key, value) => {
+          onUpdate('mode', String(value));
+        }}
+      />
+      {isCountdownOrCountup && !hasAbsoluteCountdown ?
+        <FieldShell label="Start Value">
+          <Input
+            aria-label="Start Value"
+            value={startValue}
+            onChange={(e) => {
+              onUpdate('startValue', e.currentTarget.value);
+            }}
+          />
+        </FieldShell>
+      : null}
+      {isCountdown && !hasAbsoluteCountdown ?
+        <FieldShell label="Target Value">
+          <Input
+            aria-label="Target Value"
+            value={targetValue}
+            onChange={(e) => {
+              onUpdate('targetValue', e.currentTarget.value);
+            }}
+          />
+        </FieldShell>
+      : null}
+      {isCountdown ?
+        <FieldShell label="Countdown To">
+          <Input
+            aria-label="Countdown To"
+            value={countdownTo}
+            onChange={(e) => {
+              onUpdate('countdownTo', e.currentTarget.value);
+            }}
+          />
+        </FieldShell>
+      : null}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  TickerPanel — items list, speed, direction, gap, paused            */
+/* ------------------------------------------------------------------ */
+
+const TICKER_DIRECTIONS = ['left', 'right', 'up', 'down'] as const;
+
+export interface TickerPanelProps {
+  readonly items: readonly string[];
+  readonly speed: number;
+  readonly direction: string;
+  readonly gap: number;
+  readonly paused: boolean;
+  readonly onUpdate: (key: string, value: string | number | boolean) => void;
+  readonly onUpdateItems: (items: readonly string[]) => void;
+}
+
+export function TickerPanel({
+  items,
+  speed,
+  direction,
+  gap,
+  paused,
+  onUpdate,
+  onUpdateItems,
+}: TickerPanelProps): JSX.Element {
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+
+  function handleItemDragStart(e: ReactDragEvent<HTMLDivElement>, index: number): void {
+    setDragIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+
+    // Use transparent 1×1 image as drag ghost
+    const ghost = document.createElement('canvas');
+
+    ghost.width = 1;
+    ghost.height = 1;
+    e.dataTransfer.setDragImage(ghost, 0, 0);
+  }
+
+  function handleItemDragOver(e: ReactDragEvent<HTMLDivElement>): void {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }
+
+  function handleItemDrop(targetIndex: number): void {
+    if (dragIndex === null || dragIndex === targetIndex) {
+      setDragIndex(null);
+
+      return;
+    }
+
+    const reordered = [...items];
+
+    const [moved] = reordered.splice(dragIndex, 1);
+
+    if (moved !== undefined) {
+      reordered.splice(targetIndex, 0, moved);
+      onUpdateItems(reordered);
+    }
+
+    setDragIndex(null);
+  }
+
+  return (
+    <section aria-label="Ticker" role="region" className="grid grid-cols-1 gap-2">
+      <FieldShell label="Items">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02') }}>
+          {items.map((item, index) => (
+            <div
+              key={`${String(index)}-${item}`}
+              draggable
+              style={{ display: 'flex', gap: sp('sp-02'), alignItems: 'center' }}
+              onDragOver={handleItemDragOver}
+              onDragStart={(e) => {
+                handleItemDragStart(e, index);
+              }}
+              onDrop={() => {
+                handleItemDrop(index);
+              }}
+            >
+              <span
+                aria-label={`Drag item ${String(index + 1)}`}
+                style={{ cursor: 'grab', display: 'flex', alignItems: 'center' }}
+              >
+                <GripVertical size={ICON_SIZE} />
+              </span>
+              <Input
+                aria-label={`Item ${String(index + 1)}`}
+                value={item}
+                onChange={(e) => {
+                  const updated = items.map((existing, i) => (i === index ? e.currentTarget.value : existing));
+
+                  onUpdateItems(updated);
+                }}
+              />
+              {items.length > 1 ?
+                <Button
+                  aria-label={`Remove item ${String(index + 1)}`}
+                  isIconOnly
+                  size="sm"
+                  variant="ghost"
+                  onPress={() => {
+                    onUpdateItems(items.filter((_, i) => i !== index));
+                  }}
+                >
+                  <Trash2 size={ICON_SIZE} />
+                </Button>
+              : null}
+            </div>
+          ))}
+          <Button
+            aria-label="Add Item"
+            size="sm"
+            variant="ghost"
+            onPress={() => {
+              onUpdateItems([...items, 'New item']);
+            }}
+          >
+            <Plus size={ICON_SIZE} /> Add Item
+          </Button>
+        </div>
+      </FieldShell>
+      <NumericField
+        label="Speed (px/s)"
+        maxValue={2000}
+        minValue={1}
+        value={speed}
+        onValueChange={(v) => {
+          onUpdate('speed', v);
+        }}
+      />
+      <SelectField
+        label="Direction"
+        options={TICKER_DIRECTIONS as unknown as readonly string[]}
+        updateKey="direction"
+        value={direction}
+        onUpdate={(key, value) => {
+          onUpdate(key, value);
+        }}
+      />
+      <NumericField
+        label="Gap (px)"
+        minValue={0}
+        value={gap}
+        onValueChange={(v) => {
+          onUpdate('gap', v);
+        }}
+      />
+      <Switch
+        aria-label="Paused"
+        isSelected={paused}
+        onChange={(v) => {
+          onUpdate('paused', v);
+        }}
+      >
+        Paused
+      </Switch>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  PropertiesSidebar — main panel orchestrator                        */
 /* ------------------------------------------------------------------ */
 
@@ -1483,6 +1884,9 @@ export function PropertiesSidebar({
   const isQrCode = primary.type === 'qrcode';
   const isGroup = primary.type === 'group';
   const isImage = primary.type === 'image';
+  const isVideo = primary.type === 'video';
+  const isClock = primary.type === 'clock';
+  const isTicker = primary.type === 'ticker';
   const showSpacing = profile.typography || isGroup;
   const showPathProperties = profile.svgStrokeFill || profile.pathEditing;
 
@@ -1509,6 +1913,8 @@ export function PropertiesSidebar({
               rotateY={primary.rotateY}
               rotateZ={primary.rotateZ}
               translateZ={primary.translateZ}
+              autoSize={primary.autoSize}
+              elementType={primary.type}
               onUpdate={onUpdate}
               documentMode={documentMode}
             />
@@ -1705,6 +2111,67 @@ export function PropertiesSidebar({
             </Accordion.Heading>
             <Accordion.Panel>
               <GroupPanel name={primary.name} clipChildren={primary.clipChildren} onUpdate={onUpdate} />
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+
+        {/* Video */}
+        {isVideo ?
+          <Accordion.Item id="video">
+            <Accordion.Heading>
+              <Accordion.Trigger>Video</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <VideoPanel
+                sourceUrl={primary.content}
+                autoplay={primary.videoAutoplay ?? false}
+                loop={primary.videoLoop ?? false}
+                muted={primary.videoMuted ?? false}
+                startTime={primary.videoStartTime ?? 0}
+                endTime={primary.videoEndTime ?? 0}
+                onUpdate={onUpdate}
+              />
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+
+        {/* Clock */}
+        {isClock ?
+          <Accordion.Item id="clock">
+            <Accordion.Heading>
+              <Accordion.Trigger>Clock</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <ClockPanel
+                format={primary.content}
+                mode={primary.clockMode ?? 'realtime'}
+                startValue={primary.clockStartValue ?? ''}
+                targetValue={primary.clockTargetValue ?? ''}
+                countdownTo={primary.clockCountdownTo ?? ''}
+                onUpdate={onUpdate}
+              />
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+
+        {/* Ticker */}
+        {isTicker ?
+          <Accordion.Item id="ticker">
+            <Accordion.Heading>
+              <Accordion.Trigger>Ticker</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <TickerPanel
+                items={primary.tickerItems ?? ['New item']}
+                speed={primary.tickerSpeed ?? 100}
+                direction={primary.tickerDirection ?? 'left'}
+                gap={primary.tickerGap ?? 20}
+                paused={primary.tickerPaused ?? false}
+                onUpdate={onUpdate}
+                onUpdateItems={(items) => {
+                  onUpdate('tickerItems', JSON.stringify(items));
+                }}
+              />
             </Accordion.Panel>
           </Accordion.Item>
         : null}

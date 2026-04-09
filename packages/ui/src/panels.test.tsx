@@ -10,6 +10,7 @@ import {
   AppearancePanel,
   BoxEffectsPanel,
   ClipPathPanel,
+  ClockPanel,
   GeometryPanel,
   GroupPanel,
   ImagePanel,
@@ -22,14 +23,21 @@ import {
   QrCodePanel,
   SpacingPanel,
   TextEffectsPanel,
+  TickerPanel,
   TypographyPanel,
+  VideoPanel,
 } from './panels';
 
 /* ------------------------------------------------------------------ */
 /*  HeroUI mock — all helpers use mock prefix to pass jest-hoist       */
 /* ------------------------------------------------------------------ */
 
-const mockNumCtx = React.createContext({ label: '', val: 0, cb: undefined as ((n: number) => void) | undefined });
+const mockNumCtx = React.createContext({
+  label: '',
+  val: 0,
+  cb: undefined as ((n: number) => void) | undefined,
+  disabled: false,
+});
 
 function mockWrap(tag = 'div') {
   return (p: Record<string, unknown>) => {
@@ -66,7 +74,7 @@ function mockInput(p: Record<string, unknown>) {
 }
 
 function mockNumberFieldRoot(p: Record<string, unknown>) {
-  const { children, label, maxValue: _1, minValue: _2, onChange, step: _3, ...rest } = p;
+  const { children, label, maxValue: _1, minValue: _2, onChange, step: _3, isDisabled: _d, ...rest } = p;
 
   return React.createElement(
     'div',
@@ -78,6 +86,7 @@ function mockNumberFieldRoot(p: Record<string, unknown>) {
           label: (p['aria-label'] ?? label ?? '') as string,
           val: Number(p['value'] ?? 0),
           cb: typeof onChange === 'function' ? (onChange as (n: number) => void) : undefined,
+          disabled: Boolean(p['isDisabled']),
         },
       },
       (children as React.ReactNode) ?? null,
@@ -91,6 +100,7 @@ function mockNumberFieldInput(p: Record<string, unknown>) {
   return React.createElement('input', {
     ...p,
     'aria-label': ctx.label,
+    disabled: ctx.disabled,
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
       ctx.cb?.(Number(e.currentTarget.value));
     },
@@ -1502,6 +1512,465 @@ describe('PropertiesSidebar', () => {
     expect(typographyIdx).toBeLessThan(textEffectsIdx);
     expect(textEffectsIdx).toBeLessThan(spacingIdx);
     expect(spacingIdx).toBeLessThan(boxEffectsIdx);
+  });
+});
+
+/* ================================================================== */
+/*  VideoPanel                                                         */
+/* ================================================================== */
+
+describe('VideoPanel', () => {
+  /** @description VideoPanel must render source URL, autoplay, loop, muted, start/end time controls. */
+  it('renders all video controls', () => {
+    render(
+      <VideoPanel
+        sourceUrl="https://example.com/video.mp4"
+        autoplay={true}
+        loop={false}
+        muted={true}
+        startTime={5}
+        endTime={30}
+        onUpdate={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole('textbox', { name: /source url/i })).not.toBeNull();
+    expect(screen.getByRole('switch', { name: /autoplay/i })).not.toBeNull();
+    expect(screen.getByRole('switch', { name: /loop/i })).not.toBeNull();
+    expect(screen.getByRole('switch', { name: /muted/i })).not.toBeNull();
+    expect(screen.getByRole('spinbutton', { name: /start time/i })).not.toBeNull();
+    expect(screen.getByRole('spinbutton', { name: /end time/i })).not.toBeNull();
+  });
+
+  /** @description Toggling autoplay must fire onUpdate with the boolean value. */
+  it('fires onUpdate when autoplay is toggled', () => {
+    const onUpdate = jest.fn<(k: string, v: string | number | boolean) => void>();
+
+    render(
+      <VideoPanel
+        sourceUrl="https://example.com/video.mp4"
+        autoplay={false}
+        loop={false}
+        muted={false}
+        startTime={0}
+        endTime={0}
+        onUpdate={onUpdate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('switch', { name: /autoplay/i }));
+    expect(onUpdate).toHaveBeenCalledWith('autoplay', true);
+  });
+
+  /** @description Changing source URL must update content. */
+  it('fires onUpdate when source URL is changed', () => {
+    const onUpdate = jest.fn<(k: string, v: string | number | boolean) => void>();
+
+    render(
+      <VideoPanel
+        sourceUrl=""
+        autoplay={false}
+        loop={false}
+        muted={false}
+        startTime={0}
+        endTime={0}
+        onUpdate={onUpdate}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: /source url/i }), {
+      target: { value: 'https://example.com/new.mp4' },
+    });
+
+    expect(onUpdate).toHaveBeenCalledWith('content', 'https://example.com/new.mp4');
+  });
+});
+
+/* ================================================================== */
+/*  ClockPanel                                                         */
+/* ================================================================== */
+
+describe('ClockPanel', () => {
+  /** @description ClockPanel must render format, mode, and mode-dependent fields for countdown. */
+  it('renders format, mode, and countdown fields', () => {
+    render(
+      <ClockPanel
+        format="HH:mm:ss"
+        mode="countdown"
+        startValue="00:10:00"
+        targetValue="00:00:00"
+        countdownTo=""
+        onUpdate={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole('textbox', { name: /format/i })).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: /start value/i })).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: /target value/i })).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: /countdown to/i })).not.toBeNull();
+  });
+
+  /** @description In realtime mode, start/target/countdownTo fields must be hidden. */
+  it('hides countdown fields in realtime mode', () => {
+    render(
+      <ClockPanel
+        format="HH:mm:ss"
+        mode="realtime"
+        startValue=""
+        targetValue=""
+        countdownTo=""
+        onUpdate={() => undefined}
+      />,
+    );
+
+    expect(screen.queryByRole('textbox', { name: /start value/i })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /target value/i })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /countdown to/i })).toBeNull();
+  });
+
+  /** @description When countdownTo is set, start/target fields must be hidden. */
+  it('hides start/target when countdownTo is set', () => {
+    render(
+      <ClockPanel
+        format="HH:mm:ss"
+        mode="countdown"
+        startValue="00:10:00"
+        targetValue="00:00:00"
+        countdownTo="2026-12-31T00:00:00Z"
+        onUpdate={() => undefined}
+      />,
+    );
+
+    // countdownTo is set, so start and target should be hidden
+    expect(screen.queryByRole('textbox', { name: /start value/i })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /target value/i })).toBeNull();
+
+    // countdownTo field should still be visible
+    expect(screen.getByRole('textbox', { name: /countdown to/i })).not.toBeNull();
+  });
+
+  /** @description Changing format must update content. */
+  it('fires onUpdate when format changes', () => {
+    const onUpdate = jest.fn<(k: string, v: string) => void>();
+
+    render(
+      <ClockPanel format="HH:mm:ss" mode="realtime" startValue="" targetValue="" countdownTo="" onUpdate={onUpdate} />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: /format/i }), { target: { value: 'mm:ss' } });
+    expect(onUpdate).toHaveBeenCalledWith('content', 'mm:ss');
+  });
+});
+
+/* ================================================================== */
+/*  TickerPanel                                                        */
+/* ================================================================== */
+
+describe('TickerPanel', () => {
+  /** @description TickerPanel must render items list, speed, direction, gap, paused controls. */
+  it('renders all ticker controls', () => {
+    render(
+      <TickerPanel
+        items={['Breaking News', 'Weather Update']}
+        speed={100}
+        direction="left"
+        gap={20}
+        paused={false}
+        onUpdate={() => undefined}
+        onUpdateItems={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole('textbox', { name: /item 1/i })).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: /item 2/i })).not.toBeNull();
+    expect(screen.getByRole('spinbutton', { name: /speed/i })).not.toBeNull();
+    expect(screen.getByRole('spinbutton', { name: /gap/i })).not.toBeNull();
+    expect(screen.getByRole('switch', { name: /paused/i })).not.toBeNull();
+    expect(screen.getByRole('button', { name: /add item/i })).not.toBeNull();
+  });
+
+  /** @description Adding an item must call onUpdateItems with the new list. */
+  it('adds a new item when Add Item is clicked', () => {
+    const onUpdateItems = jest.fn<(items: readonly string[]) => void>();
+
+    render(
+      <TickerPanel
+        items={['Item 1']}
+        speed={100}
+        direction="left"
+        gap={20}
+        paused={false}
+        onUpdate={() => undefined}
+        onUpdateItems={onUpdateItems}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add item/i }));
+    expect(onUpdateItems).toHaveBeenCalledWith(['Item 1', 'New item']);
+  });
+
+  /** @description Removing an item must call onUpdateItems with the filtered list. */
+  it('removes an item when remove button is clicked', () => {
+    const onUpdateItems = jest.fn<(items: readonly string[]) => void>();
+
+    render(
+      <TickerPanel
+        items={['Item A', 'Item B']}
+        speed={100}
+        direction="left"
+        gap={20}
+        paused={false}
+        onUpdate={() => undefined}
+        onUpdateItems={onUpdateItems}
+      />,
+    );
+
+    // Click the first remove button
+    const removeBtn = screen.getByRole('button', { name: /remove item 1/i });
+
+    fireEvent.click(removeBtn);
+    expect(onUpdateItems).toHaveBeenCalledWith(['Item B']);
+  });
+
+  /** @description Last item must not have a remove button. */
+  it('hides remove button when only one item exists', () => {
+    render(
+      <TickerPanel
+        items={['Only Item']}
+        speed={100}
+        direction="left"
+        gap={20}
+        paused={false}
+        onUpdate={() => undefined}
+        onUpdateItems={() => undefined}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /remove item/i })).toBeNull();
+  });
+
+  /** @description Ticker items must have drag handles for reordering. */
+  it('renders drag handles for each item', () => {
+    render(
+      <TickerPanel
+        items={['A', 'B']}
+        speed={100}
+        direction="left"
+        gap={20}
+        paused={false}
+        onUpdate={() => undefined}
+        onUpdateItems={() => undefined}
+      />,
+    );
+
+    expect(screen.getByLabelText('Drag item 1')).not.toBeNull();
+    expect(screen.getByLabelText('Drag item 2')).not.toBeNull();
+  });
+
+  /** @description Dragging item from position 0 to position 2 must reorder via onUpdateItems. */
+  it('reorders items when dragged from one position to another', () => {
+    const onUpdateItems = jest.fn<(items: readonly string[]) => void>();
+
+    render(
+      <TickerPanel
+        items={['A', 'B', 'C']}
+        speed={100}
+        direction="left"
+        gap={20}
+        paused={false}
+        onUpdate={() => undefined}
+        onUpdateItems={onUpdateItems}
+      />,
+    );
+
+    // Get the draggable rows (parent div of each item input)
+    const itemInputs = screen.getAllByRole('textbox');
+    const firstRow = itemInputs[0]?.closest('[draggable="true"]');
+    const thirdRow = itemInputs[2]?.closest('[draggable="true"]');
+
+    expect(firstRow).not.toBeNull();
+    expect(thirdRow).not.toBeNull();
+
+    // Simulate drag from index 0 to index 2
+    const mockDt = { effectAllowed: 'move', dropEffect: 'none', setDragImage: () => undefined };
+    const source = firstRow as Element;
+    const target = thirdRow as Element;
+
+    fireEvent.dragStart(source, { dataTransfer: mockDt });
+    fireEvent.dragOver(target, { dataTransfer: mockDt });
+    fireEvent.drop(target);
+
+    expect(onUpdateItems).toHaveBeenCalledWith(['B', 'C', 'A']);
+  });
+});
+
+/* ================================================================== */
+/*  Auto-Size Mode in GeometryPanel                                    */
+/* ================================================================== */
+
+describe('GeometryPanel auto-size', () => {
+  /** @description Auto-size control must appear for text elements. */
+  it('shows auto-size segmented control for text elements', () => {
+    render(
+      <GeometryPanel
+        x={0}
+        y={0}
+        width={100}
+        height={50}
+        rotation={0}
+        elementType="text"
+        autoSize="fixed"
+        onUpdate={() => undefined}
+        documentMode="screen"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /fixed/i })).not.toBeNull();
+    expect(screen.getByRole('button', { name: /auto height/i })).not.toBeNull();
+    expect(screen.getByRole('button', { name: /shrink to fit/i })).not.toBeNull();
+  });
+
+  /** @description Auto-size control must be hidden for non-text elements. */
+  it('hides auto-size control for non-text elements', () => {
+    render(
+      <GeometryPanel
+        x={0}
+        y={0}
+        width={100}
+        height={50}
+        rotation={0}
+        elementType="rectangle"
+        autoSize="fixed"
+        onUpdate={() => undefined}
+        documentMode="screen"
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /auto height/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /shrink to fit/i })).toBeNull();
+  });
+
+  /** @description Clicking Auto Height must fire onUpdate and the Height field must become disabled. */
+  it('fires onUpdate when auto-height is clicked', () => {
+    const onUpdate = jest.fn<(k: string, v: string | number) => void>();
+
+    render(
+      <GeometryPanel
+        x={0}
+        y={0}
+        width={100}
+        height={50}
+        rotation={0}
+        elementType="text"
+        autoSize="fixed"
+        onUpdate={onUpdate}
+        documentMode="screen"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /auto height/i }));
+    expect(onUpdate).toHaveBeenCalledWith('autoSize', 'auto-height');
+  });
+
+  /** @description When autoSize is auto-height, the Height field must be disabled. */
+  it('disables height field when autoSize is auto-height', () => {
+    render(
+      <GeometryPanel
+        x={0}
+        y={0}
+        width={100}
+        height={50}
+        rotation={0}
+        elementType="text"
+        autoSize="auto-height"
+        onUpdate={() => undefined}
+        documentMode="screen"
+      />,
+    );
+
+    const heightInput = screen.getByRole('spinbutton', { name: /height/i });
+
+    // The mock NumberField context propagates isDisabled to the input as disabled
+    expect(heightInput).toHaveProperty('disabled', true);
+  });
+});
+
+/* ================================================================== */
+/*  PropertiesSidebar type-specific panel rendering                    */
+/* ================================================================== */
+
+describe('PropertiesSidebar type-specific', () => {
+  /** @description PropertiesSidebar must show VideoPanel for video elements. */
+  it('shows video panel for video elements', () => {
+    render(
+      <PropertiesSidebar
+        documentMode="screen"
+        elements={[
+          {
+            ...BASE_ELEMENT,
+            type: 'video',
+            content: 'https://video.mp4',
+            videoAutoplay: true,
+            videoLoop: false,
+            videoMuted: false,
+            videoStartTime: 0,
+            videoEndTime: 60,
+          },
+        ]}
+        onUpdate={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: /video/i })).not.toBeNull();
+  });
+
+  /** @description PropertiesSidebar must show ClockPanel for clock elements. */
+  it('shows clock panel for clock elements', () => {
+    render(
+      <PropertiesSidebar
+        documentMode="screen"
+        elements={[{ ...BASE_ELEMENT, type: 'clock', content: 'HH:mm:ss', clockMode: 'realtime' }]}
+        onUpdate={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: /clock/i })).not.toBeNull();
+  });
+
+  /** @description PropertiesSidebar must show TickerPanel for ticker elements. */
+  it('shows ticker panel for ticker elements', () => {
+    render(
+      <PropertiesSidebar
+        documentMode="screen"
+        elements={[
+          {
+            ...BASE_ELEMENT,
+            type: 'ticker',
+            tickerItems: ['News'],
+            tickerSpeed: 100,
+            tickerDirection: 'left',
+            tickerGap: 20,
+            tickerPaused: false,
+          },
+        ]}
+        onUpdate={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: /ticker/i })).not.toBeNull();
+  });
+
+  /** @description PropertiesSidebar must NOT show VIdeoPanel for non-video elements. */
+  it('hides video panel for non-video elements', () => {
+    render(
+      <PropertiesSidebar
+        documentMode="screen"
+        elements={[{ ...BASE_ELEMENT, type: 'rectangle' }]}
+        onUpdate={() => undefined}
+      />,
+    );
+
+    expect(screen.queryByRole('region', { name: /^video$/i })).toBeNull();
   });
 });
 
