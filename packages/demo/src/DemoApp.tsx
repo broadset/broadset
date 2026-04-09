@@ -1966,7 +1966,7 @@ export function DemoApp(): React.JSX.Element {
         onDelete={(elementId) => {
           editorStore.getState().removeElement(elementId);
         }}
-        onSelect={(elementId) => {
+        onSelect={(elementId, _mode) => {
           editorStore.getState().selectElement(elementId);
           setSidebarTab('properties');
           setIsSidebarOpen(true);

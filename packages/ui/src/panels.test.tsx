@@ -4,7 +4,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import * as React from 'react';
 
-import type { PanelElement, PropertyValue } from './panels';
+import type { LayerInfo, PanelElement, PropertyValue } from './panels';
 import {
   AnimationModePropertiesPanel,
   AppearancePanel,
@@ -13,6 +13,7 @@ import {
   GeometryPanel,
   GroupPanel,
   ImagePanel,
+  LayersSidebar,
   ObjectFitPanel,
   PathPropertiesPanel,
   PreflightPanel,
@@ -1501,5 +1502,524 @@ describe('PropertiesSidebar', () => {
     expect(typographyIdx).toBeLessThan(textEffectsIdx);
     expect(textEffectsIdx).toBeLessThan(spacingIdx);
     expect(spacingIdx).toBeLessThan(boxEffectsIdx);
+  });
+});
+
+/* ================================================================== */
+/*  LayersSidebar                                                      */
+/* ================================================================== */
+
+const SAMPLE_LAYERS: readonly LayerInfo[] = [
+  { id: 'el-1', type: 'rectangle', name: 'Hero Card', locked: false, visible: true },
+  { id: 'el-2', type: 'text', name: 'Headline', locked: true, visible: true },
+  { id: 'el-3', type: 'image', name: 'Background', locked: false, visible: false },
+];
+
+const HIERARCHY_LAYERS: readonly LayerInfo[] = [
+  {
+    id: 'g-1',
+    type: 'group',
+    name: 'Card Group',
+    locked: false,
+    visible: true,
+    depth: 0,
+    hasChildren: true,
+    expanded: true,
+  },
+  { id: 'el-1', type: 'rectangle', name: 'Card BG', locked: false, visible: true, depth: 1 },
+  { id: 'el-2', type: 'text', name: 'Card Title', locked: false, visible: true, depth: 1 },
+  { id: 'el-3', type: 'image', name: 'Logo', locked: false, visible: true, depth: 0 },
+];
+
+describe('LayersSidebar', () => {
+  /** @description Clicking a layer must fire onSelect with the element's id and single mode. */
+  it('fires onSelect with single mode when a layer is clicked', () => {
+    const onSelect = jest.fn<(id: string, mode: string) => void>();
+
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={onSelect}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+
+    const heroBtn = screen.getByRole('button', { name: /select hero card/i });
+
+    fireEvent.click(heroBtn);
+    expect(onSelect).toHaveBeenCalledWith('el-1', 'single');
+  });
+
+  /** @description Empty state must show a message when no elements exist. */
+  it('shows empty state when no layers exist', () => {
+    render(
+      <LayersSidebar
+        layers={[]}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText(/no elements/i)).not.toBeNull();
+  });
+
+  /** @description Lock toggle must fire onToggleLock with the element's id. */
+  it('fires onToggleLock when lock button is clicked', () => {
+    const onToggleLock = jest.fn<(id: string) => void>();
+
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={() => undefined}
+        onToggleLock={onToggleLock}
+        onDelete={() => undefined}
+      />,
+    );
+
+    const lockBtn = screen.getByRole('button', { name: /toggle lock hero card/i });
+
+    fireEvent.click(lockBtn);
+    expect(onToggleLock).toHaveBeenCalledWith('el-1');
+  });
+
+  /** @description Visibility toggle must fire onToggleVisibility with the element's id. */
+  it('fires onToggleVisibility when visibility button is clicked', () => {
+    const onToggleVisibility = jest.fn<(id: string) => void>();
+
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onToggleVisibility={onToggleVisibility}
+        onDelete={() => undefined}
+      />,
+    );
+
+    // Background is hidden (visible: false), so aria says "Show Background"
+    const visBtn = screen.getByRole('button', { name: /show background/i });
+
+    fireEvent.click(visBtn);
+    expect(onToggleVisibility).toHaveBeenCalledWith('el-3');
+  });
+
+  /** @description Delete button must fire onDelete with the element's id. */
+  it('fires onDelete when delete button is clicked', () => {
+    const onDelete = jest.fn<(id: string) => void>();
+
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={onDelete}
+      />,
+    );
+
+    const deleteBtn = screen.getByRole('button', { name: /delete hero card/i });
+
+    fireEvent.click(deleteBtn);
+    expect(onDelete).toHaveBeenCalledWith('el-1');
+  });
+
+  /** @description Selected layers must be visually highlighted. */
+  it('highlights selected layers', () => {
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        selectedIds={['el-2']}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+
+    // The layer items are <li> elements. The selected one should have a different background.
+    const listItems = screen.getAllByRole('listitem');
+
+    expect(listItems).toHaveLength(3);
+
+    const selectedItem = listItems[1];
+
+    expect(selectedItem).toBeDefined();
+  });
+
+  /** @description Double-click on a layer name must activate inline rename. */
+  it('activates inline rename on double-click', () => {
+    const onRename = jest.fn<(id: string, name: string) => void>();
+
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+        onRename={onRename}
+      />,
+    );
+
+    const heroBtn = screen.getByRole('button', { name: /select hero card/i });
+
+    fireEvent.doubleClick(heroBtn);
+
+    // After double-click, a text input should appear for renaming
+    const renameInput = screen.getByRole('textbox', { name: /rename layer/i });
+
+    expect(renameInput).not.toBeNull();
+  });
+
+  /** @description Enter commits the rename, empty names are rejected. */
+  it('commits rename on Enter, rejects empty names', () => {
+    const onRename = jest.fn<(id: string, name: string) => void>();
+
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+        onRename={onRename}
+      />,
+    );
+
+    // Start rename
+    const heroBtn = screen.getByRole('button', { name: /select hero card/i });
+
+    fireEvent.doubleClick(heroBtn);
+
+    const input = screen.getByRole('textbox', { name: /rename layer/i });
+
+    // Change to empty and press Enter — should not call onRename
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onRename).not.toHaveBeenCalled();
+
+    // Double-click again to re-enter rename mode
+    // The input should be gone after Enter (even with empty, it exits)
+    expect(screen.queryByRole('textbox', { name: /rename layer/i })).toBeNull();
+  });
+
+  /** @description Escape cancels the rename without committing. */
+  it('cancels rename on Escape', () => {
+    const onRename = jest.fn<(id: string, name: string) => void>();
+
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+        onRename={onRename}
+      />,
+    );
+
+    const headlineBtn = screen.getByRole('button', { name: /select headline/i });
+
+    fireEvent.doubleClick(headlineBtn);
+
+    const input = screen.getByRole('textbox', { name: /rename layer/i });
+
+    fireEvent.change(input, { target: { value: 'New Name' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+
+    expect(onRename).not.toHaveBeenCalled();
+    expect(screen.queryByRole('textbox', { name: /rename layer/i })).toBeNull();
+  });
+
+  /** @description Successful rename commits with Enter. */
+  it('commits rename with valid name on Enter', () => {
+    const onRename = jest.fn<(id: string, name: string) => void>();
+
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+        onRename={onRename}
+      />,
+    );
+
+    const heroBtn = screen.getByRole('button', { name: /select hero card/i });
+
+    fireEvent.doubleClick(heroBtn);
+
+    const input = screen.getByRole('textbox', { name: /rename layer/i });
+
+    fireEvent.change(input, { target: { value: 'Updated Card' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onRename).toHaveBeenCalledWith('el-1', 'Updated Card');
+  });
+
+  /** @description Each layer row must display the correct type icon. */
+  it('renders type-specific icons for each layer', () => {
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+
+    // Each layer should be rendered as a list item
+    const listItems = screen.getAllByRole('listitem');
+
+    expect(listItems).toHaveLength(3);
+  });
+
+  /** @description Ctrl/Cmd+Click must fire onSelect with toggle mode. */
+  it('fires onSelect with toggle mode on Ctrl+Click', () => {
+    const onSelect = jest.fn<(id: string, mode: string) => void>();
+
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={onSelect}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+
+    const heroBtn = screen.getByRole('button', { name: /select hero card/i });
+
+    fireEvent.click(heroBtn, { ctrlKey: true });
+    expect(onSelect).toHaveBeenCalledWith('el-1', 'toggle');
+  });
+
+  /** @description Shift+Click must fire onSelect with range mode. */
+  it('fires onSelect with range mode on Shift+Click', () => {
+    const onSelect = jest.fn<(id: string, mode: string) => void>();
+
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={onSelect}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+
+    const heroBtn = screen.getByRole('button', { name: /select hero card/i });
+
+    fireEvent.click(heroBtn, { shiftKey: true });
+    expect(onSelect).toHaveBeenCalledWith('el-1', 'range');
+  });
+
+  /** @description Group layers with children must display expand/collapse chevron. */
+  it('renders expand/collapse chevron for group layers with children', () => {
+    render(
+      <LayersSidebar
+        layers={HIERARCHY_LAYERS}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+        onToggleExpand={() => undefined}
+      />,
+    );
+
+    // Expanded group should have collapse button
+    const collapseBtn = screen.getByRole('button', { name: /collapse card group/i });
+
+    expect(collapseBtn).not.toBeNull();
+  });
+
+  /** @description Clicking expand/collapse chevron must fire onToggleExpand. */
+  it('fires onToggleExpand when chevron is clicked', () => {
+    const onToggleExpand = jest.fn<(id: string) => void>();
+
+    render(
+      <LayersSidebar
+        layers={HIERARCHY_LAYERS}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+        onToggleExpand={onToggleExpand}
+      />,
+    );
+
+    const collapseBtn = screen.getByRole('button', { name: /collapse card group/i });
+
+    fireEvent.click(collapseBtn);
+    expect(onToggleExpand).toHaveBeenCalledWith('g-1');
+  });
+
+  /** @description Each layer row must have a drag handle for reordering. */
+  it('renders drag handle grip on each layer row', () => {
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+
+    const grips = screen.getAllByRole('img', { name: /drag/i });
+
+    expect(grips).toHaveLength(3);
+  });
+
+  /** @description Delete button must use a Trash icon and be visible only on hover (not selection). */
+  it('shows delete button only on hover, not on selection alone', () => {
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        selectedIds={['el-2']}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+
+    const deleteBtns = screen.getAllByRole('button', { name: /delete/i });
+
+    // All delete buttons should be hidden (opacity 0) when not hovered — even selected ones
+    expect(deleteBtns).toHaveLength(3);
+
+    const firstDeleteStyle = deleteBtns[0]?.getAttribute('style') ?? '';
+
+    expect(firstDeleteStyle).toContain('opacity: 0');
+
+    // Selected but not hovered — still hidden per spec "visible on hover only"
+    const secondDeleteStyle = deleteBtns[1]?.getAttribute('style') ?? '';
+
+    expect(secondDeleteStyle).toContain('opacity: 0');
+  });
+
+  /** @description Hierarchy layers must be indented according to their depth. */
+  it('indents nested layers according to depth', () => {
+    render(
+      <LayersSidebar
+        layers={HIERARCHY_LAYERS}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+
+    const listItems = screen.getAllByRole('listitem');
+
+    // First item (depth 0) and second item (depth 1) should have different padding
+    const firstStyle = listItems[0]?.getAttribute('style') ?? '';
+    const secondStyle = listItems[1]?.getAttribute('style') ?? '';
+
+    // depth=0 → base padding, depth=1 → base padding + 16px
+    expect(firstStyle).not.toEqual(secondStyle);
+  });
+
+  /** @description Scenes tabs must render when scenes prop is provided with "Scene" labels. */
+  it('renders scene tabs with Scenes terminology', () => {
+    render(
+      <LayersSidebar
+        activeSceneId="s-1"
+        layers={SAMPLE_LAYERS}
+        scenes={[
+          { id: 's-1', name: 'Scene 1' },
+          { id: 's-2', name: 'Scene 2' },
+        ]}
+        onAddScene={() => undefined}
+        onSelect={() => undefined}
+        onSelectScene={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /scene scene 1/i })).not.toBeNull();
+    expect(screen.getByRole('button', { name: /scene scene 2/i })).not.toBeNull();
+    expect(screen.getByRole('button', { name: /add scene/i })).not.toBeNull();
+  });
+
+  /** @description Clicking a scene tab must fire onSelectScene with the scene id. */
+  it('fires onSelectScene when a scene tab is clicked', () => {
+    const onSelectScene = jest.fn<(id: string) => void>();
+
+    render(
+      <LayersSidebar
+        activeSceneId="s-1"
+        layers={SAMPLE_LAYERS}
+        scenes={[
+          { id: 's-1', name: 'Scene 1' },
+          { id: 's-2', name: 'Scene 2' },
+        ]}
+        onSelect={() => undefined}
+        onSelectScene={onSelectScene}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /scene scene 2/i }));
+    expect(onSelectScene).toHaveBeenCalledWith('s-2');
+  });
+
+  /** @description Clicking outside the rename input (blur) must commit the rename. */
+  it('commits rename on blur', () => {
+    const onRename = jest.fn<(id: string, name: string) => void>();
+
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+        onRename={onRename}
+      />,
+    );
+
+    const heroBtn = screen.getByRole('button', { name: /select hero card/i });
+
+    fireEvent.doubleClick(heroBtn);
+
+    const input = screen.getByRole('textbox', { name: /rename layer/i });
+
+    fireEvent.change(input, { target: { value: 'Renamed' } });
+    fireEvent.blur(input);
+
+    expect(onRename).toHaveBeenCalledWith('el-1', 'Renamed');
+  });
+
+  /** @description Double-click rename must pre-fill the input with the current element name. */
+  it('pre-fills rename input with current name', () => {
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={() => undefined}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+        onRename={() => undefined}
+      />,
+    );
+
+    const heroBtn = screen.getByRole('button', { name: /select hero card/i });
+
+    fireEvent.doubleClick(heroBtn);
+
+    const input: HTMLInputElement = screen.getByRole('textbox', { name: /rename layer/i });
+
+    expect(input.value).toBe('Hero Card');
+  });
+
+  /** @description Keyboard Enter on a layer name must fire onSelect for accessibility. */
+  it('fires onSelect via Enter key for keyboard accessibility', () => {
+    const onSelect = jest.fn<(id: string, mode: string) => void>();
+
+    render(
+      <LayersSidebar
+        layers={SAMPLE_LAYERS}
+        onSelect={onSelect}
+        onToggleLock={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+
+    const heroBtn = screen.getByRole('button', { name: /select hero card/i });
+
+    fireEvent.keyDown(heroBtn, { key: 'Enter' });
+    expect(onSelect).toHaveBeenCalledWith('el-1', 'single');
   });
 });

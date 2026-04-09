@@ -57,10 +57,10 @@ gradient/3D/clip; multi-element editing — common values shown, “Mixed” for
 differing values; animation mode adapter — keyframe selection routes edits to
 keyframe values)
 
-- [ ] tests: red — ui/panels (full properties panel)
-- [ ] impl: green
-- [ ] **HeroUI verified**
-- [ ] demo milestone: select element → all applicable style fields visible based
+- [x] tests: red — ui/panels (full properties panel)
+- [x] impl: green
+- [x] **HeroUI verified**
+- [x] demo milestone: select element → all applicable style fields visible based
       on element type capabilities; select multiple → common values shown, differing
       show “Mixed”; print mode hides gradient/3D/clip fields; changing any property
       updates canvas in real-time
