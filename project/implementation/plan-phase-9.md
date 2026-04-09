@@ -43,9 +43,9 @@ periodic updates)
 _Renderer spec:_ `renderer/spec.md` (dynamic data — `{{key}}` token resolution
 from data store, dot-notation, unresolved tokens rendered literal)
 
-- [ ] tests: red — demo live data integration
-- [ ] impl: green
-- [ ] demo milestone: sample document has data-bound elements; scores/clock/ticker
+- [x] tests: red — demo live data integration
+- [x] impl: green
+- [x] demo milestone: sample document has data-bound elements; scores/clock/ticker
       update on a timer; rendered output reflects live data without full re-render
 
 ## Feature Group 9-C: Collaboration / change stream
@@ -137,7 +137,7 @@ NewDocumentModal preset; sample document on startup)
 | Group                              | Red | Green | Demo |
 | ---------------------------------- | --- | ----- | ---- |
 | 9-A data store + React integration | ✅  | ✅    | ☐    |
-| 9-B live data binding              | ☐   | ☐     | ☐    |
+| 9-B live data binding              | ✅  | ✅    | ✅   |
 | 9-C collaboration / change stream  | ☐   | ☐     | ☐    |
 | 9-D modal dialogs                  | ☐   | ☐     | ☐    |
 | 9-E named snapshots                | ☐   | ☐     | ☐    |
