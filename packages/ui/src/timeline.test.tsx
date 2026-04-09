@@ -7,6 +7,8 @@ import * as React from 'react';
 
 import type {
   AnimationBindingSectionsProps,
+  EasingGraphEditorProps,
+  PerPropertyLanesProps,
   TimelineBottomPanelProps,
   TimelineEditingContextValue,
   TimelineEditorProps,
@@ -97,6 +99,8 @@ jest.mock('@heroui/react', () => {
 /* --------- Lazy import after mock --------- */
 
 let AnimationBindingSections: React.ComponentType<AnimationBindingSectionsProps>;
+let EasingGraphEditor: React.ComponentType<EasingGraphEditorProps>;
+let PerPropertyLanes: React.ComponentType<PerPropertyLanesProps>;
 let TimelineBottomPanel: React.ComponentType<TimelineBottomPanelProps>;
 let TimelineEditingProvider: React.ComponentType<{ readonly children: React.ReactNode }>;
 let TimelineEditor: React.ComponentType<TimelineEditorProps>;
@@ -106,6 +110,8 @@ beforeAll(async () => {
   const mod = await import('./timeline');
 
   AnimationBindingSections = mod.AnimationBindingSections;
+  EasingGraphEditor = mod.EasingGraphEditor;
+  PerPropertyLanes = mod.PerPropertyLanes;
   TimelineBottomPanel = mod.TimelineBottomPanel;
   TimelineEditingProvider = mod.TimelineEditingProvider;
   TimelineEditor = mod.TimelineEditor;
@@ -719,5 +725,459 @@ describe('AnimationBindingSections', () => {
     if (args !== undefined) {
       expect(args).toHaveLength(3);
     }
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * EasingGraphEditor (7-D)
+ * --------------------------------------------------------------------------- */
+
+function defaultEasingGraphProps(overrides: Partial<EasingGraphEditorProps> = {}): EasingGraphEditorProps {
+  return {
+    easing: 'ease' as EasingMode,
+    onChange: jest.fn<(easing: EasingMode) => void>(),
+    isPlaying: false,
+    playbackProgress: 0,
+    ...overrides,
+  };
+}
+
+/**
+ * @description Verifies the visual easing graph editor renders the curve canvas
+ * and responds to preset, cubic-bezier, spring, and playback interactions.
+ */
+describe('EasingGraphEditor', () => {
+  /**
+   * @description When the easing graph editor is rendered with a preset easing,
+   * the SVG curve area MUST be visible with the correct preset name displayed.
+   */
+  it('renders the easing curve area with the current preset', () => {
+    const props = defaultEasingGraphProps({ easing: 'ease-in-out' });
+
+    render(<EasingGraphEditor {...props} />);
+
+    expect(screen.getByTestId('easing-graph-canvas')).toBeDefined();
+    // The preset row should show the preset chips
+    expect(screen.getByRole('button', { name: /linear/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /ease-in-out/i })).toBeDefined();
+  });
+
+  /**
+   * @description Clicking a preset chip MUST immediately call onChange
+   * with the preset easing mode value.
+   */
+  it('applies a preset chip on click', () => {
+    const props = defaultEasingGraphProps({ easing: 'linear' });
+
+    render(<EasingGraphEditor {...props} />);
+
+    // Use exact match to avoid matching "ease-in-out" too
+    fireEvent.click(screen.getByRole('button', { name: 'ease-in' }));
+
+    expect(props.onChange).toHaveBeenCalledWith('ease-in');
+  });
+
+  /**
+   * @description For cubic-bezier curves, the graph editor MUST render two
+   * draggable control handles and display the curve. Dragging a handle MUST
+   * call onChange with a new cubic-bezier easing string.
+   */
+  it('renders draggable control handles for cubic-bezier curve', () => {
+    const props = defaultEasingGraphProps({
+      easing: 'cubic-bezier(0.42, 0, 0.58, 1)' as EasingMode,
+    });
+
+    render(<EasingGraphEditor {...props} />);
+
+    const handles = screen.getAllByTestId('bezier-handle');
+
+    expect(handles).toHaveLength(2);
+  });
+
+  /**
+   * @description Dragging a cubic-bezier control handle MUST update the
+   * interpolation mode with the new handle positions.
+   */
+  it('calls onChange when a cubic-bezier handle is dragged', () => {
+    const props = defaultEasingGraphProps({
+      easing: 'cubic-bezier(0.42, 0, 0.58, 1)' as EasingMode,
+    });
+
+    render(<EasingGraphEditor {...props} />);
+
+    const handles = screen.getAllByTestId('bezier-handle');
+
+    expect(handles[0]).toBeDefined();
+
+    const handle = handles[0] as HTMLElement;
+
+    // Simulate drag sequence
+    fireEvent.pointerDown(handle, { clientX: 50, clientY: 50 });
+    fireEvent.pointerMove(handle, { clientX: 60, clientY: 40 });
+    fireEvent.pointerUp(handle, { clientX: 60, clientY: 40 });
+
+    expect(props.onChange).toHaveBeenCalled();
+
+    const call = (props.onChange as jest.MockedFunction<typeof props.onChange>).mock.calls[0];
+
+    expect(call).toBeDefined();
+    // The new easing should be a cubic-bezier string
+    expect(String(call?.[0]).startsWith('cubic-bezier(')).toBe(true);
+  });
+
+  /**
+   * @description When a spring easing is selected (e.g. spring-bouncy),
+   * the graph MUST render a spring decay curve indicator so the user can
+   * see values above 1.0 (overshoot).
+   */
+  it('displays spring curve indicator for spring presets', () => {
+    const props = defaultEasingGraphProps({ easing: 'spring-bouncy' });
+
+    render(<EasingGraphEditor {...props} />);
+
+    expect(screen.getByTestId('spring-curve-indicator')).toBeDefined();
+  });
+
+  /**
+   * @description During playback or scrubbing, a preview dot MUST be visible
+   * on the curve at the current playback progress position.
+   */
+  it('shows a preview dot during playback', () => {
+    const props = defaultEasingGraphProps({
+      isPlaying: true,
+      playbackProgress: 0.5,
+    });
+
+    render(<EasingGraphEditor {...props} />);
+
+    expect(screen.getByTestId('preview-dot')).toBeDefined();
+  });
+
+  /**
+   * @description The preview dot MUST NOT be visible when not playing and
+   * playbackProgress is 0 (idle state).
+   */
+  it('hides the preview dot when idle', () => {
+    const props = defaultEasingGraphProps({
+      isPlaying: false,
+      playbackProgress: 0,
+    });
+
+    render(<EasingGraphEditor {...props} />);
+
+    expect(screen.queryByTestId('preview-dot')).toBeNull();
+  });
+
+  /**
+   * @description When the close callback is provided and triggered,
+   * the graph editor MUST invoke onClose (e.g. for click-outside behavior).
+   */
+  it('invokes onClose callback when provided', () => {
+    const onClose = jest.fn<() => void>();
+    const props = defaultEasingGraphProps({ onClose });
+
+    render(<EasingGraphEditor {...props} />);
+
+    const closeButton = screen.getByRole('button', { name: /close/i });
+
+    fireEvent.click(closeButton);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * @description Named presets (ease, ease-in, etc.) MUST display the curve
+   * as read-only — no control handles should be rendered.
+   */
+  it('renders named preset curves as read-only (no bezier handles)', () => {
+    const props = defaultEasingGraphProps({ easing: 'ease' });
+
+    render(<EasingGraphEditor {...props} />);
+
+    expect(screen.queryAllByTestId('bezier-handle')).toHaveLength(0);
+  });
+
+  /**
+   * @description Clicking outside the graph editor MUST close it by invoking onClose.
+   * The spec requires "The graph editor closes when clicking outside it."
+   */
+  it('closes on click outside via document mousedown', () => {
+    const onClose = jest.fn<() => void>();
+    const props = defaultEasingGraphProps({ onClose });
+
+    render(
+      <div>
+        <div data-testid="outside-element">outside</div>
+        <EasingGraphEditor {...props} />
+      </div>,
+    );
+
+    // Click outside the graph editor
+    fireEvent.mouseDown(screen.getByTestId('outside-element'));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * @description Clicking inside the graph editor MUST NOT close it.
+   */
+  it('does not close when clicking inside', () => {
+    const onClose = jest.fn<() => void>();
+    const props = defaultEasingGraphProps({ onClose });
+
+    render(<EasingGraphEditor {...props} />);
+
+    // Click inside the graph editor
+    fireEvent.mouseDown(screen.getByTestId('easing-graph-editor'));
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * PerPropertyLanes (7-D)
+ * --------------------------------------------------------------------------- */
+
+/** Helper to build a keyframe with typed property values. */
+function makePropertyKeyframe(
+  overrides: Partial<Keyframe> & {
+    properties?: Record<string, { readonly type: 'number'; readonly value: number; readonly easing: EasingMode }>;
+  } = {},
+): Keyframe {
+  return {
+    name: 'kf-prop',
+    action: 'none',
+    offsetMs: 0,
+    properties: {},
+    ...overrides,
+  };
+}
+
+function defaultPerPropertyLanesProps(overrides: Partial<PerPropertyLanesProps> = {}): PerPropertyLanesProps {
+  return {
+    keyframes: [],
+    durationMs: 3000,
+    onAddPropertyKeyframe: jest.fn<(offsetMs: number, property: string) => void>(),
+    onMovePropertyKeyframe: jest.fn<(fromIndex: number, property: string, toOffsetMs: number) => void>(),
+    ...overrides,
+  };
+}
+
+/**
+ * @description Verifies the per-property keyframe lanes component renders
+ * expandable, category-grouped property tracks with drag/add support.
+ */
+describe('PerPropertyLanes', () => {
+  /**
+   * @description When expanded with animated properties, the component MUST
+   * render individual lanes for each property with keyframe markers.
+   */
+  it('renders property lanes with per-property keyframe markers', () => {
+    const keyframes: readonly Keyframe[] = [
+      makePropertyKeyframe({
+        name: 'kf-1',
+        offsetMs: 0,
+        properties: {
+          x: { type: 'number', value: 0, easing: 'linear' },
+          opacity: { type: 'number', value: 1, easing: 'ease' },
+        },
+      }),
+      makePropertyKeyframe({
+        name: 'kf-2',
+        offsetMs: 1000,
+        properties: {
+          x: { type: 'number', value: 100, easing: 'linear' },
+          opacity: { type: 'number', value: 0.5, easing: 'ease' },
+        },
+      }),
+    ];
+    const props = defaultPerPropertyLanesProps({ keyframes });
+
+    render(<PerPropertyLanes {...props} />);
+
+    // Should have property lane headings
+    expect(screen.getByText('x')).toBeDefined();
+    expect(screen.getByText('opacity')).toBeDefined();
+
+    // Each lane should have markers
+    const lanes = screen.getAllByTestId('property-lane');
+
+    expect(lanes.length).toBeGreaterThanOrEqual(2);
+  });
+
+  /**
+   * @description Double-clicking on a property lane at a specific offset MUST
+   * call onAddPropertyKeyframe with the offset and property name.
+   */
+  it('creates a property keyframe on double-click', () => {
+    const keyframes: readonly Keyframe[] = [
+      makePropertyKeyframe({
+        offsetMs: 0,
+        properties: {
+          opacity: { type: 'number', value: 1, easing: 'ease' },
+        },
+      }),
+    ];
+    const props = defaultPerPropertyLanesProps({ keyframes, durationMs: 3000 });
+
+    render(<PerPropertyLanes {...props} />);
+
+    const lanes = screen.getAllByTestId('property-lane');
+
+    expect(lanes[0]).toBeDefined();
+
+    const lane = lanes[0] as HTMLElement;
+
+    // Double-click in the middle of the lane
+    fireEvent.doubleClick(lane, { clientX: 150 });
+
+    expect(props.onAddPropertyKeyframe).toHaveBeenCalled();
+
+    const call = (props.onAddPropertyKeyframe as jest.MockedFunction<typeof props.onAddPropertyKeyframe>).mock.calls[0];
+
+    expect(call).toBeDefined();
+    // First arg is offsetMs (number), second is property name (string)
+    expect(typeof call?.[0]).toBe('number');
+    expect(typeof call?.[1]).toBe('string');
+  });
+
+  /**
+   * @description Dragging a property keyframe marker to a new offset MUST call
+   * onMovePropertyKeyframe to move that property independently.
+   */
+  it('moves a property keyframe via drag', () => {
+    const keyframes: readonly Keyframe[] = [
+      makePropertyKeyframe({
+        name: 'kf-1',
+        offsetMs: 300,
+        properties: {
+          x: { type: 'number', value: 100, easing: 'linear' },
+          opacity: { type: 'number', value: 0.5, easing: 'ease' },
+        },
+      }),
+    ];
+    const props = defaultPerPropertyLanesProps({ keyframes, durationMs: 3000 });
+
+    render(<PerPropertyLanes {...props} />);
+
+    const markers = screen.getAllByTestId('property-keyframe-marker');
+
+    expect(markers.length).toBeGreaterThanOrEqual(1);
+
+    expect(markers[0]).toBeDefined();
+
+    const marker = markers[0] as HTMLElement;
+
+    fireEvent.pointerDown(marker, { clientX: 30, pointerId: 1 });
+    fireEvent.pointerMove(marker, { clientX: 180, pointerId: 1 });
+    fireEvent.pointerUp(marker, { clientX: 180, pointerId: 1 });
+
+    expect(props.onMovePropertyKeyframe).toHaveBeenCalled();
+  });
+
+  /**
+   * @description The component MUST group property lanes by category:
+   * Geometry (x, y, width, height, rotation), Appearance (opacity, backgroundColor, etc.),
+   * Typography (fontSize, color, etc.).
+   */
+  it('groups properties by category', () => {
+    const keyframes: readonly Keyframe[] = [
+      makePropertyKeyframe({
+        offsetMs: 0,
+        properties: {
+          x: { type: 'number', value: 0, easing: 'linear' },
+          y: { type: 'number', value: 0, easing: 'linear' },
+          opacity: { type: 'number', value: 1, easing: 'ease' },
+          fontSize: { type: 'number', value: 14, easing: 'ease' },
+        },
+      }),
+    ];
+    const props = defaultPerPropertyLanesProps({ keyframes });
+
+    render(<PerPropertyLanes {...props} />);
+
+    // Category headings must be present
+    expect(screen.getByText('Geometry')).toBeDefined();
+    expect(screen.getByText('Appearance')).toBeDefined();
+    expect(screen.getByText('Typography')).toBeDefined();
+  });
+
+  /**
+   * @description The collapse toggle MUST return the view to the standard
+   * monolithic keyframe display — property lanes should disappear.
+   */
+  it('collapses property lanes via collapse toggle', () => {
+    const keyframes: readonly Keyframe[] = [
+      makePropertyKeyframe({
+        offsetMs: 0,
+        properties: {
+          x: { type: 'number', value: 0, easing: 'linear' },
+          opacity: { type: 'number', value: 1, easing: 'ease' },
+        },
+      }),
+    ];
+    const props = defaultPerPropertyLanesProps({ keyframes, isExpanded: true });
+
+    const { rerender } = render(<PerPropertyLanes {...props} />);
+
+    // Lanes are initially present
+    expect(screen.getAllByTestId('property-lane').length).toBeGreaterThanOrEqual(1);
+
+    // Collapse — rerender with isExpanded=false
+    rerender(<PerPropertyLanes {...{ ...props, isExpanded: false }} />);
+
+    expect(screen.queryAllByTestId('property-lane')).toHaveLength(0);
+  });
+
+  /**
+   * @description Only one element's property lanes can be expanded at a time.
+   * The component enforces this via its controlled isExpanded prop.
+   * When isExpanded is false, no lanes should be rendered.
+   */
+  it('renders no lanes when isExpanded is false', () => {
+    const keyframes: readonly Keyframe[] = [
+      makePropertyKeyframe({
+        offsetMs: 0,
+        properties: {
+          x: { type: 'number', value: 0, easing: 'linear' },
+        },
+      }),
+    ];
+    const props = defaultPerPropertyLanesProps({ keyframes, isExpanded: false });
+
+    render(<PerPropertyLanes {...props} />);
+
+    expect(screen.queryAllByTestId('property-lane')).toHaveLength(0);
+  });
+
+  /**
+   * @description Per-property keyframe markers MUST appear at the correct
+   * offsets within their respective lanes — verifying data-offset attribute.
+   */
+  it('positions markers at correct offsets within lanes', () => {
+    const keyframes: readonly Keyframe[] = [
+      makePropertyKeyframe({
+        offsetMs: 500,
+        properties: {
+          opacity: { type: 'number', value: 0.8, easing: 'ease' },
+        },
+      }),
+      makePropertyKeyframe({
+        offsetMs: 1500,
+        properties: {
+          opacity: { type: 'number', value: 0.2, easing: 'ease' },
+        },
+      }),
+    ];
+    const props = defaultPerPropertyLanesProps({ keyframes, durationMs: 3000 });
+
+    render(<PerPropertyLanes {...props} />);
+
+    const markers = screen.getAllByTestId('property-keyframe-marker');
+
+    expect(markers).toHaveLength(2);
+    // Verify each marker has an offset data attribute
+    expect(markers[0]?.getAttribute('data-offset-ms')).toBe('500');
+    expect(markers[1]?.getAttribute('data-offset-ms')).toBe('1500');
   });
 });
