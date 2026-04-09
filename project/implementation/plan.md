@@ -31,8 +31,8 @@ its package.
 ## Current Status
 
 - **Active Phase:** Phase 5 — Rich Properties & Layers
-- **In Progress:** 5-A input components (CSS parsers)
-- **Last Merged:** 4-D Demo shell polish
+- **In Progress:** 5-B full properties panel
+- **Last Merged:** 5-A input components
 
 ---
 

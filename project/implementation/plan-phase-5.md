@@ -32,9 +32,9 @@ length parse, animation binding normalization, timeline/state resolution,
 keyframe value resolution)
 
 - [x] tests: red — ui/utilities (CSS parsers)
-- [ ] tests: red — ui/inputs (all 5 input components)
-- [ ] impl: green — all
-- [ ] **HeroUI verified**
+- [x] tests: red — ui/inputs (all 5 input components)
+- [x] impl: green — all
+- [x] **HeroUI verified**
 - [ ] demo milestone: color picker shows saturation/brightness area + hue slider;
       gradient editing via fill type switcher; filter and shadow editors allow
       stacking multiple effects; color values normalized to hex
