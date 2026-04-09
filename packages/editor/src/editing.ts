@@ -19,6 +19,7 @@ export function startPlacement(store: EditorStore, elementType: string): void {
     pendingPlacementType: elementType,
     pathEditingElementId: null,
     pathDrawingElementId: null,
+    inlineTextEditingElementId: null,
     editingMode: { type: 'placement', elementType },
   });
 }
@@ -77,6 +78,7 @@ export function placeElement(
     pendingPlacementType: null,
     pathEditingElementId: null,
     pathDrawingElementId: entersPathDrawing ? newElement.id : null,
+    inlineTextEditingElementId: null,
     editingMode: entersPathDrawing ? { type: 'path-drawing', elementId: newElement.id } : { type: 'none' },
   });
 
@@ -89,6 +91,7 @@ export function startPathEditing(store: EditorStore, elementId: string): void {
     pendingPlacementType: null,
     pathEditingElementId: elementId,
     pathDrawingElementId: null,
+    inlineTextEditingElementId: null,
     editingMode: { type: 'path-editing', elementId },
   });
 }
@@ -111,6 +114,7 @@ export function startPathDrawing(store: EditorStore, elementId: string): void {
     pendingPlacementType: null,
     pathEditingElementId: null,
     pathDrawingElementId: elementId,
+    inlineTextEditingElementId: null,
     editingMode: { type: 'path-drawing', elementId },
   });
 }

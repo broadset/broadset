@@ -22,7 +22,8 @@ export type EditingMode =
   | { readonly type: 'none' }
   | { readonly type: 'placement'; readonly elementType: string }
   | { readonly type: 'path-editing'; readonly elementId: string }
-  | { readonly type: 'path-drawing'; readonly elementId: string };
+  | { readonly type: 'path-drawing'; readonly elementId: string }
+  | { readonly type: 'inline-text'; readonly elementId: string };
 
 export type ReorderDirection = 'forward' | 'backward' | 'front' | 'back';
 
@@ -49,6 +50,7 @@ export interface EditorState extends UIActionsState {
   readonly pendingPlacementType: string | null;
   readonly pathEditingElementId: string | null;
   readonly pathDrawingElementId: string | null;
+  readonly inlineTextEditingElementId: string | null;
   readonly editingMode: EditingMode;
   readonly loadTemplate: (document: BroadsetDocument) => void;
   readonly setDocument: (document: BroadsetDocument) => void;
@@ -87,7 +89,12 @@ function createEditingMode(
   pendingPlacementType: string | null,
   pathEditingElementId: string | null,
   pathDrawingElementId: string | null,
+  inlineTextEditingElementId: string | null,
 ): EditingMode {
+  if (inlineTextEditingElementId !== null) {
+    return { type: 'inline-text', elementId: inlineTextEditingElementId };
+  }
+
   if (pathDrawingElementId !== null) {
     return { type: 'path-drawing', elementId: pathDrawingElementId };
   }
@@ -114,25 +121,45 @@ function createInteractionState(
   pendingPlacementType: string | null,
   pathEditingElementId: string | null,
   pathDrawingElementId: string | null,
+  inlineTextEditingElementId: string | null = null,
 ): Pick<
   EditorState,
-  'activeElementIds' | 'pendingPlacementType' | 'pathEditingElementId' | 'pathDrawingElementId' | 'editingMode'
+  | 'activeElementIds'
+  | 'pendingPlacementType'
+  | 'pathEditingElementId'
+  | 'pathDrawingElementId'
+  | 'inlineTextEditingElementId'
+  | 'editingMode'
 > {
   return {
     activeElementIds,
     pendingPlacementType,
     pathEditingElementId,
     pathDrawingElementId,
-    editingMode: createEditingMode(pendingPlacementType, pathEditingElementId, pathDrawingElementId),
+    inlineTextEditingElementId,
+    editingMode: createEditingMode(
+      pendingPlacementType,
+      pathEditingElementId,
+      pathDrawingElementId,
+      inlineTextEditingElementId,
+    ),
   };
 }
 
 function applySelectionSideEffects(
-  state: Pick<EditorState, 'pendingPlacementType' | 'pathEditingElementId' | 'pathDrawingElementId'>,
+  state: Pick<
+    EditorState,
+    'pendingPlacementType' | 'pathEditingElementId' | 'pathDrawingElementId' | 'inlineTextEditingElementId'
+  >,
   nextActiveElementIds: readonly string[],
 ): Pick<
   EditorState,
-  'activeElementIds' | 'pendingPlacementType' | 'pathEditingElementId' | 'pathDrawingElementId' | 'editingMode'
+  | 'activeElementIds'
+  | 'pendingPlacementType'
+  | 'pathEditingElementId'
+  | 'pathDrawingElementId'
+  | 'inlineTextEditingElementId'
+  | 'editingMode'
 > {
   const nextPathEditingElementId =
     state.pathEditingElementId !== null && nextActiveElementIds.includes(state.pathEditingElementId) ?
@@ -142,6 +169,10 @@ function applySelectionSideEffects(
     state.pathDrawingElementId !== null && nextActiveElementIds.includes(state.pathDrawingElementId) ?
       state.pathDrawingElementId
     : null;
+  const nextInlineTextEditingElementId =
+    state.inlineTextEditingElementId !== null && nextActiveElementIds.includes(state.inlineTextEditingElementId) ?
+      state.inlineTextEditingElementId
+    : null;
   const nextPendingPlacementType = nextActiveElementIds.length === 0 ? state.pendingPlacementType : null;
 
   return createInteractionState(
@@ -149,6 +180,7 @@ function applySelectionSideEffects(
     nextPendingPlacementType,
     nextPathEditingElementId,
     nextPathDrawingElementId,
+    nextInlineTextEditingElementId,
   );
 }
 
@@ -251,6 +283,7 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
         pendingPlacementType: null,
         pathEditingElementId: null,
         pathDrawingElementId: null,
+        inlineTextEditingElementId: null,
         editingMode: { type: 'none' },
         ...createUIActionsSlice((updater) => {
           set((state) => updater(state));
@@ -493,6 +526,10 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
               state.pathDrawingElementId !== null && deletedIds.has(state.pathDrawingElementId) ?
                 null
               : state.pathDrawingElementId;
+            const nextInlineTextEditingElementId =
+              state.inlineTextEditingElementId !== null && deletedIds.has(state.inlineTextEditingElementId) ?
+                null
+              : state.inlineTextEditingElementId;
 
             return {
               document: nextDocument,
@@ -501,6 +538,7 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
                 state.pendingPlacementType,
                 nextPathEditingElementId,
                 nextPathDrawingElementId,
+                nextInlineTextEditingElementId,
               ),
             };
           });
