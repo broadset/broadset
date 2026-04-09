@@ -1,3 +1,4 @@
+export * from './animation-state';
 export * from './canvas';
 export * from './data-store';
 export * from './editing';
