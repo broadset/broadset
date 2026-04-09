@@ -7,6 +7,7 @@ import * as React from 'react';
 import type { LayerInfo, PanelElement, PropertyValue } from './panels';
 import {
   AnimationModePropertiesPanel,
+  AnimationSidebar,
   AppearancePanel,
   BoxEffectsPanel,
   ClipPathPanel,
@@ -2490,5 +2491,377 @@ describe('LayersSidebar', () => {
 
     fireEvent.keyDown(heroBtn, { key: 'Enter' });
     expect(onSelect).toHaveBeenCalledWith('el-1', 'single');
+  });
+});
+
+/* ================================================================== */
+/*  AnimationSidebar (7-E)                                             */
+/* ================================================================== */
+
+const SAMPLE_TIMELINES: ReadonlyArray<{
+  readonly id: string;
+  readonly name: string;
+  readonly keyframes: readonly [];
+}> = [
+  { id: 'tl-1', name: 'Enter', keyframes: [] },
+  { id: 'tl-2', name: 'Exit', keyframes: [] },
+];
+
+const ANIMATION_SIDEBAR_DEFAULTS = {
+  availableStates: ['Enter', 'Exit'],
+  availableModifiers: ['hover', 'focus'],
+  activeState: null as string | null,
+  activeModifiers: [] as readonly string[],
+  onSelectState: jest.fn(),
+  onToggleModifier: jest.fn(),
+  onAddTimeline: jest.fn(),
+  onEditTimeline: jest.fn(),
+  onDeleteTimeline: jest.fn(),
+  onDuplicateTimeline: jest.fn(),
+  onRenameTimeline: jest.fn(),
+  onQuickSetup: jest.fn(),
+  onAddStateBinding: jest.fn(),
+  onRemoveStateBinding: jest.fn(),
+  onAddModifierBinding: jest.fn(),
+  onRemoveModifierBinding: jest.fn(),
+} as const;
+
+describe('AnimationSidebar', () => {
+  /**
+   * @description When an element is selected and animations are enabled,
+   * the animation builder MUST be visible with the element header.
+   */
+  it('renders animation builder when element is selected and animations enabled', () => {
+    render(
+      <AnimationSidebar
+        element={BASE_ELEMENT}
+        isLocked={false}
+        animationsEnabled={true}
+        timelines={SAMPLE_TIMELINES}
+        stateBindings={[]}
+        modifierBindings={[]}
+        {...ANIMATION_SIDEBAR_DEFAULTS}
+      />,
+    );
+
+    // Element name and type chip should be visible in the header
+    expect(screen.getByText('Hero Card')).not.toBeNull();
+    expect(screen.getByText('rectangle')).not.toBeNull();
+    // Timeline section must be present
+    expect(screen.getByText('Timelines')).not.toBeNull();
+  });
+
+  /**
+   * @description When no element is selected, the sidebar MUST show an empty state message.
+   */
+  it('shows empty state when no element is selected', () => {
+    render(
+      <AnimationSidebar
+        element={null}
+        isLocked={false}
+        animationsEnabled={true}
+        timelines={[]}
+        stateBindings={[]}
+        modifierBindings={[]}
+        {...ANIMATION_SIDEBAR_DEFAULTS}
+      />,
+    );
+
+    expect(screen.getByText(/select an element/i)).not.toBeNull();
+  });
+
+  /**
+   * @description When animations are disabled, the sidebar MUST show a disabled state message.
+   */
+  it('shows disabled state when animations are turned off', () => {
+    render(
+      <AnimationSidebar
+        element={BASE_ELEMENT}
+        isLocked={false}
+        animationsEnabled={false}
+        timelines={[]}
+        stateBindings={[]}
+        modifierBindings={[]}
+        {...ANIMATION_SIDEBAR_DEFAULTS}
+      />,
+    );
+
+    expect(screen.getByText(/animation.*disabled/i)).not.toBeNull();
+  });
+
+  /**
+   * @description When the selected element is locked, lock helper text and an icon
+   * MUST be displayed, and animation controls MUST be dimmed.
+   */
+  it('shows lock helper text for locked elements', () => {
+    render(
+      <AnimationSidebar
+        element={BASE_ELEMENT}
+        isLocked={true}
+        animationsEnabled={true}
+        timelines={SAMPLE_TIMELINES}
+        stateBindings={[]}
+        modifierBindings={[]}
+        {...ANIMATION_SIDEBAR_DEFAULTS}
+      />,
+    );
+
+    expect(screen.getByText(/element is locked/i)).not.toBeNull();
+  });
+
+  /**
+   * @description The timelines section MUST list all provided timelines with Edit, Rename,
+   * Duplicate, and Delete actions.
+   */
+  it('renders timeline list with action buttons', () => {
+    render(
+      <AnimationSidebar
+        element={BASE_ELEMENT}
+        isLocked={false}
+        animationsEnabled={true}
+        timelines={SAMPLE_TIMELINES}
+        stateBindings={[]}
+        modifierBindings={[]}
+        {...ANIMATION_SIDEBAR_DEFAULTS}
+      />,
+    );
+
+    // Both timeline names visible (use getAllByText since state names may match)
+    expect(screen.getAllByText('Enter').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Exit').length).toBeGreaterThanOrEqual(1);
+
+    // Edit buttons for each timeline
+    expect(screen.getAllByRole('button', { name: /edit/i }).length).toBeGreaterThanOrEqual(2);
+  });
+
+  /**
+   * @description Clicking "Add Timeline" MUST invoke the onAddTimeline callback.
+   */
+  it('calls onAddTimeline when add button is clicked', () => {
+    const onAddTimeline = jest.fn<() => void>();
+
+    render(
+      <AnimationSidebar
+        element={BASE_ELEMENT}
+        isLocked={false}
+        animationsEnabled={true}
+        timelines={[]}
+        stateBindings={[]}
+        modifierBindings={[]}
+        {...ANIMATION_SIDEBAR_DEFAULTS}
+        onAddTimeline={onAddTimeline}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add timeline/i }));
+
+    expect(onAddTimeline).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * @description The animation builder MUST NOT crash when the animation config
+   * has partial or malformed data (e.g. undefined timelines array).
+   */
+  it('does not crash with malformed config (resilience check)', () => {
+    expect(() => {
+      render(
+        <AnimationSidebar
+          element={BASE_ELEMENT}
+          isLocked={false}
+          animationsEnabled={true}
+          timelines={undefined as unknown as readonly []}
+          stateBindings={undefined as unknown as readonly []}
+          modifierBindings={undefined as unknown as readonly []}
+          {...ANIMATION_SIDEBAR_DEFAULTS}
+        />,
+      );
+    }).not.toThrow();
+  });
+
+  /**
+   * @description Clicking "Edit" on a timeline MUST invoke onEditTimeline with the timeline ID.
+   */
+  it('calls onEditTimeline with timeline ID when edit is clicked', () => {
+    const onEditTimeline = jest.fn<(id: string) => void>();
+
+    render(
+      <AnimationSidebar
+        element={BASE_ELEMENT}
+        isLocked={false}
+        animationsEnabled={true}
+        timelines={SAMPLE_TIMELINES}
+        stateBindings={[]}
+        modifierBindings={[]}
+        {...ANIMATION_SIDEBAR_DEFAULTS}
+        onEditTimeline={onEditTimeline}
+      />,
+    );
+
+    const editButtons = screen.getAllByRole('button', { name: /edit/i });
+
+    fireEvent.click(editButtons[0] as HTMLElement);
+
+    expect(onEditTimeline).toHaveBeenCalledWith('tl-1');
+  });
+
+  /**
+   * @description Clicking "Delete" on a timeline MUST invoke onDeleteTimeline with the timeline ID.
+   */
+  it('calls onDeleteTimeline with timeline ID when delete is clicked', () => {
+    const onDeleteTimeline = jest.fn<(id: string) => void>();
+
+    render(
+      <AnimationSidebar
+        element={BASE_ELEMENT}
+        isLocked={false}
+        animationsEnabled={true}
+        timelines={SAMPLE_TIMELINES}
+        stateBindings={[]}
+        modifierBindings={[]}
+        {...ANIMATION_SIDEBAR_DEFAULTS}
+        onDeleteTimeline={onDeleteTimeline}
+      />,
+    );
+
+    const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
+
+    fireEvent.click(deleteButtons[0] as HTMLElement);
+
+    expect(onDeleteTimeline).toHaveBeenCalledWith('tl-1');
+  });
+
+  /**
+   * @description Clicking "Rename" on a timeline MUST invoke onRenameTimeline with the timeline ID.
+   */
+  it('calls onRenameTimeline with timeline ID when rename is clicked', () => {
+    const onRenameTimeline = jest.fn<(id: string) => void>();
+
+    render(
+      <AnimationSidebar
+        element={BASE_ELEMENT}
+        isLocked={false}
+        animationsEnabled={true}
+        timelines={SAMPLE_TIMELINES}
+        stateBindings={[]}
+        modifierBindings={[]}
+        {...ANIMATION_SIDEBAR_DEFAULTS}
+        onRenameTimeline={onRenameTimeline}
+      />,
+    );
+
+    const renameButtons = screen.getAllByRole('button', { name: /rename/i });
+
+    fireEvent.click(renameButtons[0] as HTMLElement);
+
+    expect(onRenameTimeline).toHaveBeenCalledWith('tl-1');
+  });
+
+  /**
+   * @description Clicking "Quick setup" MUST invoke onQuickSetup to create
+   * Enter/Exit animations with preset values.
+   */
+  it('calls onQuickSetup when quick setup button is clicked', () => {
+    const onQuickSetup = jest.fn<() => void>();
+
+    render(
+      <AnimationSidebar
+        element={BASE_ELEMENT}
+        isLocked={false}
+        animationsEnabled={true}
+        timelines={[]}
+        stateBindings={[]}
+        modifierBindings={[]}
+        {...ANIMATION_SIDEBAR_DEFAULTS}
+        onQuickSetup={onQuickSetup}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /quick setup/i }));
+
+    expect(onQuickSetup).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * @description The "Active States & Modifiers" section MUST render a state
+   * selector dropdown and modifier toggle switches.
+   */
+  it('renders Active States & Modifiers section with dropdown and switches', () => {
+    render(
+      <AnimationSidebar
+        element={BASE_ELEMENT}
+        isLocked={false}
+        animationsEnabled={true}
+        timelines={[]}
+        stateBindings={[]}
+        modifierBindings={[]}
+        {...ANIMATION_SIDEBAR_DEFAULTS}
+        availableModifiers={['hover', 'focus']}
+      />,
+    );
+
+    expect(screen.getByText('Active States & Modifiers')).not.toBeNull();
+    expect(screen.getByText('State')).not.toBeNull();
+    expect(screen.getByText('hover')).not.toBeNull();
+    expect(screen.getByText('focus')).not.toBeNull();
+  });
+
+  /**
+   * @description Clicking "Add binding" in State Timeline Bindings section
+   * MUST invoke onAddStateBinding callback.
+   */
+  it('calls onAddStateBinding when add state binding button is clicked', () => {
+    const onAddStateBinding = jest.fn<() => void>();
+
+    render(
+      <AnimationSidebar
+        element={BASE_ELEMENT}
+        isLocked={false}
+        animationsEnabled={true}
+        timelines={[]}
+        stateBindings={[]}
+        modifierBindings={[]}
+        {...ANIMATION_SIDEBAR_DEFAULTS}
+        onAddStateBinding={onAddStateBinding}
+      />,
+    );
+
+    const addButtons = screen.getAllByRole('button', { name: /add.*binding/i });
+
+    expect(addButtons.length).toBeGreaterThanOrEqual(1);
+
+    fireEvent.click(addButtons[0] as HTMLElement);
+
+    expect(onAddStateBinding).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * @description Clicking "Add binding" in Modifier Timeline Bindings section
+   * MUST invoke onAddModifierBinding callback.
+   */
+  it('calls onAddModifierBinding when add modifier binding button is clicked', () => {
+    const onAddModifierBinding = jest.fn<() => void>();
+
+    render(
+      <AnimationSidebar
+        element={BASE_ELEMENT}
+        isLocked={false}
+        animationsEnabled={true}
+        timelines={[]}
+        stateBindings={[]}
+        modifierBindings={[]}
+        {...ANIMATION_SIDEBAR_DEFAULTS}
+        onAddModifierBinding={onAddModifierBinding}
+      />,
+    );
+
+    // There are two "Add binding" buttons — state and modifier
+    const addButtons = screen.getAllByRole('button', { name: /add.*binding/i });
+
+    expect(addButtons.length).toBe(2);
+
+    // Click the modifier one (second)
+    fireEvent.click(addButtons[1] as HTMLElement);
+
+    expect(onAddModifierBinding).toHaveBeenCalledTimes(1);
   });
 });
