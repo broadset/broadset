@@ -39,3 +39,9 @@ Non-trivial judgment calls made during implementation. See each unit for context
 **Decision:** Introduce a small `tokens.ts` helper layer and implement the Phase 4-C toolbar, panels, and utilities as typed HeroUI components in `packages/ui/src/` rather than copying legacy compiled output or mixing in raw HTML form controls.
 **Alternatives considered:** Continue relying on the old `dist` artifacts as pseudo-source, or postpone the token layer until later property-panel phases.
 **Rationale:** Phase 4-C is the first real UI slice in a greenfield package. Establishing typed, token-backed HeroUI primitives now keeps the MVP editor surface consistent with the repo’s UI mandate and makes the richer Phase 5 property work easier to extend cleanly.
+
+### Unit 8-D — Motion path editing as state-only (no overlay rendering)
+
+**Decision:** Implement motion path editing as pure state management (start/stop, mutual exclusivity, auto-exit on selection change) without the visual overlay (Bézier curve rendering, control point dragging, ghost preview).
+**Alternatives considered:** Implementing the full visual overlay in unit tests using mocked canvas/DOM, or deferring the unit entirely until CT infrastructure was ready.
+**Rationale:** The spec explicitly marks the visual overlay, control point dragging, and ghost preview as requiring Playwright Component Tests. The state management layer (tracking `motionPathEditingElementId`, mutual exclusivity with other modes, auto-exit behavior) is fully testable with unit tests and provides the foundation for the CT-tested overlay. This matches the pattern used for path editing and clip-path editing modes.
