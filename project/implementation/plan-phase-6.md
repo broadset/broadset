@@ -28,8 +28,8 @@ deselect; select-all on active page; group Ctrl+G / ungroup Ctrl+Shift+G;
 zoom in/out/reset; layer reorder forward/backward/front/back; lock toggle;
 undo/redo)
 
-- [ ] tests: red — editor/keyboard
-- [ ] impl: green
+- [x] tests: red — editor/keyboard
+- [x] impl: green
 - [ ] demo milestone: arrow nudge 1mm, Shift+arrow 10mm; Ctrl+Z/Y undo/redo;
       Ctrl+C/V copy/paste (system clipboard primary, internal fallback);
       Delete removes; Ctrl+G groups; Ctrl+A selects all; Ctrl+]/[ reorder layers
@@ -84,7 +84,7 @@ closes after action)
 
 | Group                     | Red | Green | Demo |
 | ------------------------- | --- | ----- | ---- |
-| 6-A keyboard shortcuts    | ☐   | ☐     | ☐    |
+| 6-A keyboard shortcuts    | ☑   | ☑     | ☐    |
 | 6-B inline text + toolbar | ☐   | ☐     | ☐    |
 | 6-C element operations    | ☐   | ☐     | ☐    |
 | 6-D context menu          | ☐   | ☐     | ☐    |
