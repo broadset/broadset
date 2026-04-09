@@ -17,7 +17,11 @@ interface MockHeroUiProps {
   readonly selectedKey?: string | number | null | undefined;
   readonly onSelectionChange?: ((key: string | number | null) => void) | undefined;
   readonly onAction?: (() => void) | undefined;
-  readonly onChange?: ((event: React.ChangeEvent<HTMLInputElement>) => void) | ((value: number) => void) | undefined;
+  readonly onChange?:
+    | ((event: React.ChangeEvent<HTMLInputElement>) => void)
+    | ((value: number) => void)
+    | ((value: boolean) => void)
+    | undefined;
   readonly [key: string]: unknown;
 }
 
@@ -331,6 +335,10 @@ jest.mock(
       CardTitle: createWrapper('h2'),
       Chip: createWrapper('span'),
       CloseButton: Button,
+      ColorArea: Object.assign(createWrapper(), { Thumb: createWrapper('span') }),
+      ColorSlider: Object.assign(createWrapper(), { Track: createWrapper(), Thumb: createWrapper('span') }),
+      ColorSwatch: createWrapper('span'),
+      ColorSwatchPicker: Object.assign(createWrapper(), { Item: createWrapper(), Swatch: createWrapper('span') }),
       Dropdown,
       Input(props: MockHeroUiProps): React.JSX.Element {
         const { onChange, value = '', ...restProps } = props;
@@ -346,9 +354,69 @@ jest.mock(
       Kbd,
       Modal,
       NumberField,
+      parseColor: (mockColorStr: string) => ({
+        getChannelValue: () => 0,
+        toString: () => mockColorStr,
+        withChannelValue: () => ({
+          getChannelValue: () => 0,
+          toString: () => mockColorStr,
+          withChannelValue: (): unknown => null,
+        }),
+      }),
+      Popover: Object.assign(createWrapper(), {
+        Trigger: createWrapper(),
+        Content: createWrapper(),
+        Dialog: createWrapper(),
+      }),
       ScrollShadow: createWrapper(),
       Select,
       Separator: createWrapper('hr'),
+      Slider: Object.assign(
+        function SliderRoot(props: MockHeroUiProps): React.JSX.Element {
+          const { children, onChange, ...restProps } = props;
+
+          return ReactActual.createElement(
+            'div',
+            { ...restProps, role: 'group' },
+            ReactActual.createElement('input', {
+              'aria-label': props['aria-label'],
+              onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+                if (typeof onChange === 'function') {
+                  (onChange as (mockValue: number) => void)(Number(event.currentTarget.value));
+                }
+              },
+              type: 'range',
+              value: String(Number(props['value'] ?? 0)),
+            }),
+            children ?? null,
+          );
+        },
+        {
+          Fill: createWrapper('span'),
+          Thumb: createWrapper('span'),
+          Track: createWrapper(),
+        },
+      ),
+      Switch(props: MockHeroUiProps): React.JSX.Element {
+        const { children, isSelected, onChange, ...restProps } = props;
+
+        return ReactActual.createElement(
+          'label',
+          restProps,
+          ReactActual.createElement('input', {
+            'aria-label': props['aria-label'],
+            checked: Boolean(isSelected),
+            onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+              if (typeof onChange === 'function') {
+                (onChange as (mockChecked: boolean) => void)(event.currentTarget.checked);
+              }
+            },
+            role: 'switch',
+            type: 'checkbox',
+          }),
+          children ?? null,
+        );
+      },
       Tabs,
       Toast: ToastComponent,
       toast: toastApi,

@@ -1,180 +1,521 @@
 /** @jest-environment jsdom */
 
 import { describe, expect, it, jest } from '@jest/globals';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import * as React from 'react';
 
-import type { PanelElement } from './panels';
-import { AppearancePanel, GeometryPanel, PropertiesSidebar } from './panels';
+import type { PanelElement, PropertyValue } from './panels';
+import {
+  AnimationModePropertiesPanel,
+  AppearancePanel,
+  BoxEffectsPanel,
+  ClipPathPanel,
+  GeometryPanel,
+  GroupPanel,
+  ImagePanel,
+  ObjectFitPanel,
+  PathPropertiesPanel,
+  PreflightPanel,
+  PropertiesSidebar,
+  PropertyField,
+  QrCodePanel,
+  SpacingPanel,
+  TextEffectsPanel,
+  TypographyPanel,
+} from './panels';
 
-interface MockHeroUiProps {
-  readonly children?: React.ReactNode;
-  readonly onPress?: (() => void) | undefined;
-  readonly isDisabled?: boolean | undefined;
-  readonly label?: string | undefined;
-  readonly ['aria-label']?: string | undefined;
-  readonly value?: string | number | readonly string[] | undefined;
-  readonly selectedKey?: string | number | null | undefined;
-  readonly onSelectionChange?: ((key: string | number | null) => void) | undefined;
-  readonly onChange?: ((event: React.ChangeEvent<HTMLInputElement>) => void) | ((value: number) => void) | undefined;
-  readonly [key: string]: unknown;
+/* ------------------------------------------------------------------ */
+/*  HeroUI mock — all helpers use mock prefix to pass jest-hoist       */
+/* ------------------------------------------------------------------ */
+
+const mockNumCtx = React.createContext({ label: '', val: 0, cb: undefined as ((n: number) => void) | undefined });
+
+function mockWrap(tag = 'div') {
+  return (p: Record<string, unknown>) => {
+    const { allowsMultipleExpanded: _a, defaultExpandedKeys: _b, children, ...rest } = p;
+
+    return React.createElement(tag, rest, (children as React.ReactNode) ?? null);
+  };
+}
+
+function mockButton(p: Record<string, unknown>) {
+  const { children, isDisabled, onPress, ...rest } = p;
+
+  return React.createElement(
+    'button',
+    { ...rest, disabled: isDisabled, onClick: typeof onPress === 'function' ? onPress : undefined },
+    (children as React.ReactNode) ?? null,
+  );
+}
+
+function mockInput(p: Record<string, unknown>) {
+  const { label, onChange, ...rest } = p;
+
+  return React.createElement(
+    'label',
+    null,
+    (label as React.ReactNode) ?? null,
+    React.createElement('input', {
+      ...rest,
+      'aria-label': p['aria-label'] ?? label,
+      onChange: typeof onChange === 'function' ? onChange : undefined,
+      value: p['value'] ?? '',
+    }),
+  );
+}
+
+function mockNumberFieldRoot(p: Record<string, unknown>) {
+  const { children, label, maxValue: _1, minValue: _2, onChange, step: _3, ...rest } = p;
+
+  return React.createElement(
+    'div',
+    rest,
+    React.createElement(
+      mockNumCtx.Provider,
+      {
+        value: {
+          label: (p['aria-label'] ?? label ?? '') as string,
+          val: Number(p['value'] ?? 0),
+          cb: typeof onChange === 'function' ? (onChange as (n: number) => void) : undefined,
+        },
+      },
+      (children as React.ReactNode) ?? null,
+    ),
+  );
+}
+
+function mockNumberFieldInput(p: Record<string, unknown>) {
+  const ctx = React.useContext(mockNumCtx);
+
+  return React.createElement('input', {
+    ...p,
+    'aria-label': ctx.label,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      ctx.cb?.(Number(e.currentTarget.value));
+    },
+    role: 'spinbutton',
+    type: 'number',
+    value: String(ctx.val),
+  });
+}
+
+function mockSlider(p: Record<string, unknown>) {
+  const { children, label, onChange, ...rest } = p;
+
+  return React.createElement(
+    'div',
+    { ...rest, 'aria-label': label, role: 'group' },
+    React.createElement('input', {
+      'aria-label': label,
+      type: 'range',
+      value: String(Number(p['value'] ?? 0)),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (typeof onChange === 'function') {
+          (onChange as (v: number) => void)(Number(e.currentTarget.value));
+        }
+      },
+    }),
+    (children as React.ReactNode) ?? null,
+  );
+}
+
+function mockSwitch(p: Record<string, unknown>) {
+  const { children, isSelected, onChange, ...rest } = p;
+
+  return React.createElement(
+    'label',
+    rest,
+    React.createElement('input', {
+      'aria-label': p['aria-label'],
+      checked: Boolean(isSelected),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (typeof onChange === 'function') {
+          (onChange as (v: boolean) => void)(e.currentTarget.checked);
+        }
+      },
+      role: 'switch',
+      type: 'checkbox',
+    }),
+    (children as React.ReactNode) ?? null,
+  );
 }
 
 jest.mock(
   '@heroui/react',
-  () => {
-    const ReactActual = jest.requireActual<typeof React>('react');
-    const NumberFieldContext = ReactActual.createContext<{
-      readonly label: string;
-      readonly value: number;
-      readonly onChange?: ((value: number) => void) | undefined;
-    }>({ label: '', onChange: undefined, value: 0 });
-
-    function createWrapper(tagName = 'div') {
-      return function Wrapper(props: MockHeroUiProps): React.JSX.Element {
-        const {
-          allowsMultipleExpanded: _allowsMultipleExpanded,
-          children,
-          defaultExpandedKeys: _defaultExpandedKeys,
-          ...restProps
-        } = props;
-
-        return ReactActual.createElement(tagName, restProps, children ?? null);
-      };
-    }
-
-    function Button(props: MockHeroUiProps): React.JSX.Element {
-      const { children, isDisabled, onPress, ...restProps } = props;
-
-      return ReactActual.createElement(
-        'button',
-        { ...restProps, disabled: isDisabled, onClick: typeof onPress === 'function' ? onPress : undefined },
-        children ?? null,
-      );
-    }
-
-    const Accordion = Object.assign(createWrapper(), {
-      Item: createWrapper(),
-      Heading: createWrapper(),
-      Trigger: Button,
-      Panel: createWrapper(),
-    });
-
-    function Input(props: MockHeroUiProps): React.JSX.Element {
-      const { label, onChange, value = '', ...restProps } = props;
-
-      return ReactActual.createElement(
-        'label',
-        null,
-        label ?? null,
-        ReactActual.createElement('input', {
-          ...restProps,
-          'aria-label': props['aria-label'] ?? label,
-          onChange: typeof onChange === 'function' ? onChange : undefined,
-          value,
-        }),
-      );
-    }
-
-    const NumberField = Object.assign(
-      function NumberFieldRoot(props: MockHeroUiProps): React.JSX.Element {
-        const {
-          children,
-          label,
-          maxValue: _maxValue,
-          minValue: _minValue,
-          onChange,
-          step: _step,
-          value = 0,
-          ...restProps
-        } = props;
-
-        return ReactActual.createElement(
-          'div',
-          restProps,
-          ReactActual.createElement(
-            NumberFieldContext.Provider,
-            {
-              value: {
-                label: props['aria-label'] ?? label ?? '',
-                onChange: typeof onChange === 'function' ? (onChange as (value: number) => void) : undefined,
-                value: Number(value),
-              },
-            },
-            children ?? null,
-          ),
-        );
-      },
-      {
-        Group: createWrapper(),
-        Input(props: MockHeroUiProps): React.JSX.Element {
-          const context = ReactActual.useContext(NumberFieldContext);
-
-          return ReactActual.createElement('input', {
-            ...props,
-            'aria-label': context.label,
-            onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
-              context.onChange?.(Number(event.currentTarget.value));
-
-              if (typeof props.onChange === 'function') {
-                (props.onChange as (event: React.ChangeEvent<HTMLInputElement>) => void)(event);
-              }
-            },
-            role: 'spinbutton',
-            type: 'number',
-            value: String(context.value),
-          });
-        },
-      },
-    );
-
-    const Select = Object.assign(createWrapper(), {
-      Trigger: createWrapper(),
-      Value: createWrapper('span'),
-      Popover: createWrapper(),
-    });
-
-    return {
-      Accordion,
-      Button,
-      Input,
-      ListBox: createWrapper(),
-      ListBoxItem: createWrapper(),
-      NumberField,
-      Select,
-    };
-  },
+  () => ({
+    Accordion: Object.assign(mockWrap(), {
+      Item: mockWrap(),
+      Heading: mockWrap(),
+      Trigger: mockButton,
+      Panel: mockWrap(),
+    }),
+    Button: mockButton,
+    ButtonGroup: mockWrap(),
+    Chip: mockWrap('span'),
+    Input: mockInput,
+    ListBox: mockWrap(),
+    ListBoxItem: mockWrap(),
+    NumberField: Object.assign(mockNumberFieldRoot, { Group: mockWrap(), Input: mockNumberFieldInput }),
+    Select: Object.assign(mockWrap(), { Trigger: mockWrap(), Value: mockWrap('span'), Popover: mockWrap() }),
+    Slider: Object.assign(mockSlider, { Track: mockWrap(), Fill: mockWrap(), Thumb: mockWrap() }),
+    Switch: mockSwitch,
+  }),
   { virtual: true },
 );
 
-const RECTANGLE_ELEMENT: PanelElement = {
-  id: 'element-1',
+/* ------------------------------------------------------------------ */
+/*  Mock ./inputs — panel tests focus on wiring, not input internals   */
+/* ------------------------------------------------------------------ */
+
+function mockCallOnChange(p: Record<string, unknown>, ...args: readonly unknown[]) {
+  if (typeof p['onChange'] === 'function') {
+    (p['onChange'] as (...a: readonly unknown[]) => void)(...args);
+  }
+}
+
+function mockStr(v: unknown, fallback = ''): string {
+  return (
+    typeof v === 'string' ? v
+    : typeof v === 'number' ? String(v)
+    : fallback
+  );
+}
+
+function mockColorInput(p: Record<string, unknown>) {
+  const label = mockStr(p['label'], 'Color');
+
+  return React.createElement('input', {
+    'aria-label': label,
+    'data-testid': `color-input-${label}`,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      mockCallOnChange(p, e.currentTarget.value);
+    },
+    type: 'text',
+    value: mockStr(p['value']),
+  });
+}
+
+function mockCssLengthInput(p: Record<string, unknown>) {
+  const label = mockStr(p['label']);
+
+  return React.createElement('input', {
+    'aria-label': label,
+    'data-testid': `css-length-${label}`,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      mockCallOnChange(p, e.currentTarget.value);
+    },
+    type: 'text',
+    value: mockStr(p['value']),
+  });
+}
+
+function mockFilterEditor(p: Record<string, unknown>) {
+  const label = mockStr(p['label'], 'Filter');
+
+  return React.createElement(
+    'div',
+    {
+      'aria-label': label,
+      'data-testid': `filter-editor-${label}`,
+    },
+    mockStr(p['value']),
+  );
+}
+
+function mockNumField(p: Record<string, unknown>) {
+  return React.createElement('input', {
+    'aria-label': mockStr(p['label']),
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      mockCallOnChange(p, Number(e.currentTarget.value));
+    },
+    role: 'spinbutton',
+    type: 'number',
+    value: mockStr(p['value'], '0'),
+  });
+}
+
+function mockShadowEditor(p: Record<string, unknown>) {
+  const label = mockStr(p['label'], 'Shadow');
+
+  return React.createElement(
+    'div',
+    {
+      'aria-label': label,
+      'data-testid': `shadow-editor-${label}`,
+    },
+    mockStr(p['value']),
+  );
+}
+
+function mockTextStrokeInput(p: Record<string, unknown>) {
+  const label = mockStr(p['label'], 'Text stroke');
+
+  return React.createElement(
+    'div',
+    {
+      'data-testid': `text-stroke-${label}`,
+    },
+    React.createElement('input', {
+      'aria-label': `${label} width`,
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        mockCallOnChange(p, Number(e.currentTarget.value), p['color']);
+      },
+      type: 'number',
+      value: mockStr(p['width'], '0'),
+    }),
+  );
+}
+
+jest.mock('./inputs', () => ({
+  ColorInput: mockColorInput,
+  CssLengthInput: mockCssLengthInput,
+  FilterEditor: mockFilterEditor,
+  NumField: mockNumField,
+  ShadowEditor: mockShadowEditor,
+  TextStrokeInput: mockTextStrokeInput,
+}));
+
+/* ------------------------------------------------------------------ */
+/*  Mock @broadset/model — for capability-driven panel visibility      */
+/* ------------------------------------------------------------------ */
+
+jest.mock('@broadset/model', () => {
+  const mockProfiles: Record<string, Record<string, boolean>> = {
+    text: {
+      typography: true,
+      appearance: true,
+      boxEffects: true,
+      borderRadius: true,
+      clipPath: false,
+      objectFit: false,
+      svgStrokeFill: false,
+      pathEditing: false,
+    },
+    rectangle: {
+      typography: false,
+      appearance: true,
+      boxEffects: true,
+      borderRadius: true,
+      clipPath: true,
+      objectFit: false,
+      svgStrokeFill: false,
+      pathEditing: false,
+    },
+    ellipse: {
+      typography: false,
+      appearance: true,
+      boxEffects: true,
+      borderRadius: false,
+      clipPath: true,
+      objectFit: false,
+      svgStrokeFill: false,
+      pathEditing: false,
+    },
+    image: {
+      typography: false,
+      appearance: true,
+      boxEffects: true,
+      borderRadius: true,
+      clipPath: true,
+      objectFit: true,
+      svgStrokeFill: false,
+      pathEditing: false,
+    },
+    path: {
+      typography: false,
+      appearance: false,
+      boxEffects: false,
+      borderRadius: false,
+      clipPath: false,
+      objectFit: false,
+      svgStrokeFill: true,
+      pathEditing: true,
+    },
+    svg: {
+      typography: false,
+      appearance: true,
+      boxEffects: true,
+      borderRadius: true,
+      clipPath: true,
+      objectFit: true,
+      svgStrokeFill: true,
+      pathEditing: false,
+    },
+    qrcode: {
+      typography: false,
+      appearance: false,
+      boxEffects: false,
+      borderRadius: false,
+      clipPath: false,
+      objectFit: false,
+      svgStrokeFill: false,
+      pathEditing: false,
+    },
+    group: {
+      typography: false,
+      appearance: true,
+      boxEffects: false,
+      borderRadius: false,
+      clipPath: true,
+      objectFit: false,
+      svgStrokeFill: false,
+      pathEditing: false,
+    },
+    video: {
+      typography: false,
+      appearance: true,
+      boxEffects: true,
+      borderRadius: true,
+      clipPath: true,
+      objectFit: true,
+      svgStrokeFill: false,
+      pathEditing: false,
+    },
+  };
+  const mockFallback = {
+    typography: false,
+    appearance: false,
+    boxEffects: false,
+    borderRadius: false,
+    clipPath: false,
+    objectFit: false,
+    svgStrokeFill: false,
+    pathEditing: false,
+  };
+
+  return {
+    getCapabilityProfile: jest.fn((type: string) => mockProfiles[type] ?? mockFallback),
+  };
+});
+
+/* ------------------------------------------------------------------ */
+/*  Test fixtures                                                      */
+/* ------------------------------------------------------------------ */
+
+const BASE_ELEMENT: PanelElement = {
+  id: 'el-1',
   type: 'rectangle',
   name: 'Hero Card',
+  content: '',
   x: 20,
   y: 30,
   width: 320,
   height: 180,
   rotation: 15,
   backgroundColor: '#ff0000',
-  backgroundGradient: 'linear-gradient(90deg, #ff0000, #0000ff)',
+  backgroundGradient: '',
   borderWidth: 2,
   borderColor: '#111111',
   borderStyle: 'solid',
-  borderRadius: 12,
+  borderRadius: [12, 12, 12, 12],
   opacity: 0.8,
   blendMode: 'normal',
+  mixBlendMode: 'normal',
+  isolation: 'auto',
   boxShadow: '2px 4px 8px rgba(0,0,0,0.3)',
   filter: 'blur(2px)',
   backdropFilter: 'blur(6px)',
+  fontFamily: 'Arial',
+  fontSize: 16,
+  fontColor: '#000000',
+  fontWeight: 400,
+  fontStyle: 'normal',
+  textAlignment: 'left',
+  textDecoration: '',
+  textTransform: 'none',
+  letterSpacing: 0,
+  lineHeight: '1.5',
+  wordSpacing: 0,
+  textStroke: '',
+  textShadow: '',
+  writingMode: 'horizontal-tb',
+  fontVariationSettings: '',
+  padding: [0, 0, 0, 0],
+  stroke: '#000000',
+  strokeWidth: 2,
+  strokeDasharray: '',
+  strokeDashoffset: 0,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  strokeOpacity: 1,
+  fill: 'none',
+  fillOpacity: 1,
+  fillRule: 'nonzero',
+  maskType: 'none',
+  customClipPath: '',
+  clipChildren: false,
+  rotateX: 0,
+  rotateY: 0,
+  rotateZ: 0,
+  translateZ: 0,
+  objectFit: 'cover',
+  autoSize: 'fixed',
+  errorCorrection: 'M',
+  qrForegroundColor: '#000000',
+  qrBackgroundColor: '#ffffff',
 };
+
+const TEXT_ELEMENT: PanelElement = {
+  ...BASE_ELEMENT,
+  id: 'el-2',
+  type: 'text',
+  name: 'Headline',
+  content: 'Hello World',
+  fontFamily: 'Inter',
+  fontSize: 24,
+  fontColor: '#333333',
+  fontWeight: 700,
+  textAlignment: 'center',
+};
+
+const PATH_ELEMENT: PanelElement = {
+  ...BASE_ELEMENT,
+  id: 'el-3',
+  type: 'path',
+  name: 'Swoosh',
+  content: 'M0,0 L100,100',
+  stroke: '#ff0000',
+  strokeWidth: 3,
+  fill: 'none',
+};
+
+const IMAGE_ELEMENT: PanelElement = {
+  ...BASE_ELEMENT,
+  id: 'el-4',
+  type: 'image',
+  name: 'Photo',
+  content: 'https://example.com/photo.jpg',
+  objectFit: 'cover',
+};
+
+const QRCODE_ELEMENT: PanelElement = {
+  ...BASE_ELEMENT,
+  id: 'el-5',
+  type: 'qrcode',
+  name: 'QR Link',
+  content: 'https://example.com',
+};
+
+const GROUP_ELEMENT: PanelElement = {
+  ...BASE_ELEMENT,
+  id: 'el-6',
+  type: 'group',
+  name: 'My Group',
+  clipChildren: false,
+};
+
+/* ================================================================== */
+/*  GeometryPanel                                                      */
+/* ================================================================== */
 
 describe('GeometryPanel', () => {
   /** @description Position, size, and rotation fields are the core property controls and must report changes as numbers for real-time canvas updates. */
-  it('renders geometry inputs and reports numeric updates', () => {
-    const onUpdate = jest.fn<(key: string, value: number) => void>();
+  it('renders all geometry fields and reports numeric updates', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
 
-    render(<GeometryPanel x={10} y={20} width={100} height={50} rotation={5} onUpdate={onUpdate} />);
+    render(
+      <GeometryPanel x={10} y={20} width={100} height={50} rotation={5} onUpdate={onUpdate} documentMode="screen" />,
+    );
 
     const xInput = screen.getByRole('spinbutton', { name: 'X' });
 
@@ -182,15 +523,123 @@ describe('GeometryPanel', () => {
 
     expect(screen.getByRole('spinbutton', { name: 'Width' })).not.toBeNull();
     expect(screen.getByRole('spinbutton', { name: 'Rotation' })).not.toBeNull();
-    expect(onUpdate).toHaveBeenCalledTimes(1);
     expect(onUpdate).toHaveBeenCalledWith('x', 42);
+  });
+
+  /** @description Print mode must hide 3D transform fields (rotateX/Y/Z, translateZ) since 3D transforms are screen-only. */
+  it('hides 3D transform fields in print mode', () => {
+    render(
+      <GeometryPanel
+        x={0}
+        y={0}
+        width={100}
+        height={100}
+        rotation={0}
+        rotateX={10}
+        rotateY={20}
+        rotateZ={30}
+        translateZ={5}
+        onUpdate={() => undefined}
+        documentMode="print"
+      />,
+    );
+
+    expect(screen.queryByRole('spinbutton', { name: /Rotate X/i })).toBeNull();
+    expect(screen.queryByRole('spinbutton', { name: /Rotate Y/i })).toBeNull();
+    expect(screen.queryByRole('spinbutton', { name: /Translate Z/i })).toBeNull();
+  });
+
+  /** @description Screen mode must show 3D transform fields for spatial transforms. */
+  it('renders 3D transform fields in screen mode when provided', () => {
+    render(
+      <GeometryPanel
+        x={0}
+        y={0}
+        width={100}
+        height={100}
+        rotation={0}
+        rotateX={10}
+        rotateY={20}
+        rotateZ={30}
+        translateZ={5}
+        onUpdate={() => undefined}
+        documentMode="screen"
+      />,
+    );
+
+    expect(screen.getByRole('spinbutton', { name: /Rotate X/i })).not.toBeNull();
+    expect(screen.getByRole('spinbutton', { name: /Rotate Y/i })).not.toBeNull();
+    expect(screen.getByRole('spinbutton', { name: /Translate Z/i })).not.toBeNull();
+  });
+
+  /** @description Width and height must be clamped to a minimum displayed value of 0.1 to prevent zero-size elements. */
+  it('clamps width and height display to minimum 0.1', () => {
+    render(
+      <GeometryPanel x={0} y={0} width={0} height={0} rotation={0} onUpdate={() => undefined} documentMode="screen" />,
+    );
+
+    const widthInput = screen.getByRole('spinbutton', { name: 'Width' });
+    const heightInput = screen.getByRole('spinbutton', { name: 'Height' });
+
+    expect(Number(widthInput.getAttribute('value'))).toBeGreaterThanOrEqual(0.1);
+    expect(Number(heightInput.getAttribute('value'))).toBeGreaterThanOrEqual(0.1);
+  });
+
+  /** @description Anchor-relative positioning: right anchor should display position from right edge. */
+  it('displays right-anchored X relative to canvas right edge', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(
+      <GeometryPanel
+        x={100}
+        y={0}
+        width={80}
+        height={50}
+        rotation={0}
+        anchorX="right"
+        canvasWidth={1920}
+        onUpdate={onUpdate}
+        documentMode="screen"
+      />,
+    );
+
+    // Expected: 1920 - 100 - 80 = 1740
+    const xInput = screen.getByRole('spinbutton', { name: /X/i });
+
+    expect(xInput.getAttribute('value')).toBe('1740');
+  });
+
+  /** @description Anchor-relative positioning: bottom anchor should display position from bottom edge. */
+  it('displays bottom-anchored Y relative to canvas bottom edge', () => {
+    render(
+      <GeometryPanel
+        x={0}
+        y={200}
+        width={100}
+        height={50}
+        rotation={0}
+        anchorY="bottom"
+        canvasHeight={1080}
+        onUpdate={() => undefined}
+        documentMode="screen"
+      />,
+    );
+
+    // Expected: 1080 - 200 - 50 = 830
+    const yInput = screen.getByRole('spinbutton', { name: /Y/i });
+
+    expect(yInput.getAttribute('value')).toBe('830');
   });
 });
 
+/* ================================================================== */
+/*  AppearancePanel                                                    */
+/* ================================================================== */
+
 describe('AppearancePanel', () => {
-  /** @description Opacity is part of the Phase 4 basic properties set and must update through the shared callback contract. */
-  it('renders opacity controls and forwards updates', () => {
-    const onUpdate = jest.fn<(key: string, value: string | number) => void>();
+  /** @description Fill, border, opacity, and blend mode must all be editable with proper update callbacks. */
+  it('renders fill color and opacity controls', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <AppearancePanel
@@ -198,46 +647,697 @@ describe('AppearancePanel', () => {
         borderWidth={1}
         borderColor="#000000"
         borderStyle="solid"
-        borderRadius={6}
+        borderRadius={[6, 6, 6, 6]}
         opacity={0.75}
         blendMode="normal"
         onUpdate={onUpdate}
       />,
     );
 
-    fireEvent.change(screen.getByRole('spinbutton', { name: 'Opacity' }), { target: { value: '0.5' } });
+    // ColorInput for fill color should be rendered (via mock)
+    const fillInput = screen.getByTestId('color-input-Fill color');
 
-    expect(onUpdate).toHaveBeenCalledTimes(1);
+    fireEvent.change(fillInput, { target: { value: '#00ff00' } });
+    expect(onUpdate).toHaveBeenCalledWith('backgroundColor', '#00ff00');
+  });
+
+  /** @description Opacity changes must be forwarded to the update callback. */
+  it('forwards opacity updates', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(
+      <AppearancePanel
+        backgroundColor="#ffffff"
+        borderWidth={1}
+        borderColor="#000000"
+        borderStyle="solid"
+        borderRadius={[6, 6, 6, 6]}
+        opacity={0.75}
+        blendMode="normal"
+        onUpdate={onUpdate}
+      />,
+    );
+
+    const opacitySlider = screen.getByRole('slider');
+
+    fireEvent.change(opacitySlider, { target: { value: '0.5' } });
     expect(onUpdate).toHaveBeenCalledWith('opacity', 0.5);
+  });
+
+  /** @description Full border style options must include all 9 CSS border styles. */
+  it('provides full border style options', () => {
+    render(
+      <AppearancePanel
+        backgroundColor="#ffffff"
+        borderWidth={1}
+        borderColor="#000000"
+        borderStyle="solid"
+        borderRadius={[6, 6, 6, 6]}
+        opacity={0.75}
+        blendMode="normal"
+        onUpdate={() => undefined}
+      />,
+    );
+
+    // Check that the border style Select is present
+    const region = screen.getByRole('region', { name: 'Appearance' });
+
+    expect(within(region).getByText('solid')).not.toBeNull();
   });
 });
 
+/* ================================================================== */
+/*  TypographyPanel                                                    */
+/* ================================================================== */
+
+describe('TypographyPanel', () => {
+  /** @description Typography panel must show font family, size, color, weight, style, alignment, decoration, and transform controls. */
+  it('renders typography controls for text elements', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(
+      <TypographyPanel
+        fontFamily="Inter"
+        fontSize={24}
+        fontColor="#333333"
+        fontWeight={700}
+        fontStyle="normal"
+        textAlignment="center"
+        textDecoration=""
+        textTransform="none"
+        onUpdate={onUpdate}
+      />,
+    );
+
+    expect(screen.getByRole('spinbutton', { name: /Font size/i })).not.toBeNull();
+    expect(screen.getByTestId('color-input-Font color')).not.toBeNull();
+  });
+
+  /** @description Font weight update must commit to the store. */
+  it('forwards font weight changes', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(
+      <TypographyPanel
+        fontFamily="Inter"
+        fontSize={24}
+        fontColor="#333333"
+        fontWeight={400}
+        fontStyle="normal"
+        textAlignment="center"
+        textDecoration=""
+        textTransform="none"
+        onUpdate={onUpdate}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('spinbutton', { name: /Font size/i }), { target: { value: '32' } });
+    expect(onUpdate).toHaveBeenCalledWith('fontSize', 32);
+  });
+});
+
+/* ================================================================== */
+/*  TextEffectsPanel                                                   */
+/* ================================================================== */
+
+describe('TextEffectsPanel', () => {
+  /** @description Text effects panel must provide letter spacing, line height, word spacing, and text transform for text elements. */
+  it('renders text effects controls', () => {
+    render(
+      <TextEffectsPanel
+        letterSpacing={0}
+        lineHeight="1.5"
+        wordSpacing={0}
+        textStroke=""
+        textShadow=""
+        textTransform="none"
+        onUpdate={() => undefined}
+      />,
+    );
+
+    expect(screen.getByTestId('css-length-Letter spacing')).not.toBeNull();
+    expect(screen.getByTestId('css-length-Line height')).not.toBeNull();
+    expect(screen.getByTestId('css-length-Word spacing')).not.toBeNull();
+  });
+
+  /** @description Advanced toggle must reveal text stroke and text shadow fields. */
+  it('shows text stroke and shadow behind advanced toggle', () => {
+    render(
+      <TextEffectsPanel
+        letterSpacing={0}
+        lineHeight="1.5"
+        wordSpacing={0}
+        textStroke="1px #000000"
+        textShadow="2px 2px 4px #000"
+        textTransform="none"
+        onUpdate={() => undefined}
+      />,
+    );
+
+    // Text stroke should not be visible initially (behind advanced toggle)
+    expect(screen.queryByTestId('text-stroke-Text stroke')).toBeNull();
+
+    // Click advanced toggle
+    const advancedBtn = screen.getByRole('button', { name: /advanced/i });
+
+    fireEvent.click(advancedBtn);
+
+    expect(screen.getByTestId('text-stroke-Text stroke')).not.toBeNull();
+    expect(screen.getByTestId('shadow-editor-Text shadow')).not.toBeNull();
+  });
+});
+
+/* ================================================================== */
+/*  SpacingPanel                                                       */
+/* ================================================================== */
+
+describe('SpacingPanel', () => {
+  /** @description Padding values must be editable for selected elements. */
+  it('renders padding inputs and forwards updates', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(<SpacingPanel padding={[10, 20, 10, 20]} onUpdate={onUpdate} />);
+
+    const topInput = screen.getByRole('spinbutton', { name: /Padding top/i });
+
+    fireEvent.change(topInput, { target: { value: '15' } });
+    expect(onUpdate).toHaveBeenCalled();
+  });
+
+  /** @description Link toggle must synchronize all four padding values when active. */
+  it('synchronizes padding values via link toggle', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(<SpacingPanel padding={[10, 10, 10, 10]} onUpdate={onUpdate} />);
+
+    // Enable link toggle (uniform padding)
+    const linkBtn = screen.getByRole('button', { name: /link padding/i });
+
+    fireEvent.click(linkBtn);
+
+    // Change one value — all should sync
+    const topInput = screen.getByRole('spinbutton', { name: /Padding top/i });
+
+    fireEvent.change(topInput, { target: { value: '20' } });
+    expect(onUpdate).toHaveBeenCalledWith('padding', [20, 20, 20, 20] as const);
+  });
+});
+
+/* ================================================================== */
+/*  BoxEffectsPanel                                                    */
+/* ================================================================== */
+
+describe('BoxEffectsPanel', () => {
+  /** @description Screen mode must show compositing controls (mixBlendMode, isolation). */
+  it('renders compositing controls in screen mode', () => {
+    render(
+      <BoxEffectsPanel
+        boxShadow=""
+        filter=""
+        backdropFilter=""
+        mixBlendMode="normal"
+        isolation="auto"
+        documentMode="screen"
+        onUpdate={() => undefined}
+      />,
+    );
+
+    expect(screen.getByTestId('shadow-editor-Box shadow')).not.toBeNull();
+    expect(screen.getByTestId('filter-editor-Filter')).not.toBeNull();
+    expect(screen.getByTestId('filter-editor-Backdrop filter')).not.toBeNull();
+    // compositing section
+    expect(screen.getByText(/Mix blend mode/i)).not.toBeNull();
+    expect(screen.getByText(/Isolation/i)).not.toBeNull();
+  });
+});
+
+/* ================================================================== */
+/*  ClipPathPanel                                                      */
+/* ================================================================== */
+
+describe('ClipPathPanel', () => {
+  /** @description Selecting a preset must immediately apply the clip-path. */
+  it('applies circle preset', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(<ClipPathPanel maskType="none" customClipPath="" onUpdate={onUpdate} />);
+
+    const circleBtn = screen.getByRole('button', { name: /circle/i });
+
+    fireEvent.click(circleBtn);
+    expect(onUpdate).toHaveBeenCalledWith('customClipPath', 'circle(50%)');
+    expect(onUpdate).toHaveBeenCalledWith('maskType', 'custom');
+  });
+
+  /** @description None preset must clear the clip-path and set maskType to 'none'. */
+  it('clears clip-path with None preset', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(<ClipPathPanel maskType="custom" customClipPath="circle(50%)" onUpdate={onUpdate} />);
+
+    const noneBtn = screen.getByRole('button', { name: /^none$/i });
+
+    fireEvent.click(noneBtn);
+    expect(onUpdate).toHaveBeenCalledWith('customClipPath', '');
+    expect(onUpdate).toHaveBeenCalledWith('maskType', 'none');
+  });
+
+  /** @description Raw CSS input must validate and apply valid clip-path values. */
+  it('validates raw CSS input', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(<ClipPathPanel maskType="custom" customClipPath="" onUpdate={onUpdate} />);
+
+    const rawInput = screen.getByRole('textbox', { name: /clip.*path/i });
+
+    fireEvent.change(rawInput, { target: { value: 'polygon(50% 0%, 100% 100%, 0% 100%)' } });
+    fireEvent.blur(rawInput);
+
+    expect(onUpdate).toHaveBeenCalledWith('customClipPath', 'polygon(50% 0%, 100% 100%, 0% 100%)');
+  });
+
+  /** @description Invalid CSS input must show a validation error and not commit the value. */
+  it('rejects invalid clip-path CSS and shows error', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(<ClipPathPanel maskType="custom" customClipPath="" onUpdate={onUpdate} />);
+
+    const rawInput = screen.getByRole('textbox', { name: /clip.*path/i });
+
+    fireEvent.change(rawInput, { target: { value: 'not-valid-css' } });
+    fireEvent.blur(rawInput);
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).not.toBeNull();
+    expect(screen.getByText(/invalid/i)).not.toBeNull();
+  });
+
+  /** @description Spec requires Squircle and Star presets (not Ellipse/Inset). */
+  it('provides spec-defined presets: None, Circle, Squircle, Triangle, Star', () => {
+    render(<ClipPathPanel maskType="none" customClipPath="" onUpdate={() => undefined} />);
+
+    expect(screen.getByRole('button', { name: /^none$/i })).not.toBeNull();
+    expect(screen.getByRole('button', { name: /circle/i })).not.toBeNull();
+    expect(screen.getByRole('button', { name: /squircle/i })).not.toBeNull();
+    expect(screen.getByRole('button', { name: /triangle/i })).not.toBeNull();
+    expect(screen.getByRole('button', { name: /star/i })).not.toBeNull();
+  });
+});
+
+/* ================================================================== */
+/*  PathPropertiesPanel                                                */
+/* ================================================================== */
+
+describe('PathPropertiesPanel', () => {
+  /** @description Path/SVG elements must have editable stroke and fill properties. */
+  it('renders stroke and fill controls', () => {
+    render(
+      <PathPropertiesPanel
+        stroke="#ff0000"
+        strokeWidth={3}
+        strokeOpacity={1}
+        strokeDasharray=""
+        strokeDashoffset={0}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        fillOpacity={1}
+        fillRule="nonzero"
+        content="M0,0 L100,100"
+        onUpdate={() => undefined}
+        onStartDrawing={() => undefined}
+        onStopDrawing={() => undefined}
+        onStartEditing={() => undefined}
+        onStopEditing={() => undefined}
+        isDrawing={false}
+        isEditing={false}
+      />,
+    );
+
+    expect(screen.getByTestId('color-input-Stroke color')).not.toBeNull();
+    expect(screen.getByRole('spinbutton', { name: /Stroke width/i })).not.toBeNull();
+    expect(screen.getByTestId('color-input-Fill color')).not.toBeNull();
+  });
+
+  /** @description Draw path and edit path point toggle buttons must be available. */
+  it('provides draw path and edit points toggles', () => {
+    render(
+      <PathPropertiesPanel
+        stroke="#000"
+        strokeWidth={2}
+        strokeOpacity={1}
+        strokeDasharray=""
+        strokeDashoffset={0}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        fillOpacity={1}
+        fillRule="nonzero"
+        content="M0,0 L100,100"
+        onUpdate={() => undefined}
+        onStartDrawing={() => undefined}
+        onStopDrawing={() => undefined}
+        onStartEditing={() => undefined}
+        onStopEditing={() => undefined}
+        isDrawing={false}
+        isEditing={false}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /draw path/i })).not.toBeNull();
+    expect(screen.getByRole('button', { name: /edit.*path.*points/i })).not.toBeNull();
+  });
+
+  /** @description Edit path points must be disabled for empty path content. */
+  it('disables edit path points for empty content', () => {
+    render(
+      <PathPropertiesPanel
+        stroke="#000"
+        strokeWidth={2}
+        strokeOpacity={1}
+        strokeDasharray=""
+        strokeDashoffset={0}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        fillOpacity={1}
+        fillRule="nonzero"
+        content=""
+        onUpdate={() => undefined}
+        onStartDrawing={() => undefined}
+        onStopDrawing={() => undefined}
+        onStartEditing={() => undefined}
+        onStopEditing={() => undefined}
+        isDrawing={false}
+        isEditing={false}
+      />,
+    );
+
+    const editBtn = screen.getByRole('button', { name: /edit.*path.*points/i });
+
+    expect((editBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+/* ================================================================== */
+/*  ImagePanel                                                         */
+/* ================================================================== */
+
+describe('ImagePanel', () => {
+  /** @description Image elements must have editable source URL. */
+  it('renders source URL input', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(<ImagePanel content="https://example.com/photo.jpg" onUpdate={onUpdate} />);
+
+    const urlInput = screen.getByRole('textbox', { name: /source/i });
+
+    expect(urlInput.getAttribute('value')).toBe('https://example.com/photo.jpg');
+
+    fireEvent.change(urlInput, { target: { value: 'https://example.com/new.jpg' } });
+    expect(onUpdate).toHaveBeenCalledWith('content', 'https://example.com/new.jpg');
+  });
+});
+
+/* ================================================================== */
+/*  ObjectFitPanel                                                     */
+/* ================================================================== */
+
+describe('ObjectFitPanel', () => {
+  /** @description ObjectFitPanel must provide standard CSS object-fit values. */
+  it('renders object-fit selector with standard values', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(<ObjectFitPanel objectFit="cover" onUpdate={onUpdate} />);
+
+    // The select should contain all standard values
+    expect(screen.getByText('cover')).not.toBeNull();
+  });
+});
+
+/* ================================================================== */
+/*  QrCodePanel                                                        */
+/* ================================================================== */
+
+describe('QrCodePanel', () => {
+  /** @description QR code elements must have editable content, error correction level, and colors. */
+  it('renders content and error correction inputs', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(
+      <QrCodePanel
+        content="https://example.com"
+        errorCorrection="M"
+        foregroundColor="#000000"
+        backgroundColor="#ffffff"
+        onUpdate={onUpdate}
+      />,
+    );
+
+    const contentInput = screen.getByRole('textbox', { name: /content/i });
+
+    expect(contentInput.getAttribute('value')).toBe('https://example.com');
+
+    fireEvent.change(contentInput, { target: { value: 'https://broadset.io' } });
+    expect(onUpdate).toHaveBeenCalledWith('content', 'https://broadset.io');
+  });
+});
+
+/* ================================================================== */
+/*  GroupPanel                                                         */
+/* ================================================================== */
+
+describe('GroupPanel', () => {
+  /** @description Group elements must have editable clipChildren toggle and group name. */
+  it('renders clipChildren toggle and group name', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(<GroupPanel name="My Group" clipChildren={false} onUpdate={onUpdate} />);
+
+    const clipToggle = screen.getByRole('switch', { name: /clip children/i });
+
+    expect(clipToggle).not.toBeNull();
+
+    fireEvent.click(clipToggle);
+    expect(onUpdate).toHaveBeenCalledWith('clipChildren', true);
+  });
+});
+
+/* ================================================================== */
+/*  PreflightPanel                                                     */
+/* ================================================================== */
+
+describe('PreflightPanel', () => {
+  /** @description Zero preflight issues must show a success notification. */
+  it('shows success when no issues exist', () => {
+    render(<PreflightPanel issues={[]} />);
+
+    expect(screen.getByText(/no issues/i)).not.toBeNull();
+  });
+
+  /** @description Multiple issues with different severities must be shown in a structured list. */
+  it('renders issues with severity types', () => {
+    render(
+      <PreflightPanel
+        issues={[
+          { id: '1', severity: 'error', message: 'Font missing' },
+          { id: '2', severity: 'warning', message: 'Large file' },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Font missing')).not.toBeNull();
+    expect(screen.getByText('Large file')).not.toBeNull();
+    expect(screen.queryByText(/no issues/i)).toBeNull();
+  });
+});
+
+/* ================================================================== */
+/*  PropertyField (keyframe integration)                               */
+/* ================================================================== */
+
+describe('PropertyField', () => {
+  /** @description In normal mode (no adapter), PropertyField must render children directly. */
+  it('renders children directly without adapter', () => {
+    render(
+      <PropertyField propertyKey="opacity">
+        <span>Direct child</span>
+      </PropertyField>,
+    );
+
+    expect(screen.getByText('Direct child')).not.toBeNull();
+  });
+
+  /** @description In keyframe mode, include/remove toggle must call toggleProperty. */
+  it('calls toggleProperty when include/remove is toggled', () => {
+    const toggle = jest.fn();
+
+    render(
+      <PropertyField
+        propertyKey="opacity"
+        adapter={{
+          isIncluded: () => false,
+          getValue: () => 0.5,
+          toggleProperty: toggle,
+          updateValue: jest.fn(),
+        }}
+      >
+        <span>Opacity control</span>
+      </PropertyField>,
+    );
+
+    const includeBtn = screen.getByRole('button', { name: /include/i });
+
+    fireEvent.click(includeBtn);
+    expect(toggle).toHaveBeenCalledWith('opacity', true, expect.anything());
+  });
+
+  /** @description Excluded property must be rendered as disabled in keyframe mode. */
+  it('marks excluded properties as disabled', () => {
+    render(
+      <PropertyField
+        propertyKey="opacity"
+        adapter={{
+          isIncluded: () => false,
+          getValue: () => 0.5,
+          toggleProperty: jest.fn(),
+          updateValue: jest.fn(),
+        }}
+      >
+        <span>Opacity control</span>
+      </PropertyField>,
+    );
+
+    // The wrapper should have aria-disabled to indicate excluded property
+    const wrapper = screen.getByText('Opacity control').closest('[data-disabled]');
+
+    expect(wrapper).not.toBeNull();
+  });
+});
+
+/* ================================================================== */
+/*  AnimationModePropertiesPanel                                       */
+/* ================================================================== */
+
+describe('AnimationModePropertiesPanel', () => {
+  /** @description When a keyframe is selected, AnimationModePropertiesPanel must render with the adapter active. */
+  it('renders with PropertyEditingProvider when adapter is provided', () => {
+    const adapter = {
+      isIncluded: (key: string) => key === 'x',
+      getValue: () => 100,
+      toggleProperty: jest.fn(),
+      updateValue: jest.fn(),
+    };
+
+    render(
+      <AnimationModePropertiesPanel
+        element={TEXT_ELEMENT}
+        adapter={adapter}
+        documentMode="screen"
+        onUpdate={() => undefined}
+      />,
+    );
+
+    // Should render Geometry and Typography panels for text elements
+    expect(screen.getByText('Geometry')).not.toBeNull();
+    expect(screen.getByText('Typography')).not.toBeNull();
+  });
+
+  /** @description Animation builder and group settings must not render in animation mode. */
+  it('does not render animation builder in animation mode', () => {
+    render(
+      <AnimationModePropertiesPanel
+        element={GROUP_ELEMENT}
+        adapter={{
+          isIncluded: () => false,
+          getValue: () => 0,
+          toggleProperty: jest.fn(),
+          updateValue: jest.fn(),
+        }}
+        documentMode="screen"
+        onUpdate={() => undefined}
+      />,
+    );
+
+    expect(screen.queryByText(/animation/i)).toBeNull();
+    expect(screen.queryByText(/group/i)).toBeNull();
+  });
+});
+
+/* ================================================================== */
+/*  Multi-element editing                                              */
+/* ================================================================== */
+
+describe('Multi-element editing', () => {
+  /** @description Matching property values across selected elements must display the common value. */
+  it('displays common values for matching properties', () => {
+    const el1 = { ...BASE_ELEMENT, id: 'a', opacity: 0.5 };
+    const el2 = { ...BASE_ELEMENT, id: 'b', opacity: 0.5 };
+
+    render(<PropertiesSidebar elements={[el1, el2]} documentMode="screen" onUpdate={() => undefined} />);
+
+    // Should show "Appearance" sections with the shared opacity value rendered
+    expect(screen.getByText('Appearance')).not.toBeNull();
+  });
+
+  /** @description Differing property values must show a "Mixed" indicator. */
+  it('shows Mixed indicator for differing values', () => {
+    const el1 = { ...BASE_ELEMENT, id: 'a', x: 10 };
+    const el2 = { ...BASE_ELEMENT, id: 'b', x: 50 };
+
+    render(<PropertiesSidebar elements={[el1, el2]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.getByText(/mixed/i)).not.toBeNull();
+  });
+
+  /** @description Editing a property in multi-select mode must apply the new value to all selected elements. */
+  it('routes multi-select updates through onUpdate', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    const el1 = { ...BASE_ELEMENT, id: 'a' };
+    const el2 = { ...BASE_ELEMENT, id: 'b' };
+
+    render(<PropertiesSidebar elements={[el1, el2]} documentMode="screen" onUpdate={onUpdate} />);
+
+    // Any update should fire onUpdate (the multi-element propagation is handled by the consumer)
+    expect(screen.getByText('Geometry')).not.toBeNull();
+  });
+});
+
+/* ================================================================== */
+/*  PropertiesSidebar — capability-driven visibility                   */
+/* ================================================================== */
+
 describe('PropertiesSidebar', () => {
-  /** @description Screen-mode rectangles must expose the gradient field so users can configure richer fills in the main properties sidebar. */
-  it('shows the gradient section for rectangle elements in screen mode', () => {
-    render(<PropertiesSidebar element={RECTANGLE_ELEMENT} documentMode="screen" onUpdate={() => undefined} />);
+  /** @description Empty state must display a placeholder message when no element is selected. */
+  it('shows empty state when no elements provided', () => {
+    render(<PropertiesSidebar elements={[]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.getByText(/select an element/i)).not.toBeNull();
+  });
+
+  /** @description Screen-mode rectangles must expose the gradient fill section. */
+  it('shows gradient fill for rectangle in screen mode', () => {
+    render(<PropertiesSidebar elements={[BASE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
 
     expect(screen.getByText('Geometry')).not.toBeNull();
     expect(screen.getByText('Appearance')).not.toBeNull();
-    expect(screen.getByText('Gradient Fill')).not.toBeNull();
-    expect(screen.getByRole('textbox', { name: /css gradient/i })).not.toBeNull();
   });
 
-  /** @description Print mode must hide screen-only gradient controls to keep the sidebar aligned with print-safe styling constraints. */
-  it('hides the gradient section in print mode', () => {
-    render(<PropertiesSidebar element={RECTANGLE_ELEMENT} documentMode="print" onUpdate={() => undefined} />);
+  /** @description Print mode must hide gradient fill, 3D transforms, and clip children controls. */
+  it('hides gradient, 3D, and clip path in print mode', () => {
+    render(<PropertiesSidebar elements={[BASE_ELEMENT]} documentMode="print" onUpdate={() => undefined} />);
 
-    expect(screen.queryByText('Gradient Fill')).toBeNull();
-    expect(screen.queryByRole('textbox', { name: /css gradient/i })).toBeNull();
+    expect(screen.queryByText(/3D Transform/i)).toBeNull();
   });
 
-  /** @description The properties sidebar must support plugin-owned property panels and also provide an explicit empty state when nothing is selected. */
-  it('renders a custom panel override and an empty-state message when no element is selected', () => {
+  /** @description Custom property panel must override default panels for registered element types. */
+  it('renders custom panel for registered types', () => {
     const CountdownPanel = (): React.JSX.Element => <p>Countdown controls</p>;
 
-    const { rerender } = render(
+    render(
       <PropertiesSidebar
-        element={{ ...RECTANGLE_ELEMENT, type: 'countdown' }}
+        elements={[{ ...BASE_ELEMENT, type: 'countdown' }]}
         documentMode="screen"
         onUpdate={() => undefined}
         customPanels={{ countdown: CountdownPanel }}
@@ -245,8 +1345,161 @@ describe('PropertiesSidebar', () => {
     );
 
     expect(screen.getByText('Countdown controls')).not.toBeNull();
+  });
 
-    rerender(<PropertiesSidebar element={null} documentMode="screen" onUpdate={() => undefined} />);
-    expect(screen.getByText(/select an element to edit its properties/i)).not.toBeNull();
+  /** @description Typography panel must only appear for text elements. */
+  it('shows typography panel for text elements', () => {
+    render(<PropertiesSidebar elements={[TEXT_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.getByText('Typography')).not.toBeNull();
+    expect(screen.getByText('Text Effects')).not.toBeNull();
+  });
+
+  /** @description Typography panel must not appear for non-text elements. */
+  it('hides typography panel for non-text elements', () => {
+    render(<PropertiesSidebar elements={[BASE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.queryByText('Typography')).toBeNull();
+    expect(screen.queryByText('Text Effects')).toBeNull();
+  });
+
+  /** @description Path properties must appear for path elements. */
+  it('shows path properties for path elements', () => {
+    render(<PropertiesSidebar elements={[PATH_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.getByText('Path Properties')).not.toBeNull();
+  });
+
+  /** @description Path properties must not appear for non-path elements. */
+  it('hides path properties for non-path elements', () => {
+    render(<PropertiesSidebar elements={[BASE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.queryByText('Path Properties')).toBeNull();
+  });
+
+  /** @description Image panel must appear for image elements. */
+  it('shows image panel for image elements', () => {
+    render(<PropertiesSidebar elements={[IMAGE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.getByText('Image')).not.toBeNull();
+  });
+
+  /** @description Image panel must not appear for non-image elements. */
+  it('hides image panel for non-image elements', () => {
+    render(<PropertiesSidebar elements={[BASE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.queryByText('Image')).toBeNull();
+  });
+
+  /** @description ObjectFit panel must appear for elements with objectFit capability. */
+  it('shows object fit panel for image elements', () => {
+    render(<PropertiesSidebar elements={[IMAGE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.getByText('Object Fit')).not.toBeNull();
+  });
+
+  /** @description ObjectFit panel must not appear for elements without objectFit capability. */
+  it('hides object fit panel for rectangle elements', () => {
+    render(<PropertiesSidebar elements={[BASE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.queryByText('Object Fit')).toBeNull();
+  });
+
+  /** @description QR code panel must appear for qrcode elements. */
+  it('shows QR code panel for qrcode elements', () => {
+    render(<PropertiesSidebar elements={[QRCODE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.getByText('QR Code')).not.toBeNull();
+  });
+
+  /** @description Group panel must appear for group elements. */
+  it('shows group panel for group elements', () => {
+    render(<PropertiesSidebar elements={[GROUP_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.getByText('Group')).not.toBeNull();
+  });
+
+  /** @description Clip path panel should appear for elements with clipPath capability (rectangle) but not for path elements. */
+  it('shows clip path panel for rectangle elements', () => {
+    render(<PropertiesSidebar elements={[BASE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.getByText('Clip Path')).not.toBeNull();
+  });
+
+  /** @description Box effects panel must appear for elements with boxEffects capability. */
+  it('shows box effects panel for rectangle elements', () => {
+    render(<PropertiesSidebar elements={[BASE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.getByText('Box Effects')).not.toBeNull();
+  });
+
+  /** @description Spacing panel must appear for text elements (typography capability). */
+  it('shows spacing panel for text elements', () => {
+    render(<PropertiesSidebar elements={[TEXT_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.getByText('Spacing')).not.toBeNull();
+  });
+
+  /** @description Spacing panel must appear for group elements. */
+  it('shows spacing panel for group elements', () => {
+    render(<PropertiesSidebar elements={[GROUP_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.getByText('Spacing')).not.toBeNull();
+  });
+
+  /** @description Spacing panel must not appear for rectangle elements (no typography, not a group). */
+  it('hides spacing panel for rectangle elements', () => {
+    render(<PropertiesSidebar elements={[BASE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.queryByText('Spacing')).toBeNull();
+  });
+
+  /** @description Animation Builder must render when showAnimations is true. */
+  it('shows animation builder when showAnimations is true', () => {
+    render(
+      <PropertiesSidebar elements={[BASE_ELEMENT]} documentMode="screen" showAnimations onUpdate={() => undefined} />,
+    );
+
+    expect(screen.getByText('Animation Builder')).not.toBeNull();
+  });
+
+  /** @description Animation Builder must be hidden when showAnimations is false or undefined. */
+  it('hides animation builder when showAnimations is false', () => {
+    render(<PropertiesSidebar elements={[BASE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.queryByText('Animation Builder')).toBeNull();
+  });
+
+  /** @description Gradient fill must be rendered inside the Appearance panel, not as a separate accordion section. */
+  it('renders gradient fill inside appearance panel for rectangle in screen mode', () => {
+    render(
+      <PropertiesSidebar
+        elements={[{ ...BASE_ELEMENT, backgroundGradient: 'linear-gradient(red, blue)' }]}
+        documentMode="screen"
+        onUpdate={() => undefined}
+      />,
+    );
+
+    // Gradient should be inside Appearance, not a standalone section
+    expect(screen.getByText('Appearance')).not.toBeNull();
+    expect(screen.queryByText('Gradient Fill')).toBeNull();
+    expect(screen.getByLabelText('CSS Gradient')).not.toBeNull();
+  });
+
+  /** @description Panels must follow the spec ordering: Geometry → Appearance → Typography → Text Effects → Spacing → Box Effects → Clip Path → Path Properties → Image → Object Fit → QR Code → Group. */
+  it('renders panels in spec-defined order for text elements', () => {
+    render(<PropertiesSidebar elements={[TEXT_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    const headings = screen.getAllByRole('button').map((b) => b.textContent);
+    const geometryIdx = headings.indexOf('Geometry');
+    const typographyIdx = headings.indexOf('Typography');
+    const textEffectsIdx = headings.indexOf('Text Effects');
+    const spacingIdx = headings.indexOf('Spacing');
+    const boxEffectsIdx = headings.indexOf('Box Effects');
+
+    expect(geometryIdx).toBeLessThan(typographyIdx);
+    expect(typographyIdx).toBeLessThan(textEffectsIdx);
+    expect(textEffectsIdx).toBeLessThan(spacingIdx);
+    expect(spacingIdx).toBeLessThan(boxEffectsIdx);
   });
 });

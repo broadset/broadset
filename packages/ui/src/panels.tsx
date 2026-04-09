@@ -1,4 +1,5 @@
-import { Accordion, Button, Input, ListBox, ListBoxItem, NumberField, Select } from '@heroui/react';
+import { getCapabilityProfile } from '@broadset/model';
+import { Accordion, Button, Input, ListBox, ListBoxItem, NumberField, Select, Slider, Switch } from '@heroui/react';
 import {
   Circle,
   Clock3,
@@ -7,29 +8,86 @@ import {
   FileCode2,
   Folder,
   Image,
+  Link2,
   Lock,
   PenTool,
   QrCode,
   Square,
   Type,
+  Unlink2,
   Unlock,
   Video,
 } from 'lucide-react';
-import type { JSX } from 'react';
-import { useCallback, useState } from 'react';
+import type { JSX, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState } from 'react';
 
+import { ColorInput, CssLengthInput, FilterEditor, NumField, ShadowEditor, TextStrokeInput } from './inputs';
 import { color, font, glassPanelStyle, sp } from './tokens';
 
+/* ------------------------------------------------------------------ */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
+
 const ICON_SIZE = 14;
-const GEOMETRY_FIELDS = [
-  { key: 'x', label: 'X' },
-  { key: 'y', label: 'Y' },
-  { key: 'width', label: 'Width' },
-  { key: 'height', label: 'Height' },
-  { key: 'rotation', label: 'Rotation' },
+
+const BORDER_STYLE_OPTIONS = [
+  'none',
+  'solid',
+  'dashed',
+  'dotted',
+  'double',
+  'groove',
+  'ridge',
+  'inset',
+  'outset',
 ] as const;
-const BORDER_STYLE_OPTIONS = ['none', 'solid', 'dashed', 'dotted'] as const;
-const BLEND_MODE_OPTIONS = ['normal', 'multiply', 'screen', 'overlay'] as const;
+
+const MIX_BLEND_MODE_OPTIONS = [
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'darken',
+  'lighten',
+  'color-dodge',
+  'color-burn',
+  'hard-light',
+  'soft-light',
+  'difference',
+  'exclusion',
+  'hue',
+  'saturation',
+  'color',
+  'luminosity',
+] as const;
+
+const OBJECT_FIT_OPTIONS = ['fill', 'contain', 'cover', 'none', 'scale-down'] as const;
+
+const LINECAP_OPTIONS = ['butt', 'round', 'square'] as const;
+const LINEJOIN_OPTIONS = ['miter', 'round', 'bevel'] as const;
+const FILL_RULE_OPTIONS = ['nonzero', 'evenodd'] as const;
+const ERROR_CORRECTION_OPTIONS = ['L', 'M', 'Q', 'H'] as const;
+const TEXT_TRANSFORM_OPTIONS = ['none', 'uppercase', 'lowercase', 'capitalize'] as const;
+const TEXT_DECORATION_OPTIONS = ['', 'underline', 'overline', 'line-through'] as const;
+const TEXT_ALIGNMENT_OPTIONS = ['left', 'center', 'right', 'justify'] as const;
+const FONT_STYLE_OPTIONS = ['normal', 'italic'] as const;
+const ISOLATION_OPTIONS = ['auto', 'isolate'] as const;
+
+const CLIP_PATH_PRESETS = [
+  { label: 'None', value: '', maskType: 'none' as const },
+  { label: 'Circle', value: 'circle(50%)', maskType: 'custom' as const },
+  {
+    label: 'Squircle',
+    value: 'polygon(10% 0%, 90% 0%, 100% 10%, 100% 90%, 90% 100%, 10% 100%, 0% 90%, 0% 10%)',
+    maskType: 'custom' as const,
+  },
+  { label: 'Triangle', value: 'polygon(50% 0%, 100% 100%, 0% 100%)', maskType: 'custom' as const },
+  {
+    label: 'Star',
+    value: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)',
+    maskType: 'custom' as const,
+  },
+] as const;
 
 const LAYER_ICON_MAP = {
   text: Type,
@@ -45,10 +103,25 @@ const LAYER_ICON_MAP = {
   ticker: Type,
 } as const;
 
+/**
+ * Validate a raw CSS clip-path value.
+ * Accepts common clip-path functions: circle, ellipse, inset, polygon, path, and url().
+ */
+const CLIP_PATH_FUNCTION_RE = /^(circle|ellipse|inset|polygon|path|url)\s*\([\s\S]+\)$/i;
+
+function isValidClipPathCss(value: string): boolean {
+  return CLIP_PATH_FUNCTION_RE.test(value);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
+
 export interface PanelElement {
   readonly id: string;
   readonly type: string;
   readonly name: string;
+  readonly content: string;
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -59,12 +132,52 @@ export interface PanelElement {
   readonly borderWidth: number;
   readonly borderColor: string;
   readonly borderStyle: string;
-  readonly borderRadius: number;
+  readonly borderRadius: readonly [number, number, number, number];
   readonly opacity: number;
   readonly blendMode: string;
+  readonly mixBlendMode: string;
+  readonly isolation: string;
   readonly boxShadow: string;
   readonly filter: string;
   readonly backdropFilter: string;
+  readonly fontFamily: string;
+  readonly fontSize: number;
+  readonly fontColor: string;
+  readonly fontWeight: number;
+  readonly fontStyle: string;
+  readonly textAlignment: string;
+  readonly textDecoration: string;
+  readonly textTransform: string;
+  readonly letterSpacing: number;
+  readonly lineHeight: string;
+  readonly wordSpacing: number;
+  readonly textStroke: string;
+  readonly textShadow: string;
+  readonly writingMode: string;
+  readonly fontVariationSettings: string;
+  readonly padding: readonly [number, number, number, number];
+  readonly stroke: string;
+  readonly strokeWidth: number;
+  readonly strokeDasharray: string;
+  readonly strokeDashoffset: number;
+  readonly strokeLinecap: string;
+  readonly strokeLinejoin: string;
+  readonly strokeOpacity: number;
+  readonly fill: string;
+  readonly fillOpacity: number;
+  readonly fillRule: string;
+  readonly maskType: string;
+  readonly customClipPath: string;
+  readonly clipChildren: boolean;
+  readonly rotateX: number;
+  readonly rotateY: number;
+  readonly rotateZ: number;
+  readonly translateZ: number;
+  readonly objectFit: string;
+  readonly autoSize: string;
+  readonly errorCorrection: string;
+  readonly qrForegroundColor: string;
+  readonly qrBackgroundColor: string;
 }
 
 export interface LayerInfo {
@@ -83,14 +196,18 @@ interface CustomPanelProps {
 
 type CustomPanelComponent = (props: CustomPanelProps) => JSX.Element;
 
-export interface GeometryPanelProps {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-  readonly rotation: number;
-  readonly onUpdate: (key: string, value: number) => void;
+export interface PropertyFieldAdapter {
+  readonly isIncluded: (key: string) => boolean;
+  readonly getValue: (key: string) => number | string;
+  readonly toggleProperty: (key: string, include: boolean, defaultValue: number | string) => void;
+  readonly updateValue: (key: string, value: number | string) => void;
 }
+
+const AdapterContext = createContext<PropertyFieldAdapter | null>(null);
+
+/* ------------------------------------------------------------------ */
+/*  Shared Helpers                                                     */
+/* ------------------------------------------------------------------ */
 
 function FieldShell({ label, children }: { readonly label: string; readonly children: JSX.Element }): JSX.Element {
   return (
@@ -136,31 +253,220 @@ function NumericField({
   );
 }
 
-export function GeometryPanel({ x, y, width, height, rotation, onUpdate }: GeometryPanelProps): JSX.Element {
-  const values = { x, y, width, height, rotation } as const;
+function SelectField({
+  label,
+  value,
+  options,
+  onUpdate,
+  updateKey,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly options: readonly string[];
+  readonly onUpdate: (key: string, value: string | number) => void;
+  readonly updateKey: string;
+}): JSX.Element {
+  return (
+    <FieldShell label={label}>
+      <Select
+        aria-label={label}
+        value={value}
+        onChange={(key) => {
+          if (key !== null) {
+            onUpdate(updateKey, String(key));
+          }
+        }}
+      >
+        <Select.Trigger>
+          <Select.Value />
+        </Select.Trigger>
+        <Select.Popover>
+          <ListBox>
+            {options.map((opt) => (
+              <ListBoxItem id={opt} key={opt}>
+                {opt}
+              </ListBoxItem>
+            ))}
+          </ListBox>
+        </Select.Popover>
+      </Select>
+    </FieldShell>
+  );
+}
+
+/** Compute property values for multi-element selection */
+function computeMultiValue(
+  elements: readonly PanelElement[],
+  key: keyof PanelElement,
+): { readonly value: PanelElement[keyof PanelElement]; readonly isMixed: boolean } {
+  if (elements.length === 0) {
+    return { value: '' as PanelElement[keyof PanelElement], isMixed: false };
+  }
+
+  const firstEl = elements[0];
+
+  if (firstEl === undefined) {
+    return { value: '' as PanelElement[keyof PanelElement], isMixed: false };
+  }
+
+  const first = firstEl[key];
+
+  for (let i = 1; i < elements.length; i++) {
+    const el = elements[i];
+
+    if (el === undefined) {
+      continue;
+    }
+
+    const current = el[key];
+
+    if (Array.isArray(first) && Array.isArray(current)) {
+      if (first.length !== current.length || first.some((v, idx) => v !== current[idx])) {
+        return { value: first, isMixed: true };
+      }
+    } else if (current !== first) {
+      return { value: first, isMixed: true };
+    }
+  }
+
+  return { value: first, isMixed: false };
+}
+
+/* ------------------------------------------------------------------ */
+/*  GeometryPanel                                                      */
+/* ------------------------------------------------------------------ */
+
+export interface GeometryPanelProps {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly rotation: number;
+  readonly rotateX?: number | undefined;
+  readonly rotateY?: number | undefined;
+  readonly rotateZ?: number | undefined;
+  readonly translateZ?: number | undefined;
+  readonly anchorX?: 'left' | 'right' | undefined;
+  readonly anchorY?: 'top' | 'bottom' | undefined;
+  readonly canvasWidth?: number | undefined;
+  readonly canvasHeight?: number | undefined;
+  readonly onUpdate: (key: string, value: string | number) => void;
+  readonly documentMode: 'screen' | 'print';
+}
+
+export function GeometryPanel({
+  x,
+  y,
+  width,
+  height,
+  rotation,
+  rotateX,
+  rotateY,
+  rotateZ,
+  translateZ,
+  anchorX = 'left',
+  anchorY = 'top',
+  canvasWidth = 1920,
+  canvasHeight = 1080,
+  onUpdate,
+  documentMode,
+}: GeometryPanelProps): JSX.Element {
+  const displayX = anchorX === 'right' ? canvasWidth - x - width : x;
+  const displayY = anchorY === 'bottom' ? canvasHeight - y - height : y;
+  const displayWidth = Math.max(0.1, width);
+  const displayHeight = Math.max(0.1, height);
+  const isScreenMode = documentMode === 'screen';
+  const show3D =
+    isScreenMode &&
+    (rotateX !== undefined || rotateY !== undefined || rotateZ !== undefined || translateZ !== undefined);
 
   return (
     <section aria-label="Geometry" role="region" className="grid grid-cols-1 gap-2 md:grid-cols-2">
-      {GEOMETRY_FIELDS.map((field) => (
-        <NumericField
-          key={field.key}
-          label={field.label}
-          value={values[field.key]}
-          onValueChange={(nextValue) => {
-            onUpdate(field.key, nextValue);
-          }}
-        />
-      ))}
+      <NumericField
+        label="X"
+        value={displayX}
+        onValueChange={(v) => {
+          onUpdate('x', v);
+        }}
+      />
+      <NumericField
+        label="Y"
+        value={displayY}
+        onValueChange={(v) => {
+          onUpdate('y', v);
+        }}
+      />
+      <NumericField
+        label="Width"
+        value={displayWidth}
+        minValue={0.1}
+        onValueChange={(v) => {
+          onUpdate('width', v);
+        }}
+      />
+      <NumericField
+        label="Height"
+        value={displayHeight}
+        minValue={0.1}
+        onValueChange={(v) => {
+          onUpdate('height', v);
+        }}
+      />
+      <NumericField
+        label="Rotation"
+        value={rotation}
+        onValueChange={(v) => {
+          onUpdate('rotation', v);
+        }}
+      />
+      {show3D ?
+        <>
+          <NumericField
+            label="Rotate X"
+            value={rotateX ?? 0}
+            onValueChange={(v) => {
+              onUpdate('rotateX', v);
+            }}
+          />
+          <NumericField
+            label="Rotate Y"
+            value={rotateY ?? 0}
+            onValueChange={(v) => {
+              onUpdate('rotateY', v);
+            }}
+          />
+          <NumericField
+            label="Rotate Z"
+            value={rotateZ ?? 0}
+            onValueChange={(v) => {
+              onUpdate('rotateZ', v);
+            }}
+          />
+          <NumericField
+            label="Translate Z"
+            value={translateZ ?? 0}
+            onValueChange={(v) => {
+              onUpdate('translateZ', v);
+            }}
+          />
+        </>
+      : null}
     </section>
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  AppearancePanel                                                    */
+/* ------------------------------------------------------------------ */
+
 export interface AppearancePanelProps {
   readonly backgroundColor: string;
+  readonly backgroundGradient?: string | undefined;
+  readonly showGradient?: boolean | undefined;
   readonly borderWidth: number;
   readonly borderColor: string;
   readonly borderStyle: string;
-  readonly borderRadius: number;
+  readonly borderRadius: readonly [number, number, number, number];
   readonly opacity: number;
   readonly blendMode: string;
   readonly onUpdate: (key: string, value: string | number) => void;
@@ -168,6 +474,8 @@ export interface AppearancePanelProps {
 
 export function AppearancePanel({
   backgroundColor,
+  backgroundGradient,
+  showGradient,
   borderWidth,
   borderColor,
   borderStyle,
@@ -176,125 +484,957 @@ export function AppearancePanel({
   blendMode,
   onUpdate,
 }: AppearancePanelProps): JSX.Element {
-  const handleBorderStyleChange = useCallback(
-    (key: string | number | null) => {
-      if (key !== null) {
-        onUpdate('borderStyle', String(key));
-      }
-    },
-    [onUpdate],
+  return (
+    <section aria-label="Appearance" role="region" className="flex flex-col gap-2">
+      <ColorInput
+        label="Fill color"
+        value={backgroundColor}
+        onChange={(v) => {
+          onUpdate('backgroundColor', v);
+        }}
+      />
+      {showGradient === true ?
+        <FieldShell label="CSS Gradient">
+          <Input
+            aria-label="CSS Gradient"
+            value={backgroundGradient ?? ''}
+            onChange={(event) => {
+              onUpdate('backgroundGradient', event.currentTarget.value);
+            }}
+          />
+        </FieldShell>
+      : null}
+
+      <Slider
+        aria-label="Opacity"
+        maxValue={1}
+        minValue={0}
+        step={0.01}
+        value={opacity}
+        onChange={(v: number | readonly number[]) => {
+          onUpdate('opacity', typeof v === 'number' ? v : Number(v));
+        }}
+      >
+        <Slider.Track>
+          <Slider.Fill />
+          <Slider.Thumb />
+        </Slider.Track>
+      </Slider>
+
+      <NumField
+        label="Border width"
+        value={borderWidth}
+        min={0}
+        onChange={(v) => {
+          onUpdate('borderWidth', v);
+        }}
+      />
+      <ColorInput
+        label="Border color"
+        value={borderColor}
+        onChange={(v) => {
+          onUpdate('borderColor', v);
+        }}
+      />
+
+      <SelectField
+        label="Border style"
+        value={borderStyle}
+        options={[...BORDER_STYLE_OPTIONS]}
+        onUpdate={onUpdate}
+        updateKey="borderStyle"
+      />
+      <SelectField
+        label="Blend mode"
+        value={blendMode}
+        options={[...MIX_BLEND_MODE_OPTIONS]}
+        onUpdate={onUpdate}
+        updateKey="blendMode"
+      />
+
+      <NumField
+        label="Border radius TL"
+        value={borderRadius[0]}
+        min={0}
+        onChange={(v) => {
+          onUpdate('borderRadius', v);
+        }}
+      />
+    </section>
   );
-  const handleBlendModeChange = useCallback(
-    (key: string | number | null) => {
-      if (key !== null) {
-        onUpdate('blendMode', String(key));
+}
+
+/* ------------------------------------------------------------------ */
+/*  TypographyPanel                                                    */
+/* ------------------------------------------------------------------ */
+
+export interface TypographyPanelProps {
+  readonly fontFamily: string;
+  readonly fontSize: number;
+  readonly fontColor: string;
+  readonly fontWeight: number;
+  readonly fontStyle: string;
+  readonly textAlignment: string;
+  readonly textDecoration: string;
+  readonly textTransform: string;
+  readonly onUpdate: (key: string, value: string | number) => void;
+}
+
+export function TypographyPanel({
+  fontFamily,
+  fontSize,
+  fontColor,
+  fontWeight,
+  fontStyle,
+  textAlignment,
+  textDecoration,
+  textTransform,
+  onUpdate,
+}: TypographyPanelProps): JSX.Element {
+  return (
+    <section aria-label="Typography" role="region" className="flex flex-col gap-2">
+      <FieldShell label="Font family">
+        <Input
+          aria-label="Font family"
+          value={fontFamily}
+          onChange={(e) => {
+            onUpdate('fontFamily', e.currentTarget.value);
+          }}
+        />
+      </FieldShell>
+      <NumField
+        label="Font size"
+        value={fontSize}
+        min={1}
+        onChange={(v) => {
+          onUpdate('fontSize', v);
+        }}
+      />
+      <ColorInput
+        label="Font color"
+        value={fontColor}
+        onChange={(v) => {
+          onUpdate('fontColor', v);
+        }}
+      />
+      <NumField
+        label="Font weight"
+        value={fontWeight}
+        min={100}
+        max={900}
+        step={100}
+        onChange={(v) => {
+          onUpdate('fontWeight', v);
+        }}
+      />
+      <SelectField
+        label="Font style"
+        value={fontStyle}
+        options={[...FONT_STYLE_OPTIONS]}
+        onUpdate={onUpdate}
+        updateKey="fontStyle"
+      />
+      <SelectField
+        label="Text alignment"
+        value={textAlignment}
+        options={[...TEXT_ALIGNMENT_OPTIONS]}
+        onUpdate={onUpdate}
+        updateKey="textAlignment"
+      />
+      <SelectField
+        label="Text decoration"
+        value={textDecoration || 'none'}
+        options={['none', ...TEXT_DECORATION_OPTIONS.filter((d) => d !== '')]}
+        onUpdate={onUpdate}
+        updateKey="textDecoration"
+      />
+      <SelectField
+        label="Text transform"
+        value={textTransform}
+        options={[...TEXT_TRANSFORM_OPTIONS]}
+        onUpdate={onUpdate}
+        updateKey="textTransform"
+      />
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  TextEffectsPanel                                                   */
+/* ------------------------------------------------------------------ */
+
+export interface TextEffectsPanelProps {
+  readonly letterSpacing: number;
+  readonly lineHeight: string;
+  readonly wordSpacing: number;
+  readonly textStroke: string;
+  readonly textShadow: string;
+  readonly textTransform: string;
+  readonly onUpdate: (key: string, value: string | number) => void;
+}
+
+export function TextEffectsPanel({
+  letterSpacing,
+  lineHeight,
+  wordSpacing,
+  textStroke,
+  textShadow,
+  onUpdate,
+}: TextEffectsPanelProps): JSX.Element {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  return (
+    <section aria-label="Text Effects" role="region" className="flex flex-col gap-2">
+      <CssLengthInput
+        label="Letter spacing"
+        value={String(letterSpacing)}
+        onChange={(v) => {
+          onUpdate('letterSpacing', v);
+        }}
+      />
+      <CssLengthInput
+        label="Line height"
+        value={lineHeight}
+        onChange={(v) => {
+          onUpdate('lineHeight', v);
+        }}
+      />
+      <CssLengthInput
+        label="Word spacing"
+        value={String(wordSpacing)}
+        onChange={(v) => {
+          onUpdate('wordSpacing', v);
+        }}
+      />
+
+      <Button
+        aria-label="Advanced"
+        size="sm"
+        variant="ghost"
+        onPress={() => {
+          setShowAdvanced((s) => !s);
+        }}
+      >
+        Advanced
+      </Button>
+
+      {showAdvanced ?
+        <>
+          <TextStrokeInput
+            label="Text stroke"
+            width={textStroke ? parseInt(textStroke, 10) : 0}
+            color={textStroke.split(' ')[1] ?? '#000000'}
+            onChange={(v) => {
+              onUpdate('textStroke', v);
+            }}
+          />
+          <ShadowEditor
+            label="Text shadow"
+            mode="text"
+            value={textShadow}
+            onChange={(v) => {
+              onUpdate('textShadow', v);
+            }}
+          />
+        </>
+      : null}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  SpacingPanel                                                       */
+/* ------------------------------------------------------------------ */
+
+export interface SpacingPanelProps {
+  readonly padding: readonly [number, number, number, number];
+  readonly onUpdate: (key: string, value: string | number | readonly [number, number, number, number]) => void;
+}
+
+export function SpacingPanel({ padding, onUpdate }: SpacingPanelProps): JSX.Element {
+  const [linked, setLinked] = useState(false);
+  const labels = ['Padding top', 'Padding right', 'Padding bottom', 'Padding left'] as const;
+
+  const handlePaddingChange = useCallback(
+    (index: number, value: number) => {
+      if (linked) {
+        onUpdate('padding', [value, value, value, value]);
+      } else {
+        const next: [number, number, number, number] = [...padding] as [number, number, number, number];
+
+        next[index] = value;
+        onUpdate('padding', next);
       }
     },
-    [onUpdate],
+    [linked, onUpdate, padding],
   );
 
   return (
-    <section aria-label="Appearance" role="region" className="flex flex-col gap-2">
-      <FieldShell label="Fill color">
+    <section aria-label="Spacing" role="region" className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        {labels.map((label, idx) => (
+          <NumField
+            key={label}
+            label={label}
+            value={padding[idx] ?? 0}
+            min={0}
+            onChange={(v) => {
+              handlePaddingChange(idx, v);
+            }}
+          />
+        ))}
+      </div>
+      <Button
+        aria-label="Link padding"
+        size="sm"
+        variant="ghost"
+        onPress={() => {
+          setLinked((s) => !s);
+        }}
+      >
+        {linked ?
+          <Link2 size={ICON_SIZE} />
+        : <Unlink2 size={ICON_SIZE} />}
+      </Button>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  BoxEffectsPanel                                                    */
+/* ------------------------------------------------------------------ */
+
+export interface BoxEffectsPanelProps {
+  readonly boxShadow: string;
+  readonly filter: string;
+  readonly backdropFilter: string;
+  readonly mixBlendMode: string;
+  readonly isolation: string;
+  readonly documentMode: 'screen' | 'print';
+  readonly onUpdate: (key: string, value: string | number) => void;
+}
+
+export function BoxEffectsPanel({
+  boxShadow,
+  filter,
+  backdropFilter,
+  mixBlendMode,
+  isolation,
+  documentMode,
+  onUpdate,
+}: BoxEffectsPanelProps): JSX.Element {
+  return (
+    <section aria-label="Box Effects" role="region" className="flex flex-col gap-2">
+      <ShadowEditor
+        label="Box shadow"
+        mode="box"
+        value={boxShadow}
+        onChange={(v) => {
+          onUpdate('boxShadow', v);
+        }}
+      />
+      <FilterEditor
+        label="Filter"
+        value={filter}
+        onChange={(v) => {
+          onUpdate('filter', v);
+        }}
+      />
+      <FilterEditor
+        label="Backdrop filter"
+        value={backdropFilter}
+        onChange={(v) => {
+          onUpdate('backdropFilter', v);
+        }}
+      />
+      {documentMode === 'screen' ?
+        <>
+          <SelectField
+            label="Mix blend mode"
+            value={mixBlendMode}
+            options={[...MIX_BLEND_MODE_OPTIONS]}
+            onUpdate={onUpdate}
+            updateKey="mixBlendMode"
+          />
+          <SelectField
+            label="Isolation"
+            value={isolation}
+            options={[...ISOLATION_OPTIONS]}
+            onUpdate={onUpdate}
+            updateKey="isolation"
+          />
+        </>
+      : null}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  ClipPathPanel                                                      */
+/* ------------------------------------------------------------------ */
+
+export interface ClipPathPanelProps {
+  readonly maskType: string;
+  readonly customClipPath: string;
+  readonly onUpdate: (key: string, value: string | number) => void;
+}
+
+export function ClipPathPanel({ maskType, customClipPath, onUpdate }: ClipPathPanelProps): JSX.Element {
+  const [rawValue, setRawValue] = useState(customClipPath);
+  const [error, setError] = useState('');
+
+  return (
+    <section aria-label="Clip Path" role="region" className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-1">
+        {CLIP_PATH_PRESETS.map((preset) => (
+          <Button
+            key={preset.label}
+            aria-label={preset.label}
+            size="sm"
+            variant={maskType === preset.maskType && customClipPath === preset.value ? 'primary' : 'ghost'}
+            onPress={() => {
+              onUpdate('customClipPath', preset.value);
+              onUpdate('maskType', preset.maskType);
+              setRawValue(preset.value);
+              setError('');
+            }}
+          >
+            {preset.label}
+          </Button>
+        ))}
+      </div>
+      <FieldShell label="Clip path CSS">
         <Input
-          aria-label="Fill color"
-          value={backgroundColor}
-          onChange={(event) => {
-            onUpdate('backgroundColor', event.currentTarget.value);
+          aria-label="Clip path"
+          value={rawValue}
+          onChange={(e) => {
+            setRawValue(e.currentTarget.value);
+            setError('');
+          }}
+          onBlur={() => {
+            const trimmed = rawValue.trim();
+
+            if (trimmed === '' || isValidClipPathCss(trimmed)) {
+              onUpdate('customClipPath', trimmed);
+              setError('');
+            } else {
+              setError('Invalid clip-path CSS');
+            }
           }}
         />
       </FieldShell>
+      {error !== '' ?
+        <p role="alert" style={{ color: color('danger'), fontSize: font('body-compact'), margin: 0 }}>
+          {error}
+        </p>
+      : null}
+    </section>
+  );
+}
 
-      <NumericField
-        label="Border width"
-        value={borderWidth}
-        minValue={0}
-        onValueChange={(nextValue) => {
-          onUpdate('borderWidth', nextValue);
+/* ------------------------------------------------------------------ */
+/*  PathPropertiesPanel                                                */
+/* ------------------------------------------------------------------ */
+
+export interface PathPropertiesPanelProps {
+  readonly stroke: string;
+  readonly strokeWidth: number;
+  readonly strokeOpacity: number;
+  readonly strokeDasharray: string;
+  readonly strokeDashoffset: number;
+  readonly strokeLinecap: string;
+  readonly strokeLinejoin: string;
+  readonly fill: string;
+  readonly fillOpacity: number;
+  readonly fillRule: string;
+  readonly content: string;
+  readonly onUpdate: (key: string, value: string | number) => void;
+  readonly onStartDrawing: () => void;
+  readonly onStopDrawing: () => void;
+  readonly onStartEditing: () => void;
+  readonly onStopEditing: () => void;
+  readonly isDrawing: boolean;
+  readonly isEditing: boolean;
+}
+
+export function PathPropertiesPanel({
+  stroke,
+  strokeWidth,
+  strokeOpacity,
+  strokeDasharray,
+  strokeDashoffset,
+  strokeLinecap,
+  strokeLinejoin,
+  fill,
+  fillOpacity,
+  fillRule,
+  content,
+  onUpdate,
+  onStartDrawing,
+  onStopDrawing,
+  onStartEditing,
+  onStopEditing,
+  isDrawing,
+  isEditing,
+}: PathPropertiesPanelProps): JSX.Element {
+  const hasContent = content.trim().length > 0;
+
+  return (
+    <section aria-label="Path Properties" role="region" className="flex flex-col gap-2">
+      <ColorInput
+        label="Stroke color"
+        value={stroke}
+        onChange={(v) => {
+          onUpdate('stroke', v);
         }}
       />
-
-      <FieldShell label="Border color">
+      <NumField
+        label="Stroke width"
+        value={strokeWidth}
+        min={0}
+        onChange={(v) => {
+          onUpdate('strokeWidth', v);
+        }}
+      />
+      <NumField
+        label="Stroke opacity"
+        value={strokeOpacity}
+        min={0}
+        max={1}
+        step={0.01}
+        onChange={(v) => {
+          onUpdate('strokeOpacity', v);
+        }}
+      />
+      <FieldShell label="Stroke dasharray">
         <Input
-          aria-label="Border color"
-          value={borderColor}
-          onChange={(event) => {
-            onUpdate('borderColor', event.currentTarget.value);
+          aria-label="Stroke dasharray"
+          value={strokeDasharray}
+          onChange={(e) => {
+            onUpdate('strokeDasharray', e.currentTarget.value);
           }}
         />
       </FieldShell>
-
-      <FieldShell label="Border style">
-        <Select aria-label="Border style" value={borderStyle} onChange={handleBorderStyleChange}>
-          <Select.Trigger>
-            <Select.Value />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox>
-              {BORDER_STYLE_OPTIONS.map((option) => (
-                <ListBoxItem id={option} key={option}>
-                  {option}
-                </ListBoxItem>
-              ))}
-            </ListBox>
-          </Select.Popover>
-        </Select>
-      </FieldShell>
-
-      <NumericField
-        label="Border radius"
-        value={borderRadius}
-        minValue={0}
-        onValueChange={(nextValue) => {
-          onUpdate('borderRadius', nextValue);
+      <NumField
+        label="Stroke dashoffset"
+        value={strokeDashoffset}
+        onChange={(v) => {
+          onUpdate('strokeDashoffset', v);
         }}
       />
-
-      <NumericField
-        label="Opacity"
-        value={opacity}
-        maxValue={1}
-        minValue={0}
-        step={0.1}
-        onValueChange={(nextValue) => {
-          onUpdate('opacity', nextValue);
+      <SelectField
+        label="Stroke linecap"
+        value={strokeLinecap}
+        options={[...LINECAP_OPTIONS]}
+        onUpdate={onUpdate}
+        updateKey="strokeLinecap"
+      />
+      <SelectField
+        label="Stroke linejoin"
+        value={strokeLinejoin}
+        options={[...LINEJOIN_OPTIONS]}
+        onUpdate={onUpdate}
+        updateKey="strokeLinejoin"
+      />
+      <ColorInput
+        label="Fill color"
+        value={fill}
+        onChange={(v) => {
+          onUpdate('fill', v);
         }}
       />
+      <NumField
+        label="Fill opacity"
+        value={fillOpacity}
+        min={0}
+        max={1}
+        step={0.01}
+        onChange={(v) => {
+          onUpdate('fillOpacity', v);
+        }}
+      />
+      <SelectField
+        label="Fill rule"
+        value={fillRule}
+        options={[...FILL_RULE_OPTIONS]}
+        onUpdate={onUpdate}
+        updateKey="fillRule"
+      />
 
-      <FieldShell label="Blend mode">
-        <Select aria-label="Blend mode" value={blendMode} onChange={handleBlendModeChange}>
-          <Select.Trigger>
-            <Select.Value />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox>
-              {BLEND_MODE_OPTIONS.map((option) => (
-                <ListBoxItem id={option} key={option}>
-                  {option}
-                </ListBoxItem>
-              ))}
-            </ListBox>
-          </Select.Popover>
-        </Select>
+      <div className="flex gap-2">
+        <Button
+          aria-label="Draw path"
+          size="sm"
+          variant={isDrawing ? 'primary' : 'ghost'}
+          onPress={() => {
+            if (isDrawing) {
+              onStopDrawing();
+            } else {
+              onStartDrawing();
+            }
+          }}
+        >
+          Draw path
+        </Button>
+        <Button
+          aria-label="Edit path points"
+          isDisabled={!hasContent}
+          size="sm"
+          variant={isEditing ? 'primary' : 'ghost'}
+          onPress={() => {
+            if (isEditing) {
+              onStopEditing();
+            } else {
+              onStartEditing();
+            }
+          }}
+        >
+          Edit path points
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  ImagePanel                                                         */
+/* ------------------------------------------------------------------ */
+
+export interface ImagePanelProps {
+  readonly content: string;
+  readonly onUpdate: (key: string, value: string | number) => void;
+}
+
+export function ImagePanel({ content, onUpdate }: ImagePanelProps): JSX.Element {
+  return (
+    <section aria-label="Image" role="region" className="flex flex-col gap-2">
+      <FieldShell label="Source URL">
+        <Input
+          aria-label="Source URL"
+          value={content}
+          onChange={(e) => {
+            onUpdate('content', e.currentTarget.value);
+          }}
+        />
       </FieldShell>
     </section>
   );
 }
 
-export interface PropertiesSidebarProps {
-  readonly element: PanelElement | null;
+/* ------------------------------------------------------------------ */
+/*  ObjectFitPanel                                                     */
+/* ------------------------------------------------------------------ */
+
+export interface ObjectFitPanelProps {
+  readonly objectFit: string;
+  readonly onUpdate: (key: string, value: string | number) => void;
+}
+
+export function ObjectFitPanel({ objectFit, onUpdate }: ObjectFitPanelProps): JSX.Element {
+  return (
+    <section aria-label="Object Fit" role="region" className="flex flex-col gap-2">
+      <SelectField
+        label="Object fit"
+        value={objectFit}
+        options={[...OBJECT_FIT_OPTIONS]}
+        onUpdate={onUpdate}
+        updateKey="objectFit"
+      />
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  QrCodePanel                                                        */
+/* ------------------------------------------------------------------ */
+
+export interface QrCodePanelProps {
+  readonly content: string;
+  readonly errorCorrection: string;
+  readonly foregroundColor: string;
+  readonly backgroundColor: string;
+  readonly onUpdate: (key: string, value: string | number) => void;
+}
+
+export function QrCodePanel({
+  content,
+  errorCorrection,
+  foregroundColor,
+  backgroundColor,
+  onUpdate,
+}: QrCodePanelProps): JSX.Element {
+  return (
+    <section aria-label="QR Code" role="region" className="flex flex-col gap-2">
+      <FieldShell label="Content">
+        <Input
+          aria-label="Content"
+          value={content}
+          onChange={(e) => {
+            onUpdate('content', e.currentTarget.value);
+          }}
+        />
+      </FieldShell>
+      <SelectField
+        label="Error correction"
+        value={errorCorrection}
+        options={[...ERROR_CORRECTION_OPTIONS]}
+        onUpdate={onUpdate}
+        updateKey="errorCorrection"
+      />
+      <ColorInput
+        label="Foreground color"
+        value={foregroundColor}
+        onChange={(v) => {
+          onUpdate('qrForegroundColor', v);
+        }}
+      />
+      <ColorInput
+        label="Background color"
+        value={backgroundColor}
+        onChange={(v) => {
+          onUpdate('qrBackgroundColor', v);
+        }}
+      />
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  GroupPanel                                                         */
+/* ------------------------------------------------------------------ */
+
+export interface GroupPanelProps {
+  readonly name: string;
+  readonly clipChildren: boolean;
+  readonly onUpdate: (key: string, value: PropertyValue) => void;
+}
+
+export function GroupPanel({ name, clipChildren, onUpdate }: GroupPanelProps): JSX.Element {
+  return (
+    <section aria-label="Group" role="region" className="flex flex-col gap-2">
+      <FieldShell label="Group name">
+        <Input
+          aria-label="Group name"
+          value={name}
+          onChange={(e) => {
+            onUpdate('name', e.currentTarget.value);
+          }}
+        />
+      </FieldShell>
+      <Switch
+        aria-label="Clip children"
+        isSelected={clipChildren}
+        onChange={(v) => {
+          onUpdate('clipChildren', v);
+        }}
+      >
+        Clip children
+      </Switch>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  PreflightPanel                                                     */
+/* ------------------------------------------------------------------ */
+
+export interface PreflightIssue {
+  readonly id: string;
+  readonly severity: 'error' | 'warning' | 'info';
+  readonly message: string;
+}
+
+export interface PreflightPanelProps {
+  readonly issues: readonly PreflightIssue[];
+}
+
+export function PreflightPanel({ issues }: PreflightPanelProps): JSX.Element {
+  if (issues.length === 0) {
+    return (
+      <section aria-label="Preflight" role="region" className="flex flex-col gap-2">
+        <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>No issues found</p>
+      </section>
+    );
+  }
+
+  return (
+    <section aria-label="Preflight" role="region" className="flex flex-col gap-2">
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {issues.map((issue) => (
+          <li
+            key={issue.id}
+            style={{
+              fontSize: font('body-compact'),
+              color: issue.severity === 'error' ? color('danger') : color('foreground'),
+            }}
+          >
+            {issue.message}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  PropertyField (keyframe integration)                               */
+/* ------------------------------------------------------------------ */
+
+export interface PropertyFieldProps {
+  readonly propertyKey: string;
+  readonly adapter?: PropertyFieldAdapter | undefined;
+  readonly children: ReactNode;
+}
+
+export function PropertyField({ propertyKey, adapter, children }: PropertyFieldProps): JSX.Element {
+  const contextAdapter = useContext(AdapterContext);
+  const active = adapter ?? contextAdapter;
+
+  if (active === null) {
+    return <div data-property-key={propertyKey}>{children}</div>;
+  }
+
+  const included = active.isIncluded(propertyKey);
+  const currentValue = active.getValue(propertyKey);
+
+  return (
+    <div data-property-key={propertyKey} data-disabled={!included ? '' : undefined}>
+      {children}
+      <Button
+        aria-label={included ? 'Remove' : 'Include'}
+        size="sm"
+        variant="ghost"
+        onPress={() => {
+          active.toggleProperty(propertyKey, !included, currentValue);
+        }}
+      >
+        {included ? 'Remove' : 'Include'}
+      </Button>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  AnimationModePropertiesPanel                                       */
+/* ------------------------------------------------------------------ */
+
+export interface AnimationModePropertiesPanelProps {
+  readonly element: PanelElement;
+  readonly adapter: PropertyFieldAdapter;
   readonly documentMode: 'screen' | 'print';
   readonly onUpdate: (key: string, value: string | number) => void;
+}
+
+export function AnimationModePropertiesPanel({
+  element,
+  adapter,
+  documentMode,
+  onUpdate,
+}: AnimationModePropertiesPanelProps): JSX.Element {
+  const profile = getCapabilityProfile(element.type);
+
+  return (
+    <aside aria-label="Animation Properties" role="region" className="p-3" style={glassPanelStyle()}>
+      <AdapterContext.Provider value={adapter}>
+        <Accordion allowsMultipleExpanded defaultExpandedKeys={['geometry']}>
+          <Accordion.Item id="geometry">
+            <Accordion.Heading>
+              <Accordion.Trigger>Geometry</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <GeometryPanel
+                x={element.x}
+                y={element.y}
+                width={element.width}
+                height={element.height}
+                rotation={element.rotation}
+                onUpdate={onUpdate}
+                documentMode={documentMode}
+              />
+            </Accordion.Panel>
+          </Accordion.Item>
+
+          {profile.typography ?
+            <Accordion.Item id="typography">
+              <Accordion.Heading>
+                <Accordion.Trigger>Typography</Accordion.Trigger>
+              </Accordion.Heading>
+              <Accordion.Panel>
+                <TypographyPanel
+                  fontFamily={element.fontFamily}
+                  fontSize={element.fontSize}
+                  fontColor={element.fontColor}
+                  fontWeight={element.fontWeight}
+                  fontStyle={element.fontStyle}
+                  textAlignment={element.textAlignment}
+                  textDecoration={element.textDecoration}
+                  textTransform={element.textTransform}
+                  onUpdate={onUpdate}
+                />
+              </Accordion.Panel>
+            </Accordion.Item>
+          : null}
+
+          {profile.appearance ?
+            <Accordion.Item id="appearance">
+              <Accordion.Heading>
+                <Accordion.Trigger>Appearance</Accordion.Trigger>
+              </Accordion.Heading>
+              <Accordion.Panel>
+                <AppearancePanel
+                  backgroundColor={element.backgroundColor}
+                  borderWidth={element.borderWidth}
+                  borderColor={element.borderColor}
+                  borderStyle={element.borderStyle}
+                  borderRadius={element.borderRadius}
+                  opacity={element.opacity}
+                  blendMode={element.blendMode}
+                  onUpdate={onUpdate}
+                />
+              </Accordion.Panel>
+            </Accordion.Item>
+          : null}
+        </Accordion>
+      </AdapterContext.Provider>
+    </aside>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  PropertiesSidebar — main panel orchestrator                        */
+/* ------------------------------------------------------------------ */
+
+/** Union of all property value types passed through onUpdate callbacks. */
+export type PropertyValue = string | number | boolean | readonly [number, number, number, number];
+
+export interface PropertiesSidebarProps {
+  readonly elements: readonly PanelElement[];
+  readonly documentMode: 'screen' | 'print';
+  readonly showAnimations?: boolean | undefined;
+  readonly onUpdate: (key: string, value: PropertyValue) => void;
   readonly customPanels?: Readonly<Record<string, CustomPanelComponent>> | undefined;
+  readonly onStartDrawing?: (() => void) | undefined;
+  readonly onStopDrawing?: (() => void) | undefined;
+  readonly onStartEditing?: (() => void) | undefined;
+  readonly onStopEditing?: (() => void) | undefined;
+  readonly isDrawing?: boolean | undefined;
+  readonly isEditing?: boolean | undefined;
 }
 
 export function PropertiesSidebar({
-  element,
+  elements,
   documentMode,
+  showAnimations,
   onUpdate,
   customPanels,
+  onStartDrawing,
+  onStopDrawing,
+  onStartEditing,
+  onStopEditing,
+  isDrawing = false,
+  isEditing = false,
 }: PropertiesSidebarProps): JSX.Element {
-  if (element === null) {
+  if (elements.length === 0) {
     return (
       <aside aria-label="Properties" role="region" className="p-3" style={glassPanelStyle()}>
         <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>
@@ -304,74 +1444,275 @@ export function PropertiesSidebar({
     );
   }
 
-  const CustomPanel = customPanels?.[element.type];
+  const primary = elements[0];
 
-  if (CustomPanel !== undefined) {
+  if (primary === undefined) {
     return (
       <aside aria-label="Properties" role="region" className="p-3" style={glassPanelStyle()}>
-        <CustomPanel documentMode={documentMode} element={element} onUpdate={onUpdate} />
+        <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>
+          Select an element to edit its properties
+        </p>
       </aside>
     );
   }
 
+  const isMulti = elements.length > 1;
+  const hasMixedX = isMulti && computeMultiValue(elements, 'x').isMixed;
+
+  const CustomPanel = customPanels?.[primary.type];
+
+  if (CustomPanel !== undefined) {
+    return (
+      <aside aria-label="Properties" role="region" className="p-3" style={glassPanelStyle()}>
+        <CustomPanel documentMode={documentMode} element={primary} onUpdate={onUpdate} />
+      </aside>
+    );
+  }
+
+  const profile = getCapabilityProfile(primary.type);
   const isScreenMode = documentMode === 'screen';
-  const showGradient = isScreenMode && element.type === 'rectangle';
+  const showGradient = isScreenMode && primary.type === 'rectangle';
+  const isQrCode = primary.type === 'qrcode';
+  const isGroup = primary.type === 'group';
+  const isImage = primary.type === 'image';
+  const showSpacing = profile.typography || isGroup;
+  const showPathProperties = profile.svgStrokeFill || profile.pathEditing;
+
+  const defaultExpanded = ['geometry', 'appearance'];
 
   return (
     <aside aria-label="Properties" role="region" className="p-3" style={glassPanelStyle()}>
-      <Accordion
-        allowsMultipleExpanded
-        defaultExpandedKeys={showGradient ? ['geometry', 'appearance', 'gradient'] : ['geometry', 'appearance']}
-      >
+      {hasMixedX ?
+        <p style={{ color: color('muted'), fontSize: font('label') }}>Mixed</p>
+      : null}
+      <Accordion allowsMultipleExpanded defaultExpandedKeys={defaultExpanded}>
         <Accordion.Item id="geometry">
           <Accordion.Heading>
             <Accordion.Trigger>Geometry</Accordion.Trigger>
           </Accordion.Heading>
           <Accordion.Panel>
             <GeometryPanel
-              x={element.x}
-              y={element.y}
-              width={element.width}
-              height={element.height}
-              rotation={element.rotation}
+              x={primary.x}
+              y={primary.y}
+              width={primary.width}
+              height={primary.height}
+              rotation={primary.rotation}
+              rotateX={primary.rotateX}
+              rotateY={primary.rotateY}
+              rotateZ={primary.rotateZ}
+              translateZ={primary.translateZ}
               onUpdate={onUpdate}
+              documentMode={documentMode}
             />
           </Accordion.Panel>
         </Accordion.Item>
 
-        <Accordion.Item id="appearance">
-          <Accordion.Heading>
-            <Accordion.Trigger>Appearance</Accordion.Trigger>
-          </Accordion.Heading>
-          <Accordion.Panel>
-            <AppearancePanel
-              backgroundColor={element.backgroundColor}
-              borderWidth={element.borderWidth}
-              borderColor={element.borderColor}
-              borderStyle={element.borderStyle}
-              borderRadius={element.borderRadius}
-              blendMode={element.blendMode}
-              opacity={element.opacity}
-              onUpdate={onUpdate}
-            />
-          </Accordion.Panel>
-        </Accordion.Item>
-
-        {showGradient ?
-          <Accordion.Item id="gradient">
+        {/* 2. Appearance */}
+        {profile.appearance ?
+          <Accordion.Item id="appearance">
             <Accordion.Heading>
-              <Accordion.Trigger>Gradient Fill</Accordion.Trigger>
+              <Accordion.Trigger>Appearance</Accordion.Trigger>
             </Accordion.Heading>
             <Accordion.Panel>
-              <FieldShell label="CSS Gradient">
-                <Input
-                  aria-label="CSS Gradient"
-                  value={element.backgroundGradient}
-                  onChange={(event) => {
-                    onUpdate('backgroundGradient', event.currentTarget.value);
-                  }}
-                />
-              </FieldShell>
+              <AppearancePanel
+                backgroundColor={primary.backgroundColor}
+                backgroundGradient={primary.backgroundGradient}
+                showGradient={showGradient}
+                borderWidth={primary.borderWidth}
+                borderColor={primary.borderColor}
+                borderStyle={primary.borderStyle}
+                borderRadius={primary.borderRadius}
+                opacity={primary.opacity}
+                blendMode={primary.blendMode}
+                onUpdate={onUpdate}
+              />
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+
+        {/* 3. Typography */}
+        {profile.typography ?
+          <Accordion.Item id="typography">
+            <Accordion.Heading>
+              <Accordion.Trigger>Typography</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <TypographyPanel
+                fontFamily={primary.fontFamily}
+                fontSize={primary.fontSize}
+                fontColor={primary.fontColor}
+                fontWeight={primary.fontWeight}
+                fontStyle={primary.fontStyle}
+                textAlignment={primary.textAlignment}
+                textDecoration={primary.textDecoration}
+                textTransform={primary.textTransform}
+                onUpdate={onUpdate}
+              />
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+
+        {/* 4. Text Effects */}
+        {profile.typography ?
+          <Accordion.Item id="text-effects">
+            <Accordion.Heading>
+              <Accordion.Trigger>Text Effects</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <TextEffectsPanel
+                letterSpacing={primary.letterSpacing}
+                lineHeight={primary.lineHeight}
+                wordSpacing={primary.wordSpacing}
+                textStroke={primary.textStroke}
+                textShadow={primary.textShadow}
+                textTransform={primary.textTransform}
+                onUpdate={onUpdate}
+              />
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+
+        {/* 5. Spacing */}
+        {showSpacing ?
+          <Accordion.Item id="spacing">
+            <Accordion.Heading>
+              <Accordion.Trigger>Spacing</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <SpacingPanel padding={primary.padding} onUpdate={onUpdate} />
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+
+        {/* 6. Box Effects */}
+        {profile.boxEffects ?
+          <Accordion.Item id="box-effects">
+            <Accordion.Heading>
+              <Accordion.Trigger>Box Effects</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <BoxEffectsPanel
+                boxShadow={primary.boxShadow}
+                filter={primary.filter}
+                backdropFilter={primary.backdropFilter}
+                mixBlendMode={primary.mixBlendMode}
+                isolation={primary.isolation}
+                documentMode={documentMode}
+                onUpdate={onUpdate}
+              />
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+
+        {/* 7. Clip Path */}
+        {profile.clipPath && isScreenMode ?
+          <Accordion.Item id="clip-path">
+            <Accordion.Heading>
+              <Accordion.Trigger>Clip Path</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <ClipPathPanel maskType={primary.maskType} customClipPath={primary.customClipPath} onUpdate={onUpdate} />
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+
+        {/* 8. Path Properties */}
+        {showPathProperties ?
+          <Accordion.Item id="path-properties">
+            <Accordion.Heading>
+              <Accordion.Trigger>Path Properties</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <PathPropertiesPanel
+                stroke={primary.stroke}
+                strokeWidth={primary.strokeWidth}
+                strokeOpacity={primary.strokeOpacity}
+                strokeDasharray={primary.strokeDasharray}
+                strokeDashoffset={primary.strokeDashoffset}
+                strokeLinecap={primary.strokeLinecap}
+                strokeLinejoin={primary.strokeLinejoin}
+                fill={primary.fill}
+                fillOpacity={primary.fillOpacity}
+                fillRule={primary.fillRule}
+                content={primary.content}
+                onUpdate={onUpdate}
+                onStartDrawing={onStartDrawing ?? (() => undefined)}
+                onStopDrawing={onStopDrawing ?? (() => undefined)}
+                onStartEditing={onStartEditing ?? (() => undefined)}
+                onStopEditing={onStopEditing ?? (() => undefined)}
+                isDrawing={isDrawing}
+                isEditing={isEditing}
+              />
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+
+        {/* 9. Image */}
+        {isImage ?
+          <Accordion.Item id="image">
+            <Accordion.Heading>
+              <Accordion.Trigger>Image</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <ImagePanel content={primary.content} onUpdate={onUpdate} />
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+
+        {/* 10. Object Fit */}
+        {profile.objectFit ?
+          <Accordion.Item id="object-fit">
+            <Accordion.Heading>
+              <Accordion.Trigger>Object Fit</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <ObjectFitPanel objectFit={primary.objectFit} onUpdate={onUpdate} />
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+
+        {/* 11. QR Code */}
+        {isQrCode ?
+          <Accordion.Item id="qrcode">
+            <Accordion.Heading>
+              <Accordion.Trigger>QR Code</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <QrCodePanel
+                content={primary.content}
+                errorCorrection={primary.errorCorrection}
+                foregroundColor={primary.qrForegroundColor}
+                backgroundColor={primary.qrBackgroundColor}
+                onUpdate={onUpdate}
+              />
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+
+        {/* 12. Group */}
+        {isGroup ?
+          <Accordion.Item id="group">
+            <Accordion.Heading>
+              <Accordion.Trigger>Group</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <GroupPanel name={primary.name} clipChildren={primary.clipChildren} onUpdate={onUpdate} />
+            </Accordion.Panel>
+          </Accordion.Item>
+        : null}
+
+        {/* 13. Animation Builder — rendered when showAnimations is enabled */}
+        {showAnimations === true ?
+          <Accordion.Item id="animation-builder">
+            <Accordion.Heading>
+              <Accordion.Trigger>Animation Builder</Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <section aria-label="Animation Builder" role="region" className="flex flex-col gap-2">
+                <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>
+                  Animation builder controls
+                </p>
+              </section>
             </Accordion.Panel>
           </Accordion.Item>
         : null}

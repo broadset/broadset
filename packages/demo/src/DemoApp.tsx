@@ -31,6 +31,7 @@ import {
   LayersSidebar,
   type PanelElement,
   PropertiesSidebar,
+  type PropertyValue,
   sp,
   TimelineEditingProvider,
 } from '@broadset/ui';
@@ -396,15 +397,16 @@ function downloadJsonFile(filename: string, payload: unknown): void {
 }
 
 function toPanelElement(element: BroadsetElement): PanelElement {
-  const borderRadiusValue =
-    typeof element.style.borderRadius === 'number' ? element.style.borderRadius
-    : Array.isArray(element.style.borderRadius) ? element.style.borderRadius[0]
-    : 0;
+  const borderRadiusValue: readonly [number, number, number, number] =
+    element.style.borderRadius ?? ([0, 0, 0, 0] as const);
+
+  const paddingValue: readonly [number, number, number, number] = element.style.padding ?? ([0, 0, 0, 0] as const);
 
   return {
     id: element.id,
     type: element.type,
     name: element.name,
+    content: element.content,
     x: element.position.x,
     y: element.position.y,
     width: element.width,
@@ -421,9 +423,52 @@ function toPanelElement(element: BroadsetElement): PanelElement {
     borderRadius: borderRadiusValue,
     opacity: element.style.opacity,
     blendMode: typeof element.style.mixBlendMode === 'string' ? element.style.mixBlendMode : 'normal',
+    mixBlendMode: typeof element.style.mixBlendMode === 'string' ? element.style.mixBlendMode : 'normal',
+    isolation: element.style.isolation ?? 'auto',
     boxShadow: element.style.boxShadow ?? '',
     filter: element.style.filter ?? '',
     backdropFilter: element.style.backdropFilter ?? '',
+    fontFamily: element.style.fontFamily ?? '',
+    fontSize: element.style.fontSize ?? 16,
+    fontColor: element.style.fontColor ?? '#000000',
+    fontWeight: element.style.fontWeight ?? 400,
+    fontStyle: element.style.fontStyle ?? 'normal',
+    textAlignment: element.style.textAlignment ?? 'left',
+    textDecoration: element.style.textDecoration ?? 'none',
+    textTransform: element.style.textTransform ?? 'none',
+    letterSpacing: element.style.letterSpacing ?? 0,
+    lineHeight:
+      typeof element.style.lineHeight === 'number' ?
+        String(element.style.lineHeight)
+      : (element.style.lineHeight ?? 'normal'),
+    wordSpacing: element.style.wordSpacing ?? 0,
+    textStroke: element.style.textStroke ?? '',
+    textShadow: element.style.textShadow ?? '',
+    writingMode: element.style.writingMode ?? 'horizontal-tb',
+    fontVariationSettings: element.style.fontVariationSettings ?? '',
+    padding: paddingValue,
+    stroke: element.style.stroke ?? '',
+    strokeWidth: element.style.strokeWidth ?? 1,
+    strokeDasharray: element.style.strokeDasharray ?? '',
+    strokeDashoffset: element.style.strokeDashoffset ?? 0,
+    strokeLinecap: element.style.strokeLinecap ?? 'butt',
+    strokeLinejoin: element.style.strokeLinejoin ?? 'miter',
+    strokeOpacity: element.style.strokeOpacity ?? 1,
+    fill: element.style.fill ?? '',
+    fillOpacity: element.style.fillOpacity ?? 1,
+    fillRule: element.style.fillRule ?? 'nonzero',
+    maskType: element.style.maskType ?? 'none',
+    customClipPath: element.style.customClipPath ?? '',
+    clipChildren: element.style.clipChildren ?? false,
+    rotateX: element.style.rotateX ?? 0,
+    rotateY: element.style.rotateY ?? 0,
+    rotateZ: element.style.rotateZ ?? 0,
+    translateZ: element.style.translateZ ?? 0,
+    objectFit: element.style.objectFit ?? 'fill',
+    autoSize: element.autoSize,
+    errorCorrection: 'M',
+    qrForegroundColor: '#000000',
+    qrBackgroundColor: '#ffffff',
   };
 }
 
@@ -1866,7 +1911,7 @@ export function DemoApp(): React.JSX.Element {
   );
 
   const handlePropertyUpdate = useCallback(
-    (key: string, value: string | number): void => {
+    (key: string, value: PropertyValue): void => {
       if (selectedElement === null) {
         return;
       }
@@ -1936,7 +1981,7 @@ export function DemoApp(): React.JSX.Element {
     : sidebarTab === 'properties' ?
       <PropertiesSidebar
         documentMode={currentDocument.documentMode}
-        element={selectedElement === null ? null : toPanelElement(selectedElement)}
+        elements={selectedElement === null ? [] : [toPanelElement(selectedElement)]}
         onUpdate={handlePropertyUpdate}
       />
     : sidebarTab === 'animation' ?
