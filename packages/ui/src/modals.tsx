@@ -1,7 +1,7 @@
 import { Button, ButtonGroup, Input, Kbd, Modal, Select, Slider, Switch, Table, Tabs } from '@heroui/react';
 import { X } from 'lucide-react';
 import type { ChangeEvent, JSX, ReactNode } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { NumField } from './inputs';
 import { color, sp } from './tokens';
@@ -394,6 +394,7 @@ export function MediaLibraryModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedAsset, setSelectedAsset] = useState<MediaAsset | null>(null);
+  const lastClickRef = useRef<{ id: string; time: number } | null>(null);
 
   const filteredAssets = assets.filter((asset) => {
     const matchesSearch = searchQuery === '' || asset.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -462,7 +463,16 @@ export function MediaLibraryModal({
                 }}
                 variant="ghost"
                 onPress={() => {
-                  setSelectedAsset(asset);
+                  const now = Date.now();
+                  const last = lastClickRef.current;
+
+                  if (last !== null && last.id === asset.id && now - last.time < 400) {
+                    onSelect(asset);
+                    lastClickRef.current = null;
+                  } else {
+                    setSelectedAsset(asset);
+                    lastClickRef.current = { id: asset.id, time: now };
+                  }
                 }}
               >
                 <img alt={asset.name} src={asset.url} style={{ width: '100%', height: 'auto' }} />

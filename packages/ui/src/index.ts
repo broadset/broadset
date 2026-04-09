@@ -1,4 +1,5 @@
 export * from './inputs';
+export * from './modals';
 export * from './panels';
 export * from './timeline';
 export * from './tokens';

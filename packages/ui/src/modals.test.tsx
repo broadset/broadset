@@ -603,6 +603,33 @@ describe('MediaLibraryModal', () => {
     render(<MediaLibraryModal {...makeProps({ assets: [] })} />);
     expect(screen.getByText(/no media/i)).toBeTruthy();
   });
+
+  /** @description Double-clicking an asset selects and confirms in one action */
+  it('double-click on asset calls onSelect directly', async () => {
+    const { MediaLibraryModal } = await import('./modals');
+    const onSelect = jest.fn();
+
+    render(<MediaLibraryModal {...makeProps({ onSelect })} />);
+
+    const logoBtn = screen.getByRole('button', { name: 'Logo' });
+
+    // First click — selects; mock Date.now to control timing
+    const now = jest.spyOn(Date, 'now');
+
+    now.mockReturnValue(1000);
+    fireEvent.click(logoBtn);
+    expect(onSelect).not.toHaveBeenCalled();
+
+    // Second click within 400 ms — should trigger onSelect directly
+    now.mockReturnValue(1200);
+    fireEvent.click(logoBtn);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect((onSelect.mock.calls[0] as readonly unknown[])[0]).toEqual(
+      expect.objectContaining({ id: 'a1', name: 'Logo' }),
+    );
+
+    now.mockRestore();
+  });
 });
 
 /* ------------------------------------------------------------------ */
