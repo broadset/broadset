@@ -30,8 +30,8 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 4 — Editor MVP: Core Editing & Canvas (complete)
-- **In Progress:** none — awaiting next instruction
+- **Active Phase:** Phase 5 — Rich Properties & Layers
+- **In Progress:** 5-A input components (CSS parsers)
 - **Last Merged:** 4-D Demo shell polish
 
 ---

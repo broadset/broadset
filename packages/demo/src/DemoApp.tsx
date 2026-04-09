@@ -1,11 +1,16 @@
 import {
+  applyDragTranslation,
+  applyResize,
+  applyRotation,
   cancelPlacement,
   createDataStore,
   createEditorStore,
   EditorErrorBoundary,
   EditorProvider,
   type EditorStore,
+  type ElementUpdate,
   placeElement,
+  type ResizeHandle,
   startPlacement,
 } from '@broadset/editor';
 import {
@@ -24,7 +29,6 @@ import {
   glassPanelStyle,
   type LayerInfo,
   LayersSidebar,
-  PageSorter,
   type PanelElement,
   PropertiesSidebar,
   sp,
@@ -97,6 +101,9 @@ const SIDEBAR_TOP_OFFSET = 72;
 const MAX_CANVAS_ZOOM = 4;
 const MIN_CANVAS_ZOOM = 0.1;
 const ZOOM_STEP = 0.1;
+const TRANSFORM_HANDLE_SIZE = 10;
+const ROTATION_HANDLE_OFFSET = 28;
+const MIN_TRANSFORM_SIZE = 12;
 const SIDEBAR_STORAGE_KEY = 'broadset:demo-sidebar-preferences:v1';
 const TOAST_DISMISS_MS = {
   error: 5000,
@@ -165,6 +172,9 @@ interface ContextMenuState {
 }
 
 interface ScreenPreviewProps {
+  readonly selectedElement: BroadsetElement | null;
+  readonly onElementTransformPreview: (elementId: string, updates: ElementUpdate) => void;
+  readonly onElementTransformCommit: (elementId: string, updates: ElementUpdate) => void;
   readonly documentData: BroadsetDocument;
   readonly isPlaying: boolean;
   readonly resetToken: number;
@@ -179,6 +189,107 @@ interface ScreenPreviewProps {
     readonly panY?: number;
     readonly zoom?: number;
   }) => void;
+}
+
+type TransformGesture =
+  | {
+      readonly kind: 'drag';
+      readonly startX: number;
+      readonly startY: number;
+      readonly initialPosition: { readonly x: number; readonly y: number };
+      lastUpdate: ElementUpdate | null;
+    }
+  | {
+      readonly kind: 'resize';
+      readonly startX: number;
+      readonly startY: number;
+      readonly initialRect: {
+        readonly x: number;
+        readonly y: number;
+        readonly width: number;
+        readonly height: number;
+      };
+      readonly handle: ResizeHandle;
+      lastUpdate: ElementUpdate | null;
+    }
+  | {
+      readonly kind: 'rotate';
+      readonly startAngle: number;
+      readonly initialRotation: number;
+      lastUpdate: ElementUpdate | null;
+    };
+
+const TRANSFORM_HANDLE_POSITIONS: Readonly<Record<ResizeHandle, React.CSSProperties>> = {
+  e: { right: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`, top: '50%', transform: 'translate(50%, -50%)' },
+  n: { left: '50%', top: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`, transform: 'translate(-50%, -50%)' },
+  ne: {
+    right: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
+    top: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
+    transform: 'translate(50%, -50%)',
+  },
+  nw: {
+    left: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
+    top: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
+    transform: 'translate(-50%, -50%)',
+  },
+  s: { bottom: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`, left: '50%', transform: 'translate(-50%, 50%)' },
+  se: {
+    bottom: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
+    right: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
+    transform: 'translate(50%, 50%)',
+  },
+  sw: {
+    bottom: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
+    left: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
+    transform: 'translate(-50%, 50%)',
+  },
+  w: { left: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`, top: '50%', transform: 'translate(-50%, -50%)' },
+};
+
+const TRANSFORM_HANDLE_CURSORS: Readonly<Record<ResizeHandle, React.CSSProperties['cursor']>> = {
+  e: 'ew-resize',
+  n: 'ns-resize',
+  ne: 'nesw-resize',
+  nw: 'nwse-resize',
+  s: 'ns-resize',
+  se: 'nwse-resize',
+  sw: 'nesw-resize',
+  w: 'ew-resize',
+};
+
+function normalizeTransformRect(
+  rect: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  },
+  handle: ResizeHandle,
+): {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+} {
+  let { x, y, width, height } = rect;
+
+  if (width < MIN_TRANSFORM_SIZE) {
+    if (handle.includes('w')) {
+      x += width - MIN_TRANSFORM_SIZE;
+    }
+
+    width = MIN_TRANSFORM_SIZE;
+  }
+
+  if (height < MIN_TRANSFORM_SIZE) {
+    if (handle.includes('n')) {
+      y += height - MIN_TRANSFORM_SIZE;
+    }
+
+    height = MIN_TRANSFORM_SIZE;
+  }
+
+  return { x, y, width, height };
 }
 
 function clampSidebarWidth(width: number): number {
@@ -538,7 +649,269 @@ function IconToolButton({
   );
 }
 
+function SelectionTransformWidget({
+  element,
+  panX,
+  panY,
+  zoom,
+  onPreviewUpdate,
+  onCommitUpdate,
+}: {
+  readonly element: BroadsetElement;
+  readonly panX: number;
+  readonly panY: number;
+  readonly zoom: number;
+  readonly onPreviewUpdate: (elementId: string, updates: ElementUpdate) => void;
+  readonly onCommitUpdate: (elementId: string, updates: ElementUpdate) => void;
+}): React.JSX.Element {
+  const gestureRef = useRef<TransformGesture | null>(null);
+  const [isRotating, setIsRotating] = useState(false);
+
+  const beginDrag = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>): void => {
+      if (event.button !== 0) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      gestureRef.current = {
+        initialPosition: { ...element.position },
+        kind: 'drag',
+        lastUpdate: null,
+        startX: event.clientX,
+        startY: event.clientY,
+      };
+    },
+    [element.position],
+  );
+
+  const beginResize = useCallback(
+    (handle: ResizeHandle) =>
+      (event: React.PointerEvent<HTMLDivElement>): void => {
+        if (event.button !== 0) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        gestureRef.current = {
+          handle,
+          initialRect: {
+            height: element.height,
+            width: element.width,
+            x: element.position.x,
+            y: element.position.y,
+          },
+          kind: 'resize',
+          lastUpdate: null,
+          startX: event.clientX,
+          startY: event.clientY,
+        };
+      },
+    [element.height, element.position.x, element.position.y, element.width],
+  );
+
+  const beginRotation = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>): void => {
+      if (event.button !== 0) {
+        return;
+      }
+
+      const centerX = panX + (element.position.x + element.width / 2) * zoom;
+      const centerY = panY + (element.position.y + element.height / 2) * zoom;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setIsRotating(true);
+      gestureRef.current = {
+        initialRotation: element.rotation,
+        kind: 'rotate',
+        lastUpdate: null,
+        startAngle: Math.atan2(event.clientY - centerY, event.clientX - centerX),
+      };
+    },
+    [element.height, element.position.x, element.position.y, element.rotation, element.width, panX, panY, zoom],
+  );
+
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>): void => {
+      const gesture = gestureRef.current;
+
+      if (gesture === null) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (gesture.kind === 'drag') {
+        const update = {
+          position: applyDragTranslation(
+            gesture.initialPosition,
+            { dx: event.clientX - gesture.startX, dy: event.clientY - gesture.startY },
+            zoom,
+          ),
+        } satisfies ElementUpdate;
+
+        gesture.lastUpdate = update;
+        onPreviewUpdate(element.id, update);
+
+        return;
+      }
+
+      if (gesture.kind === 'resize') {
+        const nextRect = normalizeTransformRect(
+          applyResize(
+            gesture.initialRect,
+            gesture.handle,
+            event.clientX - gesture.startX,
+            event.clientY - gesture.startY,
+            zoom,
+          ),
+          gesture.handle,
+        );
+        const update = {
+          height: nextRect.height,
+          position: { x: nextRect.x, y: nextRect.y },
+          width: nextRect.width,
+        } satisfies ElementUpdate;
+
+        gesture.lastUpdate = update;
+        onPreviewUpdate(element.id, update);
+
+        return;
+      }
+
+      const centerX = panX + (element.position.x + element.width / 2) * zoom;
+      const centerY = panY + (element.position.y + element.height / 2) * zoom;
+      const currentAngle = Math.atan2(event.clientY - centerY, event.clientX - centerX);
+      const update = {
+        rotation: applyRotation(gesture.initialRotation, ((currentAngle - gesture.startAngle) * 180) / Math.PI),
+      } satisfies ElementUpdate;
+
+      gesture.lastUpdate = update;
+      onPreviewUpdate(element.id, update);
+    },
+    [element.height, element.id, element.position, element.rotation, element.width, onPreviewUpdate, panX, panY, zoom],
+  );
+
+  const finishGesture = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>): void => {
+      const gesture = gestureRef.current;
+
+      if (gesture === null) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+
+      setIsRotating(false);
+      gestureRef.current = null;
+
+      if (gesture.lastUpdate !== null) {
+        onCommitUpdate(element.id, gesture.lastUpdate);
+      }
+    },
+    [element.id, onCommitUpdate],
+  );
+
+  return (
+    <div
+      data-testid="demo-transform-widget"
+      onClick={(event) => {
+        event.stopPropagation();
+      }}
+      onPointerCancel={finishGesture}
+      onPointerMove={handlePointerMove}
+      onPointerUp={finishGesture}
+      style={{
+        height: `${String(Math.max(element.height * zoom, 1))}px`,
+        left: `${String(panX + element.position.x * zoom)}px`,
+        pointerEvents: 'auto',
+        position: 'absolute',
+        top: `${String(panY + element.position.y * zoom)}px`,
+        transform: `rotate(${String(element.rotation)}deg)`,
+        transformOrigin: 'center center',
+        width: `${String(Math.max(element.width * zoom, 1))}px`,
+        zIndex: 2,
+      }}
+    >
+      <div
+        data-testid="transform-bounds"
+        onPointerDown={beginDrag}
+        style={{
+          background: 'rgba(59, 130, 246, 0.06)',
+          border: '1px solid rgba(59, 130, 246, 0.95)',
+          borderRadius: '0.4rem',
+          boxShadow: '0 0 0 1px rgba(15, 23, 42, 0.35)',
+          cursor: 'move',
+          inset: 0,
+          position: 'absolute',
+        }}
+      />
+      {(['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const).map((handle) => (
+        <div
+          key={handle}
+          data-testid={`transform-handle-${handle}`}
+          onPointerDown={beginResize(handle)}
+          style={{
+            ...TRANSFORM_HANDLE_POSITIONS[handle],
+            background: '#ffffff',
+            border: '1px solid rgba(37, 99, 235, 0.95)',
+            borderRadius: '9999px',
+            cursor: TRANSFORM_HANDLE_CURSORS[handle],
+            height: `${String(TRANSFORM_HANDLE_SIZE)}px`,
+            position: 'absolute',
+            width: `${String(TRANSFORM_HANDLE_SIZE)}px`,
+          }}
+        />
+      ))}
+      <div
+        aria-hidden="true"
+        style={{
+          background: 'rgba(59, 130, 246, 0.8)',
+          height: `${String(ROTATION_HANDLE_OFFSET - 6)}px`,
+          left: '50%',
+          position: 'absolute',
+          top: `${String(-ROTATION_HANDLE_OFFSET + 8)}px`,
+          transform: 'translateX(-50%)',
+          width: '1px',
+        }}
+      />
+      <div
+        data-testid="transform-rotation-handle"
+        onPointerDown={beginRotation}
+        style={{
+          background: 'rgba(37, 99, 235, 0.98)',
+          border: '2px solid rgba(255, 255, 255, 0.96)',
+          borderRadius: '9999px',
+          boxShadow: '0 4px 10px rgba(15, 23, 42, 0.24)',
+          cursor: isRotating ? 'grabbing' : 'grab',
+          height: `${String(TRANSFORM_HANDLE_SIZE + 2)}px`,
+          left: '50%',
+          position: 'absolute',
+          top: `${String(-ROTATION_HANDLE_OFFSET)}px`,
+          transform: 'translate(-50%, -50%)',
+          width: `${String(TRANSFORM_HANDLE_SIZE + 2)}px`,
+        }}
+      />
+    </div>
+  );
+}
+
 function ScreenPreview({
+  selectedElement,
+  onElementTransformPreview,
+  onElementTransformCommit,
   documentData,
   isPlaying,
   resetToken,
@@ -679,6 +1052,28 @@ function ScreenPreview({
 
   const handleWheel = useCallback(
     (event: React.WheelEvent<HTMLDivElement>): void => {
+      const isLegacyWheel = event.deltaMode !== 0;
+
+      if (isLegacyWheel && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        onViewportChange({
+          panX: panX - event.deltaY,
+          panY,
+        });
+
+        return;
+      }
+
+      if (isLegacyWheel && event.altKey) {
+        event.preventDefault();
+        onViewportChange({
+          panX,
+          panY: panY - event.deltaY,
+        });
+
+        return;
+      }
+
       const intent = classifyWheelInput({
         altKey: event.altKey,
         ctrlKey: event.ctrlKey || event.metaKey,
@@ -728,7 +1123,7 @@ function ScreenPreview({
 
   return (
     <div
-      aria-description="Scroll pans the canvas, pinch or wheel zooms, and Shift-drag pans the view."
+      aria-description="Mouse wheel zooms, ctrl or command wheel pans horizontally, Alt pans vertically, and Shift-drag or middle-click pans the view."
       aria-label={`Screen preview for ${documentData.name}`}
       className="h-full w-full overflow-hidden"
       onClick={handlePreviewClick}
@@ -741,6 +1136,7 @@ function ScreenPreview({
       style={{
         backgroundColor: color('surface-secondary'),
         cursor: isPanning ? 'grabbing' : cursor,
+        position: 'relative',
         touchAction: 'none',
       }}
     >
@@ -755,6 +1151,16 @@ function ScreenPreview({
           willChange: 'transform',
         }}
       />
+      {selectedElement === null ? null : (
+        <SelectionTransformWidget
+          element={selectedElement}
+          panX={panX}
+          panY={panY}
+          zoom={zoom}
+          onCommitUpdate={onElementTransformCommit}
+          onPreviewUpdate={onElementTransformPreview}
+        />
+      )}
     </div>
   );
 }
@@ -985,6 +1391,20 @@ export function DemoApp(): React.JSX.Element {
   const handleCanvasViewportChange = useCallback(
     (settings: { readonly panX?: number; readonly panY?: number; readonly zoom?: number }): void => {
       editorStore.getState().updateCanvasSettings(settings);
+    },
+    [editorStore],
+  );
+
+  const handleElementTransformPreview = useCallback(
+    (elementId: string, updates: ElementUpdate): void => {
+      editorStore.getState().updateElementEphemeral(elementId, updates);
+    },
+    [editorStore],
+  );
+
+  const handleElementTransformCommit = useCallback(
+    (elementId: string, updates: ElementUpdate): void => {
+      editorStore.getState().commitElementUpdate(elementId, updates);
     },
     [editorStore],
   );
@@ -2213,22 +2633,6 @@ export function DemoApp(): React.JSX.Element {
                           </CardContent>
                         </Card>
                       </div>
-
-                      <div data-testid="demo-scene-sorter" style={{ maxWidth: '360px' }}>
-                        <PageSorter
-                          activePageIndex={editorState.activePageIndex}
-                          onPageAdd={() => {
-                            editorStore.getState().addPage();
-                          }}
-                          onPageRemove={(index) => {
-                            editorStore.getState().removePage(index);
-                          }}
-                          onPageSelect={(index) => {
-                            editorStore.getState().switchPage(index);
-                          }}
-                          pages={currentDocument.pages}
-                        />
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -2343,9 +2747,12 @@ export function DemoApp(): React.JSX.Element {
                       isPlaying={isPlaying}
                       panX={editorState.canvasSettings.panX}
                       panY={editorState.canvasSettings.panY}
+                      selectedElement={selectedElement}
                       zoom={editorState.canvasSettings.zoom}
                       onCanvasClick={handleCanvasClick}
                       onCanvasContextMenu={handleCanvasContextMenu}
+                      onElementTransformCommit={handleElementTransformCommit}
+                      onElementTransformPreview={handleElementTransformPreview}
                       onViewportChange={handleCanvasViewportChange}
                       resetToken={resetToken}
                     />

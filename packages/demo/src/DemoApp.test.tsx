@@ -703,6 +703,86 @@ describe('DemoApp playback shell lifecycle', () => {
   });
 
   /**
+   * @description Keeps wheel navigation aligned with the canvas spec: plain mouse-wheel scrolling zooms the viewport, modifier keys pan, and trackpad panning still works.
+   */
+  it('zooms with mouse wheel scroll while ctrl/alt wheel pans and trackpad panning remains intact', () => {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    render(<DemoApp />);
+
+    const preview = screen.getByLabelText(/screen preview for/i);
+    const zoomLevel = screen.getByLabelText(/zoom level/i);
+    const rendererHost = screen.getByTestId('screen-renderer-host');
+
+    fireEvent.wheel(preview, { deltaMode: 0, deltaY: -120 });
+    expect(zoomLevel.textContent).toBe('124%');
+    expect(rendererHost.style.transform).toBe('translate(0px, 0px) scale(1.24)');
+
+    fireEvent.wheel(preview, { ctrlKey: true, deltaMode: 1, deltaY: 3 });
+    expect(zoomLevel.textContent).toBe('124%');
+    expect(rendererHost.style.transform).toBe('translate(-3px, 0px) scale(1.24)');
+
+    fireEvent.wheel(preview, { altKey: true, deltaMode: 1, deltaY: 4 });
+    expect(zoomLevel.textContent).toBe('124%');
+    expect(rendererHost.style.transform).toBe('translate(-3px, -4px) scale(1.24)');
+
+    fireEvent.wheel(preview, { deltaMode: 0, deltaX: 18, deltaY: 12 });
+    expect(zoomLevel.textContent).toBe('124%');
+    expect(rendererHost.style.transform).toBe('translate(-21px, -16px) scale(1.24)');
+  });
+
+  /**
+   * @description Restores the expected direct-manipulation affordance by requiring a visible transform widget with resize and rotation handles whenever an element is selected.
+   */
+  it('renders a transform widget with resize and rotation handles for the selected element', () => {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    render(<DemoApp />);
+
+    expect(screen.getByTestId('demo-transform-widget')).toBeTruthy();
+    expect(screen.getByTestId('transform-handle-se')).toBeTruthy();
+    expect(screen.getByTestId('transform-rotation-handle')).toBeTruthy();
+  });
+
+  /**
    * @description Keeps tooltip callouts readable by pointing them inward toward the working canvas rather than outward off the screen edges.
    */
   it('places toolbar tooltips inward toward the canvas center', () => {

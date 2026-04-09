@@ -294,5 +294,18 @@ export function classifyWheelInput(input: WheelInput): WheelAction {
     return 'zoom';
   }
 
-  return 'pan';
+  const absoluteDeltaX = Math.abs(input.deltaX);
+  const absoluteDeltaY = Math.abs(input.deltaY);
+
+  // macOS browsers can report physical mouse-wheel steps as large pixel deltas instead of line deltas.
+  // Treat those coarse vertical jumps as zoom so plain mouse-wheel scrolling still follows the canvas spec.
+  if (absoluteDeltaY >= 60 && absoluteDeltaY >= absoluteDeltaX * 2) {
+    return 'zoom';
+  }
+
+  if (absoluteDeltaX > 0.5) {
+    return 'pan';
+  }
+
+  return absoluteDeltaY >= 60 ? 'zoom' : 'pan';
 }

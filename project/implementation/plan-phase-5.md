@@ -31,7 +31,7 @@ text-shadow builder),
 length parse, animation binding normalization, timeline/state resolution,
 keyframe value resolution)
 
-- [ ] tests: red — ui/utilities (CSS parsers)
+- [x] tests: red — ui/utilities (CSS parsers)
 - [ ] tests: red — ui/inputs (all 5 input components)
 - [ ] impl: green — all
 - [ ] **HeroUI verified**

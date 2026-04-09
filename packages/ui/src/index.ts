@@ -1,3 +1,4 @@
+export * from './inputs';
 export * from './panels';
 export * from './timeline';
 export * from './tokens';

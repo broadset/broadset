@@ -139,10 +139,11 @@ test('renders dark editor chrome with floating toolbars around the preview canva
   await mount(<DemoApp />);
 
   await expect(page.getByTestId('demo-main-toolbar')).toBeVisible();
-  await expect(page.getByTestId('demo-scene-sorter')).toBeVisible();
   await expect(page.getByTestId('demo-element-library')).toBeVisible();
   await expect(page.getByTestId('demo-properties-sidebar')).toBeVisible();
   await expect(page.getByTestId('screen-renderer-host')).toBeVisible();
+  await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
+  await expect(page.getByTestId('demo-scene-sorter')).toHaveCount(0);
 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect(page.locator('html')).toHaveClass(/dark/);
