@@ -32,9 +32,9 @@ click-to-place points, M first then L subsequent, coords relative to bbox with
 2dp rounding, Enter closes path, Escape commits open path, selection auto-exit,
 no-op outside drawing mode)
 
-- [ ] tests: red — editor/editing (path editing + drawing modes)
-- [ ] impl: green
-- [ ] demo milestone: select path element → enter edit mode → drag control handles
+- [x] tests: red — editor/editing (path editing + drawing modes)
+- [x] impl: green
+- [x] demo milestone: select path element → enter edit mode → drag control handles
       to reshape; use draw tool → click to place points → Enter closes path →
       new path element created; Escape commits open path
 
@@ -70,6 +70,6 @@ draggable control points, ghost preview at endpoint, start/stop editing mode)
 | Group                      | Red | Green | Demo |
 | -------------------------- | --- | ----- | ---- |
 | 8-A path geometry          | ✅  | ✅    | ☐    |
-| 8-B path editing + drawing | ☐   | ☐     | ☐    |
+| 8-B path editing + drawing | ✅  | ✅    | ✅   |
 | 8-C clip-path editing      | ☐   | ☐     | ☐    |
 | 8-D motion path editor     | ☐   | ☐     | ☐    |

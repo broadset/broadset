@@ -188,14 +188,22 @@ function hasAscendingGradientStops(stops: readonly BroadsetGradientStop[]): bool
   return true;
 }
 
-function isValidSvgPathLikeValue(value: string): boolean {
+/** CSS clip-path function prefixes accepted alongside SVG path data. */
+const CLIP_PATH_FUNCTION_PREFIXES = ['polygon(', 'circle(', 'ellipse(', 'inset(', 'path('] as const;
+
+function isValidClipPathValue(value: string): boolean {
   if (value.trim() === '') {
     return true;
   }
 
   const trimmed = value.trim();
+  const lower = trimmed.toLowerCase();
 
-  return trimmed.startsWith('M') || trimmed.startsWith('m');
+  if (trimmed.startsWith('M') || trimmed.startsWith('m')) {
+    return true;
+  }
+
+  return CLIP_PATH_FUNCTION_PREFIXES.some((prefix) => lower.startsWith(prefix));
 }
 
 const borderRadiusSchema = z.union([
@@ -298,10 +306,10 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
       });
     }
 
-    if (value.customClipPath !== undefined && !isValidSvgPathLikeValue(value.customClipPath)) {
+    if (value.customClipPath !== undefined && !isValidClipPathValue(value.customClipPath)) {
       context.addIssue({
         code: 'custom',
-        message: 'customClipPath must be valid SVG path data',
+        message: 'customClipPath must be valid SVG path data or CSS clip-path function',
         path: ['customClipPath'],
       });
     }

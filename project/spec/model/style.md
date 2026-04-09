@@ -136,7 +136,7 @@ The system MUST support SVG-specific properties for path and SVG elements: `stro
 The style MUST support masking and clipping properties that were previously on the `screen` object:
 
 - `maskType`: `'none'` | `'alpha'` | `'luminance'` | `'custom'` — mask mode. Default: `'none'`
-- `customClipPath`: SVG path `d` string for custom clipping shape. Validated same as path element content (must start with M/m if non-empty). Default: `''`
+- `customClipPath`: SVG path `d` string or CSS clip-path function (`polygon()`, `circle()`, `ellipse()`, `inset()`, `path()`) for custom clipping shape. Must start with M/m (SVG path) or be a recognized CSS clip-path function if non-empty. Default: `''`
 - `clipChildren`: boolean — when true on a group element, child elements are clipped to the group's bounds. Default: `false`
 
 #### Scenario: Custom clip path applied
@@ -149,6 +149,7 @@ The style MUST support masking and clipping properties that were previously on t
 
 - [ ] Given maskType as a valid union value, validation succeeds
 - [ ] Given customClipPath with valid SVG path data, validation succeeds
+- [ ] Given customClipPath with valid CSS clip-path function (polygon, circle, etc.), validation succeeds
 - [ ] Given clipChildren true on a group, child elements are clipped
 - [ ] Given customClipPath with invalid path data, validation fails
 

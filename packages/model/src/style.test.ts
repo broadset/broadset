@@ -260,3 +260,41 @@ describe('Numeric field constraints', () => {
     expect(styleSchema.safeParse({ opacity: 1, strokeWidth: 0 }).success).toBe(true);
   });
 });
+
+describe('Masking and clipping properties', () => {
+  /** @description maskType must accept all valid union values. */
+  it('accepts valid maskType values', () => {
+    for (const value of ['none', 'alpha', 'luminance', 'custom'] as const) {
+      expect(styleSchema.safeParse({ opacity: 1, maskType: value }).success).toBe(true);
+    }
+  });
+
+  /** @description customClipPath must accept valid SVG path data (starting with M/m). */
+  it('accepts SVG path data for customClipPath', () => {
+    expect(styleSchema.safeParse({ opacity: 1, customClipPath: 'M 0 0 L 100 0 L 100 100 Z' }).success).toBe(true);
+    expect(styleSchema.safeParse({ opacity: 1, customClipPath: 'm 0 0 l 100 0 l 0 100 z' }).success).toBe(true);
+  });
+
+  /** @description customClipPath must accept CSS clip-path functions (polygon, circle, ellipse, inset, path). */
+  it('accepts CSS clip-path functions for customClipPath', () => {
+    expect(
+      styleSchema.safeParse({ opacity: 1, customClipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)' }).success,
+    ).toBe(true);
+    expect(styleSchema.safeParse({ opacity: 1, customClipPath: 'circle(50%)' }).success).toBe(true);
+    expect(styleSchema.safeParse({ opacity: 1, customClipPath: 'ellipse(40% 60%)' }).success).toBe(true);
+    expect(styleSchema.safeParse({ opacity: 1, customClipPath: 'inset(10%)' }).success).toBe(true);
+    expect(styleSchema.safeParse({ opacity: 1, customClipPath: 'path("M 0 0 L 100 100")' }).success).toBe(true);
+  });
+
+  /** @description customClipPath must reject invalid values that are not SVG paths or CSS clip-path functions. */
+  it('rejects invalid customClipPath values', () => {
+    expect(styleSchema.safeParse({ opacity: 1, customClipPath: 'not a path' }).success).toBe(false);
+    expect(styleSchema.safeParse({ opacity: 1, customClipPath: 'L 0 0 L 100 0' }).success).toBe(false);
+    expect(styleSchema.safeParse({ opacity: 1, customClipPath: 'rect(0, 0, 100, 100)' }).success).toBe(false);
+  });
+
+  /** @description Empty customClipPath must be accepted (default state). */
+  it('accepts empty customClipPath', () => {
+    expect(styleSchema.safeParse({ opacity: 1, customClipPath: '' }).success).toBe(true);
+  });
+});

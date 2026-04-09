@@ -1,4 +1,4 @@
-import { createDefaultElement, type EditorConfig, editorConfigSchema } from '@broadset/model';
+import { createDefaultElement, type EditorConfig, editorConfigSchema, getCapabilityProfile } from '@broadset/model';
 
 import { type ElementDefaults, getElementDefaults, type PluginDefaults } from './element-defaults';
 import type { EditorStore } from './store-actions';
@@ -19,6 +19,7 @@ export function startPlacement(store: EditorStore, elementType: string): void {
     pendingPlacementType: elementType,
     pathEditingElementId: null,
     pathDrawingElementId: null,
+    clipPathEditingElementId: null,
     inlineTextEditingElementId: null,
     editingMode: { type: 'placement', elementType },
   });
@@ -78,6 +79,7 @@ export function placeElement(
     pendingPlacementType: null,
     pathEditingElementId: null,
     pathDrawingElementId: entersPathDrawing ? newElement.id : null,
+    clipPathEditingElementId: null,
     inlineTextEditingElementId: null,
     editingMode: entersPathDrawing ? { type: 'path-drawing', elementId: newElement.id } : { type: 'none' },
   });
@@ -91,6 +93,7 @@ export function startPathEditing(store: EditorStore, elementId: string): void {
     pendingPlacementType: null,
     pathEditingElementId: elementId,
     pathDrawingElementId: null,
+    clipPathEditingElementId: null,
     inlineTextEditingElementId: null,
     editingMode: { type: 'path-editing', elementId },
   });
@@ -114,6 +117,7 @@ export function startPathDrawing(store: EditorStore, elementId: string): void {
     pendingPlacementType: null,
     pathEditingElementId: null,
     pathDrawingElementId: elementId,
+    clipPathEditingElementId: null,
     inlineTextEditingElementId: null,
     editingMode: { type: 'path-drawing', elementId },
   });
@@ -161,6 +165,254 @@ export function closeAndStopPathDrawing(store: EditorStore): void {
  */
 export function commitAndStopPathDrawing(store: EditorStore): void {
   stopPathDrawing(store);
+}
+
+/* ================================================================== */
+/*  Clip-path editing                                                 */
+/* ================================================================== */
+
+const DEFAULT_CLIP_PATH = 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)';
+const MIN_CLIP_PATH_POINTS = 3;
+
+/** Regex that extracts individual points from a CSS `polygon(...)` value. */
+const POLYGON_POINT_PATTERN = /(-?\d+(?:\.\d+)?%?)\s+(-?\d+(?:\.\d+)?%?)/g;
+
+/**
+ * Parse a CSS polygon() value into an array of `{ x, y }` numeric percentage values.
+ * Returns null if the value is not a polygon.
+ */
+function parsePolygonPoints(clipPath: string): { readonly x: number; readonly y: number }[] | null {
+  const polygonMatch = /^polygon\(([^)]*)\)$/i.exec(clipPath.trim());
+
+  if (polygonMatch === null || polygonMatch[1] === undefined) {
+    return null;
+  }
+
+  const body = polygonMatch[1];
+  const points: { readonly x: number; readonly y: number }[] = [];
+  let match = POLYGON_POINT_PATTERN.exec(body);
+
+  while (match !== null) {
+    const xStr = match[1];
+    const yStr = match[2];
+
+    if (xStr === undefined || yStr === undefined) {
+      match = POLYGON_POINT_PATTERN.exec(body);
+      continue;
+    }
+
+    points.push({
+      x: Number.parseFloat(xStr.replace('%', '')),
+      y: Number.parseFloat(yStr.replace('%', '')),
+    });
+    match = POLYGON_POINT_PATTERN.exec(body);
+  }
+
+  POLYGON_POINT_PATTERN.lastIndex = 0;
+
+  return points;
+}
+
+/** Serialize an array of point objects back into a CSS polygon() string. */
+function serializePolygon(points: ReadonlyArray<{ readonly x: number; readonly y: number }>): string {
+  const pointStrings = points.map((point) => `${String(point.x)}% ${String(point.y)}%`);
+
+  return `polygon(${pointStrings.join(', ')})`;
+}
+
+/**
+ * Enter clip-path editing mode for the given element.
+ * Seeds a default rectangular polygon if customClipPath is empty.
+ * No-op if the element lacks the clipPath capability.
+ */
+export function startClipPathEditing(store: EditorStore, elementId: string): void {
+  const state = store.getState();
+  const element = state.document.elements.find((candidate) => candidate.id === elementId);
+
+  if (element === undefined) {
+    return;
+  }
+
+  const capabilities = getCapabilityProfile(element.type);
+
+  if (!capabilities.clipPath) {
+    return;
+  }
+
+  const needsSeeding = (element.style.customClipPath ?? '') === '';
+  const nextDocument =
+    needsSeeding ?
+      {
+        ...state.document,
+        elements: state.document.elements.map((candidate) =>
+          candidate.id === elementId ?
+            {
+              ...candidate,
+              style: {
+                ...candidate.style,
+                customClipPath: DEFAULT_CLIP_PATH,
+                maskType: 'custom' as const,
+              },
+            }
+          : candidate,
+        ),
+      }
+    : state.document;
+
+  store.setState({
+    document: nextDocument,
+    activeElementIds: [elementId],
+    pendingPlacementType: null,
+    pathEditingElementId: null,
+    pathDrawingElementId: null,
+    clipPathEditingElementId: elementId,
+    inlineTextEditingElementId: null,
+    editingMode: { type: 'clip-path-editing', elementId },
+  });
+}
+
+/**
+ * Exit clip-path editing mode and clear the tracking ID.
+ */
+export function stopClipPathEditing(store: EditorStore): void {
+  store.setState({
+    clipPathEditingElementId: null,
+    editingMode: { type: 'none' },
+  });
+}
+
+/**
+ * Update the coordinates of a clip-path control point at the given index.
+ * Coordinates are element-relative percentages.
+ * No-op when not in clip-path editing mode.
+ */
+export function updateClipPathPoint(store: EditorStore, index: number, x: number, y: number): void {
+  const state = store.getState();
+  const editingElementId = state.clipPathEditingElementId;
+
+  if (editingElementId === null) {
+    return;
+  }
+
+  const element = state.document.elements.find((candidate) => candidate.id === editingElementId);
+
+  if (element === undefined) {
+    return;
+  }
+
+  const points = parsePolygonPoints(element.style.customClipPath ?? '');
+
+  if (points === null || index < 0 || index >= points.length) {
+    return;
+  }
+
+  const updated = points.map((point, idx) => (idx === index ? { x, y } : point));
+
+  store.setState({
+    document: {
+      ...state.document,
+      elements: state.document.elements.map((candidate) =>
+        candidate.id === editingElementId ?
+          {
+            ...candidate,
+            style: {
+              ...candidate.style,
+              customClipPath: serializePolygon(updated),
+            },
+          }
+        : candidate,
+      ),
+    },
+  });
+}
+
+/**
+ * Insert a new point after the given index in the clip-path polygon.
+ * No-op when not in clip-path editing mode.
+ */
+export function insertClipPathPoint(store: EditorStore, afterIndex: number, x: number, y: number): void {
+  const state = store.getState();
+  const editingElementId = state.clipPathEditingElementId;
+
+  if (editingElementId === null) {
+    return;
+  }
+
+  const element = state.document.elements.find((candidate) => candidate.id === editingElementId);
+
+  if (element === undefined) {
+    return;
+  }
+
+  const points = parsePolygonPoints(element.style.customClipPath ?? '');
+
+  if (points === null || afterIndex < 0 || afterIndex >= points.length) {
+    return;
+  }
+
+  const updated = [...points.slice(0, afterIndex + 1), { x, y }, ...points.slice(afterIndex + 1)];
+
+  store.setState({
+    document: {
+      ...state.document,
+      elements: state.document.elements.map((candidate) =>
+        candidate.id === editingElementId ?
+          {
+            ...candidate,
+            style: {
+              ...candidate.style,
+              customClipPath: serializePolygon(updated),
+            },
+          }
+        : candidate,
+      ),
+    },
+  });
+}
+
+/**
+ * Remove the point at the given index from the clip-path polygon.
+ * Rejected if the polygon has 3 or fewer points (minimum enforced).
+ * No-op when not in clip-path editing mode.
+ */
+export function deleteClipPathPoint(store: EditorStore, index: number): void {
+  const state = store.getState();
+  const editingElementId = state.clipPathEditingElementId;
+
+  if (editingElementId === null) {
+    return;
+  }
+
+  const element = state.document.elements.find((candidate) => candidate.id === editingElementId);
+
+  if (element === undefined) {
+    return;
+  }
+
+  const points = parsePolygonPoints(element.style.customClipPath ?? '');
+
+  if (points === null || points.length <= MIN_CLIP_PATH_POINTS || index < 0 || index >= points.length) {
+    return;
+  }
+
+  const updated = points.filter((_, idx) => idx !== index);
+
+  store.setState({
+    document: {
+      ...state.document,
+      elements: state.document.elements.map((candidate) =>
+        candidate.id === editingElementId ?
+          {
+            ...candidate,
+            style: {
+              ...candidate.style,
+              customClipPath: serializePolygon(updated),
+            },
+          }
+        : candidate,
+      ),
+    },
+  });
 }
 
 export function appendPathPoint(store: EditorStore, canvasX: number, canvasY: number): void {
