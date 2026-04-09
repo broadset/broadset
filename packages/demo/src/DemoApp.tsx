@@ -580,27 +580,16 @@ function ToolbarMenu({
   label,
   icon,
   children,
-  tooltipPlacement = 'bottom',
 }: {
   readonly label: string;
   readonly icon: React.ReactNode;
   readonly children: React.ReactNode;
-  readonly tooltipPlacement?: 'bottom' | 'left' | 'right' | 'top' | undefined;
 }): React.JSX.Element {
   return (
     <Dropdown>
-      <Dropdown.Trigger>
-        <div data-placement={tooltipPlacement} style={{ display: 'inline-flex' }}>
-          <Tooltip>
-            <Tooltip.Trigger>
-              <Button aria-label={label} isIconOnly size="sm" variant="ghost">
-                {icon}
-              </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content placement={tooltipPlacement}>{label}</Tooltip.Content>
-          </Tooltip>
-        </div>
-      </Dropdown.Trigger>
+      <Button aria-label={label} isIconOnly size="sm" variant="ghost">
+        {icon}
+      </Button>
       <Dropdown.Popover>
         <Dropdown.Menu aria-label={`${label} menu`}>{children}</Dropdown.Menu>
       </Dropdown.Popover>
@@ -674,24 +663,20 @@ function IconToolButton({
   readonly tooltipPlacement?: 'bottom' | 'left' | 'right' | 'top' | undefined;
 }): React.JSX.Element {
   return (
-    <div data-placement={tooltipPlacement} style={{ display: 'inline-flex' }}>
-      <Tooltip>
-        <Tooltip.Trigger>
-          <Button
-            aria-label={label}
-            data-testid={testId}
-            isDisabled={isDisabled}
-            isIconOnly
-            size="sm"
-            variant={isActive ? 'primary' : 'ghost'}
-            onPress={onPress}
-          >
-            {children}
-          </Button>
-        </Tooltip.Trigger>
-        <Tooltip.Content placement={tooltipPlacement}>{label}</Tooltip.Content>
-      </Tooltip>
-    </div>
+    <Tooltip delay={0}>
+      <Button
+        aria-label={label}
+        data-testid={testId}
+        isDisabled={isDisabled}
+        isIconOnly
+        size="sm"
+        variant={isActive ? 'primary' : 'ghost'}
+        onPress={onPress}
+      >
+        {children}
+      </Button>
+      <Tooltip.Content placement={tooltipPlacement}>{label}</Tooltip.Content>
+    </Tooltip>
   );
 }
 
@@ -2705,24 +2690,20 @@ export function DemoApp(): React.JSX.Element {
                   >
                     {isSidebarOpen ?
                       <>
-                        <div data-placement="left" style={{ display: 'inline-flex' }}>
-                          <Tooltip>
-                            <Tooltip.Trigger>
-                              <Button
-                                aria-label="Close sidebar"
-                                isIconOnly
-                                size="sm"
-                                variant="ghost"
-                                onPress={() => {
-                                  setIsSidebarOpen(false);
-                                }}
-                              >
-                                <X size={16} />
-                              </Button>
-                            </Tooltip.Trigger>
-                            <Tooltip.Content placement="left">Close sidebar</Tooltip.Content>
-                          </Tooltip>
-                        </div>
+                        <Tooltip delay={0}>
+                          <Button
+                            aria-label="Close sidebar"
+                            isIconOnly
+                            size="sm"
+                            variant="ghost"
+                            onPress={() => {
+                              setIsSidebarOpen(false);
+                            }}
+                          >
+                            <X size={16} />
+                          </Button>
+                          <Tooltip.Content placement="left">Close sidebar</Tooltip.Content>
+                        </Tooltip>
                         <span
                           aria-hidden="true"
                           style={{

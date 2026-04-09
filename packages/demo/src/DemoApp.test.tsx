@@ -144,7 +144,9 @@ jest.mock(
         );
       },
       {
+        DecrementButton: Button,
         Group: createWrapper(),
+        IncrementButton: Button,
         Input(props: MockHeroUiProps): React.JSX.Element {
           const context = ReactActual.useContext(NumberFieldContext);
 
@@ -194,6 +196,7 @@ jest.mock(
     });
 
     const Select = Object.assign(createWrapper(), {
+      Indicator: createWrapper('span'),
       Trigger: createWrapper(),
       Value: createWrapper('span'),
       Popover: createWrapper(),
@@ -349,7 +352,7 @@ jest.mock(
           value,
         });
       },
-      ListBox: createWrapper(),
+      ListBox: Object.assign(createWrapper(), { Item: createWrapper() }),
       ListBoxItem: createWrapper(),
       Kbd,
       Modal,
@@ -881,19 +884,18 @@ describe('DemoApp playback shell lifecycle', () => {
     const sidebarToolbar = screen.getByRole('toolbar', { name: /sidebar toolbar/i });
     const elementToolbar = screen.getByRole('toolbar', { name: /element toolbar/i });
 
-    expect(
-      within(mainToolbar).getByRole('button', { name: /undo/i }).closest('div[data-placement="bottom"]'),
-    ).not.toBeNull();
-    expect(
-      within(elementToolbar)
-        .getByRole('button', { name: /^text$/i })
-        .closest('div[data-placement="right"]'),
-    ).not.toBeNull();
-    expect(
-      within(sidebarToolbar)
-        .getByRole('button', { name: /^layers$/i })
-        .closest('div[data-placement="left"]'),
-    ).not.toBeNull();
+    // placement is on Tooltip.Content (sibling span), not on Tooltip root
+    const undoParent = within(mainToolbar).getByRole('button', { name: /undo/i }).parentElement;
+
+    expect(undoParent?.querySelector('[placement="bottom"]')).not.toBeNull();
+
+    const textParent = within(elementToolbar).getByRole('button', { name: /^text$/i }).parentElement;
+
+    expect(textParent?.querySelector('[placement="right"]')).not.toBeNull();
+
+    const layersParent = within(sidebarToolbar).getByRole('button', { name: /^layers$/i }).parentElement;
+
+    expect(layersParent?.querySelector('[placement="left"]')).not.toBeNull();
   });
 
   /**

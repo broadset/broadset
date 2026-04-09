@@ -1,6 +1,6 @@
 import type { EasingMode, Keyframe, ModifierTimelineBinding, StateTimelineBinding, Timeline } from '@broadset/model';
 import { validateCubicBezier } from '@broadset/model';
-import { Button, ListBoxItem, Select, Tooltip } from '@heroui/react';
+import { Button, ListBox, Select, Tooltip } from '@heroui/react';
 import { Pause, Play, Plus, Square, Trash2, X } from 'lucide-react';
 import {
   createContext,
@@ -376,35 +376,33 @@ export function TimelineEditor(props: TimelineEditorProps): JSX.Element {
             const displayOffset = dragIndex === i && dragOffsetMs !== null ? dragOffsetMs : kf.offsetMs;
 
             return (
-              <Tooltip key={`${kf.name}-${String(kf.offsetMs)}`}>
-                <Tooltip.Trigger>
-                  <Button
-                    isIconOnly
-                    data-testid="keyframe-marker"
-                    data-action={kf.action}
-                    aria-pressed={isSelected}
-                    aria-label={`Keyframe ${kf.name} at ${formatTime(kf.offsetMs)}`}
-                    onPointerDown={(e) => {
-                      handleMarkerPointerDown(i, e);
-                    }}
-                    style={{
-                      position: 'absolute',
-                      left: `${String((displayOffset / durationMs) * 100)}%`,
-                      top: '50%',
-                      transform: 'translate(-50%, -50%) rotate(45deg)',
-                      width: `${String(MARKER_SIZE_PX)}px`,
-                      height: `${String(MARKER_SIZE_PX)}px`,
-                      minWidth: `${String(MARKER_SIZE_PX)}px`,
-                      minHeight: `${String(MARKER_SIZE_PX)}px`,
-                      backgroundColor: color(actionToken),
-                      border: isSelected ? `2px solid ${color('foreground')}` : 'none',
-                      borderRadius: '2px',
-                      cursor: 'grab',
-                      padding: 0,
-                      zIndex: 2,
-                    }}
-                  />
-                </Tooltip.Trigger>
+              <Tooltip key={`${kf.name}-${String(kf.offsetMs)}`} delay={0}>
+                <Button
+                  isIconOnly
+                  data-testid="keyframe-marker"
+                  data-action={kf.action}
+                  aria-pressed={isSelected}
+                  aria-label={`Keyframe ${kf.name} at ${formatTime(kf.offsetMs)}`}
+                  onPointerDown={(e) => {
+                    handleMarkerPointerDown(i, e);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    left: `${String((displayOffset / durationMs) * 100)}%`,
+                    top: '50%',
+                    transform: 'translate(-50%, -50%) rotate(45deg)',
+                    width: `${String(MARKER_SIZE_PX)}px`,
+                    height: `${String(MARKER_SIZE_PX)}px`,
+                    minWidth: `${String(MARKER_SIZE_PX)}px`,
+                    minHeight: `${String(MARKER_SIZE_PX)}px`,
+                    backgroundColor: color(actionToken),
+                    border: isSelected ? `2px solid ${color('foreground')}` : 'none',
+                    borderRadius: '2px',
+                    cursor: 'grab',
+                    padding: 0,
+                    zIndex: 2,
+                  }}
+                />
                 <Tooltip.Content>{`${kf.name} (${formatTime(kf.offsetMs)})`}</Tooltip.Content>
               </Tooltip>
             );
@@ -462,11 +460,19 @@ export function TimelineEditor(props: TimelineEditorProps): JSX.Element {
               }
             }}
           >
-            {EASING_PRESET_OPTIONS.map((preset) => (
-              <ListBoxItem key={preset} id={preset}>
-                {preset}
-              </ListBoxItem>
-            ))}
+            <Select.Trigger>
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                {EASING_PRESET_OPTIONS.map((preset) => (
+                  <ListBox.Item key={preset} id={preset} textValue={preset}>
+                    {preset}
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Select.Popover>
           </Select>
         </div>
       )}

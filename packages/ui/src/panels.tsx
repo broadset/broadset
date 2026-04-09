@@ -6,7 +6,6 @@ import {
   Chip,
   Input,
   ListBox,
-  ListBoxItem,
   NumberField,
   Select,
   Slider,
@@ -321,13 +320,14 @@ function SelectField({
       >
         <Select.Trigger>
           <Select.Value />
+          <Select.Indicator />
         </Select.Trigger>
         <Select.Popover>
           <ListBox>
             {options.map((opt) => (
-              <ListBoxItem id={opt} key={opt}>
+              <ListBox.Item id={opt} key={opt} textValue={opt}>
                 {opt}
-              </ListBoxItem>
+              </ListBox.Item>
             ))}
           </ListBox>
         </Select.Popover>
@@ -2785,14 +2785,22 @@ export function AnimationSidebar({
                     onSelectState(key === '' || key == null ? null : String(key));
                   }}
                 >
-                  <ListBoxItem id="" key="">
-                    None
-                  </ListBoxItem>
-                  {availableStates.map((s) => (
-                    <ListBoxItem id={s} key={s}>
-                      {s}
-                    </ListBoxItem>
-                  ))}
+                  <Select.Trigger>
+                    <Select.Value />
+                    <Select.Indicator />
+                  </Select.Trigger>
+                  <Select.Popover>
+                    <ListBox>
+                      <ListBox.Item id="" textValue="None">
+                        None
+                      </ListBox.Item>
+                      {availableStates.map((s) => (
+                        <ListBox.Item id={s} key={s} textValue={s}>
+                          {s}
+                        </ListBox.Item>
+                      ))}
+                    </ListBox>
+                  </Select.Popover>
                 </Select>
               </div>
 

@@ -61,12 +61,10 @@ function ToolbarIconButton({
   onPress,
 }: ToolbarIconButtonProps): JSX.Element {
   return (
-    <Tooltip>
-      <Tooltip.Trigger>
-        <Button aria-label={label} isDisabled={isDisabled} isIconOnly size="sm" variant={variant} onPress={onPress}>
-          {children}
-        </Button>
-      </Tooltip.Trigger>
+    <Tooltip delay={0}>
+      <Button aria-label={label} isDisabled={isDisabled} isIconOnly size="sm" variant={variant} onPress={onPress}>
+        {children}
+      </Button>
       <Tooltip.Content>{label}</Tooltip.Content>
     </Tooltip>
   );

@@ -72,10 +72,15 @@ jest.mock('@heroui/react', () => {
     );
   }
 
+  function createFragment(props: MockHeroUiProps): React.JSX.Element {
+    return ReactActual.createElement(ReactActual.Fragment, null, props.children ?? null);
+  }
+
   const Select = Object.assign(SelectRoot, {
-    Trigger: createWrapper(),
-    Value: createWrapper('span'),
-    Popover: createWrapper(),
+    Trigger: createFragment,
+    Value: createFragment,
+    Indicator: createFragment,
+    Popover: createFragment,
   });
 
   function ListBoxItem(props: MockHeroUiProps): React.JSX.Element {
@@ -90,6 +95,11 @@ jest.mock('@heroui/react', () => {
 
   return {
     Button,
+    ListBox: Object.assign(createFragment, {
+      Item: ListBoxItem,
+      Section: createWrapper(),
+      ItemIndicator: createWrapper('span'),
+    }),
     ListBoxItem,
     Select,
     Tooltip,

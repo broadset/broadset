@@ -5,7 +5,7 @@ import {
   ColorSwatch,
   ColorSwatchPicker,
   Input,
-  ListBoxItem,
+  ListBox,
   NumberField,
   parseColor,
   Popover,
@@ -13,7 +13,7 @@ import {
   Slider,
   Switch,
 } from '@heroui/react';
-import { ChevronDown, ChevronUp, Minus, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import type { JSX } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Color } from 'react-aria-components';
@@ -462,15 +462,23 @@ export function ColorInput({ value, onChange, label }: ColorInputProps): JSX.Ele
               </ColorSlider>
 
               <Select aria-label="Color format" value={format} onChange={handleFormatChange}>
-                <ListBoxItem key="hex" id="hex">
-                  HEX
-                </ListBoxItem>
-                <ListBoxItem key="rgb" id="rgb">
-                  RGB
-                </ListBoxItem>
-                <ListBoxItem key="hsl" id="hsl">
-                  HSL
-                </ListBoxItem>
+                <Select.Trigger>
+                  <Select.Value />
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox>
+                    <ListBox.Item id="hex" textValue="HEX">
+                      HEX
+                    </ListBox.Item>
+                    <ListBox.Item id="rgb" textValue="RGB">
+                      RGB
+                    </ListBox.Item>
+                    <ListBox.Item id="hsl" textValue="HSL">
+                      HSL
+                    </ListBox.Item>
+                  </ListBox>
+                </Select.Popover>
               </Select>
 
               <div data-testid="palette" style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02') }}>
@@ -636,24 +644,6 @@ export function NumField({ value, onChange, label, step = 1, min, max }: NumFiel
     [commitValue, localValue, step, clamp, onChange],
   );
 
-  const handleIncrement = useCallback(() => {
-    const newVal = clamp(localValue + step);
-
-    setLocalValue(newVal);
-    lastValid.current = newVal;
-    setIsDirty(false);
-    onChange(newVal);
-  }, [localValue, step, clamp, onChange]);
-
-  const handleDecrement = useCallback(() => {
-    const newVal = clamp(localValue - step);
-
-    setLocalValue(newVal);
-    lastValid.current = newVal;
-    setIsDirty(false);
-    onChange(newVal);
-  }, [localValue, step, clamp, onChange]);
-
   return (
     <NumberField
       aria-label={label}
@@ -666,13 +656,9 @@ export function NumField({ value, onChange, label, step = 1, min, max }: NumFiel
       step={step}
     >
       <NumberField.Group>
-        <Button aria-label={`Decrement ${label}`} onPress={handleDecrement}>
-          <Minus size={12} />
-        </Button>
+        <NumberField.DecrementButton />
         <NumberField.Input />
-        <Button aria-label={`Increment ${label}`} onPress={handleIncrement}>
-          <Plus size={12} />
-        </Button>
+        <NumberField.IncrementButton />
       </NumberField.Group>
     </NumberField>
   );
@@ -756,11 +742,19 @@ export function CssLengthInput({ value, onChange, label }: CssLengthInputProps):
         </NumberField.Group>
       </NumberField>
       <Select aria-label="Unit" value={unit} onChange={handleUnitChange}>
-        {CSS_LENGTH_UNITS.map((u) => (
-          <ListBoxItem key={u} id={u}>
-            {u}
-          </ListBoxItem>
-        ))}
+        <Select.Trigger>
+          <Select.Value />
+          <Select.Indicator />
+        </Select.Trigger>
+        <Select.Popover>
+          <ListBox>
+            {CSS_LENGTH_UNITS.map((u) => (
+              <ListBox.Item key={u} id={u} textValue={u}>
+                {u}
+              </ListBox.Item>
+            ))}
+          </ListBox>
+        </Select.Popover>
       </Select>
     </div>
   );
@@ -991,11 +985,19 @@ export function FilterEditor({ value, onChange, label }: FilterEditorProps): JSX
       })}
       {availableFunctions.length > 0 && (
         <Select aria-label="Add filter" value={null} onChange={handleAddSelection}>
-          {availableFunctions.map((f) => (
-            <ListBoxItem key={f.fn} id={f.fn}>
-              {f.fn}
-            </ListBoxItem>
-          ))}
+          <Select.Trigger>
+            <Select.Value />
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox>
+              {availableFunctions.map((f) => (
+                <ListBox.Item key={f.fn} id={f.fn} textValue={f.fn}>
+                  {f.fn}
+                </ListBox.Item>
+              ))}
+            </ListBox>
+          </Select.Popover>
         </Select>
       )}
     </fieldset>

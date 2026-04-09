@@ -103,8 +103,36 @@ jest.mock(
             value: String(context.value),
           });
         },
-        DecrementButton: Button,
-        IncrementButton: Button,
+        DecrementButton(props: MockHeroUiProps): React.JSX.Element {
+          const context = ReactActual.useContext(NumberFieldContext);
+
+          return ReactActual.createElement(
+            'button',
+            {
+              ...props,
+              'aria-label': `Decrement ${context.label}`,
+              onClick: () => {
+                context.onChange?.(context.value - 1);
+              },
+            },
+            props.children ?? null,
+          );
+        },
+        IncrementButton(props: MockHeroUiProps): React.JSX.Element {
+          const context = ReactActual.useContext(NumberFieldContext);
+
+          return ReactActual.createElement(
+            'button',
+            {
+              ...props,
+              'aria-label': `Increment ${context.label}`,
+              onClick: () => {
+                context.onChange?.(context.value + 1);
+              },
+            },
+            props.children ?? null,
+          );
+        },
       },
     );
 
@@ -159,6 +187,10 @@ jest.mock(
       );
     }
 
+    function createFragment(props: MockHeroUiProps): React.JSX.Element {
+      return ReactActual.createElement(ReactActual.Fragment, null, props.children ?? null);
+    }
+
     const Select = Object.assign(
       function SelectRoot(props: MockHeroUiProps): React.JSX.Element {
         const { children, label, onChange, value, ...rest } = props;
@@ -178,7 +210,12 @@ jest.mock(
           children ?? null,
         );
       },
-      { Trigger: createWrapper(), Value: createWrapper('span'), Popover: createWrapper() },
+      {
+        Trigger: createFragment,
+        Value: createFragment,
+        Indicator: createFragment,
+        Popover: createFragment,
+      },
     );
 
     const SelectItem = function SelectItem(props: MockHeroUiProps): React.JSX.Element {
@@ -276,7 +313,11 @@ jest.mock(
         Content: createWrapper(),
         Dialog: createWrapper(),
       }),
-      ListBox: createWrapper(),
+      ListBox: Object.assign(createFragment, {
+        Item: SelectItem,
+        Section: createWrapper(),
+        ItemIndicator: createWrapper('span'),
+      }),
       ListBoxItem: SelectItem,
       ColorArea,
       ColorSlider: ColorSliderComponent,
@@ -481,6 +522,12 @@ describe('NumField', () => {
     const incButton = screen.getByLabelText('Increment Size');
 
     fireEvent.click(incButton);
+
+    // HeroUI's NumberField fires onChange on value change, then the component
+    // commits on blur. Simulate the blur to flush the committed value.
+    const input = screen.getByRole('spinbutton', { name: 'Size' });
+
+    fireEvent.blur(input);
     expect(onChange).toHaveBeenCalledWith(11);
   });
 });
