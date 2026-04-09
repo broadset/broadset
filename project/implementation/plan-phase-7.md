@@ -53,10 +53,10 @@ open/close, height/className, callbacks; editing context — start with no targe
 open sets target+snapshot, close clears both, null outside provider; animation
 binding sections — state bindings CRUD with rename, modifier binding pairs)
 
-- [ ] tests: red — ui/timeline
-- [ ] impl: green
-- [ ] **HeroUI verified**
-- [ ] demo milestone: timeline bottom panel opens; keyframes visible as dots on
+- [x] tests: red — ui/timeline
+- [x] impl: green
+- [x] **HeroUI verified**
+- [x] demo milestone: timeline bottom panel opens; keyframes visible as dots on
       timeline; click to select, drag to reposition in time; Delete key removes;
       play button starts animation; state/modifier bindings editable
 
@@ -97,6 +97,6 @@ integration)
 | ----------------------------- | --- | ----- | ---- |
 | 7-A animation state mutations | ☑   | ☑     | —    |
 | 7-B timeline playback         | ☑   | ☑     | —    |
-| 7-C timeline UI + bottom      | ☐   | ☐     | ☐    |
+| 7-C timeline UI + bottom      | ☑   | ☑     | ☑    |
 | 7-D easing graph + lanes      | ☐   | ☐     | ☐    |
 | 7-E animation sidebar         | ☐   | ☐     | ☐    |
