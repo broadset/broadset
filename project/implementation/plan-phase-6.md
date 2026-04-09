@@ -71,8 +71,8 @@ not rendered before first right-click; position at cursor; items disabled when
 no element selected; all 8 actions; group/ungroup visibility based on selection;
 closes after action)
 
-- [ ] tests: red — ui/toolbar-nav (context menu)
-- [ ] impl: green
+- [x] tests: red — ui/toolbar-nav (context menu)
+- [x] impl: green
 - [ ] **HeroUI verified**
 - [ ] demo milestone: right-click on canvas → context menu with all operations;
       items correctly disabled/enabled based on selection; group/ungroup visibility
