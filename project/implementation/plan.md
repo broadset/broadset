@@ -30,8 +30,8 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 8 — File Format & I/O
-- **In Progress:** 8-A BSP serialization
+- **Active Phase:** Phase 8 — Path & Vector Tools
+- **In Progress:** 8-A path geometry engine
 - **Last Merged:** 7-E animation sidebar
 
 ---

@@ -6,6 +6,7 @@ export * from './element-defaults';
 export * from './element-operations';
 export * from './inline-text';
 export * from './keyboard';
+export * from './path-geometry';
 export * from './react-data-integration';
 export * from './store-actions';
 export * from './store-ui-actions';
