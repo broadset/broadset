@@ -20,6 +20,7 @@ export function startPlacement(store: EditorStore, elementType: string): void {
     pathEditingElementId: null,
     pathDrawingElementId: null,
     clipPathEditingElementId: null,
+    motionPathEditingElementId: null,
     inlineTextEditingElementId: null,
     editingMode: { type: 'placement', elementType },
   });
@@ -80,6 +81,7 @@ export function placeElement(
     pathEditingElementId: null,
     pathDrawingElementId: entersPathDrawing ? newElement.id : null,
     clipPathEditingElementId: null,
+    motionPathEditingElementId: null,
     inlineTextEditingElementId: null,
     editingMode: entersPathDrawing ? { type: 'path-drawing', elementId: newElement.id } : { type: 'none' },
   });
@@ -94,6 +96,7 @@ export function startPathEditing(store: EditorStore, elementId: string): void {
     pathEditingElementId: elementId,
     pathDrawingElementId: null,
     clipPathEditingElementId: null,
+    motionPathEditingElementId: null,
     inlineTextEditingElementId: null,
     editingMode: { type: 'path-editing', elementId },
   });
@@ -118,6 +121,7 @@ export function startPathDrawing(store: EditorStore, elementId: string): void {
     pathEditingElementId: null,
     pathDrawingElementId: elementId,
     clipPathEditingElementId: null,
+    motionPathEditingElementId: null,
     inlineTextEditingElementId: null,
     editingMode: { type: 'path-drawing', elementId },
   });
@@ -266,6 +270,7 @@ export function startClipPathEditing(store: EditorStore, elementId: string): voi
     pathEditingElementId: null,
     pathDrawingElementId: null,
     clipPathEditingElementId: elementId,
+    motionPathEditingElementId: null,
     inlineTextEditingElementId: null,
     editingMode: { type: 'clip-path-editing', elementId },
   });
@@ -475,4 +480,31 @@ export function appendPathPoint(store: EditorStore, canvasX: number, canvasY: nu
 
 export function validateEditorConfig(config: unknown): EditorConfig {
   return editorConfigSchema.parse(config);
+}
+
+/**
+ * Enter motion path editing mode for the given element.
+ * Selects the element and clears all other overlay modes.
+ */
+export function startMotionPathEditing(store: EditorStore, elementId: string): void {
+  store.setState({
+    activeElementIds: [elementId],
+    pendingPlacementType: null,
+    pathEditingElementId: null,
+    pathDrawingElementId: null,
+    clipPathEditingElementId: null,
+    motionPathEditingElementId: elementId,
+    inlineTextEditingElementId: null,
+    editingMode: { type: 'motion-path-editing', elementId },
+  });
+}
+
+/**
+ * Exit motion path editing mode and clear the tracking ID.
+ */
+export function stopMotionPathEditing(store: EditorStore): void {
+  store.setState({
+    motionPathEditingElementId: null,
+    editingMode: { type: 'none' },
+  });
 }

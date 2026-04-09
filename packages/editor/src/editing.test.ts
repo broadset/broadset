@@ -17,10 +17,12 @@ import {
   insertClipPathPoint,
   placeElement,
   startClipPathEditing,
+  startMotionPathEditing,
   startPathDrawing,
   startPathEditing,
   startPlacement,
   stopClipPathEditing,
+  stopMotionPathEditing,
   stopPathDrawing,
   stopPathEditing,
   updateClipPathPoint,
@@ -628,5 +630,90 @@ describe('clip-path editing — point mutations', () => {
     const afterRedo = store.getState().document.elements.find((el) => el.id === rect.id);
 
     expect(afterRedo?.style.customClipPath).toBe('polygon(0% 0%, 80% 0%, 100% 100%, 0% 100%)');
+  });
+});
+
+/* ================================================================== */
+/*  Motion path editing — state management                           */
+/* ================================================================== */
+
+describe('motion path editing — start and stop', () => {
+  /** @description Starting motion path editing MUST set motionPathEditingElementId and select the element. Stopping MUST clear the ID to null. */
+  it('sets and clears motionPathEditingElementId', () => {
+    const rect = makeElement({ type: 'rectangle' });
+    const store = storeWithElements(rect);
+
+    startMotionPathEditing(store, rect.id);
+    expect(store.getState().motionPathEditingElementId).toBe(rect.id);
+    expect(store.getState().activeElementIds).toContain(rect.id);
+
+    stopMotionPathEditing(store);
+    expect(store.getState().motionPathEditingElementId).toBeNull();
+  });
+
+  /** @description Starting motion path editing MUST clear path editing, path drawing, clip-path editing, and placement modes so only one overlay mode is active. */
+  it('clears other editing modes on start', () => {
+    const path = makeElement({ type: 'path', content: 'M0,0 L10,10' });
+    const rect = makeElement({ type: 'rectangle' });
+    const store = storeWithElements(path, rect);
+
+    startPathEditing(store, path.id);
+    expect(store.getState().pathEditingElementId).toBe(path.id);
+
+    startMotionPathEditing(store, rect.id);
+    expect(store.getState().pathEditingElementId).toBeNull();
+    expect(store.getState().pathDrawingElementId).toBeNull();
+    expect(store.getState().clipPathEditingElementId).toBeNull();
+    expect(store.getState().pendingPlacementType).toBeNull();
+    expect(store.getState().motionPathEditingElementId).toBe(rect.id);
+  });
+
+  /** @description Changing the active selection to a different element MUST auto-exit motion path editing. */
+  it('auto-exits on selection change to a different element', () => {
+    const rect = makeElement({ type: 'rectangle' });
+    const text = makeElement({ type: 'text' });
+    const store = storeWithElements(rect, text);
+
+    startMotionPathEditing(store, rect.id);
+    expect(store.getState().motionPathEditingElementId).toBe(rect.id);
+
+    store.getState().selectElement(text.id);
+    expect(store.getState().motionPathEditingElementId).toBeNull();
+  });
+
+  /** @description Clearing the selection to null MUST auto-exit motion path editing. */
+  it('auto-exits when selection is cleared to null', () => {
+    const rect = makeElement({ type: 'rectangle' });
+    const store = storeWithElements(rect);
+
+    startMotionPathEditing(store, rect.id);
+    store.getState().selectElement(null);
+
+    expect(store.getState().motionPathEditingElementId).toBeNull();
+  });
+
+  /** @description Starting clip-path editing while motion path editing is active MUST clear motion path editing (mutual exclusivity). */
+  it('is cleared when clip-path editing starts', () => {
+    const rect = makeElement({ type: 'rectangle' });
+    const store = storeWithElements(rect);
+
+    startMotionPathEditing(store, rect.id);
+    expect(store.getState().motionPathEditingElementId).toBe(rect.id);
+
+    startClipPathEditing(store, rect.id);
+    expect(store.getState().motionPathEditingElementId).toBeNull();
+    expect(store.getState().clipPathEditingElementId).toBe(rect.id);
+  });
+
+  /** @description The editingMode union MUST reflect motion-path-editing when the mode is active. */
+  it('sets editingMode to motion-path-editing', () => {
+    const rect = makeElement({ type: 'rectangle' });
+    const store = storeWithElements(rect);
+
+    startMotionPathEditing(store, rect.id);
+    expect(store.getState().editingMode).toEqual({ type: 'motion-path-editing', elementId: rect.id });
+
+    stopMotionPathEditing(store);
+    expect(store.getState().editingMode).toEqual({ type: 'none' });
   });
 });

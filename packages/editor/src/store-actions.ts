@@ -24,7 +24,8 @@ export type EditingMode =
   | { readonly type: 'path-editing'; readonly elementId: string }
   | { readonly type: 'path-drawing'; readonly elementId: string }
   | { readonly type: 'inline-text'; readonly elementId: string }
-  | { readonly type: 'clip-path-editing'; readonly elementId: string };
+  | { readonly type: 'clip-path-editing'; readonly elementId: string }
+  | { readonly type: 'motion-path-editing'; readonly elementId: string };
 
 export type ReorderDirection = 'forward' | 'backward' | 'front' | 'back';
 
@@ -52,6 +53,7 @@ export interface EditorState extends UIActionsState {
   readonly pathEditingElementId: string | null;
   readonly pathDrawingElementId: string | null;
   readonly clipPathEditingElementId: string | null;
+  readonly motionPathEditingElementId: string | null;
   readonly inlineTextEditingElementId: string | null;
   readonly editingMode: EditingMode;
   readonly loadTemplate: (document: BroadsetDocument) => void;
@@ -94,7 +96,12 @@ function createEditingMode(
   pathDrawingElementId: string | null,
   inlineTextEditingElementId: string | null,
   clipPathEditingElementId: string | null = null,
+  motionPathEditingElementId: string | null = null,
 ): EditingMode {
+  if (motionPathEditingElementId !== null) {
+    return { type: 'motion-path-editing', elementId: motionPathEditingElementId };
+  }
+
   if (clipPathEditingElementId !== null) {
     return { type: 'clip-path-editing', elementId: clipPathEditingElementId };
   }
@@ -131,6 +138,7 @@ function createInteractionState(
   pathDrawingElementId: string | null,
   inlineTextEditingElementId: string | null = null,
   clipPathEditingElementId: string | null = null,
+  motionPathEditingElementId: string | null = null,
 ): Pick<
   EditorState,
   | 'activeElementIds'
@@ -138,6 +146,7 @@ function createInteractionState(
   | 'pathEditingElementId'
   | 'pathDrawingElementId'
   | 'clipPathEditingElementId'
+  | 'motionPathEditingElementId'
   | 'inlineTextEditingElementId'
   | 'editingMode'
 > {
@@ -147,6 +156,7 @@ function createInteractionState(
     pathEditingElementId,
     pathDrawingElementId,
     clipPathEditingElementId,
+    motionPathEditingElementId,
     inlineTextEditingElementId,
     editingMode: createEditingMode(
       pendingPlacementType,
@@ -154,6 +164,7 @@ function createInteractionState(
       pathDrawingElementId,
       inlineTextEditingElementId,
       clipPathEditingElementId,
+      motionPathEditingElementId,
     ),
   };
 }
@@ -165,6 +176,7 @@ function applySelectionSideEffects(
     | 'pathEditingElementId'
     | 'pathDrawingElementId'
     | 'clipPathEditingElementId'
+    | 'motionPathEditingElementId'
     | 'inlineTextEditingElementId'
   >,
   nextActiveElementIds: readonly string[],
@@ -175,6 +187,7 @@ function applySelectionSideEffects(
   | 'pathEditingElementId'
   | 'pathDrawingElementId'
   | 'clipPathEditingElementId'
+  | 'motionPathEditingElementId'
   | 'inlineTextEditingElementId'
   | 'editingMode'
 > {
@@ -190,6 +203,10 @@ function applySelectionSideEffects(
     state.clipPathEditingElementId !== null && nextActiveElementIds.includes(state.clipPathEditingElementId) ?
       state.clipPathEditingElementId
     : null;
+  const nextMotionPathEditingElementId =
+    state.motionPathEditingElementId !== null && nextActiveElementIds.includes(state.motionPathEditingElementId) ?
+      state.motionPathEditingElementId
+    : null;
   const nextInlineTextEditingElementId =
     state.inlineTextEditingElementId !== null && nextActiveElementIds.includes(state.inlineTextEditingElementId) ?
       state.inlineTextEditingElementId
@@ -203,6 +220,7 @@ function applySelectionSideEffects(
     nextPathDrawingElementId,
     nextInlineTextEditingElementId,
     nextClipPathEditingElementId,
+    nextMotionPathEditingElementId,
   );
 }
 
@@ -306,6 +324,7 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
         pathEditingElementId: null,
         pathDrawingElementId: null,
         clipPathEditingElementId: null,
+        motionPathEditingElementId: null,
         inlineTextEditingElementId: null,
         editingMode: { type: 'none' },
         ...createUIActionsSlice((updater) => {
@@ -553,6 +572,10 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
               state.clipPathEditingElementId !== null && deletedIds.has(state.clipPathEditingElementId) ?
                 null
               : state.clipPathEditingElementId;
+            const nextMotionPathEditingElementId =
+              state.motionPathEditingElementId !== null && deletedIds.has(state.motionPathEditingElementId) ?
+                null
+              : state.motionPathEditingElementId;
             const nextInlineTextEditingElementId =
               state.inlineTextEditingElementId !== null && deletedIds.has(state.inlineTextEditingElementId) ?
                 null
@@ -567,6 +590,7 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
                 nextPathDrawingElementId,
                 nextInlineTextEditingElementId,
                 nextClipPathEditingElementId,
+                nextMotionPathEditingElementId,
               ),
             };
           });
@@ -622,6 +646,10 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
               state.clipPathEditingElementId !== null && allDeletedIds.has(state.clipPathEditingElementId) ?
                 null
               : state.clipPathEditingElementId;
+            const nextMotionPathEditingElementId =
+              state.motionPathEditingElementId !== null && allDeletedIds.has(state.motionPathEditingElementId) ?
+                null
+              : state.motionPathEditingElementId;
             const nextInlineTextEditingElementId =
               state.inlineTextEditingElementId !== null && allDeletedIds.has(state.inlineTextEditingElementId) ?
                 null
@@ -636,6 +664,7 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
                 nextPathDrawingElementId,
                 nextInlineTextEditingElementId,
                 nextClipPathEditingElementId,
+                nextMotionPathEditingElementId,
               ),
             };
           });

@@ -45,10 +45,10 @@ drag handles, default path seeding for elements without existing clip-path)
 _UI specs:_ `ui/panels.md` (clip-path panel — start/editing/stop states, default
 path seeding)
 
-- [ ] tests: red — editor/editing (clip-path editing mode)
-- [ ] tests: red — ui/panels (clip-path panel states)
-- [ ] impl: green
-- [ ] demo milestone: select element → click “Edit Clip Path” → SVG overlay with
+- [x] tests: red — editor/editing (clip-path editing mode)
+- [x] tests: red — ui/panels (clip-path panel states)
+- [x] impl: green
+- [x] demo milestone: select element → click "Edit Clip Path" → SVG overlay with
       drag handles appears → reshape clipping region; elements without clip-path
       get default rectangular clip
 
@@ -71,5 +71,5 @@ draggable control points, ghost preview at endpoint, start/stop editing mode)
 | -------------------------- | --- | ----- | ---- |
 | 8-A path geometry          | ✅  | ✅    | ☐    |
 | 8-B path editing + drawing | ✅  | ✅    | ✅   |
-| 8-C clip-path editing      | ☐   | ☐     | ☐    |
+| 8-C clip-path editing      | ✅  | ✅    | ✅   |
 | 8-D motion path editor     | ☐   | ☐     | ☐    |
