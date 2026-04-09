@@ -30,9 +30,9 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 5 — Rich Properties & Layers
-- **In Progress:** 5-B full properties panel
-- **Last Merged:** 5-A input components
+- **Active Phase:** Phase 6 — Interaction Polish
+- **In Progress:** 6-A keyboard shortcuts & focus management
+- **Last Merged:** 5-D type-specific panels + auto-size
 
 ---
 

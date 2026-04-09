@@ -88,10 +88,10 @@ speed 1–2000 px/s, direction left/right/up/down, gap, paused toggle),
 `ui/panels.md` (auto-size mode — segmented button: fixed/auto-height/
 shrink-to-fit with minimum 6pt)
 
-- [ ] tests: red — ui/panels (type-specific panels + auto-size)
-- [ ] impl: green
-- [ ] **HeroUI verified**
-- [ ] demo milestone: select video element → source URL + playback controls shown;
+- [x] tests: red — ui/panels (type-specific panels + auto-size)
+- [x] impl: green
+- [x] **HeroUI verified**
+- [x] demo milestone: select video element → source URL + playback controls shown;
       select clock → format pattern + mode selector; select ticker → items list +
       speed/direction; text elements show auto-size toggle (fixed/auto-height/
       shrink-to-fit)
@@ -102,7 +102,7 @@ shrink-to-fit with minimum 6pt)
 
 | Group                         | Red | Green | Demo |
 | ----------------------------- | --- | ----- | ---- |
-| 5-A input components          | ☐   | ☐     | ☐    |
-| 5-B full properties panel     | ☐   | ☐     | ☐    |
+| 5-A input components          | ☒   | ☒     | ☒    |
+| 5-B full properties panel     | ☒   | ☒     | ☒    |
 | 5-C layers panel              | ☒   | ☒     | ☒    |
-| 5-D type-specific + auto-size | ☐   | ☐     | ☐    |
+| 5-D type-specific + auto-size | ☒   | ☒     | ☒    |
