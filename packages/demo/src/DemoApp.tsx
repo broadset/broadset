@@ -90,6 +90,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
+import { COUNTDOWN_PLUGIN, DEMO_DOCUMENT_PRESETS, DEMO_EDITOR_CONFIG } from './demoConfig';
 import { SAMPLE_DOCUMENT } from './sampleDocument';
 import { useLiveData } from './useLiveData';
 
@@ -120,28 +121,6 @@ const TOAST_DISMISS_MS = {
 const ELEMENT_TOOL_TYPES = [
   ...DEFAULT_ELEMENT_TYPES,
   { type: 'countdown', label: 'Countdown', icon: <span aria-hidden="true">⏱</span> },
-] as const;
-
-/* ── Document presets for New Document modal ─────────────────────── */
-
-const DOCUMENT_PRESETS: readonly DocumentPreset[] = [
-  { name: 'HD 1080p', width: 1920, height: 1080, unit: 'px', mode: 'broadcast', category: 'Broadcast' },
-  { name: 'HD 720p', width: 1280, height: 720, unit: 'px', mode: 'broadcast', category: 'Broadcast' },
-  { name: '4K UHD', width: 3840, height: 2160, unit: 'px', mode: 'broadcast', category: 'Broadcast' },
-  { name: 'Lower Third', width: 1920, height: 200, unit: 'px', mode: 'broadcast', category: 'Broadcast' },
-  { name: 'A4 Portrait', width: 210, height: 297, unit: 'mm', mode: 'print', category: 'Print' },
-  { name: 'A4 Landscape', width: 297, height: 210, unit: 'mm', mode: 'print', category: 'Print' },
-  { name: 'US Letter', width: 216, height: 279, unit: 'mm', mode: 'print', category: 'Print' },
-  { name: 'A3', width: 297, height: 420, unit: 'mm', mode: 'print', category: 'Print' },
-  { name: 'Instagram Post', width: 1080, height: 1080, unit: 'px', mode: 'none', category: 'Social Media' },
-  { name: 'Instagram Story', width: 1080, height: 1920, unit: 'px', mode: 'none', category: 'Social Media' },
-  { name: 'Facebook Cover', width: 820, height: 312, unit: 'px', mode: 'none', category: 'Social Media' },
-  { name: 'YouTube Thumbnail', width: 1280, height: 720, unit: 'px', mode: 'none', category: 'Social Media' },
-  { name: 'Banner 728×90', width: 728, height: 90, unit: 'px', mode: 'none', category: 'Commercial' },
-  { name: 'MPU 300×250', width: 300, height: 250, unit: 'px', mode: 'none', category: 'Commercial' },
-  { name: 'Leaderboard 970×250', width: 970, height: 250, unit: 'px', mode: 'none', category: 'Commercial' },
-  { name: 'Billboard', width: 3048, height: 1524, unit: 'mm', mode: 'print', category: 'Large Format' },
-  { name: 'A0 Poster', width: 841, height: 1189, unit: 'mm', mode: 'print', category: 'Large Format' },
 ] as const;
 
 /** Exporters enabled in the demo — OGraf is disabled as it requires a server. */
@@ -1206,7 +1185,7 @@ export function DemoApp(): React.JSX.Element {
   const changeStreamRef = useRef<ChangeStream | null>(null);
 
   if (storeRef.current === null) {
-    const store = createEditorStore();
+    const store = createEditorStore({ config: DEMO_EDITOR_CONFIG });
     const initialDocument = loadSavedDocument();
     const initialSelectionId = initialDocument.elements.find((element) => !element.locked)?.id ?? null;
 
@@ -2104,7 +2083,7 @@ export function DemoApp(): React.JSX.Element {
       </div>;
 
   return (
-    <EditorProvider components={[]} dataStore={dataStore} store={editorStore}>
+    <EditorProvider components={[{ ...COUNTDOWN_PLUGIN }]} dataStore={dataStore} store={editorStore}>
       <TimelineEditingProvider>
         <main
           className="fixed inset-0 overflow-hidden"
@@ -3252,7 +3231,7 @@ export function DemoApp(): React.JSX.Element {
 
               <NewDocumentModal
                 isOpen={activeDialog === 'new-document'}
-                presets={DOCUMENT_PRESETS}
+                presets={DEMO_DOCUMENT_PRESETS}
                 onCreateDocument={handleCreateFromPreset}
                 onClose={() => {
                   setActiveDialog(null);

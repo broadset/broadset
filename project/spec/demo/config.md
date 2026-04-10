@@ -65,7 +65,7 @@ The demo MUST include presets covering at least five categories: Broadcast, Prin
 #### Acceptance Criteria
 
 - [ ] Given the demo config, at least one preset exists per category (Broadcast, Print, Social Media, Commercial, Large Format)
-- [ ] Given each preset, it specifies name, category, width, height, units, and viewMode
+- [ ] Given each preset, it specifies name, category, width, height, units, and viewMode (`'broadcast'`, `'print'`, or `'none'`)
 
 ---
 
@@ -81,7 +81,7 @@ The demo MUST configure at least one required element that cannot be deleted by 
 
 #### Acceptance Criteria
 
-- [ ] Given the demo config, at least one required element is configured with type and id
+- [ ] Given the demo config, at least one required element ID is configured
 
 ---
 
@@ -160,7 +160,8 @@ The demo MUST configure grid defaults (gridSize=10, showGrid=false, snapToGrid=t
 
 ## Spec Gaps
 
-_None — all requirements have acceptance criteria._
+- **viewMode `'none'`:** The existing spec limits viewMode to `'broadcast'` or `'print'`, but Social Media and Commercial presets are neither broadcast nor print. The `DocumentPreset` type and canvas system support `'none'` as a third mode, which disables broadcast/print-specific features (safe areas, bleed). Presets in non-broadcast/non-print categories SHOULD use `mode: 'none'`.
+- **Required elements are IDs:** The acceptance criterion mentions "type and id" but the EditorConfig schema (`requiredElements: z.array(z.string())`) and the editor store enforce deletion prevention by **element ID only**. The element's type is implicit — it is determined by the element with that ID in the document. The config array is therefore `string[]` of element IDs, not `{type, id}` objects.
 
 ---
 

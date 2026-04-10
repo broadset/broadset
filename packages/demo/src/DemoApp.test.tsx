@@ -1696,4 +1696,14 @@ describe('9-F: Preflight Diagnostics', () => {
     expect(items.length).toBeGreaterThan(0);
     expect(preflightPanel.textContent).toContain('title-safe');
   });
+
+  /** @description The custom countdown plugin type must appear as a button in the element toolbar. */
+  it('shows countdown plugin in the element toolbar', () => {
+    renderDemoApp();
+
+    const elementToolbar = screen.getByRole('toolbar', { name: /element toolbar/i });
+    const countdownButton = within(elementToolbar).getByRole('button', { name: /countdown/i });
+
+    expect(countdownButton).toBeTruthy();
+  });
 });
