@@ -1,4 +1,12 @@
-import { createDefaultElement, type EditorConfig, editorConfigSchema, getCapabilityProfile } from '@broadset/model';
+import {
+  type BroadsetDocument,
+  type BroadsetElement,
+  createDefaultElement,
+  type EditorConfig,
+  editorConfigSchema,
+  type FontDefinition,
+  getCapabilityProfile,
+} from '@broadset/model';
 
 import { type ElementDefaults, getElementDefaults, type PluginDefaults } from './element-defaults';
 import type { EditorStore } from './store-actions';
@@ -500,4 +508,261 @@ export function stopMotionPathEditing(store: EditorStore): void {
     motionPathEditingElementId: null,
     editingMode: { type: 'none' },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Preflight Diagnostics
+// ---------------------------------------------------------------------------
+
+export type PreflightSeverity = 'error' | 'warning' | 'info';
+
+export type PreflightRule =
+  | 'title-safe'
+  | 'dpi-resolution'
+  | 'bleed'
+  | 'small-text'
+  | 'color-mode'
+  | 'unsupported-property'
+  | 'missing-font';
+
+export interface PreflightDiagnostic {
+  readonly rule: PreflightRule;
+  readonly severity: PreflightSeverity;
+  readonly elementName: string;
+  readonly message: string;
+}
+
+export interface PreflightConfig {
+  readonly allowedFonts?: readonly FontDefinition[] | undefined;
+  readonly bleedMarginMm?: number | undefined;
+}
+
+const TITLE_SAFE_INSET_RATIO = 0.1;
+const MIN_DPI_DIMENSION_PX = 500;
+const DEFAULT_BLEED_MARGIN_MM = 3;
+const MIN_PRINT_FONT_SIZE_PT = 6;
+
+const SYSTEM_FALLBACK_FONTS: ReadonlySet<string> = new Set([
+  'serif',
+  'sans-serif',
+  'monospace',
+  'cursive',
+  'fantasy',
+  'system-ui',
+  'ui-serif',
+  'ui-sans-serif',
+  'ui-monospace',
+  'ui-rounded',
+  'math',
+  'emoji',
+  'fangsong',
+]);
+
+const SCREEN_ONLY_STYLE_PROPERTIES: ReadonlyArray<keyof BroadsetElement['style']> = ['rotateX', 'rotateY'];
+
+/**
+ * Parse a hex color string (#RGB or #RRGGBB) into [r, g, b] components.
+ * Returns undefined for unparseable input.
+ */
+function parseHexRgb(hex: string): readonly [number, number, number] | undefined {
+  const cleaned = hex.replace('#', '');
+
+  let r: number, g: number, b: number;
+
+  if (cleaned.length === 3) {
+    const c0 = cleaned.charAt(0);
+    const c1 = cleaned.charAt(1);
+    const c2 = cleaned.charAt(2);
+
+    r = parseInt(c0 + c0, 16);
+    g = parseInt(c1 + c1, 16);
+    b = parseInt(c2 + c2, 16);
+  } else if (cleaned.length >= 6) {
+    r = parseInt(cleaned.slice(0, 2), 16);
+    g = parseInt(cleaned.slice(2, 4), 16);
+    b = parseInt(cleaned.slice(4, 6), 16);
+  } else {
+    return undefined;
+  }
+
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
+    return undefined;
+  }
+
+  return [r, g, b] as const;
+}
+
+/**
+ * Checks whether a color is "fluorescent" or out-of-gamut for CMYK print.
+ * Supports #RGB and #RRGGBB hex formats.
+ * Uses a simple heuristic: one channel at 255 and another at 0 (fully saturated).
+ */
+function isFluorescentColor(hex: string | undefined): boolean {
+  if (hex === undefined || hex === '') {
+    return false;
+  }
+
+  const rgb = parseHexRgb(hex);
+
+  if (rgb === undefined) {
+    return false;
+  }
+
+  const [r, g, b] = rgb;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+
+  // Fully saturated: one channel at 255, another at 0, high contrast
+  return max === 255 && min === 0 && max - min === 255;
+}
+
+function isElementOutsideTitleSafe(el: BroadsetElement, canvasWidth: number, canvasHeight: number): boolean {
+  const insetX = canvasWidth * TITLE_SAFE_INSET_RATIO;
+  const insetY = canvasHeight * TITLE_SAFE_INSET_RATIO;
+
+  const safeLeft = insetX;
+  const safeTop = insetY;
+  const safeRight = canvasWidth - insetX;
+  const safeBottom = canvasHeight - insetY;
+
+  const elRight = el.position.x + el.width;
+  const elBottom = el.position.y + el.height;
+
+  return el.position.x < safeLeft || el.position.y < safeTop || elRight > safeRight || elBottom > safeBottom;
+}
+
+function isElementBeyondBleed(
+  el: BroadsetElement,
+  canvasWidth: number,
+  canvasHeight: number,
+  bleedMm: number,
+): boolean {
+  const elRight = el.position.x + el.width;
+  const elBottom = el.position.y + el.height;
+
+  return (
+    el.position.x < -bleedMm ||
+    el.position.y < -bleedMm ||
+    elRight > canvasWidth + bleedMm ||
+    elBottom > canvasHeight + bleedMm
+  );
+}
+
+/**
+ * Run preflight diagnostics on a document. Returns a deterministic list of issues.
+ */
+export function runPreflightDiagnostics(
+  document: BroadsetDocument,
+  config: PreflightConfig,
+): readonly PreflightDiagnostic[] {
+  const issues: PreflightDiagnostic[] = [];
+  const { canvas, documentMode, elements } = document;
+  const isPrint = documentMode === 'print';
+  const bleedMm = config.bleedMarginMm ?? DEFAULT_BLEED_MARGIN_MM;
+
+  const allowedFontFamilies: ReadonlySet<string> = new Set(
+    (config.allowedFonts ?? []).map((f) => f.family.toLowerCase()),
+  );
+
+  for (const el of elements) {
+    const isTextLike = el.type === 'text' || el.type === 'ticker' || el.type === 'clock';
+
+    // title-safe: text, image, svg outside 90% inset
+    if (
+      (isTextLike || el.type === 'image' || el.type === 'svg') &&
+      isElementOutsideTitleSafe(el, canvas.width, canvas.height)
+    ) {
+      issues.push({
+        rule: 'title-safe',
+        severity: 'warning',
+        elementName: el.name,
+        message: `"${el.name}" extends beyond the title-safe area`,
+      });
+    }
+
+    // dpi-resolution: images rendered > 500px
+    if (el.type === 'image' && (el.width > MIN_DPI_DIMENSION_PX || el.height > MIN_DPI_DIMENSION_PX)) {
+      issues.push({
+        rule: 'dpi-resolution',
+        severity: 'info',
+        elementName: el.name,
+        message: `"${el.name}" is rendered at ${String(Math.round(Math.max(el.width, el.height)))}px — recommend source resolution of at least 1.5× rendered size`,
+      });
+    }
+
+    // bleed (print only): elements beyond canvas + bleed margin
+    if (isPrint && isElementBeyondBleed(el, canvas.width, canvas.height, bleedMm)) {
+      issues.push({
+        rule: 'bleed',
+        severity: 'warning',
+        elementName: el.name,
+        message: `"${el.name}" extends beyond canvas bounds + ${String(bleedMm)}mm bleed margin`,
+      });
+    }
+
+    // small-text (print only): text < 6pt
+    if (isPrint && isTextLike) {
+      const fontSize = el.style.fontSize ?? 0;
+
+      if (fontSize > 0 && fontSize < MIN_PRINT_FONT_SIZE_PT) {
+        issues.push({
+          rule: 'small-text',
+          severity: 'warning',
+          elementName: el.name,
+          message: `"${el.name}" has font size ${String(fontSize)}pt — minimum recommended is ${String(MIN_PRINT_FONT_SIZE_PT)}pt for print`,
+        });
+      }
+    }
+
+    // color-mode (print only): fluorescent / out-of-gamut colors
+    if (isPrint) {
+      const bgColor = el.style.backgroundColor;
+      const borderColor = el.style.borderColor;
+
+      if (isFluorescentColor(bgColor) || isFluorescentColor(borderColor)) {
+        issues.push({
+          rule: 'color-mode',
+          severity: 'info',
+          elementName: el.name,
+          message: `"${el.name}" uses a fluorescent or out-of-gamut color that may not reproduce accurately in print`,
+        });
+      }
+    }
+
+    // unsupported-property (print only): screen-only style properties
+    if (isPrint) {
+      for (const prop of SCREEN_ONLY_STYLE_PROPERTIES) {
+        const value = el.style[prop];
+
+        if (typeof value === 'number' && value !== 0) {
+          issues.push({
+            rule: 'unsupported-property',
+            severity: 'warning',
+            elementName: el.name,
+            message: `"${el.name}" uses "${prop}" which is not supported in print mode`,
+          });
+        }
+      }
+    }
+
+    // missing-font: text element with unknown font
+    if (isTextLike && config.allowedFonts !== undefined) {
+      const fontFamily = el.style.fontFamily;
+
+      if (fontFamily !== undefined && fontFamily !== '') {
+        const normalized = fontFamily.toLowerCase();
+
+        if (!SYSTEM_FALLBACK_FONTS.has(normalized) && !allowedFontFamilies.has(normalized)) {
+          issues.push({
+            rule: 'missing-font',
+            severity: 'warning',
+            elementName: el.name,
+            message: `"${el.name}" uses font "${fontFamily}" which is not in the allowed fonts list`,
+          });
+        }
+      }
+    }
+  }
+
+  return issues;
 }

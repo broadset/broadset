@@ -87,7 +87,7 @@ restore, serialized with document)
 
 - [x] tests: red — editor/store-actions (snapshots)
 - [x] impl: green
-- [ ] demo milestone: save named snapshot → restore it → document returns to
+- [x] demo milestone: save named snapshot → restore it → document returns to
       saved state; snapshot names visible in UI
 
 ## Feature Group 9-F: Preflight diagnostics
