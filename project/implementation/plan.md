@@ -30,9 +30,9 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 9 — Data & Collaboration
-- **In Progress:** 9-A (first unit of phase 9)
-- **Last Merged:** 8-D motion path editor
+- **Active Phase:** Phase 10 — Formats
+- **In Progress:** 10-A (first unit of phase 10)
+- **Last Merged:** 9-G demo config + persistence
 
 ---
 

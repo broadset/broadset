@@ -123,9 +123,9 @@ initial bundle, cached after first load; all enabled export formats through
 ExportModal with success/error toasts; import orchestration; new document from
 NewDocumentModal preset; sample document on startup)
 
-- [ ] tests: red — demo config + state + data orchestration (Playwright CT)
-- [ ] impl: green
-- [ ] demo milestone: sidebar width and active tab persist across reload;
+- [x] tests: red — demo config + state + data orchestration (Playwright CT)
+- [x] impl: green
+- [x] demo milestone: sidebar width and active tab persist across reload;
       toasts appear for export/import; fullscreen toggle works; ≥5 fonts, ≥8 palette
       colors, ≥1 custom plugin, ≥1 required element configured; save writes to
       localStorage; reload restores document; lazy format loading works
@@ -142,4 +142,4 @@ NewDocumentModal preset; sample document on startup)
 | 9-D modal dialogs                  | ✅  | ✅    | ✅   |
 | 9-E named snapshots                | ✅  | ✅    | ✅   |
 | 9-F preflight diagnostics          | ✅  | ✅    | ✅   |
-| 9-G demo config + persistence      | ☐   | ☐     | ☐    |
+| 9-G demo config + persistence      | ✅  | ✅    | ✅   |
