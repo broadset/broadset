@@ -51,6 +51,7 @@ import {
 import { Button, ButtonGroup, Card, CardContent, Chip, Dropdown, Toast, toast, Toolbar, Tooltip } from '@heroui/react';
 import {
   Bug,
+  Camera,
   CheckCircle2,
   Copy,
   Download,
@@ -59,6 +60,7 @@ import {
   FolderOpen,
   Grid3X3,
   Hash,
+  History,
   Image,
   Info,
   Keyboard,
@@ -1425,6 +1427,37 @@ export function DemoApp(): React.JSX.Element {
     }
   }, [editorStore, pushToast]);
 
+  const handleSaveSnapshot = useCallback((): void => {
+    const name = window.prompt('Snapshot name:');
+
+    if (name === null || name.trim() === '') {
+      return;
+    }
+
+    try {
+      editorStore.getState().saveSnapshot(name.trim());
+      pushToast('success', `Saved snapshot "${name.trim()}".`);
+    } catch (error: unknown) {
+      pushToast('error', error instanceof Error ? error.message : 'Could not save snapshot.');
+    }
+  }, [editorStore, pushToast]);
+
+  const handleRestoreSnapshot = useCallback(
+    (snapshotId: string): void => {
+      editorStore.getState().restoreSnapshot(snapshotId);
+      pushToast('success', 'Restored snapshot.');
+    },
+    [editorStore, pushToast],
+  );
+
+  const handleDeleteSnapshot = useCallback(
+    (snapshotId: string): void => {
+      editorStore.getState().deleteSnapshot(snapshotId);
+      pushToast('success', 'Deleted snapshot.');
+    },
+    [editorStore, pushToast],
+  );
+
   const handleCreateFromPreset = useCallback(
     (preset: DocumentPreset): void => {
       const doc = createEmptyBroadsetDocument();
@@ -2235,6 +2268,52 @@ export function DemoApp(): React.JSX.Element {
                             Document Settings
                           </span>
                         </Dropdown.Item>
+                        <Dropdown.Item key="save-snapshot" onAction={handleSaveSnapshot}>
+                          <span className="inline-flex items-center gap-2">
+                            <Camera size={14} />
+                            Save Snapshot
+                            {editorState.snapshots.length > 0 ?
+                              <Chip size="sm" variant="soft">
+                                {editorState.snapshots.length}
+                              </Chip>
+                            : null}
+                          </span>
+                        </Dropdown.Item>
+                        {editorState.snapshots.map((snapshot) => (
+                          <Dropdown.Item
+                            key={`restore-${snapshot.id}`}
+                            onAction={() => {
+                              handleRestoreSnapshot(snapshot.id);
+                            }}
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              <History size={14} />
+                              <span className="truncate max-w-48">{snapshot.name}</span>
+                              <Tooltip delay={0}>
+                                <Tooltip.Trigger>
+                                  <span
+                                    role="button"
+                                    tabIndex={0}
+                                    className="ml-auto opacity-50 hover:opacity-100"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteSnapshot(snapshot.id);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.stopPropagation();
+                                        handleDeleteSnapshot(snapshot.id);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 size={12} />
+                                  </span>
+                                </Tooltip.Trigger>
+                                <Tooltip.Content>Delete snapshot</Tooltip.Content>
+                              </Tooltip>
+                            </span>
+                          </Dropdown.Item>
+                        ))}
                         <Dropdown.Item key="debug-snapshot" onAction={handleDebugSnapshotDownload}>
                           <span className="inline-flex items-center gap-2">
                             <Bug size={14} />

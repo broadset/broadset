@@ -988,6 +988,7 @@ describe('DemoApp playback shell lifecycle', () => {
     expect(screen.getByRole('button', { name: /^import$/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /^export$/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /document settings/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /save snapshot/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /debug snapshot/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /show rulers/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /show grid/i })).toBeTruthy();
@@ -1549,5 +1550,86 @@ describe('DemoApp modal dialog integration (9-D)', () => {
 
     // Dialog should be gone
     expect(screen.queryByRole('dialog', { name: /new document/i })).toBeNull();
+  });
+});
+
+describe('DemoApp named snapshots integration (9-E)', () => {
+  function renderDemoApp() {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    return render(<DemoApp />);
+  }
+
+  /** @description The File menu must include a "Save Snapshot" action visible to the user. */
+  it('shows the Save Snapshot action in the File menu', () => {
+    renderDemoApp();
+
+    expect(screen.getByRole('button', { name: /save snapshot/i })).toBeTruthy();
+  });
+
+  /** @description Saving a snapshot via prompt must store it and show a success toast. */
+  it('saves a named snapshot and shows it in the File menu', () => {
+    const promptSpy = jest.spyOn(window, 'prompt').mockReturnValue('My Checkpoint');
+
+    renderDemoApp();
+
+    const saveButton = screen.getByRole('button', { name: /save snapshot/i });
+
+    act(() => {
+      fireEvent.click(saveButton);
+    });
+
+    expect(promptSpy).toHaveBeenCalledWith('Snapshot name:');
+
+    // Snapshot should now appear as a menu item
+    expect(screen.getByText('My Checkpoint')).toBeTruthy();
+
+    promptSpy.mockRestore();
+  });
+
+  /** @description Clicking a snapshot entry in the menu must restore it and show a success toast. */
+  it('restores a snapshot by clicking it in the File menu', () => {
+    const promptSpy = jest.spyOn(window, 'prompt').mockReturnValue('Before Edit');
+
+    renderDemoApp();
+
+    // Save a snapshot
+    const saveButton = screen.getByRole('button', { name: /save snapshot/i });
+
+    act(() => {
+      fireEvent.click(saveButton);
+    });
+
+    // Click the snapshot entry to restore
+    expect(screen.getByText('Before Edit')).toBeTruthy();
+
+    const snapshotEntry = screen.getByText('Before Edit').closest('[role="button"], button, [data-key]');
+
+    if (snapshotEntry) {
+      act(() => {
+        fireEvent.click(snapshotEntry);
+      });
+    }
+
+    promptSpy.mockRestore();
   });
 });

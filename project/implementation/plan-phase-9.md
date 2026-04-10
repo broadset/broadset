@@ -85,8 +85,8 @@ selected template as new document)
 _Editor specs:_ `editor/store-actions.md` (named snapshots — up to 20, undoable
 restore, serialized with document)
 
-- [ ] tests: red — editor/store-actions (snapshots)
-- [ ] impl: green
+- [x] tests: red — editor/store-actions (snapshots)
+- [x] impl: green
 - [ ] demo milestone: save named snapshot → restore it → document returns to
       saved state; snapshot names visible in UI
 
