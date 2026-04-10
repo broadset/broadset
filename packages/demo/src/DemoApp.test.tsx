@@ -1633,3 +1633,67 @@ describe('DemoApp named snapshots integration (9-E)', () => {
     promptSpy.mockRestore();
   });
 });
+
+describe('9-F: Preflight Diagnostics', () => {
+  function renderDemoApp() {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+
+    return render(<DemoApp />);
+  }
+
+  /** @description The Pre-flight sidebar tab must show the preflight panel with issue results. */
+  it('shows the preflight panel when the Pre-flight tab is clicked', () => {
+    renderDemoApp();
+
+    // Click the Pre-flight tab button in the sidebar toolbar
+    const sidebarToolbar = screen.getByRole('toolbar', { name: /sidebar toolbar/i });
+    const preflightButton = within(sidebarToolbar).getByRole('button', { name: /pre-flight/i });
+
+    act(() => {
+      fireEvent.click(preflightButton);
+    });
+
+    // The preflight panel region should be visible
+    const preflightPanel = screen.getByRole('region', { name: /preflight/i });
+
+    expect(preflightPanel).toBeTruthy();
+  });
+
+  /** @description The sample document has elements outside title-safe, so issues must be shown. */
+  it('shows preflight issues for the sample document', () => {
+    renderDemoApp();
+
+    const sidebarToolbar = screen.getByRole('toolbar', { name: /sidebar toolbar/i });
+    const preflightButton = within(sidebarToolbar).getByRole('button', { name: /pre-flight/i });
+
+    act(() => {
+      fireEvent.click(preflightButton);
+    });
+
+    const preflightPanel = screen.getByRole('region', { name: /preflight/i });
+    const items = preflightPanel.querySelectorAll('li');
+
+    // The sample document has multiple elements outside title-safe area
+    expect(items.length).toBeGreaterThan(0);
+    expect(preflightPanel.textContent).toContain('title-safe');
+  });
+});

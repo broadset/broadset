@@ -14,6 +14,7 @@ import {
   type ElementUpdate,
   placeElement,
   type ResizeHandle,
+  runPreflightDiagnostics,
   startPlacement,
 } from '@broadset/editor';
 import {
@@ -40,6 +41,8 @@ import {
   MediaLibraryModal,
   NewDocumentModal,
   type PanelElement,
+  type PreflightIssue,
+  PreflightPanel,
   PropertiesSidebar,
   type PropertyValue,
   ShortcutHelpModal,
@@ -1269,6 +1272,15 @@ export function DemoApp(): React.JSX.Element {
       (currentDocument.elements.find((element) => element.id === selectedElementId) ?? null)
     );
   const activePage = currentDocument.pages[editorState.activePageIndex] ?? currentDocument.pages[0];
+  const preflightIssues = useMemo<readonly PreflightIssue[]>(() => {
+    const diagnostics = runPreflightDiagnostics(currentDocument, {});
+
+    return diagnostics.map((d) => ({
+      id: `${d.rule}:${d.elementName}`,
+      severity: d.severity,
+      message: `[${d.elementName}] ${d.message}`,
+    }));
+  }, [currentDocument]);
   const placementLabel = getElementLabel(editorState.pendingPlacementType);
   const clipboardRef = useRef<readonly BroadsetElement[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -2088,9 +2100,7 @@ export function DemoApp(): React.JSX.Element {
         </p>
       </div>
     : <div className="p-3" style={glassPanelStyle()}>
-        <Chip color="success" size="sm" variant="soft">
-          No preflight issues detected
-        </Chip>
+        <PreflightPanel issues={preflightIssues} />
       </div>;
 
   return (
