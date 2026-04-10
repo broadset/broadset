@@ -98,10 +98,10 @@ font warning)
 _UI specs:_ `ui/panels.md` (preflight tab — zero-issue success message,
 structured issue list, success hidden when issues exist)
 
-- [ ] tests: red — editor/editing (preflight rules)
-- [ ] tests: red — ui/panels (preflight panel)
-- [ ] impl: green
-- [ ] demo milestone: preflight tab shows diagnostic results; fix issue → result
+- [x] tests: red — editor/editing (preflight rules)
+- [x] tests: red — ui/panels (preflight panel)
+- [x] impl: green
+- [x] demo milestone: preflight tab shows diagnostic results; fix issue → result
       updates; zero issues shows success message
 
 ## Feature Group 9-G: Full demo configuration + persistence
@@ -140,6 +140,6 @@ NewDocumentModal preset; sample document on startup)
 | 9-B live data binding              | ✅  | ✅    | ✅   |
 | 9-C collaboration / change stream  | ✅  | ✅    | ✅   |
 | 9-D modal dialogs                  | ✅  | ✅    | ✅   |
-| 9-E named snapshots                | ☐   | ☐     | ☐    |
-| 9-F preflight diagnostics          | ☐   | ☐     | ☐    |
+| 9-E named snapshots                | ✅  | ✅    | ✅   |
+| 9-F preflight diagnostics          | ✅  | ✅    | ✅   |
 | 9-G demo config + persistence      | ☐   | ☐     | ☐    |
