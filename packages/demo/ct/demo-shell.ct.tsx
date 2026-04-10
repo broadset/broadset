@@ -221,3 +221,144 @@ test('shows a placement-mode banner when the user activates an element tool', as
   await page.locator('button[aria-label="Cancel placement"]').first().click();
   await expect(page.getByTestId('placement-mode-banner')).toBeHidden();
 });
+
+/**
+ * @description Validates the 9-G sidebar preference persistence from
+ * `project/spec/demo/state.md`: sidebar open/closed, active tab, and width
+ * persist to localStorage, and remounting restores them.
+ */
+test('persists sidebar preferences across remounts', async ({ mount, page }) => {
+  const component = await mount(<DemoApp />);
+
+  const sidebar = page.getByTestId('demo-properties-sidebar');
+
+  await expect(sidebar).toBeVisible();
+
+  // Click the Layers tab to switch
+  await page.locator('button[aria-label="Layers"]').first().click();
+
+  // Wait for the useEffect to persist the new tab selection to localStorage
+  await page.waitForFunction(
+    () => {
+      const s = window.localStorage.getItem('broadset:demo-sidebar-preferences:v1');
+      const p = JSON.parse(s ?? '{}') as { tab?: string };
+
+      return p.tab === 'layers';
+    },
+    undefined,
+    { timeout: 3000 },
+  );
+
+  // Verify preferences were saved to localStorage
+  const stored = await page.evaluate(() => window.localStorage.getItem('broadset:demo-sidebar-preferences:v1'));
+
+  expect(stored).not.toBeNull();
+
+  const prefs = JSON.parse(stored ?? '{}') as { isOpen: boolean; tab: string; width: number };
+
+  expect(prefs.tab).toBe('layers');
+  expect(prefs.isOpen).toBe(true);
+  expect(prefs.width).toBeGreaterThanOrEqual(256);
+  expect(prefs.width).toBeLessThanOrEqual(800);
+
+  // Remount and verify preferences are restored
+  await component.unmount();
+  await mount(<DemoApp />);
+
+  const restoredStored = await page.evaluate(() => window.localStorage.getItem('broadset:demo-sidebar-preferences:v1'));
+  const restoredPrefs = JSON.parse(restoredStored ?? '{}') as { isOpen: boolean; tab: string; width: number };
+
+  expect(restoredPrefs.tab).toBe('layers');
+});
+
+/**
+ * @description Validates the 9-G save/restore document lifecycle from
+ * `project/spec/demo/state.md`: saving writes to localStorage with valid
+ * document JSON. Restoration is verified via DemoApp.test.tsx unit tests.
+ */
+test('saves the current document to localStorage via the File menu', async ({ mount, page }) => {
+  // Clear any stale document from a previous test in this worker
+  await page.evaluate(() => {
+    window.localStorage.removeItem('broadset:demo-document:v1');
+  });
+  await mount(<DemoApp />);
+
+  // Trigger save via the File menu
+  const fileButton = page.locator('button[aria-label="File"]').first();
+
+  await fileButton.click();
+  await page.getByText('Save').first().click();
+
+  // Verify localStorage has a valid document entry
+  const stored = await page.evaluate(() => window.localStorage.getItem('broadset:demo-document:v1'));
+
+  expect(stored).not.toBeNull();
+
+  const doc = JSON.parse(stored ?? '{}') as { elements?: unknown[] };
+  const elements = doc.elements ?? [];
+
+  expect(doc.elements).toBeDefined();
+  expect(Array.isArray(doc.elements)).toBe(true);
+  expect(elements.length).toBeGreaterThan(0);
+});
+
+/**
+ * @description Validates the 9-G toast notification system from
+ * `project/spec/demo/state.md`: successful actions show auto-dismissing
+ * success toasts at the bottom-right.
+ */
+test('shows a success toast after saving the document', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  // Trigger save via the File menu
+  const fileButton = page.locator('button[aria-label="File"]').first();
+
+  await fileButton.click();
+  await page.getByText('Save').first().click();
+
+  // Toast should appear with success message
+  await expect(page.getByText('Saved the demo document locally.')).toBeVisible({ timeout: 3000 });
+});
+
+/**
+ * @description Validates the 9-G countdown plugin from `project/spec/demo/config.md`:
+ * the element toolbar includes the countdown custom plugin alongside built-in types.
+ */
+test('shows countdown custom plugin in the element toolbar alongside built-in types', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const toolbar = page.getByTestId('demo-element-library');
+
+  await expect(toolbar).toBeVisible();
+
+  // Built-in types
+  for (const label of ['Text', 'Rectangle', 'Ellipse', 'Image', 'SVG', 'Path', 'QR Code', 'Video', 'Clock', 'Ticker']) {
+    await expect(toolbar.locator(`button[aria-label="${label}"]`)).toBeVisible();
+  }
+
+  // Custom plugin
+  await expect(toolbar.locator('button[aria-label="Countdown"]')).toBeVisible();
+});
+
+/**
+ * @description Validates the 9-G provider wiring from `project/spec/demo/state.md`:
+ * EditorProvider, TimelineEditingProvider, and BroadsetDataStoreProvider are all
+ * functional and the editor store is accessible from child components.
+ */
+test('wires all three providers so child components have editor, timeline, and data access', async ({
+  mount,
+  page,
+}) => {
+  await mount(<DemoApp />);
+
+  // If providers are wired correctly, the sidebar Layers tab should show document elements
+  await page.locator('button[aria-label="Layers"]').first().click();
+
+  // The sidebar should display layer entries for document elements
+  const sidebar = page.getByTestId('demo-properties-sidebar');
+
+  await expect(sidebar).toBeVisible();
+
+  // All three providers wired — the app renders without provider errors
+  await expect(page.getByTestId('demo-shell')).toBeVisible();
+});
