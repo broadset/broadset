@@ -25,36 +25,30 @@ import {
 import { createPlaybackController, type PlaybackController } from '@broadset/playback';
 import { createScreenRenderer, type ScreenRendererController } from '@broadset/renderer';
 import {
+  AboutModal,
+  CanvasSettingsModal,
   classifyWheelInput,
   color,
   DEFAULT_ELEMENT_TYPES,
+  type DocumentPreset,
+  ExportModal,
   font,
   glassPanelStyle,
   type LayerInfo,
   LayersSidebar,
+  type MediaAsset,
+  MediaLibraryModal,
+  NewDocumentModal,
   type PanelElement,
   PropertiesSidebar,
   type PropertyValue,
+  ShortcutHelpModal,
   sp,
+  TemplateBrowserModal,
+  type TemplateEntry,
   TimelineEditingProvider,
 } from '@broadset/ui';
-import {
-  Button,
-  ButtonGroup,
-  Card,
-  CardContent,
-  Chip,
-  CloseButton,
-  Dropdown,
-  Input,
-  Kbd,
-  Modal,
-  ScrollShadow,
-  Toast,
-  toast,
-  Toolbar,
-  Tooltip,
-} from '@heroui/react';
+import { Button, ButtonGroup, Card, CardContent, Chip, Dropdown, Toast, toast, Toolbar, Tooltip } from '@heroui/react';
 import {
   Bug,
   CheckCircle2,
@@ -65,9 +59,11 @@ import {
   FolderOpen,
   Grid3X3,
   Hash,
+  Image,
   Info,
   Keyboard,
   Layers,
+  LayoutTemplate,
   Magnet,
   Maximize2,
   Minimize2,
@@ -121,53 +117,101 @@ const ELEMENT_TOOL_TYPES = [
   { type: 'countdown', label: 'Countdown', icon: <span aria-hidden="true">⏱</span> },
 ] as const;
 
-const KEYBOARD_SHORTCUTS: readonly ShortcutDefinition[] = [
+/* ── Document presets for New Document modal ─────────────────────── */
+
+const DOCUMENT_PRESETS: readonly DocumentPreset[] = [
+  { name: 'HD 1080p', width: 1920, height: 1080, unit: 'px', mode: 'broadcast', category: 'Broadcast' },
+  { name: 'HD 720p', width: 1280, height: 720, unit: 'px', mode: 'broadcast', category: 'Broadcast' },
+  { name: '4K UHD', width: 3840, height: 2160, unit: 'px', mode: 'broadcast', category: 'Broadcast' },
+  { name: 'Lower Third', width: 1920, height: 200, unit: 'px', mode: 'broadcast', category: 'Broadcast' },
+  { name: 'A4 Portrait', width: 210, height: 297, unit: 'mm', mode: 'print', category: 'Print' },
+  { name: 'A4 Landscape', width: 297, height: 210, unit: 'mm', mode: 'print', category: 'Print' },
+  { name: 'US Letter', width: 216, height: 279, unit: 'mm', mode: 'print', category: 'Print' },
+  { name: 'A3', width: 297, height: 420, unit: 'mm', mode: 'print', category: 'Print' },
+  { name: 'Instagram Post', width: 1080, height: 1080, unit: 'px', mode: 'none', category: 'Social Media' },
+  { name: 'Instagram Story', width: 1080, height: 1920, unit: 'px', mode: 'none', category: 'Social Media' },
+  { name: 'Facebook Cover', width: 820, height: 312, unit: 'px', mode: 'none', category: 'Social Media' },
+  { name: 'YouTube Thumbnail', width: 1280, height: 720, unit: 'px', mode: 'none', category: 'Social Media' },
+  { name: 'Banner 728×90', width: 728, height: 90, unit: 'px', mode: 'none', category: 'Commercial' },
+  { name: 'MPU 300×250', width: 300, height: 250, unit: 'px', mode: 'none', category: 'Commercial' },
+  { name: 'Leaderboard 970×250', width: 970, height: 250, unit: 'px', mode: 'none', category: 'Commercial' },
+  { name: 'Billboard', width: 3048, height: 1524, unit: 'mm', mode: 'print', category: 'Large Format' },
+  { name: 'A0 Poster', width: 841, height: 1189, unit: 'mm', mode: 'print', category: 'Large Format' },
+] as const;
+
+/** Exporters enabled in the demo — OGraf is disabled as it requires a server. */
+const ENABLED_EXPORTERS: readonly string[] = [
+  'html',
+  'svg',
+  'pdf',
+  'psd',
+  'pptx',
+  'png',
+  'jpeg',
+  'mp4',
+  'webm',
+] as const;
+
+/** Sample media assets for the Media Library demo. */
+const DEMO_MEDIA_ASSETS: readonly MediaAsset[] = [
+  { id: 'placeholder-1', name: 'Placeholder 800×600', url: 'https://placehold.co/800x600', category: 'Backgrounds' },
   {
-    description: 'Save',
-    primary: [{ label: '⌘', title: 'Command' }, { label: 'S' }],
-    secondary: [{ label: 'Ctrl' }, { label: 'S' }],
+    id: 'placeholder-2',
+    name: 'Placeholder 1920×1080',
+    url: 'https://placehold.co/1920x1080',
+    category: 'Backgrounds',
+  },
+  { id: 'placeholder-3', name: 'Logo Placeholder', url: 'https://placehold.co/200x200', category: 'Logos' },
+  { id: 'placeholder-4', name: 'Icon Placeholder', url: 'https://placehold.co/100x100', category: 'Icons' },
+] as const;
+
+const MEDIA_CATEGORIES: readonly string[] = ['All', 'Backgrounds', 'Logos', 'Icons'] as const;
+
+/** Sample templates for the Template Browser demo. */
+const DEMO_TEMPLATES: readonly TemplateEntry[] = [
+  {
+    id: 'tpl-score',
+    name: 'Sports Score',
+    thumbnail: 'https://placehold.co/320x180?text=Score',
+    category: 'Lower Thirds',
   },
   {
-    description: 'Undo',
-    primary: [{ label: '⌘', title: 'Command' }, { label: 'Z' }],
-    secondary: [{ label: 'Ctrl' }, { label: 'Z' }],
+    id: 'tpl-news',
+    name: 'News Ticker',
+    thumbnail: 'https://placehold.co/320x180?text=News',
+    category: 'Lower Thirds',
   },
   {
-    description: 'Redo',
-    primary: [{ label: '⌘', title: 'Command' }, { label: '⇧', title: 'Shift' }, { label: 'Z' }],
-    secondary: [{ label: 'Ctrl' }, { label: '⇧', title: 'Shift' }, { label: 'Z' }],
+    id: 'tpl-fullscreen',
+    name: 'Full Screen Graphic',
+    thumbnail: 'https://placehold.co/320x180?text=Full',
+    category: 'Full Screen',
   },
   {
-    description: 'Remove selection',
-    primary: [{ label: 'Delete' }],
-    secondary: [{ label: 'Backspace' }],
-  },
-  {
-    description: 'Exit placement mode',
-    primary: [{ label: 'Escape' }],
+    id: 'tpl-weather',
+    name: 'Weather Overlay',
+    thumbnail: 'https://placehold.co/320x180?text=Weather',
+    category: 'Full Screen',
   },
 ] as const;
 
 type SidebarTab = 'layers' | 'properties' | 'animation' | 'preflight';
 type ToastSeverity = keyof typeof TOAST_DISMISS_MS;
-type ActiveDialog = 'about' | 'export' | 'new-document' | 'settings' | 'shortcuts' | null;
+type ActiveDialog =
+  | 'about'
+  | 'export'
+  | 'media-library'
+  | 'new-document'
+  | 'settings'
+  | 'shortcuts'
+  | 'template-browser'
+  | null;
 type AlignmentAction = 'bottom' | 'center-x' | 'center-y' | 'left' | 'right' | 'top';
 
 interface SidebarPreferences {
   readonly isOpen: boolean;
   readonly tab: SidebarTab;
   readonly width: number;
-}
-
-interface ShortcutKey {
-  readonly label: string;
-  readonly title?: string | undefined;
-}
-
-interface ShortcutDefinition {
-  readonly description: string;
-  readonly primary: readonly ShortcutKey[];
-  readonly secondary?: readonly ShortcutKey[] | undefined;
 }
 
 interface ContextMenuState {
@@ -597,54 +641,6 @@ function ToolbarMenu({
         <Dropdown.Menu aria-label={`${label} menu`}>{children}</Dropdown.Menu>
       </Dropdown.Popover>
     </Dropdown>
-  );
-}
-
-function DialogPanel({
-  title,
-  children,
-  onClose,
-}: {
-  readonly title: string;
-  readonly children: React.ReactNode;
-  readonly onClose: () => void;
-}): React.JSX.Element {
-  return (
-    <Modal>
-      <Modal.Backdrop
-        isDismissable
-        isOpen
-        variant="blur"
-        onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            onClose();
-          }
-        }}
-      >
-        <Modal.Container placement="center" scroll="inside" size="md">
-          <Modal.Dialog
-            aria-label={title}
-            style={{ ...glassPanelStyle(), maxWidth: 'min(520px, calc(100vw - 32px))', width: '100%' }}
-          >
-            <Modal.Header
-              style={{ alignItems: 'center', display: 'flex', gap: sp('sp-02'), justifyContent: 'space-between' }}
-            >
-              <Modal.Heading style={{ color: color('foreground'), fontSize: font('heading-sm'), fontWeight: 700 }}>
-                {title}
-              </Modal.Heading>
-              <CloseButton aria-label={`Close ${title}`} onPress={onClose} />
-            </Modal.Header>
-            <Modal.Body>
-              <ScrollShadow
-                style={{ display: 'grid', gap: sp('sp-03'), maxHeight: 'min(60vh, 520px)', paddingRight: sp('sp-01') }}
-              >
-                {children}
-              </ScrollShadow>
-            </Modal.Body>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
   );
 }
 
@@ -1429,16 +1425,57 @@ export function DemoApp(): React.JSX.Element {
     }
   }, [editorStore, pushToast]);
 
-  const handleCreateNewDocument = useCallback(
-    (mode: 'empty' | 'sample'): void => {
-      const nextDocument =
-        mode === 'empty' ? createEmptyBroadsetDocument() : (
-          broadsetDocumentSchema.parse(JSON.parse(JSON.stringify(DEMO_DOCUMENT)))
-        );
+  const handleCreateFromPreset = useCallback(
+    (preset: DocumentPreset): void => {
+      const doc = createEmptyBroadsetDocument();
+      const updated: BroadsetDocument = {
+        ...doc,
+        name: preset.name,
+        canvas: { ...doc.canvas, width: preset.width, height: preset.height, unit: preset.unit as 'in' | 'mm' | 'px' },
+      };
 
-      editorStore.getState().loadTemplate(nextDocument);
+      editorStore.getState().loadTemplate(updated);
       setActiveDialog(null);
-      pushToast('success', mode === 'empty' ? 'Started a new blank document.' : 'Loaded the sample document.');
+      pushToast(
+        'success',
+        `Created "${preset.name}" (${String(preset.width)}×${String(preset.height)} ${preset.unit}).`,
+      );
+    },
+    [editorStore, pushToast],
+  );
+
+  const handleExportFormat = useCallback(
+    (exporter: string, _data: Readonly<Record<string, unknown>>): void => {
+      if (exporter === 'json') {
+        handleSaveAsJson();
+      } else {
+        // Format-specific exporting will be implemented in Phase 10 (Formats).
+        // For now, show a toast indicating which exporter was selected.
+        pushToast('info', `Export format "${exporter.toUpperCase()}" selected. Full export in Phase 10.`);
+      }
+
+      setActiveDialog(null);
+    },
+    [handleSaveAsJson, pushToast],
+  );
+
+  const handleMediaSelect = useCallback(
+    (asset: MediaAsset): void => {
+      pushToast('success', `Selected media: ${asset.name}`);
+      setActiveDialog(null);
+    },
+    [pushToast],
+  );
+
+  const handleTemplateSelect = useCallback(
+    (template: TemplateEntry): void => {
+      // In a full implementation, this would load the template's BroadsetDocument.
+      // For now, create a placeholder document named after the template.
+      const doc = createEmptyBroadsetDocument();
+
+      editorStore.getState().loadTemplate({ ...doc, name: template.name });
+      setActiveDialog(null);
+      pushToast('success', `Loaded template "${template.name}".`);
     },
     [editorStore, pushToast],
   );
@@ -2128,6 +2165,28 @@ export function DemoApp(): React.JSX.Element {
                           <span className="inline-flex items-center gap-2">
                             <FilePlus size={14} />
                             New Document
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="browse-templates"
+                          onAction={() => {
+                            setActiveDialog('template-browser');
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <LayoutTemplate size={14} />
+                            Browse Templates
+                          </span>
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          key="media-library"
+                          onAction={() => {
+                            setActiveDialog('media-library');
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Image size={14} />
+                            Media Library
                           </span>
                         </Dropdown.Item>
                         <Dropdown.Item key="open-demo" onAction={handleOpenImportDialog}>
@@ -3102,251 +3161,93 @@ export function DemoApp(): React.JSX.Element {
                 </Card>
               : null}
 
-              {activeDialog === 'new-document' ?
-                <DialogPanel
-                  title="New Document"
-                  onClose={() => {
-                    setActiveDialog(null);
-                  }}
-                >
-                  <p style={{ color: color('muted'), fontSize: font('body-compact') }}>
-                    Start from a clean canvas or reload the sample broadcast layout.
-                  </p>
-                  <div style={{ display: 'flex', gap: sp('sp-02'), justifyContent: 'flex-end' }}>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onPress={() => {
-                        setActiveDialog(null);
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onPress={() => {
-                        handleCreateNewDocument('sample');
-                      }}
-                    >
-                      Load Sample
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onPress={() => {
-                        handleCreateNewDocument('empty');
-                      }}
-                    >
-                      Blank Document
-                    </Button>
-                  </div>
-                </DialogPanel>
-              : null}
+              <NewDocumentModal
+                isOpen={activeDialog === 'new-document'}
+                presets={DOCUMENT_PRESETS}
+                onCreateDocument={handleCreateFromPreset}
+                onClose={() => {
+                  setActiveDialog(null);
+                }}
+              />
 
-              {activeDialog === 'settings' ?
-                <DialogPanel
-                  title="Document Settings"
-                  onClose={() => {
-                    setActiveDialog(null);
-                  }}
-                >
-                  <Input
-                    aria-label="Document name"
-                    value={currentDocument.name}
-                    onChange={(event) => {
-                      editorStore.getState().loadTemplate({ ...currentDocument, name: event.currentTarget.value });
-                    }}
-                  />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02') }}>
-                    <span style={{ color: color('muted'), fontSize: font('label') }}>Units</span>
-                    <div style={{ display: 'flex', gap: sp('sp-02') }}>
-                      {(['px', 'mm', 'in'] as const).map((unit) => (
-                        <Button
-                          key={unit}
-                          size="sm"
-                          variant={editorState.canvasSettings.units === unit ? 'primary' : 'ghost'}
-                          onPress={() => {
-                            editorStore.getState().updateCanvasSettings({ units: unit });
-                          }}
-                        >
-                          {unit}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02') }}>
-                    <span style={{ color: color('muted'), fontSize: font('label') }}>View mode</span>
-                    <div style={{ display: 'flex', gap: sp('sp-02') }}>
-                      {(['none', 'broadcast', 'print'] as const).map((mode) => (
-                        <Button
-                          key={mode}
-                          size="sm"
-                          variant={editorState.canvasSettings.viewMode === mode ? 'primary' : 'ghost'}
-                          onPress={() => {
-                            editorStore.getState().updateCanvasSettings({ viewMode: mode });
-                          }}
-                        >
-                          {mode}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: sp('sp-02'), justifyContent: 'space-between' }}>
-                    <Button
-                      size="sm"
-                      variant={editorState.canvasSettings.showRulers ? 'primary' : 'ghost'}
-                      onPress={() => {
-                        editorStore
-                          .getState()
-                          .updateCanvasSettings({ showRulers: !editorState.canvasSettings.showRulers });
-                      }}
-                    >
-                      {editorState.canvasSettings.showRulers ? 'Hide rulers' : 'Show rulers'}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={editorState.gridSettings.showGrid ? 'primary' : 'ghost'}
-                      onPress={() => {
-                        editorStore.getState().updateGridSettings({ showGrid: !editorState.gridSettings.showGrid });
-                      }}
-                    >
-                      {editorState.gridSettings.showGrid ? 'Hide grid' : 'Show grid'}
-                    </Button>
-                  </div>
-                  <div style={{ display: 'flex', gap: sp('sp-02'), justifyContent: 'flex-end' }}>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onPress={() => {
-                        setActiveDialog(null);
-                      }}
-                    >
-                      Done
-                    </Button>
-                  </div>
-                </DialogPanel>
-              : null}
+              <CanvasSettingsModal
+                isOpen={activeDialog === 'settings'}
+                documentName={currentDocument.name}
+                showRulers={editorState.canvasSettings.showRulers}
+                rulerUnit={editorState.canvasSettings.units}
+                viewMode={editorState.canvasSettings.viewMode}
+                perspective={editorState.canvasSettings.perspective}
+                showGrid={editorState.gridSettings.showGrid}
+                gridSize={editorState.gridSettings.gridSize}
+                snapToGrid={editorState.gridSettings.snapToGrid}
+                snapThreshold={editorState.gridSettings.snapThreshold}
+                onDocumentNameChange={(name) => {
+                  editorStore.getState().loadTemplate({ ...currentDocument, name });
+                }}
+                onRulerChange={(show) => {
+                  editorStore.getState().updateCanvasSettings({ showRulers: show });
+                }}
+                onRulerUnitChange={(unit) => {
+                  editorStore.getState().updateCanvasSettings({ units: unit as 'in' | 'mm' | 'px' });
+                }}
+                onViewModeChange={(mode) => {
+                  editorStore.getState().updateCanvasSettings({ viewMode: mode as 'broadcast' | 'none' | 'print' });
+                }}
+                onPerspectiveChange={(value) => {
+                  editorStore.getState().updateCanvasSettings({ perspective: value });
+                }}
+                onGridChange={(changes) => {
+                  editorStore.getState().updateGridSettings(changes);
+                }}
+                onClose={() => {
+                  setActiveDialog(null);
+                }}
+              />
 
-              {activeDialog === 'export' ?
-                <DialogPanel
-                  title="Export"
-                  onClose={() => {
-                    setActiveDialog(null);
-                  }}
-                >
-                  <p style={{ color: color('muted'), fontSize: font('body-compact') }}>
-                    Export the current Phase 4 demo document as JSON for inspection or reuse.
-                  </p>
-                  <div style={{ display: 'flex', gap: sp('sp-02'), justifyContent: 'flex-end' }}>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onPress={() => {
-                        setActiveDialog(null);
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onPress={() => {
-                        handleSaveAsJson();
-                        setActiveDialog(null);
-                      }}
-                    >
-                      Download JSON
-                    </Button>
-                  </div>
-                </DialogPanel>
-              : null}
+              <ExportModal
+                isOpen={activeDialog === 'export'}
+                enabledExporters={ENABLED_EXPORTERS}
+                dynamicData={{}}
+                onExport={handleExportFormat}
+                onClose={() => {
+                  setActiveDialog(null);
+                }}
+              />
 
-              {activeDialog === 'shortcuts' ?
-                <DialogPanel
-                  title="Keyboard Shortcuts"
-                  onClose={() => {
-                    setActiveDialog(null);
-                  }}
-                >
-                  <ul
-                    style={{
-                      color: color('foreground'),
-                      display: 'grid',
-                      gap: sp('sp-02'),
-                      fontSize: font('body-compact'),
-                    }}
-                  >
-                    {KEYBOARD_SHORTCUTS.map((shortcut) => (
-                      <li
-                        key={shortcut.description}
-                        style={{
-                          alignItems: 'center',
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: sp('sp-02'),
-                          justifyContent: 'space-between',
-                        }}
-                      >
-                        <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: sp('sp-01') }}>
-                          {shortcut.primary.map((key, index) => (
-                            <Kbd key={`${shortcut.description}-primary-${String(index)}`} title={key.title}>
-                              <Kbd.Content>{key.label}</Kbd.Content>
-                            </Kbd>
-                          ))}
-                          {shortcut.secondary !== undefined ?
-                            <>
-                              <span aria-hidden="true">/</span>
-                              {shortcut.secondary.map((key, index) => (
-                                <Kbd key={`${shortcut.description}-secondary-${String(index)}`} title={key.title}>
-                                  <Kbd.Content>{key.label}</Kbd.Content>
-                                </Kbd>
-                              ))}
-                            </>
-                          : null}
-                        </span>
-                        <span>{shortcut.description}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onPress={() => {
-                        setActiveDialog(null);
-                      }}
-                    >
-                      Close
-                    </Button>
-                  </div>
-                </DialogPanel>
-              : null}
+              <ShortcutHelpModal
+                isOpen={activeDialog === 'shortcuts'}
+                onClose={() => {
+                  setActiveDialog(null);
+                }}
+              />
 
-              {activeDialog === 'about' ?
-                <DialogPanel
-                  title="About Broadset Demo"
-                  onClose={() => {
-                    setActiveDialog(null);
-                  }}
-                >
-                  <p style={{ color: color('foreground'), fontSize: font('body-compact') }}>
-                    Broadset Phase 4 showcases the editor shell with floating toolbars, ruler-guided canvas work, a
-                    resizable sidebar, and live preview controls.
-                  </p>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onPress={() => {
-                        setActiveDialog(null);
-                      }}
-                    >
-                      Close
-                    </Button>
-                  </div>
-                </DialogPanel>
-              : null}
+              <AboutModal
+                isOpen={activeDialog === 'about'}
+                version="0.1.0"
+                onClose={() => {
+                  setActiveDialog(null);
+                }}
+              />
+
+              <MediaLibraryModal
+                isOpen={activeDialog === 'media-library'}
+                assets={DEMO_MEDIA_ASSETS}
+                categories={MEDIA_CATEGORIES}
+                onSelect={handleMediaSelect}
+                onClose={() => {
+                  setActiveDialog(null);
+                }}
+              />
+
+              <TemplateBrowserModal
+                isOpen={activeDialog === 'template-browser'}
+                templates={DEMO_TEMPLATES}
+                hasUnsavedChanges={false}
+                onSelectTemplate={handleTemplateSelect}
+                onClose={() => {
+                  setActiveDialog(null);
+                }}
+              />
 
               <Toast.Provider className="bottom-7 right-7 z-40" placement="bottom end" />
             </div>

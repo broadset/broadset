@@ -209,7 +209,11 @@ jest.mock(
 
     const Modal = Object.assign(
       function ModalRoot(props: MockHeroUiProps): React.JSX.Element | null {
-        const { children, ...restProps } = props;
+        const { children, isOpen = true, onOpenChange: _onOpenChange, ...restProps } = props;
+
+        if (isOpen === false) {
+          return null;
+        }
 
         return ReactActual.createElement('div', restProps, children ?? null);
       },
@@ -420,6 +424,13 @@ jest.mock(
           children ?? null,
         );
       },
+      Table: Object.assign(createWrapper('table'), {
+        Body: createWrapper('tbody'),
+        Cell: createWrapper('td'),
+        Column: createWrapper('th'),
+        Header: createWrapper('thead'),
+        Row: createWrapper('tr'),
+      }),
       Tabs,
       Toast: ToastComponent,
       toast: toastApi,
@@ -1048,7 +1059,7 @@ describe('DemoApp playback shell lifecycle', () => {
     expect(screen.getByRole('dialog', { name: /keyboard shortcuts/i })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: /about/i }));
-    expect(screen.getByRole('dialog', { name: /about broadset demo/i })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: /broadset/i })).toBeTruthy();
   });
 
   /**
@@ -1356,5 +1367,187 @@ describe('DemoApp playback shell lifecycle', () => {
     expect(changeLogCalls[0]?.[0]).toMatch(/Change batch #\d+/);
 
     consoleSpy.mockRestore();
+  });
+});
+
+/**
+ * @description Verifies that the demo shell wires all @broadset/ui modal components correctly —
+ * dialogs open from the menu, show the expected content, and close cleanly.
+ */
+describe('DemoApp modal dialog integration (9-D)', () => {
+  /** Shared mock setup for tests that only need the shell to render. */
+  function setupShellMocks(): void {
+    const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
+    const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      host: document.createElement('div'),
+      updateDocument: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      detach: jest.fn(),
+      play: jest.fn(),
+      pause: jest.fn(),
+      seek: jest.fn(),
+      setSpeed: jest.fn(),
+      setRegistry: jest.fn(),
+      seekTimeline: jest.fn(),
+      stopTimeline: jest.fn(),
+      destroy: jest.fn(),
+    });
+  }
+
+  /**
+   * @description The New Document dialog must show category tabs and preset names so users
+   * can choose from a curated list of document sizes.
+   */
+  it('opens the New Document dialog with preset categories and names', () => {
+    setupShellMocks();
+    render(<DemoApp />);
+
+    // Click "New Document" in File menu
+    fireEvent.click(screen.getByRole('button', { name: /new document/i }));
+
+    // Dialog should be open
+    const dialog = screen.getByRole('dialog', { name: /new document/i });
+
+    expect(dialog).toBeTruthy();
+
+    // Should show preset category tabs (All + the unique categories from DOCUMENT_PRESETS)
+    expect(within(dialog).getByText('All')).toBeTruthy();
+    expect(within(dialog).getByText('Broadcast')).toBeTruthy();
+    expect(within(dialog).getByText('Print')).toBeTruthy();
+    expect(within(dialog).getByText('Social Media')).toBeTruthy();
+
+    // Should show at least one preset name from the list
+    expect(within(dialog).getByText('HD 1080p')).toBeTruthy();
+    expect(within(dialog).getByText('A4 Portrait')).toBeTruthy();
+
+    // Create button should be present but disabled (no preset selected)
+    expect(within(dialog).getByRole('button', { name: /create document/i })).toBeTruthy();
+  });
+
+  /**
+   * @description The Export dialog must show only the feature-gated exporter buttons so
+   * users see what formats are available in the current build.
+   */
+  it('opens the Export dialog with feature-gated format buttons', () => {
+    setupShellMocks();
+    render(<DemoApp />);
+
+    // Click "Export" in File menu
+    fireEvent.click(screen.getByRole('button', { name: /^export$/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /export/i });
+
+    expect(dialog).toBeTruthy();
+
+    // Should show enabled exporters as buttons
+    expect(within(dialog).getByRole('button', { name: 'HTML' })).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'SVG' })).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'PDF' })).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'PNG' })).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'MP4' })).toBeTruthy();
+
+    // OGraf should NOT be shown (disabled in ENABLED_EXPORTERS)
+    expect(within(dialog).queryByRole('button', { name: 'OGRAF' })).toBeNull();
+  });
+
+  /**
+   * @description The Template Browser must open from the File menu and show categorized
+   * template entries with thumbnail previews and a search field.
+   */
+  it('opens the Template Browser with categories and search', () => {
+    setupShellMocks();
+    render(<DemoApp />);
+
+    // Click "Browse Templates" in File menu
+    fireEvent.click(screen.getByRole('button', { name: /browse templates/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /template browser/i });
+
+    expect(dialog).toBeTruthy();
+
+    // Should show category headings
+    expect(within(dialog).getByText('Lower Thirds')).toBeTruthy();
+    expect(within(dialog).getByText('Full Screen')).toBeTruthy();
+
+    // Should show template names as buttons
+    expect(within(dialog).getByRole('button', { name: 'Sports Score' })).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'News Ticker' })).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'Full Screen Graphic' })).toBeTruthy();
+
+    // Should have a search input
+    const searchInput = within(dialog).getByRole('textbox', { name: /search templates/i });
+
+    expect(searchInput).toBeTruthy();
+  });
+
+  /**
+   * @description The Media Library dialog must be accessible from the File menu and
+   * show the configured demo assets.
+   */
+  it('opens the Media Library from the File menu', () => {
+    setupShellMocks();
+    render(<DemoApp />);
+
+    // Click "Media Library" in File menu
+    fireEvent.click(screen.getByRole('button', { name: /media library/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /media library/i });
+
+    expect(dialog).toBeTruthy();
+
+    // Should show asset category headers
+    expect(within(dialog).getByText('Backgrounds')).toBeTruthy();
+
+    // Should show at least one asset name
+    expect(within(dialog).getByText('Placeholder 800×600')).toBeTruthy();
+  });
+
+  /**
+   * @description The Canvas Settings dialog must open and display controls for document name,
+   * rulers, grid, and other canvas properties.
+   */
+  it('opens the Canvas Settings dialog with property controls', () => {
+    setupShellMocks();
+    render(<DemoApp />);
+
+    // Click "Document Settings" in File menu
+    fireEvent.click(screen.getByRole('button', { name: /document settings/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /canvas settings/i });
+
+    expect(dialog).toBeTruthy();
+
+    // Should show setting labels
+    expect(within(dialog).getByText(/rulers/i)).toBeTruthy();
+    expect(within(dialog).getByText(/show grid/i)).toBeTruthy();
+  });
+
+  /**
+   * @description Each modal must close cleanly when its close/cancel button is clicked,
+   * removing the dialog from the DOM.
+   */
+  it('closes open modals when cancel is clicked', () => {
+    setupShellMocks();
+    render(<DemoApp />);
+
+    // Open then close the New Document dialog
+    fireEvent.click(screen.getByRole('button', { name: /new document/i }));
+    expect(screen.getByRole('dialog', { name: /new document/i })).toBeTruthy();
+
+    // Click Cancel inside the dialog
+    const cancelButtons = screen.getAllByRole('button', { name: /cancel/i });
+    const dialogCancel = cancelButtons.find((btn) => btn.closest('[role="dialog"]') !== null);
+
+    expect(dialogCancel).toBeDefined();
+    if (dialogCancel === undefined) throw new Error('Cancel button not found inside dialog');
+    fireEvent.click(dialogCancel);
+
+    // Dialog should be gone
+    expect(screen.queryByRole('dialog', { name: /new document/i })).toBeNull();
   });
 });

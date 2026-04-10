@@ -32,7 +32,7 @@ provider, reactive propagation)
 - [x] tests: red — editor/data-store
 - [x] tests: red — editor/react-data-integration (full coverage)
 - [x] impl: green — all
-- [ ] demo milestone: EditorProvider error boundary catches errors and shows
+- [x] demo milestone: EditorProvider error boundary catches errors and shows
       recovery UI; data subscriptions trigger selective re-renders
 
 ## Feature Group 9-B: Live data binding
@@ -60,7 +60,7 @@ echo-loop prevention)
 
 - [x] tests: red — editor/collaboration
 - [x] impl: green
-- [ ] demo milestone: change stream logs batches to console with cumulative count
+- [x] demo milestone: change stream logs batches to console with cumulative count
 
 ## Feature Group 9-D: All modal dialogs
 
@@ -136,9 +136,9 @@ NewDocumentModal preset; sample document on startup)
 
 | Group                              | Red | Green | Demo |
 | ---------------------------------- | --- | ----- | ---- |
-| 9-A data store + React integration | ✅  | ✅    | ☐    |
+| 9-A data store + React integration | ✅  | ✅    | ✅   |
 | 9-B live data binding              | ✅  | ✅    | ✅   |
-| 9-C collaboration / change stream  | ✅  | ✅    | ☐    |
+| 9-C collaboration / change stream  | ✅  | ✅    | ✅   |
 | 9-D modal dialogs                  | ✅  | ✅    | ☐    |
 | 9-E named snapshots                | ☐   | ☐     | ☐    |
 | 9-F preflight diagnostics          | ☐   | ☐     | ☐    |
