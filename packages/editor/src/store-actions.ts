@@ -17,6 +17,7 @@ import { getElementDefaults } from './element-defaults';
 import { createUIActionsSlice, type UIActionsState } from './store-ui-actions';
 
 const DEFAULT_MAX_UNDO_STEPS = 50;
+const MAX_SNAPSHOTS = 20;
 
 export type EditingMode =
   | { readonly type: 'none' }
@@ -28,6 +29,13 @@ export type EditingMode =
   | { readonly type: 'motion-path-editing'; readonly elementId: string };
 
 export type ReorderDirection = 'forward' | 'backward' | 'front' | 'back';
+
+export interface NamedSnapshot {
+  readonly id: string;
+  readonly name: string;
+  readonly timestamp: string;
+  readonly document: BroadsetDocument;
+}
 
 export interface ElementUpdate {
   readonly position?: ElementPosition;
@@ -80,6 +88,11 @@ export interface EditorState extends UIActionsState {
   readonly ungroupElements: () => void;
   readonly toggleLock: (elementId: string) => void;
   readonly toggleVisibility: (elementId: string) => void;
+  readonly snapshots: readonly NamedSnapshot[];
+  readonly saveSnapshot: (name: string) => string;
+  readonly restoreSnapshot: (id: string) => void;
+  readonly renameSnapshot: (id: string, newName: string) => void;
+  readonly deleteSnapshot: (id: string) => void;
 }
 
 export type EditorStore = StoreApi<EditorState> & {
@@ -327,6 +340,7 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
         motionPathEditingElementId: null,
         inlineTextEditingElementId: null,
         editingMode: { type: 'none' },
+        snapshots: [],
         ...createUIActionsSlice((updater) => {
           set((state) => updater(state));
         }, options.config),
@@ -336,6 +350,7 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
             documentMode: document.documentMode,
             featureConfig: createDefaultFeatureConfig(document.documentMode),
             activePageIndex: 0,
+            snapshots: [],
             ...createInteractionState([], null, null, null),
           });
           temporalRef.current?.getState().clear();
@@ -720,6 +735,78 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
                 : page,
               ),
             },
+          }));
+        },
+        saveSnapshot(name: string): string {
+          const trimmed = name.trim();
+
+          if (trimmed === '') {
+            throw new Error('Snapshot name must be a non-empty string');
+          }
+
+          const state = get();
+
+          if (state.snapshots.length >= MAX_SNAPSHOTS) {
+            throw new Error(`Maximum number of snapshots (${String(MAX_SNAPSHOTS)}) reached`);
+          }
+
+          if (state.snapshots.some((s) => s.name === trimmed)) {
+            throw new Error(`A snapshot named "${trimmed}" already exists`);
+          }
+
+          const id = crypto.randomUUID();
+          const snapshot: NamedSnapshot = {
+            id,
+            name: trimmed,
+            timestamp: new Date().toISOString(),
+            document: structuredClone(state.document),
+          };
+
+          set({ snapshots: [...state.snapshots, snapshot] });
+
+          return id;
+        },
+        restoreSnapshot(id: string): void {
+          const state = get();
+          const snapshot = state.snapshots.find((s) => s.id === id);
+
+          if (snapshot === undefined) {
+            return;
+          }
+
+          const newDocumentMode = snapshot.document.documentMode;
+
+          set({
+            document: structuredClone(snapshot.document),
+            documentMode: newDocumentMode,
+            featureConfig:
+              newDocumentMode === state.documentMode ?
+                state.featureConfig
+              : createDefaultFeatureConfig(newDocumentMode),
+            activePageIndex: 0,
+            ...createInteractionState([], null, null, null),
+          });
+        },
+        renameSnapshot(id: string, newName: string): void {
+          const trimmed = newName.trim();
+
+          if (trimmed === '') {
+            throw new Error('Snapshot name must be a non-empty string');
+          }
+
+          const state = get();
+
+          if (state.snapshots.some((s) => s.name === trimmed && s.id !== id)) {
+            throw new Error(`A snapshot named "${trimmed}" already exists`);
+          }
+
+          set({
+            snapshots: state.snapshots.map((s) => (s.id === id ? { ...s, name: trimmed } : s)),
+          });
+        },
+        deleteSnapshot(id: string): void {
+          set((state) => ({
+            snapshots: state.snapshots.filter((s) => s.id !== id),
           }));
         },
       }),

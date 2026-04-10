@@ -76,7 +76,7 @@ selected template as new document)
 - [x] tests: red — ui/modals (all 7 modal types)
 - [x] impl: green
 - [x] **HeroUI verified**
-- [ ] demo milestone: all modals open/close correctly; Canvas Settings changes
+- [x] demo milestone: all modals open/close correctly; Canvas Settings changes
       take effect; Export shows feature-gated formats; New Document presets create
       correct canvas; Template Browser with categories, search, thumbnails
 
@@ -139,7 +139,7 @@ NewDocumentModal preset; sample document on startup)
 | 9-A data store + React integration | ✅  | ✅    | ✅   |
 | 9-B live data binding              | ✅  | ✅    | ✅   |
 | 9-C collaboration / change stream  | ✅  | ✅    | ✅   |
-| 9-D modal dialogs                  | ✅  | ✅    | ☐    |
+| 9-D modal dialogs                  | ✅  | ✅    | ✅   |
 | 9-E named snapshots                | ☐   | ☐     | ☐    |
 | 9-F preflight diagnostics          | ☐   | ☐     | ☐    |
 | 9-G demo config + persistence      | ☐   | ☐     | ☐    |
