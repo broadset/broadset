@@ -80,6 +80,16 @@ function isTransformProperty(propertyName: string): boolean {
   return ['x', 'y', 'translateX', 'translateY', 'rotation', 'scale', 'scaleX', 'scaleY'].includes(propertyName);
 }
 
+function isTrimPathProperty(propertyName: string): boolean {
+  return propertyName === 'trimStart' || propertyName === 'trimEnd' || propertyName === 'trimOffset';
+}
+
+interface MutableTrimPathState {
+  trimStart?: number;
+  trimEnd?: number;
+  trimOffset?: number;
+}
+
 function hasTransformState(state: MutableTransformState): boolean {
   return (
     state.x !== undefined ||
@@ -109,9 +119,21 @@ function applyPathValue(target: HTMLElement, value: string): void {
   }
 }
 
+/** Read total path length via duck-typing — returns 0 if the element lacks getTotalLength. */
+function getPathTotalLength(element: Element): number {
+  const geo = element as unknown as { getTotalLength?: () => number };
+
+  if (typeof geo.getTotalLength === 'function') {
+    return geo.getTotalLength();
+  }
+
+  return 0;
+}
+
 export function resolveAnimationTargets(): AnimationTargetsResolver {
   const cache = new WeakMap<HTMLElement, ResolvedAnimationTargets>();
   const transforms = new WeakMap<HTMLElement, MutableTransformState>();
+  const trimStates = new WeakMap<HTMLElement, MutableTrimPathState>();
   const baselines = new WeakMap<Element, Map<string, string>>();
 
   function getTargets(container: HTMLElement): ResolvedAnimationTargets {
@@ -261,6 +283,120 @@ export function resolveAnimationTargets(): AnimationTargetsResolver {
     target.style.transform = readBaseline(target, 'transform');
   }
 
+  function updateTrimPath(target: HTMLElement, propertyName: string, value: unknown): void {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return;
+    }
+
+    const current = trimStates.get(target) ?? {};
+
+    if (propertyName === 'trimStart') {
+      current.trimStart = value;
+    } else if (propertyName === 'trimEnd') {
+      current.trimEnd = value;
+    } else if (propertyName === 'trimOffset') {
+      current.trimOffset = value;
+    }
+
+    trimStates.set(target, current);
+    applyTrimPathToElement(target, current);
+  }
+
+  function applyTrimPathToElement(target: HTMLElement, state: MutableTrimPathState): void {
+    const pathElement = findPathElement(target);
+
+    if (pathElement === null) {
+      return;
+    }
+
+    const trimStart = state.trimStart ?? 0;
+    const trimEnd = state.trimEnd ?? 1;
+    const trimOffset = state.trimOffset ?? 0;
+    const totalLength = getPathTotalLength(pathElement);
+
+    if (totalLength <= 0) {
+      return;
+    }
+
+    if (trimStart === 0 && trimEnd === 1 && trimOffset === 0) {
+      const baselineDasharray = readBaseline(pathElement, 'stroke-dasharray');
+      const baselineDashoffset = readBaseline(pathElement, 'stroke-dashoffset');
+
+      if (baselineDasharray !== '') {
+        pathElement.setAttribute('stroke-dasharray', baselineDasharray);
+      } else {
+        pathElement.removeAttribute('stroke-dasharray');
+      }
+
+      if (baselineDashoffset !== '') {
+        pathElement.setAttribute('stroke-dashoffset', baselineDashoffset);
+      } else {
+        pathElement.removeAttribute('stroke-dashoffset');
+      }
+
+      return;
+    }
+
+    const visibleFraction = Math.max(0, trimEnd - trimStart);
+    const visibleLength = visibleFraction * totalLength;
+
+    if (visibleLength <= 0) {
+      pathElement.setAttribute('stroke-dasharray', `0 ${String(totalLength)}`);
+      pathElement.setAttribute('stroke-dashoffset', '0');
+
+      return;
+    }
+
+    const gapLength = totalLength - visibleLength;
+    const offsetLength = (trimStart + trimOffset) * totalLength;
+
+    pathElement.setAttribute('stroke-dasharray', `${String(visibleLength)} ${String(gapLength)}`);
+    pathElement.setAttribute('stroke-dashoffset', String(-offsetLength));
+  }
+
+  function clearTrimPathProperty(target: HTMLElement, propertyName: string): void {
+    const current = { ...(trimStates.get(target) ?? {}) };
+
+    if (propertyName === 'trimStart') {
+      delete current.trimStart;
+    } else if (propertyName === 'trimEnd') {
+      delete current.trimEnd;
+    } else if (propertyName === 'trimOffset') {
+      delete current.trimOffset;
+    }
+
+    const hasTrimState =
+      current.trimStart !== undefined || current.trimEnd !== undefined || current.trimOffset !== undefined;
+
+    if (hasTrimState) {
+      trimStates.set(target, current);
+      applyTrimPathToElement(target, current);
+
+      return;
+    }
+
+    trimStates.delete(target);
+
+    const pathElement = findPathElement(target);
+
+    if (pathElement !== null) {
+      const baselineDasharray = readBaseline(pathElement, 'stroke-dasharray');
+      const baselineDashoffset = readBaseline(pathElement, 'stroke-dashoffset');
+
+      if (baselineDasharray === '') {
+        pathElement.removeAttribute('stroke-dasharray');
+      } else {
+        pathElement.setAttribute('stroke-dasharray', baselineDasharray);
+      }
+
+      if (baselineDashoffset === '') {
+        pathElement.removeAttribute('stroke-dashoffset');
+      } else {
+        pathElement.setAttribute('stroke-dashoffset', baselineDashoffset);
+      }
+    }
+  }
+
   return {
     applyStyles(container: HTMLElement, styles: Readonly<Record<string, unknown>>): void {
       const targets = getTargets(container);
@@ -299,6 +435,18 @@ export function resolveAnimationTargets(): AnimationTargetsResolver {
         if (isTransformProperty(propertyName)) {
           rememberBaseline(targets.contentTarget, 'transform', targets.contentTarget.style.transform);
           updateTransform(targets.contentTarget, propertyName, value);
+          continue;
+        }
+
+        if (isTrimPathProperty(propertyName)) {
+          const pathEl = findPathElement(targets.contentTarget);
+
+          if (pathEl !== null) {
+            rememberBaseline(pathEl, 'stroke-dasharray', pathEl.getAttribute('stroke-dasharray'));
+            rememberBaseline(pathEl, 'stroke-dashoffset', pathEl.getAttribute('stroke-dashoffset'));
+          }
+
+          updateTrimPath(targets.contentTarget, propertyName, value);
           continue;
         }
 
@@ -345,6 +493,11 @@ export function resolveAnimationTargets(): AnimationTargetsResolver {
 
         if (propertyName === 'transform' || isTransformProperty(propertyName)) {
           clearTransformProperty(targets.contentTarget, propertyName);
+          continue;
+        }
+
+        if (isTrimPathProperty(propertyName)) {
+          clearTrimPathProperty(targets.contentTarget, propertyName);
           continue;
         }
 

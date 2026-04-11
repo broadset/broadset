@@ -152,6 +152,38 @@ describe('resolveAnimationTargets', () => {
 
     expect(host.style.color).toBe('rgb(255, 255, 255)');
   });
+
+  /** @description Trim path properties must be handled specially (not set as generic CSS) to avoid polluting the style attribute. */
+  it('does not set trim path properties as generic CSS', () => {
+    const { contentTarget, host } = createHostElement('path-el');
+    const targets = resolveAnimationTargets();
+
+    targets.applyStyles(host, {
+      trimStart: 0.25,
+      trimEnd: 0.75,
+      trimOffset: 0.1,
+    });
+
+    /* trimStart/trimEnd/trimOffset are NOT valid CSS properties and must not
+       appear on the element style — the applyStyles code should route them
+       through the trim path handler instead of the generic setProperty path. */
+    expect(contentTarget.style.getPropertyValue('trim-start')).toBe('');
+    expect(contentTarget.style.getPropertyValue('trim-end')).toBe('');
+    expect(contentTarget.style.getPropertyValue('trim-offset')).toBe('');
+  });
+
+  /** @description Clearing trim path properties must not leave residual CSS. */
+  it('clears trim path properties without residual CSS', () => {
+    const { contentTarget, host } = createHostElement('path-el2');
+    const targets = resolveAnimationTargets();
+
+    targets.applyStyles(host, { trimStart: 0.5 });
+    targets.clearStyles(host, ['trimStart', 'trimEnd', 'trimOffset']);
+
+    expect(contentTarget.style.getPropertyValue('trim-start')).toBe('');
+    expect(contentTarget.style.getPropertyValue('trim-end')).toBe('');
+    expect(contentTarget.style.getPropertyValue('trim-offset')).toBe('');
+  });
 });
 
 describe('parseElementRuntimeState and validation helpers', () => {

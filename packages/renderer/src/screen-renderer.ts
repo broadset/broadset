@@ -421,6 +421,36 @@ const createSvgRenderer = createSimpleRenderer((host, element) => {
   firstChild.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 });
 
+/**
+ * Compute `stroke-dasharray` and `stroke-dashoffset` SVG attributes from trim path
+ * fractions. Returns `null` when trim values are at their defaults (full stroke visible).
+ */
+export function computeTrimPathAttributes(
+  totalLength: number,
+  trimStart: number,
+  trimEnd: number,
+  trimOffset: number,
+): { readonly dasharray: string; readonly dashoffset: string } | null {
+  if (totalLength <= 0 || (trimStart === 0 && trimEnd === 1 && trimOffset === 0)) {
+    return null;
+  }
+
+  const visibleFraction = Math.max(0, trimEnd - trimStart);
+  const visibleLength = visibleFraction * totalLength;
+
+  if (visibleLength <= 0) {
+    return { dasharray: `0 ${String(totalLength)}`, dashoffset: '0' };
+  }
+
+  const gapLength = totalLength - visibleLength;
+  const offsetLength = (trimStart + trimOffset) * totalLength;
+
+  return {
+    dasharray: `${String(visibleLength)} ${String(gapLength)}`,
+    dashoffset: String(-offsetLength),
+  };
+}
+
 const createPathRenderer = createSimpleRenderer((host, element) => {
   const svgNamespace = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNamespace, 'svg');
@@ -437,6 +467,20 @@ const createPathRenderer = createSimpleRenderer((host, element) => {
 
   if (element.style.strokeDasharray !== undefined) {
     path.setAttribute('stroke-dasharray', element.style.strokeDasharray);
+  }
+
+  const trimStart = element.style.trimStart ?? 0;
+  const trimEnd = element.style.trimEnd ?? 1;
+  const trimOffset = element.style.trimOffset ?? 0;
+
+  if (trimStart !== 0 || trimEnd !== 1 || trimOffset !== 0) {
+    const totalLength = typeof path.getTotalLength === 'function' ? path.getTotalLength() : 0;
+    const trimAttrs = computeTrimPathAttributes(totalLength, trimStart, trimEnd, trimOffset);
+
+    if (trimAttrs !== null) {
+      path.setAttribute('stroke-dasharray', trimAttrs.dasharray);
+      path.setAttribute('stroke-dashoffset', trimAttrs.dashoffset);
+    }
   }
 
   svg.appendChild(path);

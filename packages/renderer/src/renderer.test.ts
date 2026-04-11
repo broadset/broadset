@@ -7,6 +7,7 @@ import {
   ALL_DISABLED_CAPABILITIES,
   applyBackgroundStyle,
   buildSceneTree,
+  computeTrimPathAttributes,
   createScreenRenderer,
   DATA_ATTRIBUTES,
   getRendererCapabilities,
@@ -218,5 +219,66 @@ describe('renderer core', () => {
 
     expect(host.innerHTML).toBe('');
     expect(lifecycleEvents).toEqual(['mount:custom-a', 'destroy:custom-a', 'mount:custom-b', 'destroy:custom-b']);
+  });
+});
+
+/* ================================================================== */
+/*  computeTrimPathAttributes                                          */
+/* ================================================================== */
+
+describe('computeTrimPathAttributes', () => {
+  /** @description Default trim values (start=0, end=1, offset=0) must return null (no dash modification needed). */
+  it('returns null for default trim values', () => {
+    expect(computeTrimPathAttributes(200, 0, 1, 0)).toBeNull();
+  });
+
+  /** @description Zero total length must return null regardless of trim values. */
+  it('returns null for zero total length', () => {
+    expect(computeTrimPathAttributes(0, 0.25, 0.75, 0)).toBeNull();
+  });
+
+  /** @description Partial visibility (25% to 75%) must produce a dasharray showing 50% of the path. */
+  it('computes correct dasharray for partial visibility', () => {
+    const result = computeTrimPathAttributes(200, 0.25, 0.75, 0);
+
+    expect(result).not.toBeNull();
+    expect(result?.dasharray).toBe('100 100');
+    expect(result?.dashoffset).toBe('-50');
+  });
+
+  /** @description trimEnd: 0, trimStart: 0 means nothing visible — dasharray gap covers entire path. */
+  it('produces zero-length dash when trimStart equals trimEnd', () => {
+    const result = computeTrimPathAttributes(200, 0.5, 0.5, 0);
+
+    expect(result).not.toBeNull();
+    expect(result?.dasharray).toBe('0 200');
+    expect(result?.dashoffset).toBe('0');
+  });
+
+  /** @description Trim offset rotates the visible window around the path. */
+  it('applies trim offset to dashoffset', () => {
+    const result = computeTrimPathAttributes(400, 0, 0.5, 0.25);
+
+    expect(result).not.toBeNull();
+    expect(result?.dasharray).toBe('200 200');
+    expect(result?.dashoffset).toBe('-100');
+  });
+
+  /** @description Full path with non-zero offset still hides nothing but shifts the dash start. */
+  it('handles full visibility with offset', () => {
+    const result = computeTrimPathAttributes(100, 0, 1, 0.5);
+
+    expect(result).not.toBeNull();
+    expect(result?.dasharray).toBe('100 0');
+    expect(result?.dashoffset).toBe('-50');
+  });
+
+  /** @description Line-draw reveal from empty (trimEnd=0) has zero-length dash. */
+  it('handles line-draw start at trimEnd=0', () => {
+    const result = computeTrimPathAttributes(300, 0, 0, 0);
+
+    expect(result).not.toBeNull();
+    expect(result?.dasharray).toBe('0 300');
+    expect(result?.dashoffset).toBe('0');
   });
 });

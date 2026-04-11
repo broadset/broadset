@@ -190,6 +190,9 @@ export interface PanelElement {
   readonly fill: string;
   readonly fillOpacity: number;
   readonly fillRule: string;
+  readonly trimStart: number;
+  readonly trimEnd: number;
+  readonly trimOffset: number;
   readonly maskType: string;
   readonly customClipPath: string;
   readonly clipChildren: boolean;
@@ -1045,6 +1048,9 @@ export interface PathPropertiesPanelProps {
   readonly fill: string;
   readonly fillOpacity: number;
   readonly fillRule: string;
+  readonly trimStart: number;
+  readonly trimEnd: number;
+  readonly trimOffset: number;
   readonly content: string;
   readonly onUpdate: (key: string, value: string | number) => void;
   readonly onStartDrawing: () => void;
@@ -1066,6 +1072,9 @@ export function PathPropertiesPanel({
   fill,
   fillOpacity,
   fillRule,
+  trimStart,
+  trimEnd,
+  trimOffset,
   content,
   onUpdate,
   onStartDrawing,
@@ -1158,6 +1167,52 @@ export function PathPropertiesPanel({
         onUpdate={onUpdate}
         updateKey="fillRule"
       />
+
+      <Slider
+        aria-label="Trim start"
+        maxValue={1}
+        minValue={0}
+        step={0.01}
+        value={trimStart}
+        onChange={(v: number | readonly number[]) => {
+          onUpdate('trimStart', typeof v === 'number' ? v : Number(v));
+        }}
+      >
+        <Slider.Track>
+          <Slider.Fill />
+          <Slider.Thumb />
+        </Slider.Track>
+      </Slider>
+      <Slider
+        aria-label="Trim end"
+        maxValue={1}
+        minValue={0}
+        step={0.01}
+        value={trimEnd}
+        onChange={(v: number | readonly number[]) => {
+          onUpdate('trimEnd', typeof v === 'number' ? v : Number(v));
+        }}
+      >
+        <Slider.Track>
+          <Slider.Fill />
+          <Slider.Thumb />
+        </Slider.Track>
+      </Slider>
+      <Slider
+        aria-label="Trim offset"
+        maxValue={1}
+        minValue={0}
+        step={0.01}
+        value={trimOffset}
+        onChange={(v: number | readonly number[]) => {
+          onUpdate('trimOffset', typeof v === 'number' ? v : Number(v));
+        }}
+      >
+        <Slider.Track>
+          <Slider.Fill />
+          <Slider.Thumb />
+        </Slider.Track>
+      </Slider>
 
       <div className="flex gap-2">
         <Button
@@ -2065,6 +2120,9 @@ export function PropertiesSidebar({
                 fill={primary.fill}
                 fillOpacity={primary.fillOpacity}
                 fillRule={primary.fillRule}
+                trimStart={primary.trimStart}
+                trimEnd={primary.trimEnd}
+                trimOffset={primary.trimOffset}
                 content={primary.content}
                 onUpdate={onUpdate}
                 onStartDrawing={onStartDrawing ?? (() => undefined)}
