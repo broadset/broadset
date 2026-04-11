@@ -30,8 +30,8 @@ exports); stress tests (large documents, deeply nested elements).
 
 ### 10.2 Raster export (`formats/raster.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/formats/raster.md`
 _What to cover:_ PNG export (lossless, pixel-ratio scaling, 1x preserves

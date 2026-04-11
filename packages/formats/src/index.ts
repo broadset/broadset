@@ -17,3 +17,4 @@ export {
   triggerDownload,
   type WebMExportOptions,
 } from './raster';
+export { exportHtmlStandalone, exportSvg, importSvg, type SvgImportResult } from './web-vector';
