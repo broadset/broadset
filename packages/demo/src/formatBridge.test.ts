@@ -1,0 +1,399 @@
+import type { BroadsetDocument } from '@broadset/model';
+import { createEmptyBroadsetDocument } from '@broadset/model';
+import { describe, expect, it, jest } from '@jest/globals';
+
+import { type ExportContext, exportDocument, importDocument, loadFormats, resetFormatsCache } from './formatBridge';
+
+/* ------------------------------------------------------------------ */
+/*  Mock dynamic import('@broadset/formats')                          */
+/* ------------------------------------------------------------------ */
+
+const mockTriggerDownload = jest.fn();
+const mockSanitizeFilename = jest.fn((name: string) => name.replace(/\s+/g, '-'));
+const mockExportSvg = jest.fn(() => '<svg></svg>');
+const mockExportHtmlStandalone = jest.fn(() => '<html></html>');
+const mockExportPdfBytes = jest.fn(() => Promise.resolve(new Uint8Array([1, 2, 3])));
+const mockExportPptxBytes = jest.fn(() => new Uint8Array([4, 5, 6]));
+const mockExportPsdBytes = jest.fn(() => new Uint8Array([7, 8, 9]));
+const mockExportPsdBytesAsync = jest.fn(() => Promise.resolve(new Uint8Array([7, 8, 9])));
+const mockExportPngBlob = jest.fn(() => Promise.resolve(new Blob(['png'], { type: 'image/png' })));
+const mockExportJpegBlob = jest.fn(() => Promise.resolve(new Blob(['jpeg'], { type: 'image/jpeg' })));
+const mockExportEmbeddedSvgBlob = jest.fn(() => Promise.resolve(new Blob(['svg'], { type: 'image/svg+xml' })));
+const mockExportVideoBlob = jest.fn(() => Promise.resolve(new Blob(['video'], { type: 'video/webm' })));
+const mockExportWebMBlob = jest.fn(() => Promise.resolve(new Blob(['webm'], { type: 'video/webm' })));
+const mockGenerateOGrafPackages = jest.fn(() => []);
+const mockImportPsd = jest.fn((): BroadsetDocument => ({ ...createEmptyBroadsetDocument(), name: 'Imported PSD' }));
+const mockImportPptx = jest.fn((): BroadsetDocument => ({ ...createEmptyBroadsetDocument(), name: 'Imported PPTX' }));
+const mockImportSvg = jest.fn(() => ({
+  elements: [],
+  canvasWidth: 100,
+  canvasHeight: 100,
+  warnings: [],
+}));
+const mockExportProjectJson = jest.fn(() => '{}');
+const mockDiscoverCanvasElement = jest.fn(() => null);
+
+const mockFormats = {
+  discoverCanvasElement: mockDiscoverCanvasElement,
+  exportEmbeddedSvgBlob: mockExportEmbeddedSvgBlob,
+  exportHtmlStandalone: mockExportHtmlStandalone,
+  exportJpegBlob: mockExportJpegBlob,
+  exportPdfBytes: mockExportPdfBytes,
+  exportPngBlob: mockExportPngBlob,
+  exportPptxBytes: mockExportPptxBytes,
+  exportProjectJson: mockExportProjectJson,
+  exportPsdBytes: mockExportPsdBytes,
+  exportPsdBytesAsync: mockExportPsdBytesAsync,
+  exportSvg: mockExportSvg,
+  exportVideoBlob: mockExportVideoBlob,
+  exportWebMBlob: mockExportWebMBlob,
+  generateOGrafPackages: mockGenerateOGrafPackages,
+  importPptx: mockImportPptx,
+  importPsd: mockImportPsd,
+  importSvg: mockImportSvg,
+  sanitizeFilename: mockSanitizeFilename,
+  triggerDownload: mockTriggerDownload,
+};
+
+jest.mock('@broadset/formats', () => mockFormats);
+
+/**
+ * JSDOM's File/Blob may not support `.text()` or `.arrayBuffer()`.
+ * Create test files with explicit polyfill for these methods.
+ */
+function createTestFile(content: string | Uint8Array, name: string, type: string): File {
+  const blobPart: BlobPart = typeof content === 'string' ? content : (content.buffer as ArrayBuffer);
+  const blob = new Blob([blobPart], { type });
+  const file = new File([blob], name, { type });
+
+  // Polyfill .text() using FileReader
+  if (typeof file.text !== 'function') {
+    (file as { text: () => Promise<string> }).text = () =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = () => {
+          resolve(reader.result as string);
+        };
+
+        reader.onerror = () => {
+          reject(new Error(String(reader.error)));
+        };
+
+        reader.readAsText(blob);
+      });
+  }
+
+  // Polyfill .arrayBuffer() using FileReader
+  if (typeof file.arrayBuffer !== 'function') {
+    (file as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer = () =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = () => {
+          resolve(reader.result as ArrayBuffer);
+        };
+
+        reader.onerror = () => {
+          reject(new Error(String(reader.error)));
+        };
+
+        reader.readAsArrayBuffer(blob);
+      });
+  }
+
+  return file;
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  resetFormatsCache();
+});
+
+/* ================================================================== */
+/*  Lazy Format Loading                                               */
+/* ================================================================== */
+
+describe('lazy format loading', () => {
+  /** @description The formats module MUST NOT be loaded until the first export or import triggers it. */
+  it('loads the formats module on first call', async () => {
+    const formats = await loadFormats();
+
+    expect(formats.exportSvg).toBe(mockExportSvg);
+    expect(formats.triggerDownload).toBe(mockTriggerDownload);
+  });
+
+  /** @description Subsequent calls MUST reuse the cached module to avoid redundant dynamic imports. */
+  it('returns the same cached module on subsequent calls', async () => {
+    const first = await loadFormats();
+    const second = await loadFormats();
+
+    expect(first).toBe(second);
+  });
+});
+
+/* ================================================================== */
+/*  Export Orchestration                                               */
+/* ================================================================== */
+
+describe('export orchestration', () => {
+  const makeContext = (overrides?: Partial<ExportContext>): ExportContext => ({
+    document: createEmptyBroadsetDocument(),
+    ...overrides,
+  });
+
+  /** @description SVG export MUST call exportSvg and trigger a file download. */
+  it('exports SVG format and triggers download', async () => {
+    await exportDocument('svg', makeContext());
+
+    expect(mockExportSvg).toHaveBeenCalledTimes(1);
+    expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
+
+    const [blob, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];
+
+    expect(blob).toBeInstanceOf(Blob);
+    expect(filename).toMatch(/\.svg$/);
+  });
+
+  /** @description HTML export MUST call exportHtmlStandalone and trigger a file download. */
+  it('exports HTML format and triggers download', async () => {
+    await exportDocument('html', makeContext());
+
+    expect(mockExportHtmlStandalone).toHaveBeenCalledTimes(1);
+    expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
+
+    const [, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];
+
+    expect(filename).toMatch(/\.html$/);
+  });
+
+  /** @description PDF export MUST call exportPdfBytes and trigger a file download. */
+  it('exports PDF format and triggers download', async () => {
+    await exportDocument('pdf', makeContext());
+
+    expect(mockExportPdfBytes).toHaveBeenCalledTimes(1);
+    expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
+
+    const [, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];
+
+    expect(filename).toMatch(/\.pdf$/);
+  });
+
+  /** @description PPTX export MUST call exportPptxBytes and trigger a file download. */
+  it('exports PPTX format and triggers download', async () => {
+    await exportDocument('pptx', makeContext());
+
+    expect(mockExportPptxBytes).toHaveBeenCalledTimes(1);
+    expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
+
+    const [, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];
+
+    expect(filename).toMatch(/\.pptx$/);
+  });
+
+  /** @description PSD export MUST call exportPsdBytesAsync and trigger a file download. */
+  it('exports PSD format and triggers download', async () => {
+    await exportDocument('psd', makeContext());
+
+    expect(mockExportPsdBytesAsync).toHaveBeenCalledTimes(1);
+    expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
+
+    const [, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];
+
+    expect(filename).toMatch(/\.psd$/);
+  });
+
+  /** @description PNG raster export MUST require a snapshotCanvas and trigger a file download. */
+  it('exports PNG format when a snapshot canvas is provided', async () => {
+    const canvas = document.createElement('canvas');
+
+    await exportDocument('png', makeContext({ snapshotCanvas: canvas }));
+
+    expect(mockExportPngBlob).toHaveBeenCalledTimes(1);
+    expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
+
+    const [, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];
+
+    expect(filename).toMatch(/\.png$/);
+  });
+
+  /** @description JPEG raster export MUST require a snapshotCanvas and trigger a file download. */
+  it('exports JPEG format when a snapshot canvas is provided', async () => {
+    const canvas = document.createElement('canvas');
+
+    await exportDocument('jpeg', makeContext({ snapshotCanvas: canvas }));
+
+    expect(mockExportJpegBlob).toHaveBeenCalledTimes(1);
+    expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
+
+    const [, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];
+
+    expect(filename).toMatch(/\.jpe?g$/);
+  });
+
+  /** @description Raster export without a snapshot renderer MUST raise an error. */
+  it('throws when a raster export has no snapshot canvas', async () => {
+    await expect(exportDocument('png', makeContext())).rejects.toThrow(/snapshot/i);
+  });
+
+  /** @description SVG-embedded raster export MUST require a snapshotCanvas. */
+  it('exports SVG-embedded format when a snapshot canvas is provided', async () => {
+    const canvas = document.createElement('canvas');
+
+    await exportDocument('svg-embedded', makeContext({ snapshotCanvas: canvas }));
+
+    expect(mockExportEmbeddedSvgBlob).toHaveBeenCalledTimes(1);
+    expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
+  });
+
+  /** @description Video export (WebM) MUST require a renderFrame callback and durationMs. */
+  it('exports WebM format with video settings', async () => {
+    const renderFrame = jest.fn();
+    const canvas = document.createElement('canvas');
+
+    await exportDocument(
+      'webm',
+      makeContext({
+        snapshotCanvas: canvas,
+        renderFrame,
+        playbackDurationMs: 5000,
+        videoFrameRate: 30,
+      }),
+    );
+
+    expect(mockExportVideoBlob).toHaveBeenCalledTimes(1);
+    expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
+
+    const [, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];
+
+    expect(filename).toMatch(/\.webm$/);
+  });
+
+  /** @description Video export (MP4) MUST require a renderFrame callback and durationMs. */
+  it('exports MP4 format with video settings', async () => {
+    const renderFrame = jest.fn();
+    const canvas = document.createElement('canvas');
+
+    await exportDocument(
+      'mp4',
+      makeContext({
+        snapshotCanvas: canvas,
+        renderFrame,
+        playbackDurationMs: 5000,
+        videoFrameRate: 30,
+      }),
+    );
+
+    expect(mockExportVideoBlob).toHaveBeenCalledTimes(1);
+    expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
+
+    const [, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];
+
+    expect(filename).toMatch(/\.mp4$/);
+  });
+
+  /** @description Video export without renderFrame MUST raise an error. */
+  it('throws when a video export has no renderFrame', async () => {
+    await expect(exportDocument('webm', makeContext())).rejects.toThrow(/playback/i);
+  });
+
+  /** @description OGraf export MUST call generateOGrafPackages and trigger a download. */
+  it('exports OGraf format and triggers download', async () => {
+    await exportDocument('ograf', makeContext());
+
+    expect(mockGenerateOGrafPackages).toHaveBeenCalledTimes(1);
+    expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
+  });
+
+  /** @description A failed export MUST propagate the error so callers can display an error toast. */
+  it('propagates errors from format functions', async () => {
+    mockExportSvg.mockImplementationOnce(() => {
+      throw new Error('SVG render failed');
+    });
+
+    await expect(exportDocument('svg', makeContext())).rejects.toThrow('SVG render failed');
+  });
+});
+
+/* ================================================================== */
+/*  Import Orchestration                                              */
+/* ================================================================== */
+
+describe('import orchestration', () => {
+  /** @description JSON import MUST parse the file and return a valid BroadsetDocument. */
+  it('imports a JSON document file', async () => {
+    const doc = createEmptyBroadsetDocument();
+    const file = createTestFile(JSON.stringify(doc), 'test.json', 'application/json');
+    const result = await importDocument(file);
+
+    expect(result.name).toBe(doc.name);
+  });
+
+  /** @description BSP files use the same JSON code path as .json files. */
+  it('imports a .bsp document file', async () => {
+    const doc = createEmptyBroadsetDocument();
+    const file = createTestFile(JSON.stringify(doc), 'project.bsp', 'application/vnd.broadset.project+json');
+    const result = await importDocument(file);
+
+    expect(result.name).toBe(doc.name);
+  });
+
+  /** @description PSD import MUST call importPsd and return a BroadsetDocument. */
+  it('imports a PSD file', async () => {
+    const file = createTestFile(new Uint8Array([0, 1, 2]), 'design.psd', 'image/vnd.adobe.photoshop');
+    const result = await importDocument(file);
+
+    expect(mockImportPsd).toHaveBeenCalledTimes(1);
+    expect(result.name).toBe('Imported PSD');
+  });
+
+  /** @description PPTX import MUST call importPptx and return a BroadsetDocument. */
+  it('imports a PPTX file', async () => {
+    const file = createTestFile(
+      new Uint8Array([0, 1, 2]),
+      'slides.pptx',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    );
+    const result = await importDocument(file);
+
+    expect(mockImportPptx).toHaveBeenCalledTimes(1);
+    expect(result.name).toBe('Imported PPTX');
+  });
+
+  /** @description SVG import MUST call importSvg and convert the result to a BroadsetDocument. */
+  it('imports an SVG file', async () => {
+    const file = createTestFile('<svg></svg>', 'graphic.svg', 'image/svg+xml');
+    const result = await importDocument(file);
+
+    expect(mockImportSvg).toHaveBeenCalledTimes(1);
+    expect(result).toBeDefined();
+  });
+
+  /** @description Unsupported file extensions MUST throw an error so the caller can show a toast. */
+  it('throws for unsupported file formats', async () => {
+    const file = createTestFile('data', 'unknown.xyz', 'application/octet-stream');
+
+    await expect(importDocument(file)).rejects.toThrow(/unsupported/i);
+  });
+
+  /** @description A failed import MUST propagate the error for the caller to display. */
+  it('propagates errors from format import functions', async () => {
+    mockImportPsd.mockImplementationOnce(() => {
+      throw new Error('PSD corrupted');
+    });
+
+    const file = createTestFile(new Uint8Array([0]), 'bad.psd', 'image/vnd.adobe.photoshop');
+
+    await expect(importDocument(file)).rejects.toThrow('PSD corrupted');
+  });
+
+  /** @description JSON import MUST also accept BroadsetProject wrappers (array of documents). */
+  it('unwraps a BroadsetProject wrapper during JSON import', async () => {
+    const doc = { ...createEmptyBroadsetDocument(), name: 'Wrapped Doc' };
+    const project = { documents: [doc], settings: {}, assets: [] };
+    const file = createTestFile(JSON.stringify(project), 'project.json', 'application/json');
+    const result = await importDocument(file);
+
+    expect(result.name).toBe('Wrapped Doc');
+  });
+});

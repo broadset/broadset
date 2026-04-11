@@ -27,4 +27,37 @@ describe('sample document fixture', () => {
   it('does not rely on unresolved placeholder CDN assets', () => {
     expect(JSON.stringify(SAMPLE_PROJECT)).not.toContain('https://cdn.example.com/');
   });
+
+  /**
+   * @description At least one animation MUST include `translateX` keyframes to exercise the transform animation path in the sample document.
+   */
+  it('includes at least one animation with transform keyframes (translateX)', () => {
+    const hasTranslateX = SAMPLE_DOCUMENT.animations.some((anim) =>
+      anim.config.timelines.some((tl) => tl.keyframes.some((kf) => 'translateX' in kf.properties)),
+    );
+
+    expect(hasTranslateX).toBe(true);
+  });
+
+  /**
+   * @description At least one animation MUST bind both IN and OUT states so the demo exercises state-based animation transitions.
+   */
+  it('includes at least one animation with both IN and OUT state bindings', () => {
+    const hasInOut = SAMPLE_DOCUMENT.animations.some((anim) => {
+      const stateNames = anim.config.stateTimelineBindings.map((b) => b.stateName);
+
+      return stateNames.includes('IN') && stateNames.includes('OUT');
+    });
+
+    expect(hasInOut).toBe(true);
+  });
+
+  /**
+   * @description The sample document MUST include elements with data field bindings so the live data integration path is exercised on load.
+   */
+  it('includes elements with data field bindings', () => {
+    const elementsWithDataField = SAMPLE_DOCUMENT.elements.filter((el) => el.dataField !== null);
+
+    expect(elementsWithDataField.length).toBeGreaterThanOrEqual(3);
+  });
 });

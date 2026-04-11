@@ -48,7 +48,7 @@ const VIEW_MODES = ['broadcast', 'none', 'print'] as const;
 
 const EXPORTER_CATEGORIES = [
   { category: 'Web', formats: ['html', 'svg'] },
-  { category: 'Image', formats: ['png', 'jpeg'] },
+  { category: 'Image', formats: ['png', 'jpeg', 'svg-embedded'] },
   { category: 'Document', formats: ['pdf', 'psd', 'pptx'] },
   { category: 'Video', formats: ['mp4', 'webm'] },
   { category: 'Broadcast', formats: ['ograf'] },

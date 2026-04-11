@@ -91,6 +91,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { COUNTDOWN_PLUGIN, DEMO_DOCUMENT_PRESETS, DEMO_EDITOR_CONFIG } from './demoConfig';
+import type { ExportFormat } from './formatBridge';
 import { SAMPLE_DOCUMENT } from './sampleDocument';
 import { useLiveData } from './useLiveData';
 
@@ -123,7 +124,7 @@ const ELEMENT_TOOL_TYPES = [
   { type: 'countdown', label: 'Countdown', icon: <span aria-hidden="true">⏱</span> },
 ] as const;
 
-/** Exporters enabled in the demo — OGraf is disabled as it requires a server. */
+/** Exporters enabled in the demo. */
 const ENABLED_EXPORTERS: readonly string[] = [
   'html',
   'svg',
@@ -132,6 +133,8 @@ const ENABLED_EXPORTERS: readonly string[] = [
   'pptx',
   'png',
   'jpeg',
+  'svg-embedded',
+  'ograf',
   'mp4',
   'webm',
 ] as const;
@@ -596,15 +599,6 @@ function formatResolutionLabel(width: number, height: number): string {
   const divisor = greatestCommonDivisor(width, height);
 
   return `${String(width)}×${String(height)} — ${String(width / divisor)}:${String(height / divisor)}`;
-}
-
-function hasDocumentsArray(value: unknown): value is { readonly documents: readonly unknown[] } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'documents' in value &&
-    Array.isArray((value as { readonly documents?: unknown }).documents)
-  );
 }
 
 function ToolbarMenu({
@@ -1381,15 +1375,13 @@ export function DemoApp(): React.JSX.Element {
       }
 
       try {
-        const text = await file.text();
-        const parsed: unknown = JSON.parse(text);
-        const candidate = hasDocumentsArray(parsed) ? parsed.documents[0] : parsed;
-        const nextDocument = broadsetDocumentSchema.parse(candidate);
+        const { importDocument } = await import('./formatBridge');
+        const nextDocument = await importDocument(file);
 
         editorStore.getState().loadTemplate(nextDocument);
-        pushToast('success', `Imported ${file.name}.`);
-      } catch {
-        pushToast('error', `Could not import ${file.name}.`);
+        pushToast('success', 'Import complete.');
+      } catch (error: unknown) {
+        pushToast('error', `Import failed: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
         event.currentTarget.value = '';
       }
@@ -1452,6 +1444,7 @@ export function DemoApp(): React.JSX.Element {
   const handleCreateFromPreset = useCallback(
     (preset: DocumentPreset): void => {
       const doc = createEmptyBroadsetDocument();
+      const viewMode = preset.mode === 'broadcast' || preset.mode === 'print' ? preset.mode : 'none';
       const updated: BroadsetDocument = {
         ...doc,
         name: preset.name,
@@ -1459,6 +1452,7 @@ export function DemoApp(): React.JSX.Element {
       };
 
       editorStore.getState().loadTemplate(updated);
+      editorStore.getState().updateCanvasSettings({ viewMode });
       setActiveDialog(null);
       pushToast(
         'success',
@@ -1472,15 +1466,30 @@ export function DemoApp(): React.JSX.Element {
     (exporter: string, _data: Readonly<Record<string, unknown>>): void => {
       if (exporter === 'json') {
         handleSaveAsJson();
-      } else {
-        // Format-specific exporting will be implemented in Phase 10 (Formats).
-        // For now, show a toast indicating which exporter was selected.
-        pushToast('info', `Export format "${exporter.toUpperCase()}" selected. Full export in Phase 10.`);
+        setActiveDialog(null);
+
+        return;
       }
+
+      const doExport = async (): Promise<void> => {
+        const bridge = await import('./formatBridge');
+        const formats = await bridge.loadFormats();
+        const snapshotCanvas = formats.discoverCanvasElement() ?? undefined;
+
+        await bridge.exportDocument(exporter as ExportFormat, {
+          document: currentDocument,
+          ...(snapshotCanvas !== undefined ? { snapshotCanvas } : {}),
+        });
+        pushToast('success', `Exported as ${exporter.toUpperCase()}.`);
+      };
+
+      void doExport().catch((error: unknown) => {
+        pushToast('error', `Export failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
 
       setActiveDialog(null);
     },
-    [handleSaveAsJson, pushToast],
+    [currentDocument, handleSaveAsJson, pushToast],
   );
 
   const handleMediaSelect = useCallback(
@@ -2092,7 +2101,7 @@ export function DemoApp(): React.JSX.Element {
         >
           <input
             ref={fileInputRef}
-            accept=".json,application/json"
+            accept=".json,.bsp,.psd,.pptx,.svg,application/json,image/vnd.adobe.photoshop,image/svg+xml"
             hidden
             type="file"
             onChange={(event) => {
