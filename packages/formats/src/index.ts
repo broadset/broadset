@@ -17,6 +17,7 @@ export {
   resolveGoogleFontUrl,
   wrapText,
 } from './pdf';
+export { exportPptxBytes, importPptx } from './pptx';
 export {
   discoverCanvasElement,
   exportEmbeddedSvgBlob,

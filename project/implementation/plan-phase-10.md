@@ -56,8 +56,8 @@ animation support).
 
 ### 10.4 PDF export (`formats/pdf.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/formats/pdf.md`
 _What to cover:_ PDF generation; coordinate conversion (mm → pt); font embedding
