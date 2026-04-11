@@ -469,6 +469,7 @@ function toPanelElement(element: BroadsetElement): PanelElement {
     fontWeight: element.style.fontWeight ?? 400,
     fontStyle: element.style.fontStyle ?? 'normal',
     textAlignment: element.style.textAlignment ?? 'left',
+    verticalAlignment: element.style.verticalAlignment ?? 'top',
     textDecoration: element.style.textDecoration ?? 'none',
     textTransform: element.style.textTransform ?? 'none',
     letterSpacing: element.style.letterSpacing ?? 0,

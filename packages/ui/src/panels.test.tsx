@@ -438,6 +438,7 @@ const BASE_ELEMENT: PanelElement = {
   fontWeight: 400,
   fontStyle: 'normal',
   textAlignment: 'left',
+  verticalAlignment: 'top',
   textDecoration: '',
   textTransform: 'none',
   letterSpacing: 0,
@@ -740,6 +741,7 @@ describe('TypographyPanel', () => {
         fontWeight={700}
         fontStyle="normal"
         textAlignment="center"
+        verticalAlignment="top"
         textDecoration=""
         textTransform="none"
         onUpdate={onUpdate}
@@ -762,6 +764,7 @@ describe('TypographyPanel', () => {
         fontWeight={400}
         fontStyle="normal"
         textAlignment="center"
+        verticalAlignment="top"
         textDecoration=""
         textTransform="none"
         onUpdate={onUpdate}
@@ -1370,6 +1373,13 @@ describe('PropertiesSidebar', () => {
 
     expect(screen.getByText('Typography')).not.toBeNull();
     expect(screen.getByText('Text Effects')).not.toBeNull();
+  });
+
+  /** @description Vertical alignment control must appear in the Typography panel for text elements. */
+  it('shows vertical alignment control for text elements', () => {
+    render(<PropertiesSidebar elements={[TEXT_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    expect(screen.getByLabelText('Vertical alignment')).not.toBeNull();
   });
 
   /** @description Typography panel must not appear for non-text elements. */

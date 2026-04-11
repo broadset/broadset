@@ -1,3 +1,4 @@
+import type { VerticalAlignment } from '@broadset/model';
 import { getCapabilityProfile } from '@broadset/model';
 import {
   Accordion,
@@ -91,6 +92,7 @@ const ERROR_CORRECTION_OPTIONS = ['L', 'M', 'Q', 'H'] as const;
 const TEXT_TRANSFORM_OPTIONS = ['none', 'uppercase', 'lowercase', 'capitalize'] as const;
 const TEXT_DECORATION_OPTIONS = ['', 'underline', 'overline', 'line-through'] as const;
 const TEXT_ALIGNMENT_OPTIONS = ['left', 'center', 'right', 'justify'] as const;
+const VERTICAL_ALIGNMENT_OPTIONS = ['top', 'middle', 'bottom'] as const;
 const FONT_STYLE_OPTIONS = ['normal', 'italic'] as const;
 const ISOLATION_OPTIONS = ['auto', 'isolate'] as const;
 
@@ -167,6 +169,7 @@ export interface PanelElement {
   readonly fontWeight: number;
   readonly fontStyle: string;
   readonly textAlignment: string;
+  readonly verticalAlignment: VerticalAlignment;
   readonly textDecoration: string;
   readonly textTransform: string;
   readonly letterSpacing: number;
@@ -661,6 +664,7 @@ export interface TypographyPanelProps {
   readonly fontWeight: number;
   readonly fontStyle: string;
   readonly textAlignment: string;
+  readonly verticalAlignment: VerticalAlignment;
   readonly textDecoration: string;
   readonly textTransform: string;
   readonly onUpdate: (key: string, value: string | number) => void;
@@ -673,6 +677,7 @@ export function TypographyPanel({
   fontWeight,
   fontStyle,
   textAlignment,
+  verticalAlignment,
   textDecoration,
   textTransform,
   onUpdate,
@@ -726,6 +731,13 @@ export function TypographyPanel({
         options={[...TEXT_ALIGNMENT_OPTIONS]}
         onUpdate={onUpdate}
         updateKey="textAlignment"
+      />
+      <SelectField
+        label="Vertical alignment"
+        value={verticalAlignment}
+        options={[...VERTICAL_ALIGNMENT_OPTIONS]}
+        onUpdate={onUpdate}
+        updateKey="verticalAlignment"
       />
       <SelectField
         label="Text decoration"
@@ -1453,6 +1465,7 @@ export function AnimationModePropertiesPanel({
                   fontWeight={element.fontWeight}
                   fontStyle={element.fontStyle}
                   textAlignment={element.textAlignment}
+                  verticalAlignment={element.verticalAlignment}
                   textDecoration={element.textDecoration}
                   textTransform={element.textTransform}
                   onUpdate={onUpdate}
@@ -1961,6 +1974,7 @@ export function PropertiesSidebar({
                 fontWeight={primary.fontWeight}
                 fontStyle={primary.fontStyle}
                 textAlignment={primary.textAlignment}
+                verticalAlignment={primary.verticalAlignment}
                 textDecoration={primary.textDecoration}
                 textTransform={primary.textTransform}
                 onUpdate={onUpdate}
