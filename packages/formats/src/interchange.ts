@@ -100,15 +100,117 @@ export function isVideoExportSupported(): boolean {
   return typeof globalThis.VideoEncoder !== 'undefined';
 }
 
+/** Options for frame-by-frame video export. */
+export interface VideoExportOptions {
+  /** Target canvas to capture frames from. */
+  readonly canvas: HTMLCanvasElement;
+  /** Callback that renders the scene at the given time (ms) before frame capture. */
+  readonly renderFrame: (timeMs: number) => void;
+  /** Total animation duration in milliseconds. */
+  readonly durationMs: number;
+  /** Frames per second (defaults to 30). */
+  readonly frameRate?: number;
+  /** Enable alpha channel transparency for broadcast overlay (defaults to false). */
+  readonly alpha?: boolean;
+  /** Encoding quality 0–1 (defaults to 0.8). */
+  readonly quality?: number;
+  /** Progress callback invoked with a value in [0, 1] and an optional stage descriptor. */
+  readonly onProgress?: (progress: number, stage?: string) => void;
+}
+
 /**
- * Exports video as a Blob. Rejects when VideoEncoder is unavailable.
+ * Exports video as a Blob using the VideoEncoder API.
+ * Rejects when VideoEncoder is unavailable or when encoding fails.
  */
-export function exportVideoBlob(): Promise<Blob> {
+export async function exportVideoBlob(options: VideoExportOptions): Promise<Blob> {
   if (!isVideoExportSupported()) {
-    return Promise.reject(new Error('Video export is not supported: VideoEncoder API is unavailable'));
+    throw new Error('Video export is not supported: VideoEncoder API is unavailable');
   }
 
-  return Promise.reject(new Error('Video export is not yet implemented'));
+  const frameRate = options.frameRate ?? 30;
+  const alpha = options.alpha ?? false;
+  const quality = options.quality ?? 0.8;
+
+  if (frameRate <= 0) {
+    throw new Error('frameRate must be positive');
+  }
+
+  if (options.durationMs <= 0) {
+    throw new Error('durationMs must be positive');
+  }
+
+  options.onProgress?.(0, 'Initializing encoder');
+
+  const totalFrames = Math.ceil((options.durationMs / 1000) * frameRate);
+  const frameDurationUs = Math.round(1_000_000 / frameRate);
+  const collectedChunks: EncodedVideoChunk[] = [];
+  const encoderState = { error: null as Error | null };
+
+  const encoder = new VideoEncoder({
+    output(chunk: EncodedVideoChunk) {
+      collectedChunks.push(chunk);
+    },
+    error(err: DOMException) {
+      encoderState.error = new Error('VideoEncoder error during video export', { cause: err });
+    },
+  });
+
+  /** VP9 max bitrate in bits/sec, scaled by quality 0–1 */
+  const MAX_BITRATE = 4_000_000;
+  const bitrate = Math.round(quality * MAX_BITRATE);
+  /** VP9 codec profile: 01 (profile 1, alpha) or 00 (profile 0, opaque), 10-bit, level 08 */
+  const codecString = alpha ? 'vp09.01.10.08' : 'vp09.00.10.08';
+
+  encoder.configure({
+    codec: codecString,
+    width: options.canvas.width,
+    height: options.canvas.height,
+    bitrate,
+    framerate: frameRate,
+    alpha: alpha ? 'keep' : 'discard',
+  });
+
+  options.onProgress?.(0.1, 'Rendering frames');
+
+  for (let i = 0; i < totalFrames; i++) {
+    if (encoderState.error) throw encoderState.error;
+
+    const timeMs = (i / frameRate) * 1000;
+
+    options.renderFrame(timeMs);
+
+    const frame = new VideoFrame(options.canvas, {
+      timestamp: i * frameDurationUs,
+      alpha: alpha ? 'keep' : 'discard',
+    });
+
+    encoder.encode(frame);
+    frame.close();
+
+    // Report progress: 10% for init, 80% for frames, 10% for flushing
+    const frameProgress = 0.1 + 0.8 * ((i + 1) / totalFrames);
+
+    options.onProgress?.(frameProgress, 'Rendering frames');
+  }
+
+  options.onProgress?.(0.9, 'Flushing encoder');
+
+  await encoder.flush();
+
+  if (encoderState.error) throw encoderState.error;
+
+  const totalSize = collectedChunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  const buffer = new Uint8Array(totalSize);
+  let offset = 0;
+
+  for (const chunk of collectedChunks) {
+    chunk.copyTo(buffer.subarray(offset));
+    offset += chunk.byteLength;
+  }
+
+  options.onProgress?.(1, 'Complete');
+
+  return new Blob([buffer], { type: 'video/webm' });
 }
 
 /* ------------------------------------------------------------------ */

@@ -5,6 +5,7 @@ export {
   generateQrSvgFragment,
   isVideoExportSupported,
   sanitizeFilename,
+  type VideoExportOptions,
 } from './interchange';
 export {
   buildMaskedSvgSource,
