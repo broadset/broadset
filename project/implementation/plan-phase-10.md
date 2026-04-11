@@ -69,8 +69,8 @@ masked SVG fallback (clip-path generates mask).
 
 ### 10.5 PPTX export/import (`formats/pptx.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/formats/pptx.md`
 _What to cover:_ PPTX OOXML output with SVG fallback for styled rectangles;

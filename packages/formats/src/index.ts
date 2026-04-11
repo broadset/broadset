@@ -18,6 +18,7 @@ export {
   wrapText,
 } from './pdf';
 export { exportPptxBytes, importPptx } from './pptx';
+export { exportPsdBytes, exportPsdBytesAsync, importPsd, svgPathToPsdVectorMask } from './psd';
 export {
   discoverCanvasElement,
   exportEmbeddedSvgBlob,
