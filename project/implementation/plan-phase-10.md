@@ -43,8 +43,8 @@ background for compositing).
 
 ### 10.3 Web vector — SVG and HTML (`formats/web-vector.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/formats/web-vector.md`
 _What to cover:_ SVG export (static SVG with clip-path, rotation, viewBox);

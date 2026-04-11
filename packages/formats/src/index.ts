@@ -7,6 +7,17 @@ export {
   sanitizeFilename,
 } from './interchange';
 export {
+  buildMaskedSvgSource,
+  canvasToPoints,
+  decodeDataUri,
+  drawQrOnPage,
+  exportPdfBytes,
+  normalizeFontFamily,
+  parseCssColor,
+  resolveGoogleFontUrl,
+  wrapText,
+} from './pdf';
+export {
   discoverCanvasElement,
   exportEmbeddedSvgBlob,
   exportJpegBlob,
