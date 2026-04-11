@@ -18,8 +18,8 @@ complexity.
 
 ### 10.1 JSON interchange and utilities (`formats/interchange.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/formats/interchange.md`
 _What to cover:_ JSON export/import round-trip (BroadsetDocument ↔ JSON string);
