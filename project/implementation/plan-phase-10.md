@@ -92,8 +92,8 @@ preserve rest as fallback).
 
 ### 10.7 Video export (`formats/interchange.md`)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 _Spec:_ `project/spec/formats/interchange.md`
 _What to cover:_ VideoEncoder with capability detection; frame-by-frame rendering
