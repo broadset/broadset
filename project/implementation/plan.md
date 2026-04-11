@@ -30,9 +30,9 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 10 — Formats
-- **In Progress:** 10-A (first unit of phase 10)
-- **Last Merged:** 9-G demo config + persistence
+- **Active Phase:** Phase 11 — Cross-Cutting Extras
+- **In Progress:** 11.1 (first unit of phase 11)
+- **Last Merged:** 10.8 demo export/import integration
 
 ---
 

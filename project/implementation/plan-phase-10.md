@@ -103,8 +103,8 @@ meaningful error, full export or failure).
 
 ### 10.8 Demo: export/import integration
 
-- [ ] tests: red (Playwright CT)
-- [ ] impl: green
+- [x] tests: red (Playwright CT)
+- [x] impl: green
 
 _Spec:_ `project/spec/demo/data-integration.md` (export orchestration, import
 orchestration, lazy format loading, success/error toasts)
@@ -119,11 +119,11 @@ formats with validation; success/error toasts for all operations.
 
 | Unit                       | Red | Green |
 | -------------------------- | --- | ----- |
-| 10.1 JSON interchange      | ☐   | ☐     |
-| 10.2 raster export         | ☐   | ☐     |
-| 10.3 web vector (SVG/HTML) | ☐   | ☐     |
-| 10.4 PDF export            | ☐   | ☐     |
-| 10.5 PPTX export/import    | ☐   | ☐     |
-| 10.6 PSD export/import     | ☐   | ☐     |
-| 10.7 video export          | ☐   | ☐     |
-| 10.8 demo export/import    | ☐   | ☐     |
+| 10.1 JSON interchange      | ✅  | ✅    |
+| 10.2 raster export         | ✅  | ✅    |
+| 10.3 web vector (SVG/HTML) | ✅  | ✅    |
+| 10.4 PDF export            | ✅  | ✅    |
+| 10.5 PPTX export/import    | ✅  | ✅    |
+| 10.6 PSD export/import     | ✅  | ✅    |
+| 10.7 video export          | ✅  | ✅    |
+| 10.8 demo export/import    | ✅  | ✅    |
