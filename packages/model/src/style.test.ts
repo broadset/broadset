@@ -298,3 +298,28 @@ describe('Masking and clipping properties', () => {
     expect(styleSchema.safeParse({ opacity: 1, customClipPath: '' }).success).toBe(true);
   });
 });
+
+/** @description fontVariationSettings stores a CSS font-variation-settings string on the element style. */
+describe('fontVariationSettings', () => {
+  /** @description A valid axis tag and numeric value string is accepted. */
+  it('accepts valid font-variation-settings string', () => {
+    const result = styleSchema.safeParse({ opacity: 1, fontVariationSettings: "'wght' 450, 'wdth' 80" });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.data.fontVariationSettings).toBe("'wght' 450, 'wdth' 80");
+    }
+  });
+
+  /** @description When omitted, fontVariationSettings is undefined in the parsed style. */
+  it('omits fontVariationSettings when not provided', () => {
+    const result = styleSchema.safeParse({ opacity: 1 });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.data.fontVariationSettings).toBeUndefined();
+    }
+  });
+});

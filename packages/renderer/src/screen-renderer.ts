@@ -286,6 +286,7 @@ class DOMScreenRenderer implements ScreenRendererController {
     contentHost.style.textAlign = style.textAlignment ?? '';
     contentHost.style.textDecoration = style.textDecoration ?? '';
     contentHost.style.textTransform = style.textTransform ?? '';
+    contentHost.style.fontVariationSettings = style.fontVariationSettings ?? '';
     contentHost.style.whiteSpace = element.type === 'ticker' ? 'nowrap' : 'normal';
 
     applyBackgroundStyle(contentHost, style);

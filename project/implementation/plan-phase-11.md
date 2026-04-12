@@ -96,8 +96,8 @@ _Spec sections:_ `model/animation.md` §audioCues, `model/format-reference.md`
 _Affected packages:_ model, renderer, ui
 _Spec sections:_ `model/style.md` §fontVariationSettings, `model/capabilities.md` §typography
 
-- [ ] model: `fontVariationSettings` (CSS string) on style, gated by typography capability
-- [ ] renderer: apply `font-variation-settings` CSS property to text elements
+- [x] model: `fontVariationSettings` (CSS string) on style, gated by typography capability
+- [x] renderer: apply `font-variation-settings` CSS property to text elements
 - [ ] ui: per-axis sliders in properties panel when variable font is active (dynamically generated from font metadata)
 - [ ] demo milestone: select text with variable font → adjust weight/width axes
       via sliders → font appearance changes in real-time
