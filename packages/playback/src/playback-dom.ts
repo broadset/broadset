@@ -7,7 +7,8 @@ import {
   parseGradientTarget,
   serializeGradientToCss,
 } from './gradient-targets';
-import type { TimelineFrame } from './timeline';
+import { computeTextSegments } from './text-animator';
+import { computeTimelineFrame, type TimelineFrame } from './timeline';
 
 export type VisibilityState = 'onscreen' | 'offscreen';
 
@@ -675,5 +676,60 @@ export function applyTimelineFrameToDom(args: {
     if (targetContainer !== null) {
       args.targetsResolver.applyStyles(targetContainer, properties);
     }
+  }
+
+  applyTextAnimator(args);
+}
+
+function applyTextAnimator(args: {
+  readonly targetsResolver: AnimationTargetsResolver;
+  readonly container: HTMLElement;
+  readonly config: ElementAnimationConfig;
+  readonly frame: TimelineFrame;
+}): void {
+  const textAnimator = args.config.textAnimator;
+
+  if (textAnimator === null) {
+    return;
+  }
+
+  const contentTarget = args.container.querySelector<HTMLElement>('[data-element-content]') ?? args.container;
+  const charSpans = contentTarget.querySelectorAll<HTMLElement>('[data-char-index]');
+
+  if (charSpans.length === 0) {
+    return;
+  }
+
+  const timeline = args.config.timelines.find((tl) => tl.id === textAnimator.timelineId);
+
+  if (timeline === undefined) {
+    return;
+  }
+
+  const textContent = Array.from(charSpans)
+    .map((span) => span.textContent)
+    .join('');
+  const segments = computeTextSegments(textContent, textAnimator);
+
+  for (const segment of segments) {
+    const span = charSpans[segment.index];
+
+    if (span === undefined) {
+      continue;
+    }
+
+    const segmentTimeMs = args.frame.timeMs - segment.startTimeMs;
+
+    if (segmentTimeMs < 0) {
+      // Segment hasn't started yet — apply first keyframe value (start state)
+      const startFrame = computeTimelineFrame({ timeline, timeMs: 0 });
+
+      args.targetsResolver.applyStyles(span, startFrame.properties);
+      continue;
+    }
+
+    const segmentFrame = computeTimelineFrame({ timeline, timeMs: segmentTimeMs });
+
+    args.targetsResolver.applyStyles(span, segmentFrame.properties);
   }
 }

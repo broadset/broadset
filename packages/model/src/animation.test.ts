@@ -437,3 +437,149 @@ describe('Gradient animation target validation', () => {
     expect(result.success).toBe(true);
   });
 });
+
+/** @description TextAnimator validation ensures stagger config is well-formed and references valid timelines. */
+describe('TextAnimator validation', () => {
+  const baseTimeline = {
+    id: 'tl-char',
+    name: 'char-reveal',
+    keyframes: [
+      {
+        name: 'start',
+        action: 'none',
+        offsetMs: 0,
+        properties: { opacity: { type: 'number', value: 0, easing: 'linear' } },
+      },
+      {
+        name: 'end',
+        action: 'none',
+        offsetMs: 200,
+        properties: { opacity: { type: 'number', value: 1, easing: 'linear' } },
+      },
+    ],
+  };
+
+  /** @description A valid textAnimator with rangeMode characters and matching timelineId must pass validation. */
+  it('accepts valid textAnimator with characters rangeMode', () => {
+    const config = {
+      timelines: [baseTimeline],
+      stateTimelineBindings: [],
+      modifierTimelineBindings: [],
+      textAnimator: { rangeMode: 'characters', staggerDelayMs: 50, randomOrder: false, timelineId: 'tl-char' },
+    };
+    const result = elementAnimationConfigSchema.safeParse(config);
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description A valid textAnimator with rangeMode words must pass validation. */
+  it('accepts textAnimator with words rangeMode', () => {
+    const config = {
+      timelines: [baseTimeline],
+      stateTimelineBindings: [],
+      modifierTimelineBindings: [],
+      textAnimator: { rangeMode: 'words', staggerDelayMs: 100, randomOrder: false, timelineId: 'tl-char' },
+    };
+    const result = elementAnimationConfigSchema.safeParse(config);
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description A valid textAnimator with rangeMode lines must pass validation. */
+  it('accepts textAnimator with lines rangeMode', () => {
+    const config = {
+      timelines: [baseTimeline],
+      stateTimelineBindings: [],
+      modifierTimelineBindings: [],
+      textAnimator: { rangeMode: 'lines', staggerDelayMs: 200, randomOrder: true, timelineId: 'tl-char' },
+    };
+    const result = elementAnimationConfigSchema.safeParse(config);
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description textAnimator.timelineId must reference a timeline that exists in the config. */
+  it('rejects textAnimator referencing non-existent timeline', () => {
+    const config = {
+      timelines: [baseTimeline],
+      stateTimelineBindings: [],
+      modifierTimelineBindings: [],
+      textAnimator: { rangeMode: 'characters', staggerDelayMs: 50, randomOrder: false, timelineId: 'tl-missing' },
+    };
+    const result = elementAnimationConfigSchema.safeParse(config);
+
+    expect(result.success).toBe(false);
+  });
+
+  /** @description staggerDelayMs must be non-negative. */
+  it('rejects negative staggerDelayMs', () => {
+    const config = {
+      timelines: [baseTimeline],
+      stateTimelineBindings: [],
+      modifierTimelineBindings: [],
+      textAnimator: { rangeMode: 'characters', staggerDelayMs: -10, randomOrder: false, timelineId: 'tl-char' },
+    };
+    const result = elementAnimationConfigSchema.safeParse(config);
+
+    expect(result.success).toBe(false);
+  });
+
+  /** @description An invalid rangeMode must be rejected. */
+  it('rejects invalid rangeMode', () => {
+    const config = {
+      timelines: [baseTimeline],
+      stateTimelineBindings: [],
+      modifierTimelineBindings: [],
+      textAnimator: { rangeMode: 'paragraphs', staggerDelayMs: 50, randomOrder: false, timelineId: 'tl-char' },
+    };
+    const result = elementAnimationConfigSchema.safeParse(config);
+
+    expect(result.success).toBe(false);
+  });
+
+  /** @description textAnimator null means no per-character animation and must be valid. */
+  it('accepts null textAnimator', () => {
+    const config = {
+      timelines: [baseTimeline],
+      stateTimelineBindings: [],
+      modifierTimelineBindings: [],
+      textAnimator: null,
+    };
+    const result = elementAnimationConfigSchema.safeParse(config);
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description Omitted textAnimator defaults to null. */
+  it('defaults omitted textAnimator to null', () => {
+    const config = {
+      timelines: [baseTimeline],
+      stateTimelineBindings: [],
+      modifierTimelineBindings: [],
+    };
+    const result = elementAnimationConfigSchema.safeParse(config);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.data.textAnimator).toBeNull();
+    }
+  });
+
+  /** @description randomOrder defaults to false when omitted. */
+  it('defaults randomOrder to false', () => {
+    const config = {
+      timelines: [baseTimeline],
+      stateTimelineBindings: [],
+      modifierTimelineBindings: [],
+      textAnimator: { rangeMode: 'characters', staggerDelayMs: 50, timelineId: 'tl-char' },
+    };
+    const result = elementAnimationConfigSchema.safeParse(config);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.data.textAnimator?.randomOrder).toBe(false);
+    }
+  });
+});

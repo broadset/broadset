@@ -377,8 +377,28 @@ function createSimpleRenderer(update: (host: HTMLElement, element: BroadsetEleme
   };
 }
 
+const HTML_TAG_RE = /<[^>]*>/gu;
+
+function stripHtmlTags(content: string): string {
+  return content.replace(HTML_TAG_RE, '');
+}
+
+function renderPerCharacterSpans(host: HTMLElement, content: string): void {
+  const plainText = stripHtmlTags(sanitizeTextContent(content));
+
+  host.textContent = '';
+
+  for (let i = 0; i < plainText.length; i += 1) {
+    const span = document.createElement('span');
+
+    span.setAttribute('data-char-index', String(i));
+    span.textContent = plainText[i] ?? '';
+    host.appendChild(span);
+  }
+}
+
 const createTextRenderer = createSimpleRenderer((host, element) => {
-  host.innerHTML = sanitizeTextContent(element.content);
+  renderPerCharacterSpans(host, element.content);
   host.style.display = 'flex';
   host.style.alignItems = mapVerticalAlignment(element.style.verticalAlignment);
   host.style.justifyContent = mapTextAlignment(element.style.textAlignment);
