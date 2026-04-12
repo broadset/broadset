@@ -20,6 +20,7 @@ import {
   renameTemplateGroup,
   type ResizeHandle,
   runPreflightDiagnostics,
+  startClipPathEditing,
   startPlacement,
   updateMemberRole,
 } from '@broadset/editor';
@@ -3407,7 +3408,7 @@ export function DemoApp(): React.JSX.Element {
                           <Dropdown.Item
                             key="edit-clip-path"
                             onAction={() => {
-                              pushToast('info', 'Clip-path editing is not wired in this shell yet.');
+                              startClipPathEditing(editorStore, contextMenuElement.id);
                               setContextMenu(null);
                             }}
                           >
