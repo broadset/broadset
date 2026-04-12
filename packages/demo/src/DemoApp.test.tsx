@@ -1705,4 +1705,51 @@ describe('9-F: Preflight Diagnostics', () => {
 
     expect(countdownButton).toBeTruthy();
   });
+
+  /* ================================================================= */
+  /*  WCAG AA Accessibility Compliance                                  */
+  /* ================================================================= */
+
+  /** @description All toolbar regions must have role="toolbar" with descriptive aria-label so screen readers can announce them as navigable regions. */
+  it('all toolbars have role="toolbar" with aria-label', () => {
+    renderDemoApp();
+
+    const toolbars = screen.getAllByRole('toolbar');
+
+    for (const toolbar of toolbars) {
+      expect(toolbar.getAttribute('aria-label')).toBeTruthy();
+    }
+
+    // At minimum: main toolbar, sidebar toolbar, element toolbar
+    expect(toolbars.length).toBeGreaterThanOrEqual(3);
+  });
+
+  /** @description All icon-only toolbar buttons must have aria-label so screen readers can announce their purpose. */
+  it('icon-only toolbar buttons have aria-label', () => {
+    renderDemoApp();
+
+    const mainToolbar = screen.getByRole('toolbar', { name: /main editor toolbar/i });
+    const buttons = within(mainToolbar).getAllByRole('button');
+
+    for (const button of buttons) {
+      // Every button must have an aria-label or visible text content
+      const hasAriaLabel = button.getAttribute('aria-label') !== null;
+      const hasText = button.textContent.trim().length > 0;
+
+      expect(hasAriaLabel || hasText).toBe(true);
+    }
+  });
+
+  /** @description The canvas area must have an accessible description to communicate interaction hints to screen reader users. */
+  it('canvas has aria-description for interaction context', () => {
+    renderDemoApp();
+
+    const workarea = screen.getByTestId('demo-canvas-workarea');
+
+    // The ScreenPreview inside the workarea should have descriptive text for screen readers
+    const previewDiv = workarea.querySelector('[aria-description]');
+
+    expect(previewDiv).not.toBeNull();
+    expect(previewDiv?.getAttribute('aria-description')).toBeTruthy();
+  });
 });

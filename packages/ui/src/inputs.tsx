@@ -15,7 +15,7 @@ import {
 } from '@heroui/react';
 import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import type { JSX } from 'react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import type { Color } from 'react-aria-components';
 
 import { color as colorToken, sp } from './tokens';
@@ -313,6 +313,7 @@ export function ColorInput({ value, onChange, label }: ColorInputProps): JSX.Ele
   const [format, setFormat] = useState<ColorFormat>('hex');
   const [palette, setPalette] = useState<readonly string[]>([]);
   const lastValidRef = useRef(value);
+  const errorId = useId();
 
   const parsed = useMemo(() => parseColorToRgba(value), [value]);
   const isTransparent = parsed !== null && parsed.a === 0;
@@ -329,6 +330,9 @@ export function ColorInput({ value, onChange, label }: ColorInputProps): JSX.Ele
 
     return formatColor(parsed.r, parsed.g, parsed.b, parsed.a, format);
   }, [isDrafting, draft, parsed, value, format]);
+
+  /** Whether the current draft text is an invalid color string. */
+  const draftInvalid = useMemo(() => isDrafting && parseColorToRgba(draft) === null, [isDrafting, draft]);
 
   const handleTextChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setDraft(event.currentTarget.value);
@@ -528,11 +532,30 @@ export function ColorInput({ value, onChange, label }: ColorInputProps): JSX.Ele
 
       <Input
         aria-label={`${label} color text`}
+        aria-invalid={draftInvalid || undefined}
+        aria-describedby={draftInvalid ? errorId : undefined}
         value={displayValue}
         onChange={handleTextChange}
         onBlur={handleTextBlur}
         onKeyDown={handleTextKeyDown}
       />
+      {draftInvalid && (
+        <span
+          id={errorId}
+          role="alert"
+          style={{
+            clip: 'rect(0 0 0 0)',
+            clipPath: 'inset(50%)',
+            height: 1,
+            overflow: 'hidden',
+            position: 'absolute',
+            whiteSpace: 'nowrap',
+            width: 1,
+          }}
+        >
+          Invalid color format
+        </span>
+      )}
     </div>
   );
 }
