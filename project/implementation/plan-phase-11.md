@@ -73,11 +73,11 @@ _Spec sections:_ `model/animation.md` §gradient stop animation, `model/format-r
 _Affected packages:_ model, playback, renderer, ui
 _Spec sections:_ `model/animation.md` §TextAnimator, `model/format-reference.md`
 
-- [ ] model: add `TextAnimator` type (rangeMode: character/word/line, staggerDelayMs, randomOrder, timelineId) + Zod schema
-- [ ] playback: per-unit splitting engine — decompose text into characters/words/lines, compute per-unit stagger offsets, apply referenced timeline to each unit with delay
-- [ ] renderer: wrap individual text characters in `<span>` with `data-char-index` for per-character animation targeting
-- [ ] ui: text animator controls in animation sidebar (range mode dropdown, stagger delay input, random order toggle, timeline selector)
-- [ ] demo milestone: text element → add text animator with character stagger →
+- [x] model: add `TextAnimator` type (rangeMode: character/word/line, staggerDelayMs, randomOrder, timelineId) + Zod schema
+- [x] playback: per-unit splitting engine — decompose text into characters/words/lines, compute per-unit stagger offsets, apply referenced timeline to each unit with delay
+- [x] renderer: wrap individual text characters in `<span>` with `data-char-index` for per-character animation targeting
+- [x] ui: text animator controls in animation sidebar (range mode dropdown, stagger delay input, random order toggle, timeline selector)
+- [x] demo milestone: text element → add text animator with character stagger →
       play → each character animates in sequence with configured delay
 
 ## Feature Group 11-G: Audio cue support
@@ -85,8 +85,8 @@ _Spec sections:_ `model/animation.md` §TextAnimator, `model/format-reference.md
 _Affected packages:_ model, playback, ui
 _Spec sections:_ `model/animation.md` §audioCues, `model/format-reference.md`
 
-- [ ] model: add `audioCues` array to timeline type (assetId, offsetMs, volume 0–1, loop) + Zod schema
-- [ ] playback: fire-and-forget `<audio>` during forward playback; skip cues on seek; re-fire when time crosses cue offset forward; respect volume and loop flag
+- [x] model: add `audioCues` array to timeline type (assetId, offsetMs, volume 0–1, loop) + Zod schema
+- [x] playback: fire-and-forget `<audio>` during forward playback; skip cues on seek; re-fire when time crosses cue offset forward; respect volume and loop flag
 - [ ] ui: audio cue markers on timeline editor (visual markers at cue offsets, add/remove controls, asset picker, volume slider)
 - [ ] demo milestone: add audio cue at 500ms → play → audio fires; seek past →
       no audio; replay → fires again at 500ms

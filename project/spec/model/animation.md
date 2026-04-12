@@ -406,7 +406,8 @@ Audio cues are stored on the timeline, NOT on individual keyframes. The `audioCu
 
 ## Spec Gaps
 
-_None — all requirements have acceptance criteria._
+- **Audio cue asset validation** — Acceptance criterion "Given an assetId referencing a non-audio or non-existent asset, a validation warning is emitted" requires document-level validation context (access to the project asset library). The model-layer `audioCueSchema` validates `assetId` as a non-empty string but cannot verify asset existence or kind. This cross-package validation belongs in a document-level validator or editor-layer check when the full project context is available.
+- **Audio cue loop termination** — Acceptance criterion "Given loop: true, the audio loops until the timeline ends or another cue replaces it" requires integration with the actual audio playback system (HTMLAudioElement or Web Audio API). The `AudioCueEngine` preserves the `loop` flag on fired cues for downstream consumers, but the actual loop-until-timeline-end behavior is handled at the integration layer, not in the engine itself.
 
 ---
 
