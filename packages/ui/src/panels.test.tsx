@@ -1226,6 +1226,23 @@ describe('PreflightPanel', () => {
     expect(screen.getByText('Large file')).not.toBeNull();
     expect(screen.queryByText(/no issues/i)).toBeNull();
   });
+
+  /** @description Issues with elementName and ruleId must render them as part of the display. */
+  it('renders elementName and ruleId when provided', () => {
+    render(
+      <PreflightPanel
+        issues={[
+          { id: '1', severity: 'error', message: 'Outside safe area', elementName: 'Title Text', ruleId: 'title-safe' },
+        ]}
+      />,
+    );
+
+    const item = screen.getByRole('listitem');
+
+    expect(item.textContent).toContain('[title-safe]');
+    expect(item.textContent).toContain('Title Text');
+    expect(item.textContent).toContain('Outside safe area');
+  });
 });
 
 /* ================================================================== */

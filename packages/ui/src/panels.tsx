@@ -1411,6 +1411,8 @@ export interface PreflightIssue {
   readonly id: string;
   readonly severity: 'error' | 'warning' | 'info';
   readonly message: string;
+  readonly elementName?: string | undefined;
+  readonly ruleId?: string | undefined;
 }
 
 export interface PreflightPanelProps {
@@ -1435,9 +1437,17 @@ export function PreflightPanel({ issues }: PreflightPanelProps): JSX.Element {
             style={{
               fontSize: font('body-compact'),
               color: issue.severity === 'error' ? color('danger') : color('foreground'),
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+              padding: `${sp('sp-01')} 0`,
             }}
           >
-            {issue.message}
+            <span style={{ fontWeight: 600 }}>
+              {issue.ruleId !== undefined && issue.ruleId !== '' ? `[${issue.ruleId}] ` : ''}
+              {issue.elementName !== undefined && issue.elementName !== '' ? `${issue.elementName}: ` : ''}
+              {issue.message}
+            </span>
           </li>
         ))}
       </ul>

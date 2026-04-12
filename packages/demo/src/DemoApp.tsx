@@ -1274,7 +1274,9 @@ export function DemoApp(): React.JSX.Element {
     return diagnostics.map((d) => ({
       id: `${d.rule}:${d.elementName}`,
       severity: d.severity,
-      message: `[${d.elementName}] ${d.message}`,
+      message: d.message,
+      elementName: d.elementName,
+      ruleId: d.rule,
     }));
   }, [currentDocument]);
   const placementLabel = getElementLabel(editorState.pendingPlacementType);
