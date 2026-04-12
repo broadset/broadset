@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { type AnimationDefinition, animationsSchema } from './animation';
 import { type BroadsetElement, elementSchema } from './element';
+import { type OutputSpec, outputSpecSchema } from './output-spec';
 import {
   hasAcyclicParentIds,
   hasUniqueElementIds,
@@ -71,7 +72,7 @@ export interface BroadsetDocument {
   readonly animations: readonly AnimationDefinition[];
   readonly pages: readonly Page[];
   readonly dataSchema: DataSchema;
-  readonly output?: Readonly<Record<string, unknown>> | undefined;
+  readonly output?: OutputSpec | undefined;
   readonly extensions?: Readonly<Record<string, unknown>> | undefined;
 }
 
@@ -169,7 +170,7 @@ export const broadsetDocumentSchema: z.ZodType<BroadsetDocument> = z
     pages: z.array(pageSchema).min(1),
     animations: animationsSchema,
     dataSchema: dataSchemaSchema,
-    output: z.record(z.string(), z.unknown()).optional(),
+    output: outputSpecSchema.optional(),
     extensions: z.record(z.string(), z.unknown()).optional(),
   })
   .superRefine((value, context) => {

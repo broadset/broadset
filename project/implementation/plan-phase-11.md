@@ -107,7 +107,7 @@ _Spec sections:_ `model/style.md` §fontVariationSettings, `model/capabilities.m
 _Affected packages:_ model, editor, ui
 _Spec sections:_ `model/output-spec.md` (frame rate, color space, dynamic range)
 
-- [ ] model: add `BroadcastOutputSpec` type (frameRate: 23.976/24/25/29.97/30/50/59.94/60, colorSpace: rec709/rec2020/srgb, dynamicRange: sdr/hlg/pq) + Zod validation
+- [x] model: add `BroadcastOutputSpec` type (frameRate: 23.976/24/25/29.97/30/50/59.94/60, colorSpace: rec709/rec2020/srgb, dynamicRange: sdr/hlg/pq) + Zod validation
 - [ ] editor: output spec in canvas/document settings (applies to animation quantization, timecode display)
 - [ ] ui: output spec controls in canvas settings modal (frame rate dropdown, color space select, dynamic range select)
 - [ ] demo milestone: set frame rate to 25fps → animation quantizes to 40ms

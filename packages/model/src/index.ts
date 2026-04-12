@@ -6,6 +6,7 @@ export * from './config';
 export * from './document';
 export * from './element';
 export * from './format-reference';
+export * from './output-spec';
 export * from './page-validation';
 export * from './style';
 export * from './utilities';
