@@ -30,9 +30,9 @@ its package.
 
 ## Current Status
 
-- **Active Phase:** Phase 11 — Cross-Cutting Extras
-- **In Progress:** 11.1 (first unit of phase 11)
-- **Last Merged:** 10.8 demo export/import integration
+- **Active Phase:** All phases complete
+- **In Progress:** —
+- **Last Merged:** 11-J accessibility audit
 
 ---
 
@@ -60,19 +60,19 @@ Phase 11 — Advanced Features     → trim path, boolean ops, text animation, a
 
 ## Phase Files
 
-| Phase | File                                 | Packages                              | Status      |
-| ----- | ------------------------------------ | ------------------------------------- | ----------- |
-| 1     | [plan-phase-1.md](plan-phase-1.md)   | `model`                               | complete    |
-| 2     | [plan-phase-2.md](plan-phase-2.md)   | `renderer` + `demo` shell             | complete    |
-| 3     | [plan-phase-3.md](plan-phase-3.md)   | `playback` + `demo` animated          | complete    |
-| 4     | [plan-phase-4.md](plan-phase-4.md)   | `editor` + `ui` + `demo` (MVP)        | complete    |
-| 5     | [plan-phase-5.md](plan-phase-5.md)   | `ui` + `editor` + `demo` (properties) | complete    |
-| 6     | [plan-phase-6.md](plan-phase-6.md)   | `editor` + `ui` + `demo` (polish)     | complete    |
-| 7     | [plan-phase-7.md](plan-phase-7.md)   | `editor` + `ui` + `demo` (animation)  | complete    |
-| 8     | [plan-phase-8.md](plan-phase-8.md)   | `editor` + `ui` + `demo` (paths)      | complete    |
-| 9     | [plan-phase-9.md](plan-phase-9.md)   | `editor` + `ui` + `demo` (data)       | not started |
-| 10    | [plan-phase-10.md](plan-phase-10.md) | `formats` + `demo`                    | not started |
-| 11    | [plan-phase-11.md](plan-phase-11.md) | cross-cutting (all packages)          | not started |
+| Phase | File                                 | Packages                              | Status   |
+| ----- | ------------------------------------ | ------------------------------------- | -------- |
+| 1     | [plan-phase-1.md](plan-phase-1.md)   | `model`                               | complete |
+| 2     | [plan-phase-2.md](plan-phase-2.md)   | `renderer` + `demo` shell             | complete |
+| 3     | [plan-phase-3.md](plan-phase-3.md)   | `playback` + `demo` animated          | complete |
+| 4     | [plan-phase-4.md](plan-phase-4.md)   | `editor` + `ui` + `demo` (MVP)        | complete |
+| 5     | [plan-phase-5.md](plan-phase-5.md)   | `ui` + `editor` + `demo` (properties) | complete |
+| 6     | [plan-phase-6.md](plan-phase-6.md)   | `editor` + `ui` + `demo` (polish)     | complete |
+| 7     | [plan-phase-7.md](plan-phase-7.md)   | `editor` + `ui` + `demo` (animation)  | complete |
+| 8     | [plan-phase-8.md](plan-phase-8.md)   | `editor` + `ui` + `demo` (paths)      | complete |
+| 9     | [plan-phase-9.md](plan-phase-9.md)   | `editor` + `ui` + `demo` (data)       | complete |
+| 10    | [plan-phase-10.md](plan-phase-10.md) | `formats` + `demo`                    | complete |
+| 11    | [plan-phase-11.md](plan-phase-11.md) | cross-cutting (all packages)          | complete |
 
 Update the Status column and the checkboxes inside each phase file as work
 progresses.

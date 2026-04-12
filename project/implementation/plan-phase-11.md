@@ -118,11 +118,11 @@ _Spec sections:_ `model/output-spec.md` (frame rate, color space, dynamic range)
 _Affected packages:_ ui, demo
 _Spec sections:_ `ui/utilities.md` §Accessibility, `ui/spec.md` §WCAG AA
 
-- [ ] ui: verify all inputs labeled, keyboard-operable, 4.5:1 contrast ratio, `aria-invalid` on validation errors
-- [ ] ui: tab navigation through all interactive elements, collapsibles with `aria-expanded`, toolbars with arrow key navigation, icon buttons with `aria-label`
-- [ ] ui: modals with focus trap + escape close + `aria-modal` + `aria-labelledby`
-- [ ] demo: full WCAG AA compliance audit across all UI components
-- [ ] demo milestone: screen reader navigates entire UI; all interactive elements
+- [x] ui: verify all inputs labeled, keyboard-operable, 4.5:1 contrast ratio, `aria-invalid` on validation errors
+- [x] ui: tab navigation through all interactive elements, collapsibles with `aria-expanded`, toolbars with arrow key navigation, icon buttons with `aria-label`
+- [x] ui: modals with focus trap + escape close + `aria-modal` + `aria-labelledby`
+- [x] demo: full WCAG AA compliance audit across all UI components
+- [x] demo milestone: screen reader navigates entire UI; all interactive elements
       keyboard-reachable; contrast ratios meet AA; focus management correct in
       modals and dialogs
 
@@ -132,13 +132,13 @@ _Spec sections:_ `ui/utilities.md` §Accessibility, `ui/spec.md` §WCAG AA
 
 | Group                             | Model | Renderer | Playback | Editor/UI | Demo |
 | --------------------------------- | ----- | -------- | -------- | --------- | ---- |
-| 11-A vertical text alignment      | ☐     | ☐        | —        | ☐         | ☐    |
-| 11-B trim path properties         | ☐     | ☐        | ☐        | ☐         | ☐    |
-| 11-C boolean shape operations     | ☐     | ☐        | —        | ☐         | ☐    |
-| 11-D template groups              | ☐     | —        | —        | ☐         | ☐    |
-| 11-E gradient animation targets   | ☐     | ☐        | ☐        | —         | ☐    |
-| 11-F per-character text animation | ☐     | ☐        | ☐        | ☐         | ☐    |
-| 11-G audio support                | ☐     | —        | ☐        | ☐         | ☐    |
-| 11-H variable font controls       | ☐     | ☐        | —        | ☐         | ☐    |
-| 11-I output specification         | ☐     | —        | —        | ☐         | ☐    |
-| 11-J accessibility audit          | —     | —        | —        | ☐         | ☐    |
+| 11-A vertical text alignment      | ✅    | ✅       | —        | ✅        | ✅   |
+| 11-B trim path properties         | ✅    | ✅       | ✅       | ✅        | ✅   |
+| 11-C boolean shape operations     | ✅    | ✅       | —        | ✅        | ✅   |
+| 11-D template groups              | ✅    | —        | —        | ✅        | ✅   |
+| 11-E gradient animation targets   | ✅    | ✅       | ✅       | —         | ✅   |
+| 11-F per-character text animation | ✅    | ✅       | ✅       | ✅        | ✅   |
+| 11-G audio support                | ✅    | —        | ✅       | ✅        | ✅   |
+| 11-H variable font controls       | ✅    | ✅       | —        | ✅        | ✅   |
+| 11-I output specification         | ✅    | —        | —        | ✅        | ✅   |
+| 11-J accessibility audit          | —     | —        | —        | ✅        | ✅   |
