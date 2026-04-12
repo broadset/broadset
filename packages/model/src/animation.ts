@@ -17,6 +17,13 @@ const EASING_PRESETS = new Set([
 
 const CUBIC_BEZIER_RE = /^cubic-bezier\(\s*([^\s,]+)\s*,\s*([^\s,]+)\s*,\s*([^\s,]+)\s*,\s*([^\s,)]+)\s*\)$/;
 const SPRING_RE = /^spring\(\s*([^\s,]+)\s*,\s*([^\s,]+)\s*,\s*([^\s,)]+)\s*\)$/;
+const GRADIENT_STOP_RE = /^backgroundGradient\.stops\[(\d+)\]\.(color|position)$/;
+
+/** Expected keyframe value type for each gradient animation target pattern. */
+const GRADIENT_TARGET_TYPES: Readonly<Record<string, string>> = {
+  'backgroundGradient.angle': 'number',
+  'backgroundGradient.center': 'tuple',
+};
 
 export type EasingMode =
   | 'linear'
@@ -235,6 +242,37 @@ export const keyframeSchema: z.ZodType<Keyframe> = z
           message: 'motionPath must be valid SVG path data',
           path: ['properties', 'motionPath'],
         });
+      }
+    }
+
+    for (const [key, prop] of Object.entries(value.properties)) {
+      const fixedType = GRADIENT_TARGET_TYPES[key];
+
+      if (fixedType !== undefined) {
+        if (prop.type !== fixedType) {
+          context.addIssue({
+            code: 'custom',
+            message: `${key} must use a '${fixedType}' keyframe value`,
+            path: ['properties', key],
+          });
+        }
+
+        continue;
+      }
+
+      const stopMatch = GRADIENT_STOP_RE.exec(key);
+
+      if (stopMatch !== null) {
+        const field = stopMatch[2];
+        const expectedType = field === 'color' ? 'color' : 'number';
+
+        if (prop.type !== expectedType) {
+          context.addIssue({
+            code: 'custom',
+            message: `${key} must use a '${expectedType}' keyframe value`,
+            path: ['properties', key],
+          });
+        }
       }
     }
   });

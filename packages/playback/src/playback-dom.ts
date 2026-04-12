@@ -1,5 +1,12 @@
-import type { ElementAnimationConfig } from '@broadset/model';
+import type { BroadsetGradient, ElementAnimationConfig } from '@broadset/model';
 
+import {
+  applyGradientPropertyUpdates,
+  type GradientPropertyUpdate,
+  isGradientAnimationTarget,
+  parseGradientTarget,
+  serializeGradientToCss,
+} from './gradient-targets';
 import type { TimelineFrame } from './timeline';
 
 export type VisibilityState = 'onscreen' | 'offscreen';
@@ -135,6 +142,7 @@ export function resolveAnimationTargets(): AnimationTargetsResolver {
   const transforms = new WeakMap<HTMLElement, MutableTransformState>();
   const trimStates = new WeakMap<HTMLElement, MutableTrimPathState>();
   const baselines = new WeakMap<Element, Map<string, string>>();
+  const baselineGradients = new WeakMap<HTMLElement, BroadsetGradient>();
 
   function getTargets(container: HTMLElement): ResolvedAnimationTargets {
     const cached = cache.get(container);
@@ -397,11 +405,42 @@ export function resolveAnimationTargets(): AnimationTargetsResolver {
     }
   }
 
+  function readBaselineGradient(target: HTMLElement): BroadsetGradient | null {
+    const cached = baselineGradients.get(target);
+
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const gradientJson = target.dataset['gradient'];
+
+    if (gradientJson === undefined) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(gradientJson) as BroadsetGradient;
+    } catch {
+      return null;
+    }
+  }
+
   return {
     applyStyles(container: HTMLElement, styles: Readonly<Record<string, unknown>>): void {
       const targets = getTargets(container);
+      const gradientUpdates: GradientPropertyUpdate[] = [];
 
       for (const [propertyName, value] of Object.entries(styles)) {
+        if (isGradientAnimationTarget(propertyName)) {
+          const parsed = parseGradientTarget(propertyName);
+
+          if (parsed !== null) {
+            gradientUpdates.push({ target: parsed, value });
+          }
+
+          continue;
+        }
+
         if (propertyName === 'opacity') {
           rememberBaseline(targets.opacityTarget, 'opacity', targets.opacityTarget.style.opacity);
           targets.opacityTarget.style.opacity = String(value);
@@ -459,12 +498,35 @@ export function resolveAnimationTargets(): AnimationTargetsResolver {
         );
         targets.contentTarget.style.setProperty(cssPropertyName, String(value));
       }
+
+      if (gradientUpdates.length > 0) {
+        rememberBaseline(
+          targets.contentTarget,
+          'background',
+          targets.contentTarget.style.getPropertyValue('background'),
+        );
+
+        const baseline = readBaselineGradient(targets.contentTarget);
+
+        if (baseline !== null) {
+          const updated = applyGradientPropertyUpdates(baseline, gradientUpdates);
+
+          baselineGradients.set(targets.contentTarget, baseline);
+          targets.contentTarget.style.background = serializeGradientToCss(updated);
+        }
+      }
     },
     clearStyles(container: HTMLElement, propertyNames: readonly string[]): void {
       const targets = getTargets(container);
       const uniquePropertyNames = new Set(propertyNames);
 
       for (const propertyName of uniquePropertyNames) {
+        if (isGradientAnimationTarget(propertyName)) {
+          baselineGradients.delete(targets.contentTarget);
+          restoreCssProperty(targets.contentTarget, 'background');
+          continue;
+        }
+
         if (propertyName === 'opacity') {
           targets.opacityTarget.style.opacity = readBaseline(targets.opacityTarget, 'opacity');
           continue;

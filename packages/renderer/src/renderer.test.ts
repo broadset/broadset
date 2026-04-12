@@ -124,6 +124,71 @@ describe('renderer core', () => {
     expect(node.style.backgroundImage).toBe('');
   });
 
+  /** @description Structured gradients must store JSON on data-gradient for playback animation targeting. */
+  it('stores data-gradient attribute for structured gradient objects', () => {
+    const node = document.createElement('div');
+
+    applyBackgroundStyle(node, {
+      ...createDefaultStyle(),
+      backgroundGradient: {
+        type: 'linear',
+        stops: [
+          { color: '#ff0000', position: 0 },
+          { color: '#0000ff', position: 100 },
+        ],
+        angle: 90,
+      },
+    });
+
+    const parsed = JSON.parse(node.dataset['gradient'] ?? '{}') as {
+      readonly type: string;
+      readonly stops: readonly unknown[];
+      readonly angle: number;
+    };
+
+    expect(parsed.type).toBe('linear');
+    expect(parsed.stops).toHaveLength(2);
+    expect(parsed.angle).toBe(90);
+  });
+
+  /** @description String gradients should not store data-gradient since they cannot be parsed back for per-stop animation. */
+  it('does not store data-gradient for string gradients', () => {
+    const node = document.createElement('div');
+
+    applyBackgroundStyle(node, {
+      ...createDefaultStyle(),
+      backgroundGradient: 'linear-gradient(90deg, red, blue)',
+    });
+
+    expect(node.dataset['gradient']).toBeUndefined();
+  });
+
+  /** @description Switching from gradient to solid background must clear the data-gradient attribute. */
+  it('clears data-gradient when switching to solid background', () => {
+    const node = document.createElement('div');
+
+    applyBackgroundStyle(node, {
+      ...createDefaultStyle(),
+      backgroundGradient: {
+        type: 'radial',
+        stops: [
+          { color: '#ffffff', position: 0 },
+          { color: '#000000', position: 100 },
+        ],
+        center: [50, 50],
+      },
+    });
+
+    expect(node.dataset['gradient']).toBeDefined();
+
+    applyBackgroundStyle(node, {
+      ...createDefaultStyle(),
+      backgroundColor: '#000000',
+    });
+
+    expect(node.dataset['gradient']).toBeUndefined();
+  });
+
   it('resolves capabilities in plugin, built-in, then all-false priority order', () => {
     const plugin: RendererPlugin = {
       type: 'countdown',

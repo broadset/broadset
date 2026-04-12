@@ -38,16 +38,24 @@ export function applyBackgroundStyle(node: HTMLElement, style: BroadsetElementSt
     node.style.backgroundColor = '';
     node.style.background = serializeGradient(style.backgroundGradient);
 
+    if (typeof style.backgroundGradient !== 'string') {
+      node.dataset['gradient'] = JSON.stringify(style.backgroundGradient);
+    } else {
+      delete node.dataset['gradient'];
+    }
+
     return;
   }
 
   if (style.backgroundColor !== undefined) {
     node.style.background = '';
     node.style.backgroundColor = style.backgroundColor;
+    delete node.dataset['gradient'];
 
     return;
   }
 
   node.style.background = '';
   node.style.backgroundColor = '';
+  delete node.dataset['gradient'];
 }
