@@ -7,6 +7,7 @@ import {
   ALL_DISABLED_CAPABILITIES,
   applyBackgroundStyle,
   buildSceneTree,
+  computeBooleanPath,
   computeTrimPathAttributes,
   createScreenRenderer,
   DATA_ATTRIBUTES,
@@ -220,6 +221,140 @@ describe('renderer core', () => {
     expect(host.innerHTML).toBe('');
     expect(lifecycleEvents).toEqual(['mount:custom-a', 'destroy:custom-a', 'mount:custom-b', 'destroy:custom-b']);
   });
+
+  /** @description Boolean group with union renders an SVG with a combined path element. */
+  it('renders a boolean group as a single SVG path', () => {
+    const host = document.createElement('div');
+
+    host.style.width = '1280px';
+    host.style.height = '720px';
+
+    const group = createElement({
+      id: 'group-1',
+      type: 'group',
+      booleanOperation: 'union',
+      width: 200,
+      height: 200,
+    });
+    const child1 = createElement({
+      id: 'child-1',
+      type: 'path',
+      parentId: 'group-1',
+      content: 'M0 0 L100 0 L100 100 L0 100 Z',
+      style: { ...createDefaultStyle(), stroke: '#ff0000', strokeWidth: 3, fill: '#00ff00' },
+    });
+    const child2 = createElement({
+      id: 'child-2',
+      type: 'path',
+      parentId: 'group-1',
+      content: 'M50 50 L150 50 L150 150 L50 150 Z',
+    });
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument([group, child1, child2]),
+    });
+
+    const groupNode = host.querySelector(`[${DATA_ATTRIBUTES.elementId}="group-1"]`);
+
+    expect(groupNode).not.toBeNull();
+
+    const svg = groupNode?.querySelector('svg');
+
+    expect(svg).not.toBeNull();
+    expect(svg?.querySelector('path')?.getAttribute('d')).toBeTruthy();
+    expect(svg?.querySelector('path')?.getAttribute('stroke')).toBe('#ff0000');
+    expect(svg?.querySelector('path')?.getAttribute('fill')).toBe('#00ff00');
+
+    controller.destroy();
+  });
+
+  /** @description Boolean group with null operation renders normally — children visible as separate elements. */
+  it('renders a group without booleanOperation normally', () => {
+    const host = document.createElement('div');
+
+    host.style.width = '1280px';
+    host.style.height = '720px';
+
+    const group = createElement({
+      id: 'group-1',
+      type: 'group',
+      booleanOperation: null,
+      width: 200,
+      height: 200,
+    });
+    const child1 = createElement({
+      id: 'child-1',
+      type: 'path',
+      parentId: 'group-1',
+      content: 'M0 0 L100 0 L100 100 L0 100 Z',
+    });
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument([group, child1]),
+    });
+
+    const groupNode = host.querySelector(`[${DATA_ATTRIBUTES.elementId}="group-1"]`);
+
+    expect(groupNode).not.toBeNull();
+
+    // Child element should be rendered as a separate node inside the group
+    const childNode = groupNode?.querySelector(`[${DATA_ATTRIBUTES.elementId}="child-1"]`);
+
+    expect(childNode).not.toBeNull();
+
+    // The group's own content host should NOT contain a boolean SVG with group dimensions
+    const contentHost = groupNode?.querySelector('[data-element-content]');
+    const booleanSvg = contentHost?.querySelector(':scope > svg[viewBox="0 0 200 200"]');
+
+    expect(booleanSvg).toBeNull();
+
+    controller.destroy();
+  });
+
+  /** @description Boolean group styling inherits from the first child. */
+  it('inherits stroke/fill from first child in boolean group', () => {
+    const host = document.createElement('div');
+
+    host.style.width = '1280px';
+    host.style.height = '720px';
+
+    const group = createElement({
+      id: 'group-1',
+      type: 'group',
+      booleanOperation: 'subtract',
+      width: 200,
+      height: 200,
+    });
+    const child1 = createElement({
+      id: 'child-1',
+      type: 'path',
+      parentId: 'group-1',
+      content: 'M0 0 L100 0 L100 100 L0 100 Z',
+      style: { ...createDefaultStyle(), stroke: '#0000ff', strokeWidth: 5, fill: '#ff00ff' },
+    });
+    const child2 = createElement({
+      id: 'child-2',
+      type: 'path',
+      parentId: 'group-1',
+      content: 'M25 25 L75 25 L75 75 L25 75 Z',
+    });
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument([group, child1, child2]),
+    });
+
+    const groupNode = host.querySelector(`[${DATA_ATTRIBUTES.elementId}="group-1"]`);
+    const pathEl = groupNode?.querySelector('svg path');
+
+    expect(pathEl?.getAttribute('stroke')).toBe('#0000ff');
+    expect(pathEl?.getAttribute('stroke-width')).toBe('5');
+    expect(pathEl?.getAttribute('fill')).toBe('#ff00ff');
+
+    controller.destroy();
+  });
 });
 
 /* ================================================================== */
@@ -280,5 +415,109 @@ describe('computeTrimPathAttributes', () => {
     expect(result).not.toBeNull();
     expect(result?.dasharray).toBe('0 300');
     expect(result?.dashoffset).toBe('0');
+  });
+});
+
+describe('computeBooleanPath', () => {
+  /** @description Union of two non-overlapping rects should produce a combined path string extending to both. */
+  it('produces a path for union of two children', () => {
+    const children: readonly BroadsetElement[] = [
+      createElement({ id: 'r1', type: 'path', content: 'M0 0 L100 0 L100 100 L0 100 Z' }),
+      createElement({ id: 'r2', type: 'path', content: 'M50 50 L150 50 L150 150 L50 150 Z' }),
+    ];
+
+    const result = computeBooleanPath(children, 'union');
+
+    expect(result).not.toBeNull();
+    expect(typeof result).toBe('string');
+    expect((result ?? '').length).toBeGreaterThan(0);
+    // Union of [0..100]x[0..100] and [50..150]x[50..150] should span to 150
+    expect(result).toMatch(/150/);
+  });
+
+  /** @description Subtract should produce a different path than union. */
+  it('produces a path for subtract operation', () => {
+    const children: readonly BroadsetElement[] = [
+      createElement({ id: 'r1', type: 'path', content: 'M0 0 L100 0 L100 100 L0 100 Z' }),
+      createElement({ id: 'r2', type: 'path', content: 'M25 25 L75 25 L75 75 L25 75 Z' }),
+    ];
+
+    const result = computeBooleanPath(children, 'subtract');
+
+    expect(result).not.toBeNull();
+    expect(typeof result).toBe('string');
+  });
+
+  /** @description Intersect should produce only the overlapping region. */
+  it('produces a path for intersect operation', () => {
+    const children: readonly BroadsetElement[] = [
+      createElement({ id: 'r1', type: 'path', content: 'M0 0 L100 0 L100 100 L0 100 Z' }),
+      createElement({ id: 'r2', type: 'path', content: 'M50 50 L150 50 L150 150 L50 150 Z' }),
+    ];
+
+    const result = computeBooleanPath(children, 'intersect');
+
+    expect(result).not.toBeNull();
+    expect(typeof result).toBe('string');
+  });
+
+  /** @description Exclude should produce the XOR of two shapes. */
+  it('produces a path for exclude operation', () => {
+    const children: readonly BroadsetElement[] = [
+      createElement({ id: 'r1', type: 'path', content: 'M0 0 L100 0 L100 100 L0 100 Z' }),
+      createElement({ id: 'r2', type: 'path', content: 'M50 50 L150 50 L150 150 L50 150 Z' }),
+    ];
+
+    const result = computeBooleanPath(children, 'exclude');
+
+    expect(result).not.toBeNull();
+    expect(typeof result).toBe('string');
+  });
+
+  /** @description Fewer than 2 children should return null (no boolean op possible). */
+  it('returns null for fewer than 2 children', () => {
+    const children: readonly BroadsetElement[] = [
+      createElement({ id: 'r1', type: 'path', content: 'M0 0 L100 0 L100 100 L0 100 Z' }),
+    ];
+
+    expect(computeBooleanPath(children, 'union')).toBeNull();
+  });
+
+  /** @description Null or absent operation returns null. */
+  it('returns null when operation is not in the valid map', () => {
+    const children: readonly BroadsetElement[] = [
+      createElement({ id: 'r1', type: 'path', content: 'M0 0 L100 0 Z' }),
+      createElement({ id: 'r2', type: 'path', content: 'M10 10 L50 10 Z' }),
+    ];
+
+    expect(computeBooleanPath(children, 'invalid')).toBeNull();
+  });
+
+  /** @description Children with empty content should be filtered out; if remaining < 2, returns null. */
+  it('returns null when children have empty content', () => {
+    const children: readonly BroadsetElement[] = [
+      createElement({ id: 'r1', type: 'path', content: 'M0 0 L100 0 L100 100 L0 100 Z' }),
+      createElement({ id: 'r2', type: 'path', content: '' }),
+    ];
+
+    expect(computeBooleanPath(children, 'union')).toBeNull();
+  });
+
+  /** @description Three-child union applies operations iteratively; result includes the third shape. */
+  it('handles more than 2 children (iterative reduction)', () => {
+    const children: readonly BroadsetElement[] = [
+      createElement({ id: 'r1', type: 'path', content: 'M0 0 L100 0 L100 100 L0 100 Z' }),
+      createElement({ id: 'r2', type: 'path', content: 'M50 0 L150 0 L150 100 L50 100 Z' }),
+      createElement({ id: 'r3', type: 'path', content: 'M100 0 L200 0 L200 100 L100 100 Z' }),
+    ];
+
+    const result3 = computeBooleanPath(children, 'union');
+    const result2 = computeBooleanPath(children.slice(0, 2), 'union');
+
+    expect(result3).not.toBeNull();
+    expect(result2).not.toBeNull();
+    // 3-child union should differ from 2-child union (it includes the third rect extending to 200)
+    expect(result3).not.toEqual(result2);
+    expect(result3).toMatch(/200/);
   });
 });

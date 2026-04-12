@@ -18,6 +18,7 @@ import {
   startPlacement,
 } from '@broadset/editor';
 import {
+  type BooleanOperation,
   type BroadsetDocument,
   broadsetDocumentSchema,
   type BroadsetElement,
@@ -508,6 +509,7 @@ function toPanelElement(element: BroadsetElement): PanelElement {
     errorCorrection: 'M',
     qrForegroundColor: '#000000',
     qrBackgroundColor: '#ffffff',
+    booleanOperation: element.booleanOperation,
   };
 }
 
@@ -2031,6 +2033,28 @@ export function DemoApp(): React.JSX.Element {
       if (key === 'width' || key === 'height' || key === 'rotation') {
         editorStore.getState().commitElementUpdate(selectedElement.id, {
           [key]: Number(value),
+        });
+
+        return;
+      }
+
+      if (key === 'name') {
+        editorStore.getState().commitElementUpdate(selectedElement.id, {
+          name: String(value),
+        });
+
+        return;
+      }
+
+      if (key === 'booleanOperation') {
+        const validOps = new Set<string>(['union', 'subtract', 'intersect', 'exclude']);
+        const stringValue = String(value);
+
+        editorStore.getState().commitElementUpdate(selectedElement.id, {
+          booleanOperation:
+            stringValue === '' || stringValue === 'none' ? null
+            : validOps.has(stringValue) ? (stringValue as BooleanOperation)
+            : null,
         });
 
         return;

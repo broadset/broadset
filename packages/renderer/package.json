@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@broadset/model": "^0.1.0",
+    "path-bool": "^0.0.7",
     "qrcode-generator": "^2.0.4"
   }
 }

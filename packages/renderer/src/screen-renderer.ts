@@ -1,5 +1,6 @@
 import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle } from '@broadset/model';
 import { sanitizeTextContent } from '@broadset/model';
+import { FillRule, pathBoolean, PathBooleanOperation, pathFromPathData, pathToPathData } from 'path-bool';
 import qrcode from 'qrcode-generator';
 
 import { applyBackgroundStyle } from './background';
@@ -384,6 +385,109 @@ const createTextRenderer = createSimpleRenderer((host, element) => {
   host.style.wordBreak = 'break-word';
 });
 
+const BOOLEAN_OP_MAP: Readonly<Record<string, PathBooleanOperation>> = {
+  union: PathBooleanOperation.Union,
+  subtract: PathBooleanOperation.Difference,
+  intersect: PathBooleanOperation.Intersection,
+  exclude: PathBooleanOperation.Exclusion,
+};
+
+/**
+ * Compute a combined SVG path string by applying a boolean operation to child paths.
+ * Returns `null` if fewer than 2 children have usable path data.
+ */
+export function computeBooleanPath(children: readonly BroadsetElement[], operation: string): string | null {
+  const op = BOOLEAN_OP_MAP[operation];
+
+  if (op === undefined) {
+    return null;
+  }
+
+  const pathDataEntries = children.map((child) => child.content.trim()).filter((d) => d.length > 0);
+
+  if (pathDataEntries.length < 2) {
+    return null;
+  }
+
+  const firstEntry = pathDataEntries[0];
+
+  if (firstEntry === undefined) {
+    return null;
+  }
+
+  let resultPath = pathFromPathData(firstEntry);
+
+  for (let i = 1; i < pathDataEntries.length; i += 1) {
+    const entry = pathDataEntries[i];
+
+    if (entry === undefined) {
+      continue;
+    }
+
+    const nextPath = pathFromPathData(entry);
+    const combined = pathBoolean(resultPath, FillRule.NonZero, nextPath, FillRule.NonZero, op);
+    const firstCombined = combined[0];
+
+    resultPath = firstCombined !== undefined ? firstCombined : [];
+  }
+
+  return pathToPathData(resultPath);
+}
+
+function createGroupRenderer(): ElementRendererFactory {
+  return ({ document: doc, element, host }) => {
+    function render(el: BroadsetElement): void {
+      if (el.booleanOperation === null) {
+        host.textContent = '';
+
+        return;
+      }
+
+      const children = doc.elements.filter((child) => child.parentId === el.id);
+      const combinedPath = computeBooleanPath(children, el.booleanOperation);
+
+      if (combinedPath === null) {
+        host.textContent = '';
+
+        return;
+      }
+
+      const firstChild = children[0];
+      const svgNs = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(svgNs, 'svg');
+      const path = document.createElementNS(svgNs, 'path');
+
+      svg.setAttribute('viewBox', `0 0 ${String(Math.max(el.width, 1))} ${String(Math.max(el.height, 1))}`);
+      svg.setAttribute('width', '100%');
+      svg.setAttribute('height', '100%');
+      svg.setAttribute('overflow', 'visible');
+      path.setAttribute('d', combinedPath);
+      path.setAttribute('vector-effect', 'non-scaling-stroke');
+
+      if (firstChild !== undefined) {
+        path.setAttribute('stroke', firstChild.style.stroke ?? 'none');
+        path.setAttribute('stroke-width', String(firstChild.style.strokeWidth ?? 2));
+        path.setAttribute('fill', firstChild.style.fill ?? 'none');
+      }
+
+      svg.appendChild(path);
+      host.replaceChildren(svg);
+    }
+
+    render(element);
+
+    return {
+      update(nextElement) {
+        render(nextElement);
+      },
+      destroy() {
+        host.replaceChildren();
+        host.textContent = '';
+      },
+    };
+  };
+}
+
 const createShapeRenderer = createSimpleRenderer((host, element) => {
   if (element.type === 'group') {
     host.textContent = '';
@@ -547,7 +651,7 @@ const BUILT_IN_RENDERERS: Readonly<Record<string, ElementRendererFactory>> = {
   rectangle: createShapeRenderer,
   ellipse: createShapeRenderer,
   qrcode: createQrCodeRenderer,
-  group: createShapeRenderer,
+  group: createGroupRenderer(),
   video: createVideoRenderer,
   clock: createClockRenderer,
   ticker: createTickerRenderer,

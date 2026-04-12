@@ -474,6 +474,7 @@ const BASE_ELEMENT: PanelElement = {
   errorCorrection: 'M',
   qrForegroundColor: '#000000',
   qrBackgroundColor: '#ffffff',
+  booleanOperation: null,
 };
 
 const TEXT_ELEMENT: PanelElement = {
@@ -1175,7 +1176,7 @@ describe('GroupPanel', () => {
   it('renders clipChildren toggle and group name', () => {
     const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
 
-    render(<GroupPanel name="My Group" clipChildren={false} onUpdate={onUpdate} />);
+    render(<GroupPanel name="My Group" clipChildren={false} booleanOperation={null} onUpdate={onUpdate} />);
 
     const clipToggle = screen.getByRole('switch', { name: /clip children/i });
 
@@ -1183,6 +1184,17 @@ describe('GroupPanel', () => {
 
     fireEvent.click(clipToggle);
     expect(onUpdate).toHaveBeenCalledWith('clipChildren', true);
+  });
+
+  /** @description Boolean operation dropdown must be visible with expected value rendered. */
+  it('renders boolean operation dropdown', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(<GroupPanel name="Test Group" clipChildren={false} booleanOperation="union" onUpdate={onUpdate} />);
+
+    const region = screen.getByRole('region', { name: 'Group' });
+
+    expect(within(region).getByText('union')).not.toBeNull();
   });
 });
 

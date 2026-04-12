@@ -21,7 +21,7 @@ module.exports = {
     '^@heroui/react$': path.resolve(__dirname, 'node_modules/@heroui/react/dist/index.js'),
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(@heroui|@react-aria|@react-stately|@react-types|react-aria-components|tailwind-merge|tailwind-variants|@radix-ui|@internationalized)/)',
+    'node_modules/(?!(@heroui|@react-aria|@react-stately|@react-types|react-aria-components|tailwind-merge|tailwind-variants|@radix-ui|@internationalized|path-bool)/)',
   ],
   transform: {
     '^.+\\.m?[jt]sx?$': ['babel-jest', { configFile: require.resolve('./babel.config.json') }],

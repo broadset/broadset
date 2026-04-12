@@ -1,4 +1,5 @@
 import {
+  type BooleanOperation,
   type BroadsetDocument,
   type BroadsetElement,
   type BroadsetElementStyle,
@@ -43,6 +44,8 @@ export interface ElementUpdate {
   readonly height?: number;
   readonly rotation?: number;
   readonly content?: string;
+  readonly name?: string;
+  readonly booleanOperation?: BooleanOperation | null;
 }
 
 interface PartializedState {
@@ -245,6 +248,8 @@ function applyElementUpdate(element: BroadsetElement, updates: ElementUpdate): B
     ...(updates.height !== undefined ? { height: updates.height } : {}),
     ...(updates.rotation !== undefined ? { rotation: updates.rotation } : {}),
     ...(updates.content !== undefined ? { content: updates.content } : {}),
+    ...(updates.name !== undefined ? { name: updates.name } : {}),
+    ...(updates.booleanOperation !== undefined ? { booleanOperation: updates.booleanOperation } : {}),
   };
 }
 

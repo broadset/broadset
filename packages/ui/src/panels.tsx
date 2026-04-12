@@ -1,4 +1,4 @@
-import type { VerticalAlignment } from '@broadset/model';
+import type { BooleanOperation, VerticalAlignment } from '@broadset/model';
 import { getCapabilityProfile } from '@broadset/model';
 import {
   Accordion,
@@ -219,6 +219,7 @@ export interface PanelElement {
   readonly tickerDirection?: string | undefined;
   readonly tickerGap?: number | undefined;
   readonly tickerPaused?: boolean | undefined;
+  readonly booleanOperation: BooleanOperation | null;
 }
 
 export interface LayerInfo {
@@ -1356,13 +1357,16 @@ export function QrCodePanel({
 /*  GroupPanel                                                         */
 /* ------------------------------------------------------------------ */
 
+const BOOLEAN_OPERATION_OPTIONS = ['none', 'union', 'subtract', 'intersect', 'exclude'] as const;
+
 export interface GroupPanelProps {
   readonly name: string;
   readonly clipChildren: boolean;
+  readonly booleanOperation: BooleanOperation | null;
   readonly onUpdate: (key: string, value: PropertyValue) => void;
 }
 
-export function GroupPanel({ name, clipChildren, onUpdate }: GroupPanelProps): JSX.Element {
+export function GroupPanel({ name, clipChildren, booleanOperation, onUpdate }: GroupPanelProps): JSX.Element {
   return (
     <section aria-label="Group" role="region" className="flex flex-col gap-2">
       <FieldShell label="Group name">
@@ -1374,6 +1378,15 @@ export function GroupPanel({ name, clipChildren, onUpdate }: GroupPanelProps): J
           }}
         />
       </FieldShell>
+      <SelectField
+        label="Boolean operation"
+        value={booleanOperation ?? 'none'}
+        options={[...BOOLEAN_OPERATION_OPTIONS]}
+        onUpdate={(key, v) => {
+          onUpdate(key, v === 'none' ? '' : v);
+        }}
+        updateKey="booleanOperation"
+      />
       <Switch
         aria-label="Clip children"
         isSelected={clipChildren}
@@ -2185,7 +2198,12 @@ export function PropertiesSidebar({
               <Accordion.Trigger>Group</Accordion.Trigger>
             </Accordion.Heading>
             <Accordion.Panel>
-              <GroupPanel name={primary.name} clipChildren={primary.clipChildren} onUpdate={onUpdate} />
+              <GroupPanel
+                name={primary.name}
+                clipChildren={primary.clipChildren}
+                booleanOperation={primary.booleanOperation}
+                onUpdate={onUpdate}
+              />
             </Accordion.Panel>
           </Accordion.Item>
         : null}
