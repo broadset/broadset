@@ -21,6 +21,7 @@ import {
   type ResizeHandle,
   runPreflightDiagnostics,
   startClipPathEditing,
+  startMotionPathEditing,
   startPlacement,
   updateMemberRole,
 } from '@broadset/editor';
@@ -3427,6 +3428,15 @@ export function DemoApp(): React.JSX.Element {
                             }}
                           >
                             Edit path points
+                          </Dropdown.Item>
+                          <Dropdown.Item
+                            key="edit-motion-path"
+                            onAction={() => {
+                              startMotionPathEditing(editorStore, contextMenuElement.id);
+                              setContextMenu(null);
+                            }}
+                          >
+                            Edit motion path
                           </Dropdown.Item>
                           <Dropdown.Item
                             key="delete-selection"
