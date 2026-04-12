@@ -38,6 +38,7 @@ import { createPlaybackController, type PlaybackController } from '@broadset/pla
 import { createScreenRenderer, type ScreenRendererController } from '@broadset/renderer';
 import {
   AboutModal,
+  AnimationSidebar,
   CanvasSettingsModal,
   classifyWheelInput,
   color,
@@ -1279,6 +1280,15 @@ export function DemoApp(): React.JSX.Element {
       ruleId: d.rule,
     }));
   }, [currentDocument]);
+
+  const animationConfig = useMemo(() => {
+    if (selectedElementId === null) return null;
+
+    const def = currentDocument.animations.find((a) => a.elementId === selectedElementId);
+
+    return def?.config ?? null;
+  }, [currentDocument, selectedElementId]);
+
   const placementLabel = getElementLabel(editorState.pendingPlacementType);
   const clipboardRef = useRef<readonly BroadsetElement[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -2211,11 +2221,65 @@ export function DemoApp(): React.JSX.Element {
         onUpdate={handlePropertyUpdate}
       />
     : sidebarTab === 'animation' ?
-      <div className="p-3" style={glassPanelStyle()}>
-        <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>
-          Animations are disabled in this Phase 4 demo shell.
-        </p>
-      </div>
+      <AnimationSidebar
+        element={selectedElement === null ? null : toPanelElement(selectedElement)}
+        isLocked={selectedElement?.locked ?? false}
+        animationsEnabled
+        timelines={animationConfig?.timelines.map((t) => ({
+          id: t.id,
+          name: t.name,
+          keyframes: t.keyframes,
+        }))}
+        stateBindings={animationConfig?.stateTimelineBindings.map((b) => ({
+          stateName: b.stateName,
+          timelineId: b.timelineId,
+        }))}
+        modifierBindings={animationConfig?.modifierTimelineBindings.map((b) => ({
+          modifierName: b.modifierName,
+          inTimelineId: b.inTimelineId,
+          ...(b.outTimelineId !== undefined ? { outTimelineId: b.outTimelineId } : {}),
+        }))}
+        availableStates={['IN', 'OUT', 'LOOP']}
+        availableModifiers={['hover', 'focus', 'active']}
+        activeState={null}
+        activeModifiers={[]}
+        onSelectState={() => {
+          toast.info('State selection not yet wired.');
+        }}
+        onToggleModifier={() => {
+          toast.info('Modifier toggle not yet wired.');
+        }}
+        onAddTimeline={() => {
+          toast.info('Add timeline not yet wired.');
+        }}
+        onEditTimeline={() => {
+          toast.info('Edit timeline not yet wired.');
+        }}
+        onDeleteTimeline={() => {
+          toast.info('Delete timeline not yet wired.');
+        }}
+        onDuplicateTimeline={() => {
+          toast.info('Duplicate timeline not yet wired.');
+        }}
+        onRenameTimeline={() => {
+          toast.info('Rename timeline not yet wired.');
+        }}
+        onQuickSetup={() => {
+          toast.info('Quick setup not yet wired.');
+        }}
+        onAddStateBinding={() => {
+          toast.info('Add state binding not yet wired.');
+        }}
+        onRemoveStateBinding={() => {
+          toast.info('Remove state binding not yet wired.');
+        }}
+        onAddModifierBinding={() => {
+          toast.info('Add modifier binding not yet wired.');
+        }}
+        onRemoveModifierBinding={() => {
+          toast.info('Remove modifier binding not yet wired.');
+        }}
+      />
     : sidebarTab === 'template-groups' ?
       <TemplateGroupPanel
         groups={templateGroups}
