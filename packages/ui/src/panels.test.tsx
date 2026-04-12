@@ -4,7 +4,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import * as React from 'react';
 
-import type { LayerInfo, PanelElement, PropertyValue } from './panels';
+import type { LayerInfo, PanelElement, PropertyValue, TemplateGroupPanelProps } from './panels';
 import {
   AnimationModePropertiesPanel,
   AnimationSidebar,
@@ -23,6 +23,7 @@ import {
   PropertyField,
   QrCodePanel,
   SpacingPanel,
+  TemplateGroupPanel,
   TextEffectsPanel,
   TickerPanel,
   TypographyPanel,
@@ -2933,5 +2934,146 @@ describe('AnimationSidebar', () => {
     fireEvent.click(addButtons[1] as HTMLElement);
 
     expect(onAddModifierBinding).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  Template Group Panel                                               */
+/* ------------------------------------------------------------------ */
+
+const TEMPLATE_GROUP_DEFAULTS: TemplateGroupPanelProps = {
+  groups: [],
+  availableDocuments: [
+    { id: 'doc-hd', name: '1920×1080 HD' },
+    { id: 'doc-vert', name: '1080×1920 Vertical' },
+    { id: 'doc-sq', name: '1080×1080 Square' },
+  ],
+  onCreateGroup: jest.fn<(name: string) => void>(),
+  onRemoveGroup: jest.fn<(groupId: string) => void>(),
+  onRenameGroup: jest.fn<(groupId: string, newName: string) => void>(),
+  onAddMember: jest.fn<(groupId: string, documentId: string, role: string) => void>(),
+  onRemoveMember: jest.fn<(groupId: string, documentId: string) => void>(),
+  onUpdateMemberRole: jest.fn<(groupId: string, documentId: string, role: string, label?: string) => void>(),
+};
+
+describe('TemplateGroupPanel', () => {
+  /** @description Panel must render with the "Template Groups" heading region. */
+  it('renders the template groups region', () => {
+    render(<TemplateGroupPanel {...TEMPLATE_GROUP_DEFAULTS} />);
+
+    expect(screen.getByRole('region', { name: 'Template Groups' })).toBeTruthy();
+  });
+
+  /** @description When no groups exist, an empty state message must be shown. */
+  it('shows empty state message when no groups exist', () => {
+    render(<TemplateGroupPanel {...TEMPLATE_GROUP_DEFAULTS} />);
+
+    expect(screen.getByText('No template groups')).toBeTruthy();
+  });
+
+  /** @description Creating a group must invoke onCreateGroup with the entered name. */
+  it('calls onCreateGroup when add button is clicked with a name', () => {
+    const onCreateGroup = jest.fn<(name: string) => void>();
+
+    render(<TemplateGroupPanel {...TEMPLATE_GROUP_DEFAULTS} onCreateGroup={onCreateGroup} />);
+
+    const input = screen.getByLabelText('New group name');
+
+    fireEvent.change(input, { target: { value: 'Scorebug' } });
+
+    const addButton = screen.getByRole('button', { name: 'Create template group' });
+
+    fireEvent.click(addButton);
+
+    expect(onCreateGroup).toHaveBeenCalledWith('Scorebug');
+  });
+
+  /** @description When groups exist, the panel must list each group name. */
+  it('renders existing groups', () => {
+    const groups = [
+      { groupId: 'tg-1', name: 'Scorebug', members: [{ documentId: 'doc-hd', role: '16:9' as const }] },
+      { groupId: 'tg-2', name: 'Lower Third', members: [{ documentId: 'doc-vert', role: '9:16' as const }] },
+    ];
+
+    render(<TemplateGroupPanel {...TEMPLATE_GROUP_DEFAULTS} groups={groups} />);
+
+    expect(screen.getByText('Scorebug')).toBeTruthy();
+    expect(screen.getByText('Lower Third')).toBeTruthy();
+  });
+
+  /** @description Clicking the remove button for a group must invoke onRemoveGroup. */
+  it('calls onRemoveGroup when remove button is clicked', () => {
+    const onRemoveGroup = jest.fn<(groupId: string) => void>();
+    const groups = [{ groupId: 'tg-1', name: 'Scorebug', members: [{ documentId: 'doc-hd', role: '16:9' as const }] }];
+
+    render(<TemplateGroupPanel {...TEMPLATE_GROUP_DEFAULTS} groups={groups} onRemoveGroup={onRemoveGroup} />);
+
+    const removeBtn = screen.getByRole('button', { name: 'Remove Scorebug' });
+
+    fireEvent.click(removeBtn);
+
+    expect(onRemoveGroup).toHaveBeenCalledWith('tg-1');
+  });
+
+  /** @description Group members must display the document name and role. */
+  it('renders member information', () => {
+    const groups = [
+      {
+        groupId: 'tg-1',
+        name: 'Scorebug',
+        members: [
+          { documentId: 'doc-hd', role: '16:9' as const },
+          { documentId: 'doc-vert', role: '9:16' as const, label: 'Social Vertical' },
+        ],
+      },
+    ];
+
+    render(<TemplateGroupPanel {...TEMPLATE_GROUP_DEFAULTS} groups={groups} />);
+
+    expect(screen.getByText('1920×1080 HD')).toBeTruthy();
+    expect(screen.getByText(/Social Vertical/)).toBeTruthy();
+  });
+
+  /** @description Clicking the remove member button must invoke onRemoveMember. */
+  it('calls onRemoveMember when member remove button is clicked', () => {
+    const onRemoveMember = jest.fn<(groupId: string, documentId: string) => void>();
+    const groups = [{ groupId: 'tg-1', name: 'Scorebug', members: [{ documentId: 'doc-hd', role: '16:9' as const }] }];
+
+    render(<TemplateGroupPanel {...TEMPLATE_GROUP_DEFAULTS} groups={groups} onRemoveMember={onRemoveMember} />);
+
+    const removeBtn = screen.getByRole('button', { name: 'Remove 1920×1080 HD from group' });
+
+    fireEvent.click(removeBtn);
+
+    expect(onRemoveMember).toHaveBeenCalledWith('tg-1', 'doc-hd');
+  });
+
+  /** @description The role selector must show role options for each member. */
+  it('renders role selector for members', () => {
+    const groups = [{ groupId: 'tg-1', name: 'Scorebug', members: [{ documentId: 'doc-hd', role: '16:9' as const }] }];
+
+    render(<TemplateGroupPanel {...TEMPLATE_GROUP_DEFAULTS} groups={groups} />);
+
+    // With mock Select, the role options render as text
+    expect(screen.getAllByText('16:9').length).toBeGreaterThanOrEqual(1);
+  });
+
+  /** @description When all documents are assigned, show a message instead of add member form. */
+  it('shows all-assigned message when no unassigned documents remain', () => {
+    const groups = [
+      {
+        groupId: 'tg-1',
+        name: 'All Assigned',
+        members: [
+          { documentId: 'doc-hd', role: '16:9' as const },
+          { documentId: 'doc-vert', role: '9:16' as const },
+          { documentId: 'doc-sq', role: '1:1' as const },
+        ],
+      },
+    ];
+
+    render(<TemplateGroupPanel {...TEMPLATE_GROUP_DEFAULTS} groups={groups} />);
+
+    expect(screen.getByText('All documents assigned')).toBeTruthy();
   });
 });

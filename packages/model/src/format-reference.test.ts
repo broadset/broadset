@@ -240,3 +240,141 @@ describe('Structured error rejection', () => {
     }
   });
 });
+
+/** @description Template group validation tests ensure referential integrity and uniqueness constraints. */
+describe('Template group validation', () => {
+  /** @description A valid template group with members referencing existing documents validates. */
+  it('accepts valid template group with existing document references', () => {
+    const project = {
+      ...minimalProject(),
+      templateGroups: [
+        {
+          groupId: 'tg-1',
+          name: 'Scorebug',
+          members: [{ documentId: 'minimal-template', role: '16:9' as const }],
+        },
+      ],
+    };
+    const result = broadsetProjectSchema.safeParse(project);
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description A member referencing a non-existent document must cause validation to fail. */
+  it('rejects member referencing non-existent document', () => {
+    const project = {
+      ...minimalProject(),
+      templateGroups: [
+        {
+          groupId: 'tg-1',
+          name: 'Scorebug',
+          members: [{ documentId: 'doc-missing', role: '16:9' as const }],
+        },
+      ],
+    };
+    const result = broadsetProjectSchema.safeParse(project);
+
+    expect(result.success).toBe(false);
+  });
+
+  /** @description Duplicate groupId values must cause validation to fail. */
+  it('rejects duplicate groupId values', () => {
+    const project = {
+      ...minimalProject(),
+      templateGroups: [
+        {
+          groupId: 'tg-dup',
+          name: 'Group A',
+          members: [{ documentId: 'minimal-template', role: '16:9' as const }],
+        },
+        {
+          groupId: 'tg-dup',
+          name: 'Group B',
+          members: [{ documentId: 'minimal-template', role: '9:16' as const }],
+        },
+      ],
+    };
+    const result = broadsetProjectSchema.safeParse(project);
+
+    expect(result.success).toBe(false);
+  });
+
+  /** @description An empty templateGroups array is valid. */
+  it('accepts empty templateGroups array', () => {
+    const project = {
+      ...minimalProject(),
+      templateGroups: [],
+    };
+    const result = broadsetProjectSchema.safeParse(project);
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description A document appearing in multiple template groups is valid. */
+  it('accepts document in multiple template groups', () => {
+    const project = {
+      ...minimalProject(),
+      templateGroups: [
+        {
+          groupId: 'tg-1',
+          name: 'Group A',
+          members: [{ documentId: 'minimal-template', role: '16:9' as const }],
+        },
+        {
+          groupId: 'tg-2',
+          name: 'Group B',
+          members: [{ documentId: 'minimal-template', role: '1:1' as const }],
+        },
+      ],
+    };
+    const result = broadsetProjectSchema.safeParse(project);
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description A template group with custom role and label validates. */
+  it('accepts template group with custom role', () => {
+    const project = {
+      ...minimalProject(),
+      templateGroups: [
+        {
+          groupId: 'tg-1',
+          name: 'Banner',
+          members: [{ documentId: 'minimal-template', role: 'custom' as const, label: 'Ultra-wide Banner' }],
+        },
+      ],
+    };
+    const result = broadsetProjectSchema.safeParse(project);
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description Template group data round-trips through schema serialization. */
+  it('preserves template group data on round-trip', () => {
+    const project = {
+      ...minimalProject(),
+      templateGroups: [
+        {
+          groupId: 'tg-1',
+          name: 'Scorebug',
+          members: [
+            { documentId: 'minimal-template', role: '16:9' as const },
+            { documentId: 'minimal-template', role: '9:16' as const, label: 'Social Vertical' },
+          ],
+        },
+      ],
+    };
+    const result = broadsetProjectSchema.safeParse(project);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      const tg = result.data.templateGroups?.[0];
+
+      expect(tg?.groupId).toBe('tg-1');
+      expect(tg?.name).toBe('Scorebug');
+      expect(tg?.members).toHaveLength(2);
+      expect(tg?.members[1]?.label).toBe('Social Vertical');
+    }
+  });
+});

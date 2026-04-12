@@ -1,4 +1,5 @@
 import {
+  addGroupMember,
   applyDragTranslation,
   applyResize,
   applyRotation,
@@ -7,22 +8,31 @@ import {
   createChangeStream,
   createDataStore,
   createEditorStore,
+  createTemplateGroup,
   diffDocuments,
   EditorErrorBoundary,
   EditorProvider,
   type EditorStore,
   type ElementUpdate,
   placeElement,
+  removeGroupMember,
+  removeTemplateGroup,
+  renameTemplateGroup,
   type ResizeHandle,
   runPreflightDiagnostics,
   startPlacement,
+  updateMemberRole,
 } from '@broadset/editor';
 import {
   type BooleanOperation,
   type BroadsetDocument,
   broadsetDocumentSchema,
   type BroadsetElement,
+  type BroadsetProject,
+  broadsetProjectSchema,
   createEmptyBroadsetDocument,
+  type TemplateGroup,
+  type TemplateGroupRole,
 } from '@broadset/model';
 import { createPlaybackController, type PlaybackController } from '@broadset/playback';
 import { createScreenRenderer, type ScreenRendererController } from '@broadset/renderer';
@@ -50,6 +60,7 @@ import {
   sp,
   TemplateBrowserModal,
   type TemplateEntry,
+  TemplateGroupPanel,
   TimelineEditingProvider,
 } from '@broadset/ui';
 import { Button, ButtonGroup, Card, CardContent, Chip, Dropdown, Toast, toast, Toolbar, Tooltip } from '@heroui/react';
@@ -93,7 +104,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 
 import { COUNTDOWN_PLUGIN, DEMO_DOCUMENT_PRESETS, DEMO_EDITOR_CONFIG } from './demoConfig';
 import type { ExportFormat } from './formatBridge';
-import { SAMPLE_DOCUMENT } from './sampleDocument';
+import { SAMPLE_DOCUMENT, SAMPLE_PROJECT } from './sampleDocument';
 import { useLiveData } from './useLiveData';
 
 const DEMO_DOCUMENT = broadsetDocumentSchema.parse(SAMPLE_DOCUMENT);
@@ -183,7 +194,7 @@ const DEMO_TEMPLATES: readonly TemplateEntry[] = [
   },
 ] as const;
 
-type SidebarTab = 'layers' | 'properties' | 'animation' | 'preflight';
+type SidebarTab = 'layers' | 'properties' | 'animation' | 'preflight' | 'template-groups';
 type ToastSeverity = keyof typeof TOAST_DISMISS_MS;
 type ActiveDialog =
   | 'about'
@@ -379,7 +390,13 @@ function loadSidebarPreferences(): SidebarPreferences {
     return {
       isOpen: typeof parsed['isOpen'] === 'boolean' ? parsed['isOpen'] : defaults.isOpen,
       tab:
-        storedTab === 'layers' || storedTab === 'properties' || storedTab === 'animation' || storedTab === 'preflight' ?
+        (
+          storedTab === 'layers' ||
+          storedTab === 'properties' ||
+          storedTab === 'animation' ||
+          storedTab === 'preflight' ||
+          storedTab === 'template-groups'
+        ) ?
           storedTab
         : defaults.tab,
       width: typeof parsed['width'] === 'number' ? clampSidebarWidth(parsed['width']) : defaults.width,
@@ -1270,6 +1287,11 @@ export function DemoApp(): React.JSX.Element {
   );
   const [isPlaying, setIsPlaying] = useState(false);
   const [resetToken, setResetToken] = useState(0);
+  const [templateGroups, setTemplateGroups] = useState<TemplateGroup[]>(() => {
+    const parsed = broadsetProjectSchema.safeParse(SAMPLE_PROJECT);
+
+    return parsed.success ? (parsed.data.templateGroups ?? []) : [];
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarPreferences.isOpen);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(initialSidebarPreferences.tab);
   const [sidebarWidth, setSidebarWidth] = useState(initialSidebarPreferences.width);
@@ -2069,6 +2091,83 @@ export function DemoApp(): React.JSX.Element {
     [editorStore, selectedElement],
   );
 
+  /* Template group management handlers */
+  const projectForTemplateOps = useMemo<BroadsetProject>(
+    () => ({
+      schemaVersion: 1 as const,
+      id: 'demo-project',
+      name: 'Demo Project',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      settings: { fonts: [], palette: [], defaultDocumentMode: 'screen' as const },
+      assets: [],
+      documents: [currentDocument],
+      templateGroups: templateGroups,
+    }),
+    [currentDocument, templateGroups],
+  );
+
+  const availableDocuments = useMemo(
+    () => [{ id: currentDocument.id, name: currentDocument.name }],
+    [currentDocument.id, currentDocument.name],
+  );
+
+  const handleCreateGroup = useCallback(
+    (name: string) => {
+      const groupId = `tg-${crypto.randomUUID().slice(0, 8)}`;
+      const firstMember = { documentId: currentDocument.id, role: '16:9' as TemplateGroupRole };
+      const updated = createTemplateGroup(projectForTemplateOps, groupId, name, firstMember);
+
+      setTemplateGroups(updated.templateGroups ?? []);
+    },
+    [currentDocument.id, projectForTemplateOps],
+  );
+
+  const handleRemoveGroup = useCallback(
+    (groupId: string) => {
+      const updated = removeTemplateGroup(projectForTemplateOps, groupId);
+
+      setTemplateGroups(updated.templateGroups ?? []);
+    },
+    [projectForTemplateOps],
+  );
+
+  const handleRenameGroup = useCallback(
+    (groupId: string, newName: string) => {
+      const updated = renameTemplateGroup(projectForTemplateOps, groupId, newName);
+
+      setTemplateGroups(updated.templateGroups ?? []);
+    },
+    [projectForTemplateOps],
+  );
+
+  const handleAddMember = useCallback(
+    (groupId: string, documentId: string, role: TemplateGroupRole) => {
+      const updated = addGroupMember(projectForTemplateOps, groupId, { documentId, role });
+
+      setTemplateGroups(updated.templateGroups ?? []);
+    },
+    [projectForTemplateOps],
+  );
+
+  const handleRemoveMember = useCallback(
+    (groupId: string, documentId: string) => {
+      const updated = removeGroupMember(projectForTemplateOps, groupId, documentId);
+
+      setTemplateGroups(updated.templateGroups ?? []);
+    },
+    [projectForTemplateOps],
+  );
+
+  const handleUpdateMemberRole = useCallback(
+    (groupId: string, documentId: string, role: TemplateGroupRole, label?: string) => {
+      const updated = updateMemberRole(projectForTemplateOps, groupId, documentId, role, label);
+
+      setTemplateGroups(updated.templateGroups ?? []);
+    },
+    [projectForTemplateOps],
+  );
+
   const handleSidebarTabToggle = useCallback(
     (nextTab: SidebarTab): void => {
       setIsSidebarOpen((currentValue) => {
@@ -2115,6 +2214,17 @@ export function DemoApp(): React.JSX.Element {
           Animations are disabled in this Phase 4 demo shell.
         </p>
       </div>
+    : sidebarTab === 'template-groups' ?
+      <TemplateGroupPanel
+        groups={templateGroups}
+        availableDocuments={availableDocuments}
+        onCreateGroup={handleCreateGroup}
+        onRemoveGroup={handleRemoveGroup}
+        onRenameGroup={handleRenameGroup}
+        onAddMember={handleAddMember}
+        onRemoveMember={handleRemoveMember}
+        onUpdateMemberRole={handleUpdateMemberRole}
+      />
     : <div className="p-3" style={glassPanelStyle()}>
         <PreflightPanel issues={preflightIssues} />
       </div>;
@@ -2959,6 +3069,16 @@ export function DemoApp(): React.JSX.Element {
                       }}
                     >
                       <ShieldCheck size={16} />
+                    </IconToolButton>
+                    <IconToolButton
+                      label="Template Groups"
+                      isActive={isSidebarOpen && sidebarTab === 'template-groups'}
+                      tooltipPlacement="left"
+                      onPress={() => {
+                        handleSidebarTabToggle('template-groups');
+                      }}
+                    >
+                      <LayoutTemplate size={16} />
                     </IconToolButton>
                   </Toolbar>
                 </div>

@@ -69,35 +69,71 @@ const assetSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
-const templateGroupSchema = z.object({
+export const templateGroupMemberSchema = z.object({
+  documentId: z.string().min(1),
+  role: z.enum(['16:9', '9:16', '1:1', '4:3', 'custom']),
+  label: z.string().optional(),
+});
+
+export const templateGroupSchema = z.object({
   groupId: z.string().min(1),
   name: z.string().min(1),
-  members: z
-    .array(
-      z.object({
-        documentId: z.string().min(1),
-        role: z.enum(['16:9', '9:16', '1:1', '4:3', 'custom']),
-        label: z.string().optional(),
-      }),
-    )
-    .min(1),
+  members: z.array(templateGroupMemberSchema).min(1),
 });
+
+export type TemplateGroupMember = z.infer<typeof templateGroupMemberSchema>;
+export type TemplateGroup = z.infer<typeof templateGroupSchema>;
+export type TemplateGroupRole = TemplateGroupMember['role'];
 
 export const fullDocumentSchema = broadsetDocumentSchema;
 
-export const broadsetProjectSchema = z.object({
-  $schema: z.string().optional(),
-  schemaVersion: z.literal(1),
-  id: z.string().min(1),
-  name: z.string().min(1),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-  settings: projectSettingsSchema,
-  assets: z.array(assetSchema),
-  documents: z.array(broadsetDocumentSchema).min(1),
-  templateGroups: z.array(templateGroupSchema).optional(),
-  extensions: z.record(z.string(), z.unknown()).optional(),
-});
+export const broadsetProjectSchema = z
+  .object({
+    $schema: z.string().optional(),
+    schemaVersion: z.literal(1),
+    id: z.string().min(1),
+    name: z.string().min(1),
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+    settings: projectSettingsSchema,
+    assets: z.array(assetSchema),
+    documents: z.array(broadsetDocumentSchema).min(1),
+    templateGroups: z.array(templateGroupSchema).optional(),
+    extensions: z.record(z.string(), z.unknown()).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const groups = data.templateGroups;
+
+    if (!groups || groups.length === 0) return;
+
+    const documentIds = new Set(data.documents.map((d) => d.id));
+
+    // Validate unique groupIds
+    const seenGroupIds = new Set<string>();
+
+    for (const [gi, group] of groups.entries()) {
+      if (seenGroupIds.has(group.groupId)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Duplicate template group ID: ${group.groupId}`,
+          path: ['templateGroups', gi, 'groupId'],
+        });
+      }
+
+      seenGroupIds.add(group.groupId);
+
+      // Validate member documentId references
+      for (const [mi, member] of group.members.entries()) {
+        if (!documentIds.has(member.documentId)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Template group member references non-existent document: ${member.documentId}`,
+            path: ['templateGroups', gi, 'members', mi, 'documentId'],
+          });
+        }
+      }
+    }
+  });
 
 export type FullBroadsetDocument = z.infer<typeof fullDocumentSchema>;
 export type BroadsetProject = z.infer<typeof broadsetProjectSchema>;

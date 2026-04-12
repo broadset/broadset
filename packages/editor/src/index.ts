@@ -11,5 +11,6 @@ export * from './path-geometry';
 export * from './react-data-integration';
 export * from './store-actions';
 export * from './store-ui-actions';
+export * from './template-groups';
 export * from './timeline-playback';
 export * from './transforms';
