@@ -28,8 +28,10 @@ import {
   type BroadsetProject,
   broadsetProjectSchema,
   createEmptyBroadsetDocument,
+  type EasingMode,
   type TemplateGroup,
   type TemplateGroupRole,
+  type Timeline,
 } from '@broadset/model';
 import {
   AboutModal,
@@ -54,7 +56,9 @@ import {
   TemplateBrowserModal,
   type TemplateEntry,
   TemplateGroupPanel,
+  TimelineBottomPanel,
   TimelineEditingProvider,
+  TimelineEditor,
 } from '@broadset/ui';
 import { Button, ButtonGroup, Card, CardContent, Chip, Dropdown, Toast, toast, Toolbar, Tooltip } from '@heroui/react';
 import {
@@ -314,6 +318,8 @@ export function DemoApp(): React.JSX.Element {
   );
   const [isPlaying, setIsPlaying] = useState(false);
   const [resetToken, setResetToken] = useState(0);
+  const [editingTimeline, setEditingTimeline] = useState<Timeline | null>(null);
+  const [editingTimelineSelectedKf, setEditingTimelineSelectedKf] = useState<number | null>(null);
   const [templateGroups, setTemplateGroups] = useState<TemplateGroup[]>(() => {
     const parsed = broadsetProjectSchema.safeParse(SAMPLE_PROJECT);
 
@@ -1267,8 +1273,13 @@ export function DemoApp(): React.JSX.Element {
         onAddTimeline={() => {
           toast.info('Add timeline not yet wired.');
         }}
-        onEditTimeline={() => {
-          toast.info('Edit timeline not yet wired.');
+        onEditTimeline={(id: string) => {
+          const tl = animationConfig?.timelines.find((t) => t.id === id);
+
+          if (tl) {
+            setEditingTimeline(tl);
+            setEditingTimelineSelectedKf(null);
+          }
         }}
         onDeleteTimeline={() => {
           toast.info('Delete timeline not yet wired.');
@@ -2568,6 +2579,42 @@ export function DemoApp(): React.JSX.Element {
             </div>
           </EditorErrorBoundary>
         </main>
+
+        <TimelineBottomPanel
+          isOpen={editingTimeline !== null}
+          onClose={() => {
+            setEditingTimeline(null);
+            setEditingTimelineSelectedKf(null);
+          }}
+        >
+          {editingTimeline !== null && (
+            <TimelineEditor
+              timeline={editingTimeline}
+              selectedKeyframeIndex={editingTimelineSelectedKf}
+              onSelectKeyframe={setEditingTimelineSelectedKf}
+              onAddKeyframe={() => {
+                toast.info('Add keyframe not yet wired.');
+              }}
+              onMoveKeyframe={(_index: number, _offsetMs: number) => {
+                toast.info('Move keyframe not yet wired.');
+              }}
+              onChangeEasing={(_index: number, _easing: EasingMode) => {
+                toast.info('Change easing not yet wired.');
+              }}
+              onPlayTimeline={() => {
+                toast.info('Play timeline not yet wired.');
+              }}
+              onStopTimeline={() => {
+                toast.info('Stop timeline not yet wired.');
+              }}
+              onSeekTimeline={(_timeMs: number) => {
+                toast.info('Seek timeline not yet wired.');
+              }}
+              currentTimeMs={0}
+              isPlaying={false}
+            />
+          )}
+        </TimelineBottomPanel>
       </TimelineEditingProvider>
     </EditorProvider>
   );
