@@ -62,10 +62,10 @@ _Spec sections:_ `model/project.md` §templateGroups, `model/format-reference.md
 _Affected packages:_ model, playback, renderer
 _Spec sections:_ `model/animation.md` §gradient stop animation, `model/format-reference.md`
 
-- [ ] model: validate dot-path gradient stop targets (`backgroundGradient.stops[N].color`, `.position`, `.angle`, `.center`)
-- [ ] playback: gradient stop interpolation (OKLab for color, number for position/angle/center); resolve dot-path targets into nested style updates
-- [ ] renderer: style writer reconstructs full gradient CSS value from per-stop changes
-- [ ] demo milestone: gradient background → keyframes targeting stop color →
+- [x] model: validate dot-path gradient stop targets (`backgroundGradient.stops[N].color`, `.position`, `.angle`, `.center`)
+- [x] playback: gradient stop interpolation (OKLab for color, number for position/angle/center); resolve dot-path targets into nested style updates
+- [x] renderer: style writer reconstructs full gradient CSS value from per-stop changes
+- [x] demo milestone: gradient background → keyframes targeting stop color →
       play → gradient animates smoothly through OKLab color space
 
 ## Feature Group 11-F: Per-character text animation
