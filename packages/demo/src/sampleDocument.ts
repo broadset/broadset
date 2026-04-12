@@ -11,6 +11,8 @@
  * chase file-length metrics.
  */
 
+import { type BroadsetDocument, broadsetDocumentSchema } from '@broadset/model';
+
 const ISO_TIMESTAMP = '2026-04-06T12:00:00Z';
 const PARTNER_MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180"><defs><linearGradient id="partner-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#3da9fc"/><stop offset="100%" stop-color="#15c39a"/></linearGradient></defs><rect width="180" height="180" rx="36" fill="#08111f"/><path d="M38 118 73 55l22 36 18-28 29 55H38Z" fill="url(#partner-gradient)"/><circle cx="120" cy="57" r="10" fill="#ffcb47"/></svg>`;
 const PARTNER_MARK_DATA_URI = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(PARTNER_MARK_SVG)}`;
@@ -1438,3 +1440,5 @@ export const SAMPLE_PROJECT = {
     },
   },
 } as const;
+
+export const DEMO_DOCUMENT: BroadsetDocument = broadsetDocumentSchema.parse(SAMPLE_DOCUMENT);
