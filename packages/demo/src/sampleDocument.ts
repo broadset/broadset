@@ -1347,7 +1347,7 @@ export const SAMPLE_PROJECT = {
           { weight: 500, style: 'normal' },
           { weight: 700, style: 'normal' },
         ],
-        source: { kind: 'system' },
+        source: { kind: 'url', url: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap' },
       },
       {
         family: 'Barlow Condensed',
@@ -1355,7 +1355,40 @@ export const SAMPLE_PROJECT = {
           { weight: 600, style: 'normal' },
           { weight: 700, style: 'normal' },
         ],
-        source: { kind: 'system' },
+        source: {
+          kind: 'url',
+          url: 'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap',
+        },
+      },
+      {
+        family: 'Roboto',
+        variants: [
+          { weight: 400, style: 'normal' },
+          { weight: 700, style: 'normal' },
+        ],
+        source: { kind: 'url', url: 'https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' },
+      },
+      {
+        family: 'Merriweather',
+        variants: [
+          { weight: 400, style: 'normal' },
+          { weight: 700, style: 'normal' },
+        ],
+        source: {
+          kind: 'url',
+          url: 'https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap',
+        },
+      },
+      {
+        family: 'Source Code Pro',
+        variants: [
+          { weight: 400, style: 'normal' },
+          { weight: 700, style: 'normal' },
+        ],
+        source: {
+          kind: 'url',
+          url: 'https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;700&display=swap',
+        },
       },
     ],
     palette: [BRAND.ink, BRAND.panel, BRAND.blue, BRAND.cyan, BRAND.mint, BRAND.gold, BRAND.coral, BRAND.white],
