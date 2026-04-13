@@ -44,25 +44,22 @@ Non-negotiables:
 
 ### 3.1 Oversized Non-Test Files (>500 lines)
 
-1. 2624 - `packages/demo/src/DemoApp.tsx`
-2. 1551 - `packages/ui/src/property-panels.tsx`
-3. 1443 - `packages/demo/src/sampleDocument.ts`
-4. 1440 - `packages/ui/src/timeline.tsx`
-5. 1354 - `packages/formats/src/psd.ts`
-6. 1304 - `packages/ui/src/inputs.tsx`
-7. 1079 - `packages/formats/src/pptx.ts`
-8. 982 - `packages/ui/src/modals.tsx`
-9. 836 - `packages/editor/src/store-actions.ts`
-10. 817 - `packages/renderer/src/screen-renderer.ts`
-11. 768 - `packages/editor/src/editing.ts`
-12. 760 - `packages/formats/src/pdf.ts`
-13. 754 - `packages/demo/src/demo-components.tsx`
-14. 735 - `packages/playback/src/playback-dom.ts`
-15. 661 - `packages/formats/src/web-vector.ts`
-16. 607 - `packages/editor/src/path-geometry.ts`
-17. 582 - `packages/playback/src/interpolation.ts`
-18. 579 - `packages/model/src/element.ts`
-19. 575 - `packages/editor/src/collaboration.ts`
+1. 1440 - `packages/ui/src/timeline.tsx`
+2. 1354 - `packages/formats/src/psd.ts`
+3. 1304 - `packages/ui/src/inputs.tsx`
+4. 1079 - `packages/formats/src/pptx.ts`
+5. 982 - `packages/ui/src/modals.tsx`
+6. 836 - `packages/editor/src/store-actions.ts`
+7. 817 - `packages/renderer/src/screen-renderer.ts`
+8. 768 - `packages/editor/src/editing.ts`
+9. 760 - `packages/formats/src/pdf.ts`
+10. 754 - `packages/demo/src/demo-components.tsx`
+11. 735 - `packages/playback/src/playback-dom.ts`
+12. 661 - `packages/formats/src/web-vector.ts`
+13. 607 - `packages/editor/src/path-geometry.ts`
+14. 582 - `packages/playback/src/interpolation.ts`
+15. 579 - `packages/model/src/element.ts`
+16. 575 - `packages/editor/src/collaboration.ts`
 
 ### 3.2 Priority Oversized Test Files (Worst Overage)
 
@@ -184,18 +181,16 @@ Target files:
 1. `packages/playback/src/playback-dom.ts`
 2. `packages/playback/src/interpolation.ts`
 3. `packages/model/src/element.ts`
-4. `packages/demo/src/sampleDocument.ts`
 
 Planned extraction map:
 
 - `playback-dom.ts` -> `playback-dom/bindings.ts`, `playback-dom/style-apply.ts`, `playback-dom/visibility.ts`, `playback-dom/runtime-guards.ts`.
 - `interpolation.ts` -> `interpolation/number.ts`, `interpolation/color.ts`, `interpolation/tuple.ts`, `interpolation/easing.ts`.
 - `element.ts` -> `element/style-types.ts`, `element/content-types.ts`, `element/guards.ts`, `element/defaults.ts`.
-- `sampleDocument.ts` -> `sample-document/assets.ts`, `sample-document/pages.ts`, `sample-document/elements.ts`, `sample-document/animations.ts`.
 
 Exit criteria:
 
-- All four target files below 500 lines.
+- All three target files below 500 lines.
 - Model and playback tests remain green.
 
 ---
