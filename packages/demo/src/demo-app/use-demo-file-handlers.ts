@@ -1,9 +1,9 @@
 import type { EditorStore } from '@broadset/editor';
 import { createEmptyBroadsetDocument } from '@broadset/model';
-import type { DocumentPreset, MediaAsset, TemplateEntry } from '@broadset/ui';
 import type { ChangeEvent, Dispatch, RefObject, SetStateAction } from 'react';
 import { useCallback } from 'react';
 
+import type { DocumentPreset, MediaAsset, TemplateEntry } from '../../../ui/src/modals/types';
 import type { ActiveDialog } from '../demo-types';
 import { DOCUMENT_STORAGE_KEY } from '../demo-types';
 import { downloadJsonFile } from '../demo-utils';

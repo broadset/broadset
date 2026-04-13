@@ -1,1 +1,1 @@
-export * from './property-panels/all-panels';
+export * from './property-panels/index';
