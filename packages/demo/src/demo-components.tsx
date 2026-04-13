@@ -287,6 +287,7 @@ export function SelectionTransformWidget({
             event.clientX - gesture.startX,
             event.clientY - gesture.startY,
             effectiveZoom,
+            element.rotation,
           ),
           gesture.handle,
         );

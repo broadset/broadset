@@ -45,6 +45,69 @@ describe('Resize via Handles', () => {
     expect(result.width).toBe(110);
     expect(result.height).toBe(50);
   });
+
+  /** @description At 90° rotation, the east handle's local-X axis aligns with screen-Y. Moving the pointer down (dy=30) should grow width without affecting height. */
+  it('projects screen delta onto local axes for east handle at 90° rotation', () => {
+    const result = applyResize(baseRect, 'e', 0, 30, 1, 90);
+
+    expect(result.width).toBeCloseTo(110, 5);
+    expect(result.height).toBeCloseTo(50, 5);
+    expect(result.x).toBeCloseTo(0, 5);
+    expect(result.y).toBeCloseTo(0, 5);
+  });
+
+  /** @description At 45° rotation, a purely horizontal screen delta should contribute equally to local-X and local-Y. The east handle only uses local-X, so width grows by dx*cos(45°). */
+  it('east handle at 45° rotation only scales local-X axis', () => {
+    const result = applyResize(baseRect, 'e', 40, 0, 1, 45);
+    const cos45 = Math.cos(Math.PI / 4);
+
+    expect(result.width).toBeCloseTo(80 + 40 * cos45, 5);
+    expect(result.height).toBeCloseTo(50, 5);
+  });
+
+  /** @description At 90° rotation, the north handle's local-Y axis aligns with negative screen-X. Moving the pointer right (dx=20) pulls away from the element, growing height. Width stays constant. */
+  it('projects screen delta onto local axes for north handle at 90° rotation', () => {
+    const result = applyResize(baseRect, 'n', 20, 0, 1, 90);
+
+    expect(result.width).toBeCloseTo(80, 5);
+    // localDy = -dx*sin(90°) = -20; dHeight = -localDy = 20; height = 50 + 20 = 70
+    expect(result.height).toBeCloseTo(70, 5);
+  });
+
+  /** @description The SE corner handle at 45° rotation should still resize both axes, but using the rotated projection of screen deltas. */
+  it('SE corner handle at 45° rotation resizes both axes in local space', () => {
+    // A screen delta of (20, 20) at 45° projects to localDx ≈ 28.28, localDy ≈ 0
+    const result = applyResize(baseRect, 'se', 20, 20, 1, 45);
+    const cos45 = Math.cos(Math.PI / 4);
+    const sin45 = Math.sin(Math.PI / 4);
+    const localDx = 20 * cos45 + 20 * sin45;
+    const localDy = -20 * sin45 + 20 * cos45;
+
+    expect(result.width).toBeCloseTo(80 + localDx, 5);
+    expect(result.height).toBeCloseTo(50 + localDy, 5);
+  });
+
+  /** @description The NW handle at 180° rotation should behave like SE at 0° for direction reversal. Position shifts back to global space correctly. */
+  it('NW handle at 180° rotation applies inverse position adjustment', () => {
+    const result = applyResize({ x: 100, y: 100, width: 80, height: 50 }, 'nw', -20, -10, 1, 180);
+    // At 180°: localDx = (-20)*cos(180) + (-10)*sin(180) ≈ 20, localDy = 20*sin(180) + (-10)*cos(180) ≈ 10
+    // NW: dLocalX = localDx, dWidth = -localDx, dLocalY = localDy, dHeight = -localDy
+    // Then project dLocalX, dLocalY back to global for position offset
+
+    expect(result.width).toBeCloseTo(60, 5);
+    expect(result.height).toBeCloseTo(40, 5);
+  });
+
+  /** @description With zero rotation, the new applyResize must behave identically to the old version — no regression. */
+  it('behaves identically to unrotated resize when rotation is 0', () => {
+    const seResult = applyResize(baseRect, 'se', 20, 10, 1, 0);
+
+    expect(seResult).toEqual({ x: 0, y: 0, width: 100, height: 60 });
+
+    const nwResult = applyResize(baseRect, 'nw', -15, -10, 1, 0);
+
+    expect(nwResult).toEqual({ x: -15, y: -10, width: 95, height: 60 });
+  });
 });
 
 describe('Rotation', () => {

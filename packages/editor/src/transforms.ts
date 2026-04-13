@@ -162,55 +162,123 @@ export function applyDragTranslation(
   };
 }
 
-/** Applies a resize delta for one of the eight transform handles. */
-export function applyResize(rect: Rect, handle: ResizeHandle, dx: number, dy: number, zoom: number): Rect {
+/**
+ * Projects a screen-space pointer delta into the element's local coordinate
+ * system by rotating it by the negative of the element's rotation angle.
+ */
+function projectToLocal(
+  screenDx: number,
+  screenDy: number,
+  rotationDeg: number,
+): { readonly localDx: number; readonly localDy: number } {
+  const rad = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
+  return {
+    localDx: screenDx * cos + screenDy * sin,
+    localDy: -screenDx * sin + screenDy * cos,
+  };
+}
+
+/**
+ * Rotates a local-space position delta back to screen/global space so it can
+ * be applied to the element's global x/y position.
+ */
+function projectToGlobal(
+  localDx: number,
+  localDy: number,
+  rotationDeg: number,
+): { readonly globalDx: number; readonly globalDy: number } {
+  const rad = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
+  return {
+    globalDx: localDx * cos - localDy * sin,
+    globalDy: localDx * sin + localDy * cos,
+  };
+}
+
+/**
+ * Applies a resize delta for one of the eight transform handles.
+ *
+ * When `rotationDeg` is non-zero, screen-space pointer deltas are projected
+ * onto the element's local axes so that edge handles only scale along their
+ * intended axis and the resize handle stays under the cursor.
+ */
+export function applyResize(
+  rect: Rect,
+  handle: ResizeHandle,
+  dx: number,
+  dy: number,
+  zoom: number,
+  rotationDeg = 0,
+): Rect {
   const compensatedDx = compensateZoom(dx, zoom);
   const compensatedDy = compensateZoom(dy, zoom);
-  let { x, y, width, height } = rect;
+
+  // Project screen-space movement into the element's local coordinate system.
+  const { localDx, localDy } = projectToLocal(compensatedDx, compensatedDy, rotationDeg);
+
+  // Compute width/height and local-space origin adjustments.
+  let dWidth = 0;
+  let dHeight = 0;
+  let dLocalX = 0;
+  let dLocalY = 0;
 
   if (CORNER_HANDLES.has(handle)) {
     switch (handle) {
       case 'se':
-        width += compensatedDx;
-        height += compensatedDy;
+        dWidth = localDx;
+        dHeight = localDy;
         break;
       case 'ne':
-        width += compensatedDx;
-        y += compensatedDy;
-        height -= compensatedDy;
+        dWidth = localDx;
+        dLocalY = localDy;
+        dHeight = -localDy;
         break;
       case 'nw':
-        x += compensatedDx;
-        width -= compensatedDx;
-        y += compensatedDy;
-        height -= compensatedDy;
+        dLocalX = localDx;
+        dWidth = -localDx;
+        dLocalY = localDy;
+        dHeight = -localDy;
         break;
       case 'sw':
-        x += compensatedDx;
-        width -= compensatedDx;
-        height += compensatedDy;
+        dLocalX = localDx;
+        dWidth = -localDx;
+        dHeight = localDy;
         break;
     }
   } else {
     switch (handle) {
       case 'e':
-        width += compensatedDx;
+        dWidth = localDx;
         break;
       case 'w':
-        x += compensatedDx;
-        width -= compensatedDx;
+        dLocalX = localDx;
+        dWidth = -localDx;
         break;
       case 's':
-        height += compensatedDy;
+        dHeight = localDy;
         break;
       case 'n':
-        y += compensatedDy;
-        height -= compensatedDy;
+        dLocalY = localDy;
+        dHeight = -localDy;
         break;
     }
   }
 
-  return { x, y, width, height };
+  // When the element is rotated, a local-space origin shift must be rotated
+  // back to global space before applying to x/y.
+  const { globalDx, globalDy } = projectToGlobal(dLocalX, dLocalY, rotationDeg);
+
+  return {
+    x: rect.x + globalDx,
+    y: rect.y + globalDy,
+    width: rect.width + dWidth,
+    height: rect.height + dHeight,
+  };
 }
 
 /** Adds a rotation delta in degrees to the current rotation value. */
