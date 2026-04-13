@@ -611,7 +611,6 @@ export const SAMPLE_DOCUMENT = {
       rotation: 0,
       content: '',
       visibleWhen: 'showPromoPanel == true',
-      booleanOperation: 'union' as const,
       style: {
         ...BASE_STYLE,
         backgroundColor: 'rgba(19, 36, 60, 0.92)',

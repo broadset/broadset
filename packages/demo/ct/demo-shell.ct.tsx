@@ -23,7 +23,7 @@ test('fills the viewport and renders the sample document on screen', async ({ mo
     'el-accent-svg',
     'el-accent-arc',
     'el-sponsor-logo',
-    'el-scorebug',
+    'el-info-panel',
     'el-promo-qr',
     'el-clock',
     'el-hero-badge',

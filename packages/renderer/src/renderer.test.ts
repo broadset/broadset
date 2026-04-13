@@ -585,6 +585,27 @@ describe('computeBooleanPath', () => {
     expect(result3).not.toEqual(result2);
     expect(result3).toMatch(/200/);
   });
+
+  /** @description Non-path children (text, rectangle, etc.) are ignored when computing boolean paths. */
+  it('ignores non-path children and returns null when fewer than 2 paths remain', () => {
+    const children: readonly BroadsetElement[] = [
+      createElement({ id: 'r1', type: 'rectangle', content: '' }),
+      createElement({ id: 'r2', type: 'text', content: '<b>Hello</b>' }),
+      createElement({ id: 'r3', type: 'path', content: 'M0 0 L100 0 L100 100 L0 100 Z' }),
+    ];
+
+    expect(computeBooleanPath(children, 'union')).toBeNull();
+  });
+
+  /** @description Malformed path data returns null instead of throwing. */
+  it('returns null for malformed path data', () => {
+    const children: readonly BroadsetElement[] = [
+      createElement({ id: 'r1', type: 'path', content: 'not-valid-path' }),
+      createElement({ id: 'r2', type: 'path', content: 'M0 0 L100 0 Z' }),
+    ];
+
+    expect(computeBooleanPath(children, 'union')).toBeNull();
+  });
 });
 
 describe('per-character text wrapping', () => {

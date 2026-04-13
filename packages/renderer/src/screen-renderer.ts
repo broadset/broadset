@@ -424,7 +424,8 @@ export function computeBooleanPath(children: readonly BroadsetElement[], operati
     return null;
   }
 
-  const pathDataEntries = children.map((child) => child.content.trim()).filter((d) => d.length > 0);
+  const pathChildren = children.filter((child) => child.type === 'path');
+  const pathDataEntries = pathChildren.map((child) => child.content.trim()).filter((d) => d.length > 0);
 
   if (pathDataEntries.length < 2) {
     return null;
@@ -436,23 +437,27 @@ export function computeBooleanPath(children: readonly BroadsetElement[], operati
     return null;
   }
 
-  let resultPath = pathFromPathData(firstEntry);
+  try {
+    let resultPath = pathFromPathData(firstEntry);
 
-  for (let i = 1; i < pathDataEntries.length; i += 1) {
-    const entry = pathDataEntries[i];
+    for (let i = 1; i < pathDataEntries.length; i += 1) {
+      const entry = pathDataEntries[i];
 
-    if (entry === undefined) {
-      continue;
+      if (entry === undefined) {
+        continue;
+      }
+
+      const nextPath = pathFromPathData(entry);
+      const combined = pathBoolean(resultPath, FillRule.NonZero, nextPath, FillRule.NonZero, op);
+      const firstCombined = combined[0];
+
+      resultPath = firstCombined !== undefined ? firstCombined : [];
     }
 
-    const nextPath = pathFromPathData(entry);
-    const combined = pathBoolean(resultPath, FillRule.NonZero, nextPath, FillRule.NonZero, op);
-    const firstCombined = combined[0];
-
-    resultPath = firstCombined !== undefined ? firstCombined : [];
+    return pathToPathData(resultPath);
+  } catch {
+    return null;
   }
-
-  return pathToPathData(resultPath);
 }
 
 function createGroupRenderer(): ElementRendererFactory {
