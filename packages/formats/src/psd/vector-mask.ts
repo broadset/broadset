@@ -1,0 +1,1 @@
+export { svgPathToPsdVectorMask } from './core';

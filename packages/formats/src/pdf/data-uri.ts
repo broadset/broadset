@@ -1,0 +1,1 @@
+export { decodeDataUri } from './core';

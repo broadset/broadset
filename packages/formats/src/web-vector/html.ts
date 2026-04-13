@@ -1,0 +1,1 @@
+export { exportHtmlStandalone } from './core';

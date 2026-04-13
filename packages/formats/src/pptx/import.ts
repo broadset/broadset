@@ -1,0 +1,1 @@
+export { importPptx } from './core';

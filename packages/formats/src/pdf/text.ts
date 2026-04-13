@@ -1,0 +1,1 @@
+export { wrapText } from './core';

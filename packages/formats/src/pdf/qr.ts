@@ -1,0 +1,1 @@
+export { drawQrOnPage } from './core';

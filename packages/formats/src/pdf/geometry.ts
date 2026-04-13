@@ -1,0 +1,1 @@
+export { canvasToPoints } from './core';
