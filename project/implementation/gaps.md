@@ -1,71 +1,50 @@
-# Gaps Audit — Phases 1–9
+# Implementation Gaps
 
-> Review scope: `plan-phase-1.md` through `plan-phase-9.md`, related specs under `project/spec/**`, and the current implementation in `packages/**`.
->
-> Phases **10** and **11** were intentionally skipped per request.
->
-> **Update:** All major gaps have been addressed. Remaining items are acknowledged limitations.
+Generated: 2026-04-13
 
----
+## 1) Animation sidebar actions not wired (demo UI)
 
-## Executive Summary
+- State selection not wired: `toast.info('State selection not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L1268)
+- Modifier toggle not wired: `toast.info('Modifier toggle not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L1271)
+- Add timeline not wired: `toast.info('Add timeline not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L1274)
+- Delete timeline not wired: `toast.info('Delete timeline not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L1285)
+- Duplicate timeline not wired: `toast.info('Duplicate timeline not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L1288)
+- Rename timeline not wired: `toast.info('Rename timeline not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L1291)
+- Quick setup not wired: `toast.info('Quick setup not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L1294)
+- Add state binding not wired: `toast.info('Add state binding not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L1297)
+- Remove state binding not wired: `toast.info('Remove state binding not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L1300)
+- Add modifier binding not wired: `toast.info('Add modifier binding not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L1303)
+- Remove modifier binding not wired: `toast.info('Remove modifier binding not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L1306)
 
-- **Phases 1–9** are fully implemented with all features wired into the demo shell.
-- The previously identified gaps (animation wiring, clip-path actions, modal suite, timeline panel, preflight diagnostics, named snapshots, font configuration) have all been resolved.
-- The sole remaining gap is **CT coverage breadth** (5.1 in fixes.md).
+## 2) Timeline editor actions not wired (demo UI)
 
----
+- Add keyframe not wired: `toast.info('Add keyframe not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L2599)
+- Move keyframe not wired: `toast.info('Move keyframe not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L2602)
+- Change easing not wired: `toast.info('Change easing not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L2605)
+- Play timeline not wired: `toast.info('Play timeline not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L2608)
+- Stop timeline not wired: `toast.info('Stop timeline not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L2611)
+- Seek timeline not wired: `toast.info('Seek timeline not yet wired.')` at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L2614)
 
-## Phase-by-Phase Status
+## 3) Template browser uses placeholder load behavior
 
-### Phase 1 — Model ✅
+- Comment documents temporary behavior: "In a full implementation, this would load the template's BroadsetDocument. For now, create a placeholder document named after the template." at [packages/demo/src/DemoApp.tsx](../../packages/demo/src/DemoApp.tsx#L566)
 
-- Core model layer fully implemented and tested (226 tests passing).
+## 4) SVG import intentionally skips content
 
-### Phase 2 — Renderer + Demo Shell ✅
+- Simple `<g>` groups are skipped with warning at [packages/formats/src/web-vector.ts](../../packages/formats/src/web-vector.ts#L371)
+- Unsupported SVG elements are skipped with warnings at [packages/formats/src/web-vector.ts](../../packages/formats/src/web-vector.ts#L380)
 
-- Static renderer slice complete (32 tests passing).
+## 5) PSD sync export skips URL images
 
-### Phase 3 — Playback + Demo Animated ✅
+- Sync PSD export skips URL images and instructs using async export for URL support at [packages/formats/src/psd.ts](../../packages/formats/src/psd.ts#L802)
 
-- Playback engine complete (70 tests passing).
+## 6) PDF export uses placeholders for unsupported/non-embeddable content
 
-### Phase 4 — Editor MVP ✅
+- SVG data URIs are not natively embedded; placeholder rectangle is drawn at [packages/formats/src/pdf.ts](../../packages/formats/src/pdf.ts#L615)
+- Image embed failures fall back to placeholder rectangle at [packages/formats/src/pdf.ts](../../packages/formats/src/pdf.ts#L639)
+- Non-data-URI content falls back to placeholder rectangle at [packages/formats/src/pdf.ts](../../packages/formats/src/pdf.ts#L652)
+- `video`, `clock`, and `ticker` render as placeholder rectangle at [packages/formats/src/pdf.ts](../../packages/formats/src/pdf.ts#L708)
 
-- Editor engine complete (364 tests passing).
+## 7) Video export can be unsupported at runtime
 
-### Phase 5 — Rich Properties & Layers ✅
-
-- PropertiesSidebar and LayersSidebar fully wired in demo.
-
-### Phase 6 — Keyboard, Text & Interaction Polish ✅
-
-- Keyboard/clipboard/context-menu all present and wired.
-
-### Phase 7 — Animation Authoring ✅
-
-- AnimationSidebar wired in demo animation tab.
-- TimelineBottomPanel with TimelineEditor wired and opening from "Edit timeline" action.
-- TimelineEditingProvider context in place.
-
-### Phase 8 — Path & Vector Tools ✅
-
-- Clip-path editing wired to startClipPathEditing via context menu.
-- Motion path editing wired to startMotionPathEditing via context menu.
-
-### Phase 9 — Data, Collaboration, Modals & Demo Polish ✅
-
-- **9-A to 9-D:** Live data, change-stream, persistence, toasts, fullscreen all wired.
-- **9-E Named Snapshots:** Fully implemented (saveSnapshot, restoreSnapshot, renameSnapshot, deleteSnapshot with MAX_SNAPSHOTS=20).
-- **9-F Preflight Diagnostics:** 7-rule engine implemented (title-safe, dpi-resolution, bleed, small-text, color-mode, unsupported-property, missing-font). PreflightPanel wired in demo.
-- **9-G Demo Config:** 5 URL-sourced web fonts, all 7 modals from packages/ui wired.
-
----
-
-## Remaining Acknowledged Limitations
-
-1. **CT coverage breadth** — The Playwright CT suite covers shell rendering, playback, context-menu, and placement. Later-phase cross-region flows (properties→canvas, timeline→preview, modal workflows) are not yet covered by CT.
-
-2. **Animation timeline callbacks** — The TimelineEditor's keyframe manipulation callbacks (addKeyframe, moveKeyframe, changeEasing, playTimeline) are wired but show toast stubs. The underlying editor store actions exist but the demo does not yet fully orchestrate the round-trip.
-
-3. **DemoApp.tsx size** — Still ~2,600 lines after decomposition (types, utils, and sub-components extracted). Further decomposition would require separating the main layout into route-level components.
+- Explicit unsupported error when `VideoEncoder` API is unavailable at [packages/formats/src/interchange.ts](../../packages/formats/src/interchange.ts#L127)
