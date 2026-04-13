@@ -1347,7 +1347,7 @@ export function ClockPanel({
       </FieldShell>
       <SelectField
         label="Mode"
-        options={CLOCK_MODES as unknown as readonly string[]}
+        options={[...CLOCK_MODES]}
         updateKey="mode"
         value={mode}
         onUpdate={(_key, value) => {
@@ -1522,7 +1522,7 @@ export function TickerPanel({
       />
       <SelectField
         label="Direction"
-        options={TICKER_DIRECTIONS as unknown as readonly string[]}
+        options={[...TICKER_DIRECTIONS]}
         updateKey="direction"
         value={direction}
         onUpdate={(key, value) => {

@@ -4,7 +4,7 @@ import { Folder, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { JSX } from 'react';
 import { useCallback, useState } from 'react';
 
-import { FieldShell, ICON_SIZE, TEMPLATE_GROUP_ROLE_OPTIONS, VALID_TEMPLATE_GROUP_ROLES } from './panel-types';
+import { FieldShell, ICON_SIZE, isTemplateGroupRole, TEMPLATE_GROUP_ROLE_OPTIONS } from './panel-types';
 import { color, font, glassPanelStyle, sp } from './tokens';
 
 /* ------------------------------------------------------------------ */
@@ -191,8 +191,8 @@ export function TemplateGroupPanel({
                               if (key !== null) {
                                 const val = String(key);
 
-                                if (VALID_TEMPLATE_GROUP_ROLES.has(val)) {
-                                  onUpdateMemberRole(group.groupId, member.documentId, val as TemplateGroupRole);
+                                if (isTemplateGroupRole(val)) {
+                                  onUpdateMemberRole(group.groupId, member.documentId, val);
                                 }
                               }
                             }}
@@ -309,8 +309,8 @@ function TemplateGroupAddMember({
             if (key !== null) {
               const val = String(key);
 
-              if (VALID_TEMPLATE_GROUP_ROLES.has(val)) {
-                setSelectedRole(val as TemplateGroupRole);
+              if (isTemplateGroupRole(val)) {
+                setSelectedRole(val);
               }
             }
           }}

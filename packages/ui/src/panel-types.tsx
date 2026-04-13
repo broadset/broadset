@@ -1,4 +1,4 @@
-import type { BooleanOperation, VerticalAlignment } from '@broadset/model';
+import type { BooleanOperation, TemplateGroupRole, VerticalAlignment } from '@broadset/model';
 import { ListBox, NumberField, Select } from '@heroui/react';
 import type { JSX, ReactNode } from 'react';
 import { createContext } from 'react';
@@ -57,6 +57,10 @@ export const ISOLATION_OPTIONS = ['auto', 'isolate'] as const;
 
 export const TEMPLATE_GROUP_ROLE_OPTIONS = ['16:9', '9:16', '1:1', '4:3', 'custom'] as const;
 export const VALID_TEMPLATE_GROUP_ROLES = new Set<string>(TEMPLATE_GROUP_ROLE_OPTIONS);
+
+export function isTemplateGroupRole(value: string): value is TemplateGroupRole {
+  return VALID_TEMPLATE_GROUP_ROLES.has(value);
+}
 
 export const CLIP_PATH_PRESETS = [
   { label: 'None', value: '', maskType: 'none' as const },
