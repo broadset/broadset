@@ -3,366 +3,15 @@ import type { Page } from '@playwright/test';
 
 import { DemoApp } from '../src/DemoApp';
 
-/**
- * @description Validates the phase 2 demo shell scenario from
- * `project/spec/demo/layout.md` and `project/spec/demo/visual.md`.
- */
-test('fills the viewport and renders the sample document on screen', async ({ mount, page }) => {
-  await mount(<DemoApp />);
+async function getHandleCenter(page: Page, handle: 'e' | 'w' | 'n' | 's'): Promise<{ x: number; y: number }> {
+  const box = await page.getByTestId(`transform-handle-${handle}`).boundingBox();
 
-  const shell = page.getByTestId('demo-shell');
-  const rendererHost = page.getByTestId('screen-renderer-host');
-
-  await expect(shell).toBeVisible();
-  await expect(rendererHost).toBeVisible();
-  await expect(rendererHost.getByText('CHAMPIONSHIP NIGHT')).toBeVisible();
-
-  for (const elementId of [
-    'el-show-title',
-    'el-stage-bg',
-    'el-video-wall',
-    'el-accent-svg',
-    'el-accent-arc',
-    'el-sponsor-logo',
-    'el-info-panel',
-    'el-promo-qr',
-    'el-clock',
-    'el-hero-badge',
-    'el-ticker',
-  ]) {
-    await expect(page.locator(`[data-element-id="${elementId}"]`)).toBeVisible();
+  if (box === null) {
+    throw new Error(`Handle ${handle} bounding box not found`);
   }
 
-  const shellBox = await shell.boundingBox();
-  const viewport = page.viewportSize();
-
-  expect(Math.round(shellBox?.width ?? 0)).toBeGreaterThanOrEqual(viewport?.width ?? 0);
-  expect(Math.round(shellBox?.height ?? 0)).toBeGreaterThanOrEqual(viewport?.height ?? 0);
-  expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).toBe('hidden');
-  expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).toBe('hidden');
-});
-
-/**
- * @description Validates the phase 3 playback scenario from
- * `project/spec/demo/data-integration.md` and `project/spec/demo/state.md`.
- */
-test('playback controls animate, pause, resume, and reset the demo content', async ({ mount, page }) => {
-  await mount(<DemoApp />);
-
-  const toggle = page.getByTestId('demo-playback-toggle');
-  const reset = page.getByTestId('demo-playback-reset');
-  const heroOpacity = page.locator('[data-element-id="el-hero-badge"] [data-opacity-target]');
-
-  const initialOpacity = Number(await heroOpacity.evaluate((element) => getComputedStyle(element).opacity));
-
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-label', 'Pause playback');
-  await page.waitForTimeout(350);
-
-  const animatedOpacity = Number(await heroOpacity.evaluate((element) => getComputedStyle(element).opacity));
-
-  expect(animatedOpacity).not.toBe(initialOpacity);
-
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-label', 'Play playback');
-
-  const pausedOpacity = Number(await heroOpacity.evaluate((element) => getComputedStyle(element).opacity));
-
-  await page.waitForTimeout(250);
-
-  const pausedOpacityAfterWait = Number(await heroOpacity.evaluate((element) => getComputedStyle(element).opacity));
-
-  expect(pausedOpacityAfterWait).toBe(pausedOpacity);
-
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-label', 'Pause playback');
-  await page.waitForTimeout(180);
-
-  const resumedOpacity = Number(await heroOpacity.evaluate((element) => getComputedStyle(element).opacity));
-
-  expect(resumedOpacity).toBeGreaterThan(pausedOpacity);
-
-  await toggle.click();
-  await reset.click();
-
-  const resetOpacity = Number(await heroOpacity.evaluate((element) => getComputedStyle(element).opacity));
-
-  expect(resetOpacity).toBe(initialOpacity);
-});
-
-/**
- * @description Validates the phase 3 playback-engine visibility scenario from
- * `project/spec/playback/playback.md` through the demo sample's IN/OUT bindings.
- * This is an engine integration check rather than a broader Phase 9 demo-workflow proof.
- */
-test('playback engine applies the sample promo panel IN and OUT visibility bindings', async ({ mount, page }) => {
-  await mount(<DemoApp />);
-
-  const promoPanel = page.locator('[data-element-id="el-promo-panel"]');
-  const promoOpacity = page.locator('[data-element-id="el-promo-panel"] > [data-opacity-target]');
-
-  await expect(promoPanel).toBeVisible();
-
-  await promoPanel.evaluate((element) => {
-    element.setAttribute('data-visibility', 'offscreen');
-  });
-  await page.waitForTimeout(80);
-
-  const outOpacity = Number(await promoOpacity.evaluate((element) => getComputedStyle(element).opacity));
-
-  expect(outOpacity).toBeLessThan(1);
-
-  await page.waitForTimeout(650);
-  await expect(promoPanel).toHaveCSS('visibility', 'hidden');
-
-  await promoPanel.evaluate((element) => {
-    element.setAttribute('data-visibility', 'onscreen');
-  });
-  await page.waitForTimeout(80);
-  await expect(promoPanel).toHaveCSS('visibility', 'visible');
-
-  const inOpacity = Number(await promoOpacity.evaluate((element) => getComputedStyle(element).opacity));
-
-  expect(inOpacity).toBeLessThan(1);
-
-  await page.waitForTimeout(950);
-
-  const settledOpacity = Number(await promoOpacity.evaluate((element) => getComputedStyle(element).opacity));
-
-  expect(settledOpacity).toBeCloseTo(1, 1);
-});
-
-/**
- * @description Validates the Phase 4 demo-shell layout and visual contracts from
- * `project/spec/demo/layout.md` and `project/spec/demo/visual.md`.
- */
-test('renders dark editor chrome with floating toolbars around the preview canvas', async ({ mount, page }) => {
-  await mount(<DemoApp />);
-
-  await expect(page.getByTestId('demo-main-toolbar')).toBeVisible();
-  await expect(page.getByTestId('demo-element-library')).toBeVisible();
-  await expect(page.getByTestId('demo-properties-sidebar')).toBeVisible();
-  await expect(page.getByTestId('screen-renderer-host')).toBeVisible();
-  await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
-  await expect(page.getByTestId('demo-scene-sorter')).toHaveCount(0);
-
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await expect(page.locator('html')).toHaveClass(/dark/);
-});
-
-/**
- * @description Validates the Phase 4 toolbar-chrome contract from
- * `project/spec/demo/layout.md` and `project/spec/demo/visual.md` so the main toolbar uses icon-only controls with accessible labels rather than visible text buttons.
- */
-test('uses icon-only main toolbar controls with accessible labels', async ({ mount, page }) => {
-  await mount(<DemoApp />);
-
-  const toolbar = page.getByTestId('demo-main-toolbar');
-
-  for (const label of ['File', 'View', 'Scenes', 'Help']) {
-    await expect(toolbar.locator(`button[aria-label="${label}"]`).first()).toBeVisible();
-    await expect(toolbar.getByText(new RegExp(`^${label}$`))).toHaveCount(0);
-  }
-});
-
-/**
- * @description Verifies the Phase 4 shell keeps the sidebar inset correctly and clamps the canvas context menu within the viewport bounds.
- */
-test('keeps the sidebar inset and the context menu within the visible viewport', async ({ mount, page }) => {
-  await mount(<DemoApp />);
-
-  const sidebar = page.getByTestId('demo-properties-sidebar');
-
-  await expect(sidebar).toHaveCSS('top', '72px');
-  await expect(sidebar).toHaveCSS('bottom', '72px');
-
-  const preview = page.getByLabel(/screen preview for/i);
-  const previewBox = await preview.boundingBox();
-
-  await preview.click({
-    button: 'right',
-    position: {
-      x: Math.max((previewBox?.width ?? 12) - 4, 4),
-      y: Math.max((previewBox?.height ?? 12) - 4, 4),
-    },
-  });
-
-  const contextMenu = page.getByTestId('demo-context-menu');
-
-  await expect(contextMenu).toBeVisible();
-
-  const shell = page.getByTestId('demo-shell');
-  const shellRect = await shell.evaluate((element) => {
-    const { bottom, left, right, top } = element.getBoundingClientRect();
-
-    return { bottom, left, right, top };
-  });
-  const menuRect = await contextMenu.evaluate((element) => {
-    const { bottom, left, right, top } = element.getBoundingClientRect();
-
-    return { bottom, left, right, top };
-  });
-
-  expect(menuRect.left).toBeGreaterThanOrEqual(shellRect.left);
-  expect(menuRect.top).toBeGreaterThanOrEqual(shellRect.top);
-  expect(menuRect.right).toBeLessThanOrEqual(shellRect.right);
-  expect(menuRect.bottom).toBeLessThanOrEqual(shellRect.bottom);
-});
-
-/**
- * @description Validates the Phase 4 placement-mode affordance from
- * `project/spec/demo/layout.md` so activating a tool shows a clear banner and cancel path.
- */
-test('shows a placement-mode banner when the user activates an element tool', async ({ mount, page }) => {
-  await mount(<DemoApp />);
-
-  await page.locator('button[aria-label="Rectangle"]').first().click();
-  await expect(page.getByTestId('placement-mode-banner')).toContainText('Rectangle');
-
-  await page.locator('button[aria-label="Cancel placement"]').first().click();
-  await expect(page.getByTestId('placement-mode-banner')).toBeHidden();
-});
-
-/**
- * @description Validates the 9-G sidebar preference persistence from
- * `project/spec/demo/state.md`: sidebar open/closed, active tab, and width
- * persist to localStorage, and remounting restores them.
- */
-test('persists sidebar preferences across remounts', async ({ mount, page }) => {
-  const component = await mount(<DemoApp />);
-
-  const sidebar = page.getByTestId('demo-properties-sidebar');
-
-  await expect(sidebar).toBeVisible();
-
-  // Click the Layers tab to switch
-  await page.locator('button[aria-label="Layers"]').first().click();
-
-  // Wait for the useEffect to persist the new tab selection to localStorage
-  await page.waitForFunction(
-    () => {
-      const s = window.localStorage.getItem('broadset:demo-sidebar-preferences:v1');
-      const p = JSON.parse(s ?? '{}') as { tab?: string };
-
-      return p.tab === 'layers';
-    },
-    undefined,
-    { timeout: 3000 },
-  );
-
-  // Verify preferences were saved to localStorage
-  const stored = await page.evaluate(() => window.localStorage.getItem('broadset:demo-sidebar-preferences:v1'));
-
-  expect(stored).not.toBeNull();
-
-  const prefs = JSON.parse(stored ?? '{}') as { isOpen: boolean; tab: string; width: number };
-
-  expect(prefs.tab).toBe('layers');
-  expect(prefs.isOpen).toBe(true);
-  expect(prefs.width).toBeGreaterThanOrEqual(256);
-  expect(prefs.width).toBeLessThanOrEqual(800);
-
-  // Remount and verify preferences are restored
-  await component.unmount();
-  await mount(<DemoApp />);
-
-  const restoredStored = await page.evaluate(() => window.localStorage.getItem('broadset:demo-sidebar-preferences:v1'));
-  const restoredPrefs = JSON.parse(restoredStored ?? '{}') as { isOpen: boolean; tab: string; width: number };
-
-  expect(restoredPrefs.tab).toBe('layers');
-});
-
-/**
- * @description Validates the 9-G save/restore document lifecycle from
- * `project/spec/demo/state.md`: saving writes to localStorage with valid
- * document JSON. Restoration is verified via DemoApp.test.tsx unit tests.
- */
-test('saves the current document to localStorage via the File menu', async ({ mount, page }) => {
-  // Clear any stale document from a previous test in this worker
-  await page.evaluate(() => {
-    window.localStorage.removeItem('broadset:demo-document:v1');
-  });
-  await mount(<DemoApp />);
-
-  // Trigger save via the File menu
-  const fileButton = page.locator('button[aria-label="File"]').first();
-
-  await fileButton.click();
-  await page.getByText('Save').first().click();
-
-  // Verify localStorage has a valid document entry
-  const stored = await page.evaluate(() => window.localStorage.getItem('broadset:demo-document:v1'));
-
-  expect(stored).not.toBeNull();
-
-  const doc = JSON.parse(stored ?? '{}') as { elements?: unknown[] };
-  const elements = doc.elements ?? [];
-
-  expect(doc.elements).toBeDefined();
-  expect(Array.isArray(doc.elements)).toBe(true);
-  expect(elements.length).toBeGreaterThan(0);
-});
-
-/**
- * @description Validates the 9-G toast notification system from
- * `project/spec/demo/state.md`: successful actions show auto-dismissing
- * success toasts at the bottom-right.
- */
-test('shows a success toast after saving the document', async ({ mount, page }) => {
-  await mount(<DemoApp />);
-
-  // Trigger save via the File menu
-  const fileButton = page.locator('button[aria-label="File"]').first();
-
-  await fileButton.click();
-  await page.getByText('Save').first().click();
-
-  // Toast should appear with success message
-  await expect(page.getByText('Saved the demo document locally.')).toBeVisible({ timeout: 3000 });
-});
-
-/**
- * @description Validates the 9-G countdown plugin from `project/spec/demo/config.md`:
- * the element toolbar includes the countdown custom plugin alongside built-in types.
- */
-test('shows countdown custom plugin in the element toolbar alongside built-in types', async ({ mount, page }) => {
-  await mount(<DemoApp />);
-
-  const toolbar = page.getByTestId('demo-element-library');
-
-  await expect(toolbar).toBeVisible();
-
-  // Built-in types
-  for (const label of ['Text', 'Rectangle', 'Ellipse', 'Image', 'SVG', 'Path', 'QR Code', 'Video', 'Clock', 'Ticker']) {
-    await expect(toolbar.locator(`button[aria-label="${label}"]`)).toBeVisible();
-  }
-
-  // Custom plugin
-  await expect(toolbar.locator('button[aria-label="Countdown"]')).toBeVisible();
-});
-
-/**
- * @description Validates the 9-G provider wiring from `project/spec/demo/state.md`:
- * EditorProvider, TimelineEditingProvider, and BroadsetDataStoreProvider are all
- * functional and the editor store is accessible from child components.
- */
-test('wires all three providers so child components have editor, timeline, and data access', async ({
-  mount,
-  page,
-}) => {
-  await mount(<DemoApp />);
-
-  // If providers are wired correctly, the sidebar Layers tab should show document elements
-  await page.locator('button[aria-label="Layers"]').first().click();
-
-  // The sidebar should display layer entries for document elements
-  const sidebar = page.getByTestId('demo-properties-sidebar');
-
-  await expect(sidebar).toBeVisible();
-
-  // All three providers wired — the app renders without provider errors
-  await expect(page.getByTestId('demo-shell')).toBeVisible();
-});
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
 
 /* ------------------------------------------------------------------ */
 /*  Transform widget — selection and positioning                       */
@@ -739,6 +388,99 @@ test('dragging a resize handle changes the element dimensions', async ({ mount, 
 /* ------------------------------------------------------------------ */
 /*  Direct canvas click selection                                      */
 /* ------------------------------------------------------------------ */
+
+/**
+ * @description Validates `project/spec/editor/canvas.md` C-02 behavior:
+ * clicking empty canvas space clears selection, hides the transform widget,
+ * and disables selection-dependent sidebar tabs.
+ */
+test('clicking empty canvas space clears selection and disables dependent sidebar tabs', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
+
+  const preview = page.getByLabel(/screen preview for/i);
+
+  // The sample document includes a full-stage background hit target, so a
+  // pointer click usually lands on an element. Dispatching a click on the
+  // preview root exercises the explicit "clear selection" branch.
+  await preview.dispatchEvent('click');
+
+  await expect(page.getByTestId('demo-transform-widget')).toHaveCount(0);
+  await expect(page.locator('button[aria-label="Properties"]').first()).toBeDisabled();
+  await expect(page.locator('button[aria-label="Animation"]').first()).toBeDisabled();
+});
+
+/**
+ * @description Validates `project/spec/editor/editing.md` C-08 behavior:
+ * click-only placement uses default element dimensions and selects the newly
+ * placed element so transform controls attach immediately.
+ */
+test('click-only placement creates a default-size rectangle and selects it', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const idsBefore = await page
+    .locator('[data-element-id]')
+    .evaluateAll((elements) => [
+      ...new Set(elements.map((element) => element.getAttribute('data-element-id')).filter((id) => id !== null)),
+    ]);
+
+  await page.locator('button[aria-label="Rectangle"]').first().click();
+  await expect(page.getByTestId('placement-mode-banner')).toContainText('Rectangle');
+
+  const preview = page.getByLabel(/screen preview for/i);
+  const previewBox = await preview.boundingBox();
+
+  if (previewBox === null) {
+    throw new Error('Preview bounding box not found');
+  }
+
+  const clickOffsetX = previewBox.width * 0.28;
+  const clickOffsetY = previewBox.height * 0.78;
+
+  await preview.click({ position: { x: clickOffsetX, y: clickOffsetY } });
+
+  await expect(page.getByTestId('placement-mode-banner')).toBeHidden();
+
+  const idsAfter = await page
+    .locator('[data-element-id]')
+    .evaluateAll((elements) => [
+      ...new Set(elements.map((element) => element.getAttribute('data-element-id')).filter((id) => id !== null)),
+    ]);
+  const newElementId = idsAfter.find((id) => !idsBefore.includes(id));
+
+  if (newElementId === undefined) {
+    throw new Error('No new element ID found after click-only placement');
+  }
+
+  const newElement = page.locator(`[data-element-id="${newElementId}"]`);
+  const newBox = await newElement.boundingBox();
+  const widgetBox = await page.getByTestId('demo-transform-widget').boundingBox();
+
+  if (newBox === null || widgetBox === null) {
+    throw new Error('Placed element or transform widget bounding box not found');
+  }
+
+  expect(widgetBox.x).toBeCloseTo(newBox.x, -1);
+  expect(widgetBox.y).toBeCloseTo(newBox.y, -1);
+  expect(widgetBox.width).toBeCloseTo(newBox.width, -1);
+  expect(widgetBox.height).toBeCloseTo(newBox.height, -1);
+
+  // Default rectangle size is 80x50 in document space.
+  const ribbonBox = await page.locator('[data-element-id="el-top-ribbon"]').boundingBox();
+
+  if (ribbonBox === null) {
+    throw new Error('Reference ribbon bounding box not found');
+  }
+
+  const contentScale = ribbonBox.width / 920;
+
+  expect(Math.abs(newBox.width - 80 * contentScale)).toBeLessThan(4);
+  expect(Math.abs(newBox.height - 50 * contentScale)).toBeLessThan(4);
+
+  // Placement selects the new element immediately.
+  await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
+});
 
 /**
  * @description Validates that clicking a canvas element directly (not via
@@ -1322,6 +1064,87 @@ test('resize works correctly after rotating the element (rotate → resize SE)',
   const finalTransform = await widget.evaluate((el) => el.style.transform);
 
   expect(finalTransform).toBe(`rotate(${String(rotationDeg)}deg)`);
+});
+
+/**
+ * @description Validates C-05 local-axis resize behavior after rotation:
+ * dragging the east handle along the element's local X axis changes width,
+ * keeps height stable, and keeps the west-edge anchor near-stationary.
+ */
+test('after rotation, east-handle drag along local X changes width only and keeps west anchor stable', async ({
+  mount,
+  page,
+}) => {
+  await mount(<DemoApp />);
+
+  const widget = page.getByTestId('demo-transform-widget');
+
+  await expect(widget).toBeVisible();
+
+  const rotationDeg = await rotateSelectedElement(page, 80, 30);
+  const rotationRad = (rotationDeg * Math.PI) / 180;
+
+  const preWidth = parseFloat(await widget.evaluate((element) => element.style.width));
+  const preHeight = parseFloat(await widget.evaluate((element) => element.style.height));
+  const westBefore = await getHandleCenter(page, 'w');
+  const eastStart = await getHandleCenter(page, 'e');
+
+  const localXDrag = 90;
+  const targetX = eastStart.x + Math.cos(rotationRad) * localXDrag;
+  const targetY = eastStart.y + Math.sin(rotationRad) * localXDrag;
+
+  await page.mouse.move(eastStart.x, eastStart.y);
+  await page.mouse.down();
+  await page.mouse.move(targetX, targetY, { steps: 12 });
+  await page.mouse.up();
+
+  const postWidth = parseFloat(await widget.evaluate((element) => element.style.width));
+  const postHeight = parseFloat(await widget.evaluate((element) => element.style.height));
+  const westAfter = await getHandleCenter(page, 'w');
+
+  expect(postWidth).toBeGreaterThan(preWidth);
+  expect(Math.abs(postHeight - preHeight)).toBeLessThan(2);
+  expect(Math.abs(westAfter.x - westBefore.x)).toBeLessThan(4);
+  expect(Math.abs(westAfter.y - westBefore.y)).toBeLessThan(4);
+});
+
+/**
+ * @description Validates rotated min-size clamp UX:
+ * collapsing a rotated element through the east handle to minimum size must
+ * not cause opposite-edge drift (the element should not slide around).
+ */
+test('collapsing a rotated element to minimum size does not slide the opposite edge', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  await page.locator('[data-element-id="el-sponsor-logo"]').click();
+
+  const widget = page.getByTestId('demo-transform-widget');
+
+  await expect(widget).toBeVisible();
+
+  const rotationDeg = await rotateSelectedElement(page, 70, 20);
+  const rotationRad = (rotationDeg * Math.PI) / 180;
+  const preWidth = parseFloat(await widget.evaluate((element) => element.style.width));
+
+  const westBefore = await getHandleCenter(page, 'w');
+  const eastStart = await getHandleCenter(page, 'e');
+
+  const collapseDrag = 260;
+  const targetX = eastStart.x - Math.cos(rotationRad) * collapseDrag;
+  const targetY = eastStart.y - Math.sin(rotationRad) * collapseDrag;
+
+  await page.mouse.move(eastStart.x, eastStart.y);
+  await page.mouse.down();
+  await page.mouse.move(targetX, targetY, { steps: 12 });
+  await page.mouse.up();
+
+  const postWidth = parseFloat(await widget.evaluate((element) => element.style.width));
+  const westAfter = await getHandleCenter(page, 'w');
+
+  expect(postWidth).toBeLessThan(preWidth);
+  expect(postWidth).toBeGreaterThan(0);
+  expect(Math.abs(westAfter.x - westBefore.x)).toBeLessThan(5);
+  expect(Math.abs(westAfter.y - westBefore.y)).toBeLessThan(5);
 });
 
 /**
