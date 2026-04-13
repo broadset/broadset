@@ -454,7 +454,7 @@ The toolbar and navigation elements MUST conform to WCAG 2.1 AA standards. The m
 
 ## Spec Gaps
 
-- [ ] **Undo/Redo Button States:** No automated tests verify disabled state of undo/redo buttons based on history depth — component tests needed for the toolbar undo/redo state.
+- [x] **Undo/Redo Button States:** Automated tests verify disabled state behavior for undo/redo controls in toolbar component tests (`packages/ui/src/toolbar-nav.test.tsx`).
 - [ ] **WCAG AA Toolbar Accessibility:** No automated tests verify role="toolbar", arrow-key focus movement, aria-label on icon-only buttons, or aria-pressed on toggle buttons — accessibility-focused component tests are needed.
 
 ---

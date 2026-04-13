@@ -532,9 +532,9 @@ Copy and paste operations MUST use the system clipboard (Clipboard API) when ava
 
 ## Spec Gaps
 
-- [ ] **Required Element Promotion on Parent Deletion:** No automated tests verify promotion of required descendants on parent deletion or absolute position preservation.
+- [x] **Required Element Promotion on Parent Deletion:** Automated tests verify promotion of required descendants on parent deletion and absolute position preservation (`packages/editor/src/store-actions.test.ts`).
 - [ ] **Cross-Page Undo Visibility:** No automated tests verify that undo/redo does not change the active page.
-- [ ] **Named Snapshots:** No automated tests cover snapshot creation, restoration with undo integration, deletion, limit enforcement, or serialization round-trip.
+- [x] **Named Snapshots:** Automated tests cover snapshot creation, restoration with undo integration, deletion, limit enforcement, and serialization round-trip (`packages/editor/src/store-actions.test.ts`).
 - [ ] **System Clipboard Integration:** No automated tests cover Clipboard API write/read, Broadset JSON detection, plain text pasting, ID reassignment, or internal fallback behavior.
 
 ---
