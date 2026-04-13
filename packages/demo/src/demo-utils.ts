@@ -140,11 +140,25 @@ export function downloadJsonFile(filename: string, payload: unknown): void {
   }, 0);
 }
 
-export function toPanelElement(element: BroadsetElement): PanelElement {
-  const borderRadiusValue: readonly [number, number, number, number] =
-    element.style.borderRadius ?? ([0, 0, 0, 0] as const);
+function normalizeBoxTuple(value: number | readonly number[] | undefined): readonly [number, number, number, number] {
+  if (typeof value === 'number') {
+    return [value, value, value, value];
+  }
 
-  const paddingValue: readonly [number, number, number, number] = element.style.padding ?? ([0, 0, 0, 0] as const);
+  if (
+    Array.isArray(value) &&
+    value.length === 4 &&
+    value.every((entry) => typeof entry === 'number' && Number.isFinite(entry))
+  ) {
+    return [value[0], value[1], value[2], value[3]];
+  }
+
+  return [0, 0, 0, 0];
+}
+
+export function toPanelElement(element: BroadsetElement): PanelElement {
+  const borderRadiusValue = normalizeBoxTuple(element.style.borderRadius);
+  const paddingValue = normalizeBoxTuple(element.style.padding);
 
   return {
     id: element.id,

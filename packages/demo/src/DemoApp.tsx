@@ -981,10 +981,21 @@ export function DemoApp(): React.JSX.Element {
 
       const target =
         event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-element-id]') : null;
-      const elementId = target?.dataset['elementId'] ?? null;
+      const hitElementId =
+        typeof target?.dataset['elementId'] === 'string' && target.dataset['elementId'] !== '' ?
+          target.dataset['elementId']
+        : null;
+      const state = editorStore.getState();
+      const contextElementId = hitElementId ?? state.activeElementIds[0] ?? null;
 
-      if (typeof elementId === 'string' && elementId !== '') {
-        editorStore.getState().selectElement(elementId);
+      if (contextElementId !== null) {
+        const hasMultipleSelection = state.activeElementIds.length > 1;
+        const isElementAlreadySelected = state.activeElementIds.includes(contextElementId);
+
+        // Preserve multi-selection when opening context menu on any already-selected element.
+        if (!(hasMultipleSelection && isElementAlreadySelected)) {
+          state.selectElement(contextElementId);
+        }
       }
 
       const bounds = event.currentTarget.getBoundingClientRect();
@@ -994,7 +1005,7 @@ export function DemoApp(): React.JSX.Element {
       const maxY = bounds.bottom - CONTEXT_MENU_HEIGHT + RULER_SIZE;
 
       setContextMenu({
-        elementId,
+        elementId: contextElementId,
         x: Math.max(minX, Math.min(event.clientX, maxX)),
         y: Math.max(minY, Math.min(event.clientY, maxY)),
       });
@@ -1342,6 +1353,7 @@ export function DemoApp(): React.JSX.Element {
             <>
               <div
                 className="absolute left-0 top-0 z-30"
+                data-testid="ruler-corner"
                 style={{ height: `${String(RULER_SIZE)}px`, width: `${String(RULER_SIZE)}px` }}
               >
                 <div
@@ -1357,6 +1369,7 @@ export function DemoApp(): React.JSX.Element {
 
               <div
                 className="absolute right-0 top-0 z-20"
+                data-testid="ruler-horizontal-strip"
                 style={{ height: `${String(RULER_SIZE)}px`, left: `${String(RULER_SIZE)}px` }}
               >
                 <RulerStrip orientation="horizontal" ticks={horizontalTicks} />
@@ -1364,6 +1377,7 @@ export function DemoApp(): React.JSX.Element {
 
               <div
                 className="absolute bottom-0 left-0 z-20"
+                data-testid="ruler-vertical-strip"
                 style={{ top: `${String(RULER_SIZE)}px`, width: `${String(RULER_SIZE)}px` }}
               >
                 <RulerStrip orientation="vertical" ticks={verticalTicks} />

@@ -428,6 +428,7 @@ jest.mock(
         Body: createWrapper('tbody'),
         Cell: createWrapper('td'),
         Column: createWrapper('th'),
+        Content: createWrapper(),
         Header: createWrapper('thead'),
         Row: createWrapper('tr'),
       }),
@@ -1123,7 +1124,11 @@ describe('DemoApp playback shell lifecycle', () => {
     });
 
     render(<DemoApp />);
-    fireEvent.contextMenu(screen.getByLabelText(/screen preview for/i));
+
+    const preview = screen.getByLabelText(/screen preview for/i);
+
+    fireEvent.click(preview);
+    fireEvent.contextMenu(preview);
 
     expect(screen.getByRole('button', { name: /^paste\b/i })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /^cut\b/i })).toBeNull();

@@ -48,20 +48,11 @@ describe('live data injection — periodic updates', () => {
   /** @description simulateLiveUpdate MUST return new values that differ from the input so the data store actually updates on each tick. */
   it('produces a new set of values that differs from the input', () => {
     const initial: LiveDataValues = { ...INITIAL_LIVE_DATA };
+    const updated = simulateLiveUpdate(initial);
 
-    // Run multiple simulations — at least one should produce a different score
-    let anyScoreChanged = false;
-
-    for (let i = 0; i < 20; i++) {
-      const updated = simulateLiveUpdate(initial);
-
-      if (updated.homeScore !== initial.homeScore || updated.awayScore !== initial.awayScore) {
-        anyScoreChanged = true;
-        break;
-      }
-    }
-
-    expect(anyScoreChanged).toBe(true);
+    expect(updated).not.toEqual(initial);
+    expect(updated.clock).not.toBe(initial.clock);
+    expect(updated.ticker).not.toEqual(initial.ticker);
   });
 
   /** @description simulateLiveUpdate MUST always advance the clock string so the display shows a changing timestamp. */
