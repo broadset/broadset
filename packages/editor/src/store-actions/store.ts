@@ -1,0 +1,614 @@
+import {
+  type BooleanOperation,
+  type BroadsetDocument,
+  type BroadsetElement,
+  type BroadsetElementStyle,
+  createDefaultElement,
+  createDefaultFeatureConfig,
+  createEmptyBroadsetDocument,
+  type EditorConfig,
+  type EditorFeatureConfig,
+  type ElementPosition,
+} from '@broadset/model';
+import { temporal, type TemporalState } from 'zundo';
+import { createStore, type StoreApi } from 'zustand/vanilla';
+
+import { getElementDefaults } from '../element-defaults';
+import { createUIActionsSlice, type UIActionsState } from '../store-ui-actions';
+import { createSnapshot, ensureSnapshotName, MAX_SNAPSHOTS } from './history';
+import { applySelectionSideEffects, createInteractionState, filterSelectionToExisting } from './selection';
+import {
+  applyElementUpdate,
+  collectDescendantIds,
+  toggleOverrideVisibility,
+  updateDocumentElement,
+  updateDocumentElements,
+} from './transform';
+
+const DEFAULT_MAX_UNDO_STEPS = 50;
+
+export type EditingMode =
+  | { readonly type: 'none' }
+  | { readonly type: 'placement'; readonly elementType: string }
+  | { readonly type: 'path-editing'; readonly elementId: string }
+  | { readonly type: 'path-drawing'; readonly elementId: string }
+  | { readonly type: 'inline-text'; readonly elementId: string }
+  | { readonly type: 'clip-path-editing'; readonly elementId: string }
+  | { readonly type: 'motion-path-editing'; readonly elementId: string };
+
+export type ReorderDirection = 'forward' | 'backward' | 'front' | 'back';
+
+export interface NamedSnapshot {
+  readonly id: string;
+  readonly name: string;
+  readonly timestamp: string;
+  readonly document: BroadsetDocument;
+}
+
+export interface ElementUpdate {
+  readonly position?: ElementPosition;
+  readonly width?: number;
+  readonly height?: number;
+  readonly rotation?: number;
+  readonly content?: string;
+  readonly name?: string;
+  readonly booleanOperation?: BooleanOperation | null;
+}
+
+interface PartializedState {
+  readonly document: BroadsetDocument;
+  readonly documentMode: 'screen' | 'print';
+  readonly featureConfig: EditorFeatureConfig;
+}
+
+export interface EditorState extends UIActionsState {
+  readonly document: BroadsetDocument;
+  readonly documentMode: 'screen' | 'print';
+  readonly featureConfig: EditorFeatureConfig;
+  readonly activeElementIds: readonly string[];
+  readonly activePageIndex: number;
+  readonly pendingPlacementType: string | null;
+  readonly pathEditingElementId: string | null;
+  readonly pathDrawingElementId: string | null;
+  readonly clipPathEditingElementId: string | null;
+  readonly motionPathEditingElementId: string | null;
+  readonly inlineTextEditingElementId: string | null;
+  readonly editingMode: EditingMode;
+  readonly loadTemplate: (document: BroadsetDocument) => void;
+  readonly setDocument: (document: BroadsetDocument) => void;
+  readonly getDocument: () => BroadsetDocument;
+  readonly updateFeatureConfig: (partial: Partial<EditorFeatureConfig>) => void;
+  readonly selectElement: (elementId: string | null) => void;
+  readonly setActiveElements: (elementIds: readonly string[]) => void;
+  readonly toggleSelectElement: (elementId: string) => void;
+  readonly enterPathEditing: (elementId: string) => void;
+  readonly updateElementEphemeral: (elementId: string, updates: ElementUpdate) => void;
+  readonly commitElementUpdate: (elementId: string, updates: ElementUpdate) => void;
+  readonly commitGroupMove: (
+    updates: ReadonlyArray<{ readonly elementId: string; readonly position: ElementPosition }>,
+  ) => void;
+  readonly updateElementStyle: (elementId: string, style: Partial<BroadsetElementStyle>) => void;
+  readonly reorderElement: (elementId: string, direction: ReorderDirection) => void;
+  readonly addElement: (typeOrElement: string | BroadsetElement) => string;
+  readonly removeElement: (elementId: string) => void;
+  readonly removeElements: (elementIds: readonly string[]) => void;
+  readonly undo: () => void;
+  readonly redo: () => void;
+  readonly groupElements: () => void;
+  readonly ungroupElements: () => void;
+  readonly toggleLock: (elementId: string) => void;
+  readonly toggleVisibility: (elementId: string) => void;
+  readonly snapshots: readonly NamedSnapshot[];
+  readonly saveSnapshot: (name: string) => string;
+  readonly restoreSnapshot: (id: string) => void;
+  readonly renameSnapshot: (id: string, newName: string) => void;
+  readonly deleteSnapshot: (id: string) => void;
+}
+
+export type EditorStore = StoreApi<EditorState> & {
+  temporal: StoreApi<TemporalState<PartializedState>>;
+};
+
+export interface CreateEditorStoreOptions {
+  readonly config?: Partial<EditorConfig>;
+}
+
+export function createEmptyEditorDocument(): BroadsetDocument {
+  return createEmptyBroadsetDocument();
+}
+
+export function createEditorStore(options: CreateEditorStoreOptions = {}): EditorStore {
+  const maxUndoSteps = options.config?.maxUndoSteps ?? DEFAULT_MAX_UNDO_STEPS;
+  const requiredElementIds = new Set(options.config?.requiredElements ?? []);
+  const temporalRef: { current: StoreApi<TemporalState<PartializedState>> | null } = { current: null };
+
+  const store: EditorStore = createStore<EditorState>()(
+    temporal(
+      (set, get) => ({
+        document: createEmptyEditorDocument(),
+        documentMode: 'screen',
+        featureConfig: createDefaultFeatureConfig('screen'),
+        activeElementIds: [],
+        activePageIndex: 0,
+        pendingPlacementType: null,
+        pathEditingElementId: null,
+        pathDrawingElementId: null,
+        clipPathEditingElementId: null,
+        motionPathEditingElementId: null,
+        inlineTextEditingElementId: null,
+        editingMode: { type: 'none' },
+        snapshots: [],
+        ...createUIActionsSlice((updater) => {
+          set((state) => updater(state));
+        }, options.config),
+        loadTemplate(document: BroadsetDocument): void {
+          set({
+            document,
+            documentMode: document.documentMode,
+            featureConfig: createDefaultFeatureConfig(document.documentMode),
+            activePageIndex: 0,
+            snapshots: [],
+            ...createInteractionState([], null, null, null),
+          });
+          temporalRef.current?.getState().clear();
+        },
+        setDocument(document: BroadsetDocument): void {
+          set((state) => ({
+            document,
+            documentMode: document.documentMode,
+            featureConfig: createDefaultFeatureConfig(document.documentMode),
+            activeElementIds: filterSelectionToExisting(document, state.activeElementIds),
+          }));
+        },
+        getDocument(): BroadsetDocument {
+          return get().document;
+        },
+        updateFeatureConfig(partial: Partial<EditorFeatureConfig>): void {
+          set((state) => ({
+            featureConfig: {
+              ...state.featureConfig,
+              ...partial,
+            },
+          }));
+        },
+        selectElement(elementId: string | null): void {
+          set((state) => applySelectionSideEffects(state, elementId === null ? [] : [elementId]));
+        },
+        setActiveElements(elementIds: readonly string[]): void {
+          set((state) => applySelectionSideEffects(state, [...elementIds]));
+        },
+        toggleSelectElement(elementId: string): void {
+          set((state) => {
+            const isAlreadySelected = state.activeElementIds.includes(elementId);
+            const nextActiveElementIds =
+              isAlreadySelected ?
+                state.activeElementIds.filter((activeId) => activeId !== elementId)
+              : [...state.activeElementIds, elementId];
+
+            return applySelectionSideEffects(state, nextActiveElementIds);
+          });
+        },
+        enterPathEditing(elementId: string): void {
+          set(createInteractionState([elementId], null, elementId, null));
+        },
+        updateElementEphemeral(elementId: string, updates: ElementUpdate): void {
+          temporalRef.current?.getState().pause();
+          set((state) => ({
+            document: updateDocumentElement(state.document, elementId, (element) =>
+              applyElementUpdate(element, updates),
+            ),
+          }));
+          temporalRef.current?.getState().resume();
+        },
+        commitElementUpdate(elementId: string, updates: ElementUpdate): void {
+          set((state) => ({
+            document: updateDocumentElement(state.document, elementId, (element) =>
+              applyElementUpdate(element, updates),
+            ),
+          }));
+        },
+        commitGroupMove(
+          updates: ReadonlyArray<{ readonly elementId: string; readonly position: ElementPosition }>,
+        ): void {
+          set((state) => {
+            const positionsById = new Map(updates.map((update) => [update.elementId, update.position]));
+            const nextDocument = {
+              ...state.document,
+              elements: state.document.elements.map((element) => {
+                const nextPosition = positionsById.get(element.id);
+
+                return nextPosition === undefined ? element : { ...element, position: nextPosition };
+              }),
+            };
+
+            return { document: nextDocument };
+          });
+        },
+        updateElementStyle(elementId: string, style: Partial<BroadsetElementStyle>): void {
+          set((state) => ({
+            document: updateDocumentElement(state.document, elementId, (element) => ({
+              ...element,
+              style: {
+                ...element.style,
+                ...style,
+              },
+            })),
+          }));
+        },
+        reorderElement(elementId: string, direction: ReorderDirection): void {
+          set((state) => {
+            const currentIndex = state.document.elements.findIndex((element) => element.id === elementId);
+
+            if (currentIndex === -1) {
+              return {};
+            }
+
+            const nextElements = [...state.document.elements];
+
+            switch (direction) {
+              case 'forward': {
+                if (currentIndex >= nextElements.length - 1) {
+                  return {};
+                }
+
+                const [element] = nextElements.splice(currentIndex, 1);
+
+                if (element === undefined) {
+                  return {};
+                }
+
+                nextElements.splice(currentIndex + 1, 0, element);
+                break;
+              }
+
+              case 'backward': {
+                if (currentIndex <= 0) {
+                  return {};
+                }
+
+                const [element] = nextElements.splice(currentIndex, 1);
+
+                if (element === undefined) {
+                  return {};
+                }
+
+                nextElements.splice(currentIndex - 1, 0, element);
+                break;
+              }
+
+              case 'front': {
+                if (currentIndex === nextElements.length - 1) {
+                  return {};
+                }
+
+                const [element] = nextElements.splice(currentIndex, 1);
+
+                if (element === undefined) {
+                  return {};
+                }
+
+                nextElements.push(element);
+                break;
+              }
+
+              case 'back': {
+                if (currentIndex === 0) {
+                  return {};
+                }
+
+                const [element] = nextElements.splice(currentIndex, 1);
+
+                if (element === undefined) {
+                  return {};
+                }
+
+                nextElements.unshift(element);
+                break;
+              }
+            }
+
+            return {
+              document: {
+                ...state.document,
+                elements: nextElements,
+              },
+            };
+          });
+        },
+        addElement(typeOrElement: string | BroadsetElement): string {
+          const nextElement =
+            typeof typeOrElement === 'string' ?
+              (() => {
+                const defaults = getElementDefaults(typeOrElement);
+
+                return {
+                  ...createDefaultElement(typeOrElement, {
+                    width: defaults.width,
+                    height: defaults.height,
+                    content: defaults.content,
+                  }),
+                  name: typeOrElement,
+                };
+              })()
+            : typeOrElement;
+          const entersPathDrawing = nextElement.type === 'path' && nextElement.content.trim() === '';
+
+          set((state) => ({
+            document: {
+              ...state.document,
+              elements: [...state.document.elements, nextElement],
+            },
+            ...createInteractionState([nextElement.id], null, null, entersPathDrawing ? nextElement.id : null),
+          }));
+
+          return nextElement.id;
+        },
+        removeElement(elementId: string): void {
+          if (requiredElementIds.has(elementId)) {
+            return;
+          }
+
+          set((state) => {
+            const affectedIds = collectDescendantIds(state.document, elementId);
+            const promotedIds = new Set<string>(
+              [...affectedIds].filter((affectedId) => affectedId !== elementId && requiredElementIds.has(affectedId)),
+            );
+            const deletedIds = new Set<string>([...affectedIds].filter((affectedId) => !promotedIds.has(affectedId)));
+            const nextDocument: BroadsetDocument = {
+              ...state.document,
+              elements: state.document.elements
+                .filter((element) => !deletedIds.has(element.id))
+                .map((element) =>
+                  promotedIds.has(element.id) ?
+                    {
+                      ...element,
+                      parentId: null,
+                    }
+                  : element,
+                ),
+              pages: state.document.pages.map((page) => ({
+                ...page,
+                overrides: page.overrides.filter((override) => !deletedIds.has(override.elementId)),
+              })),
+            };
+            const nextActiveElementIds = state.activeElementIds.filter((activeId) => !deletedIds.has(activeId));
+            const nextPathEditingElementId =
+              state.pathEditingElementId !== null && deletedIds.has(state.pathEditingElementId) ?
+                null
+              : state.pathEditingElementId;
+            const nextPathDrawingElementId =
+              state.pathDrawingElementId !== null && deletedIds.has(state.pathDrawingElementId) ?
+                null
+              : state.pathDrawingElementId;
+            const nextClipPathEditingElementId =
+              state.clipPathEditingElementId !== null && deletedIds.has(state.clipPathEditingElementId) ?
+                null
+              : state.clipPathEditingElementId;
+            const nextMotionPathEditingElementId =
+              state.motionPathEditingElementId !== null && deletedIds.has(state.motionPathEditingElementId) ?
+                null
+              : state.motionPathEditingElementId;
+            const nextInlineTextEditingElementId =
+              state.inlineTextEditingElementId !== null && deletedIds.has(state.inlineTextEditingElementId) ?
+                null
+              : state.inlineTextEditingElementId;
+
+            return {
+              document: nextDocument,
+              ...createInteractionState(
+                nextActiveElementIds,
+                state.pendingPlacementType,
+                nextPathEditingElementId,
+                nextPathDrawingElementId,
+                nextInlineTextEditingElementId,
+                nextClipPathEditingElementId,
+                nextMotionPathEditingElementId,
+              ),
+            };
+          });
+        },
+        removeElements(elementIds: readonly string[]): void {
+          const removableIds = elementIds.filter((elementId) => !requiredElementIds.has(elementId));
+
+          if (removableIds.length === 0) {
+            return;
+          }
+
+          set((state) => {
+            const allDeletedIds = new Set<string>();
+
+            for (const elementId of removableIds) {
+              const descendants = collectDescendantIds(state.document, elementId);
+
+              for (const descendantId of descendants) {
+                if (!requiredElementIds.has(descendantId)) {
+                  allDeletedIds.add(descendantId);
+                }
+              }
+            }
+
+            const nextDocument: BroadsetDocument = {
+              ...state.document,
+              elements: state.document.elements
+                .filter((element) => !allDeletedIds.has(element.id))
+                .map((element) =>
+                  (
+                    requiredElementIds.has(element.id) &&
+                    element.parentId !== null &&
+                    allDeletedIds.has(element.parentId)
+                  ) ?
+                    { ...element, parentId: null }
+                  : element,
+                ),
+              pages: state.document.pages.map((page) => ({
+                ...page,
+                overrides: page.overrides.filter((override) => !allDeletedIds.has(override.elementId)),
+              })),
+            };
+            const nextActiveElementIds = state.activeElementIds.filter((activeId) => !allDeletedIds.has(activeId));
+            const nextPathEditingElementId =
+              state.pathEditingElementId !== null && allDeletedIds.has(state.pathEditingElementId) ?
+                null
+              : state.pathEditingElementId;
+            const nextPathDrawingElementId =
+              state.pathDrawingElementId !== null && allDeletedIds.has(state.pathDrawingElementId) ?
+                null
+              : state.pathDrawingElementId;
+            const nextClipPathEditingElementId =
+              state.clipPathEditingElementId !== null && allDeletedIds.has(state.clipPathEditingElementId) ?
+                null
+              : state.clipPathEditingElementId;
+            const nextMotionPathEditingElementId =
+              state.motionPathEditingElementId !== null && allDeletedIds.has(state.motionPathEditingElementId) ?
+                null
+              : state.motionPathEditingElementId;
+            const nextInlineTextEditingElementId =
+              state.inlineTextEditingElementId !== null && allDeletedIds.has(state.inlineTextEditingElementId) ?
+                null
+              : state.inlineTextEditingElementId;
+
+            return {
+              document: nextDocument,
+              ...createInteractionState(
+                nextActiveElementIds,
+                state.pendingPlacementType,
+                nextPathEditingElementId,
+                nextPathDrawingElementId,
+                nextInlineTextEditingElementId,
+                nextClipPathEditingElementId,
+                nextMotionPathEditingElementId,
+              ),
+            };
+          });
+        },
+        undo(): void {
+          temporalRef.current?.getState().undo();
+        },
+        redo(): void {
+          temporalRef.current?.getState().redo();
+        },
+        groupElements(): void {
+          set((state) => {
+            if (state.activeElementIds.length < 2) {
+              return {};
+            }
+
+            const groupId = crypto.randomUUID();
+
+            return {
+              document: updateDocumentElements(state.document, new Set(state.activeElementIds), (element) => ({
+                ...element,
+                groupId,
+              })),
+            };
+          });
+        },
+        ungroupElements(): void {
+          set((state) => ({
+            document: updateDocumentElements(state.document, new Set(state.activeElementIds), (element) => ({
+              ...element,
+              groupId: null,
+            })),
+          }));
+        },
+        toggleLock(elementId: string): void {
+          set((state) => ({
+            document: updateDocumentElement(state.document, elementId, (element) => ({
+              ...element,
+              locked: !element.locked,
+            })),
+          }));
+        },
+        toggleVisibility(elementId: string): void {
+          set((state) => ({
+            document: {
+              ...state.document,
+              pages: state.document.pages.map((page, pageIndex) =>
+                pageIndex === state.activePageIndex ?
+                  {
+                    ...page,
+                    overrides: toggleOverrideVisibility(page.overrides, elementId),
+                  }
+                : page,
+              ),
+            },
+          }));
+        },
+        saveSnapshot(name: string): string {
+          const trimmed = ensureSnapshotName(name);
+
+          const state = get();
+
+          if (state.snapshots.length >= MAX_SNAPSHOTS) {
+            throw new Error(`Maximum number of snapshots (${String(MAX_SNAPSHOTS)}) reached`);
+          }
+
+          if (state.snapshots.some((s) => s.name === trimmed)) {
+            throw new Error(`A snapshot named "${trimmed}" already exists`);
+          }
+
+          const snapshot = createSnapshot(trimmed, state.document);
+
+          set({ snapshots: [...state.snapshots, snapshot] });
+
+          return snapshot.id;
+        },
+        restoreSnapshot(id: string): void {
+          const state = get();
+          const snapshot = state.snapshots.find((s) => s.id === id);
+
+          if (snapshot === undefined) {
+            return;
+          }
+
+          const newDocumentMode = snapshot.document.documentMode;
+
+          set({
+            document: structuredClone(snapshot.document),
+            documentMode: newDocumentMode,
+            featureConfig:
+              newDocumentMode === state.documentMode ?
+                state.featureConfig
+              : createDefaultFeatureConfig(newDocumentMode),
+            activePageIndex: 0,
+            ...createInteractionState([], null, null, null),
+          });
+        },
+        renameSnapshot(id: string, newName: string): void {
+          const trimmed = ensureSnapshotName(newName);
+
+          const state = get();
+
+          if (state.snapshots.some((s) => s.name === trimmed && s.id !== id)) {
+            throw new Error(`A snapshot named "${trimmed}" already exists`);
+          }
+
+          set({
+            snapshots: state.snapshots.map((s) => (s.id === id ? { ...s, name: trimmed } : s)),
+          });
+        },
+        deleteSnapshot(id: string): void {
+          set((state) => ({
+            snapshots: state.snapshots.filter((s) => s.id !== id),
+          }));
+        },
+      }),
+      {
+        partialize: (state) => ({
+          document: state.document,
+          documentMode: state.documentMode,
+          featureConfig: state.featureConfig,
+        }),
+        limit: maxUndoSteps,
+        equality: (previousState, currentState) =>
+          previousState.document === currentState.document &&
+          previousState.documentMode === currentState.documentMode &&
+          previousState.featureConfig === currentState.featureConfig,
+      },
+    ),
+  );
+
+  temporalRef.current = store.temporal;
+
+  return store;
+}
