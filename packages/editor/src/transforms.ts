@@ -229,6 +229,7 @@ export function applyResize(
   dy: number,
   zoom: number,
   rotationDeg = 0,
+  minSize = 0,
 ): Rect {
   const compensatedDx = compensateZoom(dx, zoom);
   const compensatedDy = compensateZoom(dy, zoom);
@@ -276,8 +277,10 @@ export function applyResize(
     }
   }
 
-  const newWidth = rect.width + dWidth;
-  const newHeight = rect.height + dHeight;
+  // Clamp to minimum size BEFORE anchor math so the anchor preservation
+  // uses the actual final dimensions and doesn't produce drift.
+  const newWidth = Math.max(rect.width + dWidth, minSize);
+  const newHeight = Math.max(rect.height + dHeight, minSize);
 
   // ----- Anchor point preservation -----
   // The anchor is the opposite edge/corner of the handle being dragged. Its

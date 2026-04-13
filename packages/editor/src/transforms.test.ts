@@ -164,6 +164,49 @@ describe('Resize via Handles', () => {
     expect(newAnchorGlobalX).toBeCloseTo(oldAnchorGlobalX, 10);
     expect(newAnchorGlobalY).toBeCloseTo(oldAnchorGlobalY, 10);
   });
+
+  /** @description When minSize is set, width and height must never go below it, and anchor preservation must use the clamped dimensions so the element doesn't drift. */
+  it('clamps to minSize and preserves anchor when dragged past zero', () => {
+    const rect = { x: 100, y: 100, width: 80, height: 50 };
+    const minSize = 12;
+
+    // Drag E handle far left — would make width go to -120 without clamping
+    const result = applyResize(rect, 'e', -200, 0, 1, 0, minSize);
+
+    expect(result.width).toBe(minSize);
+    expect(result.height).toBe(50);
+    // The W-edge anchor stays fixed at x=100 (unrotated case)
+    expect(result.x).toBeCloseTo(100, 10);
+  });
+
+  /** @description With rotation and minSize, the anchor must still stay fixed when the element is clamped to minimum dimensions. */
+  it('clamps to minSize and preserves anchor at 45° rotation', () => {
+    const rect = { x: 100, y: 100, width: 80, height: 50 };
+    const rotation = 45;
+    const minSize = 12;
+    const rad = (rotation * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    // W-midpoint anchor before resize
+    const oldCx = rect.x + rect.width / 2;
+    const oldCy = rect.y + rect.height / 2;
+    const oldAnchorGlobalX = oldCx + cos * (-rect.width / 2);
+    const oldAnchorGlobalY = oldCy + sin * (-rect.width / 2);
+
+    const result = applyResize(rect, 'e', -200, 0, 1, rotation, minSize);
+
+    expect(result.width).toBe(minSize);
+    expect(result.height).toBe(50);
+
+    const newCx = result.x + result.width / 2;
+    const newCy = result.y + result.height / 2;
+    const newAnchorGlobalX = newCx + cos * (-result.width / 2);
+    const newAnchorGlobalY = newCy + sin * (-result.width / 2);
+
+    expect(newAnchorGlobalX).toBeCloseTo(oldAnchorGlobalX, 10);
+    expect(newAnchorGlobalY).toBeCloseTo(oldAnchorGlobalY, 10);
+  });
 });
 
 describe('Rotation', () => {

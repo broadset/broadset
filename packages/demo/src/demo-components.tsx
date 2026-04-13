@@ -13,6 +13,7 @@ import { Button, Dropdown, Tooltip } from '@heroui/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
+  MIN_TRANSFORM_SIZE,
   ROTATION_HANDLE_OFFSET,
   RULER_SIZE,
   TRANSFORM_HANDLE_CURSORS,
@@ -21,7 +22,7 @@ import {
   type TransformGesture,
   ZOOM_STEP,
 } from './demo-types';
-import { clampCanvasZoom, normalizeTransformRect } from './demo-utils';
+import { clampCanvasZoom } from './demo-utils';
 
 export function RulerStrip({
   ticks,
@@ -280,16 +281,14 @@ export function SelectionTransformWidget({
       }
 
       if (gesture.kind === 'resize') {
-        const nextRect = normalizeTransformRect(
-          applyResize(
-            gesture.initialRect,
-            gesture.handle,
-            event.clientX - gesture.startX,
-            event.clientY - gesture.startY,
-            effectiveZoom,
-            element.rotation,
-          ),
+        const nextRect = applyResize(
+          gesture.initialRect,
           gesture.handle,
+          event.clientX - gesture.startX,
+          event.clientY - gesture.startY,
+          effectiveZoom,
+          element.rotation,
+          MIN_TRANSFORM_SIZE,
         );
         const update = {
           height: nextRect.height,
