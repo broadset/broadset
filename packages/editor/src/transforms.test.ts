@@ -46,14 +46,17 @@ describe('Resize via Handles', () => {
     expect(result.height).toBe(50);
   });
 
-  /** @description At 90° rotation, the east handle's local-X axis aligns with screen-Y. Moving the pointer down (dy=30) should grow width without affecting height. */
+  /** @description At 90° rotation, the east handle's local-X axis aligns with screen-Y. Moving the pointer down (dy=30) should grow width. Position adjusts to keep the W-edge anchor fixed in screen space. */
   it('projects screen delta onto local axes for east handle at 90° rotation', () => {
     const result = applyResize(baseRect, 'e', 0, 30, 1, 90);
 
     expect(result.width).toBeCloseTo(110, 5);
     expect(result.height).toBeCloseTo(50, 5);
-    expect(result.x).toBeCloseTo(0, 5);
-    expect(result.y).toBeCloseTo(0, 5);
+    // Anchor preservation: W midpoint must stay fixed → position shifts
+    // dWidth=30, anchorDx = (-40)-(-55) = 15, R(90°)*(15,0) = (0,15)
+    // newX = 0+40+0-55 = -15, newY = 0+25+15-25 = 15
+    expect(result.x).toBeCloseTo(-15, 5);
+    expect(result.y).toBeCloseTo(15, 5);
   });
 
   /** @description At 45° rotation, a purely horizontal screen delta should contribute equally to local-X and local-Y. The east handle only uses local-X, so width grows by dx*cos(45°). */
@@ -107,6 +110,59 @@ describe('Resize via Handles', () => {
     const nwResult = applyResize(baseRect, 'nw', -15, -10, 1, 0);
 
     expect(nwResult).toEqual({ x: -15, y: -10, width: 95, height: 60 });
+  });
+
+  /** @description The opposite edge anchor must stay fixed in screen space after resize, preventing the element from drifting due to the CSS rotation pivot shifting. */
+  it('preserves the W-edge anchor position when resizing E handle at 45° rotation', () => {
+    const rect = { x: 100, y: 100, width: 200, height: 100 };
+    const rotation = 45;
+    const rad = (rotation * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    // Compute W-midpoint anchor in global space before resize
+    const oldCx = rect.x + rect.width / 2;
+    const oldCy = rect.y + rect.height / 2;
+    const oldAnchorGlobalX = oldCx + cos * (-rect.width / 2) - sin * 0;
+    const oldAnchorGlobalY = oldCy + sin * (-rect.width / 2) + cos * 0;
+
+    // Resize: drag along 45° diagonal (maps to pure localDx)
+    const result = applyResize(rect, 'e', 40, 40, 1, rotation);
+
+    // Compute W-midpoint anchor in global space after resize
+    const newCx = result.x + result.width / 2;
+    const newCy = result.y + result.height / 2;
+    const newAnchorGlobalX = newCx + cos * (-result.width / 2) - sin * 0;
+    const newAnchorGlobalY = newCy + sin * (-result.width / 2) + cos * 0;
+
+    // The anchor must not have moved
+    expect(newAnchorGlobalX).toBeCloseTo(oldAnchorGlobalX, 10);
+    expect(newAnchorGlobalY).toBeCloseTo(oldAnchorGlobalY, 10);
+  });
+
+  /** @description The NW corner anchor must stay fixed in screen space when resizing via the SE handle at 30° rotation. */
+  it('preserves the NW-corner anchor when resizing SE handle at 30° rotation', () => {
+    const rect = { x: 50, y: 50, width: 150, height: 80 };
+    const rotation = 30;
+    const rad = (rotation * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    // NW anchor (opposite of SE): local offset from center = (-w/2, -h/2)
+    const oldCx = rect.x + rect.width / 2;
+    const oldCy = rect.y + rect.height / 2;
+    const oldAnchorGlobalX = oldCx + cos * (-rect.width / 2) - sin * (-rect.height / 2);
+    const oldAnchorGlobalY = oldCy + sin * (-rect.width / 2) + cos * (-rect.height / 2);
+
+    const result = applyResize(rect, 'se', 30, 20, 1, rotation);
+
+    const newCx = result.x + result.width / 2;
+    const newCy = result.y + result.height / 2;
+    const newAnchorGlobalX = newCx + cos * (-result.width / 2) - sin * (-result.height / 2);
+    const newAnchorGlobalY = newCy + sin * (-result.width / 2) + cos * (-result.height / 2);
+
+    expect(newAnchorGlobalX).toBeCloseTo(oldAnchorGlobalX, 10);
+    expect(newAnchorGlobalY).toBeCloseTo(oldAnchorGlobalY, 10);
   });
 });
 

@@ -182,22 +182,34 @@ function projectToLocal(
 }
 
 /**
- * Rotates a local-space position delta back to screen/global space so it can
- * be applied to the element's global x/y position.
+ * Returns the local-space offset from the element center to the anchor point
+ * (the opposite edge/corner) for a given resize handle.
+ *
+ * The anchor is the point that must stay fixed in screen space during resize.
  */
-function projectToGlobal(
-  localDx: number,
-  localDy: number,
-  rotationDeg: number,
-): { readonly globalDx: number; readonly globalDy: number } {
-  const rad = (rotationDeg * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-
-  return {
-    globalDx: localDx * cos - localDy * sin,
-    globalDy: localDx * sin + localDy * cos,
-  };
+function anchorOffset(
+  handle: ResizeHandle,
+  width: number,
+  height: number,
+): { readonly ax: number; readonly ay: number } {
+  switch (handle) {
+    case 'e':
+      return { ax: -width / 2, ay: 0 };
+    case 'w':
+      return { ax: width / 2, ay: 0 };
+    case 'n':
+      return { ax: 0, ay: height / 2 };
+    case 's':
+      return { ax: 0, ay: -height / 2 };
+    case 'se':
+      return { ax: -width / 2, ay: -height / 2 };
+    case 'nw':
+      return { ax: width / 2, ay: height / 2 };
+    case 'ne':
+      return { ax: -width / 2, ay: height / 2 };
+    case 'sw':
+      return { ax: width / 2, ay: -height / 2 };
+  }
 }
 
 /**
@@ -205,7 +217,10 @@ function projectToGlobal(
  *
  * When `rotationDeg` is non-zero, screen-space pointer deltas are projected
  * onto the element's local axes so that edge handles only scale along their
- * intended axis and the resize handle stays under the cursor.
+ * intended axis. The position is then adjusted to keep the **opposite
+ * handle/edge fixed in screen space** (anchor point preservation), which
+ * compensates for the CSS `transform-origin: center center` rotation pivot
+ * shifting when width/height changes.
  */
 export function applyResize(
   rect: Rect,
@@ -221,11 +236,9 @@ export function applyResize(
   // Project screen-space movement into the element's local coordinate system.
   const { localDx, localDy } = projectToLocal(compensatedDx, compensatedDy, rotationDeg);
 
-  // Compute width/height and local-space origin adjustments.
+  // Compute width/height changes from local-space deltas.
   let dWidth = 0;
   let dHeight = 0;
-  let dLocalX = 0;
-  let dLocalY = 0;
 
   if (CORNER_HANDLES.has(handle)) {
     switch (handle) {
@@ -235,17 +248,13 @@ export function applyResize(
         break;
       case 'ne':
         dWidth = localDx;
-        dLocalY = localDy;
         dHeight = -localDy;
         break;
       case 'nw':
-        dLocalX = localDx;
         dWidth = -localDx;
-        dLocalY = localDy;
         dHeight = -localDy;
         break;
       case 'sw':
-        dLocalX = localDx;
         dWidth = -localDx;
         dHeight = localDy;
         break;
@@ -256,29 +265,47 @@ export function applyResize(
         dWidth = localDx;
         break;
       case 'w':
-        dLocalX = localDx;
         dWidth = -localDx;
         break;
       case 's':
         dHeight = localDy;
         break;
       case 'n':
-        dLocalY = localDy;
         dHeight = -localDy;
         break;
     }
   }
 
-  // When the element is rotated, a local-space origin shift must be rotated
-  // back to global space before applying to x/y.
-  const { globalDx, globalDy } = projectToGlobal(dLocalX, dLocalY, rotationDeg);
+  const newWidth = rect.width + dWidth;
+  const newHeight = rect.height + dHeight;
 
-  return {
-    x: rect.x + globalDx,
-    y: rect.y + globalDy,
-    width: rect.width + dWidth,
-    height: rect.height + dHeight,
-  };
+  // ----- Anchor point preservation -----
+  // The anchor is the opposite edge/corner of the handle being dragged. Its
+  // global (screen-space) position must stay fixed so the element doesn't
+  // shift when the CSS rotation pivot (center center) moves.
+  //
+  // Anchor_global = old_center + R(θ) · old_anchor_offset
+  //
+  // We need: new_center + R(θ) · new_anchor_offset = Anchor_global
+  // → new_center = old_center + R(θ) · (old_anchor - new_anchor)
+  // → new_pos    = new_center - (newWidth/2, newHeight/2)
+
+  const oldAnchor = anchorOffset(handle, rect.width, rect.height);
+  const newAnchor = anchorOffset(handle, newWidth, newHeight);
+  const dAnchorX = oldAnchor.ax - newAnchor.ax;
+  const dAnchorY = oldAnchor.ay - newAnchor.ay;
+
+  const rad = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
+  // old_center = (rect.x + rect.width/2, rect.y + rect.height/2)
+  // new_center = old_center + R(θ) · (dAnchorX, dAnchorY)
+  // new_pos    = new_center - (newWidth/2, newHeight/2)
+  const newX = rect.x + rect.width / 2 + (cos * dAnchorX - sin * dAnchorY) - newWidth / 2;
+  const newY = rect.y + rect.height / 2 + (sin * dAnchorX + cos * dAnchorY) - newHeight / 2;
+
+  return { x: newX, y: newY, width: newWidth, height: newHeight };
 }
 
 /** Adds a rotation delta in degrees to the current rotation value. */
