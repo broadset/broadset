@@ -1,7 +1,16 @@
 import { Button, ButtonGroup, Input, Kbd, Modal, Select, Slider, Switch, Table, Tabs } from '@heroui/react';
 import { X } from 'lucide-react';
-import type { ChangeEvent, JSX, ReactNode } from 'react';
-import { useCallback, useRef, useState } from 'react';
+import {
+  type ChangeEvent,
+  type CSSProperties,
+  type JSX,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 
 import { NumField } from './inputs';
 import { color, sp } from './tokens';
@@ -54,6 +63,18 @@ const EXPORTER_CATEGORIES = [
   { category: 'Broadcast', formats: ['ograf'] },
 ] as const;
 
+const VISUALLY_HIDDEN_HEADING_STYLE: Readonly<CSSProperties> = {
+  border: 0,
+  clip: 'rect(0 0 0 0)',
+  height: '1px',
+  margin: '-1px',
+  overflow: 'hidden',
+  padding: 0,
+  position: 'absolute',
+  whiteSpace: 'nowrap',
+  width: '1px',
+};
+
 /* ================================================================== */
 /*  Modal shell — wraps compound v3 Modal structure                    */
 /* ================================================================== */
@@ -71,6 +92,24 @@ function ModalShell({
   readonly onClose: () => void;
   readonly children: ReactNode;
 }): JSX.Element {
+  const dialogContainerRef = useRef<HTMLDivElement | null>(null);
+  const titleId = useId();
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const dialogElement = dialogContainerRef.current?.querySelector<HTMLElement>('[role="dialog"]');
+
+    if (dialogElement === null || dialogElement === undefined) {
+      return;
+    }
+
+    dialogElement.setAttribute('aria-modal', 'true');
+    dialogElement.setAttribute('aria-labelledby', titleId);
+  }, [isOpen, titleId]);
+
   return (
     <Modal
       isOpen={isOpen}
@@ -80,7 +119,14 @@ function ModalShell({
     >
       <Modal.Backdrop>
         <Modal.Container size={size}>
-          <Modal.Dialog aria-label={title}>{children}</Modal.Dialog>
+          <div ref={dialogContainerRef}>
+            <Modal.Dialog aria-label={title} aria-labelledby={titleId}>
+              <h2 id={titleId} style={VISUALLY_HIDDEN_HEADING_STYLE}>
+                {title}
+              </h2>
+              {children}
+            </Modal.Dialog>
+          </div>
         </Modal.Container>
       </Modal.Backdrop>
     </Modal>
@@ -552,32 +598,40 @@ export function NewDocumentModal({
         </Tabs>
 
         <Table aria-label="Document presets">
-          <Table.Header>
-            <Table.Column>Name</Table.Column>
-            <Table.Column>Dimensions</Table.Column>
-            <Table.Column>Mode</Table.Column>
-          </Table.Header>
-          <Table.Body>
-            {filteredPresets.map((preset) => (
-              <Table.Row
-                key={preset.name}
-                data-selected={selectedPreset?.name === preset.name ? 'true' : undefined}
-                style={{
-                  backgroundColor: selectedPreset?.name === preset.name ? color('accent') : undefined,
-                  cursor: 'pointer',
-                }}
-                onPress={() => {
-                  setSelectedPreset(preset);
-                }}
-              >
-                <Table.Cell>{preset.name}</Table.Cell>
-                <Table.Cell>
-                  {preset.width} × {preset.height} {preset.unit}
-                </Table.Cell>
-                <Table.Cell>{preset.mode}</Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
+          <Table.Content
+            onRowAction={(key) => {
+              const preset = filteredPresets.find((candidate) => candidate.name === String(key));
+
+              if (preset !== undefined) {
+                setSelectedPreset(preset);
+              }
+            }}
+          >
+            <Table.Header>
+              <Table.Column id="name">Name</Table.Column>
+              <Table.Column id="dimensions">Dimensions</Table.Column>
+              <Table.Column id="mode">Mode</Table.Column>
+            </Table.Header>
+            <Table.Body>
+              {filteredPresets.map((preset) => (
+                <Table.Row
+                  key={preset.name}
+                  data-selected={selectedPreset?.name === preset.name ? 'true' : undefined}
+                  id={preset.name}
+                  style={{
+                    backgroundColor: selectedPreset?.name === preset.name ? color('accent') : undefined,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Table.Cell>{preset.name}</Table.Cell>
+                  <Table.Cell>
+                    {preset.width} × {preset.height} {preset.unit}
+                  </Table.Cell>
+                  <Table.Cell>{preset.mode}</Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table.Content>
         </Table>
       </Modal.Body>
       <Modal.Footer>
@@ -756,15 +810,12 @@ export function GuidePositionModal({
 
   const handleKeyDown = useCallback(
     (event: { readonly key: string; preventDefault(): void }) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        onApply(localPosition);
-      } else if (event.key === 'Escape') {
+      if (event.key === 'Escape') {
         event.preventDefault();
         onClose();
       }
     },
-    [localPosition, onApply, onClose],
+    [onClose],
   );
 
   return (
@@ -774,7 +825,7 @@ export function GuidePositionModal({
       </Modal.Header>
       <Modal.Body>
         <div onKeyDown={handleKeyDown}>
-          <NumField label={`Position (${unit})`} value={localPosition} onChange={setLocalPosition} />
+          <NumField label={`Position (${unit})`} value={localPosition} onChange={setLocalPosition} onCommit={onApply} />
         </div>
       </Modal.Body>
       <Modal.Footer>

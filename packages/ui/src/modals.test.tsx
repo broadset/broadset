@@ -24,6 +24,10 @@ const mockNumCtx = React.createContext({
   disabled: false,
 });
 
+const mockTableCtx = React.createContext({
+  onRowAction: undefined as ((key: string) => void) | undefined,
+});
+
 function mockWrap(tag = 'div') {
   return (p: Record<string, unknown>) => {
     const { children, ...rest } = p;
@@ -171,6 +175,24 @@ function mockTable(p: Record<string, unknown>) {
   return React.createElement('table', rest, (children as React.ReactNode) ?? null);
 }
 
+function mockTableContent(p: Record<string, unknown>) {
+  const { children, onRowAction, ...rest } = p;
+
+  return React.createElement(
+    'div',
+    rest,
+    React.createElement(
+      mockTableCtx.Provider,
+      {
+        value: {
+          onRowAction: typeof onRowAction === 'function' ? (onRowAction as (key: string) => void) : undefined,
+        },
+      },
+      (children as React.ReactNode) ?? null,
+    ),
+  );
+}
+
 function mockTabs(p: Record<string, unknown>) {
   const { children, onSelectionChange, selectedKey, ...rest } = p;
 
@@ -226,11 +248,29 @@ function mockListBoxItem(p: Record<string, unknown>) {
 }
 
 function mockTableRow(p: Record<string, unknown>) {
+  const tableCtx = React.useContext(mockTableCtx);
   const { children, ...rest } = p;
 
   return React.createElement(
     'tr',
-    { ...rest, onClick: typeof p['onPress'] === 'function' ? p['onPress'] : undefined },
+    {
+      ...rest,
+      onClick: () => {
+        if (typeof p['onPress'] === 'function') {
+          (p['onPress'] as () => void)();
+
+          return;
+        }
+
+        if (tableCtx.onRowAction !== undefined) {
+          const rowId = p['id'];
+
+          if (typeof rowId === 'string' || typeof rowId === 'number') {
+            tableCtx.onRowAction(String(rowId));
+          }
+        }
+      },
+    },
     (children as React.ReactNode) ?? null,
   );
 }
@@ -263,6 +303,7 @@ jest.mock(
     Switch: mockSwitch,
     Tab: mockTab,
     Table: Object.assign(mockTable, {
+      Content: mockTableContent,
       Header: mockWrap('thead'),
       Body: mockWrap('tbody'),
       Column: mockWrap('th'),
@@ -284,6 +325,16 @@ function mockNumField(p: Record<string, unknown>) {
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
       if (typeof p['onChange'] === 'function') {
         (p['onChange'] as (v: number) => void)(Number(e.currentTarget.value));
+      }
+    },
+    onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+      if (typeof p['onCommit'] === 'function') {
+        (p['onCommit'] as (v: number) => void)(Number(e.currentTarget.value));
+      }
+    },
+    onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter' && typeof p['onCommit'] === 'function') {
+        (p['onCommit'] as (v: number) => void)(Number((e.currentTarget as HTMLInputElement).value));
       }
     },
     role: 'spinbutton',
@@ -332,7 +383,7 @@ describe('AboutModal', () => {
     const { AboutModal } = await import('./modals');
 
     render(<AboutModal isOpen={true} version="2.3.1" onClose={jest.fn()} />);
-    expect(screen.getByText('Broadset')).toBeTruthy();
+    expect(screen.getByLabelText('Broadset')).toBeTruthy();
     expect(screen.getByText(/2\.3\.1/)).toBeTruthy();
     // Stack info: React, Zustand, HeroUI v3
     expect(screen.getByText(/React/)).toBeTruthy();

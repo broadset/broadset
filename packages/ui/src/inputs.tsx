@@ -568,15 +568,17 @@ export interface NumFieldProps {
   readonly value: number;
   readonly onChange: (value: number) => void;
   readonly label: string;
+  readonly onCommit?: ((value: number) => void) | undefined;
   readonly step?: number | undefined;
   readonly min?: number | undefined;
   readonly max?: number | undefined;
 }
 
-export function NumField({ value, onChange, label, step = 1, min, max }: NumFieldProps): JSX.Element {
+export function NumField({ value, onChange, label, onCommit, step = 1, min, max }: NumFieldProps): JSX.Element {
   const [localValue, setLocalValue] = useState(value);
   const [isDirty, setIsDirty] = useState(false);
   const lastValid = useRef(value);
+  const skipNextBlurCommit = useRef(false);
 
   // Sync external value changes
   if (!isDirty && value !== localValue) {
@@ -599,6 +601,8 @@ export function NumField({ value, onChange, label, step = 1, min, max }: NumFiel
   );
 
   const handleChange = useCallback((newVal: number) => {
+    skipNextBlurCommit.current = false;
+
     if (Number.isNaN(newVal)) {
       setIsDirty(true);
 
@@ -610,7 +614,7 @@ export function NumField({ value, onChange, label, step = 1, min, max }: NumFiel
   }, []);
 
   const commitValue = useCallback(
-    (val: number) => {
+    (val: number, options?: { readonly emitCommit?: boolean }) => {
       if (Number.isNaN(val)) {
         setLocalValue(lastValid.current);
         setIsDirty(false);
@@ -624,47 +628,45 @@ export function NumField({ value, onChange, label, step = 1, min, max }: NumFiel
       setLocalValue(clamped);
       setIsDirty(false);
       onChange(clamped);
+
+      if (options?.emitCommit ?? true) {
+        onCommit?.(clamped);
+      }
     },
-    [clamp, onChange],
+    [clamp, onChange, onCommit],
   );
 
   const handleBlur = useCallback(() => {
-    commitValue(localValue);
+    const emitCommit = !skipNextBlurCommit.current;
+
+    skipNextBlurCommit.current = false;
+    commitValue(localValue, { emitCommit });
   }, [commitValue, localValue]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Enter') {
         commitValue(localValue);
+        skipNextBlurCommit.current = true;
 
         return;
       }
 
       if (event.key === 'ArrowUp') {
         event.preventDefault();
-
-        const newVal = clamp(localValue + step);
-
-        setLocalValue(newVal);
-        lastValid.current = newVal;
-        setIsDirty(false);
-        onChange(newVal);
+        commitValue(localValue + step);
+        skipNextBlurCommit.current = true;
 
         return;
       }
 
       if (event.key === 'ArrowDown') {
         event.preventDefault();
-
-        const newVal = clamp(localValue - step);
-
-        setLocalValue(newVal);
-        lastValid.current = newVal;
-        setIsDirty(false);
-        onChange(newVal);
+        commitValue(localValue - step);
+        skipNextBlurCommit.current = true;
       }
     },
-    [commitValue, localValue, step, clamp, onChange],
+    [commitValue, localValue, step],
   );
 
   return (
