@@ -379,18 +379,19 @@ test('shows the transform widget on mount for the auto-selected element', async 
 
   await expect(widget).toBeVisible();
 
-  // el-top-ribbon is the first unlocked element: x:60, y:52, 920×96
-  const style = await widget.evaluate((el) => ({
-    left: el.style.left,
-    top: el.style.top,
-    width: el.style.width,
-    height: el.style.height,
-  }));
+  // Widget should visually overlay the auto-selected el-top-ribbon
+  const ribbonEl = page.locator('[data-element-id="el-top-ribbon"]');
+  const ribbonBox = await ribbonEl.boundingBox();
+  const widgetBox = await widget.boundingBox();
 
-  expect(style.left).toBe('60px');
-  expect(style.top).toBe('52px');
-  expect(style.width).toBe('920px');
-  expect(style.height).toBe('96px');
+  if (ribbonBox === null || widgetBox === null) {
+    throw new Error('Element or widget bounding box not found');
+  }
+
+  expect(widgetBox.x).toBeCloseTo(ribbonBox.x, -1);
+  expect(widgetBox.y).toBeCloseTo(ribbonBox.y, -1);
+  expect(widgetBox.width).toBeCloseTo(ribbonBox.width, -1);
+  expect(widgetBox.height).toBeCloseTo(ribbonBox.height, -1);
 });
 
 /**
@@ -421,13 +422,19 @@ test('repositions the transform widget when a different element is selected', as
 
   const widget = page.getByTestId('demo-transform-widget');
 
-  // Initial selection: el-top-ribbon (x:60, y:52, 920×96)
+  // Initial selection: el-top-ribbon
   await expect(widget).toBeVisible();
 
-  const initialStyle = await widget.evaluate((el) => ({ left: el.style.left, top: el.style.top }));
+  const ribbonEl = page.locator('[data-element-id="el-top-ribbon"]');
+  const initialWidgetBox = await widget.boundingBox();
+  const ribbonBox = await ribbonEl.boundingBox();
 
-  expect(initialStyle.left).toBe('60px');
-  expect(initialStyle.top).toBe('52px');
+  if (initialWidgetBox === null || ribbonBox === null) {
+    throw new Error('Widget or ribbon bounding box not found');
+  }
+
+  expect(initialWidgetBox.x).toBeCloseTo(ribbonBox.x, -1);
+  expect(initialWidgetBox.y).toBeCloseTo(ribbonBox.y, -1);
 
   // Select el-hero-badge via layers panel (x:1010, y:126, 96×96)
   await page.locator('button[aria-label="Layers"]').first().click();
@@ -436,17 +443,18 @@ test('repositions the transform widget when a different element is selected', as
 
   await sidebar.locator('[role="button"]', { hasText: 'Live Badge Orb' }).click();
 
-  const newStyle = await widget.evaluate((el) => ({
-    left: el.style.left,
-    top: el.style.top,
-    width: el.style.width,
-    height: el.style.height,
-  }));
+  const badgeEl = page.locator('[data-element-id="el-hero-badge"]');
+  const newWidgetBox = await widget.boundingBox();
+  const badgeBox = await badgeEl.boundingBox();
 
-  expect(newStyle.left).toBe('1010px');
-  expect(newStyle.top).toBe('126px');
-  expect(newStyle.width).toBe('96px');
-  expect(newStyle.height).toBe('96px');
+  if (newWidgetBox === null || badgeBox === null) {
+    throw new Error('Widget or badge bounding box not found');
+  }
+
+  expect(newWidgetBox.x).toBeCloseTo(badgeBox.x, -1);
+  expect(newWidgetBox.y).toBeCloseTo(badgeBox.y, -1);
+  expect(newWidgetBox.width).toBeCloseTo(badgeBox.width, -1);
+  expect(newWidgetBox.height).toBeCloseTo(badgeBox.height, -1);
 });
 
 /**
@@ -511,9 +519,15 @@ test('selects an element via the layers panel and repositions the transform widg
   const widget = page.getByTestId('demo-transform-widget');
 
   // Initial widget position for el-top-ribbon
-  const initialLeft = await widget.evaluate((el) => el.style.left);
+  const ribbonEl = page.locator('[data-element-id="el-top-ribbon"]');
+  const initialWidgetBox = await widget.boundingBox();
+  const ribbonBox = await ribbonEl.boundingBox();
 
-  expect(initialLeft).toBe('60px');
+  if (initialWidgetBox === null || ribbonBox === null) {
+    throw new Error('Widget or ribbon bounding box not found');
+  }
+
+  expect(initialWidgetBox.x).toBeCloseTo(ribbonBox.x, -1);
 
   // Switch to layers tab
   await page.locator('button[aria-label="Layers"]').first().click();
@@ -523,18 +537,19 @@ test('selects an element via the layers panel and repositions the transform widg
   // Click on the el-hero-badge layer (named "Live Badge Orb")
   await sidebar.locator('[role="button"]', { hasText: 'Live Badge Orb' }).click();
 
-  // Widget should reposition to el-hero-badge (x:1010, y:126, 96×96)
-  const newStyle = await widget.evaluate((el) => ({
-    left: el.style.left,
-    top: el.style.top,
-    width: el.style.width,
-    height: el.style.height,
-  }));
+  // Widget should reposition to el-hero-badge
+  const badgeEl = page.locator('[data-element-id="el-hero-badge"]');
+  const newWidgetBox = await widget.boundingBox();
+  const badgeBox = await badgeEl.boundingBox();
 
-  expect(newStyle.left).toBe('1010px');
-  expect(newStyle.top).toBe('126px');
-  expect(newStyle.width).toBe('96px');
-  expect(newStyle.height).toBe('96px');
+  if (newWidgetBox === null || badgeBox === null) {
+    throw new Error('Widget or badge bounding box not found');
+  }
+
+  expect(newWidgetBox.x).toBeCloseTo(badgeBox.x, -1);
+  expect(newWidgetBox.y).toBeCloseTo(badgeBox.y, -1);
+  expect(newWidgetBox.width).toBeCloseTo(badgeBox.width, -1);
+  expect(newWidgetBox.height).toBeCloseTo(badgeBox.height, -1);
 });
 
 /* ------------------------------------------------------------------ */
@@ -652,12 +667,9 @@ test('dragging the transform bounds moves the element position', async ({ mount,
 
   await expect(widget).toBeVisible();
 
-  // Initial position for el-top-ribbon: (60, 52)
+  // Initial position for el-top-ribbon
   const initialLeft = await widget.evaluate((el) => parseFloat(el.style.left));
   const initialTop = await widget.evaluate((el) => parseFloat(el.style.top));
-
-  expect(initialLeft).toBe(60);
-  expect(initialTop).toBe(52);
 
   // Drag the bounds area to move the element
   const bounds = page.getByTestId('transform-bounds');
@@ -698,10 +710,8 @@ test('dragging a resize handle changes the element dimensions', async ({ mount, 
 
   await expect(widget).toBeVisible();
 
-  // Initial width for el-top-ribbon: 920
+  // Initial width for el-top-ribbon
   const initialWidth = await widget.evaluate((el) => parseFloat(el.style.width));
-
-  expect(initialWidth).toBe(920);
 
   // Drag the east (right) handle to resize wider
   const handle = page.getByTestId('transform-handle-e');
@@ -723,4 +733,474 @@ test('dragging a resize handle changes the element dimensions', async ({ mount, 
   const newWidth = await widget.evaluate((el) => parseFloat(el.style.width));
 
   expect(newWidth).toBeGreaterThan(initialWidth);
+});
+
+/* ------------------------------------------------------------------ */
+/*  Direct canvas click selection                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * @description Validates that clicking a canvas element directly (not via
+ * the layers panel) selects it and repositions the transform widget to
+ * visually overlay that element's bounds. Uses el-sponsor-logo which is
+ * isolated in the bottom-right and not obscured by any other element.
+ */
+test('clicking a canvas element directly selects it and shows the widget at its bounds', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const widget = page.getByTestId('demo-transform-widget');
+
+  // Verify initial auto-selection is el-top-ribbon — widget overlays rendered element
+  await expect(widget).toBeVisible();
+
+  const ribbonEl = page.locator('[data-element-id="el-top-ribbon"]');
+  const ribbonBox = await ribbonEl.boundingBox();
+  const widgetBox = await widget.boundingBox();
+
+  if (ribbonBox === null || widgetBox === null) {
+    throw new Error('Element or widget bounding box not found');
+  }
+
+  expect(widgetBox.x).toBeCloseTo(ribbonBox.x, -1);
+  expect(widgetBox.y).toBeCloseTo(ribbonBox.y, -1);
+  expect(widgetBox.width).toBeCloseTo(ribbonBox.width, -1);
+  expect(widgetBox.height).toBeCloseTo(ribbonBox.height, -1);
+
+  // Click el-sponsor-logo which is isolated in the bottom-right (far from widget)
+  const sponsorLogo = page.locator('[data-element-id="el-sponsor-logo"]');
+
+  await expect(sponsorLogo).toBeVisible();
+  await sponsorLogo.click();
+
+  // Widget should reposition to visually overlay el-sponsor-logo
+  const logoBox = await sponsorLogo.boundingBox();
+  const newWidgetBox = await widget.boundingBox();
+
+  if (logoBox === null || newWidgetBox === null) {
+    throw new Error('Logo or widget bounding box not found');
+  }
+
+  expect(newWidgetBox.x).toBeCloseTo(logoBox.x, -1);
+  expect(newWidgetBox.y).toBeCloseTo(logoBox.y, -1);
+  expect(newWidgetBox.width).toBeCloseTo(logoBox.width, -1);
+  expect(newWidgetBox.height).toBeCloseTo(logoBox.height, -1);
+});
+
+/**
+ * @description Validates that clicking a second canvas element outside the
+ * first widget area switches selection. After selecting el-sponsor-logo,
+ * clicking el-hero-badge (isolated on the right) should reposition the widget.
+ */
+test('clicking another canvas element switches the selection and widget position', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const widget = page.getByTestId('demo-transform-widget');
+
+  await expect(widget).toBeVisible();
+
+  // Click el-sponsor-logo first (isolated bottom-right, outside ribbon widget)
+  const sponsorLogo = page.locator('[data-element-id="el-sponsor-logo"]');
+
+  await sponsorLogo.click();
+
+  const logoBox = await sponsorLogo.boundingBox();
+  const widgetAfterLogo = await widget.boundingBox();
+
+  if (logoBox === null || widgetAfterLogo === null) {
+    throw new Error('Logo or widget bounding box not found');
+  }
+
+  expect(widgetAfterLogo.x).toBeCloseTo(logoBox.x, -1);
+  expect(widgetAfterLogo.y).toBeCloseTo(logoBox.y, -1);
+
+  // Now click el-hero-badge (isolated on the right, outside sponsor-logo widget)
+  const heroBadge = page.locator('[data-element-id="el-hero-badge"]');
+
+  await expect(heroBadge).toBeVisible();
+  await heroBadge.click();
+
+  const badgeBox = await heroBadge.boundingBox();
+  const widgetAfterBadge = await widget.boundingBox();
+
+  if (badgeBox === null || widgetAfterBadge === null) {
+    throw new Error('Widget bounding box not found after badge click');
+  }
+
+  // Widget should overlay el-hero-badge
+  expect(widgetAfterBadge.x).toBeCloseTo(badgeBox.x, -1);
+  expect(widgetAfterBadge.y).toBeCloseTo(badgeBox.y, -1);
+  expect(widgetAfterBadge.width).toBeCloseTo(badgeBox.width, -1);
+  expect(widgetAfterBadge.height).toBeCloseTo(badgeBox.height, -1);
+});
+
+/* ------------------------------------------------------------------ */
+/*  Handle position verification                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * @description Validates that all 8 resize handles are positioned at the
+ * correct locations relative to the widget bounds. Handles are 10×10 px
+ * circles positioned at corners and edge midpoints within the widget.
+ */
+test('resize handles are positioned at correct locations relative to the widget', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const widget = page.getByTestId('demo-transform-widget');
+
+  await expect(widget).toBeVisible();
+
+  const widgetBox = await widget.boundingBox();
+
+  if (widgetBox === null) {
+    throw new Error('Widget bounding box not found');
+  }
+
+  const tolerance = 3;
+  // Handles are positioned with CSS left/right/top/bottom: -5px and
+  // transform: translate(±50%, ±50%), placing their centers 5px outside
+  // the widget edge (half the 10px handle size).
+  const offset = 5;
+
+  const checkHandle = async (handle: string, expectedCenterX: number, expectedCenterY: number): Promise<void> => {
+    const handleEl = page.getByTestId(`transform-handle-${handle}`);
+    const handleBox = await handleEl.boundingBox();
+
+    if (handleBox === null) {
+      throw new Error(`Handle ${handle} bounding box not found`);
+    }
+
+    const handleCenterX = handleBox.x + handleBox.width / 2;
+    const handleCenterY = handleBox.y + handleBox.height / 2;
+
+    expect(handleCenterX).toBeCloseTo(expectedCenterX, -Math.log10(tolerance));
+    expect(handleCenterY).toBeCloseTo(expectedCenterY, -Math.log10(tolerance));
+  };
+
+  // Corner handles: center offset 5px outside widget corner
+  // Edge handles: center on edge midpoint, offset 5px outward
+  await checkHandle('nw', widgetBox.x - offset, widgetBox.y - offset);
+  await checkHandle('n', widgetBox.x + widgetBox.width / 2, widgetBox.y - offset);
+  await checkHandle('ne', widgetBox.x + widgetBox.width + offset, widgetBox.y - offset);
+  await checkHandle('e', widgetBox.x + widgetBox.width + offset, widgetBox.y + widgetBox.height / 2);
+  await checkHandle('se', widgetBox.x + widgetBox.width + offset, widgetBox.y + widgetBox.height + offset);
+  await checkHandle('s', widgetBox.x + widgetBox.width / 2, widgetBox.y + widgetBox.height + offset);
+  await checkHandle('sw', widgetBox.x - offset, widgetBox.y + widgetBox.height + offset);
+  await checkHandle('w', widgetBox.x - offset, widgetBox.y + widgetBox.height / 2);
+});
+
+/**
+ * @description Validates that the rotation handle is positioned above the
+ * widget's top-center by the ROTATION_HANDLE_OFFSET (28px) distance.
+ */
+test('rotation handle is positioned above the widget top-center', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const widget = page.getByTestId('demo-transform-widget');
+
+  await expect(widget).toBeVisible();
+
+  const widgetBox = await widget.boundingBox();
+  const rotationHandle = page.getByTestId('transform-rotation-handle');
+  const rotationBox = await rotationHandle.boundingBox();
+
+  if (widgetBox === null || rotationBox === null) {
+    throw new Error('Widget or rotation handle bounding box not found');
+  }
+
+  const rotationCenterX = rotationBox.x + rotationBox.width / 2;
+  const rotationCenterY = rotationBox.y + rotationBox.height / 2;
+  const widgetTopCenterX = widgetBox.x + widgetBox.width / 2;
+
+  expect(rotationCenterX).toBeCloseTo(widgetTopCenterX, 0);
+  // Rotation handle center is 28px above widget top edge
+  expect(rotationCenterY).toBeCloseTo(widgetBox.y - 28, 0);
+});
+
+/**
+ * @description Validates that handle positions update correctly when selecting
+ * a different, smaller element. After selecting el-hero-badge (96×96 doc-space),
+ * the widget and handle positions should match the smaller element's bounds.
+ */
+test('handles reposition correctly for a small element selected via canvas click', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const widget = page.getByTestId('demo-transform-widget');
+
+  await expect(widget).toBeVisible();
+
+  // Click el-sponsor-logo (isolated bottom-right, not obscured)
+  const sponsorLogo = page.locator('[data-element-id="el-sponsor-logo"]');
+
+  await sponsorLogo.click();
+
+  const widgetBox = await widget.boundingBox();
+  const logoBox = await sponsorLogo.boundingBox();
+
+  if (widgetBox === null || logoBox === null) {
+    throw new Error('Widget or logo bounding box not found');
+  }
+
+  // Widget dimensions should match the rendered logo element
+  expect(widgetBox.width).toBeCloseTo(logoBox.width, -1);
+  expect(widgetBox.height).toBeCloseTo(logoBox.height, -1);
+
+  // East handle at right edge, west handle at left edge
+  const eastHandle = page.getByTestId('transform-handle-e');
+  const westHandle = page.getByTestId('transform-handle-w');
+  const eastBox = await eastHandle.boundingBox();
+  const westBox = await westHandle.boundingBox();
+
+  if (eastBox === null || westBox === null) {
+    throw new Error('Handle bounding box not found');
+  }
+
+  const eastCenterX = eastBox.x + eastBox.width / 2;
+  const westCenterX = westBox.x + westBox.width / 2;
+
+  // East handle center is 5px outside widget right edge (CSS translate offset)
+  expect(eastCenterX).toBeCloseTo(widgetBox.x + widgetBox.width + 5, 1);
+  // West handle center is 5px outside widget left edge
+  expect(westCenterX).toBeCloseTo(widgetBox.x - 5, 1);
+  // Distance between east and west handle centers should equal widget width + 10
+  expect(eastCenterX - westCenterX).toBeCloseTo(widgetBox.width + 10, 0);
+});
+
+/* ------------------------------------------------------------------ */
+/*  Handle resize gestures — directional correctness                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * @description Validates that dragging the NW (north-west) handle resizes
+ * the element from the top-left corner, moving position and reducing size.
+ */
+test('dragging the NW handle resizes from the top-left corner', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const widget = page.getByTestId('demo-transform-widget');
+
+  await expect(widget).toBeVisible();
+
+  const initialBox = await widget.boundingBox();
+
+  if (initialBox === null) {
+    throw new Error('Widget bounding box not found');
+  }
+
+  const handle = page.getByTestId('transform-handle-nw');
+  const handleBox = await handle.boundingBox();
+
+  if (handleBox === null) {
+    throw new Error('NW handle bounding box not found');
+  }
+
+  const startX = handleBox.x + handleBox.width / 2;
+  const startY = handleBox.y + handleBox.height / 2;
+
+  // Drag NW handle 30px right and 20px down (shrinks from top-left)
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 30, startY + 20, { steps: 5 });
+  await page.mouse.up();
+
+  const newBox = await widget.boundingBox();
+
+  if (newBox === null) {
+    throw new Error('Widget bounding box not found after drag');
+  }
+
+  // Position should move right and down
+  expect(newBox.x).toBeGreaterThan(initialBox.x);
+  expect(newBox.y).toBeGreaterThan(initialBox.y);
+
+  // Size should decrease
+  expect(newBox.width).toBeLessThan(initialBox.width);
+  expect(newBox.height).toBeLessThan(initialBox.height);
+});
+
+/**
+ * @description Validates that dragging the SE (south-east) handle resizes
+ * from the bottom-right corner, keeping position but increasing size.
+ */
+test('dragging the SE handle resizes from the bottom-right corner', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const widget = page.getByTestId('demo-transform-widget');
+
+  await expect(widget).toBeVisible();
+
+  const initialBox = await widget.boundingBox();
+
+  if (initialBox === null) {
+    throw new Error('Widget bounding box not found');
+  }
+
+  const handle = page.getByTestId('transform-handle-se');
+  const handleBox = await handle.boundingBox();
+
+  if (handleBox === null) {
+    throw new Error('SE handle bounding box not found');
+  }
+
+  const startX = handleBox.x + handleBox.width / 2;
+  const startY = handleBox.y + handleBox.height / 2;
+
+  // Drag SE handle 40px right and 25px down (grows from bottom-right)
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 40, startY + 25, { steps: 5 });
+  await page.mouse.up();
+
+  const newBox = await widget.boundingBox();
+
+  if (newBox === null) {
+    throw new Error('Widget bounding box not found after drag');
+  }
+
+  // Position should stay the same (SE doesn't move origin)
+  expect(newBox.x).toBeCloseTo(initialBox.x, 0);
+  expect(newBox.y).toBeCloseTo(initialBox.y, 0);
+
+  // Size should increase
+  expect(newBox.width).toBeGreaterThan(initialBox.width);
+  expect(newBox.height).toBeGreaterThan(initialBox.height);
+});
+
+/**
+ * @description Validates that dragging the N (north) handle only changes
+ * the element's top position and height, not its width or left position.
+ */
+test('dragging the N handle only changes top and height', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const widget = page.getByTestId('demo-transform-widget');
+
+  await expect(widget).toBeVisible();
+
+  const initialBox = await widget.boundingBox();
+
+  if (initialBox === null) {
+    throw new Error('Widget bounding box not found');
+  }
+
+  const handle = page.getByTestId('transform-handle-n');
+  const handleBox = await handle.boundingBox();
+
+  if (handleBox === null) {
+    throw new Error('N handle bounding box not found');
+  }
+
+  const startX = handleBox.x + handleBox.width / 2;
+  const startY = handleBox.y + handleBox.height / 2;
+
+  // Drag N handle 40px down (shrinks from top)
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX, startY + 40, { steps: 10 });
+  await page.mouse.up();
+
+  const newBox = await widget.boundingBox();
+
+  if (newBox === null) {
+    throw new Error('Widget bounding box not found after drag');
+  }
+
+  // Left and width should remain the same
+  expect(newBox.x).toBeCloseTo(initialBox.x, 0);
+  expect(newBox.width).toBeCloseTo(initialBox.width, 0);
+
+  // Top should move down and height should decrease
+  expect(newBox.y).toBeGreaterThan(initialBox.y);
+  expect(newBox.height).toBeLessThan(initialBox.height);
+});
+
+/**
+ * @description Validates that dragging the W (west) handle only changes
+ * the element's left position and width, not its top or height.
+ */
+test('dragging the W handle only changes left and width', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const widget = page.getByTestId('demo-transform-widget');
+
+  await expect(widget).toBeVisible();
+
+  const initialBox = await widget.boundingBox();
+
+  if (initialBox === null) {
+    throw new Error('Widget bounding box not found');
+  }
+
+  const handle = page.getByTestId('transform-handle-w');
+  const handleBox = await handle.boundingBox();
+
+  if (handleBox === null) {
+    throw new Error('W handle bounding box not found');
+  }
+
+  const startX = handleBox.x + handleBox.width / 2;
+  const startY = handleBox.y + handleBox.height / 2;
+
+  // Drag W handle 30px right (shrinks from left)
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 30, startY, { steps: 5 });
+  await page.mouse.up();
+
+  const newBox = await widget.boundingBox();
+
+  if (newBox === null) {
+    throw new Error('Widget bounding box not found after drag');
+  }
+
+  // Top and height should remain the same
+  expect(newBox.y).toBeCloseTo(initialBox.y, 0);
+  expect(newBox.height).toBeCloseTo(initialBox.height, 0);
+
+  // Left should move right and width should decrease
+  expect(newBox.x).toBeGreaterThan(initialBox.x);
+  expect(newBox.width).toBeLessThan(initialBox.width);
+});
+
+/* ------------------------------------------------------------------ */
+/*  Rotation gesture                                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * @description Validates that dragging the rotation handle changes the
+ * widget's CSS rotation transform. Drags the handle to the right to
+ * produce a clockwise rotation.
+ */
+test('dragging the rotation handle changes the widget rotation', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const widget = page.getByTestId('demo-transform-widget');
+
+  await expect(widget).toBeVisible();
+
+  // Initial rotation should be 0deg
+  const initialTransform = await widget.evaluate((el) => el.style.transform);
+
+  expect(initialTransform).toBe('rotate(0deg)');
+
+  const rotationHandle = page.getByTestId('transform-rotation-handle');
+  const rotationBox = await rotationHandle.boundingBox();
+
+  if (rotationBox === null) {
+    throw new Error('Rotation handle bounding box not found');
+  }
+
+  const startX = rotationBox.x + rotationBox.width / 2;
+  const startY = rotationBox.y + rotationBox.height / 2;
+
+  // Drag rotation handle to the right to rotate clockwise
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 80, startY + 30, { steps: 10 });
+  await page.mouse.up();
+
+  // Rotation should no longer be 0deg
+  const newTransform = await widget.evaluate((el) => el.style.transform);
+
+  expect(newTransform).not.toBe('rotate(0deg)');
+  expect(newTransform).toMatch(/^rotate\([\d.-]+deg\)$/);
 });

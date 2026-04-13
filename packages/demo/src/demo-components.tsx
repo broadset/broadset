@@ -150,6 +150,7 @@ export function IconToolButton({
 }
 
 export function SelectionTransformWidget({
+  contentScale,
   element,
   panX,
   panY,
@@ -157,6 +158,7 @@ export function SelectionTransformWidget({
   onPreviewUpdate,
   onCommitUpdate,
 }: {
+  readonly contentScale: number;
   readonly element: BroadsetElement;
   readonly panX: number;
   readonly panY: number;
@@ -166,6 +168,11 @@ export function SelectionTransformWidget({
 }): React.JSX.Element {
   const gestureRef = useRef<TransformGesture | null>(null);
   const [isRotating, setIsRotating] = useState(false);
+
+  // The effective visual scale combines the editor zoom with the renderer's
+  // internal content-fit scale so that widget position + gesture math match
+  // what the user sees on screen.
+  const effectiveZoom = zoom * contentScale;
 
   const beginDrag = useCallback(
     (event: React.PointerEvent<HTMLDivElement>): void => {
@@ -220,8 +227,8 @@ export function SelectionTransformWidget({
         return;
       }
 
-      const centerX = panX + (element.position.x + element.width / 2) * zoom;
-      const centerY = panY + (element.position.y + element.height / 2) * zoom;
+      const centerX = panX + (element.position.x + element.width / 2) * effectiveZoom;
+      const centerY = panY + (element.position.y + element.height / 2) * effectiveZoom;
 
       event.preventDefault();
       event.stopPropagation();
@@ -234,7 +241,16 @@ export function SelectionTransformWidget({
         startAngle: Math.atan2(event.clientY - centerY, event.clientX - centerX),
       };
     },
-    [element.height, element.position.x, element.position.y, element.rotation, element.width, panX, panY, zoom],
+    [
+      element.height,
+      element.position.x,
+      element.position.y,
+      element.rotation,
+      element.width,
+      panX,
+      panY,
+      effectiveZoom,
+    ],
   );
 
   const handlePointerMove = useCallback(
@@ -253,7 +269,7 @@ export function SelectionTransformWidget({
           position: applyDragTranslation(
             gesture.initialPosition,
             { dx: event.clientX - gesture.startX, dy: event.clientY - gesture.startY },
-            zoom,
+            effectiveZoom,
           ),
         } satisfies ElementUpdate;
 
@@ -270,7 +286,7 @@ export function SelectionTransformWidget({
             gesture.handle,
             event.clientX - gesture.startX,
             event.clientY - gesture.startY,
-            zoom,
+            effectiveZoom,
           ),
           gesture.handle,
         );
@@ -286,8 +302,8 @@ export function SelectionTransformWidget({
         return;
       }
 
-      const centerX = panX + (element.position.x + element.width / 2) * zoom;
-      const centerY = panY + (element.position.y + element.height / 2) * zoom;
+      const centerX = panX + (element.position.x + element.width / 2) * effectiveZoom;
+      const centerY = panY + (element.position.y + element.height / 2) * effectiveZoom;
       const currentAngle = Math.atan2(event.clientY - centerY, event.clientX - centerX);
       const update = {
         rotation: applyRotation(gesture.initialRotation, ((currentAngle - gesture.startAngle) * 180) / Math.PI),
@@ -296,7 +312,17 @@ export function SelectionTransformWidget({
       gesture.lastUpdate = update;
       onPreviewUpdate(element.id, update);
     },
-    [element.height, element.id, element.position, element.rotation, element.width, onPreviewUpdate, panX, panY, zoom],
+    [
+      element.height,
+      element.id,
+      element.position,
+      element.rotation,
+      element.width,
+      onPreviewUpdate,
+      panX,
+      panY,
+      effectiveZoom,
+    ],
   );
 
   const finishGesture = useCallback(
@@ -334,14 +360,14 @@ export function SelectionTransformWidget({
       onPointerMove={handlePointerMove}
       onPointerUp={finishGesture}
       style={{
-        height: `${String(Math.max(element.height * zoom, 1))}px`,
-        left: `${String(panX + element.position.x * zoom)}px`,
+        height: `${String(Math.max(element.height * effectiveZoom, 1))}px`,
+        left: `${String(panX + element.position.x * effectiveZoom)}px`,
         pointerEvents: 'auto',
         position: 'absolute',
-        top: `${String(panY + element.position.y * zoom)}px`,
+        top: `${String(panY + element.position.y * effectiveZoom)}px`,
         transform: `rotate(${String(element.rotation)}deg)`,
         transformOrigin: 'center center',
-        width: `${String(Math.max(element.width * zoom, 1))}px`,
+        width: `${String(Math.max(element.width * effectiveZoom, 1))}px`,
         zIndex: 2,
       }}
     >
@@ -381,6 +407,7 @@ export function SelectionTransformWidget({
           background: 'rgba(59, 130, 246, 0.8)',
           height: `${String(ROTATION_HANDLE_OFFSET - 6)}px`,
           left: '50%',
+          pointerEvents: 'none',
           position: 'absolute',
           top: `${String(-ROTATION_HANDLE_OFFSET + 8)}px`,
           transform: 'translateX(-50%)',
@@ -443,10 +470,12 @@ export function ScreenPreview({
   onCanvasContextMenu,
   onViewportChange,
 }: ScreenPreviewProps): React.JSX.Element {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<ScreenRendererController | null>(null);
   const playbackRef = useRef<PlaybackController | null>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [contentScale, setContentScale] = useState(1);
   const panGestureRef = useRef<{
     readonly originPanX: number;
     readonly originPanY: number;
@@ -454,6 +483,43 @@ export function ScreenPreview({
     readonly startY: number;
   } | null>(null);
   const suppressClickRef = useRef(false);
+
+  // Track the renderer's internal auto-scale so the transform widget can
+  // position itself to match the visually rendered element positions.
+  useEffect(() => {
+    const container = containerRef.current;
+
+    if (container === null) {
+      return undefined;
+    }
+
+    const updateContentScale = (): void => {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+
+      if (w <= 0 || h <= 0) {
+        return;
+      }
+
+      const scale = Math.min(w / documentData.canvas.width, h / documentData.canvas.height);
+
+      setContentScale(Number.isFinite(scale) && scale > 0 ? scale : 1);
+    };
+
+    updateContentScale();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+
+    const resizeObserver = new ResizeObserver(updateContentScale);
+
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [documentData.canvas.width, documentData.canvas.height]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -643,6 +709,7 @@ export function ScreenPreview({
 
   return (
     <div
+      ref={containerRef}
       aria-description="Mouse wheel zooms, ctrl or command wheel pans horizontally, Alt pans vertically, and Shift-drag or middle-click pans the view."
       aria-label={`Screen preview for ${documentData.name}`}
       className="h-full w-full overflow-hidden"
@@ -673,6 +740,7 @@ export function ScreenPreview({
       />
       {selectedElement === null ? null : (
         <SelectionTransformWidget
+          contentScale={contentScale}
           element={selectedElement}
           panX={panX}
           panY={panY}
