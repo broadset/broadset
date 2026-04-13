@@ -228,7 +228,7 @@ Target files:
 1. `packages/ui/src/modals.test.tsx`
 2. `packages/editor/src/keyboard.test.ts`
 
-Then optionally split set B:
+Then split set B:
 
 1. `packages/ui/src/inputs.test.tsx`
 2. `packages/renderer/src/renderer.test.ts`
@@ -291,6 +291,6 @@ git ls-files '*.ts' '*.tsx' '*.js' \
 
 - [ ] All 19 oversized non-test files listed in Section 3.1 are below 500 lines.
 - [ ] Priority set A oversized tests listed in Section 3.2 are below 500 lines.
-- [ ] Optional priority set B test splits completed (if scheduled).
+- [ ] Priority set B test splits completed.
 - [ ] Root verification chain passes.
 - [ ] This plan and any follow-up implementation docs are updated with final status.
