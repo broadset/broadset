@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 
-import { createScreenRenderer, DATA_ATTRIBUTES } from './index';
-import { createDocument, createElement } from './renderer-test-helpers';
+import { createScreenRenderer, DATA_ATTRIBUTES } from '../index';
+import { createDocument, createElement } from './test-helpers';
 
 /** @description The renderer must apply font-variation-settings CSS when the style field is set. */
 describe('font-variation-settings', () => {

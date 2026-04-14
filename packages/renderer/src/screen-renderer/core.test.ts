@@ -10,8 +10,8 @@ import {
   DATA_ATTRIBUTES,
   getRendererCapabilities,
   type RendererPlugin,
-} from './index';
-import { createDocument, createElement } from './renderer-test-helpers';
+} from '../index';
+import { createDocument, createElement } from './test-helpers';
 
 describe('renderer core', () => {
   it('renders the cross-package data attributes on each element node', () => {

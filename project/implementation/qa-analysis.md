@@ -1,6 +1,6 @@
 # QA Analysis - Package-by-Package (Refreshed)
 
-Date: 2026-04-14 10:30
+Date: 2026-04-14 19:45
 Scope: model, playback, renderer, editor, formats, ui, demo
 Method: targeted refresh of previous findings using current files under `project/spec/**` and `packages/**`.
 
@@ -8,7 +8,7 @@ Method: targeted refresh of previous findings using current files under `project
 
 - This refresh validates relevance and evidence paths after recent refactors.
 - It does not re-run the full quality/build/CT chain; assertions below are based on source and test inspection.
-- Demo Playwright CT is now split across seven files in `packages/demo/ct/`.
+- Demo Playwright CT is now split across ten files in folder-based domains under `packages/demo/ct/`.
 
 ## Severity Legend
 
@@ -71,17 +71,17 @@ Method: targeted refresh of previous findings using current files under `project
 
 1. MEDIUM - Editor CT portfolio is broader but still likely incomplete against full matrix.
 
-- Prior single-file CT claim is obsolete; demo CT now spans dedicated files for canvas, toolbar, timeline, panels, inputs, modals, and demo shell state.
-- Remaining likely gaps from required matrix still include explicit marquee selection and canvas pan workflows.
+- Prior single-file CT claim is obsolete; demo CT now spans 10 files in `accessibility/`, `canvas-transform/`, `layout/`, `state/`, and `timeline/` folders.
+- Current matrix tracking in `project/implementation/component-testing.md` shows 42/57 IDs covered (74%): largest gaps remain in canvas interactions (C-_) and demo state/data workflows (D-_).
 
 2. MEDIUM - Spec gap notes for store actions are still stale versus implemented tests.
 
 - Spec still claims missing automation for required descendant promotion, snapshots, and clipboard integration: `project/spec/editor/store-actions.md:533`.
-- Current tests cover those scenarios: `packages/editor/src/store-actions.test.ts:159`, `packages/editor/src/store-actions.test.ts:303`, `packages/editor/src/keyboard.test.ts:402`.
+- Current tests cover those scenarios: `packages/editor/src/store-actions.core.test.ts:118`, `packages/editor/src/store-actions.snapshots.test.ts:44`, `packages/editor/src/keyboard.clipboard-grouping.test.ts:68`.
 
-3. MEDIUM - Editor complexity risk persists in newly split core modules.
+3. LOW - Editor complexity risk is reduced after split, with one near-threshold module.
 
-- Largest non-test editor module is now `packages/editor/src/store-actions/store.ts` (614 lines), above the soft 500-line target.
+- Largest non-test editor module is now `packages/editor/src/keyboard.ts` (481 lines), which is below but close to the soft 500-line target.
 
 ### Strengths
 
@@ -101,14 +101,15 @@ Method: targeted refresh of previous findings using current files under `project
 2. MEDIUM - Formats spec gap entries remain stale for animated static export.
 
 - Spec still says no tests for animated static export in PDF/PSD: `project/spec/formats/pdf.md:194`, `project/spec/formats/psd.md:227`.
-- Tests exist: `packages/formats/src/pdf.test.ts:502`, `packages/formats/src/psd.test.ts:448`.
+- Tests exist: `packages/formats/src/pdf/fonts-wrap-qr-animation.test.ts:192`, `packages/formats/src/psd/import-vector-animated-url.test.ts:101`.
 
-3. MEDIUM - Converter complexity hotspots remain and are now clearly concentrated in `core.ts` files.
+3. LOW - Previous converter hotspot paths are obsolete after formats module split.
 
-- `packages/formats/src/psd/core.ts` (1354 lines)
-- `packages/formats/src/pptx/core.ts` (1079)
-- `packages/formats/src/pdf/core.ts` (760)
-- `packages/formats/src/web-vector/core.ts` (661)
+- Current larger non-test modules are:
+  - `packages/formats/src/pdf/core.ts` (425 lines)
+  - `packages/formats/src/pptx/slide-shapes.ts` (358)
+  - `packages/formats/src/psd/import.ts` (310)
+  - `packages/formats/src/psd/export-layer.ts` (278)
 
 ### Strengths
 
@@ -126,15 +127,15 @@ Method: targeted refresh of previous findings using current files under `project
 
 2. MEDIUM - UI spec gap entries remain stale versus existing tests.
 
-- Example: toolbar spec still claims no undo/redo disabled-state automation: `project/spec/ui/toolbar-nav.md:457`.
-- Existing test coverage includes this behavior: `packages/ui/src/toolbar-nav.test.tsx:226`.
+- Example: toolbar spec marks undo/redo disabled-state automation as covered but points to stale file path `packages/ui/src/toolbar-nav.test.tsx`: `project/spec/ui/toolbar-nav.md:457`.
+- Existing test coverage is in split test files: `packages/ui/src/toolbar-nav.editor-pages.test.tsx:11`.
 
-3. MEDIUM - UI complexity risk remains but file hotspots moved after split.
+3. LOW - UI complexity risk remains moderate with near-threshold panel modules.
 
-- Old monolith file names are obsolete; current large non-test modules include:
-  - `packages/ui/src/modals/core-modals.tsx` (502)
+- Current larger non-test modules include:
   - `packages/ui/src/property-panels/layout-panels.tsx` (464)
   - `packages/ui/src/animation-sidebar.tsx` (464)
+  - `packages/ui/src/modals/core-modals.tsx` (282)
 
 ### Strengths
 
@@ -153,15 +154,18 @@ Method: targeted refresh of previous findings using current files under `project
 
 2. MEDIUM - Previous single-file CT concentration finding is obsolete, but CT matrix completion risk remains.
 
-- CT is now split across seven files:
-  - `packages/demo/ct/canvas-selection-transform.ct.tsx`
-  - `packages/demo/ct/demo-state-data.ct.tsx`
-  - `packages/demo/ct/inputs-a11y.ct.tsx`
-  - `packages/demo/ct/modals-a11y.ct.tsx`
-  - `packages/demo/ct/sidebar-properties-layers.ct.tsx`
-  - `packages/demo/ct/timeline-animation.ct.tsx`
-  - `packages/demo/ct/toolbar-navigation.ct.tsx`
-- Still advisable to close remaining mandatory scenarios not yet explicit in CT (for example marquee and pan).
+- CT is now split across ten files:
+  - `packages/demo/ct/accessibility/inputs-a11y.ct.tsx`
+  - `packages/demo/ct/accessibility/modals-a11y.ct.tsx`
+  - `packages/demo/ct/canvas-transform/compound.ct.tsx`
+  - `packages/demo/ct/canvas-transform/handles.ct.tsx`
+  - `packages/demo/ct/canvas-transform/resize-rotation.ct.tsx`
+  - `packages/demo/ct/canvas-transform/selection.ct.tsx`
+  - `packages/demo/ct/layout/sidebar-properties-layers.ct.tsx`
+  - `packages/demo/ct/layout/toolbar-navigation.ct.tsx`
+  - `packages/demo/ct/state/demo-state-data.ct.tsx`
+  - `packages/demo/ct/timeline/timeline-animation.ct.tsx`
+- Matrix completion risk remains: see `project/implementation/component-testing.md` for missing IDs (notably C-_, D-_, and L-05/L-07/L-10).
 
 3. MEDIUM - Hidden raw file input exception still exists and should be documented explicitly.
 
@@ -170,8 +174,9 @@ Method: targeted refresh of previous findings using current files under `project
 4. MEDIUM - Demo complexity hotspot has shifted.
 
 - `packages/demo/src/DemoApp.tsx` is no longer a large shell; complexity now centers in:
-  - `packages/demo/src/sampleDocument.ts` (1443)
   - `packages/demo/src/demo-app/app.tsx` (497)
+  - `packages/demo/src/demo-app/layout-main-toolbar.tsx` (447)
+  - `packages/demo/src/demo-components/screen-preview.tsx` (326)
 
 ### Strengths
 
@@ -190,14 +195,14 @@ Method: targeted refresh of previous findings using current files under `project
 
 3. MEDIUM - Maintainability risk remains present but shifted to new split-module hotspots.
 
-- Old hotspot filenames in prior report are partially obsolete and should not be reused for planning.
+- Old hotspot filenames in prior report are partially obsolete and should not be reused for planning; current hotspots are mostly below the 500-line soft limit.
 
 ## Recommended Remediation Sequence
 
 1. Wire timeline editor and animation-sidebar callbacks in demo split modules (`layout-timeline-panel.tsx`, `sidebar.tsx`) to real editor/timeline actions.
 2. Run a spec hygiene pass to update stale `Spec Gaps` across editor/formats/ui/renderer so docs match current automation.
-3. Expand CT matrix for explicit remaining interaction gaps (notably marquee and pan) and tie each to scenario IDs in `project/implementation/component-testing.md`.
-4. Continue phased splitting of current largest non-test modules (`formats/*/core.ts`, `renderer/base-render.ts`, `editor/store-actions/store.ts`, key UI panels/modals).
+3. Expand CT matrix for explicit remaining interaction gaps (notably C-_ canvas flows, D-_ state/data flows, and L-05/L-07/L-10 timeline items) and tie each to scenario IDs in `project/implementation/component-testing.md`.
+4. Continue phased splitting of current largest non-test modules where justified (`packages/demo/src/demo-app/app.tsx`, `packages/editor/src/keyboard.ts`, and near-threshold UI panel modules).
 5. Define a unified importer warning contract and surface warnings in demo import UX (starting with SVG parity, then PPTX/PSD).
 
 ## Appendix: Evidence Commands Executed (Refresh)

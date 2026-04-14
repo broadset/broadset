@@ -2,8 +2,8 @@
 
 import type { BroadsetElement } from '@broadset/model';
 
-import { computeBooleanPath, computeTrimPathAttributes } from './index';
-import { createElement } from './renderer-test-helpers';
+import { computeBooleanPath, computeTrimPathAttributes } from '../index';
+import { createElement } from './test-helpers';
 
 /* ================================================================== */
 /*  computeTrimPathAttributes                                          */

@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 
-import { createScreenRenderer, DATA_ATTRIBUTES } from './index';
-import { createDocument, createElement } from './renderer-test-helpers';
+import { createScreenRenderer, DATA_ATTRIBUTES } from '../index';
+import { createDocument, createElement } from './test-helpers';
 
 describe('per-character text wrapping', () => {
   /** @description Text elements must wrap each character in a span with data-char-index for animation targeting. */
