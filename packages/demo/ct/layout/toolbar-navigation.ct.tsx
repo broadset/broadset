@@ -93,6 +93,24 @@ test('Escape cancels placement mode and restores default preview cursor', async 
 });
 
 /**
+ * @description Validates `project/spec/ui/toolbar-nav.md` T-06 +
+ * `project/spec/editor/editing.md` C-07: built-in and plugin library tools
+ * activate placement mode and expose clear placement affordances.
+ */
+test('element library built-ins and plugin tools activate placement mode', async ({ mount, page }) => {
+  await mount(<DemoAppFresh />);
+
+  await page.locator('button[aria-label="Text"]').first().click();
+  await expect(page.getByTestId('placement-mode-banner')).toContainText('Text');
+
+  await page.locator('button[aria-label="Cancel placement"]').first().click();
+  await expect(page.getByTestId('placement-mode-banner')).toBeHidden();
+
+  await page.locator('button[aria-label="Countdown"]').first().click();
+  await expect(page.getByTestId('placement-mode-banner')).toContainText('Countdown');
+});
+
+/**
  * @description Validates `project/spec/ui/toolbar-nav.md` T-03: File/Help menu
  * actions open the expected dialogs and each dialog can be closed by keyboard or controls.
  */
