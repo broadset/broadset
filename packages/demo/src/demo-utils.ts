@@ -1,5 +1,11 @@
 import type { ResizeHandle } from '@broadset/editor';
-import { type BroadsetDocument, broadsetDocumentSchema, type BroadsetElement } from '@broadset/model';
+import {
+  type BroadsetDocument,
+  broadsetDocumentSchema,
+  type BroadsetElement,
+  type BroadsetProject,
+  type ElementOverride,
+} from '@broadset/model';
 import type { LayerInfo, PanelElement } from '@broadset/ui';
 
 import {
@@ -74,6 +80,416 @@ export function loadSavedDocument(): BroadsetDocument {
   } catch {
     return DEMO_DOCUMENT;
   }
+}
+
+function stripVisibilityOverride(override: ElementOverride): ElementOverride {
+  const { visible: _visible, ...rest } = override;
+
+  return rest;
+}
+
+export function normalizeDocumentForEditMode(document: BroadsetDocument): BroadsetDocument {
+  return {
+    ...document,
+    pages: document.pages.map((page) => ({
+      ...page,
+      overrides: page.overrides.map(stripVisibilityOverride),
+    })),
+  };
+}
+
+function buildOverrideMap(page: BroadsetDocument['pages'][number] | undefined): ReadonlyMap<string, ElementOverride> {
+  return new Map((page?.overrides ?? []).map((override) => [override.elementId, override]));
+}
+
+function resolveElementVisibility(args: {
+  readonly element: BroadsetElement;
+  readonly elementsById: ReadonlyMap<string, BroadsetElement>;
+  readonly overrideMap: ReadonlyMap<string, ElementOverride>;
+}): boolean {
+  let currentElement: BroadsetElement | undefined = args.element;
+
+  while (currentElement !== undefined) {
+    const override = args.overrideMap.get(currentElement.id);
+
+    if (override?.visible === false) {
+      return false;
+    }
+
+    if (currentElement.parentId === null) {
+      return true;
+    }
+
+    currentElement = args.elementsById.get(currentElement.parentId);
+  }
+
+  return true;
+}
+
+function applyPageOverride(element: BroadsetElement, override: ElementOverride | undefined): BroadsetElement {
+  if (override === undefined) {
+    return element;
+  }
+
+  return {
+    ...element,
+    ...(override.assetId !== undefined ? { assetId: override.assetId } : {}),
+    ...(override.content !== undefined ? { content: override.content } : {}),
+    ...(override.style !== undefined ? { style: { ...element.style, ...override.style } } : {}),
+  };
+}
+
+type ProjectAsset = BroadsetProject['assets'][number];
+
+function resolveAssetContent(asset: ProjectAsset): string | null {
+  if (asset.source.type === 'url') {
+    return asset.source.url;
+  }
+
+  if (asset.source.type === 'embedded') {
+    return asset.source.dataUri;
+  }
+
+  return null;
+}
+
+export function buildRenderableDocumentForActivePage(
+  document: BroadsetDocument,
+  activePageIndex: number,
+  assets: readonly ProjectAsset[] = [],
+): BroadsetDocument {
+  const activePage = document.pages[activePageIndex] ?? document.pages[0];
+  const overrideMap = buildOverrideMap(activePage);
+  const elementsById = new Map(document.elements.map((element) => [element.id, element]));
+  const assetContentById = new Map(
+    assets
+      .map((asset) => [asset.id, resolveAssetContent(asset)] as const)
+      .filter((entry): entry is readonly [string, string] => entry[1] !== null),
+  );
+
+  return {
+    ...document,
+    elements: document.elements
+      .filter((element) => resolveElementVisibility({ element, elementsById, overrideMap }))
+      .map((element) => {
+        const overriddenElement = applyPageOverride(element, overrideMap.get(element.id));
+
+        if (overriddenElement.type !== 'image' || overriddenElement.content.trim() !== '') {
+          return overriddenElement;
+        }
+
+        const resolvedContent =
+          overriddenElement.assetId === null ? undefined : assetContentById.get(overriddenElement.assetId);
+
+        if (resolvedContent === undefined) {
+          return overriddenElement;
+        }
+
+        return {
+          ...overriddenElement,
+          content: resolvedContent,
+        };
+      }),
+  };
+}
+
+export function getElementWorldPosition(
+  elements: readonly BroadsetElement[],
+  elementId: string,
+): {
+  readonly x: number;
+  readonly y: number;
+} {
+  const elementsById = new Map(elements.map((element) => [element.id, element]));
+  let currentElement = elementsById.get(elementId);
+  let x = 0;
+  let y = 0;
+
+  while (currentElement !== undefined) {
+    x += currentElement.position.x;
+    y += currentElement.position.y;
+
+    if (currentElement.parentId === null) {
+      break;
+    }
+
+    currentElement = elementsById.get(currentElement.parentId);
+  }
+
+  return { x, y };
+}
+
+export function buildLayerInfoList(document: BroadsetDocument, activePageIndex: number): readonly LayerInfo[] {
+  const activePage = document.pages[activePageIndex] ?? document.pages[0];
+  const overrideMap = buildOverrideMap(activePage);
+  const elementsById = new Map(document.elements.map((element) => [element.id, element]));
+  const childrenByParentId = new Map<string, readonly BroadsetElement[]>();
+  const layerOrderIds = [...document.elements].reverse().map((element) => element.id);
+  const layerOrderIndexById = new Map(layerOrderIds.map((id, index) => [id, index]));
+
+  for (const element of document.elements) {
+    if (element.parentId === null) {
+      continue;
+    }
+
+    const currentChildren = childrenByParentId.get(element.parentId) ?? [];
+
+    childrenByParentId.set(element.parentId, [...currentChildren, element]);
+  }
+
+  const getDepth = (element: BroadsetElement): number => {
+    let depth = 0;
+    let parent = element.parentId === null ? undefined : elementsById.get(element.parentId);
+
+    while (parent !== undefined) {
+      depth += 1;
+      parent = parent.parentId === null ? undefined : elementsById.get(parent.parentId);
+    }
+
+    return depth;
+  };
+
+  const toSortedChildren = (parentId: string): readonly BroadsetElement[] => {
+    const children = childrenByParentId.get(parentId) ?? [];
+
+    return [...children].sort((left, right) => {
+      const leftIndex = layerOrderIndexById.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+      const rightIndex = layerOrderIndexById.get(right.id) ?? Number.MAX_SAFE_INTEGER;
+
+      return leftIndex - rightIndex;
+    });
+  };
+
+  const orderedElements: BroadsetElement[] = [];
+  const visitedIds = new Set<string>();
+
+  const appendSubtree = (element: BroadsetElement): void => {
+    if (visitedIds.has(element.id)) {
+      return;
+    }
+
+    visitedIds.add(element.id);
+    orderedElements.push(element);
+
+    for (const child of toSortedChildren(element.id)) {
+      appendSubtree(child);
+    }
+  };
+
+  const topLevelElements = [...document.elements]
+    .reverse()
+    .filter((element) => element.parentId === null || !elementsById.has(element.parentId));
+
+  for (const element of topLevelElements) {
+    appendSubtree(element);
+  }
+
+  for (const element of document.elements) {
+    appendSubtree(element);
+  }
+
+  return orderedElements.map((element) => {
+    const depth = getDepth(element);
+
+    const override = overrideMap.get(element.id);
+    const parentName =
+      element.parentId === null ? undefined : (elementsById.get(element.parentId)?.name ?? 'Missing parent');
+
+    return toLayerInfo(element, override?.visible !== false, {
+      depth,
+      expanded: true,
+      hasChildren: (childrenByParentId.get(element.id)?.length ?? 0) > 0,
+      parentName,
+    });
+  });
+}
+
+export type LayerDropPosition = 'before' | 'inside' | 'after';
+
+function buildChildrenByParentId(elements: readonly BroadsetElement[]): ReadonlyMap<string, readonly string[]> {
+  const mutable = new Map<string, string[]>();
+
+  for (const element of elements) {
+    if (element.parentId === null) {
+      continue;
+    }
+
+    const children = mutable.get(element.parentId) ?? [];
+
+    children.push(element.id);
+    mutable.set(element.parentId, children);
+  }
+
+  return mutable;
+}
+
+function collectSubtreeIds(
+  childrenByParentId: ReadonlyMap<string, readonly string[]>,
+  rootId: string,
+): ReadonlySet<string> {
+  const ids = new Set<string>([rootId]);
+  const queue = [rootId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+
+    if (currentId === undefined) {
+      break;
+    }
+
+    const children = childrenByParentId.get(currentId) ?? [];
+
+    for (const childId of children) {
+      if (ids.has(childId)) {
+        continue;
+      }
+
+      ids.add(childId);
+      queue.push(childId);
+    }
+  }
+
+  return ids;
+}
+
+function isDescendantOf(
+  candidateId: string,
+  ancestorId: string,
+  elementsById: ReadonlyMap<string, BroadsetElement>,
+): boolean {
+  let current = elementsById.get(candidateId);
+
+  while (current !== undefined && current.parentId !== null) {
+    if (current.parentId === ancestorId) {
+      return true;
+    }
+
+    current = elementsById.get(current.parentId);
+  }
+
+  return false;
+}
+
+function isTargetOrDescendant(
+  candidateId: string,
+  targetId: string,
+  elementsById: ReadonlyMap<string, BroadsetElement>,
+): boolean {
+  return candidateId === targetId || isDescendantOf(candidateId, targetId, elementsById);
+}
+
+export function reorderDocumentLayers(
+  document: BroadsetDocument,
+  dragId: string,
+  targetId: string,
+  position: LayerDropPosition,
+): BroadsetDocument {
+  if (dragId === targetId) {
+    return document;
+  }
+
+  const elementsById = new Map(document.elements.map((element) => [element.id, element]));
+  const dragElement = elementsById.get(dragId);
+  const targetElement = elementsById.get(targetId);
+
+  if (dragElement === undefined || targetElement === undefined) {
+    return document;
+  }
+
+  const childrenByParentId = buildChildrenByParentId(document.elements);
+  const movedIds = collectSubtreeIds(childrenByParentId, dragId);
+
+  if (movedIds.has(targetId)) {
+    return document;
+  }
+
+  const shouldReparentToTarget = position === 'inside' || position === 'before';
+  const nextParentId = shouldReparentToTarget ? targetId : targetElement.parentId;
+
+  if (position === 'inside' && targetElement.type !== 'group') {
+    return document;
+  }
+
+  if (nextParentId === dragId) {
+    return document;
+  }
+
+  if (nextParentId !== null && isDescendantOf(nextParentId, dragId, elementsById)) {
+    return document;
+  }
+
+  const layerOrderIds = [...document.elements].reverse().map((element) => element.id);
+  const movedLayerOrderIds = layerOrderIds.filter((id) => movedIds.has(id));
+  const remainingLayerOrderIds = layerOrderIds.filter((id) => !movedIds.has(id));
+  const targetIndex = remainingLayerOrderIds.indexOf(targetId);
+
+  if (targetIndex < 0) {
+    return document;
+  }
+
+  const insertionIndex =
+    position === 'before' ? targetIndex + 1
+    : position !== 'after' ? targetIndex
+    : (() => {
+        let lastSubtreeIndex = targetIndex;
+
+        for (let index = targetIndex + 1; index < remainingLayerOrderIds.length; index += 1) {
+          const candidateId = remainingLayerOrderIds[index];
+
+          if (candidateId === undefined || !isTargetOrDescendant(candidateId, targetId, elementsById)) {
+            break;
+          }
+
+          lastSubtreeIndex = index;
+        }
+
+        return lastSubtreeIndex + 1;
+      })();
+
+  const nextLayerOrderIds = [
+    ...remainingLayerOrderIds.slice(0, insertionIndex),
+    ...movedLayerOrderIds,
+    ...remainingLayerOrderIds.slice(insertionIndex),
+  ];
+
+  const nextElements = [...nextLayerOrderIds]
+    .reverse()
+    .map((id) => {
+      const element = elementsById.get(id);
+
+      if (element === undefined) {
+        return undefined;
+      }
+
+      if (id !== dragId || element.parentId === nextParentId) {
+        return element;
+      }
+
+      return {
+        ...element,
+        parentId: nextParentId,
+      };
+    })
+    .filter((element): element is BroadsetElement => element !== undefined);
+
+  if (nextElements.length !== document.elements.length) {
+    return document;
+  }
+
+  const changed = nextElements.some((element, index) => {
+    const current = document.elements[index];
+
+    return current === undefined || current.id !== element.id || current.parentId !== element.parentId;
+  });
+
+  if (!changed) {
+    return document;
+  }
+
+  return {
+    ...document,
+    elements: nextElements,
+  };
 }
 
 export function loadSidebarPreferences(): SidebarPreferences {
@@ -235,8 +651,21 @@ export function toPanelElement(element: BroadsetElement): PanelElement {
   };
 }
 
-export function toLayerInfo(element: BroadsetElement, visible: boolean): LayerInfo {
+export function toLayerInfo(
+  element: BroadsetElement,
+  visible: boolean,
+  metadata?: {
+    readonly depth?: number | undefined;
+    readonly expanded?: boolean | undefined;
+    readonly hasChildren?: boolean | undefined;
+    readonly parentName?: string | undefined;
+  },
+): LayerInfo {
   return {
+    ...(metadata?.depth !== undefined ? { depth: metadata.depth } : {}),
+    ...(metadata?.expanded !== undefined ? { expanded: metadata.expanded } : {}),
+    ...(metadata?.hasChildren !== undefined ? { hasChildren: metadata.hasChildren } : {}),
+    ...(metadata?.parentName !== undefined ? { parentName: metadata.parentName } : {}),
     id: element.id,
     type: element.type,
     name: element.name,

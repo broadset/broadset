@@ -46,6 +46,8 @@ const LAYER_ICON_MAP = {
 } as const;
 
 const INDENT_PER_LEVEL = 16;
+const DROP_PARENT_ZONE_RATIO = 0.55;
+const DROP_AFTER_ZONE_RATIO = 0.82;
 
 /* ------------------------------------------------------------------ */
 /*  LayersSidebar                                                      */
@@ -127,12 +129,6 @@ export function LayersSidebar({
   const handleDragStart = useCallback((id: string, event: React.DragEvent) => {
     setDragId(id);
 
-    // Use 1x1 transparent image as drag ghost
-    const ghost = document.createElement('canvas');
-
-    ghost.width = 1;
-    ghost.height = 1;
-    event.dataTransfer.setDragImage(ghost, 0, 0);
     event.dataTransfer.effectAllowed = 'move';
   }, []);
 
@@ -184,34 +180,36 @@ export function LayersSidebar({
 
       const rect = event.currentTarget.getBoundingClientRect();
       const y = event.clientY - rect.top;
-      const third = rect.height / 3;
+      const targetLayer = layers.find((layer) => layer.id === targetId);
+      const supportsInsideDrop = targetLayer?.type === 'group';
+      const parentZoneLimit = rect.height * DROP_PARENT_ZONE_RATIO;
+      const afterZoneStart = rect.height * DROP_AFTER_ZONE_RATIO;
 
       let position: 'before' | 'inside' | 'after';
 
-      if (y < third) {
+      if (y <= parentZoneLimit) {
         position = 'before';
-      } else if (y > third * 2) {
+      } else if (y >= afterZoneStart) {
         position = 'after';
-      } else {
+      } else if (supportsInsideDrop) {
         position = 'inside';
+      } else {
+        position = 'before';
       }
 
       setDropTarget({ id: targetId, position });
     },
-    [dragId, isDescendant],
+    [dragId, isDescendant, layers],
   );
 
-  const handleDrop = useCallback(
-    (targetId: string) => {
-      if (dragId !== null && onReorder !== undefined && dropTarget !== null) {
-        onReorder(dragId, targetId, dropTarget.position);
-      }
+  const handleDrop = useCallback(() => {
+    if (dragId !== null && onReorder !== undefined && dropTarget !== null) {
+      onReorder(dragId, dropTarget.id, dropTarget.position);
+    }
 
-      setDragId(null);
-      setDropTarget(null);
-    },
-    [dragId, dropTarget, onReorder],
-  );
+    setDragId(null);
+    setDropTarget(null);
+  }, [dragId, dropTarget, onReorder]);
 
   const handleDragEnd = useCallback(() => {
     setDragId(null);
@@ -290,7 +288,7 @@ export function LayersSidebar({
                 handleDragOver(layer.id, e);
               }}
               onDrop={() => {
-                handleDrop(layer.id);
+                handleDrop();
               }}
               style={{
                 alignItems: 'center',
@@ -298,13 +296,55 @@ export function LayersSidebar({
                 borderRadius: '0.75rem',
                 borderTop: isDropBefore ? `2px solid ${color('accent')}` : undefined,
                 borderBottom: isDropAfter ? `2px solid ${color('accent')}` : undefined,
+                boxShadow: isDropBefore || isDropInside ? `inset 0 0 0 1px ${color('accent')}` : undefined,
                 display: 'grid',
                 gap: sp('sp-02'),
                 gridTemplateColumns: 'auto auto auto 1fr auto auto auto',
                 padding: `${sp('sp-02')} ${sp('sp-03')}`,
                 paddingLeft: depth > 0 ? `calc(${sp('sp-03')} + ${String(depth * INDENT_PER_LEVEL)}px)` : sp('sp-03'),
+                position: 'relative',
               }}
             >
+              {isDropBefore ?
+                <span
+                  data-testid={`layer-drop-parent-indicator-${layer.id}`}
+                  style={{
+                    backgroundColor: color('accent'),
+                    borderRadius: '999px',
+                    color: color('foreground'),
+                    fontSize: font('label'),
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    position: 'absolute',
+                    right: sp('sp-03'),
+                    top: '-10px',
+                    zIndex: 1,
+                  }}
+                >
+                  Parent on drop
+                </span>
+              : null}
+
+              {isDropInside ?
+                <span
+                  data-testid={`layer-drop-inside-indicator-${layer.id}`}
+                  style={{
+                    backgroundColor: color('accent'),
+                    borderRadius: '999px',
+                    color: color('foreground'),
+                    fontSize: font('label'),
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    position: 'absolute',
+                    right: sp('sp-03'),
+                    top: '-10px',
+                    zIndex: 1,
+                  }}
+                >
+                  Drop inside group
+                </span>
+              : null}
+
               {/* Grip handle for drag initiation */}
               <span
                 draggable
@@ -384,7 +424,14 @@ export function LayersSidebar({
                     }
                   }}
                 >
-                  <span style={{ color: color('foreground'), fontSize: font('body-compact') }}>{layer.name}</span>
+                  <span style={{ display: 'grid', gap: '2px' }}>
+                    <span style={{ color: color('foreground'), fontSize: font('body-compact') }}>{layer.name}</span>
+                    {layer.parentName === undefined ? null : (
+                      <span style={{ color: color('muted'), fontSize: font('label') }}>
+                        Child of {layer.parentName}
+                      </span>
+                    )}
+                  </span>
                 </span>
               }
 

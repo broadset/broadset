@@ -23,11 +23,13 @@ import {
   type ToastSeverity,
 } from '../demo-types';
 import {
+  buildLayerInfoList,
+  buildRenderableDocumentForActivePage,
   clampSidebarWidth,
   formatResolutionLabel,
   loadSavedDocument,
   loadSidebarPreferences,
-  toLayerInfo,
+  reorderDocumentLayers,
 } from '../demo-utils';
 import { DEMO_EDITOR_CONFIG } from '../demoConfig';
 import { SAMPLE_PROJECT } from '../sampleDocument';
@@ -110,7 +112,10 @@ export function DemoApp(): React.JSX.Element {
     selectedElementId === null ? null : (
       (currentDocument.elements.find((element) => element.id === selectedElementId) ?? null)
     );
-  const activePage = currentDocument.pages[editorState.activePageIndex] ?? currentDocument.pages[0];
+  const renderDocument = useMemo(
+    () => buildRenderableDocumentForActivePage(currentDocument, editorState.activePageIndex, SAMPLE_PROJECT.assets),
+    [currentDocument, editorState.activePageIndex],
+  );
   const preflightIssues = useMemo<readonly PreflightIssue[]>(() => {
     const diagnostics = runPreflightDiagnostics(currentDocument, {});
 
@@ -180,13 +185,8 @@ export function DemoApp(): React.JSX.Element {
   );
 
   const layers = useMemo(
-    () =>
-      [...currentDocument.elements].reverse().map((element) => {
-        const override = activePage?.overrides.find((entry) => entry.elementId === element.id);
-
-        return toLayerInfo(element, override?.visible !== false);
-      }),
-    [activePage, currentDocument.elements],
+    () => buildLayerInfoList(currentDocument, editorState.activePageIndex),
+    [currentDocument, editorState.activePageIndex],
   );
 
   const horizontalTicks = useMemo(() => {
@@ -393,11 +393,16 @@ export function DemoApp(): React.JSX.Element {
       }}
       onSelectElement={(elementId) => {
         editorStore.getState().selectElement(elementId);
-        setSidebarTab('properties');
-        setIsSidebarOpen(true);
       }}
       onToggleLock={(elementId) => {
         editorStore.getState().toggleLock(elementId);
+      }}
+      onReorderLayers={(dragId, targetId, position) => {
+        editorStore.setState((state) => {
+          const nextDocument = reorderDocumentLayers(state.document, dragId, targetId, position);
+
+          return nextDocument === state.document ? {} : { document: nextDocument };
+        });
       }}
       onToggleVisibility={(elementId) => {
         editorStore.getState().toggleVisibility(elementId);
@@ -520,6 +525,7 @@ export function DemoApp(): React.JSX.Element {
       pasteClipboardElements={pasteClipboardElements}
       placementLabel={placementLabel}
       pushToast={pushToast}
+      renderDocument={renderDocument}
       resetToken={resetToken}
       resolutionLabel={resolutionLabel}
       selectedElement={selectedElement}
