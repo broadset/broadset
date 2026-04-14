@@ -1,8 +1,8 @@
 import { broadsetProjectSchema } from '@broadset/model';
 import { describe, expect, it } from '@jest/globals';
 
-import { exportProjectJson, generateOGrafPackages } from './interchange';
-import { first, makeDocument, makeElement, makeProject } from './interchange-test-helpers';
+import { exportProjectJson, generateOGrafPackages } from './index';
+import { first, makeDocument, makeElement, makeProject } from './test-helpers';
 
 describe('JSON Document Export', () => {
   /** @description Validates that a document with animations survives JSON round-trip with schema and animation config intact. */

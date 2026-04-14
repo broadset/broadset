@@ -1,8 +1,8 @@
 import type { BroadsetElementStyle } from '@broadset/model';
 import { describe, expect, it } from '@jest/globals';
 
-import { exportPsdBytes, exportPsdBytesAsync, importPsd, svgPathToPsdVectorMask } from './psd';
-import { makeDocument, makeElement, makeStyle } from './psd-test-helpers';
+import { exportPsdBytes, exportPsdBytesAsync, importPsd, svgPathToPsdVectorMask } from './index';
+import { makeDocument, makeElement, makeStyle } from './test-helpers';
 
 describe('PSD Import', () => {
   /** @description Imported PSD with rounded rectangle vector masks must set borderRadius on the recovered element style. */

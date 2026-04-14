@@ -1,8 +1,8 @@
 import type { BroadsetElementStyle } from '@broadset/model';
 import { describe, expect, it } from '@jest/globals';
 
-import { drawQrOnPage, exportPdfBytes, normalizeFontFamily, resolveGoogleFontUrl, wrapText } from './pdf';
-import { makeDocument, makeElement, makeStyle } from './pdf-test-helpers';
+import { drawQrOnPage, exportPdfBytes, normalizeFontFamily, resolveGoogleFontUrl, wrapText } from './index';
+import { makeDocument, makeElement, makeStyle } from './test-helpers';
 
 describe('Font Embedding', () => {
   /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { exportVideoBlob, isVideoExportSupported } from './interchange';
+import { exportVideoBlob, isVideoExportSupported } from './index';
 
 describe('Video Export Support Detection', () => {
   /** @description Validates that JSDOM without VideoEncoder reports unsupported. */

@@ -1,8 +1,8 @@
 import type { BroadsetProject } from '@broadset/model';
 import { describe, expect, it } from '@jest/globals';
 
-import { exportProjectJson, generateQrSvgFragment, sanitizeFilename } from './interchange';
-import { makeProject } from './interchange-test-helpers';
+import { exportProjectJson, generateQrSvgFragment, sanitizeFilename } from './index';
+import { makeProject } from './test-helpers';
 
 describe('QR SVG Fragment Generation', () => {
   /** @description Validates that empty content returns null. */

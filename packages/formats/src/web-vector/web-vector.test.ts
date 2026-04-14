@@ -1,7 +1,7 @@
 import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle, Canvas } from '@broadset/model';
 import { describe, expect, it } from '@jest/globals';
 
-import { exportHtmlStandalone, exportSvg, importSvg } from './web-vector';
+import { exportHtmlStandalone, exportSvg, importSvg } from './index';
 
 /* ------------------------------------------------------------------ */
 /*  Test Helpers                                                     */

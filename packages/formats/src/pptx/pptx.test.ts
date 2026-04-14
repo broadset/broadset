@@ -2,7 +2,7 @@ import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle, Canvas } 
 import { describe, expect, it } from '@jest/globals';
 import PizZip from 'pizzip';
 
-import { exportPptxBytes, importPptx } from './pptx';
+import { exportPptxBytes, importPptx } from './index';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */

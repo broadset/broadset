@@ -1,8 +1,8 @@
 import type { BroadsetElementStyle } from '@broadset/model';
 import { describe, expect, it } from '@jest/globals';
 
-import { buildMaskedSvgSource, canvasToPoints, decodeDataUri, exportPdfBytes, parseCssColor } from './pdf';
-import { makeCanvas, makeDocument, makeElement, makeStyle } from './pdf-test-helpers';
+import { buildMaskedSvgSource, canvasToPoints, decodeDataUri, exportPdfBytes, parseCssColor } from './index';
+import { makeCanvas, makeDocument, makeElement, makeStyle } from './test-helpers';
 
 describe('PDF Page Dimensions', () => {
   /**

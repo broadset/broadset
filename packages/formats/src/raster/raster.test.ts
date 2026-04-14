@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import type { WebMExportOptions } from './raster';
+import type { WebMExportOptions } from './index';
 import {
   discoverCanvasElement,
   exportEmbeddedSvgBlob,
@@ -8,7 +8,7 @@ import {
   exportPngBlob,
   exportWebMBlob,
   triggerDownload,
-} from './raster';
+} from './index';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
