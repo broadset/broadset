@@ -58,7 +58,7 @@ Method: targeted refresh of previous findings using current files under `project
 
 2. MEDIUM - Renderer complexity hotspot has moved to split module path.
 
-- Large file is now `packages/renderer/src/screen-renderer/base-render.ts` (817 lines), while `packages/renderer/src/screen-renderer.ts` is now a barrel re-export.
+- Largest renderer implementation files are now `packages/renderer/src/screen-renderer/element-renderers.ts` (425 lines) and `packages/renderer/src/screen-renderer/base-render.ts` (424 lines), while `packages/renderer/src/screen-renderer.ts` is a barrel re-export.
 
 ### Strengths
 
@@ -94,9 +94,9 @@ Method: targeted refresh of previous findings using current files under `project
 
 1. MEDIUM - Warning/reporting contract is still inconsistent across importers and demo bridge.
 
-- SVG importer returns warnings via `SvgImportResult.warnings`: `packages/formats/src/web-vector/core.ts:185`.
+- SVG importer returns warnings via `SvgImportResult.warnings`: `packages/formats/src/web-vector/import.ts:3`.
 - Demo bridge still does not surface SVG warnings in import UX: `packages/demo/src/formatBridge.ts:250`.
-- PPTX/PSD import entry points still return only `BroadsetDocument`: `packages/formats/src/pptx/core.ts:1007`, `packages/formats/src/psd/core.ts:1264`.
+- PPTX/PSD import entry points still return only `BroadsetDocument`: `packages/formats/src/pptx/import.ts:7`, `packages/formats/src/psd/import.ts:227`.
 
 2. MEDIUM - Formats spec gap entries remain stale for animated static export.
 
@@ -127,7 +127,7 @@ Method: targeted refresh of previous findings using current files under `project
 
 2. MEDIUM - UI spec gap entries remain stale versus existing tests.
 
-- Example: toolbar spec marks undo/redo disabled-state automation as covered but points to stale file path `packages/ui/src/toolbar-nav.test.tsx`: `project/spec/ui/toolbar-nav.md:457`.
+- Example: toolbar spec marks undo/redo disabled-state automation as covered but still references an obsolete toolbar test file path: `project/spec/ui/toolbar-nav.md:457`.
 - Existing test coverage is in split test files: `packages/ui/src/toolbar-nav.editor-pages.test.tsx:11`.
 
 3. LOW - UI complexity risk remains moderate with near-threshold panel modules.

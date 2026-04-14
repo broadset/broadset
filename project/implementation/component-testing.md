@@ -57,9 +57,9 @@ Derive CT coverage from these files:
 
 ## 5. Coverage Baseline (Current)
 
-- Current CT count: 23 tests.
-- Current CT files: only `packages/demo/ct/demo-shell.ct.tsx`.
-- This is not enough to satisfy the full spec matrix below.
+- Current CT count: 87 tests across 10 files.
+- Current CT files are folder-organized under `packages/demo/ct/` by domain (`accessibility/`, `canvas-transform/`, `layout/`, `state/`, `timeline/`).
+- Current matrix coverage is partial: 42/57 scenario IDs covered; gaps remain concentrated in C-_, D-_, and some L-\* scenarios.
 
 ## 6. Comprehensive CT Matrix
 
@@ -187,22 +187,22 @@ Use this section to ensure all exported UI components are covered by at least on
 - `TemplateGroupPanel`: P-09 and relevant grouping flows
 - `PreflightPanel`: P-03 and preflight visibility flows
 
-### 7.3 `packages/ui/src/property-panels.tsx`
+### 7.3 `packages/ui/src/property-panels/`
 
 - `GeometryPanel`, `AppearancePanel`, `TypographyPanel`, `TextEffectsPanel`, `SpacingPanel`, `BoxEffectsPanel`, `ClipPathPanel`, `PathPropertiesPanel`, `ImagePanel`, `ObjectFitPanel`, `QrCodePanel`, `GroupPanel`, `VideoPanel`, `ClockPanel`, `TickerPanel`, `PropertyField`, `AnimationModePropertiesPanel`:
   - Covered via P-03, P-04, P-09, P-10, L-07, and type-specific edit scenarios.
 
-### 7.4 `packages/ui/src/inputs.tsx`
+### 7.4 `packages/ui/src/inputs/`
 
 - `ColorInput`, `NumField`, `CssLengthInput`, `TextStrokeInput`, `FilterEditor`, `ShadowEditor`:
   - Covered via I-01 to I-06.
 
-### 7.5 `packages/ui/src/modals.tsx`
+### 7.5 `packages/ui/src/modals/`
 
 - `AboutModal`, `CanvasSettingsModal`, `ExportModal`, `MediaLibraryModal`, `NewDocumentModal`, `ShortcutHelpModal`, `GuidePositionModal`, `TemplateBrowserModal`:
   - Covered via M-01 to M-08.
 
-### 7.6 `packages/ui/src/timeline.tsx`
+### 7.6 `packages/ui/src/timeline/`
 
 - `TimelineEditingProvider`, `TimelineEditor`, `TimelineBottomPanel`, `AnimationBindingSections`, `EasingGraphEditor`, `PerPropertyLanes`:
   - Covered via L-01 to L-10.
@@ -211,13 +211,13 @@ Use this section to ensure all exported UI components are covered by at least on
 
 Split CTs by feature area instead of keeping one monolithic file.
 
-- `packages/demo/ct/canvas-selection-transform.ct.tsx` -> C-01..C-16
-- `packages/demo/ct/toolbar-navigation.ct.tsx` -> T-01..T-10
-- `packages/demo/ct/sidebar-properties-layers.ct.tsx` -> P-01..P-11
-- `packages/demo/ct/inputs-a11y.ct.tsx` -> I-01..I-06
-- `packages/demo/ct/modals-a11y.ct.tsx` -> M-01..M-08
-- `packages/demo/ct/timeline-animation.ct.tsx` -> L-01..L-10
-- `packages/demo/ct/demo-state-data.ct.tsx` -> D-01..D-09
+- `packages/demo/ct/canvas-transform/selection.ct.tsx` + `packages/demo/ct/canvas-transform/handles.ct.tsx` + `packages/demo/ct/canvas-transform/compound.ct.tsx` + `packages/demo/ct/canvas-transform/resize-rotation.ct.tsx` -> C-01..C-16
+- `packages/demo/ct/layout/toolbar-navigation.ct.tsx` -> T-01..T-10
+- `packages/demo/ct/layout/sidebar-properties-layers.ct.tsx` -> P-01..P-11
+- `packages/demo/ct/accessibility/inputs-a11y.ct.tsx` -> I-01..I-06
+- `packages/demo/ct/accessibility/modals-a11y.ct.tsx` -> M-01..M-08
+- `packages/demo/ct/timeline/timeline-animation.ct.tsx` -> L-01..L-10
+- `packages/demo/ct/state/demo-state-data.ct.tsx` -> D-01..D-09
 
 ## 9. Test Writing Rules
 
@@ -233,7 +233,7 @@ Keep a traceability table in each CT file header or a central checklist.
 
 | Case ID | CT file                             | Requirement                | Regions asserted                             | Status  |
 | ------- | ----------------------------------- | -------------------------- | -------------------------------------------- | ------- |
-| C-01    | `canvas-selection-transform.ct.tsx` | Element Selection by Click | canvas, transform widget, layers, properties | pending |
+| C-01    | `canvas-transform/selection.ct.tsx` | Element Selection by Click | canvas, transform widget, layers, properties | pending |
 
 ## 11. Definition Of Done For CT Coverage
 
