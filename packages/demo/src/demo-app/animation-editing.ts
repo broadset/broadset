@@ -70,13 +70,15 @@ export function moveTimelineKeyframe(timeline: Timeline, index: number, offsetMs
     return timeline;
   }
 
+  const clampedOffsetMs = Math.max(0, offsetMs);
+
   const nextKeyframes = timeline.keyframes
-    .map((entry, entryIndex) => (entryIndex === index ? { ...entry, offsetMs } : entry))
+    .map((entry, entryIndex) => (entryIndex === index ? { ...entry, offsetMs: clampedOffsetMs } : entry))
     .sort((left, right) => left.offsetMs - right.offsetMs);
 
   return {
     ...timeline,
-    durationMs: Math.max(computeTimelineDurationMs(timeline), offsetMs),
+    durationMs: Math.max(computeTimelineDurationMs(timeline), clampedOffsetMs),
     keyframes: nextKeyframes,
   };
 }
