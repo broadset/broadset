@@ -55,6 +55,81 @@ function resolveOpacity(style: Partial<BroadsetElementStyle>): number {
   return typeof style.opacity === 'number' ? clamp01(style.opacity) : 1;
 }
 
+async function fetchImageBytes(
+  url: string,
+  fetchFn?: typeof globalThis.fetch,
+): Promise<{ readonly mime: string; readonly bytes: Uint8Array } | undefined> {
+  if (fetchFn === undefined) {
+    return undefined;
+  }
+
+  try {
+    const response = await fetchFn(url);
+
+    if (!response.ok) {
+      return undefined;
+    }
+
+    const mime = response.headers.get('content-type') ?? 'image/png';
+    const bytes = new Uint8Array(await response.arrayBuffer());
+
+    return { mime, bytes };
+  } catch {
+    return undefined;
+  }
+}
+
+async function rasterizeSvgToPngBytes(svgBytes: Uint8Array): Promise<Uint8Array | undefined> {
+  if (typeof document === 'undefined') {
+    return undefined;
+  }
+
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+
+  if (context === null) {
+    return undefined;
+  }
+
+  const svgText = new TextDecoder().decode(svgBytes);
+  const svgBlob = new Blob([svgText], { type: 'image/svg+xml' });
+
+  return await new Promise((resolve) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(svgBlob);
+
+    image.onload = () => {
+      const width = Math.max(1, image.naturalWidth || image.width || 1);
+      const height = Math.max(1, image.naturalHeight || image.height || 1);
+
+      canvas.width = width;
+      canvas.height = height;
+      context.drawImage(image, 0, 0);
+
+      canvas.toBlob((blob) => {
+        URL.revokeObjectURL(objectUrl);
+
+        if (!blob) {
+          resolve(undefined);
+
+          return;
+        }
+
+        void blob.arrayBuffer().then((buffer) => {
+          resolve(new Uint8Array(buffer));
+        });
+      }, 'image/png');
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(undefined);
+    };
+
+    image.src = objectUrl;
+  });
+}
+
 /* ------------------------------------------------------------------ */
 /*  Font Resolution                                                    */
 /* ------------------------------------------------------------------ */
@@ -261,7 +336,33 @@ function renderPath(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt
   });
 }
 
-function renderImage(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number, pdf: PDF): void {
+function drawImagePlaceholder(
+  page: PDFPage,
+  xPt: number,
+  yPt: number,
+  wPt: number,
+  hPt: number,
+  opacity: number,
+): void {
+  page.drawRectangle({
+    x: xPt,
+    y: yPt,
+    width: wPt,
+    height: hPt,
+    borderColor: SVG_PLACEHOLDER_BORDER,
+    borderWidth: SVG_PLACEHOLDER_BORDER_WIDTH,
+    opacity,
+  });
+}
+
+async function renderImage(
+  page: PDFPage,
+  el: BroadsetElement,
+  canvas: Canvas,
+  heightPt: number,
+  pdf: PDF,
+  fetchFn?: typeof globalThis.fetch,
+): Promise<void> {
   if (!el.content) {
     return;
   }
@@ -272,59 +373,64 @@ function renderImage(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightP
   const hPt = elementToPoints(canvas, el.height);
   const opacity = resolveOpacity(el.style);
 
-  // Handle data URIs
   const decoded = el.content.startsWith('data:') ? decodeDataUri(el.content) : undefined;
+  const fetched = decoded === undefined ? await fetchImageBytes(el.content, fetchFn) : undefined;
 
-  if (decoded) {
-    if (decoded.mime.startsWith('image/svg')) {
-      // SVG cannot be embedded natively in PDF; draw a placeholder.
-      // buildMaskedSvgSource is available for pipelines that support SVG (e.g. HTML export).
-      page.drawRectangle({
-        x: xPt,
-        y: yPt,
-        width: wPt,
-        height: hPt,
-        borderColor: SVG_PLACEHOLDER_BORDER,
-        borderWidth: SVG_PLACEHOLDER_BORDER_WIDTH,
-        opacity,
-      });
-    } else {
-      // Try to embed as JPEG/PNG
-      try {
-        const image = pdf.embedImage(decoded.bytes);
+  if (decoded === undefined && fetched === undefined) {
+    drawImagePlaceholder(page, xPt, yPt, wPt, hPt, opacity);
 
-        page.drawImage(image, {
-          x: xPt,
-          y: yPt,
-          width: wPt,
-          height: hPt,
-          opacity,
-        });
-      } catch {
-        // If embedding fails, draw a placeholder rectangle
-        page.drawRectangle({
-          x: xPt,
-          y: yPt,
-          width: wPt,
-          height: hPt,
-          borderColor: SVG_PLACEHOLDER_BORDER,
-          borderWidth: SVG_PLACEHOLDER_BORDER_WIDTH,
-          opacity,
-        });
-      }
+    return;
+  }
+
+  let imageBytes = decoded ?? fetched;
+
+  if (imageBytes?.mime.startsWith('image/svg')) {
+    const rasterized = await rasterizeSvgToPngBytes(imageBytes.bytes);
+
+    if (rasterized) {
+      imageBytes = { mime: 'image/png', bytes: rasterized };
     }
-  } else {
-    // Non-data-URI content: draw placeholder
-    page.drawRectangle({
+  }
+
+  if (imageBytes === undefined) {
+    drawImagePlaceholder(page, xPt, yPt, wPt, hPt, opacity);
+
+    return;
+  }
+
+  try {
+    const image = pdf.embedImage(imageBytes.bytes);
+
+    page.drawImage(image, {
       x: xPt,
       y: yPt,
       width: wPt,
       height: hPt,
-      borderColor: SVG_PLACEHOLDER_BORDER,
-      borderWidth: SVG_PLACEHOLDER_BORDER_WIDTH,
       opacity,
     });
+  } catch {
+    drawImagePlaceholder(page, xPt, yPt, wPt, hPt, opacity);
   }
+}
+
+function renderNonStaticElement(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
+  renderRectangle(page, el, canvas, heightPt);
+
+  const xPt = elementToPoints(canvas, el.position.x) + 4;
+  const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height) + 4;
+  const label =
+    el.type === 'clock' ? el.content || '00:00'
+    : el.type === 'ticker' ? el.content || 'Ticker'
+    : 'Video';
+
+  page.drawText(label, {
+    x: xPt,
+    y: yPt,
+    size: 10,
+    color: rgb(0.2, 0.2, 0.2),
+    font: StandardFonts.Helvetica,
+    opacity: resolveOpacity(el.style),
+  });
 }
 
 function renderQrCode(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
@@ -336,14 +442,15 @@ function renderQrCode(page: PDFPage, el: BroadsetElement, canvas: Canvas, height
   drawQrOnPage(page, el.content, xPt, yPt, wPt, hPt);
 }
 
-function renderElement(
+async function renderElement(
   page: PDFPage,
   el: BroadsetElement,
   canvas: Canvas,
   heightPt: number,
   pdf: PDF,
   fontMap: ReadonlyMap<string, FontInput>,
-): void {
+  fetchFn?: typeof globalThis.fetch,
+): Promise<void> {
   switch (el.type) {
     case 'text':
       renderText(page, el, canvas, heightPt, fontMap);
@@ -359,7 +466,7 @@ function renderElement(
       break;
     case 'image':
     case 'svg':
-      renderImage(page, el, canvas, heightPt, pdf);
+      await renderImage(page, el, canvas, heightPt, pdf, fetchFn);
       break;
     case 'qrcode':
       renderQrCode(page, el, canvas, heightPt);
@@ -370,8 +477,7 @@ function renderElement(
     case 'video':
     case 'clock':
     case 'ticker':
-      // Render as placeholder rectangle for non-static types
-      renderRectangle(page, el, canvas, heightPt);
+      renderNonStaticElement(page, el, canvas, heightPt);
       break;
   }
 }
@@ -418,7 +524,7 @@ export async function exportPdfBytes(doc: BroadsetDocument, fetchFn?: typeof glo
 
   // Render elements at rest state (t=0) — ignore all animation data
   for (const el of doc.elements) {
-    renderElement(page, el, canvas, heightPt, pdf, fontMap);
+    await renderElement(page, el, canvas, heightPt, pdf, fontMap, effectiveFetch);
   }
 
   return pdf.save();
