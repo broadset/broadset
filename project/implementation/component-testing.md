@@ -1,6 +1,6 @@
 # CT Testing Guide (Spec-Driven)
 
-Date: 2026-04-13 12:00
+Date: 2026-04-14 21:10
 Scope: Playwright component tests for `@broadset/demo` covering all user-facing UI component behaviors from `@broadset/ui`.
 
 ## 1. Purpose
@@ -59,7 +59,7 @@ Derive CT coverage from these files:
 
 - Current CT count: 87 tests across 10 files.
 - Current CT files are folder-organized under `packages/demo/ct/` by domain (`accessibility/`, `canvas-transform/`, `layout/`, `state/`, `timeline/`).
-- Current matrix coverage is partial: 42/57 scenario IDs covered; gaps remain concentrated in C-_, D-_, and some L-\* scenarios.
+- The matrix below enumerates the full 57 scenario IDs across C/T/P/I/M/L/D groups; scenario-to-file ownership is tracked in Section 8.
 
 ## 6. Comprehensive CT Matrix
 
@@ -233,7 +233,7 @@ Keep a traceability table in each CT file header or a central checklist.
 
 | Case ID | CT file                             | Requirement                | Regions asserted                             | Status  |
 | ------- | ----------------------------------- | -------------------------- | -------------------------------------------- | ------- |
-| C-01    | `canvas-transform/selection.ct.tsx` | Element Selection by Click | canvas, transform widget, layers, properties | pending |
+| C-01    | `canvas-transform/selection.ct.tsx` | Element Selection by Click | canvas, transform widget, layers, properties | covered |
 
 ## 11. Definition Of Done For CT Coverage
 

@@ -7,7 +7,7 @@ import { createPlaybackController } from './playback-controller';
 import { createConfig, createHostElement, createKeyframe, createTimeline } from './playback-controller-test-helpers';
 
 describe('createPlaybackController', () => {
-  it('hides offscreen elements on attach, refreshes on setRegistry, and supports timeline seek/stop', () => {
+  it('hides offscreen elements on attach, refreshes on setAnimations, and supports timeline seek/stop', () => {
     const { contentTarget, host, root } = createHostElement('hero');
 
     host.dataset['visibility'] = 'offscreen';
@@ -59,7 +59,7 @@ describe('createPlaybackController', () => {
       },
     ];
 
-    const controller = createPlaybackController({ root, registry: animations });
+    const controller = createPlaybackController({ root, animations });
 
     controller.attach();
 
@@ -69,7 +69,7 @@ describe('createPlaybackController', () => {
     host.classList.remove('offscreen');
     host.dataset['visibility'] = 'onscreen';
 
-    controller.setRegistry(animations);
+    controller.setAnimations(animations);
     controller.seekTimeline({ elementId: 'hero', timelineName: 'spin', timeMs: 1000 });
 
     expect(contentTarget.style.transform).toBe('translateX(80px)');
@@ -116,7 +116,7 @@ describe('createPlaybackController', () => {
       },
     ];
 
-    const controller = createPlaybackController({ root, registry: animations, suppressTransitions: true });
+    const controller = createPlaybackController({ root, animations, suppressTransitions: true });
 
     controller.attach();
     root.firstElementChild?.classList.add('onscreen');
@@ -157,7 +157,7 @@ describe('createPlaybackController', () => {
         },
       ];
 
-      const controller = createPlaybackController({ root, registry: animations });
+      const controller = createPlaybackController({ root, animations });
 
       controller.attach();
       controller.play();
@@ -221,7 +221,7 @@ describe('createPlaybackController', () => {
       },
     ];
 
-    const controller = createPlaybackController({ root, registry: animations, suppressTransitions: true });
+    const controller = createPlaybackController({ root, animations, suppressTransitions: true });
 
     controller.attach();
     host.classList.add('active');

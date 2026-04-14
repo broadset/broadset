@@ -26,7 +26,7 @@ export function setupDemoShellMocks(): DemoShellMocks {
     play: jest.fn(),
     seek: jest.fn(),
     seekTimeline: jest.fn(),
-    setRegistry: jest.fn(),
+    setAnimations: jest.fn(),
     setSpeed: jest.fn(),
     stopTimeline: jest.fn(),
   });

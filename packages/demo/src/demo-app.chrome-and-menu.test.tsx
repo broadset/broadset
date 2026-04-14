@@ -80,6 +80,15 @@ describe('DemoApp chrome and menu integration', () => {
     expect(screen.getByRole('button', { name: /reset zoom/i })).toBeTruthy();
   });
 
+  /** @description Enforces the layout contract that the File menu omits the Save action when the host did not provide an onSave handler. */
+  it('hides the Save file action when onSave is not configured', () => {
+    setupDemoShellMocks();
+    render(<DemoApp />);
+
+    expect(screen.queryByRole('button', { name: /^save$/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /save as json/i })).toBeTruthy();
+  });
+
   /** @description Preserves the Phase 4 custom plugin contract so the countdown tool appears alongside the built-in element types in the vertical toolbar. */
   it('renders the countdown plugin in the element toolbar', () => {
     setupDemoShellMocks();

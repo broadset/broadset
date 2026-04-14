@@ -170,8 +170,8 @@ describe('DemoApp playback shell lifecycle', () => {
     expect(rootElement?.style.overflow).toBe('visible');
   });
 
-  /** @description Verifies the host save callback persists the current document, restores saved work on the next load, and exposes action feedback through a HeroUI toast live region. */
-  it('restores a saved document from localStorage and saves the current document through the File menu', () => {
+  /** @description Verifies startup restores local saved work and keeps File menu actions aligned with the layout contract when host onSave is not configured. */
+  it('restores a saved document from localStorage and hides the Save file action by default', () => {
     const savedDocument = { ...createDemoAppPlaybackTestDocument(), name: 'Recovered demo layout' };
 
     window.localStorage.setItem('broadset:demo-document:v1', JSON.stringify(savedDocument));
@@ -179,20 +179,8 @@ describe('DemoApp playback shell lifecycle', () => {
     render(<DemoApp />);
 
     expect(screen.getByText('Recovered demo layout')).toBeTruthy();
-
-    const [saveButton] = screen.getAllByRole('button', { name: /^save$/i });
-
-    expect(saveButton).toBeDefined();
-
-    if (saveButton === undefined) {
-      throw new Error('Expected the demo shell to render a Save action.');
-    }
-
-    fireEvent.click(saveButton);
-
-    expect(window.localStorage.getItem('broadset:demo-document:v1')).toContain('Recovered demo layout');
-    expect(screen.getByRole('status')).toBeTruthy();
-    expect(screen.getByText(/saved the demo document locally/i)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^save$/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /save as json/i })).toBeTruthy();
   });
 
   /** @description Prevents the floating menu bar from nesting HeroUI trigger buttons inside other buttons, which breaks layout and accessibility in the real browser. */

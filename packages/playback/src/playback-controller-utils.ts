@@ -133,8 +133,8 @@ export function clearTimelineStyles(args: {
   }
 }
 
-export function validateAnimationRegistry(registry: readonly AnimationDefinition[]): void {
-  for (const entry of registry) {
+export function validateAnimationDefinitions(definitions: readonly AnimationDefinition[]): void {
+  for (const entry of definitions) {
     const triggeredReferences = new Set<string>();
 
     for (const binding of entry.config.stateTimelineBindings) {

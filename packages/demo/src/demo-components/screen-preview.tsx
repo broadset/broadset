@@ -103,7 +103,7 @@ export function ScreenPreview({
     }
 
     const rendererController = createScreenRenderer({ host });
-    const playbackController = createPlaybackController({ root: host, registry: documentData.animations });
+    const playbackController = createPlaybackController({ root: host, animations: documentData.animations });
 
     rendererRef.current = rendererController;
     playbackRef.current = playbackController;
@@ -124,7 +124,7 @@ export function ScreenPreview({
 
   useEffect(() => {
     rendererRef.current?.updateDocument(documentData);
-    playbackRef.current?.setRegistry(documentData.animations);
+    playbackRef.current?.setAnimations(documentData.animations);
     playbackRef.current?.pause();
     playbackRef.current?.seek(0);
   }, [documentData]);

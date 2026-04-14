@@ -1,14 +1,13 @@
 # QA Analysis - Package-by-Package (Refreshed)
 
-Date: 2026-04-14 19:45
+Date: 2026-04-14 22:10
 Scope: model, playback, renderer, editor, formats, ui, demo
-Method: targeted refresh of previous findings using current files under `project/spec/**` and `packages/**`.
+Method: targeted refresh against current code and spec state after remediation commits.
 
-## Verification Baseline (Refresh Scope)
+## Verification Baseline
 
-- This refresh validates relevance and evidence paths after recent refactors.
-- It does not re-run the full quality/build/CT chain; assertions below are based on source and test inspection.
-- Demo Playwright CT is now split across ten files in folder-based domains under `packages/demo/ct/`.
+- Validation includes code and spec inspection plus package quality verification for playback and demo.
+- This refresh reflects completed QA remediation work that landed after the prior snapshot.
 
 ## Severity Legend
 
@@ -16,196 +15,128 @@ Method: targeted refresh of previous findings using current files under `project
 - MEDIUM: meaningful quality risk or significant maintainability/documentation drift.
 - LOW: cleanup/naming/ergonomics issues with limited immediate impact.
 
-## 1) `@broadset/model`
+## 1) @broadset/model
 
 ### Findings
 
-1. MEDIUM - Runtime immutability guard for `documentMode` is still not explicit.
+No active findings.
 
-- Spec still requires runtime mutation rejection (`project/spec/model/spec.md`, requirement "Document Mode Immutability").
-- Schema transform returns plain object shape with no explicit runtime freeze/guard in this path: `packages/model/src/document.ts:206`.
-- Current tests still focus on valid/invalid values, not post-creation runtime mutation rejection: `packages/model/src/document.test.ts:27`.
+### Resolved Since Prior Snapshot
+
+- Document mode runtime immutability is now explicitly guarded and covered by tests.
 
 ### Strengths
 
-- Model shape remains aligned with core spec structure.
-- Validation and model-level test depth remain strong.
-- Package boundary remains clean.
+- Model contract remains aligned with spec reference shape and invariants.
+- Validation and tests remain strong.
 
-## 2) `@broadset/playback`
+## 2) @broadset/playback
 
 ### Findings
 
-1. LOW - Legacy "registry" terminology remains in playback API naming.
+No active findings.
 
-- `validateAnimationRegistry(...)` remains the validator naming: `packages/playback/src/playback-controller-utils.ts:136`.
-- `setRegistry(...)` and related fields remain in controller API: `packages/playback/src/playback-controller.ts:53`.
-- Behavior appears correct; this is clarity debt, not a functional bug.
+### Resolved Since Prior Snapshot
+
+- Legacy registry naming was removed from controller and validation API:
+  - `validateAnimationDefinitions(...)` replaces `validateAnimationRegistry(...)`
+  - `setAnimations(...)` replaces `setRegistry(...)`
+  - create options now use `animations` instead of `registry`
 
 ### Strengths
 
-- Boundary compliance remains correct (`model` only).
-- Playback structure remains coherent and test-backed.
+- Package boundary remains correct (`model` only).
+- Controller lifecycle and validation tests remain green.
 
-## 3) `@broadset/renderer`
+## 3) @broadset/renderer
 
 ### Findings
 
-1. MEDIUM - Renderer spec gaps for several acceptance areas remain open.
+No active QA-gap findings from the prior report remain open.
 
-- Current spec still records missing tests for incremental mutation counting, broken image fallback, sanitizer allowlist behavior, and performance mutation complexity: `project/spec/renderer/spec.md:674`.
-- Existing renderer tests do cover group container/data-attribute behavior in part, but open items above are still listed as unresolved.
+### Resolved Since Prior Snapshot
 
-2. MEDIUM - Renderer complexity hotspot has moved to split module path.
+- Renderer spec gaps previously listed for incremental updates and broken image fallback were closed and reflected in spec notes.
 
-- Largest renderer implementation files are now `packages/renderer/src/screen-renderer/element-renderers.ts` (425 lines) and `packages/renderer/src/screen-renderer/base-render.ts` (424 lines), while `packages/renderer/src/screen-renderer.ts` is a barrel re-export.
+### Ongoing Risk (Maintainability)
 
-### Strengths
+- Medium-sized implementation files remain in the screen-renderer split modules and should continue to be monitored.
 
-- Group/container contract coverage exists in renderer tests.
-- Scene/rendering core remains modularized compared to prior monolith path.
-
-## 4) `@broadset/editor`
+## 4) @broadset/editor
 
 ### Findings
 
-1. MEDIUM - Editor CT portfolio is broader but still likely incomplete against full matrix.
+No active implementation gap findings from the prior report remain open.
 
-- Prior single-file CT claim is obsolete; demo CT now spans 10 files in `accessibility/`, `canvas-transform/`, `layout/`, `state/`, and `timeline/` folders.
-- Current matrix tracking in `project/implementation/component-testing.md` shows 42/57 IDs covered (74%): largest gaps remain in canvas interactions (C-_) and demo state/data workflows (D-_).
+### Resolved Since Prior Snapshot
 
-2. MEDIUM - Spec gap notes for store actions are still stale versus implemented tests.
+- Store-actions spec gaps were synchronized with existing automation for descendant promotion, snapshots, and clipboard flows.
 
-- Spec still claims missing automation for required descendant promotion, snapshots, and clipboard integration: `project/spec/editor/store-actions.md:533`.
-- Current tests cover those scenarios: `packages/editor/src/store-actions.core.test.ts:118`, `packages/editor/src/store-actions.snapshots.test.ts:44`, `packages/editor/src/keyboard.clipboard-grouping.test.ts:68`.
+### Ongoing Risk (Maintainability)
 
-3. LOW - Editor complexity risk is reduced after split, with one near-threshold module.
+- `keyboard.ts` remains near the soft module-size threshold and may merit further decomposition when touched.
 
-- Largest non-test editor module is now `packages/editor/src/keyboard.ts` (481 lines), which is below but close to the soft 500-line target.
-
-### Strengths
-
-- Strong unit coverage remains across editing, keyboard, collaboration, and store actions.
-- Refactor reduced old monolith paths (`store-actions.ts`, `editing.ts`, `path-geometry.ts`) into submodules.
-
-## 5) `@broadset/formats`
+## 5) @broadset/formats
 
 ### Findings
 
-1. MEDIUM - Warning/reporting contract is still inconsistent across importers and demo bridge.
+No active implementation gap findings from the prior report remain open.
 
-- SVG importer returns warnings via `SvgImportResult.warnings`: `packages/formats/src/web-vector/import.ts:3`.
-- Demo bridge still does not surface SVG warnings in import UX: `packages/demo/src/formatBridge.ts:250`.
-- PPTX/PSD import entry points still return only `BroadsetDocument`: `packages/formats/src/pptx/import.ts:7`, `packages/formats/src/psd/import.ts:227`.
+### Resolved Since Prior Snapshot
 
-2. MEDIUM - Formats spec gap entries remain stale for animated static export.
+- Unified warning contract is now represented through document import result wiring and surfaced through demo import handling.
+- PDF/PSD animated-static-export spec gaps were updated to reference existing tests.
 
-- Spec still says no tests for animated static export in PDF/PSD: `project/spec/formats/pdf.md:194`, `project/spec/formats/psd.md:227`.
-- Tests exist: `packages/formats/src/pdf/fonts-wrap-qr-animation.test.ts:192`, `packages/formats/src/psd/import-vector-animated-url.test.ts:101`.
+### Ongoing Risk (Maintainability)
 
-3. LOW - Previous converter hotspot paths are obsolete after formats module split.
+- Large converter modules remain candidates for incremental split when changed.
 
-- Current larger non-test modules are:
-  - `packages/formats/src/pdf/core.ts` (425 lines)
-  - `packages/formats/src/pptx/slide-shapes.ts` (358)
-  - `packages/formats/src/psd/import.ts` (310)
-  - `packages/formats/src/psd/export-layer.ts` (278)
-
-### Strengths
-
-- Formats remain boundary-compliant (`model` + `playback`).
-- Import/export test coverage remains broad across major format surfaces.
-
-## 6) `@broadset/ui`
+## 6) @broadset/ui
 
 ### Findings
 
-1. HIGH - No dedicated Playwright CT suite exists in `packages/ui`.
+No active high-severity findings from the prior report remain open.
 
-- UI still relies on Jest/RTL tests; there are no `*.ct.tsx` files under `packages/ui`.
-- This leaves package-local browser-level acceptance coverage dependent on demo CT rather than package-owned CT.
+### Resolved Since Prior Snapshot
 
-2. MEDIUM - UI spec gap entries remain stale versus existing tests.
+- Dedicated UI package Playwright CT now exists.
+- UI spec references were aligned with current split test paths.
 
-- Example: toolbar spec marks undo/redo disabled-state automation as covered but still references an obsolete toolbar test file path: `project/spec/ui/toolbar-nav.md:457`.
-- Existing test coverage is in split test files: `packages/ui/src/toolbar-nav.editor-pages.test.tsx:11`.
+### Ongoing Risk (Maintainability)
 
-3. LOW - UI complexity risk remains moderate with near-threshold panel modules.
+- Near-threshold panel modules remain and should be kept under active review during feature work.
 
-- Current larger non-test modules include:
-  - `packages/ui/src/property-panels/layout-panels.tsx` (464)
-  - `packages/ui/src/animation-sidebar.tsx` (464)
-  - `packages/ui/src/modals/core-modals.tsx` (282)
-
-### Strengths
-
-- HeroUI-first implementation is maintained.
-- Unit coverage remains strong in core UI modules.
-
-## 7) `@broadset/demo`
+## 7) @broadset/demo
 
 ### Findings
 
-1. HIGH - Timeline and animation-sidebar actions are still not wired end-to-end.
+No active high-severity findings from the prior report remain open.
 
-- Placeholder toasts remain for timeline editor actions in split layout module: `packages/demo/src/demo-app/layout-timeline-panel.tsx:24`.
-- Placeholder toasts remain for animation sidebar actions: `packages/demo/src/demo-app/sidebar.tsx:132`.
-- Finding is still valid; evidence moved from old `DemoApp.tsx` line references to split files.
+### Resolved Since Prior Snapshot
 
-2. MEDIUM - Previous single-file CT concentration finding is obsolete, but CT matrix completion risk remains.
+- Timeline editor and animation-sidebar callbacks are wired to real animation editing actions.
+- Hidden native file input exception is now explicitly documented in demo layout spec.
+- Save-menu visibility contract is now covered by automated test (Save hidden when `onSave` is not configured).
 
-- CT is now split across ten files:
-  - `packages/demo/ct/accessibility/inputs-a11y.ct.tsx`
-  - `packages/demo/ct/accessibility/modals-a11y.ct.tsx`
-  - `packages/demo/ct/canvas-transform/compound.ct.tsx`
-  - `packages/demo/ct/canvas-transform/handles.ct.tsx`
-  - `packages/demo/ct/canvas-transform/resize-rotation.ct.tsx`
-  - `packages/demo/ct/canvas-transform/selection.ct.tsx`
-  - `packages/demo/ct/layout/sidebar-properties-layers.ct.tsx`
-  - `packages/demo/ct/layout/toolbar-navigation.ct.tsx`
-  - `packages/demo/ct/state/demo-state-data.ct.tsx`
-  - `packages/demo/ct/timeline/timeline-animation.ct.tsx`
-- Matrix completion risk remains: see `project/implementation/component-testing.md` for missing IDs (notably C-_, D-_, and L-05/L-07/L-10).
+### Ongoing Risk (Maintainability)
 
-3. MEDIUM - Hidden raw file input exception still exists and should be documented explicitly.
-
-- Raw native file input is now in layout split module: `packages/demo/src/demo-app/layout.tsx:46`.
-
-4. MEDIUM - Demo complexity hotspot has shifted.
-
-- `packages/demo/src/DemoApp.tsx` is no longer a large shell; complexity now centers in:
-  - `packages/demo/src/demo-app/app.tsx` (497)
-  - `packages/demo/src/demo-app/layout-main-toolbar.tsx` (447)
-  - `packages/demo/src/demo-components/screen-preview.tsx` (326)
-
-### Strengths
-
-- Demo CT now has significantly broader functional coverage than the prior single-file state.
-- Refactor improved shell modularity and moved major concerns into dedicated files.
+- Complexity hotspot remains centered in split app/layout modules; continue phased extraction when changes are made.
 
 ## Cross-Package Systemic Findings
 
-1. HIGH - Timeline/binding integration remains the most visible user-facing functional gap.
+1. LOW - Continued spec/document drift prevention is required.
 
-- Placeholder handlers still block true end-to-end timeline editing in demo shell.
+- As refactors land, corresponding spec gap notes and implementation docs must be updated in the same change window.
 
-2. MEDIUM - Spec-document drift remains a concrete quality issue.
+2. LOW - Maintainability hotspots are now primarily module-size concerns, not functional acceptance gaps.
 
-- Multiple `Spec Gaps` sections still claim absent tests where automation now exists.
+## Recommended Next Sequence
 
-3. MEDIUM - Maintainability risk remains present but shifted to new split-module hotspots.
+1. Keep `project/spec/**` and implementation docs synchronized as part of each feature PR.
+2. Continue incremental module decomposition in near-threshold files when touched for feature work.
+3. Keep CT matrix ownership and status current in `project/implementation/component-testing.md` as scenarios evolve.
 
-- Old hotspot filenames in prior report are partially obsolete and should not be reused for planning; current hotspots are mostly below the 500-line soft limit.
+## Appendix: Evidence Snapshot
 
-## Recommended Remediation Sequence
-
-1. Wire timeline editor and animation-sidebar callbacks in demo split modules (`layout-timeline-panel.tsx`, `sidebar.tsx`) to real editor/timeline actions.
-2. Run a spec hygiene pass to update stale `Spec Gaps` across editor/formats/ui/renderer so docs match current automation.
-3. Expand CT matrix for explicit remaining interaction gaps (notably C-_ canvas flows, D-_ state/data flows, and L-05/L-07/L-10 timeline items) and tie each to scenario IDs in `project/implementation/component-testing.md`.
-4. Continue phased splitting of current largest non-test modules where justified (`packages/demo/src/demo-app/app.tsx`, `packages/editor/src/keyboard.ts`, and near-threshold UI panel modules).
-5. Define a unified importer warning contract and surface warnings in demo import UX (starting with SVG parity, then PPTX/PSD).
-
-## Appendix: Evidence Commands Executed (Refresh)
-
-- Targeted `rg` searches and file reads across `project/spec/**`, `packages/**`, and CT paths.
-- Module line-count scans for non-test `*.ts`/`*.tsx` files to refresh complexity hotspots.
+- Source/spec inspection in `project/spec/**`, `project/implementation/**`, and `packages/**`.
+- Verified package quality for playback and demo after playback naming updates and demo menu test additions.

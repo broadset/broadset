@@ -3,7 +3,7 @@
 import type { AnimationDefinition } from '@broadset/model';
 import { describe, expect, it } from '@jest/globals';
 
-import { escapeCssIdentifier, parseElementRuntimeState, validateAnimationRegistry } from './playback-controller';
+import { escapeCssIdentifier, parseElementRuntimeState, validateAnimationDefinitions } from './playback-controller';
 import { createConfig, createHostElement, createKeyframe, createTimeline } from './playback-controller-test-helpers';
 
 describe('parseElementRuntimeState and validation helpers', () => {
@@ -57,11 +57,11 @@ describe('parseElementRuntimeState and validation helpers', () => {
     ];
 
     expect(() => {
-      validateAnimationRegistry(animations);
+      validateAnimationDefinitions(animations);
     }).toThrow(/circular dependency/i);
 
     expect(() => {
-      validateAnimationRegistry([
+      validateAnimationDefinitions([
         {
           elementId: 'hero',
           config: createConfig({

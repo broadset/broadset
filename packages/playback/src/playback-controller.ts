@@ -7,7 +7,7 @@ import {
   resolveModifierTimeline,
   resolveStateTimeline,
   resolveTimelineFromReference,
-  validateAnimationRegistry,
+  validateAnimationDefinitions,
 } from './playback-controller-utils';
 import {
   applyTimelineFrameToDom,
@@ -25,7 +25,7 @@ export {
   escapeCssIdentifier,
   parseElementRuntimeState,
   resolveAnimationTargets,
-  validateAnimationRegistry,
+  validateAnimationDefinitions,
 };
 export type { AnimationTargetsResolver, ParsedElementRuntimeState } from './playback-dom';
 export type { CreatePlaybackHandleOptions, PlaybackHandle } from './playback-handle';
@@ -50,7 +50,7 @@ export interface PlaybackController {
   pause(): void;
   seek(timeMs: number): void;
   setSpeed(speed: number): void;
-  setRegistry(registry: readonly AnimationDefinition[]): void;
+  setAnimations(animations: readonly AnimationDefinition[]): void;
   seekTimeline(options: SeekTimelineOptions): TimelineFrame | null;
   stopTimeline(options: StopTimelineOptions): void;
   destroy(): void;
@@ -58,7 +58,7 @@ export interface PlaybackController {
 
 export interface CreatePlaybackControllerOptions {
   readonly root: HTMLElement;
-  readonly registry: readonly AnimationDefinition[];
+  readonly animations: readonly AnimationDefinition[];
   readonly suppressTransitions?: boolean | undefined;
 }
 
@@ -73,12 +73,12 @@ function getHandleKey(elementId: string, timelineId: string): string {
 }
 
 export function createPlaybackController(options: CreatePlaybackControllerOptions): PlaybackController {
-  validateAnimationRegistry(options.registry);
+  validateAnimationDefinitions(options.animations);
 
   const targetsResolver = resolveAnimationTargets();
   const runtimes = new Map<string, RuntimeRecord>();
   const handles = new Map<string, PlaybackHandle>();
-  let registry = options.registry;
+  let animations = options.animations;
   let currentTimeMs = 0;
   let playbackSpeed = 1;
   let observer: MutationObserver | null = null;
@@ -97,7 +97,7 @@ export function createPlaybackController(options: CreatePlaybackControllerOption
         continue;
       }
 
-      const config = registry.find((entry) => entry.elementId === elementId)?.config ?? EMPTY_ANIMATION_CONFIG;
+      const config = animations.find((entry) => entry.elementId === elementId)?.config ?? EMPTY_ANIMATION_CONFIG;
       const parsedState = parseElementRuntimeState({ element: container, config });
 
       applyVisibility(container, parsedState.visibility);
@@ -422,7 +422,7 @@ export function createPlaybackController(options: CreatePlaybackControllerOption
         this.attach();
       }
 
-      for (const entry of registry) {
+      for (const entry of animations) {
         for (const timeline of getDefaultTimelines(entry.config)) {
           playResolvedTimeline({ elementId: entry.elementId, timeline });
         }
@@ -436,7 +436,7 @@ export function createPlaybackController(options: CreatePlaybackControllerOption
     seek(timeMs: number): void {
       currentTimeMs = Math.max(0, timeMs);
 
-      for (const entry of registry) {
+      for (const entry of animations) {
         for (const timeline of getDefaultTimelines(entry.config)) {
           seekTimelineInternal({
             elementId: entry.elementId,
@@ -457,9 +457,9 @@ export function createPlaybackController(options: CreatePlaybackControllerOption
         handle.setSpeed(speed);
       }
     },
-    setRegistry(nextRegistry: readonly AnimationDefinition[]): void {
-      validateAnimationRegistry(nextRegistry);
-      registry = nextRegistry;
+    setAnimations(nextAnimations: readonly AnimationDefinition[]): void {
+      validateAnimationDefinitions(nextAnimations);
+      animations = nextAnimations;
       refreshRuntimes();
     },
     seekTimeline(seekOptions: SeekTimelineOptions): TimelineFrame | null {

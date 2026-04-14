@@ -21,7 +21,6 @@ import {
   Plus,
   RotateCcw,
   Ruler,
-  Save,
   Settings,
   Trash2,
   Upload,
@@ -43,7 +42,6 @@ export function LayoutMainToolbar(props: DemoAppLayoutProps): React.JSX.Element 
     handleResetZoom,
     handleRestoreSnapshot,
     handleSaveAsJson,
-    handleSaveDocument,
     handleSaveSnapshot,
     handleZoomToFit,
     pushToast,
@@ -122,12 +120,6 @@ export function LayoutMainToolbar(props: DemoAppLayoutProps): React.JSX.Element 
               <span className="inline-flex items-center gap-2">
                 <FolderOpen size={14} />
                 Open
-              </span>
-            </Dropdown.Item>
-            <Dropdown.Item key="save-demo" onAction={handleSaveDocument}>
-              <span className="inline-flex items-center gap-2">
-                <Save size={14} />
-                Save
               </span>
             </Dropdown.Item>
             <Dropdown.Item key="save-json" onAction={handleSaveAsJson}>

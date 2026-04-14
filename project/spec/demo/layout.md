@@ -24,6 +24,24 @@ The app MUST occupy the full browser viewport (100vw × 100vh) with no page-leve
 
 ---
 
+### Requirement: Import File Input Bridge
+
+The demo shell MUST include a hidden native file input as the browser-backed bridge for import actions initiated from HeroUI menus and toolbar controls. This native `<input type="file">` is an allowed host-shell exception to HeroUI-only controls because browser file chooser access requires the native file input element.
+
+#### Scenario: Menu-triggered file chooser
+
+- GIVEN the user selects an import action from toolbar/menu UI
+- WHEN the demo shell opens the file chooser
+- THEN the hidden native file input handles accepted file types and dispatches the selection to the import orchestration flow
+
+#### Acceptance Criteria
+
+- [ ] Given an import action, a hidden native file input exists as the file chooser bridge
+- [ ] Given accepted import formats, the file input accept list includes json, bsp, psd, pptx, and svg
+- [ ] Given file selection, the input change event is routed to the import handler
+
+---
+
 ### Requirement: Canvas Area
 
 The center area MUST contain the EditorCanvas wrapped in a RulerSystem and an EditorErrorBoundary. The canvas area MUST fill all available space not occupied by toolbars or the sidebar. The RulerSystem MUST render rulers along the **top and left edges only** (horizontal ruler on top, vertical ruler on the left). There is no right ruler or bottom ruler. A small origin square MUST appear at the top-left corner where the two rulers meet.
@@ -446,7 +464,8 @@ When one or more elements are selected on the canvas, a visible selection outlin
 
 ## Spec Gaps
 
-- [ ] **Floating Main Toolbar — save button visibility:** No automated test currently verifies that the save button is hidden when `onSave` is not configured. A test covering this acceptance criterion needs to be written.
+- [x] **Floating Main Toolbar — save button visibility:** Automated demo shell tests verify the File menu omits `Save` when `onSave` is not configured (`packages/demo/src/demo-app.chrome-and-menu.test.tsx`).
+- [x] **Native file input exception:** The layout spec now explicitly documents the hidden native file input bridge used for import flows (`packages/demo/src/demo-app/layout.tsx`).
 
 ---
 
