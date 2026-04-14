@@ -1,19 +1,11 @@
 /** @jest-environment jsdom */
 
-import { beforeAll, describe, expect, it, jest } from '@jest/globals';
+import './inputs-test-helpers';
+
+import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type * as React from 'react';
 
-import type { ColorInputProps } from './inputs';
-import { loadInputsTestModules } from './inputs-test-helpers';
-
-let ColorInput: React.ComponentType<ColorInputProps>;
-
-beforeAll(async () => {
-  const mod = await loadInputsTestModules();
-
-  ColorInput = mod.ColorInput;
-});
+import { ColorInput } from './inputs';
 
 describe('ColorInput', () => {
   /** @description Typing a valid hex value in the text field must emit the color string via onChange. */

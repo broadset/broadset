@@ -1,25 +1,11 @@
 /** @jest-environment jsdom */
 
-import { beforeAll, describe, expect, it, jest } from '@jest/globals';
+import './inputs-test-helpers';
+
+import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type * as React from 'react';
 
-import type { ColorInputProps, CssLengthInputProps, NumFieldProps, TextStrokeInputProps } from './inputs';
-import { loadInputsTestModules } from './inputs-test-helpers';
-
-let ColorInput: React.ComponentType<ColorInputProps>;
-let NumField: React.ComponentType<NumFieldProps>;
-let CssLengthInput: React.ComponentType<CssLengthInputProps>;
-let TextStrokeInput: React.ComponentType<TextStrokeInputProps>;
-
-beforeAll(async () => {
-  const mod = await loadInputsTestModules();
-
-  ColorInput = mod.ColorInput;
-  NumField = mod.NumField;
-  CssLengthInput = mod.CssLengthInput;
-  TextStrokeInput = mod.TextStrokeInput;
-});
+import { ColorInput, CssLengthInput, NumField, TextStrokeInput } from './inputs';
 
 describe('Accessibility: aria-invalid on input validation', () => {
   /** @description ColorInput must set aria-invalid="true" on the text field when the user types an unparseable color string, enabling screen readers to announce the error state. */

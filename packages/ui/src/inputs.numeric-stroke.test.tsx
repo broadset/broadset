@@ -1,23 +1,12 @@
 /** @jest-environment jsdom */
 
-import { beforeAll, describe, expect, it, jest } from '@jest/globals';
+import './inputs-test-helpers';
+
+import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type * as React from 'react';
 
-import type { CssLengthInputProps, NumFieldProps, TextStrokeInputProps } from './inputs';
-import { loadInputsTestModules } from './inputs-test-helpers';
-
-let NumField: React.ComponentType<NumFieldProps>;
-let CssLengthInput: React.ComponentType<CssLengthInputProps>;
-let TextStrokeInput: React.ComponentType<TextStrokeInputProps>;
-
-beforeAll(async () => {
-  const mod = await loadInputsTestModules();
-
-  NumField = mod.NumField;
-  CssLengthInput = mod.CssLengthInput;
-  TextStrokeInput = mod.TextStrokeInput;
-});
+import { CssLengthInput, NumField, TextStrokeInput } from './inputs';
+import { convertLength, isCssUnit, toCssUnit } from './inputs/css-length';
 
 describe('NumField', () => {
   /** @description Arrow Up/Down keys must increment/decrement by the configured step. */
@@ -111,21 +100,19 @@ describe('NumField', () => {
    ============================================================ */
 
 describe('CssLengthInput', () => {
-  /** @description Switching units must convert the numeric value to the new unit. */
-  it('converts value when unit changes', () => {
-    const onChange = jest.fn<(value: string) => void>();
+  /** @description CSS length conversion must preserve absolute lengths across supported units. */
+  it('converts absolute length units deterministically', () => {
+    expect(convertLength(96, 'px', 'mm')).toBeCloseTo(25.4, 5);
+    expect(convertLength(25.4, 'mm', 'in')).toBeCloseTo(1, 5);
+    expect(convertLength(1, 'in', 'px')).toBeCloseTo(96, 5);
+  });
 
-    render(<CssLengthInput value="96px" onChange={onChange} label="Width" />);
-
-    // Switch to mm - 96px at 96dpi = 25.4mm
-    const unitSelect = screen.getByLabelText('Unit');
-
-    fireEvent.change(unitSelect, { target: { value: 'mm' } });
-    expect(onChange).toHaveBeenCalled();
-
-    const emittedValue = onChange.mock.calls[0]?.[0];
-
-    expect(emittedValue).toContain('mm');
+  /** @description Unit helpers must guard unsupported values and normalize unknown units to px. */
+  it('normalizes CSS units safely', () => {
+    expect(isCssUnit('mm')).toBe(true);
+    expect(isCssUnit('vh')).toBe(false);
+    expect(toCssUnit('in')).toBe('in');
+    expect(toCssUnit('vh')).toBe('px');
   });
 
   /** @description Blur should emit the current numeric value in the active unit. */

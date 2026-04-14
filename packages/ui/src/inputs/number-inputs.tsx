@@ -4,51 +4,9 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { sp } from '../tokens';
 import { parseCssLength } from '../utilities';
+import { convertLength, CSS_LENGTH_UNITS, type CssUnit, isCssUnit, toCssUnit } from './css-length';
 
 const DECIMAL_DISPLAY_PRECISION = 2;
-const PX_PER_INCH = 96;
-const MM_PER_INCH = 25.4;
-const CSS_LENGTH_UNITS = ['px', 'mm', 'in', '%', 'em', 'rem'] as const;
-
-type CssUnit = (typeof CSS_LENGTH_UNITS)[number];
-
-function isCssUnit(u: string): u is CssUnit {
-  return (CSS_LENGTH_UNITS as readonly string[]).includes(u);
-}
-
-function toCssUnit(u: string): CssUnit {
-  return isCssUnit(u) ? u : 'px';
-}
-
-function convertLength(value: number, fromUnit: CssUnit, toUnit: CssUnit): number {
-  if (fromUnit === toUnit) return value;
-
-  let px = value;
-
-  switch (fromUnit) {
-    case 'mm':
-      px = value * (PX_PER_INCH / MM_PER_INCH);
-      break;
-    case 'in':
-      px = value * PX_PER_INCH;
-      break;
-    case 'px':
-      break;
-    default:
-      return value;
-  }
-
-  switch (toUnit) {
-    case 'mm':
-      return px * (MM_PER_INCH / PX_PER_INCH);
-    case 'in':
-      return px / PX_PER_INCH;
-    case 'px':
-      return px;
-    default:
-      return value;
-  }
-}
 
 export interface NumFieldProps {
   readonly value: number;

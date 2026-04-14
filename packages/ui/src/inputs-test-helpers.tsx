@@ -3,15 +3,6 @@
 import { jest } from '@jest/globals';
 import type * as React from 'react';
 
-import type {
-  ColorInputProps,
-  CssLengthInputProps,
-  FilterEditorProps,
-  NumFieldProps,
-  ShadowEditorProps,
-  TextStrokeInputProps,
-} from './inputs';
-
 /* ---------- HeroUI mock (comprehensive for ColorInput, NumField, etc.) ---------- */
 
 interface MockHeroUiProps {
@@ -327,25 +318,3 @@ jest.mock(
   },
   { virtual: true },
 );
-
-export interface InputsTestModules {
-  readonly ColorInput: React.ComponentType<ColorInputProps>;
-  readonly NumField: React.ComponentType<NumFieldProps>;
-  readonly CssLengthInput: React.ComponentType<CssLengthInputProps>;
-  readonly TextStrokeInput: React.ComponentType<TextStrokeInputProps>;
-  readonly FilterEditor: React.ComponentType<FilterEditorProps>;
-  readonly ShadowEditor: React.ComponentType<ShadowEditorProps>;
-}
-
-export async function loadInputsTestModules(): Promise<InputsTestModules> {
-  const mod = await import('./inputs');
-
-  return {
-    ColorInput: mod.ColorInput,
-    NumField: mod.NumField,
-    CssLengthInput: mod.CssLengthInput,
-    TextStrokeInput: mod.TextStrokeInput,
-    FilterEditor: mod.FilterEditor,
-    ShadowEditor: mod.ShadowEditor,
-  };
-}

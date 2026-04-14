@@ -1,21 +1,11 @@
 /** @jest-environment jsdom */
 
-import { beforeAll, describe, expect, it, jest } from '@jest/globals';
+import './inputs-test-helpers';
+
+import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type * as React from 'react';
 
-import type { FilterEditorProps, ShadowEditorProps } from './inputs';
-import { loadInputsTestModules } from './inputs-test-helpers';
-
-let FilterEditor: React.ComponentType<FilterEditorProps>;
-let ShadowEditor: React.ComponentType<ShadowEditorProps>;
-
-beforeAll(async () => {
-  const mod = await loadInputsTestModules();
-
-  FilterEditor = mod.FilterEditor;
-  ShadowEditor = mod.ShadowEditor;
-});
+import { FilterEditor, ShadowEditor } from './inputs';
 
 describe('FilterEditor', () => {
   /** @description A single filter must produce the correct CSS function string. */
