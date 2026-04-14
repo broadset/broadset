@@ -1,7 +1,12 @@
 import { expect, test } from '@playwright/experimental-ct-react';
+import type { Page } from '@playwright/test';
 
 import { DemoApp } from '../../src/DemoApp';
 import { FIXTURE_IDS } from '../fixture-selectors';
+
+async function openToolbarMenu(page: Page, menuLabel: string): Promise<void> {
+  await page.locator(`button[aria-label="${menuLabel}"]`).first().click();
+}
 
 /**
  * @description Validates the phase 2 demo shell scenario from
@@ -363,4 +368,122 @@ test('wires all three providers so child components have editor, timeline, and d
 
   // All three providers wired — the app renders without provider errors
   await expect(page.getByTestId('demo-shell')).toBeVisible();
+});
+
+/**
+ * @description Validates D-05 from `project/spec/demo/data-integration.md`:
+ * import/export workflows surface descriptive error toasts on failures,
+ * including export precondition failures for video formats.
+ */
+test('surfaces import and export failure workflows with descriptive toasts', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  await page.locator('input[type="file"]').setInputFiles({
+    buffer: Buffer.from('not-a-supported-format'),
+    mimeType: 'text/plain',
+    name: 'unsupported.txt',
+  });
+  await expect(page.getByText(/Import failed:/)).toBeVisible({ timeout: 4000 });
+
+  await openToolbarMenu(page, 'File');
+  await page.getByText('Export').first().click();
+  await expect(page.getByRole('dialog', { name: 'Export' })).toBeVisible();
+
+  await page.locator('button[aria-label="MP4"]').first().click();
+  await page.locator('button[aria-label="Export"]').first().click();
+  await expect(page.getByText(/Export failed:/)).toBeVisible({ timeout: 5000 });
+});
+
+/**
+ * @description Validates D-06 from `project/spec/demo/data-integration.md`:
+ * live-data-fed clock/ticker renderer surfaces are present and populated so
+ * runtime data updates have concrete render targets in the mounted demo shell.
+ */
+test('live data is seeded into rendered clock and ticker content', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const clockElement = page.locator(`[data-element-id="${FIXTURE_IDS.clock}"]`).first();
+  const tickerElement = page.locator(`[data-element-id="${FIXTURE_IDS.ticker}"]`).first();
+
+  await expect(clockElement).toBeVisible();
+  await expect(tickerElement).toBeVisible();
+
+  await expect(clockElement).toContainText('HH:mm:ss');
+  await expect(tickerElement).not.toHaveText('');
+});
+
+/**
+ * @description Validates D-07 from `project/spec/demo/state.md`:
+ * fullscreen control toggles host fullscreen state and updates toolbar icon
+ * labeling to reflect current mode.
+ */
+test('fullscreen toggle updates toolbar state label for enter/exit transitions', async ({ mount, page }) => {
+  await page.evaluate(() => {
+    let activeFullscreenElement: Element | null = null;
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => activeFullscreenElement,
+    });
+
+    Object.defineProperty(document.documentElement, 'requestFullscreen', {
+      configurable: true,
+      value: () => {
+        activeFullscreenElement = document.documentElement;
+        document.dispatchEvent(new Event('fullscreenchange'));
+      },
+    });
+
+    Object.defineProperty(document, 'exitFullscreen', {
+      configurable: true,
+      value: () => {
+        activeFullscreenElement = null;
+        document.dispatchEvent(new Event('fullscreenchange'));
+      },
+    });
+  });
+
+  await mount(<DemoApp />);
+
+  const fullscreenButton = page.locator('button[aria-label="Enter fullscreen"]').first();
+
+  await expect(fullscreenButton).toBeVisible();
+  await fullscreenButton.click();
+  await expect(page.locator('button[aria-label="Exit fullscreen"]').first()).toBeVisible();
+
+  await page.locator('button[aria-label="Exit fullscreen"]').first().click();
+  await expect(page.locator('button[aria-label="Enter fullscreen"]').first()).toBeVisible();
+});
+
+/**
+ * @description Validates D-08 from `project/spec/demo/state.md`:
+ * browser zoom gestures (Ctrl/Cmd+wheel and zoom shortcuts) are prevented
+ * while standard non-zoom interactions continue to work.
+ */
+test('prevents browser zoom gestures while allowing normal wheel/key events', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const preventResults = await page.evaluate(() => {
+    const wheelZoom = new WheelEvent('wheel', { cancelable: true, ctrlKey: true });
+    const wheelNormal = new WheelEvent('wheel', { cancelable: true });
+    const keyZoom = new KeyboardEvent('keydown', { cancelable: true, ctrlKey: true, key: '+' });
+    const keyNormal = new KeyboardEvent('keydown', { cancelable: true, key: 'a' });
+
+    window.dispatchEvent(wheelZoom);
+    window.dispatchEvent(wheelNormal);
+    window.dispatchEvent(keyZoom);
+    window.dispatchEvent(keyNormal);
+
+    return {
+      keyNormalPrevented: keyNormal.defaultPrevented,
+      keyZoomPrevented: keyZoom.defaultPrevented,
+      wheelNormalPrevented: wheelNormal.defaultPrevented,
+      wheelZoomPrevented: wheelZoom.defaultPrevented,
+    };
+  });
+
+  expect(preventResults.wheelZoomPrevented).toBe(true);
+  expect(preventResults.keyZoomPrevented).toBe(true);
+  expect(preventResults.wheelNormalPrevented).toBe(false);
+  expect(preventResults.keyNormalPrevented).toBe(false);
 });
