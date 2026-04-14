@@ -80,3 +80,4 @@ progresses.
 ## Focused Follow-Up Plans
 
 - [Formats Gap Closure (SVG, PSD, PDF)](plan-formats-gap-closure.md)
+- [Carry-Over Additions Plan and Progress](carry-over-plan-progress.md)

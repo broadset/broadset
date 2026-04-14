@@ -8,6 +8,7 @@ These files describe **how the project is structured**, not the behavioral sourc
 - `architecture.md` — package graph, dependencies, toolchain, repo layout
 - `project.md` — implementation context and technical constitution
 - `plan.md` — execution order and current implementation status
+- `carry-over-plan-progress.md` — additive-only parity-plus execution board and task tracking for carry-over phases
 
 ## Scope boundary
 
