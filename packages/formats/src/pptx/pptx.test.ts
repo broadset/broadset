@@ -47,7 +47,7 @@ function makeDocument(overrides: Partial<BroadsetDocument> = {}): BroadsetDocume
     name: 'Test Doc',
     canvas: makeCanvas(),
     elements: [],
-    pages: [{ id: 'page-1', name: 'Page 1', overrides: [] }],
+    pages: [{ id: 'page-1', name: 'Page 1', elements: [], locale: null, extensions: {} }],
     animations: [],
     ...overrides,
   } as BroadsetDocument;

@@ -19,7 +19,15 @@ type MinimalDocument = {
   pages: Array<{
     id: string;
     name: string;
-    overrides: Array<{ elementId: string; content?: string }>;
+    elements: Array<{
+      elementId: string;
+      transform: {
+        position: { x: number; y: number; z: number };
+        rotation: { x: number; y: number; z: number };
+        scale: { x: number; y: number; z: number };
+      };
+      visible: boolean;
+    }>;
     locale: null;
     extensions: Record<string, unknown>;
   }>;
@@ -63,7 +71,7 @@ function minimalDoc(): MinimalDocument {
       {
         id: 'page-1',
         name: 'Default',
-        overrides: [],
+        elements: [],
         locale: null,
         extensions: {},
       },

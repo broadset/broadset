@@ -512,59 +512,83 @@ Every document carries a `dataSchema` declaring its data contract. See [data-sch
 
 ---
 
-## 10. Pages (Override Layers)
+## 10. Pages (Layout Instances)
 
-Pages are **data override layers** — NOT independent artboards. Elements live on the document; pages carry per-element overrides.
+Pages define layout variants by explicitly specifying which template elements are used on each page and their per-page transform and visibility properties. Elements are defined once as templates on the document; pages list instances of those elements with page-specific transform and visibility.
 
 ```jsonc
 {
   "pages": [
     {
-      "id": "page-default",
-      "name": "Default",
-      "overrides": [],
-      "locale": null,
-      "extensions": {},
-    },
-    {
-      "id": "page-halftime",
-      "name": "Half-Time",
-      "overrides": [
+      "id": "page-layout-a",
+      "name": "Layout A",
+      "elements": [
         {
           "elementId": "el-title",
-          "content": "<b>HALF-TIME</b>",
-          "style": { "fontColor": "#ffcc00" },
+          "transform": {
+            "position": { "x": 100, "y": 50, "z": 0 },
+            "rotation": { "x": 0, "y": 0, "z": 0 },
+            "scale": { "x": 1, "y": 1, "z": 1 },
+          },
+          "visible": true,
         },
         {
           "elementId": "el-subtitle",
-          "visible": false,
+          "transform": {
+            "position": { "x": 100, "y": 160, "z": 0 },
+            "rotation": { "x": 0, "y": 0, "z": 0 },
+            "scale": { "x": 1, "y": 1, "z": 1 },
+          },
+          "visible": true,
         },
       ],
-      "locale": null,
+      "locale": "en-US",
+      "extensions": {},
+    },
+    {
+      "id": "page-layout-b",
+      "name": "Layout B",
+      "elements": [
+        {
+          "elementId": "el-title",
+          "transform": {
+            "position": { "x": 150, "y": 100, "z": 0 },
+            "rotation": { "x": 0, "y": 0, "z": 0 },
+            "scale": { "x": 0.75, "y": 1.2, "z": 1 },
+          },
+          "visible": true,
+        },
+      ],
+      "locale": "en-US",
     },
   ],
 }
 ```
 
-| Field        | Type                      | Required | Description                           |
-| ------------ | ------------------------- | -------- | ------------------------------------- |
-| `id`         | `string`                  | Yes      | Unique page ID within document.       |
-| `name`       | `string`                  | Yes      | Human-readable name.                  |
-| `overrides`  | `ElementOverride[]`       | Yes      | Per-element overrides (can be empty). |
-| `locale`     | `string \| null`          | No       | BCP 47 language tag for localization. |
-| `extensions` | `Record<string, unknown>` | No       | Vendor extensions.                    |
+| Field        | Type                      | Required | Description                                         |
+| ------------ | ------------------------- | -------- | --------------------------------------------------- |
+| ------------ | ------------------------- | -------- | --------------------------------------------------  |
+| `id`         | `string`                  | Yes      | Unique page ID within document.                     |
+| `name`       | `string`                  | Yes      | Human-readable page name.                           |
+| `elements`   | `PageElementInstance[]`   | Yes      | Element instances used on this page (can be empty). |
+| `locale`     | `string \| null`          | No       | BCP 47 language tag for localization.               |
+| `extensions` | `Record<string, unknown>` | No       | Vendor extensions.                                  |
 
-**ElementOverride:**
+**PageElementInstance** — References a template element and specifies its layout on this page:
+| Field | Type | Required | Description |
+| ------------ | ---------------------- | -------- | -------------------------------------------------------------------- |
+| `elementId` | `string` | Yes | References element ID in document. |
+| `transform` | `PageElementTransform` | Yes | Per-page 3D transform (`position`, `rotation`, `scale` vectors). |
+| `visible` | `boolean` | Yes | Whether this instance is visible. |
 
-| Field       | Type                    | Required | Description                     |
-| ----------- | ----------------------- | -------- | ------------------------------- |
-| `elementId` | `string`                | Yes      | References element in document. |
-| `content`   | `string`                | No       | Override content.               |
-| `assetId`   | `string`                | No       | Override asset reference.       |
-| `visible`   | `boolean`               | No       | Override visibility.            |
-| `style`     | `Partial<ElementStyle>` | No       | Partial style override.         |
+**PageElementTransform**
+| Field | Type | Required | Description |
+| ----------- | --------- | -------- | ---------------------------------------------------- |
+| `position` | `Vector3` | Yes | Position offset relative to canvas origin. |
+| `rotation` | `Vector3` | Yes | Rotation in degrees for x, y, and z axes. |
+| `scale` | `Vector3` | Yes | Scale multipliers for x, y, and z axes (template-driven sizing). |
 
----
+## **Hierarchy:** Pages list only root-level elements. Children inherit parentId from template and are positioned relative to parent.
 
 ## 11. Animations
 

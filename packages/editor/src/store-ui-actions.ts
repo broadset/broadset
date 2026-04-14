@@ -88,7 +88,7 @@ function createPage(name: string): Page {
   return {
     id: crypto.randomUUID(),
     name,
-    overrides: [],
+    elements: [],
     locale: null,
     extensions: {},
   };

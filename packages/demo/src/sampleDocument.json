@@ -2559,25 +2559,518 @@
       {
         "id": "page-match-live",
         "name": "Match — Live",
-        "overrides": [],
+        "elements": [
+          {
+            "elementId": "el-top-gradient",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-bottom-gradient",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 880,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-scorebug",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-live-badge-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 120,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-event-tag-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 156,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-network-bug",
+            "transform": {
+              "position": {
+                "x": 1808,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-l3-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 828,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-stats-bg",
+            "transform": {
+              "position": {
+                "x": 1232,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-replay-window",
+            "transform": {
+              "position": {
+                "x": 1232,
+                "y": 524,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-promo-bg",
+            "transform": {
+              "position": {
+                "x": 1632,
+                "y": 900,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-ticker-bg",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 1040,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-top-rule",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 200,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          }
+        ],
         "locale": "en-GB",
         "extensions": {}
       },
       {
         "id": "page-match-player",
         "name": "Match — Player Card",
-        "overrides": [
+        "elements": [
           {
-            "elementId": "el-replay-window",
-            "visible": false
+            "elementId": "el-top-gradient",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           },
           {
-            "elementId": "el-replay-label",
-            "visible": false
+            "elementId": "el-bottom-gradient",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 880,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-scorebug",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-live-badge-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 120,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-event-tag-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 156,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-network-bug",
+            "transform": {
+              "position": {
+                "x": 1808,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-l3-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 828,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           },
           {
             "elementId": "el-stats-bg",
+            "transform": {
+              "position": {
+                "x": 1232,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
             "visible": false
+          },
+          {
+            "elementId": "el-replay-window",
+            "transform": {
+              "position": {
+                "x": 1232,
+                "y": 524,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": false
+          },
+          {
+            "elementId": "el-promo-bg",
+            "transform": {
+              "position": {
+                "x": 1632,
+                "y": 900,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-ticker-bg",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 1040,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-top-rule",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 200,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           }
         ],
         "locale": "en-GB",
@@ -2586,18 +3079,258 @@
       {
         "id": "page-match-stats",
         "name": "Match — Statistics",
-        "overrides": [
+        "elements": [
           {
-            "elementId": "el-replay-window",
-            "visible": false
+            "elementId": "el-top-gradient",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           },
           {
-            "elementId": "el-replay-label",
-            "visible": false
+            "elementId": "el-bottom-gradient",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 880,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-scorebug",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-live-badge-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 120,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-event-tag-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 156,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-network-bug",
+            "transform": {
+              "position": {
+                "x": 1808,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           },
           {
             "elementId": "el-l3-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 828,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
             "visible": false
+          },
+          {
+            "elementId": "el-stats-bg",
+            "transform": {
+              "position": {
+                "x": 1232,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-replay-window",
+            "transform": {
+              "position": {
+                "x": 1232,
+                "y": 524,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": false
+          },
+          {
+            "elementId": "el-promo-bg",
+            "transform": {
+              "position": {
+                "x": 1632,
+                "y": 900,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-ticker-bg",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 1040,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-top-rule",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 200,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           }
         ],
         "locale": "en-GB",
@@ -2606,26 +3339,258 @@
       {
         "id": "page-replay",
         "name": "Replay",
-        "overrides": [
+        "elements": [
+          {
+            "elementId": "el-top-gradient",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-bottom-gradient",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 880,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-scorebug",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-live-badge-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 120,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-event-tag-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 156,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": false
+          },
+          {
+            "elementId": "el-network-bug",
+            "transform": {
+              "position": {
+                "x": 1808,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
           {
             "elementId": "el-l3-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 828,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
             "visible": false
           },
           {
             "elementId": "el-stats-bg",
+            "transform": {
+              "position": {
+                "x": 1232,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
             "visible": false
           },
           {
-            "elementId": "el-replay-label",
+            "elementId": "el-replay-window",
+            "transform": {
+              "position": {
+                "x": 1232,
+                "y": 524,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
             "visible": true
           },
           {
-            "elementId": "el-ticker-tag-text",
-            "content": "<b>REPLAY</b>"
+            "elementId": "el-promo-bg",
+            "transform": {
+              "position": {
+                "x": 1632,
+                "y": 900,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           },
           {
-            "elementId": "el-event-tag-bg",
-            "visible": false
+            "elementId": "el-ticker-bg",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 1040,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-top-rule",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 200,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           }
         ],
         "locale": "en-GB",
@@ -2634,30 +3599,258 @@
       {
         "id": "page-halftime",
         "name": "Half-Time",
-        "overrides": [
+        "elements": [
           {
-            "elementId": "el-replay-window",
-            "visible": false
+            "elementId": "el-top-gradient",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           },
           {
-            "elementId": "el-replay-label",
-            "visible": false
+            "elementId": "el-bottom-gradient",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 880,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           },
           {
-            "elementId": "el-l3-bg",
-            "visible": false
+            "elementId": "el-scorebug",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-live-badge-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 120,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           },
           {
             "elementId": "el-event-tag-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 156,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
             "visible": false
           },
           {
-            "elementId": "el-sb-half-label",
-            "content": "HALF-TIME"
+            "elementId": "el-network-bug",
+            "transform": {
+              "position": {
+                "x": 1808,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           },
           {
-            "elementId": "el-ticker-tag-text",
-            "content": "<b>HALF-TIME</b>"
+            "elementId": "el-l3-bg",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 828,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": false
+          },
+          {
+            "elementId": "el-stats-bg",
+            "transform": {
+              "position": {
+                "x": 1232,
+                "y": 36,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-replay-window",
+            "transform": {
+              "position": {
+                "x": 1232,
+                "y": 524,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": false
+          },
+          {
+            "elementId": "el-promo-bg",
+            "transform": {
+              "position": {
+                "x": 1632,
+                "y": 900,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-ticker-bg",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 1040,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-top-rule",
+            "transform": {
+              "position": {
+                "x": 48,
+                "y": 200,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           }
         ],
         "locale": "en-GB",
@@ -3322,17 +4515,560 @@
       {
         "id": "page-social-live",
         "name": "Social — Live",
-        "overrides": [],
+        "elements": [
+          {
+            "elementId": "el-s-top-accent",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-bg-glow",
+            "transform": {
+              "position": {
+                "x": 240,
+                "y": 480,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-title",
+            "transform": {
+              "position": {
+                "x": 80,
+                "y": 180,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-league",
+            "transform": {
+              "position": {
+                "x": 80,
+                "y": 280,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-home-crest",
+            "transform": {
+              "position": {
+                "x": 160,
+                "y": 480,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-home-name",
+            "transform": {
+              "position": {
+                "x": 60,
+                "y": 620,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-score",
+            "transform": {
+              "position": {
+                "x": 240,
+                "y": 760,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-away-crest",
+            "transform": {
+              "position": {
+                "x": 800,
+                "y": 480,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-away-name",
+            "transform": {
+              "position": {
+                "x": 700,
+                "y": 620,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-vs-divider",
+            "transform": {
+              "position": {
+                "x": 440,
+                "y": 490,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-vs-text",
+            "transform": {
+              "position": {
+                "x": 480,
+                "y": 510,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-bottom-divider",
+            "transform": {
+              "position": {
+                "x": 340,
+                "y": 1020,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-goal-detail",
+            "transform": {
+              "position": {
+                "x": 80,
+                "y": 1060,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          }
+        ],
         "locale": "en-GB",
         "extensions": {}
       },
       {
         "id": "page-social-halftime",
         "name": "Social — Half-Time",
-        "overrides": [
+        "elements": [
+          {
+            "elementId": "el-s-top-accent",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-bg-glow",
+            "transform": {
+              "position": {
+                "x": 240,
+                "y": 480,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
           {
             "elementId": "el-s-title",
-            "content": "<b>HALF-TIME</b>"
+            "transform": {
+              "position": {
+                "x": 80,
+                "y": 180,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-league",
+            "transform": {
+              "position": {
+                "x": 80,
+                "y": 280,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-home-crest",
+            "transform": {
+              "position": {
+                "x": 160,
+                "y": 480,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-home-name",
+            "transform": {
+              "position": {
+                "x": 60,
+                "y": 620,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-score",
+            "transform": {
+              "position": {
+                "x": 240,
+                "y": 760,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-away-crest",
+            "transform": {
+              "position": {
+                "x": 800,
+                "y": 480,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-away-name",
+            "transform": {
+              "position": {
+                "x": 700,
+                "y": 620,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-vs-divider",
+            "transform": {
+              "position": {
+                "x": 440,
+                "y": 490,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-vs-text",
+            "transform": {
+              "position": {
+                "x": 480,
+                "y": 510,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-bottom-divider",
+            "transform": {
+              "position": {
+                "x": 340,
+                "y": 1020,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-goal-detail",
+            "transform": {
+              "position": {
+                "x": 80,
+                "y": 1060,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           }
         ],
         "locale": "en-GB",
@@ -3341,10 +5077,279 @@
       {
         "id": "page-social-fulltime",
         "name": "Social — Full-Time",
-        "overrides": [
+        "elements": [
+          {
+            "elementId": "el-s-top-accent",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-bg-glow",
+            "transform": {
+              "position": {
+                "x": 240,
+                "y": 480,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
           {
             "elementId": "el-s-title",
-            "content": "<b>FULL-TIME</b>"
+            "transform": {
+              "position": {
+                "x": 80,
+                "y": 180,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-league",
+            "transform": {
+              "position": {
+                "x": 80,
+                "y": 280,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-home-crest",
+            "transform": {
+              "position": {
+                "x": 160,
+                "y": 480,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-home-name",
+            "transform": {
+              "position": {
+                "x": 60,
+                "y": 620,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-score",
+            "transform": {
+              "position": {
+                "x": 240,
+                "y": 760,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-away-crest",
+            "transform": {
+              "position": {
+                "x": 800,
+                "y": 480,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-away-name",
+            "transform": {
+              "position": {
+                "x": 700,
+                "y": 620,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-vs-divider",
+            "transform": {
+              "position": {
+                "x": 440,
+                "y": 490,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-vs-text",
+            "transform": {
+              "position": {
+                "x": 480,
+                "y": 510,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-bottom-divider",
+            "transform": {
+              "position": {
+                "x": 340,
+                "y": 1020,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
+          },
+          {
+            "elementId": "el-s-goal-detail",
+            "transform": {
+              "position": {
+                "x": 80,
+                "y": 1060,
+                "z": 0
+              },
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            },
+            "visible": true
           }
         ],
         "locale": "en-GB",

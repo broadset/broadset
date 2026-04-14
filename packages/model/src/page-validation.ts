@@ -6,17 +6,17 @@ interface ParentLinkedItem extends IdentifiedItem {
   readonly parentId: string | null;
 }
 
-interface PageOverrideRef {
+interface PageElementRef {
   readonly elementId: string;
 }
 
-interface OverridePage {
-  readonly overrides: readonly PageOverrideRef[];
+interface InstancePage {
+  readonly elements: readonly PageElementRef[];
 }
 
-interface OverrideDocument {
-  readonly elements: readonly IdentifiedItem[];
-  readonly pages: readonly OverridePage[];
+interface InstanceDocument {
+  readonly elements: readonly ParentLinkedItem[];
+  readonly pages: readonly InstancePage[];
 }
 
 /** Returns true when all item IDs in the collection are unique. */
@@ -72,13 +72,13 @@ export function hasAcyclicParentIds(items: readonly ParentLinkedItem[]): boolean
   return true;
 }
 
-/** Returns true when every page override references an element defined on the document. */
-export function hasValidPageOverrideReferences(document: OverrideDocument): boolean {
-  const elementIds = new Set(document.elements.map((element) => element.id));
+/** Returns true when every page element reference points to a root-level element on the document. */
+export function hasValidPageElementReferences(document: InstanceDocument): boolean {
+  const rootElementIds = new Set(document.elements.filter((element) => element.parentId === null).map((el) => el.id));
 
   for (const page of document.pages) {
-    for (const override of page.overrides) {
-      if (!elementIds.has(override.elementId)) {
+    for (const elementRef of page.elements) {
+      if (!rootElementIds.has(elementRef.elementId)) {
         return false;
       }
     }

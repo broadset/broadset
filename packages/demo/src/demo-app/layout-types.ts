@@ -81,6 +81,7 @@ export interface DemoAppLayoutProps {
   readonly pasteClipboardElements: () => void;
   readonly placementLabel: string;
   readonly pushToast: (severity: 'error' | 'info' | 'success', message: string) => void;
+  readonly renderDocument: BroadsetDocument;
   readonly resetToken: number;
   readonly resolutionLabel: string;
   readonly selectedElement: BroadsetElement | null;

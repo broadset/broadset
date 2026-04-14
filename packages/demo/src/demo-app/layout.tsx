@@ -26,6 +26,7 @@ export function DemoAppLayout(props: DemoAppLayoutProps): React.JSX.Element {
     handleImportFileChange,
     horizontalTicks,
     isPlaying,
+    renderDocument,
     resetToken,
     selectedElement,
     verticalTicks,
@@ -109,8 +110,9 @@ export function DemoAppLayout(props: DemoAppLayoutProps): React.JSX.Element {
                     }}
                   >
                     <ScreenPreview
+                      allElements={currentDocument.elements}
                       cursor={editorState.pendingPlacementType === null ? 'default' : 'crosshair'}
-                      documentData={currentDocument}
+                      documentData={renderDocument}
                       isPlaying={isPlaying}
                       onPlaybackControllerChange={props.setPreviewPlaybackController}
                       panX={editorState.canvasSettings.panX}

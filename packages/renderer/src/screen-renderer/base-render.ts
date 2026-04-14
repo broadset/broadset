@@ -57,6 +57,10 @@ function toDegreeValue(value: number): string {
   return `${String(value)}deg`;
 }
 
+const CHECKER_SIZE_PX = 16;
+const CHECKER_LIGHT = '#d5d7dc';
+const CHECKER_DARK = '#b8bcc4';
+
 class DOMScreenRenderer implements ScreenRendererController {
   readonly host: HTMLElement;
 
@@ -143,10 +147,29 @@ class DOMScreenRenderer implements ScreenRendererController {
     this.canvasRoot.style.width = toPixelValue(documentData.canvas.width);
     this.canvasRoot.style.height = toPixelValue(documentData.canvas.height);
     this.canvasRoot.style.background = '';
-    this.canvasRoot.style.backgroundColor =
-      documentData.canvas.backgroundMode === 'solid' ?
-        (documentData.canvas.backgroundColor ?? '#0f172a')
-      : 'transparent';
+
+    if (documentData.canvas.backgroundMode === 'solid') {
+      this.canvasRoot.style.backgroundColor = documentData.canvas.backgroundColor ?? '#0f172a';
+      this.canvasRoot.style.backgroundImage = '';
+
+      return;
+    }
+
+    this.canvasRoot.style.backgroundColor = CHECKER_LIGHT;
+    this.canvasRoot.style.backgroundImage =
+      `linear-gradient(45deg, ${CHECKER_DARK} 25%, transparent 25%), ` +
+      `linear-gradient(-45deg, ${CHECKER_DARK} 25%, transparent 25%), ` +
+      `linear-gradient(45deg, transparent 75%, ${CHECKER_DARK} 75%), ` +
+      `linear-gradient(-45deg, transparent 75%, ${CHECKER_DARK} 75%)`;
+    this.canvasRoot.style.backgroundSize =
+      `${String(CHECKER_SIZE_PX)}px ${String(CHECKER_SIZE_PX)}px, ` +
+      `${String(CHECKER_SIZE_PX)}px ${String(CHECKER_SIZE_PX)}px, ` +
+      `${String(CHECKER_SIZE_PX)}px ${String(CHECKER_SIZE_PX)}px, ` +
+      `${String(CHECKER_SIZE_PX)}px ${String(CHECKER_SIZE_PX)}px`;
+    this.canvasRoot.style.backgroundPosition =
+      `0 0, 0 ${String(CHECKER_SIZE_PX / 2)}px, ` +
+      `${String(CHECKER_SIZE_PX / 2)}px ${String(-CHECKER_SIZE_PX / 2)}px, ` +
+      `${String(-CHECKER_SIZE_PX / 2)}px 0`;
   }
 
   private renderDocument(documentData: BroadsetDocument): void {

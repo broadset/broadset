@@ -39,7 +39,7 @@ export function makeDocument(overrides: Partial<BroadsetDocument> = {}): Broadse
     documentMode: 'screen',
     canvas: makeCanvas(),
     elements: [],
-    pages: [{ id: 'page-1', name: 'Page 1', overrides: [], locale: null, extensions: {} }],
+    pages: [{ id: 'page-1', name: 'Page 1', elements: [], locale: null, extensions: {} }],
     animations: [],
     dataSchema: { fields: [] },
     ...overrides,

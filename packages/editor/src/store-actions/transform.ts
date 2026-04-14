@@ -1,4 +1,4 @@
-import type { BroadsetDocument, BroadsetElement, ElementOverride } from '@broadset/model';
+import type { BroadsetDocument, BroadsetElement, PageElementInstance, Vector3 } from '@broadset/model';
 
 import type { ElementUpdate } from './store';
 
@@ -59,26 +59,98 @@ export function collectDescendantIds(document: BroadsetDocument, rootElementId: 
   return collectedIds;
 }
 
-export function toggleOverrideVisibility(
-  pageOverrides: readonly ElementOverride[],
+export function applyPageInstanceTransformUpdate(
+  document: BroadsetDocument,
+  activePageIndex: number,
   elementId: string,
-): readonly ElementOverride[] {
-  const overrideIndex = pageOverrides.findIndex((override) => override.elementId === elementId);
+  updates: {
+    readonly position?: { readonly x: number; readonly y: number };
+    readonly rotation?: number;
+  },
+): BroadsetDocument {
+  const { pages } = document;
 
-  if (overrideIndex === -1) {
-    return [...pageOverrides, { elementId, visible: false }];
+  if (activePageIndex < 0 || activePageIndex >= pages.length) {
+    return document;
   }
 
-  return pageOverrides.map((override, index) => {
-    if (index !== overrideIndex) {
-      return override;
+  const page = pages[activePageIndex];
+
+  if (page === undefined) {
+    return document;
+  }
+
+  const instanceIndex = page.elements.findIndex((inst) => inst.elementId === elementId);
+
+  if (instanceIndex === -1) {
+    return document;
+  }
+
+  const instance = page.elements[instanceIndex];
+
+  if (instance === undefined) {
+    return document;
+  }
+
+  const nextPosition: Vector3 =
+    updates.position !== undefined ?
+      { ...instance.transform.position, x: updates.position.x, y: updates.position.y }
+    : instance.transform.position;
+  const nextRotation: Vector3 =
+    updates.rotation !== undefined ?
+      { ...instance.transform.rotation, z: updates.rotation }
+    : instance.transform.rotation;
+  const nextTransform = { ...instance.transform, position: nextPosition, rotation: nextRotation };
+
+  return {
+    ...document,
+    pages: pages.map((p, idx) =>
+      idx !== activePageIndex ? p : (
+        {
+          ...p,
+          elements: p.elements.map((inst, instIdx) =>
+            instIdx !== instanceIndex ? inst : { ...inst, transform: nextTransform },
+          ),
+        }
+      ),
+    ),
+  };
+}
+
+export function applyPageInstancePositionBatch(
+  document: BroadsetDocument,
+  activePageIndex: number,
+  updates: ReadonlyArray<{ readonly elementId: string; readonly position: { readonly x: number; readonly y: number } }>,
+): BroadsetDocument {
+  let result = document;
+
+  for (const update of updates) {
+    result = applyPageInstanceTransformUpdate(result, activePageIndex, update.elementId, {
+      position: update.position,
+    });
+  }
+
+  return result;
+}
+
+export function togglePageElementVisibility(
+  pageElements: readonly PageElementInstance[],
+  elementId: string,
+): readonly PageElementInstance[] {
+  const elementIndex = pageElements.findIndex((element) => element.elementId === elementId);
+
+  if (elementIndex === -1) {
+    return pageElements;
+  }
+
+  return pageElements.map((element, index) => {
+    if (index !== elementIndex) {
+      return element;
     }
 
-    const currentVisible = override.visible ?? true;
-
     return {
-      ...override,
-      visible: !currentVisible,
+      ...element,
+      visible: !element.visible,
     };
   });
 }

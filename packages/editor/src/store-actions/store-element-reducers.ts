@@ -136,7 +136,7 @@ export function computeRemoveElementState(
       ),
     pages: state.document.pages.map((page) => ({
       ...page,
-      overrides: page.overrides.filter((override) => !deletedIds.has(override.elementId)),
+      elements: page.elements.filter((element) => !deletedIds.has(element.elementId)),
     })),
   };
 
@@ -193,7 +193,7 @@ export function computeRemoveElementsState(
       ),
     pages: state.document.pages.map((page) => ({
       ...page,
-      overrides: page.overrides.filter((override) => !allDeletedIds.has(override.elementId)),
+      elements: page.elements.filter((element) => !allDeletedIds.has(element.elementId)),
     })),
   };
 

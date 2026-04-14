@@ -2,6 +2,7 @@ import type {
   BroadsetDocument,
   BroadsetElement,
   ElementAnimationConfig,
+  PageElementInstance,
   TemplateGroup,
   TemplateGroupRole,
   Timeline,
@@ -27,6 +28,7 @@ export interface DemoSidebarPanelProps {
   readonly activeElementIds: readonly string[];
   readonly selectedElement: BroadsetElement | null;
   readonly currentDocumentMode: BroadsetDocument['documentMode'];
+  readonly selectedElementInstance: PageElementInstance | null;
   readonly preflightIssues: readonly PreflightIssue[];
   readonly templateGroups: readonly TemplateGroup[];
   readonly availableDocuments: readonly {
@@ -48,6 +50,7 @@ export interface DemoSidebarPanelProps {
   readonly onRemoveElement: (elementId: string) => void;
   readonly onSelectElement: (elementId: string) => void;
   readonly onToggleLock: (elementId: string) => void;
+  readonly onReorderLayers: (dragId: string, targetId: string, position: 'before' | 'inside' | 'after') => void;
   readonly onToggleVisibility: (elementId: string) => void;
   readonly onUpdateProperty: (key: string, value: PropertyValue) => void;
   readonly onAnimationAddModifierBinding: () => void;
@@ -83,6 +86,7 @@ export function DemoSidebarPanel({
   onRemoveElement,
   onSelectElement,
   onToggleLock,
+  onReorderLayers,
   onToggleVisibility,
   onUpdateProperty,
   onAnimationAddModifierBinding,
@@ -100,6 +104,7 @@ export function DemoSidebarPanel({
   preflightIssues,
   selectedElement,
   setEditingTimeline,
+  selectedElementInstance,
   setEditingTimelineSelectedKf,
   sidebarTab,
   templateGroups,
@@ -115,6 +120,7 @@ export function DemoSidebarPanel({
         onSelect={(elementId, _mode) => {
           onSelectElement(elementId);
         }}
+        onReorder={onReorderLayers}
         onToggleLock={onToggleLock}
         onToggleVisibility={onToggleVisibility}
       />
@@ -125,7 +131,9 @@ export function DemoSidebarPanel({
     return (
       <PropertiesSidebar
         documentMode={currentDocumentMode}
-        elements={selectedElement === null ? [] : [toPanelElement(selectedElement)]}
+        elements={
+          selectedElement === null ? [] : [toPanelElement(selectedElement, selectedElementInstance ?? undefined)]
+        }
         onUpdate={onUpdateProperty}
       />
     );
@@ -134,7 +142,9 @@ export function DemoSidebarPanel({
   if (sidebarTab === 'animation') {
     return (
       <AnimationSidebar
-        element={selectedElement === null ? null : toPanelElement(selectedElement)}
+        element={
+          selectedElement === null ? null : toPanelElement(selectedElement, selectedElementInstance ?? undefined)
+        }
         isLocked={selectedElement?.locked ?? false}
         animationsEnabled
         timelines={animationConfig?.timelines.map((t) => ({

@@ -7,6 +7,18 @@ import {
   createEmptyBroadsetDocument,
 } from './index';
 
+function makePageElementInstance(elementId: string): Record<string, unknown> {
+  return {
+    elementId,
+    transform: {
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+    },
+    visible: true,
+  };
+}
+
 /** @description Helper to build a minimal valid current-format document for mutation tests. */
 function makeValidDoc(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   const base = createEmptyBroadsetDocument();
@@ -18,7 +30,7 @@ function makeValidDoc(overrides: Record<string, unknown> = {}): Record<string, u
     canvas: { ...base.canvas },
     elements: [...base.elements],
     animations: [...base.animations],
-    pages: base.pages.map((page) => ({ ...page, overrides: [...page.overrides] })),
+    pages: base.pages.map((page) => ({ ...page, elements: [...page.elements] })),
     dataSchema: { ...base.dataSchema, fields: [...base.dataSchema.fields] },
     ...overrides,
   };
@@ -129,7 +141,7 @@ describe('Page and element structure', () => {
     const doc = createEmptyBroadsetDocument();
 
     expect(doc.pages).toHaveLength(1);
-    expect(doc.pages[0]?.overrides).toEqual([]);
+    expect(doc.pages[0]?.elements).toEqual([]);
     expect(doc.elements).toEqual([]);
     expect(broadsetDocumentSchema.safeParse(makeValidDoc({ pages: [] })).success).toBe(false);
   });
@@ -148,7 +160,7 @@ describe('Page and element structure', () => {
   });
 });
 
-/** @description Element ids, geometry, and page override references must remain internally consistent. */
+/** @description Element ids, geometry, and page element references must remain internally consistent. */
 describe('Element integrity rules', () => {
   /** @description Duplicate ids in the document-level element array must be rejected. */
   it('rejects duplicate element IDs in the document', () => {
@@ -195,8 +207,8 @@ describe('Element integrity rules', () => {
     ).toBe(false);
   });
 
-  /** @description Page overrides must reference existing document-level elements. */
-  it('rejects page overrides for missing elements', () => {
+  /** @description Page element instances must reference existing root document elements. */
+  it('rejects page instances for missing elements', () => {
     const result = broadsetDocumentSchema.safeParse(
       makeValidDoc({
         elements: [createDefaultElement('text', { id: 'title' })],
@@ -204,7 +216,7 @@ describe('Element integrity rules', () => {
           {
             id: 'page-1',
             name: 'Default',
-            overrides: [{ elementId: 'subtitle', content: 'Hidden' }],
+            elements: [makePageElementInstance('subtitle')],
             locale: null,
             extensions: {},
           },
@@ -223,7 +235,7 @@ describe('No hard page or element limits', () => {
     const pages = Array.from({ length: 200 }, (_, index) => ({
       id: `p${String(index)}`,
       name: `Page ${String(index + 1)}`,
-      overrides: [],
+      elements: [],
       locale: null,
       extensions: {},
     }));

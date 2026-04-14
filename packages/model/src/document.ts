@@ -6,10 +6,9 @@ import { type OutputSpec, outputSpecSchema } from './output-spec';
 import {
   hasAcyclicParentIds,
   hasUniqueElementIds,
-  hasValidPageOverrideReferences,
+  hasValidPageElementReferences,
   hasValidParentIds,
 } from './page-validation';
-import type { BroadsetElementStyle } from './style';
 
 export interface SafeAreas {
   readonly actionSafe?: readonly [number, number, number, number] | undefined;
@@ -33,18 +32,28 @@ export interface Canvas {
   readonly safeAreas?: SafeAreas | undefined;
 }
 
-export interface ElementOverride {
+export interface Vector3 {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+
+export interface PageElementTransform {
+  readonly position: Vector3;
+  readonly rotation: Vector3;
+  readonly scale: Vector3;
+}
+
+export interface PageElementInstance {
   readonly elementId: string;
-  readonly content?: string | undefined;
-  readonly assetId?: string | undefined;
-  readonly visible?: boolean | undefined;
-  readonly style?: Partial<BroadsetElementStyle> | undefined;
+  readonly transform: PageElementTransform;
+  readonly visible: boolean;
 }
 
 export interface Page {
   readonly id: string;
   readonly name: string;
-  readonly overrides: readonly ElementOverride[];
+  readonly elements: readonly PageElementInstance[];
   readonly locale: string | null;
   readonly extensions: Readonly<Record<string, unknown>>;
 }
@@ -114,18 +123,28 @@ const canvasSchema = z.object({
   safeAreas: safeAreasSchema.optional(),
 });
 
-const elementOverrideSchema: z.ZodType<ElementOverride> = z.object({
+const vector3Schema: z.ZodType<Vector3> = z.object({
+  x: z.number(),
+  y: z.number(),
+  z: z.number(),
+});
+
+const pageElementTransformSchema: z.ZodType<PageElementTransform> = z.object({
+  position: vector3Schema,
+  rotation: vector3Schema,
+  scale: vector3Schema,
+});
+
+const pageElementInstanceSchema: z.ZodType<PageElementInstance> = z.object({
   elementId: z.string().min(1),
-  content: z.string().optional(),
-  assetId: z.string().optional(),
-  visible: z.boolean().optional(),
-  style: z.record(z.string(), z.unknown()).optional(),
+  transform: pageElementTransformSchema,
+  visible: z.boolean(),
 });
 
 const pageSchema: z.ZodType<Page> = z.object({
   id: z.string().min(1),
   name: z.string().default('Page'),
-  overrides: z.array(elementOverrideSchema),
+  elements: z.array(pageElementInstanceSchema),
   locale: z.string().nullable().default(null),
   extensions: z.record(z.string(), z.unknown()).default({}),
 });
@@ -211,10 +230,10 @@ export const broadsetDocumentSchema: z.ZodType<BroadsetDocument> = z
       });
     }
 
-    if (!hasValidPageOverrideReferences({ elements: effectiveElements, pages: value.pages })) {
+    if (!hasValidPageElementReferences({ elements: effectiveElements, pages: value.pages })) {
       context.addIssue({
         code: 'custom',
-        message: 'Page overrides must reference elements defined on the document',
+        message: 'Page elements must reference document root elements',
         path: ['pages'],
       });
     }
@@ -253,7 +272,7 @@ export function createEmptyBroadsetDocument(): BroadsetDocument {
       {
         id: 'page-1',
         name: 'Default',
-        overrides: [],
+        elements: [],
         locale: null,
         extensions: {},
       },

@@ -49,7 +49,7 @@ export function createDocument(elements: readonly BroadsetElement[]): BroadsetDo
     },
     elements,
     animations: [],
-    pages: [{ id: 'page-1', name: 'Default', overrides: [], locale: null, extensions: {} }],
+    pages: [{ id: 'page-1', name: 'Default', elements: [], locale: null, extensions: {} }],
     dataSchema: { fields: [] },
     extensions: {},
   };

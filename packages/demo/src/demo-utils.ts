@@ -4,7 +4,7 @@ import {
   broadsetDocumentSchema,
   type BroadsetElement,
   type BroadsetProject,
-  type ElementOverride,
+  type PageElementInstance,
 } from '@broadset/model';
 import type { LayerInfo, PanelElement } from '@broadset/ui';
 
@@ -82,61 +82,101 @@ export function loadSavedDocument(): BroadsetDocument {
   }
 }
 
-function stripVisibilityOverride(override: ElementOverride): ElementOverride {
-  const { visible: _visible, ...rest } = override;
-
-  return rest;
-}
-
 export function normalizeDocumentForEditMode(document: BroadsetDocument): BroadsetDocument {
-  return {
-    ...document,
-    pages: document.pages.map((page) => ({
-      ...page,
-      overrides: page.overrides.map(stripVisibilityOverride),
-    })),
-  };
+  return document;
 }
 
-function buildOverrideMap(page: BroadsetDocument['pages'][number] | undefined): ReadonlyMap<string, ElementOverride> {
-  return new Map((page?.overrides ?? []).map((override) => [override.elementId, override]));
+function buildPageElementInstanceMap(
+  page: BroadsetDocument['pages'][number] | undefined,
+): ReadonlyMap<string, PageElementInstance> {
+  return new Map((page?.elements ?? []).map((instance) => [instance.elementId, instance]));
 }
 
-function resolveElementVisibility(args: {
-  readonly element: BroadsetElement;
-  readonly elementsById: ReadonlyMap<string, BroadsetElement>;
-  readonly overrideMap: ReadonlyMap<string, ElementOverride>;
-}): boolean {
-  let currentElement: BroadsetElement | undefined = args.element;
+function buildVisibleRootElementIds(args: {
+  readonly page: BroadsetDocument['pages'][number] | undefined;
+  readonly rootElements: readonly BroadsetElement[];
+}): ReadonlySet<string> {
+  const instanceMap = buildPageElementInstanceMap(args.page);
+  const visibleIds = new Set<string>();
 
-  while (currentElement !== undefined) {
-    const override = args.overrideMap.get(currentElement.id);
+  for (const rootElement of args.rootElements) {
+    const instance = instanceMap.get(rootElement.id);
 
-    if (override?.visible === false) {
-      return false;
+    if (instance === undefined) {
+      continue;
     }
 
-    if (currentElement.parentId === null) {
-      return true;
+    if (instance.visible) {
+      visibleIds.add(rootElement.id);
     }
-
-    currentElement = args.elementsById.get(currentElement.parentId);
   }
 
-  return true;
+  return visibleIds;
 }
 
-function applyPageOverride(element: BroadsetElement, override: ElementOverride | undefined): BroadsetElement {
-  if (override === undefined) {
-    return element;
+function buildElementChildrenByParentId(
+  elements: readonly BroadsetElement[],
+): ReadonlyMap<string, readonly BroadsetElement[]> {
+  const map = new Map<string, BroadsetElement[]>();
+
+  for (const element of elements) {
+    if (element.parentId === null) {
+      continue;
+    }
+
+    const children = map.get(element.parentId) ?? [];
+
+    children.push(element);
+    map.set(element.parentId, children);
   }
 
-  return {
-    ...element,
-    ...(override.assetId !== undefined ? { assetId: override.assetId } : {}),
-    ...(override.content !== undefined ? { content: override.content } : {}),
-    ...(override.style !== undefined ? { style: { ...element.style, ...override.style } } : {}),
+  return new Map(Array.from(map.entries()).map(([key, value]) => [key, [...value]] as const));
+}
+
+function collectPageElements(args: {
+  readonly document: BroadsetDocument;
+  readonly page: BroadsetDocument['pages'][number] | undefined;
+}): readonly BroadsetElement[] {
+  const childrenByParentId = buildElementChildrenByParentId(args.document.elements);
+  const instanceMap = buildPageElementInstanceMap(args.page);
+  const rootElements = args.document.elements.filter((element) => element.parentId === null);
+  const visibleRootIds = buildVisibleRootElementIds({ page: args.page, rootElements });
+  const ordered: BroadsetElement[] = [];
+
+  const appendSubtree = (element: BroadsetElement): void => {
+    ordered.push(element);
+
+    const children = childrenByParentId.get(element.id) ?? [];
+
+    for (const child of children) {
+      appendSubtree(child);
+    }
   };
+
+  for (const rootElement of rootElements) {
+    if (!visibleRootIds.has(rootElement.id)) {
+      continue;
+    }
+
+    const instance = instanceMap.get(rootElement.id);
+
+    if (instance === undefined) {
+      continue;
+    }
+
+    appendSubtree({
+      ...rootElement,
+      position: {
+        x: instance.transform.position.x,
+        y: instance.transform.position.y,
+      },
+      rotation: instance.transform.rotation.z,
+      width: rootElement.width * instance.transform.scale.x,
+      height: rootElement.height * instance.transform.scale.y,
+    });
+  }
+
+  return ordered;
 }
 
 type ProjectAsset = BroadsetProject['assets'][number];
@@ -159,8 +199,7 @@ export function buildRenderableDocumentForActivePage(
   assets: readonly ProjectAsset[] = [],
 ): BroadsetDocument {
   const activePage = document.pages[activePageIndex] ?? document.pages[0];
-  const overrideMap = buildOverrideMap(activePage);
-  const elementsById = new Map(document.elements.map((element) => [element.id, element]));
+  const pageElements = collectPageElements({ document, page: activePage });
   const assetContentById = new Map(
     assets
       .map((asset) => [asset.id, resolveAssetContent(asset)] as const)
@@ -169,27 +208,22 @@ export function buildRenderableDocumentForActivePage(
 
   return {
     ...document,
-    elements: document.elements
-      .filter((element) => resolveElementVisibility({ element, elementsById, overrideMap }))
-      .map((element) => {
-        const overriddenElement = applyPageOverride(element, overrideMap.get(element.id));
+    elements: pageElements.map((element) => {
+      if (element.type !== 'image' || element.content.trim() !== '') {
+        return element;
+      }
 
-        if (overriddenElement.type !== 'image' || overriddenElement.content.trim() !== '') {
-          return overriddenElement;
-        }
+      const resolvedContent = element.assetId === null ? undefined : assetContentById.get(element.assetId);
 
-        const resolvedContent =
-          overriddenElement.assetId === null ? undefined : assetContentById.get(overriddenElement.assetId);
+      if (resolvedContent === undefined) {
+        return element;
+      }
 
-        if (resolvedContent === undefined) {
-          return overriddenElement;
-        }
-
-        return {
-          ...overriddenElement,
-          content: resolvedContent,
-        };
-      }),
+      return {
+        ...element,
+        content: resolvedContent,
+      };
+    }),
   };
 }
 
@@ -221,8 +255,8 @@ export function getElementWorldPosition(
 
 export function buildLayerInfoList(document: BroadsetDocument, activePageIndex: number): readonly LayerInfo[] {
   const activePage = document.pages[activePageIndex] ?? document.pages[0];
-  const overrideMap = buildOverrideMap(activePage);
   const elementsById = new Map(document.elements.map((element) => [element.id, element]));
+  const pageInstanceById = new Map((activePage?.elements ?? []).map((instance) => [instance.elementId, instance]));
   const childrenByParentId = new Map<string, readonly BroadsetElement[]>();
   const layerOrderIds = [...document.elements].reverse().map((element) => element.id);
   const layerOrderIndexById = new Map(layerOrderIds.map((id, index) => [id, index]));
@@ -276,26 +310,41 @@ export function buildLayerInfoList(document: BroadsetDocument, activePageIndex: 
     }
   };
 
-  const topLevelElements = [...document.elements]
-    .reverse()
-    .filter((element) => element.parentId === null || !elementsById.has(element.parentId));
+  const includedRootElements = (activePage?.elements ?? [])
+    .map((instance) => elementsById.get(instance.elementId))
+    .filter((element): element is BroadsetElement => element !== undefined && element.parentId === null)
+    .sort((left, right) => {
+      const leftIndex = layerOrderIndexById.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+      const rightIndex = layerOrderIndexById.get(right.id) ?? Number.MAX_SAFE_INTEGER;
 
-  for (const element of topLevelElements) {
+      return leftIndex - rightIndex;
+    });
+
+  for (const element of includedRootElements) {
     appendSubtree(element);
   }
 
-  for (const element of document.elements) {
-    appendSubtree(element);
-  }
+  const getLayerVisible = (element: BroadsetElement): boolean => {
+    let cursor: BroadsetElement | undefined = element;
+
+    while (cursor !== undefined && cursor.parentId !== null) {
+      cursor = elementsById.get(cursor.parentId);
+    }
+
+    if (cursor === undefined) {
+      return true;
+    }
+
+    return pageInstanceById.get(cursor.id)?.visible ?? true;
+  };
 
   return orderedElements.map((element) => {
     const depth = getDepth(element);
 
-    const override = overrideMap.get(element.id);
     const parentName =
       element.parentId === null ? undefined : (elementsById.get(element.parentId)?.name ?? 'Missing parent');
 
-    return toLayerInfo(element, override?.visible !== false, {
+    return toLayerInfo(element, getLayerVisible(element), {
       depth,
       expanded: true,
       hasChildren: (childrenByParentId.get(element.id)?.length ?? 0) > 0,
@@ -572,7 +621,7 @@ function normalizeBoxTuple(value: number | readonly number[] | undefined): reado
   return [0, 0, 0, 0];
 }
 
-export function toPanelElement(element: BroadsetElement): PanelElement {
+export function toPanelElement(element: BroadsetElement, instance?: PageElementInstance): PanelElement {
   const borderRadiusValue = normalizeBoxTuple(element.style.borderRadius);
   const paddingValue = normalizeBoxTuple(element.style.padding);
 
@@ -581,11 +630,11 @@ export function toPanelElement(element: BroadsetElement): PanelElement {
     type: element.type,
     name: element.name,
     content: element.content,
-    x: element.position.x,
-    y: element.position.y,
+    x: instance !== undefined ? instance.transform.position.x : element.position.x,
+    y: instance !== undefined ? instance.transform.position.y : element.position.y,
     width: element.width,
     height: element.height,
-    rotation: element.rotation,
+    rotation: instance !== undefined ? instance.transform.rotation.z : element.rotation,
     backgroundColor: element.style.backgroundColor ?? '',
     backgroundGradient:
       typeof element.style.backgroundGradient === 'string' ? element.style.backgroundGradient

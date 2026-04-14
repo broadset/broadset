@@ -185,6 +185,7 @@ export interface LayerInfo {
   readonly depth?: number | undefined;
   readonly hasChildren?: boolean | undefined;
   readonly expanded?: boolean | undefined;
+  readonly parentName?: string | undefined;
 }
 
 export interface PropertyFieldAdapter {

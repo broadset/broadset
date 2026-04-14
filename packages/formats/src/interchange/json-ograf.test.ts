@@ -56,9 +56,9 @@ describe('JSON Document Export', () => {
   it('preserves all pages in a multi-page document', () => {
     const doc = makeDocument({
       pages: [
-        { id: 'page-1', name: 'Intro', overrides: [], locale: null, extensions: {} },
-        { id: 'page-2', name: 'Main', overrides: [], locale: null, extensions: {} },
-        { id: 'page-3', name: 'Outro', overrides: [], locale: null, extensions: {} },
+        { id: 'page-1', name: 'Intro', elements: [], locale: null, extensions: {} },
+        { id: 'page-2', name: 'Main', elements: [], locale: null, extensions: {} },
+        { id: 'page-3', name: 'Outro', elements: [], locale: null, extensions: {} },
       ],
     });
     const project = makeProject([doc]);

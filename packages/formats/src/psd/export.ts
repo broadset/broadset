@@ -64,16 +64,26 @@ function exportPsdBytesCore(doc: BroadsetDocument): Uint8Array {
 
   if (doc.pages.length > 1) {
     const artboardLayers = [];
+    const elementsById = new Map(doc.elements.map((element) => [element.id, element]));
 
     for (const page of doc.pages) {
-      const visibleElements = doc.elements.filter((el) => {
-        const override = page.overrides.find((o) => o.elementId === el.id && o.visible !== undefined);
+      const pageInstanceById = new Map(page.elements.map((instance) => [instance.elementId, instance]));
+      const visibleElements = doc.elements.filter((element) => {
+        let current = element;
 
-        if (override?.visible !== undefined) {
-          return override.visible;
+        while (current.parentId !== null) {
+          const parent = elementsById.get(current.parentId);
+
+          if (parent === undefined) {
+            return false;
+          }
+
+          current = parent;
         }
 
-        return true;
+        const rootInstance = pageInstanceById.get(current.id);
+
+        return rootInstance?.visible === true;
       });
 
       artboardLayers.push({

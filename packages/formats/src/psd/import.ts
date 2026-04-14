@@ -258,7 +258,7 @@ export function importPsd(data: Uint8Array): BroadsetDocument {
   const pages: Array<{
     readonly id: string;
     readonly name: string;
-    readonly overrides: readonly [];
+    readonly elements: readonly [];
     readonly locale: null;
     readonly extensions: Readonly<Record<string, unknown>>;
   }> = [];
@@ -270,7 +270,7 @@ export function importPsd(data: Uint8Array): BroadsetDocument {
       pages.push({
         id: `page-${String(pages.length + 1)}`,
         name: artboard.name ?? `Page ${String(pages.length + 1)}`,
-        overrides: [],
+        elements: [],
         locale: null,
         extensions: {},
       });
@@ -285,7 +285,7 @@ export function importPsd(data: Uint8Array): BroadsetDocument {
     pages.push({
       id: 'page-1',
       name: 'Page 1',
-      overrides: [],
+      elements: [],
       locale: null,
       extensions: {},
     });

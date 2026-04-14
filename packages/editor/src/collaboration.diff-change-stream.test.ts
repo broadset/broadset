@@ -103,7 +103,7 @@ describe('diffDocuments - page and settings diffing', () => {
     const prev = { ...base };
     const next = {
       ...base,
-      pages: [...base.pages, { id: 'page-2', name: 'Second', overrides: [], locale: null, extensions: {} }],
+      pages: [...base.pages, { id: 'page-2', name: 'Second', elements: [], locale: null, extensions: {} }],
     };
 
     const changes = diffDocuments(prev, next);

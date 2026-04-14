@@ -9,6 +9,7 @@ export function LayoutSidebarShell(props: DemoAppLayoutProps): React.JSX.Element
 
   return (
     <aside
+      aria-hidden={!isSidebarOpen}
       className="absolute z-30"
       data-testid="demo-properties-sidebar"
       style={{
@@ -27,6 +28,7 @@ export function LayoutSidebarShell(props: DemoAppLayoutProps): React.JSX.Element
         top: `${String(SIDEBAR_TOP_OFFSET)}px`,
         transform: isSidebarOpen ? 'translateX(0)' : `translateX(calc(100% + ${sp('sp-04')}))`,
         transition: 'var(--transition-panel, transform 160ms ease)',
+        visibility: isSidebarOpen ? 'visible' : 'hidden',
         width: `${String(sidebarWidth)}px`,
       }}
     >
@@ -77,9 +79,11 @@ export function LayoutSidebarShell(props: DemoAppLayoutProps): React.JSX.Element
         </div>
       : null}
 
-      <div className="h-full overflow-auto" style={{ padding: `${sp('sp-02')} ${sp('sp-03')}` }}>
-        {sidebarPanel}
-      </div>
+      {isSidebarOpen ?
+        <div className="h-full overflow-auto" style={{ padding: `${sp('sp-02')} ${sp('sp-03')}` }}>
+          {sidebarPanel}
+        </div>
+      : null}
     </aside>
   );
 }

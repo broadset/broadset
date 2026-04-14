@@ -87,7 +87,7 @@ describe('applyRemoteChanges', () => {
   /** @description Applying a remote page:remove MUST remove the page from the document. */
   it('applies page:remove change', () => {
     const base = createEmptyBroadsetDocument();
-    const newPage = { id: 'page-2', name: 'Second', overrides: [] as const, locale: null, extensions: {} };
+    const newPage = { id: 'page-2', name: 'Second', elements: [] as const, locale: null, extensions: {} };
     const doc = { ...base, pages: [...base.pages, newPage] };
 
     const result = applyRemoteChanges(doc, [

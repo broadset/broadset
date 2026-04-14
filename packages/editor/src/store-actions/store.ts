@@ -25,7 +25,9 @@ import {
 } from './store-element-reducers';
 import {
   applyElementUpdate,
-  toggleOverrideVisibility,
+  applyPageInstancePositionBatch,
+  applyPageInstanceTransformUpdate,
+  togglePageElementVisibility,
   updateDocumentElement,
   updateDocumentElements,
 } from './transform';
@@ -198,26 +200,48 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
         },
         updateElementEphemeral(elementId: string, updates: ElementUpdate): void {
           temporalRef.current?.getState().pause();
-          set((state) => ({
-            document: updateDocumentElement(state.document, elementId, (element) =>
+          set((state) => {
+            let nextDoc = updateDocumentElement(state.document, elementId, (element) =>
               applyElementUpdate(element, updates),
-            ),
-          }));
+            );
+
+            if (updates.position !== undefined || updates.rotation !== undefined) {
+              nextDoc = applyPageInstanceTransformUpdate(nextDoc, state.activePageIndex, elementId, {
+                ...(updates.position !== undefined ?
+                  { position: { x: updates.position.x, y: updates.position.y } }
+                : {}),
+                ...(updates.rotation !== undefined ? { rotation: updates.rotation } : {}),
+              });
+            }
+
+            return { document: nextDoc };
+          });
           temporalRef.current?.getState().resume();
         },
         commitElementUpdate(elementId: string, updates: ElementUpdate): void {
-          set((state) => ({
-            document: updateDocumentElement(state.document, elementId, (element) =>
+          set((state) => {
+            let nextDoc = updateDocumentElement(state.document, elementId, (element) =>
               applyElementUpdate(element, updates),
-            ),
-          }));
+            );
+
+            if (updates.position !== undefined || updates.rotation !== undefined) {
+              nextDoc = applyPageInstanceTransformUpdate(nextDoc, state.activePageIndex, elementId, {
+                ...(updates.position !== undefined ?
+                  { position: { x: updates.position.x, y: updates.position.y } }
+                : {}),
+                ...(updates.rotation !== undefined ? { rotation: updates.rotation } : {}),
+              });
+            }
+
+            return { document: nextDoc };
+          });
         },
         commitGroupMove(
           updates: ReadonlyArray<{ readonly elementId: string; readonly position: ElementPosition }>,
         ): void {
           set((state) => {
             const positionsById = new Map(updates.map((update) => [update.elementId, update.position]));
-            const nextDocument = {
+            let nextDocument: BroadsetDocument = {
               ...state.document,
               elements: state.document.elements.map((element) => {
                 const nextPosition = positionsById.get(element.id);
@@ -225,6 +249,12 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
                 return nextPosition === undefined ? element : { ...element, position: nextPosition };
               }),
             };
+
+            nextDocument = applyPageInstancePositionBatch(
+              nextDocument,
+              state.activePageIndex,
+              updates.map((u) => ({ elementId: u.elementId, position: { x: u.position.x, y: u.position.y } })),
+            );
 
             return { document: nextDocument };
           });
@@ -335,7 +365,7 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
                 pageIndex === state.activePageIndex ?
                   {
                     ...page,
-                    overrides: toggleOverrideVisibility(page.overrides, elementId),
+                    elements: togglePageElementVisibility(page.elements, elementId),
                   }
                 : page,
               ),

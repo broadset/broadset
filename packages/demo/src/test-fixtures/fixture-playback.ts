@@ -5,42 +5,44 @@ import {
   createDefaultStyle,
 } from '@broadset/model';
 
-import { createBaseFixtureDocument } from './base-document';
+import { createBaseFixtureDocument, createRootPageInstances } from './base-document';
 import { FIXTURE_IDS } from './ids';
 
 export function createDemoAppPlaybackTestDocument(): BroadsetDocument {
   const base = createBaseFixtureDocument('Fixture: Demo Playback');
+  const elements = [
+    createDefaultElement('ellipse', {
+      id: FIXTURE_IDS.liveOrb,
+      name: 'Live Orb',
+      position: { x: 980, y: 116 },
+      width: 96,
+      height: 96,
+      style: {
+        ...createDefaultStyle(),
+        backgroundColor: '#3da9fc',
+      },
+    }),
+    createDefaultElement('text', {
+      id: FIXTURE_IDS.title,
+      name: 'Score Title',
+      position: { x: 96, y: 84 },
+      width: 600,
+      height: 80,
+      content: '<b>PLAYBACK TEST</b>',
+      style: {
+        ...createDefaultStyle(),
+        fontFamily: 'Inter',
+        fontSize: 48,
+        fontWeight: 700,
+        fontColor: '#f7fbff',
+      },
+    }),
+  ];
 
   return {
     ...base,
-    elements: [
-      createDefaultElement('ellipse', {
-        id: FIXTURE_IDS.liveOrb,
-        name: 'Live Orb',
-        position: { x: 980, y: 116 },
-        width: 96,
-        height: 96,
-        style: {
-          ...createDefaultStyle(),
-          backgroundColor: '#3da9fc',
-        },
-      }),
-      createDefaultElement('text', {
-        id: FIXTURE_IDS.title,
-        name: 'Score Title',
-        position: { x: 96, y: 84 },
-        width: 600,
-        height: 80,
-        content: '<b>PLAYBACK TEST</b>',
-        style: {
-          ...createDefaultStyle(),
-          fontFamily: 'Inter',
-          fontSize: 48,
-          fontWeight: 700,
-          fontColor: '#f7fbff',
-        },
-      }),
-    ],
+    elements,
+    pages: base.pages.map((page) => ({ ...page, elements: createRootPageInstances(elements) })),
     animations: [
       {
         elementId: FIXTURE_IDS.liveOrb,

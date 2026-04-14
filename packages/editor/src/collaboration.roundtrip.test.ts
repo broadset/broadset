@@ -61,7 +61,7 @@ describe('change round-trip fidelity', () => {
   it('page add round-trip', () => {
     const base = createEmptyBroadsetDocument();
     const prev = { ...base };
-    const newPage = { id: 'page-2', name: 'Second', overrides: [], locale: null, extensions: {} };
+    const newPage = { id: 'page-2', name: 'Second', elements: [], locale: null, extensions: {} };
     const next = { ...base, pages: [...base.pages, newPage] };
 
     const changes = diffDocuments(prev, next);

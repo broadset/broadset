@@ -197,8 +197,8 @@ describe('PSD Artboard and Text Export', () => {
   it('exports multiple pages as PSD artboards', () => {
     const doc = makeDocument({
       pages: [
-        { id: 'page-1', name: 'Page 1', overrides: [], locale: null, extensions: {} },
-        { id: 'page-2', name: 'Page 2', overrides: [], locale: null, extensions: {} },
+        { id: 'page-1', name: 'Page 1', elements: [], locale: null, extensions: {} },
+        { id: 'page-2', name: 'Page 2', elements: [], locale: null, extensions: {} },
       ],
       elements: [
         makeElement('rectangle', { style: makeStyle({ backgroundColor: '#ff0000' }) as BroadsetElementStyle }),

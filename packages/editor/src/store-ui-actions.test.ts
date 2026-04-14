@@ -9,7 +9,7 @@ function createPage(index: number): Page {
   return {
     id: `page-${String(index + 1)}`,
     name: `Scene ${String(index + 1)}`,
-    overrides: [],
+    elements: [],
     locale: null,
     extensions: {},
   };
@@ -71,7 +71,7 @@ describe('Page Add and Remove', () => {
     store.getState().addPage();
 
     expect(store.getState().document.pages).toHaveLength(2);
-    expect(store.getState().document.pages[1]?.overrides).toEqual([]);
+    expect(store.getState().document.pages[1]?.elements).toEqual([]);
   });
 
   /** @description Removing the active page must clamp the active index back into range so the editor never points at a missing scene. */

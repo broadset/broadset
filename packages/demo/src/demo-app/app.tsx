@@ -112,6 +112,12 @@ export function DemoApp(): React.JSX.Element {
     selectedElementId === null ? null : (
       (currentDocument.elements.find((element) => element.id === selectedElementId) ?? null)
     );
+  const selectedElementInstance =
+    selectedElementId === null ? null : (
+      (currentDocument.pages[editorState.activePageIndex]?.elements.find(
+        (inst) => inst.elementId === selectedElementId,
+      ) ?? null)
+    );
   const renderDocument = useMemo(
     () => buildRenderableDocumentForActivePage(currentDocument, editorState.activePageIndex, SAMPLE_PROJECT.assets),
     [currentDocument, editorState.activePageIndex],
@@ -410,6 +416,7 @@ export function DemoApp(): React.JSX.Element {
       onUpdateProperty={handlePropertyUpdate}
       preflightIssues={preflightIssues}
       selectedElement={selectedElement}
+      selectedElementInstance={selectedElementInstance}
       setEditingTimeline={setEditingTimeline}
       setEditingTimelineSelectedKf={setEditingTimelineSelectedKf}
       sidebarTab={sidebarTab}

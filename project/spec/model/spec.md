@@ -227,47 +227,51 @@ Animation definitions are stored at the document level as a flat array, each pai
 
 ### Requirement: Pages as Data Override Layers
 
-Pages are lightweight data override layers. Each page has:
+### Requirement: Pages as Layout Instances
+
+Pages define layout variants by explicitly specifying template element instances and their per-page properties. Elements are defined once as templates on the document; each page lists the instances it uses with page-specific 3D transform (`position`, `rotation`, `scale`) and visibility.
+
+Each page has:
 
 - `id`: non-empty string, unique within the document
 - `name`: human-readable string
-- `overrides`: array of `ElementOverride`, each referencing an element by `elementId`
+- `elements`: array of `PageElementInstance`, each referencing a template element by `elementId`
 - `locale` (optional): BCP 47 language tag for localization
 - `extensions` (optional): vendor extension data
 
-A document MUST have at least one page. The first page with an empty overrides array represents the template's default state.
+A document MUST have at least one page. Pages list only root-level template elements; child relationships are inherited from the document template.
 
-#### Scenario: Page with data overrides
+#### Scenario: Page with element instances
 
-- GIVEN a page with overrides changing content of two text elements
+- GIVEN a page with elements array specifying transform and visibility of two template elements
 - WHEN the page is applied
-- THEN element content is replaced with override values
+- THEN the page displays those elements with their specified transform and visibility
 
-#### Scenario: Override references valid element
+#### Scenario: Instance references valid element
 
-- GIVEN a page override with `elementId: 'el-999'` referencing a non-existent element
+- GIVEN a page element instance with `elementId: 'el-999'` referencing a non-existent template
 - WHEN the document is validated
-- THEN validation fails (or the override is silently ignored)
+- THEN validation fails (or the instance is silently ignored)
 
-#### Scenario: Element visibility override
+#### Scenario: Element instance visibility
 
-- GIVEN a page override with `{ elementId: 'el-subtitle', visible: false }`
+- GIVEN a page element instance with `{ elementId: 'el-subtitle', visible: false }`
 - WHEN the page is applied
 - THEN the element is hidden on this page
 
-#### Scenario: Style override
+#### Scenario: Instance per-page positioning
 
-- GIVEN a page override with `{ elementId: 'el-title', style: { fontColor: '#ff0000' } }`
+- GIVEN a template element at (0,0) 100x50 and a page instance of the same element with position (200,100,0) and scale (1.5,1.5,1)
 - WHEN the page is applied
-- THEN the element's fontColor is overridden to red; all other styles remain as defined
+- THEN the page displays the element at (200,100) with rendered size 150x75; template properties (name, type, content, style, base width, base height) are unchanged
 
 #### Acceptance Criteria
 
 - [ ] Given a document, it has at least one page
-- [ ] Given a page with content overrides, the element content is replaced
+- [ ] Given a page with element instances, each instance references a valid template element
 - [ ] Given a page with visibility override false, the element is hidden
-- [ ] Given a page with partial style override, only the specified style properties change
-- [ ] Given a page override referencing a non-existent element, validation fails or it is ignored
+- [ ] Given a page with different instance transforms, the page displays elements with those transforms
+- [ ] Given a page instance referencing a non-existent element, validation fails or it is ignored
 - [ ] Given duplicate page IDs within a document, validation fails
 
 ---

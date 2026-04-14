@@ -141,7 +141,7 @@ export function LayoutSideRails(props: DemoAppLayoutProps): React.JSX.Element {
                     </Button>
                   </span>
                 </Tooltip.Trigger>
-                <Tooltip.Content placement="left">Close sidebar</Tooltip.Content>
+                <Tooltip.Content placement="bottom">Close sidebar</Tooltip.Content>
               </Tooltip>
               <span
                 aria-hidden="true"
@@ -161,7 +161,7 @@ export function LayoutSideRails(props: DemoAppLayoutProps): React.JSX.Element {
             onPress={() => {
               handleSidebarTabToggle('layers');
             }}
-            tooltipPlacement="left"
+            tooltipPlacement="bottom"
           >
             <Layers size={16} />
           </IconToolButton>
@@ -172,7 +172,7 @@ export function LayoutSideRails(props: DemoAppLayoutProps): React.JSX.Element {
             onPress={() => {
               handleSidebarTabToggle('properties');
             }}
-            tooltipPlacement="left"
+            tooltipPlacement="bottom"
           >
             <Sliders size={16} />
           </IconToolButton>
@@ -183,7 +183,7 @@ export function LayoutSideRails(props: DemoAppLayoutProps): React.JSX.Element {
             onPress={() => {
               handleSidebarTabToggle('animation');
             }}
-            tooltipPlacement="left"
+            tooltipPlacement="bottom"
           >
             <Workflow size={16} />
           </IconToolButton>
@@ -193,7 +193,7 @@ export function LayoutSideRails(props: DemoAppLayoutProps): React.JSX.Element {
             onPress={() => {
               handleSidebarTabToggle('preflight');
             }}
-            tooltipPlacement="left"
+            tooltipPlacement="bottom"
           >
             <ShieldCheck size={16} />
           </IconToolButton>
@@ -203,7 +203,7 @@ export function LayoutSideRails(props: DemoAppLayoutProps): React.JSX.Element {
             onPress={() => {
               handleSidebarTabToggle('template-groups');
             }}
-            tooltipPlacement="left"
+            tooltipPlacement="bottom"
           >
             <LayoutTemplate size={16} />
           </IconToolButton>

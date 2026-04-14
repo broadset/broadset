@@ -1,10 +1,11 @@
 /** @jest-environment jsdom */
 
+import { createDefaultElement } from '@broadset/model';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import { dispatchDeleteKey, setupDemoShellMocks } from './demo-shell-test-utils';
 import { DemoApp } from './DemoApp';
-import { createDemoAppChromeTestDocument } from './test-fixtures';
+import { createDemoAppChromeTestDocument, createParentingTransformTestDocument } from './test-fixtures';
 
 describe('DemoApp chrome and menu integration', () => {
   /** @description Restores the expected direct-manipulation affordance by requiring a visible transform widget with resize and rotation handles whenever an element is selected. */
@@ -31,7 +32,264 @@ describe('DemoApp chrome and menu integration', () => {
 
     expect(undoParent?.querySelector('[placement="bottom"]')).not.toBeNull();
     expect(textParent?.querySelector('[placement="right"]')).not.toBeNull();
-    expect(layersParent?.querySelector('[placement="left"]')).not.toBeNull();
+    expect(layersParent?.querySelector('[placement="bottom"]')).not.toBeNull();
+  });
+
+  /** @description Parented element selections must position the transform widget using world coordinates so handles align with the actual on-canvas location. */
+  it('positions the transform widget at the world position for parented elements', () => {
+    setupDemoShellMocks();
+
+    const fixtureDocument = createParentingTransformTestDocument();
+    const elementById = new Map(fixtureDocument.elements.map((element) => [element.id, element]));
+    const parentedElement = fixtureDocument.elements.find((element) => element.parentId !== null);
+
+    if (parentedElement === undefined) {
+      throw new Error('Expected sample fixture to contain at least one parented element.');
+    }
+
+    let expectedLeft = parentedElement.position.x;
+    let expectedTop = parentedElement.position.y;
+    let parent = elementById.get(parentedElement.parentId ?? '');
+
+    while (parent !== undefined) {
+      expectedLeft += parent.position.x;
+      expectedTop += parent.position.y;
+      parent = parent.parentId === null ? undefined : elementById.get(parent.parentId);
+    }
+
+    const reorderedDocument = {
+      ...fixtureDocument,
+      elements: [parentedElement, ...fixtureDocument.elements.filter((element) => element.id !== parentedElement.id)],
+    };
+
+    window.localStorage.setItem('broadset:demo-document:v1', JSON.stringify(reorderedDocument));
+    window.localStorage.setItem(
+      'broadset:demo-sidebar-preferences:v1',
+      JSON.stringify({ isOpen: true, tab: 'layers', width: 332 }),
+    );
+    render(<DemoApp />);
+
+    const widgetStyle = screen.getByTestId('demo-transform-widget').getAttribute('style') ?? '';
+
+    expect(widgetStyle).toContain(`left: ${String(expectedLeft)}px`);
+    expect(widgetStyle).toContain(`top: ${String(expectedTop)}px`);
+  });
+
+  /** @description Layers must explicitly show parent-child relationships so grouped/parented structures are understandable without guessing from canvas placement. */
+  it('shows explicit parenting labels in the layers panel', () => {
+    setupDemoShellMocks();
+    render(<DemoApp />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^layers$/i }));
+
+    expect(screen.getAllByText('Child of Score Bug').length).toBeGreaterThan(0);
+  });
+
+  /** @description Dragging a layer onto another layer must reparent it so hierarchy edits in the layers panel update the real document structure. */
+  it('reparents a layer when dropped inside another layer', () => {
+    setupDemoShellMocks();
+
+    const fixtureDocument = createParentingTransformTestDocument();
+    const standaloneBadge = createDefaultElement('text', {
+      id: 'el-standalone-badge',
+      name: 'Standalone Badge',
+      position: { x: 40, y: 40 },
+      width: 160,
+      height: 40,
+      content: 'Standalone',
+    });
+    const withStandaloneRoot = {
+      ...fixtureDocument,
+      elements: [...fixtureDocument.elements, standaloneBadge],
+      pages: fixtureDocument.pages.map((page, index) =>
+        index === 0 ?
+          {
+            ...page,
+            elements: [
+              ...page.elements,
+              {
+                elementId: standaloneBadge.id,
+                transform: {
+                  position: { x: standaloneBadge.position.x, y: standaloneBadge.position.y, z: 0 },
+                  rotation: { x: 0, y: 0, z: standaloneBadge.rotation },
+                  scale: { x: 1, y: 1, z: 1 },
+                },
+                visible: true,
+              },
+            ],
+          }
+        : page,
+      ),
+    };
+
+    window.localStorage.setItem('broadset:demo-document:v1', JSON.stringify(withStandaloneRoot));
+    window.localStorage.setItem(
+      'broadset:demo-sidebar-preferences:v1',
+      JSON.stringify({ isOpen: true, tab: 'layers', width: 332 }),
+    );
+
+    render(<DemoApp />);
+
+    expect(screen.getAllByText('Child of Promo Group')).toHaveLength(1);
+
+    const dragHandle = screen.getByLabelText('Drag Standalone Badge');
+    const dropTarget = screen.getByLabelText('Select Promo Group').closest('li');
+
+    if (dropTarget === null) {
+      throw new Error('Expected Promo Group layer row to exist.');
+    }
+
+    Object.defineProperty(dropTarget, 'getBoundingClientRect', {
+      value: () => ({
+        bottom: 30,
+        height: 30,
+        left: 0,
+        right: 200,
+        top: 0,
+        width: 200,
+        x: 0,
+        y: 0,
+      }),
+    });
+
+    fireEvent.dragStart(dragHandle, {
+      dataTransfer: {
+        effectAllowed: 'move',
+        setDragImage: jest.fn(),
+      },
+    });
+    fireEvent.dragOver(dropTarget, { clientY: 15 });
+    fireEvent.drop(dropTarget);
+
+    expect(screen.getAllByText('Child of Promo Group')).toHaveLength(2);
+  });
+
+  /** @description Dragging near the upper half of a layer row must clearly show that parenting will happen, so users can discover and trust the feature. */
+  it('shows a parent-drop indicator across the expanded upper drop zone', () => {
+    setupDemoShellMocks();
+
+    const fixtureDocument = createParentingTransformTestDocument();
+    const standaloneBadge = createDefaultElement('text', {
+      id: 'el-standalone-badge',
+      name: 'Standalone Badge',
+      position: { x: 40, y: 40 },
+      width: 160,
+      height: 40,
+      content: 'Standalone',
+    });
+    const withStandaloneRoot = {
+      ...fixtureDocument,
+      elements: [...fixtureDocument.elements, standaloneBadge],
+      pages: fixtureDocument.pages.map((page, index) =>
+        index === 0 ?
+          {
+            ...page,
+            elements: [
+              ...page.elements,
+              {
+                elementId: standaloneBadge.id,
+                transform: {
+                  position: { x: standaloneBadge.position.x, y: standaloneBadge.position.y, z: 0 },
+                  rotation: { x: 0, y: 0, z: standaloneBadge.rotation },
+                  scale: { x: 1, y: 1, z: 1 },
+                },
+                visible: true,
+              },
+            ],
+          }
+        : page,
+      ),
+    };
+
+    window.localStorage.setItem('broadset:demo-document:v1', JSON.stringify(withStandaloneRoot));
+    window.localStorage.setItem(
+      'broadset:demo-sidebar-preferences:v1',
+      JSON.stringify({ isOpen: true, tab: 'layers', width: 332 }),
+    );
+
+    render(<DemoApp />);
+
+    const dragHandle = screen.getByLabelText('Drag Standalone Badge');
+    const dropTarget = screen.getByLabelText('Select Promo Group').closest('li');
+
+    if (dropTarget === null) {
+      throw new Error('Expected Promo Group layer row to exist.');
+    }
+
+    Object.defineProperty(dropTarget, 'getBoundingClientRect', {
+      value: () => ({
+        bottom: 30,
+        height: 30,
+        left: 0,
+        right: 200,
+        top: 0,
+        width: 200,
+        x: 0,
+        y: 0,
+      }),
+    });
+
+    fireEvent.dragStart(dragHandle, {
+      dataTransfer: {
+        effectAllowed: 'move',
+        setDragImage: jest.fn(),
+      },
+    });
+
+    // 14px over a 30px row is below the old top-third threshold but inside the new expanded parent zone.
+    fireEvent.dragOver(dropTarget, { clientY: 14 });
+
+    expect(screen.queryAllByTestId(/layer-drop-(parent|inside)-indicator-/).length).toBeGreaterThan(0);
+  });
+
+  /** @description Sidebar visibility toggles must immediately force element visibility in edit mode and feed an updated document to the renderer. */
+  it('updates renderer document when toggling layer visibility in edit mode', () => {
+    const { mockedCreateScreenRenderer } = setupDemoShellMocks();
+    const updateDocument = jest.fn();
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      destroy: jest.fn(),
+      host: document.createElement('div'),
+      updateDocument,
+    });
+
+    render(<DemoApp />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^layers$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^hide score bug$/i }));
+
+    const hasHiddenUpdate = updateDocument.mock.calls.some((call) => {
+      const [documentArg] = call as [{ readonly elements: readonly { readonly id: string }[] }];
+
+      return documentArg.elements.every((element) => element.id !== 'el-scorebug');
+    });
+
+    expect(hasHiddenUpdate).toBe(true);
+  });
+
+  /** @description Closing the sidebar must remove hidden panel controls from keyboard navigation so Tab cannot scroll focus into offscreen UI. */
+  it('removes sidebar panel controls from the tab order when the sidebar is closed', () => {
+    setupDemoShellMocks();
+    render(<DemoApp />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^layers$/i }));
+    expect(screen.getByRole('region', { name: /layers/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /close sidebar/i }));
+
+    expect(screen.queryByRole('region', { name: /layers/i })).toBeNull();
+  });
+
+  /** @description Selecting a layer row must keep the user in the Layers panel instead of forcing a tab switch to Properties. */
+  it('keeps the layers tab active when selecting a layer row', () => {
+    setupDemoShellMocks();
+    render(<DemoApp />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^layers$/i }));
+    fireEvent.click(screen.getByLabelText('Select Score Bug'));
+
+    expect(screen.getByRole('region', { name: /layers/i })).toBeTruthy();
+    expect(screen.queryByRole('region', { name: /properties/i })).toBeNull();
   });
 
   /** @description Prevents the horizontal ruler scale from drifting when the right sidebar is resized, since the top ruler must stay independent of sidebar width. */
