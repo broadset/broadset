@@ -39,7 +39,7 @@ describe('DemoApp modal dialog integration (9-D)', () => {
     expect(within(dialog).getByRole('button', { name: 'SVG' })).toBeTruthy();
     expect(within(dialog).getByRole('button', { name: 'PDF' })).toBeTruthy();
     expect(within(dialog).getByRole('button', { name: 'PNG' })).toBeTruthy();
-    expect(within(dialog).getByRole('button', { name: 'MP4' })).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'WEBM' })).toBeTruthy();
     expect(within(dialog).getByRole('button', { name: 'OGRAF' })).toBeTruthy();
     expect(within(dialog).getByRole('button', { name: 'SVG-EMBEDDED' })).toBeTruthy();
   });

@@ -275,27 +275,24 @@ describe('export orchestration', () => {
     expect(filename).toMatch(/\.webm$/);
   });
 
-  /** @description Video export (MP4) MUST require a renderFrame callback and durationMs. */
-  it('exports MP4 format with video settings', async () => {
+  /** @description MP4 export must fail fast until a true MP4 container path is implemented. */
+  it('rejects MP4 export as unsupported', async () => {
     const renderFrame = jest.fn();
     const canvas = document.createElement('canvas');
 
-    await exportDocument(
-      'mp4',
-      makeContext({
-        snapshotCanvas: canvas,
-        renderFrame,
-        playbackDurationMs: 5000,
-        videoFrameRate: 30,
-      }),
-    );
-
-    expect(mockExportVideoBlob).toHaveBeenCalledTimes(1);
-    expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
-
-    const [, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];
-
-    expect(filename).toMatch(/\.mp4$/);
+    await expect(
+      exportDocument(
+        'mp4',
+        makeContext({
+          snapshotCanvas: canvas,
+          renderFrame,
+          playbackDurationMs: 5000,
+          videoFrameRate: 30,
+        }),
+      ),
+    ).rejects.toThrow(/unavailable|webm/i);
+    expect(mockExportVideoBlob).not.toHaveBeenCalled();
+    expect(mockTriggerDownload).not.toHaveBeenCalled();
   });
 
   /** @description Video export without renderFrame MUST raise an error. */

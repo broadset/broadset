@@ -39,6 +39,22 @@ describe('Video Export Support Detection', () => {
     ).rejects.toThrow('VideoEncoder API is unavailable');
   });
 
+  /** @description MP4 export must reject until the encoder pipeline supports true MP4 container output. */
+  it('rejects MP4 export requests as unsupported', async () => {
+    const dummyCanvas = { width: 100, height: 100 } as HTMLCanvasElement;
+
+    await expect(
+      exportVideoBlob({
+        canvas: dummyCanvas,
+        renderFrame: () => {
+          /* noop */
+        },
+        durationMs: 1000,
+        format: 'mp4',
+      }),
+    ).rejects.toThrow(/MP4 export is not yet supported/i);
+  });
+
   /** @description Validates that frameRate must be positive. */
   it('rejects with error for non-positive frameRate', async () => {
     const original = (globalThis as Record<string, unknown>)['VideoEncoder'];

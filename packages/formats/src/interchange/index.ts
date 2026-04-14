@@ -116,6 +116,8 @@ export interface VideoExportOptions {
   readonly quality?: number;
   /** Progress callback invoked with a value in [0, 1] and an optional stage descriptor. */
   readonly onProgress?: (progress: number, stage?: string) => void;
+  /** Target container format. MP4 is reserved for a future true container mux path. */
+  readonly format?: 'webm' | 'mp4';
 }
 
 /**
@@ -123,6 +125,12 @@ export interface VideoExportOptions {
  * Rejects when VideoEncoder is unavailable or when encoding fails.
  */
 export async function exportVideoBlob(options: VideoExportOptions): Promise<Blob> {
+  const format = options.format ?? 'webm';
+
+  if (format === 'mp4') {
+    throw new Error('MP4 export is not yet supported in the current browser encoder pipeline. Use WebM instead.');
+  }
+
   if (!isVideoExportSupported()) {
     throw new Error('Video export is not supported: VideoEncoder API is unavailable');
   }

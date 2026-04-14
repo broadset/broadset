@@ -33,7 +33,7 @@ export function AboutModal({ isOpen, version, onClose }: AboutModalProps): JSX.E
           <dt>Renderer</dt>
           <dd>HTML / CSS / Canvas</dd>
           <dt>Exports</dt>
-          <dd>HTML, SVG, PDF, PSD, PPTX, PNG, JPEG, MP4, WebM, OGraf</dd>
+          <dd>HTML, SVG, PDF, PSD, PPTX, PNG, JPEG, WebM, OGraf</dd>
         </dl>
         <p>Version: {version}</p>
       </Modal.Body>

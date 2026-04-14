@@ -150,7 +150,9 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
       break;
     }
 
-    case 'mp4': // falls through
+    case 'mp4': {
+      throw new Error('MP4 export is currently unavailable. Use WebM export.');
+    }
 
     case 'webm': {
       requireVideoSettings(context);
@@ -160,11 +162,11 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
         renderFrame: context.renderFrame,
         durationMs: context.playbackDurationMs,
         frameRate: context.videoFrameRate ?? DEFAULT_VIDEO_FRAME_RATE,
+        format: 'webm',
         ...(context.onProgress !== undefined ? { onProgress: context.onProgress } : {}),
       });
-      const ext = format === 'mp4' ? 'mp4' : 'webm';
 
-      formats.triggerDownload(videoBlob, `${name}.${ext}`);
+      formats.triggerDownload(videoBlob, `${name}.webm`);
       break;
     }
 
