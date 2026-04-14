@@ -213,10 +213,22 @@ export function CssLengthInput({ value, onChange, label }: CssLengthInputProps):
   );
 
   const handleUnitChange = useCallback(
-    (key: string | number | null) => {
+    (key: unknown) => {
       if (key === null) return;
 
-      const raw = String(key);
+      let raw = '';
+
+      if (typeof key === 'string' || typeof key === 'number') {
+        raw = String(key);
+      } else if (typeof key === 'object' && 'target' in key) {
+        const eventTarget = (key as { readonly target?: { readonly value?: unknown } }).target;
+
+        if (typeof eventTarget?.value === 'string' || typeof eventTarget?.value === 'number') {
+          raw = String(eventTarget.value);
+        }
+      }
+
+      if (raw === '') return;
 
       if (!isCssUnit(raw)) return;
 
