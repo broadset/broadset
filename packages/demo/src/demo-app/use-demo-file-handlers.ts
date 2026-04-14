@@ -49,6 +49,12 @@ export interface DemoFileHandlers {
   readonly handleTemplateSelect: (template: TemplateEntry) => void;
 }
 
+function getOptionalNumber(data: Readonly<Record<string, unknown>>, key: string): number | undefined {
+  const value = data[key];
+
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 export function useDemoFileHandlers({
   editorStore,
   currentDocument,
@@ -170,7 +176,7 @@ export function useDemoFileHandlers({
   );
 
   const handleExportFormat = useCallback(
-    (exporter: string, _data: Readonly<Record<string, unknown>>): void => {
+    (exporter: string, data: Readonly<Record<string, unknown>>): void => {
       if (exporter === 'json') {
         handleSaveAsJson();
         setActiveDialog(null);
@@ -182,9 +188,17 @@ export function useDemoFileHandlers({
         const bridge = await import('../formatBridge');
         const formats = await bridge.loadFormats();
         const snapshotCanvas = formats.discoverCanvasElement() ?? undefined;
+        const pixelRatio = getOptionalNumber(data, 'pixelRatio');
+        const jpegQuality = getOptionalNumber(data, 'jpegQuality');
+        const videoFrameRate = getOptionalNumber(data, 'videoFrameRate');
+        const videoQuality = getOptionalNumber(data, 'videoQuality');
 
         await bridge.exportDocument(exporter as ExportFormat, {
           document: currentDocument,
+          ...(pixelRatio !== undefined ? { pixelRatio } : {}),
+          ...(jpegQuality !== undefined ? { jpegQuality } : {}),
+          ...(videoFrameRate !== undefined ? { videoFrameRate } : {}),
+          ...(videoQuality !== undefined ? { videoQuality } : {}),
           ...(snapshotCanvas !== undefined ? { snapshotCanvas } : {}),
         });
         pushToast('success', `Exported as ${exporter.toUpperCase()}.`);

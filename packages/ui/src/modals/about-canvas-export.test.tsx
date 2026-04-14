@@ -156,7 +156,7 @@ describe('ExportModal', () => {
     expect(screen.queryByRole('button', { name: /mp4/i })).toBeNull();
   });
 
-  /** @description Submit with a selected exporter passes exporter, dynamic data, and snapshot */
+  /** @description Submit with a selected exporter passes exporter plus advanced export settings and dynamic data. */
   it('fires onExport with exporter and dynamic data on submit', () => {
     const onExport = jest.fn();
 
@@ -168,6 +168,34 @@ describe('ExportModal', () => {
     const callArg = onExport.mock.calls[0] as readonly unknown[];
 
     expect(callArg[0]).toBe('png');
+    expect(callArg[1]).toEqual(
+      expect.objectContaining({
+        jpegQuality: 0.92,
+        pixelRatio: 2,
+        videoFrameRate: 30,
+        videoQuality: 0.8,
+      }),
+    );
+  });
+
+  /** @description Advanced export controls must update payload values so output tuning is applied without leaving the export modal. */
+  it('updates advanced export values in onExport payload', () => {
+    const onExport = jest.fn();
+
+    render(<ExportModal {...makeProps({ enabledExporters: ['jpeg', 'webm'], onExport })} />);
+
+    fireEvent.click(screen.getByRole('switch', { name: /advanced export options/i }));
+    fireEvent.change(screen.getByRole('spinbutton', { name: /raster pixel ratio/i }), { target: { value: '3' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: /video frame rate/i }), { target: { value: '60' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /jpeg/i }));
+    fireEvent.click(screen.getByRole('button', { name: /export/i }));
+
+    const callArg = onExport.mock.calls[0] as readonly unknown[];
+    const payload = callArg[1] as Record<string, unknown>;
+
+    expect(payload['pixelRatio']).toBe(3);
+    expect(payload['videoFrameRate']).toBe(60);
   });
 
   /** @description Submit button is disabled when no exporter is selected */

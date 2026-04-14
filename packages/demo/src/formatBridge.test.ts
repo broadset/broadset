@@ -223,6 +223,27 @@ describe('export orchestration', () => {
     expect(filename).toMatch(/\.png$/);
   });
 
+  /** @description PNG export must forward pixel ratio overrides from export context. */
+  it('forwards custom pixel ratio for PNG export', async () => {
+    const canvas = document.createElement('canvas');
+
+    await exportDocument('png', makeContext({ pixelRatio: 3, snapshotCanvas: canvas }));
+
+    const calls = (mockExportPngBlob as unknown as { readonly mock: { readonly calls: readonly unknown[][] } }).mock
+      .calls;
+    const firstCall = calls[0];
+
+    if (firstCall === undefined) {
+      throw new Error('Expected exportPngBlob to be called');
+    }
+
+    const calledCanvas = firstCall[0] as HTMLCanvasElement;
+    const calledOptions = firstCall[1] as { readonly pixelRatio: number };
+
+    expect(calledCanvas).toBe(canvas);
+    expect(calledOptions.pixelRatio).toBe(3);
+  });
+
   /** @description JPEG raster export MUST require a snapshotCanvas and trigger a file download. */
   it('exports JPEG format when a snapshot canvas is provided', async () => {
     const canvas = document.createElement('canvas');
@@ -273,6 +294,41 @@ describe('export orchestration', () => {
     const [, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];
 
     expect(filename).toMatch(/\.webm$/);
+  });
+
+  /** @description WebM export must forward frame rate and quality overrides from export context. */
+  it('forwards custom frame rate and quality for WebM export', async () => {
+    const renderFrame = jest.fn();
+    const canvas = document.createElement('canvas');
+
+    await exportDocument(
+      'webm',
+      makeContext({
+        snapshotCanvas: canvas,
+        renderFrame,
+        playbackDurationMs: 5000,
+        videoFrameRate: 60,
+        videoQuality: 0.6,
+      }),
+    );
+
+    const calls = (mockExportVideoBlob as unknown as { readonly mock: { readonly calls: readonly unknown[][] } }).mock
+      .calls;
+    const firstCall = calls[0];
+
+    if (firstCall === undefined) {
+      throw new Error('Expected exportVideoBlob to be called');
+    }
+
+    const calledOptions = firstCall[0] as {
+      readonly frameRate: number;
+      readonly format: string;
+      readonly quality: number;
+    };
+
+    expect(calledOptions.frameRate).toBe(60);
+    expect(calledOptions.format).toBe('webm');
+    expect(calledOptions.quality).toBe(0.6);
   });
 
   /** @description MP4 export must fail fast until a true MP4 container path is implemented. */

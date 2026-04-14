@@ -28,7 +28,7 @@ This plan explicitly forbids regressions to currently working behavior.
 ## Progress Snapshot
 
 - Overall status: `in-progress` (planning completed)
-- Completed tasks: `1 / 15`
+- Completed tasks: `2 / 15`
 - Active execution wave: `Wave 1 (P0 correctness)`
 
 ## Prioritized Waves
@@ -69,7 +69,7 @@ This plan explicitly forbids regressions to currently working behavior.
 | C3  | P0       | planned     | ui + demo                | Complete keyframe-context properties orchestration in sidebar flow                    | Preserve non-animation property editing behavior                 | Panel tests for include/remove/keyframe-scoped values + demo CT coverage                                       |
 | C4  | P2       | planned     | ui                       | Strengthen nested subtree DnD guardrails and feedback                                 | Preserve existing layers reorder/select behavior                 | Dedicated layers sidebar tests for descendant rejection and range/toggle selection                             |
 | C5  | P2       | planned     | demo + editor + renderer | Reduce interaction-path write amplification with profile-driven fixes                 | Keep pointer interaction parity and visual preview correctness   | Before/after profiling artifacts + CT interaction suites + quality gates                                       |
-| C6  | P1       | planned     | ui + demo                | Add advanced export controls (raster/video tuning) and progress UI                    | Keep simple one-click export flow intact                         | Export modal unit tests + demo export flow tests                                                               |
+| C6  | P1       | done        | ui + demo                | Add advanced export controls (raster/video tuning) and progress UI                    | Keep simple one-click export flow intact                         | Export modal unit tests + demo export flow tests                                                               |
 | C7  | P0       | done        | formats + demo           | Make MP4 option truthful: implement real MP4 or gate option until true support exists | Keep WebM path and existing downloads stable                     | Video export tests for MIME/path correctness + bridge tests + quality                                          |
 | C8  | P1       | planned     | formats                  | Enrich HTML standalone export (runtime, anchors, masks, QR inline)                    | Preserve current basic HTML export compatibility                 | Format-specific tests + parity assertions for sample docs                                                      |
 | C9  | P1       | planned     | formats                  | Enrich SVG export (gradients, named masks, shadows, richer shape handling, QR inline) | Preserve current SVG import/export outputs where already correct | SVG export unit tests + non-regression fixtures                                                                |
@@ -144,3 +144,10 @@ All of the following must be true:
 - Summary: Hardened timeline seeking by clamping playhead seeks to valid timeline bounds and ensured non-loop timelines restart from 0 when play is pressed at end/near-end.
 - Evidence: updated `packages/demo/src/demo-app/use-animation-editing.ts`; added integration coverage in `packages/demo/src/demo-app.playback-shell.test.tsx`; verified with targeted test run and `npm run quality -w @broadset/demo`.
 - Risk/Follow-up: continue C1 with additional timeline authoring reliability checks and CT expansion for end-to-end transport/edit loops.
+
+### 2026-04-15 - C6 - advanced export options wired to runtime
+
+- Status: done
+- Summary: Added optional advanced export controls in Export modal (pixel ratio, JPEG quality, frame rate, video quality) and threaded values through demo export handlers into format bridge raster/video export options.
+- Evidence: updated `packages/ui/src/modals/core-modals.tsx`, `packages/demo/src/demo-app/use-demo-file-handlers.ts`, `packages/demo/src/formatBridge.ts`; extended tests in `packages/ui/src/modals/about-canvas-export.test.tsx` and `packages/demo/src/formatBridge.test.ts`; verified with `npm run quality -w @broadset/ui` and `npm run quality -w @broadset/demo`.
+- Risk/Follow-up: connect modal-driven progress feedback UI to bridge `onProgress` updates in a follow-up C6b slice.

@@ -27,7 +27,10 @@ export interface ExportContext {
   readonly snapshotCanvas?: HTMLCanvasElement;
   readonly renderFrame?: (timeMs: number) => void;
   readonly playbackDurationMs?: number;
+  readonly pixelRatio?: number;
+  readonly jpegQuality?: number;
   readonly videoFrameRate?: number;
+  readonly videoQuality?: number;
   readonly onProgress?: (progress: number, stage?: string) => void;
 }
 
@@ -63,6 +66,7 @@ export function resetFormatsCache(): void {
 const DEFAULT_PIXEL_RATIO = 2;
 const DEFAULT_JPEG_QUALITY = 0.92;
 const DEFAULT_VIDEO_FRAME_RATE = 30;
+const DEFAULT_VIDEO_QUALITY = 0.8;
 
 export async function exportDocument(format: ExportFormat, context: ExportContext): Promise<void> {
   const formats = await loadFormats();
@@ -123,7 +127,9 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
     case 'png': {
       requireSnapshotCanvas(context);
 
-      const pngBlob = await formats.exportPngBlob(context.snapshotCanvas, { pixelRatio: DEFAULT_PIXEL_RATIO });
+      const pngBlob = await formats.exportPngBlob(context.snapshotCanvas, {
+        pixelRatio: context.pixelRatio ?? DEFAULT_PIXEL_RATIO,
+      });
 
       formats.triggerDownload(pngBlob, `${name}.png`);
       break;
@@ -133,8 +139,8 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
       requireSnapshotCanvas(context);
 
       const jpegBlob = await formats.exportJpegBlob(context.snapshotCanvas, {
-        pixelRatio: DEFAULT_PIXEL_RATIO,
-        quality: DEFAULT_JPEG_QUALITY,
+        pixelRatio: context.pixelRatio ?? DEFAULT_PIXEL_RATIO,
+        quality: context.jpegQuality ?? DEFAULT_JPEG_QUALITY,
       });
 
       formats.triggerDownload(jpegBlob, `${name}.jpeg`);
@@ -162,6 +168,7 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
         renderFrame: context.renderFrame,
         durationMs: context.playbackDurationMs,
         frameRate: context.videoFrameRate ?? DEFAULT_VIDEO_FRAME_RATE,
+        quality: context.videoQuality ?? DEFAULT_VIDEO_QUALITY,
         format: 'webm',
         ...(context.onProgress !== undefined ? { onProgress: context.onProgress } : {}),
       });

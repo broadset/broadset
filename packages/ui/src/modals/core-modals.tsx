@@ -223,12 +223,23 @@ export function ExportModal({
   onClose,
 }: ExportModalProps): JSX.Element | null {
   const [selectedExporter, setSelectedExporter] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [pixelRatio, setPixelRatio] = useState(2);
+  const [jpegQuality, setJpegQuality] = useState(0.92);
+  const [videoFrameRate, setVideoFrameRate] = useState(30);
+  const [videoQuality, setVideoQuality] = useState(0.8);
 
   const handleExport = useCallback(() => {
     if (selectedExporter !== null) {
-      onExport(selectedExporter, dynamicData);
+      onExport(selectedExporter, {
+        ...dynamicData,
+        pixelRatio,
+        jpegQuality,
+        videoFrameRate,
+        videoQuality,
+      });
     }
-  }, [selectedExporter, dynamicData, onExport]);
+  }, [dynamicData, jpegQuality, onExport, pixelRatio, selectedExporter, videoFrameRate, videoQuality]);
 
   return (
     <ModalShell isOpen={isOpen} size="lg" title="Export" onClose={onClose}>
@@ -261,6 +272,73 @@ export function ExportModal({
             </div>
           );
         })}
+
+        <section aria-label="Advanced export options" style={{ marginTop: sp('sp-02') }}>
+          <Switch aria-label="Show advanced export options" isSelected={showAdvanced} onChange={setShowAdvanced}>
+            Advanced export options
+          </Switch>
+
+          {showAdvanced && (
+            <div
+              style={{
+                marginTop: sp('sp-02'),
+                padding: sp('sp-02'),
+                border: `1px solid ${color('border')}`,
+                borderRadius: 10,
+                display: 'grid',
+                gap: sp('sp-02'),
+              }}
+            >
+              <NumField
+                label="Raster pixel ratio"
+                max={8}
+                min={1}
+                step={1}
+                value={pixelRatio}
+                onChange={(value) => {
+                  setPixelRatio(Math.max(1, Math.min(8, Math.round(value))));
+                }}
+              />
+
+              <Slider
+                aria-label="JPEG quality"
+                maxValue={1}
+                minValue={0.1}
+                step={0.01}
+                value={jpegQuality}
+                onChange={(value) => {
+                  setJpegQuality(typeof value === 'number' ? value : jpegQuality);
+                }}
+              >
+                JPEG quality ({jpegQuality.toFixed(2)})
+              </Slider>
+
+              <NumField
+                label="Video frame rate"
+                max={120}
+                min={1}
+                step={1}
+                value={videoFrameRate}
+                onChange={(value) => {
+                  setVideoFrameRate(Math.max(1, Math.min(120, Math.round(value))));
+                }}
+              />
+
+              <Slider
+                aria-label="Video quality"
+                maxValue={1}
+                minValue={0.1}
+                step={0.01}
+                value={videoQuality}
+                onChange={(value) => {
+                  setVideoQuality(typeof value === 'number' ? value : videoQuality);
+                }}
+              >
+                Video quality ({videoQuality.toFixed(2)})
+              </Slider>
+            </div>
+          )}
+        </section>
       </Modal.Body>
       <Modal.Footer>
         <Button variant="ghost" onPress={onClose}>
