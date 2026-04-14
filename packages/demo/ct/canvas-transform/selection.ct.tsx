@@ -11,8 +11,9 @@ import { FIXTURE_IDS, FIXTURE_LAYER_LABELS } from '../fixture-selectors';
  * @description Validates that the DemoApp starts with the first unlocked
  * element auto-selected and the transform widget visible at that element's
  * bounds. The initial selection is el-score-title (x:60, y:52, 920×96).
- */
-test('shows the transform widget on mount for the auto-selected element', async ({ mount, page }) => {
+/**
+ * @description Validates `project/spec/editor/canvas.md` C-01 by ensuring
+ * clicking a canvas element directly (not via
   await mount(<DemoApp />);
 
   const widget = page.getByTestId('demo-transform-widget');
@@ -149,7 +150,8 @@ test('updates the properties sidebar when a different element is selected via la
 /* ------------------------------------------------------------------ */
 
 /**
- * @description Validates the cross-region flow: clicking a layer entry in the
+ * @description Validates `project/spec/ui/panels.md` P-05:
+ * clicking a layer entry in the
  * layers sidebar selects the element, causing the transform widget to
  * reposition and the sidebar to switch to properties.
  */
@@ -297,7 +299,8 @@ test('shows element-specific context menu actions when an element is selected', 
 /* ------------------------------------------------------------------ */
 
 /**
- * @description Validates that dragging the transform bounds area moves the
+ * @description Validates `project/spec/editor/canvas.md` C-04:
+ * dragging the transform bounds area moves the
  * element, updating the widget's inline position on the canvas.
  */
 test('dragging the transform bounds moves the element position', async ({ mount, page }) => {

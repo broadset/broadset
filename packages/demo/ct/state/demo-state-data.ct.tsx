@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/experimental-ct-react';
 import type { Page } from '@playwright/test';
 
 import { DemoApp } from '../../src/DemoApp';
+import { createDemoAppChromeTestDocument } from '../../src/test-fixtures';
 import { FIXTURE_IDS } from '../fixture-selectors';
 
 async function openToolbarMenu(page: Page, menuLabel: string): Promise<void> {
@@ -9,7 +10,8 @@ async function openToolbarMenu(page: Page, menuLabel: string): Promise<void> {
 }
 
 /**
- * @description Validates the phase 2 demo shell scenario from
+ * @description Validates D-09 from `project/spec/demo/layout.md` and
+ * `project/spec/demo/visual.md`:
  * `project/spec/demo/layout.md` and `project/spec/demo/visual.md`.
  */
 test('fills the viewport and renders the sample document on screen', async ({ mount, page }) => {
@@ -157,7 +159,8 @@ test('renders dark editor chrome with floating toolbars around the preview canva
 });
 
 /**
- * @description Validates the Phase 4 toolbar-chrome contract from
+ * @description Validates T-01 from `project/spec/ui/toolbar-nav.md` and
+ * `project/spec/demo/layout.md`:
  * `project/spec/demo/layout.md` and `project/spec/demo/visual.md` so the main toolbar uses icon-only controls with accessible labels rather than visible text buttons.
  */
 test('uses icon-only main toolbar controls with accessible labels', async ({ mount, page }) => {
@@ -230,7 +233,7 @@ test('shows a placement-mode banner when the user activates an element tool', as
 });
 
 /**
- * @description Validates the 9-G sidebar preference persistence from
+ * @description Validates D-02 from `project/spec/demo/state.md`:
  * `project/spec/demo/state.md`: sidebar open/closed, active tab, and width
  * persist to localStorage, and remounting restores them.
  */
@@ -279,52 +282,45 @@ test('persists sidebar preferences across remounts', async ({ mount, page }) => 
 });
 
 /**
- * @description Validates the 9-G save/restore document lifecycle from
- * `project/spec/demo/state.md`: saving writes to localStorage with valid
- * document JSON. Restoration is verified via DemoApp.test.tsx unit tests.
+ * @description Validates D-03 from `project/spec/demo/state.md`:
+ * startup restores a previously saved localStorage document.
  */
-test('saves the current document to localStorage via the File menu', async ({ mount, page }) => {
-  // Clear any stale document from a previous test in this worker
+test('restores a previously saved localStorage document on startup', async ({ mount, page }) => {
+  const savedDocument = JSON.parse(JSON.stringify(createDemoAppChromeTestDocument())) as {
+    name?: string;
+  };
+
+  savedDocument.name = 'Restored Startup Document';
+
   await page.evaluate(() => {
     window.localStorage.removeItem('broadset:demo-document:v1');
   });
+  await page.evaluate((documentPayload) => {
+    window.localStorage.setItem('broadset:demo-document:v1', JSON.stringify(documentPayload));
+  }, savedDocument);
+
   await mount(<DemoApp />);
 
-  // Trigger save via the File menu
-  const fileButton = page.locator('button[aria-label="File"]').first();
-
-  await fileButton.click();
-  await page.getByText('Save').first().click();
-
-  // Verify localStorage has a valid document entry
-  const stored = await page.evaluate(() => window.localStorage.getItem('broadset:demo-document:v1'));
-
-  expect(stored).not.toBeNull();
-
-  const doc = JSON.parse(stored ?? '{}') as { elements?: unknown[] };
-  const elements = doc.elements ?? [];
-
-  expect(doc.elements).toBeDefined();
-  expect(Array.isArray(doc.elements)).toBe(true);
-  expect(elements.length).toBeGreaterThan(0);
+  await openToolbarMenu(page, 'File');
+  await page.getByText('Document Settings').first().click();
+  await expect(page.getByLabel('Document name')).toHaveValue('Restored Startup Document');
+  await page.getByRole('button', { name: 'Done' }).click();
 });
 
 /**
- * @description Validates the 9-G toast notification system from
+ * @description Validates D-04 from `project/spec/demo/state.md`:
  * `project/spec/demo/state.md`: successful actions show auto-dismissing
  * success toasts at the bottom-right.
  */
-test('shows a success toast after saving the document', async ({ mount, page }) => {
+test('shows and auto-dismisses success toasts for successful actions', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  // Trigger save via the File menu
-  const fileButton = page.locator('button[aria-label="File"]').first();
-
-  await fileButton.click();
-  await page.getByText('Save').first().click();
+  await openToolbarMenu(page, 'Scenes');
+  await page.getByText('Add scene').first().click();
 
   // Toast should appear with success message
-  await expect(page.getByText('Saved the demo document locally.')).toBeVisible({ timeout: 3000 });
+  await expect(page.getByText('Added a new scene.')).toBeVisible({ timeout: 3000 });
+  await expect(page.getByText('Added a new scene.')).toHaveCount(0, { timeout: 6000 });
 });
 
 /**
@@ -348,7 +344,7 @@ test('shows countdown custom plugin in the element toolbar alongside built-in ty
 });
 
 /**
- * @description Validates the 9-G provider wiring from `project/spec/demo/state.md`:
+ * @description Validates D-01 from `project/spec/demo/state.md`:
  * EditorProvider, TimelineEditingProvider, and BroadsetDataStoreProvider are all
  * functional and the editor store is accessible from child components.
  */

@@ -9,7 +9,7 @@ async function openToolbarMenu(page: Page, menuLabel: string): Promise<void> {
 }
 
 /**
- * @description Validates `project/spec/ui/toolbar-nav.md` undo/redo state rules:
+ * @description Validates `project/spec/ui/toolbar-nav.md` T-02 undo/redo state rules:
  * both controls start disabled, an edit enables Undo, and undo enables Redo.
  */
 test('undo and redo buttons update disabled states after an edit and undo', async ({ mount, page }) => {
@@ -45,7 +45,7 @@ test('undo and redo buttons update disabled states after an edit and undo', asyn
 });
 
 /**
- * @description Validates `project/spec/editor/canvas.md` zoom clamp behavior:
+ * @description Validates `project/spec/editor/canvas.md` C-10 zoom clamp behavior:
  * toolbar zoom controls clamp at max 400% and min 10% with visible percentage feedback.
  */
 test('toolbar zoom controls clamp at 400% max and 10% min', async ({ mount, page }) => {
@@ -69,7 +69,7 @@ test('toolbar zoom controls clamp at 400% max and 10% min', async ({ mount, page
 });
 
 /**
- * @description Validates `project/spec/editor/editing.md` + `project/spec/demo/layout.md`:
+ * @description Validates `project/spec/editor/editing.md` C-09 + `project/spec/demo/layout.md`:
  * Escape cancels placement mode, hides the banner, and restores the default preview cursor.
  */
 test('Escape cancels placement mode and restores default preview cursor', async ({ mount, page }) => {
@@ -90,6 +90,46 @@ test('Escape cancels placement mode and restores default preview cursor', async 
 
   await expect.poll(async () => page.getByTestId('placement-mode-banner').isVisible()).toBe(false);
   await expect.poll(async () => preview.evaluate((element) => getComputedStyle(element).cursor)).toBe('default');
+});
+
+/**
+ * @description Validates `project/spec/editor/canvas.md` C-13 and
+ * `project/spec/ui/toolbar-nav.md` View toggles: rulers and grid can be toggled
+ * from the View menu, and ruler ticks remain responsive after zoom and pan.
+ */
+test('view toggles switch rulers/grid and ruler ticks react to zoom and pan', async ({ mount, page }) => {
+  await mount(<DemoAppFresh />);
+
+  await expect(page.getByTestId('ruler-horizontal-strip')).toHaveCount(1);
+  await expect(page.getByTestId('ruler-vertical-strip')).toHaveCount(1);
+
+  await openToolbarMenu(page, 'View');
+  await page.getByText('Show grid').first().click();
+
+  await openToolbarMenu(page, 'File');
+  await page.getByText('Document Settings').first().click();
+  await expect(page.getByRole('switch', { name: 'Show grid' })).toBeChecked();
+  await page.getByRole('button', { name: 'Done' }).click();
+
+  await openToolbarMenu(page, 'View');
+  await page.getByText('Show grid').first().click();
+
+  await openToolbarMenu(page, 'View');
+  await page.getByText('Show rulers').first().click();
+  await expect(page.getByTestId('ruler-horizontal-strip')).toHaveCount(0);
+  await expect(page.getByTestId('ruler-vertical-strip')).toHaveCount(0);
+
+  await openToolbarMenu(page, 'View');
+  await page.getByText('Show rulers').first().click();
+  await expect(page.getByTestId('ruler-horizontal-strip')).toHaveCount(1);
+  await expect(page.getByTestId('ruler-vertical-strip')).toHaveCount(1);
+
+  await page.locator('button[aria-label="Zoom in"]').first().click();
+  await page.keyboard.down('Shift');
+  await page.mouse.wheel(180, 0);
+  await page.keyboard.up('Shift');
+
+  await expect(page.getByTestId('ruler-horizontal-strip')).toBeVisible();
 });
 
 /**

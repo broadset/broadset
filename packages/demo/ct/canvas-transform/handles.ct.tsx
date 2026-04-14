@@ -270,6 +270,43 @@ test('rotation handle is positioned above the widget top-center', async ({ mount
 });
 
 /**
+ * @description Validates `project/spec/editor/canvas.md` C-06:
+ * dragging the rotation handle changes visible widget rotation.
+ */
+test('dragging the rotation handle updates the widget rotation', async ({ mount, page }) => {
+  await mount(<DemoApp />);
+
+  const widget = page.getByTestId('demo-transform-widget');
+
+  await expect(widget).toBeVisible();
+
+  const initialTransform = await widget.evaluate((element) => element.style.transform);
+
+  const rotationHandle = page.getByTestId('transform-rotation-handle');
+  const rotationBox = await rotationHandle.boundingBox();
+  const widgetBox = await widget.boundingBox();
+
+  if (rotationBox === null || widgetBox === null) {
+    throw new Error('Rotation handle or widget bounds not found');
+  }
+
+  const handleCenterX = rotationBox.x + rotationBox.width / 2;
+  const handleCenterY = rotationBox.y + rotationBox.height / 2;
+  const widgetCenterX = widgetBox.x + widgetBox.width / 2;
+  const widgetCenterY = widgetBox.y + widgetBox.height / 2;
+
+  await page.mouse.move(handleCenterX, handleCenterY);
+  await page.mouse.down();
+  await page.mouse.move(widgetCenterX + 80, widgetCenterY - 40, { steps: 10 });
+  await page.mouse.up();
+
+  const rotatedTransform = await widget.evaluate((element) => element.style.transform);
+
+  expect(rotatedTransform).not.toBe(initialTransform);
+  expect(rotatedTransform).not.toBe('rotate(0deg)');
+});
+
+/**
  * @description Validates that handle positions update correctly when selecting
  * a different, smaller element. After selecting el-live-ellipse (96×96 doc-space),
  * the widget and handle positions should match the smaller element's bounds.

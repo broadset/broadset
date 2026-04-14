@@ -82,10 +82,18 @@ test('PropertiesSidebar hides clip-path controls in print mode', async ({ mount,
  */
 test('multi-selection with mixed values shows mixed indicator', async ({ mount, page }) => {
   const first = requireElementById(FIXTURE_IDS.title);
-  const second = requireElementById(FIXTURE_IDS.logo);
+  const baseSecond = requireElementById(FIXTURE_IDS.logo);
+  const second = {
+    ...baseSecond,
+    x: baseSecond.x + 120,
+  };
 
   await mount(<PropertiesSidebar elements={[first, second]} documentMode="screen" onUpdate={() => undefined} />);
 
+  const geometryTrigger = page.getByRole('button', { name: 'Geometry' });
+
+  await geometryTrigger.click();
+  await geometryTrigger.click();
   await expect(page.getByText('Mixed')).toBeVisible();
 });
 
