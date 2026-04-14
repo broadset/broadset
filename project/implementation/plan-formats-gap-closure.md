@@ -12,9 +12,9 @@
 ## Scope
 
 - In scope:
-  - SVG import currently skipping simple `<g>` and unsupported elements.
-  - PSD sync export currently skipping URL-backed images.
-  - PDF export currently drawing placeholders for SVG/non-embeddable image content and non-static types (`video`, `clock`, `ticker`).
+  - SVG import gap: simple `<g>` and unsupported elements fallback behavior.
+  - PSD sync export gap: URL-backed image handling.
+  - PDF export gap: placeholder-heavy behavior for SVG/non-embeddable image content and non-static types (`video`, `clock`, `ticker`).
 - Out of scope:
   - Template-browser gap in demo.
   - VideoEncoder runtime support gap.
@@ -25,8 +25,8 @@
 
 _Spec anchors:_ `project/spec/formats/web-vector.md` (Import, Fallback Preservation, Error Recovery)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 ### Implementation targets
 
@@ -58,8 +58,8 @@ _Spec anchors:_ `project/spec/formats/web-vector.md` (Import, Fallback Preservat
 
 _Spec anchors:_ `project/spec/formats/psd.md` (Smart Object Export)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 ### Decision gate (first step)
 
@@ -96,8 +96,8 @@ Pick one path and implement fully (do not mix partially):
 
 _Spec anchors:_ `project/spec/formats/pdf.md` (Masked SVG fallback, multi-type rendering, static export)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 ### Implementation targets
 
@@ -163,6 +163,6 @@ Run at plan completion:
 
 | Group                         | Red | Green |
 | ----------------------------- | --- | ----- |
-| FGC-A SVG import preservation | ☐   | ☐     |
-| FGC-B PSD sync URL coverage   | ☐   | ☐     |
-| FGC-C PDF fallback upgrade    | ☐   | ☐     |
+| FGC-A SVG import preservation | ☒   | ☒     |
+| FGC-B PSD sync URL coverage   | ☒   | ☒     |
+| FGC-C PDF fallback upgrade    | ☒   | ☒     |
