@@ -32,6 +32,66 @@ jest.mock(
       readonly onChange?: ((value: number) => void) | undefined;
       readonly value: number;
     }>({ label: '', onChange: undefined, value: 0 });
+    const TableContext = ReactActual.createContext<{
+      readonly onRowAction?: ((key: string) => void) | undefined;
+    }>({ onRowAction: undefined });
+
+    const ALLOWED_EVENT_PROPS = new Set([
+      'onBlur',
+      'onChange',
+      'onClick',
+      'onFocus',
+      'onInput',
+      'onKeyDown',
+      'onKeyUp',
+      'onMouseDown',
+      'onMouseUp',
+      'onSubmit',
+    ]);
+
+    const ALLOWED_STANDARD_PROPS = new Set([
+      'aria-describedby',
+      'aria-label',
+      'aria-labelledby',
+      'aria-selected',
+      'checked',
+      'className',
+      'disabled',
+      'id',
+      'name',
+      'placeholder',
+      'placement',
+      'role',
+      'style',
+      'tabIndex',
+      'title',
+      'type',
+      'value',
+    ]);
+
+    const shouldForwardProp = (propName: string): boolean => {
+      if (propName.startsWith('data-')) {
+        return true;
+      }
+
+      if (propName.startsWith('aria-')) {
+        return true;
+      }
+
+      return ALLOWED_EVENT_PROPS.has(propName) || ALLOWED_STANDARD_PROPS.has(propName);
+    };
+
+    const sanitizeDomProps = (props: Record<string, unknown>): Record<string, unknown> => {
+      return Object.entries(props).reduce<Record<string, unknown>>((sanitizedProps, [propName, propValue]) => {
+        if (!shouldForwardProp(propName)) {
+          return sanitizedProps;
+        }
+
+        sanitizedProps[propName] = propValue;
+
+        return sanitizedProps;
+      }, {});
+    };
 
     function createWrapper(tagName = 'div') {
       return function Wrapper(props: MockHeroUiProps): React.JSX.Element {
@@ -43,7 +103,9 @@ jest.mock(
           ...restProps
         } = props;
 
-        return ReactActual.createElement(tagName, restProps, children ?? null);
+        const domProps = sanitizeDomProps(restProps);
+
+        return ReactActual.createElement(tagName, domProps, children ?? null);
       };
     }
 
@@ -107,6 +169,7 @@ jest.mock(
       function NumberFieldRoot(props: MockHeroUiProps): React.JSX.Element {
         const {
           children,
+          isDisabled: _isDisabled,
           label,
           maxValue: _maxValue,
           minValue: _minValue,
@@ -119,10 +182,11 @@ jest.mock(
           typeof props['aria-label'] === 'string' ? props['aria-label']
           : typeof label === 'string' ? label
           : '';
+        const domProps = sanitizeDomProps(restProps);
 
         return ReactActual.createElement(
           'div',
-          restProps,
+          domProps,
           ReactActual.createElement(
             NumberFieldContext.Provider,
             {
@@ -376,20 +440,25 @@ jest.mock(
       Separator: createWrapper('hr'),
       Slider: Object.assign(
         function SliderRoot(props: MockHeroUiProps): React.JSX.Element {
-          const { children, onChange, ...restProps } = props;
+          const { children, isDisabled, maxValue, minValue, onChange, step, value, ...restProps } = props;
+          const domProps = sanitizeDomProps(restProps);
 
           return ReactActual.createElement(
             'div',
-            { ...restProps, role: 'group' },
+            { ...domProps, role: 'group' },
             ReactActual.createElement('input', {
               'aria-label': props['aria-label'],
+              disabled: Boolean(isDisabled),
+              max: typeof maxValue === 'number' ? maxValue : undefined,
+              min: typeof minValue === 'number' ? minValue : undefined,
               onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
                 if (typeof onChange === 'function') {
                   (onChange as (mockValue: number) => void)(Number(event.currentTarget.value));
                 }
               },
+              step: typeof step === 'number' ? step : undefined,
               type: 'range',
-              value: String(Number(props['value'] ?? 0)),
+              value: String(Number(value ?? 0)),
             }),
             children ?? null,
           );
@@ -420,9 +489,51 @@ jest.mock(
         Body: createWrapper('tbody'),
         Cell: createWrapper('td'),
         Column: createWrapper('th'),
-        Content: createWrapper(),
-        Header: createWrapper('thead'),
-        Row: createWrapper('tr'),
+        Content(props: MockHeroUiProps): React.JSX.Element {
+          const { children, onRowAction } = props;
+
+          return ReactActual.createElement(
+            TableContext.Provider,
+            {
+              value: {
+                onRowAction: typeof onRowAction === 'function' ? (onRowAction as (mockKey: string) => void) : undefined,
+              },
+            },
+            children ?? null,
+          );
+        },
+        Header(props: MockHeroUiProps): React.JSX.Element {
+          const { children, ...restProps } = props;
+          const domProps = sanitizeDomProps(restProps);
+
+          return ReactActual.createElement('thead', domProps, ReactActual.createElement('tr', null, children ?? null));
+        },
+        Row(props: MockHeroUiProps): React.JSX.Element {
+          const tableContext = ReactActual.useContext(TableContext);
+          const { children, onPress, ...restProps } = props;
+          const domProps = sanitizeDomProps(restProps);
+
+          return ReactActual.createElement(
+            'tr',
+            {
+              ...domProps,
+              onClick: () => {
+                if (typeof onPress === 'function') {
+                  onPress();
+
+                  return;
+                }
+
+                const rowId = props['id'];
+
+                if (typeof rowId === 'number' || typeof rowId === 'string') {
+                  tableContext.onRowAction?.(String(rowId));
+                }
+              },
+            },
+            children ?? null,
+          );
+        },
       }),
       Tabs,
       Toast: ToastComponent,
