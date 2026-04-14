@@ -18,8 +18,13 @@ import { createUIActionsSlice, type UIActionsState } from '../store-ui-actions';
 import { createSnapshot, ensureSnapshotName, MAX_SNAPSHOTS } from './history';
 import { applySelectionSideEffects, createInteractionState, filterSelectionToExisting } from './selection';
 import {
+  computeRemoveElementsState,
+  computeRemoveElementState,
+  type ReorderDirection,
+  reorderElementInList,
+} from './store-element-reducers';
+import {
   applyElementUpdate,
-  collectDescendantIds,
   toggleOverrideVisibility,
   updateDocumentElement,
   updateDocumentElements,
@@ -36,7 +41,7 @@ export type EditingMode =
   | { readonly type: 'clip-path-editing'; readonly elementId: string }
   | { readonly type: 'motion-path-editing'; readonly elementId: string };
 
-export type ReorderDirection = 'forward' | 'backward' | 'front' | 'back';
+export type { ReorderDirection } from './store-element-reducers';
 
 export interface NamedSnapshot {
   readonly id: string;
@@ -237,82 +242,9 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
         },
         reorderElement(elementId: string, direction: ReorderDirection): void {
           set((state) => {
-            const currentIndex = state.document.elements.findIndex((element) => element.id === elementId);
+            const nextElements = reorderElementInList(state.document.elements, elementId, direction);
 
-            if (currentIndex === -1) {
-              return {};
-            }
-
-            const nextElements = [...state.document.elements];
-
-            switch (direction) {
-              case 'forward': {
-                if (currentIndex >= nextElements.length - 1) {
-                  return {};
-                }
-
-                const [element] = nextElements.splice(currentIndex, 1);
-
-                if (element === undefined) {
-                  return {};
-                }
-
-                nextElements.splice(currentIndex + 1, 0, element);
-                break;
-              }
-
-              case 'backward': {
-                if (currentIndex <= 0) {
-                  return {};
-                }
-
-                const [element] = nextElements.splice(currentIndex, 1);
-
-                if (element === undefined) {
-                  return {};
-                }
-
-                nextElements.splice(currentIndex - 1, 0, element);
-                break;
-              }
-
-              case 'front': {
-                if (currentIndex === nextElements.length - 1) {
-                  return {};
-                }
-
-                const [element] = nextElements.splice(currentIndex, 1);
-
-                if (element === undefined) {
-                  return {};
-                }
-
-                nextElements.push(element);
-                break;
-              }
-
-              case 'back': {
-                if (currentIndex === 0) {
-                  return {};
-                }
-
-                const [element] = nextElements.splice(currentIndex, 1);
-
-                if (element === undefined) {
-                  return {};
-                }
-
-                nextElements.unshift(element);
-                break;
-              }
-            }
-
-            return {
-              document: {
-                ...state.document,
-                elements: nextElements,
-              },
-            };
+            return nextElements === null ? {} : { document: { ...state.document, elements: nextElements } };
           });
         },
         addElement(typeOrElement: string | BroadsetElement): string {
@@ -349,136 +281,12 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
           }
 
           set((state) => {
-            const affectedIds = collectDescendantIds(state.document, elementId);
-            const promotedIds = new Set<string>(
-              [...affectedIds].filter((affectedId) => affectedId !== elementId && requiredElementIds.has(affectedId)),
-            );
-            const deletedIds = new Set<string>([...affectedIds].filter((affectedId) => !promotedIds.has(affectedId)));
-            const nextDocument: BroadsetDocument = {
-              ...state.document,
-              elements: state.document.elements
-                .filter((element) => !deletedIds.has(element.id))
-                .map((element) =>
-                  promotedIds.has(element.id) ?
-                    {
-                      ...element,
-                      parentId: null,
-                    }
-                  : element,
-                ),
-              pages: state.document.pages.map((page) => ({
-                ...page,
-                overrides: page.overrides.filter((override) => !deletedIds.has(override.elementId)),
-              })),
-            };
-            const nextActiveElementIds = state.activeElementIds.filter((activeId) => !deletedIds.has(activeId));
-            const nextPathEditingElementId =
-              state.pathEditingElementId !== null && deletedIds.has(state.pathEditingElementId) ?
-                null
-              : state.pathEditingElementId;
-            const nextPathDrawingElementId =
-              state.pathDrawingElementId !== null && deletedIds.has(state.pathDrawingElementId) ?
-                null
-              : state.pathDrawingElementId;
-            const nextClipPathEditingElementId =
-              state.clipPathEditingElementId !== null && deletedIds.has(state.clipPathEditingElementId) ?
-                null
-              : state.clipPathEditingElementId;
-            const nextMotionPathEditingElementId =
-              state.motionPathEditingElementId !== null && deletedIds.has(state.motionPathEditingElementId) ?
-                null
-              : state.motionPathEditingElementId;
-            const nextInlineTextEditingElementId =
-              state.inlineTextEditingElementId !== null && deletedIds.has(state.inlineTextEditingElementId) ?
-                null
-              : state.inlineTextEditingElementId;
-
-            return {
-              document: nextDocument,
-              ...createInteractionState(
-                nextActiveElementIds,
-                state.pendingPlacementType,
-                nextPathEditingElementId,
-                nextPathDrawingElementId,
-                nextInlineTextEditingElementId,
-                nextClipPathEditingElementId,
-                nextMotionPathEditingElementId,
-              ),
-            };
+            return computeRemoveElementState(state, elementId, requiredElementIds) ?? {};
           });
         },
         removeElements(elementIds: readonly string[]): void {
-          const removableIds = elementIds.filter((elementId) => !requiredElementIds.has(elementId));
-
-          if (removableIds.length === 0) {
-            return;
-          }
-
           set((state) => {
-            const allDeletedIds = new Set<string>();
-
-            for (const elementId of removableIds) {
-              const descendants = collectDescendantIds(state.document, elementId);
-
-              for (const descendantId of descendants) {
-                if (!requiredElementIds.has(descendantId)) {
-                  allDeletedIds.add(descendantId);
-                }
-              }
-            }
-
-            const nextDocument: BroadsetDocument = {
-              ...state.document,
-              elements: state.document.elements
-                .filter((element) => !allDeletedIds.has(element.id))
-                .map((element) =>
-                  (
-                    requiredElementIds.has(element.id) &&
-                    element.parentId !== null &&
-                    allDeletedIds.has(element.parentId)
-                  ) ?
-                    { ...element, parentId: null }
-                  : element,
-                ),
-              pages: state.document.pages.map((page) => ({
-                ...page,
-                overrides: page.overrides.filter((override) => !allDeletedIds.has(override.elementId)),
-              })),
-            };
-            const nextActiveElementIds = state.activeElementIds.filter((activeId) => !allDeletedIds.has(activeId));
-            const nextPathEditingElementId =
-              state.pathEditingElementId !== null && allDeletedIds.has(state.pathEditingElementId) ?
-                null
-              : state.pathEditingElementId;
-            const nextPathDrawingElementId =
-              state.pathDrawingElementId !== null && allDeletedIds.has(state.pathDrawingElementId) ?
-                null
-              : state.pathDrawingElementId;
-            const nextClipPathEditingElementId =
-              state.clipPathEditingElementId !== null && allDeletedIds.has(state.clipPathEditingElementId) ?
-                null
-              : state.clipPathEditingElementId;
-            const nextMotionPathEditingElementId =
-              state.motionPathEditingElementId !== null && allDeletedIds.has(state.motionPathEditingElementId) ?
-                null
-              : state.motionPathEditingElementId;
-            const nextInlineTextEditingElementId =
-              state.inlineTextEditingElementId !== null && allDeletedIds.has(state.inlineTextEditingElementId) ?
-                null
-              : state.inlineTextEditingElementId;
-
-            return {
-              document: nextDocument,
-              ...createInteractionState(
-                nextActiveElementIds,
-                state.pendingPlacementType,
-                nextPathEditingElementId,
-                nextPathDrawingElementId,
-                nextInlineTextEditingElementId,
-                nextClipPathEditingElementId,
-                nextMotionPathEditingElementId,
-              ),
-            };
+            return computeRemoveElementsState(state, elementIds, requiredElementIds) ?? {};
           });
         },
         undo(): void {
