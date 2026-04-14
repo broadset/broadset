@@ -1,0 +1,360 @@
+/** @jest-environment jsdom */
+
+import { jest } from '@jest/globals';
+import * as React from 'react';
+
+/* ------------------------------------------------------------------ */
+/*  HeroUI mock — all helpers use mock prefix to pass jest-hoist       */
+/* ------------------------------------------------------------------ */
+
+const mockNumCtx = React.createContext({
+  label: '',
+  val: 0,
+  cb: undefined as ((n: number) => void) | undefined,
+  disabled: false,
+});
+
+const mockTableCtx = React.createContext({
+  onRowAction: undefined as ((key: string) => void) | undefined,
+});
+
+function mockWrap(tag = 'div') {
+  return (p: Record<string, unknown>) => {
+    const { children, ...rest } = p;
+
+    return React.createElement(tag, rest, (children as React.ReactNode) ?? null);
+  };
+}
+
+function mockButton(p: Record<string, unknown>) {
+  const { children, isDisabled, onPress, ...rest } = p;
+
+  return React.createElement(
+    'button',
+    { ...rest, disabled: isDisabled, onClick: typeof onPress === 'function' ? onPress : undefined },
+    (children as React.ReactNode) ?? null,
+  );
+}
+
+function mockInput(p: Record<string, unknown>) {
+  const { label, onChange, onValueChange, ...rest } = p;
+
+  return React.createElement('input', {
+    ...rest,
+    'aria-label': p['aria-label'] ?? label,
+    onChange:
+      typeof onValueChange === 'function' ?
+        (e: React.ChangeEvent<HTMLInputElement>) => {
+          (onValueChange as (v: string) => void)(e.currentTarget.value);
+        }
+      : typeof onChange === 'function' ? onChange
+      : undefined,
+    value: p['value'] ?? '',
+  });
+}
+
+function mockNumberFieldRoot(p: Record<string, unknown>) {
+  const { children, label, onChange, isDisabled: _d, ...rest } = p;
+
+  return React.createElement(
+    'div',
+    rest,
+    React.createElement(
+      mockNumCtx.Provider,
+      {
+        value: {
+          label: (p['aria-label'] ?? label ?? '') as string,
+          val: Number(p['value'] ?? 0),
+          cb: typeof onChange === 'function' ? (onChange as (n: number) => void) : undefined,
+          disabled: Boolean(p['isDisabled']),
+        },
+      },
+      (children as React.ReactNode) ?? null,
+    ),
+  );
+}
+
+function mockNumberFieldInput(p: Record<string, unknown>) {
+  const ctx = React.useContext(mockNumCtx);
+
+  return React.createElement('input', {
+    ...p,
+    'aria-label': ctx.label,
+    disabled: ctx.disabled,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      ctx.cb?.(Number(e.currentTarget.value));
+    },
+    role: 'spinbutton',
+    type: 'number',
+    value: String(ctx.val),
+  });
+}
+
+function mockSlider(p: Record<string, unknown>) {
+  const { children, label, onChange, ...rest } = p;
+
+  return React.createElement(
+    'div',
+    { ...rest, 'aria-label': label, role: 'group' },
+    React.createElement('input', {
+      'aria-label': label,
+      type: 'range',
+      value: String(Number(p['value'] ?? 0)),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (typeof onChange === 'function') {
+          (onChange as (v: number) => void)(Number(e.currentTarget.value));
+        }
+      },
+    }),
+    (children as React.ReactNode) ?? null,
+  );
+}
+
+function mockSwitch(p: Record<string, unknown>) {
+  const { children, isSelected, onChange, ...rest } = p;
+
+  return React.createElement(
+    'label',
+    rest,
+    React.createElement('input', {
+      'aria-label': p['aria-label'],
+      checked: Boolean(isSelected),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (typeof onChange === 'function') {
+          (onChange as (v: boolean) => void)(e.currentTarget.checked);
+        }
+      },
+      role: 'switch',
+      type: 'checkbox',
+    }),
+    (children as React.ReactNode) ?? null,
+  );
+}
+
+function mockModal(p: Record<string, unknown>) {
+  const { children, isOpen, onClose, size: _s, ...rest } = p;
+
+  if (!isOpen) return null;
+
+  return React.createElement(
+    'div',
+    { ...rest, 'aria-modal': 'true', role: 'dialog' },
+    (children as React.ReactNode) ?? null,
+  );
+}
+
+function mockKbd(p: Record<string, unknown>) {
+  const { children, ...rest } = p;
+
+  return React.createElement('kbd', rest, (children as React.ReactNode) ?? null);
+}
+
+function mockSpinner(p: Record<string, unknown>) {
+  return React.createElement('div', { ...p, role: 'progressbar' });
+}
+
+function mockProgress(p: Record<string, unknown>) {
+  const { label, ...rest } = p;
+
+  return React.createElement('div', { ...rest, 'aria-label': label, role: 'progressbar' });
+}
+
+function mockTable(p: Record<string, unknown>) {
+  const { children, ...rest } = p;
+
+  return React.createElement('table', rest, (children as React.ReactNode) ?? null);
+}
+
+function mockTableContent(p: Record<string, unknown>) {
+  const { children, onRowAction, ...rest } = p;
+
+  return React.createElement(
+    'div',
+    rest,
+    React.createElement(
+      mockTableCtx.Provider,
+      {
+        value: {
+          onRowAction: typeof onRowAction === 'function' ? (onRowAction as (key: string) => void) : undefined,
+        },
+      },
+      (children as React.ReactNode) ?? null,
+    ),
+  );
+}
+
+function mockTabs(p: Record<string, unknown>) {
+  const { children, onSelectionChange, selectedKey, ...rest } = p;
+
+  return React.createElement(
+    'div',
+    { ...rest, role: 'tablist' },
+    React.createElement('input', {
+      'data-testid': 'tabs-selection',
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (typeof onSelectionChange === 'function') {
+          (onSelectionChange as (v: string) => void)(e.currentTarget.value);
+        }
+      },
+      type: 'text',
+      value: typeof selectedKey === 'string' ? selectedKey : '',
+    }),
+    (children as React.ReactNode | undefined) ?? null,
+  );
+}
+
+function mockTab(p: Record<string, unknown>) {
+  const { children, ...rest } = p;
+
+  return React.createElement('div', { ...rest, role: 'tab' }, (children as React.ReactNode) ?? null);
+}
+
+function mockSelect(p: Record<string, unknown>) {
+  const { children, label, onChange, onSelectionChange, ...rest } = p;
+
+  return React.createElement(
+    'select',
+    {
+      ...rest,
+      'aria-label': label,
+      onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+        if (typeof onSelectionChange === 'function') {
+          (onSelectionChange as (v: string) => void)(e.currentTarget.value);
+        }
+
+        if (typeof onChange === 'function') {
+          (onChange as (v: string) => void)(e.currentTarget.value);
+        }
+      },
+    },
+    (children as React.ReactNode) ?? null,
+  );
+}
+
+function mockListBoxItem(p: Record<string, unknown>) {
+  const { children, ...rest } = p;
+
+  return React.createElement('option', rest, (children as React.ReactNode) ?? null);
+}
+
+function mockTableRow(p: Record<string, unknown>) {
+  const tableCtx = React.useContext(mockTableCtx);
+  const { children, ...rest } = p;
+
+  return React.createElement(
+    'tr',
+    {
+      ...rest,
+      onClick: () => {
+        if (typeof p['onPress'] === 'function') {
+          (p['onPress'] as () => void)();
+
+          return;
+        }
+
+        if (tableCtx.onRowAction !== undefined) {
+          const rowId = p['id'];
+
+          if (typeof rowId === 'string' || typeof rowId === 'number') {
+            tableCtx.onRowAction(String(rowId));
+          }
+        }
+      },
+    },
+    (children as React.ReactNode) ?? null,
+  );
+}
+
+jest.mock(
+  '@heroui/react',
+  () => ({
+    Button: mockButton,
+    ButtonGroup: mockWrap(),
+    Input: mockInput,
+    Kbd: mockKbd,
+    ListBoxItem: mockListBoxItem,
+    Modal: Object.assign(mockModal, {
+      Backdrop: mockWrap(),
+      Container: mockWrap(),
+      Dialog: mockWrap(),
+      Header: mockWrap('header'),
+      Body: mockWrap(),
+      Footer: mockWrap('footer'),
+    }),
+    NumberField: Object.assign(mockNumberFieldRoot, { Group: mockWrap(), Input: mockNumberFieldInput }),
+    Progress: mockProgress,
+    Select: Object.assign(mockSelect, {
+      Trigger: mockWrap(),
+      Value: mockWrap('span'),
+      Popover: mockWrap(),
+    }),
+    Slider: Object.assign(mockSlider, { Track: mockWrap(), Fill: mockWrap(), Thumb: mockWrap() }),
+    Spinner: mockSpinner,
+    Switch: mockSwitch,
+    Tab: mockTab,
+    Table: Object.assign(mockTable, {
+      Content: mockTableContent,
+      Header: mockWrap('thead'),
+      Body: mockWrap('tbody'),
+      Column: mockWrap('th'),
+      Row: mockTableRow,
+      Cell: mockWrap('td'),
+    }),
+    Tabs: Object.assign(mockTabs, { List: mockWrap(), Tab: mockTab }),
+  }),
+  { virtual: true },
+);
+
+/* ------------------------------------------------------------------ */
+/*  Mock ./inputs                                                      */
+/* ------------------------------------------------------------------ */
+
+function mockNumField(p: Record<string, unknown>) {
+  return React.createElement('input', {
+    'aria-label': (p['label'] as string | undefined) ?? '',
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (typeof p['onChange'] === 'function') {
+        (p['onChange'] as (v: number) => void)(Number(e.currentTarget.value));
+      }
+    },
+    onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+      if (typeof p['onCommit'] === 'function') {
+        (p['onCommit'] as (v: number) => void)(Number(e.currentTarget.value));
+      }
+    },
+    onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter' && typeof p['onCommit'] === 'function') {
+        (p['onCommit'] as (v: number) => void)(Number((e.currentTarget as HTMLInputElement).value));
+      }
+    },
+    role: 'spinbutton',
+    type: 'number',
+    value: String(Number(p['value'] ?? 0)),
+  });
+}
+
+function mockColorInput(p: Record<string, unknown>) {
+  return React.createElement('input', {
+    'aria-label': (p['label'] as string | undefined) ?? 'Color',
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (typeof p['onChange'] === 'function') {
+        (p['onChange'] as (v: string) => void)(e.currentTarget.value);
+      }
+    },
+    type: 'text',
+    value: (p['value'] as string | undefined) ?? '',
+  });
+}
+
+jest.mock('./inputs', () => ({
+  ColorInput: mockColorInput,
+  NumField: mockNumField,
+}));
+
+/* ================================================================== */
+/*  TESTS                                                              */
+/* ================================================================== */
+
+/* ------------------------------------------------------------------ */
+/*  About Modal                                                        */
+/* ------------------------------------------------------------------ */
