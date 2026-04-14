@@ -5,6 +5,7 @@ import {
   InlineTextHarness,
   MarqueeSelectionHarness,
   SnapGuideHarness,
+  ViewportInteractionHarness,
 } from './advanced-harnesses.helper';
 
 /**
@@ -131,4 +132,76 @@ test('inline text editing supports open cancel commit and viewport suppression',
 
   await expect(page.getByTestId('inline-editing')).toHaveText('false');
   await expect(page.getByTestId('inline-text-value')).toHaveText('Updated Headline');
+});
+
+/**
+ * @description Validates `project/spec/editor/canvas.md` C-11: wheel zoom keeps
+ * the cursor anchor stable by compensating pan while changing scale.
+ */
+test('cursor-locked wheel zoom preserves anchor via pan compensation', async ({ mount, page }) => {
+  await mount(<ViewportInteractionHarness />);
+
+  const canvas = page.getByTestId('viewport-canvas');
+  const box = await canvas.boundingBox();
+
+  if (box === null) {
+    throw new Error('Expected viewport canvas bounds');
+  }
+
+  const localCursorX = box.width * 0.58;
+  const localCursorY = box.height * 0.42;
+
+  await canvas.dispatchEvent('wheel', {
+    clientX: box.x + localCursorX,
+    clientY: box.y + localCursorY,
+    deltaMode: 0,
+    deltaX: 0,
+    deltaY: -120,
+  });
+
+  await expect(page.getByTestId('viewport-zoom')).toHaveText('1.24');
+
+  const panText = (await page.getByTestId('viewport-pan').textContent()) ?? '0,0';
+  const [panX, panY] = panText.split(',').map((value) => Number(value));
+  const expectedPanX = localCursorX - localCursorX * 1.24;
+  const expectedPanY = localCursorY - localCursorY * 1.24;
+
+  expect(panX).toBeCloseTo(expectedPanX, 1);
+  expect(panY).toBeCloseTo(expectedPanY, 1);
+});
+
+/**
+ * @description Validates `project/spec/editor/canvas.md` C-12: trackpad-like
+ * pan gestures (wheel pan + Shift-drag pan) update translation without zoom drift.
+ */
+test('trackpad-like pan gestures move viewport while zoom remains stable', async ({ mount, page }) => {
+  await mount(<ViewportInteractionHarness />);
+
+  const canvas = page.getByTestId('viewport-canvas');
+  const box = await canvas.boundingBox();
+
+  if (box === null) {
+    throw new Error('Expected viewport canvas bounds');
+  }
+
+  await canvas.dispatchEvent('wheel', { deltaMode: 0, deltaX: 40, deltaY: 14 });
+  await expect(page.getByTestId('viewport-pan')).toHaveText('-40,-14');
+  await expect(page.getByTestId('viewport-zoom')).toHaveText('1');
+
+  const startX = box.x + box.width * 0.4;
+  const startY = box.y + box.height * 0.4;
+
+  await page.mouse.move(startX, startY);
+  await page.keyboard.down('Shift');
+  await page.mouse.down();
+  await page.mouse.move(startX + 66, startY + 44, { steps: 8 });
+  await page.mouse.up();
+  await page.keyboard.up('Shift');
+
+  const panText = (await page.getByTestId('viewport-pan').textContent()) ?? '0,0';
+  const [panX, panY] = panText.split(',').map((value) => Number(value));
+
+  expect(panX).toBeCloseTo(26, 0);
+  expect(panY).toBeCloseTo(30, 0);
+  await expect(page.getByTestId('viewport-zoom')).toHaveText('1');
 });

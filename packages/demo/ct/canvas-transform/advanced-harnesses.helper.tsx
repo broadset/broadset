@@ -1,3 +1,4 @@
+import { classifyWheelInput } from '@broadset/ui';
 import { type JSX, useMemo, useState } from 'react';
 
 interface Rect {
@@ -14,6 +15,12 @@ interface ElementNode extends Rect {
 
 const CANVAS_WIDTH = 640;
 const CANVAS_HEIGHT = 360;
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 4;
+
+function clampZoom(nextZoom: number): number {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(nextZoom * 100) / 100));
+}
 
 const MARQUEE_ELEMENTS: readonly ElementNode[] = [
   { id: 'el-a', label: 'A', x: 40, y: 40, width: 120, height: 70 },
@@ -376,6 +383,124 @@ export function InlineTextHarness(): JSX.Element {
       <output data-testid="inline-text-value">{text}</output>
       <output data-testid="inline-editing">{String(editing)}</output>
       <output data-testid="inline-viewport-locked">{String(viewportLocked)}</output>
+    </div>
+  );
+}
+
+export function ViewportInteractionHarness(): JSX.Element {
+  const [zoom, setZoom] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState<{
+    readonly originPanX: number;
+    readonly originPanY: number;
+    readonly startX: number;
+    readonly startY: number;
+  } | null>(null);
+
+  return (
+    <div>
+      <div
+        data-testid="viewport-canvas"
+        onPointerDown={(event) => {
+          if (!event.shiftKey && event.button !== 1) {
+            return;
+          }
+
+          event.currentTarget.setPointerCapture(event.pointerId);
+          setPanStart({
+            originPanX: panX,
+            originPanY: panY,
+            startX: event.clientX,
+            startY: event.clientY,
+          });
+          setIsPanning(true);
+        }}
+        onPointerMove={(event) => {
+          if (panStart === null) {
+            return;
+          }
+
+          const deltaX = event.clientX - panStart.startX;
+          const deltaY = event.clientY - panStart.startY;
+
+          setPanX(panStart.originPanX + deltaX);
+          setPanY(panStart.originPanY + deltaY);
+        }}
+        onPointerUp={(event) => {
+          setIsPanning(false);
+          setPanStart(null);
+
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+        }}
+        onWheel={(event) => {
+          const intent = classifyWheelInput({
+            altKey: event.altKey,
+            ctrlKey: event.ctrlKey || event.metaKey,
+            deltaMode: event.deltaMode,
+            deltaX: event.deltaX,
+            deltaY: event.deltaY,
+          });
+
+          if (intent === 'none') {
+            return;
+          }
+
+          event.preventDefault();
+
+          if (intent === 'pan') {
+            setPanX((currentValue) => currentValue - event.deltaX);
+            setPanY((currentValue) => currentValue - event.deltaY);
+
+            return;
+          }
+
+          const nextZoom =
+            event.deltaMode === 0 ?
+              clampZoom(zoom - event.deltaY * 0.002)
+            : clampZoom(zoom + (event.deltaY < 0 ? 0.1 : -0.1));
+
+          if (nextZoom === zoom) {
+            return;
+          }
+
+          const bounds = event.currentTarget.getBoundingClientRect();
+          const cursorX = event.clientX - bounds.left;
+          const cursorY = event.clientY - bounds.top;
+          const worldX = (cursorX - panX) / zoom;
+          const worldY = (cursorY - panY) / zoom;
+
+          setZoom(nextZoom);
+          setPanX(cursorX - worldX * nextZoom);
+          setPanY(cursorY - worldY * nextZoom);
+        }}
+        style={{
+          background: '#0f172a',
+          cursor: isPanning ? 'grabbing' : 'default',
+          height: `${String(CANVAS_HEIGHT)}px`,
+          position: 'relative',
+          width: `${String(CANVAS_WIDTH)}px`,
+        }}
+      >
+        <div
+          data-testid="viewport-content"
+          style={{
+            background: '#2563eb',
+            height: '120px',
+            left: '200px',
+            position: 'absolute',
+            top: '110px',
+            transform: `translate(${String(panX)}px, ${String(panY)}px) scale(${String(zoom)})`,
+            transformOrigin: 'top left',
+            width: '160px',
+          }}
+        />
+      </div>
+      <output data-testid="viewport-pan">{`${String(panX)},${String(panY)}`}</output>
+      <output data-testid="viewport-zoom">{String(zoom)}</output>
     </div>
   );
 }
