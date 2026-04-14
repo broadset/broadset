@@ -238,4 +238,72 @@ describe('createPlaybackController', () => {
 
     controller.destroy();
   });
+
+  /** @description play() must trigger the IN timeline for elements with IN/OUT state bindings so the entrance animation plays when the user clicks the global play button. */
+  it('plays the IN timeline on play() for elements with IN/OUT state bindings', () => {
+    jest.useFakeTimers();
+
+    try {
+      const { opacityTarget, root } = createHostElement('hero');
+      const animations: readonly AnimationDefinition[] = [
+        {
+          elementId: 'hero',
+          config: createConfig({
+            timelines: [
+              createTimeline({
+                id: 'tl-in',
+                name: 'Score Bug In',
+                durationMs: 600,
+                keyframes: [
+                  createKeyframe({
+                    name: 'start',
+                    offsetMs: 0,
+                    properties: { opacity: { type: 'number', value: 0, easing: 'linear' } },
+                  }),
+                  createKeyframe({
+                    name: 'end',
+                    offsetMs: 600,
+                    properties: { opacity: { type: 'number', value: 1, easing: 'linear' } },
+                  }),
+                ],
+              }),
+              createTimeline({
+                id: 'tl-out',
+                name: 'Score Bug Out',
+                durationMs: 400,
+                keyframes: [
+                  createKeyframe({
+                    name: 'start',
+                    offsetMs: 0,
+                    properties: { opacity: { type: 'number', value: 1, easing: 'linear' } },
+                  }),
+                  createKeyframe({
+                    name: 'end',
+                    offsetMs: 400,
+                    properties: { opacity: { type: 'number', value: 0, easing: 'linear' } },
+                  }),
+                ],
+              }),
+            ],
+            stateTimelineBindings: [
+              { stateName: 'IN', timelineId: 'tl-in' },
+              { stateName: 'OUT', timelineId: 'tl-out' },
+            ],
+          }),
+        },
+      ];
+
+      const controller = createPlaybackController({ root, animations });
+
+      controller.attach();
+      controller.play();
+      jest.advanceTimersByTime(600);
+
+      expect(Number(opacityTarget.style.opacity)).toBeCloseTo(1, 1);
+
+      controller.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

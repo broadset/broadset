@@ -554,7 +554,7 @@
       {
         "id": "el-live-badge-bg",
         "type": "rectangle",
-        "name": "LIVE BG",
+        "name": "LIVE Badge",
         "locked": true,
         "position": {
           "x": 48,
@@ -648,7 +648,7 @@
       {
         "id": "el-event-tag-bg",
         "type": "rectangle",
-        "name": "Event Tag BG",
+        "name": "Event Tag",
         "locked": true,
         "position": {
           "x": 48,
@@ -773,7 +773,7 @@
       {
         "id": "el-l3-bg",
         "type": "rectangle",
-        "name": "L3 Background",
+        "name": "Lower Third",
         "locked": true,
         "position": {
           "x": 48,
@@ -1020,7 +1020,7 @@
       {
         "id": "el-stats-bg",
         "type": "rectangle",
-        "name": "Stats BG",
+        "name": "Stats Panel",
         "locked": true,
         "position": {
           "x": 1232,
@@ -1359,8 +1359,8 @@
         "name": "Replay Label",
         "locked": false,
         "position": {
-          "x": 1244,
-          "y": 536
+          "x": 12,
+          "y": 12
         },
         "width": 100,
         "height": 24,
@@ -1379,7 +1379,7 @@
           "textAlignment": "center",
           "verticalAlignment": "middle"
         },
-        "parentId": null,
+        "parentId": "el-replay-window",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -1395,7 +1395,7 @@
       {
         "id": "el-promo-bg",
         "type": "rectangle",
-        "name": "Sponsor BG",
+        "name": "Sponsor Panel",
         "locked": true,
         "position": {
           "x": 1632,
@@ -1497,7 +1497,7 @@
       {
         "id": "el-ticker-bg",
         "type": "rectangle",
-        "name": "Ticker BG",
+        "name": "Ticker Bar",
         "locked": true,
         "position": {
           "x": 0,
@@ -3455,10 +3455,40 @@
         "id": "asset-player-headshot",
         "name": "Player Headshot",
         "kind": "image",
-        "mimeType": "image/svg+xml",
+        "mimeType": "image/jpeg",
         "source": {
           "type": "url",
-          "url": "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 116 116'%3E%3Crect width='116' height='116' rx='8' fill='%231a1a3e'/%3E%3Ccircle cx='58' cy='42' r='24' fill='%23444'/%3E%3Cellipse cx='58' cy='100' rx='36' ry='28' fill='%23444'/%3E%3C/svg%3E"
+          "url": "https://fastly.picsum.photos/id/192/150/150.jpg"
+        }
+      },
+      {
+        "id": "asset-stadium-background",
+        "name": "Stadium Background",
+        "kind": "image",
+        "mimeType": "image/jpeg",
+        "source": {
+          "type": "url",
+          "url": "https://fastly.picsum.photos/id/110/300/200.jpg"
+        }
+      },
+      {
+        "id": "asset-match-hero",
+        "name": "Match Hero Image",
+        "kind": "image",
+        "mimeType": "image/jpeg",
+        "source": {
+          "type": "url",
+          "url": "https://fastly.picsum.photos/id/204/400/267.jpg"
+        }
+      },
+      {
+        "id": "asset-social-artwork",
+        "name": "Social Artwork",
+        "kind": "image",
+        "mimeType": "image/jpeg",
+        "source": {
+          "type": "url",
+          "url": "https://fastly.picsum.photos/id/140/200/200.jpg"
         }
       },
       {
