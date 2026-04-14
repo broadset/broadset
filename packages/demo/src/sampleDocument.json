@@ -2559,24 +2559,7 @@
       {
         "id": "page-match-live",
         "name": "Match — Live",
-        "overrides": [
-          {
-            "elementId": "el-replay-window",
-            "visible": false
-          },
-          {
-            "elementId": "el-replay-label",
-            "visible": false
-          },
-          {
-            "elementId": "el-stats-bg",
-            "visible": false
-          },
-          {
-            "elementId": "el-l3-bg",
-            "visible": false
-          }
-        ],
+        "overrides": [],
         "locale": "en-GB",
         "extensions": {}
       },
@@ -3425,30 +3408,30 @@
         "id": "asset-home-crest",
         "name": "Home Team Crest",
         "kind": "image",
-        "mimeType": "image/svg+xml",
+        "mimeType": "image/jpeg",
         "source": {
           "type": "url",
-          "url": "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Ccircle cx='60' cy='60' r='56' fill='%23d4213d' stroke='%23fff' stroke-width='2'/%3E%3Ctext x='60' y='68' font-family='Inter' font-size='28' font-weight='800' fill='%23fff' text-anchor='middle'%3ENCF%3C/text%3E%3C/svg%3E"
+          "url": "https://picsum.photos/id/102/150/150"
         }
       },
       {
         "id": "asset-away-crest",
         "name": "Away Team Crest",
         "kind": "image",
-        "mimeType": "image/svg+xml",
+        "mimeType": "image/jpeg",
         "source": {
           "type": "url",
-          "url": "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Ccircle cx='60' cy='60' r='56' fill='%231a5db5' stroke='%23fff' stroke-width='2'/%3E%3Ctext x='60' y='68' font-family='Inter' font-size='28' font-weight='800' fill='%23fff' text-anchor='middle'%3EHBU%3C/text%3E%3C/svg%3E"
+          "url": "https://picsum.photos/id/103/150/150"
         }
       },
       {
         "id": "asset-network-bug",
         "name": "Network Bug",
         "kind": "image",
-        "mimeType": "image/svg+xml",
+        "mimeType": "image/jpeg",
         "source": {
           "type": "url",
-          "url": "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 72'%3E%3Ccircle cx='36' cy='36' r='32' fill='rgba(255,255,255,0.08)' stroke='rgba(255,255,255,0.12)' stroke-width='1'/%3E%3Ctext x='36' y='42' font-family='Inter' font-size='16' font-weight='700' fill='rgba(255,255,255,0.6)' text-anchor='middle'%3EBCS%3C/text%3E%3C/svg%3E"
+          "url": "https://picsum.photos/id/104/150/150"
         }
       },
       {
@@ -3458,37 +3441,7 @@
         "mimeType": "image/jpeg",
         "source": {
           "type": "url",
-          "url": "https://fastly.picsum.photos/id/192/150/150.jpg"
-        }
-      },
-      {
-        "id": "asset-stadium-background",
-        "name": "Stadium Background",
-        "kind": "image",
-        "mimeType": "image/jpeg",
-        "source": {
-          "type": "url",
-          "url": "https://fastly.picsum.photos/id/110/300/200.jpg"
-        }
-      },
-      {
-        "id": "asset-match-hero",
-        "name": "Match Hero Image",
-        "kind": "image",
-        "mimeType": "image/jpeg",
-        "source": {
-          "type": "url",
-          "url": "https://fastly.picsum.photos/id/204/400/267.jpg"
-        }
-      },
-      {
-        "id": "asset-social-artwork",
-        "name": "Social Artwork",
-        "kind": "image",
-        "mimeType": "image/jpeg",
-        "source": {
-          "type": "url",
-          "url": "https://fastly.picsum.photos/id/140/200/200.jpg"
+          "url": "https://picsum.photos/id/192/150/150"
         }
       },
       {
