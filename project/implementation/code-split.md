@@ -211,7 +211,7 @@ Split approach:
 
 - Convert monolithic suites into scenario-focused files by region/feature.
 - Keep shared test harnesses in local `test-helpers/` modules.
-- For CT: split by scenario groups and keep scenario IDs aligned with `project/implementation/ct-testing.md`.
+- For CT: split by scenario groups and keep scenario IDs aligned with `project/implementation/component-testing.md`.
 
 Suggested resulting files:
 

@@ -196,7 +196,7 @@ Method: targeted refresh of previous findings using current files under `project
 
 1. Wire timeline editor and animation-sidebar callbacks in demo split modules (`layout-timeline-panel.tsx`, `sidebar.tsx`) to real editor/timeline actions.
 2. Run a spec hygiene pass to update stale `Spec Gaps` across editor/formats/ui/renderer so docs match current automation.
-3. Expand CT matrix for explicit remaining interaction gaps (notably marquee and pan) and tie each to scenario IDs in `project/implementation/ct-testing.md`.
+3. Expand CT matrix for explicit remaining interaction gaps (notably marquee and pan) and tie each to scenario IDs in `project/implementation/component-testing.md`.
 4. Continue phased splitting of current largest non-test modules (`formats/*/core.ts`, `renderer/base-render.ts`, `editor/store-actions/store.ts`, key UI panels/modals).
 5. Define a unified importer warning contract and surface warnings in demo import UX (starting with SVG parity, then PPTX/PSD).
 
