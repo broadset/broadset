@@ -76,3 +76,7 @@ Phase 11 — Advanced Features     → trim path, boolean ops, text animation, a
 
 Update the Status column and the checkboxes inside each phase file as work
 progresses.
+
+## Focused Follow-Up Plans
+
+- [Formats Gap Closure (SVG, PSD, PDF)](plan-formats-gap-closure.md)
