@@ -21,7 +21,10 @@
         "type": "rectangle",
         "name": "Top Vignette",
         "locked": true,
-        "position": { "x": 0, "y": 0 },
+        "position": {
+          "x": 0,
+          "y": 0
+        },
         "width": 1920,
         "height": 200,
         "rotation": 0,
@@ -31,8 +34,14 @@
             "type": "linear",
             "angle": 180,
             "stops": [
-              { "color": "rgba(0, 0, 0, 0.55)", "position": 0 },
-              { "color": "rgba(0, 0, 0, 0)", "position": 100 }
+              {
+                "color": "rgba(0, 0, 0, 0.55)",
+                "position": 0
+              },
+              {
+                "color": "rgba(0, 0, 0, 0)",
+                "position": 100
+              }
             ]
           }
         },
@@ -54,7 +63,10 @@
         "type": "rectangle",
         "name": "Bottom Vignette",
         "locked": true,
-        "position": { "x": 0, "y": 880 },
+        "position": {
+          "x": 0,
+          "y": 880
+        },
         "width": 1920,
         "height": 200,
         "rotation": 0,
@@ -64,8 +76,14 @@
             "type": "linear",
             "angle": 0,
             "stops": [
-              { "color": "rgba(0, 0, 0, 0.65)", "position": 0 },
-              { "color": "rgba(0, 0, 0, 0)", "position": 100 }
+              {
+                "color": "rgba(0, 0, 0, 0.65)",
+                "position": 0
+              },
+              {
+                "color": "rgba(0, 0, 0, 0)",
+                "position": 100
+              }
             ]
           }
         },
@@ -82,39 +100,15 @@
         "booleanOperation": null,
         "extensions": {}
       },
-
       {
         "id": "el-scorebug",
-        "type": "group",
+        "type": "rectangle",
         "name": "Score Bug",
         "locked": false,
-        "position": { "x": 48, "y": 36 },
-        "width": 580,
-        "height": 76,
-        "rotation": 0,
-        "content": "",
-        "style": {
-          "clipChildren": true
+        "position": {
+          "x": 48,
+          "y": 36
         },
-        "parentId": null,
-        "groupId": null,
-        "assetId": null,
-        "dataField": null,
-        "visibleWhen": null,
-        "repeater": null,
-        "typeConfig": null,
-        "componentRef": null,
-        "autoSize": "fixed",
-        "textPathElementId": null,
-        "booleanOperation": null,
-        "extensions": {}
-      },
-      {
-        "id": "el-sb-bg",
-        "type": "rectangle",
-        "name": "SB Background",
-        "locked": true,
-        "position": { "x": 0, "y": 0 },
         "width": 580,
         "height": 76,
         "rotation": 0,
@@ -123,9 +117,10 @@
           "backgroundColor": "rgba(8, 8, 24, 0.88)",
           "backdropFilter": "blur(24px)",
           "borderRadius": 6,
-          "boxShadow": "0 2px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04)"
+          "boxShadow": "0 2px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04)",
+          "clipChildren": true
         },
-        "parentId": "el-scorebug",
+        "parentId": null,
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -143,7 +138,10 @@
         "type": "rectangle",
         "name": "Home Color Bar",
         "locked": true,
-        "position": { "x": 0, "y": 0 },
+        "position": {
+          "x": 0,
+          "y": 0
+        },
         "width": 5,
         "height": 76,
         "rotation": 0,
@@ -170,7 +168,10 @@
         "type": "image",
         "name": "Home Crest",
         "locked": false,
-        "position": { "x": 16, "y": 14 },
+        "position": {
+          "x": 16,
+          "y": 14
+        },
         "width": 48,
         "height": 48,
         "rotation": 0,
@@ -196,7 +197,10 @@
         "type": "text",
         "name": "Home Abbr",
         "locked": false,
-        "position": { "x": 74, "y": 16 },
+        "position": {
+          "x": 74,
+          "y": 16
+        },
         "width": 64,
         "height": 44,
         "rotation": 0,
@@ -213,7 +217,10 @@
         "parentId": "el-scorebug",
         "groupId": null,
         "assetId": null,
-        "dataField": { "fieldName": "homeAbbr", "overflow": "clip" },
+        "dataField": {
+          "fieldName": "homeAbbr",
+          "overflow": "clip"
+        },
         "visibleWhen": null,
         "repeater": null,
         "typeConfig": null,
@@ -228,7 +235,10 @@
         "type": "text",
         "name": "Home Score",
         "locked": false,
-        "position": { "x": 148, "y": 6 },
+        "position": {
+          "x": 148,
+          "y": 6
+        },
         "width": 64,
         "height": 64,
         "rotation": 0,
@@ -244,7 +254,10 @@
         "parentId": "el-scorebug",
         "groupId": null,
         "assetId": null,
-        "dataField": { "fieldName": "homeScore", "overflow": "clip" },
+        "dataField": {
+          "fieldName": "homeScore",
+          "overflow": "clip"
+        },
         "visibleWhen": null,
         "repeater": null,
         "typeConfig": null,
@@ -259,7 +272,10 @@
         "type": "rectangle",
         "name": "Score Divider",
         "locked": true,
-        "position": { "x": 222, "y": 18 },
+        "position": {
+          "x": 222,
+          "y": 18
+        },
         "width": 2,
         "height": 40,
         "rotation": 0,
@@ -286,7 +302,10 @@
         "type": "text",
         "name": "Away Score",
         "locked": false,
-        "position": { "x": 234, "y": 6 },
+        "position": {
+          "x": 234,
+          "y": 6
+        },
         "width": 64,
         "height": 64,
         "rotation": 0,
@@ -302,7 +321,10 @@
         "parentId": "el-scorebug",
         "groupId": null,
         "assetId": null,
-        "dataField": { "fieldName": "awayScore", "overflow": "clip" },
+        "dataField": {
+          "fieldName": "awayScore",
+          "overflow": "clip"
+        },
         "visibleWhen": null,
         "repeater": null,
         "typeConfig": null,
@@ -317,7 +339,10 @@
         "type": "text",
         "name": "Away Abbr",
         "locked": false,
-        "position": { "x": 308, "y": 16 },
+        "position": {
+          "x": 308,
+          "y": 16
+        },
         "width": 64,
         "height": 44,
         "rotation": 0,
@@ -334,7 +359,10 @@
         "parentId": "el-scorebug",
         "groupId": null,
         "assetId": null,
-        "dataField": { "fieldName": "awayAbbr", "overflow": "clip" },
+        "dataField": {
+          "fieldName": "awayAbbr",
+          "overflow": "clip"
+        },
         "visibleWhen": null,
         "repeater": null,
         "typeConfig": null,
@@ -349,7 +377,10 @@
         "type": "image",
         "name": "Away Crest",
         "locked": false,
-        "position": { "x": 382, "y": 14 },
+        "position": {
+          "x": 382,
+          "y": 14
+        },
         "width": 48,
         "height": 48,
         "rotation": 0,
@@ -375,7 +406,10 @@
         "type": "rectangle",
         "name": "Away Color Bar",
         "locked": true,
-        "position": { "x": 440, "y": 0 },
+        "position": {
+          "x": 440,
+          "y": 0
+        },
         "width": 5,
         "height": 76,
         "rotation": 0,
@@ -401,7 +435,10 @@
         "type": "rectangle",
         "name": "Time Panel",
         "locked": true,
-        "position": { "x": 456, "y": 0 },
+        "position": {
+          "x": 456,
+          "y": 0
+        },
         "width": 124,
         "height": 76,
         "rotation": 0,
@@ -411,8 +448,14 @@
             "type": "linear",
             "angle": 180,
             "stops": [
-              { "color": "#1a1a3e", "position": 0 },
-              { "color": "#0e0e28", "position": 100 }
+              {
+                "color": "#1a1a3e",
+                "position": 0
+              },
+              {
+                "color": "#0e0e28",
+                "position": 100
+              }
             ]
           },
           "borderRadius": [0, 6, 6, 0]
@@ -435,7 +478,10 @@
         "type": "clock",
         "name": "Match Clock",
         "locked": false,
-        "position": { "x": 456, "y": 6 },
+        "position": {
+          "x": 456,
+          "y": 6
+        },
         "width": 124,
         "height": 40,
         "rotation": 0,
@@ -471,7 +517,10 @@
         "type": "text",
         "name": "Half Label",
         "locked": false,
-        "position": { "x": 456, "y": 48 },
+        "position": {
+          "x": 456,
+          "y": 48
+        },
         "width": 124,
         "height": 22,
         "rotation": 0,
@@ -489,31 +538,10 @@
         "parentId": "el-scorebug",
         "groupId": null,
         "assetId": null,
-        "dataField": { "fieldName": "matchPeriod", "overflow": "clip" },
-        "visibleWhen": null,
-        "repeater": null,
-        "typeConfig": null,
-        "componentRef": null,
-        "autoSize": "fixed",
-        "textPathElementId": null,
-        "booleanOperation": null,
-        "extensions": {}
-      },
-      {
-        "id": "el-live-badge",
-        "type": "group",
-        "name": "LIVE Badge",
-        "locked": false,
-        "position": { "x": 48, "y": 120 },
-        "width": 78,
-        "height": 28,
-        "rotation": 0,
-        "content": "",
-        "style": {},
-        "parentId": null,
-        "groupId": null,
-        "assetId": null,
-        "dataField": null,
+        "dataField": {
+          "fieldName": "matchPeriod",
+          "overflow": "clip"
+        },
         "visibleWhen": null,
         "repeater": null,
         "typeConfig": null,
@@ -528,7 +556,10 @@
         "type": "rectangle",
         "name": "LIVE BG",
         "locked": true,
-        "position": { "x": 0, "y": 0 },
+        "position": {
+          "x": 48,
+          "y": 120
+        },
         "width": 78,
         "height": 28,
         "rotation": 0,
@@ -538,7 +569,7 @@
           "borderRadius": [0, 4, 4, 4],
           "boxShadow": "0 2px 12px rgba(212, 33, 61, 0.45)"
         },
-        "parentId": "el-live-badge",
+        "parentId": null,
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -556,7 +587,10 @@
         "type": "ellipse",
         "name": "Live Dot",
         "locked": false,
-        "position": { "x": 10, "y": 9 },
+        "position": {
+          "x": 10,
+          "y": 9
+        },
         "width": 10,
         "height": 10,
         "rotation": 0,
@@ -564,7 +598,7 @@
         "style": {
           "backgroundColor": "#ffffff"
         },
-        "parentId": "el-live-badge",
+        "parentId": "el-live-badge-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -582,7 +616,10 @@
         "type": "text",
         "name": "LIVE Text",
         "locked": true,
-        "position": { "x": 26, "y": 2 },
+        "position": {
+          "x": 26,
+          "y": 2
+        },
         "width": 48,
         "height": 24,
         "rotation": 0,
@@ -595,7 +632,7 @@
           "verticalAlignment": "middle",
           "letterSpacing": 2
         },
-        "parentId": "el-live-badge",
+        "parentId": "el-live-badge-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -608,18 +645,24 @@
         "booleanOperation": null,
         "extensions": {}
       },
-
       {
-        "id": "el-event-tag",
-        "type": "group",
-        "name": "Event Tag",
-        "locked": false,
-        "position": { "x": 48, "y": 156 },
+        "id": "el-event-tag-bg",
+        "type": "rectangle",
+        "name": "Event Tag BG",
+        "locked": true,
+        "position": {
+          "x": 48,
+          "y": 156
+        },
         "width": 220,
         "height": 32,
         "rotation": 0,
         "content": "",
-        "style": {},
+        "style": {
+          "backgroundColor": "rgba(8, 8, 24, 0.75)",
+          "backdropFilter": "blur(12px)",
+          "borderRadius": [0, 4, 4, 4]
+        },
         "parentId": null,
         "groupId": null,
         "assetId": null,
@@ -634,45 +677,20 @@
         "extensions": {}
       },
       {
-        "id": "el-event-tag-bg",
-        "type": "rectangle",
-        "name": "Event Tag BG",
-        "locked": true,
-        "position": { "x": 0, "y": 0 },
-        "width": 220,
-        "height": 32,
-        "rotation": 0,
-        "content": "",
-        "style": {
-          "backgroundColor": "rgba(8, 8, 24, 0.75)",
-          "backdropFilter": "blur(12px)",
-          "borderRadius": [0, 4, 4, 4]
-        },
-        "parentId": "el-event-tag",
-        "groupId": null,
-        "assetId": null,
-        "dataField": null,
-        "visibleWhen": null,
-        "repeater": null,
-        "typeConfig": null,
-        "componentRef": null,
-        "autoSize": "fixed",
-        "textPathElementId": null,
-        "booleanOperation": null,
-        "extensions": {}
-      },
-      {
         "id": "el-event-icon",
         "type": "svg",
         "name": "Goal Icon",
         "locked": true,
-        "position": { "x": 8, "y": 6 },
+        "position": {
+          "x": 8,
+          "y": 6
+        },
         "width": 20,
         "height": 20,
         "rotation": 0,
         "content": "<svg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'><circle cx='10' cy='10' r='9' fill='none' stroke='#ffd024' stroke-width='1.5'/><path d='M10 3.5L11.5 8H16L12.5 11L14 15.5L10 12.5L6 15.5L7.5 11L4 8H8.5Z' fill='#ffd024'/></svg>",
         "style": {},
-        "parentId": "el-event-tag",
+        "parentId": "el-event-tag-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -690,7 +708,10 @@
         "type": "text",
         "name": "Event Label",
         "locked": false,
-        "position": { "x": 34, "y": 4 },
+        "position": {
+          "x": 34,
+          "y": 4
+        },
         "width": 180,
         "height": 24,
         "rotation": 0,
@@ -703,10 +724,13 @@
           "verticalAlignment": "middle",
           "letterSpacing": 0.5
         },
-        "parentId": "el-event-tag",
+        "parentId": "el-event-tag-bg",
         "groupId": null,
         "assetId": null,
-        "dataField": { "fieldName": "lastEvent", "overflow": "ellipsis" },
+        "dataField": {
+          "fieldName": "lastEvent",
+          "overflow": "ellipsis"
+        },
         "visibleWhen": null,
         "repeater": null,
         "typeConfig": null,
@@ -716,13 +740,15 @@
         "booleanOperation": null,
         "extensions": {}
       },
-
       {
         "id": "el-network-bug",
         "type": "image",
         "name": "Network Bug",
         "locked": false,
-        "position": { "x": 1808, "y": 36 },
+        "position": {
+          "x": 1808,
+          "y": 36
+        },
         "width": 72,
         "height": 72,
         "rotation": 0,
@@ -744,37 +770,15 @@
         "booleanOperation": null,
         "extensions": {}
       },
-
-      {
-        "id": "el-lower-third",
-        "type": "group",
-        "name": "Lower Third",
-        "locked": false,
-        "position": { "x": 48, "y": 828 },
-        "width": 640,
-        "height": 148,
-        "rotation": 0,
-        "content": "",
-        "style": {},
-        "parentId": null,
-        "groupId": null,
-        "assetId": null,
-        "dataField": null,
-        "visibleWhen": null,
-        "repeater": null,
-        "typeConfig": null,
-        "componentRef": null,
-        "autoSize": "fixed",
-        "textPathElementId": null,
-        "booleanOperation": null,
-        "extensions": {}
-      },
       {
         "id": "el-l3-bg",
         "type": "rectangle",
         "name": "L3 Background",
         "locked": true,
-        "position": { "x": 0, "y": 0 },
+        "position": {
+          "x": 48,
+          "y": 828
+        },
         "width": 640,
         "height": 148,
         "rotation": 0,
@@ -785,7 +789,7 @@
           "borderRadius": 6,
           "boxShadow": "0 4px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04)"
         },
-        "parentId": "el-lower-third",
+        "parentId": null,
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -803,7 +807,10 @@
         "type": "rectangle",
         "name": "L3 Accent",
         "locked": true,
-        "position": { "x": 0, "y": 0 },
+        "position": {
+          "x": 0,
+          "y": 0
+        },
         "width": 4,
         "height": 148,
         "rotation": 0,
@@ -813,13 +820,19 @@
             "type": "linear",
             "angle": 180,
             "stops": [
-              { "color": "#d4213d", "position": 0 },
-              { "color": "#ff6b35", "position": 100 }
+              {
+                "color": "#d4213d",
+                "position": 0
+              },
+              {
+                "color": "#ff6b35",
+                "position": 100
+              }
             ]
           },
           "borderRadius": [6, 0, 0, 6]
         },
-        "parentId": "el-lower-third",
+        "parentId": "el-l3-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -837,7 +850,10 @@
         "type": "image",
         "name": "Player Headshot",
         "locked": false,
-        "position": { "x": 20, "y": 16 },
+        "position": {
+          "x": 20,
+          "y": 16
+        },
         "width": 116,
         "height": 116,
         "rotation": 0,
@@ -849,7 +865,7 @@
           "borderColor": "rgba(255, 255, 255, 0.08)",
           "borderStyle": "solid"
         },
-        "parentId": "el-lower-third",
+        "parentId": "el-l3-bg",
         "groupId": null,
         "assetId": "asset-player-headshot",
         "dataField": null,
@@ -867,7 +883,10 @@
         "type": "text",
         "name": "Player Name",
         "locked": false,
-        "position": { "x": 152, "y": 24 },
+        "position": {
+          "x": 152,
+          "y": 24
+        },
         "width": 460,
         "height": 42,
         "rotation": 0,
@@ -879,10 +898,13 @@
           "fontColor": "#ffffff",
           "verticalAlignment": "middle"
         },
-        "parentId": "el-lower-third",
+        "parentId": "el-l3-bg",
         "groupId": null,
         "assetId": null,
-        "dataField": { "fieldName": "playerName", "overflow": "ellipsis" },
+        "dataField": {
+          "fieldName": "playerName",
+          "overflow": "ellipsis"
+        },
         "visibleWhen": null,
         "repeater": null,
         "typeConfig": null,
@@ -897,7 +919,10 @@
         "type": "text",
         "name": "Player Role",
         "locked": false,
-        "position": { "x": 152, "y": 72 },
+        "position": {
+          "x": 152,
+          "y": 72
+        },
         "width": 460,
         "height": 28,
         "rotation": 0,
@@ -910,10 +935,13 @@
           "verticalAlignment": "middle",
           "letterSpacing": 0.3
         },
-        "parentId": "el-lower-third",
+        "parentId": "el-l3-bg",
         "groupId": null,
         "assetId": null,
-        "dataField": { "fieldName": "playerRole", "overflow": "ellipsis" },
+        "dataField": {
+          "fieldName": "playerRole",
+          "overflow": "ellipsis"
+        },
         "visibleWhen": null,
         "repeater": null,
         "typeConfig": null,
@@ -928,7 +956,10 @@
         "type": "rectangle",
         "name": "Stat Line",
         "locked": true,
-        "position": { "x": 152, "y": 108 },
+        "position": {
+          "x": 152,
+          "y": 108
+        },
         "width": 460,
         "height": 1,
         "rotation": 0,
@@ -936,7 +967,7 @@
         "style": {
           "backgroundColor": "rgba(255, 255, 255, 0.06)"
         },
-        "parentId": "el-lower-third",
+        "parentId": "el-l3-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -954,7 +985,10 @@
         "type": "text",
         "name": "Player Stat",
         "locked": false,
-        "position": { "x": 152, "y": 116 },
+        "position": {
+          "x": 152,
+          "y": 116
+        },
         "width": 460,
         "height": 24,
         "rotation": 0,
@@ -967,10 +1001,13 @@
           "verticalAlignment": "middle",
           "letterSpacing": 0.5
         },
-        "parentId": "el-lower-third",
+        "parentId": "el-l3-bg",
         "groupId": null,
         "assetId": null,
-        "dataField": { "fieldName": "playerStat", "overflow": "ellipsis" },
+        "dataField": {
+          "fieldName": "playerStat",
+          "overflow": "ellipsis"
+        },
         "visibleWhen": null,
         "repeater": null,
         "typeConfig": null,
@@ -980,18 +1017,24 @@
         "booleanOperation": null,
         "extensions": {}
       },
-
       {
-        "id": "el-stats-panel",
-        "type": "group",
-        "name": "Stats Panel",
-        "locked": false,
-        "position": { "x": 1232, "y": 36 },
+        "id": "el-stats-bg",
+        "type": "rectangle",
+        "name": "Stats BG",
+        "locked": true,
+        "position": {
+          "x": 1232,
+          "y": 36
+        },
         "width": 560,
         "height": 280,
         "rotation": 0,
         "content": "",
         "style": {
+          "backgroundColor": "rgba(8, 8, 24, 0.92)",
+          "backdropFilter": "blur(24px)",
+          "borderRadius": 6,
+          "boxShadow": "0 4px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04)",
           "clipChildren": true
         },
         "parentId": null,
@@ -1008,40 +1051,14 @@
         "extensions": {}
       },
       {
-        "id": "el-stats-bg",
-        "type": "rectangle",
-        "name": "Stats BG",
-        "locked": true,
-        "position": { "x": 0, "y": 0 },
-        "width": 560,
-        "height": 280,
-        "rotation": 0,
-        "content": "",
-        "style": {
-          "backgroundColor": "rgba(8, 8, 24, 0.92)",
-          "backdropFilter": "blur(24px)",
-          "borderRadius": 6,
-          "boxShadow": "0 4px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04)"
-        },
-        "parentId": "el-stats-panel",
-        "groupId": null,
-        "assetId": null,
-        "dataField": null,
-        "visibleWhen": null,
-        "repeater": null,
-        "typeConfig": null,
-        "componentRef": null,
-        "autoSize": "fixed",
-        "textPathElementId": null,
-        "booleanOperation": null,
-        "extensions": {}
-      },
-      {
         "id": "el-stats-title",
         "type": "text",
         "name": "Stats Title",
         "locked": false,
-        "position": { "x": 24, "y": 20 },
+        "position": {
+          "x": 24,
+          "y": 20
+        },
         "width": 512,
         "height": 28,
         "rotation": 0,
@@ -1055,7 +1072,7 @@
           "textTransform": "uppercase",
           "verticalAlignment": "middle"
         },
-        "parentId": "el-stats-panel",
+        "parentId": "el-stats-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -1073,7 +1090,10 @@
         "type": "rectangle",
         "name": "Possession Bar Home",
         "locked": false,
-        "position": { "x": 24, "y": 68 },
+        "position": {
+          "x": 24,
+          "y": 68
+        },
         "width": 302,
         "height": 6,
         "rotation": 0,
@@ -1082,7 +1102,7 @@
           "backgroundColor": "#d4213d",
           "borderRadius": 3
         },
-        "parentId": "el-stats-panel",
+        "parentId": "el-stats-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -1100,7 +1120,10 @@
         "type": "rectangle",
         "name": "Possession Bar Away",
         "locked": false,
-        "position": { "x": 334, "y": 68 },
+        "position": {
+          "x": 334,
+          "y": 68
+        },
         "width": 202,
         "height": 6,
         "rotation": 0,
@@ -1109,7 +1132,7 @@
           "backgroundColor": "#1a5db5",
           "borderRadius": 3
         },
-        "parentId": "el-stats-panel",
+        "parentId": "el-stats-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -1127,7 +1150,10 @@
         "type": "text",
         "name": "Possession",
         "locked": false,
-        "position": { "x": 24, "y": 80 },
+        "position": {
+          "x": 24,
+          "y": 80
+        },
         "width": 512,
         "height": 22,
         "rotation": 0,
@@ -1141,7 +1167,7 @@
           "verticalAlignment": "middle",
           "letterSpacing": 1
         },
-        "parentId": "el-stats-panel",
+        "parentId": "el-stats-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -1159,7 +1185,10 @@
         "type": "text",
         "name": "Shots",
         "locked": false,
-        "position": { "x": 24, "y": 118 },
+        "position": {
+          "x": 24,
+          "y": 118
+        },
         "width": 512,
         "height": 32,
         "rotation": 0,
@@ -1172,7 +1201,7 @@
           "textAlignment": "center",
           "verticalAlignment": "middle"
         },
-        "parentId": "el-stats-panel",
+        "parentId": "el-stats-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -1190,7 +1219,10 @@
         "type": "text",
         "name": "On Target",
         "locked": false,
-        "position": { "x": 24, "y": 158 },
+        "position": {
+          "x": 24,
+          "y": 158
+        },
         "width": 512,
         "height": 32,
         "rotation": 0,
@@ -1203,7 +1235,7 @@
           "textAlignment": "center",
           "verticalAlignment": "middle"
         },
-        "parentId": "el-stats-panel",
+        "parentId": "el-stats-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -1221,7 +1253,10 @@
         "type": "text",
         "name": "Corners",
         "locked": false,
-        "position": { "x": 24, "y": 198 },
+        "position": {
+          "x": 24,
+          "y": 198
+        },
         "width": 512,
         "height": 32,
         "rotation": 0,
@@ -1234,7 +1269,7 @@
           "textAlignment": "center",
           "verticalAlignment": "middle"
         },
-        "parentId": "el-stats-panel",
+        "parentId": "el-stats-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -1252,7 +1287,10 @@
         "type": "text",
         "name": "Fouls",
         "locked": false,
-        "position": { "x": 24, "y": 238 },
+        "position": {
+          "x": 24,
+          "y": 238
+        },
         "width": 512,
         "height": 32,
         "rotation": 0,
@@ -1265,7 +1303,7 @@
           "textAlignment": "center",
           "verticalAlignment": "middle"
         },
-        "parentId": "el-stats-panel",
+        "parentId": "el-stats-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -1278,13 +1316,15 @@
         "booleanOperation": null,
         "extensions": {}
       },
-
       {
         "id": "el-replay-window",
         "type": "video",
         "name": "Replay Window",
         "locked": false,
-        "position": { "x": 1232, "y": 524 },
+        "position": {
+          "x": 1232,
+          "y": 524
+        },
         "width": 640,
         "height": 360,
         "rotation": 0,
@@ -1318,7 +1358,10 @@
         "type": "text",
         "name": "Replay Label",
         "locked": false,
-        "position": { "x": 1244, "y": 536 },
+        "position": {
+          "x": 1244,
+          "y": 536
+        },
         "width": 100,
         "height": 24,
         "rotation": 0,
@@ -1349,18 +1392,24 @@
         "booleanOperation": null,
         "extensions": {}
       },
-
       {
-        "id": "el-promo-panel",
-        "type": "group",
-        "name": "Sponsor Panel",
-        "locked": false,
-        "position": { "x": 1632, "y": 900 },
+        "id": "el-promo-bg",
+        "type": "rectangle",
+        "name": "Sponsor BG",
+        "locked": true,
+        "position": {
+          "x": 1632,
+          "y": 900
+        },
         "width": 240,
         "height": 140,
         "rotation": 0,
         "content": "",
         "style": {
+          "backgroundColor": "rgba(8, 8, 24, 0.92)",
+          "backdropFilter": "blur(24px)",
+          "borderRadius": 6,
+          "boxShadow": "0 2px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04)",
           "clipChildren": true
         },
         "parentId": null,
@@ -1377,40 +1426,14 @@
         "extensions": {}
       },
       {
-        "id": "el-promo-bg",
-        "type": "rectangle",
-        "name": "Sponsor BG",
-        "locked": true,
-        "position": { "x": 0, "y": 0 },
-        "width": 240,
-        "height": 140,
-        "rotation": 0,
-        "content": "",
-        "style": {
-          "backgroundColor": "rgba(8, 8, 24, 0.92)",
-          "backdropFilter": "blur(24px)",
-          "borderRadius": 6,
-          "boxShadow": "0 2px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04)"
-        },
-        "parentId": "el-promo-panel",
-        "groupId": null,
-        "assetId": null,
-        "dataField": null,
-        "visibleWhen": null,
-        "repeater": null,
-        "typeConfig": null,
-        "componentRef": null,
-        "autoSize": "fixed",
-        "textPathElementId": null,
-        "booleanOperation": null,
-        "extensions": {}
-      },
-      {
         "id": "el-promo-qr",
         "type": "qrcode",
         "name": "Sponsor QR",
         "locked": false,
-        "position": { "x": 16, "y": 16 },
+        "position": {
+          "x": 16,
+          "y": 16
+        },
         "width": 108,
         "height": 108,
         "rotation": 0,
@@ -1420,10 +1443,13 @@
           "padding": [6, 6, 6, 6],
           "borderRadius": 4
         },
-        "parentId": "el-promo-panel",
+        "parentId": "el-promo-bg",
         "groupId": null,
         "assetId": null,
-        "dataField": { "fieldName": "sponsorUrl", "overflow": "clip" },
+        "dataField": {
+          "fieldName": "sponsorUrl",
+          "overflow": "clip"
+        },
         "visibleWhen": null,
         "repeater": null,
         "typeConfig": null,
@@ -1438,7 +1464,10 @@
         "type": "text",
         "name": "Sponsor CTA",
         "locked": false,
-        "position": { "x": 136, "y": 24 },
+        "position": {
+          "x": 136,
+          "y": 24
+        },
         "width": 92,
         "height": 92,
         "rotation": 0,
@@ -1452,34 +1481,7 @@
           "verticalAlignment": "middle",
           "lineHeight": 1.6
         },
-        "parentId": "el-promo-panel",
-        "groupId": null,
-        "assetId": null,
-        "dataField": null,
-        "visibleWhen": null,
-        "repeater": null,
-        "typeConfig": null,
-        "componentRef": null,
-        "autoSize": "fixed",
-        "textPathElementId": null,
-        "booleanOperation": null,
-        "extensions": {}
-      },
-
-      {
-        "id": "el-ticker-bar",
-        "type": "group",
-        "name": "Ticker Bar",
-        "locked": false,
-        "position": { "x": 0, "y": 1040 },
-        "width": 1920,
-        "height": 40,
-        "rotation": 0,
-        "content": "",
-        "style": {
-          "clipChildren": true
-        },
-        "parentId": null,
+        "parentId": "el-promo-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -1497,7 +1499,10 @@
         "type": "rectangle",
         "name": "Ticker BG",
         "locked": true,
-        "position": { "x": 0, "y": 0 },
+        "position": {
+          "x": 0,
+          "y": 1040
+        },
         "width": 1920,
         "height": 40,
         "rotation": 0,
@@ -1506,9 +1511,10 @@
           "backgroundColor": "rgba(8, 8, 24, 0.94)",
           "borderWidth": 1,
           "borderColor": "rgba(255, 255, 255, 0.04)",
-          "borderStyle": "solid"
+          "borderStyle": "solid",
+          "clipChildren": true
         },
-        "parentId": "el-ticker-bar",
+        "parentId": null,
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -1526,7 +1532,10 @@
         "type": "rectangle",
         "name": "Ticker Tag BG",
         "locked": true,
-        "position": { "x": 0, "y": 0 },
+        "position": {
+          "x": 0,
+          "y": 0
+        },
         "width": 160,
         "height": 40,
         "rotation": 0,
@@ -1536,12 +1545,18 @@
             "type": "linear",
             "angle": 90,
             "stops": [
-              { "color": "#d4213d", "position": 0 },
-              { "color": "#a01830", "position": 100 }
+              {
+                "color": "#d4213d",
+                "position": 0
+              },
+              {
+                "color": "#a01830",
+                "position": 100
+              }
             ]
           }
         },
-        "parentId": "el-ticker-bar",
+        "parentId": "el-ticker-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -1559,7 +1574,10 @@
         "type": "text",
         "name": "Ticker Tag Label",
         "locked": true,
-        "position": { "x": 0, "y": 0 },
+        "position": {
+          "x": 0,
+          "y": 0
+        },
         "width": 160,
         "height": 40,
         "rotation": 0,
@@ -1573,7 +1591,7 @@
           "verticalAlignment": "middle",
           "letterSpacing": 3
         },
-        "parentId": "el-ticker-bar",
+        "parentId": "el-ticker-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -1591,7 +1609,10 @@
         "type": "ticker",
         "name": "News Ticker",
         "locked": false,
-        "position": { "x": 168, "y": 0 },
+        "position": {
+          "x": 168,
+          "y": 0
+        },
         "width": 1752,
         "height": 40,
         "rotation": 0,
@@ -1603,7 +1624,7 @@
           "fontColor": "rgba(255, 255, 255, 0.8)",
           "verticalAlignment": "middle"
         },
-        "parentId": "el-ticker-bar",
+        "parentId": "el-ticker-bg",
         "groupId": null,
         "assetId": null,
         "dataField": null,
@@ -1621,13 +1642,15 @@
         "booleanOperation": null,
         "extensions": {}
       },
-
       {
         "id": "el-top-rule",
         "type": "path",
         "name": "Top Accent Rule",
         "locked": true,
-        "position": { "x": 48, "y": 200 },
+        "position": {
+          "x": 48,
+          "y": 200
+        },
         "width": 560,
         "height": 2,
         "rotation": 0,
@@ -1652,7 +1675,6 @@
         "extensions": {}
       }
     ],
-
     "animations": [
       {
         "elementId": "el-live-dot",
@@ -1670,7 +1692,11 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "ease-in-out" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "ease-in-out"
+                    }
                   }
                 },
                 {
@@ -1678,7 +1704,11 @@
                   "action": "none",
                   "offsetMs": 800,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0.15, "easing": "ease-in-out" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0.15,
+                      "easing": "ease-in-out"
+                    }
                   }
                 }
               ],
@@ -1707,8 +1737,16 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0, "easing": "linear" },
-                    "translateX": { "type": "number", "value": -40, "easing": "ease-out" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "linear"
+                    },
+                    "translateX": {
+                      "type": "number",
+                      "value": -40,
+                      "easing": "ease-out"
+                    }
                   }
                 },
                 {
@@ -1716,44 +1754,20 @@
                   "action": "none",
                   "offsetMs": 600,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "ease-out" },
-                    "translateX": { "type": "number", "value": 0, "easing": "cubic-bezier(0.16, 1, 0.3, 1)" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "ease-out"
+                    },
+                    "translateX": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "cubic-bezier(0.16, 1, 0.3, 1)"
+                    }
                   }
                 }
               ],
-              "childTimelines": [
-                {
-                  "childElementId": "el-live-badge",
-                  "delayMs": 150,
-                  "timeline": {
-                    "id": "tl-live-badge-stagger",
-                    "name": "Live Badge Stagger",
-                    "durationMs": 400,
-                    "loop": "none",
-                    "loopCount": null,
-                    "keyframes": [
-                      {
-                        "name": "start",
-                        "action": "none",
-                        "offsetMs": 0,
-                        "properties": {
-                          "opacity": { "type": "number", "value": 0, "easing": "linear" },
-                          "translateY": { "type": "number", "value": -8, "easing": "ease-out" }
-                        }
-                      },
-                      {
-                        "name": "end",
-                        "action": "none",
-                        "offsetMs": 400,
-                        "properties": {
-                          "opacity": { "type": "number", "value": 1, "easing": "ease-out" },
-                          "translateY": { "type": "number", "value": 0, "easing": "cubic-bezier(0.16, 1, 0.3, 1)" }
-                        }
-                      }
-                    ]
-                  }
-                }
-              ],
+              "childTimelines": [],
               "audioCues": []
             },
             {
@@ -1768,8 +1782,16 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "linear" },
-                    "translateX": { "type": "number", "value": 0, "easing": "ease-in" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "linear"
+                    },
+                    "translateX": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "ease-in"
+                    }
                   }
                 },
                 {
@@ -1777,8 +1799,16 @@
                   "action": "none",
                   "offsetMs": 400,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0, "easing": "ease-in" },
-                    "translateX": { "type": "number", "value": -40, "easing": "ease-in" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "ease-in"
+                    },
+                    "translateX": {
+                      "type": "number",
+                      "value": -40,
+                      "easing": "ease-in"
+                    }
                   }
                 }
               ],
@@ -1787,15 +1817,21 @@
             }
           ],
           "stateTimelineBindings": [
-            { "stateName": "IN", "timelineId": "tl-sb-in" },
-            { "stateName": "OUT", "timelineId": "tl-sb-out" }
+            {
+              "stateName": "IN",
+              "timelineId": "tl-sb-in"
+            },
+            {
+              "stateName": "OUT",
+              "timelineId": "tl-sb-out"
+            }
           ],
           "modifierTimelineBindings": [],
           "textAnimator": null
         }
       },
       {
-        "elementId": "el-lower-third",
+        "elementId": "el-l3-bg",
         "config": {
           "timelines": [
             {
@@ -1810,8 +1846,16 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0, "easing": "linear" },
-                    "translateX": { "type": "number", "value": -60, "easing": "ease-out" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "linear"
+                    },
+                    "translateX": {
+                      "type": "number",
+                      "value": -60,
+                      "easing": "ease-out"
+                    }
                   }
                 },
                 {
@@ -1819,12 +1863,209 @@
                   "action": "none",
                   "offsetMs": 700,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "ease-out" },
-                    "translateX": { "type": "number", "value": 0, "easing": "cubic-bezier(0.16, 1, 0.3, 1)" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "ease-out"
+                    },
+                    "translateX": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "cubic-bezier(0.16, 1, 0.3, 1)"
+                    }
                   }
                 }
               ],
-              "childTimelines": [],
+              "childTimelines": [
+                {
+                  "childElementId": "el-l3-headshot",
+                  "delayMs": 80,
+                  "timeline": {
+                    "id": "tl-l3-headshot-in",
+                    "name": "Headshot In",
+                    "durationMs": 400,
+                    "loop": "none",
+                    "loopCount": null,
+                    "keyframes": [
+                      {
+                        "name": "start",
+                        "action": "none",
+                        "offsetMs": 0,
+                        "properties": {
+                          "opacity": {
+                            "type": "number",
+                            "value": 0,
+                            "easing": "linear"
+                          },
+                          "scale": {
+                            "type": "number",
+                            "value": 0.85,
+                            "easing": "ease-out"
+                          }
+                        }
+                      },
+                      {
+                        "name": "end",
+                        "action": "none",
+                        "offsetMs": 400,
+                        "properties": {
+                          "opacity": {
+                            "type": "number",
+                            "value": 1,
+                            "easing": "ease-out"
+                          },
+                          "scale": {
+                            "type": "number",
+                            "value": 1,
+                            "easing": "cubic-bezier(0.16, 1, 0.3, 1)"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "childElementId": "el-l3-name",
+                  "delayMs": 150,
+                  "timeline": {
+                    "id": "tl-l3-name-in",
+                    "name": "Name In",
+                    "durationMs": 450,
+                    "loop": "none",
+                    "loopCount": null,
+                    "keyframes": [
+                      {
+                        "name": "start",
+                        "action": "none",
+                        "offsetMs": 0,
+                        "properties": {
+                          "opacity": {
+                            "type": "number",
+                            "value": 0,
+                            "easing": "linear"
+                          },
+                          "translateX": {
+                            "type": "number",
+                            "value": -20,
+                            "easing": "ease-out"
+                          }
+                        }
+                      },
+                      {
+                        "name": "end",
+                        "action": "none",
+                        "offsetMs": 450,
+                        "properties": {
+                          "opacity": {
+                            "type": "number",
+                            "value": 1,
+                            "easing": "ease-out"
+                          },
+                          "translateX": {
+                            "type": "number",
+                            "value": 0,
+                            "easing": "cubic-bezier(0.16, 1, 0.3, 1)"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "childElementId": "el-l3-role",
+                  "delayMs": 220,
+                  "timeline": {
+                    "id": "tl-l3-role-in",
+                    "name": "Role In",
+                    "durationMs": 400,
+                    "loop": "none",
+                    "loopCount": null,
+                    "keyframes": [
+                      {
+                        "name": "start",
+                        "action": "none",
+                        "offsetMs": 0,
+                        "properties": {
+                          "opacity": {
+                            "type": "number",
+                            "value": 0,
+                            "easing": "linear"
+                          },
+                          "translateX": {
+                            "type": "number",
+                            "value": -16,
+                            "easing": "ease-out"
+                          }
+                        }
+                      },
+                      {
+                        "name": "end",
+                        "action": "none",
+                        "offsetMs": 400,
+                        "properties": {
+                          "opacity": {
+                            "type": "number",
+                            "value": 1,
+                            "easing": "ease-out"
+                          },
+                          "translateX": {
+                            "type": "number",
+                            "value": 0,
+                            "easing": "cubic-bezier(0.16, 1, 0.3, 1)"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "childElementId": "el-l3-stat",
+                  "delayMs": 320,
+                  "timeline": {
+                    "id": "tl-l3-stat-in",
+                    "name": "Stat In",
+                    "durationMs": 350,
+                    "loop": "none",
+                    "loopCount": null,
+                    "keyframes": [
+                      {
+                        "name": "start",
+                        "action": "none",
+                        "offsetMs": 0,
+                        "properties": {
+                          "opacity": {
+                            "type": "number",
+                            "value": 0,
+                            "easing": "linear"
+                          },
+                          "translateX": {
+                            "type": "number",
+                            "value": -12,
+                            "easing": "ease-out"
+                          }
+                        }
+                      },
+                      {
+                        "name": "end",
+                        "action": "none",
+                        "offsetMs": 350,
+                        "properties": {
+                          "opacity": {
+                            "type": "number",
+                            "value": 1,
+                            "easing": "ease-out"
+                          },
+                          "translateX": {
+                            "type": "number",
+                            "value": 0,
+                            "easing": "cubic-bezier(0.16, 1, 0.3, 1)"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ],
               "audioCues": []
             },
             {
@@ -1839,8 +2080,16 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "linear" },
-                    "translateX": { "type": "number", "value": 0, "easing": "ease-in" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "linear"
+                    },
+                    "translateX": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "ease-in"
+                    }
                   }
                 },
                 {
@@ -1848,8 +2097,16 @@
                   "action": "none",
                   "offsetMs": 400,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0, "easing": "ease-in" },
-                    "translateX": { "type": "number", "value": -60, "easing": "ease-in" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "ease-in"
+                    },
+                    "translateX": {
+                      "type": "number",
+                      "value": -60,
+                      "easing": "ease-in"
+                    }
                   }
                 }
               ],
@@ -1858,57 +2115,21 @@
             }
           ],
           "stateTimelineBindings": [
-            { "stateName": "IN", "timelineId": "tl-l3-in" },
-            { "stateName": "OUT", "timelineId": "tl-l3-out" }
+            {
+              "stateName": "IN",
+              "timelineId": "tl-l3-in"
+            },
+            {
+              "stateName": "OUT",
+              "timelineId": "tl-l3-out"
+            }
           ],
           "modifierTimelineBindings": [],
           "textAnimator": null
         }
       },
       {
-        "elementId": "el-l3-name",
-        "config": {
-          "timelines": [
-            {
-              "id": "tl-l3-name-reveal",
-              "name": "Name Reveal",
-              "durationMs": 500,
-              "loop": "none",
-              "loopCount": null,
-              "keyframes": [
-                {
-                  "name": "start",
-                  "action": "none",
-                  "offsetMs": 0,
-                  "properties": {
-                    "opacity": { "type": "number", "value": 0, "easing": "linear" }
-                  }
-                },
-                {
-                  "name": "end",
-                  "action": "none",
-                  "offsetMs": 500,
-                  "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "ease-out" }
-                  }
-                }
-              ],
-              "childTimelines": [],
-              "audioCues": []
-            }
-          ],
-          "stateTimelineBindings": [],
-          "modifierTimelineBindings": [],
-          "textAnimator": {
-            "rangeMode": "characters",
-            "staggerDelayMs": 30,
-            "randomOrder": false,
-            "timelineId": "tl-l3-name-reveal"
-          }
-        }
-      },
-      {
-        "elementId": "el-stats-panel",
+        "elementId": "el-stats-bg",
         "config": {
           "timelines": [
             {
@@ -1923,8 +2144,16 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0, "easing": "linear" },
-                    "translateY": { "type": "number", "value": 24, "easing": "ease-out" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "linear"
+                    },
+                    "translateY": {
+                      "type": "number",
+                      "value": 24,
+                      "easing": "ease-out"
+                    }
                   }
                 },
                 {
@@ -1932,8 +2161,16 @@
                   "action": "none",
                   "offsetMs": 500,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "ease-out" },
-                    "translateY": { "type": "number", "value": 0, "easing": "cubic-bezier(0.16, 1, 0.3, 1)" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "ease-out"
+                    },
+                    "translateY": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "cubic-bezier(0.16, 1, 0.3, 1)"
+                    }
                   }
                 }
               ],
@@ -1952,8 +2189,16 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "linear" },
-                    "translateY": { "type": "number", "value": 0, "easing": "ease-in" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "linear"
+                    },
+                    "translateY": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "ease-in"
+                    }
                   }
                 },
                 {
@@ -1961,8 +2206,16 @@
                   "action": "none",
                   "offsetMs": 350,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0, "easing": "ease-in" },
-                    "translateY": { "type": "number", "value": 24, "easing": "ease-in" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "ease-in"
+                    },
+                    "translateY": {
+                      "type": "number",
+                      "value": 24,
+                      "easing": "ease-in"
+                    }
                   }
                 }
               ],
@@ -1971,15 +2224,21 @@
             }
           ],
           "stateTimelineBindings": [
-            { "stateName": "IN", "timelineId": "tl-stats-in" },
-            { "stateName": "OUT", "timelineId": "tl-stats-out" }
+            {
+              "stateName": "IN",
+              "timelineId": "tl-stats-in"
+            },
+            {
+              "stateName": "OUT",
+              "timelineId": "tl-stats-out"
+            }
           ],
           "modifierTimelineBindings": [],
           "textAnimator": null
         }
       },
       {
-        "elementId": "el-promo-panel",
+        "elementId": "el-promo-bg",
         "config": {
           "timelines": [
             {
@@ -1994,8 +2253,16 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0, "easing": "linear" },
-                    "translateX": { "type": "number", "value": 30, "easing": "ease-out" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "linear"
+                    },
+                    "translateX": {
+                      "type": "number",
+                      "value": 30,
+                      "easing": "ease-out"
+                    }
                   }
                 },
                 {
@@ -2003,8 +2270,16 @@
                   "action": "none",
                   "offsetMs": 500,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "ease-out" },
-                    "translateX": { "type": "number", "value": 0, "easing": "cubic-bezier(0.16, 1, 0.3, 1)" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "ease-out"
+                    },
+                    "translateX": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "cubic-bezier(0.16, 1, 0.3, 1)"
+                    }
                   }
                 }
               ],
@@ -2023,8 +2298,16 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "linear" },
-                    "translateX": { "type": "number", "value": 0, "easing": "ease-in" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "linear"
+                    },
+                    "translateX": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "ease-in"
+                    }
                   }
                 },
                 {
@@ -2032,8 +2315,16 @@
                   "action": "none",
                   "offsetMs": 350,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0, "easing": "ease-in" },
-                    "translateX": { "type": "number", "value": 30, "easing": "ease-in" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "ease-in"
+                    },
+                    "translateX": {
+                      "type": "number",
+                      "value": 30,
+                      "easing": "ease-in"
+                    }
                   }
                 }
               ],
@@ -2042,15 +2333,21 @@
             }
           ],
           "stateTimelineBindings": [
-            { "stateName": "IN", "timelineId": "tl-promo-in" },
-            { "stateName": "OUT", "timelineId": "tl-promo-out" }
+            {
+              "stateName": "IN",
+              "timelineId": "tl-promo-in"
+            },
+            {
+              "stateName": "OUT",
+              "timelineId": "tl-promo-out"
+            }
           ],
           "modifierTimelineBindings": [],
           "textAnimator": null
         }
       },
       {
-        "elementId": "el-ticker-bar",
+        "elementId": "el-ticker-bg",
         "config": {
           "timelines": [
             {
@@ -2065,8 +2362,16 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0, "easing": "linear" },
-                    "translateY": { "type": "number", "value": 40, "easing": "ease-out" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "linear"
+                    },
+                    "translateY": {
+                      "type": "number",
+                      "value": 40,
+                      "easing": "ease-out"
+                    }
                   }
                 },
                 {
@@ -2074,8 +2379,16 @@
                   "action": "none",
                   "offsetMs": 400,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "ease-out" },
-                    "translateY": { "type": "number", "value": 0, "easing": "cubic-bezier(0.16, 1, 0.3, 1)" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "ease-out"
+                    },
+                    "translateY": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "cubic-bezier(0.16, 1, 0.3, 1)"
+                    }
                   }
                 }
               ],
@@ -2094,8 +2407,16 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "linear" },
-                    "translateY": { "type": "number", "value": 0, "easing": "ease-in" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "linear"
+                    },
+                    "translateY": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "ease-in"
+                    }
                   }
                 },
                 {
@@ -2103,8 +2424,16 @@
                   "action": "none",
                   "offsetMs": 300,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0, "easing": "ease-in" },
-                    "translateY": { "type": "number", "value": 40, "easing": "ease-in" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "ease-in"
+                    },
+                    "translateY": {
+                      "type": "number",
+                      "value": 40,
+                      "easing": "ease-in"
+                    }
                   }
                 }
               ],
@@ -2113,15 +2442,21 @@
             }
           ],
           "stateTimelineBindings": [
-            { "stateName": "IN", "timelineId": "tl-ticker-in" },
-            { "stateName": "OUT", "timelineId": "tl-ticker-out" }
+            {
+              "stateName": "IN",
+              "timelineId": "tl-ticker-in"
+            },
+            {
+              "stateName": "OUT",
+              "timelineId": "tl-ticker-out"
+            }
           ],
           "modifierTimelineBindings": [],
           "textAnimator": null
         }
       },
       {
-        "elementId": "el-event-tag",
+        "elementId": "el-event-tag-bg",
         "config": {
           "timelines": [
             {
@@ -2136,8 +2471,16 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0, "easing": "linear" },
-                    "translateY": { "type": "number", "value": -6, "easing": "ease-out" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "linear"
+                    },
+                    "translateY": {
+                      "type": "number",
+                      "value": -6,
+                      "easing": "ease-out"
+                    }
                   }
                 },
                 {
@@ -2145,8 +2488,16 @@
                   "action": "none",
                   "offsetMs": 350,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "ease-out" },
-                    "translateY": { "type": "number", "value": 0, "easing": "cubic-bezier(0.16, 1, 0.3, 1)" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "ease-out"
+                    },
+                    "translateY": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "cubic-bezier(0.16, 1, 0.3, 1)"
+                    }
                   }
                 }
               ],
@@ -2165,7 +2516,11 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "linear" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "linear"
+                    }
                   }
                 },
                 {
@@ -2173,7 +2528,11 @@
                   "action": "none",
                   "offsetMs": 300,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0, "easing": "ease-in" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "ease-in"
+                    }
                   }
                 }
               ],
@@ -2182,24 +2541,41 @@
             }
           ],
           "stateTimelineBindings": [
-            { "stateName": "IN", "timelineId": "tl-event-in" },
-            { "stateName": "OUT", "timelineId": "tl-event-out" }
+            {
+              "stateName": "IN",
+              "timelineId": "tl-event-in"
+            },
+            {
+              "stateName": "OUT",
+              "timelineId": "tl-event-out"
+            }
           ],
           "modifierTimelineBindings": [],
           "textAnimator": null
         }
       }
     ],
-
     "pages": [
       {
         "id": "page-match-live",
         "name": "Match — Live",
         "overrides": [
-          { "elementId": "el-replay-window", "visible": false },
-          { "elementId": "el-replay-label", "visible": false },
-          { "elementId": "el-stats-panel", "visible": false },
-          { "elementId": "el-lower-third", "visible": false }
+          {
+            "elementId": "el-replay-window",
+            "visible": false
+          },
+          {
+            "elementId": "el-replay-label",
+            "visible": false
+          },
+          {
+            "elementId": "el-stats-bg",
+            "visible": false
+          },
+          {
+            "elementId": "el-l3-bg",
+            "visible": false
+          }
         ],
         "locale": "en-GB",
         "extensions": {}
@@ -2208,9 +2584,18 @@
         "id": "page-match-player",
         "name": "Match — Player Card",
         "overrides": [
-          { "elementId": "el-replay-window", "visible": false },
-          { "elementId": "el-replay-label", "visible": false },
-          { "elementId": "el-stats-panel", "visible": false }
+          {
+            "elementId": "el-replay-window",
+            "visible": false
+          },
+          {
+            "elementId": "el-replay-label",
+            "visible": false
+          },
+          {
+            "elementId": "el-stats-bg",
+            "visible": false
+          }
         ],
         "locale": "en-GB",
         "extensions": {}
@@ -2219,9 +2604,18 @@
         "id": "page-match-stats",
         "name": "Match — Statistics",
         "overrides": [
-          { "elementId": "el-replay-window", "visible": false },
-          { "elementId": "el-replay-label", "visible": false },
-          { "elementId": "el-lower-third", "visible": false }
+          {
+            "elementId": "el-replay-window",
+            "visible": false
+          },
+          {
+            "elementId": "el-replay-label",
+            "visible": false
+          },
+          {
+            "elementId": "el-l3-bg",
+            "visible": false
+          }
         ],
         "locale": "en-GB",
         "extensions": {}
@@ -2230,11 +2624,26 @@
         "id": "page-replay",
         "name": "Replay",
         "overrides": [
-          { "elementId": "el-lower-third", "visible": false },
-          { "elementId": "el-stats-panel", "visible": false },
-          { "elementId": "el-replay-label", "visible": true },
-          { "elementId": "el-ticker-tag-text", "content": "<b>REPLAY</b>" },
-          { "elementId": "el-event-tag", "visible": false }
+          {
+            "elementId": "el-l3-bg",
+            "visible": false
+          },
+          {
+            "elementId": "el-stats-bg",
+            "visible": false
+          },
+          {
+            "elementId": "el-replay-label",
+            "visible": true
+          },
+          {
+            "elementId": "el-ticker-tag-text",
+            "content": "<b>REPLAY</b>"
+          },
+          {
+            "elementId": "el-event-tag-bg",
+            "visible": false
+          }
         ],
         "locale": "en-GB",
         "extensions": {}
@@ -2243,29 +2652,86 @@
         "id": "page-halftime",
         "name": "Half-Time",
         "overrides": [
-          { "elementId": "el-replay-window", "visible": false },
-          { "elementId": "el-replay-label", "visible": false },
-          { "elementId": "el-lower-third", "visible": false },
-          { "elementId": "el-event-tag", "visible": false },
-          { "elementId": "el-sb-half-label", "content": "HALF-TIME" },
-          { "elementId": "el-ticker-tag-text", "content": "<b>HALF-TIME</b>" }
+          {
+            "elementId": "el-replay-window",
+            "visible": false
+          },
+          {
+            "elementId": "el-replay-label",
+            "visible": false
+          },
+          {
+            "elementId": "el-l3-bg",
+            "visible": false
+          },
+          {
+            "elementId": "el-event-tag-bg",
+            "visible": false
+          },
+          {
+            "elementId": "el-sb-half-label",
+            "content": "HALF-TIME"
+          },
+          {
+            "elementId": "el-ticker-tag-text",
+            "content": "<b>HALF-TIME</b>"
+          }
         ],
         "locale": "en-GB",
         "extensions": {}
       }
     ],
-
     "dataSchema": {
       "description": "Live broadcast data fields bound to on-air graphics",
       "fields": [
-        { "name": "homeAbbr", "type": "string", "label": "Home Abbreviation", "defaultValue": "NCF" },
-        { "name": "awayAbbr", "type": "string", "label": "Away Abbreviation", "defaultValue": "HBU" },
-        { "name": "homeScore", "type": "string", "label": "Home Score", "defaultValue": "2" },
-        { "name": "awayScore", "type": "string", "label": "Away Score", "defaultValue": "1" },
-        { "name": "matchPeriod", "type": "string", "label": "Match Period", "defaultValue": "2ND HALF" },
-        { "name": "lastEvent", "type": "string", "label": "Last Event", "defaultValue": "GOAL · Rivera 62'" },
-        { "name": "playerName", "type": "string", "label": "Player Name", "defaultValue": "Carlos Rivera" },
-        { "name": "playerRole", "type": "string", "label": "Player Role", "defaultValue": "Midfielder · #10" },
+        {
+          "name": "homeAbbr",
+          "type": "string",
+          "label": "Home Abbreviation",
+          "defaultValue": "NCF"
+        },
+        {
+          "name": "awayAbbr",
+          "type": "string",
+          "label": "Away Abbreviation",
+          "defaultValue": "HBU"
+        },
+        {
+          "name": "homeScore",
+          "type": "string",
+          "label": "Home Score",
+          "defaultValue": "2"
+        },
+        {
+          "name": "awayScore",
+          "type": "string",
+          "label": "Away Score",
+          "defaultValue": "1"
+        },
+        {
+          "name": "matchPeriod",
+          "type": "string",
+          "label": "Match Period",
+          "defaultValue": "2ND HALF"
+        },
+        {
+          "name": "lastEvent",
+          "type": "string",
+          "label": "Last Event",
+          "defaultValue": "GOAL · Rivera 62'"
+        },
+        {
+          "name": "playerName",
+          "type": "string",
+          "label": "Player Name",
+          "defaultValue": "Carlos Rivera"
+        },
+        {
+          "name": "playerRole",
+          "type": "string",
+          "label": "Player Role",
+          "defaultValue": "Midfielder · #10"
+        },
         {
           "name": "playerStat",
           "type": "string",
@@ -2278,9 +2744,24 @@
           "label": "Sponsor QR URL",
           "defaultValue": "https://broadset.dev/live"
         },
-        { "name": "showBranding", "type": "boolean", "label": "Show Network Bug", "defaultValue": true },
-        { "name": "showStats", "type": "boolean", "label": "Show Stats Panel", "defaultValue": true },
-        { "name": "showSponsor", "type": "boolean", "label": "Show Sponsor Panel", "defaultValue": true }
+        {
+          "name": "showBranding",
+          "type": "boolean",
+          "label": "Show Network Bug",
+          "defaultValue": true
+        },
+        {
+          "name": "showStats",
+          "type": "boolean",
+          "label": "Show Stats Panel",
+          "defaultValue": true
+        },
+        {
+          "name": "showSponsor",
+          "type": "boolean",
+          "label": "Show Sponsor Panel",
+          "defaultValue": true
+        }
       ]
     },
     "output": {
@@ -2290,7 +2771,6 @@
     },
     "extensions": {}
   },
-
   "sampleSocialDocument": {
     "id": "doc-broadcast-social",
     "name": "Match Day — Social 9:16",
@@ -2309,7 +2789,10 @@
         "type": "rectangle",
         "name": "Top Accent",
         "locked": true,
-        "position": { "x": 0, "y": 0 },
+        "position": {
+          "x": 0,
+          "y": 0
+        },
         "width": 1080,
         "height": 6,
         "rotation": 0,
@@ -2319,9 +2802,18 @@
             "type": "linear",
             "angle": 90,
             "stops": [
-              { "color": "#d4213d", "position": 0 },
-              { "color": "#ff6b35", "position": 50 },
-              { "color": "#d4213d", "position": 100 }
+              {
+                "color": "#d4213d",
+                "position": 0
+              },
+              {
+                "color": "#ff6b35",
+                "position": 50
+              },
+              {
+                "color": "#d4213d",
+                "position": 100
+              }
             ]
           }
         },
@@ -2343,7 +2835,10 @@
         "type": "ellipse",
         "name": "Background Glow",
         "locked": true,
-        "position": { "x": 240, "y": 480 },
+        "position": {
+          "x": 240,
+          "y": 480
+        },
         "width": 600,
         "height": 600,
         "rotation": 0,
@@ -2370,7 +2865,10 @@
         "type": "text",
         "name": "Title",
         "locked": false,
-        "position": { "x": 80, "y": 180 },
+        "position": {
+          "x": 80,
+          "y": 180
+        },
         "width": 920,
         "height": 80,
         "rotation": 0,
@@ -2402,7 +2900,10 @@
         "type": "text",
         "name": "League",
         "locked": false,
-        "position": { "x": 80, "y": 280 },
+        "position": {
+          "x": 80,
+          "y": 280
+        },
         "width": 920,
         "height": 40,
         "rotation": 0,
@@ -2434,7 +2935,10 @@
         "type": "image",
         "name": "Home Crest",
         "locked": false,
-        "position": { "x": 160, "y": 480 },
+        "position": {
+          "x": 160,
+          "y": 480
+        },
         "width": 120,
         "height": 120,
         "rotation": 0,
@@ -2460,7 +2964,10 @@
         "type": "text",
         "name": "Home Team",
         "locked": false,
-        "position": { "x": 60, "y": 620 },
+        "position": {
+          "x": 60,
+          "y": 620
+        },
         "width": 320,
         "height": 50,
         "rotation": 0,
@@ -2491,7 +2998,10 @@
         "type": "text",
         "name": "Score",
         "locked": false,
-        "position": { "x": 240, "y": 760 },
+        "position": {
+          "x": 240,
+          "y": 760
+        },
         "width": 600,
         "height": 200,
         "rotation": 0,
@@ -2523,7 +3033,10 @@
         "type": "image",
         "name": "Away Crest",
         "locked": false,
-        "position": { "x": 800, "y": 480 },
+        "position": {
+          "x": 800,
+          "y": 480
+        },
         "width": 120,
         "height": 120,
         "rotation": 0,
@@ -2549,7 +3062,10 @@
         "type": "text",
         "name": "Away Team",
         "locked": false,
-        "position": { "x": 700, "y": 620 },
+        "position": {
+          "x": 700,
+          "y": 620
+        },
         "width": 320,
         "height": 50,
         "rotation": 0,
@@ -2580,7 +3096,10 @@
         "type": "path",
         "name": "VS Divider",
         "locked": true,
-        "position": { "x": 440, "y": 490 },
+        "position": {
+          "x": 440,
+          "y": 490
+        },
         "width": 200,
         "height": 100,
         "rotation": 0,
@@ -2609,7 +3128,10 @@
         "type": "text",
         "name": "VS",
         "locked": true,
-        "position": { "x": 480, "y": 510 },
+        "position": {
+          "x": 480,
+          "y": 510
+        },
         "width": 120,
         "height": 60,
         "rotation": 0,
@@ -2641,7 +3163,10 @@
         "type": "rectangle",
         "name": "Bottom Divider",
         "locked": true,
-        "position": { "x": 340, "y": 1020 },
+        "position": {
+          "x": 340,
+          "y": 1020
+        },
         "width": 400,
         "height": 1,
         "rotation": 0,
@@ -2667,7 +3192,10 @@
         "type": "text",
         "name": "Goal Detail",
         "locked": false,
-        "position": { "x": 80, "y": 1060 },
+        "position": {
+          "x": 80,
+          "y": 1060
+        },
         "width": 920,
         "height": 120,
         "rotation": 0,
@@ -2712,8 +3240,16 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0.3, "easing": "ease-in-out" },
-                    "scale": { "type": "number", "value": 0.9, "easing": "ease-in-out" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0.3,
+                      "easing": "ease-in-out"
+                    },
+                    "scale": {
+                      "type": "number",
+                      "value": 0.9,
+                      "easing": "ease-in-out"
+                    }
                   }
                 },
                 {
@@ -2721,8 +3257,16 @@
                   "action": "none",
                   "offsetMs": 4000,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "ease-in-out" },
-                    "scale": { "type": "number", "value": 1.15, "easing": "ease-in-out" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "ease-in-out"
+                    },
+                    "scale": {
+                      "type": "number",
+                      "value": 1.15,
+                      "easing": "ease-in-out"
+                    }
                   }
                 }
               ],
@@ -2751,8 +3295,16 @@
                   "action": "none",
                   "offsetMs": 0,
                   "properties": {
-                    "opacity": { "type": "number", "value": 0, "easing": "linear" },
-                    "scale": { "type": "number", "value": 0.8, "easing": "ease-out" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 0,
+                      "easing": "linear"
+                    },
+                    "scale": {
+                      "type": "number",
+                      "value": 0.8,
+                      "easing": "ease-out"
+                    }
                   }
                 },
                 {
@@ -2760,8 +3312,16 @@
                   "action": "none",
                   "offsetMs": 600,
                   "properties": {
-                    "opacity": { "type": "number", "value": 1, "easing": "ease-out" },
-                    "scale": { "type": "number", "value": 1, "easing": "spring-gentle" }
+                    "opacity": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "ease-out"
+                    },
+                    "scale": {
+                      "type": "number",
+                      "value": 1,
+                      "easing": "spring-gentle"
+                    }
                   }
                 }
               ],
@@ -2786,14 +3346,24 @@
       {
         "id": "page-social-halftime",
         "name": "Social — Half-Time",
-        "overrides": [{ "elementId": "el-s-title", "content": "<b>HALF-TIME</b>" }],
+        "overrides": [
+          {
+            "elementId": "el-s-title",
+            "content": "<b>HALF-TIME</b>"
+          }
+        ],
         "locale": "en-GB",
         "extensions": {}
       },
       {
         "id": "page-social-fulltime",
         "name": "Social — Full-Time",
-        "overrides": [{ "elementId": "el-s-title", "content": "<b>FULL-TIME</b>" }],
+        "overrides": [
+          {
+            "elementId": "el-s-title",
+            "content": "<b>FULL-TIME</b>"
+          }
+        ],
         "locale": "en-GB",
         "extensions": {}
       }
@@ -2808,7 +3378,6 @@
     },
     "extensions": {}
   },
-
   "sampleProject": {
     "$schema": "https://schema.broadset.dev/v1/project.json",
     "schemaVersion": 1,
@@ -2821,11 +3390,26 @@
         {
           "family": "Inter",
           "variants": [
-            { "weight": 400, "style": "normal" },
-            { "weight": 500, "style": "normal" },
-            { "weight": 600, "style": "normal" },
-            { "weight": 700, "style": "normal" },
-            { "weight": 800, "style": "normal" }
+            {
+              "weight": 400,
+              "style": "normal"
+            },
+            {
+              "weight": 500,
+              "style": "normal"
+            },
+            {
+              "weight": 600,
+              "style": "normal"
+            },
+            {
+              "weight": 700,
+              "style": "normal"
+            },
+            {
+              "weight": 800,
+              "style": "normal"
+            }
           ],
           "source": {
             "kind": "url",
@@ -2888,14 +3472,29 @@
         }
       }
     ],
-    "documents": [{ "$ref": "sampleDocument" }, { "$ref": "sampleSocialDocument" }],
+    "documents": [
+      {
+        "$ref": "sampleDocument"
+      },
+      {
+        "$ref": "sampleSocialDocument"
+      }
+    ],
     "templateGroups": [
       {
         "groupId": "tg-broadcast",
         "name": "Live Match Package",
         "members": [
-          { "documentId": "doc-broadcast-main", "role": "16:9", "label": "Main HD" },
-          { "documentId": "doc-broadcast-social", "role": "9:16", "label": "Social Vertical" }
+          {
+            "documentId": "doc-broadcast-main",
+            "role": "16:9",
+            "label": "Main HD"
+          },
+          {
+            "documentId": "doc-broadcast-social",
+            "role": "9:16",
+            "label": "Social Vertical"
+          }
         ]
       }
     ],
