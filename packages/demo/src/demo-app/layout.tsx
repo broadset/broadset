@@ -112,6 +112,7 @@ export function DemoAppLayout(props: DemoAppLayoutProps): React.JSX.Element {
                       cursor={editorState.pendingPlacementType === null ? 'default' : 'crosshair'}
                       documentData={currentDocument}
                       isPlaying={isPlaying}
+                      onPlaybackControllerChange={props.setPreviewPlaybackController}
                       panX={editorState.canvasSettings.panX}
                       panY={editorState.canvasSettings.panY}
                       selectedElement={selectedElement}

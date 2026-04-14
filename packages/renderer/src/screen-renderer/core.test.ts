@@ -13,12 +13,18 @@ import {
 } from '../index';
 import { createDocument, createElement } from './test-helpers';
 
+function createHost(): HTMLDivElement {
+  const host = document.createElement('div');
+
+  host.style.width = '1280px';
+  host.style.height = '720px';
+
+  return host;
+}
+
 describe('renderer core', () => {
   it('renders the cross-package data attributes on each element node', () => {
-    const host = document.createElement('div');
-
-    host.style.width = '1280px';
-    host.style.height = '720px';
+    const host = createHost();
 
     const controller = createScreenRenderer({
       host,
@@ -37,6 +43,129 @@ describe('renderer core', () => {
     controller.destroy();
   });
 
+  /** @description Every rendered element must expose exactly one animation target; groups must place the marker on the container itself. */
+  it('applies data-element-content on exactly one target per element and on the group container', () => {
+    const host = createHost();
+
+    const elements = [
+      createElement({ id: 'text-ct', type: 'text', content: 'Hello' }),
+      createElement({ id: 'image-ct', type: 'image', content: 'https://example.com/logo.png' }),
+      createElement({ id: 'svg-ct', type: 'svg', content: '<svg viewBox="0 0 10 10"></svg>' }),
+      createElement({ id: 'path-ct', type: 'path', content: 'M0 0 L10 10' }),
+      createElement({ id: 'rect-ct', type: 'rectangle' }),
+      createElement({ id: 'ellipse-ct', type: 'ellipse' }),
+      createElement({ id: 'qr-ct', type: 'qrcode', content: 'https://broadset.dev' }),
+      createElement({ id: 'video-ct', type: 'video', content: 'https://example.com/video.mp4' }),
+      createElement({ id: 'clock-ct', type: 'clock', content: '12:00:00' }),
+      createElement({ id: 'ticker-ct', type: 'ticker', content: '["A","B"]' }),
+      createElement({ id: 'group-ct', type: 'group' }),
+    ];
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument(elements),
+    });
+
+    for (const element of elements) {
+      const node = host.querySelector(`[${DATA_ATTRIBUTES.elementId}="${element.id}"]`);
+
+      expect(node).not.toBeNull();
+
+      if (element.type === 'group') {
+        expect(node?.hasAttribute('data-element-content')).toBe(true);
+        expect(node?.querySelectorAll('[data-element-content]')).toHaveLength(0);
+      } else {
+        const targets = node?.querySelectorAll('[data-element-content]') ?? [];
+
+        expect(node?.hasAttribute('data-element-content')).toBe(false);
+        expect(targets).toHaveLength(1);
+      }
+    }
+
+    controller.destroy();
+  });
+
+  /** @description Empty image content must render a visible placeholder instead of an empty or broken image node. */
+  it('renders a placeholder for image elements with empty content', () => {
+    const host = document.createElement('div');
+
+    host.style.width = '1280px';
+    host.style.height = '720px';
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument([createElement({ id: 'image-empty', type: 'image', name: 'Hero Image', content: '' })]),
+    });
+
+    const placeholder = host.querySelector('[aria-label="Hero Image placeholder"]');
+
+    expect(placeholder).not.toBeNull();
+    expect(placeholder?.textContent).toContain('Image unavailable');
+    expect(host.querySelector('img')).toBeNull();
+
+    controller.destroy();
+  });
+
+  /** @description Broken image loads must swap to a visible placeholder instead of leaving a failed img element behind. */
+  it('renders a placeholder after an image load error', () => {
+    const host = document.createElement('div');
+
+    host.style.width = '1280px';
+    host.style.height = '720px';
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument([
+        createElement({
+          id: 'image-error',
+          type: 'image',
+          name: 'Scorebug Image',
+          content: 'https://cdn.invalid/logo.png',
+        }),
+      ]),
+    });
+
+    const image = host.querySelector('img');
+
+    expect(image).not.toBeNull();
+    image?.dispatchEvent(new Event('error'));
+
+    const placeholder = host.querySelector('[aria-label="Scorebug Image placeholder"]');
+
+    expect(placeholder).not.toBeNull();
+    expect(host.querySelector('img')).toBeNull();
+
+    controller.destroy();
+  });
+
+  /** @description Text rendering must strip executable markup and event-handler attributes so only safe visible text reaches the DOM. */
+  it('sanitizes text content before rendering visible characters', () => {
+    const host = document.createElement('div');
+
+    host.style.width = '1280px';
+    host.style.height = '720px';
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument([
+        createElement({
+          id: 'text-safe',
+          type: 'text',
+          content:
+            '<span onclick="alert(1)">Safe</span><script>alert(2)</script><img src="x" onerror="alert(3)" /> Text',
+        }),
+      ]),
+    });
+
+    const contentNode = host.querySelector(`[${DATA_ATTRIBUTES.elementContent}]`);
+
+    expect(contentNode?.querySelector('script')).toBeNull();
+    expect(contentNode?.querySelector('img')).toBeNull();
+    expect(contentNode?.textContent).toBe('Safe Text');
+
+    controller.destroy();
+  });
+
   it('builds a scene tree that promotes orphans to roots and preserves sibling order', () => {
     const root = createElement({ id: 'root', type: 'group' });
     const childA = createElement({ id: 'child-a', type: 'text', parentId: 'root' });
@@ -48,6 +177,43 @@ describe('renderer core', () => {
 
     expect(sceneTree.map((node) => node.element.id)).toEqual(['root', 'orphan', 'tail-root']);
     expect(sceneTree[0]?.children.map((node) => node.element.id)).toEqual(['child-a', 'child-b']);
+  });
+
+  /** @description Parented child coordinates must remain relative to parent top-left and must not be shifted by parent padding. */
+  it('does not shift child coordinate origin when parent has padding', () => {
+    const host = createHost();
+
+    const parent = createElement({
+      id: 'parent-with-padding',
+      type: 'group',
+      width: 240,
+      height: 180,
+      style: { ...createDefaultStyle(), padding: [20, 24, 28, 32] },
+    });
+    const child = createElement({
+      id: 'child-relative',
+      type: 'text',
+      parentId: 'parent-with-padding',
+      position: { x: 12, y: 18 },
+      content: 'Child',
+    });
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument([parent, child]),
+    });
+
+    const parentContentHost = host.querySelector<HTMLDivElement>(
+      `[${DATA_ATTRIBUTES.elementId}="parent-with-padding"] [${DATA_ATTRIBUTES.opacityTarget}] > div`,
+    );
+    const childHost = host.querySelector<HTMLDivElement>(`[${DATA_ATTRIBUTES.elementId}="child-relative"]`);
+
+    expect(parentContentHost).not.toBeNull();
+    expect(parentContentHost?.style.padding).toBe('0px');
+    expect(childHost?.style.left).toBe('12px');
+    expect(childHost?.style.top).toBe('18px');
+
+    controller.destroy();
   });
 
   it('applies solid and gradient backgrounds without leaving stale styles behind', () => {
@@ -155,23 +321,25 @@ describe('renderer core', () => {
   });
 
   it('keeps the preview frame square without extra rounding or card chrome', () => {
-    const host = document.createElement('div');
-
-    host.style.width = '1280px';
-    host.style.height = '720px';
+    const host = createHost();
 
     const controller = createScreenRenderer({
       host,
       document: createDocument([createElement({ id: 'frame-1', type: 'rectangle' })]),
     });
 
-    const canvasScaleShell = host.firstElementChild as HTMLDivElement | null;
-    const canvasRoot = canvasScaleShell?.firstElementChild as HTMLDivElement | null;
+    const canvasScaleShell = host.firstElementChild;
+    const canvasRoot = canvasScaleShell?.firstElementChild;
 
     expect(canvasRoot).not.toBeNull();
-    expect(canvasRoot?.style.borderRadius).toBe('0px');
-    expect(canvasRoot?.style.boxShadow).toBe('none');
-    expect(canvasRoot?.style.outline).toBe('none');
+
+    if (!(canvasRoot instanceof HTMLElement)) {
+      throw new Error('Canvas root element is missing');
+    }
+
+    expect(canvasRoot.style.borderRadius).toBe('0px');
+    expect(canvasRoot.style.boxShadow).toBe('none');
+    expect(canvasRoot.style.outline).toBe('none');
 
     controller.destroy();
   });
@@ -233,12 +401,100 @@ describe('renderer core', () => {
     expect(lifecycleEvents).toEqual(['mount:custom-a', 'destroy:custom-a', 'mount:custom-b', 'destroy:custom-b']);
   });
 
+  /** @description Updating one element must only rerender that element and keep unaffected nodes stable. */
+  it('updates only the affected element on incremental document updates', () => {
+    const updateCounts = new Map<string, number>();
+    const plugin: RendererPlugin = {
+      type: 'custom',
+      rendererFactory: ({ element, host: rendererHost }) => {
+        rendererHost.textContent = element.content;
+
+        return {
+          update(nextElement) {
+            updateCounts.set(nextElement.id, (updateCounts.get(nextElement.id) ?? 0) + 1);
+            rendererHost.textContent = nextElement.content;
+          },
+          destroy() {
+            rendererHost.textContent = '';
+          },
+        };
+      },
+    };
+    const host = createHost();
+    const initialElements = Array.from({ length: 10 }, (_value, index) =>
+      createElement({
+        id: `node-${String(index)}`,
+        type: 'custom',
+        content: `content-${String(index)}`,
+        position: { x: index * 10, y: index * 5 },
+      }),
+    );
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument(initialElements),
+      plugins: [plugin],
+    });
+
+    updateCounts.clear();
+
+    const updatedElements = initialElements.map((element, index) =>
+      index === 4 ? { ...element, position: { x: element.position.x + 24, y: element.position.y + 8 } } : element,
+    );
+
+    controller.updateDocument(createDocument(updatedElements));
+
+    expect(updateCounts.get('node-4')).toBe(1);
+    expect(Array.from(updateCounts.entries()).filter(([id]) => id !== 'node-4')).toHaveLength(0);
+
+    controller.destroy();
+  });
+
+  /** @description Adding a new element must not remount existing rendered elements. */
+  it('adds new elements without remounting existing nodes', () => {
+    const mountCounts = new Map<string, number>();
+    const plugin: RendererPlugin = {
+      type: 'custom',
+      rendererFactory: ({ element, host: rendererHost }) => {
+        mountCounts.set(element.id, (mountCounts.get(element.id) ?? 0) + 1);
+        rendererHost.textContent = element.content;
+
+        return {
+          update(nextElement) {
+            rendererHost.textContent = nextElement.content;
+          },
+          destroy() {
+            rendererHost.textContent = '';
+          },
+        };
+      },
+    };
+    const host = createHost();
+    const baseElements = [
+      createElement({ id: 'custom-a', type: 'custom', content: 'A' }),
+      createElement({ id: 'custom-b', type: 'custom', content: 'B' }),
+    ];
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument(baseElements),
+      plugins: [plugin],
+    });
+
+    controller.updateDocument(
+      createDocument([...baseElements, createElement({ id: 'custom-c', type: 'custom', content: 'C' })]),
+    );
+
+    expect(mountCounts.get('custom-a')).toBe(1);
+    expect(mountCounts.get('custom-b')).toBe(1);
+    expect(mountCounts.get('custom-c')).toBe(1);
+
+    controller.destroy();
+  });
+
   /** @description Boolean group with union renders an SVG with a combined path element. */
   it('renders a boolean group as a single SVG path', () => {
-    const host = document.createElement('div');
-
-    host.style.width = '1280px';
-    host.style.height = '720px';
+    const host = createHost();
 
     const group = createElement({
       id: 'group-1',
@@ -282,10 +538,7 @@ describe('renderer core', () => {
 
   /** @description Boolean group with null operation renders normally — children visible as separate elements. */
   it('renders a group without booleanOperation normally', () => {
-    const host = document.createElement('div');
-
-    host.style.width = '1280px';
-    host.style.height = '720px';
+    const host = createHost();
 
     const group = createElement({
       id: 'group-1',
@@ -324,10 +577,7 @@ describe('renderer core', () => {
 
   /** @description Boolean group styling inherits from the first child. */
   it('inherits stroke/fill from first child in boolean group', () => {
-    const host = document.createElement('div');
-
-    host.style.width = '1280px';
-    host.style.height = '720px';
+    const host = createHost();
 
     const group = createElement({
       id: 'group-1',

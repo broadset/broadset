@@ -191,7 +191,7 @@ When exporting to PDF, animated elements MUST be exported at their default/rest 
 
 ## Spec Gaps
 
-- [x] **Animated Element Static Export:** Automated tests verify export at t=0 rest state and confirm active state modifiers are not applied (`packages/formats/src/pdf.test.ts`).
+- [x] **Animated Element Static Export:** Automated tests verify export at t=0 rest state and confirm active state modifiers are not applied (`packages/formats/src/pdf/fonts-wrap-qr-animation.test.ts`).
 
 ---
 

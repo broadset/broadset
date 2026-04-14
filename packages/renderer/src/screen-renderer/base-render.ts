@@ -66,6 +66,7 @@ class DOMScreenRenderer implements ScreenRendererController {
   private readonly rendererRecords = new Map<string, RendererRecord>();
   private readonly resizeObserver: ResizeObserver | null;
   private currentDocument: BroadsetDocument | null = null;
+  private previousElementsById = new Map<string, BroadsetElement>();
   private isDestroyed = false;
 
   constructor(options: ScreenRendererOptions) {
@@ -116,6 +117,7 @@ class DOMScreenRenderer implements ScreenRendererController {
     this.currentDocument = documentData;
     this.applyCanvasFrame(documentData);
     this.renderDocument(documentData);
+    this.previousElementsById = new Map(documentData.elements.map((element) => [element.id, element]));
     this.updateScale();
   }
 
@@ -132,6 +134,7 @@ class DOMScreenRenderer implements ScreenRendererController {
     }
 
     this.rendererRecords.clear();
+    this.previousElementsById.clear();
     this.currentDocument = null;
     this.host.replaceChildren();
   }
@@ -175,10 +178,20 @@ class DOMScreenRenderer implements ScreenRendererController {
   }): void {
     const { activeIds, documentData, node, parent } = args;
     const record = this.getOrCreateRecord(documentData, node.element);
+    const hasChildren = node.children.length > 0;
+    const previousElement = this.previousElementsById.get(node.element.id);
+    const shouldUpdate =
+      previousElement === undefined ||
+      previousElement.type !== node.element.type ||
+      !areElementsEquivalent(previousElement, node.element);
 
     activeIds.add(node.element.id);
-    this.applyElementLayout(record, node.element);
-    record.renderer.update(node.element);
+
+    if (shouldUpdate) {
+      this.applyElementLayout(record, node.element, hasChildren);
+      record.renderer.update(node.element);
+    }
+
     parent.appendChild(record.host);
 
     for (const child of node.children) {
@@ -210,7 +223,12 @@ class DOMScreenRenderer implements ScreenRendererController {
     host.setAttribute(DATA_ATTRIBUTES.elementId, element.id);
     host.setAttribute(DATA_ATTRIBUTES.visibility, 'onscreen');
     opacityHost.setAttribute(DATA_ATTRIBUTES.opacityTarget, '');
-    contentHost.setAttribute(DATA_ATTRIBUTES.elementContent, '');
+
+    if (element.type === 'group') {
+      host.setAttribute(DATA_ATTRIBUTES.elementContent, '');
+    } else {
+      contentHost.setAttribute(DATA_ATTRIBUTES.elementContent, '');
+    }
 
     host.appendChild(opacityHost);
     opacityHost.appendChild(contentHost);
@@ -240,7 +258,7 @@ class DOMScreenRenderer implements ScreenRendererController {
     return BUILT_IN_RENDERERS[type] ?? createFallbackRenderer(type);
   }
 
-  private applyElementLayout(record: RendererRecord, element: BroadsetElement): void {
+  private applyElementLayout(record: RendererRecord, element: BroadsetElement, hasChildren: boolean): void {
     const { contentHost, host, opacityHost } = record;
     const { style } = element;
     const transforms = buildTransformList(element, style);
@@ -264,7 +282,9 @@ class DOMScreenRenderer implements ScreenRendererController {
     contentHost.style.height = '100%';
     contentHost.style.boxSizing = 'border-box';
     contentHost.style.overflow = style.clipChildren === true ? 'hidden' : 'visible';
-    contentHost.style.padding = formatPadding(style);
+    // Parented elements use model-space coordinates relative to their parent's top-left.
+    // Applying parent padding on the same host shifts that coordinate origin.
+    contentHost.style.padding = hasChildren ? '0px' : formatPadding(style);
     contentHost.style.borderRadius = formatBorderRadius(element, style);
     contentHost.style.borderWidth = style.borderWidth === undefined ? '' : toPixelValue(style.borderWidth);
     contentHost.style.borderStyle = style.borderWidth === undefined ? '' : (style.borderStyle ?? 'solid');
@@ -358,6 +378,10 @@ function formatBorderRadius(element: BroadsetElement, style: BroadsetElementStyl
   }
 
   return style.borderRadius.map((value) => toPixelValue(value)).join(' ');
+}
+
+function areElementsEquivalent(previous: BroadsetElement, next: BroadsetElement): boolean {
+  return JSON.stringify(previous) === JSON.stringify(next);
 }
 
 export function createScreenRenderer(options: ScreenRendererOptions): ScreenRendererController {

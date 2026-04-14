@@ -60,4 +60,24 @@ describe('sample document fixture', () => {
 
     expect(elementsWithDataField.length).toBeGreaterThanOrEqual(3);
   });
+
+  /**
+   * @description Group children MUST use parent-relative coordinates, otherwise grouped layout appears offset in the renderer.
+   */
+  it('uses parent-relative coordinates for grouped children', () => {
+    const groupedChildren = SAMPLE_DOCUMENT.elements.filter((element) => element.parentId !== null);
+
+    for (const child of groupedChildren) {
+      const parent = SAMPLE_DOCUMENT.elements.find((element) => element.id === child.parentId);
+
+      expect(parent).toBeDefined();
+      expect(child.position.x).toBeGreaterThanOrEqual(0);
+      expect(child.position.y).toBeGreaterThanOrEqual(0);
+
+      if (parent !== undefined) {
+        expect(child.position.x + child.width).toBeLessThanOrEqual(parent.width);
+        expect(child.position.y + child.height).toBeLessThanOrEqual(parent.height);
+      }
+    }
+  });
 });

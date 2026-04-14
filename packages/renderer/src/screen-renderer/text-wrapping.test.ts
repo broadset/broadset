@@ -17,7 +17,7 @@ describe('per-character text wrapping', () => {
     });
 
     const contentNode = host.querySelector(`[${DATA_ATTRIBUTES.elementContent}]`);
-    const charSpans = contentNode?.querySelectorAll('[data-char-index]') ?? [];
+    const charSpans = contentNode?.querySelectorAll<HTMLElement>('[data-char-index]') ?? [];
 
     expect(charSpans.length).toBe(2);
     expect(charSpans[0]?.textContent).toBe('H');
@@ -41,11 +41,12 @@ describe('per-character text wrapping', () => {
     });
 
     const contentNode = host.querySelector(`[${DATA_ATTRIBUTES.elementContent}]`);
-    const charSpans = contentNode?.querySelectorAll('[data-char-index]') ?? [];
+    const charSpans = contentNode?.querySelectorAll<HTMLElement>('[data-char-index]') ?? [];
 
     expect(charSpans.length).toBe(3);
     expect(charSpans[0]?.textContent).toBe('A');
     expect(charSpans[1]?.textContent).toBe(' ');
+    expect(charSpans[1]?.style.whiteSpace).toBe('pre');
     expect(charSpans[2]?.textContent).toBe('B');
 
     controller.destroy();
@@ -64,11 +65,83 @@ describe('per-character text wrapping', () => {
     });
 
     const contentNode = host.querySelector(`[${DATA_ATTRIBUTES.elementContent}]`);
-    const charSpans = contentNode?.querySelectorAll('[data-char-index]') ?? [];
+    const charSpans = contentNode?.querySelectorAll<HTMLElement>('[data-char-index]') ?? [];
 
     expect(charSpans.length).toBe(2);
     expect(charSpans[0]?.textContent).toBe('O');
     expect(charSpans[1]?.textContent).toBe('K');
+
+    controller.destroy();
+  });
+
+  /** @description Consecutive spaces must remain distinct spans so visible spacing is not collapsed. */
+  it('preserves consecutive spaces between words', () => {
+    const host = document.createElement('div');
+
+    host.style.width = '1280px';
+    host.style.height = '720px';
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument([createElement({ id: 'txt-4', type: 'text', content: 'A  B' })]),
+    });
+
+    const contentNode = host.querySelector(`[${DATA_ATTRIBUTES.elementContent}]`);
+    const charSpans = contentNode?.querySelectorAll<HTMLElement>('[data-char-index]') ?? [];
+    const rendered = Array.from(charSpans)
+      .map((span) => span.textContent)
+      .join('');
+
+    expect(charSpans.length).toBe(4);
+    expect(rendered).toBe('A  B');
+
+    controller.destroy();
+  });
+
+  /** @description HTML entities like &nbsp; must decode to their visible character equivalents. */
+  it('decodes HTML entities while wrapping characters', () => {
+    const host = document.createElement('div');
+
+    host.style.width = '1280px';
+    host.style.height = '720px';
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument([createElement({ id: 'txt-5', type: 'text', content: 'A&nbsp;B' })]),
+    });
+
+    const contentNode = host.querySelector(`[${DATA_ATTRIBUTES.elementContent}]`);
+    const charSpans = contentNode?.querySelectorAll<HTMLElement>('[data-char-index]') ?? [];
+    const rendered = Array.from(charSpans)
+      .map((span) => span.textContent)
+      .join('');
+
+    expect(charSpans.length).toBe(3);
+    expect(rendered).toBe('A\u00A0B');
+
+    controller.destroy();
+  });
+
+  /** @description Rich-text line breaks via <br> must map to newline characters in per-character output. */
+  it('preserves rich text line breaks from br tags', () => {
+    const host = document.createElement('div');
+
+    host.style.width = '1280px';
+    host.style.height = '720px';
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument([createElement({ id: 'txt-6', type: 'text', content: 'A<br>B' })]),
+    });
+
+    const contentNode = host.querySelector(`[${DATA_ATTRIBUTES.elementContent}]`);
+    const charSpans = contentNode?.querySelectorAll<HTMLElement>('[data-char-index]') ?? [];
+    const rendered = Array.from(charSpans)
+      .map((span) => span.textContent)
+      .join('');
+
+    expect(charSpans.length).toBe(3);
+    expect(rendered).toBe('A\nB');
 
     controller.destroy();
   });

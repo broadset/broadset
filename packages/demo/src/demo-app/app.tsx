@@ -36,6 +36,7 @@ import { useCommandHandlers } from './command-handlers';
 import { getElementLabel, useEditorSnapshot } from './helpers';
 import { DemoAppLayout } from './layout';
 import { DemoSidebarPanel } from './sidebar';
+import { useAnimationEditing } from './use-animation-editing';
 import { useCanvasControlHandlers } from './use-canvas-control-handlers';
 import { useDemoFileHandlers } from './use-demo-file-handlers';
 import { useShellBrowserEffects } from './use-shell-browser-effects';
@@ -352,6 +353,16 @@ export function DemoApp(): React.JSX.Element {
     templateGroups,
   });
 
+  const animationEditing = useAnimationEditing({
+    currentDocument,
+    selectedElementId,
+    editorStore,
+    pushToast,
+    editingTimeline,
+    setEditingTimeline,
+    setEditingTimelineSelectedKf,
+  });
+
   const sidebarPanel = (
     <DemoSidebarPanel
       activeElementIds={editorState.activeElementIds}
@@ -365,6 +376,18 @@ export function DemoApp(): React.JSX.Element {
       handleRenameGroup={handleRenameGroup}
       handleUpdateMemberRole={handleUpdateMemberRole}
       layers={layers}
+      onAnimationAddModifierBinding={animationEditing.onAddModifierBinding}
+      onAnimationAddStateBinding={animationEditing.onAddStateBinding}
+      onAnimationAddTimeline={animationEditing.onAddTimeline}
+      onAnimationDeleteTimeline={animationEditing.onDeleteTimeline}
+      onAnimationDuplicateTimeline={animationEditing.onDuplicateTimeline}
+      onAnimationEditTimeline={animationEditing.onEditTimeline}
+      onAnimationQuickSetup={animationEditing.onQuickSetup}
+      onAnimationRemoveModifierBinding={animationEditing.onRemoveModifierBinding}
+      onAnimationRemoveStateBinding={animationEditing.onRemoveStateBinding}
+      onAnimationRenameTimeline={animationEditing.onRenameTimeline}
+      onAnimationSelectState={animationEditing.onSelectState}
+      onAnimationToggleModifier={animationEditing.onToggleModifier}
       onRemoveElement={(elementId) => {
         editorStore.getState().removeElement(elementId);
       }}
@@ -386,6 +409,8 @@ export function DemoApp(): React.JSX.Element {
       setEditingTimelineSelectedKf={setEditingTimelineSelectedKf}
       sidebarTab={sidebarTab}
       templateGroups={templateGroups}
+      timelinePreviewActiveModifiers={animationEditing.activeModifiers}
+      timelinePreviewActiveState={animationEditing.activeState}
     />
   );
 
@@ -438,6 +463,24 @@ export function DemoApp(): React.JSX.Element {
       editorState={editorState}
       editorStore={editorStore}
       fileInputRef={fileInputRef}
+      handleAnimationAddKeyframe={animationEditing.onAddKeyframe}
+      handleAnimationAddModifierBinding={animationEditing.onAddModifierBinding}
+      handleAnimationAddStateBinding={animationEditing.onAddStateBinding}
+      handleAnimationAddTimeline={animationEditing.onAddTimeline}
+      handleAnimationChangeEasing={animationEditing.onChangeEasing}
+      handleAnimationDeleteTimeline={animationEditing.onDeleteTimeline}
+      handleAnimationDuplicateTimeline={animationEditing.onDuplicateTimeline}
+      handleAnimationEditTimeline={animationEditing.onEditTimeline}
+      handleAnimationMoveKeyframe={animationEditing.onMoveKeyframe}
+      handleAnimationPlayTimeline={animationEditing.onPlayTimeline}
+      handleAnimationQuickSetup={animationEditing.onQuickSetup}
+      handleAnimationRemoveModifierBinding={animationEditing.onRemoveModifierBinding}
+      handleAnimationRemoveStateBinding={animationEditing.onRemoveStateBinding}
+      handleAnimationRenameTimeline={animationEditing.onRenameTimeline}
+      handleAnimationSeekTimeline={animationEditing.onSeekTimeline}
+      handleAnimationSelectState={animationEditing.onSelectState}
+      handleAnimationStopTimeline={animationEditing.onStopTimeline}
+      handleAnimationToggleModifier={animationEditing.onToggleModifier}
       handleAlignSelection={handleAlignSelection}
       handleCanvasClick={handleCanvasClick}
       handleCanvasContextMenu={handleCanvasContextMenu}
@@ -473,6 +516,7 @@ export function DemoApp(): React.JSX.Element {
       isFullscreen={isFullscreen}
       isPlaying={isPlaying}
       isSidebarOpen={isSidebarOpen}
+      isTimelinePreviewPlaying={animationEditing.isTimelinePlaying}
       pasteClipboardElements={pasteClipboardElements}
       placementLabel={placementLabel}
       pushToast={pushToast}
@@ -481,6 +525,7 @@ export function DemoApp(): React.JSX.Element {
       selectedElement={selectedElement}
       selectedElements={selectedElements}
       selectedMovableElements={selectedMovableElements}
+      setPreviewPlaybackController={animationEditing.registerPlaybackController}
       setActiveDialog={setActiveDialog}
       setContextMenu={setContextMenu}
       setEditingTimeline={setEditingTimeline}
@@ -491,6 +536,9 @@ export function DemoApp(): React.JSX.Element {
       sidebarTab={sidebarTab}
       sidebarWidth={sidebarWidth}
       temporalState={temporalState}
+      timelinePreviewActiveModifiers={animationEditing.activeModifiers}
+      timelinePreviewActiveState={animationEditing.activeState}
+      timelinePreviewCurrentTimeMs={animationEditing.currentTimeMs}
       verticalTicks={verticalTicks}
     />
   );

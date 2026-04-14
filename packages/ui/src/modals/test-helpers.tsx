@@ -27,7 +27,7 @@ function mockWrap(tag = 'div') {
 }
 
 function mockButton(p: Record<string, unknown>) {
-  const { children, isDisabled, onPress, ...rest } = p;
+  const { children, isDisabled, isIconOnly: _isIconOnly, onPress, ...rest } = p;
 
   return React.createElement(
     'button',
@@ -54,7 +54,7 @@ function mockInput(p: Record<string, unknown>) {
 }
 
 function mockNumberFieldRoot(p: Record<string, unknown>) {
-  const { children, label, onChange, isDisabled: _d, ...rest } = p;
+  const { children, label, maxValue: _maxValue, minValue: _minValue, onChange, isDisabled: _d, ...rest } = p;
 
   return React.createElement(
     'div',
@@ -76,9 +76,10 @@ function mockNumberFieldRoot(p: Record<string, unknown>) {
 
 function mockNumberFieldInput(p: Record<string, unknown>) {
   const ctx = React.useContext(mockNumCtx);
+  const { maxValue: _maxValue, minValue: _minValue, ...rest } = p;
 
   return React.createElement('input', {
-    ...p,
+    ...rest,
     'aria-label': ctx.label,
     disabled: ctx.disabled,
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,7 +92,7 @@ function mockNumberFieldInput(p: Record<string, unknown>) {
 }
 
 function mockSlider(p: Record<string, unknown>) {
-  const { children, label, onChange, ...rest } = p;
+  const { children, label, maxValue: _maxValue, minValue: _minValue, onChange, ...rest } = p;
 
   return React.createElement(
     'div',
@@ -132,7 +133,7 @@ function mockSwitch(p: Record<string, unknown>) {
 }
 
 function mockModal(p: Record<string, unknown>) {
-  const { children, isOpen, onClose, size: _s, ...rest } = p;
+  const { children, isOpen, onClose, onOpenChange: _onOpenChange, size: _s, ...rest } = p;
 
   if (!isOpen) return null;
 
@@ -166,11 +167,11 @@ function mockTable(p: Record<string, unknown>) {
 }
 
 function mockTableContent(p: Record<string, unknown>) {
-  const { children, onRowAction, ...rest } = p;
+  const { children, onRowAction } = p;
 
   return React.createElement(
-    'div',
-    rest,
+    React.Fragment,
+    null,
     React.createElement(
       mockTableCtx.Provider,
       {
@@ -181,6 +182,12 @@ function mockTableContent(p: Record<string, unknown>) {
       (children as React.ReactNode) ?? null,
     ),
   );
+}
+
+function mockTableHeader(p: Record<string, unknown>) {
+  const { children, ...rest } = p;
+
+  return React.createElement('thead', rest, React.createElement('tr', null, (children as React.ReactNode) ?? null));
 }
 
 function mockTabs(p: Record<string, unknown>) {
@@ -239,7 +246,7 @@ function mockListBoxItem(p: Record<string, unknown>) {
 
 function mockTableRow(p: Record<string, unknown>) {
   const tableCtx = React.useContext(mockTableCtx);
-  const { children, ...rest } = p;
+  const { children, onPress: _onPress, ...rest } = p;
 
   return React.createElement(
     'tr',
@@ -294,7 +301,7 @@ jest.mock(
     Tab: mockTab,
     Table: Object.assign(mockTable, {
       Content: mockTableContent,
-      Header: mockWrap('thead'),
+      Header: mockTableHeader,
       Body: mockWrap('tbody'),
       Column: mockWrap('th'),
       Row: mockTableRow,

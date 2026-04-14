@@ -27,6 +27,7 @@ export interface ScreenPreviewProps {
     readonly panY?: number;
     readonly zoom?: number;
   }) => void;
+  readonly onPlaybackControllerChange?: ((controller: PlaybackController | null) => void) | undefined;
 }
 
 export function ScreenPreview({
@@ -43,6 +44,7 @@ export function ScreenPreview({
   onCanvasClick,
   onCanvasContextMenu,
   onViewportChange,
+  onPlaybackControllerChange,
 }: ScreenPreviewProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -105,6 +107,7 @@ export function ScreenPreview({
 
     rendererRef.current = rendererController;
     playbackRef.current = playbackController;
+    onPlaybackControllerChange?.(playbackController);
 
     rendererController.updateDocument(documentData);
     playbackController.attach();
@@ -115,8 +118,9 @@ export function ScreenPreview({
       rendererController.destroy();
       playbackRef.current = null;
       rendererRef.current = null;
+      onPlaybackControllerChange?.(null);
     };
-  }, []);
+  }, [onPlaybackControllerChange]);
 
   useEffect(() => {
     rendererRef.current?.updateDocument(documentData);

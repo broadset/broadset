@@ -140,8 +140,14 @@ export function EasingGraphEditor(props: EasingGraphEditorProps): JSX.Element {
     }
 
     const rect = svg.getBoundingClientRect();
-    const ux = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    const uy = Math.max(0, Math.min(1, 1 - (clientY - rect.top) / rect.height));
+    const width = rect.width > 0 ? rect.width : GRAPH_SIZE;
+    const height = rect.height > 0 ? rect.height : GRAPH_SIZE;
+    const left = Number.isFinite(rect.left) ? rect.left : 0;
+    const top = Number.isFinite(rect.top) ? rect.top : 0;
+    const rawX = (clientX - left) / width;
+    const rawY = 1 - (clientY - top) / height;
+    const ux = Number.isFinite(rawX) ? Math.max(0, Math.min(1, rawX)) : 0;
+    const uy = Number.isFinite(rawY) ? Math.max(0, Math.min(1, rawY)) : 0;
 
     return { ux, uy };
   }, []);

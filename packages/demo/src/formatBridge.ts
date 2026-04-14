@@ -1,6 +1,6 @@
 import type * as FormatsNS from '@broadset/formats';
 import type { BroadsetDocument } from '@broadset/model';
-import { broadsetDocumentSchema, createDefaultElement, createEmptyBroadsetDocument } from '@broadset/model';
+import { broadsetDocumentSchema } from '@broadset/model';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -29,6 +29,11 @@ export interface ExportContext {
   readonly playbackDurationMs?: number;
   readonly videoFrameRate?: number;
   readonly onProgress?: (progress: number, stage?: string) => void;
+}
+
+export interface ImportDocumentResult {
+  readonly document: BroadsetDocument;
+  readonly warnings: readonly string[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -216,7 +221,7 @@ function hasDocumentsArray(value: unknown): value is { readonly documents: reado
   );
 }
 
-export async function importDocument(file: File): Promise<BroadsetDocument> {
+export async function importDocument(file: File): Promise<ImportDocumentResult> {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
 
   switch (ext) {
@@ -227,46 +232,31 @@ export async function importDocument(file: File): Promise<BroadsetDocument> {
       const parsed: unknown = JSON.parse(text);
       const candidate = hasDocumentsArray(parsed) ? parsed['documents'][0] : parsed;
 
-      return broadsetDocumentSchema.parse(candidate);
+      return {
+        document: broadsetDocumentSchema.parse(candidate),
+        warnings: [],
+      };
     }
 
     case 'psd': {
       const formats = await loadFormats();
       const buffer = await file.arrayBuffer();
 
-      return formats.importPsd(new Uint8Array(buffer));
+      return formats.importPsdDocument(new Uint8Array(buffer));
     }
 
     case 'pptx': {
       const formats = await loadFormats();
       const buffer = await file.arrayBuffer();
 
-      return formats.importPptx(new Uint8Array(buffer));
+      return formats.importPptxDocument(new Uint8Array(buffer));
     }
 
     case 'svg': {
       const formats = await loadFormats();
       const text = await file.text();
-      const result = formats.importSvg(text);
-      const doc = createEmptyBroadsetDocument();
 
-      return {
-        ...doc,
-        name: file.name.replace(/\.svg$/i, ''),
-        canvas: { ...doc.canvas, width: result.canvasWidth, height: result.canvasHeight },
-        elements: result.elements.map((el, i) =>
-          createDefaultElement(el.type === 'path' ? 'path' : 'svg', {
-            id: `imported-${String(i)}`,
-            name: `Element ${String(i + 1)}`,
-            position: { x: el.position.x, y: el.position.y },
-            width: el.width,
-            height: el.height,
-            rotation: el.rotation,
-            content: el.content,
-            style: el.style,
-          }),
-        ),
-      };
+      return formats.importSvgDocument(text, file.name);
     }
 
     default:

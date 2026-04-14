@@ -1,5 +1,6 @@
 import { type createDataStore, type EditorStore, type ElementUpdate } from '@broadset/editor';
-import type { BroadsetDocument, BroadsetElement, Timeline } from '@broadset/model';
+import type { BroadsetDocument, BroadsetElement, EasingMode, Timeline } from '@broadset/model';
+import type { PlaybackController } from '@broadset/playback';
 
 import type { DocumentPreset, MediaAsset, TemplateEntry } from '../../../ui/src/modals/types';
 import type { ActiveDialog, ContextMenuState, SidebarTab } from '../demo-types';
@@ -37,6 +38,24 @@ export interface DemoAppLayoutProps {
   readonly handleElementTransformPreview: (elementId: string, updates: ElementUpdate) => void;
   readonly handleExportFormat: (exporter: string, data: Readonly<Record<string, unknown>>) => void;
   readonly handleImportFileChange: (event: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  readonly handleAnimationAddKeyframe: () => void;
+  readonly handleAnimationAddModifierBinding: () => void;
+  readonly handleAnimationAddStateBinding: () => void;
+  readonly handleAnimationAddTimeline: () => void;
+  readonly handleAnimationChangeEasing: (index: number, easing: EasingMode) => void;
+  readonly handleAnimationDeleteTimeline: (timelineId: string) => void;
+  readonly handleAnimationDuplicateTimeline: (timelineId: string) => void;
+  readonly handleAnimationEditTimeline: (timelineId: string) => void;
+  readonly handleAnimationMoveKeyframe: (index: number, offsetMs: number) => void;
+  readonly handleAnimationPlayTimeline: () => void;
+  readonly handleAnimationQuickSetup: () => void;
+  readonly handleAnimationRemoveModifierBinding: (modifierName: string) => void;
+  readonly handleAnimationRemoveStateBinding: (stateName: string) => void;
+  readonly handleAnimationRenameTimeline: (timelineId: string) => void;
+  readonly handleAnimationSeekTimeline: (timeMs: number) => void;
+  readonly handleAnimationSelectState: (stateName: string | null) => void;
+  readonly handleAnimationStopTimeline: () => void;
+  readonly handleAnimationToggleModifier: (modifierName: string) => void;
   readonly handleMediaSelect: (asset: MediaAsset) => void;
   readonly handleOpenImportDialog: () => void;
   readonly handleResetPlayback: () => void;
@@ -58,6 +77,7 @@ export interface DemoAppLayoutProps {
   readonly isFullscreen: boolean;
   readonly isPlaying: boolean;
   readonly isSidebarOpen: boolean;
+  readonly isTimelinePreviewPlaying: boolean;
   readonly pasteClipboardElements: () => void;
   readonly placementLabel: string;
   readonly pushToast: (severity: 'error' | 'info' | 'success', message: string) => void;
@@ -66,6 +86,7 @@ export interface DemoAppLayoutProps {
   readonly selectedElement: BroadsetElement | null;
   readonly selectedElements: readonly BroadsetElement[];
   readonly selectedMovableElements: readonly BroadsetElement[];
+  readonly setPreviewPlaybackController: (controller: PlaybackController | null) => void;
   readonly setActiveDialog: React.Dispatch<React.SetStateAction<ActiveDialog>>;
   readonly setContextMenu: React.Dispatch<React.SetStateAction<ContextMenuState | null>>;
   readonly setEditingTimeline: React.Dispatch<React.SetStateAction<Timeline | null>>;
@@ -79,5 +100,8 @@ export interface DemoAppLayoutProps {
     readonly futureStates: readonly unknown[];
     readonly pastStates: readonly unknown[];
   };
+  readonly timelinePreviewActiveModifiers: readonly string[];
+  readonly timelinePreviewActiveState: string | null;
+  readonly timelinePreviewCurrentTimeMs: number;
   readonly verticalTicks: readonly { readonly label: string; readonly position: number }[];
 }

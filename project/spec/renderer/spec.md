@@ -673,11 +673,11 @@ The renderer MUST support a transparent background mode for alpha-channel export
 
 ## Spec Gaps
 
-- [ ] **Animation Target Attribute Contract:** No automated test currently verifies that exactly one descendant carries `data-element-content` per rendered element, nor that groups carry it on the container itself. A DOM-inspection test for each built-in element type is needed.
-- [ ] **Incremental Scene Tree Updates:** No automated test verifies that a single property change mutates only the affected DOM node. A test that counts DOM mutations via MutationObserver for a targeted property update is needed.
-- [ ] **Broken Image Fallback:** No automated test verifies that a 404 or empty-URL image renders a visible placeholder without throwing. Tests for the error event path and the empty-content path are needed.
-- [ ] **Text Content Sanitization:** No automated test verifies that script tags or event handler attributes are stripped at render time. Unit tests covering the sanitizer's allowlist for tags and attributes are needed.
-- [ ] **Group Element Rendering:** No dedicated automated test verifies the group-as-container contract (div wrapper, `data-element-content` on the container, children inside, no default clipping). Tests for group rendering with children and group rotation are needed.
+- [x] **Animation Target Attribute Contract:** Automated renderer tests verify one animation target per element and group-specific targeting on the container contract (`packages/renderer/src/screen-renderer/core.test.ts`).
+- [x] **Incremental Scene Tree Updates:** Automated renderer tests verify that single-element changes rerender only the affected element and that element additions do not remount existing nodes (`packages/renderer/src/screen-renderer/core.test.ts`).
+- [x] **Broken Image Fallback:** Automated renderer tests verify both the empty-content path and the image error-event path swap to a visible placeholder without leaving a broken `<img>` node (`packages/renderer/src/screen-renderer/core.test.ts`).
+- [x] **Text Content Sanitization:** Automated renderer tests verify text rendering strips script tags and inline event-handler markup before visible characters are emitted (`packages/renderer/src/screen-renderer/core.test.ts`).
+- [x] **Group Element Rendering:** Automated renderer tests verify both boolean-operation group rendering and normal group container behavior with child nodes (`packages/renderer/src/screen-renderer/core.test.ts`).
 - [ ] **Dynamic Data Token Format:** Existing dynamic-data substitution tests cover the substitution path but do not verify dot-notation key resolution or the literal fallback for missing keys. Tests for nested keys and unresolved tokens are needed.
 - [ ] **Rendering Performance (complexity):** No automated test measures per-frame DOM mutation count or verifies O(n) complexity. A mutation-counting harness for single-element updates against a populated scene is needed.
 

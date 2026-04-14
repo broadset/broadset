@@ -73,14 +73,20 @@ function createSimpleRenderer(update: (host: HTMLElement, element: BroadsetEleme
 // Text rendering helpers
 // ---------------------------------------------------------------------------
 
-const HTML_TAG_RE = /<[^>]*>/gu;
+const BR_TAG_RE = /<br\s*\/?>/giu;
 
-function stripHtmlTags(content: string): string {
-  return content.replace(HTML_TAG_RE, '');
+function toPlainText(content: string): string {
+  const sanitized = sanitizeTextContent(content);
+  const container = document.createElement('div');
+
+  // Preserve line-break intent from rich text while decoding entities via DOM parsing.
+  container.innerHTML = sanitized.replace(BR_TAG_RE, '\n');
+
+  return container.textContent;
 }
 
 function renderPerCharacterSpans(host: HTMLElement, content: string): void {
-  const plainText = stripHtmlTags(sanitizeTextContent(content));
+  const plainText = toPlainText(content);
 
   host.textContent = '';
 
@@ -88,7 +94,9 @@ function renderPerCharacterSpans(host: HTMLElement, content: string): void {
     const span = document.createElement('span');
 
     span.setAttribute('data-char-index', String(i));
-    span.textContent = plainText[i] ?? '';
+    // Preserve visible spacing for single-space spans in per-character text rendering.
+    span.style.whiteSpace = 'pre';
+    span.textContent = plainText.charAt(i);
     host.appendChild(span);
   }
 }
@@ -277,7 +285,34 @@ const createShapeRenderer = createSimpleRenderer((host, element) => {
   host.textContent = '';
 });
 
+function renderImageFallback(host: HTMLElement, element: BroadsetElement): void {
+  const placeholder = document.createElement('div');
+
+  placeholder.textContent = element.content.trim() === '' ? 'Image unavailable' : `Image unavailable: ${element.name}`;
+  placeholder.setAttribute('aria-label', `${element.name} placeholder`);
+  placeholder.style.width = '100%';
+  placeholder.style.height = '100%';
+  placeholder.style.display = 'flex';
+  placeholder.style.alignItems = 'center';
+  placeholder.style.justifyContent = 'center';
+  placeholder.style.textAlign = 'center';
+  placeholder.style.padding = '8px';
+  placeholder.style.boxSizing = 'border-box';
+  placeholder.style.backgroundColor = 'rgba(15, 23, 42, 0.42)';
+  placeholder.style.border = '1px dashed rgba(148, 163, 184, 0.6)';
+  placeholder.style.color = '#e2e8f0';
+  placeholder.style.fontSize = '12px';
+  placeholder.style.fontFamily = 'ui-sans-serif, system-ui, sans-serif';
+  host.replaceChildren(placeholder);
+}
+
 const createImageRenderer = createSimpleRenderer((host, element) => {
+  if (element.content.trim() === '') {
+    renderImageFallback(host, element);
+
+    return;
+  }
+
   const image = document.createElement('img');
 
   image.src = element.content;
@@ -286,6 +321,9 @@ const createImageRenderer = createSimpleRenderer((host, element) => {
   image.style.height = '100%';
   image.style.display = 'block';
   image.style.objectFit = element.style.objectFit ?? 'cover';
+  image.addEventListener('error', () => {
+    renderImageFallback(host, element);
+  });
 
   host.replaceChildren(image);
 });

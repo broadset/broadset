@@ -147,6 +147,17 @@ const dataSchemaSchema: z.ZodType<DataSchema> = z.object({
 const DEFAULT_SCREEN_CANVAS_DPI = 96;
 const DEFAULT_PRINT_CANVAS_DPI = 300;
 
+function lockDocumentMode(document: BroadsetDocument): BroadsetDocument {
+  Object.defineProperty(document, 'documentMode', {
+    configurable: false,
+    enumerable: true,
+    value: document.documentMode,
+    writable: false,
+  });
+
+  return document;
+}
+
 function defaultCanvasForMode(mode: 'screen' | 'print', canvas: z.infer<typeof canvasSchema>): Canvas {
   return {
     width: canvas.width,
@@ -209,18 +220,19 @@ export const broadsetDocumentSchema: z.ZodType<BroadsetDocument> = z
     }
   })
   .transform(
-    (value): BroadsetDocument => ({
-      id: value.id,
-      name: value.name,
-      documentMode: value.documentMode,
-      canvas: defaultCanvasForMode(value.documentMode, value.canvas),
-      elements: value.elements,
-      animations: value.animations,
-      pages: value.pages,
-      dataSchema: value.dataSchema,
-      output: value.output,
-      extensions: value.extensions,
-    }),
+    (value): BroadsetDocument =>
+      lockDocumentMode({
+        id: value.id,
+        name: value.name,
+        documentMode: value.documentMode,
+        canvas: defaultCanvasForMode(value.documentMode, value.canvas),
+        elements: value.elements,
+        animations: value.animations,
+        pages: value.pages,
+        dataSchema: value.dataSchema,
+        output: value.output,
+        extensions: value.extensions,
+      }),
   );
 
 export function createEmptyBroadsetDocument(): BroadsetDocument {

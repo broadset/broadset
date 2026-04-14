@@ -17,7 +17,6 @@ import {
   type PropertyValue,
   TemplateGroupPanel,
 } from '@broadset/ui';
-import { toast } from '@heroui/react';
 
 import type { SidebarTab } from '../demo-types';
 import { toPanelElement } from '../demo-utils';
@@ -51,8 +50,22 @@ export interface DemoSidebarPanelProps {
   readonly onToggleLock: (elementId: string) => void;
   readonly onToggleVisibility: (elementId: string) => void;
   readonly onUpdateProperty: (key: string, value: PropertyValue) => void;
+  readonly onAnimationAddModifierBinding: () => void;
+  readonly onAnimationAddStateBinding: () => void;
+  readonly onAnimationAddTimeline: () => void;
+  readonly onAnimationDeleteTimeline: (timelineId: string) => void;
+  readonly onAnimationDuplicateTimeline: (timelineId: string) => void;
+  readonly onAnimationEditTimeline: (timelineId: string) => void;
+  readonly onAnimationQuickSetup: () => void;
+  readonly onAnimationRemoveModifierBinding: (modifierName: string) => void;
+  readonly onAnimationRemoveStateBinding: (stateName: string) => void;
+  readonly onAnimationRenameTimeline: (timelineId: string) => void;
+  readonly onAnimationSelectState: (stateName: string | null) => void;
+  readonly onAnimationToggleModifier: (modifierName: string) => void;
   readonly setEditingTimeline: (timeline: Timeline | null) => void;
   readonly setEditingTimelineSelectedKf: (index: number | null) => void;
+  readonly timelinePreviewActiveModifiers: readonly string[];
+  readonly timelinePreviewActiveState: string | null;
 }
 
 export function DemoSidebarPanel({
@@ -72,12 +85,26 @@ export function DemoSidebarPanel({
   onToggleLock,
   onToggleVisibility,
   onUpdateProperty,
+  onAnimationAddModifierBinding,
+  onAnimationAddStateBinding,
+  onAnimationAddTimeline,
+  onAnimationDeleteTimeline,
+  onAnimationDuplicateTimeline,
+  onAnimationEditTimeline,
+  onAnimationQuickSetup,
+  onAnimationRemoveModifierBinding,
+  onAnimationRemoveStateBinding,
+  onAnimationRenameTimeline,
+  onAnimationSelectState,
+  onAnimationToggleModifier,
   preflightIssues,
   selectedElement,
   setEditingTimeline,
   setEditingTimelineSelectedKf,
   sidebarTab,
   templateGroups,
+  timelinePreviewActiveModifiers,
+  timelinePreviewActiveState,
 }: DemoSidebarPanelProps): React.JSX.Element {
   if (sidebarTab === 'layers') {
     return (
@@ -126,17 +153,11 @@ export function DemoSidebarPanel({
         }))}
         availableStates={['IN', 'OUT', 'LOOP']}
         availableModifiers={['hover', 'focus', 'active']}
-        activeState={null}
-        activeModifiers={[]}
-        onSelectState={() => {
-          toast.info('State selection not yet wired.');
-        }}
-        onToggleModifier={() => {
-          toast.info('Modifier toggle not yet wired.');
-        }}
-        onAddTimeline={() => {
-          toast.info('Add timeline not yet wired.');
-        }}
+        activeState={timelinePreviewActiveState}
+        activeModifiers={timelinePreviewActiveModifiers}
+        onSelectState={onAnimationSelectState}
+        onToggleModifier={onAnimationToggleModifier}
+        onAddTimeline={onAnimationAddTimeline}
         onEditTimeline={(id: string) => {
           const timeline = animationConfig?.timelines.find((t) => t.id === id);
 
@@ -144,31 +165,17 @@ export function DemoSidebarPanel({
             setEditingTimeline(timeline);
             setEditingTimelineSelectedKf(null);
           }
+
+          onAnimationEditTimeline(id);
         }}
-        onDeleteTimeline={() => {
-          toast.info('Delete timeline not yet wired.');
-        }}
-        onDuplicateTimeline={() => {
-          toast.info('Duplicate timeline not yet wired.');
-        }}
-        onRenameTimeline={() => {
-          toast.info('Rename timeline not yet wired.');
-        }}
-        onQuickSetup={() => {
-          toast.info('Quick setup not yet wired.');
-        }}
-        onAddStateBinding={() => {
-          toast.info('Add state binding not yet wired.');
-        }}
-        onRemoveStateBinding={() => {
-          toast.info('Remove state binding not yet wired.');
-        }}
-        onAddModifierBinding={() => {
-          toast.info('Add modifier binding not yet wired.');
-        }}
-        onRemoveModifierBinding={() => {
-          toast.info('Remove modifier binding not yet wired.');
-        }}
+        onDeleteTimeline={onAnimationDeleteTimeline}
+        onDuplicateTimeline={onAnimationDuplicateTimeline}
+        onRenameTimeline={onAnimationRenameTimeline}
+        onQuickSetup={onAnimationQuickSetup}
+        onAddStateBinding={onAnimationAddStateBinding}
+        onRemoveStateBinding={onAnimationRemoveStateBinding}
+        onAddModifierBinding={onAnimationAddModifierBinding}
+        onRemoveModifierBinding={onAnimationRemoveModifierBinding}
       />
     );
   }

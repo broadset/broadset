@@ -92,6 +92,63 @@ describe('DemoApp playback shell lifecycle', () => {
     expect(seek).toHaveBeenLastCalledWith(0);
   });
 
+  /** @description The animation sidebar and timeline editor must mutate the selected element timeline and drive targeted preview seeks instead of showing placeholder toasts. */
+  it('adds keyframes and seeks the selected timeline from the animation editor', async () => {
+    const { mockedCreatePlaybackController } = setupDemoShellMocks();
+    const seekTimeline = jest.fn(() => null);
+
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      destroy: jest.fn(),
+      detach: jest.fn(),
+      pause: jest.fn(),
+      play: jest.fn(),
+      seek: jest.fn(),
+      seekTimeline,
+      setRegistry: jest.fn(),
+      setSpeed: jest.fn(),
+      stopTimeline: jest.fn(),
+    });
+
+    const animatedElementId = 'el-live-ellipse';
+    const animatedElement = SAMPLE_DOCUMENT.elements.find((element) => element.id === animatedElementId);
+
+    expect(animatedElement).toBeDefined();
+
+    if (animatedElement === undefined) {
+      throw new Error(`Fixture element ${animatedElementId} is missing`);
+    }
+
+    const reorderedDocument = {
+      ...SAMPLE_DOCUMENT,
+      elements: [animatedElement, ...SAMPLE_DOCUMENT.elements.filter((element) => element.id !== animatedElementId)],
+    };
+
+    window.localStorage.setItem('broadset:demo-document:v1', JSON.stringify(reorderedDocument));
+
+    render(<DemoApp />);
+
+    fireEvent.click(screen.getByRole('button', { name: /animation/i }));
+    fireEvent.click(screen.getByRole('button', { name: /edit live pulse/i }));
+
+    expect(screen.getByTestId('timeline-track')).toBeTruthy();
+    expect(screen.getAllByTestId('keyframe-marker')).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: /add keyframe/i }));
+
+    expect(screen.getAllByTestId('keyframe-marker')).toHaveLength(3);
+
+    seekTimeline.mockClear();
+    fireEvent.click(screen.getByTestId('timeline-track'), { clientX: 180 });
+
+    await waitFor(() => {
+      expect(seekTimeline).toHaveBeenCalled();
+    });
+    expect(seekTimeline).toHaveBeenLastCalledWith(
+      expect.objectContaining({ elementId: animatedElementId, timelineId: 'tl-live-pulse' }),
+    );
+  });
+
   /** @description Ensures the shell enforces the dark viewport contract and restores the host page state on unmount. */
   it('applies the dark theme and viewport overflow lock while mounted and restores previous values on unmount', () => {
     setupDemoShellMocks();

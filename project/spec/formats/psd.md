@@ -224,7 +224,7 @@ When exporting to PSD, animated elements MUST be exported at their default/rest 
 
 ## Spec Gaps
 
-- [x] **Animated Element Static Export:** Automated tests verify animated elements export at t=0 rest state and that timeline animation data is not represented in PSD output (`packages/formats/src/psd.test.ts`).
+- [x] **Animated Element Static Export:** Automated tests verify animated elements export at t=0 rest state and that timeline animation data is not represented in PSD output (`packages/formats/src/psd/import-vector-animated-url.test.ts`).
 
 ---
 

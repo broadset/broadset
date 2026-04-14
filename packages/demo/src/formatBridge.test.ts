@@ -24,13 +24,17 @@ const mockExportEmbeddedSvgBlob = jest.fn(() => Promise.resolve(new Blob(['svg']
 const mockExportVideoBlob = jest.fn(() => Promise.resolve(new Blob(['video'], { type: 'video/webm' })));
 const mockExportWebMBlob = jest.fn(() => Promise.resolve(new Blob(['webm'], { type: 'video/webm' })));
 const mockGenerateOGrafPackages = jest.fn(() => []);
-const mockImportPsd = jest.fn((): BroadsetDocument => ({ ...createEmptyBroadsetDocument(), name: 'Imported PSD' }));
-const mockImportPptx = jest.fn((): BroadsetDocument => ({ ...createEmptyBroadsetDocument(), name: 'Imported PPTX' }));
-const mockImportSvg = jest.fn(() => ({
-  elements: [],
-  canvasWidth: 100,
-  canvasHeight: 100,
-  warnings: [],
+const mockImportPsdDocument = jest.fn(() => ({
+  document: { ...createEmptyBroadsetDocument(), name: 'Imported PSD' } satisfies BroadsetDocument,
+  warnings: [] as string[],
+}));
+const mockImportPptxDocument = jest.fn(() => ({
+  document: { ...createEmptyBroadsetDocument(), name: 'Imported PPTX' } satisfies BroadsetDocument,
+  warnings: [] as string[],
+}));
+const mockImportSvgDocument = jest.fn(() => ({
+  document: { ...createEmptyBroadsetDocument(), name: 'Imported SVG' } satisfies BroadsetDocument,
+  warnings: [] as string[],
 }));
 const mockExportProjectJson = jest.fn(() => '{}');
 const mockDiscoverCanvasElement = jest.fn(() => null);
@@ -50,9 +54,9 @@ const mockFormats = {
   exportVideoBlob: mockExportVideoBlob,
   exportWebMBlob: mockExportWebMBlob,
   generateOGrafPackages: mockGenerateOGrafPackages,
-  importPptx: mockImportPptx,
-  importPsd: mockImportPsd,
-  importSvg: mockImportSvg,
+  importPptxDocument: mockImportPptxDocument,
+  importPsdDocument: mockImportPsdDocument,
+  importSvgDocument: mockImportSvgDocument,
   sanitizeFilename: mockSanitizeFilename,
   triggerDownload: mockTriggerDownload,
 };
@@ -328,7 +332,8 @@ describe('import orchestration', () => {
     const file = createTestFile(JSON.stringify(doc), 'test.json', 'application/json');
     const result = await importDocument(file);
 
-    expect(result.name).toBe(doc.name);
+    expect(result.document.name).toBe(doc.name);
+    expect(result.warnings).toEqual([]);
   });
 
   /** @description BSP files use the same JSON code path as .json files. */
@@ -337,7 +342,7 @@ describe('import orchestration', () => {
     const file = createTestFile(JSON.stringify(doc), 'project.bsp', 'application/vnd.broadset.project+json');
     const result = await importDocument(file);
 
-    expect(result.name).toBe(doc.name);
+    expect(result.document.name).toBe(doc.name);
   });
 
   /** @description PSD import MUST call importPsd and return a BroadsetDocument. */
@@ -345,8 +350,8 @@ describe('import orchestration', () => {
     const file = createTestFile(new Uint8Array([0, 1, 2]), 'design.psd', 'image/vnd.adobe.photoshop');
     const result = await importDocument(file);
 
-    expect(mockImportPsd).toHaveBeenCalledTimes(1);
-    expect(result.name).toBe('Imported PSD');
+    expect(mockImportPsdDocument).toHaveBeenCalledTimes(1);
+    expect(result.document.name).toBe('Imported PSD');
   });
 
   /** @description PPTX import MUST call importPptx and return a BroadsetDocument. */
@@ -358,8 +363,8 @@ describe('import orchestration', () => {
     );
     const result = await importDocument(file);
 
-    expect(mockImportPptx).toHaveBeenCalledTimes(1);
-    expect(result.name).toBe('Imported PPTX');
+    expect(mockImportPptxDocument).toHaveBeenCalledTimes(1);
+    expect(result.document.name).toBe('Imported PPTX');
   });
 
   /** @description SVG import MUST call importSvg and convert the result to a BroadsetDocument. */
@@ -367,8 +372,21 @@ describe('import orchestration', () => {
     const file = createTestFile('<svg></svg>', 'graphic.svg', 'image/svg+xml');
     const result = await importDocument(file);
 
-    expect(mockImportSvg).toHaveBeenCalledTimes(1);
-    expect(result).toBeDefined();
+    expect(mockImportSvgDocument).toHaveBeenCalledTimes(1);
+    expect(result.document).toBeDefined();
+  });
+
+  /** @description Import orchestration MUST preserve importer warnings so the demo shell can surface them to the user. */
+  it('returns importer warnings for the caller to surface in the UI', async () => {
+    mockImportSvgDocument.mockReturnValueOnce({
+      document: { ...createEmptyBroadsetDocument(), name: 'Imported SVG' },
+      warnings: ['Unsupported blend mode converted to fallback'],
+    });
+
+    const file = createTestFile('<svg></svg>', 'graphic.svg', 'image/svg+xml');
+    const result = await importDocument(file);
+
+    expect(result.warnings).toEqual(['Unsupported blend mode converted to fallback']);
   });
 
   /** @description Unsupported file extensions MUST throw an error so the caller can show a toast. */
@@ -380,7 +398,7 @@ describe('import orchestration', () => {
 
   /** @description A failed import MUST propagate the error for the caller to display. */
   it('propagates errors from format import functions', async () => {
-    mockImportPsd.mockImplementationOnce(() => {
+    mockImportPsdDocument.mockImplementationOnce(() => {
       throw new Error('PSD corrupted');
     });
 
@@ -396,6 +414,6 @@ describe('import orchestration', () => {
     const file = createTestFile(JSON.stringify(project), 'project.json', 'application/json');
     const result = await importDocument(file);
 
-    expect(result.name).toBe('Wrapped Doc');
+    expect(result.document.name).toBe('Wrapped Doc');
   });
 });

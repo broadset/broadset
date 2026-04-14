@@ -289,7 +289,7 @@
         "type": "qrcode",
         "name": "Promo QR",
         "locked": false,
-        "position": { "x": 1468, "y": 810 },
+        "position": { "x": 38, "y": 40 },
         "width": 140,
         "height": 140,
         "rotation": 0,

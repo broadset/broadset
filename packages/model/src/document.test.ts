@@ -41,6 +41,17 @@ describe('Document identity', () => {
 
     expect(result.success).toBe(false);
   });
+
+  /** @description Runtime attempts to mutate documentMode after creation must be rejected to preserve document invariants. */
+  it('rejects runtime mutation of documentMode after creation', () => {
+    const document = createEmptyBroadsetDocument();
+    const mutableDocument: { documentMode: 'print' | 'screen' } = document;
+
+    expect(() => {
+      mutableDocument.documentMode = 'print';
+    }).toThrow(TypeError);
+    expect(document.documentMode).toBe('screen');
+  });
 });
 
 /** @description Canvas dimensions and padding must stay finite, positive, and structurally valid. */

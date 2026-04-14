@@ -27,6 +27,10 @@ jest.mock(
       readonly selectedKey: string;
       readonly onSelectionChange?: ((key: string | number | null) => void) | undefined;
     }>({ selectedKey: '', onSelectionChange: undefined });
+    const DropdownMenuContext = ReactActual.createContext<{
+      readonly disabledKeys: readonly string[];
+      readonly onAction?: ((mockId: string | number) => void) | undefined;
+    }>({ disabledKeys: [], onAction: undefined });
 
     function createWrapper(tagName = 'div') {
       return function Wrapper(props: MockHeroUiProps): React.JSX.Element {
@@ -127,43 +131,31 @@ jest.mock(
           Menu(props: MockHeroUiProps): React.JSX.Element {
             const { children, disabledKeys, onAction, ...restProps } = props;
 
-            function mockPropagateMenuProps(node: React.ReactNode): React.ReactNode {
-              return ReactActual.Children.map(node, (child) => {
-                if (!ReactActual.isValidElement(child)) {
-                  return child;
-                }
-
-                const childEl = child as React.ReactElement<Record<string, unknown>>;
-
-                if (childEl.type === ReactActual.Fragment) {
-                  return ReactActual.createElement(
-                    ReactActual.Fragment,
-                    null,
-                    mockPropagateMenuProps(childEl.props['children'] as React.ReactNode),
-                  );
-                }
-
-                return ReactActual.cloneElement(childEl, {
-                  __onAction: onAction,
-                  __disabledKeys: disabledKeys,
-                });
-              });
-            }
-
             return ReactActual.createElement(
-              'div',
+              DropdownMenuContext.Provider,
               {
-                'data-testid': 'dropdown-menu',
-                role: 'menu',
-                'data-disabled-keys': Array.isArray(disabledKeys) ? disabledKeys.join(',') : '',
-                ...restProps,
+                value: {
+                  disabledKeys: Array.isArray(disabledKeys) ? disabledKeys.map((key) => String(key)) : [],
+                  onAction:
+                    typeof onAction === 'function' ? (onAction as (mockId: string | number) => void) : undefined,
+                },
               },
-              mockPropagateMenuProps(children),
+              ReactActual.createElement(
+                'div',
+                {
+                  'data-testid': 'dropdown-menu',
+                  role: 'menu',
+                  'data-disabled-keys': Array.isArray(disabledKeys) ? disabledKeys.join(',') : '',
+                  ...restProps,
+                },
+                children ?? null,
+              ),
             );
           },
           Item(props: MockHeroUiProps): React.JSX.Element {
-            const { children, id, textValue: _textValue, variant, __onAction, __disabledKeys, ...restProps } = props;
-            const dKeys = Array.isArray(__disabledKeys) ? (__disabledKeys as readonly string[]) : [];
+            const { children, id, textValue: _textValue, variant, ...restProps } = props;
+            const menuContext = ReactActual.useContext(DropdownMenuContext);
+            const dKeys = menuContext.disabledKeys;
             const itemId = typeof id === 'string' || typeof id === 'number' ? String(id) : '';
             const isDisabled = itemId !== '' && dKeys.includes(itemId);
 
@@ -175,8 +167,8 @@ jest.mock(
                 'data-variant': variant ?? 'default',
                 'aria-disabled': isDisabled ? 'true' : 'false',
                 onClick: () => {
-                  if (!isDisabled && __onAction !== undefined) {
-                    __onAction(id as string | number);
+                  if (!isDisabled && menuContext.onAction !== undefined) {
+                    menuContext.onAction(id as string | number);
                   }
                 },
                 ...restProps,

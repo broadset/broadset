@@ -17,6 +17,23 @@ export interface UseDemoFileHandlersOptions {
   readonly fileInputRef: RefObject<HTMLInputElement | null>;
 }
 
+function formatImportWarningMessage(warnings: readonly string[]): string {
+  const [firstWarning, secondWarning] = warnings;
+
+  if (warnings.length === 1 && firstWarning !== undefined) {
+    return `Import completed with 1 warning: ${firstWarning}`;
+  }
+
+  if (warnings.length > 1 && firstWarning !== undefined) {
+    const moreCount = warnings.length - 1;
+    const suffix = secondWarning === undefined ? '' : ` Next: ${secondWarning}`;
+
+    return `Import completed with ${String(warnings.length)} warnings. First: ${firstWarning}${suffix}${moreCount > 1 ? ' …' : ''}`;
+  }
+
+  return 'Import completed with warnings.';
+}
+
 export interface DemoFileHandlers {
   readonly handleCreateFromPreset: (preset: DocumentPreset) => void;
   readonly handleDebugSnapshotDownload: () => void;
@@ -62,10 +79,14 @@ export function useDemoFileHandlers({
 
       try {
         const { importDocument } = await import('../formatBridge');
-        const nextDocument = await importDocument(file);
+        const result = await importDocument(file);
 
-        editorStore.getState().loadTemplate(nextDocument);
+        editorStore.getState().loadTemplate(result.document);
         pushToast('success', 'Import complete.');
+
+        if (result.warnings.length > 0) {
+          pushToast('info', formatImportWarningMessage(result.warnings));
+        }
       } catch (error: unknown) {
         pushToast('error', `Import failed: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
