@@ -1,11 +1,13 @@
 import { broadsetDocumentSchema } from '@broadset/model';
 
-import { FIXTURE_IDS } from '../../ct/fixture-selectors';
+import { FIXTURE_IDS } from './ids';
 import {
   createDemoAppChromeTestDocument,
   createDemoAppPlaybackTestDocument,
   createParentingTransformTestDocument,
+  createPlaybackAndParentingComboDocument,
   createSidebarPanelFixtureElements,
+  createVisibilityAndDataBindingComboDocument,
 } from './index';
 
 describe('isolated demo test fixtures', () => {
@@ -62,5 +64,34 @@ describe('isolated demo test fixtures', () => {
     expect(elements[FIXTURE_IDS.video]?.type).toBe('video');
     expect(elements[FIXTURE_IDS.clock]?.type).toBe('clock');
     expect(elements[FIXTURE_IDS.ticker]?.type).toBe('ticker');
+  });
+
+  /** @description Combo fixture preserves both playback timelines and parent-relative child placement in one document. */
+  it('creates a playback and parenting combo fixture with both scenario guarantees', () => {
+    const fixture = createPlaybackAndParentingComboDocument();
+
+    expect(() => broadsetDocumentSchema.parse(fixture)).not.toThrow();
+
+    const animation = fixture.animations.find((entry) => entry.elementId === FIXTURE_IDS.liveOrb);
+    const parent = fixture.elements.find((element) => element.id === FIXTURE_IDS.promoGroup);
+    const child = fixture.elements.find((element) => element.id === FIXTURE_IDS.promoQr);
+
+    expect(animation).toBeDefined();
+    expect(parent).toBeDefined();
+    expect(child?.parentId).toBe(FIXTURE_IDS.promoGroup);
+  });
+
+  /** @description Combo fixture encodes data-binding + visibility conditions used by document-driven UI flows. */
+  it('creates a visibility and data binding combo fixture with schema-valid fields', () => {
+    const fixture = createVisibilityAndDataBindingComboDocument();
+
+    expect(() => broadsetDocumentSchema.parse(fixture)).not.toThrow();
+
+    const logo = fixture.elements.find((element) => element.id === FIXTURE_IDS.logo);
+
+    expect(logo?.visibleWhen).toBe('sponsorVisible == true');
+    expect(logo?.dataField?.fieldName).toBe('sponsorLogo');
+    expect(fixture.dataSchema.fields.some((field) => field.name === 'sponsorVisible')).toBe(true);
+    expect(fixture.dataSchema.fields.some((field) => field.name === 'sponsorLogo')).toBe(true);
   });
 });

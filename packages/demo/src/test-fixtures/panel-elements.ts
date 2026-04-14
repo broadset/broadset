@@ -1,8 +1,8 @@
 import { type BroadsetElement, createDefaultElement, createDefaultStyle } from '@broadset/model';
 import type { PanelElement } from '@broadset/ui';
 
-import { FIXTURE_IDS } from '../../ct/fixture-selectors';
 import { toPanelElement } from '../demo-utils';
+import { FIXTURE_IDS } from './ids';
 
 function buildPanelElement(element: BroadsetElement): PanelElement {
   return toPanelElement(element);

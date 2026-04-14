@@ -126,6 +126,18 @@ module.exports = [
     files: ['**/src/**/*.test.ts', '**/src/**/*.test.tsx', '**/ct/**/*.ts', '**/ct/**/*.tsx'],
     rules: {
       '@typescript-eslint/unbound-method': 'off',
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/sampleDocument', '**/sampleDocument.ts', '**/sampleDocument.json'],
+              message:
+                'Tests and CT must use dedicated test fixtures from src/test-fixtures, not the demo sample document.',
+            },
+          ],
+        },
+      ],
     },
   },
   eslintConfigPrettier,
