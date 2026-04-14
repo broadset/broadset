@@ -5,6 +5,15 @@ import { writePsdUint8Array } from 'ag-psd';
 import { elementToLayer, getPendingLinkedFiles, resetExportState, setPrefetchedUrlImages } from './export-layer';
 import { ensureCanvasInitialized } from './runtime-canvas';
 
+export interface PsdImageBytes {
+  readonly mime: string;
+  readonly bytes: Uint8Array;
+}
+
+export interface ExportPsdSyncOptions {
+  readonly prefetchedUrlImages?: ReadonlyMap<string, PsdImageBytes>;
+}
+
 function canvasToPixels(canvas: Canvas, value: number): number {
   switch (canvas.unit) {
     case 'px':
@@ -101,10 +110,22 @@ function exportPsdBytesCore(doc: BroadsetDocument): Uint8Array {
 /**
  * Export a BroadsetDocument to PSD bytes.
  * Animated elements are exported at their rest state (t=0).
- * URL images are skipped — use exportPsdBytesAsync for URL image support.
+ * URL images require prefetched bytes in sync mode.
  */
-export function exportPsdBytes(doc: BroadsetDocument): Uint8Array {
-  setPrefetchedUrlImages(new Map());
+export function exportPsdBytes(doc: BroadsetDocument, options?: ExportPsdSyncOptions): Uint8Array {
+  const prefetched = new Map(options?.prefetchedUrlImages ?? []);
+  const missingUrlElementNames = doc.elements
+    .filter((el) => el.type === 'image' && el.content && isUrl(el.content) && !prefetched.has(el.id))
+    .map((el) => el.name || el.id);
+
+  if (missingUrlElementNames.length > 0) {
+    throw new Error(
+      `PSD sync export requires prefetched URL image bytes for: ${missingUrlElementNames.join(', ')}. ` +
+        'Provide prefetchedUrlImages or use exportPsdBytesAsync.',
+    );
+  }
+
+  setPrefetchedUrlImages(prefetched);
 
   return exportPsdBytesCore(doc);
 }

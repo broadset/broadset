@@ -154,6 +154,58 @@ describe('PSD Animated Element Static Export', () => {
 });
 
 describe('PSD URL Image Fetch Export', () => {
+  /** @description Sync PSD export should fail explicitly when URL image bytes are not prefetched. */
+  it('throws in sync export when URL images are missing prefetched bytes', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement('image', {
+          id: 'url-img-missing',
+          content: 'https://example.com/photo.png',
+          style: makeStyle() as BroadsetElementStyle,
+        }),
+      ],
+    });
+
+    expect(() => exportPsdBytes(doc)).toThrow('Provide prefetchedUrlImages or use exportPsdBytesAsync');
+  });
+
+  /** @description Sync PSD export should embed URL images when prefetched bytes are provided. */
+  it('embeds URL images in sync export when prefetched bytes are provided', () => {
+    const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const doc = makeDocument({
+      elements: [
+        makeElement('image', {
+          id: 'url-img-sync',
+          content: 'https://example.com/sync-photo.png',
+          style: makeStyle() as BroadsetElementStyle,
+        }),
+      ],
+    });
+
+    const bytes = exportPsdBytes(doc, {
+      prefetchedUrlImages: new Map([
+        [
+          'url-img-sync',
+          {
+            mime: 'image/png',
+            bytes: pngBytes,
+          },
+        ],
+      ]),
+    });
+
+    expect(bytes.length).toBeGreaterThan(0);
+
+    const imported = importPsd(bytes);
+    const img = imported.elements.find((el) => el.type === 'image');
+
+    expect(img).toBeDefined();
+
+    if (img) {
+      expect(img.content).toMatch(/^data:image/);
+    }
+  });
+
   /**
    * @description When an image element has a URL (not a data URI) and
    * exportPsdBytesAsync is used with a fetch function, the image should
