@@ -10,6 +10,7 @@ import { clampCanvasZoom } from '../demo-utils';
 import { SelectionTransformWidget } from './selection-transform-widget';
 
 export interface ScreenPreviewProps {
+  readonly allElements: readonly BroadsetElement[];
   readonly selectedElement: BroadsetElement | null;
   readonly onElementTransformPreview: (elementId: string, updates: ElementUpdate) => void;
   readonly onElementTransformCommit: (elementId: string, updates: ElementUpdate) => void;
@@ -31,6 +32,7 @@ export interface ScreenPreviewProps {
 }
 
 export function ScreenPreview({
+  allElements,
   selectedElement,
   onElementTransformPreview,
   onElementTransformCommit,
@@ -59,6 +61,97 @@ export function ScreenPreview({
     readonly startY: number;
   } | null>(null);
   const suppressClickRef = useRef(false);
+  const resetTokenMountedRef = useRef(false);
+
+  const getElementWorldOffset = useCallback(
+    (element: BroadsetElement): { readonly x: number; readonly y: number } => {
+      const elementsById = new Map(allElements.map((entry) => [entry.id, entry]));
+      let currentElement: BroadsetElement | undefined = element;
+      let x = 0;
+      let y = 0;
+
+      while (currentElement !== undefined) {
+        x += currentElement.position.x;
+        y += currentElement.position.y;
+
+        if (currentElement.parentId === null) {
+          break;
+        }
+
+        currentElement = elementsById.get(currentElement.parentId);
+      }
+
+      return { x, y };
+    },
+    [allElements],
+  );
+
+  const selectedWorldElement =
+    selectedElement === null ? null : (
+      {
+        ...selectedElement,
+        position: getElementWorldOffset(selectedElement),
+      }
+    );
+
+  const localizePositionUpdate = useCallback(
+    (element: BroadsetElement, updates: ElementUpdate): ElementUpdate => {
+      if (updates.position === undefined || element.parentId === null) {
+        return updates;
+      }
+
+      const elementsById = new Map(allElements.map((entry) => [entry.id, entry]));
+      let parentElement = elementsById.get(element.parentId);
+      let parentWorldX = 0;
+      let parentWorldY = 0;
+
+      while (parentElement !== undefined) {
+        parentWorldX += parentElement.position.x;
+        parentWorldY += parentElement.position.y;
+
+        if (parentElement.parentId === null) {
+          break;
+        }
+
+        parentElement = elementsById.get(parentElement.parentId);
+      }
+
+      return {
+        ...updates,
+        position: {
+          x: updates.position.x - parentWorldX,
+          y: updates.position.y - parentWorldY,
+        },
+      };
+    },
+    [allElements],
+  );
+
+  const handlePreviewTransform = useCallback(
+    (elementId: string, updates: ElementUpdate): void => {
+      const element = allElements.find((entry) => entry.id === elementId);
+
+      if (element === undefined) {
+        return;
+      }
+
+      onElementTransformPreview(elementId, localizePositionUpdate(element, updates));
+    },
+    [allElements, localizePositionUpdate, onElementTransformPreview],
+  );
+
+  const handleCommitTransform = useCallback(
+    (elementId: string, updates: ElementUpdate): void => {
+      const element = allElements.find((entry) => entry.id === elementId);
+
+      if (element === undefined) {
+        return;
+      }
+
+      onElementTransformCommit(elementId, localizePositionUpdate(element, updates));
+    },
+    [allElements, localizePositionUpdate, onElementTransformCommit],
+  );
 
   useEffect(() => {
     const container = containerRef.current;
@@ -111,7 +204,7 @@ export function ScreenPreview({
 
     rendererController.updateDocument(documentData);
     playbackController.attach();
-    playbackController.seek(0);
+    playbackController.seek(Infinity);
 
     return () => {
       playbackController.destroy();
@@ -126,14 +219,18 @@ export function ScreenPreview({
     rendererRef.current?.updateDocument(documentData);
     playbackRef.current?.setAnimations(documentData.animations);
     playbackRef.current?.pause();
-    playbackRef.current?.seek(0);
+    playbackRef.current?.seek(Infinity);
   }, [documentData]);
 
   useEffect(() => {
-    if (resetToken >= 0) {
-      playbackRef.current?.pause();
-      playbackRef.current?.seek(0);
+    if (!resetTokenMountedRef.current) {
+      resetTokenMountedRef.current = true;
+
+      return;
     }
+
+    playbackRef.current?.pause();
+    playbackRef.current?.seek(0);
   }, [resetToken]);
 
   useEffect(() => {
@@ -314,15 +411,15 @@ export function ScreenPreview({
           willChange: 'transform',
         }}
       />
-      {selectedElement === null ? null : (
+      {selectedWorldElement === null ? null : (
         <SelectionTransformWidget
           contentScale={contentScale}
-          element={selectedElement}
+          element={selectedWorldElement}
           panX={panX}
           panY={panY}
           zoom={zoom}
-          onCommitUpdate={onElementTransformCommit}
-          onPreviewUpdate={onElementTransformPreview}
+          onCommitUpdate={handleCommitTransform}
+          onPreviewUpdate={handlePreviewTransform}
         />
       )}
     </div>

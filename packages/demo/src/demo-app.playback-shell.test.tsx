@@ -45,7 +45,7 @@ describe('DemoApp playback shell lifecycle', () => {
     expect(mockedCreateScreenRenderer).toHaveBeenCalledTimes(1);
     expect(mockedCreatePlaybackController).toHaveBeenCalledTimes(1);
     expect(attach).toHaveBeenCalledTimes(1);
-    expect(seek).toHaveBeenCalledWith(0);
+    expect(seek).toHaveBeenCalledWith(Infinity);
 
     rerender(<DemoApp />);
 
@@ -181,6 +181,45 @@ describe('DemoApp playback shell lifecycle', () => {
     expect(screen.getByText('Recovered demo layout')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /^save$/i })).toBeNull();
     expect(screen.getByRole('button', { name: /save as json/i })).toBeTruthy();
+  });
+
+  /** @description Opening a document in edit mode must force all elements visible by default, even when imported pages contain persisted visibility-off overrides. */
+  it('applies page visibility overrides to the canvas preview', () => {
+    const { mockedCreateScreenRenderer } = setupDemoShellMocks();
+    const updateDocument = jest.fn();
+    const fixtureDocument = createDemoAppPlaybackTestDocument();
+    const replayElementId = 'el-live-ellipse';
+
+    mockedCreateScreenRenderer.mockReturnValue({
+      destroy: jest.fn(),
+      host: document.createElement('div'),
+      updateDocument,
+    });
+    window.localStorage.setItem(
+      'broadset:demo-document:v1',
+      JSON.stringify({
+        ...fixtureDocument,
+        pages: fixtureDocument.pages.map((page, index) =>
+          index === 0 ?
+            {
+              ...page,
+              overrides: [...page.overrides, { elementId: replayElementId, visible: false }],
+            }
+          : page,
+        ),
+      }),
+    );
+
+    render(<DemoApp />);
+
+    const hasReplayElementInUpdates = updateDocument.mock.calls.some((call) => {
+      const [documentArg] = call as [{ readonly elements: readonly { readonly id: string }[] }];
+
+      return documentArg.elements.some((element) => element.id === replayElementId);
+    });
+
+    // The replay element should be hidden on page 0 due to visibility override
+    expect(hasReplayElementInUpdates).toBe(false);
   });
 
   /** @description Prevents the floating menu bar from nesting HeroUI trigger buttons inside other buttons, which breaks layout and accessibility in the real browser. */

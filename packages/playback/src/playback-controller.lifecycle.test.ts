@@ -306,4 +306,45 @@ describe('createPlaybackController', () => {
       jest.useRealTimers();
     }
   });
+
+  /** @description seek(Infinity) snaps IN timelines to their final keyframe (post-entrance resting state) so elements appear fully visible on mount. */
+  it('seek(Infinity) shows elements at post-IN resting state', () => {
+    const { opacityTarget, root } = createHostElement('hero');
+    const animations: readonly AnimationDefinition[] = [
+      {
+        elementId: 'hero',
+        config: createConfig({
+          timelines: [
+            createTimeline({
+              id: 'tl-in',
+              name: 'In',
+              durationMs: 600,
+              keyframes: [
+                createKeyframe({
+                  name: 'start',
+                  offsetMs: 0,
+                  properties: { opacity: { type: 'number', value: 0, easing: 'linear' } },
+                }),
+                createKeyframe({
+                  name: 'end',
+                  offsetMs: 600,
+                  properties: { opacity: { type: 'number', value: 1, easing: 'linear' } },
+                }),
+              ],
+            }),
+          ],
+          stateTimelineBindings: [{ stateName: 'IN', timelineId: 'tl-in' }],
+        }),
+      },
+    ];
+
+    const controller = createPlaybackController({ root, animations });
+
+    controller.attach();
+    controller.seek(Infinity);
+
+    expect(Number(opacityTarget.style.opacity)).toBeCloseTo(1, 1);
+
+    controller.destroy();
+  });
 });
