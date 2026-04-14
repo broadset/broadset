@@ -1,0 +1,684 @@
+{
+  "sampleDocument": {
+    "id": "doc-demo-main",
+    "name": "Demo Main Document",
+    "documentMode": "screen",
+    "canvas": {
+      "width": 1920,
+      "height": 1080,
+      "unit": "px",
+      "dpi": 96,
+      "padding": [0, 0, 0, 0],
+      "backgroundColor": "#0b1320",
+      "backgroundMode": "solid"
+    },
+    "elements": [
+      {
+        "id": "el-bg",
+        "type": "rectangle",
+        "name": "Background",
+        "locked": true,
+        "position": { "x": 0, "y": 0 },
+        "width": 1920,
+        "height": 1080,
+        "rotation": 0,
+        "content": "",
+        "style": { "backgroundColor": "#0b1320" },
+        "parentId": null,
+        "groupId": null,
+        "assetId": null,
+        "dataField": null,
+        "visibleWhen": null,
+        "repeater": null,
+        "typeConfig": null,
+        "componentRef": null,
+        "autoSize": "fixed",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      },
+      {
+        "id": "el-score-title",
+        "type": "text",
+        "name": "Score Title",
+        "locked": false,
+        "position": { "x": 96, "y": 84 },
+        "width": 600,
+        "height": 80,
+        "rotation": 0,
+        "content": "<b>CHAMPIONSHIP NIGHT</b>",
+        "style": {
+          "fontFamily": "Inter",
+          "fontSize": 48,
+          "fontWeight": 700,
+          "fontColor": "#f7fbff"
+        },
+        "parentId": null,
+        "groupId": null,
+        "assetId": null,
+        "dataField": null,
+        "visibleWhen": null,
+        "repeater": null,
+        "typeConfig": null,
+        "componentRef": null,
+        "autoSize": "shrink-to-fit",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      },
+      {
+        "id": "el-team-home",
+        "type": "text",
+        "name": "Home Team",
+        "locked": false,
+        "position": { "x": 96, "y": 188 },
+        "width": 500,
+        "height": 56,
+        "rotation": 0,
+        "content": "NORTH CITY FC",
+        "style": {
+          "fontFamily": "Inter",
+          "fontSize": 34,
+          "fontWeight": 700,
+          "fontColor": "#74d9ff"
+        },
+        "parentId": null,
+        "groupId": null,
+        "assetId": null,
+        "dataField": { "fieldName": "homeTeam", "overflow": "ellipsis", "prefix": "", "suffix": "" },
+        "visibleWhen": null,
+        "repeater": null,
+        "typeConfig": null,
+        "componentRef": null,
+        "autoSize": "shrink-to-fit",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      },
+      {
+        "id": "el-team-away",
+        "type": "text",
+        "name": "Away Team",
+        "locked": false,
+        "position": { "x": 96, "y": 252 },
+        "width": 500,
+        "height": 56,
+        "rotation": 0,
+        "content": "HARBOR UNITED",
+        "style": {
+          "fontFamily": "Inter",
+          "fontSize": 34,
+          "fontWeight": 700,
+          "fontColor": "#ff6b7a"
+        },
+        "parentId": null,
+        "groupId": null,
+        "assetId": null,
+        "dataField": { "fieldName": "awayTeam", "overflow": "ellipsis", "prefix": "", "suffix": "" },
+        "visibleWhen": null,
+        "repeater": null,
+        "typeConfig": null,
+        "componentRef": null,
+        "autoSize": "shrink-to-fit",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      },
+      {
+        "id": "el-video",
+        "type": "video",
+        "name": "Hero Video",
+        "locked": false,
+        "position": { "x": 1100, "y": 96 },
+        "width": 700,
+        "height": 394,
+        "rotation": 0,
+        "content": "data:application/octet-stream;base64,",
+        "style": { "borderRadius": 24 },
+        "parentId": null,
+        "groupId": null,
+        "assetId": "asset-hero-loop",
+        "dataField": null,
+        "visibleWhen": null,
+        "repeater": null,
+        "typeConfig": {
+          "loop": true,
+          "autoplay": true,
+          "muted": true,
+          "startTimeS": 0,
+          "endTimeS": null
+        },
+        "componentRef": null,
+        "autoSize": "fixed",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      },
+      {
+        "id": "el-logo-image",
+        "type": "image",
+        "name": "Logo",
+        "locked": false,
+        "position": { "x": 1600, "y": 540 },
+        "width": 220,
+        "height": 220,
+        "rotation": 0,
+        "content": "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2080%22%3E%3Crect%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22%2308111f%22/%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2240%22%20r%3D%2220%22%20fill%3D%22%233da9fc%22/%3E%3C/svg%3E",
+        "style": { "objectFit": "contain", "backgroundColor": "#ffffff", "padding": [12, 12, 12, 12] },
+        "parentId": null,
+        "groupId": null,
+        "assetId": "asset-sponsor-mark",
+        "dataField": null,
+        "visibleWhen": "sponsorVisible == true",
+        "repeater": null,
+        "typeConfig": null,
+        "componentRef": null,
+        "autoSize": "fixed",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      },
+      {
+        "id": "el-accent-svg",
+        "type": "svg",
+        "name": "Accent SVG",
+        "locked": false,
+        "position": { "x": 96, "y": 336 },
+        "width": 200,
+        "height": 40,
+        "rotation": 0,
+        "content": "<svg viewBox='0 0 200 40' xmlns='http://www.w3.org/2000/svg'><rect x='0' y='14' width='90' height='12' rx='6' fill='#3da9fc'/><rect x='100' y='14' width='42' height='12' rx='6' fill='#15c39a'/></svg>",
+        "style": {},
+        "parentId": null,
+        "groupId": null,
+        "assetId": null,
+        "dataField": null,
+        "visibleWhen": null,
+        "repeater": null,
+        "typeConfig": null,
+        "componentRef": null,
+        "autoSize": "fixed",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      },
+      {
+        "id": "el-curve",
+        "type": "path",
+        "name": "Curve",
+        "locked": false,
+        "position": { "x": 90, "y": 400 },
+        "width": 520,
+        "height": 120,
+        "rotation": 0,
+        "content": "M 20 90 C 140 10, 360 10, 500 84",
+        "style": {
+          "stroke": "#74d9ff",
+          "strokeWidth": 3,
+          "fill": "none"
+        },
+        "parentId": null,
+        "groupId": null,
+        "assetId": null,
+        "dataField": null,
+        "visibleWhen": null,
+        "repeater": null,
+        "typeConfig": null,
+        "componentRef": null,
+        "autoSize": "fixed",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      },
+      {
+        "id": "el-live-ellipse",
+        "type": "ellipse",
+        "name": "Live Orb",
+        "locked": false,
+        "position": { "x": 980, "y": 116 },
+        "width": 96,
+        "height": 96,
+        "rotation": 0,
+        "content": "",
+        "style": {
+          "backgroundColor": "#3da9fc"
+        },
+        "parentId": null,
+        "groupId": null,
+        "assetId": null,
+        "dataField": null,
+        "visibleWhen": null,
+        "repeater": null,
+        "typeConfig": null,
+        "componentRef": null,
+        "autoSize": "fixed",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      },
+      {
+        "id": "el-promo-group",
+        "type": "group",
+        "name": "Promo Group",
+        "locked": false,
+        "position": { "x": 1430, "y": 770 },
+        "width": 430,
+        "height": 246,
+        "rotation": 0,
+        "content": "",
+        "style": {
+          "backgroundColor": "rgba(19, 36, 60, 0.92)",
+          "borderRadius": 20,
+          "clipChildren": true
+        },
+        "parentId": null,
+        "groupId": null,
+        "assetId": null,
+        "dataField": null,
+        "visibleWhen": "showPromoPanel == true",
+        "repeater": null,
+        "typeConfig": null,
+        "componentRef": null,
+        "autoSize": "fixed",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      },
+      {
+        "id": "el-promo-qr",
+        "type": "qrcode",
+        "name": "Promo QR",
+        "locked": false,
+        "position": { "x": 1468, "y": 810 },
+        "width": 140,
+        "height": 140,
+        "rotation": 0,
+        "content": "https://broadset.dev/live",
+        "style": { "backgroundColor": "#ffffff", "padding": [10, 10, 10, 10], "borderRadius": 12 },
+        "parentId": "el-promo-group",
+        "groupId": "grp-promo",
+        "assetId": null,
+        "dataField": { "fieldName": "promoQr", "overflow": "clip", "prefix": "", "suffix": "" },
+        "visibleWhen": null,
+        "repeater": null,
+        "typeConfig": null,
+        "componentRef": null,
+        "autoSize": "fixed",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      },
+      {
+        "id": "el-clock",
+        "type": "clock",
+        "name": "Clock",
+        "locked": false,
+        "position": { "x": 1100, "y": 820 },
+        "width": 260,
+        "height": 84,
+        "rotation": 0,
+        "content": "HH:mm:ss",
+        "style": {
+          "backgroundColor": "rgba(8, 17, 31, 0.74)",
+          "fontFamily": "Inter",
+          "fontSize": 32,
+          "fontWeight": 700,
+          "fontColor": "#f7fbff",
+          "textAlignment": "center"
+        },
+        "parentId": null,
+        "groupId": null,
+        "assetId": null,
+        "dataField": null,
+        "visibleWhen": null,
+        "repeater": null,
+        "typeConfig": {
+          "mode": "realtime",
+          "startValue": null,
+          "targetValue": null,
+          "countdownTo": null
+        },
+        "componentRef": null,
+        "autoSize": "fixed",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      },
+      {
+        "id": "el-ticker",
+        "type": "ticker",
+        "name": "Ticker",
+        "locked": false,
+        "position": { "x": 0, "y": 1028 },
+        "width": 1920,
+        "height": 52,
+        "rotation": 0,
+        "content": "[\"North City FC clinches playoff berth\",\"Studio analysis starts next\",\"Player interview at full-time\"]",
+        "style": {
+          "backgroundColor": "rgba(8, 17, 31, 0.94)",
+          "fontFamily": "Inter",
+          "fontSize": 18,
+          "fontWeight": 600,
+          "fontColor": "#f7fbff"
+        },
+        "parentId": null,
+        "groupId": null,
+        "assetId": null,
+        "dataField": null,
+        "visibleWhen": null,
+        "repeater": null,
+        "typeConfig": {
+          "speed": 96,
+          "direction": "left",
+          "gap": 48,
+          "paused": false
+        },
+        "componentRef": null,
+        "autoSize": "fixed",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      }
+    ],
+    "animations": [
+      {
+        "elementId": "el-live-ellipse",
+        "config": {
+          "timelines": [
+            {
+              "id": "tl-live-pulse",
+              "name": "Live Pulse",
+              "durationMs": 1200,
+              "loop": "ping-pong",
+              "loopCount": null,
+              "keyframes": [
+                {
+                  "name": "start",
+                  "action": "none",
+                  "offsetMs": 0,
+                  "properties": {
+                    "opacity": { "type": "number", "value": 0.6, "easing": "linear" },
+                    "translateX": { "type": "number", "value": 0, "easing": "ease-in-out" },
+                    "scale": { "type": "number", "value": 0.85, "easing": "spring-gentle" }
+                  }
+                },
+                {
+                  "name": "end",
+                  "action": "none",
+                  "offsetMs": 1200,
+                  "properties": {
+                    "opacity": { "type": "number", "value": 1, "easing": "linear" },
+                    "translateX": { "type": "number", "value": 80, "easing": "ease-in-out" },
+                    "scale": { "type": "number", "value": 1.15, "easing": "spring-bouncy" }
+                  }
+                }
+              ],
+              "childTimelines": [],
+              "audioCues": []
+            },
+            {
+              "id": "tl-promo-in",
+              "name": "Promo In",
+              "durationMs": 600,
+              "loop": "none",
+              "loopCount": null,
+              "keyframes": [
+                {
+                  "name": "in-start",
+                  "action": "none",
+                  "offsetMs": 0,
+                  "properties": {
+                    "opacity": { "type": "number", "value": 0, "easing": "linear" },
+                    "translateY": { "type": "number", "value": 24, "easing": "ease-out" }
+                  }
+                },
+                {
+                  "name": "in-end",
+                  "action": "none",
+                  "offsetMs": 600,
+                  "properties": {
+                    "opacity": { "type": "number", "value": 1, "easing": "linear" },
+                    "translateY": { "type": "number", "value": 0, "easing": "spring-gentle" }
+                  }
+                }
+              ],
+              "childTimelines": [],
+              "audioCues": []
+            },
+            {
+              "id": "tl-promo-out",
+              "name": "Promo Out",
+              "durationMs": 450,
+              "loop": "none",
+              "loopCount": null,
+              "keyframes": [
+                {
+                  "name": "out-start",
+                  "action": "none",
+                  "offsetMs": 0,
+                  "properties": {
+                    "opacity": { "type": "number", "value": 1, "easing": "linear" },
+                    "translateY": { "type": "number", "value": 0, "easing": "ease-in" }
+                  }
+                },
+                {
+                  "name": "out-end",
+                  "action": "none",
+                  "offsetMs": 450,
+                  "properties": {
+                    "opacity": { "type": "number", "value": 0, "easing": "linear" },
+                    "translateY": { "type": "number", "value": 20, "easing": "ease-in" }
+                  }
+                }
+              ],
+              "childTimelines": [],
+              "audioCues": []
+            }
+          ],
+          "stateTimelineBindings": [
+            { "stateName": "IN", "timelineId": "tl-promo-in" },
+            { "stateName": "OUT", "timelineId": "tl-promo-out" }
+          ],
+          "modifierTimelineBindings": [],
+          "textAnimator": null
+        }
+      }
+    ],
+    "pages": [
+      {
+        "id": "page-live",
+        "name": "Live",
+        "overrides": [],
+        "locale": "en-GB",
+        "extensions": {}
+      },
+      {
+        "id": "page-final",
+        "name": "Final",
+        "overrides": [
+          { "elementId": "el-score-title", "content": "<b>FINAL RESULT</b>" },
+          { "elementId": "el-video", "visible": false }
+        ],
+        "locale": "en-GB",
+        "extensions": {}
+      }
+    ],
+    "dataSchema": {
+      "description": "Demo data fields",
+      "fields": [
+        { "name": "homeTeam", "type": "string", "label": "Home Team", "defaultValue": "North City FC" },
+        { "name": "awayTeam", "type": "string", "label": "Away Team", "defaultValue": "Harbor United" },
+        {
+          "name": "promoQr",
+          "type": "string",
+          "label": "Promo QR",
+          "defaultValue": "https://broadset.dev/live"
+        },
+        { "name": "sponsorVisible", "type": "boolean", "label": "Show Sponsor", "defaultValue": true },
+        { "name": "showPromoPanel", "type": "boolean", "label": "Show Promo Panel", "defaultValue": true }
+      ]
+    },
+    "output": {
+      "frameRate": 25,
+      "colorSpace": "rec709",
+      "dynamicRange": "sdr"
+    },
+    "extensions": {
+      "dev.broadset.sample": {
+        "purpose": "Compact JSON fixture"
+      }
+    }
+  },
+  "sampleSocialDocument": {
+    "id": "doc-demo-social",
+    "name": "Demo Social Vertical",
+    "documentMode": "screen",
+    "canvas": {
+      "width": 1080,
+      "height": 1920,
+      "unit": "px",
+      "dpi": 96,
+      "padding": [0, 0, 0, 0],
+      "backgroundColor": "#0b1320",
+      "backgroundMode": "solid"
+    },
+    "elements": [
+      {
+        "id": "el-social-bg",
+        "type": "rectangle",
+        "name": "Social Background",
+        "locked": true,
+        "position": { "x": 0, "y": 0 },
+        "width": 1080,
+        "height": 1920,
+        "rotation": 0,
+        "content": "",
+        "style": { "backgroundColor": "#0b1320" },
+        "parentId": null,
+        "groupId": null,
+        "assetId": null,
+        "dataField": null,
+        "visibleWhen": null,
+        "repeater": null,
+        "typeConfig": null,
+        "componentRef": null,
+        "autoSize": "fixed",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      },
+      {
+        "id": "el-social-title",
+        "type": "text",
+        "name": "Social Title",
+        "locked": false,
+        "position": { "x": 80, "y": 140 },
+        "width": 920,
+        "height": 120,
+        "rotation": 0,
+        "content": "<b>CHAMPIONSHIP NIGHT</b>",
+        "style": {
+          "fontFamily": "Inter",
+          "fontSize": 64,
+          "fontWeight": 700,
+          "fontColor": "#f7fbff",
+          "textAlignment": "center"
+        },
+        "parentId": null,
+        "groupId": null,
+        "assetId": null,
+        "dataField": null,
+        "visibleWhen": null,
+        "repeater": null,
+        "typeConfig": null,
+        "componentRef": null,
+        "autoSize": "shrink-to-fit",
+        "textPathElementId": null,
+        "booleanOperation": null,
+        "extensions": {}
+      }
+    ],
+    "animations": [],
+    "pages": [
+      {
+        "id": "page-social-live",
+        "name": "Social Live",
+        "overrides": [],
+        "locale": "en-GB",
+        "extensions": {}
+      }
+    ],
+    "dataSchema": {
+      "fields": []
+    },
+    "output": {
+      "frameRate": 25,
+      "colorSpace": "rec709",
+      "dynamicRange": "sdr"
+    },
+    "extensions": {}
+  },
+  "sampleProject": {
+    "$schema": "https://schema.broadset.dev/v1/project.json",
+    "schemaVersion": 1,
+    "id": "proj-demo",
+    "name": "Demo Broadcast Package",
+    "createdAt": "2026-04-14T12:00:00Z",
+    "updatedAt": "2026-04-14T12:00:00Z",
+    "settings": {
+      "fonts": [
+        {
+          "family": "Inter",
+          "variants": [
+            { "weight": 400, "style": "normal" },
+            { "weight": 700, "style": "normal" }
+          ],
+          "source": {
+            "kind": "url",
+            "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+          }
+        }
+      ],
+      "palette": ["#0b1320", "#3da9fc", "#74d9ff", "#15c39a", "#ff6b7a", "#f7fbff"],
+      "defaultDocumentMode": "screen"
+    },
+    "assets": [
+      {
+        "id": "asset-sponsor-mark",
+        "name": "Partner Mark",
+        "kind": "image",
+        "mimeType": "image/svg+xml",
+        "source": {
+          "type": "url",
+          "url": "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2080%22%3E%3Crect%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22%2308111f%22/%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2240%22%20r%3D%2220%22%20fill%3D%22%233da9fc%22/%3E%3C/svg%3E"
+        }
+      },
+      {
+        "id": "asset-hero-loop",
+        "name": "Arena Crowd Loop",
+        "kind": "video",
+        "mimeType": "video/mp4",
+        "source": {
+          "type": "url",
+          "url": "data:application/octet-stream;base64,"
+        }
+      }
+    ],
+    "documents": [{ "$ref": "sampleDocument" }, { "$ref": "sampleSocialDocument" }],
+    "templateGroups": [
+      {
+        "groupId": "tg-demo",
+        "name": "Demo Package",
+        "members": [
+          { "documentId": "doc-demo-main", "role": "16:9", "label": "Main" },
+          { "documentId": "doc-demo-social", "role": "9:16", "label": "Social" }
+        ]
+      }
+    ],
+    "extensions": {
+      "dev.broadset.sample": {
+        "purpose": "JSON-backed fixture"
+      }
+    }
+  }
+}

@@ -132,7 +132,13 @@ describe('DemoApp chrome and menu integration', () => {
   it('disables destructive context-menu actions for locked elements', () => {
     setupDemoShellMocks();
 
-    const lockedElementId = SAMPLE_DOCUMENT.elements[0].id;
+    const firstElement = SAMPLE_DOCUMENT.elements[0];
+
+    if (firstElement === undefined) {
+      throw new Error('Expected sample fixture to contain at least one element.');
+    }
+
+    const lockedElementId = firstElement.id;
     const lockedDocument = {
       ...SAMPLE_DOCUMENT,
       elements: SAMPLE_DOCUMENT.elements.map((element, index) =>
