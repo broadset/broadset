@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { setupDemoShellMocks } from './demo-shell-test-utils';
 import { DemoApp } from './DemoApp';
-import { SAMPLE_DOCUMENT } from './sampleDocument';
+import { createDemoAppPlaybackTestDocument } from './test-fixtures';
 
 describe('DemoApp playback shell lifecycle', () => {
   /** @description Guards against rebuilding the animated preview controller when the demo shell rerenders. */
@@ -16,7 +16,7 @@ describe('DemoApp playback shell lifecycle', () => {
     const pause = jest.fn();
     const play = jest.fn();
     const seek = jest.fn();
-    const setRegistry = jest.fn();
+    const setAnimations = jest.fn();
     const setSpeed = jest.fn();
     const seekTimeline = jest.fn();
     const stopTimeline = jest.fn();
@@ -35,7 +35,7 @@ describe('DemoApp playback shell lifecycle', () => {
       play,
       seek,
       seekTimeline,
-      setRegistry,
+      setAnimations,
       setSpeed,
       stopTimeline,
     });
@@ -75,7 +75,7 @@ describe('DemoApp playback shell lifecycle', () => {
       play,
       seek,
       seekTimeline: jest.fn(),
-      setRegistry: jest.fn(),
+      setAnimations: jest.fn(),
       setSpeed: jest.fn(),
       stopTimeline: jest.fn(),
     });
@@ -105,13 +105,14 @@ describe('DemoApp playback shell lifecycle', () => {
       play: jest.fn(),
       seek: jest.fn(),
       seekTimeline,
-      setRegistry: jest.fn(),
+      setAnimations: jest.fn(),
       setSpeed: jest.fn(),
       stopTimeline: jest.fn(),
     });
 
+    const playbackDocument = createDemoAppPlaybackTestDocument();
     const animatedElementId = 'el-live-ellipse';
-    const animatedElement = SAMPLE_DOCUMENT.elements.find((element) => element.id === animatedElementId);
+    const animatedElement = playbackDocument.elements.find((element) => element.id === animatedElementId);
 
     expect(animatedElement).toBeDefined();
 
@@ -120,8 +121,8 @@ describe('DemoApp playback shell lifecycle', () => {
     }
 
     const reorderedDocument = {
-      ...SAMPLE_DOCUMENT,
-      elements: [animatedElement, ...SAMPLE_DOCUMENT.elements.filter((element) => element.id !== animatedElementId)],
+      ...playbackDocument,
+      elements: [animatedElement, ...playbackDocument.elements.filter((element) => element.id !== animatedElementId)],
     };
 
     window.localStorage.setItem('broadset:demo-document:v1', JSON.stringify(reorderedDocument));
@@ -171,7 +172,7 @@ describe('DemoApp playback shell lifecycle', () => {
 
   /** @description Verifies the host save callback persists the current document, restores saved work on the next load, and exposes action feedback through a HeroUI toast live region. */
   it('restores a saved document from localStorage and saves the current document through the File menu', () => {
-    const savedDocument = { ...SAMPLE_DOCUMENT, name: 'Recovered demo layout' };
+    const savedDocument = { ...createDemoAppPlaybackTestDocument(), name: 'Recovered demo layout' };
 
     window.localStorage.setItem('broadset:demo-document:v1', JSON.stringify(savedDocument));
     setupDemoShellMocks();

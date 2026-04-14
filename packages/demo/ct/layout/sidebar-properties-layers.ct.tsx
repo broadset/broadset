@@ -1,20 +1,20 @@
 import { PropertiesSidebar } from '@broadset/ui';
 import { expect, test } from '@playwright/experimental-ct-react';
 
-import { toPanelElement } from '../../src/demo-utils';
-import { SAMPLE_DOCUMENT } from '../../src/sampleDocument';
+import { createSidebarPanelFixtureElements } from '../../src/test-fixtures';
 import { FIXTURE_IDS } from '../fixture-selectors';
 import { DemoAppFresh } from '../helpers/demo-app-fresh.helper';
 import { LayersHarness } from './panel-harnesses.helper';
 
 function requireElementById(elementId: string) {
-  const element = SAMPLE_DOCUMENT.elements.find((candidate) => candidate.id === elementId);
+  const elements = createSidebarPanelFixtureElements();
+  const element = elements[elementId];
 
   if (element === undefined) {
     throw new Error(`Missing sample element: ${elementId}`);
   }
 
-  return toPanelElement(element);
+  return element;
 }
 
 /**

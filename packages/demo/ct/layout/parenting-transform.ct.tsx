@@ -1,34 +1,12 @@
 import type { BroadsetDocument } from '@broadset/model';
 import { expect, test } from '@playwright/experimental-ct-react';
 
-import { SAMPLE_DOCUMENT } from '../../src/sampleDocument';
+import { createParentingTransformTestDocument } from '../../src/test-fixtures';
 import { FIXTURE_IDS } from '../fixture-selectors';
 import { DemoAppStored } from '../helpers/demo-app-stored.helper';
 
 function createParentPaddingFixture(): BroadsetDocument {
-  return {
-    ...SAMPLE_DOCUMENT,
-    elements: SAMPLE_DOCUMENT.elements.map((element) => {
-      if (element.id === FIXTURE_IDS.promoGroup) {
-        return {
-          ...element,
-          style: {
-            ...element.style,
-            padding: [20, 24, 28, 32],
-          },
-        };
-      }
-
-      if (element.id === FIXTURE_IDS.promoQr) {
-        return {
-          ...element,
-          position: { x: 12, y: 18 },
-        };
-      }
-
-      return element;
-    }),
-  };
+  return createParentingTransformTestDocument();
 }
 
 /**

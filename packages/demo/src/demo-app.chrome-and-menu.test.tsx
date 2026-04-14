@@ -4,7 +4,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import { dispatchDeleteKey, setupDemoShellMocks } from './demo-shell-test-utils';
 import { DemoApp } from './DemoApp';
-import { SAMPLE_DOCUMENT } from './sampleDocument';
+import { createDemoAppChromeTestDocument } from './test-fixtures';
 
 describe('DemoApp chrome and menu integration', () => {
   /** @description Restores the expected direct-manipulation affordance by requiring a visible transform widget with resize and rotation handles whenever an element is selected. */
@@ -132,7 +132,9 @@ describe('DemoApp chrome and menu integration', () => {
   it('disables destructive context-menu actions for locked elements', () => {
     setupDemoShellMocks();
 
-    const firstElement = SAMPLE_DOCUMENT.elements[0];
+    const chromeDocument = createDemoAppChromeTestDocument();
+
+    const firstElement = chromeDocument.elements[0];
 
     if (firstElement === undefined) {
       throw new Error('Expected sample fixture to contain at least one element.');
@@ -140,10 +142,8 @@ describe('DemoApp chrome and menu integration', () => {
 
     const lockedElementId = firstElement.id;
     const lockedDocument = {
-      ...SAMPLE_DOCUMENT,
-      elements: SAMPLE_DOCUMENT.elements.map((element, index) =>
-        index === 0 ? { ...element, locked: true } : element,
-      ),
+      ...chromeDocument,
+      elements: chromeDocument.elements.map((element, index) => (index === 0 ? { ...element, locked: true } : element)),
     };
 
     window.localStorage.setItem('broadset:demo-document:v1', JSON.stringify(lockedDocument));
