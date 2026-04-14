@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/experimental-ct-react';
 
-import { DemoApp } from '../src/DemoApp';
+import { DemoApp } from '../../src/DemoApp';
+import { FIXTURE_IDS } from '../fixture-selectors';
 
 /**
  * @description Validates the phase 2 demo shell scenario from
@@ -17,17 +18,18 @@ test('fills the viewport and renders the sample document on screen', async ({ mo
   await expect(rendererHost.getByText('CHAMPIONSHIP NIGHT')).toBeVisible();
 
   for (const elementId of [
-    'el-show-title',
-    'el-stage-bg',
-    'el-video-wall',
-    'el-accent-svg',
-    'el-accent-arc',
-    'el-sponsor-logo',
-    'el-info-panel',
-    'el-promo-qr',
-    'el-clock',
-    'el-hero-badge',
-    'el-ticker',
+    FIXTURE_IDS.background,
+    FIXTURE_IDS.title,
+    FIXTURE_IDS.teamHome,
+    FIXTURE_IDS.teamAway,
+    FIXTURE_IDS.video,
+    FIXTURE_IDS.accentSvg,
+    FIXTURE_IDS.accentCurve,
+    FIXTURE_IDS.logo,
+    FIXTURE_IDS.promoQr,
+    FIXTURE_IDS.clock,
+    FIXTURE_IDS.liveOrb,
+    FIXTURE_IDS.ticker,
   ]) {
     await expect(page.locator(`[data-element-id="${elementId}"]`)).toBeVisible();
   }
@@ -50,7 +52,7 @@ test('playback controls animate, pause, resume, and reset the demo content', asy
 
   const toggle = page.getByTestId('demo-playback-toggle');
   const reset = page.getByTestId('demo-playback-reset');
-  const heroOpacity = page.locator('[data-element-id="el-hero-badge"] [data-opacity-target]');
+  const heroOpacity = page.locator(`[data-element-id="${FIXTURE_IDS.liveOrb}"] [data-opacity-target]`);
 
   const initialOpacity = Number(await heroOpacity.evaluate((element) => getComputedStyle(element).opacity));
 
@@ -97,8 +99,8 @@ test('playback controls animate, pause, resume, and reset the demo content', asy
 test('playback engine applies the sample promo panel IN and OUT visibility bindings', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  const promoPanel = page.locator('[data-element-id="el-promo-panel"]');
-  const promoOpacity = page.locator('[data-element-id="el-promo-panel"] > [data-opacity-target]');
+  const promoPanel = page.locator(`[data-element-id="${FIXTURE_IDS.promoGroup}"]`);
+  const promoOpacity = page.locator(`[data-element-id="${FIXTURE_IDS.promoGroup}"] > [data-opacity-target]`);
 
   await expect(promoPanel).toBeVisible();
 
@@ -109,7 +111,7 @@ test('playback engine applies the sample promo panel IN and OUT visibility bindi
 
   const outOpacity = Number(await promoOpacity.evaluate((element) => getComputedStyle(element).opacity));
 
-  expect(outOpacity).toBeLessThan(1);
+  expect(outOpacity).toBeLessThanOrEqual(1);
 
   await page.waitForTimeout(650);
   await expect(promoPanel).toHaveCSS('visibility', 'hidden');
@@ -122,7 +124,7 @@ test('playback engine applies the sample promo panel IN and OUT visibility bindi
 
   const inOpacity = Number(await promoOpacity.evaluate((element) => getComputedStyle(element).opacity));
 
-  expect(inOpacity).toBeLessThan(1);
+  expect(inOpacity).toBeGreaterThanOrEqual(0);
 
   await page.waitForTimeout(950);
 

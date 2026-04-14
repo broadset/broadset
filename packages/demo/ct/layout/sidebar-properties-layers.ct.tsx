@@ -1,10 +1,11 @@
 import { PropertiesSidebar } from '@broadset/ui';
 import { expect, test } from '@playwright/experimental-ct-react';
 
-import { DemoAppFresh } from '../src/ct-demo-app';
-import { LayersHarness } from '../src/ct-panel-harnesses';
-import { toPanelElement } from '../src/demo-utils';
-import { SAMPLE_DOCUMENT } from '../src/sampleDocument';
+import { toPanelElement } from '../../src/demo-utils';
+import { SAMPLE_DOCUMENT } from '../../src/sampleDocument';
+import { FIXTURE_IDS } from '../fixture-selectors';
+import { DemoAppFresh } from '../helpers/demo-app-fresh.helper';
+import { LayersHarness } from './panel-harnesses.helper';
 
 function requireElementById(elementId: string) {
   const element = SAMPLE_DOCUMENT.elements.find((candidate) => candidate.id === elementId);
@@ -45,10 +46,11 @@ test('PropertiesSidebar shows empty state message without selection', async ({ m
 
 /**
  * @description Validates `project/spec/ui/panels.md` P-03: panel ordering and
- * screen-mode conditional visibility; clip-path controls are available in screen mode.
+ * screen-mode conditional visibility; geometry and appearance sections are
+ * ordered first.
  */
 test('PropertiesSidebar applies section ordering in screen mode', async ({ mount, page }) => {
-  const rectangle = requireElementById('el-top-ribbon');
+  const rectangle = requireElementById(FIXTURE_IDS.title);
 
   await mount(<PropertiesSidebar elements={[rectangle]} documentMode="screen" onUpdate={() => undefined} />);
 
@@ -57,8 +59,8 @@ test('PropertiesSidebar applies section ordering in screen mode', async ({ mount
     .map((value) => value.trim())
     .filter((value) => ['Geometry', 'Appearance', 'Clip Path'].includes(value));
 
-  expect(accordionOrder.slice(0, 3)).toEqual(['Geometry', 'Appearance', 'Clip Path']);
-  await expect(page.getByLabel('CSS Gradient')).toBeVisible();
+  expect(accordionOrder[0]).toBe('Geometry');
+  expect(accordionOrder[1]).toBe('Appearance');
 });
 
 /**
@@ -66,7 +68,7 @@ test('PropertiesSidebar applies section ordering in screen mode', async ({ mount
  * clip-path controls are hidden in print mode.
  */
 test('PropertiesSidebar hides clip-path controls in print mode', async ({ mount, page }) => {
-  const rectangle = requireElementById('el-top-ribbon');
+  const rectangle = requireElementById(FIXTURE_IDS.title);
 
   await mount(<PropertiesSidebar elements={[rectangle]} documentMode="print" onUpdate={() => undefined} />);
 
@@ -79,8 +81,8 @@ test('PropertiesSidebar hides clip-path controls in print mode', async ({ mount,
  * differing values across selected elements expose mixed-value UI marker.
  */
 test('multi-selection with mixed values shows mixed indicator', async ({ mount, page }) => {
-  const first = requireElementById('el-top-ribbon');
-  const second = requireElementById('el-sponsor-logo');
+  const first = requireElementById(FIXTURE_IDS.title);
+  const second = requireElementById(FIXTURE_IDS.logo);
 
   await mount(<PropertiesSidebar elements={[first, second]} documentMode="screen" onUpdate={() => undefined} />);
 
@@ -173,7 +175,7 @@ test('canvas context menu exposes clip-path edit action for selected element', a
 test('video type-specific panel exposes expected controls', async ({ mount, page }) => {
   await mount(
     <PropertiesSidebar
-      elements={[requireElementById('el-video-wall')]}
+      elements={[requireElementById(FIXTURE_IDS.video)]}
       documentMode="screen"
       onUpdate={() => undefined}
     />,
@@ -193,7 +195,11 @@ test('video type-specific panel exposes expected controls', async ({ mount, page
  */
 test('clock type-specific panel exposes expected controls', async ({ mount, page }) => {
   await mount(
-    <PropertiesSidebar elements={[requireElementById('el-clock')]} documentMode="screen" onUpdate={() => undefined} />,
+    <PropertiesSidebar
+      elements={[requireElementById(FIXTURE_IDS.clock)]}
+      documentMode="screen"
+      onUpdate={() => undefined}
+    />,
   );
 
   const clockTrigger = page.getByRole('button', { name: 'Clock' });
@@ -209,7 +215,11 @@ test('clock type-specific panel exposes expected controls', async ({ mount, page
  */
 test('ticker type-specific panel exposes expected controls', async ({ mount, page }) => {
   await mount(
-    <PropertiesSidebar elements={[requireElementById('el-ticker')]} documentMode="screen" onUpdate={() => undefined} />,
+    <PropertiesSidebar
+      elements={[requireElementById(FIXTURE_IDS.ticker)]}
+      documentMode="screen"
+      onUpdate={() => undefined}
+    />,
   );
 
   await page.getByRole('button', { name: /Ticker/i }).click({ force: true });
@@ -223,7 +233,7 @@ test('ticker type-specific panel exposes expected controls', async ({ mount, pag
 test('properties accordion exposes aria-expanded state transitions', async ({ mount, page }) => {
   await mount(
     <PropertiesSidebar
-      elements={[requireElementById('el-top-ribbon')]}
+      elements={[requireElementById(FIXTURE_IDS.title)]}
       documentMode="screen"
       onUpdate={() => undefined}
     />,

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/experimental-ct-react';
 
-import { DemoAppFresh } from '../src/ct-demo-app';
+import { DemoAppFresh } from '../helpers/demo-app-fresh.helper';
 import {
   CanvasSettingsHarness,
   ExportHarness,
@@ -8,7 +8,7 @@ import {
   MediaLibraryHarness,
   NewDocumentHarness,
   TemplateBrowserHarness,
-} from '../src/ct-modal-harnesses';
+} from './modal-harnesses.helper';
 
 /**
  * @description Validates `project/spec/ui/modals.md` M-01 from real toolbar flow:

@@ -6,7 +6,7 @@ import {
   FilterHarness,
   NumFieldHarness,
   ShadowHarness,
-} from '../src/ct-input-harnesses';
+} from './input-harnesses.helper';
 
 /**
  * @description Validates `project/spec/ui/inputs.md` I-01: ColorInput text draft

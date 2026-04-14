@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/experimental-ct-react';
 
-import { DemoApp } from '../src/DemoApp';
+import { DemoApp } from '../../src/DemoApp';
+import { FIXTURE_IDS, FIXTURE_LAYER_LABELS } from '../fixture-selectors';
 
 /* ------------------------------------------------------------------ */
 /*  Transform widget — selection and positioning                       */
@@ -9,7 +10,7 @@ import { DemoApp } from '../src/DemoApp';
 /**
  * @description Validates that the DemoApp starts with the first unlocked
  * element auto-selected and the transform widget visible at that element's
- * bounds. The initial selection is el-top-ribbon (x:60, y:52, 920×96).
+ * bounds. The initial selection is el-score-title (x:60, y:52, 920×96).
  */
 test('shows the transform widget on mount for the auto-selected element', async ({ mount, page }) => {
   await mount(<DemoApp />);
@@ -18,8 +19,8 @@ test('shows the transform widget on mount for the auto-selected element', async 
 
   await expect(widget).toBeVisible();
 
-  // Widget should visually overlay the auto-selected el-top-ribbon
-  const ribbonEl = page.locator('[data-element-id="el-top-ribbon"]');
+  // Widget should visually overlay the auto-selected el-score-title
+  const ribbonEl = page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`);
   const ribbonBox = await ribbonEl.boundingBox();
   const widgetBox = await widget.boundingBox();
 
@@ -61,10 +62,10 @@ test('repositions the transform widget when a different element is selected', as
 
   const widget = page.getByTestId('demo-transform-widget');
 
-  // Initial selection: el-top-ribbon
+  // Initial selection: el-score-title
   await expect(widget).toBeVisible();
 
-  const ribbonEl = page.locator('[data-element-id="el-top-ribbon"]');
+  const ribbonEl = page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`);
   const initialWidgetBox = await widget.boundingBox();
   const ribbonBox = await ribbonEl.boundingBox();
 
@@ -75,14 +76,14 @@ test('repositions the transform widget when a different element is selected', as
   expect(initialWidgetBox.x).toBeCloseTo(ribbonBox.x, -1);
   expect(initialWidgetBox.y).toBeCloseTo(ribbonBox.y, -1);
 
-  // Select el-hero-badge via layers panel (x:1010, y:126, 96×96)
+  // Select el-live-ellipse via layers panel (x:1010, y:126, 96×96)
   await page.locator('button[aria-label="Layers"]').first().click();
 
   const sidebar = page.getByTestId('demo-properties-sidebar');
 
-  await sidebar.locator('[role="button"]', { hasText: 'Live Badge Orb' }).click();
+  await sidebar.locator('[role="button"]', { hasText: FIXTURE_LAYER_LABELS.liveOrb }).click();
 
-  const badgeEl = page.locator('[data-element-id="el-hero-badge"]');
+  const badgeEl = page.locator(`[data-element-id="${FIXTURE_IDS.liveOrb}"]`);
   const newWidgetBox = await widget.boundingBox();
   const badgeBox = await badgeEl.boundingBox();
 
@@ -107,7 +108,7 @@ test('applies element rotation to the transform widget', async ({ mount, page })
 
   await expect(widget).toBeVisible();
 
-  // el-top-ribbon has rotation: 0 (all sample elements have 0 rotation)
+  // el-score-title has rotation: 0 (all sample elements have 0 rotation)
   const transform = await widget.evaluate((el) => el.style.transform);
 
   expect(transform).toBe('rotate(0deg)');
@@ -127,7 +128,7 @@ test('updates the properties sidebar when a different element is selected via la
 
   const sidebar = page.getByTestId('demo-properties-sidebar');
 
-  // Initial selection is el-top-ribbon — properties should be populated (no empty message)
+  // Initial selection is el-score-title — properties should be populated (no empty message)
   await expect(sidebar.getByText('Select an element to edit its properties')).toHaveCount(0);
 
   // Geometry X field should be visible
@@ -137,7 +138,7 @@ test('updates the properties sidebar when a different element is selected via la
 
   // Select a different element via layers panel
   await page.locator('button[aria-label="Layers"]').first().click();
-  await sidebar.locator('[role="button"]', { hasText: 'Live Badge Orb' }).click();
+  await sidebar.locator('[role="button"]', { hasText: FIXTURE_LAYER_LABELS.liveOrb }).click();
 
   // Sidebar auto-switches to properties — X field should still be visible
   await expect(xField).toBeVisible();
@@ -157,8 +158,8 @@ test('selects an element via the layers panel and repositions the transform widg
 
   const widget = page.getByTestId('demo-transform-widget');
 
-  // Initial widget position for el-top-ribbon
-  const ribbonEl = page.locator('[data-element-id="el-top-ribbon"]');
+  // Initial widget position for el-score-title
+  const ribbonEl = page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`);
   const initialWidgetBox = await widget.boundingBox();
   const ribbonBox = await ribbonEl.boundingBox();
 
@@ -173,11 +174,11 @@ test('selects an element via the layers panel and repositions the transform widg
 
   const sidebar = page.getByTestId('demo-properties-sidebar');
 
-  // Click on the el-hero-badge layer (named "Live Badge Orb")
-  await sidebar.locator('[role="button"]', { hasText: 'Live Badge Orb' }).click();
+  // Click on the el-live-ellipse layer (named "Live Orb")
+  await sidebar.locator('[role="button"]', { hasText: FIXTURE_LAYER_LABELS.liveOrb }).click();
 
-  // Widget should reposition to el-hero-badge
-  const badgeEl = page.locator('[data-element-id="el-hero-badge"]');
+  // Widget should reposition to el-live-ellipse
+  const badgeEl = page.locator(`[data-element-id="${FIXTURE_IDS.liveOrb}"]`);
   const newWidgetBox = await widget.boundingBox();
   const badgeBox = await badgeEl.boundingBox();
 
@@ -207,9 +208,9 @@ test('removes a selected element from the canvas when Delete is pressed', async 
 
   const sidebar = page.getByTestId('demo-properties-sidebar');
 
-  await sidebar.locator('[role="button"]', { hasText: 'Broadcast Accent SVG' }).click();
+  await sidebar.locator('[role="button"]', { hasText: FIXTURE_LAYER_LABELS.accentSvg }).click();
 
-  const svgElement = page.locator('[data-element-id="el-accent-svg"]');
+  const svgElement = page.locator(`[data-element-id="${FIXTURE_IDS.accentSvg}"]`);
 
   await expect(svgElement).toBeVisible();
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
@@ -240,9 +241,9 @@ test('restores a deleted element when Ctrl+Z undo is pressed', async ({ mount, p
 
   const sidebar = page.getByTestId('demo-properties-sidebar');
 
-  await sidebar.locator('[role="button"]', { hasText: 'Broadcast Accent SVG' }).click();
+  await sidebar.locator('[role="button"]', { hasText: FIXTURE_LAYER_LABELS.accentSvg }).click();
 
-  const svgElement = page.locator('[data-element-id="el-accent-svg"]');
+  const svgElement = page.locator(`[data-element-id="${FIXTURE_IDS.accentSvg}"]`);
 
   await expect(svgElement).toBeVisible();
 
@@ -306,7 +307,7 @@ test('dragging the transform bounds moves the element position', async ({ mount,
 
   await expect(widget).toBeVisible();
 
-  // Initial position for el-top-ribbon
+  // Initial position for el-score-title
   const initialLeft = await widget.evaluate((el) => parseFloat(el.style.left));
   const initialTop = await widget.evaluate((el) => parseFloat(el.style.top));
 
@@ -349,7 +350,7 @@ test('dragging a resize handle changes the element dimensions', async ({ mount, 
 
   await expect(widget).toBeVisible();
 
-  // Initial width for el-top-ribbon
+  // Initial width for el-score-title
   const initialWidth = await widget.evaluate((el) => parseFloat(el.style.width));
 
   // Drag the east (right) handle to resize wider

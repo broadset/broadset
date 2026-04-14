@@ -5,7 +5,7 @@ import {
   broadsetProjectSchema,
 } from '@broadset/model';
 
-import sampleFixture from './sampleDocument.json';
+import sampleFixture from './sampleDocument.json' with { type: 'json' };
 
 const SAMPLE_DOCUMENT: BroadsetDocument = broadsetDocumentSchema.parse(sampleFixture.sampleDocument);
 const SAMPLE_SOCIAL_DOCUMENT: BroadsetDocument = broadsetDocumentSchema.parse(sampleFixture.sampleSocialDocument);

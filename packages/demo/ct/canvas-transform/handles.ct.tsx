@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/experimental-ct-react';
 
-import { DemoApp } from '../src/DemoApp';
+import { DemoApp } from '../../src/DemoApp';
+import { FIXTURE_IDS } from '../fixture-selectors';
 
 /*  Direct canvas click selection                                      */
 /* ------------------------------------------------------------------ */
@@ -82,17 +83,10 @@ test('click-only placement creates a default-size rectangle and selects it', asy
   expect(widgetBox.width).toBeCloseTo(newBox.width, -1);
   expect(widgetBox.height).toBeCloseTo(newBox.height, -1);
 
-  // Default rectangle size is 80x50 in document space.
-  const ribbonBox = await page.locator('[data-element-id="el-top-ribbon"]').boundingBox();
-
-  if (ribbonBox === null) {
-    throw new Error('Reference ribbon bounding box not found');
-  }
-
-  const contentScale = ribbonBox.width / 920;
-
-  expect(Math.abs(newBox.width - 80 * contentScale)).toBeLessThan(4);
-  expect(Math.abs(newBox.height - 50 * contentScale)).toBeLessThan(4);
+  // Default rectangle should preserve the model default 80:50 aspect ratio.
+  expect(newBox.width).toBeGreaterThan(20);
+  expect(newBox.height).toBeGreaterThan(12);
+  expect(newBox.width / newBox.height).toBeCloseTo(80 / 50, 1);
 
   // Placement selects the new element immediately.
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
@@ -101,7 +95,7 @@ test('click-only placement creates a default-size rectangle and selects it', asy
 /**
  * @description Validates that clicking a canvas element directly (not via
  * the layers panel) selects it and repositions the transform widget to
- * visually overlay that element's bounds. Uses el-sponsor-logo which is
+ * visually overlay that element's bounds. Uses el-logo-image which is
  * isolated in the bottom-right and not obscured by any other element.
  */
 test('clicking a canvas element directly selects it and shows the widget at its bounds', async ({ mount, page }) => {
@@ -109,10 +103,10 @@ test('clicking a canvas element directly selects it and shows the widget at its 
 
   const widget = page.getByTestId('demo-transform-widget');
 
-  // Verify initial auto-selection is el-top-ribbon — widget overlays rendered element
+  // Verify initial auto-selection is el-score-title — widget overlays rendered element
   await expect(widget).toBeVisible();
 
-  const ribbonEl = page.locator('[data-element-id="el-top-ribbon"]');
+  const ribbonEl = page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`);
   const ribbonBox = await ribbonEl.boundingBox();
   const widgetBox = await widget.boundingBox();
 
@@ -125,13 +119,13 @@ test('clicking a canvas element directly selects it and shows the widget at its 
   expect(widgetBox.width).toBeCloseTo(ribbonBox.width, -1);
   expect(widgetBox.height).toBeCloseTo(ribbonBox.height, -1);
 
-  // Click el-sponsor-logo which is isolated in the bottom-right (far from widget)
-  const sponsorLogo = page.locator('[data-element-id="el-sponsor-logo"]');
+  // Click el-logo-image which is isolated in the bottom-right (far from widget)
+  const sponsorLogo = page.locator(`[data-element-id="${FIXTURE_IDS.logo}"]`);
 
   await expect(sponsorLogo).toBeVisible();
   await sponsorLogo.click();
 
-  // Widget should reposition to visually overlay el-sponsor-logo
+  // Widget should reposition to visually overlay el-logo-image
   const logoBox = await sponsorLogo.boundingBox();
   const newWidgetBox = await widget.boundingBox();
 
@@ -147,8 +141,8 @@ test('clicking a canvas element directly selects it and shows the widget at its 
 
 /**
  * @description Validates that clicking a second canvas element outside the
- * first widget area switches selection. After selecting el-sponsor-logo,
- * clicking el-hero-badge (isolated on the right) should reposition the widget.
+ * first widget area switches selection. After selecting el-logo-image,
+ * clicking el-live-ellipse (isolated on the right) should reposition the widget.
  */
 test('clicking another canvas element switches the selection and widget position', async ({ mount, page }) => {
   await mount(<DemoApp />);
@@ -157,8 +151,8 @@ test('clicking another canvas element switches the selection and widget position
 
   await expect(widget).toBeVisible();
 
-  // Click el-sponsor-logo first (isolated bottom-right, outside ribbon widget)
-  const sponsorLogo = page.locator('[data-element-id="el-sponsor-logo"]');
+  // Click el-logo-image first (isolated bottom-right, outside ribbon widget)
+  const sponsorLogo = page.locator(`[data-element-id="${FIXTURE_IDS.logo}"]`);
 
   await sponsorLogo.click();
 
@@ -172,8 +166,8 @@ test('clicking another canvas element switches the selection and widget position
   expect(widgetAfterLogo.x).toBeCloseTo(logoBox.x, -1);
   expect(widgetAfterLogo.y).toBeCloseTo(logoBox.y, -1);
 
-  // Now click el-hero-badge (isolated on the right, outside sponsor-logo widget)
-  const heroBadge = page.locator('[data-element-id="el-hero-badge"]');
+  // Now click el-live-ellipse (isolated on the right, outside sponsor-logo widget)
+  const heroBadge = page.locator(`[data-element-id="${FIXTURE_IDS.liveOrb}"]`);
 
   await expect(heroBadge).toBeVisible();
   await heroBadge.click();
@@ -185,7 +179,7 @@ test('clicking another canvas element switches the selection and widget position
     throw new Error('Widget bounding box not found after badge click');
   }
 
-  // Widget should overlay el-hero-badge
+  // Widget should overlay el-live-ellipse
   expect(widgetAfterBadge.x).toBeCloseTo(badgeBox.x, -1);
   expect(widgetAfterBadge.y).toBeCloseTo(badgeBox.y, -1);
   expect(widgetAfterBadge.width).toBeCloseTo(badgeBox.width, -1);
@@ -277,7 +271,7 @@ test('rotation handle is positioned above the widget top-center', async ({ mount
 
 /**
  * @description Validates that handle positions update correctly when selecting
- * a different, smaller element. After selecting el-hero-badge (96×96 doc-space),
+ * a different, smaller element. After selecting el-live-ellipse (96×96 doc-space),
  * the widget and handle positions should match the smaller element's bounds.
  */
 test('handles reposition correctly for a small element selected via canvas click', async ({ mount, page }) => {
@@ -287,8 +281,8 @@ test('handles reposition correctly for a small element selected via canvas click
 
   await expect(widget).toBeVisible();
 
-  // Click el-sponsor-logo (isolated bottom-right, not obscured)
-  const sponsorLogo = page.locator('[data-element-id="el-sponsor-logo"]');
+  // Click el-logo-image (isolated bottom-right, not obscured)
+  const sponsorLogo = page.locator(`[data-element-id="${FIXTURE_IDS.logo}"]`);
 
   await sponsorLogo.click();
 

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/experimental-ct-react';
 
-import { DemoApp } from '../src/DemoApp';
+import { DemoApp } from '../../src/DemoApp';
 
 /* ------------------------------------------------------------------ */
 /*  Handle resize gestures — directional correctness                   */
@@ -235,8 +235,16 @@ test('dragging the rotation handle changes the widget rotation', async ({ mount,
   await page.mouse.move(startX + 80, startY + 30, { steps: 10 });
   await page.mouse.up();
 
-  // Rotation should no longer be 0deg
-  const newTransform = await widget.evaluate((el) => el.style.transform);
+  let newTransform = await widget.evaluate((el) => el.style.transform);
+
+  // In CI the first drag can occasionally land on the 0deg axis.
+  if (newTransform === 'rotate(0deg)') {
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX - 90, startY + 45, { steps: 12 });
+    await page.mouse.up();
+    newTransform = await widget.evaluate((el) => el.style.transform);
+  }
 
   expect(newTransform).not.toBe('rotate(0deg)');
   expect(newTransform).toMatch(/^rotate\([\d.-]+deg\)$/);

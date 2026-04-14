@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/experimental-ct-react';
 import type { Page } from '@playwright/test';
 
-import { DemoAppFresh } from '../src/ct-demo-app';
+import { FIXTURE_IDS, FIXTURE_LAYER_LABELS } from '../fixture-selectors';
+import { DemoAppFresh } from '../helpers/demo-app-fresh.helper';
 
 async function openToolbarMenu(page: Page, menuLabel: string): Promise<void> {
   await page.locator(`button[aria-label="${menuLabel}"]`).first().click();
@@ -169,11 +170,11 @@ test('scenes menu switches content and supports add/remove actions', async ({ mo
   await mount(<DemoAppFresh />);
 
   await openToolbarMenu(page, 'Scenes');
-  await page.getByText('Half-Time Analysis').first().click();
+  await page.getByText(FIXTURE_LAYER_LABELS.finalScene).first().click();
 
   await openToolbarMenu(page, 'Scenes');
 
-  const halfTimeScene = page.getByRole('menuitem', { name: /Half-Time Analysis/i }).first();
+  const halfTimeScene = page.getByRole('menuitem', { name: new RegExp(FIXTURE_LAYER_LABELS.finalScene, 'i') }).first();
 
   await expect(halfTimeScene.locator('svg').first()).toBeVisible();
 
@@ -226,8 +227,8 @@ test('context menu reflects lock state and multi-select group actions', async ({
   const preview = page.getByLabel(/screen preview for/i);
   const contextMenu = page.getByTestId('demo-context-menu');
 
-  const badgeElement = preview.locator('[data-element-id="el-sponsor-logo"]').first();
-  const clockElement = preview.locator('[data-element-id="el-clock"]').first();
+  const badgeElement = preview.locator(`[data-element-id="${FIXTURE_IDS.logo}"]`).first();
+  const clockElement = preview.locator(`[data-element-id="${FIXTURE_IDS.clock}"]`).first();
 
   await expect(badgeElement).toBeVisible();
   await expect(clockElement).toBeVisible();

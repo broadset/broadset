@@ -6,7 +6,7 @@ import {
   PropertyLanesHarness,
   TimelineHarness,
   TimelinePanelHarness,
-} from '../src/ct-timeline-harnesses';
+} from './timeline-harnesses.helper';
 
 /**
  * @description Validates `project/spec/ui/timeline.md` L-01: Timeline bottom panel

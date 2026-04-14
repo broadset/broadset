@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/experimental-ct-react';
 
-import { DemoApp } from '../src/DemoApp';
-import { getHandleCenter, rotateSelectedElement } from './canvas-selection-transform.helpers';
+import { DemoApp } from '../../src/DemoApp';
+import { FIXTURE_IDS } from '../fixture-selectors';
+import { getHandleCenter, rotateSelectedElement } from './helpers';
 
 /**
  * @description After rotating an element, the widget's CSS `rotate()` changes
@@ -137,7 +138,7 @@ test('after rotation, east-handle drag along local X changes width only and keep
 test('collapsing a rotated element to minimum size does not slide the opposite edge', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  await page.locator('[data-element-id="el-sponsor-logo"]').click();
+  await page.locator(`[data-element-id="${FIXTURE_IDS.logo}"]`).click();
 
   const widget = page.getByTestId('demo-transform-widget');
 
