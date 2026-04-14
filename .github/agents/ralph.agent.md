@@ -259,6 +259,20 @@ npm run quality
 
 Run from the **repository root** (not from `packages/`). This executes lint, typecheck, and tests across active packages. All must stay green. Fix regressions (they count toward the retry limit too). Do not commit until quality passes.
 
+### Step 6b — React/Browser warning gate (mandatory)
+
+Run the same browser-facing tests with full error output and manually inspect for React/browser warnings and errors:
+
+```bash
+npm run quality -w <package> 2>&1 | grep -i "warning\|error\|does not recognize\|cannot contain\|unknown\|event handler"
+```
+
+**Forbidden:** Commits with any React PropTypes warnings, invalid DOM nesting errors, unknown event handler properties, or browser console errors from the code you wrote. If warnings appear:
+
+1. Fix the root cause (do not suppress with `@ts-ignore` or eslint-disable comments).
+2. Rerun the test suite to confirm warnings are eliminated.
+3. Only then proceed to Step 7.
+
 ### Step 7 — Independent Review (separate agent, zero shared context)
 
 **You MUST NOT review your own code.** Use the Explore subagent as an independent reviewer with zero context about your implementation decisions. The reviewer has never seen your code and will judge it purely against the spec and codebase standards.
@@ -299,7 +313,7 @@ git add -A
 
 5. Only proceed to Step 8 when the independent review passes. Include the final review report verbatim in your session output so the user can see the 🟡 and 🔵 items.
 
-### Step 8 — Commit (only after quality + review are clean)
+### Step 8 — Commit (only after quality + warning gate + review are clean)
 
 ```bash
 git commit -m "feat(<pkg>): unit <N.M> — <one-line description>"
