@@ -1,1 +1,140 @@
-export { exportPsdBytes, exportPsdBytesAsync } from './core';
+import type { BroadsetDocument, Canvas } from '@broadset/model';
+import type { Psd } from 'ag-psd';
+import { writePsdUint8Array } from 'ag-psd';
+
+import { elementToLayer, getPendingLinkedFiles, resetExportState, setPrefetchedUrlImages } from './export-layer';
+import { ensureCanvasInitialized } from './runtime-canvas';
+
+function canvasToPixels(canvas: Canvas, value: number): number {
+  switch (canvas.unit) {
+    case 'px':
+      return value;
+    case 'mm':
+      return (value / 25.4) * canvas.dpi;
+    case 'in':
+      return value * canvas.dpi;
+  }
+}
+
+function isUrl(content: string): boolean {
+  return content.startsWith('http://') || content.startsWith('https://');
+}
+
+async function fetchImageAsBytes(
+  url: string,
+  fetchFn: typeof globalThis.fetch,
+): Promise<{ readonly mime: string; readonly bytes: Uint8Array } | undefined> {
+  try {
+    const response = await fetchFn(url);
+
+    if (!response.ok) return undefined;
+
+    const contentType = response.headers.get('content-type') ?? 'image/png';
+    const mime = contentType.split(';')[0]?.trim() ?? 'image/png';
+    const arrayBuffer = await response.arrayBuffer();
+
+    return { mime, bytes: new Uint8Array(arrayBuffer) };
+  } catch {
+    return undefined;
+  }
+}
+
+function exportPsdBytesCore(doc: BroadsetDocument): Uint8Array {
+  ensureCanvasInitialized();
+  resetExportState();
+
+  const width = Math.round(canvasToPixels(doc.canvas, doc.canvas.width));
+  const height = Math.round(canvasToPixels(doc.canvas, doc.canvas.height));
+
+  const psd: Psd = {
+    width,
+    height,
+    colorMode: 3,
+    children: [],
+  };
+
+  if (doc.pages.length > 1) {
+    const artboardLayers = [];
+
+    for (const page of doc.pages) {
+      const visibleElements = doc.elements.filter((el) => {
+        const override = page.overrides.find((o) => o.elementId === el.id && o.visible !== undefined);
+
+        if (override?.visible !== undefined) {
+          return override.visible;
+        }
+
+        return true;
+      });
+
+      artboardLayers.push({
+        name: page.name,
+        left: 0,
+        top: 0,
+        right: width,
+        bottom: height,
+        artboard: {
+          rect: { top: 0, left: 0, bottom: height, right: width },
+        },
+        children: visibleElements.map((el) => elementToLayer(el)),
+      });
+    }
+
+    psd.children = artboardLayers;
+  } else {
+    psd.children = doc.elements.map((el) => elementToLayer(el));
+  }
+
+  const pendingLinkedFiles = getPendingLinkedFiles();
+
+  if (pendingLinkedFiles.length > 0) {
+    psd.linkedFiles = pendingLinkedFiles.map((lf) => ({
+      id: lf.id,
+      name: lf.name,
+      data: lf.data,
+    }));
+  }
+
+  return writePsdUint8Array(psd);
+}
+
+/**
+ * Export a BroadsetDocument to PSD bytes.
+ * Animated elements are exported at their rest state (t=0).
+ * URL images are skipped — use exportPsdBytesAsync for URL image support.
+ */
+export function exportPsdBytes(doc: BroadsetDocument): Uint8Array {
+  setPrefetchedUrlImages(new Map());
+
+  return exportPsdBytesCore(doc);
+}
+
+/**
+ * Export a BroadsetDocument to PSD bytes, fetching URL images via the
+ * provided fetch function. Falls back to data URIs for non-URL content.
+ */
+export async function exportPsdBytesAsync(
+  doc: BroadsetDocument,
+  fetchFn: typeof globalThis.fetch = globalThis.fetch,
+): Promise<Uint8Array> {
+  const prefetched = new Map<string, { readonly mime: string; readonly bytes: Uint8Array }>();
+  const urlElements = doc.elements.filter((el) => el.type === 'image' && el.content && isUrl(el.content));
+
+  const fetchResults = await Promise.all(
+    urlElements.map(async (el) => {
+      const result = await fetchImageAsBytes(el.content, fetchFn);
+
+      return { id: el.id, result };
+    }),
+  );
+
+  for (const { id, result } of fetchResults) {
+    if (result) {
+      prefetched.set(id, result);
+    }
+  }
+
+  setPrefetchedUrlImages(prefetched);
+
+  return exportPsdBytesCore(doc);
+}
