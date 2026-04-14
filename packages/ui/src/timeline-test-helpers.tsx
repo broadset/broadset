@@ -1,0 +1,230 @@
+/** @jest-environment jsdom */
+
+import type { EasingMode, Keyframe, Timeline } from '@broadset/model';
+import { jest } from '@jest/globals';
+import type * as React from 'react';
+
+import type {
+  AnimationBindingSectionsProps,
+  EasingGraphEditorProps,
+  PerPropertyLanesProps,
+  TimelineBottomPanelProps,
+  TimelineEditingContextValue,
+  TimelineEditorProps,
+} from './timeline';
+
+interface MockHeroUiProps {
+  readonly children?: React.ReactNode;
+  readonly onPress?: (() => void) | undefined;
+  readonly isDisabled?: boolean | undefined;
+  readonly isIconOnly?: boolean | undefined;
+  readonly ['aria-label']?: string | undefined;
+  readonly ['aria-pressed']?: boolean | undefined;
+  readonly value?: string | number | readonly string[] | null | undefined;
+  readonly onChange?: ((key: string | number | null) => void) | undefined;
+  readonly [key: string]: unknown;
+}
+
+jest.mock('@heroui/react', () => {
+  const ReactActual = jest.requireActual<typeof React>('react');
+
+  function createWrapper(tagName = 'div') {
+    return function Wrapper(props: MockHeroUiProps): React.JSX.Element {
+      const { children, ...rest } = props;
+
+      return ReactActual.createElement(tagName, rest, children ?? null);
+    };
+  }
+
+  function Button(props: MockHeroUiProps): React.JSX.Element {
+    const { children, isDisabled, isIconOnly: _isIconOnly, onPress, ...rest } = props;
+
+    return ReactActual.createElement(
+      'button',
+      { ...rest, disabled: isDisabled, onClick: typeof onPress === 'function' ? onPress : undefined },
+      children ?? null,
+    );
+  }
+
+  const Tooltip = Object.assign(createWrapper(), {
+    Trigger: createWrapper(),
+    Content: createWrapper('span'),
+  });
+
+  function SelectRoot(props: MockHeroUiProps): React.JSX.Element {
+    const { children, onChange, value, ...rest } = props;
+
+    return ReactActual.createElement(
+      'select',
+      {
+        ...rest,
+        onChange: (event: React.ChangeEvent<HTMLSelectElement>) => {
+          if (typeof onChange === 'function') {
+            onChange(event.currentTarget.value);
+          }
+        },
+        value: value ?? '',
+      },
+      children ?? null,
+    );
+  }
+
+  function createFragment(props: MockHeroUiProps): React.JSX.Element {
+    return ReactActual.createElement(ReactActual.Fragment, null, props.children ?? null);
+  }
+
+  const Select = Object.assign(SelectRoot, {
+    Trigger: createFragment,
+    Value: createFragment,
+    Indicator: createFragment,
+    Popover: createFragment,
+  });
+
+  function ListBoxItem(props: MockHeroUiProps): React.JSX.Element {
+    const { children } = props;
+
+    return ReactActual.createElement(
+      'option',
+      { value: props['id'] ?? (typeof children === 'string' ? children : '') },
+      children ?? null,
+    );
+  }
+
+  return {
+    Button,
+    ListBox: Object.assign(createFragment, {
+      Item: ListBoxItem,
+      Section: createWrapper(),
+      ItemIndicator: createWrapper('span'),
+    }),
+    ListBoxItem,
+    Select,
+    Tooltip,
+  };
+});
+
+export interface TimelineTestModules {
+  readonly AnimationBindingSections: React.ComponentType<AnimationBindingSectionsProps>;
+  readonly EasingGraphEditor: React.ComponentType<EasingGraphEditorProps>;
+  readonly PerPropertyLanes: React.ComponentType<PerPropertyLanesProps>;
+  readonly TimelineBottomPanel: React.ComponentType<TimelineBottomPanelProps>;
+  readonly TimelineEditingProvider: React.ComponentType<{ readonly children: React.ReactNode }>;
+  readonly TimelineEditor: React.ComponentType<TimelineEditorProps>;
+  readonly useTimelineEditing: () => TimelineEditingContextValue | null;
+}
+
+let cachedModules: TimelineTestModules | null = null;
+
+export async function loadTimelineTestModules(): Promise<TimelineTestModules> {
+  if (cachedModules !== null) {
+    return cachedModules;
+  }
+
+  const mod = await import('./timeline');
+
+  cachedModules = {
+    AnimationBindingSections: mod.AnimationBindingSections,
+    EasingGraphEditor: mod.EasingGraphEditor,
+    PerPropertyLanes: mod.PerPropertyLanes,
+    TimelineBottomPanel: mod.TimelineBottomPanel,
+    TimelineEditingProvider: mod.TimelineEditingProvider,
+    TimelineEditor: mod.TimelineEditor,
+    useTimelineEditing: mod.useTimelineEditing,
+  };
+
+  return cachedModules;
+}
+
+export function makeKeyframe(overrides: Partial<Keyframe> = {}): Keyframe {
+  return {
+    name: 'kf-1',
+    action: 'setState',
+    offsetMs: 0,
+    properties: {},
+    ...overrides,
+  };
+}
+
+export function makeTimeline(overrides: Partial<Timeline> & { keyframes?: readonly Keyframe[] } = {}): Timeline {
+  return {
+    id: 'tl-1',
+    name: 'default',
+    keyframes: [],
+    ...overrides,
+  };
+}
+
+export function defaultEditorProps(overrides: Partial<TimelineEditorProps> = {}): TimelineEditorProps {
+  return {
+    timeline: makeTimeline(),
+    selectedKeyframeIndex: null,
+    onSelectKeyframe: jest.fn<(index: number) => void>(),
+    onAddKeyframe: jest.fn<() => void>(),
+    onMoveKeyframe: jest.fn<(index: number, offsetMs: number) => void>(),
+    onChangeEasing: jest.fn<(index: number, easing: EasingMode) => void>(),
+    onPlayTimeline: jest.fn<() => void>(),
+    onStopTimeline: jest.fn<() => void>(),
+    onSeekTimeline: jest.fn<(timeMs: number) => void>(),
+    currentTimeMs: 0,
+    isPlaying: false,
+    ...overrides,
+  };
+}
+
+export function defaultBottomPanelProps(overrides: Partial<TimelineBottomPanelProps> = {}): TimelineBottomPanelProps {
+  return {
+    isOpen: false,
+    onClose: jest.fn<() => void>(),
+    ...overrides,
+  };
+}
+
+export function defaultBindingSectionsProps(
+  overrides: Partial<AnimationBindingSectionsProps> = {},
+): AnimationBindingSectionsProps {
+  return {
+    stateBindings: [],
+    modifierBindings: [],
+    timelines: [],
+    onAddStateBinding: jest.fn<(stateName: string, timelineId: string) => void>(),
+    onRemoveStateBinding: jest.fn<(stateName: string) => void>(),
+    onRenameStateBinding: jest.fn<(oldName: string, newName: string) => void>(),
+    onAddModifierBinding: jest.fn<(modifierName: string, inTimelineId: string, outTimelineId: string) => void>(),
+    onRemoveModifierBinding: jest.fn<(modifierName: string) => void>(),
+    ...overrides,
+  };
+}
+
+export function defaultEasingGraphProps(overrides: Partial<EasingGraphEditorProps> = {}): EasingGraphEditorProps {
+  return {
+    easing: 'ease' as EasingMode,
+    onChange: jest.fn<(easing: EasingMode) => void>(),
+    isPlaying: false,
+    playbackProgress: 0,
+    ...overrides,
+  };
+}
+
+export function makePropertyKeyframe(
+  overrides: Partial<Keyframe> & {
+    properties?: Record<string, { readonly type: 'number'; readonly value: number; readonly easing: EasingMode }>;
+  } = {},
+): Keyframe {
+  return {
+    name: 'kf-prop',
+    action: 'none',
+    offsetMs: 0,
+    properties: {},
+    ...overrides,
+  };
+}
+
+export function defaultPerPropertyLanesProps(overrides: Partial<PerPropertyLanesProps> = {}): PerPropertyLanesProps {
+  return {
+    keyframes: [],
+    durationMs: 3000,
+    onAddPropertyKeyframe: jest.fn<(offsetMs: number, property: string) => void>(),
+    onMovePropertyKeyframe: jest.fn<(fromIndex: number, property: string, toOffsetMs: number) => void>(),
+    ...overrides,
+  };
+}
