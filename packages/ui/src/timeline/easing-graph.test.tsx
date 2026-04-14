@@ -5,8 +5,8 @@ import { beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 
-import type { EasingGraphEditorProps } from './timeline';
-import { defaultEasingGraphProps, loadTimelineTestModules } from './timeline-test-helpers';
+import type { EasingGraphEditorProps } from './index';
+import { defaultEasingGraphProps, loadTimelineTestModules } from './test-helpers';
 
 let EasingGraphEditor: React.ComponentType<EasingGraphEditorProps>;
 

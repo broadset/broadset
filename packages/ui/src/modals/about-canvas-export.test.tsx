@@ -1,25 +1,23 @@
 /** @jest-environment jsdom */
 
-import './modals-test-helpers';
+import './test-helpers';
 
 import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import type { CanvasSettingsModalProps, ExportModalProps } from './modals';
+import type { CanvasSettingsModalProps, ExportModalProps } from './index';
+import { AboutModal, CanvasSettingsModal, ExportModal } from './index';
 
 describe('AboutModal', () => {
   /** @description Ensures the modal does not render any content when closed */
-  it('does not render when closed', async () => {
-    const { AboutModal } = await import('./modals');
+  it('does not render when closed', () => {
     const { container } = render(<AboutModal isOpen={false} version="1.0.0" onClose={jest.fn()} />);
 
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
   /** @description Verifies all content zones render when the modal is open: title, description, stack info, and version */
-  it('renders about content when open', async () => {
-    const { AboutModal } = await import('./modals');
-
+  it('renders about content when open', () => {
     render(<AboutModal isOpen={true} version="2.3.1" onClose={jest.fn()} />);
     expect(screen.getByLabelText('Broadset')).toBeTruthy();
     expect(screen.getByText(/2\.3\.1/)).toBeTruthy();
@@ -30,8 +28,7 @@ describe('AboutModal', () => {
   });
 
   /** @description Validates that clicking the close button fires the onClose callback */
-  it('calls onClose when close button is clicked', async () => {
-    const { AboutModal } = await import('./modals');
+  it('calls onClose when close button is clicked', () => {
     const onClose = jest.fn();
 
     render(<AboutModal isOpen={true} version="1.0.0" onClose={onClose} />);
@@ -69,16 +66,14 @@ describe('CanvasSettingsModal', () => {
   }
 
   /** @description Confirms the modal does not render when isOpen is false */
-  it('does not render when closed', async () => {
-    const { CanvasSettingsModal } = await import('./modals');
+  it('does not render when closed', () => {
     const { container } = render(<CanvasSettingsModal {...makeProps({ isOpen: false })} />);
 
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
   /** @description Validates document name input calls the onDocumentNameChange callback */
-  it('fires document name change callback', async () => {
-    const { CanvasSettingsModal } = await import('./modals');
+  it('fires document name change callback', () => {
     const onDocumentNameChange = jest.fn();
 
     render(<CanvasSettingsModal {...makeProps({ onDocumentNameChange })} />);
@@ -90,8 +85,7 @@ describe('CanvasSettingsModal', () => {
   });
 
   /** @description Validates view mode button group fires onViewModeChange */
-  it('shows all three view mode buttons and fires onViewModeChange', async () => {
-    const { CanvasSettingsModal } = await import('./modals');
+  it('shows all three view mode buttons and fires onViewModeChange', () => {
     const onViewModeChange = jest.fn();
 
     render(<CanvasSettingsModal {...makeProps({ onViewModeChange })} />);
@@ -104,8 +98,7 @@ describe('CanvasSettingsModal', () => {
   });
 
   /** @description Validates grid toggle calls onGridChange */
-  it('toggles show grid and calls onGridChange', async () => {
-    const { CanvasSettingsModal } = await import('./modals');
+  it('toggles show grid and calls onGridChange', () => {
     const onGridChange = jest.fn();
 
     render(<CanvasSettingsModal {...makeProps({ onGridChange })} />);
@@ -117,8 +110,7 @@ describe('CanvasSettingsModal', () => {
   });
 
   /** @description Validates snap to grid toggle calls onGridChange */
-  it('toggles snap to grid and calls onGridChange', async () => {
-    const { CanvasSettingsModal } = await import('./modals');
+  it('toggles snap to grid and calls onGridChange', () => {
     const onGridChange = jest.fn();
 
     render(<CanvasSettingsModal {...makeProps({ onGridChange })} />);
@@ -130,8 +122,7 @@ describe('CanvasSettingsModal', () => {
   });
 
   /** @description Validates Done button fires onClose */
-  it('Done button fires onClose', async () => {
-    const { CanvasSettingsModal } = await import('./modals');
+  it('Done button fires onClose', () => {
     const onClose = jest.fn();
 
     render(<CanvasSettingsModal {...makeProps({ onClose })} />);
@@ -157,9 +148,7 @@ describe('ExportModal', () => {
   }
 
   /** @description Only exporters that are feature-flag enabled should appear */
-  it('shows only enabled exporters', async () => {
-    const { ExportModal } = await import('./modals');
-
+  it('shows only enabled exporters', () => {
     render(<ExportModal {...makeProps({ enabledExporters: ['html', 'png'] })} />);
     expect(screen.getByRole('button', { name: /html/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /png/i })).toBeTruthy();
@@ -168,8 +157,7 @@ describe('ExportModal', () => {
   });
 
   /** @description Submit with a selected exporter passes exporter, dynamic data, and snapshot */
-  it('fires onExport with exporter and dynamic data on submit', async () => {
-    const { ExportModal } = await import('./modals');
+  it('fires onExport with exporter and dynamic data on submit', () => {
     const onExport = jest.fn();
 
     render(<ExportModal {...makeProps({ enabledExporters: ['png'], onExport })} />);
@@ -183,9 +171,7 @@ describe('ExportModal', () => {
   });
 
   /** @description Submit button is disabled when no exporter is selected */
-  it('disables submit when no exporter is selected', async () => {
-    const { ExportModal } = await import('./modals');
-
+  it('disables submit when no exporter is selected', () => {
     render(<ExportModal {...makeProps()} />);
 
     const submitBtn = screen.getByRole('button', { name: /export/i });

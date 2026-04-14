@@ -11,7 +11,7 @@ import type {
   TimelineBottomPanelProps,
   TimelineEditingContextValue,
   TimelineEditorProps,
-} from './timeline';
+} from './index';
 
 interface MockHeroUiProps {
   readonly children?: React.ReactNode;
@@ -124,7 +124,7 @@ export async function loadTimelineTestModules(): Promise<TimelineTestModules> {
     return cachedModules;
   }
 
-  const mod = await import('./timeline');
+  const mod = await import('./index');
 
   cachedModules = {
     AnimationBindingSections: mod.AnimationBindingSections,

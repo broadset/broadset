@@ -346,7 +346,7 @@ function mockColorInput(p: Record<string, unknown>) {
   });
 }
 
-jest.mock('./inputs', () => ({
+jest.mock('../inputs', () => ({
   ColorInput: mockColorInput,
   NumField: mockNumField,
 }));

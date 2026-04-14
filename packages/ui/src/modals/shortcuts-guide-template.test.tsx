@@ -1,25 +1,23 @@
 /** @jest-environment jsdom */
 
-import './modals-test-helpers';
+import './test-helpers';
 
 import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import type { GuidePositionModalProps, TemplateBrowserModalProps } from './modals';
+import type { GuidePositionModalProps, TemplateBrowserModalProps } from './index';
+import { GuidePositionModal, ShortcutHelpModal, TemplateBrowserModal } from './index';
 
 describe('ShortcutHelpModal', () => {
   /** @description Confirms modal does not render when closed */
-  it('does not render when closed', async () => {
-    const { ShortcutHelpModal } = await import('./modals');
+  it('does not render when closed', () => {
     const { container } = render(<ShortcutHelpModal isOpen={false} onClose={jest.fn()} />);
 
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
   /** @description All five shortcut groups are displayed with Kbd elements */
-  it('renders all five shortcut groups with kbd elements', async () => {
-    const { ShortcutHelpModal } = await import('./modals');
-
+  it('renders all five shortcut groups with kbd elements', () => {
     render(<ShortcutHelpModal isOpen={true} onClose={jest.fn()} />);
     // 5 groups: Clipboard & Selection, Nudge, Layer Order, Grouping & Lock, Zoom & History
     expect(screen.getByText(/clipboard & selection/i)).toBeTruthy();
@@ -35,8 +33,7 @@ describe('ShortcutHelpModal', () => {
   });
 
   /** @description Close button calls onClose */
-  it('calls onClose on close button', async () => {
-    const { ShortcutHelpModal } = await import('./modals');
+  it('calls onClose on close button', () => {
     const onClose = jest.fn();
 
     render(<ShortcutHelpModal isOpen={true} onClose={onClose} />);
@@ -45,8 +42,7 @@ describe('ShortcutHelpModal', () => {
   });
 
   /** @description Accepts custom shortcuts override */
-  it('accepts custom shortcuts override', async () => {
-    const { ShortcutHelpModal } = await import('./modals');
+  it('accepts custom shortcuts override', () => {
     const customShortcuts = {
       'Clipboard & Selection': [{ action: 'Custom Copy', keys: ['Ctrl', 'Shift', 'C'] }],
     };
@@ -74,8 +70,7 @@ describe('GuidePositionModal', () => {
   }
 
   /** @description Edit guide position and click Apply repositions the guide */
-  it('edits position and fires onApply', async () => {
-    const { GuidePositionModal } = await import('./modals');
+  it('edits position and fires onApply', () => {
     const onApply = jest.fn();
 
     render(<GuidePositionModal {...makeProps({ onApply })} />);
@@ -88,8 +83,7 @@ describe('GuidePositionModal', () => {
   });
 
   /** @description Delete button removes the guide */
-  it('fires onDelete when Delete is clicked', async () => {
-    const { GuidePositionModal } = await import('./modals');
+  it('fires onDelete when Delete is clicked', () => {
     const onDelete = jest.fn();
 
     render(<GuidePositionModal {...makeProps({ onDelete })} />);
@@ -98,8 +92,7 @@ describe('GuidePositionModal', () => {
   });
 
   /** @description Enter key applies the position */
-  it('applies position on Enter key', async () => {
-    const { GuidePositionModal } = await import('./modals');
+  it('applies position on Enter key', () => {
     const onApply = jest.fn();
 
     render(<GuidePositionModal {...makeProps({ onApply })} />);
@@ -112,8 +105,7 @@ describe('GuidePositionModal', () => {
   });
 
   /** @description Escape key closes without changes */
-  it('closes on Escape without applying', async () => {
-    const { GuidePositionModal } = await import('./modals');
+  it('closes on Escape without applying', () => {
     const onClose = jest.fn();
     const onApply = jest.fn();
 
@@ -151,9 +143,7 @@ describe('TemplateBrowserModal', () => {
   }
 
   /** @description Templates are grouped by category with alphabetical sorting */
-  it('groups templates by category alphabetically', async () => {
-    const { TemplateBrowserModal } = await import('./modals');
-
+  it('groups templates by category alphabetically', () => {
     render(<TemplateBrowserModal {...makeProps()} />);
 
     expect(screen.getByText('Full Screen')).toBeTruthy();
@@ -165,9 +155,7 @@ describe('TemplateBrowserModal', () => {
   });
 
   /** @description Search filters templates by name substring match */
-  it('filters templates by search', async () => {
-    const { TemplateBrowserModal } = await import('./modals');
-
+  it('filters templates by search', () => {
     render(<TemplateBrowserModal {...makeProps()} />);
 
     const searchInput = screen.getByRole('textbox', { name: /search/i });
@@ -180,9 +168,7 @@ describe('TemplateBrowserModal', () => {
   });
 
   /** @description Shows empty message when search has no results */
-  it('shows no templates found when search has no results', async () => {
-    const { TemplateBrowserModal } = await import('./modals');
-
+  it('shows no templates found when search has no results', () => {
     render(<TemplateBrowserModal {...makeProps()} />);
 
     const searchInput = screen.getByRole('textbox', { name: /search/i });
@@ -192,8 +178,7 @@ describe('TemplateBrowserModal', () => {
   });
 
   /** @description Selecting and creating from template fires onSelectTemplate */
-  it('selects and creates from template', async () => {
-    const { TemplateBrowserModal } = await import('./modals');
+  it('selects and creates from template', () => {
     const onSelectTemplate = jest.fn();
 
     render(<TemplateBrowserModal {...makeProps({ onSelectTemplate })} />);
@@ -206,8 +191,7 @@ describe('TemplateBrowserModal', () => {
   });
 
   /** @description When hasUnsavedChanges is true, confirmation dialog appears */
-  it('shows confirmation when unsaved changes exist', async () => {
-    const { TemplateBrowserModal } = await import('./modals');
+  it('shows confirmation when unsaved changes exist', () => {
     const onSelectTemplate = jest.fn();
 
     render(<TemplateBrowserModal {...makeProps({ hasUnsavedChanges: true, onSelectTemplate })} />);
@@ -218,18 +202,14 @@ describe('TemplateBrowserModal', () => {
   });
 
   /** @description Template browser hidden when no templates configured */
-  it('does not render when templates array is empty', async () => {
-    const { TemplateBrowserModal } = await import('./modals');
-
+  it('does not render when templates array is empty', () => {
     render(<TemplateBrowserModal {...makeProps({ templates: [] })} />);
 
     expect(screen.getByText(/no templates/i)).toBeTruthy();
   });
 
   /** @description Responsive grid with 3-5 columns via CSS grid */
-  it('renders a responsive grid for template thumbnails', async () => {
-    const { TemplateBrowserModal } = await import('./modals');
-
+  it('renders a responsive grid for template thumbnails', () => {
     render(<TemplateBrowserModal {...makeProps()} />);
 
     // The grid container should have grid display styles

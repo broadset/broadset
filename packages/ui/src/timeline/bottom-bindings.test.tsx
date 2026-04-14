@@ -4,13 +4,13 @@ import { beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 
-import type { AnimationBindingSectionsProps, TimelineBottomPanelProps } from './timeline';
+import type { AnimationBindingSectionsProps, TimelineBottomPanelProps } from './index';
 import {
   defaultBindingSectionsProps,
   defaultBottomPanelProps,
   loadTimelineTestModules,
   makeTimeline,
-} from './timeline-test-helpers';
+} from './test-helpers';
 
 let AnimationBindingSections: React.ComponentType<AnimationBindingSectionsProps>;
 let TimelineBottomPanel: React.ComponentType<TimelineBottomPanelProps>;

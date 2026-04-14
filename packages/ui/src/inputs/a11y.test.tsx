@@ -1,11 +1,11 @@
 /** @jest-environment jsdom */
 
-import './inputs-test-helpers';
+import './test-helpers';
 
 import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import { ColorInput, CssLengthInput, NumField, TextStrokeInput } from './inputs';
+import { ColorInput, CssLengthInput, NumField, TextStrokeInput } from './index';
 
 describe('Accessibility: aria-invalid on input validation', () => {
   /** @description ColorInput must set aria-invalid="true" on the text field when the user types an unparseable color string, enabling screen readers to announce the error state. */

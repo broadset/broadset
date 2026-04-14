@@ -1,12 +1,12 @@
 /** @jest-environment jsdom */
 
-import './inputs-test-helpers';
+import './test-helpers';
 
 import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import { CssLengthInput, NumField, TextStrokeInput } from './inputs';
-import { convertLength, isCssUnit, toCssUnit } from './inputs/css-length';
+import { convertLength, isCssUnit, toCssUnit } from './css-length';
+import { CssLengthInput, NumField, TextStrokeInput } from './index';
 
 describe('NumField', () => {
   /** @description Arrow Up/Down keys must increment/decrement by the configured step. */

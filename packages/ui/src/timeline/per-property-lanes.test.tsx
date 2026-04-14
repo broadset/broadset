@@ -5,8 +5,8 @@ import { beforeAll, describe, expect, it } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 
-import type { PerPropertyLanesProps } from './timeline';
-import { defaultPerPropertyLanesProps, loadTimelineTestModules, makePropertyKeyframe } from './timeline-test-helpers';
+import type { PerPropertyLanesProps } from './index';
+import { defaultPerPropertyLanesProps, loadTimelineTestModules, makePropertyKeyframe } from './test-helpers';
 
 let PerPropertyLanes: React.ComponentType<PerPropertyLanesProps>;
 

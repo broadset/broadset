@@ -1,11 +1,11 @@
 /** @jest-environment jsdom */
 
-import './inputs-test-helpers';
+import './test-helpers';
 
 import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import { ColorInput } from './inputs';
+import { ColorInput } from './index';
 
 describe('ColorInput', () => {
   /** @description Typing a valid hex value in the text field must emit the color string via onChange. */

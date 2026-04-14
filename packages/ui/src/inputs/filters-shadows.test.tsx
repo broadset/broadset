@@ -1,11 +1,11 @@
 /** @jest-environment jsdom */
 
-import './inputs-test-helpers';
+import './test-helpers';
 
 import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import { FilterEditor, ShadowEditor } from './inputs';
+import { FilterEditor, ShadowEditor } from './index';
 
 describe('FilterEditor', () => {
   /** @description A single filter must produce the correct CSS function string. */

@@ -1,11 +1,12 @@
 /** @jest-environment jsdom */
 
-import './modals-test-helpers';
+import './test-helpers';
 
 import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import type { MediaLibraryModalProps, NewDocumentModalProps } from './modals';
+import type { MediaLibraryModalProps, NewDocumentModalProps } from './index';
+import { MediaLibraryModal, NewDocumentModal } from './index';
 
 describe('MediaLibraryModal', () => {
   const sampleAssets = [
@@ -26,9 +27,7 @@ describe('MediaLibraryModal', () => {
   }
 
   /** @description Search input filters assets by name substring match */
-  it('filters assets by search query', async () => {
-    const { MediaLibraryModal } = await import('./modals');
-
+  it('filters assets by search query', () => {
     render(<MediaLibraryModal {...makeProps()} />);
 
     const searchInput = screen.getByRole('textbox', { name: /search/i });
@@ -41,9 +40,7 @@ describe('MediaLibraryModal', () => {
   });
 
   /** @description Category tabs filter assets by category */
-  it('filters assets by category tab', async () => {
-    const { MediaLibraryModal } = await import('./modals');
-
+  it('filters assets by category tab', () => {
     render(<MediaLibraryModal {...makeProps()} />);
 
     // Simulate category tab selection to "Backgrounds"
@@ -56,8 +53,7 @@ describe('MediaLibraryModal', () => {
   });
 
   /** @description Selecting asset and confirming fires onSelect with the asset */
-  it('selects an asset and confirms', async () => {
-    const { MediaLibraryModal } = await import('./modals');
+  it('selects an asset and confirms', () => {
     const onSelect = jest.fn();
 
     render(<MediaLibraryModal {...makeProps({ onSelect })} />);
@@ -74,9 +70,7 @@ describe('MediaLibraryModal', () => {
   });
 
   /** @description Select button is disabled when nothing is selected */
-  it('disables Select button when nothing is selected', async () => {
-    const { MediaLibraryModal } = await import('./modals');
-
+  it('disables Select button when nothing is selected', () => {
     render(<MediaLibraryModal {...makeProps()} />);
 
     const selectBtn = screen.getByRole('button', { name: /select/i });
@@ -85,8 +79,7 @@ describe('MediaLibraryModal', () => {
   });
 
   /** @description Upload button is visible only when onUploadRequest is provided */
-  it('shows upload button only when onUploadRequest is provided', async () => {
-    const { MediaLibraryModal } = await import('./modals');
+  it('shows upload button only when onUploadRequest is provided', () => {
     const { rerender } = render(<MediaLibraryModal {...makeProps()} />);
 
     expect(screen.queryByRole('button', { name: /upload/i })).toBeNull();
@@ -95,16 +88,13 @@ describe('MediaLibraryModal', () => {
   });
 
   /** @description Shows empty state when no assets are available */
-  it('shows empty state when no assets', async () => {
-    const { MediaLibraryModal } = await import('./modals');
-
+  it('shows empty state when no assets', () => {
     render(<MediaLibraryModal {...makeProps({ assets: [] })} />);
     expect(screen.getByText(/no media/i)).toBeTruthy();
   });
 
   /** @description Double-clicking an asset selects and confirms in one action */
-  it('double-click on asset calls onSelect directly', async () => {
-    const { MediaLibraryModal } = await import('./modals');
+  it('double-click on asset calls onSelect directly', () => {
     const onSelect = jest.fn();
 
     render(<MediaLibraryModal {...makeProps({ onSelect })} />);
@@ -174,8 +164,7 @@ describe('NewDocumentModal', () => {
   }
 
   /** @description Preset selection and Create fires onCreateDocument with mode */
-  it('creates document from selected preset', async () => {
-    const { NewDocumentModal } = await import('./modals');
+  it('creates document from selected preset', () => {
     const onCreateDocument = jest.fn();
 
     render(<NewDocumentModal {...makeProps({ onCreateDocument })} />);
@@ -194,8 +183,7 @@ describe('NewDocumentModal', () => {
   });
 
   /** @description Custom presets show in their categories */
-  it('shows custom presets in custom categories', async () => {
-    const { NewDocumentModal } = await import('./modals');
+  it('shows custom presets in custom categories', () => {
     const customPresets = [
       {
         name: 'Custom Canvas',
@@ -213,9 +201,7 @@ describe('NewDocumentModal', () => {
   });
 
   /** @description Without a selection, Create button is disabled */
-  it('disables Create without selection', async () => {
-    const { NewDocumentModal } = await import('./modals');
-
+  it('disables Create without selection', () => {
     render(<NewDocumentModal {...makeProps()} />);
 
     const createBtn = screen.getByRole('button', { name: /create/i });
@@ -224,9 +210,7 @@ describe('NewDocumentModal', () => {
   });
 
   /** @description Category tabs filter presets by category */
-  it('filters presets by category tab', async () => {
-    const { NewDocumentModal } = await import('./modals');
-
+  it('filters presets by category tab', () => {
     render(<NewDocumentModal {...makeProps()} />);
 
     const tabsInput = screen.getByTestId('tabs-selection');

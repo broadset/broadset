@@ -4,8 +4,8 @@ import { beforeAll, describe, expect, it } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 
-import type { TimelineEditingContextValue, TimelineEditorProps } from './timeline';
-import { defaultEditorProps, loadTimelineTestModules, makeKeyframe, makeTimeline } from './timeline-test-helpers';
+import type { TimelineEditingContextValue, TimelineEditorProps } from './index';
+import { defaultEditorProps, loadTimelineTestModules, makeKeyframe, makeTimeline } from './test-helpers';
 
 let TimelineEditingProvider: React.ComponentType<{ readonly children: React.ReactNode }>;
 let TimelineEditor: React.ComponentType<TimelineEditorProps>;
