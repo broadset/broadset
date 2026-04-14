@@ -28,7 +28,7 @@ This plan explicitly forbids regressions to currently working behavior.
 ## Progress Snapshot
 
 - Overall status: `in-progress` (planning completed)
-- Completed tasks: `2 / 15`
+- Completed tasks: `3 / 15`
 - Active execution wave: `Wave 1 (P0 correctness)`
 
 ## Prioritized Waves
@@ -77,7 +77,7 @@ This plan explicitly forbids regressions to currently working behavior.
 | C11 | P2       | planned     | formats                  | Verify and complete OGraf manifest/state/background fidelity                          | Preserve current OGraf package generation behavior               | OGraf manifest snapshot/assertion tests + sample package validation                                            |
 | C12 | P2       | planned     | formats                  | Add PPTX embedded image extraction from relationships/zip payloads                    | Preserve current shape/text mapping behavior                     | PPTX import tests covering embedded images and mixed slides                                                    |
 | C13 | P2       | planned     | formats                  | Add cross-format parity conformance + stress/round-trip tests                         | Keep all existing format tests passing                           | New parity/stress suites + `npm run quality -w @broadset/formats`                                              |
-| C14 | P3       | planned     | all packages             | Add concise package README files with API and usage guidance                          | No behavior impact                                               | Documentation lint/review, links valid                                                                         |
+| C14 | P3       | done        | all packages             | Add concise package README files with API and usage guidance                          | No behavior impact                                               | Documentation lint/review, links valid                                                                         |
 | C15 | P3       | planned     | ui                       | Continue decomposition of high-churn large modules by domain internals                | Preserve public exports and behavior                             | Existing and new unit tests, unchanged package public API from `src/index.ts`                                  |
 
 ## Dependency and Sequence Rules
@@ -151,3 +151,10 @@ All of the following must be true:
 - Summary: Added optional advanced export controls in Export modal (pixel ratio, JPEG quality, frame rate, video quality) and threaded values through demo export handlers into format bridge raster/video export options.
 - Evidence: updated `packages/ui/src/modals/core-modals.tsx`, `packages/demo/src/demo-app/use-demo-file-handlers.ts`, `packages/demo/src/formatBridge.ts`; extended tests in `packages/ui/src/modals/about-canvas-export.test.tsx` and `packages/demo/src/formatBridge.test.ts`; verified with `npm run quality -w @broadset/ui` and `npm run quality -w @broadset/demo`.
 - Risk/Follow-up: connect modal-driven progress feedback UI to bridge `onProgress` updates in a follow-up C6b slice.
+
+### 2026-04-15 - C14 - package-level README coverage
+
+- Status: done
+- Summary: Added concise package README files for model, playback, renderer, editor, formats, and ui with responsibilities, basic usage, and boundary notes.
+- Evidence: created `packages/model/README.md`, `packages/playback/README.md`, `packages/renderer/README.md`, `packages/editor/README.md`, `packages/formats/README.md`, `packages/ui/README.md`.
+- Risk/Follow-up: keep usage snippets synchronized with public barrel exports as APIs evolve.
