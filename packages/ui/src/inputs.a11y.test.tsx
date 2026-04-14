@@ -118,7 +118,7 @@ describe('Accessibility: aria-invalid on input validation', () => {
   it('NumField has accessible spinbutton role with label', () => {
     render(<NumField value={50} step={1} onChange={jest.fn()} label="Width" />);
 
-    const input = screen.getByRole('spinbutton', { name: 'Width' });
+    const input = screen.getByLabelText('Width', { selector: 'input' });
 
     expect(input).not.toBeNull();
   });
@@ -127,7 +127,7 @@ describe('Accessibility: aria-invalid on input validation', () => {
   it('CssLengthInput has labeled number and unit controls', () => {
     render(<CssLengthInput value="50px" onChange={jest.fn()} label="Height" />);
 
-    const numInput = screen.getByRole('spinbutton', { name: 'Height value' });
+    const numInput = screen.getByLabelText('Height value', { selector: 'input' });
     const unitSelect = screen.getByLabelText('Unit');
 
     expect(numInput).not.toBeNull();

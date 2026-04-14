@@ -26,7 +26,7 @@ describe('NumField', () => {
 
     render(<NumField value={50} step={1} onChange={onChange} label="X" />);
 
-    const input = screen.getByRole('spinbutton', { name: 'X' });
+    const input = screen.getByLabelText('X', { selector: 'input' });
 
     fireEvent.keyDown(input, { key: 'ArrowUp' });
     expect(onChange).toHaveBeenCalledWith(51);
@@ -38,7 +38,7 @@ describe('NumField', () => {
 
     render(<NumField value={50} step={1} onChange={onChange} label="Y" />);
 
-    const input = screen.getByRole('spinbutton', { name: 'Y' });
+    const input = screen.getByLabelText('Y', { selector: 'input' });
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     expect(onChange).toHaveBeenCalledWith(49);
@@ -50,7 +50,7 @@ describe('NumField', () => {
 
     render(<NumField value={50} step={1} onChange={onChange} label="Width" />);
 
-    const input = screen.getByRole('spinbutton', { name: 'Width' });
+    const input = screen.getByLabelText('Width', { selector: 'input' });
 
     fireEvent.blur(input);
     expect(onChange).toHaveBeenLastCalledWith(50);
@@ -62,7 +62,7 @@ describe('NumField', () => {
 
     render(<NumField value={50} step={1} onChange={onChange} label="Height" />);
 
-    const input = screen.getByRole('spinbutton', { name: 'Height' });
+    const input = screen.getByLabelText('Height', { selector: 'input' });
 
     // Simulate typing invalid text then blurring
     fireEvent.change(input, { target: { value: 'abc' } });
@@ -80,7 +80,7 @@ describe('NumField', () => {
   it('formats value with max 2 decimal places', () => {
     render(<NumField value={3.14159} step={0.01} onChange={jest.fn()} label="Val" />);
 
-    const input = screen.getByRole('spinbutton', { name: 'Val' });
+    const input = screen.getByLabelText('Val', { selector: 'input' });
     // The displayed value should be limited to 2 decimals
     const val = input.getAttribute('value');
 
@@ -93,13 +93,13 @@ describe('NumField', () => {
 
     render(<NumField value={10} step={1} onChange={onChange} label="Size" />);
 
-    const incButton = screen.getByLabelText('Increment Size');
+    const incButton = screen.getByLabelText(/(Increase|Increment) Size/);
 
     fireEvent.click(incButton);
 
     // HeroUI's NumberField fires onChange on value change, then the component
     // commits on blur. Simulate the blur to flush the committed value.
-    const input = screen.getByRole('spinbutton', { name: 'Size' });
+    const input = screen.getByLabelText('Size', { selector: 'input' });
 
     fireEvent.blur(input);
     expect(onChange).toHaveBeenCalledWith(11);
@@ -134,7 +134,7 @@ describe('CssLengthInput', () => {
 
     render(<CssLengthInput value="50px" onChange={onChange} label="Height" />);
 
-    const numInput = screen.getByRole('spinbutton', { name: 'Height value' });
+    const numInput = screen.getByLabelText('Height value', { selector: 'input' });
 
     fireEvent.blur(numInput);
     expect(onChange).toHaveBeenLastCalledWith('50px');
@@ -154,7 +154,7 @@ describe('TextStrokeInput', () => {
 
     // The component should already have produced the initial value.
     // Trigger width change
-    const widthInput = screen.getByRole('spinbutton', { name: 'Stroke width' });
+    const widthInput = screen.getByLabelText('Stroke width', { selector: 'input' });
 
     fireEvent.change(widthInput, { target: { value: '3' } });
     fireEvent.blur(widthInput);

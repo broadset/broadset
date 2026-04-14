@@ -1,3 +1,5 @@
+/** @jest-environment jsdom */
+
 import type { BroadsetDocument } from '@broadset/model';
 import { createEmptyBroadsetDocument } from '@broadset/model';
 import { describe, expect, it, jest } from '@jest/globals';
