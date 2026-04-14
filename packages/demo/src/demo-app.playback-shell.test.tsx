@@ -60,6 +60,25 @@ describe('DemoApp playback shell lifecycle', () => {
     expect(playbackDestroy).toHaveBeenCalledTimes(1);
   });
 
+  /** @description Change-batch console logging must stay disabled by default so interactive editing does not flood logs or slow tests. */
+  it('does not emit change-batch logs by default', () => {
+    const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => {
+      /* no-op */
+    });
+
+    try {
+      setupDemoShellMocks();
+      render(<DemoApp />);
+
+      fireEvent.click(screen.getByRole('button', { name: /animation/i }));
+      fireEvent.click(screen.getByRole('button', { name: /add timeline/i }));
+
+      expect(infoSpy).not.toHaveBeenCalled();
+    } finally {
+      infoSpy.mockRestore();
+    }
+  });
+
   /** @description Proves the play, pause, and reset controls dispatch the expected playback API calls. */
   it('wires the play/pause toggle and reset controls to the playback controller', () => {
     const { mockedCreatePlaybackController } = setupDemoShellMocks();

@@ -68,7 +68,7 @@ This plan explicitly forbids regressions to currently working behavior.
 | C2  | P3       | planned     | ui + demo                | Add integrated animation adapter/hook while preserving callback API                   | Do not break existing callback consumers                         | Adapter unit tests + existing sidebar tests + demo integration tests                                           |
 | C3  | P0       | planned     | ui + demo                | Complete keyframe-context properties orchestration in sidebar flow                    | Preserve non-animation property editing behavior                 | Panel tests for include/remove/keyframe-scoped values + demo CT coverage                                       |
 | C4  | P2       | planned     | ui                       | Strengthen nested subtree DnD guardrails and feedback                                 | Preserve existing layers reorder/select behavior                 | Dedicated layers sidebar tests for descendant rejection and range/toggle selection                             |
-| C5  | P2       | planned     | demo + editor + renderer | Reduce interaction-path write amplification with profile-driven fixes                 | Keep pointer interaction parity and visual preview correctness   | Before/after profiling artifacts + CT interaction suites + quality gates                                       |
+| C5  | P2       | in-progress | demo + editor + renderer | Reduce interaction-path write amplification with profile-driven fixes                 | Keep pointer interaction parity and visual preview correctness   | Before/after profiling artifacts + CT interaction suites + quality gates                                       |
 | C6  | P1       | done        | ui + demo                | Add advanced export controls (raster/video tuning) and progress UI                    | Keep simple one-click export flow intact                         | Export modal unit tests + demo export flow tests                                                               |
 | C7  | P0       | done        | formats + demo           | Make MP4 option truthful: implement real MP4 or gate option until true support exists | Keep WebM path and existing downloads stable                     | Video export tests for MIME/path correctness + bridge tests + quality                                          |
 | C8  | P1       | planned     | formats                  | Enrich HTML standalone export (runtime, anchors, masks, QR inline)                    | Preserve current basic HTML export compatibility                 | Format-specific tests + parity assertions for sample docs                                                      |
@@ -158,3 +158,10 @@ All of the following must be true:
 - Summary: Added concise package README files for model, playback, renderer, editor, formats, and ui with responsibilities, basic usage, and boundary notes.
 - Evidence: created `packages/model/README.md`, `packages/playback/README.md`, `packages/renderer/README.md`, `packages/editor/README.md`, `packages/formats/README.md`, `packages/ui/README.md`.
 - Risk/Follow-up: keep usage snippets synchronized with public barrel exports as APIs evolve.
+
+### 2026-04-15 - C5 - change-stream overhead reduction slice 1
+
+- Status: in-progress
+- Summary: Added default-off debug gate for change-stream batch console logging and skipped expensive document diffs when temporal tracking is paused; also prevented empty change emissions.
+- Evidence: updated `packages/demo/src/demo-app/app.tsx`; aligned tests in `packages/demo/src/demo-app.chrome-and-menu.test.tsx` and `packages/demo/src/demo-app.playback-shell.test.tsx`; verified by running `npm run lint && npm run prettier:check && npm run typecheck && npm run test -- --runInBand` in `packages/demo`.
+- Risk/Follow-up: add profiling artifacts and evaluate additional interaction-path write coalescing for full C5 completion.

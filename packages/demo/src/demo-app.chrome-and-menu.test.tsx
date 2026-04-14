@@ -457,22 +457,26 @@ describe('DemoApp chrome and menu integration', () => {
     consoleSpy.mockRestore();
   });
 
-  /** @description 9-C demo milestone: change stream subscription logs batches to console with a cumulative count. */
-  it('logs change stream batches to the console with a cumulative count', () => {
+  /** @description 9-C demo milestone: change stream subscription logs batches only when debug mode is explicitly enabled. */
+  it('logs change stream batches when debug mode is enabled', () => {
     setupDemoShellMocks();
+    window.localStorage.setItem('broadset:debug-change-stream', '1');
 
     const consoleSpy = jest.spyOn(console, 'info').mockImplementation(() => undefined);
 
-    render(<DemoApp />);
-    dispatchDeleteKey();
+    try {
+      render(<DemoApp />);
+      dispatchDeleteKey();
 
-    const changeLogCalls = consoleSpy.mock.calls.filter(
-      (args) => typeof args[0] === 'string' && args[0].includes('Change batch'),
-    );
+      const changeLogCalls = consoleSpy.mock.calls.filter(
+        (args) => typeof args[0] === 'string' && args[0].includes('Change batch'),
+      );
 
-    expect(changeLogCalls.length).toBeGreaterThanOrEqual(1);
-    expect(changeLogCalls[0]?.[0]).toMatch(/Change batch #\d+/);
-
-    consoleSpy.mockRestore();
+      expect(changeLogCalls.length).toBeGreaterThanOrEqual(1);
+      expect(changeLogCalls[0]?.[0]).toMatch(/Change batch #\d+/);
+    } finally {
+      window.localStorage.removeItem('broadset:debug-change-stream');
+      consoleSpy.mockRestore();
+    }
   });
 });

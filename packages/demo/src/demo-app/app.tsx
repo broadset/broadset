@@ -44,6 +44,16 @@ import { useDemoFileHandlers } from './use-demo-file-handlers';
 import { useShellBrowserEffects } from './use-shell-browser-effects';
 import { useTemplateGroupManagement } from './use-template-group-management';
 
+const DEBUG_CHANGE_STREAM_STORAGE_KEY = 'broadset:debug-change-stream';
+
+function isChangeStreamDebugEnabled(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return window.localStorage.getItem(DEBUG_CHANGE_STREAM_STORAGE_KEY) === '1';
+}
+
 export function DemoApp(): React.JSX.Element {
   const storeRef = useRef<EditorStore | null>(null);
   const dataStoreRef = useRef<ReturnType<typeof createDataStore> | null>(null);
@@ -75,6 +85,8 @@ export function DemoApp(): React.JSX.Element {
   const dataStore = dataStoreRef.current;
   const changeStream = changeStreamRef.current;
 
+  const shouldLogChangeStream = isChangeStreamDebugEnabled();
+
   useLiveData(dataStore);
 
   useEffect(() => {
@@ -84,24 +96,38 @@ export function DemoApp(): React.JSX.Element {
       const nextDoc = state.document;
 
       if (nextDoc !== prevDoc) {
+        if (!editorStore.temporal.getState().isTracking) {
+          prevDoc = nextDoc;
+
+          return;
+        }
+
         const changes = diffDocuments(prevDoc, nextDoc);
 
-        changeStream.emit(changes);
+        if (changes.length > 0) {
+          changeStream.emit(changes);
+        }
+
         prevDoc = nextDoc;
       }
     });
 
     let batchCount = 0;
-    const unsubscribeStream = changeStream.subscribe((changes) => {
-      batchCount += 1;
-      console.info(`Change batch #${String(batchCount)}:`, changes.length, 'changes', changes);
-    });
+    const unsubscribeStream =
+      !shouldLogChangeStream ?
+        () => {
+          /* no-op */
+        }
+      : changeStream.subscribe((changes) => {
+          batchCount += 1;
+          console.info(`Change batch #${String(batchCount)}:`, changes.length, 'changes', changes);
+        });
 
     return () => {
       unsubscribeStore();
       unsubscribeStream();
     };
-  }, [editorStore, changeStream]);
+  }, [editorStore, changeStream, shouldLogChangeStream]);
 
   const editorState = useEditorSnapshot(editorStore);
   const temporalState = editorStore.temporal.getState();
