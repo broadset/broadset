@@ -112,10 +112,11 @@ jest.mock(
     const Button = (props: MockHeroUiProps): React.JSX.Element => {
       const { children, isDisabled, isIconOnly: _isIconOnly, onPress, startContent, ...restProps } = props;
       const onClick = typeof onPress === 'function' ? onPress : undefined;
+      const domProps = sanitizeDomProps(restProps);
 
       return ReactActual.createElement(
         'button',
-        { ...restProps, disabled: isDisabled, onClick },
+        { ...domProps, disabled: isDisabled, onClick },
         startContent ?? null,
         children ?? null,
       );
@@ -124,10 +125,11 @@ jest.mock(
     const Tabs = Object.assign(
       function TabsRoot(props: MockHeroUiProps): React.JSX.Element {
         const { children, onSelectionChange, selectedKey, ...restProps } = props;
+        const domProps = sanitizeDomProps(restProps);
 
         return ReactActual.createElement(
           'div',
-          restProps,
+          domProps,
           ReactActual.createElement(
             TabsContext.Provider,
             { value: { onSelectionChange, selectedKey: String(selectedKey ?? '') } },
@@ -138,15 +140,17 @@ jest.mock(
       {
         List: createWrapper(),
         Tab(props: MockHeroUiProps): React.JSX.Element {
-          const { children, id, ...restProps } = props;
+          const { children, id, isDisabled, ...restProps } = props;
           const context = ReactActual.useContext(TabsContext);
           const tabId = typeof id === 'number' || typeof id === 'string' ? String(id) : '';
+          const domProps = sanitizeDomProps(restProps);
 
           return ReactActual.createElement(
             'button',
             {
-              ...restProps,
+              ...domProps,
               'aria-selected': String(context.selectedKey === tabId),
+              disabled: Boolean(isDisabled),
               onClick: () => {
                 context.onSelectionChange?.(tabId);
               },
@@ -229,11 +233,12 @@ jest.mock(
     const Dropdown = Object.assign(createWrapper(), {
       Item(props: MockHeroUiProps): React.JSX.Element {
         const { children, isDisabled, onAction, onPress, ...restProps } = props;
+        const domProps = sanitizeDomProps(restProps);
 
         return ReactActual.createElement(
           'button',
           {
-            ...restProps,
+            ...domProps,
             disabled: isDisabled,
             onClick: () => {
               onAction?.();
@@ -245,8 +250,9 @@ jest.mock(
       },
       Menu(props: MockHeroUiProps): React.JSX.Element {
         const { children, ...restProps } = props;
+        const domProps = sanitizeDomProps(restProps);
 
-        return ReactActual.createElement('div', { role: 'menu', ...restProps }, children ?? null);
+        return ReactActual.createElement('div', { role: 'menu', ...domProps }, children ?? null);
       },
       Popover: createWrapper(),
       Trigger: createWrapper(),
@@ -267,12 +273,13 @@ jest.mock(
     const Modal = Object.assign(
       function ModalRoot(props: MockHeroUiProps): React.JSX.Element | null {
         const { children, isOpen = true, onOpenChange: _onOpenChange, ...restProps } = props;
+        const domProps = sanitizeDomProps(restProps);
 
         if (isOpen === false) {
           return null;
         }
 
-        return ReactActual.createElement('div', restProps, children ?? null);
+        return ReactActual.createElement('div', domProps, children ?? null);
       },
       {
         Backdrop(props: MockHeroUiProps): React.JSX.Element | null {
@@ -283,20 +290,22 @@ jest.mock(
             onOpenChange: _onOpenChange,
             ...restProps
           } = props;
+          const domProps = sanitizeDomProps(restProps);
 
           if (isOpen === false) {
             return null;
           }
 
-          return ReactActual.createElement('div', restProps, children ?? null);
+          return ReactActual.createElement('div', domProps, children ?? null);
         },
         Body: createWrapper(),
         CloseTrigger: Button,
         Container: createWrapper(),
         Dialog(props: MockHeroUiProps): React.JSX.Element {
           const { children, ...restProps } = props;
+          const domProps = sanitizeDomProps(restProps);
 
-          return ReactActual.createElement('div', { role: 'dialog', ...restProps }, children ?? null);
+          return ReactActual.createElement('div', { role: 'dialog', ...domProps }, children ?? null);
         },
         Footer: createWrapper(),
         Header: createWrapper(),
@@ -350,14 +359,16 @@ jest.mock(
     const ToastComponent = Object.assign(
       function ToastRoot(props: MockHeroUiProps): React.JSX.Element {
         const { children, ...restProps } = props;
+        const domProps = sanitizeDomProps(restProps);
 
-        return ReactActual.createElement('div', { role: 'status', ...restProps }, children ?? null);
+        return ReactActual.createElement('div', { role: 'status', ...domProps }, children ?? null);
       },
       {
         CloseButton: Button,
         Description: createWrapper('span'),
         Provider(props: MockHeroUiProps): React.JSX.Element {
           const { children, ...restProps } = props;
+          const domProps = sanitizeDomProps(restProps);
           const [entries, setEntries] = ReactActual.useState(toastEntries);
 
           ReactActual.useEffect(() => {
@@ -374,7 +385,7 @@ jest.mock(
 
           return ReactActual.createElement(
             'div',
-            { ...restProps, 'data-testid': 'hero-toast-provider' },
+            { ...domProps, 'data-testid': 'hero-toast-provider' },
             children ?? null,
             ...entries.map((entry) =>
               ReactActual.createElement(
@@ -409,9 +420,10 @@ jest.mock(
       Dropdown,
       Input(props: MockHeroUiProps): React.JSX.Element {
         const { onChange, value = '', ...restProps } = props;
+        const domProps = sanitizeDomProps(restProps);
 
         return ReactActual.createElement('input', {
-          ...restProps,
+          ...domProps,
           onChange: typeof onChange === 'function' ? onChange : undefined,
           value,
         });
@@ -467,10 +479,11 @@ jest.mock(
       ),
       Switch(props: MockHeroUiProps): React.JSX.Element {
         const { children, isSelected, onChange, ...restProps } = props;
+        const domProps = sanitizeDomProps(restProps);
 
         return ReactActual.createElement(
           'label',
-          restProps,
+          domProps,
           ReactActual.createElement('input', {
             'aria-label': props['aria-label'],
             checked: Boolean(isSelected),
@@ -539,8 +552,9 @@ jest.mock(
       Toast: ToastComponent,
       Toolbar(props: MockHeroUiProps): React.JSX.Element {
         const { children, isAttached: _isAttached, ...restProps } = props;
+        const domProps = sanitizeDomProps(restProps);
 
-        return ReactActual.createElement('div', { role: 'toolbar', ...restProps }, children ?? null);
+        return ReactActual.createElement('div', { role: 'toolbar', ...domProps }, children ?? null);
       },
       Tooltip,
       toast: toastApi,
