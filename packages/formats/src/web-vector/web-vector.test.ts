@@ -258,8 +258,8 @@ describe('SVG Import Fallback Preservation', () => {
     expect(svgEl?.content).toContain('foreignObject');
   });
 
-  /** @description Validates that transformed groups are preserved as svg element type. */
-  it('preserves transformed groups as svg element type', () => {
+  /** @description Validates that transformed matrix groups are preserved as svg element type. */
+  it('preserves transformed matrix groups as svg element type', () => {
     const input = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
       <g transform="matrix(1,0,0,1,10,20)"><rect width="50" height="25"/></g>
     </svg>`;
@@ -270,6 +270,41 @@ describe('SVG Import Fallback Preservation', () => {
 
     expect(svgEl).toBeDefined();
     expect(svgEl?.content).toContain('<g');
+  });
+
+  /** @description Validates that simple groups are flattened so supported children import natively. */
+  it('flattens simple groups and imports their supported children', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+      <g transform="translate(10,20)">
+        <rect width="50" height="25" fill="#ff0000"/>
+      </g>
+    </svg>`;
+
+    const result = importSvg(input);
+
+    expect(result.elements).toHaveLength(1);
+
+    const rectEl = result.elements[0];
+
+    expect(rectEl?.type).toBe('rectangle');
+    expect(rectEl?.position.x).toBe(10);
+    expect(rectEl?.position.y).toBe(20);
+  });
+
+  /** @description Validates that unsupported elements are preserved as svg payload fallbacks with warnings. */
+  it('preserves unsupported elements as svg payload fallback and emits warning', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+      <meshgradient id="mg-1"><meshrow/></meshgradient>
+    </svg>`;
+
+    const result = importSvg(input);
+
+    expect(result.elements).toHaveLength(1);
+    expect(result.elements[0]?.type).toBe('svg');
+    expect(result.elements[0]?.content).toContain('<meshgradient');
+    expect(result.warnings.some((warning) => warning.includes('Preserved unsupported SVG element as payload'))).toBe(
+      true,
+    );
   });
 });
 

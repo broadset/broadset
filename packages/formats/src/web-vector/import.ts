@@ -17,6 +17,12 @@ interface ImportedElement {
   readonly style: Partial<BroadsetElementStyle>;
 }
 
+interface TransformState {
+  readonly x: number;
+  readonly y: number;
+  readonly rotation: number;
+}
+
 function parseTransform(transformStr: string): { readonly x: number; readonly y: number; readonly rotation: number } {
   let x = 0;
   let y = 0;
@@ -36,6 +42,14 @@ function parseTransform(transformStr: string): { readonly x: number; readonly y:
   }
 
   return { x, y, rotation };
+}
+
+function combineTransform(base: TransformState, next: TransformState): TransformState {
+  return {
+    x: base.x + next.x,
+    y: base.y + next.y,
+    rotation: base.rotation + next.rotation,
+  };
 }
 
 function getAttr(el: Element, name: string): string | null {
@@ -80,10 +94,31 @@ function buildDefsMap(doc: Document): ReadonlyMap<string, string> {
   return map;
 }
 
-function importElement(el: Element, defsMap: ReadonlyMap<string, string>, warnings: string[]): ImportedElement | null {
+function importUnsupportedElement(el: Element, transform: TransformState, warnings: string[]): ImportedElement {
+  const tagName = el.tagName.toLowerCase();
+
+  warnings.push(`Preserved unsupported SVG element as payload: <${tagName}>`);
+
+  return {
+    type: 'svg',
+    content: el.outerHTML,
+    position: { x: transform.x, y: transform.y },
+    width: getNumAttr(el, 'width', 0),
+    height: getNumAttr(el, 'height', 0),
+    rotation: transform.rotation,
+    style: {},
+  };
+}
+
+function importElement(
+  el: Element,
+  defsMap: ReadonlyMap<string, string>,
+  warnings: string[],
+  inheritedTransform: TransformState,
+): ImportedElement[] {
   const tagName = el.tagName.toLowerCase();
   const transformStr = getAttr(el, 'transform') ?? '';
-  const { x, y, rotation } = parseTransform(transformStr);
+  const transform = combineTransform(inheritedTransform, parseTransform(transformStr));
   const clipPath = resolveClipPath(el, defsMap);
   const fill = getAttr(el, 'fill');
   const stroke = getAttr(el, 'stroke');
@@ -95,107 +130,134 @@ function importElement(el: Element, defsMap: ReadonlyMap<string, string>, warnin
 
   switch (tagName) {
     case 'rect':
-      return {
-        type: 'rectangle',
-        content: '',
-        position: { x, y },
-        width: getNumAttr(el, 'width', 0),
-        height: getNumAttr(el, 'height', 0),
-        rotation,
-        style: baseStyle,
-      };
+      return [
+        {
+          type: 'rectangle',
+          content: '',
+          position: { x: transform.x, y: transform.y },
+          width: getNumAttr(el, 'width', 0),
+          height: getNumAttr(el, 'height', 0),
+          rotation: transform.rotation,
+          style: baseStyle,
+        },
+      ];
 
     case 'path':
-      return {
-        type: 'path',
-        content: getAttr(el, 'd') ?? '',
-        position: { x, y },
-        width: 0,
-        height: 0,
-        rotation,
-        style: baseStyle,
-      };
+      return [
+        {
+          type: 'path',
+          content: getAttr(el, 'd') ?? '',
+          position: { x: transform.x, y: transform.y },
+          width: 0,
+          height: 0,
+          rotation: transform.rotation,
+          style: baseStyle,
+        },
+      ];
 
     case 'ellipse':
-      return {
-        type: 'ellipse',
-        content: '',
-        position: { x, y },
-        width: getNumAttr(el, 'rx', 0) * 2,
-        height: getNumAttr(el, 'ry', 0) * 2,
-        rotation,
-        style: baseStyle,
-      };
+      return [
+        {
+          type: 'ellipse',
+          content: '',
+          position: { x: transform.x, y: transform.y },
+          width: getNumAttr(el, 'rx', 0) * 2,
+          height: getNumAttr(el, 'ry', 0) * 2,
+          rotation: transform.rotation,
+          style: baseStyle,
+        },
+      ];
 
     case 'circle': {
       const r = getNumAttr(el, 'r', 0);
 
-      return {
-        type: 'ellipse',
-        content: '',
-        position: { x, y },
-        width: r * 2,
-        height: r * 2,
-        rotation,
-        style: baseStyle,
-      };
+      return [
+        {
+          type: 'ellipse',
+          content: '',
+          position: { x: transform.x, y: transform.y },
+          width: r * 2,
+          height: r * 2,
+          rotation: transform.rotation,
+          style: baseStyle,
+        },
+      ];
     }
 
     case 'text':
-      return {
-        type: 'text',
-        content: el.textContent,
-        position: { x, y },
-        width: 0,
-        height: 0,
-        rotation,
-        style: baseStyle,
-      };
+      return [
+        {
+          type: 'text',
+          content: el.textContent,
+          position: { x: transform.x, y: transform.y },
+          width: 0,
+          height: 0,
+          rotation: transform.rotation,
+          style: baseStyle,
+        },
+      ];
 
     case 'image':
-      return {
-        type: 'image',
-        content: getAttr(el, 'href') ?? getAttr(el, 'xlink:href') ?? '',
-        position: { x, y },
-        width: getNumAttr(el, 'width', 0),
-        height: getNumAttr(el, 'height', 0),
-        rotation,
-        style: baseStyle,
-      };
+      return [
+        {
+          type: 'image',
+          content: getAttr(el, 'href') ?? getAttr(el, 'xlink:href') ?? '',
+          position: { x: transform.x, y: transform.y },
+          width: getNumAttr(el, 'width', 0),
+          height: getNumAttr(el, 'height', 0),
+          rotation: transform.rotation,
+          style: baseStyle,
+        },
+      ];
 
     case 'g': {
       if (transformStr.includes('matrix')) {
-        return {
-          type: 'svg',
-          content: el.outerHTML,
-          position: { x: 0, y: 0 },
-          width: 0,
-          height: 0,
-          rotation: 0,
-          style: {},
-        };
+        warnings.push(`Preserved transformed group as SVG payload (id: ${getAttr(el, 'id') ?? 'unknown'})`);
+
+        return [
+          {
+            type: 'svg',
+            content: el.outerHTML,
+            position: { x: 0, y: 0 },
+            width: 0,
+            height: 0,
+            rotation: 0,
+            style: {},
+          },
+        ];
       }
 
-      warnings.push(`Skipped simple group element (id: ${getAttr(el, 'id') ?? 'unknown'})`);
+      const importedChildren: ImportedElement[] = [];
+      const children = el.children;
 
-      return null;
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+
+        if (!child || child.tagName.toLowerCase() === 'defs') {
+          continue;
+        }
+
+        importedChildren.push(...importElement(child, defsMap, warnings, transform));
+      }
+
+      return importedChildren;
     }
 
     case 'foreignobject':
-      return {
-        type: 'svg',
-        content: el.outerHTML,
-        position: { x, y },
-        width: getNumAttr(el, 'width', 0),
-        height: getNumAttr(el, 'height', 0),
-        rotation,
-        style: {},
-      };
+      return [
+        {
+          type: 'svg',
+          content: el.outerHTML,
+          position: { x: transform.x, y: transform.y },
+          width: getNumAttr(el, 'width', 0),
+          height: getNumAttr(el, 'height', 0),
+          rotation: transform.rotation,
+          style: {},
+        },
+      ];
 
     default:
-      warnings.push(`Skipped unsupported SVG element: <${tagName}>`);
-
-      return null;
+      return [importUnsupportedElement(el, transform, warnings)];
   }
 }
 
@@ -235,6 +297,7 @@ export function importSvg(input: string): SvgImportResult {
   const warnings: string[] = [];
   const elements: ImportedElement[] = [];
   const children = svgRoot.children;
+  const rootTransform: TransformState = { x: 0, y: 0, rotation: 0 };
 
   for (let i = 0; i < children.length; i++) {
     const child = children[i];
@@ -243,11 +306,7 @@ export function importSvg(input: string): SvgImportResult {
       continue;
     }
 
-    const imported = importElement(child, defsMap, warnings);
-
-    if (imported) {
-      elements.push(imported);
-    }
+    elements.push(...importElement(child, defsMap, warnings, rootTransform));
   }
 
   return { elements, canvasWidth, canvasHeight, warnings };
