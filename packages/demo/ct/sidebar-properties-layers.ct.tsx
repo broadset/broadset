@@ -1,4 +1,3 @@
-import type { BroadsetElement } from '@broadset/model';
 import { PropertiesSidebar } from '@broadset/ui';
 import { expect, test } from '@playwright/experimental-ct-react';
 
@@ -14,7 +13,7 @@ function requireElementById(elementId: string) {
     throw new Error(`Missing sample element: ${elementId}`);
   }
 
-  return toPanelElement(element as BroadsetElement);
+  return toPanelElement(element);
 }
 
 /**
