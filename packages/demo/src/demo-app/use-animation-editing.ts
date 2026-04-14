@@ -175,8 +175,14 @@ export function useAnimationEditing({
         return;
       }
 
-      playbackControllerRef.current?.seekTimeline({ elementId: selectedElementId, timelineId: timeline.id, timeMs });
-      setCurrentTimeMs(timeMs);
+      const clampedTimeMs = Math.max(0, Math.min(timeMs, computeTimelineDurationMs(timeline)));
+
+      playbackControllerRef.current?.seekTimeline({
+        elementId: selectedElementId,
+        timelineId: timeline.id,
+        timeMs: clampedTimeMs,
+      });
+      setCurrentTimeMs(clampedTimeMs);
     },
     [selectedElementId],
   );
@@ -515,9 +521,17 @@ export function useAnimationEditing({
       return;
     }
 
+    const durationMs = Math.max(computeTimelineDurationMs(editingTimeline), 1);
+    const shouldRestartFromStart =
+      editingTimeline.loop === 'none' && currentTimeMs + TIMELINE_LOOP_EPSILON_MS >= durationMs;
+
+    if (shouldRestartFromStart) {
+      seekTimeline(editingTimeline, 0);
+    }
+
     stopPlaybackLoop();
     playbackStartRef.current = performance.now();
-    playbackStartOffsetRef.current = currentTimeMs;
+    playbackStartOffsetRef.current = shouldRestartFromStart ? 0 : currentTimeMs;
     setIsTimelinePlaying(true);
 
     const step = (frameTimeMs: number): void => {

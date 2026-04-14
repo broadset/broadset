@@ -150,6 +150,62 @@ describe('DemoApp playback shell lifecycle', () => {
     );
   });
 
+  /** @description Pressing play at the end of a non-loop timeline must restart preview from 0 so users can replay without manually seeking backward first. */
+  it('restarts non-loop timeline playback from 0 when play is pressed at the end of the track', async () => {
+    const { mockedCreatePlaybackController } = setupDemoShellMocks();
+    const seekTimeline = jest.fn(() => null);
+
+    mockedCreatePlaybackController.mockReturnValue({
+      attach: jest.fn(),
+      destroy: jest.fn(),
+      detach: jest.fn(),
+      pause: jest.fn(),
+      play: jest.fn(),
+      seek: jest.fn(),
+      seekTimeline,
+      setAnimations: jest.fn(),
+      setSpeed: jest.fn(),
+      stopTimeline: jest.fn(),
+    });
+
+    const playbackDocument = createDemoAppPlaybackTestDocument();
+    const animatedElementId = 'el-live-ellipse';
+    const animatedElement = playbackDocument.elements.find((element) => element.id === animatedElementId);
+
+    expect(animatedElement).toBeDefined();
+
+    if (animatedElement === undefined) {
+      throw new Error(`Fixture element ${animatedElementId} is missing`);
+    }
+
+    const reorderedDocument = {
+      ...playbackDocument,
+      elements: [animatedElement, ...playbackDocument.elements.filter((element) => element.id !== animatedElementId)],
+    };
+
+    window.localStorage.setItem('broadset:demo-document:v1', JSON.stringify(reorderedDocument));
+
+    render(<DemoApp />);
+
+    fireEvent.click(screen.getByRole('button', { name: /animation/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add timeline/i }));
+    fireEvent.click(screen.getByRole('button', { name: /edit timeline 2/i }));
+
+    fireEvent.click(screen.getByTestId('timeline-track'), { clientX: 99_999 });
+
+    seekTimeline.mockClear();
+    fireEvent.click(screen.getByLabelText('Play'));
+
+    await waitFor(() => {
+      expect(seekTimeline).toHaveBeenCalledWith(
+        expect.objectContaining({
+          elementId: animatedElementId,
+          timeMs: 0,
+        }),
+      );
+    });
+  });
+
   /** @description Ensures the shell enforces the dark viewport contract and restores the host page state on unmount. */
   it('applies the dark theme and viewport overflow lock while mounted and restores previous values on unmount', () => {
     setupDemoShellMocks();
