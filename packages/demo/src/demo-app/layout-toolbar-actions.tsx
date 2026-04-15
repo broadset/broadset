@@ -1,4 +1,5 @@
 import { color, font, sp } from '@broadset/ui';
+import { Separator } from '@heroui/react';
 import { Maximize2, Minimize2, Minus, Pause, Play, Plus, RotateCcw } from 'lucide-react';
 
 import { IconToolButton } from '../demo-components';
@@ -7,7 +8,6 @@ import type { DemoAppLayoutProps } from './layout-types';
 
 export function LayoutToolbarActions(props: DemoAppLayoutProps): React.JSX.Element {
   const {
-    currentDocument,
     editorState,
     editorStore,
     handleAlignSelection,
@@ -20,7 +20,6 @@ export function LayoutToolbarActions(props: DemoAppLayoutProps): React.JSX.Eleme
     hasGroupedSelection,
     isFullscreen,
     isPlaying,
-    resolutionLabel,
     selectedElements,
     selectedMovableElements,
     temporalState,
@@ -70,136 +69,103 @@ export function LayoutToolbarActions(props: DemoAppLayoutProps): React.JSX.Eleme
       </div>
 
       {selectedElements.length >= 2 ?
-        <div style={{ alignItems: 'center', display: 'flex', gap: sp('sp-02'), whiteSpace: 'nowrap' }}>
-          <IconToolButton
-            label="Align left"
-            isDisabled={selectedMovableElements.length < 2}
-            onPress={() => {
-              handleAlignSelection('left');
-            }}
-          >
-            <span aria-hidden="true">⇤</span>
-          </IconToolButton>
-          <IconToolButton
-            label="Align center"
-            isDisabled={selectedMovableElements.length < 2}
-            onPress={() => {
-              handleAlignSelection('center-x');
-            }}
-          >
-            <span aria-hidden="true">↔</span>
-          </IconToolButton>
-          <IconToolButton
-            label="Align right"
-            isDisabled={selectedMovableElements.length < 2}
-            onPress={() => {
-              handleAlignSelection('right');
-            }}
-          >
-            <span aria-hidden="true">⇥</span>
-          </IconToolButton>
-          <IconToolButton
-            label="Align top"
-            isDisabled={selectedMovableElements.length < 2}
-            onPress={() => {
-              handleAlignSelection('top');
-            }}
-          >
-            <span aria-hidden="true">⇡</span>
-          </IconToolButton>
-          <IconToolButton
-            label="Align middle"
-            isDisabled={selectedMovableElements.length < 2}
-            onPress={() => {
-              handleAlignSelection('center-y');
-            }}
-          >
-            <span aria-hidden="true">↕</span>
-          </IconToolButton>
-          <IconToolButton
-            label="Align bottom"
-            isDisabled={selectedMovableElements.length < 2}
-            onPress={() => {
-              handleAlignSelection('bottom');
-            }}
-          >
-            <span aria-hidden="true">⇣</span>
-          </IconToolButton>
-          <IconToolButton
-            label="Distribute horizontal"
-            isDisabled={selectedMovableElements.length < 3}
-            onPress={() => {
-              handleDistributeSelection('horizontal');
-            }}
-          >
-            <span aria-hidden="true">⇹</span>
-          </IconToolButton>
-          <IconToolButton
-            label="Distribute vertical"
-            isDisabled={selectedMovableElements.length < 3}
-            onPress={() => {
-              handleDistributeSelection('vertical');
-            }}
-          >
-            <span aria-hidden="true">⇵</span>
-          </IconToolButton>
-          <IconToolButton
-            label="Group selection"
-            onPress={() => {
-              editorStore.getState().groupElements();
-            }}
-          >
-            <span aria-hidden="true">⊡</span>
-          </IconToolButton>
-          <IconToolButton
-            label="Ungroup selection"
-            isDisabled={!hasGroupedSelection}
-            onPress={() => {
-              editorStore.getState().ungroupElements();
-            }}
-          >
-            <span aria-hidden="true">⊟</span>
-          </IconToolButton>
-        </div>
+        <>
+          <Separator orientation="vertical" />
+          <div style={{ alignItems: 'center', display: 'flex', gap: sp('sp-02'), whiteSpace: 'nowrap' }}>
+            <IconToolButton
+              label="Align left"
+              isDisabled={selectedMovableElements.length < 2}
+              onPress={() => {
+                handleAlignSelection('left');
+              }}
+            >
+              <span aria-hidden="true">⇤</span>
+            </IconToolButton>
+            <IconToolButton
+              label="Align center"
+              isDisabled={selectedMovableElements.length < 2}
+              onPress={() => {
+                handleAlignSelection('center-x');
+              }}
+            >
+              <span aria-hidden="true">↔</span>
+            </IconToolButton>
+            <IconToolButton
+              label="Align right"
+              isDisabled={selectedMovableElements.length < 2}
+              onPress={() => {
+                handleAlignSelection('right');
+              }}
+            >
+              <span aria-hidden="true">⇥</span>
+            </IconToolButton>
+            <IconToolButton
+              label="Align top"
+              isDisabled={selectedMovableElements.length < 2}
+              onPress={() => {
+                handleAlignSelection('top');
+              }}
+            >
+              <span aria-hidden="true">⇡</span>
+            </IconToolButton>
+            <IconToolButton
+              label="Align middle"
+              isDisabled={selectedMovableElements.length < 2}
+              onPress={() => {
+                handleAlignSelection('center-y');
+              }}
+            >
+              <span aria-hidden="true">↕</span>
+            </IconToolButton>
+            <IconToolButton
+              label="Align bottom"
+              isDisabled={selectedMovableElements.length < 2}
+              onPress={() => {
+                handleAlignSelection('bottom');
+              }}
+            >
+              <span aria-hidden="true">⇣</span>
+            </IconToolButton>
+            <IconToolButton
+              label="Distribute horizontal"
+              isDisabled={selectedMovableElements.length < 3}
+              onPress={() => {
+                handleDistributeSelection('horizontal');
+              }}
+            >
+              <span aria-hidden="true">⇹</span>
+            </IconToolButton>
+            <IconToolButton
+              label="Distribute vertical"
+              isDisabled={selectedMovableElements.length < 3}
+              onPress={() => {
+                handleDistributeSelection('vertical');
+              }}
+            >
+              <span aria-hidden="true">⇵</span>
+            </IconToolButton>
+            <IconToolButton
+              label="Group selection"
+              onPress={() => {
+                editorStore.getState().groupElements();
+              }}
+            >
+              <span aria-hidden="true">⊡</span>
+            </IconToolButton>
+            <IconToolButton
+              label="Ungroup selection"
+              isDisabled={!hasGroupedSelection}
+              onPress={() => {
+                editorStore.getState().ungroupElements();
+              }}
+            >
+              <span aria-hidden="true">⊟</span>
+            </IconToolButton>
+          </div>
+        </>
       : null}
 
-      <div
-        style={{
-          alignItems: 'center',
-          display: 'flex',
-          gap: sp('sp-01'),
-          maxWidth: '240px',
-          minWidth: '0',
-          overflow: 'hidden',
-          paddingInline: sp('sp-01'),
-          whiteSpace: 'nowrap',
-        }}
-      >
-        <span
-          style={{
-            color: color('foreground'),
-            fontSize: font('label'),
-            fontWeight: 600,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {currentDocument.name}
-        </span>
-        <span aria-hidden="true" style={{ color: color('muted') }}>
-          •
-        </span>
-        <span
-          style={{
-            color: color('muted'),
-            fontSize: font('label'),
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {resolutionLabel}
-        </span>
-      </div>
+      <Separator orientation="vertical" />
 
       <div
         style={{
