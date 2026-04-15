@@ -6,7 +6,7 @@
 - **Frontend:** React 19, HeroUI v3, Tailwind CSS v4, Lucide icons
 - **State Management:** Zustand + Zundo (undo/redo middleware)
 - **Schema Validation:** Zod
-- **DOM Manipulation:** subjx (drag-and-drop transforms)
+- **DOM Manipulation:** Native pointer events with editor transform utilities
 - **Playback Engine:** Custom — cubic-bezier interpolation, timeline compilation, CSS style writer
 - **Formats:** @libpdf/core (PDF), ag-psd (PSD), html-to-image (raster), JSZip/PizZip (archives), mediabunny (video), qrcode-generator
 - **Build:** tsup (library bundles), Vite (demo app)
