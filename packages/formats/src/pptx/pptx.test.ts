@@ -430,3 +430,172 @@ describe('PPTX Round-Trip Fidelity', () => {
     }
   });
 });
+
+/* ------------------------------------------------------------------ */
+/*  Embedded Image Import Tests  (C12)                                 */
+/* ------------------------------------------------------------------ */
+
+describe('PPTX Embedded Image Import', () => {
+  /**
+   * @description When a PPTX contains a PNG image embedded in ppt/media/ and
+   * referenced via a blip relationship, the importer must extract the binary
+   * bytes, encode them as a data:image/png;base64,… URI, and set it as the
+   * image element's content — not leave a broken pptx-media:rIdN placeholder.
+   */
+  it('extracts embedded PNG as data URI on round-trip', () => {
+    const dataUri = 'data:image/png;base64,iVBORw0KGgo=';
+    const doc = makeDocument({
+      elements: [makeElement('image', { content: dataUri })],
+    });
+
+    const bytes = exportPptxBytes(doc);
+    const imported = importPptx(bytes);
+
+    const images = imported.elements.filter((el) => el.type === 'image');
+
+    expect(images).toHaveLength(1);
+    expect(images[0]?.content).toMatch(/^data:image\/png;base64,/);
+  });
+
+  /**
+   * @description JPEG images embedded in ppt/media/*.jpg must also be extracted
+   * and converted to data:image/jpeg;base64,… URIs.
+   */
+  it('extracts embedded JPEG as data URI on round-trip', () => {
+    const dataUri = 'data:image/jpeg;base64,/9j/4AAQ';
+    const doc = makeDocument({
+      elements: [makeElement('image', { content: dataUri })],
+    });
+
+    const bytes = exportPptxBytes(doc);
+    const imported = importPptx(bytes);
+
+    const images = imported.elements.filter((el) => el.type === 'image');
+
+    expect(images).toHaveLength(1);
+    expect(images[0]?.content).toMatch(/^data:image\/jpeg;base64,/);
+  });
+
+  /**
+   * @description When a PPTX contains both PNG images and SVG fallback media,
+   * the importer must correctly distinguish them — SVGs go to SVG/path recovery
+   * while PNGs are extracted as data URIs.
+   */
+  it('handles mixed SVG fallback and PNG images in same slide', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement('rectangle', {
+          style: makeStyle({
+            backgroundColor: '#ff0000',
+            backgroundGradient: {
+              type: 'linear',
+              angle: 90,
+              stops: [
+                { color: '#ff0000', position: 0 },
+                { color: '#0000ff', position: 1 },
+              ],
+            },
+          }) as BroadsetElementStyle,
+        }),
+        makeElement('image', { content: 'data:image/png;base64,iVBORw0KGgo=' }),
+      ],
+    });
+
+    const bytes = exportPptxBytes(doc);
+    const imported = importPptx(bytes);
+
+    // SVG fallback should be recovered as path or svg element
+    const nonImageTypes = imported.elements.filter((el) => el.type !== 'image');
+
+    expect(nonImageTypes.length).toBeGreaterThanOrEqual(1);
+
+    // PNG should be extracted as data URI
+    const imageElements = imported.elements.filter((el) => el.type === 'image');
+
+    expect(imageElements.length).toBeGreaterThanOrEqual(1);
+
+    const pngImage = imageElements.find((el) => el.content.includes('data:image/'));
+
+    expect(pngImage).toBeDefined();
+  });
+
+  /**
+   * @description Imported image elements should never contain the broken
+   * placeholder format pptx-media:rIdN when the media file exists in the ZIP.
+   */
+  it('never produces pptx-media: placeholders for extractable images', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement('image', { content: 'data:image/png;base64,iVBORw0KGgo=' }),
+        makeElement('image', { content: 'data:image/jpeg;base64,/9j/4AAQ' }),
+      ],
+    });
+
+    const bytes = exportPptxBytes(doc);
+    const imported = importPptx(bytes);
+
+    for (const el of imported.elements) {
+      if (el.type === 'image') {
+        expect(el.content).not.toMatch(/^pptx-media:/);
+      }
+    }
+  });
+
+  /**
+   * @description Multiple images in a single slide must all be extracted
+   * independently with correct data URIs.
+   */
+  it('extracts multiple embedded images from the same slide', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement('image', { content: 'data:image/png;base64,AAAA' }),
+        makeElement('image', { content: 'data:image/png;base64,BBBB' }),
+        makeElement('image', { content: 'data:image/png;base64,CCCC' }),
+      ],
+    });
+
+    const bytes = exportPptxBytes(doc);
+    const imported = importPptx(bytes);
+
+    const images = imported.elements.filter((el) => el.type === 'image');
+
+    expect(images).toHaveLength(3);
+
+    for (const img of images) {
+      expect(img.content).toMatch(/^data:image\/png;base64,/);
+      expect(img.content).not.toMatch(/^pptx-media:/);
+    }
+  });
+
+  /**
+   * @description Image dimensions and position must be preserved within EMU
+   * tolerance across a round-trip, just like rectangles.
+   */
+  it('preserves image position and dimensions across round-trip', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement('image', {
+          content: 'data:image/png;base64,iVBORw0KGgo=',
+          position: { x: 30, y: 20 },
+          width: 80,
+          height: 60,
+        }),
+      ],
+    });
+
+    const bytes = exportPptxBytes(doc);
+    const imported = importPptx(bytes);
+
+    const images = imported.elements.filter((el) => el.type === 'image');
+
+    expect(images).toHaveLength(1);
+
+    const img = images[0];
+
+    expect(img).toBeDefined();
+    expect(img?.position.x).toBeCloseTo(30, 0);
+    expect(img?.position.y).toBeCloseTo(20, 0);
+    expect(img?.width).toBeCloseTo(80, 0);
+    expect(img?.height).toBeCloseTo(60, 0);
+  });
+});

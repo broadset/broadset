@@ -140,6 +140,7 @@ export function importShapeElement(
   shapeXml: string,
   canvas: Canvas,
   svgMediaMap: ReadonlyMap<string, string>,
+  imageMediaMap: ReadonlyMap<string, string> = new Map(),
 ): BroadsetElement | undefined {
   const xfrm = extractTransform(shapeXml);
 
@@ -174,7 +175,7 @@ export function importShapeElement(
       return createImportedElement('svg', svgContent, position, width, height);
     }
 
-    return createImportedElement('image', `pptx-media:${relId}`, position, width, height);
+    return createImportedElement('image', imageMediaMap.get(relId) ?? `pptx-media:${relId}`, position, width, height);
   }
 
   const hasFill = shapeXml.includes('<a:solidFill') || shapeXml.includes('<a:noFill');

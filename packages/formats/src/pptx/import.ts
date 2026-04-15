@@ -4,6 +4,38 @@ import PizZip from 'pizzip';
 import { MM_TO_EMU } from './constants';
 import { extractAll, importShapeElement, parseSlideRelationships } from './import-utils';
 
+/** MIME type lookup for image extensions found in PPTX media. */
+const IMAGE_MIME: ReadonlyMap<string, string> = new Map([
+  ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+  ['.gif', 'image/gif'],
+  ['.bmp', 'image/bmp'],
+  ['.tiff', 'image/tiff'],
+  ['.tif', 'image/tiff'],
+  ['.webp', 'image/webp'],
+]);
+
+function resolveMediaPath(target: string): string {
+  return target.startsWith('..') ? `ppt/${target.slice(3)}` : target;
+}
+
+function extOf(path: string): string {
+  const dot = path.lastIndexOf('.');
+
+  return dot >= 0 ? path.slice(dot).toLowerCase() : '';
+}
+
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = '';
+
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i] ?? 0);
+  }
+
+  return btoa(binary);
+}
+
 export function importPptx(data: Uint8Array): BroadsetDocument {
   const zip = new PizZip(data);
 
@@ -25,14 +57,31 @@ export function importPptx(data: Uint8Array): BroadsetDocument {
   const relMap = parseSlideRelationships(slideRelsXml);
 
   const svgMediaMap = new Map<string, string>();
+  const imageMediaMap = new Map<string, string>();
 
   for (const [relId, target] of relMap) {
-    if (target.endsWith('.svg')) {
-      const mediaPath = target.startsWith('..') ? `ppt/${target.slice(3)}` : target;
+    const mediaPath = resolveMediaPath(target);
+    const ext = extOf(target);
+
+    if (ext === '.svg') {
       const svgContent = zip.file(mediaPath)?.asText();
 
       if (svgContent) {
         svgMediaMap.set(relId, svgContent);
+      }
+    } else {
+      const mime = IMAGE_MIME.get(ext);
+
+      if (mime) {
+        const entry = zip.file(mediaPath);
+
+        if (entry) {
+          const raw: unknown = entry.asUint8Array();
+          const bytes = raw as Uint8Array;
+          const dataUri = `data:${mime};base64,${uint8ToBase64(bytes)}`;
+
+          imageMediaMap.set(relId, dataUri);
+        }
       }
     }
   }
@@ -44,7 +93,7 @@ export function importPptx(data: Uint8Array): BroadsetDocument {
   const spShapes = extractAll(slideXml, /<p:sp>[\s\S]*?<\/p:sp>/);
 
   for (const shapeXml of spShapes) {
-    const el = importShapeElement(shapeXml, canvas, svgMediaMap);
+    const el = importShapeElement(shapeXml, canvas, svgMediaMap, imageMediaMap);
 
     if (el) {
       elements.push(el);
@@ -54,7 +103,7 @@ export function importPptx(data: Uint8Array): BroadsetDocument {
   const picShapes = extractAll(slideXml, /<p:pic>[\s\S]*?<\/p:pic>/);
 
   for (const picXml of picShapes) {
-    const el = importShapeElement(picXml, canvas, svgMediaMap);
+    const el = importShapeElement(picXml, canvas, svgMediaMap, imageMediaMap);
 
     if (el) {
       elements.push(el);
