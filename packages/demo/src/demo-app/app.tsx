@@ -7,7 +7,14 @@ import {
   type EditorStore,
   runPreflightDiagnostics,
 } from '@broadset/editor';
-import { type BroadsetElement, broadsetProjectSchema, type TemplateGroup, type Timeline } from '@broadset/model';
+import {
+  type BroadsetElement,
+  broadsetProjectSchema,
+  type CanvasSettings,
+  type TemplateGroup,
+  type Timeline,
+} from '@broadset/model';
+import type { PlaybackController } from '@broadset/playback';
 import { type PreflightIssue } from '@broadset/ui';
 import { toast } from '@heroui/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -35,7 +42,7 @@ import { DEMO_EDITOR_CONFIG } from '../demoConfig';
 import { SAMPLE_PROJECT } from '../sampleDocument';
 import { useLiveData } from '../useLiveData';
 import { useCommandHandlers } from './command-handlers';
-import { getElementLabel, useEditorSnapshot } from './helpers';
+import { getElementLabel, useEditorSelector } from './helpers';
 import { DemoAppLayout } from './layout';
 import { DemoSidebarPanel } from './sidebar';
 import { useAnimationEditing } from './use-animation-editing';
@@ -52,6 +59,45 @@ function isChangeStreamDebugEnabled(): boolean {
   }
 
   return window.localStorage.getItem(DEBUG_CHANGE_STREAM_STORAGE_KEY) === '1';
+}
+
+function areCanvasSettingsEqual(left: CanvasSettings, right: CanvasSettings): boolean {
+  return (
+    left.zoom === right.zoom &&
+    left.panX === right.panX &&
+    left.panY === right.panY &&
+    left.showRulers === right.showRulers &&
+    left.units === right.units &&
+    left.viewMode === right.viewMode &&
+    left.perspective === right.perspective &&
+    left.originX === right.originX &&
+    left.originY === right.originY &&
+    left.guides === right.guides &&
+    left.grid === right.grid
+  );
+}
+
+function areEditorStateEqualIgnoringCanvas(
+  left: ReturnType<EditorStore['getState']>,
+  right: ReturnType<EditorStore['getState']>,
+): boolean {
+  if (left === right) {
+    return true;
+  }
+
+  const leftKeys = Object.keys(left) as ReadonlyArray<keyof ReturnType<EditorStore['getState']>>;
+
+  for (const key of leftKeys) {
+    if (key === 'canvasSettings') {
+      continue;
+    }
+
+    if (left[key] !== right[key]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function DemoApp(): React.JSX.Element {
@@ -129,7 +175,8 @@ export function DemoApp(): React.JSX.Element {
     };
   }, [editorStore, changeStream, shouldLogChangeStream]);
 
-  const editorState = useEditorSnapshot(editorStore);
+  const editorState = useEditorSelector(editorStore, (state) => state, areEditorStateEqualIgnoringCanvas);
+  const canvasSettings = useEditorSelector(editorStore, (state) => state.canvasSettings, areCanvasSettingsEqual);
   const temporalState = editorStore.temporal.getState();
   const currentDocument = editorState.document;
   const initialSidebarPreferences = useMemo<SidebarPreferences>(() => loadSidebarPreferences(), []);
@@ -180,6 +227,7 @@ export function DemoApp(): React.JSX.Element {
   const placementLabel = getElementLabel(editorState.pendingPlacementType);
   const clipboardRef = useRef<readonly BroadsetElement[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const playbackControllerRef = useRef<PlaybackController | null>(null);
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(
@@ -233,15 +281,10 @@ export function DemoApp(): React.JSX.Element {
 
       return {
         label: String(value),
-        position: (rulerLength / 10) * index * editorState.canvasSettings.zoom + editorState.canvasSettings.panX,
+        position: (rulerLength / 10) * index * canvasSettings.zoom + canvasSettings.panX,
       };
     }).filter((tick) => tick.position >= -40 && tick.position <= rulerLength + 40);
-  }, [
-    currentDocument.canvas.width,
-    editorState.canvasSettings.panX,
-    editorState.canvasSettings.zoom,
-    viewportSize.width,
-  ]);
+  }, [currentDocument.canvas.width, canvasSettings.panX, canvasSettings.zoom, viewportSize.width]);
   const verticalTicks = useMemo(() => {
     const rulerLength = Math.max(viewportSize.height - RULER_SIZE, 240);
 
@@ -250,15 +293,10 @@ export function DemoApp(): React.JSX.Element {
 
       return {
         label: String(value),
-        position: (rulerLength / 8) * index * editorState.canvasSettings.zoom + editorState.canvasSettings.panY,
+        position: (rulerLength / 8) * index * canvasSettings.zoom + canvasSettings.panY,
       };
     }).filter((tick) => tick.position >= -40 && tick.position <= rulerLength + 40);
-  }, [
-    currentDocument.canvas.height,
-    editorState.canvasSettings.panY,
-    editorState.canvasSettings.zoom,
-    viewportSize.height,
-  ]);
+  }, [currentDocument.canvas.height, canvasSettings.panY, canvasSettings.zoom, viewportSize.height]);
 
   const pushToast = useCallback((severity: ToastSeverity, message: string): void => {
     const options = { timeout: TOAST_DISMISS_MS[severity] };
@@ -295,6 +333,7 @@ export function DemoApp(): React.JSX.Element {
     currentDocument,
     editorStore,
     fileInputRef,
+    playbackControllerRef,
     pushToast,
     setActiveDialog,
   });
@@ -393,70 +432,111 @@ export function DemoApp(): React.JSX.Element {
     currentDocument,
     selectedElementId,
     editorStore,
+    playbackControllerRef,
     pushToast,
     editingTimeline,
     setEditingTimeline,
     setEditingTimelineSelectedKf,
   });
 
-  const sidebarPanel = (
-    <DemoSidebarPanel
-      activeElementIds={editorState.activeElementIds}
-      animationConfig={animationConfig}
-      availableDocuments={availableDocuments}
-      currentDocumentMode={currentDocument.documentMode}
-      editorStore={editorStore}
-      editingTimeline={editingTimeline}
-      editingTimelineSelectedKf={editingTimelineSelectedKf}
-      handleAddMember={handleAddMember}
-      handleCreateGroup={handleCreateGroup}
-      handleRemoveGroup={handleRemoveGroup}
-      handleRemoveMember={handleRemoveMember}
-      handleRenameGroup={handleRenameGroup}
-      handleUpdateMemberRole={handleUpdateMemberRole}
-      layers={layers}
-      onAnimationAddModifierBinding={animationEditing.onAddModifierBinding}
-      onAnimationAddStateBinding={animationEditing.onAddStateBinding}
-      onAnimationAddTimeline={animationEditing.onAddTimeline}
-      onAnimationDeleteTimeline={animationEditing.onDeleteTimeline}
-      onAnimationDuplicateTimeline={animationEditing.onDuplicateTimeline}
-      onAnimationEditTimeline={animationEditing.onEditTimeline}
-      onAnimationQuickSetup={animationEditing.onQuickSetup}
-      onAnimationRemoveModifierBinding={animationEditing.onRemoveModifierBinding}
-      onAnimationRemoveStateBinding={animationEditing.onRemoveStateBinding}
-      onAnimationRenameTimeline={animationEditing.onRenameTimeline}
-      onAnimationSelectState={animationEditing.onSelectState}
-      onAnimationToggleModifier={animationEditing.onToggleModifier}
-      onRemoveElement={(elementId) => {
-        editorStore.getState().removeElement(elementId);
-      }}
-      onSelectElement={(elementId) => {
-        editorStore.getState().selectElement(elementId);
-      }}
-      onToggleLock={(elementId) => {
-        editorStore.getState().toggleLock(elementId);
-      }}
-      onReorderLayers={(dragId, targetId, position) => {
-        editorStore.setState((state) => {
-          const nextDocument = reorderDocumentLayers(state.document, dragId, targetId, position);
+  const sidebarPanel = useMemo(
+    () => (
+      <DemoSidebarPanel
+        activeElementIds={editorState.activeElementIds}
+        animationConfig={animationConfig}
+        availableDocuments={availableDocuments}
+        currentDocumentMode={currentDocument.documentMode}
+        editorStore={editorStore}
+        editingTimeline={editingTimeline}
+        editingTimelineSelectedKf={editingTimelineSelectedKf}
+        handleAddMember={handleAddMember}
+        handleCreateGroup={handleCreateGroup}
+        handleRemoveGroup={handleRemoveGroup}
+        handleRemoveMember={handleRemoveMember}
+        handleRenameGroup={handleRenameGroup}
+        handleUpdateMemberRole={handleUpdateMemberRole}
+        layers={layers}
+        onAnimationAddModifierBinding={animationEditing.onAddModifierBinding}
+        onAnimationAddStateBinding={animationEditing.onAddStateBinding}
+        onAnimationAddTimeline={animationEditing.onAddTimeline}
+        onAnimationDeleteTimeline={animationEditing.onDeleteTimeline}
+        onAnimationDuplicateTimeline={animationEditing.onDuplicateTimeline}
+        onAnimationEditTimeline={animationEditing.onEditTimeline}
+        onAnimationQuickSetup={animationEditing.onQuickSetup}
+        onAnimationRemoveModifierBinding={animationEditing.onRemoveModifierBinding}
+        onAnimationRemoveStateBinding={animationEditing.onRemoveStateBinding}
+        onAnimationRenameTimeline={animationEditing.onRenameTimeline}
+        onAnimationSelectState={animationEditing.onSelectState}
+        onAnimationToggleModifier={animationEditing.onToggleModifier}
+        onRemoveElement={(elementId) => {
+          editorStore.getState().removeElement(elementId);
+        }}
+        onSelectElement={(elementId) => {
+          editorStore.getState().selectElement(elementId);
+        }}
+        onToggleLock={(elementId) => {
+          editorStore.getState().toggleLock(elementId);
+        }}
+        onReorderLayers={(dragId, targetId, position) => {
+          editorStore.setState((state) => {
+            const nextDocument = reorderDocumentLayers(state.document, dragId, targetId, position);
 
-          return nextDocument === state.document ? {} : { document: nextDocument };
-        });
-      }}
-      onToggleVisibility={(elementId) => {
-        editorStore.getState().toggleVisibility(elementId);
-      }}
-      onUpdateProperty={handlePropertyUpdate}
-      preflightIssues={preflightIssues}
-      selectedElement={selectedElement}
-      selectedElementInstance={selectedElementInstance}
-      setEditingTimeline={setEditingTimeline}
-      setEditingTimelineSelectedKf={setEditingTimelineSelectedKf}
-      sidebarTab={sidebarTab}
-      templateGroups={templateGroups}
-      timelinePreviewActiveModifiers={animationEditing.activeModifiers}
-      timelinePreviewActiveState={animationEditing.activeState}
-    />
+            return nextDocument === state.document ? {} : { document: nextDocument };
+          });
+        }}
+        onToggleVisibility={(elementId) => {
+          editorStore.getState().toggleVisibility(elementId);
+        }}
+        onUpdateProperty={handlePropertyUpdate}
+        preflightIssues={preflightIssues}
+        selectedElement={selectedElement}
+        selectedElementInstance={selectedElementInstance}
+        setEditingTimeline={setEditingTimeline}
+        setEditingTimelineSelectedKf={setEditingTimelineSelectedKf}
+        sidebarTab={sidebarTab}
+        templateGroups={templateGroups}
+        timelinePreviewActiveModifiers={animationEditing.activeModifiers}
+        timelinePreviewActiveState={animationEditing.activeState}
+      />
+    ),
+    [
+      animationConfig,
+      animationEditing.activeModifiers,
+      animationEditing.activeState,
+      animationEditing.onAddModifierBinding,
+      animationEditing.onAddStateBinding,
+      animationEditing.onAddTimeline,
+      animationEditing.onDeleteTimeline,
+      animationEditing.onDuplicateTimeline,
+      animationEditing.onEditTimeline,
+      animationEditing.onQuickSetup,
+      animationEditing.onRemoveModifierBinding,
+      animationEditing.onRemoveStateBinding,
+      animationEditing.onRenameTimeline,
+      animationEditing.onSelectState,
+      animationEditing.onToggleModifier,
+      availableDocuments,
+      currentDocument.documentMode,
+      editingTimeline,
+      editingTimelineSelectedKf,
+      editorState.activeElementIds,
+      editorStore,
+      handleAddMember,
+      handleCreateGroup,
+      handlePropertyUpdate,
+      handleRemoveGroup,
+      handleRemoveMember,
+      handleRenameGroup,
+      handleUpdateMemberRole,
+      layers,
+      preflightIssues,
+      selectedElement,
+      selectedElementInstance,
+      setEditingTimeline,
+      setEditingTimelineSelectedKf,
+      sidebarTab,
+      templateGroups,
+    ],
   );
 
   useEffect(() => {
@@ -497,6 +577,7 @@ export function DemoApp(): React.JSX.Element {
   return (
     <DemoAppLayout
       activeDialog={activeDialog}
+      canvasSettings={canvasSettings}
       clipboardRef={clipboardRef}
       contextMenu={contextMenu}
       contextMenuElement={contextMenuElement}

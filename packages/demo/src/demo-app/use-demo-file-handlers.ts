@@ -1,9 +1,11 @@
 import type { EditorStore } from '@broadset/editor';
 import { createEmptyBroadsetDocument } from '@broadset/model';
+import type { PlaybackController } from '@broadset/playback';
+import { computeTimelineLoopDuration } from '@broadset/playback';
+import type { DocumentPreset, MediaAsset, TemplateEntry } from '@broadset/ui';
 import type { ChangeEvent, Dispatch, RefObject, SetStateAction } from 'react';
 import { useCallback } from 'react';
 
-import type { DocumentPreset, MediaAsset, TemplateEntry } from '../../../ui/src/modals/types';
 import type { ActiveDialog } from '../demo-types';
 import { DOCUMENT_STORAGE_KEY } from '../demo-types';
 import { downloadJsonFile } from '../demo-utils';
@@ -12,6 +14,7 @@ import type { ExportFormat } from '../formatBridge';
 export interface UseDemoFileHandlersOptions {
   readonly editorStore: EditorStore;
   readonly currentDocument: ReturnType<EditorStore['getState']>['document'];
+  readonly playbackControllerRef: Readonly<RefObject<PlaybackController | null>>;
   readonly pushToast: (severity: 'error' | 'info' | 'success', message: string) => void;
   readonly setActiveDialog: Dispatch<SetStateAction<ActiveDialog>>;
   readonly fileInputRef: RefObject<HTMLInputElement | null>;
@@ -58,6 +61,7 @@ function getOptionalNumber(data: Readonly<Record<string, unknown>>, key: string)
 export function useDemoFileHandlers({
   editorStore,
   currentDocument,
+  playbackControllerRef,
   pushToast,
   setActiveDialog,
   fileInputRef,
@@ -193,6 +197,24 @@ export function useDemoFileHandlers({
         const videoFrameRate = getOptionalNumber(data, 'videoFrameRate');
         const videoQuality = getOptionalNumber(data, 'videoQuality');
 
+        const isVideoFormat = exporter === 'mp4' || exporter === 'webm';
+        const controller = playbackControllerRef.current;
+        const renderFrame =
+          isVideoFormat && controller !== null ?
+            (timeMs: number): void => {
+              controller.seek(timeMs);
+            }
+          : undefined;
+        const playbackDurationMs =
+          isVideoFormat ?
+            Math.max(
+              1000,
+              ...currentDocument.animations.flatMap((a) =>
+                a.config.timelines.map((t) => computeTimelineLoopDuration(t)),
+              ),
+            )
+          : undefined;
+
         await bridge.exportDocument(exporter as ExportFormat, {
           document: currentDocument,
           ...(pixelRatio !== undefined ? { pixelRatio } : {}),
@@ -200,6 +222,8 @@ export function useDemoFileHandlers({
           ...(videoFrameRate !== undefined ? { videoFrameRate } : {}),
           ...(videoQuality !== undefined ? { videoQuality } : {}),
           ...(snapshotCanvas !== undefined ? { snapshotCanvas } : {}),
+          ...(renderFrame !== undefined ? { renderFrame } : {}),
+          ...(playbackDurationMs !== undefined ? { playbackDurationMs } : {}),
         });
         pushToast('success', `Exported as ${exporter.toUpperCase()}.`);
       };

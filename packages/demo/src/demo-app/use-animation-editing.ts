@@ -10,7 +10,7 @@ import {
 } from '@broadset/editor';
 import { type BroadsetDocument, type EasingMode, type ElementAnimationConfig, type Timeline } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 
 import { applyAnimationConfigUpdate } from './animation-adapter';
 import {
@@ -32,6 +32,7 @@ interface UseAnimationEditingOptions {
   readonly currentDocument: BroadsetDocument;
   readonly selectedElementId: string | null;
   readonly editorStore: EditorStore;
+  readonly playbackControllerRef: RefObject<PlaybackController | null>;
   readonly pushToast: (severity: 'error' | 'info' | 'success', message: string) => void;
   readonly editingTimeline: Timeline | null;
   readonly setEditingTimeline: React.Dispatch<React.SetStateAction<Timeline | null>>;
@@ -61,6 +62,7 @@ export interface AnimationEditingController {
   readonly onSelectState: (stateName: string | null) => void;
   readonly onStopTimeline: () => void;
   readonly onToggleModifier: (modifierName: string) => void;
+  readonly playbackControllerRef: Readonly<RefObject<PlaybackController | null>>;
   readonly registerPlaybackController: (controller: PlaybackController | null) => void;
 }
 
@@ -105,6 +107,7 @@ export function useAnimationEditing({
   currentDocument,
   selectedElementId,
   editorStore,
+  playbackControllerRef,
   pushToast,
   editingTimeline,
   setEditingTimeline,
@@ -114,7 +117,6 @@ export function useAnimationEditing({
   const [activeModifiers, setActiveModifiers] = useState<readonly string[]>([]);
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
   const [isTimelinePlaying, setIsTimelinePlaying] = useState(false);
-  const playbackControllerRef = useRef<PlaybackController | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const playbackStartRef = useRef(0);
   const playbackStartOffsetRef = useRef(0);
@@ -608,6 +610,7 @@ export function useAnimationEditing({
     onSelectState,
     onStopTimeline,
     onToggleModifier,
+    playbackControllerRef,
     registerPlaybackController,
   };
 }
