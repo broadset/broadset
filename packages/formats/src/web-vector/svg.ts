@@ -1,9 +1,101 @@
-import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle } from '@broadset/model';
+import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle, BroadsetGradient } from '@broadset/model';
 
+import { generateQrSvgFragment } from '../interchange';
 import { escapeXml } from './shared';
 
 const SVG_XMLNS = 'http://www.w3.org/2000/svg';
 const XLINK_XMLNS = 'http://www.w3.org/1999/xlink';
+
+/* ------------------------------------------------------------------ */
+/*  Gradient Defs                                                     */
+/* ------------------------------------------------------------------ */
+
+function renderGradientDef(elementId: string, gradient: string | BroadsetGradient): { id: string; def: string } | null {
+  if (typeof gradient === 'string') {
+    return null; // CSS gradient strings cannot be converted to SVG defs
+  }
+
+  const gradId = `grad-${elementId}`;
+  const stops = gradient.stops
+    .map((s) => `<stop offset="${String(s.position * 100)}%" stop-color="${escapeXml(s.color)}"/>`)
+    .join('');
+
+  if (gradient.type === 'linear') {
+    const angle = gradient.angle ?? 0;
+    const rad = (angle * Math.PI) / 180;
+    const x2 = Math.round((Math.cos(rad) * 0.5 + 0.5) * 100) / 100;
+    const y2 = Math.round((Math.sin(rad) * 0.5 + 0.5) * 100) / 100;
+    const x1 = 1 - x2;
+    const y1 = 1 - y2;
+
+    return {
+      id: gradId,
+      def: `<linearGradient id="${gradId}" x1="${String(x1)}" y1="${String(y1)}" x2="${String(x2)}" y2="${String(y2)}">${stops}</linearGradient>`,
+    };
+  }
+
+  if (gradient.type === 'radial') {
+    const cx = (gradient.center?.[0] ?? 50) / 100;
+    const cy = (gradient.center?.[1] ?? 50) / 100;
+
+    return {
+      id: gradId,
+      def: `<radialGradient id="${gradId}" cx="${String(cx)}" cy="${String(cy)}" r="0.5">${stops}</radialGradient>`,
+    };
+  }
+
+  // Conic gradients have no SVG equivalent — skip
+  return null;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Box-Shadow → SVG Filter Approximation                            */
+/* ------------------------------------------------------------------ */
+
+function renderShadowFilter(elementId: string, shadow: string): { id: string; def: string } | null {
+  // Parse simple box-shadow: <x>px <y>px <blur>px <color>
+  const match = /^(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px\s+(\d+(?:\.\d+)?)px\s+(.+)$/.exec(shadow.trim());
+
+  if (match === null) {
+    return null;
+  }
+
+  const filterId = `shadow-${elementId}`;
+  const dx = match[1];
+  const dy = match[2];
+  const blur = match[3];
+  const color = match[4];
+
+  if (dx === undefined || dy === undefined || blur === undefined || color === undefined) {
+    return null;
+  }
+
+  return {
+    id: filterId,
+    def: `<filter id="${filterId}"><feDropShadow dx="${dx}" dy="${dy}" stdDeviation="${String(Number(blur) / 2)}" flood-color="${escapeXml(color.trim())}"/></filter>`,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Object-Fit → preserveAspectRatio Mapping                         */
+/* ------------------------------------------------------------------ */
+
+function objectFitToPreserveAspectRatio(objectFit: string | undefined): string {
+  switch (objectFit) {
+    case 'contain':
+      return 'xMidYMid meet';
+    case 'cover':
+      return 'xMidYMid slice';
+    case 'fill':
+      return 'none';
+    case 'none':
+      return 'xMidYMid meet';
+    case 'scale-down':
+      return 'xMidYMid meet';
+    default:
+      return 'xMidYMid slice'; // default to cover
+  }
+}
 
 function buildTransform(el: BroadsetElement): string {
   const parts: string[] = [];
@@ -74,6 +166,10 @@ function buildTextAttrs(style: BroadsetElementStyle): string {
     attrs.push(`font-weight="${String(style.fontWeight)}"`);
   }
 
+  if (style.fontStyle) {
+    attrs.push(`font-style="${escapeXml(style.fontStyle)}"`);
+  }
+
   if (style.textAlignment) {
     const anchor =
       style.textAlignment === 'left' ? 'start'
@@ -81,6 +177,14 @@ function buildTextAttrs(style: BroadsetElementStyle): string {
       : 'middle';
 
     attrs.push(`text-anchor="${anchor}"`);
+  }
+
+  if (style.textDecoration) {
+    attrs.push(`text-decoration="${escapeXml(style.textDecoration)}"`);
+  }
+
+  if (style.letterSpacing !== undefined) {
+    attrs.push(`letter-spacing="${String(style.letterSpacing)}"`);
   }
 
   return attrs.length > 0 ? ' ' + attrs.join(' ') : '';
@@ -99,39 +203,80 @@ function renderSvgPayload(el: BroadsetElement, transform: string): string {
   return `<g id="${escapeXml(el.id)}"${transform}>${inner}</g>`;
 }
 
-function renderElement(el: BroadsetElement, clipDefs: string[]): string {
+function renderElement(el: BroadsetElement, defs: string[]): string {
   const transform = buildTransform(el);
   const styleAttrs = buildStyleAttrs(el.style);
   let clipAttr = '';
+  let fillOverride = '';
+  let filterAttr = '';
 
   if (el.style.customClipPath) {
     const clipId = `clip-${el.id}`;
 
-    clipDefs.push(renderClipPathDef(el.id, el.style.customClipPath));
+    defs.push(renderClipPathDef(el.id, el.style.customClipPath));
     clipAttr = ` clip-path="url(#${clipId})"`;
   }
 
+  // Gradient fill
+  if (el.style.backgroundGradient !== undefined) {
+    const grad = renderGradientDef(el.id, el.style.backgroundGradient);
+
+    if (grad !== null) {
+      defs.push(grad.def);
+      fillOverride = ` fill="url(#${grad.id})"`;
+    }
+  }
+
+  // Box-shadow filter
+  if (el.style.boxShadow) {
+    const shadow = renderShadowFilter(el.id, el.style.boxShadow);
+
+    if (shadow !== null) {
+      defs.push(shadow.def);
+      filterAttr = ` filter="url(#${shadow.id})"`;
+    }
+  }
+
+  const extras = clipAttr + filterAttr;
+
   switch (el.type) {
     case 'path':
-      return `<path id="${escapeXml(el.id)}" d="${escapeXml(el.content)}"${styleAttrs}${transform}${clipAttr}/>`;
+      return `<path id="${escapeXml(el.id)}" d="${escapeXml(el.content)}"${styleAttrs}${fillOverride}${transform}${extras}/>`;
 
     case 'rectangle':
-      return `<rect id="${escapeXml(el.id)}" width="${String(el.width)}" height="${String(el.height)}"${styleAttrs}${transform}${clipAttr}/>`;
+      return `<rect id="${escapeXml(el.id)}" width="${String(el.width)}" height="${String(el.height)}"${styleAttrs}${fillOverride}${transform}${extras}/>`;
 
     case 'ellipse':
-      return `<ellipse id="${escapeXml(el.id)}" cx="${String(el.width / 2)}" cy="${String(el.height / 2)}" rx="${String(el.width / 2)}" ry="${String(el.height / 2)}"${styleAttrs}${transform}${clipAttr}/>`;
+      return `<ellipse id="${escapeXml(el.id)}" cx="${String(el.width / 2)}" cy="${String(el.height / 2)}" rx="${String(el.width / 2)}" ry="${String(el.height / 2)}"${styleAttrs}${fillOverride}${transform}${extras}/>`;
 
     case 'text':
-      return `<text id="${escapeXml(el.id)}"${buildTextAttrs(el.style)}${transform}${clipAttr}>${escapeXml(el.content)}</text>`;
+      return `<text id="${escapeXml(el.id)}"${buildTextAttrs(el.style)}${transform}${extras}>${escapeXml(el.content)}</text>`;
 
-    case 'image':
-      return `<image id="${escapeXml(el.id)}" href="${escapeXml(el.content)}" width="${String(el.width)}" height="${String(el.height)}"${transform}${clipAttr}/>`;
+    case 'image': {
+      const par = objectFitToPreserveAspectRatio(el.style.objectFit);
+
+      return `<image id="${escapeXml(el.id)}" href="${escapeXml(el.content)}" width="${String(el.width)}" height="${String(el.height)}" preserveAspectRatio="${par}"${transform}${extras}/>`;
+    }
 
     case 'svg':
-      return renderSvgPayload(el, transform + styleAttrs + clipAttr);
+      return renderSvgPayload(el, transform + styleAttrs + extras);
+
+    case 'qrcode': {
+      const qrSvg = generateQrSvgFragment(el.content);
+
+      if (qrSvg === null) {
+        return `<g id="${escapeXml(el.id)}"${transform}/>`;
+      }
+
+      // Extract SVG inner content from the fragment
+      const innerMatch = /<svg[^>]*>([\s\S]*)<\/svg>/i.exec(qrSvg);
+      const inner = innerMatch?.[1] ?? qrSvg;
+
+      return `<g id="${escapeXml(el.id)}"${transform}>${inner}</g>`;
+    }
 
     case 'group':
-      return `<g id="${escapeXml(el.id)}"${transform}${clipAttr}/>`;
+      return `<g id="${escapeXml(el.id)}"${transform}${extras}/>`;
 
     default:
       return `<g id="${escapeXml(el.id)}"${transform}/>`;
@@ -139,14 +284,14 @@ function renderElement(el: BroadsetElement, clipDefs: string[]): string {
 }
 
 export function exportSvg(doc: BroadsetDocument): string {
-  const clipDefs: string[] = [];
-  const elementNodes = doc.elements.map((el) => renderElement(el, clipDefs));
+  const defs: string[] = [];
+  const elementNodes = doc.elements.map((el) => renderElement(el, defs));
 
-  const defs = clipDefs.length > 0 ? `<defs>${clipDefs.join('')}</defs>` : '';
+  const defsBlock = defs.length > 0 ? `<defs>${defs.join('')}</defs>` : '';
 
   return [
     `<svg xmlns="${SVG_XMLNS}" xmlns:xlink="${XLINK_XMLNS}" width="${String(doc.canvas.width)}" height="${String(doc.canvas.height)}" viewBox="0 0 ${String(doc.canvas.width)} ${String(doc.canvas.height)}">`,
-    defs,
+    defsBlock,
     ...elementNodes,
     '</svg>',
   ].join('\n');

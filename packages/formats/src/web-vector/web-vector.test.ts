@@ -336,6 +336,164 @@ describe('SVG Import Error Recovery', () => {
 });
 
 /* ------------------------------------------------------------------ */
+/*  SVG Export Style Enrichments (C9)                                */
+/* ------------------------------------------------------------------ */
+
+describe('SVG Export Style Enrichments', () => {
+  /** @description Linear gradient must produce a linearGradient def and fill reference. */
+  it('exports linearGradient def for backgroundGradient', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          id: 'rect-grad',
+          type: 'rectangle',
+          style: makeStyle({
+            backgroundGradient: {
+              type: 'linear',
+              angle: 90,
+              stops: [
+                { color: '#ff0000', position: 0 },
+                { color: '#0000ff', position: 1 },
+              ],
+            },
+          }),
+        }),
+      ],
+    });
+
+    const svg = exportSvg(doc);
+
+    expect(svg).toContain('<linearGradient id="grad-rect-grad"');
+    expect(svg).toContain('stop-color="#ff0000"');
+    expect(svg).toContain('stop-color="#0000ff"');
+    expect(svg).toContain('fill="url(#grad-rect-grad)"');
+  });
+
+  /** @description Radial gradient must produce a radialGradient def. */
+  it('exports radialGradient def for backgroundGradient', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          id: 'ellipse-grad',
+          type: 'ellipse',
+          style: makeStyle({
+            backgroundGradient: {
+              type: 'radial',
+              stops: [
+                { color: '#00ff00', position: 0 },
+                { color: '#ff00ff', position: 1 },
+              ],
+            },
+          }),
+        }),
+      ],
+    });
+
+    const svg = exportSvg(doc);
+
+    expect(svg).toContain('<radialGradient id="grad-ellipse-grad"');
+    expect(svg).toContain('fill="url(#grad-ellipse-grad)"');
+  });
+
+  /** @description boxShadow must produce an SVG filter def with feDropShadow. */
+  it('exports boxShadow as SVG filter', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          id: 'shadow-el',
+          type: 'rectangle',
+          style: makeStyle({ boxShadow: '2px 4px 6px #000000' }),
+        }),
+      ],
+    });
+
+    const svg = exportSvg(doc);
+
+    expect(svg).toContain('<filter id="shadow-shadow-el"');
+    expect(svg).toContain('feDropShadow');
+    expect(svg).toContain('dx="2"');
+    expect(svg).toContain('dy="4"');
+    expect(svg).toContain('filter="url(#shadow-shadow-el)"');
+  });
+
+  /** @description QR code elements must produce inline SVG content. */
+  it('exports qrcode elements as svg content', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          id: 'qr-svg',
+          type: 'qrcode',
+          content: 'https://example.com',
+        }),
+      ],
+    });
+
+    const svg = exportSvg(doc);
+
+    expect(svg).toContain('id="qr-svg"');
+    expect(svg).toContain('<rect');
+  });
+
+  /** @description Image elements must include preserveAspectRatio. */
+  it('exports image with preserveAspectRatio', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          type: 'image',
+          content: 'https://img.example.com/pic.png',
+          style: makeStyle({ objectFit: 'contain' }),
+        }),
+      ],
+    });
+
+    const svg = exportSvg(doc);
+
+    expect(svg).toContain('preserveAspectRatio="xMidYMid meet"');
+  });
+
+  /** @description Text elements must include fontStyle and textDecoration attributes. */
+  it('exports text with fontStyle and textDecoration', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          type: 'text',
+          content: 'Fancy',
+          style: makeStyle({
+            fontStyle: 'italic',
+            textDecoration: 'underline',
+            letterSpacing: 2,
+          }),
+        }),
+      ],
+    });
+
+    const svg = exportSvg(doc);
+
+    expect(svg).toContain('font-style="italic"');
+    expect(svg).toContain('text-decoration="underline"');
+    expect(svg).toContain('letter-spacing="2"');
+  });
+
+  /** @description QR code with empty content must produce empty group. */
+  it('exports empty qrcode as empty group', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          id: 'qr-empty',
+          type: 'qrcode',
+          content: '',
+        }),
+      ],
+    });
+
+    const svg = exportSvg(doc);
+
+    expect(svg).toContain('id="qr-empty"');
+    expect(svg).toContain('<g id="qr-empty"');
+  });
+});
+
+/* ------------------------------------------------------------------ */
 /*  HTML Standalone Export                                            */
 /* ------------------------------------------------------------------ */
 
