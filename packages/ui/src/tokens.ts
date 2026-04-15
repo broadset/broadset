@@ -157,7 +157,11 @@ export function mattePanelStyle(): CSSProperties {
   };
 }
 
-/** Elevated overlay style for modals and popovers. */
+/**
+ * Elevated overlay style for modals and popovers.
+ * Uses opaque `surface` background (not `glass-bg`) for readability of dense content,
+ * combined with backdrop blur and the strongest shadow for clear layering separation.
+ */
 export function overlayPanelStyle(): CSSProperties {
   return {
     backgroundColor: color('surface'),

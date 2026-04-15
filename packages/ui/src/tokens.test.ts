@@ -31,6 +31,23 @@ describe('tokens', () => {
       expect(result).toContain('var(--sp-03');
       expect(result).toContain('0.5rem');
     });
+
+    /** @description All spacing presets must be defined and return valid CSS custom properties */
+    it.each([
+      'sp-01',
+      'sp-02',
+      'sp-03',
+      'sp-04',
+      'sp-05',
+      'sp-06',
+      'sp-07',
+      'sp-08',
+      'sp-09',
+    ] as readonly SpacingToken[])('defines spacing preset "%s"', (token) => {
+      const result = sp(token);
+
+      expect(result).toMatch(/^var\(--sp-\d{2}, /);
+    });
   });
 
   describe('color()', () => {
@@ -39,6 +56,26 @@ describe('tokens', () => {
       const result = color('accent');
 
       expect(result).toContain('var(--accent');
+    });
+
+    /** @description All color presets must be defined and return valid CSS custom properties */
+    it.each([
+      'foreground',
+      'muted',
+      'surface',
+      'surface-secondary',
+      'surface-tertiary',
+      'border',
+      'accent',
+      'danger',
+      'success',
+      'field-background',
+      'focus',
+      'glass-bg',
+    ] as readonly ColorToken[])('defines color token "%s"', (token) => {
+      const result = color(token);
+
+      expect(result).toMatch(/^var\(--/);
     });
   });
 
@@ -50,6 +87,16 @@ describe('tokens', () => {
       expect(result).toContain('var(--font-body-compact');
       expect(result).toContain('0.875rem');
     });
+
+    /** @description All font presets must be defined and return valid CSS custom properties */
+    it.each(['label', 'body-compact', 'heading-sm', 'heading-md'] as readonly FontToken[])(
+      'defines font token "%s"',
+      (token) => {
+        const result = font(token);
+
+        expect(result).toMatch(/^var\(--font-/);
+      },
+    );
   });
 
   describe('radius()', () => {
