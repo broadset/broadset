@@ -2,11 +2,10 @@ import { Button } from '@heroui/react';
 import { X } from 'lucide-react';
 import type { JSX, ReactNode } from 'react';
 
-import { color, sp } from '../tokens';
+import { color, font, radius, sp, zLayer } from '../tokens';
 
 const DEFAULT_HEIGHT_PX = 240;
 const PANEL_INSET = sp('sp-04');
-const PANEL_Z_INDEX = 8000;
 
 export interface TimelineBottomPanelProps {
   readonly isOpen: boolean;
@@ -30,10 +29,10 @@ export function TimelineBottomPanel(props: TimelineBottomPanelProps): JSX.Elemen
         left: PANEL_INSET,
         right: PANEL_INSET,
         height: `${String(height)}px`,
-        zIndex: PANEL_Z_INDEX,
+        zIndex: zLayer('overlay'),
         backgroundColor: color('surface'),
-        borderTopLeftRadius: '12px',
-        borderTopRightRadius: '12px',
+        borderTopLeftRadius: radius('lg'),
+        borderTopRightRadius: radius('lg'),
         borderTop: `1px solid ${color('border')}`,
         transform: isOpen ? 'translateY(0)' : 'translateY(100%)',
         transition: 'var(--transition-panel, transform 0.25s ease)',
@@ -51,7 +50,7 @@ export function TimelineBottomPanel(props: TimelineBottomPanelProps): JSX.Elemen
           borderBottom: `1px solid ${color('border')}`,
         }}
       >
-        <span style={{ fontSize: '12px', fontWeight: 600, color: color('foreground') }}>Timeline</span>
+        <span style={{ fontSize: font('label'), fontWeight: 600, color: color('foreground') }}>Timeline</span>
         <Button size="sm" variant="ghost" isIconOnly aria-label="Close" onPress={onClose}>
           <X size={14} />
         </Button>
