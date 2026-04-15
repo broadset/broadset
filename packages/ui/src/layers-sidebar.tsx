@@ -23,6 +23,7 @@ import {
 import type { JSX } from 'react';
 import { useCallback, useState } from 'react';
 
+import { computeDropPosition, INDENT_PER_LEVEL, isDescendantInLayerList } from './layers-utils';
 import type { LayerInfo } from './panel-types';
 import { ICON_SIZE } from './panel-types';
 import { color, font, glassPanelStyle, sp } from './tokens';
@@ -44,10 +45,6 @@ const LAYER_ICON_MAP = {
   clock: Clock3,
   ticker: LetterText,
 } as const;
-
-const INDENT_PER_LEVEL = 16;
-const DROP_PARENT_ZONE_RATIO = 0.55;
-const DROP_AFTER_ZONE_RATIO = 0.82;
 
 /* ------------------------------------------------------------------ */
 /*  LayersSidebar                                                      */
@@ -134,34 +131,7 @@ export function LayersSidebar({
 
   /** Check whether targetId is a descendant of dragSourceId in the flat layer list */
   const isDescendant = useCallback(
-    (dragSourceId: string, targetId: string): boolean => {
-      const sourceIndex = layers.findIndex((l) => l.id === dragSourceId);
-
-      if (sourceIndex < 0) {
-        return false;
-      }
-
-      const sourceDepth = layers[sourceIndex]?.depth ?? 0;
-
-      // Walk forward from the source — all immediately following layers with greater depth are descendants
-      for (let i = sourceIndex + 1; i < layers.length; i++) {
-        const layer = layers[i];
-
-        if (layer === undefined) {
-          break;
-        }
-
-        if ((layer.depth ?? 0) <= sourceDepth) {
-          break; // Out of the subtree
-        }
-
-        if (layer.id === targetId) {
-          return true;
-        }
-      }
-
-      return false;
-    },
+    (dragSourceId: string, targetId: string): boolean => isDescendantInLayerList(layers, dragSourceId, targetId),
     [layers],
   );
 
@@ -181,21 +151,7 @@ export function LayersSidebar({
       const rect = event.currentTarget.getBoundingClientRect();
       const y = event.clientY - rect.top;
       const targetLayer = layers.find((layer) => layer.id === targetId);
-      const supportsInsideDrop = targetLayer?.type === 'group';
-      const parentZoneLimit = rect.height * DROP_PARENT_ZONE_RATIO;
-      const afterZoneStart = rect.height * DROP_AFTER_ZONE_RATIO;
-
-      let position: 'before' | 'inside' | 'after';
-
-      if (y <= parentZoneLimit) {
-        position = 'before';
-      } else if (y >= afterZoneStart) {
-        position = 'after';
-      } else if (supportsInsideDrop) {
-        position = 'inside';
-      } else {
-        position = 'before';
-      }
+      const position = computeDropPosition(y, rect.height, targetLayer?.type === 'group');
 
       setDropTarget({ id: targetId, position });
     },

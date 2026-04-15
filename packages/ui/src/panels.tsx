@@ -16,6 +16,8 @@ export type { AnimationSidebarProps } from './animation-sidebar';
 export { AnimationSidebar } from './animation-sidebar';
 export type { LayersSidebarProps } from './layers-sidebar';
 export { LayersSidebar } from './layers-sidebar';
+export type { LayerDropPosition } from './layers-utils';
+export { computeDropPosition, isDescendantInLayerList } from './layers-utils';
 export type {
   CustomPanelComponent,
   CustomPanelProps,
