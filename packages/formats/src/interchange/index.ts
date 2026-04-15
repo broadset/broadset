@@ -318,7 +318,7 @@ function buildOGrafSchema(element: BroadsetElement): OGrafSchema {
   }
 
   // Data binding field
-  if (element.dataField !== null) {
+  if (element.dataField != null) {
     const key = `${element.id}-data`;
     const fieldName = element.dataField.fieldName;
 
