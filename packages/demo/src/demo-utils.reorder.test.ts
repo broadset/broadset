@@ -234,3 +234,188 @@ describe('buildRenderableDocumentForActivePage', () => {
     expect(renderable.elements[0]?.content).toBe('https://picsum.photos/id/103/150/150');
   });
 });
+
+/* ------------------------------------------------------------------ */
+/*  C4 — Nested DnD Guardrails and Edge Cases                         */
+/* ------------------------------------------------------------------ */
+
+function createDeepHierarchyFixture(): BroadsetDocument {
+  const base = createEmptyBroadsetDocument();
+  const elements = [
+    createDefaultElement('group', { id: 'el-groupA', name: 'GroupA' }),
+    createDefaultElement('text', { id: 'el-childA1', name: 'ChildA1', parentId: 'el-groupA' }),
+    createDefaultElement('group', { id: 'el-childA2', name: 'ChildGroupA2', parentId: 'el-groupA' }),
+    createDefaultElement('rectangle', { id: 'el-grandchild', name: 'Grandchild', parentId: 'el-childA2' }),
+    createDefaultElement('group', { id: 'el-groupB', name: 'GroupB' }),
+    createDefaultElement('ellipse', { id: 'el-childB1', name: 'ChildB1', parentId: 'el-groupB' }),
+    createDefaultElement('image', { id: 'el-standalone', name: 'Standalone' }),
+  ];
+
+  return {
+    ...base,
+    elements,
+    pages: base.pages.map((page) => ({ ...page, elements: createRootPageInstances(elements) })),
+  };
+}
+
+describe('reorderDocumentLayers — nested DnD guardrails (C4)', () => {
+  /** @description Deep indirect cycle detection: dragging an ancestor (GroupA) into a grandchild must be rejected. */
+  it('rejects indirect cycle through grandchild', () => {
+    const document = createDeepHierarchyFixture();
+    const result = reorderDocumentLayers(document, 'el-groupA', 'el-grandchild', 'inside');
+
+    expect(result).toBe(document);
+  });
+
+  /** @description Moving a grandchild from GroupA subtree into GroupB via inside-drop must reparent it correctly. */
+  it('cross-parent reparent: grandchild from GroupA into GroupB', () => {
+    const document = createDeepHierarchyFixture();
+    const result = reorderDocumentLayers(document, 'el-grandchild', 'el-groupB', 'inside');
+    const moved = result.elements.find((el) => el.id === 'el-grandchild');
+
+    expect(moved?.parentId).toBe('el-groupB');
+  });
+
+  /** @description Moving a child group (with its own child) between groups must move the entire subtree together. */
+  it('subtree follows parent on cross-group move', () => {
+    const document = createDeepHierarchyFixture();
+    const result = reorderDocumentLayers(document, 'el-childA2', 'el-groupB', 'inside');
+
+    const movedGroup = result.elements.find((el) => el.id === 'el-childA2');
+    const grandchild = result.elements.find((el) => el.id === 'el-grandchild');
+
+    expect(movedGroup?.parentId).toBe('el-groupB');
+    // Grandchild stays parented to its original parent (the moved group)
+    expect(grandchild?.parentId).toBe('el-childA2');
+  });
+
+  /** @description Sibling reorder within the same group must change order but not parentId. */
+  it('sibling reorder within same parent preserves parentId', () => {
+    const document = createDeepHierarchyFixture();
+    const result = reorderDocumentLayers(document, 'el-childA1', 'el-childA2', 'after');
+
+    const moved = result.elements.find((el) => el.id === 'el-childA1');
+
+    // parentId stays the same (still under GroupA, not under ChildGroupA2)
+    expect(moved?.parentId).toBe('el-groupA');
+  });
+
+  /** @description After-drop must position the drag source after the target's subtree, not between target and its children. */
+  it('after-drop positions source after target subtree', () => {
+    const document = createDeepHierarchyFixture();
+    const result = reorderDocumentLayers(document, 'el-standalone', 'el-groupA', 'after');
+
+    // In layer order (reversed elements), standalone should appear after GroupA's entire subtree
+    const layerOrder = [...result.elements].reverse().map((el) => el.id);
+    const groupAIdx = layerOrder.indexOf('el-groupA');
+    const grandchildIdx = layerOrder.indexOf('el-grandchild');
+    const standaloneIdx = layerOrder.indexOf('el-standalone');
+
+    // Standalone must come after all of GroupA's children
+    expect(standaloneIdx).toBeGreaterThan(groupAIdx);
+    expect(standaloneIdx).toBeGreaterThan(grandchildIdx);
+  });
+
+  /** @description Before-drop on a root group must reparent the dragged element into that group. */
+  it('before-drop on root group reparents into target', () => {
+    const document = createDeepHierarchyFixture();
+    const result = reorderDocumentLayers(document, 'el-standalone', 'el-groupA', 'before');
+
+    const moved = result.elements.find((el) => el.id === 'el-standalone');
+
+    expect(moved?.parentId).toBe('el-groupA');
+  });
+
+  /** @description Dropping a non-group element into another non-group must be rejected (only groups accept children). */
+  it('rejects inside drop on non-group element at any depth', () => {
+    const document = createDeepHierarchyFixture();
+    const result = reorderDocumentLayers(document, 'el-standalone', 'el-childA1', 'inside');
+
+    expect(result).toBe(document);
+  });
+
+  /** @description Moving a group with children from root into another group must preserve the entire hierarchy. */
+  it('preserves deep hierarchy when moving group with children into another group', () => {
+    const document = createDeepHierarchyFixture();
+    const result = reorderDocumentLayers(document, 'el-groupA', 'el-groupB', 'inside');
+
+    const groupA = result.elements.find((el) => el.id === 'el-groupA');
+    const childA1 = result.elements.find((el) => el.id === 'el-childA1');
+    const childA2 = result.elements.find((el) => el.id === 'el-childA2');
+    const grandchild = result.elements.find((el) => el.id === 'el-grandchild');
+
+    // GroupA now nested into GroupB
+    expect(groupA?.parentId).toBe('el-groupB');
+    // Internal hierarchy unchanged
+    expect(childA1?.parentId).toBe('el-groupA');
+    expect(childA2?.parentId).toBe('el-groupA');
+    expect(grandchild?.parentId).toBe('el-childA2');
+  });
+
+  /** @description Self-drop must be a no-op, returning the same document reference. */
+  it('self-drop is a no-op', () => {
+    const document = createDeepHierarchyFixture();
+    const result = reorderDocumentLayers(document, 'el-groupA', 'el-groupA', 'inside');
+
+    expect(result).toBe(document);
+  });
+
+  /** @description Dropping on a nonexistent target must be a no-op. */
+  it('nonexistent target is a no-op', () => {
+    const document = createDeepHierarchyFixture();
+    const result = reorderDocumentLayers(document, 'el-standalone', 'el-nonexistent', 'before');
+
+    expect(result).toBe(document);
+  });
+});
+
+describe('buildLayerInfoList — depth and hierarchy (C4)', () => {
+  /** @description Deep nesting must produce correct depth values at every level (0, 1, 2, …). */
+  it('assigns correct depth for three levels of nesting', () => {
+    const base = createEmptyBroadsetDocument();
+    const elements = [
+      createDefaultElement('group', { id: 'el-root', name: 'Root' }),
+      createDefaultElement('group', { id: 'el-mid', name: 'Mid', parentId: 'el-root' }),
+      createDefaultElement('text', { id: 'el-deep', name: 'Deep', parentId: 'el-mid' }),
+      createDefaultElement('rectangle', { id: 'el-toplevel', name: 'TopLevel' }),
+    ];
+    const document: BroadsetDocument = {
+      ...base,
+      elements,
+      pages: base.pages.map((page) => ({ ...page, elements: createRootPageInstances(elements) })),
+    };
+
+    const layers = buildLayerInfoList(document, 0);
+    const rootLayer = layers.find((l) => l.id === 'el-root');
+    const midLayer = layers.find((l) => l.id === 'el-mid');
+    const deepLayer = layers.find((l) => l.id === 'el-deep');
+    const topLayer = layers.find((l) => l.id === 'el-toplevel');
+
+    expect(rootLayer?.depth).toBe(0);
+    expect(midLayer?.depth).toBe(1);
+    expect(deepLayer?.depth).toBe(2);
+    expect(topLayer?.depth).toBe(0);
+  });
+
+  /** @description A group with children must report hasChildren=true even when collapsed. */
+  it('sets hasChildren on groups with children', () => {
+    const base = createEmptyBroadsetDocument();
+    const elements = [
+      createDefaultElement('group', { id: 'el-parent', name: 'Parent' }),
+      createDefaultElement('text', { id: 'el-child', name: 'Child', parentId: 'el-parent' }),
+      createDefaultElement('group', { id: 'el-empty-group', name: 'EmptyGroup' }),
+    ];
+    const document: BroadsetDocument = {
+      ...base,
+      elements,
+      pages: base.pages.map((page) => ({ ...page, elements: createRootPageInstances(elements) })),
+    };
+
+    const layers = buildLayerInfoList(document, 0);
+    const parentLayer = layers.find((l) => l.id === 'el-parent');
+    const emptyGroupLayer = layers.find((l) => l.id === 'el-empty-group');
+
+    expect(parentLayer?.hasChildren).toBe(true);
+    expect(emptyGroupLayer?.hasChildren).toBeFalsy();
+  });
+});
