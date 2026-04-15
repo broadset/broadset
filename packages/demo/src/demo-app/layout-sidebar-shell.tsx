@@ -1,11 +1,23 @@
-import { color, font, sp } from '@broadset/ui';
+import { color, font, radius, shadow, SidebarContextHeader, sp } from '@broadset/ui';
+import { Layers, LayoutTemplate, ShieldCheck, Sliders, Workflow } from 'lucide-react';
 
+import type { SidebarTab } from '../demo-types';
 import { SIDEBAR_EDGE_INSET, SIDEBAR_TOP_OFFSET } from '../demo-types';
 import { clampSidebarWidth } from '../demo-utils';
 import type { DemoAppLayoutProps } from './layout-types';
 
+const TAB_ICON_SIZE = 16;
+
+const SIDEBAR_TAB_META: Record<SidebarTab, { readonly icon: React.ReactNode; readonly label: string }> = {
+  layers: { icon: <Layers size={TAB_ICON_SIZE} />, label: 'Layers' },
+  properties: { icon: <Sliders size={TAB_ICON_SIZE} />, label: 'Properties' },
+  animation: { icon: <Workflow size={TAB_ICON_SIZE} />, label: 'Animation' },
+  preflight: { icon: <ShieldCheck size={TAB_ICON_SIZE} />, label: 'Pre-flight' },
+  'template-groups': { icon: <LayoutTemplate size={TAB_ICON_SIZE} />, label: 'Template Groups' },
+};
+
 export function LayoutSidebarShell(props: DemoAppLayoutProps): React.JSX.Element {
-  const { isSidebarOpen, setSidebarWidth, sidebarPanel, sidebarWidth } = props;
+  const { isSidebarOpen, setSidebarWidth, sidebarPanel, sidebarTab, sidebarWidth } = props;
 
   return (
     <aside
@@ -15,13 +27,13 @@ export function LayoutSidebarShell(props: DemoAppLayoutProps): React.JSX.Element
       style={{
         backgroundColor: color('surface'),
         border: `1px solid ${color('border')}`,
-        borderBottomLeftRadius: '1rem',
+        borderBottomLeftRadius: radius('xl'),
         borderBottomRightRadius: 0,
         borderRight: 'none',
-        borderTopLeftRadius: '1rem',
+        borderTopLeftRadius: radius('xl'),
         borderTopRightRadius: 0,
         bottom: `${String(SIDEBAR_EDGE_INSET)}px`,
-        boxShadow: 'var(--overlay-shadow, 0 14px 40px rgba(15, 23, 42, 0.22))',
+        boxShadow: shadow('overlay'),
         overflow: 'hidden',
         pointerEvents: isSidebarOpen ? 'auto' : 'none',
         right: '0px',
@@ -81,6 +93,7 @@ export function LayoutSidebarShell(props: DemoAppLayoutProps): React.JSX.Element
 
       {isSidebarOpen ?
         <div className="h-full overflow-auto" style={{ padding: `${sp('sp-02')} ${sp('sp-03')}` }}>
+          <SidebarContextHeader icon={SIDEBAR_TAB_META[sidebarTab].icon} label={SIDEBAR_TAB_META[sidebarTab].label} />
           {sidebarPanel}
         </div>
       : null}
