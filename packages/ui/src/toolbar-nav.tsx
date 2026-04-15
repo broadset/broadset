@@ -203,7 +203,12 @@ export function PageSorter({
   onPageRemove,
 }: PageSorterProps): JSX.Element {
   return (
-    <section aria-label="Scenes" className="flex items-center gap-2" style={glassPanelStyle()}>
+    <section
+      aria-label="Scenes"
+      className="flex items-center gap-2"
+      data-testid="scene-strip"
+      style={glassPanelStyle()}
+    >
       <Tabs
         aria-label="Scenes"
         selectedKey={String(activePageIndex)}
