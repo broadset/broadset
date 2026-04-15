@@ -1,7 +1,7 @@
 import type { EditorStore, ElementUpdate } from '@broadset/editor';
 import type { BroadsetElement } from '@broadset/model';
 import type { Dispatch, SetStateAction } from 'react';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { clampCanvasZoom } from '../demo-utils';
 
@@ -64,9 +64,35 @@ export function useCanvasControlHandlers({
     [editorStore],
   );
 
+  const pendingPreviewRef = useRef<{ elementId: string; updates: ElementUpdate } | null>(null);
+  // 0 means no RAF is scheduled; RAF IDs are always positive integers
+  const rafIdRef = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== 0) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = 0;
+      }
+    };
+  }, []);
+
   const handleElementTransformPreview = useCallback(
     (elementId: string, updates: ElementUpdate): void => {
-      editorStore.getState().updateElementEphemeral(elementId, updates);
+      pendingPreviewRef.current = { elementId, updates };
+
+      if (rafIdRef.current === 0) {
+        rafIdRef.current = requestAnimationFrame(() => {
+          rafIdRef.current = 0;
+
+          const pending = pendingPreviewRef.current;
+
+          if (pending !== null) {
+            editorStore.getState().updateElementEphemeral(pending.elementId, pending.updates);
+            pendingPreviewRef.current = null;
+          }
+        });
+      }
     },
     [editorStore],
   );

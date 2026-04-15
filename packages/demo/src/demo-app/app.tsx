@@ -148,7 +148,14 @@ export function DemoApp(): React.JSX.Element {
     () => buildRenderableDocumentForActivePage(currentDocument, editorState.activePageIndex, SAMPLE_PROJECT.assets),
     [currentDocument, editorState.activePageIndex],
   );
+  const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarPreferences.isOpen);
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>(initialSidebarPreferences.tab);
+  const [sidebarWidth, setSidebarWidth] = useState(initialSidebarPreferences.width);
   const preflightIssues = useMemo<readonly PreflightIssue[]>(() => {
+    if (sidebarTab !== 'preflight') {
+      return [];
+    }
+
     const diagnostics = runPreflightDiagnostics(currentDocument, {});
 
     return diagnostics.map((d) => ({
@@ -158,7 +165,7 @@ export function DemoApp(): React.JSX.Element {
       elementName: d.elementName,
       ruleId: d.rule,
     }));
-  }, [currentDocument]);
+  }, [currentDocument, sidebarTab]);
 
   const animationConfig = useMemo(() => {
     if (selectedElementId === null) {
@@ -187,9 +194,6 @@ export function DemoApp(): React.JSX.Element {
 
     return parsed.success ? (parsed.data.templateGroups ?? []) : [];
   });
-  const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarPreferences.isOpen);
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>(initialSidebarPreferences.tab);
-  const [sidebarWidth, setSidebarWidth] = useState(initialSidebarPreferences.width);
   const [viewportSize, setViewportSize] = useState(() => ({
     height: typeof window === 'undefined' ? currentDocument.canvas.height : window.innerHeight,
     width: typeof window === 'undefined' ? currentDocument.canvas.width : window.innerWidth,
