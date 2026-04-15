@@ -507,3 +507,216 @@ describe('HTML Runtime Feature Parity', () => {
     expect(html).toContain('easeStep');
   });
 });
+
+/* ------------------------------------------------------------------ */
+/*  HTML Standalone Style Enrichments (C8)                           */
+/* ------------------------------------------------------------------ */
+
+describe('HTML Standalone Style Enrichments', () => {
+  /** @description backgroundGradient CSS string must appear in the HTML output as a background property. */
+  it('exports backgroundGradient CSS strings', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          type: 'rectangle',
+          style: makeStyle({ backgroundGradient: 'linear-gradient(to right, red, blue)' }),
+        }),
+      ],
+    });
+
+    const html = exportHtmlStandalone(doc);
+
+    expect(html).toContain('background:linear-gradient(to right, red, blue)');
+  });
+
+  /** @description Structured BroadsetGradient objects must be converted to valid CSS gradient strings. */
+  it('exports structured gradient objects as CSS', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          type: 'rectangle',
+          style: makeStyle({
+            backgroundGradient: {
+              type: 'linear',
+              angle: 90,
+              stops: [
+                { color: '#ff0000', position: 0 },
+                { color: '#0000ff', position: 1 },
+              ],
+            },
+          }),
+        }),
+      ],
+    });
+
+    const html = exportHtmlStandalone(doc);
+
+    expect(html).toContain('linear-gradient(90deg');
+    expect(html).toContain('#ff0000 0%');
+    expect(html).toContain('#0000ff 100%');
+  });
+
+  /** @description boxShadow must appear in the HTML output. */
+  it('exports boxShadow CSS property', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          type: 'rectangle',
+          style: makeStyle({ boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }),
+        }),
+      ],
+    });
+
+    const html = exportHtmlStandalone(doc);
+
+    expect(html).toContain('box-shadow:0 4px 6px rgba(0,0,0,0.1)');
+  });
+
+  /** @description textShadow must appear in the HTML text element output. */
+  it('exports textShadow CSS property', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          type: 'text',
+          content: 'Shadow',
+          style: makeStyle({ textShadow: '2px 2px 4px black' }),
+        }),
+      ],
+    });
+
+    const html = exportHtmlStandalone(doc);
+
+    expect(html).toContain('text-shadow:2px 2px 4px black');
+  });
+
+  /** @description textStroke must appear as -webkit-text-stroke in the HTML text element output. */
+  it('exports textStroke as -webkit-text-stroke', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          type: 'text',
+          content: 'Stroke',
+          style: makeStyle({ textStroke: '1px white' }),
+        }),
+      ],
+    });
+
+    const html = exportHtmlStandalone(doc);
+
+    expect(html).toContain('-webkit-text-stroke:1px white');
+  });
+
+  /** @description textTransform must appear in the HTML output. */
+  it('exports textTransform CSS property', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          type: 'text',
+          content: 'upper',
+          style: makeStyle({ textTransform: 'uppercase' }),
+        }),
+      ],
+    });
+
+    const html = exportHtmlStandalone(doc);
+
+    expect(html).toContain('text-transform:uppercase');
+  });
+
+  /** @description filter CSS must appear in the HTML output. */
+  it('exports filter CSS property', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          type: 'rectangle',
+          style: makeStyle({ filter: 'blur(4px)' }),
+        }),
+      ],
+    });
+
+    const html = exportHtmlStandalone(doc);
+
+    expect(html).toContain('filter:blur(4px)');
+  });
+
+  /** @description Text typography properties must appear as inline styles. */
+  it('exports text typography inline styles', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          type: 'text',
+          content: 'Hello',
+          style: makeStyle({
+            fontFamily: 'Inter',
+            fontSize: 24,
+            fontColor: '#333333',
+            fontWeight: 700,
+            textAlignment: 'center',
+          }),
+        }),
+      ],
+    });
+
+    const html = exportHtmlStandalone(doc);
+
+    expect(html).toContain('font-family:Inter');
+    expect(html).toContain('font-size:24px');
+    expect(html).toContain('color:#333333');
+    expect(html).toContain('font-weight:700');
+    expect(html).toContain('text-align:center');
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  HTML QR Code Rendering (C8)                                      */
+/* ------------------------------------------------------------------ */
+
+describe('HTML QR Code Rendering', () => {
+  /** @description QR code elements must produce inline SVG in the HTML output. */
+  it('renders qrcode elements as inline SVG', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          id: 'qr-1',
+          type: 'qrcode',
+          content: 'https://example.com',
+        }),
+      ],
+    });
+
+    const html = exportHtmlStandalone(doc);
+
+    expect(html).toContain('<svg');
+    expect(html).toContain('viewBox=');
+    expect(html).toContain('<rect');
+  });
+
+  /** @description QR code with empty content must render as empty div. */
+  it('renders empty qrcode as empty div', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          id: 'qr-empty',
+          type: 'qrcode',
+          content: '',
+        }),
+      ],
+    });
+
+    const html = exportHtmlStandalone(doc);
+
+    expect(html).not.toContain('<svg');
+    expect(html).toContain('data-element-id="qr-empty"');
+  });
+
+  /** @description Ellipse elements must render with border-radius:50%. */
+  it('renders ellipse with border-radius:50%', () => {
+    const doc = makeDocument({
+      elements: [makeElement({ type: 'ellipse' })],
+    });
+
+    const html = exportHtmlStandalone(doc);
+
+    expect(html).toContain('border-radius:50%');
+  });
+});

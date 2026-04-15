@@ -1,6 +1,36 @@
-import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
+import type { BroadsetDocument, BroadsetElement, BroadsetGradient } from '@broadset/model';
 
+import { generateQrSvgFragment } from '../interchange';
 import { escapeXml } from './shared';
+
+/* ------------------------------------------------------------------ */
+/*  Gradient CSS Resolution                                           */
+/* ------------------------------------------------------------------ */
+
+function resolveGradientCss(gradient: string | BroadsetGradient): string | null {
+  if (typeof gradient === 'string') {
+    return gradient;
+  }
+
+  const stops = gradient.stops.map((s) => `${s.color} ${String(s.position * 100)}%`).join(', ');
+
+  if (gradient.type === 'linear') {
+    return `linear-gradient(${String(gradient.angle ?? 0)}deg, ${stops})`;
+  }
+
+  if (gradient.type === 'radial') {
+    const cx = gradient.center?.[0] ?? 50;
+    const cy = gradient.center?.[1] ?? 50;
+
+    return `radial-gradient(circle at ${String(cx)}% ${String(cy)}%, ${stops})`;
+  }
+
+  // gradient.type === 'conic'
+  const cx = gradient.center?.[0] ?? 50;
+  const cy = gradient.center?.[1] ?? 50;
+
+  return `conic-gradient(from ${String(gradient.angle ?? 0)}deg at ${String(cx)}% ${String(cy)}%, ${stops})`;
+}
 
 const OKLAB_RUNTIME = `
 function srgbToLinear(c) { return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
@@ -46,6 +76,73 @@ function easeStep(steps, position, t) {
 	if (position === 'end') return Math.min(s, steps - 1) / steps;
 	return Math.min(s + 1, steps) / steps;
 }`;
+
+/* ------------------------------------------------------------------ */
+/*  Text Inline Style                                                */
+/* ------------------------------------------------------------------ */
+
+function buildTextInlineStyle(el: BroadsetElement): string {
+  const parts: string[] = [];
+
+  if (el.style.fontFamily) {
+    parts.push(`font-family:${el.style.fontFamily}`);
+  }
+
+  if (el.style.fontSize) {
+    parts.push(`font-size:${String(el.style.fontSize)}px`);
+  }
+
+  if (el.style.fontColor) {
+    parts.push(`color:${el.style.fontColor}`);
+  }
+
+  if (el.style.fontWeight) {
+    parts.push(`font-weight:${String(el.style.fontWeight)}`);
+  }
+
+  if (el.style.fontStyle) {
+    parts.push(`font-style:${el.style.fontStyle}`);
+  }
+
+  if (el.style.textAlignment) {
+    parts.push(`text-align:${el.style.textAlignment}`);
+  }
+
+  if (el.style.textDecoration) {
+    parts.push(`text-decoration:${el.style.textDecoration}`);
+  }
+
+  if (el.style.letterSpacing !== undefined) {
+    parts.push(`letter-spacing:${String(el.style.letterSpacing)}px`);
+  }
+
+  if (el.style.lineHeight !== undefined) {
+    parts.push(
+      `line-height:${typeof el.style.lineHeight === 'number' ? String(el.style.lineHeight) : el.style.lineHeight}`,
+    );
+  }
+
+  if (el.style.wordSpacing !== undefined) {
+    parts.push(`word-spacing:${String(el.style.wordSpacing)}px`);
+  }
+
+  if (el.style.verticalAlignment) {
+    const alignMap: Record<string, string> = {
+      top: 'flex-start',
+      middle: 'center',
+      bottom: 'flex-end',
+    };
+
+    parts.push(`display:flex`);
+    parts.push(`align-items:${alignMap[el.style.verticalAlignment] ?? 'flex-start'}`);
+  }
+
+  return parts.join(';');
+}
+
+/* ------------------------------------------------------------------ */
+/*  Element Renderers                                                */
+/* ------------------------------------------------------------------ */
 
 function renderHtmlPath(el: BroadsetElement, dataAttr: string, containerStyle: string): string {
   const fill = el.style.fill ?? 'none';
@@ -110,10 +207,55 @@ function buildCssStyle(el: BroadsetElement): string {
     parts.push(`background:${el.style.backgroundColor}`);
   }
 
+  if (el.style.backgroundGradient !== undefined) {
+    const gradient = resolveGradientCss(el.style.backgroundGradient);
+
+    if (gradient !== null) {
+      parts.push(`background:${gradient}`);
+    }
+  }
+
   if (el.style.borderRadius) {
     const [tl, tr, br, bl] = el.style.borderRadius;
 
     parts.push(`border-radius:${String(tl)}px ${String(tr)}px ${String(br)}px ${String(bl)}px`);
+  }
+
+  if (el.style.borderWidth !== undefined && el.style.borderWidth > 0) {
+    parts.push(`border-width:${String(el.style.borderWidth)}px`);
+    parts.push(`border-style:${el.style.borderStyle ?? 'solid'}`);
+
+    if (el.style.borderColor) {
+      parts.push(`border-color:${el.style.borderColor}`);
+    }
+  }
+
+  if (el.style.boxShadow) {
+    parts.push(`box-shadow:${el.style.boxShadow}`);
+  }
+
+  if (el.style.textStroke) {
+    parts.push(`-webkit-text-stroke:${el.style.textStroke}`);
+  }
+
+  if (el.style.textShadow) {
+    parts.push(`text-shadow:${el.style.textShadow}`);
+  }
+
+  if (el.style.textTransform) {
+    parts.push(`text-transform:${el.style.textTransform}`);
+  }
+
+  if (el.style.filter) {
+    parts.push(`filter:${el.style.filter}`);
+  }
+
+  if (el.style.backdropFilter) {
+    parts.push(`backdrop-filter:${el.style.backdropFilter}`);
+  }
+
+  if (el.style.mixBlendMode) {
+    parts.push(`mix-blend-mode:${el.style.mixBlendMode}`);
   }
 
   if (el.style.customClipPath) {
@@ -128,8 +270,12 @@ function renderHtmlElement(el: BroadsetElement, allElements: readonly BroadsetEl
   const dataAttr = `data-element-id="${escapeXml(el.id)}"`;
 
   switch (el.type) {
-    case 'text':
-      return `<div ${dataAttr} style="${style}">${escapeXml(el.content)}</div>`;
+    case 'text': {
+      const textStyle = buildTextInlineStyle(el);
+      const fullStyle = textStyle ? `${style};${textStyle}` : style;
+
+      return `<div ${dataAttr} style="${fullStyle}">${escapeXml(el.content)}</div>`;
+    }
 
     case 'image':
       return `<div ${dataAttr} style="${style}"><img src="${escapeXml(el.content)}" style="width:100%;height:100%;object-fit:${el.style.objectFit ?? 'cover'}"/></div>`;
@@ -139,6 +285,18 @@ function renderHtmlElement(el: BroadsetElement, allElements: readonly BroadsetEl
 
     case 'path':
       return renderHtmlPath(el, dataAttr, style);
+
+    case 'rectangle':
+    case 'ellipse':
+      return `<div ${dataAttr} style="${style}${el.type === 'ellipse' ? ';border-radius:50%' : ''}"></div>`;
+
+    case 'qrcode': {
+      const qrSvg = generateQrSvgFragment(el.content);
+
+      return qrSvg !== null ?
+          `<div ${dataAttr} style="${style}">${qrSvg}</div>`
+        : `<div ${dataAttr} style="${style}"></div>`;
+    }
 
     case 'group':
       return renderHtmlGroup(el, allElements, dataAttr, style);
