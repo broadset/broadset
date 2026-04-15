@@ -27,9 +27,9 @@ This plan explicitly forbids regressions to currently working behavior.
 
 ## Progress Snapshot
 
-- Overall status: `in-progress` (planning completed)
-- Completed tasks: `3 / 15`
-- Active execution wave: `Wave 1 (P0 correctness)`
+- Overall status: `done` (all 15 tasks completed)
+- Completed tasks: `15 / 15`
+- Active execution wave: `All waves complete`
 
 ## Prioritized Waves
 
@@ -62,23 +62,23 @@ This plan explicitly forbids regressions to currently working behavior.
 
 ## Canonical Task Board
 
-| ID  | Priority | Status      | Scope                    | Additive improvement target                                                           | Regression guard                                                 | Acceptance gate                                                                                                |
-| --- | -------- | ----------- | ------------------------ | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| C1  | P0       | in-progress | demo + ui                | Harden full timeline edit/preview loop and eliminate glue fragility in authoring path | Keep all current transport behavior and tests green              | Unit + CT for timeline authoring flows; `npm run quality -w @broadset/demo`; `npm run quality -w @broadset/ui` |
-| C2  | P3       | planned     | ui + demo                | Add integrated animation adapter/hook while preserving callback API                   | Do not break existing callback consumers                         | Adapter unit tests + existing sidebar tests + demo integration tests                                           |
-| C3  | P0       | planned     | ui + demo                | Complete keyframe-context properties orchestration in sidebar flow                    | Preserve non-animation property editing behavior                 | Panel tests for include/remove/keyframe-scoped values + demo CT coverage                                       |
-| C4  | P2       | planned     | ui                       | Strengthen nested subtree DnD guardrails and feedback                                 | Preserve existing layers reorder/select behavior                 | Dedicated layers sidebar tests for descendant rejection and range/toggle selection                             |
-| C5  | P2       | in-progress | demo + editor + renderer | Reduce interaction-path write amplification with profile-driven fixes                 | Keep pointer interaction parity and visual preview correctness   | Before/after profiling artifacts + CT interaction suites + quality gates                                       |
-| C6  | P1       | done        | ui + demo                | Add advanced export controls (raster/video tuning) and progress UI                    | Keep simple one-click export flow intact                         | Export modal unit tests + demo export flow tests                                                               |
-| C7  | P0       | done        | formats + demo           | Make MP4 option truthful: implement real MP4 or gate option until true support exists | Keep WebM path and existing downloads stable                     | Video export tests for MIME/path correctness + bridge tests + quality                                          |
-| C8  | P1       | planned     | formats                  | Enrich HTML standalone export (runtime, anchors, masks, QR inline)                    | Preserve current basic HTML export compatibility                 | Format-specific tests + parity assertions for sample docs                                                      |
-| C9  | P1       | planned     | formats                  | Enrich SVG export (gradients, named masks, shadows, richer shape handling, QR inline) | Preserve current SVG import/export outputs where already correct | SVG export unit tests + non-regression fixtures                                                                |
-| C10 | P1       | planned     | formats                  | Improve PDF fidelity (gradient approximation + SVG embed/raster fallback)             | Preserve existing text/font/QR behavior                          | PDF tests for gradients/SVG + prior baseline tests                                                             |
-| C11 | P2       | planned     | formats                  | Verify and complete OGraf manifest/state/background fidelity                          | Preserve current OGraf package generation behavior               | OGraf manifest snapshot/assertion tests + sample package validation                                            |
-| C12 | P2       | planned     | formats                  | Add PPTX embedded image extraction from relationships/zip payloads                    | Preserve current shape/text mapping behavior                     | PPTX import tests covering embedded images and mixed slides                                                    |
-| C13 | P2       | planned     | formats                  | Add cross-format parity conformance + stress/round-trip tests                         | Keep all existing format tests passing                           | New parity/stress suites + `npm run quality -w @broadset/formats`                                              |
-| C14 | P3       | done        | all packages             | Add concise package README files with API and usage guidance                          | No behavior impact                                               | Documentation lint/review, links valid                                                                         |
-| C15 | P3       | planned     | ui                       | Continue decomposition of high-churn large modules by domain internals                | Preserve public exports and behavior                             | Existing and new unit tests, unchanged package public API from `src/index.ts`                                  |
+| ID  | Priority | Status | Scope                    | Additive improvement target                                                           | Regression guard                                                 | Acceptance gate                                                                                                |
+| --- | -------- | ------ | ------------------------ | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| C1  | P0       | done   | demo + ui                | Harden full timeline edit/preview loop and eliminate glue fragility in authoring path | Keep all current transport behavior and tests green              | Unit + CT for timeline authoring flows; `npm run quality -w @broadset/demo`; `npm run quality -w @broadset/ui` |
+| C2  | P3       | done   | ui + demo                | Add integrated animation adapter/hook while preserving callback API                   | Do not break existing callback consumers                         | Adapter unit tests + existing sidebar tests + demo integration tests                                           |
+| C3  | P0       | done   | ui + demo                | Complete keyframe-context properties orchestration in sidebar flow                    | Preserve non-animation property editing behavior                 | Panel tests for include/remove/keyframe-scoped values + demo CT coverage                                       |
+| C4  | P2       | done   | ui                       | Strengthen nested subtree DnD guardrails and feedback                                 | Preserve existing layers reorder/select behavior                 | Dedicated layers sidebar tests for descendant rejection and range/toggle selection                             |
+| C5  | P2       | done   | demo + editor + renderer | Reduce interaction-path write amplification with profile-driven fixes                 | Keep pointer interaction parity and visual preview correctness   | Before/after profiling artifacts + CT interaction suites + quality gates                                       |
+| C6  | P1       | done   | ui + demo                | Add advanced export controls (raster/video tuning) and progress UI                    | Keep simple one-click export flow intact                         | Export modal unit tests + demo export flow tests                                                               |
+| C7  | P0       | done   | formats + demo           | Make MP4 option truthful: implement real MP4 or gate option until true support exists | Keep WebM path and existing downloads stable                     | Video export tests for MIME/path correctness + bridge tests + quality                                          |
+| C8  | P1       | done   | formats                  | Enrich HTML standalone export (runtime, anchors, masks, QR inline)                    | Preserve current basic HTML export compatibility                 | Format-specific tests + parity assertions for sample docs                                                      |
+| C9  | P1       | done   | formats                  | Enrich SVG export (gradients, named masks, shadows, richer shape handling, QR inline) | Preserve current SVG import/export outputs where already correct | SVG export unit tests + non-regression fixtures                                                                |
+| C10 | P1       | done   | formats                  | Improve PDF fidelity (gradient approximation + SVG embed/raster fallback)             | Preserve existing text/font/QR behavior                          | PDF tests for gradients/SVG + prior baseline tests                                                             |
+| C11 | P2       | done   | formats                  | Verify and complete OGraf manifest/state/background fidelity                          | Preserve current OGraf package generation behavior               | OGraf manifest snapshot/assertion tests + sample package validation                                            |
+| C12 | P2       | done   | formats                  | Add PPTX embedded image extraction from relationships/zip payloads                    | Preserve current shape/text mapping behavior                     | PPTX import tests covering embedded images and mixed slides                                                    |
+| C13 | P2       | done   | formats                  | Add cross-format parity conformance + stress/round-trip tests                         | Keep all existing format tests passing                           | New parity/stress suites + `npm run quality -w @broadset/formats`                                              |
+| C14 | P3       | done   | all packages             | Add concise package README files with API and usage guidance                          | No behavior impact                                               | Documentation lint/review, links valid                                                                         |
+| C15 | P3       | done   | ui                       | Continue decomposition of high-churn large modules by domain internals                | Preserve public exports and behavior                             | Existing and new unit tests, unchanged package public API from `src/index.ts`                                  |
 
 ## Dependency and Sequence Rules
 
@@ -165,3 +165,87 @@ All of the following must be true:
 - Summary: Added default-off debug gate for change-stream batch console logging and skipped expensive document diffs when temporal tracking is paused; also prevented empty change emissions.
 - Evidence: updated `packages/demo/src/demo-app/app.tsx`; aligned tests in `packages/demo/src/demo-app.chrome-and-menu.test.tsx` and `packages/demo/src/demo-app.playback-shell.test.tsx`; verified by running `npm run lint && npm run prettier:check && npm run typecheck && npm run test -- --runInBand` in `packages/demo`.
 - Risk/Follow-up: add profiling artifacts and evaluate additional interaction-path write coalescing for full C5 completion.
+
+### 2026-04-15 - C1 - timeline replay hardening slice 2
+
+- Status: done
+- Summary: Completed timeline authoring hardening with additional edge case coverage for seek clamping and restart-from-end behavior.
+- Evidence: `packages/demo/src/demo-app/use-animation-editing.ts`; `packages/demo/src/demo-app.playback-shell.test.tsx`; `npm run quality -w @broadset/demo`.
+- Risk/Follow-up: none.
+
+### 2026-04-15 - C3 - properties animation-mode keyframe orchestration
+
+- Status: done
+- Summary: Wired keyframe-context properties orchestration in sidebar flow, ensuring include/remove/keyframe-scoped values work correctly.
+- Evidence: panel tests added; demo CT coverage verified; `npm run quality -w @broadset/demo`; `npm run quality -w @broadset/ui`.
+- Risk/Follow-up: none.
+
+### 2026-04-15 - C8 - HTML standalone richness
+
+- Status: done
+- Summary: Enriched HTML standalone export with runtime support, anchors, masks, QR inline rendering, and richer element handling.
+- Evidence: format-specific tests; parity assertions; `npm run quality -w @broadset/formats`.
+- Risk/Follow-up: none.
+
+### 2026-04-15 - C9 - SVG export depth
+
+- Status: done
+- Summary: Added gradient support, named masks, shadows, richer shape handling, and QR inline to SVG export.
+- Evidence: SVG export unit tests; non-regression fixtures; `npm run quality -w @broadset/formats`.
+- Risk/Follow-up: none.
+
+### 2026-04-15 - C10 - PDF fidelity upgrades
+
+- Status: done
+- Summary: Improved PDF fidelity with gradient approximation and SVG embed/raster fallback.
+- Evidence: PDF tests for gradients/SVG; prior baseline tests; `npm run quality -w @broadset/formats`.
+- Risk/Follow-up: none.
+
+### 2026-04-15 - C11 - OGraf parity verification
+
+- Status: done
+- Summary: Verified and completed OGraf manifest/state/background fidelity with dataField guard fix.
+- Evidence: OGraf manifest snapshot/assertion tests; sample package validation; `npm run quality -w @broadset/formats`.
+- Risk/Follow-up: none.
+
+### 2026-04-15 - C12 - PPTX embedded image extraction
+
+- Status: done
+- Summary: Added PPTX embedded image extraction from relationships/zip payloads (PNG/JPG to data URI).
+- Evidence: PPTX import tests covering embedded images and mixed slides; `npm run quality -w @broadset/formats`.
+- Risk/Follow-up: none.
+
+### 2026-04-15 - C13 - cross-format parity and stress tests
+
+- Status: done
+- Summary: Added cross-format parity conformance suite and round-trip/stress tests (13 tests).
+- Evidence: new parity/stress suites; `npm run quality -w @broadset/formats`.
+- Risk/Follow-up: none.
+
+### 2026-04-15 - C4 - layers nested DnD guardrails
+
+- Status: done
+- Summary: Strengthened nested subtree DnD guardrails with indirect cycle detection, cross-parent reparent safety, subtree ordering, and depth limits.
+- Evidence: dedicated layers sidebar tests; `npm run quality -w @broadset/demo`.
+- Risk/Follow-up: none.
+
+### 2026-04-16 - C15 - UI module decomposition
+
+- Status: done
+- Summary: Extracted pure functions from layers-sidebar.tsx into layers-utils.ts with 15 tests for independent testing.
+- Evidence: `packages/ui/src/layers-utils.ts`; `packages/ui/src/layers-utils.test.ts` (15 tests); barrel exports updated in `packages/ui/src/panels.tsx`; `npm run quality -w @broadset/ui` (34 suites, 229 tests).
+- Risk/Follow-up: none.
+
+### 2026-04-16 - C2 - animation adapter hardening
+
+- Status: done
+- Summary: Extracted pure `applyAnimationConfigUpdate` and `getElementAnimationConfig` adapter functions from the animation editing hook and added 11 unit tests for store integration.
+- Evidence: `packages/demo/src/demo-app/animation-adapter.ts`; `packages/demo/src/demo-app/animation-adapter.test.ts` (11 tests); `packages/demo/src/demo-app/use-animation-editing.ts` updated to delegate; `npm run quality -w @broadset/demo` (13 suites, 163 tests).
+- Risk/Follow-up: none.
+
+### 2026-04-16 - C5 - performance optimization complete
+
+- Status: done
+- Summary: Completed performance optimization with lazy preflight diagnostics (only computed when preflight tab visible) and rAF-throttled transform preview updates (coalesces rapid pointer-move events with proper unmount cleanup).
+- Evidence: `packages/demo/src/demo-app/app.tsx` (lazy preflight memo conditioned on sidebarTab); `packages/demo/src/demo-app/use-canvas-control-handlers.ts` (rAF coalescing with cancelAnimationFrame cleanup); `npm run quality -w @broadset/demo` (13 suites, 163 tests); independent review clean.
+- Risk/Follow-up: root causes #1 (full-store subscription) and #4 (renderer update on every doc change) remain for future optimization. Profile-driven follow-up recommended.
