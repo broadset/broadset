@@ -8,16 +8,11 @@ import {
   toggleModifier,
   upsertTimeline,
 } from '@broadset/editor';
-import {
-  type BroadsetDocument,
-  createDefaultAnimationConfig,
-  type EasingMode,
-  type ElementAnimationConfig,
-  type Timeline,
-} from '@broadset/model';
+import { type BroadsetDocument, type EasingMode, type ElementAnimationConfig, type Timeline } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { applyAnimationConfigUpdate } from './animation-adapter';
 import {
   addTimelineKeyframe,
   changeTimelineKeyframeEasing,
@@ -139,32 +134,7 @@ export function useAnimationEditing({
         return null;
       }
 
-      let nextConfig: ElementAnimationConfig = createDefaultAnimationConfig();
-
-      editorStore.setState((state) => {
-        const existingAnimation = state.document.animations.find(
-          (animation) => animation.elementId === selectedElementId,
-        );
-        const baseConfig = existingAnimation?.config ?? createDefaultAnimationConfig();
-
-        nextConfig = updater(baseConfig);
-
-        const nextAnimations =
-          existingAnimation === undefined ?
-            [...state.document.animations, { elementId: selectedElementId, config: nextConfig }]
-          : state.document.animations.map((animation) =>
-              animation.elementId === selectedElementId ? { ...animation, config: nextConfig } : animation,
-            );
-
-        return {
-          document: {
-            ...state.document,
-            animations: nextAnimations,
-          },
-        };
-      });
-
-      return nextConfig;
+      return applyAnimationConfigUpdate(editorStore, selectedElementId, updater);
     },
     [editorStore, pushToast, selectedElementId],
   );
