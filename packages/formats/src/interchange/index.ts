@@ -1,4 +1,6 @@
 import type { BroadsetDocument, BroadsetElement, BroadsetProject } from '@broadset/model';
+import type { VideoEncodingConfig } from 'mediabunny';
+import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, WebMOutputFormat } from 'mediabunny';
 import qrcode from 'qrcode-generator';
 
 /* ------------------------------------------------------------------ */
@@ -116,27 +118,30 @@ export interface VideoExportOptions {
   readonly quality?: number;
   /** Progress callback invoked with a value in [0, 1] and an optional stage descriptor. */
   readonly onProgress?: (progress: number, stage?: string) => void;
-  /** Target container format. MP4 is reserved for a future true container mux path. */
+  /** Target container format. Defaults to 'webm'. */
   readonly format?: 'webm' | 'mp4';
 }
 
+/** Maximum bitrate in bits/sec, scaled by quality 0–1. */
+const MAX_VIDEO_BITRATE = 4_000_000;
+
 /**
- * Exports video as a Blob using the VideoEncoder API.
+ * Exports video as a Blob using mediabunny for proper container muxing.
+ *
+ * - WebM: VP9 codec (supports alpha transparency)
+ * - MP4: H.264 (AVC) codec (opaque only — alpha is silently discarded)
+ *
  * Rejects when VideoEncoder is unavailable or when encoding fails.
  */
 export async function exportVideoBlob(options: VideoExportOptions): Promise<Blob> {
   const format = options.format ?? 'webm';
-
-  if (format === 'mp4') {
-    throw new Error('MP4 export is not yet supported in the current browser encoder pipeline. Use WebM instead.');
-  }
 
   if (!isVideoExportSupported()) {
     throw new Error('Video export is not supported: VideoEncoder API is unavailable');
   }
 
   const frameRate = options.frameRate ?? 30;
-  const alpha = options.alpha ?? false;
+  const alpha = format === 'webm' ? (options.alpha ?? false) : false;
   const quality = options.quality ?? 0.8;
 
   if (frameRate <= 0) {
@@ -147,78 +152,61 @@ export async function exportVideoBlob(options: VideoExportOptions): Promise<Blob
     throw new Error('durationMs must be positive');
   }
 
+  if (quality < 0 || quality > 1) {
+    throw new Error('quality must be in range [0, 1]');
+  }
+
   options.onProgress?.(0, 'Initializing encoder');
 
-  const totalFrames = Math.ceil((options.durationMs / 1000) * frameRate);
-  const frameDurationUs = Math.round(1_000_000 / frameRate);
-  const collectedChunks: EncodedVideoChunk[] = [];
-  const encoderState = { error: null as Error | null };
+  const bitrate = Math.round(quality * MAX_VIDEO_BITRATE);
+  const codec = format === 'mp4' ? 'avc' : 'vp9';
 
-  const encoder = new VideoEncoder({
-    output(chunk: EncodedVideoChunk) {
-      collectedChunks.push(chunk);
-    },
-    error(err: DOMException) {
-      encoderState.error = new Error('VideoEncoder error during video export', { cause: err });
-    },
-  });
-
-  /** VP9 max bitrate in bits/sec, scaled by quality 0–1 */
-  const MAX_BITRATE = 4_000_000;
-  const bitrate = Math.round(quality * MAX_BITRATE);
-  /** VP9 codec profile: 01 (profile 1, alpha) or 00 (profile 0, opaque), 10-bit, level 08 */
-  const codecString = alpha ? 'vp09.01.10.08' : 'vp09.00.10.08';
-
-  encoder.configure({
-    codec: codecString,
-    width: options.canvas.width,
-    height: options.canvas.height,
+  const encodingConfig: VideoEncodingConfig = {
+    codec,
     bitrate,
-    framerate: frameRate,
     alpha: alpha ? 'keep' : 'discard',
-  });
+  };
+
+  const canvasSource = new CanvasSource(options.canvas, encodingConfig);
+  const outputFormat = format === 'mp4' ? new Mp4OutputFormat({ fastStart: 'in-memory' }) : new WebMOutputFormat();
+  const target = new BufferTarget();
+  const output = new Output({ format: outputFormat, target });
+
+  output.addVideoTrack(canvasSource);
+  await output.start();
+
+  const totalFrames = Math.ceil((options.durationMs / 1000) * frameRate);
+  const frameDurationSec = 1 / frameRate;
 
   options.onProgress?.(0.1, 'Rendering frames');
 
   for (let i = 0; i < totalFrames; i++) {
-    if (encoderState.error) throw encoderState.error;
-
     const timeMs = (i / frameRate) * 1000;
+    const timestampSec = i * frameDurationSec;
 
     options.renderFrame(timeMs);
+    await canvasSource.add(timestampSec, frameDurationSec);
 
-    const frame = new VideoFrame(options.canvas, {
-      timestamp: i * frameDurationUs,
-      alpha: alpha ? 'keep' : 'discard',
-    });
-
-    encoder.encode(frame);
-    frame.close();
-
-    // Report progress: 10% for init, 80% for frames, 10% for flushing
     const frameProgress = 0.1 + 0.8 * ((i + 1) / totalFrames);
 
     options.onProgress?.(frameProgress, 'Rendering frames');
   }
 
-  options.onProgress?.(0.9, 'Flushing encoder');
+  options.onProgress?.(0.9, 'Finalizing');
 
-  await encoder.flush();
+  await output.finalize();
 
-  if (encoderState.error) throw encoderState.error;
+  const buffer = target.buffer;
 
-  const totalSize = collectedChunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
-  const buffer = new Uint8Array(totalSize);
-  let offset = 0;
-
-  for (const chunk of collectedChunks) {
-    chunk.copyTo(buffer.subarray(offset));
-    offset += chunk.byteLength;
+  if (!buffer) {
+    throw new Error('Video export failed: output buffer is null after finalization');
   }
 
   options.onProgress?.(1, 'Complete');
 
-  return new Blob([buffer], { type: 'video/webm' });
+  const mimeType = format === 'mp4' ? 'video/mp4' : 'video/webm';
+
+  return new Blob([buffer], { type: mimeType });
 }
 
 /* ------------------------------------------------------------------ */

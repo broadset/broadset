@@ -17,6 +17,7 @@ export const ENABLED_EXPORTERS: readonly string[] = [
   'jpeg',
   'svg-embedded',
   'ograf',
+  'mp4',
   'webm',
 ] as const;
 

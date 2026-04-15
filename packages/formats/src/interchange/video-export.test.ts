@@ -1,271 +1,398 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { exportVideoBlob, isVideoExportSupported } from './index';
 
+/* ------------------------------------------------------------------ */
+/*  mediabunny mock                                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Mock mediabunny so tests run in JSDOM without real WebCodecs.
+ * Captures constructor args and method calls for assertion.
+ *
+ * The mock state object is declared with `var` so it is hoisted above
+ * the `jest.mock` factory (which babel hoists to the top of the file).
+ */
+
+interface MockCanvasSourceCall {
+  readonly timestamp: unknown;
+  readonly duration: unknown;
+}
+
+interface MockState {
+  canvasSourceCalls: MockCanvasSourceCall[];
+  canvasSourceConfig: unknown;
+  outputFinalized: boolean;
+  outputStarted: boolean;
+  bufferContents: ArrayBuffer | null;
+  finalizeError: Error | null;
+  mp4FormatCreated: boolean;
+  mp4FormatOptions: unknown;
+  webmFormatCreated: boolean;
+}
+
+var mockState: MockState = {
+  canvasSourceCalls: [],
+  canvasSourceConfig: undefined,
+  outputFinalized: false,
+  outputStarted: false,
+  bufferContents: null,
+  finalizeError: null,
+  mp4FormatCreated: false,
+  mp4FormatOptions: undefined,
+  webmFormatCreated: false,
+};
+
+jest.mock('mediabunny', () => ({
+  BufferTarget: jest.fn().mockImplementation(() => ({
+    get buffer() {
+      return mockState.bufferContents;
+    },
+  })),
+  CanvasSource: jest.fn().mockImplementation((_canvas, config) => {
+    mockState.canvasSourceConfig = config;
+
+    return {
+      add: jest.fn().mockImplementation((timestamp, duration) => {
+        mockState.canvasSourceCalls.push({ timestamp, duration });
+
+        return Promise.resolve();
+      }),
+    };
+  }),
+  Mp4OutputFormat: jest.fn().mockImplementation((options) => {
+    mockState.mp4FormatCreated = true;
+    mockState.mp4FormatOptions = options;
+
+    return { type: 'mp4', options };
+  }),
+  WebMOutputFormat: jest.fn().mockImplementation(() => {
+    mockState.webmFormatCreated = true;
+
+    return { type: 'webm' };
+  }),
+  Output: jest.fn().mockImplementation(() => ({
+    addVideoTrack: jest.fn(),
+    start: jest.fn().mockImplementation(() => {
+      mockState.outputStarted = true;
+
+      return Promise.resolve();
+    }),
+    finalize: jest.fn().mockImplementation(() => {
+      if (mockState.finalizeError) {
+        return Promise.reject(mockState.finalizeError);
+      }
+
+      mockState.outputFinalized = true;
+      mockState.bufferContents = new ArrayBuffer(64);
+
+      return Promise.resolve();
+    }),
+  })),
+}));
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                          */
+/* ------------------------------------------------------------------ */
+
+function makeDummyCanvas(): HTMLCanvasElement {
+  return { width: 320, height: 240 } as HTMLCanvasElement;
+}
+
+function installVideoEncoder(): void {
+  (globalThis as Record<string, unknown>)['VideoEncoder'] = function StubVideoEncoder() {
+    /* stub */
+  };
+}
+
+function removeVideoEncoder(): void {
+  delete (globalThis as Record<string, unknown>)['VideoEncoder'];
+}
+
+/* ------------------------------------------------------------------ */
+/*  Tests                                                            */
+/* ------------------------------------------------------------------ */
+
 describe('Video Export Support Detection', () => {
-  /** @description Validates that JSDOM without VideoEncoder reports unsupported. */
+  /** @description isVideoExportSupported checks for the global VideoEncoder symbol. */
   it('returns false in JSDOM (no VideoEncoder)', () => {
     expect(isVideoExportSupported()).toBe(false);
   });
 
-  /** @description Validates that a mock VideoEncoder reports supported. */
+  /** @description When VideoEncoder is polyfilled/available, detection returns true. */
   it('returns true when VideoEncoder is defined', () => {
-    const original = (globalThis as Record<string, unknown>)['VideoEncoder'];
+    installVideoEncoder();
 
     try {
-      (globalThis as Record<string, unknown>)['VideoEncoder'] = { isSupported: () => true };
       expect(isVideoExportSupported()).toBe(true);
     } finally {
-      if (original === undefined) {
-        delete (globalThis as Record<string, unknown>)['VideoEncoder'];
-      } else {
-        (globalThis as Record<string, unknown>)['VideoEncoder'] = original;
-      }
+      removeVideoEncoder();
     }
   });
+});
 
-  /** @description Validates that exportVideoBlob rejects when VideoEncoder is unavailable. */
-  it('rejects with an error when VideoEncoder is not available', async () => {
-    const dummyCanvas = { width: 100, height: 100 } as HTMLCanvasElement;
+describe('exportVideoBlob', () => {
+  beforeEach(() => {
+    installVideoEncoder();
+    mockState.canvasSourceCalls = [];
+    mockState.canvasSourceConfig = undefined;
+    mockState.outputFinalized = false;
+    mockState.outputStarted = false;
+    mockState.bufferContents = null;
+    mockState.finalizeError = null;
+    mockState.mp4FormatCreated = false;
+    mockState.mp4FormatOptions = undefined;
+    mockState.webmFormatCreated = false;
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    removeVideoEncoder();
+  });
+
+  /** @description Export must fail with a clear message when VideoEncoder is unavailable. */
+  it('rejects when VideoEncoder is unavailable', async () => {
+    removeVideoEncoder();
+
+    const canvas = makeDummyCanvas();
+
+    await expect(exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 1000 })).rejects.toThrow(
+      'VideoEncoder API is unavailable',
+    );
+  });
+
+  /** @description frameRate must be a positive number to prevent division by zero. */
+  it('rejects for non-positive frameRate', async () => {
+    const canvas = makeDummyCanvas();
+
+    await expect(exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 1000, frameRate: 0 })).rejects.toThrow(
+      'frameRate must be positive',
+    );
+  });
+
+  /** @description durationMs must be positive to produce at least one frame. */
+  it('rejects for non-positive durationMs', async () => {
+    const canvas = makeDummyCanvas();
+
+    await expect(exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 0 })).rejects.toThrow(
+      'durationMs must be positive',
+    );
+  });
+
+  /** @description Default format is WebM with VP9 codec using WebMOutputFormat. */
+  it('defaults to WebM format with VP9 codec', async () => {
+    const canvas = makeDummyCanvas();
+
+    const blob = await exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 100, frameRate: 10 });
+
+    expect(mockState.webmFormatCreated).toBe(true);
+    expect(mockState.mp4FormatCreated).toBe(false);
+    expect(mockState.canvasSourceConfig).toMatchObject({ codec: 'vp9' });
+    expect(blob.type).toBe('video/webm');
+  });
+
+  /** @description MP4 export uses Mp4OutputFormat with AVC (H.264) codec. */
+  it('exports MP4 with AVC codec when format is mp4', async () => {
+    const canvas = makeDummyCanvas();
+
+    const blob = await exportVideoBlob({
+      canvas,
+      renderFrame: () => {},
+      durationMs: 100,
+      frameRate: 10,
+      format: 'mp4',
+    });
+
+    expect(mockState.mp4FormatCreated).toBe(true);
+    expect(mockState.mp4FormatOptions).toEqual({ fastStart: 'in-memory' });
+    expect(mockState.webmFormatCreated).toBe(false);
+    expect(mockState.canvasSourceConfig).toMatchObject({ codec: 'avc' });
+    expect(blob.type).toBe('video/mp4');
+  });
+
+  /** @description MP4 always discards alpha (AVC doesn't support transparency). */
+  it('discards alpha for MP4 even when alpha option is true', async () => {
+    const canvas = makeDummyCanvas();
+
+    await exportVideoBlob({
+      canvas,
+      renderFrame: () => {},
+      durationMs: 100,
+      frameRate: 10,
+      format: 'mp4',
+      alpha: true,
+    });
+
+    expect(mockState.canvasSourceConfig).toMatchObject({ alpha: 'discard' });
+  });
+
+  /** @description WebM preserves alpha when requested (VP9 supports transparency). */
+  it('preserves alpha for WebM when alpha option is true', async () => {
+    const canvas = makeDummyCanvas();
+
+    await exportVideoBlob({
+      canvas,
+      renderFrame: () => {},
+      durationMs: 100,
+      frameRate: 10,
+      alpha: true,
+    });
+
+    expect(mockState.canvasSourceConfig).toMatchObject({ alpha: 'keep', codec: 'vp9' });
+  });
+
+  /** @description WebM defaults to opaque when alpha is not specified. */
+  it('defaults to opaque (discard alpha) for WebM', async () => {
+    const canvas = makeDummyCanvas();
+
+    await exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 100, frameRate: 10 });
+
+    expect(mockState.canvasSourceConfig).toMatchObject({ alpha: 'discard' });
+  });
+
+  /** @description Quality maps to bitrate proportional to MAX_VIDEO_BITRATE (4 Mbps). */
+  it('maps quality to bitrate', async () => {
+    const canvas = makeDummyCanvas();
+
+    await exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 100, frameRate: 10, quality: 0.5 });
+
+    expect(mockState.canvasSourceConfig).toMatchObject({ bitrate: Math.round(0.5 * 4_000_000) });
+  });
+
+  /** @description Default quality of 0.8 maps to 3.2 Mbps bitrate. */
+  it('uses default quality of 0.8 when not specified', async () => {
+    const canvas = makeDummyCanvas();
+
+    await exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 100, frameRate: 10 });
+
+    expect(mockState.canvasSourceConfig).toMatchObject({ bitrate: Math.round(0.8 * 4_000_000) });
+  });
+
+  /** @description Quality must be in range [0, 1] to prevent nonsensical bitrate values. */
+  it('rejects invalid quality outside [0, 1]', async () => {
+    const canvas = makeDummyCanvas();
 
     await expect(
-      exportVideoBlob({
-        canvas: dummyCanvas,
-        renderFrame: () => {
-          /* noop */
-        },
-        durationMs: 1000,
-      }),
-    ).rejects.toThrow('VideoEncoder API is unavailable');
-  });
-
-  /** @description MP4 export must reject until the encoder pipeline supports true MP4 container output. */
-  it('rejects MP4 export requests as unsupported', async () => {
-    const dummyCanvas = { width: 100, height: 100 } as HTMLCanvasElement;
+      exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 100, frameRate: 10, quality: -0.1 }),
+    ).rejects.toThrow('quality must be in range [0, 1]');
 
     await expect(
-      exportVideoBlob({
-        canvas: dummyCanvas,
-        renderFrame: () => {
-          /* noop */
-        },
-        durationMs: 1000,
-        format: 'mp4',
-      }),
-    ).rejects.toThrow(/MP4 export is not yet supported/i);
+      exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 100, frameRate: 10, quality: 1.5 }),
+    ).rejects.toThrow('quality must be in range [0, 1]');
   });
 
-  /** @description Validates that frameRate must be positive. */
-  it('rejects with error for non-positive frameRate', async () => {
-    const original = (globalThis as Record<string, unknown>)['VideoEncoder'];
+  /** @description Correct number of frames for a 1s clip at 10fps = 10 frames. */
+  it('captures correct number of frames', async () => {
+    const canvas = makeDummyCanvas();
 
-    try {
-      (globalThis as Record<string, unknown>)['VideoEncoder'] = class MockVideoEncoder {
-        configure(): void {
-          /* noop */
-        }
-      };
+    await exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 1000, frameRate: 10 });
 
-      const dummyCanvas = { width: 100, height: 100 } as HTMLCanvasElement;
-
-      await expect(
-        exportVideoBlob({
-          canvas: dummyCanvas,
-          renderFrame: () => {
-            /* noop */
-          },
-          durationMs: 1000,
-          frameRate: 0,
-        }),
-      ).rejects.toThrow('frameRate must be positive');
-    } finally {
-      if (original === undefined) {
-        delete (globalThis as Record<string, unknown>)['VideoEncoder'];
-      } else {
-        (globalThis as Record<string, unknown>)['VideoEncoder'] = original;
-      }
-    }
+    expect(mockState.canvasSourceCalls).toHaveLength(10);
   });
 
-  /** @description Validates that durationMs must be positive. */
-  it('rejects with error for non-positive durationMs', async () => {
-    const original = (globalThis as Record<string, unknown>)['VideoEncoder'];
+  /** @description Frame timestamps increase monotonically in seconds. */
+  it('passes correct timestamps to canvasSource.add', async () => {
+    const canvas = makeDummyCanvas();
 
-    try {
-      (globalThis as Record<string, unknown>)['VideoEncoder'] = class MockVideoEncoder {
-        configure(): void {
-          /* noop */
-        }
-      };
+    await exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 300, frameRate: 10 });
 
-      const dummyCanvas = { width: 100, height: 100 } as HTMLCanvasElement;
-
-      await expect(
-        exportVideoBlob({
-          canvas: dummyCanvas,
-          renderFrame: () => {
-            /* noop */
-          },
-          durationMs: 0,
-        }),
-      ).rejects.toThrow('durationMs must be positive');
-    } finally {
-      if (original === undefined) {
-        delete (globalThis as Record<string, unknown>)['VideoEncoder'];
-      } else {
-        (globalThis as Record<string, unknown>)['VideoEncoder'] = original;
-      }
-    }
+    expect(mockState.canvasSourceCalls).toHaveLength(3);
+    expect(mockState.canvasSourceCalls[0]?.timestamp).toBeCloseTo(0);
+    expect(mockState.canvasSourceCalls[1]?.timestamp).toBeCloseTo(0.1);
+    expect(mockState.canvasSourceCalls[2]?.timestamp).toBeCloseTo(0.2);
   });
 
-  /** @description Validates that onProgress callback receives values between 0 and 1. */
+  /** @description renderFrame callback receives time in milliseconds matching each frame. */
+  it('calls renderFrame with correct millisecond timestamps', async () => {
+    const canvas = makeDummyCanvas();
+    const times: number[] = [];
+
+    await exportVideoBlob({
+      canvas,
+      renderFrame: (timeMs) => {
+        times.push(timeMs);
+      },
+      durationMs: 200,
+      frameRate: 10,
+    });
+
+    expect(times).toHaveLength(2);
+    expect(times[0]).toBeCloseTo(0);
+    expect(times[1]).toBeCloseTo(100);
+  });
+
+  /** @description Progress callback starts at 0 and ends at 1, monotonically non-decreasing. */
   it('invokes onProgress callback with values in [0, 1]', async () => {
-    const original = (globalThis as Record<string, unknown>)['VideoEncoder'];
-    const originalVideoFrame = (globalThis as Record<string, unknown>)['VideoFrame'];
+    const canvas = makeDummyCanvas();
+    const progressValues: number[] = [];
+    const stages: string[] = [];
 
-    try {
-      (globalThis as Record<string, unknown>)['VideoEncoder'] = class MockVideoEncoder {
-        readonly #output: (chunk: { readonly byteLength: number; copyTo: (dest: Uint8Array) => void }) => void;
+    await exportVideoBlob({
+      canvas,
+      renderFrame: () => {},
+      durationMs: 100,
+      frameRate: 10,
+      onProgress: (p, stage) => {
+        progressValues.push(p);
 
-        constructor(init: {
-          output: (chunk: { readonly byteLength: number; copyTo: (dest: Uint8Array) => void }) => void;
-        }) {
-          this.#output = init.output;
-        }
+        if (stage) stages.push(stage);
+      },
+    });
 
-        configure(): void {
-          /* noop */
-        }
+    expect(progressValues.length).toBeGreaterThan(0);
+    expect(progressValues[0]).toBe(0);
+    expect(progressValues[progressValues.length - 1]).toBe(1);
 
-        encode(): void {
-          const chunk = {
-            byteLength: 4,
-            copyTo: (dest: Uint8Array) => {
-              dest[0] = 0;
-              dest[1] = 0;
-              dest[2] = 0;
-              dest[3] = 0;
-            },
-          };
-
-          this.#output(chunk);
-        }
-
-        flush(): Promise<void> {
-          return Promise.resolve();
-        }
-      };
-
-      (globalThis as Record<string, unknown>)['VideoFrame'] = class MockVideoFrame {
-        close(): void {
-          /* noop */
-        }
-      };
-
-      const progressValues: number[] = [];
-      const stages: string[] = [];
-      const dummyCanvas = { width: 100, height: 100 } as HTMLCanvasElement;
-
-      await exportVideoBlob({
-        canvas: dummyCanvas,
-        renderFrame: () => {
-          /* noop */
-        },
-        durationMs: 100,
-        frameRate: 10,
-        onProgress: (p, stage) => {
-          progressValues.push(p);
-
-          if (stage) stages.push(stage);
-        },
-      });
-
-      expect(progressValues.length).toBeGreaterThan(0);
-      expect(progressValues[0]).toBe(0);
-      expect(progressValues[progressValues.length - 1]).toBe(1);
-
-      for (const v of progressValues) {
-        expect(v).toBeGreaterThanOrEqual(0);
-        expect(v).toBeLessThanOrEqual(1);
-      }
-
-      for (let i = 1; i < progressValues.length; i++) {
-        expect(progressValues[i]).toBeGreaterThanOrEqual(progressValues[i - 1] ?? 0);
-      }
-
-      expect(stages).toContain('Initializing encoder');
-      expect(stages).toContain('Complete');
-    } finally {
-      if (original === undefined) {
-        delete (globalThis as Record<string, unknown>)['VideoEncoder'];
-      } else {
-        (globalThis as Record<string, unknown>)['VideoEncoder'] = original;
-      }
-
-      if (originalVideoFrame === undefined) {
-        delete (globalThis as Record<string, unknown>)['VideoFrame'];
-      } else {
-        (globalThis as Record<string, unknown>)['VideoFrame'] = originalVideoFrame;
-      }
+    for (const v of progressValues) {
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(1);
     }
+
+    for (let i = 1; i < progressValues.length; i++) {
+      expect(progressValues[i]).toBeGreaterThanOrEqual(progressValues[i - 1] ?? 0);
+    }
+
+    expect(stages).toContain('Initializing encoder');
+    expect(stages).toContain('Complete');
   });
 
-  /** @description Validates that encoder errors are caught and reject the promise. */
-  it('rejects with error when VideoEncoder fires error callback', async () => {
-    const original = (globalThis as Record<string, unknown>)['VideoEncoder'];
-    const originalVideoFrame = (globalThis as Record<string, unknown>)['VideoFrame'];
+  /** @description output.start() and output.finalize() form the proper lifecycle. */
+  it('starts and finalizes the mediabunny output', async () => {
+    const canvas = makeDummyCanvas();
 
-    try {
-      (globalThis as Record<string, unknown>)['VideoEncoder'] = class MockVideoEncoder {
-        #errorCb: (err: DOMException) => void;
+    await exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 100, frameRate: 10 });
 
-        constructor(init: { output: () => void; error: (err: DOMException) => void }) {
-          this.#errorCb = init.error;
-        }
+    expect(mockState.outputStarted).toBe(true);
+    expect(mockState.outputFinalized).toBe(true);
+  });
 
-        configure(): void {
-          /* noop */
-        }
+  /** @description When finalize throws, the error propagates to the caller. */
+  it('propagates finalization errors', async () => {
+    mockState.finalizeError = new Error('Encoding failed');
 
-        encode(): void {
-          this.#errorCb(new DOMException('Codec not supported'));
-        }
+    const canvas = makeDummyCanvas();
 
-        flush(): Promise<void> {
-          return Promise.resolve();
-        }
-      };
+    await expect(exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 100, frameRate: 10 })).rejects.toThrow(
+      'Encoding failed',
+    );
+  });
 
-      (globalThis as Record<string, unknown>)['VideoFrame'] = class MockVideoFrame {
-        close(): void {
-          /* noop */
-        }
-      };
+  /** @description The returned blob has non-zero size from the buffer target. */
+  it('returns a blob with data', async () => {
+    const canvas = makeDummyCanvas();
 
-      const dummyCanvas = { width: 100, height: 100 } as HTMLCanvasElement;
+    const blob = await exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 100, frameRate: 10 });
 
-      await expect(
-        exportVideoBlob({
-          canvas: dummyCanvas,
-          renderFrame: () => {
-            /* noop */
-          },
-          durationMs: 100,
-          frameRate: 10,
-        }),
-      ).rejects.toThrow('VideoEncoder error during video export');
-    } finally {
-      if (original === undefined) {
-        delete (globalThis as Record<string, unknown>)['VideoEncoder'];
-      } else {
-        (globalThis as Record<string, unknown>)['VideoEncoder'] = original;
-      }
+    expect(blob.size).toBeGreaterThan(0);
+  });
 
-      if (originalVideoFrame === undefined) {
-        delete (globalThis as Record<string, unknown>)['VideoFrame'];
-      } else {
-        (globalThis as Record<string, unknown>)['VideoFrame'] = originalVideoFrame;
-      }
-    }
+  /** @description Default frameRate is 30 when not specified. */
+  it('uses default frameRate of 30', async () => {
+    const canvas = makeDummyCanvas();
+
+    await exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 1000 });
+
+    // 1s * 30fps = 30 frames
+    expect(mockState.canvasSourceCalls).toHaveLength(30);
   });
 });

@@ -140,6 +140,7 @@ Dependencies below are part of the current implemented architecture and package 
 | Formats PPTX         | `pizzip`                                                | OOXML ZIP processing for PPTX                      |
 | Formats raster       | `html-to-image`                                         | Raster and SVG capture utilities                   |
 | Formats ZIP utility  | `jszip`                                                 | ZIP container utility (for format packaging paths) |
+| Formats video        | `mediabunny`                                            | Video container and frame pipeline support         |
 | UI shell             | `@heroui/react`                                         | Required UI component system                       |
 | UI/demo icons        | `lucide-react`                                          | Icon system                                        |
 | Demo UI styles       | `@heroui/styles`, `tailwindcss`, `@tailwindcss/vite`    | Host styling stack                                 |
@@ -174,16 +175,15 @@ Each package keeps `quality` and `quality:strict` scripts with gate order:
 
 ---
 
-## 7. Exclusions from Active Architecture Baseline
+## 7. Non-Default Optional Dependencies
 
-The following are not part of the active, current architecture baseline and must not be treated as default stack decisions:
+The following are not part of the active baseline today and must not be treated as default stack decisions:
 
 - `subjx`
-- `mediabunny`
 - `pdfjs-dist`
 - `@uiw/react-color`
 
-They may be reconsidered only if a concrete, spec-driven implementation unit requires them.
+They are allowed when a concrete, spec-driven implementation unit benefits from them.
 
 ---
 

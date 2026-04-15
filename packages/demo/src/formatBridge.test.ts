@@ -331,24 +331,36 @@ describe('export orchestration', () => {
     expect(calledOptions.quality).toBe(0.6);
   });
 
-  /** @description MP4 export must fail fast until a true MP4 container path is implemented. */
-  it('rejects MP4 export as unsupported', async () => {
+  /** @description MP4 export uses exportVideoBlob with format:'mp4' and triggers download. */
+  it('exports MP4 video and triggers download', async () => {
     const renderFrame = jest.fn();
     const canvas = document.createElement('canvas');
 
-    await expect(
-      exportDocument(
-        'mp4',
-        makeContext({
-          snapshotCanvas: canvas,
-          renderFrame,
-          playbackDurationMs: 5000,
-          videoFrameRate: 30,
-        }),
-      ),
-    ).rejects.toThrow(/unavailable|webm/i);
-    expect(mockExportVideoBlob).not.toHaveBeenCalled();
-    expect(mockTriggerDownload).not.toHaveBeenCalled();
+    await exportDocument(
+      'mp4',
+      makeContext({
+        snapshotCanvas: canvas,
+        renderFrame,
+        playbackDurationMs: 5000,
+        videoFrameRate: 30,
+      }),
+    );
+
+    expect(mockExportVideoBlob).toHaveBeenCalledTimes(1);
+
+    const calledOptions = (mockExportVideoBlob.mock.calls as unknown[][])[0]?.[0] as
+      | Record<string, unknown>
+      | undefined;
+
+    expect(calledOptions?.['format']).toBe('mp4');
+    expect(calledOptions?.['frameRate']).toBe(30);
+    expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
+
+    const downloadArgs = mockTriggerDownload.mock.calls[0] as readonly unknown[] | undefined;
+
+    expect(downloadArgs).toBeDefined();
+    expect(typeof downloadArgs?.[1]).toBe('string');
+    expect((downloadArgs?.[1] as string).endsWith('.mp4')).toBe(true);
   });
 
   /** @description Video export without renderFrame MUST raise an error. */

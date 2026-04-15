@@ -11,6 +11,65 @@ import {
 } from './index';
 
 /* ------------------------------------------------------------------ */
+/*  mediabunny mock for WebM export                                  */
+/* ------------------------------------------------------------------ */
+
+interface MockCanvasSourceCall {
+  readonly timestamp: unknown;
+  readonly duration: unknown;
+}
+
+interface WebMMockState {
+  canvasSourceCalls: MockCanvasSourceCall[];
+  canvasSourceConfig: unknown;
+  outputFinalized: boolean;
+  bufferContents: ArrayBuffer | null;
+  webmFormatCreated: boolean;
+}
+
+var mockWebMState: WebMMockState = {
+  canvasSourceCalls: [],
+  canvasSourceConfig: undefined,
+  outputFinalized: false,
+  bufferContents: null,
+  webmFormatCreated: false,
+};
+
+jest.mock('mediabunny', () => ({
+  BufferTarget: jest.fn().mockImplementation(() => ({
+    get buffer() {
+      return mockWebMState.bufferContents;
+    },
+  })),
+  CanvasSource: jest.fn().mockImplementation((_canvas, config) => {
+    mockWebMState.canvasSourceConfig = config;
+
+    return {
+      add: jest.fn().mockImplementation((timestamp, duration) => {
+        mockWebMState.canvasSourceCalls.push({ timestamp, duration });
+
+        return Promise.resolve();
+      }),
+    };
+  }),
+  WebMOutputFormat: jest.fn().mockImplementation(() => {
+    mockWebMState.webmFormatCreated = true;
+
+    return { type: 'webm' };
+  }),
+  Output: jest.fn().mockImplementation(() => ({
+    addVideoTrack: jest.fn(),
+    start: jest.fn().mockImplementation(() => Promise.resolve()),
+    finalize: jest.fn().mockImplementation(() => {
+      mockWebMState.outputFinalized = true;
+      mockWebMState.bufferContents = new ArrayBuffer(64);
+
+      return Promise.resolve();
+    }),
+  })),
+}));
+
+/* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -239,82 +298,22 @@ describe('Embedded SVG Raster Export', () => {
 /* ------------------------------------------------------------------ */
 
 describe('WebM Alpha Video Export', () => {
-  let encodedFrames: ReadonlyArray<{
-    readonly timestamp: number;
-    readonly alpha: string;
-  }>;
-  let configureArgs: Record<string, unknown> | undefined;
-  let flushCalled: boolean;
-  let outputCallback: ((chunk: unknown) => void) | undefined;
-
   beforeEach(() => {
-    encodedFrames = [];
-    configureArgs = undefined;
-    flushCalled = false;
-    outputCallback = undefined;
+    (globalThis as Record<string, unknown>)['VideoEncoder'] = function StubVideoEncoder() {
+      /* stub */
+    };
 
-    const frames: Array<{ readonly timestamp: number; readonly alpha: string }> = [];
-
-    class MockVideoEncoder {
-      constructor(init: { readonly output: (chunk: unknown) => void }) {
-        outputCallback = init.output;
-      }
-
-      configure(config: Record<string, unknown>): void {
-        configureArgs = config;
-      }
-
-      encode(frame: { readonly timestamp: number; readonly alpha: string }): void {
-        frames.push({ timestamp: frame.timestamp, alpha: frame.alpha });
-
-        const data = new Uint8Array([0x1a, 0x45, 0xdf, 0xa3]);
-
-        outputCallback?.({
-          byteLength: data.length,
-          copyTo(dest: Uint8Array) {
-            dest.set(data);
-          },
-        });
-      }
-
-      async flush(): Promise<void> {
-        flushCalled = true;
-        encodedFrames = [...frames];
-
-        return Promise.resolve();
-      }
-    }
-
-    class MockVideoFrame {
-      readonly timestamp: number;
-      readonly alpha: string;
-
-      constructor(_source: HTMLCanvasElement, init: { readonly timestamp: number; readonly alpha: string }) {
-        this.timestamp = init.timestamp;
-        this.alpha = init.alpha;
-      }
-
-      close(): void {
-        /* noop */
-      }
-    }
-
-    (globalThis as Record<string, unknown>)['VideoEncoder'] = MockVideoEncoder;
-    (globalThis as Record<string, unknown>)['VideoFrame'] = MockVideoFrame;
+    mockWebMState.canvasSourceCalls = [];
+    mockWebMState.canvasSourceConfig = undefined;
+    mockWebMState.outputFinalized = false;
+    mockWebMState.bufferContents = null;
+    mockWebMState.webmFormatCreated = false;
+    jest.clearAllMocks();
   });
 
   afterEach(() => {
     delete (globalThis as Record<string, unknown>)['VideoEncoder'];
-    delete (globalThis as Record<string, unknown>)['VideoFrame'];
   });
-
-  function getConfigureArgs(): Record<string, unknown> {
-    if (!configureArgs) {
-      throw new Error('VideoEncoder.configure was not called');
-    }
-
-    return configureArgs;
-  }
 
   /** @description Validates that alpha:true configures VP9 encoder for alpha channel preservation. */
   it('preserves alpha channel when alpha is true', async () => {
@@ -323,10 +322,7 @@ describe('WebM Alpha Video Export', () => {
 
     await exportWebMBlob(canvas, opts, () => {});
 
-    const args = getConfigureArgs();
-
-    expect(args['alpha']).toBe('keep');
-    expect(args['codec']).toContain('vp09.01');
+    expect(mockWebMState.canvasSourceConfig).toMatchObject({ alpha: 'keep', codec: 'vp9' });
   });
 
   /** @description Validates that alpha:false configures VP9 encoder for opaque output. */
@@ -336,34 +332,7 @@ describe('WebM Alpha Video Export', () => {
 
     await exportWebMBlob(canvas, opts, () => {});
 
-    const args = getConfigureArgs();
-
-    expect(args['alpha']).toBe('discard');
-    expect(args['codec']).toContain('vp09.00');
-  });
-
-  /** @description Validates that the frame rate from options is passed to the encoder. */
-  it('uses configured frame rate', async () => {
-    const canvas = createMockCanvas(320, 240);
-    const opts: WebMExportOptions = { durationMs: 1000, frameRate: 25 };
-
-    await exportWebMBlob(canvas, opts, () => {});
-
-    const args = getConfigureArgs();
-
-    expect(args['framerate']).toBe(25);
-  });
-
-  /** @description Validates that default frame rate of 50 is used when not specified. */
-  it('uses default frame rate of 50 when not specified', async () => {
-    const canvas = createMockCanvas(320, 240);
-    const opts: WebMExportOptions = { durationMs: 1000 };
-
-    await exportWebMBlob(canvas, opts, () => {});
-
-    const args = getConfigureArgs();
-
-    expect(args['framerate']).toBe(50);
+    expect(mockWebMState.canvasSourceConfig).toMatchObject({ alpha: 'discard', codec: 'vp9' });
   });
 
   /** @description Validates that default quality of 0.8 maps to expected bitrate. */
@@ -373,20 +342,28 @@ describe('WebM Alpha Video Export', () => {
 
     await exportWebMBlob(canvas, opts, () => {});
 
-    const args = getConfigureArgs();
-
-    expect(args['bitrate']).toBe(Math.round(0.8 * 4_000_000));
+    expect(mockWebMState.canvasSourceConfig).toMatchObject({ bitrate: Math.round(0.8 * 4_000_000) });
   });
 
-  /** @description Validates correct frame count: 5s × 50fps = 250 frames. */
+  /** @description Validates correct frame count: 5s × 50fps = 250 frames via mediabunny CanvasSource.add calls. */
   it('captures correct number of frames for duration and frame rate', async () => {
     const canvas = createMockCanvas(320, 240);
     const opts: WebMExportOptions = { durationMs: 5000, frameRate: 50 };
 
     await exportWebMBlob(canvas, opts, () => {});
 
-    expect(flushCalled).toBe(true);
-    expect(encodedFrames).toHaveLength(250);
+    expect(mockWebMState.outputFinalized).toBe(true);
+    expect(mockWebMState.canvasSourceCalls).toHaveLength(250);
+  });
+
+  /** @description Validates that default frame rate of 50 is used when not specified, producing 50 frames for 1s. */
+  it('uses default frame rate of 50 when not specified', async () => {
+    const canvas = createMockCanvas(320, 240);
+    const opts: WebMExportOptions = { durationMs: 1000 };
+
+    await exportWebMBlob(canvas, opts, () => {});
+
+    expect(mockWebMState.canvasSourceCalls).toHaveLength(50);
   });
 
   /** @description Validates output blob is WebM MIME and downloadable. */
@@ -423,6 +400,30 @@ describe('WebM Alpha Video Export', () => {
     await expect(exportWebMBlob(canvas, { durationMs: 1000 }, () => {})).rejects.toThrow(
       'WebM export requires the VideoEncoder API',
     );
+  });
+
+  /** @description Validates that mediabunny WebMOutputFormat is used for container muxing. */
+  it('uses WebMOutputFormat via mediabunny', async () => {
+    const canvas = createMockCanvas(320, 240);
+    const opts: WebMExportOptions = { durationMs: 100, frameRate: 10 };
+
+    await exportWebMBlob(canvas, opts, () => {});
+
+    expect(mockWebMState.webmFormatCreated).toBe(true);
+    expect(mockWebMState.outputFinalized).toBe(true);
+  });
+
+  /** @description Validates mediabunny CanvasSource receives correct frame timestamps in seconds. */
+  it('passes correct timestamps to canvasSource.add', async () => {
+    const canvas = createMockCanvas(320, 240);
+    const opts: WebMExportOptions = { durationMs: 300, frameRate: 10 };
+
+    await exportWebMBlob(canvas, opts, () => {});
+
+    expect(mockWebMState.canvasSourceCalls).toHaveLength(3);
+    expect(mockWebMState.canvasSourceCalls[0]?.timestamp).toBeCloseTo(0);
+    expect(mockWebMState.canvasSourceCalls[1]?.timestamp).toBeCloseTo(0.1);
+    expect(mockWebMState.canvasSourceCalls[2]?.timestamp).toBeCloseTo(0.2);
   });
 });
 

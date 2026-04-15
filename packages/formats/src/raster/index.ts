@@ -2,6 +2,9 @@
 /*  Raster Export — PNG, JPEG, Embedded SVG, Canvas Discovery        */
 /* ------------------------------------------------------------------ */
 
+import type { VideoEncodingConfig } from 'mediabunny';
+import { BufferTarget, CanvasSource, Output, WebMOutputFormat } from 'mediabunny';
+
 const CANVAS_MARKER = 'data-broadset-canvas';
 const DEFAULT_JPEG_QUALITY = 0.92;
 const DEFAULT_WEBM_QUALITY = 0.8;
@@ -144,23 +147,20 @@ function computeFrameCount(durationMs: number, frameRate: number): number {
 }
 
 /**
- * Derives VP9 codec string based on alpha requirement.
- * VP9 profile 0 = 8-bit no alpha; profile 1 = 8-bit with alpha subsampling.
- */
-function vp9Codec(alpha: boolean): string {
-  return alpha ? 'vp09.01.10.08' : 'vp09.00.10.08';
-}
-
-/**
- * Exports an animated canvas sequence as a WebM video blob with VP9 codec.
+ * Exports an animated canvas sequence as a WebM video blob with VP9 codec
+ * using mediabunny for proper container muxing.
  *
  * The caller provides a `renderFrame` callback that updates the canvas content
  * for each time step. The encoder captures each frame, encodes it with VP9,
- * and produces a WebM-compatible blob.
+ * and produces a valid WebM container blob.
  *
  * When `alpha` is true, the VP9 encoder is configured for alpha channel
  * transparency (transparent background, no canvas background fill).
  * When `alpha` is false, the output has an opaque background.
+ *
+ * Note: For new code, prefer `exportVideoBlob` with `format: 'webm'` from the
+ * interchange module, which provides a unified video export API for both
+ * WebM and MP4 formats.
  */
 export async function exportWebMBlob(
   canvas: HTMLCanvasElement,
@@ -187,53 +187,37 @@ export async function exportWebMBlob(
     throw new Error('quality must be in range [0, 1]');
   }
 
-  const totalFrames = computeFrameCount(options.durationMs, frameRate);
-  const frameDurationUs = Math.round(1_000_000 / frameRate);
-  const collectedChunks: EncodedVideoChunk[] = [];
-
-  const encoder = new VideoEncoder({
-    output(chunk: EncodedVideoChunk) {
-      collectedChunks.push(chunk);
-    },
-    error(err: DOMException) {
-      throw new Error('VideoEncoder error during WebM export', { cause: err });
-    },
-  });
-
   const bitrate = Math.round(quality * 4_000_000);
 
-  encoder.configure({
-    codec: vp9Codec(alpha),
-    width: canvas.width,
-    height: canvas.height,
+  const encodingConfig: VideoEncodingConfig = {
+    codec: 'vp9',
     bitrate,
-    framerate: frameRate,
     alpha: alpha ? 'keep' : 'discard',
-  });
+  };
+
+  const canvasSource = new CanvasSource(canvas, encodingConfig);
+  const target = new BufferTarget();
+  const output = new Output({ format: new WebMOutputFormat(), target });
+
+  output.addVideoTrack(canvasSource);
+  await output.start();
+
+  const totalFrames = computeFrameCount(options.durationMs, frameRate);
+  const frameDurationSec = 1 / frameRate;
 
   for (let i = 0; i < totalFrames; i++) {
     const timeMs = (i / frameRate) * 1000;
 
     renderFrame(timeMs);
-
-    const frame = new VideoFrame(canvas, {
-      timestamp: i * frameDurationUs,
-      alpha: alpha ? 'keep' : 'discard',
-    });
-
-    encoder.encode(frame);
-    frame.close();
+    await canvasSource.add(i * frameDurationSec, frameDurationSec);
   }
 
-  await encoder.flush();
+  await output.finalize();
 
-  const totalSize = collectedChunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
-  const buffer = new Uint8Array(totalSize);
-  let offset = 0;
+  const buffer = target.buffer;
 
-  for (const chunk of collectedChunks) {
-    chunk.copyTo(buffer.subarray(offset));
-    offset += chunk.byteLength;
+  if (!buffer) {
+    throw new Error('WebM export failed: output buffer is null after finalization');
   }
 
   return new Blob([buffer], { type: 'video/webm' });
