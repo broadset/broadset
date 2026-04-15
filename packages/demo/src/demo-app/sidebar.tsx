@@ -1,3 +1,4 @@
+import type { EditorStore } from '@broadset/editor';
 import type {
   BroadsetDocument,
   BroadsetElement,
@@ -8,6 +9,7 @@ import type {
   Timeline,
 } from '@broadset/model';
 import {
+  AnimationModePropertiesPanel,
   AnimationSidebar,
   glassPanelStyle,
   type LayerInfo,
@@ -15,12 +17,15 @@ import {
   type PreflightIssue,
   PreflightPanel,
   PropertiesSidebar,
+  type PropertyFieldAdapter,
   type PropertyValue,
   TemplateGroupPanel,
 } from '@broadset/ui';
+import { useMemo } from 'react';
 
 import type { SidebarTab } from '../demo-types';
 import { toPanelElement } from '../demo-utils';
+import { createKeyframeAdapter } from './keyframe-adapter';
 
 export interface DemoSidebarPanelProps {
   readonly sidebarTab: SidebarTab;
@@ -65,6 +70,9 @@ export interface DemoSidebarPanelProps {
   readonly onAnimationRenameTimeline: (timelineId: string) => void;
   readonly onAnimationSelectState: (stateName: string | null) => void;
   readonly onAnimationToggleModifier: (modifierName: string) => void;
+  readonly editorStore: EditorStore;
+  readonly editingTimeline: Timeline | null;
+  readonly editingTimelineSelectedKf: number | null;
   readonly setEditingTimeline: (timeline: Timeline | null) => void;
   readonly setEditingTimelineSelectedKf: (index: number | null) => void;
   readonly timelinePreviewActiveModifiers: readonly string[];
@@ -101,6 +109,9 @@ export function DemoSidebarPanel({
   onAnimationRenameTimeline,
   onAnimationSelectState,
   onAnimationToggleModifier,
+  editorStore,
+  editingTimeline,
+  editingTimelineSelectedKf,
   preflightIssues,
   selectedElement,
   setEditingTimeline,
@@ -111,6 +122,22 @@ export function DemoSidebarPanel({
   timelinePreviewActiveModifiers,
   timelinePreviewActiveState,
 }: DemoSidebarPanelProps): React.JSX.Element {
+  const keyframeAdapter: PropertyFieldAdapter | null = useMemo(() => {
+    if (editingTimeline === null || editingTimelineSelectedKf === null || selectedElement === null) {
+      return null;
+    }
+
+    return createKeyframeAdapter(
+      editorStore,
+      selectedElement.id,
+      editingTimeline.id,
+      editingTimelineSelectedKf,
+      (nextTimeline) => {
+        setEditingTimeline(nextTimeline);
+      },
+    );
+  }, [editorStore, editingTimeline, editingTimelineSelectedKf, selectedElement, setEditingTimeline]);
+
   if (sidebarTab === 'layers') {
     return (
       <LayersSidebar
@@ -140,53 +167,64 @@ export function DemoSidebarPanel({
   }
 
   if (sidebarTab === 'animation') {
+    const panelElement =
+      selectedElement === null ? null : toPanelElement(selectedElement, selectedElementInstance ?? undefined);
+
     return (
-      <AnimationSidebar
-        element={
-          selectedElement === null ? null : toPanelElement(selectedElement, selectedElementInstance ?? undefined)
-        }
-        isLocked={selectedElement?.locked ?? false}
-        animationsEnabled
-        timelines={animationConfig?.timelines.map((t) => ({
-          id: t.id,
-          name: t.name,
-          keyframes: t.keyframes,
-        }))}
-        stateBindings={animationConfig?.stateTimelineBindings.map((b) => ({
-          stateName: b.stateName,
-          timelineId: b.timelineId,
-        }))}
-        modifierBindings={animationConfig?.modifierTimelineBindings.map((b) => ({
-          modifierName: b.modifierName,
-          inTimelineId: b.inTimelineId,
-          ...(b.outTimelineId !== undefined ? { outTimelineId: b.outTimelineId } : {}),
-        }))}
-        availableStates={['IN', 'OUT', 'LOOP']}
-        availableModifiers={['hover', 'focus', 'active']}
-        activeState={timelinePreviewActiveState}
-        activeModifiers={timelinePreviewActiveModifiers}
-        onSelectState={onAnimationSelectState}
-        onToggleModifier={onAnimationToggleModifier}
-        onAddTimeline={onAnimationAddTimeline}
-        onEditTimeline={(id: string) => {
-          const timeline = animationConfig?.timelines.find((t) => t.id === id);
+      <>
+        <AnimationSidebar
+          element={panelElement}
+          isLocked={selectedElement?.locked ?? false}
+          animationsEnabled
+          timelines={animationConfig?.timelines.map((t) => ({
+            id: t.id,
+            name: t.name,
+            keyframes: t.keyframes,
+          }))}
+          stateBindings={animationConfig?.stateTimelineBindings.map((b) => ({
+            stateName: b.stateName,
+            timelineId: b.timelineId,
+          }))}
+          modifierBindings={animationConfig?.modifierTimelineBindings.map((b) => ({
+            modifierName: b.modifierName,
+            inTimelineId: b.inTimelineId,
+            ...(b.outTimelineId !== undefined ? { outTimelineId: b.outTimelineId } : {}),
+          }))}
+          availableStates={['IN', 'OUT', 'LOOP']}
+          availableModifiers={['hover', 'focus', 'active']}
+          activeState={timelinePreviewActiveState}
+          activeModifiers={timelinePreviewActiveModifiers}
+          onSelectState={onAnimationSelectState}
+          onToggleModifier={onAnimationToggleModifier}
+          onAddTimeline={onAnimationAddTimeline}
+          onEditTimeline={(id: string) => {
+            const timeline = animationConfig?.timelines.find((t) => t.id === id);
 
-          if (timeline !== undefined) {
-            setEditingTimeline(timeline);
-            setEditingTimelineSelectedKf(null);
-          }
+            if (timeline !== undefined) {
+              setEditingTimeline(timeline);
+              setEditingTimelineSelectedKf(null);
+            }
 
-          onAnimationEditTimeline(id);
-        }}
-        onDeleteTimeline={onAnimationDeleteTimeline}
-        onDuplicateTimeline={onAnimationDuplicateTimeline}
-        onRenameTimeline={onAnimationRenameTimeline}
-        onQuickSetup={onAnimationQuickSetup}
-        onAddStateBinding={onAnimationAddStateBinding}
-        onRemoveStateBinding={onAnimationRemoveStateBinding}
-        onAddModifierBinding={onAnimationAddModifierBinding}
-        onRemoveModifierBinding={onAnimationRemoveModifierBinding}
-      />
+            onAnimationEditTimeline(id);
+          }}
+          onDeleteTimeline={onAnimationDeleteTimeline}
+          onDuplicateTimeline={onAnimationDuplicateTimeline}
+          onRenameTimeline={onAnimationRenameTimeline}
+          onQuickSetup={onAnimationQuickSetup}
+          onAddStateBinding={onAnimationAddStateBinding}
+          onRemoveStateBinding={onAnimationRemoveStateBinding}
+          onAddModifierBinding={onAnimationAddModifierBinding}
+          onRemoveModifierBinding={onAnimationRemoveModifierBinding}
+        />
+        {keyframeAdapter !== null && panelElement !== null && (
+          <AnimationModePropertiesPanel
+            element={panelElement}
+            adapter={keyframeAdapter}
+            documentMode={currentDocumentMode}
+            onUpdate={onUpdateProperty}
+          />
+        )}
+      </>
     );
   }
 

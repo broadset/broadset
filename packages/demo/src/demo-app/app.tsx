@@ -401,6 +401,9 @@ export function DemoApp(): React.JSX.Element {
       animationConfig={animationConfig}
       availableDocuments={availableDocuments}
       currentDocumentMode={currentDocument.documentMode}
+      editorStore={editorStore}
+      editingTimeline={editingTimeline}
+      editingTimelineSelectedKf={editingTimelineSelectedKf}
       handleAddMember={handleAddMember}
       handleCreateGroup={handleCreateGroup}
       handleRemoveGroup={handleRemoveGroup}
