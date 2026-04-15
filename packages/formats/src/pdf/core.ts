@@ -1,4 +1,10 @@
-import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle, Canvas } from '@broadset/model';
+import type {
+  BroadsetDocument,
+  BroadsetElement,
+  BroadsetElementStyle,
+  BroadsetGradient,
+  Canvas,
+} from '@broadset/model';
 import { type EmbeddedFont, PDF, type PDFPage, rgb, type Standard14FontName, StandardFonts } from '@libpdf/core';
 
 import { parseCssColor } from './color';
@@ -26,6 +32,42 @@ const STANDARD_FONT_WIDTH_RATIO = 0.5;
 
 function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
+}
+
+/**
+ * Approximate a gradient as the first stop color (PDF has no native gradient support
+ * without shading patterns, so we provide a best-effort solid fallback).
+ */
+function resolveGradientFallbackColor(gradient: string | BroadsetGradient): ReturnType<typeof rgb> | undefined {
+  if (typeof gradient === 'string') {
+    // CSS gradient string — try to extract first color token
+    const colorMatch = /#[0-9a-fA-F]{3,8}\b|rgba?\([^)]+\)/.exec(gradient);
+
+    if (colorMatch) {
+      const parsed = parseCssColor(colorMatch[0]);
+
+      if (parsed) {
+        return rgb(parsed.r, parsed.g, parsed.b);
+      }
+    }
+
+    return undefined;
+  }
+
+  // Structured gradient — use first stop color
+  const firstStop = gradient.stops[0];
+
+  if (firstStop === undefined) {
+    return undefined;
+  }
+
+  const parsed = parseCssColor(firstStop.color);
+
+  if (parsed) {
+    return rgb(parsed.r, parsed.g, parsed.b);
+  }
+
+  return undefined;
 }
 
 /* ------------------------------------------------------------------ */
@@ -147,6 +189,53 @@ const STANDARD_FONT_MAP: ReadonlyMap<string, Standard14FontName> = new Map([
   ['courier new', StandardFonts.Courier],
 ]);
 
+/** Standard 14 bold variants. */
+const STANDARD_BOLD_MAP: ReadonlyMap<Standard14FontName, Standard14FontName> = new Map([
+  [StandardFonts.Helvetica, StandardFonts.HelveticaBold],
+  [StandardFonts.TimesRoman, StandardFonts.TimesBold],
+  [StandardFonts.Courier, StandardFonts.CourierBold],
+]);
+
+/** Standard 14 italic/oblique variants. */
+const STANDARD_ITALIC_MAP: ReadonlyMap<Standard14FontName, Standard14FontName> = new Map([
+  [StandardFonts.Helvetica, StandardFonts.HelveticaOblique],
+  [StandardFonts.TimesRoman, StandardFonts.TimesItalic],
+  [StandardFonts.Courier, StandardFonts.CourierOblique],
+]);
+
+/** Standard 14 bold-italic variants. */
+const STANDARD_BOLD_ITALIC_MAP: ReadonlyMap<Standard14FontName, Standard14FontName> = new Map([
+  [StandardFonts.Helvetica, StandardFonts.HelveticaBoldOblique],
+  [StandardFonts.TimesRoman, StandardFonts.TimesBoldItalic],
+  [StandardFonts.Courier, StandardFonts.CourierBoldOblique],
+]);
+
+/**
+ * Select the standard font variant based on weight and style.
+ */
+function selectStandardFontVariant(
+  base: Standard14FontName,
+  weight: number | undefined,
+  style: string | undefined,
+): Standard14FontName {
+  const isBold = weight !== undefined && weight >= 700;
+  const isItalic = style === 'italic' || style === 'oblique';
+
+  if (isBold && isItalic) {
+    return STANDARD_BOLD_ITALIC_MAP.get(base) ?? base;
+  }
+
+  if (isBold) {
+    return STANDARD_BOLD_MAP.get(base) ?? base;
+  }
+
+  if (isItalic) {
+    return STANDARD_ITALIC_MAP.get(base) ?? base;
+  }
+
+  return base;
+}
+
 /**
  * Resolve fonts for all text elements, deduplicating by normalized family name.
  * Attempts standard font match first, then Google Fonts fetch+embed, then falls back
@@ -216,16 +305,26 @@ async function resolveFonts(
 
 /**
  * Look up the resolved font for an element, falling back to Helvetica.
+ * Applies bold/italic standard font variants when available.
  */
 function lookupFont(el: BroadsetElement, fontMap: ReadonlyMap<string, FontInput>): FontInput {
+  let font: FontInput = StandardFonts.Helvetica;
+
   if (el.style.fontFamily) {
     const normalized = normalizeFontFamily(el.style.fontFamily);
     const resolved = fontMap.get(normalized);
 
-    if (resolved) return resolved;
+    if (resolved) {
+      font = resolved;
+    }
   }
 
-  return StandardFonts.Helvetica;
+  // Apply bold/italic variants for standard fonts only
+  if (typeof font === 'string') {
+    return selectStandardFontVariant(font, el.style.fontWeight, el.style.fontStyle);
+  }
+
+  return font;
 }
 
 /* ------------------------------------------------------------------ */
@@ -264,14 +363,28 @@ function renderText(
   };
 
   const lines = wrapText(el.content, maxWidthPt, measure);
+  const alignment = el.style.textAlignment ?? 'left';
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
     if (!line) continue;
 
+    // Calculate x offset for text alignment
+    let lineX = xPt;
+
+    if (alignment === 'center' || alignment === 'right') {
+      const lineWidth = measure(line);
+
+      if (alignment === 'center') {
+        lineX = xPt + (maxWidthPt - lineWidth) / 2;
+      } else {
+        lineX = xPt + maxWidthPt - lineWidth;
+      }
+    }
+
     page.drawText(line, {
-      x: xPt,
+      x: lineX,
       y: yPt + (lines.length - 1 - i) * lineHeightPt,
       size,
       color,
@@ -286,7 +399,9 @@ function renderRectangle(page: PDFPage, el: BroadsetElement, canvas: Canvas, hei
   const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height);
   const wPt = elementToPoints(canvas, el.width);
   const hPt = elementToPoints(canvas, el.height);
-  const bg = resolveColor(el.style, 'backgroundColor');
+  const bg =
+    resolveColor(el.style, 'backgroundColor') ??
+    (el.style.backgroundGradient !== undefined ? resolveGradientFallbackColor(el.style.backgroundGradient) : undefined);
   const border = resolveColor(el.style, 'borderColor');
 
   page.drawRectangle({
@@ -304,7 +419,10 @@ function renderRectangle(page: PDFPage, el: BroadsetElement, canvas: Canvas, hei
 function renderEllipse(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
   const cx = elementToPoints(canvas, el.position.x + el.width / 2);
   const cy = heightPt - elementToPoints(canvas, el.position.y + el.height / 2);
-  const bg = resolveColor(el.style, 'backgroundColor') ?? resolveColor(el.style, 'fill');
+  const bg =
+    resolveColor(el.style, 'backgroundColor') ??
+    resolveColor(el.style, 'fill') ??
+    (el.style.backgroundGradient !== undefined ? resolveGradientFallbackColor(el.style.backgroundGradient) : undefined);
 
   page.drawEllipse({
     x: cx,
