@@ -241,37 +241,95 @@ interface OGrafPackage {
   readonly name: string;
   readonly schema: OGrafSchema;
   readonly runtime: string;
+  readonly renderRequirements: {
+    readonly width: number;
+    readonly height: number;
+  };
+  readonly stepCount: number;
+  readonly customActions: readonly string[];
+}
+
+function buildElementStyle(element: BroadsetElement): string {
+  const parts: string[] = [
+    `position:absolute`,
+    `left:${String(element.position.x)}px`,
+    `top:${String(element.position.y)}px`,
+    `width:${String(element.width)}px`,
+    `height:${String(element.height)}px`,
+  ];
+
+  if (element.rotation !== 0) {
+    parts.push(`transform:rotate(${String(element.rotation)}deg)`);
+  }
+
+  if (element.style.opacity !== 1) {
+    parts.push(`opacity:${String(element.style.opacity)}`);
+  }
+
+  if (element.style.backgroundColor) {
+    parts.push(`background:${element.style.backgroundColor}`);
+  }
+
+  if (element.style.fontFamily) {
+    parts.push(`font-family:${element.style.fontFamily}`);
+  }
+
+  if (element.style.fontSize) {
+    parts.push(`font-size:${String(element.style.fontSize)}px`);
+  }
+
+  if (element.style.fontColor) {
+    parts.push(`color:${element.style.fontColor}`);
+  }
+
+  return parts.join(';');
 }
 
 function buildOGrafRuntime(element: BroadsetElement): string {
+  const style = buildElementStyle(element);
+
   switch (element.type) {
     case 'qrcode': {
       const svg = generateQrSvgFragment(element.content);
 
-      return svg ?? '';
+      return svg !== null ? `<div style="${style}">${svg}</div>` : '';
     }
 
     case 'svg':
-      return element.content;
+      return `<div style="${style}">${element.content}</div>`;
     case 'image':
     case 'video':
-      return `<div data-element-id="${element.id}" data-type="${element.type}" data-asset="true"></div>`;
+      return `<div data-element-id="${element.id}" data-type="${element.type}" data-asset="true" style="${style}"></div>`;
     default:
-      return `<div data-element-id="${element.id}" data-type="${element.type}">${element.content}</div>`;
+      return `<div data-element-id="${element.id}" data-type="${element.type}" style="${style}">${element.content}</div>`;
   }
 }
 
 function buildOGrafSchema(element: BroadsetElement): OGrafSchema {
+  const defaults: Record<string, string> = {};
+  const inputs: OGrafSchemaInput[] = [];
+
+  // Text content binding
   if (element.type === 'text') {
     const key = `${element.id}-content`;
 
-    return {
-      defaults: Object.freeze({ [key]: element.content }),
-      inputs: Object.freeze([{ name: key, type: 'text', defaultValue: element.content }]),
-    };
+    defaults[key] = element.content;
+    inputs.push({ name: key, type: 'text', defaultValue: element.content });
   }
 
-  return { defaults: Object.freeze({}), inputs: Object.freeze([]) };
+  // Data binding field
+  if (element.dataField !== null) {
+    const key = `${element.id}-data`;
+    const fieldName = element.dataField.fieldName;
+
+    defaults[key] = fieldName;
+    inputs.push({ name: key, type: 'text', defaultValue: fieldName });
+  }
+
+  return {
+    defaults: Object.freeze(defaults),
+    inputs: Object.freeze(inputs),
+  };
 }
 
 /**
@@ -279,12 +337,27 @@ function buildOGrafSchema(element: BroadsetElement): OGrafSchema {
  * Text content is exposed as schema defaults.
  * Image elements are not exposed as text inputs.
  * QR elements are pre-rendered to inline SVG.
+ * Includes renderRequirements (canvas dimensions), stepCount (from animations), and customActions.
  */
 export function generateOGrafPackages(document: BroadsetDocument): readonly OGrafPackage[] {
-  return document.elements.map((element) => ({
-    elementId: element.id,
-    name: sanitizeFilename(element.name) || element.id,
-    schema: buildOGrafSchema(element),
-    runtime: buildOGrafRuntime(element),
-  }));
+  const { canvas } = document;
+
+  return document.elements.map((element) => {
+    // Count animation timelines for this element as step states
+    const elementAnimations = document.animations.filter((a) => a.elementId === element.id);
+    const totalKeyframes = elementAnimations.reduce(
+      (sum, a) => sum + a.config.timelines.reduce((ts, tl) => ts + tl.keyframes.length, 0),
+      0,
+    );
+
+    return {
+      elementId: element.id,
+      name: sanitizeFilename(element.name) || element.id,
+      schema: buildOGrafSchema(element),
+      runtime: buildOGrafRuntime(element),
+      renderRequirements: { width: canvas.width, height: canvas.height },
+      stepCount: totalKeyframes,
+      customActions: totalKeyframes > 0 ? ['set-step'] : [],
+    };
+  });
 }

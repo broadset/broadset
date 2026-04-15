@@ -187,4 +187,135 @@ describe('OGraf Package Generation', () => {
     expect(pkg.runtime).toContain('<svg');
     expect(pkg.runtime).toContain('</svg>');
   });
+
+  /** @description OGraf runtime must include element geometry (position, width, height) as inline style. */
+  it('includes element geometry as inline styles in runtime', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          type: 'rectangle',
+          id: 'el-geo',
+          position: { x: 50, y: 30 },
+          width: 200,
+          height: 100,
+        }),
+      ],
+    });
+    const packages = generateOGrafPackages(doc);
+    const pkg = first(packages);
+
+    expect(pkg.runtime).toContain('left:50px');
+    expect(pkg.runtime).toContain('top:30px');
+    expect(pkg.runtime).toContain('width:200px');
+    expect(pkg.runtime).toContain('height:100px');
+  });
+
+  /** @description OGraf packages must include renderRequirements from canvas dimensions. */
+  it('includes renderRequirements with canvas dimensions', () => {
+    const doc = makeDocument({
+      elements: [makeElement({ type: 'text', id: 'el-1', content: 'Hello' })],
+    });
+    const packages = generateOGrafPackages(doc);
+    const pkg = first(packages);
+
+    expect(pkg.renderRequirements.width).toBeGreaterThan(0);
+    expect(pkg.renderRequirements.height).toBeGreaterThan(0);
+  });
+
+  /** @description Elements with animations must have stepCount > 0 and set-step custom action. */
+  it('includes stepCount and customActions for animated elements', () => {
+    const doc = makeDocument({
+      elements: [makeElement({ type: 'text', id: 'el-anim', content: 'Animated' })],
+      animations: [
+        {
+          elementId: 'el-anim',
+          config: {
+            modifierTimelineBindings: [],
+            stateTimelineBindings: [],
+            textAnimator: null,
+            timelines: [
+              {
+                id: 'tl-1',
+                name: 'enter',
+                durationMs: 1000,
+                loop: 'none' as const,
+                keyframes: [
+                  {
+                    name: 'start',
+                    action: 'none' as const,
+                    offsetMs: 0,
+                    properties: {
+                      opacity: { type: 'number' as const, value: 0, easing: 'linear' as const },
+                    },
+                  },
+                  {
+                    name: 'end',
+                    action: 'none' as const,
+                    offsetMs: 1000,
+                    properties: {
+                      opacity: { type: 'number' as const, value: 1, easing: 'linear' as const },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const packages = generateOGrafPackages(doc);
+    const pkg = first(packages);
+
+    expect(pkg.stepCount).toBe(2);
+    expect(pkg.customActions).toContain('set-step');
+  });
+
+  /** @description Non-animated elements must have stepCount 0 and no custom actions. */
+  it('has zero stepCount for non-animated elements', () => {
+    const doc = makeDocument({
+      elements: [makeElement({ type: 'rectangle', id: 'el-static' })],
+    });
+    const packages = generateOGrafPackages(doc);
+    const pkg = first(packages);
+
+    expect(pkg.stepCount).toBe(0);
+    expect(pkg.customActions).toHaveLength(0);
+  });
+
+  /** @description Elements with dataField must expose data binding in schema. */
+  it('exposes dataField as schema input', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          type: 'text',
+          id: 'el-data',
+          content: 'Score: {score}',
+          dataField: { fieldName: 'score', overflow: 'clip' as const },
+        }),
+      ],
+    });
+    const packages = generateOGrafPackages(doc);
+    const pkg = first(packages);
+
+    // Should have text content input and data field input
+    expect(pkg.schema.inputs.length).toBe(2);
+    expect(pkg.schema.defaults).toHaveProperty('el-data-data', 'score');
+  });
+
+  /** @description Runtime must include rotation as transform style. */
+  it('includes rotation in runtime style', () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          type: 'rectangle',
+          id: 'el-rot',
+          rotation: 45,
+        }),
+      ],
+    });
+    const packages = generateOGrafPackages(doc);
+    const pkg = first(packages);
+
+    expect(pkg.runtime).toContain('transform:rotate(45deg)');
+  });
 });
