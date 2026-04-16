@@ -24,9 +24,9 @@
     "@broadset/playback": "^0.1.0",
     "@libpdf/core": "^0.3.4",
     "ag-psd": "^30.1.0",
-    "html-to-image": "^1.11.13",
     "jszip": "^3.10.1",
     "mediabunny": "^1.40.1",
+    "modern-screenshot": "^4.6.8",
     "pizzip": "^3.2.0",
     "qrcode-generator": "^2.0.4"
   }

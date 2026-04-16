@@ -106,8 +106,8 @@ export function isVideoExportSupported(): boolean {
 export interface VideoExportOptions {
   /** Target canvas to capture frames from. */
   readonly canvas: HTMLCanvasElement;
-  /** Callback that renders the scene at the given time (ms) before frame capture. */
-  readonly renderFrame: (timeMs: number) => void;
+  /** Callback that renders the scene at the given time (ms) before frame capture. May be async (e.g. when capturing DOM-rendered frames to canvas). */
+  readonly renderFrame: (timeMs: number) => void | Promise<void>;
   /** Total animation duration in milliseconds. */
   readonly durationMs: number;
   /** Frames per second (defaults to 30). */
@@ -148,8 +148,8 @@ export async function exportVideoBlob(options: VideoExportOptions): Promise<Blob
     throw new Error('frameRate must be positive');
   }
 
-  if (options.durationMs <= 0) {
-    throw new Error('durationMs must be positive');
+  if (options.durationMs <= 0 || !Number.isFinite(options.durationMs)) {
+    throw new Error('durationMs must be a positive finite number');
   }
 
   if (quality < 0 || quality > 1) {
@@ -184,7 +184,7 @@ export async function exportVideoBlob(options: VideoExportOptions): Promise<Blob
     const timeMs = (i / frameRate) * 1000;
     const timestampSec = i * frameDurationSec;
 
-    options.renderFrame(timeMs);
+    await options.renderFrame(timeMs);
     await canvasSource.add(timestampSec, frameDurationSec);
 
     const frameProgress = 0.1 + 0.8 * ((i + 1) / totalFrames);

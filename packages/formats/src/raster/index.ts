@@ -98,7 +98,10 @@ export async function captureElementToCanvas(
   });
 
   try {
-    return await capture(element, { width, height, scale: 1 });
+    // Disable modern-screenshot's Safari/Firefox per-image draw throttle
+    // for single-frame exports as well. Without this, image-heavy PNG/JPEG
+    // exports can spend ~100ms per image before encoding starts.
+    return await capture(element, { width, height, scale: 1, drawImageInterval: 0 });
   } catch (error: unknown) {
     // modern-screenshot may reject with a non-Error (e.g. Event from image load failure).
     // Wrap it in a proper Error for diagnostics.
@@ -154,11 +157,16 @@ export async function createBatchCapture(
   // expensive step (~seconds), but it only runs once. The context stores
   // the node reference, so subsequent captures will re-read the DOM
   // (picking up CSS changes from seek()) while reusing cached fonts.
+  //
+  // `drawImageInterval: 0` disables modern-screenshot's default 100ms
+  // per-image Safari/Firefox throttle — on a video encoding loop that
+  // throttle translates into seconds of wall-clock delay per frame.
   const context = await createCtx(element, {
     width,
     height,
     scale: 1,
     autoDestruct: false,
+    drawImageInterval: 0,
   });
 
   return {

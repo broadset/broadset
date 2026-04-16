@@ -364,11 +364,13 @@ export function createPlaybackController(options: CreatePlaybackControllerOption
       return null;
     }
 
-    const effectiveTimeMs =
-      options.suppressTransitions === true ? computeTimelineLoopDuration(timeline) : seekOptions.timeMs;
+    // Note: callers that need to skip to the end of a transition pass
+    // `timeMs: computeTimelineLoopDuration(timeline)` explicitly.
+    // We must NOT override `seekOptions.timeMs` here — doing so breaks
+    // `seek()` which passes arbitrary times for frame-by-frame export.
     const frame = computeTimelineFrame({
       timeline,
-      timeMs: effectiveTimeMs,
+      timeMs: seekOptions.timeMs,
     });
 
     isApplyingMutation = true;

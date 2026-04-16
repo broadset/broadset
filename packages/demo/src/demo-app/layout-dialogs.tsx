@@ -1,14 +1,17 @@
-import { Toast } from '@heroui/react';
-
+import { computeTimelineLoopDuration } from '@broadset/playback';
 import {
   AboutModal,
   CanvasSettingsModal,
+  type ExportAnimationInfo,
   ExportModal,
   MediaLibraryModal,
   NewDocumentModal,
   ShortcutHelpModal,
   TemplateBrowserModal,
-} from '../../../ui/src/modals';
+} from '@broadset/ui';
+import { Toast } from '@heroui/react';
+import { useMemo } from 'react';
+
 import { DEMO_DOCUMENT_PRESETS } from '../demoConfig';
 import { DEMO_MEDIA_ASSETS, DEMO_TEMPLATES, ENABLED_EXPORTERS, MEDIA_CATEGORIES } from './constants';
 import type { DemoAppLayoutProps } from './layout-types';
@@ -16,15 +19,35 @@ import type { DemoAppLayoutProps } from './layout-types';
 export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
   const {
     activeDialog,
+    canvasSettings,
     currentDocument,
     editorState,
     editorStore,
+    exportProgress,
     handleCreateFromPreset,
     handleExportFormat,
     handleMediaSelect,
     handleTemplateSelect,
     setActiveDialog,
   } = props;
+
+  // Compute animation info for the ExportModal from the current document.
+  const exportAnimations: readonly ExportAnimationInfo[] = useMemo(() => {
+    return currentDocument.animations.map((anim) => {
+      const element = currentDocument.elements.find((el) => el.id === anim.elementId);
+      const maxDuration = Math.max(
+        0,
+        ...anim.config.timelines.map((t) => computeTimelineLoopDuration(t)).filter((d) => Number.isFinite(d)),
+      );
+
+      return {
+        elementId: anim.elementId,
+        elementName: element?.name ?? anim.elementId,
+        durationMs: maxDuration,
+        timelineCount: anim.config.timelines.length,
+      };
+    });
+  }, [currentDocument.animations, currentDocument.elements]);
 
   return (
     <>
@@ -40,10 +63,10 @@ export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
       <CanvasSettingsModal
         isOpen={activeDialog === 'settings'}
         documentName={currentDocument.name}
-        showRulers={editorState.canvasSettings.showRulers}
-        rulerUnit={editorState.canvasSettings.units}
-        viewMode={editorState.canvasSettings.viewMode}
-        perspective={editorState.canvasSettings.perspective}
+        showRulers={canvasSettings.showRulers}
+        rulerUnit={canvasSettings.units}
+        viewMode={canvasSettings.viewMode}
+        perspective={canvasSettings.perspective}
         showGrid={editorState.gridSettings.showGrid}
         gridSize={editorState.gridSettings.gridSize}
         snapToGrid={editorState.gridSettings.snapToGrid}
@@ -80,6 +103,8 @@ export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
         isOpen={activeDialog === 'export'}
         enabledExporters={ENABLED_EXPORTERS}
         dynamicData={{}}
+        animations={exportAnimations}
+        exportProgress={exportProgress}
         onExport={handleExportFormat}
         onClose={() => {
           setActiveDialog(null);

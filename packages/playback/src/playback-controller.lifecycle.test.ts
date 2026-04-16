@@ -84,6 +84,7 @@ describe('createPlaybackController', () => {
     }).not.toThrow();
   });
 
+  /** @description suppressTransitions makes state transitions (IN/OUT) jump to their end state instantly. The syncTransitions code path does this by passing the timeline end time explicitly. */
   it('supports suppressTransitions for instant snapshots', () => {
     const { opacityTarget, root } = createHostElement('hero');
     const animations: readonly AnimationDefinition[] = [
@@ -120,9 +121,66 @@ describe('createPlaybackController', () => {
 
     controller.attach();
     root.firstElementChild?.classList.add('onscreen');
-    controller.seekTimeline({ elementId: 'hero', timelineName: 'IN', timeMs: 0 });
+    // Seek to the end of the IN timeline — suppressTransitions callers
+    // (syncTransitions) pass the end time explicitly.
+    controller.seekTimeline({ elementId: 'hero', timelineName: 'IN', timeMs: 200 });
 
     expect(opacityTarget.style.opacity).toBe('1');
+
+    // Seeking to a specific time must respect that time — this is how
+    // video export works (frame-by-frame seek through the timeline).
+    controller.seekTimeline({ elementId: 'hero', timelineName: 'IN', timeMs: 100 });
+
+    expect(Number(opacityTarget.style.opacity)).toBeCloseTo(0.5, 1);
+  });
+
+  /** @description seek() with suppressTransitions must apply the requested time — not the end of the timeline. This is critical for video export, which seeks to each frame time. */
+  it('seek() with suppressTransitions applies the requested time, not the timeline end', () => {
+    const { opacityTarget, root } = createHostElement('hero');
+    const animations: readonly AnimationDefinition[] = [
+      {
+        elementId: 'hero',
+        config: createConfig({
+          timelines: [
+            createTimeline({
+              id: 'tl-default',
+              name: 'Default',
+              durationMs: 1000,
+              keyframes: [
+                createKeyframe({
+                  name: 'start',
+                  offsetMs: 0,
+                  properties: { opacity: { type: 'number', value: 0, easing: 'linear' } },
+                }),
+                createKeyframe({
+                  name: 'end',
+                  offsetMs: 1000,
+                  properties: { opacity: { type: 'number', value: 1, easing: 'linear' } },
+                }),
+              ],
+            }),
+          ],
+        }),
+      },
+    ];
+
+    const controller = createPlaybackController({ root, animations, suppressTransitions: true });
+
+    controller.attach();
+
+    // Seek to 25% — must show 0.25 opacity, NOT 1.0 (the end value).
+    controller.seek(250);
+    expect(Number(opacityTarget.style.opacity)).toBeCloseTo(0.25, 1);
+
+    // Seek to 50% — must show 0.5.
+    controller.seek(500);
+    expect(Number(opacityTarget.style.opacity)).toBeCloseTo(0.5, 1);
+
+    // Seek to 0% — must show 0.
+    controller.seek(0);
+    expect(Number(opacityTarget.style.opacity)).toBeCloseTo(0, 1);
+
+    controller.destroy();
   });
 
   it('resumes paused default timelines from the paused position instead of restarting them', () => {

@@ -275,7 +275,7 @@ describe('export orchestration', () => {
 
   /** @description Video export (WebM) MUST require a renderFrame callback and durationMs. */
   it('exports WebM format with video settings', async () => {
-    const renderFrame = jest.fn();
+    const renderFrame = jest.fn<(timeMs: number) => void>();
     const canvas = document.createElement('canvas');
 
     await exportDocument(
@@ -298,7 +298,7 @@ describe('export orchestration', () => {
 
   /** @description WebM export must forward frame rate and quality overrides from export context. */
   it('forwards custom frame rate and quality for WebM export', async () => {
-    const renderFrame = jest.fn();
+    const renderFrame = jest.fn<(timeMs: number) => void>();
     const canvas = document.createElement('canvas');
 
     await exportDocument(
@@ -333,7 +333,7 @@ describe('export orchestration', () => {
 
   /** @description MP4 export uses exportVideoBlob with format:'mp4' and triggers download. */
   it('exports MP4 video and triggers download', async () => {
-    const renderFrame = jest.fn();
+    const renderFrame = jest.fn<(timeMs: number) => void>();
     const canvas = document.createElement('canvas');
 
     await exportDocument(
@@ -366,6 +366,15 @@ describe('export orchestration', () => {
   /** @description Video export without renderFrame MUST raise an error. */
   it('throws when a video export has no renderFrame', async () => {
     await expect(exportDocument('webm', makeContext())).rejects.toThrow(/playback/i);
+  });
+
+  /** @description Video export with renderFrame and duration but no snapshotCanvas MUST raise a snapshot canvas error. This test reproduces the runtime bug where the DOM renderer has no <canvas> element, so discoverCanvasElement returns null and the snapshot canvas is undefined. */
+  it('throws when video export has renderFrame and duration but no snapshot canvas', async () => {
+    const renderFrame = jest.fn<(timeMs: number) => void>();
+
+    await expect(exportDocument('mp4', makeContext({ renderFrame, playbackDurationMs: 5000 }))).rejects.toThrow(
+      /snapshot canvas/i,
+    );
   });
 
   /** @description OGraf export MUST call generateOGrafPackages and trigger a download. */

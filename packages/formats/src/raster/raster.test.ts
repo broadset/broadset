@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 
 import type { WebMExportOptions } from './index';
 import {
+  captureElementToCanvas,
   discoverCanvasElement,
+  discoverRendererRoot,
   exportEmbeddedSvgBlob,
   exportJpegBlob,
   exportPngBlob,
@@ -424,6 +426,88 @@ describe('WebM Alpha Video Export', () => {
     expect(mockWebMState.canvasSourceCalls[0]?.timestamp).toBeCloseTo(0);
     expect(mockWebMState.canvasSourceCalls[1]?.timestamp).toBeCloseTo(0.1);
     expect(mockWebMState.canvasSourceCalls[2]?.timestamp).toBeCloseTo(0.2);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  Download Wrapper                                                 */
+/* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/*  Renderer Root Discovery                                          */
+/* ------------------------------------------------------------------ */
+
+describe('Renderer Root Discovery', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  /** @description discoverRendererRoot MUST find the renderer's content root element by its data-broadset-canvas-root attribute. This is needed to capture DOM-rendered frames for video export. */
+  it('discovers the renderer root element when marked', () => {
+    const root = document.createElement('div');
+
+    root.setAttribute('data-broadset-canvas-root', 'true');
+    document.body.appendChild(root);
+
+    expect(discoverRendererRoot()).toBe(root);
+  });
+
+  /** @description discoverRendererRoot MUST return null when no renderer root exists. */
+  it('returns null when no renderer root is present', () => {
+    expect(discoverRendererRoot()).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  modern-screenshot mock (jsdom lacks real SVG rendering; mock     */
+/*  returns a canvas with the requested size)                        */
+/* ------------------------------------------------------------------ */
+
+var mockDomToCanvas = jest.fn();
+
+jest.mock('modern-screenshot', () => ({
+  domToCanvas: mockDomToCanvas,
+}));
+
+/* ------------------------------------------------------------------ */
+/*  DOM Element to Canvas Capture                                    */
+/* ------------------------------------------------------------------ */
+
+describe('captureElementToCanvas', () => {
+  beforeEach(() => {
+    mockDomToCanvas.mockImplementation((_node: unknown, options: unknown) => {
+      const opts = options as { readonly width: number; readonly height: number };
+      const canvas = document.createElement('canvas');
+
+      canvas.width = opts.width;
+      canvas.height = opts.height;
+
+      return Promise.resolve(canvas);
+    });
+  });
+
+  /** @description captureElementToCanvas MUST convert a DOM element to a canvas of the specified dimensions using modern-screenshot. This enables video export from the DOM-based renderer. */
+  it('converts a DOM element to a canvas with specified dimensions', async () => {
+    const element = document.createElement('div');
+
+    element.style.width = '200px';
+    element.style.height = '100px';
+    element.style.backgroundColor = '#ff0000';
+    document.body.appendChild(element);
+
+    const canvas = await captureElementToCanvas(element, 200, 100);
+
+    expect(canvas).toBeInstanceOf(HTMLCanvasElement);
+    expect(canvas.width).toBe(200);
+    expect(canvas.height).toBe(100);
+    expect(mockDomToCanvas).toHaveBeenCalledWith(element, {
+      width: 200,
+      height: 100,
+      scale: 1,
+      drawImageInterval: 0,
+    });
+
+    document.body.removeChild(element);
   });
 });
 

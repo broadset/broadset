@@ -170,12 +170,15 @@ describe('exportVideoBlob', () => {
     );
   });
 
-  /** @description durationMs must be positive to produce at least one frame. */
-  it('rejects for non-positive durationMs', async () => {
+  /** @description durationMs must be a positive finite number to produce a bounded frame count. */
+  it('rejects for non-positive or non-finite durationMs', async () => {
     const canvas = makeDummyCanvas();
 
     await expect(exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: 0 })).rejects.toThrow(
-      'durationMs must be positive',
+      'durationMs must be a positive finite number',
+    );
+    await expect(exportVideoBlob({ canvas, renderFrame: () => {}, durationMs: Infinity })).rejects.toThrow(
+      'durationMs must be a positive finite number',
     );
   });
 

@@ -25,7 +25,7 @@ export type ExportFormat =
 export interface ExportContext {
   readonly document: BroadsetDocument;
   readonly snapshotCanvas?: HTMLCanvasElement;
-  readonly renderFrame?: (timeMs: number) => void;
+  readonly renderFrame?: (timeMs: number) => void | Promise<void>;
   readonly playbackDurationMs?: number;
   readonly pixelRatio?: number;
   readonly jpegQuality?: number;
@@ -217,7 +217,7 @@ function requireSnapshotCanvas(context: ExportContext): asserts context is Expor
 
 function requireVideoSettings(context: ExportContext): asserts context is ExportContext & {
   readonly snapshotCanvas: HTMLCanvasElement;
-  readonly renderFrame: (timeMs: number) => void;
+  readonly renderFrame: (timeMs: number) => void | Promise<void>;
   readonly playbackDurationMs: number;
 } {
   if (context.renderFrame === undefined || context.playbackDurationMs === undefined) {

@@ -100,96 +100,6 @@ async function waitForImagesToSettle(root: HTMLElement): Promise<void> {
 }
 
 /**
- * Fetches an image URL and returns it as a `data:image/...;base64,...` URL.
- *
- * Uses `fetch(url, { mode: 'cors' })` directly, bypassing the browser's
- * `<img>` loader (which caches responses keyed by `crossOrigin` mode in
- * ways that can defeat a later CORS re-attempt). Any URL served with
- * `Access-Control-Allow-Origin` will succeed; non-CORS hosts will reject.
- */
-async function fetchAsDataUrl(url: string): Promise<string | null> {
-  try {
-    const response = await fetch(url, { mode: 'cors', cache: 'no-store' });
-
-    if (!response.ok) return null;
-
-    const blob = await response.blob();
-
-    return await new Promise<string | null>((resolve) => {
-      const reader = new FileReader();
-
-      reader.addEventListener('load', () => {
-        const result = reader.result;
-
-        resolve(typeof result === 'string' ? result : null);
-      });
-      reader.addEventListener('error', () => {
-        resolve(null);
-      });
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Returns a clone of `doc` where every remote image element's `content`
- * URL has been replaced with a `data:` URL containing the inlined image
- * bytes. Image elements whose URL can't be fetched via CORS are left
- * untouched and will render as placeholders in the export.
- *
- * Why: the renderer's `<img>` element + modern-screenshot's capture
- * pipeline both re-fetch remote image URLs, and browser image caches
- * key entries by CORS mode in ways that are unreliable across renderer
- * instances. By resolving all image URLs to data URLs up-front, the
- * offscreen renderer and the export pipeline operate entirely on inline
- * bytes — zero network, zero CORS, zero cache-state sensitivity.
- */
-async function inlineRemoteImages(doc: BroadsetDocument): Promise<BroadsetDocument> {
-  const uniqueUrls = new Set<string>();
-
-  for (const el of doc.elements) {
-    if (el.type !== 'image') continue;
-
-    const url = el.content.trim();
-
-    if (url === '' || url.startsWith('data:')) continue;
-
-    uniqueUrls.add(url);
-  }
-
-  if (uniqueUrls.size === 0) return doc;
-
-  const urlToDataUrl = new Map<string, string>();
-
-  await Promise.all(
-    Array.from(uniqueUrls).map(async (url) => {
-      const dataUrl = await fetchAsDataUrl(url);
-
-      if (dataUrl !== null) {
-        urlToDataUrl.set(url, dataUrl);
-      }
-    }),
-  );
-
-  if (urlToDataUrl.size === 0) return doc;
-
-  return {
-    ...doc,
-    elements: doc.elements.map((el) => {
-      if (el.type !== 'image') return el;
-
-      const inlined = urlToDataUrl.get(el.content.trim());
-
-      if (inlined === undefined) return el;
-
-      return { ...el, content: inlined };
-    }),
-  };
-}
-
-/**
  * Handle to a streaming video export session.
  *
  * The session owns a disposable offscreen renderer + playback controller +
@@ -221,12 +131,6 @@ async function createStreamingExportSession(options: {
 }): Promise<StreamingExportSession> {
   const { doc, width, height, createBatchCapture } = options;
 
-  // Pre-fetch every remote image URL and inline the bytes as data URLs.
-  // The renderer will then work entirely on inline data, bypassing browser
-  // cache / CORS quirks that cause the export <img> loads to fail even
-  // when the editor's <img> loads succeeded.
-  const inlinedDoc = await inlineRemoteImages(doc);
-
   const offscreenHost = document.createElement('div');
 
   offscreenHost.style.position = 'fixed';
@@ -239,10 +143,10 @@ async function createStreamingExportSession(options: {
   offscreenHost.setAttribute('aria-hidden', 'true');
   document.body.appendChild(offscreenHost);
 
-  const renderer = createScreenRenderer({ host: offscreenHost, document: inlinedDoc });
+  const renderer = createScreenRenderer({ host: offscreenHost, document: doc });
   const controller = createPlaybackController({
     root: offscreenHost,
-    animations: inlinedDoc.animations,
+    animations: doc.animations,
     suppressTransitions: true,
   });
 
@@ -258,10 +162,7 @@ async function createStreamingExportSession(options: {
   }
 
   // Wait for every <img> under the offscreen host to finish loading (or
-  // error out) before creating the batch capture context. All image
-  // content is already inlined as data URLs above, so these loads are
-  // purely synchronous decodes — we just need to let the browser finish
-  // them before capturing.
+  // error out) before creating the batch capture context.
   await waitForImagesToSettle(canvasRoot);
 
   let session: { readonly capture: () => Promise<HTMLCanvasElement>; readonly destroy: () => void };

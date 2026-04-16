@@ -568,6 +568,7 @@ jest.mock('@broadset/renderer', () => ({
 }));
 
 jest.mock('@broadset/playback', () => ({
+  computeTimelineLoopDuration: jest.fn().mockReturnValue(0),
   createPlaybackController: jest.fn(),
 }));
 
