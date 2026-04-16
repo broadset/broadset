@@ -4,9 +4,9 @@ import { createEmptyBroadsetDocument } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { computeTimelineLoopDuration, createPlaybackController } from '@broadset/playback';
 import { createScreenRenderer } from '@broadset/renderer';
-import type { DocumentPreset, MediaAsset, TemplateEntry } from '@broadset/ui';
+import type { DocumentPreset, ExportProgress, MediaAsset, TemplateEntry } from '@broadset/ui';
 import type { ChangeEvent, Dispatch, RefObject, SetStateAction } from 'react';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import type { ActiveDialog } from '../demo-types';
 import { DOCUMENT_STORAGE_KEY } from '../demo-types';
@@ -40,6 +40,7 @@ function formatImportWarningMessage(warnings: readonly string[]): string {
 }
 
 export interface DemoFileHandlers {
+  readonly exportProgress: ExportProgress | null;
   readonly handleCreateFromPreset: (preset: DocumentPreset) => void;
   readonly handleDebugSnapshotDownload: () => void;
   readonly handleDeleteSnapshot: (snapshotId: string) => void;
@@ -62,32 +63,11 @@ function getOptionalNumber(data: Readonly<Record<string, unknown>>, key: string)
 
 const FORMATS_LOAD_TIMEOUT_MS = 60_000;
 
-/**
- * Pre-renders all video frames using a disposable offscreen DOM renderer.
- *
- * Creates a hidden renderer + playback controller, seeks to each frame time,
- * captures via `domToCanvas`, and returns an array of `ImageData`.
- * The offscreen elements are removed from the DOM when done (or on error).
- *
- * This avoids disturbing the live editor workspace and prevents visual
- * flickering during export.
- */
 /** Round up to the nearest even number (H.264 requires even dimensions). */
 function ensureEven(n: number): number {
   const rounded = Math.ceil(n);
 
   return rounded % 2 === 0 ? rounded : rounded + 1;
-}
-
-/** Wait for two animation frames so the browser fully paints DOM changes. */
-function waitTwoFrames(): Promise<void> {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        resolve();
-      });
-    });
-  });
 }
 
 async function preRenderFramesOffscreen(options: {
@@ -96,10 +76,17 @@ async function preRenderFramesOffscreen(options: {
   readonly frameRate: number;
   readonly width: number;
   readonly height: number;
-  readonly captureElementToCanvas: (el: HTMLElement, w: number, h: number) => Promise<HTMLCanvasElement>;
+  readonly createBatchCapture: (
+    el: HTMLElement,
+    w: number,
+    h: number,
+  ) => Promise<{
+    readonly capture: () => Promise<HTMLCanvasElement>;
+    readonly destroy: () => void;
+  }>;
   readonly onProgress?: (frame: number, total: number) => void;
 }): Promise<readonly ImageData[]> {
-  const { doc, totalFrames, frameRate, width, height, captureElementToCanvas, onProgress } = options;
+  const { doc, totalFrames, frameRate, width, height, createBatchCapture, onProgress } = options;
 
   // Create a hidden host that is part of the DOM (so CSS/fonts resolve) but
   // invisible to the user.  Using `visibility: hidden` instead of
@@ -133,29 +120,37 @@ async function preRenderFramesOffscreen(options: {
       throw new Error('Offscreen renderer did not create a canvas root');
     }
 
-    const frames: ImageData[] = [];
+    // Create a batch capture session that pre-embeds fonts/images ONCE.
+    // Subsequent capture() calls reuse cached data — orders of magnitude
+    // faster than calling captureElementToCanvas per frame.
+    const session = await createBatchCapture(canvasRoot, width, height);
 
-    for (let i = 0; i < totalFrames; i++) {
-      const timeMs = (i / frameRate) * 1000;
+    try {
+      const frames: ImageData[] = [];
 
-      controller.seek(timeMs);
+      for (let i = 0; i < totalFrames; i++) {
+        const timeMs = (i / frameRate) * 1000;
 
-      // Wait two animation frames so the browser fully paints the DOM
-      // after seeking — matches the proven approach from the legacy exporter.
-      await waitTwoFrames();
+        controller.seek(timeMs);
 
-      const captured = await captureElementToCanvas(canvasRoot, width, height);
-      const ctx = captured.getContext('2d');
+        // No waitTwoFrames needed: seek() updates CSS synchronously and
+        // modern-screenshot reads computed styles from the live DOM, not
+        // painted pixels. The batch session handles any needed yields.
+        const captured = await session.capture();
+        const ctx = captured.getContext('2d');
 
-      if (ctx === null) {
-        throw new Error('Failed to get 2d context from captured canvas');
+        if (ctx === null) {
+          throw new Error('Failed to get 2d context from captured canvas');
+        }
+
+        frames.push(ctx.getImageData(0, 0, captured.width, captured.height));
+        onProgress?.(i + 1, totalFrames);
       }
 
-      frames.push(ctx.getImageData(0, 0, captured.width, captured.height));
-      onProgress?.(i + 1, totalFrames);
+      return frames;
+    } finally {
+      session.destroy();
     }
-
-    return frames;
   } finally {
     controller.destroy();
     renderer.destroy();
@@ -170,6 +165,8 @@ export function useDemoFileHandlers({
   setActiveDialog,
   fileInputRef,
 }: UseDemoFileHandlersOptions): DemoFileHandlers {
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
+
   useEffect(() => {
     // Warm the formats bundle in the background so export starts faster and
     // avoids stalling at first-use dynamic import under browser CT.
@@ -304,13 +301,20 @@ export function useDemoFileHandlers({
         return;
       }
 
+      const isVideoFormat = exporter === 'mp4' || exporter === 'webm';
+
+      // For video exports, keep the dialog open to show progress.
+      if (!isVideoFormat) {
+        setActiveDialog(null);
+      }
+
       const doExport = async (): Promise<void> => {
         document.body.setAttribute('data-export-status', 'loading');
+        setExportProgress(isVideoFormat ? { progress: 0, stage: 'Loading export engine…' } : null);
 
         const bridge = await import('../formatBridge');
 
         document.body.setAttribute('data-export-status', 'bridge-loaded');
-
         document.body.setAttribute('data-export-status', 'formats-loading');
 
         const formats = await Promise.race([
@@ -323,15 +327,27 @@ export function useDemoFileHandlers({
         ]);
 
         document.body.setAttribute('data-export-status', 'formats-loaded');
+        setExportProgress(isVideoFormat ? { progress: 0.05, stage: 'Preparing export…' } : null);
 
         const pixelRatio = getOptionalNumber(data, 'pixelRatio');
         const jpegQuality = getOptionalNumber(data, 'jpegQuality');
         const videoFrameRate = getOptionalNumber(data, 'videoFrameRate');
         const videoQuality = getOptionalNumber(data, 'videoQuality');
 
-        const isVideoFormat = exporter === 'mp4' || exporter === 'webm';
         const videoFrameRateActual = videoFrameRate ?? 30;
-        const formatLabel = exporter.toUpperCase();
+
+        // Parse selected animation IDs from export data.
+        const rawSelectedIds = data['selectedAnimationIds'];
+        const selectedAnimationIds =
+          Array.isArray(rawSelectedIds) ?
+            new Set(rawSelectedIds.filter((id): id is string => typeof id === 'string'))
+          : null;
+
+        // Filter animations to only selected ones (for video export).
+        const exportAnimations =
+          selectedAnimationIds !== null && selectedAnimationIds.size > 0 ?
+            currentDocument.animations.filter((a) => selectedAnimationIds.has(a.elementId))
+          : currentDocument.animations;
 
         // For raster exports, try native <canvas> first, then DOM renderer root.
         // Video exports pre-render frames offscreen and don't need this snapshot.
@@ -358,58 +374,62 @@ export function useDemoFileHandlers({
         }
 
         let renderFrame: ((timeMs: number) => void | Promise<void>) | undefined;
+        let playbackDurationMs: number | undefined;
 
         if (isVideoFormat) {
           // Force even dimensions for H.264 codec compatibility.
           const exportWidth = ensureEven(currentDocument.canvas.width);
           const exportHeight = ensureEven(currentDocument.canvas.height);
 
-          // Compute the playback duration from the document's animations.
-          const playbackDuration = Math.max(
+          // Compute the playback duration from the selected animations.
+          playbackDurationMs = Math.max(
             1000,
-            ...currentDocument.animations
+            ...exportAnimations
               .flatMap((a) => a.config.timelines.map((t) => computeTimelineLoopDuration(t)))
               .filter((d) => Number.isFinite(d)),
           );
 
-          const totalFrames = Math.ceil((playbackDuration / 1000) * videoFrameRateActual);
+          const totalFrames = Math.ceil((playbackDurationMs / 1000) * videoFrameRateActual);
 
-          pushToast('info', `Rendering ${String(totalFrames)} frames…`);
+          setExportProgress({ progress: 0.1, stage: `Rendering ${String(totalFrames)} frames…` });
           document.body.setAttribute('data-export-status', 'rendering');
+
+          // Build a document with only the selected animations for the
+          // offscreen renderer — all elements are still rendered, but only
+          // selected animations will drive property changes during seek.
+          const exportDoc: BroadsetDocument = {
+            ...currentDocument,
+            animations: [...exportAnimations],
+          };
 
           // Pre-render every frame in a disposable offscreen renderer so the
           // live editor workspace is not disturbed.
           const preRendered = await preRenderFramesOffscreen({
-            doc: currentDocument,
+            doc: exportDoc,
             totalFrames,
             frameRate: videoFrameRateActual,
             width: exportWidth,
             height: exportHeight,
-            captureElementToCanvas: formats.captureElementToCanvas,
+            createBatchCapture: formats.createBatchCapture,
             onProgress: (frame, total) => {
               document.body.setAttribute('data-export-progress', `${String(frame)}/${String(total)}`);
 
-              if (frame % 5 === 0 || frame === total) {
-                pushToast('info', `Rendering frames: ${String(frame)}/${String(total)}`);
-              }
+              const renderProgress = 0.1 + 0.6 * (frame / total);
+
+              setExportProgress({
+                progress: renderProgress,
+                stage: `Rendering frame ${String(frame)} / ${String(total)}`,
+              });
             },
           });
 
-          pushToast('info', `Encoding ${formatLabel} video…`);
+          setExportProgress({ progress: 0.75, stage: `Encoding ${exporter.toUpperCase()} video…` });
           document.body.setAttribute('data-export-status', 'encoding');
 
           // Create a canvas for the encoder to read from.
-          // If we already discovered one earlier (native <canvas> path),
-          // reuse it; otherwise create a fresh offscreen one.
-          if (snapshotCanvas === undefined) {
-            snapshotCanvas = document.createElement('canvas');
-            snapshotCanvas.width = exportWidth;
-            snapshotCanvas.height = exportHeight;
-          } else {
-            // Ensure even dimensions on existing canvas too.
-            snapshotCanvas.width = exportWidth;
-            snapshotCanvas.height = exportHeight;
-          }
+          snapshotCanvas = document.createElement('canvas');
+          snapshotCanvas.width = exportWidth;
+          snapshotCanvas.height = exportHeight;
 
           const encodingCanvas = snapshotCanvas;
 
@@ -425,16 +445,6 @@ export function useDemoFileHandlers({
           };
         }
 
-        const playbackDurationMs =
-          isVideoFormat ?
-            Math.max(
-              1000,
-              ...currentDocument.animations
-                .flatMap((a) => a.config.timelines.map((t) => computeTimelineLoopDuration(t)))
-                .filter((d) => Number.isFinite(d)),
-            )
-          : undefined;
-
         await bridge.exportDocument(exporter as ExportFormat, {
           document: currentDocument,
           ...(pixelRatio !== undefined ? { pixelRatio } : {}),
@@ -444,18 +454,32 @@ export function useDemoFileHandlers({
           ...(snapshotCanvas !== undefined ? { snapshotCanvas } : {}),
           ...(renderFrame !== undefined ? { renderFrame } : {}),
           ...(playbackDurationMs !== undefined ? { playbackDurationMs } : {}),
+          onProgress: (progress: number, stage?: string) => {
+            // Map encoder progress (0–1) into our 0.75–0.95 range.
+            const encoderProgress = 0.75 + 0.2 * progress;
+
+            setExportProgress({ progress: encoderProgress, stage: stage ?? 'Encoding…' });
+          },
         });
 
+        setExportProgress({ progress: 1, stage: 'Done!' });
         pushToast('success', `Exported as ${exporter.toUpperCase()}.`);
         document.body.setAttribute('data-export-status', 'done');
       };
 
-      void doExport().catch((error: unknown) => {
-        pushToast('error', `Export failed: ${error instanceof Error ? error.message : String(error)}`);
-        document.body.setAttribute('data-export-status', 'error');
-      });
+      void doExport()
+        .catch((error: unknown) => {
+          pushToast('error', `Export failed: ${error instanceof Error ? error.message : String(error)}`);
+          document.body.setAttribute('data-export-status', 'error');
+        })
+        .finally(() => {
+          // Close the modal after export finishes (success or error).
+          if (isVideoFormat) {
+            setActiveDialog(null);
+          }
 
-      setActiveDialog(null);
+          setExportProgress(null);
+        });
     },
     [currentDocument, handleSaveAsJson, pushToast, setActiveDialog],
   );
@@ -480,6 +504,7 @@ export function useDemoFileHandlers({
   );
 
   return {
+    exportProgress,
     handleCreateFromPreset,
     handleDebugSnapshotDownload,
     handleDeleteSnapshot,

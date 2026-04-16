@@ -22,7 +22,11 @@ export {
 export { exportPptxBytes, importPptx } from './pptx';
 export { exportPsdBytes, exportPsdBytesAsync, importPsd, svgPathToPsdVectorMask } from './psd';
 export {
+  type BatchCaptureSession,
+  captureElementToCanvas,
+  createBatchCapture,
   discoverCanvasElement,
+  discoverRendererRoot,
   exportEmbeddedSvgBlob,
   exportJpegBlob,
   exportPngBlob,
