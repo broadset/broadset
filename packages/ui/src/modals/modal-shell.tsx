@@ -43,7 +43,7 @@ export function ModalShell({
       }}
     >
       <Modal.Backdrop>
-        <Modal.Container size={size}>
+        <Modal.Container scroll="outside" size={size}>
           <div ref={dialogContainerRef}>
             <Modal.Dialog aria-label={title} aria-labelledby={titleId}>
               <h2 id={titleId} style={VISUALLY_HIDDEN_HEADING_STYLE}>

@@ -1,6 +1,6 @@
 import { Button, ButtonGroup, Input, Modal, Select, Slider, Switch } from '@heroui/react';
 import { X } from 'lucide-react';
-import { type ChangeEvent, type JSX, useCallback, useState } from 'react';
+import { type ChangeEvent, type JSX, useCallback, useEffect, useState } from 'react';
 
 import { NumField } from '../inputs';
 import { color, sp } from '../tokens';
@@ -228,6 +228,16 @@ export function ExportModal({
   const [jpegQuality, setJpegQuality] = useState(0.92);
   const [videoFrameRate, setVideoFrameRate] = useState(30);
   const [videoQuality, setVideoQuality] = useState(0.8);
+
+  const isVideoFormat = selectedExporter === 'mp4' || selectedExporter === 'webm';
+
+  // Auto-expand advanced options when a video format is selected so users
+  // can see frame-rate and quality controls without hunting for the toggle.
+  useEffect(() => {
+    if (isVideoFormat) {
+      setShowAdvanced(true);
+    }
+  }, [isVideoFormat]);
 
   const handleExport = useCallback(() => {
     if (selectedExporter !== null) {
