@@ -337,7 +337,11 @@ export function ExportModal({
         {isExporting ?
           <section aria-label="Export progress">
             <p style={{ fontWeight: 600, marginBottom: sp('sp-02') }}>{exportProgress.stage}</p>
-            <ProgressBar aria-label="Export progress" maxValue={1} minValue={0} value={exportProgress.progress} />
+            <ProgressBar aria-label="Export progress" maxValue={1} minValue={0} value={exportProgress.progress}>
+              <ProgressBar.Track>
+                <ProgressBar.Fill />
+              </ProgressBar.Track>
+            </ProgressBar>
             <p style={{ fontSize: '0.75rem', color: color('muted'), marginTop: sp('sp-01') }}>
               {Math.round(exportProgress.progress * 100)}%
             </p>

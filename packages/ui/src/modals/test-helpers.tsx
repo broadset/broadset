@@ -290,6 +290,11 @@ jest.mock(
     }),
     NumberField: Object.assign(mockNumberFieldRoot, { Group: mockWrap(), Input: mockNumberFieldInput }),
     Progress: mockProgress,
+    ProgressBar: Object.assign(mockProgress, {
+      Track: mockWrap(),
+      Fill: mockWrap(),
+      Output: mockWrap('output'),
+    }),
     Select: Object.assign(mockSelect, {
       Trigger: mockWrap(),
       Value: mockWrap('span'),

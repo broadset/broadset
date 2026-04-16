@@ -313,19 +313,40 @@ const createImageRenderer = createSimpleRenderer((host, element) => {
     return;
   }
 
-  const image = document.createElement('img');
+  // Two-phase load:
+  //   1. Try with `crossOrigin="anonymous"` so the browser issues a CORS
+  //      request. When the server responds with CORS headers (most major
+  //      image CDNs do), the `<img>` is non-tainted AND the same URL is
+  //      reusable by video/raster exporters from the HTTP cache.
+  //   2. If that fails (CORS rejection or network error), fall back to a
+  //      plain `<img>` so the image still displays in the editor —
+  //      exports of that image will show a placeholder instead.
+  const applyStyle = (node: HTMLImageElement): void => {
+    node.alt = element.name;
+    node.style.width = '100%';
+    node.style.height = '100%';
+    node.style.display = 'block';
+    node.style.objectFit = element.style.objectFit ?? 'cover';
+  };
 
-  image.src = element.content;
-  image.alt = element.name;
-  image.style.width = '100%';
-  image.style.height = '100%';
-  image.style.display = 'block';
-  image.style.objectFit = element.style.objectFit ?? 'cover';
-  image.addEventListener('error', () => {
-    renderImageFallback(host, element);
+  const corsImage = document.createElement('img');
+
+  corsImage.crossOrigin = 'anonymous';
+  applyStyle(corsImage);
+
+  corsImage.addEventListener('error', () => {
+    const fallbackImage = document.createElement('img');
+
+    applyStyle(fallbackImage);
+    fallbackImage.src = element.content;
+    fallbackImage.addEventListener('error', () => {
+      renderImageFallback(host, element);
+    });
+    host.replaceChildren(fallbackImage);
   });
 
-  host.replaceChildren(image);
+  corsImage.src = element.content;
+  host.replaceChildren(corsImage);
 });
 
 const createSvgRenderer = createSimpleRenderer((host, element) => {

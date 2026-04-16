@@ -434,6 +434,8 @@ The renderer MUST support incremental updates to the scene tree. When an element
 
 When an image element's content URL fails to load (404, network error, malformed URL), the renderer MUST display a visible placeholder indicating the broken state. The placeholder MUST include the element's dimensions and a broken-image icon or text indicator. The renderer MUST NOT throw an error or leave an invisible gap.
 
+Image loads use a two-phase strategy to maximize export compatibility: the renderer first attempts to load the image with `crossOrigin="anonymous"` so the browser issues a CORS request — when the server replies with appropriate CORS headers the image is non-tainted and the same URL is reusable by raster/video exporters from the HTTP cache. If the CORS attempt errors, the renderer falls back to a plain `<img>` (no `crossOrigin`) so the image still displays in the editor even when the server does not support CORS; exports of such images will show a placeholder. Only when both attempts error does the broken-image placeholder replace the `<img>`.
+
 #### Scenario: 404 image URL
 
 - GIVEN an image element with a 404 URL
@@ -446,11 +448,31 @@ When an image element's content URL fails to load (404, network error, malformed
 - WHEN the element is rendered
 - THEN a placeholder is displayed
 
+#### Scenario: Non-CORS image server
+
+- GIVEN an image element whose server does not send CORS headers
+- WHEN the CORS-enabled first attempt errors
+- THEN a plain-fetch fallback `<img>` loads the image for editor display
+- AND exports of this image render the broken-image placeholder
+
 #### Acceptance Criteria
 
 - [ ] Given a broken image URL, a visible placeholder is rendered at the element's dimensions
 - [ ] Given an empty image content, a placeholder is rendered
 - [ ] Given a broken image, no JavaScript error is thrown
+- [ ] Given a CORS-enabled image host, the rendered `<img>` has `crossOrigin="anonymous"` so the same URL can be re-fetched by exporters from the HTTP cache
+- [ ] Given a non-CORS image host, a plain `<img>` fallback loads the image for display after the CORS attempt errorsheaders
+- WHEN the CORS-enabled first attempt errors
+- THEN a plain-fetch fallback `<img>` loads the image for editor display
+- AND exports of this image render the broken-image placeholder
+
+#### Acceptance Criteria
+
+- [ ] Given a broken image URL, a visible placeholder is rendered at the element's dimensions
+- [ ] Given an empty image content, a placeholder is rendered
+- [ ] Given a broken image, no JavaScript error is thrown
+- [ ] Given a CORS-enabled image host, the rendered `<img>` has `crossOrigin="anonymous"` so the same URL can be re-fetched by exporters from the HTTP cache
+- [ ] Given a non-CORS image host, a plain `<img>` fallback loads the image for display after the CORS attempt errors
 
 ---
 

@@ -16,6 +16,7 @@ import type { ExportFormat } from '../formatBridge';
 export interface UseDemoFileHandlersOptions {
   readonly editorStore: EditorStore;
   readonly currentDocument: ReturnType<EditorStore['getState']>['document'];
+  readonly renderDocument: BroadsetDocument;
   readonly playbackControllerRef: Readonly<RefObject<PlaybackController | null>>;
   readonly pushToast: (severity: 'error' | 'info' | 'success', message: string) => void;
   readonly setActiveDialog: Dispatch<SetStateAction<ActiveDialog>>;
@@ -70,10 +71,143 @@ function ensureEven(n: number): number {
   return rounded % 2 === 0 ? rounded : rounded + 1;
 }
 
-async function preRenderFramesOffscreen(options: {
+/**
+ * Resolves once every `<img>` under `root` has either loaded or errored.
+ *
+ * Image loads are async; if export starts before the browser finishes
+ * downloading/decoding, the capture pipeline may miss CORS-cached bytes
+ * and fall back to placeholders for the first frame.
+ */
+async function waitForImagesToSettle(root: HTMLElement): Promise<void> {
+  const images = Array.from(root.querySelectorAll('img'));
+
+  await Promise.all(
+    images.map((img) => {
+      if (img.complete && img.naturalWidth > 0) {
+        return Promise.resolve();
+      }
+
+      return new Promise<void>((resolve) => {
+        const settle = (): void => {
+          resolve();
+        };
+
+        img.addEventListener('load', settle, { once: true });
+        img.addEventListener('error', settle, { once: true });
+      });
+    }),
+  );
+}
+
+/**
+ * Fetches an image URL and returns it as a `data:image/...;base64,...` URL.
+ *
+ * Uses `fetch(url, { mode: 'cors' })` directly, bypassing the browser's
+ * `<img>` loader (which caches responses keyed by `crossOrigin` mode in
+ * ways that can defeat a later CORS re-attempt). Any URL served with
+ * `Access-Control-Allow-Origin` will succeed; non-CORS hosts will reject.
+ */
+async function fetchAsDataUrl(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, { mode: 'cors', cache: 'no-store' });
+
+    if (!response.ok) return null;
+
+    const blob = await response.blob();
+
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+
+      reader.addEventListener('load', () => {
+        const result = reader.result;
+
+        resolve(typeof result === 'string' ? result : null);
+      });
+      reader.addEventListener('error', () => {
+        resolve(null);
+      });
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Returns a clone of `doc` where every remote image element's `content`
+ * URL has been replaced with a `data:` URL containing the inlined image
+ * bytes. Image elements whose URL can't be fetched via CORS are left
+ * untouched and will render as placeholders in the export.
+ *
+ * Why: the renderer's `<img>` element + modern-screenshot's capture
+ * pipeline both re-fetch remote image URLs, and browser image caches
+ * key entries by CORS mode in ways that are unreliable across renderer
+ * instances. By resolving all image URLs to data URLs up-front, the
+ * offscreen renderer and the export pipeline operate entirely on inline
+ * bytes — zero network, zero CORS, zero cache-state sensitivity.
+ */
+async function inlineRemoteImages(doc: BroadsetDocument): Promise<BroadsetDocument> {
+  const uniqueUrls = new Set<string>();
+
+  for (const el of doc.elements) {
+    if (el.type !== 'image') continue;
+
+    const url = el.content.trim();
+
+    if (url === '' || url.startsWith('data:')) continue;
+
+    uniqueUrls.add(url);
+  }
+
+  if (uniqueUrls.size === 0) return doc;
+
+  const urlToDataUrl = new Map<string, string>();
+
+  await Promise.all(
+    Array.from(uniqueUrls).map(async (url) => {
+      const dataUrl = await fetchAsDataUrl(url);
+
+      if (dataUrl !== null) {
+        urlToDataUrl.set(url, dataUrl);
+      }
+    }),
+  );
+
+  if (urlToDataUrl.size === 0) return doc;
+
+  return {
+    ...doc,
+    elements: doc.elements.map((el) => {
+      if (el.type !== 'image') return el;
+
+      const inlined = urlToDataUrl.get(el.content.trim());
+
+      if (inlined === undefined) return el;
+
+      return { ...el, content: inlined };
+    }),
+  };
+}
+
+/**
+ * Handle to a streaming video export session.
+ *
+ * The session owns a disposable offscreen renderer + playback controller +
+ * batch capture context. Callers drive encoding through `encoderCanvas` and
+ * `renderFrame`, which streams one frame at a time into the encoder without
+ * buffering every frame in memory (prior approach OOM'd for any real video).
+ */
+interface StreamingExportSession {
+  /** Single canvas the video encoder reads from. Updated per frame by `renderFrame`. */
+  readonly encoderCanvas: HTMLCanvasElement;
+  /** Seek the playback controller, capture the DOM, blit to `encoderCanvas`. */
+  readonly renderFrame: (timeMs: number) => Promise<void>;
+  /** Release the offscreen renderer, controller, capture context, and host node. */
+  readonly dispose: () => void;
+}
+
+async function createStreamingExportSession(options: {
   readonly doc: BroadsetDocument;
-  readonly totalFrames: number;
-  readonly frameRate: number;
   readonly width: number;
   readonly height: number;
   readonly createBatchCapture: (
@@ -84,13 +218,15 @@ async function preRenderFramesOffscreen(options: {
     readonly capture: () => Promise<HTMLCanvasElement>;
     readonly destroy: () => void;
   }>;
-  readonly onProgress?: (frame: number, total: number) => void;
-}): Promise<readonly ImageData[]> {
-  const { doc, totalFrames, frameRate, width, height, createBatchCapture, onProgress } = options;
+}): Promise<StreamingExportSession> {
+  const { doc, width, height, createBatchCapture } = options;
 
-  // Create a hidden host that is part of the DOM (so CSS/fonts resolve) but
-  // invisible to the user.  Using `visibility: hidden` instead of
-  // `display: none` ensures the browser still lays out the elements.
+  // Pre-fetch every remote image URL and inline the bytes as data URLs.
+  // The renderer will then work entirely on inline data, bypassing browser
+  // cache / CORS quirks that cause the export <img> loads to fail even
+  // when the editor's <img> loads succeeded.
+  const inlinedDoc = await inlineRemoteImages(doc);
+
   const offscreenHost = document.createElement('div');
 
   offscreenHost.style.position = 'fixed';
@@ -103,64 +239,82 @@ async function preRenderFramesOffscreen(options: {
   offscreenHost.setAttribute('aria-hidden', 'true');
   document.body.appendChild(offscreenHost);
 
-  const renderer = createScreenRenderer({ host: offscreenHost, document: doc });
+  const renderer = createScreenRenderer({ host: offscreenHost, document: inlinedDoc });
   const controller = createPlaybackController({
     root: offscreenHost,
-    animations: doc.animations,
+    animations: inlinedDoc.animations,
     suppressTransitions: true,
   });
 
   controller.attach();
 
-  try {
-    // The renderer root is the [data-broadset-canvas-root] child it created.
-    const canvasRoot = offscreenHost.querySelector<HTMLElement>('[data-broadset-canvas-root]');
+  const canvasRoot = offscreenHost.querySelector<HTMLElement>('[data-broadset-canvas-root]');
 
-    if (canvasRoot === null) {
-      throw new Error('Offscreen renderer did not create a canvas root');
-    }
-
-    // Create a batch capture session that pre-embeds fonts/images ONCE.
-    // Subsequent capture() calls reuse cached data — orders of magnitude
-    // faster than calling captureElementToCanvas per frame.
-    const session = await createBatchCapture(canvasRoot, width, height);
-
-    try {
-      const frames: ImageData[] = [];
-
-      for (let i = 0; i < totalFrames; i++) {
-        const timeMs = (i / frameRate) * 1000;
-
-        controller.seek(timeMs);
-
-        // No waitTwoFrames needed: seek() updates CSS synchronously and
-        // modern-screenshot reads computed styles from the live DOM, not
-        // painted pixels. The batch session handles any needed yields.
-        const captured = await session.capture();
-        const ctx = captured.getContext('2d');
-
-        if (ctx === null) {
-          throw new Error('Failed to get 2d context from captured canvas');
-        }
-
-        frames.push(ctx.getImageData(0, 0, captured.width, captured.height));
-        onProgress?.(i + 1, totalFrames);
-      }
-
-      return frames;
-    } finally {
-      session.destroy();
-    }
-  } finally {
+  if (canvasRoot === null) {
     controller.destroy();
     renderer.destroy();
     offscreenHost.remove();
+    throw new Error('Offscreen renderer did not create a canvas root');
   }
+
+  // Wait for every <img> under the offscreen host to finish loading (or
+  // error out) before creating the batch capture context. All image
+  // content is already inlined as data URLs above, so these loads are
+  // purely synchronous decodes — we just need to let the browser finish
+  // them before capturing.
+  await waitForImagesToSettle(canvasRoot);
+
+  let session: { readonly capture: () => Promise<HTMLCanvasElement>; readonly destroy: () => void };
+
+  try {
+    // Pre-embed fonts/images ONCE; subsequent captures reuse the cache.
+    session = await createBatchCapture(canvasRoot, width, height);
+  } catch (error: unknown) {
+    controller.destroy();
+    renderer.destroy();
+    offscreenHost.remove();
+    throw error;
+  }
+
+  // Persistent canvas consumed by the encoder. `renderFrame` overwrites it per frame.
+  const encoderCanvas = document.createElement('canvas');
+
+  encoderCanvas.width = width;
+  encoderCanvas.height = height;
+
+  const encoderCtx = encoderCanvas.getContext('2d');
+
+  if (encoderCtx === null) {
+    session.destroy();
+    controller.destroy();
+    renderer.destroy();
+    offscreenHost.remove();
+    throw new Error('Failed to get 2d context for encoder canvas');
+  }
+
+  const renderFrame = async (timeMs: number): Promise<void> => {
+    controller.seek(timeMs);
+
+    const captured = await session.capture();
+
+    // Blit — single GPU/CPU copy, no ImageData round-trip.
+    encoderCtx.drawImage(captured, 0, 0, width, height);
+  };
+
+  const dispose = (): void => {
+    session.destroy();
+    controller.destroy();
+    renderer.destroy();
+    offscreenHost.remove();
+  };
+
+  return { encoderCanvas, renderFrame, dispose };
 }
 
 export function useDemoFileHandlers({
   editorStore,
   currentDocument,
+  renderDocument,
   pushToast,
   setActiveDialog,
   fileInputRef,
@@ -350,7 +504,7 @@ export function useDemoFileHandlers({
           : currentDocument.animations;
 
         // For raster exports, try native <canvas> first, then DOM renderer root.
-        // Video exports pre-render frames offscreen and don't need this snapshot.
+        // Video exports use a streaming session and don't need this snapshot.
         let snapshotCanvas: HTMLCanvasElement | undefined;
 
         if (!isVideoFormat) {
@@ -368,18 +522,21 @@ export function useDemoFileHandlers({
         }
 
         // Fail fast if WebCodecs is unavailable — don't waste time
-        // pre-rendering frames only to discover we can't encode them.
+        // preparing the streaming session only to discover we can't encode.
         if (isVideoFormat && !formats.isVideoExportSupported()) {
           throw new Error('Video export is not supported: VideoEncoder API is unavailable in this browser.');
         }
 
         let renderFrame: ((timeMs: number) => void | Promise<void>) | undefined;
         let playbackDurationMs: number | undefined;
+        let streamingSession: StreamingExportSession | undefined;
+        let totalFrames = 0;
+        let framesEncoded = 0;
 
         if (isVideoFormat) {
           // Force even dimensions for H.264 codec compatibility.
-          const exportWidth = ensureEven(currentDocument.canvas.width);
-          const exportHeight = ensureEven(currentDocument.canvas.height);
+          const exportWidth = ensureEven(renderDocument.canvas.width);
+          const exportHeight = ensureEven(renderDocument.canvas.height);
 
           // Compute the playback duration from the selected animations.
           playbackDurationMs = Math.max(
@@ -389,82 +546,77 @@ export function useDemoFileHandlers({
               .filter((d) => Number.isFinite(d)),
           );
 
-          const totalFrames = Math.ceil((playbackDurationMs / 1000) * videoFrameRateActual);
+          totalFrames = Math.ceil((playbackDurationMs / 1000) * videoFrameRateActual);
 
-          setExportProgress({ progress: 0.1, stage: `Rendering ${String(totalFrames)} frames…` });
+          setExportProgress({ progress: 0.1, stage: `Preparing ${String(totalFrames)} frames…` });
           document.body.setAttribute('data-export-status', 'rendering');
 
-          // Build a document with only the selected animations for the
-          // offscreen renderer — all elements are still rendered, but only
-          // selected animations will drive property changes during seek.
+          // Build a document with only the selected animations so seek()
+          // only drives the chosen timelines. All elements still render.
           const exportDoc: BroadsetDocument = {
-            ...currentDocument,
+            ...renderDocument,
             animations: [...exportAnimations],
           };
 
-          // Pre-render every frame in a disposable offscreen renderer so the
-          // live editor workspace is not disturbed.
-          const preRendered = await preRenderFramesOffscreen({
+          // Streaming session: one offscreen renderer + one batch-capture
+          // context reused across every frame. Per-frame work is only
+          // seek + DOM clone + encoder blit — no ImageData buffering.
+          streamingSession = await createStreamingExportSession({
             doc: exportDoc,
-            totalFrames,
-            frameRate: videoFrameRateActual,
             width: exportWidth,
             height: exportHeight,
             createBatchCapture: formats.createBatchCapture,
-            onProgress: (frame, total) => {
-              document.body.setAttribute('data-export-progress', `${String(frame)}/${String(total)}`);
-
-              const renderProgress = 0.1 + 0.6 * (frame / total);
-
-              setExportProgress({
-                progress: renderProgress,
-                stage: `Rendering frame ${String(frame)} / ${String(total)}`,
-              });
-            },
           });
 
-          setExportProgress({ progress: 0.75, stage: `Encoding ${exporter.toUpperCase()} video…` });
-          document.body.setAttribute('data-export-status', 'encoding');
+          snapshotCanvas = streamingSession.encoderCanvas;
 
-          // Create a canvas for the encoder to read from.
-          snapshotCanvas = document.createElement('canvas');
-          snapshotCanvas.width = exportWidth;
-          snapshotCanvas.height = exportHeight;
+          const session = streamingSession;
 
-          const encodingCanvas = snapshotCanvas;
+          renderFrame = async (timeMs: number): Promise<void> => {
+            await session.renderFrame(timeMs);
 
-          renderFrame = (timeMs: number): void => {
-            const frameIndex = Math.min(Math.round((timeMs / 1000) * videoFrameRateActual), preRendered.length - 1);
-            const imageData = preRendered[frameIndex];
+            framesEncoded += 1;
+            document.body.setAttribute('data-export-progress', `${String(framesEncoded)}/${String(totalFrames)}`);
 
-            if (imageData !== undefined) {
-              const ctx = encodingCanvas.getContext('2d');
+            // Reserve 0.1–0.9 for streaming render+encode, 0.9–1 for finalize.
+            const ratio = totalFrames > 0 ? framesEncoded / totalFrames : 1;
+            const progress = 0.1 + 0.8 * ratio;
 
-              ctx?.putImageData(imageData, 0, 0);
-            }
+            setExportProgress({
+              progress,
+              stage: `Encoding frame ${String(framesEncoded)} / ${String(totalFrames)}`,
+            });
           };
         }
 
-        await bridge.exportDocument(exporter as ExportFormat, {
-          document: currentDocument,
-          ...(pixelRatio !== undefined ? { pixelRatio } : {}),
-          ...(jpegQuality !== undefined ? { jpegQuality } : {}),
-          ...(videoFrameRate !== undefined ? { videoFrameRate } : {}),
-          ...(videoQuality !== undefined ? { videoQuality } : {}),
-          ...(snapshotCanvas !== undefined ? { snapshotCanvas } : {}),
-          ...(renderFrame !== undefined ? { renderFrame } : {}),
-          ...(playbackDurationMs !== undefined ? { playbackDurationMs } : {}),
-          onProgress: (progress: number, stage?: string) => {
-            // Map encoder progress (0–1) into our 0.75–0.95 range.
-            const encoderProgress = 0.75 + 0.2 * progress;
+        try {
+          await bridge.exportDocument(exporter as ExportFormat, {
+            document: renderDocument,
+            ...(pixelRatio !== undefined ? { pixelRatio } : {}),
+            ...(jpegQuality !== undefined ? { jpegQuality } : {}),
+            ...(videoFrameRate !== undefined ? { videoFrameRate } : {}),
+            ...(videoQuality !== undefined ? { videoQuality } : {}),
+            ...(snapshotCanvas !== undefined ? { snapshotCanvas } : {}),
+            ...(renderFrame !== undefined ? { renderFrame } : {}),
+            ...(playbackDurationMs !== undefined ? { playbackDurationMs } : {}),
+            onProgress: (progress: number, stage?: string) => {
+              // Only honor encoder progress callbacks for the finalization
+              // stretch (0.9–1). The render/encode loop already reports
+              // per-frame progress via `renderFrame` above.
+              if (stage === 'Finalizing' || stage === 'Complete') {
+                const finalizeProgress = 0.9 + 0.1 * progress;
 
-            setExportProgress({ progress: encoderProgress, stage: stage ?? 'Encoding…' });
-          },
-        });
+                setExportProgress({ progress: finalizeProgress, stage: stage });
+              }
+            },
+          });
 
-        setExportProgress({ progress: 1, stage: 'Done!' });
-        pushToast('success', `Exported as ${exporter.toUpperCase()}.`);
-        document.body.setAttribute('data-export-status', 'done');
+          setExportProgress({ progress: 1, stage: 'Done!' });
+          pushToast('success', `Exported as ${exporter.toUpperCase()}.`);
+          document.body.setAttribute('data-export-status', 'done');
+        } finally {
+          streamingSession?.dispose();
+        }
       };
 
       void doExport()
@@ -481,7 +633,7 @@ export function useDemoFileHandlers({
           setExportProgress(null);
         });
     },
-    [currentDocument, handleSaveAsJson, pushToast, setActiveDialog],
+    [currentDocument, handleSaveAsJson, pushToast, renderDocument, setActiveDialog],
   );
 
   const handleMediaSelect = useCallback(

@@ -106,7 +106,7 @@ describe('renderer core', () => {
     controller.destroy();
   });
 
-  /** @description Broken image loads must swap to a visible placeholder instead of leaving a failed img element behind. */
+  /** @description Broken image loads must swap to a visible placeholder instead of leaving a failed img element behind. A CORS-enabled first attempt falls back to a plain-fetch second attempt; only when both error out does the placeholder appear. */
   it('renders a placeholder after an image load error', () => {
     const host = document.createElement('div');
 
@@ -125,11 +125,20 @@ describe('renderer core', () => {
       ]),
     });
 
-    const image = host.querySelector('img');
+    const corsImage = host.querySelector('img');
 
-    expect(image).not.toBeNull();
-    image?.dispatchEvent(new Event('error'));
+    expect(corsImage).not.toBeNull();
+    expect(corsImage?.crossOrigin).toBe('anonymous');
+    corsImage?.dispatchEvent(new Event('error'));
 
+    // First error swaps in a plain-fetch fallback <img> (no crossOrigin).
+    const fallbackImage = host.querySelector('img');
+
+    expect(fallbackImage).not.toBeNull();
+    expect(fallbackImage?.crossOrigin).toBeFalsy();
+    fallbackImage?.dispatchEvent(new Event('error'));
+
+    // Only after the fallback also errors does the placeholder appear.
     const placeholder = host.querySelector('[aria-label="Scorebug Image placeholder"]');
 
     expect(placeholder).not.toBeNull();
