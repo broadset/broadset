@@ -2,7 +2,7 @@
 
 ## 1. Tech Stack
 
-- **Language:** TypeScript 5.9, targeting ES2022
+- **Language:** TypeScript ^6.0.2, targeting ES2022
 - **Frontend:** React 19, HeroUI v3, Tailwind CSS v4, Lucide icons
 - **State Management:** Zustand + Zundo (undo/redo middleware)
 - **Schema Validation:** Zod

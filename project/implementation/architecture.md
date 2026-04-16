@@ -138,7 +138,7 @@ Dependencies below are part of the current implemented architecture and package 
 | Formats PDF          | `@libpdf/core`                                          | PDF generation                                     |
 | Formats PSD          | `ag-psd`                                                | PSD import/export                                  |
 | Formats PPTX         | `pizzip`                                                | OOXML ZIP processing for PPTX                      |
-| Formats raster       | `html-to-image`                                         | Raster and SVG capture utilities                   |
+| Formats raster       | `modern-screenshot`                                     | DOM-to-canvas/SVG capture utilities                |
 | Formats ZIP utility  | `jszip`                                                 | ZIP container utility (for format packaging paths) |
 | Formats video        | `mediabunny`                                            | Video container and frame pipeline support         |
 | UI shell             | `@heroui/react`                                         | Required UI component system                       |
