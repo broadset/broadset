@@ -22,7 +22,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type ActiveDialog,
   type ContextMenuState,
-  RULER_SIZE,
   SIDEBAR_STORAGE_KEY,
   type SidebarPreferences,
   type SidebarTab,
@@ -61,11 +60,11 @@ function isChangeStreamDebugEnabled(): boolean {
   return window.localStorage.getItem(DEBUG_CHANGE_STREAM_STORAGE_KEY) === '1';
 }
 
-function areCanvasSettingsEqual(left: CanvasSettings, right: CanvasSettings): boolean {
+// Viewport fields (zoom/panX/panY) intentionally excluded so DemoApp does not
+// re-render on every pan/zoom RAF tick. Those are read via dedicated
+// subscriptions inside DemoCanvasSurface, DemoRulers, and ZoomPercentDisplay.
+function areCanvasSettingsEqualIgnoringViewport(left: CanvasSettings, right: CanvasSettings): boolean {
   return (
-    left.zoom === right.zoom &&
-    left.panX === right.panX &&
-    left.panY === right.panY &&
     left.showRulers === right.showRulers &&
     left.units === right.units &&
     left.viewMode === right.viewMode &&
@@ -176,7 +175,11 @@ export function DemoApp(): React.JSX.Element {
   }, [editorStore, changeStream, shouldLogChangeStream]);
 
   const editorState = useEditorSelector(editorStore, (state) => state, areEditorStateEqualIgnoringCanvas);
-  const canvasSettings = useEditorSelector(editorStore, (state) => state.canvasSettings, areCanvasSettingsEqual);
+  const canvasSettings = useEditorSelector(
+    editorStore,
+    (state) => state.canvasSettings,
+    areCanvasSettingsEqualIgnoringViewport,
+  );
   const temporalState = editorStore.temporal.getState();
   const currentDocument = editorState.document;
   const initialSidebarPreferences = useMemo<SidebarPreferences>(() => loadSidebarPreferences(), []);
@@ -273,31 +276,6 @@ export function DemoApp(): React.JSX.Element {
     [currentDocument, editorState.activePageIndex],
   );
 
-  const horizontalTicks = useMemo(() => {
-    const rulerLength = Math.max(viewportSize.width - RULER_SIZE, 320);
-
-    return Array.from({ length: 10 }, (_, index) => {
-      const value = Math.round((currentDocument.canvas.width / 10) * index);
-
-      return {
-        label: String(value),
-        position: (rulerLength / 10) * index * canvasSettings.zoom + canvasSettings.panX,
-      };
-    }).filter((tick) => tick.position >= -40 && tick.position <= rulerLength + 40);
-  }, [currentDocument.canvas.width, canvasSettings.panX, canvasSettings.zoom, viewportSize.width]);
-  const verticalTicks = useMemo(() => {
-    const rulerLength = Math.max(viewportSize.height - RULER_SIZE, 240);
-
-    return Array.from({ length: 8 }, (_, index) => {
-      const value = Math.round((currentDocument.canvas.height / 8) * index);
-
-      return {
-        label: String(value),
-        position: (rulerLength / 8) * index * canvasSettings.zoom + canvasSettings.panY,
-      };
-    }).filter((tick) => tick.position >= -40 && tick.position <= rulerLength + 40);
-  }, [currentDocument.canvas.height, canvasSettings.panY, canvasSettings.zoom, viewportSize.height]);
-
   const pushToast = useCallback((severity: ToastSeverity, message: string): void => {
     const options = { timeout: TOAST_DISMISS_MS[severity] };
 
@@ -317,6 +295,7 @@ export function DemoApp(): React.JSX.Element {
   }, []);
 
   const {
+    exportProgress,
     handleCreateFromPreset,
     handleDebugSnapshotDownload,
     handleDeleteSnapshot,
@@ -331,6 +310,7 @@ export function DemoApp(): React.JSX.Element {
     handleTemplateSelect,
   } = useDemoFileHandlers({
     currentDocument,
+    renderDocument,
     editorStore,
     fileInputRef,
     playbackControllerRef,
@@ -622,6 +602,7 @@ export function DemoApp(): React.JSX.Element {
       handleElementTransformCommit={handleElementTransformCommit}
       handleElementTransformPreview={handleElementTransformPreview}
       handleExportFormat={handleExportFormat}
+      exportProgress={exportProgress}
       handleImportFileChange={handleImportFileChange}
       handleMediaSelect={handleMediaSelect}
       handleOpenImportDialog={handleOpenImportDialog}
@@ -638,7 +619,6 @@ export function DemoApp(): React.JSX.Element {
       handleZoomStep={handleZoomStep}
       handleZoomToFit={handleZoomToFit}
       hasGroupedSelection={hasGroupedSelection}
-      horizontalTicks={horizontalTicks}
       isFullscreen={isFullscreen}
       isPlaying={isPlaying}
       isSidebarOpen={isSidebarOpen}
@@ -666,7 +646,7 @@ export function DemoApp(): React.JSX.Element {
       timelinePreviewActiveModifiers={animationEditing.activeModifiers}
       timelinePreviewActiveState={animationEditing.activeState}
       timelinePreviewCurrentTimeMs={animationEditing.currentTimeMs}
-      verticalTicks={verticalTicks}
+      viewportSize={viewportSize}
     />
   );
 }

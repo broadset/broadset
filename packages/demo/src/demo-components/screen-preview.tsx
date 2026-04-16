@@ -3,11 +3,13 @@ import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 import { createPlaybackController, type PlaybackController } from '@broadset/playback';
 import { createScreenRenderer, type ScreenRendererController } from '@broadset/renderer';
 import { classifyWheelInput, color } from '@broadset/ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ZOOM_STEP } from '../demo-types';
 import { clampCanvasZoom } from '../demo-utils';
 import { SelectionTransformWidget } from './selection-transform-widget';
+
+const WHEEL_GESTURE_LOCK_MS = 140;
 
 export interface ScreenPreviewProps {
   readonly allElements: readonly BroadsetElement[];
@@ -49,6 +51,7 @@ export function ScreenPreview({
   onPlaybackControllerChange,
 }: ScreenPreviewProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const panLayerRef = useRef<HTMLDivElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<ScreenRendererController | null>(null);
   const playbackRef = useRef<PlaybackController | null>(null);
@@ -62,10 +65,23 @@ export function ScreenPreview({
   } | null>(null);
   const suppressClickRef = useRef(false);
   const resetTokenMountedRef = useRef(false);
+  const wheelGestureRef = useRef<{ readonly expiresAt: number; readonly intent: 'pan' | 'zoom' | null }>({
+    expiresAt: 0,
+    intent: null,
+  });
+
+  // Live viewport mirror. Imperative pan writes update this ahead of the RAF-batched store
+  // commit so back-to-back wheel events read the just-applied value, not a stale closure.
+  const viewportRef = useRef({ panX, panY, zoom });
+
+  useEffect(() => {
+    viewportRef.current = { panX, panY, zoom };
+  }, [panX, panY, zoom]);
+
+  const elementsById = useMemo(() => new Map(allElements.map((entry) => [entry.id, entry])), [allElements]);
 
   const getElementWorldOffset = useCallback(
     (element: BroadsetElement): { readonly x: number; readonly y: number } => {
-      const elementsById = new Map(allElements.map((entry) => [entry.id, entry]));
       let currentElement: BroadsetElement | undefined = element;
       let x = 0;
       let y = 0;
@@ -83,7 +99,7 @@ export function ScreenPreview({
 
       return { x, y };
     },
-    [allElements],
+    [elementsById],
   );
 
   const selectedWorldElement =
@@ -100,7 +116,6 @@ export function ScreenPreview({
         return updates;
       }
 
-      const elementsById = new Map(allElements.map((entry) => [entry.id, entry]));
       let parentElement = elementsById.get(element.parentId);
       let parentWorldX = 0;
       let parentWorldY = 0;
@@ -124,12 +139,12 @@ export function ScreenPreview({
         },
       };
     },
-    [allElements],
+    [elementsById],
   );
 
   const handlePreviewTransform = useCallback(
     (elementId: string, updates: ElementUpdate): void => {
-      const element = allElements.find((entry) => entry.id === elementId);
+      const element = elementsById.get(elementId);
 
       if (element === undefined) {
         return;
@@ -137,12 +152,12 @@ export function ScreenPreview({
 
       onElementTransformPreview(elementId, localizePositionUpdate(element, updates));
     },
-    [allElements, localizePositionUpdate, onElementTransformPreview],
+    [elementsById, localizePositionUpdate, onElementTransformPreview],
   );
 
   const handleCommitTransform = useCallback(
     (elementId: string, updates: ElementUpdate): void => {
-      const element = allElements.find((entry) => entry.id === elementId);
+      const element = elementsById.get(elementId);
 
       if (element === undefined) {
         return;
@@ -150,7 +165,7 @@ export function ScreenPreview({
 
       onElementTransformCommit(elementId, localizePositionUpdate(element, updates));
     },
-    [allElements, localizePositionUpdate, onElementTransformCommit],
+    [elementsById, localizePositionUpdate, onElementTransformCommit],
   );
 
   useEffect(() => {
@@ -266,15 +281,27 @@ export function ScreenPreview({
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
       panGestureRef.current = {
-        originPanX: panX,
-        originPanY: panY,
+        originPanX: viewportRef.current.panX,
+        originPanY: viewportRef.current.panY,
         startX: event.clientX,
         startY: event.clientY,
       };
       setIsPanning(true);
     },
-    [cursor, panX, panY],
+    [cursor],
   );
+
+  const writePanLayerTransformNow = useCallback((nextPanX: number, nextPanY: number): void => {
+    viewportRef.current = { ...viewportRef.current, panX: nextPanX, panY: nextPanY };
+
+    const layer = panLayerRef.current;
+
+    if (layer === null) {
+      return;
+    }
+
+    layer.style.transform = `translate(${String(nextPanX)}px, ${String(nextPanY)}px)`;
+  }, []);
 
   const handlePointerMove = useCallback(
     (event: React.PointerEvent<HTMLDivElement>): void => {
@@ -291,12 +318,15 @@ export function ScreenPreview({
         suppressClickRef.current = true;
       }
 
-      onViewportChange({
-        panX: gesture.originPanX + deltaX,
-        panY: gesture.originPanY + deltaY,
-      });
+      const nextPanX = gesture.originPanX + deltaX;
+      const nextPanY = gesture.originPanY + deltaY;
+
+      // Paint pan immediately by mutating the pan-layer transform, then commit to the
+      // store (RAF-batched) so rulers and other subscribers catch up on the next frame.
+      writePanLayerTransformNow(nextPanX, nextPanY);
+      onViewportChange({ panX: nextPanX, panY: nextPanY });
     },
-    [onViewportChange],
+    [onViewportChange, writePanLayerTransformNow],
   );
 
   const handlePointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>): void => {
@@ -310,30 +340,37 @@ export function ScreenPreview({
   }, []);
 
   const handleWheel = useCallback(
-    (event: React.WheelEvent<HTMLDivElement>): void => {
+    (event: WheelEvent): void => {
+      // Keep wheel behavior owned by the canvas so zoom gestures never leak into native scrolling.
+      // Must be attached as a non-passive native listener so preventDefault actually suppresses scroll.
+      event.preventDefault();
+
       const isLegacyWheel = event.deltaMode !== 0;
+      const { panX: currentPanX, panY: currentPanY, zoom: currentZoom } = viewportRef.current;
 
       if (isLegacyWheel && (event.ctrlKey || event.metaKey)) {
         event.preventDefault();
-        onViewportChange({
-          panX: panX - event.deltaY,
-          panY,
-        });
+
+        const nextPanX = currentPanX - event.deltaY;
+
+        writePanLayerTransformNow(nextPanX, currentPanY);
+        onViewportChange({ panX: nextPanX, panY: currentPanY });
 
         return;
       }
 
       if (isLegacyWheel && event.altKey) {
         event.preventDefault();
-        onViewportChange({
-          panX,
-          panY: panY - event.deltaY,
-        });
+
+        const nextPanY = currentPanY - event.deltaY;
+
+        writePanLayerTransformNow(currentPanX, nextPanY);
+        onViewportChange({ panX: currentPanX, panY: nextPanY });
 
         return;
       }
 
-      const intent = classifyWheelInput({
+      const rawIntent = classifyWheelInput({
         altKey: event.altKey,
         ctrlKey: event.ctrlKey || event.metaKey,
         deltaMode: event.deltaMode,
@@ -341,44 +378,91 @@ export function ScreenPreview({
         deltaY: event.deltaY,
       });
 
+      const now = event.timeStamp;
+      const hasActiveWheelLock = wheelGestureRef.current.intent !== null && now <= wheelGestureRef.current.expiresAt;
+      const absoluteDeltaX = Math.abs(event.deltaX);
+      const absoluteDeltaY = Math.abs(event.deltaY);
+      const shouldPreferZoomLock =
+        hasActiveWheelLock &&
+        wheelGestureRef.current.intent === 'zoom' &&
+        rawIntent === 'pan' &&
+        absoluteDeltaX <= 1 &&
+        absoluteDeltaY >= absoluteDeltaX * 2;
+      const intent = shouldPreferZoomLock ? 'zoom' : rawIntent;
+
+      if (intent !== 'none') {
+        wheelGestureRef.current = {
+          expiresAt: now + WHEEL_GESTURE_LOCK_MS,
+          intent,
+        };
+      }
+
       if (intent === 'none') {
         return;
       }
 
-      event.preventDefault();
-
       if (intent === 'pan') {
-        onViewportChange({
-          panX: panX - event.deltaX,
-          panY: panY - event.deltaY,
-        });
+        const nextPanX = currentPanX - event.deltaX;
+        const nextPanY = currentPanY - event.deltaY;
+
+        writePanLayerTransformNow(nextPanX, nextPanY);
+        onViewportChange({ panX: nextPanX, panY: nextPanY });
 
         return;
       }
 
       const nextZoom =
         event.deltaMode === 0 ?
-          clampCanvasZoom(zoom - event.deltaY * 0.002)
-        : clampCanvasZoom(zoom + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
+          clampCanvasZoom(currentZoom - event.deltaY * 0.002)
+        : clampCanvasZoom(currentZoom + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
 
-      if (nextZoom === zoom) {
+      if (nextZoom === currentZoom) {
         return;
       }
 
-      const bounds = event.currentTarget.getBoundingClientRect();
+      const container = containerRef.current;
+      const bounds =
+        container === null ?
+          event.target instanceof Element ?
+            event.target.getBoundingClientRect()
+          : null
+        : container.getBoundingClientRect();
+
+      if (bounds === null) {
+        return;
+      }
+
       const cursorX = event.clientX - bounds.left;
       const cursorY = event.clientY - bounds.top;
-      const worldX = (cursorX - panX) / zoom;
-      const worldY = (cursorY - panY) / zoom;
+      const worldX = (cursorX - currentPanX) / currentZoom;
+      const worldY = (cursorY - currentPanY) / currentZoom;
+      const nextPanX = cursorX - worldX * nextZoom;
+      const nextPanY = cursorY - worldY * nextZoom;
 
+      writePanLayerTransformNow(nextPanX, nextPanY);
+      viewportRef.current = { panX: nextPanX, panY: nextPanY, zoom: nextZoom };
       onViewportChange({
-        panX: cursorX - worldX * nextZoom,
-        panY: cursorY - worldY * nextZoom,
+        panX: nextPanX,
+        panY: nextPanY,
         zoom: nextZoom,
       });
     },
-    [onViewportChange, panX, panY, zoom],
+    [onViewportChange, writePanLayerTransformNow],
   );
+
+  useEffect(() => {
+    const container = containerRef.current;
+
+    if (container === null) {
+      return undefined;
+    }
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [handleWheel]);
 
   return (
     <div
@@ -392,7 +476,6 @@ export function ScreenPreview({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onWheel={handleWheel}
       style={{
         backgroundColor: color('surface-secondary'),
         cursor: isPanning ? 'grabbing' : cursor,
@@ -401,27 +484,39 @@ export function ScreenPreview({
       }}
     >
       <div
-        ref={hostRef}
-        className="h-full w-full overflow-hidden"
-        data-testid="screen-renderer-host"
+        ref={panLayerRef}
+        data-testid="screen-pan-layer"
         style={{
-          transform: `translate(${String(panX)}px, ${String(panY)}px) scale(${String(zoom)})`,
+          height: '100%',
+          left: 0,
+          position: 'absolute',
+          top: 0,
+          transform: `translate(${String(panX)}px, ${String(panY)}px)`,
           transformOrigin: 'top left',
-          transition: isPanning ? 'none' : 'transform 120ms ease',
+          width: '100%',
           willChange: 'transform',
         }}
-      />
-      {selectedWorldElement === null ? null : (
-        <SelectionTransformWidget
-          contentScale={contentScale}
-          element={selectedWorldElement}
-          panX={panX}
-          panY={panY}
-          zoom={zoom}
-          onCommitUpdate={handleCommitTransform}
-          onPreviewUpdate={handlePreviewTransform}
+      >
+        <div
+          ref={hostRef}
+          className="h-full w-full overflow-hidden"
+          data-testid="screen-renderer-host"
+          style={{
+            transform: `scale(${String(zoom)})`,
+            transformOrigin: 'top left',
+            willChange: 'transform',
+          }}
         />
-      )}
+        {selectedWorldElement === null ? null : (
+          <SelectionTransformWidget
+            contentScale={contentScale}
+            element={selectedWorldElement}
+            zoom={zoom}
+            onCommitUpdate={handleCommitTransform}
+            onPreviewUpdate={handlePreviewTransform}
+          />
+        )}
+      </div>
     </div>
   );
 }

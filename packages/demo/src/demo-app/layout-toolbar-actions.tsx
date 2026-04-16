@@ -1,14 +1,14 @@
-import { color, font, sp } from '@broadset/ui';
+import { sp } from '@broadset/ui';
 import { Separator } from '@heroui/react';
 import { Maximize2, Minimize2, Minus, Pause, Play, Plus, RotateCcw } from 'lucide-react';
 
 import { IconToolButton } from '../demo-components';
 import { ZOOM_STEP } from '../demo-types';
 import type { DemoAppLayoutProps } from './layout-types';
+import { ZoomPercentDisplay } from './zoom-percent-display';
 
 export function LayoutToolbarActions(props: DemoAppLayoutProps): React.JSX.Element {
   const {
-    editorState,
     editorStore,
     handleAlignSelection,
     handleDistributeSelection,
@@ -195,17 +195,7 @@ export function LayoutToolbarActions(props: DemoAppLayoutProps): React.JSX.Eleme
         >
           <Plus size={16} />
         </IconToolButton>
-        <span
-          aria-label="Zoom level"
-          style={{
-            color: color('muted'),
-            fontSize: font('label'),
-            minWidth: '3rem',
-            textAlign: 'right',
-          }}
-        >
-          {Math.round(editorState.canvasSettings.zoom * 100)}%
-        </span>
+        <ZoomPercentDisplay editorStore={editorStore} />
         <IconToolButton
           label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
           onPress={() => {

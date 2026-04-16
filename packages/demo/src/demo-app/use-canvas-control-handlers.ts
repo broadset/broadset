@@ -7,6 +7,12 @@ import { clampCanvasZoom } from '../demo-utils';
 
 export type AlignmentAction = 'bottom' | 'center-x' | 'center-y' | 'left' | 'right' | 'top';
 
+type CanvasViewportSettings = {
+  readonly panX?: number;
+  readonly panY?: number;
+  readonly zoom?: number;
+};
+
 export interface UseCanvasControlHandlersOptions {
   readonly editorStore: EditorStore;
   readonly selectedMovableElements: readonly BroadsetElement[];
@@ -17,11 +23,7 @@ export interface UseCanvasControlHandlersOptions {
 
 export interface CanvasControlHandlers {
   readonly handleAlignSelection: (action: AlignmentAction) => void;
-  readonly handleCanvasViewportChange: (settings: {
-    readonly panX?: number;
-    readonly panY?: number;
-    readonly zoom?: number;
-  }) => void;
+  readonly handleCanvasViewportChange: (settings: CanvasViewportSettings) => void;
   readonly handleDistributeSelection: (axis: 'horizontal' | 'vertical') => void;
   readonly handleElementTransformCommit: (elementId: string, updates: ElementUpdate) => void;
   readonly handleElementTransformPreview: (elementId: string, updates: ElementUpdate) => void;
@@ -40,6 +42,23 @@ export function useCanvasControlHandlers({
   setIsPlaying,
   setResetToken,
 }: UseCanvasControlHandlersOptions): CanvasControlHandlers {
+  const pendingViewportRef = useRef<CanvasViewportSettings | null>(null);
+  // 0 means no RAF is scheduled; RAF IDs are always positive integers
+  const viewportRafIdRef = useRef(0);
+
+  const flushPendingViewport = useCallback((): void => {
+    viewportRafIdRef.current = 0;
+
+    const pendingSettings = pendingViewportRef.current;
+
+    if (pendingSettings === null) {
+      return;
+    }
+
+    pendingViewportRef.current = null;
+    editorStore.getState().updateCanvasSettings(pendingSettings);
+  }, [editorStore]);
+
   const handleZoomStep = useCallback(
     (delta: number): void => {
       const currentZoom = editorStore.getState().canvasSettings.zoom;
@@ -58,10 +77,17 @@ export function useCanvasControlHandlers({
   }, [editorStore]);
 
   const handleCanvasViewportChange = useCallback(
-    (settings: { readonly panX?: number; readonly panY?: number; readonly zoom?: number }): void => {
-      editorStore.getState().updateCanvasSettings(settings);
+    (settings: CanvasViewportSettings): void => {
+      pendingViewportRef.current = {
+        ...(pendingViewportRef.current ?? {}),
+        ...settings,
+      };
+
+      if (viewportRafIdRef.current === 0) {
+        viewportRafIdRef.current = requestAnimationFrame(flushPendingViewport);
+      }
     },
-    [editorStore],
+    [flushPendingViewport],
   );
 
   const pendingPreviewRef = useRef<{ elementId: string; updates: ElementUpdate } | null>(null);
@@ -73,6 +99,11 @@ export function useCanvasControlHandlers({
       if (rafIdRef.current !== 0) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = 0;
+      }
+
+      if (viewportRafIdRef.current !== 0) {
+        cancelAnimationFrame(viewportRafIdRef.current);
+        viewportRafIdRef.current = 0;
       }
     };
   }, []);

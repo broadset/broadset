@@ -1,8 +1,8 @@
 import { type createDataStore, type EditorStore, type ElementUpdate } from '@broadset/editor';
 import type { BroadsetDocument, BroadsetElement, EasingMode, Timeline } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
+import type { DocumentPreset, ExportProgress, MediaAsset, TemplateEntry } from '@broadset/ui';
 
-import type { DocumentPreset, MediaAsset, TemplateEntry } from '../../../ui/src/modals/types';
 import type { ActiveDialog, ContextMenuState, SidebarTab } from '../demo-types';
 
 export interface DemoAppLayoutProps {
@@ -15,6 +15,8 @@ export interface DemoAppLayoutProps {
   readonly destructiveContextActionDisabled: boolean;
   readonly editingTimeline: Timeline | null;
   readonly editingTimelineSelectedKf: number | null;
+  readonly exportProgress: ExportProgress | null;
+  readonly canvasSettings: ReturnType<EditorStore['getState']>['canvasSettings'];
   readonly editorState: ReturnType<EditorStore['getState']>;
   readonly editorStore: EditorStore;
   readonly fileInputRef: { current: HTMLInputElement | null };
@@ -73,7 +75,6 @@ export interface DemoAppLayoutProps {
   readonly handleZoomStep: (delta: number) => void;
   readonly handleZoomToFit: () => void;
   readonly hasGroupedSelection: boolean;
-  readonly horizontalTicks: readonly { readonly label: string; readonly position: number }[];
   readonly isFullscreen: boolean;
   readonly isPlaying: boolean;
   readonly isSidebarOpen: boolean;
@@ -104,5 +105,5 @@ export interface DemoAppLayoutProps {
   readonly timelinePreviewActiveModifiers: readonly string[];
   readonly timelinePreviewActiveState: string | null;
   readonly timelinePreviewCurrentTimeMs: number;
-  readonly verticalTicks: readonly { readonly label: string; readonly position: number }[];
+  readonly viewportSize: { readonly width: number; readonly height: number };
 }

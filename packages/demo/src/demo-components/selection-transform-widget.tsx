@@ -20,20 +20,17 @@ import {
 export function SelectionTransformWidget({
   contentScale,
   element,
-  panX,
-  panY,
   zoom,
   onPreviewUpdate,
   onCommitUpdate,
 }: {
   readonly contentScale: number;
   readonly element: BroadsetElement;
-  readonly panX: number;
-  readonly panY: number;
   readonly zoom: number;
   readonly onPreviewUpdate: (elementId: string, updates: ElementUpdate) => void;
   readonly onCommitUpdate: (elementId: string, updates: ElementUpdate) => void;
 }): React.JSX.Element {
+  const widgetRef = useRef<HTMLDivElement | null>(null);
   const gestureRef = useRef<TransformGesture | null>(null);
   const [isRotating, setIsRotating] = useState(false);
   const effectiveZoom = zoom * contentScale;
@@ -91,8 +88,9 @@ export function SelectionTransformWidget({
         return;
       }
 
-      const centerX = panX + (element.position.x + element.width / 2) * effectiveZoom;
-      const centerY = panY + (element.position.y + element.height / 2) * effectiveZoom;
+      const bounds = widgetRef.current?.getBoundingClientRect();
+      const centerX = bounds === undefined ? event.clientX : bounds.left + bounds.width / 2;
+      const centerY = bounds === undefined ? event.clientY : bounds.top + bounds.height / 2;
 
       event.preventDefault();
       event.stopPropagation();
@@ -105,16 +103,7 @@ export function SelectionTransformWidget({
         startAngle: Math.atan2(event.clientY - centerY, event.clientX - centerX),
       };
     },
-    [
-      element.height,
-      element.position.x,
-      element.position.y,
-      element.rotation,
-      element.width,
-      panX,
-      panY,
-      effectiveZoom,
-    ],
+    [element.height, element.position.x, element.position.y, element.rotation, element.width, effectiveZoom],
   );
 
   const handlePointerMove = useCallback(
@@ -165,8 +154,9 @@ export function SelectionTransformWidget({
         return;
       }
 
-      const centerX = panX + (element.position.x + element.width / 2) * effectiveZoom;
-      const centerY = panY + (element.position.y + element.height / 2) * effectiveZoom;
+      const bounds = widgetRef.current?.getBoundingClientRect();
+      const centerX = bounds === undefined ? event.clientX : bounds.left + bounds.width / 2;
+      const centerY = bounds === undefined ? event.clientY : bounds.top + bounds.height / 2;
       const currentAngle = Math.atan2(event.clientY - centerY, event.clientX - centerX);
       const update = {
         rotation: applyRotation(gesture.initialRotation, ((currentAngle - gesture.startAngle) * 180) / Math.PI),
@@ -175,17 +165,7 @@ export function SelectionTransformWidget({
       gesture.lastUpdate = update;
       onPreviewUpdate(element.id, update);
     },
-    [
-      element.height,
-      element.id,
-      element.position,
-      element.rotation,
-      element.width,
-      onPreviewUpdate,
-      panX,
-      panY,
-      effectiveZoom,
-    ],
+    [element.height, element.id, element.position, element.rotation, element.width, onPreviewUpdate, effectiveZoom],
   );
 
   const finishGesture = useCallback(
@@ -215,6 +195,7 @@ export function SelectionTransformWidget({
 
   return (
     <div
+      ref={widgetRef}
       data-testid="demo-transform-widget"
       onClick={(event) => {
         event.stopPropagation();
@@ -224,10 +205,10 @@ export function SelectionTransformWidget({
       onPointerUp={finishGesture}
       style={{
         height: `${String(Math.max(element.height * effectiveZoom, 1))}px`,
-        left: `${String(panX + element.position.x * effectiveZoom)}px`,
+        left: `${String(element.position.x * effectiveZoom)}px`,
         pointerEvents: 'auto',
         position: 'absolute',
-        top: `${String(panY + element.position.y * effectiveZoom)}px`,
+        top: `${String(element.position.y * effectiveZoom)}px`,
         transform: `rotate(${String(element.rotation)}deg)`,
         transformOrigin: 'center center',
         width: `${String(Math.max(element.width * effectiveZoom, 1))}px`,

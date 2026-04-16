@@ -1,9 +1,10 @@
 import { EditorErrorBoundary, EditorProvider } from '@broadset/editor';
-import { color, glassPanelStyle, sp, TimelineEditingProvider } from '@broadset/ui';
+import { color, sp, TimelineEditingProvider } from '@broadset/ui';
 
-import { RulerStrip, ScreenPreview } from '../demo-components';
 import { RULER_SIZE } from '../demo-types';
 import { COUNTDOWN_PLUGIN } from '../demoConfig';
+import { DemoCanvasSurface } from './demo-canvas-surface';
+import { DemoRulers } from './demo-rulers';
 import { LayoutContextMenu } from './layout-context-menu';
 import { LayoutDialogs } from './layout-dialogs';
 import { LayoutOverlayControls } from './layout-overlay-controls';
@@ -13,6 +14,7 @@ import type { DemoAppLayoutProps } from './layout-types';
 
 export function DemoAppLayout(props: DemoAppLayoutProps): React.JSX.Element {
   const {
+    canvasSettings,
     currentDocument,
     dataStore,
     editorState,
@@ -24,12 +26,11 @@ export function DemoAppLayout(props: DemoAppLayoutProps): React.JSX.Element {
     handleElementTransformCommit,
     handleElementTransformPreview,
     handleImportFileChange,
-    horizontalTicks,
     isPlaying,
     renderDocument,
     resetToken,
     selectedElement,
-    verticalTicks,
+    viewportSize,
   } = props;
 
   return (
@@ -49,40 +50,14 @@ export function DemoAppLayout(props: DemoAppLayoutProps): React.JSX.Element {
               void handleImportFileChange(event);
             }}
           />
-          {editorState.canvasSettings.showRulers ?
-            <>
-              <div
-                className="absolute left-0 top-0 z-30"
-                data-testid="ruler-corner"
-                style={{ height: `${String(RULER_SIZE)}px`, width: `${String(RULER_SIZE)}px` }}
-              >
-                <div
-                  aria-hidden="true"
-                  style={{
-                    ...glassPanelStyle(),
-                    borderRadius: 0,
-                    height: '100%',
-                    width: '100%',
-                  }}
-                />
-              </div>
-
-              <div
-                className="absolute right-0 top-0 z-20"
-                data-testid="ruler-horizontal-strip"
-                style={{ height: `${String(RULER_SIZE)}px`, left: `${String(RULER_SIZE)}px` }}
-              >
-                <RulerStrip orientation="horizontal" ticks={horizontalTicks} />
-              </div>
-
-              <div
-                className="absolute bottom-0 left-0 z-20"
-                data-testid="ruler-vertical-strip"
-                style={{ top: `${String(RULER_SIZE)}px`, width: `${String(RULER_SIZE)}px` }}
-              >
-                <RulerStrip orientation="vertical" ticks={verticalTicks} />
-              </div>
-            </>
+          {canvasSettings.showRulers ?
+            <DemoRulers
+              documentCanvasHeight={currentDocument.canvas.height}
+              documentCanvasWidth={currentDocument.canvas.width}
+              editorStore={editorStore}
+              viewportHeight={viewportSize.height}
+              viewportWidth={viewportSize.width}
+            />
           : null}
 
           <EditorErrorBoundary>
@@ -109,22 +84,20 @@ export function DemoAppLayout(props: DemoAppLayoutProps): React.JSX.Element {
                       boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                     }}
                   >
-                    <ScreenPreview
+                    <DemoCanvasSurface
                       allElements={currentDocument.elements}
                       cursor={editorState.pendingPlacementType === null ? 'default' : 'crosshair'}
-                      documentData={renderDocument}
+                      editorStore={editorStore}
                       isPlaying={isPlaying}
-                      onPlaybackControllerChange={props.setPreviewPlaybackController}
-                      panX={editorState.canvasSettings.panX}
-                      panY={editorState.canvasSettings.panY}
-                      selectedElement={selectedElement}
-                      zoom={editorState.canvasSettings.zoom}
                       onCanvasClick={handleCanvasClick}
                       onCanvasContextMenu={handleCanvasContextMenu}
                       onElementTransformCommit={handleElementTransformCommit}
                       onElementTransformPreview={handleElementTransformPreview}
+                      onPlaybackControllerChange={props.setPreviewPlaybackController}
                       onViewportChange={handleCanvasViewportChange}
+                      renderDocument={renderDocument}
                       resetToken={resetToken}
+                      selectedElement={selectedElement}
                     />
                   </div>
                 </div>
