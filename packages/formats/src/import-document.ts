@@ -16,12 +16,26 @@ function createDocumentImportResult(
   return { document, warnings };
 }
 
+function buildFallbackImportWarnings(document: BroadsetDocument, formatLabel: string): readonly string[] {
+  if (document.elements.length > 0) {
+    return [];
+  }
+
+  return [
+    `${formatLabel} import produced no elements. Unsupported content may have been skipped; verify the source file and mapping coverage.`,
+  ];
+}
+
 export function importPptxDocument(data: Uint8Array): DocumentImportResult {
-  return createDocumentImportResult(importPptx(data));
+  const document = importPptx(data);
+
+  return createDocumentImportResult(document, buildFallbackImportWarnings(document, 'PPTX'));
 }
 
 export function importPsdDocument(data: Uint8Array): DocumentImportResult {
-  return createDocumentImportResult(importPsd(data));
+  const document = importPsd(data);
+
+  return createDocumentImportResult(document, buildFallbackImportWarnings(document, 'PSD'));
 }
 
 export function importSvgDocument(input: string, fileName = 'Imported SVG'): DocumentImportResult {
