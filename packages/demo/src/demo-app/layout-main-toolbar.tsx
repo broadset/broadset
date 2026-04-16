@@ -33,6 +33,7 @@ import type { DemoAppLayoutProps } from './layout-types';
 
 export function LayoutMainToolbar(props: DemoAppLayoutProps): React.JSX.Element {
   const {
+    canvasSettings,
     currentDocument,
     editorState,
     editorStore,
@@ -214,13 +215,13 @@ export function LayoutMainToolbar(props: DemoAppLayoutProps): React.JSX.Element 
             <Dropdown.Item
               key="toggle-rulers"
               onAction={() => {
-                editorStore.getState().updateCanvasSettings({ showRulers: !editorState.canvasSettings.showRulers });
+                editorStore.getState().updateCanvasSettings({ showRulers: !canvasSettings.showRulers });
               }}
             >
               <span className="inline-flex items-center gap-2">
                 <Ruler size={14} />
                 <span>Show rulers</span>
-                {editorState.canvasSettings.showRulers ?
+                {canvasSettings.showRulers ?
                   <CheckCircle2 size={14} />
                 : null}
               </span>
@@ -260,7 +261,7 @@ export function LayoutMainToolbar(props: DemoAppLayoutProps): React.JSX.Element 
               }}
             >
               <span className="inline-flex items-center gap-2">
-                {editorState.canvasSettings.units === 'px' ?
+                {canvasSettings.units === 'px' ?
                   <CheckCircle2 size={14} />
                 : <span aria-hidden="true">•</span>}
                 Units: px
@@ -273,7 +274,7 @@ export function LayoutMainToolbar(props: DemoAppLayoutProps): React.JSX.Element 
               }}
             >
               <span className="inline-flex items-center gap-2">
-                {editorState.canvasSettings.units === 'mm' ?
+                {canvasSettings.units === 'mm' ?
                   <CheckCircle2 size={14} />
                 : <span aria-hidden="true">•</span>}
                 Units: mm
@@ -286,7 +287,7 @@ export function LayoutMainToolbar(props: DemoAppLayoutProps): React.JSX.Element 
               }}
             >
               <span className="inline-flex items-center gap-2">
-                {editorState.canvasSettings.units === 'in' ?
+                {canvasSettings.units === 'in' ?
                   <CheckCircle2 size={14} />
                 : <span aria-hidden="true">•</span>}
                 Units: in
@@ -299,7 +300,7 @@ export function LayoutMainToolbar(props: DemoAppLayoutProps): React.JSX.Element 
               }}
             >
               <span className="inline-flex items-center gap-2">
-                {editorState.canvasSettings.viewMode === 'none' ?
+                {canvasSettings.viewMode === 'none' ?
                   <CheckCircle2 size={14} />
                 : <span aria-hidden="true">•</span>}
                 View Mode: None
@@ -312,7 +313,7 @@ export function LayoutMainToolbar(props: DemoAppLayoutProps): React.JSX.Element 
               }}
             >
               <span className="inline-flex items-center gap-2">
-                {editorState.canvasSettings.viewMode === 'broadcast' ?
+                {canvasSettings.viewMode === 'broadcast' ?
                   <CheckCircle2 size={14} />
                 : <span aria-hidden="true">•</span>}
                 View Mode: Broadcast
@@ -325,7 +326,7 @@ export function LayoutMainToolbar(props: DemoAppLayoutProps): React.JSX.Element 
               }}
             >
               <span className="inline-flex items-center gap-2">
-                {editorState.canvasSettings.viewMode === 'print' ?
+                {canvasSettings.viewMode === 'print' ?
                   <CheckCircle2 size={14} />
                 : <span aria-hidden="true">•</span>}
                 View Mode: Print

@@ -1,6 +1,4 @@
-import { DEFAULT_ELEMENT_TYPES } from '@broadset/ui';
-
-import type { MediaAsset, TemplateEntry } from '../../../ui/src/modals/types';
+import { DEFAULT_ELEMENT_TYPES, type MediaAsset, type TemplateEntry } from '@broadset/ui';
 
 export const ELEMENT_TOOL_TYPES = [
   ...DEFAULT_ELEMENT_TYPES,
