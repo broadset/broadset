@@ -7,7 +7,7 @@ import { GeometryPanel } from './panels';
 
 describe('GeometryPanel', () => {
   /** @description Geometry labels must include document units and numeric edits must still emit numeric model updates. */
-  it('renders geometry fields with unit labels and reports numeric updates', () => {
+  it('renders transform fields with unit labels and reports numeric updates', () => {
     const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
 
     render(
@@ -23,13 +23,13 @@ describe('GeometryPanel', () => {
       />,
     );
 
-    const xInput = screen.getByRole('textbox', { name: 'X (mm)' });
+    const xInput = screen.getByRole('textbox', { name: 'Position X (mm)' });
 
     fireEvent.change(xInput, { target: { value: '42' } });
     fireEvent.blur(xInput);
 
-    expect(screen.getByRole('textbox', { name: 'Width (mm)' })).not.toBeNull();
-    expect(screen.getByRole('textbox', { name: 'Rotation' })).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Size W (mm)' })).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Rotation Z' })).not.toBeNull();
     expect(onUpdate).toHaveBeenCalledWith('x', 42);
   });
 
@@ -59,8 +59,8 @@ describe('GeometryPanel', () => {
     expect(onUpdate).toHaveBeenCalledWith('name', 'Updated Title');
   });
 
-  /** @description Print mode must hide the entire 3D transform disclosure because 3D controls are screen-only. */
-  it('hides 3D transform fields in print mode', () => {
+  /** @description Print mode must hide the 3D axes because 3D controls are screen-only. */
+  it('hides 3D axes in print mode', () => {
     render(
       <GeometryPanel
         x={0}
@@ -77,14 +77,15 @@ describe('GeometryPanel', () => {
       />,
     );
 
-    expect(screen.queryByRole('button', { name: '3D transform' })).toBeNull();
-    expect(screen.queryByRole('textbox', { name: /Rotate X/i })).toBeNull();
-    expect(screen.queryByRole('textbox', { name: /Rotate Y/i })).toBeNull();
-    expect(screen.queryByRole('textbox', { name: /Translate Z/i })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /Rotation X/i })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /Rotation Y/i })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /Position Z/i })).toBeNull();
+    // The 2D-only rotation input must still be present as the primary rotation control.
+    expect(screen.getByRole('textbox', { name: /Rotation Z/i })).not.toBeNull();
   });
 
-  /** @description 3D controls must be collapsed by default in screen mode and only render after opening the disclosure. */
-  it('keeps 3D controls collapsed by default and reveals them when disclosure opens', () => {
+  /** @description Screen mode must show Position X/Y/Z and Rotation X/Y/Z side-by-side so all transform axes stay visible without toggling. */
+  it('shows Position and Rotation X/Y/Z axes together in screen mode', () => {
     render(
       <GeometryPanel
         x={0}
@@ -101,14 +102,12 @@ describe('GeometryPanel', () => {
       />,
     );
 
-    const disclosureToggle = screen.getByRole('button', { name: '3D transform' });
-
-    expect(screen.queryByRole('textbox', { name: /Rotate X/i })).toBeNull();
-    fireEvent.click(disclosureToggle);
-
-    expect(screen.getByRole('textbox', { name: /Rotate X/i })).not.toBeNull();
-    expect(screen.getByRole('textbox', { name: /Rotate Y/i })).not.toBeNull();
-    expect(screen.getByRole('textbox', { name: /Translate Z/i })).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: /Position X/i })).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: /Position Y/i })).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: /Position Z/i })).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: /Rotation X/i })).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: /Rotation Y/i })).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: /Rotation Z/i })).not.toBeNull();
   });
 
   /** @description Width and height must be clamped to a minimum displayed value of 0.1 to prevent zero-size elements. */
@@ -117,8 +116,8 @@ describe('GeometryPanel', () => {
       <GeometryPanel x={0} y={0} width={0} height={0} rotation={0} onUpdate={() => undefined} documentMode="screen" />,
     );
 
-    const widthInput = screen.getByRole('textbox', { name: 'Width (px)' });
-    const heightInput = screen.getByRole('textbox', { name: 'Height (px)' });
+    const widthInput = screen.getByRole('textbox', { name: 'Size W (px)' });
+    const heightInput = screen.getByRole('textbox', { name: 'Size H (px)' });
 
     expect(Number(widthInput.getAttribute('value'))).toBeGreaterThanOrEqual(0.1);
     expect(Number(heightInput.getAttribute('value'))).toBeGreaterThanOrEqual(0.1);
@@ -144,7 +143,7 @@ describe('GeometryPanel', () => {
     );
 
     // Expected: 1920 - 100 - 80 = 1740
-    const xInput = screen.getByRole('textbox', { name: 'X (Right mm)' });
+    const xInput = screen.getByRole('textbox', { name: 'Position X (Right mm)' });
 
     expect((xInput.getAttribute('value') ?? '').replace(/,/g, '')).toBe('1740');
 
@@ -175,7 +174,7 @@ describe('GeometryPanel', () => {
     );
 
     // Expected: 1080 - 200 - 50 = 830
-    const yInput = screen.getByRole('textbox', { name: 'Y (Bottom in)' });
+    const yInput = screen.getByRole('textbox', { name: 'Position Y (Bottom in)' });
 
     expect((yInput.getAttribute('value') ?? '').replace(/,/g, '')).toBe('830');
 
@@ -186,8 +185,8 @@ describe('GeometryPanel', () => {
     expect(onUpdate).toHaveBeenCalledWith('y', 210);
   });
 
-  /** @description Anchor toggles must emit anchor mode updates so users can switch left/right and top/bottom positioning semantics. */
-  it('emits anchor mode changes from anchor toggle controls', () => {
+  /** @description 9-dot anchor pad must emit both anchorX and anchorY in a single interaction when a corner dot is clicked. */
+  it('emits anchor mode changes from the 9-dot anchor pad', () => {
     const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
 
     render(
@@ -204,10 +203,26 @@ describe('GeometryPanel', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Anchor X Right' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Anchor Y Bottom' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Anchor bottom-right' }));
 
     expect(onUpdate).toHaveBeenCalledWith('anchorX', 'right');
     expect(onUpdate).toHaveBeenCalledWith('anchorY', 'bottom');
+  });
+
+  /** @description Size must expose a link-aspect toggle so designers can scale width and height proportionally. */
+  it('exposes a link-aspect toggle in the Size group', () => {
+    render(
+      <GeometryPanel
+        x={0}
+        y={0}
+        width={400}
+        height={200}
+        rotation={0}
+        onUpdate={() => undefined}
+        documentMode="screen"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Link aspect ratio' })).not.toBeNull();
   });
 });

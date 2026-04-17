@@ -29,6 +29,10 @@ const COLOR_TOKENS = {
   'field-background': 'rgba(15, 23, 42, 0.72)',
   focus: 'hsl(217 91% 60%)',
   'glass-bg': 'rgba(28, 28, 28, 0.85)',
+  'axis-x': 'hsl(4 82% 64%)',
+  'axis-y': 'hsl(120 45% 58%)',
+  'axis-z': 'hsl(215 85% 66%)',
+  'axis-xyz': 'hsl(215 16% 70%)',
 } as const;
 
 /* ── Typography ──────────────────────────────────────────── */

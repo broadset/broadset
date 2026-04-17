@@ -53,7 +53,7 @@ describe('AnimationModePropertiesPanel', () => {
       />,
     );
 
-    const xInput = screen.getByRole('textbox', { name: 'X (px)' });
+    const xInput = screen.getByRole('textbox', { name: 'Position X (px)' });
 
     fireEvent.change(xInput, { target: { value: '120' } });
     fireEvent.blur(xInput);
@@ -85,7 +85,7 @@ describe('AnimationModePropertiesPanel', () => {
     );
 
     const xField = screen.getByTestId('property-field-x');
-    const xInput = screen.getByRole('textbox', { name: 'X (px)' });
+    const xInput = screen.getByRole('textbox', { name: 'Position X (px)' });
 
     expect(xField.getAttribute('data-disabled')).toBe('true');
 

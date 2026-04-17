@@ -11,14 +11,40 @@ const UNITLESS_MARKER = '—' as const;
 
 type DisplayCssUnit = CssUnit | typeof UNITLESS_MARKER;
 
+const EXPRESSION_RE = /^[\d+\-*/.() \t]+$/;
+
+/** Evaluate arithmetic expression like "200+50" or "(100+20)*2". Returns null for anything unsafe or unparseable. */
+function evaluateExpression(raw: string): number | null {
+  const trimmed = raw.trim();
+
+  if (trimmed === '' || !EXPRESSION_RE.test(trimmed) || /[+\-*/]{2,}/.test(trimmed)) {
+    return null;
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const evaluator = new Function(`"use strict"; return (${trimmed});`) as () => unknown;
+    const result: unknown = evaluator();
+
+    return typeof result === 'number' && Number.isFinite(result) ? result : null;
+  } catch {
+    return null;
+  }
+}
+
 function parseRawNumber(rawValue: unknown): number | null {
   if (typeof rawValue !== 'string' && typeof rawValue !== 'number') {
     return null;
   }
 
-  const parsed = Number(String(rawValue).replace(/,/g, '').trim());
+  const stringValue = String(rawValue).replace(/,/g, '').trim();
+  const parsed = Number(stringValue);
 
-  return Number.isFinite(parsed) ? parsed : null;
+  if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+
+  return evaluateExpression(stringValue);
 }
 
 export interface NumFieldProps {
@@ -29,9 +55,22 @@ export interface NumFieldProps {
   readonly step?: number | undefined;
   readonly min?: number | undefined;
   readonly max?: number | undefined;
+  /** When true, renders without inc/dec buttons and with tighter padding. Designed for dense grids. */
+  readonly compact?: boolean | undefined;
+  readonly isDisabled?: boolean | undefined;
 }
 
-export function NumField({ value, onChange, label, onCommit, step = 1, min, max }: NumFieldProps): JSX.Element {
+export function NumField({
+  value,
+  onChange,
+  label,
+  onCommit,
+  step = 1,
+  min,
+  max,
+  compact,
+  isDisabled,
+}: NumFieldProps): JSX.Element {
   const [localValue, setLocalValue] = useState(value);
   const [isDirty, setIsDirty] = useState(false);
   const lastValid = useRef(value);
@@ -116,22 +155,90 @@ export function NumField({ value, onChange, label, onCommit, step = 1, min, max 
         return;
       }
 
-      if (event.key === 'ArrowUp') {
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
         event.preventDefault();
-        commitValue(localValue + step);
-        skipNextBlurCommit.current = true;
 
-        return;
-      }
+        const direction = event.key === 'ArrowUp' ? 1 : -1;
+        const multiplier =
+          event.shiftKey ? 10
+          : event.altKey ? 0.1
+          : 1;
 
-      if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        commitValue(localValue - step);
+        commitValue(localValue + direction * step * multiplier);
         skipNextBlurCommit.current = true;
       }
     },
     [commitValue, localValue, step],
   );
+
+  const isCompact = compact === true;
+
+  if (isCompact) {
+    return (
+      <input
+        type="text"
+        inputMode="decimal"
+        role="textbox"
+        aria-label={label}
+        value={String(displayValue)}
+        disabled={isDisabled === true}
+        onChange={(event) => {
+          const parsed = Number(event.currentTarget.value);
+
+          if (Number.isFinite(parsed)) {
+            handleChange(parsed);
+          } else {
+            // still store as dirty; commit will re-parse expression later
+            handleChange(Number.NaN);
+          }
+        }}
+        onBlur={(event) => {
+          const parsedDraft = parseRawNumber(event.currentTarget.value);
+          const emitCommit = !skipNextBlurCommit.current;
+
+          skipNextBlurCommit.current = false;
+          commitValue(parsedDraft ?? lastValid.current, { emitCommit });
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            const parsedDraft = parseRawNumber(event.currentTarget.value);
+
+            commitValue(parsedDraft ?? lastValid.current);
+            skipNextBlurCommit.current = true;
+
+            return;
+          }
+
+          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            event.preventDefault();
+
+            const direction = event.key === 'ArrowUp' ? 1 : -1;
+            const multiplier =
+              event.shiftKey ? 10
+              : event.altKey ? 0.1
+              : 1;
+
+            commitValue(lastValid.current + direction * step * multiplier);
+            skipNextBlurCommit.current = true;
+          }
+        }}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: 'inherit',
+          flex: 1,
+          fontFamily: 'inherit',
+          fontSize: '0.8125rem',
+          height: '100%',
+          minWidth: 0,
+          outline: 'none',
+          padding: '0 0.5rem',
+          textAlign: 'right',
+          width: '100%',
+        }}
+      />
+    );
+  }
 
   return (
     <NumberField
@@ -142,6 +249,7 @@ export function NumField({ value, onChange, label, onCommit, step = 1, min, max 
       onKeyDown={handleKeyDown}
       {...(min !== undefined ? { minValue: min } : {})}
       {...(max !== undefined ? { maxValue: max } : {})}
+      {...(isDisabled === true ? { isDisabled: true } : {})}
       step={step}
     >
       <NumberField.Group>

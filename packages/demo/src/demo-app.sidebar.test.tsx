@@ -85,6 +85,9 @@ function createSidebarProps(selectedKeyframeIndex: number | null): DemoSidebarPa
     timelinePreviewActiveModifiers: [],
     timelinePreviewActiveState: null,
     mediaAssets: [],
+    canvasWidth: playbackDocument.canvas.width,
+    canvasHeight: playbackDocument.canvas.height,
+    documentUnit: playbackDocument.canvas.unit,
   };
 }
 

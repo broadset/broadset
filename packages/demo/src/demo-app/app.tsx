@@ -505,6 +505,9 @@ export function DemoApp(): React.JSX.Element {
         timelinePreviewActiveModifiers={animationEditing.activeModifiers}
         timelinePreviewActiveState={animationEditing.activeState}
         mediaAssets={mediaAssets}
+        canvasWidth={currentDocument.canvas.width}
+        canvasHeight={currentDocument.canvas.height}
+        documentUnit={currentDocument.canvas.unit}
       />
     ),
     [
@@ -524,6 +527,9 @@ export function DemoApp(): React.JSX.Element {
       animationEditing.onSelectState,
       animationEditing.onToggleModifier,
       availableDocuments,
+      currentDocument.canvas.height,
+      currentDocument.canvas.unit,
+      currentDocument.canvas.width,
       currentDocument.documentMode,
       editingTimeline,
       editingTimelineSelectedKf,

@@ -332,7 +332,7 @@ describe('PropertiesSidebar', () => {
       .filter((value) => value.length > 0);
 
     const elementNameIndex = labels.indexOf('Element name');
-    const rotationIndex = labels.indexOf('Rotation');
+    const rotationIndex = labels.indexOf('Rotation Z');
     const fontFamilyIndex = labels.indexOf('Font family');
 
     expect(elementNameIndex).toBeGreaterThanOrEqual(0);

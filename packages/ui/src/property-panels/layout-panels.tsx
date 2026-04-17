@@ -1,9 +1,20 @@
 import { Button, ButtonGroup, Input, ListBox, Select, Slider } from '@heroui/react';
 import { ArrowDownUp, Circle, Link2, Lock, Minimize2, PenTool, Square, Star, Triangle, Unlink2 } from 'lucide-react';
 import type { JSX } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ColorInput, FilterEditor, GradientEditor, NumField, SegmentedSwitcher, ShadowEditor } from '../inputs';
+import type { AxisCell } from '../inputs';
+import {
+  AnchorPad,
+  AxisTriplet,
+  ColorInput,
+  FilterEditor,
+  GradientEditor,
+  NumField,
+  PairInput,
+  SegmentedSwitcher,
+  ShadowEditor,
+} from '../inputs';
 import {
   BORDER_STYLE_OPTIONS,
   CLIP_PATH_PRESETS,
@@ -12,7 +23,6 @@ import {
   ISOLATION_OPTIONS,
   isValidClipPathCss,
   MIX_BLEND_MODE_OPTIONS,
-  NumericField,
   SelectField,
 } from '../panel-types';
 import { color, font, sp } from '../tokens';
@@ -68,9 +78,10 @@ export function GeometryPanel({
   documentMode,
 }: GeometryPanelProps): JSX.Element {
   const [nameDraft, setNameDraft] = useState(name ?? '');
-  const [is3DOpen, setIs3DOpen] = useState(false);
   const [activeAnchorX, setActiveAnchorX] = useState<'left' | 'right'>(anchorX);
   const [activeAnchorY, setActiveAnchorY] = useState<'top' | 'bottom'>(anchorY);
+  const [isAspectLinked, setIsAspectLinked] = useState(false);
+  const aspectRatioRef = useRef<number | null>(null);
 
   useEffect(() => {
     setActiveAnchorX(anchorX);
@@ -85,17 +96,19 @@ export function GeometryPanel({
   const displayWidth = Math.max(0.1, width);
   const displayHeight = Math.max(0.1, height);
   const isScreenMode = documentMode === 'screen';
-  const show3D =
-    isScreenMode &&
-    (rotateX !== undefined || rotateY !== undefined || rotateZ !== undefined || translateZ !== undefined);
+  const has3DValues =
+    rotateX !== undefined || rotateY !== undefined || rotateZ !== undefined || translateZ !== undefined;
+  // 3D axes are screen-only (print has no perspective). When in screen mode we
+  // always expose X/Y/Z side-by-side; print mode collapses Z cells via isHidden.
+  const showZAxes = isScreenMode;
 
   const showAutoSize = elementType === 'text';
   const isAutoHeight = autoSize === 'auto-height';
 
-  const xLabel = activeAnchorX === 'right' ? `X (Right ${documentUnit})` : `X (${documentUnit})`;
-  const yLabel = activeAnchorY === 'bottom' ? `Y (Bottom ${documentUnit})` : `Y (${documentUnit})`;
-  const widthLabel = `Width (${documentUnit})`;
-  const heightLabel = `Height (${documentUnit})`;
+  // Rotation Z maps to `rotation` for 2D-only elements; when the element already
+  // has any 3D rotation authored we keep Z on `rotateZ` so the two stay in sync.
+  const rotationZKey = has3DValues && rotateZ !== undefined ? 'rotateZ' : 'rotation';
+  const rotationZValue = rotationZKey === 'rotateZ' ? (rotateZ ?? 0) : rotation;
 
   const commitNameDraft = useCallback(() => {
     onUpdate('name', nameDraft);
@@ -119,200 +132,259 @@ export function GeometryPanel({
     [activeAnchorY, canvasHeight, height, onUpdate],
   );
 
+  const handleAspectToggle = useCallback(
+    (nextLinked: boolean) => {
+      aspectRatioRef.current = nextLinked && width > 0 ? height / width : null;
+      setIsAspectLinked(nextLinked);
+    },
+    [height, width],
+  );
+
+  const positionAxes = useMemo<readonly AxisCell[]>(
+    () => [
+      {
+        chip: 'X',
+        color: 'x',
+        ariaLabel: activeAnchorX === 'right' ? `Position X (Right ${documentUnit})` : `Position X (${documentUnit})`,
+        value: displayX,
+        onChange: handleXChange,
+      },
+      {
+        chip: 'Y',
+        color: 'y',
+        ariaLabel: activeAnchorY === 'bottom' ? `Position Y (Bottom ${documentUnit})` : `Position Y (${documentUnit})`,
+        value: displayY,
+        onChange: handleYChange,
+      },
+      {
+        chip: 'Z',
+        color: 'z',
+        ariaLabel: `Position Z (${documentUnit})`,
+        value: translateZ ?? 0,
+        onChange: (nextZ: number) => {
+          onUpdate('translateZ', nextZ);
+        },
+        isHidden: !showZAxes,
+      },
+    ],
+    [
+      activeAnchorX,
+      activeAnchorY,
+      displayX,
+      displayY,
+      documentUnit,
+      handleXChange,
+      handleYChange,
+      onUpdate,
+      showZAxes,
+      translateZ,
+    ],
+  );
+
+  const rotationAxes = useMemo<readonly AxisCell[]>(
+    () => [
+      {
+        chip: 'X',
+        color: 'x',
+        ariaLabel: 'Rotation X',
+        value: rotateX ?? 0,
+        onChange: (nextRotX: number) => {
+          onUpdate('rotateX', nextRotX);
+        },
+        isHidden: !showZAxes,
+      },
+      {
+        chip: 'Y',
+        color: 'y',
+        ariaLabel: 'Rotation Y',
+        value: rotateY ?? 0,
+        onChange: (nextRotY: number) => {
+          onUpdate('rotateY', nextRotY);
+        },
+        isHidden: !showZAxes,
+      },
+      {
+        chip: 'Z',
+        color: 'z',
+        ariaLabel: 'Rotation Z',
+        value: rotationZValue,
+        onChange: (nextRotZ: number) => {
+          onUpdate(rotationZKey, nextRotZ);
+        },
+      },
+    ],
+    [onUpdate, rotateX, rotateY, rotationZKey, rotationZValue, showZAxes],
+  );
+
+  const anchorLabel = `${activeAnchorY === 'top' ? 'Top' : 'Bottom'} ${activeAnchorX === 'left' ? 'left' : 'right'}`;
+
   return (
-    <section aria-label="Geometry" role="region" className="grid grid-cols-1 gap-2 md:grid-cols-2">
+    <section
+      aria-label="Geometry"
+      role="region"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: sp('sp-04'),
+        minWidth: 0,
+        width: '100%',
+      }}
+    >
       <PropertyField propertyKey="name" defaultValue={nameDraft}>
-        <FieldShell label="Element name">
-          <Input
-            aria-label="Element name"
-            value={nameDraft}
-            onChange={(event) => {
-              setNameDraft(event.currentTarget.value);
-            }}
-            onBlur={commitNameDraft}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                commitNameDraft();
-              }
-            }}
-          />
-        </FieldShell>
+        <Input
+          aria-label="Element name"
+          placeholder="Element name"
+          value={nameDraft}
+          onChange={(event) => {
+            setNameDraft(event.currentTarget.value);
+          }}
+          onBlur={commitNameDraft}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              commitNameDraft();
+            }
+          }}
+        />
       </PropertyField>
-
-      <FieldShell label="Anchor X">
-        <ButtonGroup aria-label="Anchor X">
-          <Button
-            aria-label="Anchor X Left"
-            size="sm"
-            variant={activeAnchorX === 'left' ? 'secondary' : 'ghost'}
-            onPress={() => {
-              setActiveAnchorX('left');
-              onUpdate('anchorX', 'left');
-            }}
-          >
-            Left
-          </Button>
-          <Button
-            aria-label="Anchor X Right"
-            size="sm"
-            variant={activeAnchorX === 'right' ? 'secondary' : 'ghost'}
-            onPress={() => {
-              setActiveAnchorX('right');
-              onUpdate('anchorX', 'right');
-            }}
-          >
-            Right
-          </Button>
-        </ButtonGroup>
-      </FieldShell>
-
-      <FieldShell label="Anchor Y">
-        <ButtonGroup aria-label="Anchor Y">
-          <Button
-            aria-label="Anchor Y Top"
-            size="sm"
-            variant={activeAnchorY === 'top' ? 'secondary' : 'ghost'}
-            onPress={() => {
-              setActiveAnchorY('top');
-              onUpdate('anchorY', 'top');
-            }}
-          >
-            Top
-          </Button>
-          <Button
-            aria-label="Anchor Y Bottom"
-            size="sm"
-            variant={activeAnchorY === 'bottom' ? 'secondary' : 'ghost'}
-            onPress={() => {
-              setActiveAnchorY('bottom');
-              onUpdate('anchorY', 'bottom');
-            }}
-          >
-            Bottom
-          </Button>
-        </ButtonGroup>
-      </FieldShell>
 
       <PropertyField propertyKey="x" defaultValue={x}>
-        <NumericField label={xLabel} value={displayX} onValueChange={handleXChange} />
+        <AxisTriplet label="Position" unit={documentUnit} axes={positionAxes} />
       </PropertyField>
-      <PropertyField propertyKey="y" defaultValue={y}>
-        <NumericField label={yLabel} value={displayY} onValueChange={handleYChange} />
-      </PropertyField>
-      <PropertyField propertyKey="width" defaultValue={width}>
-        <NumericField
-          label={widthLabel}
-          value={displayWidth}
-          minValue={0.1}
-          onValueChange={(v) => {
-            onUpdate('width', v);
-          }}
-        />
-      </PropertyField>
-      <PropertyField propertyKey="height" defaultValue={height}>
-        <NumericField
-          isDisabled={isAutoHeight}
-          label={heightLabel}
-          value={displayHeight}
-          minValue={0.1}
-          onValueChange={(v) => {
-            onUpdate('height', v);
-          }}
-        />
-      </PropertyField>
-      <PropertyField propertyKey="rotation" defaultValue={rotation}>
-        <NumericField
-          label="Rotation"
-          value={rotation}
-          onValueChange={(v) => {
-            onUpdate('rotation', v);
-          }}
-        />
-      </PropertyField>
-      {showAutoSize ?
-        <div className="col-span-full" style={{ marginTop: sp('sp-02') }}>
-          <ButtonGroup aria-label="Auto-size mode">
-            <Button
-              aria-label="Fixed"
-              size="sm"
-              variant={autoSize === 'fixed' || autoSize === undefined ? 'secondary' : 'ghost'}
-              onPress={() => {
-                onUpdate('autoSize', 'fixed');
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0, width: '100%' }}>
+        <PropertyField propertyKey="width" defaultValue={width}>
+          <PairInput
+            label="Size"
+            unit={documentUnit}
+            axes={[
+              {
+                chip: 'W',
+                color: 'neutral',
+                ariaLabel: `Size W (${documentUnit})`,
+                value: displayWidth,
+                min: 0.1,
+                onChange: (nextWidth: number) => {
+                  onUpdate('width', nextWidth);
+
+                  if (isAspectLinked && aspectRatioRef.current !== null) {
+                    onUpdate('height', nextWidth * aspectRatioRef.current);
+                  }
+                },
+              },
+              {
+                chip: 'H',
+                color: 'neutral',
+                ariaLabel: `Size H (${documentUnit})`,
+                value: displayHeight,
+                min: 0.1,
+                isDisabled: isAutoHeight,
+                onChange: (nextHeight: number) => {
+                  onUpdate('height', nextHeight);
+
+                  if (isAspectLinked && aspectRatioRef.current !== null && aspectRatioRef.current !== 0) {
+                    onUpdate('width', nextHeight / aspectRatioRef.current);
+                  }
+                },
+              },
+            ]}
+            linkToggle={{ isLinked: isAspectLinked, onToggle: handleAspectToggle, ariaLabel: 'Link aspect ratio' }}
+          />
+        </PropertyField>
+        {showAutoSize ?
+          <div
+            style={{
+              alignItems: 'center',
+              display: 'grid',
+              gap: sp('sp-02'),
+              gridTemplateColumns: 'auto 1fr',
+            }}
+          >
+            <span
+              style={{
+                color: color('muted'),
+                fontSize: '0.6875rem',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
               }}
             >
-              <Lock size={ICON_SIZE} /> Fixed
-            </Button>
-            <Button
-              aria-label="Auto Height"
-              size="sm"
-              variant={autoSize === 'auto-height' ? 'secondary' : 'ghost'}
-              onPress={() => {
-                onUpdate('autoSize', 'auto-height');
-              }}
-            >
-              <ArrowDownUp size={ICON_SIZE} /> Auto Height
-            </Button>
-            <Button
-              aria-label="Shrink to Fit"
-              size="sm"
-              variant={autoSize === 'shrink-to-fit' ? 'secondary' : 'ghost'}
-              onPress={() => {
-                onUpdate('autoSize', 'shrink-to-fit');
-              }}
-            >
-              <Minimize2 size={ICON_SIZE} /> Shrink to Fit
-            </Button>
-          </ButtonGroup>
-        </div>
-      : null}
-      {show3D ?
-        <>
-          <div className="col-span-full">
-            <Button
-              aria-label="3D transform"
-              size="sm"
-              variant={is3DOpen ? 'secondary' : 'ghost'}
-              onPress={() => {
-                setIs3DOpen((current) => !current);
-              }}
-            >
-              3D transform
-            </Button>
+              Text fit
+            </span>
+            <ButtonGroup aria-label="Auto-size mode" style={{ justifySelf: 'end' }}>
+              <Button
+                aria-label="Fixed"
+                size="sm"
+                variant={autoSize === 'fixed' || autoSize === undefined ? 'secondary' : 'ghost'}
+                style={{ height: '1.75rem', minWidth: '2rem', padding: '0 0.5rem' }}
+                onPress={() => {
+                  onUpdate('autoSize', 'fixed');
+                }}
+              >
+                <Lock size={12} />
+              </Button>
+              <Button
+                aria-label="Auto Height"
+                size="sm"
+                variant={autoSize === 'auto-height' ? 'secondary' : 'ghost'}
+                style={{ height: '1.75rem', minWidth: '2rem', padding: '0 0.5rem' }}
+                onPress={() => {
+                  onUpdate('autoSize', 'auto-height');
+                }}
+              >
+                <ArrowDownUp size={12} />
+              </Button>
+              <Button
+                aria-label="Shrink to Fit"
+                size="sm"
+                variant={autoSize === 'shrink-to-fit' ? 'secondary' : 'ghost'}
+                style={{ height: '1.75rem', minWidth: '2rem', padding: '0 0.5rem' }}
+                onPress={() => {
+                  onUpdate('autoSize', 'shrink-to-fit');
+                }}
+              >
+                <Minimize2 size={12} />
+              </Button>
+            </ButtonGroup>
           </div>
-          {is3DOpen ?
-            <>
-              <NumericField
-                label="Rotate X"
-                value={rotateX ?? 0}
-                onValueChange={(v) => {
-                  onUpdate('rotateX', v);
-                }}
-              />
-              <NumericField
-                label="Rotate Y"
-                value={rotateY ?? 0}
-                onValueChange={(v) => {
-                  onUpdate('rotateY', v);
-                }}
-              />
-              <NumericField
-                label="Rotate Z"
-                value={rotateZ ?? 0}
-                onValueChange={(v) => {
-                  onUpdate('rotateZ', v);
-                }}
-              />
-              <NumericField
-                label="Translate Z"
-                value={translateZ ?? 0}
-                onValueChange={(v) => {
-                  onUpdate('translateZ', v);
-                }}
-              />
-            </>
-          : null}
-        </>
-      : null}
+        : null}
+      </div>
+
+      <PropertyField propertyKey="rotation" defaultValue={rotation}>
+        <AxisTriplet label="Rotation" unit="°" axes={rotationAxes} />
+      </PropertyField>
+
+      <div
+        role="group"
+        aria-label="Anchor origin"
+        style={{
+          alignItems: 'center',
+          display: 'grid',
+          gap: sp('sp-02'),
+          gridTemplateColumns: 'auto 1fr auto',
+          minWidth: 0,
+        }}
+      >
+        <span
+          style={{ color: color('muted'), fontSize: '0.6875rem', letterSpacing: '0.04em', textTransform: 'uppercase' }}
+        >
+          Anchor
+        </span>
+        <span style={{ color: color('muted'), fontSize: font('label'), justifySelf: 'end' }}>{anchorLabel}</span>
+        <AnchorPad
+          anchorX={activeAnchorX}
+          anchorY={activeAnchorY}
+          onChange={({ x: nextAx, y: nextAy }) => {
+            if (nextAx !== activeAnchorX) {
+              setActiveAnchorX(nextAx);
+              onUpdate('anchorX', nextAx);
+            }
+
+            if (nextAy !== activeAnchorY) {
+              setActiveAnchorY(nextAy);
+              onUpdate('anchorY', nextAy);
+            }
+          }}
+        />
+      </div>
     </section>
   );
 }

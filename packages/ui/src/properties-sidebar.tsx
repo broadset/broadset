@@ -77,6 +77,9 @@ export interface PropertiesSidebarProps {
   readonly isEditing?: boolean | undefined;
   readonly mediaAssets?: readonly MediaAsset[] | undefined;
   readonly onStartClipPathEditing?: (() => void) | undefined;
+  readonly canvasWidth?: number | undefined;
+  readonly canvasHeight?: number | undefined;
+  readonly documentUnit?: 'px' | 'mm' | 'in' | undefined;
 }
 
 export function PropertiesSidebar({
@@ -94,6 +97,9 @@ export function PropertiesSidebar({
   isEditing = false,
   mediaAssets,
   onStartClipPathEditing,
+  canvasWidth,
+  canvasHeight,
+  documentUnit,
 }: PropertiesSidebarProps): JSX.Element {
   if (elements.length === 0) {
     return (
@@ -223,6 +229,7 @@ export function PropertiesSidebar({
               </Accordion.Heading>
               <Accordion.Panel>
                 <GeometryPanel
+                  name={primary.name}
                   x={primary.x}
                   y={primary.y}
                   width={primary.width}
@@ -236,6 +243,9 @@ export function PropertiesSidebar({
                   elementType={primary.type}
                   onUpdate={onUpdate}
                   documentMode={documentMode}
+                  {...(canvasWidth !== undefined ? { canvasWidth } : {})}
+                  {...(canvasHeight !== undefined ? { canvasHeight } : {})}
+                  {...(documentUnit !== undefined ? { documentUnit } : {})}
                 />
               </Accordion.Panel>
             </Accordion.Item>

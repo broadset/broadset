@@ -79,6 +79,9 @@ export interface DemoSidebarPanelProps {
   readonly timelinePreviewActiveModifiers: readonly string[];
   readonly timelinePreviewActiveState: string | null;
   readonly mediaAssets: readonly MediaAsset[];
+  readonly canvasWidth: number;
+  readonly canvasHeight: number;
+  readonly documentUnit: 'px' | 'mm' | 'in';
 }
 
 export function DemoSidebarPanel({
@@ -124,6 +127,9 @@ export function DemoSidebarPanel({
   timelinePreviewActiveModifiers,
   timelinePreviewActiveState,
   mediaAssets,
+  canvasWidth,
+  canvasHeight,
+  documentUnit,
 }: DemoSidebarPanelProps): React.JSX.Element {
   const keyframeAdapter: PropertyFieldAdapter | null = useMemo(() => {
     if (editingTimeline === null || editingTimelineSelectedKf === null || selectedElement === null) {
@@ -167,6 +173,9 @@ export function DemoSidebarPanel({
         }
         mediaAssets={mediaAssets}
         onUpdate={onUpdateProperty}
+        canvasWidth={canvasWidth}
+        canvasHeight={canvasHeight}
+        documentUnit={documentUnit}
       />
     );
   }

@@ -36,7 +36,11 @@ export function PropertyField({ propertyKey, defaultValue, adapter, children }: 
 
   if (activeAdapter === null) {
     return (
-      <div data-property-key={propertyKey} data-testid={`property-field-${propertyKey}`}>
+      <div
+        data-property-key={propertyKey}
+        data-testid={`property-field-${propertyKey}`}
+        style={{ minWidth: 0, width: '100%' }}
+      >
         {children}
       </div>
     );
@@ -51,8 +55,9 @@ export function PropertyField({ propertyKey, defaultValue, adapter, children }: 
       data-disabled={!included ? 'true' : undefined}
       data-property-key={propertyKey}
       data-testid={`property-field-${propertyKey}`}
+      style={{ minWidth: 0, width: '100%' }}
     >
-      <fieldset disabled={!included} style={{ border: 0, margin: 0, minWidth: 0, padding: 0 }}>
+      <fieldset disabled={!included} style={{ border: 0, margin: 0, minWidth: 0, padding: 0, width: '100%' }}>
         {children}
       </fieldset>
       <Button
