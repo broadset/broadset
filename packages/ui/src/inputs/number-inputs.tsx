@@ -1,6 +1,6 @@
 import { ListBox, NumberField, Select } from '@heroui/react';
-import type { JSX } from 'react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import type { FocusEvent, JSX, KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { sp } from '../tokens';
 import { parseCssLength } from '../utilities';
@@ -10,6 +10,16 @@ const DECIMAL_DISPLAY_PRECISION = 2;
 const UNITLESS_MARKER = '—' as const;
 
 type DisplayCssUnit = CssUnit | typeof UNITLESS_MARKER;
+
+function parseRawNumber(rawValue: unknown): number | null {
+  if (typeof rawValue !== 'string' && typeof rawValue !== 'number') {
+    return null;
+  }
+
+  const parsed = Number(String(rawValue).replace(/,/g, '').trim());
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
 
 export interface NumFieldProps {
   readonly value: number;
@@ -82,17 +92,25 @@ export function NumField({ value, onChange, label, onCommit, step = 1, min, max 
     [clamp, onChange, onCommit],
   );
 
-  const handleBlur = useCallback(() => {
-    const emitCommit = !skipNextBlurCommit.current;
+  const handleBlur = useCallback(
+    (event: FocusEvent) => {
+      const emitCommit = !skipNextBlurCommit.current;
+      const keySource = event.currentTarget as { readonly value?: unknown };
+      const parsedDraft = parseRawNumber(keySource.value);
 
-    skipNextBlurCommit.current = false;
-    commitValue(localValue, { emitCommit });
-  }, [commitValue, localValue]);
+      skipNextBlurCommit.current = false;
+      commitValue(parsedDraft ?? localValue, { emitCommit });
+    },
+    [commitValue, localValue],
+  );
 
   const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLInputElement>) => {
+    (event: KeyboardEvent) => {
       if (event.key === 'Enter') {
-        commitValue(localValue);
+        const keySource = event.currentTarget as { readonly value?: unknown };
+        const parsedDraft = parseRawNumber(keySource.value);
+
+        commitValue(parsedDraft ?? localValue);
         skipNextBlurCommit.current = true;
 
         return;
@@ -167,16 +185,13 @@ export function CssLengthInput({ value, onChange, label }: CssLengthInputProps):
   const parsed = useMemo(() => parseCssLength(value), [value]);
   const [localNum, setLocalNum] = useState(parsed.value);
   const [unit, setUnit] = useState<DisplayCssUnit>(parseDisplayUnit(value, parsed.unit));
-  const prevValueRef = useRef(value);
 
-  if (value !== prevValueRef.current) {
-    prevValueRef.current = value;
+  useEffect(() => {
+    const nextParsed = parseCssLength(value);
 
-    const newParsed = parseCssLength(value);
-
-    setLocalNum(newParsed.value);
-    setUnit(parseDisplayUnit(value, newParsed.unit));
-  }
+    setLocalNum(nextParsed.value);
+    setUnit(parseDisplayUnit(value, nextParsed.unit));
+  }, [value]);
 
   const handleNumChange = useCallback((newNum: number) => {
     setLocalNum(newNum);
@@ -189,10 +204,22 @@ export function CssLengthInput({ value, onChange, label }: CssLengthInputProps):
   const handleNumKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Enter') {
-        handleCommit();
+        const keySource = event.currentTarget as { readonly value?: unknown };
+        const parsedDraft = parseRawNumber(keySource.value);
+
+        if (parsedDraft === null) {
+          handleCommit();
+
+          return;
+        }
+
+        setLocalNum(parsedDraft);
+        onChange(formatCssLength(parsedDraft, unit));
+
+        return;
       }
     },
-    [handleCommit],
+    [handleCommit, onChange, unit],
   );
 
   const handleUnitChange = useCallback(

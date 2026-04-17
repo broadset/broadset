@@ -95,7 +95,7 @@ export interface AnimationModePropertiesPanelProps {
   readonly element: PanelElement;
   readonly adapter: PropertyFieldAdapter;
   readonly documentMode: 'screen' | 'print';
-  readonly onUpdate: (key: string, value: string | number) => void;
+  readonly onUpdate: (key: string, value: string | number | readonly [number, number, number, number]) => void;
 }
 
 export function AnimationModePropertiesPanel({

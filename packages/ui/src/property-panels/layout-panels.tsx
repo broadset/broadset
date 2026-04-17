@@ -1,9 +1,9 @@
 import { Button, ButtonGroup, Input, Slider } from '@heroui/react';
 import { ArrowDownUp, Link2, Lock, Minimize2, Unlink2 } from 'lucide-react';
 import type { JSX } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import { ColorInput, FilterEditor, NumField, ShadowEditor } from '../inputs';
+import { ColorInput, FilterEditor, GradientEditor, NumField, SegmentedSwitcher, ShadowEditor } from '../inputs';
 import {
   BORDER_STYLE_OPTIONS,
   CLIP_PATH_PRESETS,
@@ -18,6 +18,7 @@ import {
 import { color, font, sp } from '../tokens';
 
 export interface GeometryPanelProps {
+  readonly name?: string | undefined;
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -33,11 +34,13 @@ export interface GeometryPanelProps {
   readonly canvasHeight?: number | undefined;
   readonly autoSize?: string | undefined;
   readonly elementType?: string | undefined;
+  readonly documentUnit?: 'px' | 'mm' | 'in' | undefined;
   readonly onUpdate: (key: string, value: string | number) => void;
   readonly documentMode: 'screen' | 'print';
 }
 
 export function GeometryPanel({
+  name,
   x,
   y,
   width,
@@ -53,11 +56,25 @@ export function GeometryPanel({
   canvasHeight = 1080,
   autoSize,
   elementType,
+  documentUnit = 'px',
   onUpdate,
   documentMode,
 }: GeometryPanelProps): JSX.Element {
-  const displayX = anchorX === 'right' ? canvasWidth - x - width : x;
-  const displayY = anchorY === 'bottom' ? canvasHeight - y - height : y;
+  const [nameDraft, setNameDraft] = useState(name ?? '');
+  const [is3DOpen, setIs3DOpen] = useState(false);
+  const [activeAnchorX, setActiveAnchorX] = useState<'left' | 'right'>(anchorX);
+  const [activeAnchorY, setActiveAnchorY] = useState<'top' | 'bottom'>(anchorY);
+
+  useEffect(() => {
+    setActiveAnchorX(anchorX);
+  }, [anchorX]);
+
+  useEffect(() => {
+    setActiveAnchorY(anchorY);
+  }, [anchorY]);
+
+  const displayX = activeAnchorX === 'right' ? canvasWidth - x - width : x;
+  const displayY = activeAnchorY === 'bottom' ? canvasHeight - y - height : y;
   const displayWidth = Math.max(0.1, width);
   const displayHeight = Math.max(0.1, height);
   const isScreenMode = documentMode === 'screen';
@@ -68,24 +85,109 @@ export function GeometryPanel({
   const showAutoSize = elementType === 'text';
   const isAutoHeight = autoSize === 'auto-height';
 
+  const xLabel = activeAnchorX === 'right' ? `X (Right ${documentUnit})` : `X (${documentUnit})`;
+  const yLabel = activeAnchorY === 'bottom' ? `Y (Bottom ${documentUnit})` : `Y (${documentUnit})`;
+  const widthLabel = `Width (${documentUnit})`;
+  const heightLabel = `Height (${documentUnit})`;
+
+  const commitNameDraft = useCallback(() => {
+    onUpdate('name', nameDraft);
+  }, [nameDraft, onUpdate]);
+
+  const handleXChange = useCallback(
+    (nextDisplayX: number) => {
+      const modelX = activeAnchorX === 'right' ? canvasWidth - nextDisplayX - width : nextDisplayX;
+
+      onUpdate('x', modelX);
+    },
+    [activeAnchorX, canvasWidth, onUpdate, width],
+  );
+
+  const handleYChange = useCallback(
+    (nextDisplayY: number) => {
+      const modelY = activeAnchorY === 'bottom' ? canvasHeight - nextDisplayY - height : nextDisplayY;
+
+      onUpdate('y', modelY);
+    },
+    [activeAnchorY, canvasHeight, height, onUpdate],
+  );
+
   return (
     <section aria-label="Geometry" role="region" className="grid grid-cols-1 gap-2 md:grid-cols-2">
+      <FieldShell label="Element name">
+        <Input
+          aria-label="Element name"
+          value={nameDraft}
+          onChange={(event) => {
+            setNameDraft(event.currentTarget.value);
+          }}
+          onBlur={commitNameDraft}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              commitNameDraft();
+            }
+          }}
+        />
+      </FieldShell>
+
+      <FieldShell label="Anchor X">
+        <ButtonGroup aria-label="Anchor X">
+          <Button
+            aria-label="Anchor X Left"
+            size="sm"
+            variant={activeAnchorX === 'left' ? 'secondary' : 'ghost'}
+            onPress={() => {
+              setActiveAnchorX('left');
+              onUpdate('anchorX', 'left');
+            }}
+          >
+            Left
+          </Button>
+          <Button
+            aria-label="Anchor X Right"
+            size="sm"
+            variant={activeAnchorX === 'right' ? 'secondary' : 'ghost'}
+            onPress={() => {
+              setActiveAnchorX('right');
+              onUpdate('anchorX', 'right');
+            }}
+          >
+            Right
+          </Button>
+        </ButtonGroup>
+      </FieldShell>
+
+      <FieldShell label="Anchor Y">
+        <ButtonGroup aria-label="Anchor Y">
+          <Button
+            aria-label="Anchor Y Top"
+            size="sm"
+            variant={activeAnchorY === 'top' ? 'secondary' : 'ghost'}
+            onPress={() => {
+              setActiveAnchorY('top');
+              onUpdate('anchorY', 'top');
+            }}
+          >
+            Top
+          </Button>
+          <Button
+            aria-label="Anchor Y Bottom"
+            size="sm"
+            variant={activeAnchorY === 'bottom' ? 'secondary' : 'ghost'}
+            onPress={() => {
+              setActiveAnchorY('bottom');
+              onUpdate('anchorY', 'bottom');
+            }}
+          >
+            Bottom
+          </Button>
+        </ButtonGroup>
+      </FieldShell>
+
+      <NumericField label={xLabel} value={displayX} onValueChange={handleXChange} />
+      <NumericField label={yLabel} value={displayY} onValueChange={handleYChange} />
       <NumericField
-        label="X"
-        value={displayX}
-        onValueChange={(v) => {
-          onUpdate('x', v);
-        }}
-      />
-      <NumericField
-        label="Y"
-        value={displayY}
-        onValueChange={(v) => {
-          onUpdate('y', v);
-        }}
-      />
-      <NumericField
-        label="Width"
+        label={widthLabel}
         value={displayWidth}
         minValue={0.1}
         onValueChange={(v) => {
@@ -94,7 +196,7 @@ export function GeometryPanel({
       />
       <NumericField
         isDisabled={isAutoHeight}
-        label="Height"
+        label={heightLabel}
         value={displayHeight}
         minValue={0.1}
         onValueChange={(v) => {
@@ -146,34 +248,50 @@ export function GeometryPanel({
       : null}
       {show3D ?
         <>
-          <NumericField
-            label="Rotate X"
-            value={rotateX ?? 0}
-            onValueChange={(v) => {
-              onUpdate('rotateX', v);
-            }}
-          />
-          <NumericField
-            label="Rotate Y"
-            value={rotateY ?? 0}
-            onValueChange={(v) => {
-              onUpdate('rotateY', v);
-            }}
-          />
-          <NumericField
-            label="Rotate Z"
-            value={rotateZ ?? 0}
-            onValueChange={(v) => {
-              onUpdate('rotateZ', v);
-            }}
-          />
-          <NumericField
-            label="Translate Z"
-            value={translateZ ?? 0}
-            onValueChange={(v) => {
-              onUpdate('translateZ', v);
-            }}
-          />
+          <div className="col-span-full">
+            <Button
+              aria-label="3D transform"
+              size="sm"
+              variant={is3DOpen ? 'secondary' : 'ghost'}
+              onPress={() => {
+                setIs3DOpen((current) => !current);
+              }}
+            >
+              3D transform
+            </Button>
+          </div>
+          {is3DOpen ?
+            <>
+              <NumericField
+                label="Rotate X"
+                value={rotateX ?? 0}
+                onValueChange={(v) => {
+                  onUpdate('rotateX', v);
+                }}
+              />
+              <NumericField
+                label="Rotate Y"
+                value={rotateY ?? 0}
+                onValueChange={(v) => {
+                  onUpdate('rotateY', v);
+                }}
+              />
+              <NumericField
+                label="Rotate Z"
+                value={rotateZ ?? 0}
+                onValueChange={(v) => {
+                  onUpdate('rotateZ', v);
+                }}
+              />
+              <NumericField
+                label="Translate Z"
+                value={translateZ ?? 0}
+                onValueChange={(v) => {
+                  onUpdate('translateZ', v);
+                }}
+              />
+            </>
+          : null}
         </>
       : null}
     </section>
@@ -190,7 +308,7 @@ export interface AppearancePanelProps {
   readonly borderRadius: readonly [number, number, number, number];
   readonly opacity: number;
   readonly blendMode: string;
-  readonly onUpdate: (key: string, value: string | number) => void;
+  readonly onUpdate: (key: string, value: string | number | readonly [number, number, number, number]) => void;
 }
 
 export function AppearancePanel({
@@ -205,8 +323,60 @@ export function AppearancePanel({
   blendMode,
   onUpdate,
 }: AppearancePanelProps): JSX.Element {
+  const [fillMode, setFillMode] = useState<'solid' | 'gradient'>(
+    showGradient === true && backgroundGradient !== undefined && backgroundGradient.trim() !== '' ?
+      'gradient'
+    : 'solid',
+  );
+  const [draftGradient, setDraftGradient] = useState(backgroundGradient?.trim() ?? '');
+  const [linkedCorners, setLinkedCorners] = useState(false);
+
+  useEffect(() => {
+    if (backgroundGradient !== undefined && backgroundGradient.trim() !== '') {
+      setDraftGradient(backgroundGradient);
+    }
+  }, [backgroundGradient]);
+
+  const effectiveGradient = draftGradient;
+  const opacityPercent = `${String(Math.round(opacity * 100))}%`;
+
+  const updateBorderRadius = (index: number, value: number): void => {
+    if (linkedCorners) {
+      onUpdate('borderRadius', [value, value, value, value]);
+
+      return;
+    }
+
+    const next: [number, number, number, number] = [...borderRadius] as [number, number, number, number];
+
+    next[index] = value;
+    onUpdate('borderRadius', next);
+  };
+
   return (
     <section aria-label="Appearance" role="region" className="flex flex-col gap-2">
+      {showGradient === true ?
+        <SegmentedSwitcher
+          ariaLabel="Fill mode"
+          value={fillMode}
+          options={[
+            { value: 'solid', label: 'Solid' },
+            { value: 'gradient', label: 'Gradient' },
+          ]}
+          onChange={(nextFillMode) => {
+            setFillMode(nextFillMode);
+
+            if (nextFillMode === 'gradient') {
+              onUpdate('backgroundGradient', draftGradient);
+
+              return;
+            }
+
+            onUpdate('backgroundGradient', '');
+          }}
+        />
+      : null}
+
       <ColorInput
         label="Fill color"
         value={backgroundColor}
@@ -214,16 +384,15 @@ export function AppearancePanel({
           onUpdate('backgroundColor', v);
         }}
       />
-      {showGradient === true ?
-        <FieldShell label="CSS Gradient">
-          <Input
-            aria-label="CSS Gradient"
-            value={backgroundGradient ?? ''}
-            onChange={(event) => {
-              onUpdate('backgroundGradient', event.currentTarget.value);
-            }}
-          />
-        </FieldShell>
+      {showGradient === true && fillMode === 'gradient' ?
+        <GradientEditor
+          label="Gradient"
+          value={effectiveGradient}
+          onChange={(nextGradient) => {
+            setDraftGradient(nextGradient);
+            onUpdate('backgroundGradient', nextGradient);
+          }}
+        />
       : null}
 
       <Slider
@@ -241,6 +410,7 @@ export function AppearancePanel({
           <Slider.Thumb />
         </Slider.Track>
       </Slider>
+      <p style={{ color: color('muted'), fontSize: font('label'), margin: 0 }}>{opacityPercent}</p>
 
       <NumField
         label="Border width"
@@ -273,14 +443,52 @@ export function AppearancePanel({
         updateKey="blendMode"
       />
 
-      <NumField
-        label="Border radius TL"
-        value={borderRadius[0]}
-        min={0}
-        onChange={(v) => {
-          onUpdate('borderRadius', v);
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: sp('sp-02') }}>
+        <NumField
+          label="Border radius TL"
+          value={borderRadius[0]}
+          min={0}
+          onChange={(v) => {
+            updateBorderRadius(0, v);
+          }}
+        />
+        <NumField
+          label="Border radius TR"
+          value={borderRadius[1]}
+          min={0}
+          onChange={(v) => {
+            updateBorderRadius(1, v);
+          }}
+        />
+        <NumField
+          label="Border radius BR"
+          value={borderRadius[2]}
+          min={0}
+          onChange={(v) => {
+            updateBorderRadius(2, v);
+          }}
+        />
+        <NumField
+          label="Border radius BL"
+          value={borderRadius[3]}
+          min={0}
+          onChange={(v) => {
+            updateBorderRadius(3, v);
+          }}
+        />
+      </div>
+      <Button
+        aria-label="Link corners"
+        size="sm"
+        variant="ghost"
+        onPress={() => {
+          setLinkedCorners((current) => !current);
         }}
-      />
+      >
+        {linkedCorners ?
+          <Link2 size={ICON_SIZE} />
+        : <Unlink2 size={ICON_SIZE} />}
+      </Button>
     </section>
   );
 }
