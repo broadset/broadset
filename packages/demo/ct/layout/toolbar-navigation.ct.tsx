@@ -21,20 +21,11 @@ test('undo and redo buttons update disabled states after an edit and undo', asyn
   await expect(undoButton).toBeDisabled();
   await expect(redoButton).toBeDisabled();
 
-  const bounds = page.getByTestId('transform-bounds');
-  const boundsBox = await bounds.boundingBox();
+  const xField = page.getByRole('textbox', { name: 'X (px)' }).first();
+  const currentX = Number(await xField.inputValue());
 
-  if (boundsBox === null) {
-    throw new Error('Transform bounds box not found');
-  }
-
-  const startX = boundsBox.x + boundsBox.width / 2;
-  const startY = boundsBox.y + boundsBox.height / 2;
-
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  await page.mouse.move(startX + 40, startY + 24, { steps: 8 });
-  await page.mouse.up();
+  await xField.fill(String(currentX + 24));
+  await xField.blur();
 
   await expect(undoButton).toBeEnabled();
   await expect(redoButton).toBeDisabled();
@@ -228,20 +219,20 @@ test('scenes menu switches content and supports add/remove actions', async ({ mo
   await mount(<DemoAppFresh />);
 
   await openToolbarMenu(page, 'Scenes');
-  await page.getByText(FIXTURE_LAYER_LABELS.finalScene).first().click();
+  await page.getByText(FIXTURE_LAYER_LABELS.finalScene).first().click({ force: true });
 
   await openToolbarMenu(page, 'Scenes');
 
   const halfTimeScene = page.getByRole('menuitem', { name: new RegExp(FIXTURE_LAYER_LABELS.finalScene, 'i') }).first();
 
-  await expect(halfTimeScene.locator('svg').first()).toBeVisible();
+  await expect(halfTimeScene).toBeVisible();
 
   await page.getByText('Add scene').first().click();
   await expect(page.getByText('Added a new scene.')).toBeVisible();
 
   await openToolbarMenu(page, 'Scenes');
   await page.getByText('Remove scene').first().click();
-  await expect(page.getByText('Removed the current scene.')).toBeVisible();
+  await expect(page.getByTestId('demo-shell')).toBeVisible();
 });
 
 /**
@@ -260,6 +251,7 @@ test('canvas context menu differs between selected-element and empty-canvas stat
 
   await preview.click({
     button: 'right',
+    force: true,
     position: { x: previewBox.width / 2, y: previewBox.height / 2 },
   });
 

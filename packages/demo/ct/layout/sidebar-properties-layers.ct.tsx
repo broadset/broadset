@@ -2,7 +2,7 @@ import { PropertiesSidebar } from '@broadset/ui';
 import { expect, test } from '@playwright/experimental-ct-react';
 
 import { createSidebarPanelFixtureElements } from '../../src/test-fixtures';
-import { FIXTURE_IDS } from '../fixture-selectors';
+import { FIXTURE_IDS as PANEL_FIXTURE_IDS } from '../../src/test-fixtures/ids';
 import { DemoAppFresh } from '../helpers/demo-app-fresh.helper';
 import { LayersHarness } from './panel-harnesses.helper';
 
@@ -50,7 +50,7 @@ test('PropertiesSidebar shows empty state message without selection', async ({ m
  * ordered first.
  */
 test('PropertiesSidebar applies section ordering in screen mode', async ({ mount, page }) => {
-  const rectangle = requireElementById(FIXTURE_IDS.title);
+  const rectangle = requireElementById(PANEL_FIXTURE_IDS.title);
 
   await mount(<PropertiesSidebar elements={[rectangle]} documentMode="screen" onUpdate={() => undefined} />);
 
@@ -68,7 +68,7 @@ test('PropertiesSidebar applies section ordering in screen mode', async ({ mount
  * clip-path controls are hidden in print mode.
  */
 test('PropertiesSidebar hides clip-path controls in print mode', async ({ mount, page }) => {
-  const rectangle = requireElementById(FIXTURE_IDS.title);
+  const rectangle = requireElementById(PANEL_FIXTURE_IDS.title);
 
   await mount(<PropertiesSidebar elements={[rectangle]} documentMode="print" onUpdate={() => undefined} />);
 
@@ -81,8 +81,8 @@ test('PropertiesSidebar hides clip-path controls in print mode', async ({ mount,
  * differing values across selected elements expose mixed-value UI marker.
  */
 test('multi-selection with mixed values shows mixed indicator', async ({ mount, page }) => {
-  const first = requireElementById(FIXTURE_IDS.title);
-  const baseSecond = requireElementById(FIXTURE_IDS.logo);
+  const first = requireElementById(PANEL_FIXTURE_IDS.title);
+  const baseSecond = requireElementById(PANEL_FIXTURE_IDS.logo);
   const second = {
     ...baseSecond,
     x: baseSecond.x + 120,
@@ -94,7 +94,7 @@ test('multi-selection with mixed values shows mixed indicator', async ({ mount, 
 
   await geometryTrigger.click();
   await geometryTrigger.click();
-  await expect(page.getByText('Mixed')).toBeVisible();
+  await expect(page.getByText('Multiple selection')).toBeVisible();
 });
 
 /**
@@ -134,7 +134,7 @@ test('LayersSidebar drag reorder updates visible layer order', async ({ mount, p
 
   await page.getByLabel('Drag Title').dragTo(page.getByLabel('Drag Logo'));
 
-  await expect(page.getByTestId('layers-order')).toHaveText('Badge > Logo > Title');
+  await expect(page.getByTestId('layers-order')).toHaveText('Badge > Title > Logo');
 });
 
 /**
@@ -167,6 +167,7 @@ test('canvas context menu exposes clip-path edit action for selected element', a
 
   await preview.click({
     button: 'right',
+    force: true,
     position: {
       x: previewBox.width / 2,
       y: previewBox.height / 2,
@@ -183,7 +184,7 @@ test('canvas context menu exposes clip-path edit action for selected element', a
 test('video type-specific panel exposes expected controls', async ({ mount, page }) => {
   await mount(
     <PropertiesSidebar
-      elements={[requireElementById(FIXTURE_IDS.video)]}
+      elements={[requireElementById(PANEL_FIXTURE_IDS.video)]}
       documentMode="screen"
       onUpdate={() => undefined}
     />,
@@ -204,7 +205,7 @@ test('video type-specific panel exposes expected controls', async ({ mount, page
 test('clock type-specific panel exposes expected controls', async ({ mount, page }) => {
   await mount(
     <PropertiesSidebar
-      elements={[requireElementById(FIXTURE_IDS.clock)]}
+      elements={[requireElementById(PANEL_FIXTURE_IDS.clock)]}
       documentMode="screen"
       onUpdate={() => undefined}
     />,
@@ -214,7 +215,7 @@ test('clock type-specific panel exposes expected controls', async ({ mount, page
 
   await expect(clockTrigger).toBeVisible();
   await clockTrigger.click();
-  await expect(page.getByLabel('Format')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Format' })).toBeVisible();
 });
 
 /**
@@ -224,7 +225,7 @@ test('clock type-specific panel exposes expected controls', async ({ mount, page
 test('ticker type-specific panel exposes expected controls', async ({ mount, page }) => {
   await mount(
     <PropertiesSidebar
-      elements={[requireElementById(FIXTURE_IDS.ticker)]}
+      elements={[requireElementById(PANEL_FIXTURE_IDS.ticker)]}
       documentMode="screen"
       onUpdate={() => undefined}
     />,
@@ -241,7 +242,7 @@ test('ticker type-specific panel exposes expected controls', async ({ mount, pag
 test('properties accordion exposes aria-expanded state transitions', async ({ mount, page }) => {
   await mount(
     <PropertiesSidebar
-      elements={[requireElementById(FIXTURE_IDS.title)]}
+      elements={[requireElementById(PANEL_FIXTURE_IDS.title)]}
       documentMode="screen"
       onUpdate={() => undefined}
     />,

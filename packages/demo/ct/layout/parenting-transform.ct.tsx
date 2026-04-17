@@ -2,7 +2,7 @@ import type { BroadsetDocument } from '@broadset/model';
 import { expect, test } from '@playwright/experimental-ct-react';
 
 import { createParentingTransformTestDocument } from '../../src/test-fixtures';
-import { FIXTURE_IDS } from '../fixture-selectors';
+import { FIXTURE_IDS as PARENTING_FIXTURE_IDS } from '../../src/test-fixtures/ids';
 import { DemoAppStored } from '../helpers/demo-app-stored.helper';
 
 function createParentPaddingFixture(): BroadsetDocument {
@@ -15,8 +15,8 @@ function createParentPaddingFixture(): BroadsetDocument {
 test('parent padding does not shift parent-relative child geometry', async ({ mount, page }) => {
   await mount(<DemoAppStored document={createParentPaddingFixture()} />);
 
-  const parent = page.locator(`[data-element-id="${FIXTURE_IDS.promoGroup}"]`);
-  const child = page.locator(`[data-element-id="${FIXTURE_IDS.promoQr}"]`);
+  const parent = page.locator(`[data-element-id="${PARENTING_FIXTURE_IDS.promoGroup}"]`);
+  const child = page.locator(`[data-element-id="${PARENTING_FIXTURE_IDS.promoQr}"]`);
 
   await expect(parent).toBeVisible();
   await expect(child).toBeVisible();
@@ -56,8 +56,8 @@ test('parent padding does not shift parent-relative child geometry', async ({ mo
       };
     },
     {
-      parentId: FIXTURE_IDS.promoGroup,
-      childId: FIXTURE_IDS.promoQr,
+      parentId: PARENTING_FIXTURE_IDS.promoGroup,
+      childId: PARENTING_FIXTURE_IDS.promoQr,
     },
   );
 

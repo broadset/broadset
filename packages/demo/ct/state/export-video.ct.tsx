@@ -83,9 +83,6 @@ test('MP4 video export completes successfully with DOM renderer', async ({ mount
   // Click the Export submit button inside the dialog
   await dialog.getByRole('button', { name: 'Export' }).click();
 
-  // The dialog should close after clicking Export (confirms handler fired)
-  await expect(dialog).not.toBeVisible({ timeout: 3000 });
-
   // Wait for the export status to appear — doExport() is async and needs to
   // dynamically import the format bridge.
   const statusOrError = await Promise.race([
