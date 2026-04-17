@@ -7,6 +7,9 @@ import { parseCssLength } from '../utilities';
 import { convertLength, CSS_LENGTH_UNITS, type CssUnit, isCssUnit, toCssUnit } from './css-length';
 
 const DECIMAL_DISPLAY_PRECISION = 2;
+const UNITLESS_MARKER = '—' as const;
+
+type DisplayCssUnit = CssUnit | typeof UNITLESS_MARKER;
 
 export interface NumFieldProps {
   readonly value: number;
@@ -138,10 +141,32 @@ export interface CssLengthInputProps {
   readonly label: string;
 }
 
+function parseDisplayUnit(rawValue: string, parsedUnit: string): DisplayCssUnit {
+  const trimmed = rawValue.trim();
+
+  if (trimmed === '') {
+    return UNITLESS_MARKER;
+  }
+
+  const explicitUnitMatch = /[a-z%]+$/i.exec(trimmed);
+
+  if (explicitUnitMatch === null) {
+    return UNITLESS_MARKER;
+  }
+
+  const explicitUnit = explicitUnitMatch[0].toLowerCase();
+
+  return isCssUnit(explicitUnit) ? explicitUnit : toCssUnit(parsedUnit);
+}
+
+function formatCssLength(value: number, unit: DisplayCssUnit): string {
+  return unit === UNITLESS_MARKER ? String(value) : `${String(value)}${unit}`;
+}
+
 export function CssLengthInput({ value, onChange, label }: CssLengthInputProps): JSX.Element {
   const parsed = useMemo(() => parseCssLength(value), [value]);
   const [localNum, setLocalNum] = useState(parsed.value);
-  const [unit, setUnit] = useState<CssUnit>(toCssUnit(parsed.unit));
+  const [unit, setUnit] = useState<DisplayCssUnit>(parseDisplayUnit(value, parsed.unit));
   const prevValueRef = useRef(value);
 
   if (value !== prevValueRef.current) {
@@ -150,7 +175,7 @@ export function CssLengthInput({ value, onChange, label }: CssLengthInputProps):
     const newParsed = parseCssLength(value);
 
     setLocalNum(newParsed.value);
-    setUnit(toCssUnit(newParsed.unit));
+    setUnit(parseDisplayUnit(value, newParsed.unit));
   }
 
   const handleNumChange = useCallback((newNum: number) => {
@@ -158,7 +183,7 @@ export function CssLengthInput({ value, onChange, label }: CssLengthInputProps):
   }, []);
 
   const handleCommit = useCallback(() => {
-    onChange(`${String(localNum)}${unit}`);
+    onChange(formatCssLength(localNum, unit));
   }, [localNum, unit, onChange]);
 
   const handleNumKeyDown = useCallback(
@@ -188,15 +213,22 @@ export function CssLengthInput({ value, onChange, label }: CssLengthInputProps):
 
       if (raw === '') return;
 
+      if (raw === UNITLESS_MARKER) {
+        setUnit(UNITLESS_MARKER);
+        onChange(formatCssLength(localNum, UNITLESS_MARKER));
+
+        return;
+      }
+
       if (!isCssUnit(raw)) return;
 
       const newUnit = raw;
-      const converted = convertLength(localNum, unit, newUnit);
+      const converted = unit === UNITLESS_MARKER ? localNum : convertLength(localNum, unit, newUnit);
       const rounded = Number(converted.toFixed(DECIMAL_DISPLAY_PRECISION));
 
       setUnit(newUnit);
       setLocalNum(rounded);
-      onChange(`${String(rounded)}${newUnit}`);
+      onChange(formatCssLength(rounded, newUnit));
     },
     [localNum, unit, onChange],
   );
@@ -221,6 +253,9 @@ export function CssLengthInput({ value, onChange, label }: CssLengthInputProps):
         </Select.Trigger>
         <Select.Popover>
           <ListBox>
+            <ListBox.Item key={UNITLESS_MARKER} id={UNITLESS_MARKER} textValue={UNITLESS_MARKER}>
+              {UNITLESS_MARKER}
+            </ListBox.Item>
             {CSS_LENGTH_UNITS.map((u) => (
               <ListBox.Item key={u} id={u} textValue={u}>
                 {u}

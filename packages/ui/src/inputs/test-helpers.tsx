@@ -22,29 +22,74 @@ jest.mock(
   () => {
     const ReactActual = jest.requireActual<typeof React>('react');
 
+    function pickSafeDomProps(rest: Record<string, unknown>): Record<string, unknown> {
+      const allowedKeys = new Set([
+        'checked',
+        'className',
+        'disabled',
+        'id',
+        'max',
+        'min',
+        'name',
+        'onBlur',
+        'onChange',
+        'onFocus',
+        'onInput',
+        'onKeyDown',
+        'onKeyUp',
+        'onMouseDown',
+        'onMouseMove',
+        'onMouseUp',
+        'onPointerCancel',
+        'onPointerDown',
+        'onPointerMove',
+        'onPointerUp',
+        'placeholder',
+        'role',
+        'step',
+        'style',
+        'tabIndex',
+        'type',
+        'value',
+      ]);
+
+      const allowedEntries = Object.entries(rest).filter(([key]) => {
+        if (key.startsWith('aria-') || key.startsWith('data-')) {
+          return true;
+        }
+
+        return allowedKeys.has(key);
+      });
+
+      return Object.fromEntries(allowedEntries);
+    }
+
     function createWrapper(tagName = 'div') {
       return function Wrapper(props: MockHeroUiProps): React.JSX.Element {
         const { children, ...rest } = props;
+        const domProps = pickSafeDomProps(rest as Record<string, unknown>);
 
-        return ReactActual.createElement(tagName, rest, children ?? null);
+        return ReactActual.createElement(tagName, domProps, children ?? null);
       };
     }
 
     function Button(props: MockHeroUiProps): React.JSX.Element {
       const { children, isDisabled, onPress, ...rest } = props;
+      const domProps = pickSafeDomProps(rest as Record<string, unknown>);
 
       return ReactActual.createElement(
         'button',
-        { ...rest, disabled: isDisabled, onClick: typeof onPress === 'function' ? onPress : undefined },
+        { ...domProps, disabled: isDisabled, onClick: typeof onPress === 'function' ? onPress : undefined },
         children ?? null,
       );
     }
 
     function Input(props: MockHeroUiProps): React.JSX.Element {
       const { label, onChange, value = '', ...rest } = props;
+      const domProps = pickSafeDomProps(rest as Record<string, unknown>);
 
       return ReactActual.createElement('input', {
-        ...rest,
+        ...domProps,
         'aria-label': props['aria-label'] ?? label,
         onChange: typeof onChange === 'function' ? onChange : undefined,
         value,
@@ -60,10 +105,11 @@ jest.mock(
     const NumberField = Object.assign(
       function NumberFieldRoot(props: MockHeroUiProps): React.JSX.Element {
         const { children, label, onChange, value = 0, ...rest } = props;
+        const domProps = pickSafeDomProps(rest as Record<string, unknown>);
 
         return ReactActual.createElement(
           'div',
-          rest,
+          domProps,
           ReactActual.createElement(
             NumberFieldContext.Provider,
             {
@@ -81,9 +127,10 @@ jest.mock(
         Group: createWrapper(),
         Input(props: MockHeroUiProps): React.JSX.Element {
           const context = ReactActual.useContext(NumberFieldContext);
+          const domProps = pickSafeDomProps(props as Record<string, unknown>);
 
           return ReactActual.createElement('input', {
-            ...props,
+            ...domProps,
             'aria-label': context.label,
             onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
               context.onChange?.(Number(event.currentTarget.value));
@@ -95,11 +142,12 @@ jest.mock(
         },
         DecrementButton(props: MockHeroUiProps): React.JSX.Element {
           const context = ReactActual.useContext(NumberFieldContext);
+          const domProps = pickSafeDomProps(props as Record<string, unknown>);
 
           return ReactActual.createElement(
             'button',
             {
-              ...props,
+              ...domProps,
               'aria-label': `Decrement ${context.label}`,
               onClick: () => {
                 context.onChange?.(context.value - 1);
@@ -110,11 +158,12 @@ jest.mock(
         },
         IncrementButton(props: MockHeroUiProps): React.JSX.Element {
           const context = ReactActual.useContext(NumberFieldContext);
+          const domProps = pickSafeDomProps(props as Record<string, unknown>);
 
           return ReactActual.createElement(
             'button',
             {
-              ...props,
+              ...domProps,
               'aria-label': `Increment ${context.label}`,
               onClick: () => {
                 context.onChange?.(context.value + 1);
@@ -128,12 +177,13 @@ jest.mock(
 
     const SliderBase = function Slider(props: MockHeroUiProps): React.JSX.Element {
       const { label, value = 0, onChange, onValueChange, children, ...rest } = props;
+      const domProps = pickSafeDomProps(rest as Record<string, unknown>);
 
       return ReactActual.createElement(
         'div',
         {},
         ReactActual.createElement('input', {
-          ...rest,
+          ...domProps,
           'aria-label': typeof label === 'string' ? label : props['aria-label'],
           onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
             const val = Number(event.currentTarget.value);
@@ -159,16 +209,19 @@ jest.mock(
 
     function Switch(props: MockHeroUiProps): React.JSX.Element {
       const { children, isSelected, onChange, ...rest } = props;
+      const domProps = pickSafeDomProps(rest as Record<string, unknown>);
+      const switchOnChange = onChange as ((...args: [boolean]) => void) | undefined;
 
       return ReactActual.createElement(
         'label',
-        rest,
+        domProps,
         ReactActual.createElement('input', {
           'aria-label': props['aria-label'] ?? (typeof children === 'string' ? children : ''),
           checked: Boolean(isSelected),
           onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
-            if (typeof onChange === 'function')
-              (onChange as unknown as (isSelected: boolean) => void)(event.currentTarget.checked);
+            if (typeof switchOnChange === 'function') {
+              switchOnChange(event.currentTarget.checked);
+            }
           },
           role: 'switch',
           type: 'checkbox',
@@ -184,11 +237,12 @@ jest.mock(
     const Select = Object.assign(
       function SelectRoot(props: MockHeroUiProps): React.JSX.Element {
         const { children, label, onChange, value, ...rest } = props;
+        const domProps = pickSafeDomProps(rest as Record<string, unknown>);
 
         return ReactActual.createElement(
           'select',
           {
-            ...rest,
+            ...domProps,
             'aria-label': typeof label === 'string' ? label : props['aria-label'],
             onChange: (event: React.ChangeEvent<HTMLSelectElement>) => {
               if (typeof onChange === 'function') {
@@ -235,12 +289,10 @@ jest.mock(
     const ColorArea = Object.assign(
       function ColorAreaRoot(props: MockHeroUiProps): React.JSX.Element {
         const { children, value, onChange, ...rest } = props;
+        const domProps = pickSafeDomProps(rest as Record<string, unknown>);
+        const dataTestId = (rest as Record<string, unknown>)['data-testid'] ?? 'color-area';
 
-        return ReactActual.createElement(
-          'div',
-          { ...rest, 'data-testid': (rest as Record<string, unknown>)['data-testid'] ?? 'color-area' },
-          children ?? null,
-        );
+        return ReactActual.createElement('div', { ...domProps, 'data-testid': dataTestId }, children ?? null);
       },
       { Thumb: createWrapper() },
     );
@@ -276,8 +328,9 @@ jest.mock(
     const ColorSwatchPicker = Object.assign(
       function ColorSwatchPickerRoot(props: MockHeroUiProps): React.JSX.Element {
         const { children, ...rest } = props;
+        const domProps = pickSafeDomProps(rest as Record<string, unknown>);
 
-        return ReactActual.createElement('div', rest, children ?? null);
+        return ReactActual.createElement('div', domProps, children ?? null);
       },
       {
         Item: createWrapper(),
@@ -287,7 +340,9 @@ jest.mock(
     );
 
     function ColorSwatch(props: MockHeroUiProps): React.JSX.Element {
-      return ReactActual.createElement('div', { ...(props as Record<string, unknown>) });
+      const domProps = pickSafeDomProps(props as Record<string, unknown>);
+
+      return ReactActual.createElement('div', domProps);
     }
 
     return {
@@ -298,6 +353,7 @@ jest.mock(
       SelectItem,
       Slider,
       Switch,
+      ButtonGroup: createWrapper(),
       Popover: Object.assign(createWrapper(), {
         Trigger: createWrapper(),
         Content: createWrapper(),

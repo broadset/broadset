@@ -262,9 +262,9 @@ Every unit follows TDD Ralph: **tests red → impl green → refactor done**. Ea
 
 Goal: Make every panel primitive art-director-grade before building on top of them.
 
-- [ ] tests: red
-- [ ] impl: green
-- [ ] refactor: done
+- [x] tests: red
+- [x] impl: green
+- [x] refactor: done
 
 **Scope:** `packages/ui/src/inputs/*`
 
@@ -662,7 +662,7 @@ Rationale: build trustworthy primitives → remove raw-string UX debt → add an
 
 | Unit | Area                                       | Tests Red | Impl Green | Refactor | Gates | UX Walk |
 | ---- | ------------------------------------------ | :-------: | :--------: | :------: | :---: | :-----: |
-| 1    | Shared input primitives                    |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
+| 1    | Shared input primitives                    |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
 | 2    | Sidebar header + lock                      |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
 | 3    | Geometry (anchors, units, name, 3D)        |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
 | 4    | Appearance 2.0 (gradient, radius, opacity) |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
