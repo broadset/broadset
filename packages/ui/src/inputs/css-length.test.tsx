@@ -3,11 +3,25 @@
 import './test-helpers';
 
 import { describe, expect, it, jest } from '@jest/globals';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import { CssLengthInput } from './index';
 
 describe('CssLengthInput behavior', () => {
+  function selectUnit(unitControl: HTMLElement, unit: string): void {
+    if (unitControl instanceof HTMLSelectElement) {
+      fireEvent.change(unitControl, { target: { value: unit } });
+
+      return;
+    }
+
+    fireEvent.click(unitControl);
+
+    const unitList = screen.getByRole('listbox');
+
+    fireEvent.click(within(unitList).getByRole('option', { name: unit }));
+  }
+
   /** @description Changing unit must convert the current numeric value to preserve the same physical length. */
   it('converts value when unit changes', () => {
     const onChange = jest.fn<(value: string) => void>();
@@ -16,7 +30,7 @@ describe('CssLengthInput behavior', () => {
 
     const unit = screen.getByLabelText('Unit');
 
-    fireEvent.change(unit, { target: { value: 'mm' } });
+    selectUnit(unit, 'mm');
 
     const emitted = onChange.mock.calls[onChange.mock.calls.length - 1]?.[0] ?? '';
 
@@ -33,6 +47,7 @@ describe('CssLengthInput behavior', () => {
     const valueInput = screen.getByLabelText('Length value', { selector: 'input' });
 
     fireEvent.change(valueInput, { target: { value: '75' } });
+    fireEvent.input(valueInput, { target: { value: '75' } });
     fireEvent.keyDown(valueInput, { key: 'Enter' });
 
     expect(onChange).toHaveBeenCalledWith('75px');
@@ -44,10 +59,12 @@ describe('CssLengthInput behavior', () => {
 
     const unit = screen.getByLabelText('Unit');
 
-    if (!(unit instanceof HTMLSelectElement)) {
-      throw new TypeError('Expected the unit control to render as a select element.');
+    if (unit instanceof HTMLSelectElement) {
+      expect(unit.value).toBe('—');
+
+      return;
     }
 
-    expect(unit.value).toBe('—');
+    expect(unit.textContent).toContain('—');
   });
 });
