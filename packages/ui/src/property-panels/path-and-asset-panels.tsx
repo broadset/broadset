@@ -4,6 +4,7 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 
 import { ColorInput, NumField } from '../inputs';
+import { type MediaAsset, MediaLibraryModal } from '../modals';
 import type { PropertyValue } from '../panel-types';
 import {
   BOOLEAN_OPERATION_OPTIONS,
@@ -11,7 +12,6 @@ import {
   FieldShell,
   LINECAP_OPTIONS,
   LINEJOIN_OPTIONS,
-  OBJECT_FIT_OPTIONS,
   SelectField,
 } from '../panel-types';
 import { color, font } from '../tokens';
@@ -19,6 +19,15 @@ import { color, font } from '../tokens';
 const OPACITY_PERCENT_MIN = 0;
 const OPACITY_PERCENT_MAX = 100;
 const OPACITY_PERCENT_STEP = 1;
+const EMPTY_ASSET_ID_VALUE = '';
+
+const OBJECT_FIT_OPTIONS_WITH_LABELS = [
+  { label: 'Contain', value: 'contain' },
+  { label: 'Cover', value: 'cover' },
+  { label: 'Fill', value: 'fill' },
+  { label: 'None', value: 'none' },
+  { label: 'Scale down', value: 'scale-down' },
+] as const;
 
 const FILL_RULE_LABELS = [
   { value: 'nonzero', label: 'Non-zero' },
@@ -333,21 +342,121 @@ export function PathPropertiesPanel({
 
 export interface ImagePanelProps {
   readonly content: string;
+  readonly assetId?: string | null | undefined;
+  readonly assets?: readonly MediaAsset[] | undefined;
+  readonly onUploadRequest?: (() => void) | undefined;
   readonly onUpdate: (key: string, value: string | number) => void;
 }
 
-export function ImagePanel({ content, onUpdate }: ImagePanelProps): JSX.Element {
+function getImageFilename(url: string): string {
+  const trimmed = url.trim();
+
+  if (trimmed === '') {
+    return 'No source selected';
+  }
+
+  try {
+    const pathname = new URL(trimmed).pathname;
+    const segments = pathname.split('/').filter((segment) => segment !== '');
+    const lastSegment = segments[segments.length - 1];
+
+    return lastSegment ?? trimmed;
+  } catch {
+    const parts = trimmed.split('/').filter((segment) => segment !== '');
+    const lastPart = parts[parts.length - 1];
+
+    return lastPart ?? trimmed;
+  }
+}
+
+export function ImagePanel({
+  content,
+  assetId = null,
+  assets = [],
+  onUploadRequest,
+  onUpdate,
+}: ImagePanelProps): JSX.Element {
+  const [isMediaLibraryOpen, setIsMediaLibraryOpen] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+
+  const selectedAsset =
+    assetId !== null && assetId !== '' ?
+      assets.find((asset) => asset.id === assetId)
+    : assets.find((asset) => asset.url === content);
+  const selectedName = selectedAsset?.name ?? getImageFilename(content);
+  const categories = ['All', ...Array.from(new Set(assets.map((asset) => asset.category)))];
+
   return (
     <section aria-label="Image" role="region" className="flex flex-col gap-2">
-      <FieldShell label="Source URL">
-        <Input
-          aria-label="Source URL"
-          value={content}
-          onChange={(e) => {
-            onUpdate('content', e.currentTarget.value);
+      <FieldShell label="Selected source">
+        <div
+          style={{
+            alignItems: 'center',
+            border: `1px solid ${color('border')}`,
+            borderRadius: 8,
+            display: 'flex',
+            gap: 8,
+            padding: 8,
           }}
-        />
+        >
+          <img
+            alt="Selected image thumbnail"
+            src={content}
+            style={{ borderRadius: 6, height: 40, objectFit: 'cover', width: 40 }}
+          />
+          <span style={{ color: color('foreground'), fontSize: font('body-compact') }}>{selectedName}</span>
+        </div>
       </FieldShell>
+
+      <Button
+        aria-label="Choose from library"
+        variant="primary"
+        onPress={() => {
+          setIsMediaLibraryOpen(true);
+        }}
+      >
+        Choose from library
+      </Button>
+
+      <Button
+        aria-label="Replace URL"
+        variant="ghost"
+        onPress={() => {
+          setShowUrlInput((current) => !current);
+        }}
+      >
+        Replace URL...
+      </Button>
+
+      {showUrlInput ?
+        <FieldShell label="Source URL">
+          <Input
+            aria-label="Source URL"
+            value={content}
+            onChange={(e) => {
+              onUpdate('content', e.currentTarget.value);
+              onUpdate('assetId', EMPTY_ASSET_ID_VALUE);
+            }}
+          />
+        </FieldShell>
+      : null}
+
+      {isMediaLibraryOpen ?
+        <MediaLibraryModal
+          isOpen={isMediaLibraryOpen}
+          assets={assets}
+          categories={categories}
+          onSelect={(asset) => {
+            onUpdate('content', asset.url);
+            onUpdate('assetId', asset.id);
+            setIsMediaLibraryOpen(false);
+          }}
+          onClose={() => {
+            setIsMediaLibraryOpen(false);
+          }}
+          onUploadRequest={onUploadRequest}
+        />
+      : null}
     </section>
   );
 }
@@ -358,15 +467,41 @@ export interface ObjectFitPanelProps {
 }
 
 export function ObjectFitPanel({ objectFit, onUpdate }: ObjectFitPanelProps): JSX.Element {
+  const selectedLabel = OBJECT_FIT_OPTIONS_WITH_LABELS.find((option) => option.value === objectFit)?.label ?? 'Contain';
+
   return (
     <section aria-label="Object Fit" role="region" className="flex flex-col gap-2">
-      <SelectField
-        label="Object fit"
-        value={objectFit}
-        options={[...OBJECT_FIT_OPTIONS]}
-        onUpdate={onUpdate}
-        updateKey="objectFit"
-      />
+      <FieldShell label="Object fit">
+        <Select
+          aria-label="Object fit"
+          value={selectedLabel}
+          onChange={(selection) => {
+            if (selection === null) {
+              return;
+            }
+
+            const selectedOption = OBJECT_FIT_OPTIONS_WITH_LABELS.find((option) => option.label === String(selection));
+
+            if (selectedOption !== undefined) {
+              onUpdate('objectFit', selectedOption.value);
+            }
+          }}
+        >
+          <Select.Trigger>
+            <Select.Value />
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox>
+              {OBJECT_FIT_OPTIONS_WITH_LABELS.map((option) => (
+                <ListBox.Item id={option.label} key={option.value} textValue={option.label}>
+                  {option.label}
+                </ListBox.Item>
+              ))}
+            </ListBox>
+          </Select.Popover>
+        </Select>
+      </FieldShell>
     </section>
   );
 }
@@ -424,12 +559,24 @@ export function QrCodePanel({
 
 export interface GroupPanelProps {
   readonly name: string;
+  readonly opacity: number;
   readonly clipChildren: boolean;
   readonly booleanOperation: BooleanOperation | null;
+  readonly documentMode: 'screen' | 'print';
   readonly onUpdate: (key: string, value: PropertyValue) => void;
 }
 
-export function GroupPanel({ name, clipChildren, booleanOperation, onUpdate }: GroupPanelProps): JSX.Element {
+export function GroupPanel({
+  name,
+  opacity,
+  clipChildren,
+  booleanOperation,
+  documentMode,
+  onUpdate,
+}: GroupPanelProps): JSX.Element {
+  const opacityPercent = Math.round(opacity * OPACITY_PERCENT_MAX);
+  const isPrintMode = documentMode === 'print';
+
   return (
     <section aria-label="Group" role="region" className="flex flex-col gap-2">
       <FieldShell label="Group name">
@@ -450,15 +597,39 @@ export function GroupPanel({ name, clipChildren, booleanOperation, onUpdate }: G
         }}
         updateKey="booleanOperation"
       />
+      <Slider
+        aria-label="Group opacity"
+        maxValue={OPACITY_PERCENT_MAX}
+        minValue={OPACITY_PERCENT_MIN}
+        step={OPACITY_PERCENT_STEP}
+        value={opacityPercent}
+        onChange={(v: number | readonly number[]) => {
+          const percent = typeof v === 'number' ? v : Number(v);
+
+          onUpdate('opacity', percent / OPACITY_PERCENT_MAX);
+        }}
+      >
+        <Slider.Track>
+          <Slider.Fill />
+          <Slider.Thumb />
+        </Slider.Track>
+      </Slider>
+      <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>{`${String(opacityPercent)}%`}</p>
       <Switch
-        aria-label="Clip children"
+        aria-label="Clip children to group bounds"
+        isDisabled={isPrintMode}
         isSelected={clipChildren}
         onChange={(v) => {
           onUpdate('clipChildren', v);
         }}
       >
-        Clip children
+        Clip children to group bounds
       </Switch>
+      {isPrintMode ?
+        <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>
+          Clip children is not available in this document mode.
+        </p>
+      : null}
     </section>
   );
 }

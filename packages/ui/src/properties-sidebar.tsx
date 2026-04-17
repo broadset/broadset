@@ -3,6 +3,7 @@ import { Accordion } from '@heroui/react';
 import { Type } from 'lucide-react';
 import type { JSX } from 'react';
 
+import type { MediaAsset } from './modals';
 import type { CustomPanelComponent, PanelElement, PropertyValue } from './panel-types';
 import { ICON_SIZE } from './panel-types';
 import {
@@ -60,6 +61,8 @@ export interface PropertiesSidebarProps {
   readonly onStopEditing?: (() => void) | undefined;
   readonly isDrawing?: boolean | undefined;
   readonly isEditing?: boolean | undefined;
+  readonly mediaAssets?: readonly MediaAsset[] | undefined;
+  readonly onStartClipPathEditing?: (() => void) | undefined;
 }
 
 export function PropertiesSidebar({
@@ -75,6 +78,8 @@ export function PropertiesSidebar({
   onStopEditing,
   isDrawing = false,
   isEditing = false,
+  mediaAssets,
+  onStartClipPathEditing,
 }: PropertiesSidebarProps): JSX.Element {
   if (elements.length === 0) {
     return (
@@ -331,6 +336,7 @@ export function PropertiesSidebar({
                   <ClipPathPanel
                     maskType={primary.maskType}
                     customClipPath={primary.customClipPath}
+                    onStartEditingClipPath={onStartClipPathEditing}
                     onUpdate={onUpdate}
                   />
                 </Accordion.Panel>
@@ -375,7 +381,12 @@ export function PropertiesSidebar({
                   <Accordion.Trigger>Image</Accordion.Trigger>
                 </Accordion.Heading>
                 <Accordion.Panel>
-                  <ImagePanel content={primary.content} onUpdate={onUpdate} />
+                  <ImagePanel
+                    content={primary.content}
+                    assetId={primary.assetId}
+                    assets={mediaAssets}
+                    onUpdate={onUpdate}
+                  />
                 </Accordion.Panel>
               </Accordion.Item>
             : null}
@@ -419,8 +430,10 @@ export function PropertiesSidebar({
                 <Accordion.Panel>
                   <GroupPanel
                     name={primary.name}
+                    opacity={primary.opacity}
                     clipChildren={primary.clipChildren}
                     booleanOperation={primary.booleanOperation}
+                    documentMode={documentMode}
                     onUpdate={onUpdate}
                   />
                 </Accordion.Panel>

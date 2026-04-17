@@ -4,6 +4,8 @@ export {
   type PreflightIssue,
   PreflightPanel,
   type PreflightPanelProps,
+  PropertyEditingProvider,
+  type PropertyEditingProviderProps,
   PropertyField,
   type PropertyFieldProps,
 } from './animation-panels';

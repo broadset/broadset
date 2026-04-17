@@ -630,6 +630,7 @@ export function toPanelElement(element: BroadsetElement, instance?: PageElementI
     type: element.type,
     name: element.name,
     content: element.content,
+    assetId: element.assetId,
     x: instance !== undefined ? instance.transform.position.x : element.position.x,
     y: instance !== undefined ? instance.transform.position.y : element.position.y,
     width: element.width,

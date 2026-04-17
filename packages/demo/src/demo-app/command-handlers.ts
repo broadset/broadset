@@ -223,6 +223,34 @@ export function useCommandHandlers({
         return;
       }
 
+      if (key === 'content') {
+        editorStore.getState().commitElementUpdate(selectedElement.id, {
+          content: String(value),
+        });
+
+        return;
+      }
+
+      if (key === 'assetId') {
+        const assetIdValue = String(value).trim();
+
+        editorStore.getState().commitElementUpdate(selectedElement.id, {
+          assetId: assetIdValue === '' ? null : assetIdValue,
+        });
+
+        return;
+      }
+
+      if (key === 'locked') {
+        const nextLocked = Boolean(value);
+
+        if (selectedElement.locked !== nextLocked) {
+          editorStore.getState().toggleLock(selectedElement.id);
+        }
+
+        return;
+      }
+
       if (key === 'booleanOperation') {
         const validOps = new Set<string>(['union', 'subtract', 'intersect', 'exclude']);
         const stringValue = String(value);

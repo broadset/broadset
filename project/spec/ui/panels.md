@@ -625,7 +625,9 @@ QrCodePanel MUST display and edit QR code content string, error correction level
 
 ### Requirement: Group Panel
 
-GroupPanel MUST display group-specific settings: clipChildren toggle and group name.
+GroupPanel MUST display group-specific settings: clipChildren toggle, group name, and group opacity.
+Opacity MUST be presented as a percent-based slider (0–100%) and stored as a 0–1 style value.
+When document mode is print, clip-children controls MUST be unavailable and an explanatory helper message MUST be shown.
 
 #### Scenario: Toggle clip children
 
@@ -633,9 +635,23 @@ GroupPanel MUST display group-specific settings: clipChildren toggle and group n
 - WHEN clipChildren is toggled on
 - THEN the group's clipChildren property is set to true
 
+#### Scenario: Edit group opacity
+
+- GIVEN a group element selected with opacity 0.5
+- WHEN the user moves the Group opacity slider to 80
+- THEN the group's opacity style is set to 0.8
+
+#### Scenario: Print mode clip-children helper
+
+- GIVEN a group element selected in print document mode
+- WHEN the Group panel renders
+- THEN the clip-children control is disabled and helper text explains it is unavailable
+
 #### Acceptance Criteria
 
 - [ ] Given a group element, clipChildren toggle and group name are editable
+- [ ] Given a group element, opacity is editable via a percent slider and stored as a 0–1 value
+- [ ] Given print mode, clip-children control is disabled and helper text is displayed
 
 ---
 

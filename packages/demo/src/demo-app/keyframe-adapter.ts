@@ -1,6 +1,30 @@
 import type { EditorStore } from '@broadset/editor';
 import type { Keyframe, KeyframeValue, Timeline } from '@broadset/model';
-import type { PropertyFieldAdapter } from '@broadset/ui';
+import type { PropertyFieldAdapter, PropertyValue } from '@broadset/ui';
+
+function isTupleValue(value: PropertyValue): value is readonly [number, number, number, number] {
+  return Array.isArray(value) && value.length === 4 && value.every((entry) => typeof entry === 'number');
+}
+
+function toDefaultKeyframeValue(defaultValue: PropertyValue): KeyframeValue {
+  if (isTupleValue(defaultValue)) {
+    return {
+      type: 'tuple',
+      value: [defaultValue[0], defaultValue[1], defaultValue[2], defaultValue[3]],
+      easing: 'linear',
+    };
+  }
+
+  if (typeof defaultValue === 'string') {
+    return { type: 'color', value: defaultValue, easing: 'linear' };
+  }
+
+  if (typeof defaultValue === 'number') {
+    return { type: 'number', value: defaultValue, easing: 'linear' };
+  }
+
+  return { type: 'number', value: defaultValue ? 1 : 0, easing: 'linear' };
+}
 
 /**
  * Create a PropertyFieldAdapter that reads and writes keyframe properties
@@ -81,7 +105,7 @@ export function createKeyframeAdapter(
       return getKeyframe()?.properties[key] !== undefined;
     },
 
-    getValue(key: string): number | string {
+    getValue(key: string): PropertyValue {
       const property = getKeyframe()?.properties[key];
 
       if (property === undefined) {
@@ -96,11 +120,10 @@ export function createKeyframeAdapter(
         return property.value;
       }
 
-      // Tuple — return first value as a reasonable numeric fallback
-      return property.value[0] ?? 0;
+      return [property.value[0] ?? 0, property.value[1] ?? 0, property.value[2] ?? 0, property.value[3] ?? 0];
     },
 
-    toggleProperty(key: string, include: boolean, defaultValue: number | string): void {
+    toggleProperty(key: string, include: boolean, defaultValue: PropertyValue): void {
       updateKeyframeProperties((properties) => {
         if (!include) {
           const { [key]: _, ...rest } = properties;
@@ -108,16 +131,11 @@ export function createKeyframeAdapter(
           return rest;
         }
 
-        const value: KeyframeValue =
-          typeof defaultValue === 'string' ?
-            { type: 'color', value: defaultValue, easing: 'linear' }
-          : { type: 'number', value: defaultValue, easing: 'linear' };
-
-        return { ...properties, [key]: value };
+        return { ...properties, [key]: toDefaultKeyframeValue(defaultValue) };
       });
     },
 
-    updateValue(key: string, value: number | string): void {
+    updateValue(key: string, value: PropertyValue): void {
       const keyframe = getKeyframe();
 
       if (keyframe === undefined || keyframe.properties[key] === undefined) {
@@ -129,6 +147,24 @@ export function createKeyframeAdapter(
 
         if (existing === undefined) {
           return properties;
+        }
+
+        if (isTupleValue(value)) {
+          return {
+            ...properties,
+            [key]: {
+              ...existing,
+              type: 'tuple',
+              value: [value[0], value[1], value[2], value[3]],
+            } as KeyframeValue,
+          };
+        }
+
+        if (typeof value === 'boolean') {
+          return {
+            ...properties,
+            [key]: { ...existing, type: 'number', value: value ? 1 : 0 } as KeyframeValue,
+          };
         }
 
         if (typeof value === 'string') {

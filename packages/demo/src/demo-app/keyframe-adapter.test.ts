@@ -54,6 +54,7 @@ describe('createKeyframeAdapter', () => {
                   x: { type: 'number', value: 10, easing: 'linear' },
                   opacity: { type: 'number', value: 0.5, easing: 'ease-in' },
                   backgroundColor: { type: 'color', value: '#ff0000', easing: 'linear' },
+                  borderRadius: { type: 'tuple', value: [2, 4, 6, 8], easing: 'linear' },
                 }),
                 makeKeyframe(500, {
                   x: { type: 'number', value: 200, easing: 'linear' },
@@ -84,6 +85,13 @@ describe('createKeyframeAdapter', () => {
     expect(adapter.getValue('x')).toBe(10);
     expect(adapter.getValue('opacity')).toBe(0.5);
     expect(adapter.getValue('backgroundColor')).toBe('#ff0000');
+  });
+
+  /** @description getValue must return the full tuple value for tuple-typed keyframe properties. */
+  it('returns tuple values from keyframe properties', () => {
+    const adapter = createKeyframeAdapter(store, ELEMENT_ID, 'tl-1', 0, onTimelineUpdated);
+
+    expect(adapter.getValue('borderRadius')).toEqual([2, 4, 6, 8]);
   });
 
   /** @description getValue must return 0 for properties not in the keyframe. */
@@ -131,6 +139,15 @@ describe('createKeyframeAdapter', () => {
     adapter.updateValue('backgroundColor', '#00ff00');
 
     expect(adapter.getValue('backgroundColor')).toBe('#00ff00');
+  });
+
+  /** @description updateValue must preserve all tuple components when updating tuple properties. */
+  it('updates an existing tuple property', () => {
+    const adapter = createKeyframeAdapter(store, ELEMENT_ID, 'tl-1', 0, onTimelineUpdated);
+
+    adapter.updateValue('borderRadius', [10, 12, 14, 16]);
+
+    expect(adapter.getValue('borderRadius')).toEqual([10, 12, 14, 16]);
   });
 
   /** @description updateValue must not add new properties if the key is not already included. */

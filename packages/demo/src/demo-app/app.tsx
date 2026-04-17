@@ -15,7 +15,7 @@ import {
   type Timeline,
 } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
-import { type PreflightIssue } from '@broadset/ui';
+import { type MediaAsset, type PreflightIssue } from '@broadset/ui';
 import { toast } from '@heroui/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -275,6 +275,33 @@ export function DemoApp(): React.JSX.Element {
     () => buildLayerInfoList(currentDocument, editorState.activePageIndex),
     [currentDocument, editorState.activePageIndex],
   );
+  const mediaAssets = useMemo<readonly MediaAsset[]>(() => {
+    const parsedProject = broadsetProjectSchema.safeParse(SAMPLE_PROJECT);
+
+    if (!parsedProject.success) {
+      return [];
+    }
+
+    return parsedProject.data.assets.flatMap((asset) => {
+      const sourceUrl =
+        asset.source.type === 'url' ? asset.source.url
+        : asset.source.type === 'embedded' ? asset.source.dataUri
+        : null;
+
+      if (sourceUrl === null) {
+        return [];
+      }
+
+      return [
+        {
+          id: asset.id,
+          name: asset.name,
+          url: sourceUrl,
+          category: asset.kind,
+        },
+      ];
+    });
+  }, []);
 
   const pushToast = useCallback((severity: ToastSeverity, message: string): void => {
     const options = { timeout: TOAST_DISMISS_MS[severity] };
@@ -477,6 +504,7 @@ export function DemoApp(): React.JSX.Element {
         templateGroups={templateGroups}
         timelinePreviewActiveModifiers={animationEditing.activeModifiers}
         timelinePreviewActiveState={animationEditing.activeState}
+        mediaAssets={mediaAssets}
       />
     ),
     [
@@ -509,6 +537,7 @@ export function DemoApp(): React.JSX.Element {
       handleRenameGroup,
       handleUpdateMemberRole,
       layers,
+      mediaAssets,
       preflightIssues,
       selectedElement,
       selectedElementInstance,

@@ -119,9 +119,10 @@ export function GuidePositionModal({
   }, [localPosition, onApply]);
 
   const handleKeyDown = useCallback(
-    (event: { readonly key: string; preventDefault(): void }) => {
+    (event: { readonly key: string; preventDefault(): void; stopPropagation(): void }) => {
       if (event.key === 'Escape') {
         event.preventDefault();
+        event.stopPropagation();
         onClose();
       }
     },

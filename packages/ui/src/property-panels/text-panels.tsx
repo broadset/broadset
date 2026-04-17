@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { ColorInput, CssLengthInput, NumField, SegmentedSwitcher, ShadowEditor, TextStrokeInput } from '../inputs';
 import { ICON_SIZE, SelectField, TEXT_TRANSFORM_OPTIONS, VERTICAL_ALIGNMENT_OPTIONS } from '../panel-types';
 import { color, font } from '../tokens';
+import { PropertyField } from './property-editing-context';
 
 const FONT_SIZE_MIN = 1;
 const FONT_SIZE_MAX = 512;
@@ -82,104 +83,122 @@ export function TypographyPanel({
         </p>
       : null}
 
-      <SelectField
-        label="Font family"
-        value={fontFamily}
-        options={fontFamilyOptions}
-        onUpdate={onUpdate}
-        updateKey="fontFamily"
-      />
-      <NumField
-        label="Font size (pt)"
-        value={fontSize}
-        min={FONT_SIZE_MIN}
-        max={FONT_SIZE_MAX}
-        onChange={(v) => {
-          onUpdate('fontSize', v);
-        }}
-      />
-      <ColorInput
-        label="Text color"
-        value={fontColor}
-        onChange={(v) => {
-          onUpdate('fontColor', v);
-        }}
-      />
+      <PropertyField propertyKey="fontFamily" defaultValue={fontFamily}>
+        <SelectField
+          label="Font family"
+          value={fontFamily}
+          options={fontFamilyOptions}
+          onUpdate={onUpdate}
+          updateKey="fontFamily"
+        />
+      </PropertyField>
+      <PropertyField propertyKey="fontSize" defaultValue={fontSize}>
+        <NumField
+          label="Font size (pt)"
+          value={fontSize}
+          min={FONT_SIZE_MIN}
+          max={FONT_SIZE_MAX}
+          onChange={(v) => {
+            onUpdate('fontSize', v);
+          }}
+        />
+      </PropertyField>
+      <PropertyField propertyKey="fontColor" defaultValue={fontColor}>
+        <ColorInput
+          label="Text color"
+          value={fontColor}
+          onChange={(v) => {
+            onUpdate('fontColor', v);
+          }}
+        />
+      </PropertyField>
 
       <div className="flex flex-col gap-1">
         <span style={{ color: color('muted'), fontSize: font('label') }}>Formatting</span>
         <ButtonGroup aria-label="Formatting">
-          <Tooltip delay={0}>
-            <Button
-              aria-label="Bold"
-              size="sm"
-              variant={formatButtonVariant(isBold)}
-              onPress={() => {
-                onUpdate('fontWeight', isBold ? REGULAR_WEIGHT : BOLD_WEIGHT);
-              }}
-            >
-              <Bold size={ICON_SIZE} />
-            </Button>
-            <Tooltip.Content>Bold</Tooltip.Content>
-          </Tooltip>
-          <Tooltip delay={0}>
-            <Button
-              aria-label="Italic"
-              size="sm"
-              variant={formatButtonVariant(isItalic)}
-              onPress={() => {
-                onUpdate('fontStyle', isItalic ? 'normal' : 'italic');
-              }}
-            >
-              <Italic size={ICON_SIZE} />
-            </Button>
-            <Tooltip.Content>Italic</Tooltip.Content>
-          </Tooltip>
-          <Tooltip delay={0}>
-            <Button
-              aria-label="Underline"
-              size="sm"
-              variant={formatButtonVariant(isUnderline)}
-              onPress={() => {
-                onUpdate('textDecoration', isUnderline ? 'none' : 'underline');
-              }}
-            >
-              <Underline size={ICON_SIZE} />
-            </Button>
-            <Tooltip.Content>Underline</Tooltip.Content>
-          </Tooltip>
-          <Tooltip delay={0}>
-            <Button
-              aria-label="Strikethrough"
-              size="sm"
-              variant={formatButtonVariant(isStrikethrough)}
-              onPress={() => {
-                onUpdate('textDecoration', isStrikethrough ? 'none' : 'line-through');
-              }}
-            >
-              <Strikethrough size={ICON_SIZE} />
-            </Button>
-            <Tooltip.Content>Strikethrough</Tooltip.Content>
-          </Tooltip>
+          <PropertyField propertyKey="fontWeight" defaultValue={fontWeight}>
+            <Tooltip delay={0}>
+              <Button
+                aria-label="Bold"
+                size="sm"
+                variant={formatButtonVariant(isBold)}
+                onPress={() => {
+                  onUpdate('fontWeight', isBold ? REGULAR_WEIGHT : BOLD_WEIGHT);
+                }}
+              >
+                <Bold size={ICON_SIZE} />
+              </Button>
+              <Tooltip.Content>Bold</Tooltip.Content>
+            </Tooltip>
+          </PropertyField>
+          <PropertyField propertyKey="fontStyle" defaultValue={fontStyle}>
+            <Tooltip delay={0}>
+              <Button
+                aria-label="Italic"
+                size="sm"
+                variant={formatButtonVariant(isItalic)}
+                onPress={() => {
+                  onUpdate('fontStyle', isItalic ? 'normal' : 'italic');
+                }}
+              >
+                <Italic size={ICON_SIZE} />
+              </Button>
+              <Tooltip.Content>Italic</Tooltip.Content>
+            </Tooltip>
+          </PropertyField>
+          <PropertyField propertyKey="textDecoration" defaultValue={textDecoration}>
+            <div className="flex gap-2">
+              <Tooltip delay={0}>
+                <Button
+                  aria-label="Underline"
+                  size="sm"
+                  variant={formatButtonVariant(isUnderline)}
+                  onPress={() => {
+                    onUpdate('textDecoration', isUnderline ? 'none' : 'underline');
+                  }}
+                >
+                  <Underline size={ICON_SIZE} />
+                </Button>
+                <Tooltip.Content>Underline</Tooltip.Content>
+              </Tooltip>
+              <Tooltip delay={0}>
+                <Button
+                  aria-label="Strikethrough"
+                  size="sm"
+                  variant={formatButtonVariant(isStrikethrough)}
+                  onPress={() => {
+                    onUpdate('textDecoration', isStrikethrough ? 'none' : 'line-through');
+                  }}
+                >
+                  <Strikethrough size={ICON_SIZE} />
+                </Button>
+                <Tooltip.Content>Strikethrough</Tooltip.Content>
+              </Tooltip>
+            </div>
+          </PropertyField>
         </ButtonGroup>
       </div>
 
-      <SegmentedSwitcher
-        ariaLabel="Text alignment"
-        value={alignment}
-        options={ALIGNMENT_OPTIONS}
-        onChange={(nextAlignment) => {
-          onUpdate('textAlignment', nextAlignment);
-        }}
-      />
+      <PropertyField propertyKey="textAlignment" defaultValue={alignment}>
+        <SegmentedSwitcher
+          ariaLabel="Text alignment"
+          value={alignment}
+          options={ALIGNMENT_OPTIONS}
+          onChange={(nextAlignment) => {
+            onUpdate('textAlignment', nextAlignment);
+          }}
+        />
+      </PropertyField>
 
-      <SelectField
-        label="Vertical alignment"
-        value={verticalAlignment}
-        options={[...VERTICAL_ALIGNMENT_OPTIONS]}
-        onUpdate={onUpdate}
-        updateKey="verticalAlignment"
-      />
+      <PropertyField propertyKey="verticalAlignment" defaultValue={verticalAlignment}>
+        <SelectField
+          label="Vertical alignment"
+          value={verticalAlignment}
+          options={[...VERTICAL_ALIGNMENT_OPTIONS]}
+          onUpdate={onUpdate}
+          updateKey="verticalAlignment"
+        />
+      </PropertyField>
 
       <Button
         aria-label="Advanced"
@@ -194,23 +213,27 @@ export function TypographyPanel({
 
       {showAdvanced ?
         <>
-          <NumField
-            label="Weight"
-            value={fontWeight}
-            min={FONT_WEIGHT_MIN}
-            max={FONT_WEIGHT_MAX}
-            step={FONT_WEIGHT_STEP}
-            onChange={(v) => {
-              onUpdate('fontWeight', v);
-            }}
-          />
-          <SelectField
-            label="Case"
-            value={textTransform}
-            options={[...TEXT_TRANSFORM_OPTIONS]}
-            onUpdate={onUpdate}
-            updateKey="textTransform"
-          />
+          <PropertyField propertyKey="fontWeight" defaultValue={fontWeight}>
+            <NumField
+              label="Weight"
+              value={fontWeight}
+              min={FONT_WEIGHT_MIN}
+              max={FONT_WEIGHT_MAX}
+              step={FONT_WEIGHT_STEP}
+              onChange={(v) => {
+                onUpdate('fontWeight', v);
+              }}
+            />
+          </PropertyField>
+          <PropertyField propertyKey="textTransform" defaultValue={textTransform}>
+            <SelectField
+              label="Case"
+              value={textTransform}
+              options={[...TEXT_TRANSFORM_OPTIONS]}
+              onUpdate={onUpdate}
+              updateKey="textTransform"
+            />
+          </PropertyField>
         </>
       : null}
     </section>
@@ -252,44 +275,54 @@ export function TextEffectsPanel({
 
       {showAdvanced ?
         <>
-          <CssLengthInput
-            label="Letter spacing"
-            value={String(letterSpacing)}
-            onChange={(v) => {
-              onUpdate('letterSpacing', v);
-            }}
-          />
-          <CssLengthInput
-            label="Line height"
-            value={lineHeight}
-            onChange={(v) => {
-              onUpdate('lineHeight', v);
-            }}
-          />
-          <CssLengthInput
-            label="Word spacing"
-            value={String(wordSpacing)}
-            onChange={(v) => {
-              onUpdate('wordSpacing', v);
-            }}
-          />
+          <PropertyField propertyKey="letterSpacing" defaultValue={letterSpacing}>
+            <CssLengthInput
+              label="Letter spacing"
+              value={String(letterSpacing)}
+              onChange={(v) => {
+                onUpdate('letterSpacing', v);
+              }}
+            />
+          </PropertyField>
+          <PropertyField propertyKey="lineHeight" defaultValue={lineHeight}>
+            <CssLengthInput
+              label="Line height"
+              value={lineHeight}
+              onChange={(v) => {
+                onUpdate('lineHeight', v);
+              }}
+            />
+          </PropertyField>
+          <PropertyField propertyKey="wordSpacing" defaultValue={wordSpacing}>
+            <CssLengthInput
+              label="Word spacing"
+              value={String(wordSpacing)}
+              onChange={(v) => {
+                onUpdate('wordSpacing', v);
+              }}
+            />
+          </PropertyField>
 
-          <TextStrokeInput
-            label="Text stroke"
-            width={textStroke ? parseInt(textStroke, 10) : 0}
-            color={textStroke.split(' ')[1] ?? '#000000'}
-            onChange={(v) => {
-              onUpdate('textStroke', v);
-            }}
-          />
-          <ShadowEditor
-            label="Text shadow"
-            mode="text"
-            value={textShadow}
-            onChange={(v) => {
-              onUpdate('textShadow', v);
-            }}
-          />
+          <PropertyField propertyKey="textStroke" defaultValue={textStroke}>
+            <TextStrokeInput
+              label="Text stroke"
+              width={textStroke ? parseInt(textStroke, 10) : 0}
+              color={textStroke.split(' ')[1] ?? '#000000'}
+              onChange={(v) => {
+                onUpdate('textStroke', v);
+              }}
+            />
+          </PropertyField>
+          <PropertyField propertyKey="textShadow" defaultValue={textShadow}>
+            <ShadowEditor
+              label="Text shadow"
+              mode="text"
+              value={textShadow}
+              onChange={(v) => {
+                onUpdate('textShadow', v);
+              }}
+            />
+          </PropertyField>
         </>
       : null}
     </section>

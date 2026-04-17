@@ -188,7 +188,9 @@ export function NewDocumentModal({
             }}
           >
             <Table.Header>
-              <Table.Column id="name">Name</Table.Column>
+              <Table.Column id="name" isRowHeader>
+                Name
+              </Table.Column>
               <Table.Column id="dimensions">Dimensions</Table.Column>
               <Table.Column id="mode">Mode</Table.Column>
             </Table.Header>

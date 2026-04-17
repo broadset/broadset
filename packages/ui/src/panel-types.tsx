@@ -100,6 +100,7 @@ export interface PanelElement {
   readonly name: string;
   readonly locked?: boolean | undefined;
   readonly content: string;
+  readonly assetId?: string | null | undefined;
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -191,9 +192,9 @@ export interface LayerInfo {
 
 export interface PropertyFieldAdapter {
   readonly isIncluded: (key: string) => boolean;
-  readonly getValue: (key: string) => number | string;
-  readonly toggleProperty: (key: string, include: boolean, defaultValue: number | string) => void;
-  readonly updateValue: (key: string, value: number | string) => void;
+  readonly getValue: (key: string) => PropertyValue;
+  readonly toggleProperty: (key: string, include: boolean, defaultValue: PropertyValue) => void;
+  readonly updateValue: (key: string, value: PropertyValue) => void;
 }
 
 /** Union of all property value types passed through onUpdate callbacks. */

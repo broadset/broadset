@@ -10,6 +10,7 @@ export function applyElementUpdate(element: BroadsetElement, updates: ElementUpd
     ...(updates.height !== undefined ? { height: updates.height } : {}),
     ...(updates.rotation !== undefined ? { rotation: updates.rotation } : {}),
     ...(updates.content !== undefined ? { content: updates.content } : {}),
+    ...(updates.assetId !== undefined ? { assetId: updates.assetId } : {}),
     ...(updates.name !== undefined ? { name: updates.name } : {}),
     ...(updates.booleanOperation !== undefined ? { booleanOperation: updates.booleanOperation } : {}),
   };

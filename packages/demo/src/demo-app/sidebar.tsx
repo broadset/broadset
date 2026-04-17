@@ -14,6 +14,7 @@ import {
   glassPanelStyle,
   type LayerInfo,
   LayersSidebar,
+  type MediaAsset,
   type PreflightIssue,
   PreflightPanel,
   PropertiesSidebar,
@@ -77,6 +78,7 @@ export interface DemoSidebarPanelProps {
   readonly setEditingTimelineSelectedKf: (index: number | null) => void;
   readonly timelinePreviewActiveModifiers: readonly string[];
   readonly timelinePreviewActiveState: string | null;
+  readonly mediaAssets: readonly MediaAsset[];
 }
 
 export function DemoSidebarPanel({
@@ -121,6 +123,7 @@ export function DemoSidebarPanel({
   templateGroups,
   timelinePreviewActiveModifiers,
   timelinePreviewActiveState,
+  mediaAssets,
 }: DemoSidebarPanelProps): React.JSX.Element {
   const keyframeAdapter: PropertyFieldAdapter | null = useMemo(() => {
     if (editingTimeline === null || editingTimelineSelectedKf === null || selectedElement === null) {
@@ -162,6 +165,7 @@ export function DemoSidebarPanel({
         elements={
           selectedElement === null ? [] : [toPanelElement(selectedElement, selectedElementInstance ?? undefined)]
         }
+        mediaAssets={mediaAssets}
         onUpdate={onUpdateProperty}
       />
     );
@@ -223,6 +227,12 @@ export function DemoSidebarPanel({
             adapter={keyframeAdapter}
             documentMode={currentDocumentMode}
             onUpdate={onUpdateProperty}
+            timelineName={editingTimeline?.name}
+            keyframeName={
+              editingTimelineSelectedKf === null ? undefined : (
+                editingTimeline?.keyframes[editingTimelineSelectedKf]?.name
+              )
+            }
           />
         )}
       </>

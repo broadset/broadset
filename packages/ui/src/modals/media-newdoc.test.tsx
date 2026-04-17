@@ -8,6 +8,18 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import type { MediaLibraryModalProps, NewDocumentModalProps } from './index';
 import { MediaLibraryModal, NewDocumentModal } from './index';
 
+function selectTabByLabel(label: string): void {
+  const tabsInput = screen.queryByTestId('tabs-selection');
+
+  if (tabsInput !== null) {
+    fireEvent.change(tabsInput, { target: { value: label } });
+
+    return;
+  }
+
+  fireEvent.click(screen.getByRole('tab', { name: label }));
+}
+
 describe('MediaLibraryModal', () => {
   const sampleAssets = [
     { id: 'a1', name: 'Logo', url: '/logo.png', category: 'Logos' },
@@ -44,9 +56,7 @@ describe('MediaLibraryModal', () => {
     render(<MediaLibraryModal {...makeProps()} />);
 
     // Simulate category tab selection to "Backgrounds"
-    const tabsInput = screen.getByTestId('tabs-selection');
-
-    fireEvent.change(tabsInput, { target: { value: 'Backgrounds' } });
+    selectTabByLabel('Backgrounds');
     expect(screen.getByText('Background')).toBeTruthy();
     // "Logo" as an asset button (aria-label) should not exist
     expect(screen.queryByRole('button', { name: 'Logo' })).toBeNull();
@@ -169,11 +179,8 @@ describe('NewDocumentModal', () => {
 
     render(<NewDocumentModal {...makeProps({ onCreateDocument })} />);
 
-    // Click the HD 1080p row
-    const row = screen.getByText('HD 1080p').closest('tr');
-
-    if (row === null) throw new Error('Expected row to exist');
-    fireEvent.click(row);
+    // Click the HD 1080p preset entry
+    fireEvent.click(screen.getByText('HD 1080p'));
     fireEvent.click(screen.getByRole('button', { name: /create/i }));
     expect(onCreateDocument).toHaveBeenCalledTimes(1);
 
@@ -213,9 +220,7 @@ describe('NewDocumentModal', () => {
   it('filters presets by category tab', () => {
     render(<NewDocumentModal {...makeProps()} />);
 
-    const tabsInput = screen.getByTestId('tabs-selection');
-
-    fireEvent.change(tabsInput, { target: { value: 'Print' } });
+    selectTabByLabel('Print');
     expect(screen.getByText('A4 Portrait')).toBeTruthy();
     expect(screen.queryByText('HD 1080p')).toBeNull();
   });

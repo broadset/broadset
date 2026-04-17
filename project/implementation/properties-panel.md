@@ -431,9 +431,9 @@ Goal: Make every panel primitive art-director-grade before building on top of th
 
 ### Unit 7 — Image + Masking Workflow
 
-- [ ] tests: red
-- [ ] impl: green
-- [ ] refactor: done
+- [x] tests: red
+- [x] impl: green
+- [x] refactor: done
 
 **Red tests required** (`panels.image.test.tsx`, `panels.clip-path.test.tsx`)
 
@@ -457,9 +457,9 @@ Goal: Make every panel primitive art-director-grade before building on top of th
 
 ### Unit 8 — Group Panel Completeness
 
-- [ ] tests: red
-- [ ] impl: green
-- [ ] refactor: done
+- [x] tests: red
+- [x] impl: green
+- [x] refactor: done
 
 **Red tests required** (`panels.group.test.tsx`)
 
@@ -476,9 +476,9 @@ Goal: Make every panel primitive art-director-grade before building on top of th
 
 ### Unit 9 — Animation Mode Property Editing
 
-- [ ] tests: red
-- [ ] impl: green
-- [ ] refactor: done
+- [x] tests: red
+- [x] impl: green
+- [x] refactor: done
 
 **Red tests required** (`panels.animation-mode.test.tsx`)
 
@@ -668,9 +668,9 @@ Rationale: build trustworthy primitives → remove raw-string UX debt → add an
 | 4    | Appearance 2.0 (gradient, radius, opacity) |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
 | 5    | Typography + text effects                  |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
 | 6    | Path panel parity                          |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
-| 7    | Image + mask workflow                      |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
-| 8    | Group panel completeness                   |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
-| 9    | Animation mode property editing            |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
+| 7    | Image + mask workflow                      |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
+| 8    | Group panel completeness                   |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
+| 9    | Animation mode property editing            |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
 | 10   | Cross-panel polish + accordion defaults    |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
 | 11   | Demo + cross-region CT                     |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
 

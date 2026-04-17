@@ -36,6 +36,7 @@ export const BASE_ELEMENT: PanelElement = {
   clockStartValue: undefined,
   clockTargetValue: undefined,
   content: '',
+  assetId: null,
   customClipPath: '',
   errorCorrection: 'M',
   fill: '#000000',

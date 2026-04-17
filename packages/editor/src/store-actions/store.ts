@@ -58,6 +58,7 @@ export interface ElementUpdate {
   readonly height?: number;
   readonly rotation?: number;
   readonly content?: string;
+  readonly assetId?: string | null;
   readonly name?: string;
   readonly booleanOperation?: BooleanOperation | null;
 }

@@ -16,3 +16,21 @@
 2. Use only `pointer-events: none` (blocks mouse but leaves keyboard/focus and assistive semantics inconsistent).
 3. Use only `<fieldset disabled>` (covers form controls but not all interactive wrappers and custom non-form controls).
    **Rationale:** Unit 2 requires panel-level lock behavior that is obvious, accessibility-friendly, and consistent across all panel composition paths. A single wrapper with layered semantics is resilient to component mix differences and prevents regressions when new controls are added.
+
+### Unit 9.0 — Tuple-Safe Animation Property Routing
+
+**Decision:** Expand the animation property adapter contract to accept full `PropertyValue` payloads (including tuple values) and propagate tuple values end-to-end through `PropertyEditingProvider` and demo keyframe adapter logic.
+**Alternatives considered:**
+
+1. Keep number/string-only adapter values and coerce tuple properties to a scalar fallback (drops data and breaks per-corner radius edits).
+2. Remove appearance controls from animation mode to avoid tuple handling (reduces user capability and diverges from property-level include/remove behavior goals).
+   **Rationale:** Unit 9 requires keyframe editing to route true property values without mutating base styles. Supporting full value shapes prevents silent data loss, keeps include/remove behavior consistent across geometry, text, and appearance controls, and aligns with Broadset's discriminated `KeyframeValue` model.
+
+### Unit 7.0 — Custom MaskType Canonicalization
+
+**Decision:** Canonicalize custom mask preset selection to `maskType: 'custom'` while still interpreting legacy `'url'` values as custom in panel resolution.
+**Alternatives considered:**
+
+1. Keep emitting `'url'` for custom masks (diverges from UI spec and model schema semantics).
+2. Hard-switch to `'custom'` and reject legacy `'url'` in panel resolution (could break older fixtures/tests still carrying `'url'`).
+   **Rationale:** This keeps behavior spec-aligned for new edits while preserving resilience when loading prior data or tests that still contain legacy custom mask values.
