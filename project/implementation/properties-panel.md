@@ -407,9 +407,9 @@ Goal: Make every panel primitive art-director-grade before building on top of th
 
 ### Unit 6 — Path Panel Parity (Stroke / Fill / Shape)
 
-- [ ] tests: red
-- [ ] impl: green
-- [ ] refactor: done
+- [x] tests: red
+- [x] impl: green
+- [x] refactor: done
 
 **Red tests required** (`panels.path-properties.test.tsx`)
 
@@ -667,7 +667,7 @@ Rationale: build trustworthy primitives → remove raw-string UX debt → add an
 | 3    | Geometry (anchors, units, name, 3D)        |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
 | 4    | Appearance 2.0 (gradient, radius, opacity) |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
 | 5    | Typography + text effects                  |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
-| 6    | Path panel parity                          |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
+| 6    | Path panel parity                          |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
 | 7    | Image + mask workflow                      |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
 | 8    | Group panel completeness                   |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
 | 9    | Animation mode property editing            |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |

@@ -355,9 +355,6 @@ export function PropertiesSidebar({
                     fill={primary.fill}
                     fillOpacity={primary.fillOpacity}
                     fillRule={primary.fillRule}
-                    trimStart={primary.trimStart}
-                    trimEnd={primary.trimEnd}
-                    trimOffset={primary.trimOffset}
                     content={primary.content}
                     onUpdate={onUpdate}
                     onStartDrawing={onStartDrawing ?? (() => undefined)}

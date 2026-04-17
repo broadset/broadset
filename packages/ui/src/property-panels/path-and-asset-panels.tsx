@@ -1,6 +1,7 @@
 import type { BooleanOperation } from '@broadset/model';
-import { Button, Input, Slider, Switch } from '@heroui/react';
+import { Accordion, Button, Input, ListBox, Select, Slider, Switch, TextArea } from '@heroui/react';
 import type { JSX } from 'react';
+import { useState } from 'react';
 
 import { ColorInput, NumField } from '../inputs';
 import type { PropertyValue } from '../panel-types';
@@ -8,12 +9,33 @@ import {
   BOOLEAN_OPERATION_OPTIONS,
   ERROR_CORRECTION_OPTIONS,
   FieldShell,
-  FILL_RULE_OPTIONS,
   LINECAP_OPTIONS,
   LINEJOIN_OPTIONS,
   OBJECT_FIT_OPTIONS,
   SelectField,
 } from '../panel-types';
+import { color, font } from '../tokens';
+
+const OPACITY_PERCENT_MIN = 0;
+const OPACITY_PERCENT_MAX = 100;
+const OPACITY_PERCENT_STEP = 1;
+
+const FILL_RULE_LABELS = [
+  { value: 'nonzero', label: 'Non-zero' },
+  { value: 'evenodd', label: 'Even-odd' },
+] as const;
+
+function toFillRuleLabel(value: string): string {
+  const matched = FILL_RULE_LABELS.find((option) => option.value === value);
+
+  return matched?.label ?? 'Non-zero';
+}
+
+function toFillRuleValue(value: string): string {
+  const matched = FILL_RULE_LABELS.find((option) => option.label === value);
+
+  return matched?.value ?? 'nonzero';
+}
 
 export interface PathPropertiesPanelProps {
   readonly stroke: string;
@@ -26,9 +48,6 @@ export interface PathPropertiesPanelProps {
   readonly fill: string;
   readonly fillOpacity: number;
   readonly fillRule: string;
-  readonly trimStart: number;
-  readonly trimEnd: number;
-  readonly trimOffset: number;
   readonly content: string;
   readonly onUpdate: (key: string, value: string | number) => void;
   readonly onStartDrawing: () => void;
@@ -50,9 +69,6 @@ export function PathPropertiesPanel({
   fill,
   fillOpacity,
   fillRule,
-  trimStart,
-  trimEnd,
-  trimOffset,
   content,
   onUpdate,
   onStartDrawing,
@@ -63,138 +79,18 @@ export function PathPropertiesPanel({
   isEditing,
 }: PathPropertiesPanelProps): JSX.Element {
   const hasContent = content.trim().length > 0;
+  const [showStrokeAdvanced, setShowStrokeAdvanced] = useState(false);
+  const [showShapeAdvanced, setShowShapeAdvanced] = useState(false);
+  const [showPathSource, setShowPathSource] = useState(false);
+  const strokeOpacityPercent = Math.round(strokeOpacity * OPACITY_PERCENT_MAX);
+  const fillOpacityPercent = Math.round(fillOpacity * OPACITY_PERCENT_MAX);
+  const fillRuleLabel = toFillRuleLabel(fillRule);
 
   return (
     <section aria-label="Path Properties" role="region" className="flex flex-col gap-2">
-      <ColorInput
-        label="Stroke color"
-        value={stroke}
-        onChange={(v) => {
-          onUpdate('stroke', v);
-        }}
-      />
-      <NumField
-        label="Stroke width"
-        value={strokeWidth}
-        min={0}
-        onChange={(v) => {
-          onUpdate('strokeWidth', v);
-        }}
-      />
-      <NumField
-        label="Stroke opacity"
-        value={strokeOpacity}
-        min={0}
-        max={1}
-        step={0.01}
-        onChange={(v) => {
-          onUpdate('strokeOpacity', v);
-        }}
-      />
-      <FieldShell label="Stroke dasharray">
-        <Input
-          aria-label="Stroke dasharray"
-          value={strokeDasharray}
-          onChange={(e) => {
-            onUpdate('strokeDasharray', e.currentTarget.value);
-          }}
-        />
-      </FieldShell>
-      <NumField
-        label="Stroke dashoffset"
-        value={strokeDashoffset}
-        onChange={(v) => {
-          onUpdate('strokeDashoffset', v);
-        }}
-      />
-      <SelectField
-        label="Stroke linecap"
-        value={strokeLinecap}
-        options={[...LINECAP_OPTIONS]}
-        onUpdate={onUpdate}
-        updateKey="strokeLinecap"
-      />
-      <SelectField
-        label="Stroke linejoin"
-        value={strokeLinejoin}
-        options={[...LINEJOIN_OPTIONS]}
-        onUpdate={onUpdate}
-        updateKey="strokeLinejoin"
-      />
-      <ColorInput
-        label="Fill color"
-        value={fill}
-        onChange={(v) => {
-          onUpdate('fill', v);
-        }}
-      />
-      <NumField
-        label="Fill opacity"
-        value={fillOpacity}
-        min={0}
-        max={1}
-        step={0.01}
-        onChange={(v) => {
-          onUpdate('fillOpacity', v);
-        }}
-      />
-      <SelectField
-        label="Fill rule"
-        value={fillRule}
-        options={[...FILL_RULE_OPTIONS]}
-        onUpdate={onUpdate}
-        updateKey="fillRule"
-      />
-
-      <Slider
-        aria-label="Trim start"
-        maxValue={1}
-        minValue={0}
-        step={0.01}
-        value={trimStart}
-        onChange={(v: number | readonly number[]) => {
-          onUpdate('trimStart', typeof v === 'number' ? v : Number(v));
-        }}
-      >
-        <Slider.Track>
-          <Slider.Fill />
-          <Slider.Thumb />
-        </Slider.Track>
-      </Slider>
-      <Slider
-        aria-label="Trim end"
-        maxValue={1}
-        minValue={0}
-        step={0.01}
-        value={trimEnd}
-        onChange={(v: number | readonly number[]) => {
-          onUpdate('trimEnd', typeof v === 'number' ? v : Number(v));
-        }}
-      >
-        <Slider.Track>
-          <Slider.Fill />
-          <Slider.Thumb />
-        </Slider.Track>
-      </Slider>
-      <Slider
-        aria-label="Trim offset"
-        maxValue={1}
-        minValue={0}
-        step={0.01}
-        value={trimOffset}
-        onChange={(v: number | readonly number[]) => {
-          onUpdate('trimOffset', typeof v === 'number' ? v : Number(v));
-        }}
-      >
-        <Slider.Track>
-          <Slider.Fill />
-          <Slider.Thumb />
-        </Slider.Track>
-      </Slider>
-
       <div className="flex gap-2">
         <Button
-          aria-label="Draw path"
+          aria-label={isDrawing ? 'Stop drawing' : 'Draw'}
           size="sm"
           variant={isDrawing ? 'primary' : 'ghost'}
           onPress={() => {
@@ -205,10 +101,10 @@ export function PathPropertiesPanel({
             }
           }}
         >
-          Draw path
+          {isDrawing ? 'Done Drawing' : 'Draw'}
         </Button>
         <Button
-          aria-label="Edit path points"
+          aria-label={isEditing ? 'Stop editing points' : 'Edit points'}
           isDisabled={!hasContent}
           size="sm"
           variant={isEditing ? 'primary' : 'ghost'}
@@ -220,9 +116,217 @@ export function PathPropertiesPanel({
             }
           }}
         >
-          Edit path points
+          {isEditing ? 'Done Editing Points' : 'Edit points'}
         </Button>
       </div>
+
+      <Accordion allowsMultipleExpanded defaultExpandedKeys={['stroke', 'fill']}>
+        <Accordion.Item id="stroke">
+          <Accordion.Heading>
+            <Accordion.Trigger>Stroke</Accordion.Trigger>
+          </Accordion.Heading>
+          <Accordion.Panel>
+            <div className="flex flex-col gap-2">
+              <ColorInput
+                label="Stroke"
+                value={stroke}
+                onChange={(v) => {
+                  onUpdate('stroke', v);
+                }}
+              />
+              <NumField
+                label="Stroke width"
+                value={strokeWidth}
+                min={0}
+                step={0.5}
+                onChange={(v) => {
+                  onUpdate('strokeWidth', v);
+                }}
+              />
+              <Slider
+                aria-label="Stroke opacity"
+                maxValue={OPACITY_PERCENT_MAX}
+                minValue={OPACITY_PERCENT_MIN}
+                step={OPACITY_PERCENT_STEP}
+                value={strokeOpacityPercent}
+                onChange={(v: number | readonly number[]) => {
+                  const percent = typeof v === 'number' ? v : Number(v);
+
+                  onUpdate('strokeOpacity', percent / OPACITY_PERCENT_MAX);
+                }}
+              >
+                <Slider.Track>
+                  <Slider.Fill />
+                  <Slider.Thumb />
+                </Slider.Track>
+              </Slider>
+              <p
+                style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}
+              >{`${String(strokeOpacityPercent)}%`}</p>
+              <SelectField
+                label="Line cap"
+                value={strokeLinecap}
+                options={[...LINECAP_OPTIONS]}
+                onUpdate={onUpdate}
+                updateKey="strokeLinecap"
+              />
+              <SelectField
+                label="Line join"
+                value={strokeLinejoin}
+                options={[...LINEJOIN_OPTIONS]}
+                onUpdate={onUpdate}
+                updateKey="strokeLinejoin"
+              />
+
+              <Button
+                aria-label="Stroke advanced"
+                size="sm"
+                variant="ghost"
+                onPress={() => {
+                  setShowStrokeAdvanced((current) => !current);
+                }}
+              >
+                Advanced
+              </Button>
+
+              {showStrokeAdvanced ?
+                <>
+                  <FieldShell label="Dash pattern">
+                    <Input
+                      aria-label="Dash pattern"
+                      value={strokeDasharray}
+                      onChange={(e) => {
+                        onUpdate('strokeDasharray', e.currentTarget.value);
+                      }}
+                    />
+                  </FieldShell>
+                  <NumField
+                    label="Dash offset"
+                    value={strokeDashoffset}
+                    onChange={(v) => {
+                      onUpdate('strokeDashoffset', v);
+                    }}
+                  />
+                </>
+              : null}
+            </div>
+          </Accordion.Panel>
+        </Accordion.Item>
+
+        <Accordion.Item id="fill">
+          <Accordion.Heading>
+            <Accordion.Trigger>Fill</Accordion.Trigger>
+          </Accordion.Heading>
+          <Accordion.Panel>
+            <div className="flex flex-col gap-2">
+              <ColorInput
+                label="Fill"
+                value={fill}
+                onChange={(v) => {
+                  onUpdate('fill', v);
+                }}
+              />
+              <Slider
+                aria-label="Fill opacity"
+                maxValue={OPACITY_PERCENT_MAX}
+                minValue={OPACITY_PERCENT_MIN}
+                step={OPACITY_PERCENT_STEP}
+                value={fillOpacityPercent}
+                onChange={(v: number | readonly number[]) => {
+                  const percent = typeof v === 'number' ? v : Number(v);
+
+                  onUpdate('fillOpacity', percent / OPACITY_PERCENT_MAX);
+                }}
+              >
+                <Slider.Track>
+                  <Slider.Fill />
+                  <Slider.Thumb />
+                </Slider.Track>
+              </Slider>
+              <p
+                style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}
+              >{`${String(fillOpacityPercent)}%`}</p>
+
+              <FieldShell label="Inside rule">
+                <Select
+                  aria-label="Inside rule"
+                  value={fillRuleLabel}
+                  onChange={(selection) => {
+                    if (selection !== null) {
+                      onUpdate('fillRule', toFillRuleValue(String(selection)));
+                    }
+                  }}
+                >
+                  <Select.Trigger>
+                    <Select.Value />
+                    <Select.Indicator />
+                  </Select.Trigger>
+                  <Select.Popover>
+                    <ListBox>
+                      {FILL_RULE_LABELS.map((option) => (
+                        <ListBox.Item id={option.label} key={option.label} textValue={option.label}>
+                          {option.label}
+                        </ListBox.Item>
+                      ))}
+                    </ListBox>
+                  </Select.Popover>
+                </Select>
+              </FieldShell>
+            </div>
+          </Accordion.Panel>
+        </Accordion.Item>
+
+        <Accordion.Item id="shape">
+          <Accordion.Heading>
+            <Accordion.Trigger>Shape</Accordion.Trigger>
+          </Accordion.Heading>
+          <Accordion.Panel>
+            <div className="flex flex-col gap-2">
+              <Button
+                aria-label="Advanced / Power user"
+                size="sm"
+                variant="ghost"
+                onPress={() => {
+                  setShowShapeAdvanced((current) => !current);
+                }}
+              >
+                Advanced / Power user
+              </Button>
+
+              {showShapeAdvanced ?
+                <>
+                  <FieldShell label="Path preview">
+                    <Input
+                      aria-label="Path preview"
+                      readOnly
+                      value={content.trim() === '' ? '(empty path)' : content}
+                    />
+                  </FieldShell>
+                  <Switch
+                    aria-label="Show path source"
+                    isSelected={showPathSource}
+                    onChange={(nextValue) => {
+                      setShowPathSource(nextValue);
+                    }}
+                  >
+                    Show path source
+                  </Switch>
+                  {showPathSource ?
+                    <FieldShell label="Shape source">
+                      <TextArea
+                        aria-label="Shape source"
+                        readOnly
+                        value={content}
+                        style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
+                      />
+                    </FieldShell>
+                  : null}
+                </>
+              : null}
+            </div>
+          </Accordion.Panel>
+        </Accordion.Item>
+      </Accordion>
     </section>
   );
 }
