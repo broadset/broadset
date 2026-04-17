@@ -158,6 +158,7 @@ export function DemoSidebarPanel({
     return (
       <PropertiesSidebar
         documentMode={currentDocumentMode}
+        availableFonts={editorStore.getState().availableFonts}
         elements={
           selectedElement === null ? [] : [toPanelElement(selectedElement, selectedElementInstance ?? undefined)]
         }

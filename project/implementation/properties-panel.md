@@ -378,9 +378,9 @@ Goal: Make every panel primitive art-director-grade before building on top of th
 
 ### Unit 5 — Typography + Text Effects UX
 
-- [ ] tests: red
-- [ ] impl: green
-- [ ] refactor: done
+- [x] tests: red
+- [x] impl: green
+- [x] refactor: done
 
 **Red tests required** (`panels.typography.test.tsx`, `panels.text-effects.test.tsx`)
 
@@ -666,7 +666,7 @@ Rationale: build trustworthy primitives → remove raw-string UX debt → add an
 | 2    | Sidebar header + lock                      |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
 | 3    | Geometry (anchors, units, name, 3D)        |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
 | 4    | Appearance 2.0 (gradient, radius, opacity) |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
-| 5    | Typography + text effects                  |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
+| 5    | Typography + text effects                  |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
 | 6    | Path panel parity                          |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
 | 7    | Image + mask workflow                      |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
 | 8    | Group panel completeness                   |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |

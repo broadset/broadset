@@ -50,6 +50,7 @@ function getElementTypeLabel(type: string): string {
 export interface PropertiesSidebarProps {
   readonly elements: readonly PanelElement[];
   readonly documentMode: 'screen' | 'print';
+  readonly availableFonts?: readonly string[] | undefined;
   readonly showAnimations?: boolean | undefined;
   readonly onUpdate: (key: string, value: PropertyValue) => void;
   readonly customPanels?: Readonly<Record<string, CustomPanelComponent>> | undefined;
@@ -64,6 +65,7 @@ export interface PropertiesSidebarProps {
 export function PropertiesSidebar({
   elements,
   documentMode,
+  availableFonts,
   showAnimations,
   onUpdate,
   customPanels,
@@ -251,6 +253,7 @@ export function PropertiesSidebar({
                 <Accordion.Panel>
                   <TypographyPanel
                     fontFamily={primary.fontFamily}
+                    availableFonts={availableFonts}
                     fontSize={primary.fontSize}
                     fontColor={primary.fontColor}
                     fontWeight={primary.fontWeight}
@@ -259,6 +262,7 @@ export function PropertiesSidebar({
                     verticalAlignment={primary.verticalAlignment}
                     textDecoration={primary.textDecoration}
                     textTransform={primary.textTransform}
+                    isAnimationMode={false}
                     onUpdate={onUpdate}
                   />
                 </Accordion.Panel>
