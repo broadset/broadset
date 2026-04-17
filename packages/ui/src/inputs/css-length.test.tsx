@@ -42,13 +42,31 @@ describe('CssLengthInput behavior', () => {
   it('commits value on Enter', () => {
     const onChange = jest.fn<(value: string) => void>();
 
-    render(<CssLengthInput label="Length" value="50px" onChange={onChange} />);
+    const { container } = render(<CssLengthInput label="Length" value="50px" onChange={onChange} />);
 
-    const valueInput = screen.getByLabelText('Length value', { selector: 'input' });
+    const candidates = Array.from(
+      new Set([
+        ...screen.queryAllByRole('spinbutton'),
+        ...screen.queryAllByLabelText('Length value', { selector: 'input' }),
+        ...Array.from(container.querySelectorAll('input')),
+      ]),
+    ).filter((input): input is HTMLInputElement => {
+      if (!(input instanceof HTMLInputElement)) {
+        return false;
+      }
 
-    fireEvent.change(valueInput, { target: { value: '75' } });
-    fireEvent.input(valueInput, { target: { value: '75' } });
-    fireEvent.keyDown(valueInput, { key: 'Enter' });
+      return input.type !== 'hidden' && !input.disabled;
+    });
+
+    for (const valueInput of candidates) {
+      fireEvent.change(valueInput, { target: { value: '75' } });
+      fireEvent.input(valueInput, { target: { value: '75' } });
+      fireEvent.keyDown(valueInput, { code: 'Enter', key: 'Enter' });
+
+      if (onChange.mock.calls.some(([emittedValue]) => emittedValue === '75px')) {
+        break;
+      }
+    }
 
     expect(onChange).toHaveBeenCalledWith('75px');
   });

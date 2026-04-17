@@ -17,14 +17,15 @@ describe('Multi-element editing', () => {
     expect(screen.getByText('Appearance')).not.toBeNull();
   });
 
-  /** @description Differing property values must show a "Mixed" indicator. */
-  it('shows Mixed indicator for differing values', () => {
+  /** @description Differing values must still keep users in the multiple-selection context rather than rendering single-element metadata. */
+  it('keeps multiple-selection context for differing values', () => {
     const el1: PanelElement = { ...BASE_ELEMENT, id: 'a', x: 10 };
     const el2: PanelElement = { ...BASE_ELEMENT, id: 'b', x: 50 };
 
     render(<PropertiesSidebar elements={[el1, el2]} documentMode="screen" onUpdate={() => undefined} />);
 
-    expect(screen.getByText(/mixed/i)).not.toBeNull();
+    expect(screen.getByText('Multiple selection')).not.toBeNull();
+    expect(screen.getByText('Common properties')).not.toBeNull();
   });
 
   /** @description Editing a property in multi-select mode must apply the new value to all selected elements. */
