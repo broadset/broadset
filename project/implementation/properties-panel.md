@@ -662,17 +662,36 @@ Rationale: build trustworthy primitives → remove raw-string UX debt → add an
 
 | Unit | Area                                       | Tests Red | Impl Green | Refactor | Gates | UX Walk |
 | ---- | ------------------------------------------ | :-------: | :--------: | :------: | :---: | :-----: |
-| 1    | Shared input primitives                    |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
-| 2    | Sidebar header + lock                      |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
-| 3    | Geometry (anchors, units, name, 3D)        |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
-| 4    | Appearance 2.0 (gradient, radius, opacity) |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
-| 5    | Typography + text effects                  |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
-| 6    | Path panel parity                          |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
-| 7    | Image + mask workflow                      |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
-| 8    | Group panel completeness                   |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
-| 9    | Animation mode property editing            |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
+| 1    | Shared input primitives                    |     ☑     |     ☑      |    ☑     |   ☑   |    ☑    |
+| 2    | Sidebar header + lock                      |     ☑     |     ☑      |    ☑     |   ☑   |    ☑    |
+| 3    | Geometry (anchors, units, name, 3D)        |     ☑     |     ☑      |    ☑     |   ☑   |    ☑    |
+| 4    | Appearance 2.0 (gradient, radius, opacity) |     ☑     |     ☑      |    ☑     |   ☑   |    ☑    |
+| 5    | Typography + text effects                  |     ☑     |     ☑      |    ☑     |   ☑   |    ☑    |
+| 6    | Path panel parity                          |     ☑     |     ☑      |    ☑     |   ☑   |    ☑    |
+| 7    | Image + mask workflow                      |     ☑     |     ☑      |    ☑     |   ☑   |    ☑    |
+| 8    | Group panel completeness                   |     ☑     |     ☑      |    ☑     |   ☑   |    ☑    |
+| 9    | Animation mode property editing            |     ☑     |     ☑      |    ☑     |   ☑   |    ☑    |
 | 10   | Cross-panel polish + accordion defaults    |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
 | 11   | Demo + cross-region CT                     |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
+
+### UX Walk-Through Record (2026-04-17)
+
+Walk-through scope: Units 1-9 as the "art director" persona in the demo shell, with targeted behavior checks and current quality/CT gate confirmation.
+
+- [x] Discoverability check: panel controls are grouped into labeled sections and reachable from the default shell chrome without docs.
+- [x] Raw technical string check: default properties flows do not expose raw grammar entry as the primary path; advanced-only paths remain gated.
+- [x] Immediate feedback check: targeted property editing and transform interaction tests pass and reflect edits on preview/canvas.
+- [x] Undo granularity check: undo/redo behavior tests pass for logical user actions (including toolbar and transform interactions).
+- [x] Keyboard/focus check: accessibility-focused tests pass for control activation and dialog focus behavior.
+- [x] Locked-state check: sidebar context header and lock behavior tests pass.
+- [x] Animation-mode routing check: animation mode appears only for selected keyframes and clears on deselection.
+
+Validation references run during this walk:
+
+- `runTests` targeted suites: `panels.animation-mode.test.tsx`, `sidebar-context-header.test.tsx`, `demo-app.sidebar.test.tsx` (16 passed, 0 failed).
+- `npm run quality -w @broadset/ui` (pass).
+- `npm run quality -w @broadset/demo` (pass).
+- `npm run ct -w @broadset/ui && npm run ct -w @broadset/demo` (pass).
 
 ---
 
