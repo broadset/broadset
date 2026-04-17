@@ -6,10 +6,13 @@ import type { CustomPanelProps } from './panels';
 import { PropertiesSidebar } from './panels';
 import {
   BASE_ELEMENT,
+  ELLIPSE_ELEMENT,
   GROUP_ELEMENT,
   IMAGE_ELEMENT,
   PATH_ELEMENT,
   QRCODE_ELEMENT,
+  RECTANGLE_ELEMENT,
+  SVG_ELEMENT,
   TEXT_ELEMENT,
 } from './panels-test-helpers';
 
@@ -242,5 +245,99 @@ describe('PropertiesSidebar', () => {
     render(<PropertiesSidebar elements={[BASE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
 
     expect(screen.queryByText('Animation Builder')).toBeNull();
+  });
+
+  /** @description Unit 10 default expansion rules must vary by element type so the most likely first edit is visible immediately. */
+  it('expands the correct top-level accordion sections by element type', () => {
+    const headingBySectionId = {
+      geometry: 'Geometry',
+      typography: 'Typography',
+      appearance: 'Appearance',
+      'path-stroke': 'Path Properties',
+      'image-source': 'Image',
+      'group-settings': 'Group',
+    } as const;
+
+    type SectionId = keyof typeof headingBySectionId;
+
+    const assertExpanded = (element: typeof TEXT_ELEMENT, expandedSectionIds: readonly SectionId[]): void => {
+      const view = render(<PropertiesSidebar elements={[element]} documentMode="screen" onUpdate={() => undefined} />);
+
+      for (const sectionId of expandedSectionIds) {
+        const heading = headingBySectionId[sectionId];
+
+        expect(screen.getByRole('button', { name: heading }).getAttribute('aria-expanded')).toBe('true');
+      }
+
+      view.unmount();
+    };
+
+    assertExpanded(TEXT_ELEMENT, ['typography', 'geometry']);
+    assertExpanded(RECTANGLE_ELEMENT, ['appearance', 'geometry']);
+    assertExpanded(ELLIPSE_ELEMENT, ['appearance', 'geometry']);
+    assertExpanded(SVG_ELEMENT, ['path-stroke', 'geometry']);
+    assertExpanded(PATH_ELEMENT, ['path-stroke', 'geometry']);
+    assertExpanded(IMAGE_ELEMENT, ['image-source', 'geometry']);
+    assertExpanded(GROUP_ELEMENT, ['group-settings']);
+  });
+
+  /** @description Unit 10 a11y smoke requires every visible form control in the properties region to expose an accessible name. */
+  it('ensures visible controls in the properties region are accessible by name', () => {
+    render(<PropertiesSidebar elements={[TEXT_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    const region = screen.getByRole('region', { name: 'Properties' });
+    const namedButtons = screen.queryAllByRole('button', { name: /.+/ });
+    const controls = [
+      ...namedButtons,
+      ...screen.queryAllByRole('checkbox'),
+      ...screen.getAllByRole('textbox'),
+      ...screen.queryAllByRole('spinbutton'),
+      ...screen.queryAllByRole('combobox'),
+      ...screen.queryAllByRole('switch'),
+    ];
+
+    expect(namedButtons.length).toBeGreaterThan(0);
+
+    for (const control of controls) {
+      const ariaLabel = control.getAttribute('aria-label');
+      const labelElement =
+        control.id.length > 0 ? region.querySelector<HTMLLabelElement>(`label[for="${control.id}"]`) : null;
+      const labelText = labelElement === null ? '' : labelElement.textContent.trim();
+      const controlText = control.textContent.trim();
+      const accessibleName =
+        ariaLabel !== null && ariaLabel.length > 0 ? ariaLabel
+        : labelText.length > 0 ? labelText
+        : controlText;
+
+      expect(accessibleName.length).toBeGreaterThan(0);
+    }
+  });
+
+  /** @description Unit 10 keyboard polish requires deterministic top-to-bottom focus ordering for visible text-element controls. */
+  it('keeps top-to-bottom focusable order stable for text element panels', () => {
+    render(<PropertiesSidebar elements={[TEXT_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
+
+    const region = screen.getByRole('region', { name: 'Properties' });
+    const focusableElements = Array.from(
+      region.querySelectorAll<HTMLElement>('button,input,select,textarea,[tabindex]:not([tabindex="-1"])'),
+    ).filter((element) => !element.hasAttribute('disabled'));
+
+    const labels = focusableElements
+      .map((element) => {
+        const ariaLabel = element.getAttribute('aria-label');
+        const text = element.textContent.trim();
+
+        return typeof ariaLabel === 'string' && ariaLabel.length > 0 ? ariaLabel : text;
+      })
+      .filter((value) => value.length > 0);
+
+    const elementNameIndex = labels.indexOf('Element name');
+    const rotationIndex = labels.indexOf('Rotation');
+    const fontFamilyIndex = labels.indexOf('Font family');
+
+    expect(elementNameIndex).toBeGreaterThanOrEqual(0);
+    expect(rotationIndex).toBeGreaterThan(elementNameIndex);
+    expect(fontFamilyIndex).toBeGreaterThan(rotationIndex);
+    expect(labels).toMatchSnapshot('text-element-tab-order');
   });
 });

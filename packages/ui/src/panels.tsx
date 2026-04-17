@@ -26,6 +26,7 @@ export type {
   PropertyFieldAdapter,
   PropertyValue,
 } from './panel-types';
+export { FieldShell } from './panel-types';
 export type { PropertiesSidebarProps } from './properties-sidebar';
 export { PropertiesSidebar } from './properties-sidebar';
 export type {

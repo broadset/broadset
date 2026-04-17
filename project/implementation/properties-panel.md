@@ -503,9 +503,9 @@ Goal: Make every panel primitive art-director-grade before building on top of th
 
 ### Unit 10 — Cross-Panel UX Polish + Accordion Defaults
 
-- [ ] tests: red
-- [ ] impl: green
-- [ ] refactor: done
+- [x] tests: red
+- [x] impl: green
+- [x] refactor: done
 
 **Red tests required**
 

@@ -44,6 +44,20 @@ function getElementTypeLabel(type: string): string {
   return ELEMENT_TYPE_LABELS[type] ?? 'Element';
 }
 
+const DEFAULT_EXPANDED_BY_TYPE: Readonly<Record<string, readonly string[]>> = {
+  ellipse: ['appearance', 'geometry'],
+  group: ['group-settings'],
+  image: ['image-source', 'geometry'],
+  path: ['path-stroke', 'geometry'],
+  rectangle: ['appearance', 'geometry'],
+  svg: ['path-stroke', 'geometry'],
+  text: ['typography', 'geometry'],
+};
+
+function getDefaultExpandedKeys(type: string): readonly string[] {
+  return DEFAULT_EXPANDED_BY_TYPE[type] ?? ['geometry', 'appearance'];
+}
+
 /* ------------------------------------------------------------------ */
 /*  PropertiesSidebar — main panel orchestrator                        */
 /* ------------------------------------------------------------------ */
@@ -169,9 +183,9 @@ export function PropertiesSidebar({
   const isClock = primary.type === 'clock';
   const isTicker = primary.type === 'ticker';
   const showSpacing = profile.typography || isGroup;
-  const showPathProperties = profile.svgStrokeFill || profile.pathEditing;
+  const showPathProperties = profile.svgStrokeFill || profile.pathEditing || primary.type === 'svg';
 
-  const defaultExpanded = ['geometry', 'appearance'];
+  const defaultExpanded = getDefaultExpandedKeys(primary.type);
 
   return (
     <aside aria-label="Properties" role="region" className="p-3" style={glassPanelStyle()}>
@@ -345,7 +359,7 @@ export function PropertiesSidebar({
 
             {/* 8. Path Properties */}
             {showPathProperties ?
-              <Accordion.Item id="path-properties">
+              <Accordion.Item id="path-stroke">
                 <Accordion.Heading>
                   <Accordion.Trigger>Path Properties</Accordion.Trigger>
                 </Accordion.Heading>
@@ -376,7 +390,7 @@ export function PropertiesSidebar({
 
             {/* 9. Image */}
             {isImage ?
-              <Accordion.Item id="image">
+              <Accordion.Item id="image-source">
                 <Accordion.Heading>
                   <Accordion.Trigger>Image</Accordion.Trigger>
                 </Accordion.Heading>
@@ -423,7 +437,7 @@ export function PropertiesSidebar({
 
             {/* 12. Group */}
             {isGroup ?
-              <Accordion.Item id="group">
+              <Accordion.Item id="group-settings">
                 <Accordion.Heading>
                   <Accordion.Trigger>Group</Accordion.Trigger>
                 </Accordion.Heading>

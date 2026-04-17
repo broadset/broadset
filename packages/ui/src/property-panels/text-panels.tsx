@@ -5,7 +5,7 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 
 import { ColorInput, CssLengthInput, NumField, SegmentedSwitcher, ShadowEditor, TextStrokeInput } from '../inputs';
-import { ICON_SIZE, SelectField, TEXT_TRANSFORM_OPTIONS, VERTICAL_ALIGNMENT_OPTIONS } from '../panel-types';
+import { FieldShell, ICON_SIZE, SelectField, TEXT_TRANSFORM_OPTIONS, VERTICAL_ALIGNMENT_OPTIONS } from '../panel-types';
 import { color, font } from '../tokens';
 import { PropertyField } from './property-editing-context';
 
@@ -113,9 +113,8 @@ export function TypographyPanel({
         />
       </PropertyField>
 
-      <div className="flex flex-col gap-1">
-        <span style={{ color: color('muted'), fontSize: font('label') }}>Formatting</span>
-        <ButtonGroup aria-label="Formatting">
+      <FieldShell label="Formatting" inputId="text-formatting-controls">
+        <ButtonGroup id="text-formatting-controls" aria-label="Formatting">
           <PropertyField propertyKey="fontWeight" defaultValue={fontWeight}>
             <Tooltip delay={0}>
               <Button
@@ -177,7 +176,7 @@ export function TypographyPanel({
             </div>
           </PropertyField>
         </ButtonGroup>
-      </div>
+      </FieldShell>
 
       <PropertyField propertyKey="textAlignment" defaultValue={alignment}>
         <SegmentedSwitcher

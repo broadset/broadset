@@ -1,7 +1,7 @@
 import type { BooleanOperation, TemplateGroupRole, VerticalAlignment } from '@broadset/model';
 import { ListBox, NumberField, Select } from '@heroui/react';
 import type { JSX, ReactNode } from 'react';
-import { createContext } from 'react';
+import { cloneElement, createContext, isValidElement, useId } from 'react';
 
 import { color, font } from './tokens';
 
@@ -218,15 +218,56 @@ export function isValidClipPathCss(value: string): boolean {
 
 export function FieldShell({
   label,
+  inputId,
+  description,
+  error,
   children,
 }: {
   readonly label: string;
-  readonly children: JSX.Element;
+  readonly inputId?: string | undefined;
+  readonly description?: string | undefined;
+  readonly error?: string | undefined;
+  readonly children: ReactNode;
 }): JSX.Element {
+  const fallbackInputId = useId();
+  const resolvedInputId = inputId ?? fallbackInputId;
+  const descriptionText = description !== undefined && description.trim().length > 0 ? description : undefined;
+  const errorText = error !== undefined && error.trim().length > 0 ? error : undefined;
+  const descriptionId = descriptionText !== undefined ? `${resolvedInputId}-description` : undefined;
+  const errorId = errorText !== undefined ? `${resolvedInputId}-error` : undefined;
+  const ariaDescribedBy = [descriptionId, errorId].filter((value): value is string => value !== undefined).join(' ');
+  const childAriaProps: { id?: string; 'aria-describedby'?: string; 'aria-invalid'?: true } = {};
+
+  if (inputId === undefined) {
+    childAriaProps.id = resolvedInputId;
+  }
+
+  if (ariaDescribedBy.length > 0) {
+    childAriaProps['aria-describedby'] = ariaDescribedBy;
+  }
+
+  if (errorText !== undefined) {
+    childAriaProps['aria-invalid'] = true;
+  }
+
+  const normalizedChildren = isValidElement(children) ? cloneElement(children, childAriaProps) : children;
+
   return (
     <div className="flex flex-col gap-1">
-      <span style={{ color: color('muted'), fontSize: font('label') }}>{label}</span>
-      {children}
+      <label htmlFor={resolvedInputId} style={{ color: color('muted'), fontSize: font('label') }}>
+        {label}
+      </label>
+      {normalizedChildren}
+      {descriptionText !== undefined ?
+        <span id={descriptionId} style={{ color: color('muted'), fontSize: font('label') }}>
+          {descriptionText}
+        </span>
+      : null}
+      {errorText !== undefined ?
+        <span id={errorId} role="alert" style={{ color: color('danger'), fontSize: font('label') }}>
+          {errorText}
+        </span>
+      : null}
     </div>
   );
 }
