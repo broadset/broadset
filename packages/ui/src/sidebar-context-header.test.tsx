@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import { SidebarContextHeader } from './sidebar-context-header';
 
@@ -56,5 +56,42 @@ describe('SidebarContextHeader', () => {
     render(<SidebarContextHeader icon={<span />} label="Properties" subtitle="Rectangle — element-1" />);
 
     expect(screen.getByText('Rectangle — element-1')).toBeInTheDocument();
+  });
+
+  /** @description Type and count chips must render when supplied so selection context stays visible in the header. */
+  it('renders type and count chips when labels are provided', () => {
+    render(
+      <SidebarContextHeader icon={<span />} label="Properties" typeChipLabel="Rectangle" countChipLabel="3 elements" />,
+    );
+
+    expect(screen.getByText('Rectangle')).toBeInTheDocument();
+    expect(screen.getByText('3 elements')).toBeInTheDocument();
+  });
+
+  /** @description Lock button must expose a stable aria-label and trigger onToggleLock for keyboard and pointer users. */
+  it('renders lock button and invokes callback', () => {
+    const onToggleLock = jest.fn(() => undefined);
+
+    render(<SidebarContextHeader icon={<span />} label="Properties" isLocked={false} onToggleLock={onToggleLock} />);
+
+    const lockButton = screen.getByRole('button', { name: 'Lock element' });
+
+    expect(lockButton.querySelector('svg')).not.toBeNull();
+    fireEvent.click(lockButton);
+    expect(onToggleLock).toHaveBeenCalledTimes(1);
+  });
+
+  /** @description Locked headers must flip the accessible lock label to unlock for clear state feedback. */
+  it('renders unlock aria label when locked', () => {
+    render(<SidebarContextHeader icon={<span />} label="Properties" isLocked onToggleLock={() => undefined} />);
+
+    expect(screen.getByRole('button', { name: 'Unlock element' })).toBeInTheDocument();
+  });
+
+  /** @description Animation mode chip must appear only when explicitly enabled and use fallback label text when omitted. */
+  it('renders animation mode chip with fallback label', () => {
+    render(<SidebarContextHeader icon={<span />} label="Animation" showAnimationMode />);
+
+    expect(screen.getByText('Animation Mode')).toBeInTheDocument();
   });
 });

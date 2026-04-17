@@ -98,6 +98,7 @@ export interface PanelElement {
   readonly id: string;
   readonly type: string;
   readonly name: string;
+  readonly locked?: boolean | undefined;
   readonly content: string;
   readonly x: number;
   readonly y: number;

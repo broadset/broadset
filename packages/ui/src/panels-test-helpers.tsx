@@ -51,6 +51,7 @@ export const BASE_ELEMENT: PanelElement = {
   height: 100,
   id: 'base-id',
   isolation: 'auto',
+  locked: false,
   letterSpacing: 0,
   lineHeight: 'normal',
   maskType: 'none',

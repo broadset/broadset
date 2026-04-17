@@ -297,9 +297,9 @@ Goal: Make every panel primitive art-director-grade before building on top of th
 
 ### Unit 2 — Sidebar Context Header + Lock UX
 
-- [ ] tests: red
-- [ ] impl: green
-- [ ] refactor: done
+- [x] tests: red
+- [x] impl: green
+- [x] refactor: done
 
 **Red tests required** (`panels.sidebar.test.tsx`)
 
@@ -663,7 +663,7 @@ Rationale: build trustworthy primitives → remove raw-string UX debt → add an
 | Unit | Area                                       | Tests Red | Impl Green | Refactor | Gates | UX Walk |
 | ---- | ------------------------------------------ | :-------: | :--------: | :------: | :---: | :-----: |
 | 1    | Shared input primitives                    |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
-| 2    | Sidebar header + lock                      |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
+| 2    | Sidebar header + lock                      |     ☑     |     ☑      |    ☑     |   ☑   |    ☐    |
 | 3    | Geometry (anchors, units, name, 3D)        |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
 | 4    | Appearance 2.0 (gradient, radius, opacity) |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
 | 5    | Typography + text effects                  |     ☐     |     ☐      |    ☐     |   ☐   |    ☐    |
