@@ -34,3 +34,12 @@
 1. Keep emitting `'url'` for custom masks (diverges from UI spec and model schema semantics).
 2. Hard-switch to `'custom'` and reject legacy `'url'` in panel resolution (could break older fixtures/tests still carrying `'url'`).
    **Rationale:** This keeps behavior spec-aligned for new edits while preserving resilience when loading prior data or tests that still contain legacy custom mask values.
+
+### Unit 10.0 — SVG Path Panel Visibility Alignment
+
+**Decision:** Force `Path Properties` visibility for SVG elements in `PropertiesSidebar` by extending the visibility condition to include `primary.type === 'svg'`.
+**Alternatives considered:**
+
+1. Keep visibility solely capability-profile driven (`profile.svgStrokeFill || profile.pathEditing`) and remove SVG defaults from the expanded-section map.
+2. Leave SVG in the defaults map but tolerate the missing panel for some capability-profile configurations.
+   **Rationale:** Unit 10's default-expanded behavior explicitly includes SVG under `path-stroke`. Showing the panel for SVG avoids a mismatch where defaults point to a non-rendered section, and preserves a consistent first-edit workflow for vector elements.
