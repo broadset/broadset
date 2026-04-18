@@ -3,7 +3,7 @@ import { Accordion, Button, Input, ListBox, Select, Slider, Switch, TextArea } f
 import type { JSX } from 'react';
 import { useState } from 'react';
 
-import { ColorInput, NumField } from '../inputs';
+import { ColorInput, FieldRow, NumField, SegmentedSwitcher } from '../inputs';
 import { type MediaAsset, MediaLibraryModal } from '../modals';
 import type { PropertyValue } from '../panel-types';
 import {
@@ -14,7 +14,7 @@ import {
   LINEJOIN_OPTIONS,
   SelectField,
 } from '../panel-types';
-import { color, font } from '../tokens';
+import { color, font, sp } from '../tokens';
 
 const OPACITY_PERCENT_MIN = 0;
 const OPACITY_PERCENT_MAX = 100;
@@ -28,6 +28,8 @@ const OBJECT_FIT_OPTIONS_WITH_LABELS = [
   { label: 'None', value: 'none' },
   { label: 'Scale down', value: 'scale-down' },
 ] as const;
+
+type ObjectFitValue = (typeof OBJECT_FIT_OPTIONS_WITH_LABELS)[number]['value'];
 
 const FILL_RULE_LABELS = [
   { value: 'nonzero', label: 'Non-zero' },
@@ -96,8 +98,12 @@ export function PathPropertiesPanel({
   const fillRuleLabel = toFillRuleLabel(fillRule);
 
   return (
-    <section aria-label="Path Properties" role="region" className="flex flex-col gap-2">
-      <div className="flex gap-2">
+    <section
+      aria-label="Path Properties"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
+    >
+      <div style={{ display: 'flex', gap: sp('sp-02'), minWidth: 0 }}>
         <Button
           aria-label={isDrawing ? 'Stop drawing' : 'Draw'}
           size="sm"
@@ -135,62 +141,95 @@ export function PathPropertiesPanel({
             <Accordion.Trigger>Stroke</Accordion.Trigger>
           </Accordion.Heading>
           <Accordion.Panel>
-            <div className="flex flex-col gap-2">
-              <ColorInput
-                label="Stroke"
-                value={stroke}
-                onChange={(v) => {
-                  onUpdate('stroke', v);
-                }}
-              />
-              <NumField
-                label="Stroke width"
-                value={strokeWidth}
-                min={0}
-                step={0.5}
-                onChange={(v) => {
-                  onUpdate('strokeWidth', v);
-                }}
-              />
-              <Slider
-                aria-label="Stroke opacity"
-                maxValue={OPACITY_PERCENT_MAX}
-                minValue={OPACITY_PERCENT_MIN}
-                step={OPACITY_PERCENT_STEP}
-                value={strokeOpacityPercent}
-                onChange={(v: number | readonly number[]) => {
-                  const percent = typeof v === 'number' ? v : Number(v);
+            <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}>
+              <FieldRow label="Stroke">
+                <div
+                  style={{
+                    display: 'grid',
+                    gap: sp('sp-02'),
+                    gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+                    minWidth: 0,
+                  }}
+                >
+                  <ColorInput
+                    compact
+                    label="Stroke"
+                    value={stroke}
+                    onChange={(v) => {
+                      onUpdate('stroke', v);
+                    }}
+                  />
+                  <NumField
+                    compact
+                    label="Stroke width"
+                    value={strokeWidth}
+                    min={0}
+                    step={0.5}
+                    onChange={(v) => {
+                      onUpdate('strokeWidth', v);
+                    }}
+                  />
+                </div>
+              </FieldRow>
 
-                  onUpdate('strokeOpacity', percent / OPACITY_PERCENT_MAX);
-                }}
+              <FieldRow
+                label="Stroke opacity"
+                trailing={
+                  <span
+                    style={{ color: color('muted'), fontSize: font('label') }}
+                  >{`${String(strokeOpacityPercent)}%`}</span>
+                }
               >
-                <Slider.Track>
-                  <Slider.Fill />
-                  <Slider.Thumb />
-                </Slider.Track>
-              </Slider>
-              <p
-                style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}
-              >{`${String(strokeOpacityPercent)}%`}</p>
-              <SelectField
-                label="Line cap"
-                value={strokeLinecap}
-                options={[...LINECAP_OPTIONS]}
-                onUpdate={onUpdate}
-                updateKey="strokeLinecap"
-              />
-              <SelectField
-                label="Line join"
-                value={strokeLinejoin}
-                options={[...LINEJOIN_OPTIONS]}
-                onUpdate={onUpdate}
-                updateKey="strokeLinejoin"
-              />
+                <Slider
+                  aria-label="Stroke opacity"
+                  maxValue={OPACITY_PERCENT_MAX}
+                  minValue={OPACITY_PERCENT_MIN}
+                  step={OPACITY_PERCENT_STEP}
+                  value={strokeOpacityPercent}
+                  onChange={(v: number | readonly number[]) => {
+                    const percent = typeof v === 'number' ? v : Number(v);
+
+                    onUpdate('strokeOpacity', percent / OPACITY_PERCENT_MAX);
+                  }}
+                >
+                  <Slider.Track>
+                    <Slider.Fill />
+                    <Slider.Thumb />
+                  </Slider.Track>
+                </Slider>
+              </FieldRow>
+
+              <FieldRow label="Line">
+                <div
+                  style={{
+                    display: 'grid',
+                    gap: sp('sp-02'),
+                    gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+                    minWidth: 0,
+                  }}
+                >
+                  <SelectField
+                    label="Line cap"
+                    value={strokeLinecap}
+                    options={[...LINECAP_OPTIONS]}
+                    onUpdate={onUpdate}
+                    updateKey="strokeLinecap"
+                  />
+                  <SelectField
+                    label="Line join"
+                    value={strokeLinejoin}
+                    options={[...LINEJOIN_OPTIONS]}
+                    onUpdate={onUpdate}
+                    updateKey="strokeLinejoin"
+                  />
+                </div>
+              </FieldRow>
 
               <Button
                 aria-label="Stroke advanced"
                 size="sm"
                 variant="ghost"
+                style={{ alignSelf: 'flex-start' }}
                 onPress={() => {
                   setShowStrokeAdvanced((current) => !current);
                 }}
@@ -199,24 +238,33 @@ export function PathPropertiesPanel({
               </Button>
 
               {showStrokeAdvanced ?
-                <>
-                  <FieldShell label="Dash pattern">
+                <FieldRow label="Dash">
+                  <div
+                    style={{
+                      display: 'grid',
+                      gap: sp('sp-02'),
+                      gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)',
+                      minWidth: 0,
+                    }}
+                  >
                     <Input
                       aria-label="Dash pattern"
+                      placeholder="e.g. 4 2"
                       value={strokeDasharray}
                       onChange={(e) => {
                         onUpdate('strokeDasharray', e.currentTarget.value);
                       }}
                     />
-                  </FieldShell>
-                  <NumField
-                    label="Dash offset"
-                    value={strokeDashoffset}
-                    onChange={(v) => {
-                      onUpdate('strokeDashoffset', v);
-                    }}
-                  />
-                </>
+                    <NumField
+                      compact
+                      label="Dash offset"
+                      value={strokeDashoffset}
+                      onChange={(v) => {
+                        onUpdate('strokeDashoffset', v);
+                      }}
+                    />
+                  </div>
+                </FieldRow>
               : null}
             </div>
           </Accordion.Panel>
@@ -227,36 +275,45 @@ export function PathPropertiesPanel({
             <Accordion.Trigger>Fill</Accordion.Trigger>
           </Accordion.Heading>
           <Accordion.Panel>
-            <div className="flex flex-col gap-2">
-              <ColorInput
-                label="Fill"
-                value={fill}
-                onChange={(v) => {
-                  onUpdate('fill', v);
-                }}
-              />
-              <Slider
-                aria-label="Fill opacity"
-                maxValue={OPACITY_PERCENT_MAX}
-                minValue={OPACITY_PERCENT_MIN}
-                step={OPACITY_PERCENT_STEP}
-                value={fillOpacityPercent}
-                onChange={(v: number | readonly number[]) => {
-                  const percent = typeof v === 'number' ? v : Number(v);
+            <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}>
+              <FieldRow label="Fill">
+                <ColorInput
+                  label="Fill"
+                  value={fill}
+                  onChange={(v) => {
+                    onUpdate('fill', v);
+                  }}
+                />
+              </FieldRow>
 
-                  onUpdate('fillOpacity', percent / OPACITY_PERCENT_MAX);
-                }}
+              <FieldRow
+                label="Fill opacity"
+                trailing={
+                  <span
+                    style={{ color: color('muted'), fontSize: font('label') }}
+                  >{`${String(fillOpacityPercent)}%`}</span>
+                }
               >
-                <Slider.Track>
-                  <Slider.Fill />
-                  <Slider.Thumb />
-                </Slider.Track>
-              </Slider>
-              <p
-                style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}
-              >{`${String(fillOpacityPercent)}%`}</p>
+                <Slider
+                  aria-label="Fill opacity"
+                  maxValue={OPACITY_PERCENT_MAX}
+                  minValue={OPACITY_PERCENT_MIN}
+                  step={OPACITY_PERCENT_STEP}
+                  value={fillOpacityPercent}
+                  onChange={(v: number | readonly number[]) => {
+                    const percent = typeof v === 'number' ? v : Number(v);
 
-              <FieldShell label="Inside rule">
+                    onUpdate('fillOpacity', percent / OPACITY_PERCENT_MAX);
+                  }}
+                >
+                  <Slider.Track>
+                    <Slider.Fill />
+                    <Slider.Thumb />
+                  </Slider.Track>
+                </Slider>
+              </FieldRow>
+
+              <FieldRow label="Inside rule">
                 <Select
                   aria-label="Inside rule"
                   value={fillRuleLabel}
@@ -280,7 +337,7 @@ export function PathPropertiesPanel({
                     </ListBox>
                   </Select.Popover>
                 </Select>
-              </FieldShell>
+              </FieldRow>
             </div>
           </Accordion.Panel>
         </Accordion.Item>
@@ -290,11 +347,12 @@ export function PathPropertiesPanel({
             <Accordion.Trigger>Shape</Accordion.Trigger>
           </Accordion.Heading>
           <Accordion.Panel>
-            <div className="flex flex-col gap-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0, width: '100%' }}>
               <Button
                 aria-label="Advanced / Power user"
                 size="sm"
                 variant="ghost"
+                style={{ alignSelf: 'flex-start' }}
                 onPress={() => {
                   setShowShapeAdvanced((current) => !current);
                 }}
@@ -304,13 +362,13 @@ export function PathPropertiesPanel({
 
               {showShapeAdvanced ?
                 <>
-                  <FieldShell label="Path preview">
+                  <FieldRow label="Path preview">
                     <Input
                       aria-label="Path preview"
                       readOnly
                       value={content.trim() === '' ? '(empty path)' : content}
                     />
-                  </FieldShell>
+                  </FieldRow>
                   <Switch
                     aria-label="Show path source"
                     isSelected={showPathSource}
@@ -321,14 +379,14 @@ export function PathPropertiesPanel({
                     Show path source
                   </Switch>
                   {showPathSource ?
-                    <FieldShell label="Shape source">
+                    <FieldRow label="Shape source">
                       <TextArea
                         aria-label="Shape source"
                         readOnly
                         value={content}
                         style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
                       />
-                    </FieldShell>
+                    </FieldRow>
                   : null}
                 </>
               : null}
@@ -387,49 +445,68 @@ export function ImagePanel({
   const categories = ['All', ...Array.from(new Set(assets.map((asset) => asset.category)))];
 
   return (
-    <section aria-label="Image" role="region" className="flex flex-col gap-2">
-      <FieldShell label="Selected source">
-        <div
+    <section
+      aria-label="Image"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0, width: '100%' }}
+    >
+      <div
+        style={{
+          alignItems: 'center',
+          background: color('field-background'),
+          border: `1px solid ${color('border')}`,
+          borderRadius: 6,
+          display: 'flex',
+          gap: sp('sp-02'),
+          minWidth: 0,
+          padding: sp('sp-02'),
+        }}
+      >
+        <img
+          alt="Selected image thumbnail"
+          src={content}
+          style={{ borderRadius: 4, flex: '0 0 auto', height: 36, objectFit: 'cover', width: 36 }}
+        />
+        <span
           style={{
-            alignItems: 'center',
-            border: `1px solid ${color('border')}`,
-            borderRadius: 8,
-            display: 'flex',
-            gap: 8,
-            padding: 8,
+            color: color('foreground'),
+            flex: 1,
+            fontSize: font('body-compact'),
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}
         >
-          <img
-            alt="Selected image thumbnail"
-            src={content}
-            style={{ borderRadius: 6, height: 40, objectFit: 'cover', width: 40 }}
-          />
-          <span style={{ color: color('foreground'), fontSize: font('body-compact') }}>{selectedName}</span>
-        </div>
-      </FieldShell>
+          {selectedName}
+        </span>
+      </div>
 
-      <Button
-        aria-label="Choose from library"
-        variant="primary"
-        onPress={() => {
-          setIsMediaLibraryOpen(true);
-        }}
-      >
-        Choose from library
-      </Button>
-
-      <Button
-        aria-label="Replace URL"
-        variant="ghost"
-        onPress={() => {
-          setShowUrlInput((current) => !current);
-        }}
-      >
-        Replace URL...
-      </Button>
+      <div style={{ display: 'flex', gap: sp('sp-02'), minWidth: 0 }}>
+        <Button
+          aria-label="Choose from library"
+          size="sm"
+          variant="primary"
+          onPress={() => {
+            setIsMediaLibraryOpen(true);
+          }}
+        >
+          Choose from library
+        </Button>
+        <Button
+          aria-label="Replace URL"
+          size="sm"
+          variant="ghost"
+          onPress={() => {
+            setShowUrlInput((current) => !current);
+          }}
+        >
+          URL…
+        </Button>
+      </div>
 
       {showUrlInput ?
-        <FieldShell label="Source URL">
+        <FieldRow label="Source URL">
           <Input
             aria-label="Source URL"
             value={content}
@@ -438,7 +515,7 @@ export function ImagePanel({
               onUpdate('assetId', EMPTY_ASSET_ID_VALUE);
             }}
           />
-        </FieldShell>
+        </FieldRow>
       : null}
 
       {isMediaLibraryOpen ?
@@ -467,41 +544,25 @@ export interface ObjectFitPanelProps {
 }
 
 export function ObjectFitPanel({ objectFit, onUpdate }: ObjectFitPanelProps): JSX.Element {
-  const selectedLabel = OBJECT_FIT_OPTIONS_WITH_LABELS.find((option) => option.value === objectFit)?.label ?? 'Contain';
+  const current: ObjectFitValue =
+    OBJECT_FIT_OPTIONS_WITH_LABELS.find((option) => option.value === objectFit)?.value ?? 'contain';
 
   return (
-    <section aria-label="Object Fit" role="region" className="flex flex-col gap-2">
-      <FieldShell label="Object fit">
-        <Select
-          aria-label="Object fit"
-          value={selectedLabel}
-          onChange={(selection) => {
-            if (selection === null) {
-              return;
-            }
-
-            const selectedOption = OBJECT_FIT_OPTIONS_WITH_LABELS.find((option) => option.label === String(selection));
-
-            if (selectedOption !== undefined) {
-              onUpdate('objectFit', selectedOption.value);
-            }
+    <section
+      aria-label="Object Fit"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0, width: '100%' }}
+    >
+      <FieldRow label="Fit">
+        <SegmentedSwitcher
+          ariaLabel="Object fit"
+          value={current}
+          options={OBJECT_FIT_OPTIONS_WITH_LABELS.map((option) => ({ label: option.label, value: option.value }))}
+          onChange={(nextValue) => {
+            onUpdate('objectFit', nextValue);
           }}
-        >
-          <Select.Trigger>
-            <Select.Value />
-            <Select.Indicator />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox>
-              {OBJECT_FIT_OPTIONS_WITH_LABELS.map((option) => (
-                <ListBox.Item id={option.label} key={option.value} textValue={option.label}>
-                  {option.label}
-                </ListBox.Item>
-              ))}
-            </ListBox>
-          </Select.Popover>
-        </Select>
-      </FieldShell>
+        />
+      </FieldRow>
     </section>
   );
 }
@@ -522,8 +583,12 @@ export function QrCodePanel({
   onUpdate,
 }: QrCodePanelProps): JSX.Element {
   return (
-    <section aria-label="QR Code" role="region" className="flex flex-col gap-2">
-      <FieldShell label="Content">
+    <section
+      aria-label="QR Code"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
+    >
+      <FieldRow label="Content">
         <Input
           aria-label="Content"
           value={content}
@@ -531,28 +596,45 @@ export function QrCodePanel({
             onUpdate('content', e.currentTarget.value);
           }}
         />
-      </FieldShell>
-      <SelectField
-        label="Error correction"
-        value={errorCorrection}
-        options={[...ERROR_CORRECTION_OPTIONS]}
-        onUpdate={onUpdate}
-        updateKey="errorCorrection"
-      />
-      <ColorInput
-        label="Foreground color"
-        value={foregroundColor}
-        onChange={(v) => {
-          onUpdate('qrForegroundColor', v);
-        }}
-      />
-      <ColorInput
-        label="Background color"
-        value={backgroundColor}
-        onChange={(v) => {
-          onUpdate('qrBackgroundColor', v);
-        }}
-      />
+      </FieldRow>
+
+      <FieldRow label="Error correction">
+        <SelectField
+          label="Error correction"
+          value={errorCorrection}
+          options={[...ERROR_CORRECTION_OPTIONS]}
+          onUpdate={onUpdate}
+          updateKey="errorCorrection"
+        />
+      </FieldRow>
+
+      <FieldRow label="Colors">
+        <div
+          style={{
+            display: 'grid',
+            gap: sp('sp-02'),
+            gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+            minWidth: 0,
+          }}
+        >
+          <ColorInput
+            compact
+            label="Foreground color"
+            value={foregroundColor}
+            onChange={(v) => {
+              onUpdate('qrForegroundColor', v);
+            }}
+          />
+          <ColorInput
+            compact
+            label="Background color"
+            value={backgroundColor}
+            onChange={(v) => {
+              onUpdate('qrBackgroundColor', v);
+            }}
+          />
+        </div>
+      </FieldRow>
     </section>
   );
 }
@@ -578,7 +660,11 @@ export function GroupPanel({
   const isPrintMode = documentMode === 'print';
 
   return (
-    <section aria-label="Group" role="region" className="flex flex-col gap-2">
+    <section
+      aria-label="Group"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
+    >
       <FieldShell label="Group name">
         <Input
           aria-label="Group name"
@@ -588,48 +674,63 @@ export function GroupPanel({
           }}
         />
       </FieldShell>
-      <SelectField
-        label="Boolean operation"
-        value={booleanOperation ?? 'none'}
-        options={[...BOOLEAN_OPERATION_OPTIONS]}
-        onUpdate={(key, v) => {
-          onUpdate(key, v === 'none' ? '' : v);
-        }}
-        updateKey="booleanOperation"
-      />
-      <Slider
-        aria-label="Group opacity"
-        maxValue={OPACITY_PERCENT_MAX}
-        minValue={OPACITY_PERCENT_MIN}
-        step={OPACITY_PERCENT_STEP}
-        value={opacityPercent}
-        onChange={(v: number | readonly number[]) => {
-          const percent = typeof v === 'number' ? v : Number(v);
 
-          onUpdate('opacity', percent / OPACITY_PERCENT_MAX);
-        }}
+      <FieldRow
+        label="Opacity"
+        trailing={
+          <span style={{ color: color('muted'), fontSize: font('label') }}>{`${String(opacityPercent)}%`}</span>
+        }
       >
-        <Slider.Track>
-          <Slider.Fill />
-          <Slider.Thumb />
-        </Slider.Track>
-      </Slider>
-      <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>{`${String(opacityPercent)}%`}</p>
-      <Switch
-        aria-label="Clip children to group bounds"
-        isDisabled={isPrintMode}
-        isSelected={clipChildren}
-        onChange={(v) => {
-          onUpdate('clipChildren', v);
-        }}
-      >
-        Clip children to group bounds
-      </Switch>
-      {isPrintMode ?
-        <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>
-          Clip children is not available in this document mode.
-        </p>
-      : null}
+        <Slider
+          aria-label="Group opacity"
+          maxValue={OPACITY_PERCENT_MAX}
+          minValue={OPACITY_PERCENT_MIN}
+          step={OPACITY_PERCENT_STEP}
+          value={opacityPercent}
+          onChange={(v: number | readonly number[]) => {
+            const percent = typeof v === 'number' ? v : Number(v);
+
+            onUpdate('opacity', percent / OPACITY_PERCENT_MAX);
+          }}
+        >
+          <Slider.Track>
+            <Slider.Fill />
+            <Slider.Thumb />
+          </Slider.Track>
+        </Slider>
+      </FieldRow>
+
+      <FieldRow label="Clip">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-01'), minWidth: 0 }}>
+          <Switch
+            aria-label="Clip children to group bounds"
+            isDisabled={isPrintMode}
+            isSelected={clipChildren}
+            onChange={(v) => {
+              onUpdate('clipChildren', v);
+            }}
+          >
+            Clip children to group bounds
+          </Switch>
+          {isPrintMode ?
+            <span style={{ color: color('muted'), fontSize: font('label') }}>
+              Clip children is not available in this document mode.
+            </span>
+          : null}
+        </div>
+      </FieldRow>
+
+      <FieldRow label="Boolean operation">
+        <SelectField
+          label="Boolean operation"
+          value={booleanOperation ?? 'none'}
+          options={[...BOOLEAN_OPERATION_OPTIONS]}
+          onUpdate={(key, v) => {
+            onUpdate(key, v === 'none' ? '' : v);
+          }}
+          updateKey="booleanOperation"
+        />
+      </FieldRow>
     </section>
   );
 }

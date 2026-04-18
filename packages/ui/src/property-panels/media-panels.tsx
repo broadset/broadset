@@ -1,9 +1,10 @@
 import { Button, Input, Switch } from '@heroui/react';
-import { GripVertical, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, GripVertical, Plus, Trash2 } from 'lucide-react';
 import type { DragEvent as ReactDragEvent, JSX } from 'react';
 import { useState } from 'react';
 
-import { CLOCK_MODES, FieldShell, ICON_SIZE, NumericField, SelectField, TICKER_DIRECTIONS } from '../panel-types';
+import { FieldRow, NumField, ToggleRow } from '../inputs';
+import { CLOCK_MODES, FieldShell, ICON_SIZE, SelectField, TICKER_DIRECTIONS } from '../panel-types';
 import { sp } from '../tokens';
 
 export interface VideoPanelProps {
@@ -26,8 +27,12 @@ export function VideoPanel({
   onUpdate,
 }: VideoPanelProps): JSX.Element {
   return (
-    <section aria-label="Video" role="region" className="grid grid-cols-1 gap-2">
-      <FieldShell label="Source URL">
+    <section
+      aria-label="Video"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
+    >
+      <FieldRow label="Source URL">
         <Input
           aria-label="Source URL"
           value={sourceUrl}
@@ -35,50 +40,73 @@ export function VideoPanel({
             onUpdate('content', e.currentTarget.value);
           }}
         />
-      </FieldShell>
-      <Switch
-        aria-label="Autoplay"
-        isSelected={autoplay}
-        onChange={(v) => {
-          onUpdate('autoplay', v);
-        }}
-      >
-        Autoplay
-      </Switch>
-      <Switch
-        aria-label="Loop"
-        isSelected={loop}
-        onChange={(v) => {
-          onUpdate('loop', v);
-        }}
-      >
-        Loop
-      </Switch>
-      <Switch
-        aria-label="Muted"
-        isSelected={muted}
-        onChange={(v) => {
-          onUpdate('muted', v);
-        }}
-      >
-        Muted
-      </Switch>
-      <NumericField
-        label="Start Time (s)"
-        minValue={0}
-        value={startTime}
-        onValueChange={(v) => {
-          onUpdate('startTime', v);
-        }}
-      />
-      <NumericField
-        label="End Time (s)"
-        minValue={0}
-        value={endTime}
-        onValueChange={(v) => {
-          onUpdate('endTime', v);
-        }}
-      />
+      </FieldRow>
+
+      <FieldRow label="Playback">
+        <div
+          role="group"
+          aria-label="Playback flags"
+          style={{ display: 'flex', flexWrap: 'wrap', gap: sp('sp-03'), minWidth: 0 }}
+        >
+          <Switch
+            aria-label="Autoplay"
+            isSelected={autoplay}
+            onChange={(v) => {
+              onUpdate('autoplay', v);
+            }}
+          >
+            Autoplay
+          </Switch>
+          <Switch
+            aria-label="Loop"
+            isSelected={loop}
+            onChange={(v) => {
+              onUpdate('loop', v);
+            }}
+          >
+            Loop
+          </Switch>
+          <Switch
+            aria-label="Muted"
+            isSelected={muted}
+            onChange={(v) => {
+              onUpdate('muted', v);
+            }}
+          >
+            Muted
+          </Switch>
+        </div>
+      </FieldRow>
+
+      <FieldRow label="Trim" unit="s">
+        <div
+          style={{
+            display: 'grid',
+            gap: sp('sp-02'),
+            gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+            minWidth: 0,
+          }}
+        >
+          <NumField
+            compact
+            label="Start Time (s)"
+            min={0}
+            value={startTime}
+            onChange={(v) => {
+              onUpdate('startTime', v);
+            }}
+          />
+          <NumField
+            compact
+            label="End Time (s)"
+            min={0}
+            value={endTime}
+            onChange={(v) => {
+              onUpdate('endTime', v);
+            }}
+          />
+        </div>
+      </FieldRow>
     </section>
   );
 }
@@ -105,8 +133,12 @@ export function ClockPanel({
   const hasAbsoluteCountdown = isCountdown && countdownTo !== '';
 
   return (
-    <section aria-label="Clock" role="region" className="grid grid-cols-1 gap-2">
-      <FieldShell label="Format">
+    <section
+      aria-label="Clock"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
+    >
+      <FieldRow label="Format">
         <Input
           aria-label="Format"
           value={format}
@@ -114,48 +146,58 @@ export function ClockPanel({
             onUpdate('content', e.currentTarget.value);
           }}
         />
-      </FieldShell>
-      <SelectField
-        label="Mode"
-        options={[...CLOCK_MODES]}
-        updateKey="mode"
-        value={mode}
-        onUpdate={(_key, value) => {
-          onUpdate('mode', String(value));
-        }}
-      />
-      {isCountdownOrCountup && !hasAbsoluteCountdown ?
-        <FieldShell label="Start Value">
-          <Input
-            aria-label="Start Value"
-            value={startValue}
-            onChange={(e) => {
-              onUpdate('startValue', e.currentTarget.value);
-            }}
-          />
-        </FieldShell>
-      : null}
-      {isCountdown && !hasAbsoluteCountdown ?
-        <FieldShell label="Target Value">
-          <Input
-            aria-label="Target Value"
-            value={targetValue}
-            onChange={(e) => {
-              onUpdate('targetValue', e.currentTarget.value);
-            }}
-          />
-        </FieldShell>
-      : null}
-      {isCountdown ?
-        <FieldShell label="Countdown To">
-          <Input
-            aria-label="Countdown To"
-            value={countdownTo}
-            onChange={(e) => {
-              onUpdate('countdownTo', e.currentTarget.value);
-            }}
-          />
-        </FieldShell>
+      </FieldRow>
+
+      <FieldRow label="Mode">
+        <SelectField
+          label="Mode"
+          options={[...CLOCK_MODES]}
+          updateKey="mode"
+          value={mode}
+          onUpdate={(_key, value) => {
+            onUpdate('mode', String(value));
+          }}
+        />
+      </FieldRow>
+
+      {(isCountdownOrCountup && !hasAbsoluteCountdown) || isCountdown ?
+        <FieldRow label="Values">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0 }}>
+            {isCountdownOrCountup && !hasAbsoluteCountdown ?
+              <FieldShell label="Start value">
+                <Input
+                  aria-label="Start Value"
+                  value={startValue}
+                  onChange={(e) => {
+                    onUpdate('startValue', e.currentTarget.value);
+                  }}
+                />
+              </FieldShell>
+            : null}
+            {isCountdown && !hasAbsoluteCountdown ?
+              <FieldShell label="Target value">
+                <Input
+                  aria-label="Target Value"
+                  value={targetValue}
+                  onChange={(e) => {
+                    onUpdate('targetValue', e.currentTarget.value);
+                  }}
+                />
+              </FieldShell>
+            : null}
+            {isCountdown ?
+              <FieldShell label="Countdown to">
+                <Input
+                  aria-label="Countdown To"
+                  value={countdownTo}
+                  onChange={(e) => {
+                    onUpdate('countdownTo', e.currentTarget.value);
+                  }}
+                />
+              </FieldShell>
+            : null}
+          </div>
+        </FieldRow>
       : null}
     </section>
   );
@@ -217,14 +259,18 @@ export function TickerPanel({
   }
 
   return (
-    <section aria-label="Ticker" role="region" className="grid grid-cols-1 gap-2">
-      <FieldShell label="Items">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02') }}>
+    <section
+      aria-label="Ticker"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
+    >
+      <FieldRow label="Items">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0 }}>
           {items.map((item, index) => (
             <div
               key={`${String(index)}-${item}`}
               draggable
-              style={{ alignItems: 'center', display: 'flex', gap: sp('sp-02') }}
+              style={{ alignItems: 'center', display: 'flex', gap: sp('sp-02'), minWidth: 0 }}
               onDragOver={handleItemDragOver}
               onDragStart={(e) => {
                 handleItemDragStart(e, index);
@@ -269,49 +315,78 @@ export function TickerPanel({
             aria-label="Add Item"
             size="sm"
             variant="ghost"
+            style={{ alignSelf: 'flex-start' }}
             onPress={() => {
               onUpdateItems([...items, 'New item']);
             }}
           >
-            <Plus size={ICON_SIZE} /> Add Item
+            <Plus size={ICON_SIZE} /> Add item
           </Button>
         </div>
-      </FieldShell>
-      <NumericField
-        label="Speed (px/s)"
-        maxValue={2000}
-        minValue={1}
-        value={speed}
-        onValueChange={(v) => {
-          onUpdate('speed', v);
-        }}
-      />
-      <SelectField
-        label="Direction"
-        options={[...TICKER_DIRECTIONS]}
-        updateKey="direction"
-        value={direction}
-        onUpdate={(key, value) => {
-          onUpdate(key, value);
-        }}
-      />
-      <NumericField
-        label="Gap (px)"
-        minValue={0}
-        value={gap}
-        onValueChange={(v) => {
-          onUpdate('gap', v);
-        }}
-      />
-      <Switch
-        aria-label="Paused"
-        isSelected={paused}
-        onChange={(v) => {
-          onUpdate('paused', v);
-        }}
-      >
-        Paused
-      </Switch>
+      </FieldRow>
+
+      <FieldRow label="Motion">
+        <div
+          style={{
+            display: 'grid',
+            gap: sp('sp-02'),
+            gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+            minWidth: 0,
+          }}
+        >
+          <NumField
+            compact
+            label="Speed (px/s)"
+            min={1}
+            max={2000}
+            value={speed}
+            onChange={(v) => {
+              onUpdate('speed', v);
+            }}
+          />
+          <NumField
+            compact
+            label="Gap (px)"
+            min={0}
+            value={gap}
+            onChange={(v) => {
+              onUpdate('gap', v);
+            }}
+          />
+        </div>
+      </FieldRow>
+
+      <FieldRow label="Direction">
+        <ToggleRow
+          ariaLabel="Direction"
+          mutuallyExclusive
+          items={TICKER_DIRECTIONS.map((dir) => ({
+            value: dir,
+            ariaLabel: `Direction ${dir}`,
+            icon:
+              dir === 'left' ? <ArrowLeft size={ICON_SIZE} />
+              : dir === 'right' ? <ArrowRight size={ICON_SIZE} />
+              : dir === 'up' ? <ArrowUp size={ICON_SIZE} />
+              : <ArrowDown size={ICON_SIZE} />,
+            isActive: direction === dir,
+          }))}
+          onChange={(nextValue) => {
+            onUpdate('direction', nextValue);
+          }}
+        />
+      </FieldRow>
+
+      <FieldRow label="Playback">
+        <Switch
+          aria-label="Paused"
+          isSelected={paused}
+          onChange={(v) => {
+            onUpdate('paused', v);
+          }}
+        >
+          Paused
+        </Switch>
+      </FieldRow>
     </section>
   );
 }

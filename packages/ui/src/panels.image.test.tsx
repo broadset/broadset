@@ -142,7 +142,7 @@ describe('ImagePanel', () => {
 
     render(<ObjectFitPanel objectFit="scale-down" onUpdate={onUpdate} />);
 
-    expect(screen.getByRole('button', { name: /object fit/i })).not.toBeNull();
+    expect(screen.getByRole('group', { name: /object fit/i })).not.toBeNull();
     expect(screen.getAllByText('Scale down').length).toBeGreaterThan(0);
     expect(screen.queryByText(/scale-down/i)).toBeNull();
   });

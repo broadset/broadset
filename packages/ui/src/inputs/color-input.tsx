@@ -219,9 +219,13 @@ export interface ColorInputProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly label: string;
+  /** When true, renders a 28px-tall row that aligns with compact NumField in dense grids. */
+  readonly compact?: boolean | undefined;
 }
 
-export function ColorInput({ value, onChange, label }: ColorInputProps): JSX.Element {
+export function ColorInput({ value, onChange, label, compact }: ColorInputProps): JSX.Element {
+  const isCompact = compact === true;
+  const swatchSize = isCompact ? 22 : 28;
   const [draft, setDraft] = useState('');
   const [isDrafting, setIsDrafting] = useState(false);
   const [format, setFormat] = useState<ColorFormat>('hex');
@@ -315,7 +319,16 @@ export function ColorInput({ value, onChange, label }: ColorInputProps): JSX.Ele
   );
 
   return (
-    <div data-testid="color-input" style={{ display: 'flex', gap: sp('sp-02'), alignItems: 'center' }}>
+    <div
+      data-testid="color-input"
+      style={{
+        alignItems: 'center',
+        display: 'flex',
+        gap: sp('sp-02'),
+        minWidth: 0,
+        width: '100%',
+      }}
+    >
       <Popover>
         <Popover.Trigger>
           <Button
@@ -323,8 +336,8 @@ export function ColorInput({ value, onChange, label }: ColorInputProps): JSX.Ele
             data-transparent={isTransparent ? 'true' : 'false'}
             aria-label={`${label} color swatch`}
             style={{
-              width: 28,
-              height: 28,
+              width: swatchSize,
+              height: swatchSize,
               borderRadius: 4,
               border: `1px solid ${colorToken('border')}`,
               backgroundColor: isTransparent ? 'transparent' : value,
@@ -335,7 +348,7 @@ export function ColorInput({ value, onChange, label }: ColorInputProps): JSX.Ele
               backgroundSize: isTransparent ? '8px 8px' : undefined,
               backgroundPosition: isTransparent ? '0 0, 4px 4px' : undefined,
               padding: 0,
-              minWidth: 28,
+              minWidth: swatchSize,
             }}
           />
         </Popover.Trigger>
@@ -440,15 +453,43 @@ export function ColorInput({ value, onChange, label }: ColorInputProps): JSX.Ele
         </Popover.Content>
       </Popover>
 
-      <Input
-        aria-label={`${label} color text`}
-        aria-invalid={draftInvalid || undefined}
-        aria-describedby={draftInvalid ? errorId : undefined}
-        value={displayValue}
-        onChange={handleTextChange}
-        onBlur={handleTextBlur}
-        onKeyDown={handleTextKeyDown}
-      />
+      {isCompact ?
+        <input
+          aria-label={`${label} color text`}
+          aria-invalid={draftInvalid || undefined}
+          aria-describedby={draftInvalid ? errorId : undefined}
+          type="text"
+          value={displayValue}
+          onChange={(e) => {
+            handleTextChange(e);
+          }}
+          onBlur={handleTextBlur}
+          onKeyDown={handleTextKeyDown}
+          style={{
+            background: colorToken('field-background'),
+            border: `1px solid ${colorToken('border')}`,
+            borderRadius: '0.25rem',
+            color: 'inherit',
+            flex: 1,
+            fontFamily: 'inherit',
+            fontSize: '0.75rem',
+            height: '1.75rem',
+            minWidth: 0,
+            outline: 'none',
+            padding: '0 0.5rem',
+            width: '100%',
+          }}
+        />
+      : <Input
+          aria-label={`${label} color text`}
+          aria-invalid={draftInvalid || undefined}
+          aria-describedby={draftInvalid ? errorId : undefined}
+          value={displayValue}
+          onChange={handleTextChange}
+          onBlur={handleTextBlur}
+          onKeyDown={handleTextKeyDown}
+        />
+      }
       {draftInvalid && (
         <span
           id={errorId}

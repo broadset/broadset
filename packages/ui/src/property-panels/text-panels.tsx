@@ -1,12 +1,21 @@
 import type { VerticalAlignment } from '@broadset/model';
-import { Button, ButtonGroup, Tooltip } from '@heroui/react';
+import { Button } from '@heroui/react';
 import { Bold, Italic, Strikethrough, Underline } from 'lucide-react';
 import type { JSX } from 'react';
 import { useState } from 'react';
 
-import { ColorInput, CssLengthInput, NumField, SegmentedSwitcher, ShadowEditor, TextStrokeInput } from '../inputs';
-import { FieldShell, ICON_SIZE, SelectField, TEXT_TRANSFORM_OPTIONS, VERTICAL_ALIGNMENT_OPTIONS } from '../panel-types';
-import { color, font } from '../tokens';
+import {
+  ColorInput,
+  CssLengthInput,
+  FieldRow,
+  NumField,
+  SegmentedSwitcher,
+  ShadowEditor,
+  TextStrokeInput,
+  ToggleRow,
+} from '../inputs';
+import { ICON_SIZE, SelectField, TEXT_TRANSFORM_OPTIONS, VERTICAL_ALIGNMENT_OPTIONS } from '../panel-types';
+import { color, font, sp } from '../tokens';
 import { PropertyField } from './property-editing-context';
 
 const FONT_SIZE_MIN = 1;
@@ -31,10 +40,6 @@ function toHorizontalAlignment(value: string): HorizontalAlignment {
   const matched = ALIGNMENT_OPTIONS.find((option) => option.value === value);
 
   return matched?.value ?? 'left';
-}
-
-function formatButtonVariant(isActive: boolean): 'ghost' | 'secondary' {
-  return isActive ? 'secondary' : 'ghost';
 }
 
 export interface TypographyPanelProps {
@@ -76,133 +81,136 @@ export function TypographyPanel({
   const alignment = toHorizontalAlignment(textAlignment);
 
   return (
-    <section aria-label="Typography" role="region" className="flex flex-col gap-2">
+    <section
+      aria-label="Typography"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
+    >
       {!isAnimationMode ?
         <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>
           Double-click the text on canvas to edit content inline.
         </p>
       : null}
 
-      <PropertyField propertyKey="fontFamily" defaultValue={fontFamily}>
-        <SelectField
-          label="Font family"
-          value={fontFamily}
-          options={fontFamilyOptions}
-          onUpdate={onUpdate}
-          updateKey="fontFamily"
-        />
-      </PropertyField>
-      <PropertyField propertyKey="fontSize" defaultValue={fontSize}>
-        <NumField
-          label="Font size (pt)"
-          value={fontSize}
-          min={FONT_SIZE_MIN}
-          max={FONT_SIZE_MAX}
-          onChange={(v) => {
-            onUpdate('fontSize', v);
+      <FieldRow label="Font">
+        <PropertyField propertyKey="fontFamily" defaultValue={fontFamily}>
+          <SelectField
+            label="Font family"
+            value={fontFamily}
+            options={fontFamilyOptions}
+            onUpdate={onUpdate}
+            updateKey="fontFamily"
+          />
+        </PropertyField>
+      </FieldRow>
+
+      <FieldRow label="Size" unit="pt">
+        <PropertyField propertyKey="fontSize" defaultValue={fontSize}>
+          <NumField
+            compact
+            label="Font size (pt)"
+            value={fontSize}
+            min={FONT_SIZE_MIN}
+            max={FONT_SIZE_MAX}
+            onChange={(v) => {
+              onUpdate('fontSize', v);
+            }}
+          />
+        </PropertyField>
+      </FieldRow>
+
+      <FieldRow label="Color">
+        <div
+          style={{
+            display: 'grid',
+            gap: sp('sp-02'),
+            gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+            minWidth: 0,
+          }}
+        >
+          <PropertyField propertyKey="fontColor" defaultValue={fontColor}>
+            <ColorInput
+              compact
+              label="Text color"
+              value={fontColor}
+              onChange={(v) => {
+                onUpdate('fontColor', v);
+              }}
+            />
+          </PropertyField>
+          <PropertyField propertyKey="verticalAlignment" defaultValue={verticalAlignment}>
+            <SelectField
+              label="Vertical alignment"
+              value={verticalAlignment}
+              options={[...VERTICAL_ALIGNMENT_OPTIONS]}
+              onUpdate={onUpdate}
+              updateKey="verticalAlignment"
+            />
+          </PropertyField>
+        </div>
+      </FieldRow>
+
+      <FieldRow label="Style">
+        <ToggleRow
+          ariaLabel="Formatting"
+          items={[
+            {
+              value: 'bold',
+              ariaLabel: 'Bold',
+              icon: <Bold size={ICON_SIZE} />,
+              isActive: isBold,
+            },
+            {
+              value: 'italic',
+              ariaLabel: 'Italic',
+              icon: <Italic size={ICON_SIZE} />,
+              isActive: isItalic,
+            },
+            {
+              value: 'underline',
+              ariaLabel: 'Underline',
+              icon: <Underline size={ICON_SIZE} />,
+              isActive: isUnderline,
+            },
+            {
+              value: 'strikethrough',
+              ariaLabel: 'Strikethrough',
+              icon: <Strikethrough size={ICON_SIZE} />,
+              isActive: isStrikethrough,
+            },
+          ]}
+          onToggle={(value) => {
+            if (value === 'bold') {
+              onUpdate('fontWeight', isBold ? REGULAR_WEIGHT : BOLD_WEIGHT);
+            } else if (value === 'italic') {
+              onUpdate('fontStyle', isItalic ? 'normal' : 'italic');
+            } else if (value === 'underline') {
+              onUpdate('textDecoration', isUnderline ? 'none' : 'underline');
+            } else {
+              onUpdate('textDecoration', isStrikethrough ? 'none' : 'line-through');
+            }
           }}
         />
-      </PropertyField>
-      <PropertyField propertyKey="fontColor" defaultValue={fontColor}>
-        <ColorInput
-          label="Text color"
-          value={fontColor}
-          onChange={(v) => {
-            onUpdate('fontColor', v);
-          }}
-        />
-      </PropertyField>
+      </FieldRow>
 
-      <FieldShell label="Formatting" inputId="text-formatting-controls">
-        <ButtonGroup id="text-formatting-controls" aria-label="Formatting">
-          <PropertyField propertyKey="fontWeight" defaultValue={fontWeight}>
-            <Tooltip delay={0}>
-              <Button
-                aria-label="Bold"
-                size="sm"
-                variant={formatButtonVariant(isBold)}
-                onPress={() => {
-                  onUpdate('fontWeight', isBold ? REGULAR_WEIGHT : BOLD_WEIGHT);
-                }}
-              >
-                <Bold size={ICON_SIZE} />
-              </Button>
-              <Tooltip.Content>Bold</Tooltip.Content>
-            </Tooltip>
-          </PropertyField>
-          <PropertyField propertyKey="fontStyle" defaultValue={fontStyle}>
-            <Tooltip delay={0}>
-              <Button
-                aria-label="Italic"
-                size="sm"
-                variant={formatButtonVariant(isItalic)}
-                onPress={() => {
-                  onUpdate('fontStyle', isItalic ? 'normal' : 'italic');
-                }}
-              >
-                <Italic size={ICON_SIZE} />
-              </Button>
-              <Tooltip.Content>Italic</Tooltip.Content>
-            </Tooltip>
-          </PropertyField>
-          <PropertyField propertyKey="textDecoration" defaultValue={textDecoration}>
-            <div className="flex gap-2">
-              <Tooltip delay={0}>
-                <Button
-                  aria-label="Underline"
-                  size="sm"
-                  variant={formatButtonVariant(isUnderline)}
-                  onPress={() => {
-                    onUpdate('textDecoration', isUnderline ? 'none' : 'underline');
-                  }}
-                >
-                  <Underline size={ICON_SIZE} />
-                </Button>
-                <Tooltip.Content>Underline</Tooltip.Content>
-              </Tooltip>
-              <Tooltip delay={0}>
-                <Button
-                  aria-label="Strikethrough"
-                  size="sm"
-                  variant={formatButtonVariant(isStrikethrough)}
-                  onPress={() => {
-                    onUpdate('textDecoration', isStrikethrough ? 'none' : 'line-through');
-                  }}
-                >
-                  <Strikethrough size={ICON_SIZE} />
-                </Button>
-                <Tooltip.Content>Strikethrough</Tooltip.Content>
-              </Tooltip>
-            </div>
-          </PropertyField>
-        </ButtonGroup>
-      </FieldShell>
-
-      <PropertyField propertyKey="textAlignment" defaultValue={alignment}>
-        <SegmentedSwitcher
-          ariaLabel="Text alignment"
-          value={alignment}
-          options={ALIGNMENT_OPTIONS}
-          onChange={(nextAlignment) => {
-            onUpdate('textAlignment', nextAlignment);
-          }}
-        />
-      </PropertyField>
-
-      <PropertyField propertyKey="verticalAlignment" defaultValue={verticalAlignment}>
-        <SelectField
-          label="Vertical alignment"
-          value={verticalAlignment}
-          options={[...VERTICAL_ALIGNMENT_OPTIONS]}
-          onUpdate={onUpdate}
-          updateKey="verticalAlignment"
-        />
-      </PropertyField>
+      <FieldRow label="Align">
+        <PropertyField propertyKey="textAlignment" defaultValue={alignment}>
+          <SegmentedSwitcher
+            ariaLabel="Text alignment"
+            value={alignment}
+            options={ALIGNMENT_OPTIONS}
+            onChange={(nextAlignment) => {
+              onUpdate('textAlignment', nextAlignment);
+            }}
+          />
+        </PropertyField>
+      </FieldRow>
 
       <Button
         aria-label="Advanced"
         size="sm"
         variant="ghost"
+        style={{ alignSelf: 'flex-start' }}
         onPress={() => {
           setShowAdvanced((current) => !current);
         }}
@@ -212,27 +220,32 @@ export function TypographyPanel({
 
       {showAdvanced ?
         <>
-          <PropertyField propertyKey="fontWeight" defaultValue={fontWeight}>
-            <NumField
-              label="Weight"
-              value={fontWeight}
-              min={FONT_WEIGHT_MIN}
-              max={FONT_WEIGHT_MAX}
-              step={FONT_WEIGHT_STEP}
-              onChange={(v) => {
-                onUpdate('fontWeight', v);
-              }}
-            />
-          </PropertyField>
-          <PropertyField propertyKey="textTransform" defaultValue={textTransform}>
-            <SelectField
-              label="Case"
-              value={textTransform}
-              options={[...TEXT_TRANSFORM_OPTIONS]}
-              onUpdate={onUpdate}
-              updateKey="textTransform"
-            />
-          </PropertyField>
+          <FieldRow label="Weight">
+            <PropertyField propertyKey="fontWeight" defaultValue={fontWeight}>
+              <NumField
+                compact
+                label="Weight"
+                value={fontWeight}
+                min={FONT_WEIGHT_MIN}
+                max={FONT_WEIGHT_MAX}
+                step={FONT_WEIGHT_STEP}
+                onChange={(v) => {
+                  onUpdate('fontWeight', v);
+                }}
+              />
+            </PropertyField>
+          </FieldRow>
+          <FieldRow label="Case">
+            <PropertyField propertyKey="textTransform" defaultValue={textTransform}>
+              <SelectField
+                label="Case"
+                value={textTransform}
+                options={[...TEXT_TRANSFORM_OPTIONS]}
+                onUpdate={onUpdate}
+                updateKey="textTransform"
+              />
+            </PropertyField>
+          </FieldRow>
         </>
       : null}
     </section>
@@ -260,11 +273,16 @@ export function TextEffectsPanel({
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   return (
-    <section aria-label="Text Effects" role="region" className="flex flex-col gap-2">
+    <section
+      aria-label="Text Effects"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
+    >
       <Button
         aria-label="Advanced"
         size="sm"
         variant="ghost"
+        style={{ alignSelf: 'flex-start' }}
         onPress={() => {
           setShowAdvanced((s) => !s);
         }}
@@ -274,54 +292,72 @@ export function TextEffectsPanel({
 
       {showAdvanced ?
         <>
-          <PropertyField propertyKey="letterSpacing" defaultValue={letterSpacing}>
-            <CssLengthInput
-              label="Letter spacing"
-              value={String(letterSpacing)}
-              onChange={(v) => {
-                onUpdate('letterSpacing', v);
-              }}
-            />
-          </PropertyField>
-          <PropertyField propertyKey="lineHeight" defaultValue={lineHeight}>
-            <CssLengthInput
-              label="Line height"
-              value={lineHeight}
-              onChange={(v) => {
-                onUpdate('lineHeight', v);
-              }}
-            />
-          </PropertyField>
-          <PropertyField propertyKey="wordSpacing" defaultValue={wordSpacing}>
-            <CssLengthInput
-              label="Word spacing"
-              value={String(wordSpacing)}
-              onChange={(v) => {
-                onUpdate('wordSpacing', v);
-              }}
-            />
-          </PropertyField>
+          <FieldRow label="Line height">
+            <PropertyField propertyKey="lineHeight" defaultValue={lineHeight}>
+              <CssLengthInput
+                label="Line height"
+                value={lineHeight}
+                onChange={(v) => {
+                  onUpdate('lineHeight', v);
+                }}
+              />
+            </PropertyField>
+          </FieldRow>
 
-          <PropertyField propertyKey="textStroke" defaultValue={textStroke}>
-            <TextStrokeInput
-              label="Text stroke"
-              width={textStroke ? parseInt(textStroke, 10) : 0}
-              color={textStroke.split(' ')[1] ?? '#000000'}
-              onChange={(v) => {
-                onUpdate('textStroke', v);
+          <FieldRow label="Spacing">
+            <div
+              style={{
+                display: 'grid',
+                gap: sp('sp-02'),
+                gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+                minWidth: 0,
               }}
-            />
-          </PropertyField>
-          <PropertyField propertyKey="textShadow" defaultValue={textShadow}>
-            <ShadowEditor
-              label="Text shadow"
-              mode="text"
-              value={textShadow}
-              onChange={(v) => {
-                onUpdate('textShadow', v);
-              }}
-            />
-          </PropertyField>
+            >
+              <PropertyField propertyKey="letterSpacing" defaultValue={letterSpacing}>
+                <CssLengthInput
+                  label="Letter spacing"
+                  value={String(letterSpacing)}
+                  onChange={(v) => {
+                    onUpdate('letterSpacing', v);
+                  }}
+                />
+              </PropertyField>
+              <PropertyField propertyKey="wordSpacing" defaultValue={wordSpacing}>
+                <CssLengthInput
+                  label="Word spacing"
+                  value={String(wordSpacing)}
+                  onChange={(v) => {
+                    onUpdate('wordSpacing', v);
+                  }}
+                />
+              </PropertyField>
+            </div>
+          </FieldRow>
+
+          <FieldRow label="Outline">
+            <PropertyField propertyKey="textStroke" defaultValue={textStroke}>
+              <TextStrokeInput
+                label="Text stroke"
+                width={textStroke ? parseInt(textStroke, 10) : 0}
+                color={textStroke.split(' ')[1] ?? '#000000'}
+                onChange={(v) => {
+                  onUpdate('textStroke', v);
+                }}
+              />
+            </PropertyField>
+          </FieldRow>
+          <FieldRow label="Shadow">
+            <PropertyField propertyKey="textShadow" defaultValue={textShadow}>
+              <ShadowEditor
+                label="Text shadow"
+                mode="text"
+                value={textShadow}
+                onChange={(v) => {
+                  onUpdate('textShadow', v);
+                }}
+              />
+            </PropertyField>
+          </FieldRow>
         </>
       : null}
     </section>

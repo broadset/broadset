@@ -1,5 +1,5 @@
-import { Button, ButtonGroup, Input, ListBox, Select, Slider } from '@heroui/react';
-import { ArrowDownUp, Circle, Link2, Lock, Minimize2, PenTool, Square, Star, Triangle, Unlink2 } from 'lucide-react';
+import { Button, ButtonGroup, Input, Slider } from '@heroui/react';
+import { ArrowDownUp, Circle, Lock, Minimize2, PenTool, Square, Star, Triangle, Unlink2 } from 'lucide-react';
 import type { JSX } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -8,10 +8,12 @@ import {
   AnchorPad,
   AxisTriplet,
   ColorInput,
+  FieldRow,
   FilterEditor,
   GradientEditor,
   NumField,
   PairInput,
+  QuadInput,
   SegmentedSwitcher,
   ShadowEditor,
 } from '../inputs';
@@ -291,60 +293,46 @@ export function GeometryPanel({
           />
         </PropertyField>
         {showAutoSize ?
-          <div
-            style={{
-              alignItems: 'center',
-              display: 'grid',
-              gap: sp('sp-02'),
-              gridTemplateColumns: 'auto 1fr',
-            }}
-          >
-            <span
-              style={{
-                color: color('muted'),
-                fontSize: '0.6875rem',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-              }}
-            >
-              Text fit
-            </span>
-            <ButtonGroup aria-label="Auto-size mode" style={{ justifySelf: 'end' }}>
-              <Button
-                aria-label="Fixed"
-                size="sm"
-                variant={autoSize === 'fixed' || autoSize === undefined ? 'secondary' : 'ghost'}
-                style={{ height: '1.75rem', minWidth: '2rem', padding: '0 0.5rem' }}
-                onPress={() => {
-                  onUpdate('autoSize', 'fixed');
-                }}
-              >
-                <Lock size={12} />
-              </Button>
-              <Button
-                aria-label="Auto Height"
-                size="sm"
-                variant={autoSize === 'auto-height' ? 'secondary' : 'ghost'}
-                style={{ height: '1.75rem', minWidth: '2rem', padding: '0 0.5rem' }}
-                onPress={() => {
-                  onUpdate('autoSize', 'auto-height');
-                }}
-              >
-                <ArrowDownUp size={12} />
-              </Button>
-              <Button
-                aria-label="Shrink to Fit"
-                size="sm"
-                variant={autoSize === 'shrink-to-fit' ? 'secondary' : 'ghost'}
-                style={{ height: '1.75rem', minWidth: '2rem', padding: '0 0.5rem' }}
-                onPress={() => {
-                  onUpdate('autoSize', 'shrink-to-fit');
-                }}
-              >
-                <Minimize2 size={12} />
-              </Button>
-            </ButtonGroup>
-          </div>
+          <FieldRow
+            label="Text fit"
+            trailing={
+              <ButtonGroup aria-label="Auto-size mode">
+                <Button
+                  aria-label="Fixed"
+                  size="sm"
+                  variant={autoSize === 'fixed' || autoSize === undefined ? 'secondary' : 'ghost'}
+                  style={{ height: '1.75rem', minWidth: '2rem', padding: '0 0.5rem' }}
+                  onPress={() => {
+                    onUpdate('autoSize', 'fixed');
+                  }}
+                >
+                  <Lock size={12} />
+                </Button>
+                <Button
+                  aria-label="Auto Height"
+                  size="sm"
+                  variant={autoSize === 'auto-height' ? 'secondary' : 'ghost'}
+                  style={{ height: '1.75rem', minWidth: '2rem', padding: '0 0.5rem' }}
+                  onPress={() => {
+                    onUpdate('autoSize', 'auto-height');
+                  }}
+                >
+                  <ArrowDownUp size={12} />
+                </Button>
+                <Button
+                  aria-label="Shrink to Fit"
+                  size="sm"
+                  variant={autoSize === 'shrink-to-fit' ? 'secondary' : 'ghost'}
+                  style={{ height: '1.75rem', minWidth: '2rem', padding: '0 0.5rem' }}
+                  onPress={() => {
+                    onUpdate('autoSize', 'shrink-to-fit');
+                  }}
+                >
+                  <Minimize2 size={12} />
+                </Button>
+              </ButtonGroup>
+            }
+          />
         : null}
       </div>
 
@@ -352,39 +340,28 @@ export function GeometryPanel({
         <AxisTriplet label="Rotation" unit="°" axes={rotationAxes} />
       </PropertyField>
 
-      <div
-        role="group"
-        aria-label="Anchor origin"
-        style={{
-          alignItems: 'center',
-          display: 'grid',
-          gap: sp('sp-02'),
-          gridTemplateColumns: 'auto 1fr auto',
-          minWidth: 0,
-        }}
+      <FieldRow
+        label="Anchor"
+        trailing={<span style={{ color: color('muted'), fontSize: font('label') }}>{anchorLabel}</span>}
       >
-        <span
-          style={{ color: color('muted'), fontSize: '0.6875rem', letterSpacing: '0.04em', textTransform: 'uppercase' }}
-        >
-          Anchor
-        </span>
-        <span style={{ color: color('muted'), fontSize: font('label'), justifySelf: 'end' }}>{anchorLabel}</span>
-        <AnchorPad
-          anchorX={activeAnchorX}
-          anchorY={activeAnchorY}
-          onChange={({ x: nextAx, y: nextAy }) => {
-            if (nextAx !== activeAnchorX) {
-              setActiveAnchorX(nextAx);
-              onUpdate('anchorX', nextAx);
-            }
+        <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'flex-start', minWidth: 0 }}>
+          <AnchorPad
+            anchorX={activeAnchorX}
+            anchorY={activeAnchorY}
+            onChange={({ x: nextAx, y: nextAy }) => {
+              if (nextAx !== activeAnchorX) {
+                setActiveAnchorX(nextAx);
+                onUpdate('anchorX', nextAx);
+              }
 
-            if (nextAy !== activeAnchorY) {
-              setActiveAnchorY(nextAy);
-              onUpdate('anchorY', nextAy);
-            }
-          }}
-        />
-      </div>
+              if (nextAy !== activeAnchorY) {
+                setActiveAnchorY(nextAy);
+                onUpdate('anchorY', nextAy);
+              }
+            }}
+          />
+        </div>
+      </FieldRow>
     </section>
   );
 }
@@ -431,69 +408,68 @@ export function AppearancePanel({
   const effectiveGradient = draftGradient;
   const opacityPercent = `${String(Math.round(opacity * 100))}%`;
 
-  const updateBorderRadius = (index: number, value: number): void => {
-    if (linkedCorners) {
-      onUpdate('borderRadius', [value, value, value, value]);
-
-      return;
-    }
-
-    const next: [number, number, number, number] = [...borderRadius] as [number, number, number, number];
-
-    next[index] = value;
-    onUpdate('borderRadius', next);
-  };
-
   return (
-    <section aria-label="Appearance" role="region" className="flex flex-col gap-2">
-      {showGradient === true ?
-        <PropertyField propertyKey="backgroundGradient" defaultValue={draftGradient}>
-          <SegmentedSwitcher
-            ariaLabel="Fill mode"
-            value={fillMode}
-            options={[
-              { value: 'solid', label: 'Solid' },
-              { value: 'gradient', label: 'Gradient' },
-            ]}
-            onChange={(nextFillMode) => {
-              setFillMode(nextFillMode);
+    <section
+      aria-label="Appearance"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
+    >
+      <FieldRow
+        label="Fill"
+        trailing={
+          showGradient === true ?
+            <SegmentedSwitcher
+              ariaLabel="Fill mode"
+              value={fillMode}
+              options={[
+                { value: 'solid', label: 'Solid' },
+                { value: 'gradient', label: 'Gradient' },
+              ]}
+              onChange={(nextFillMode) => {
+                setFillMode(nextFillMode);
 
-              if (nextFillMode === 'gradient') {
-                onUpdate('backgroundGradient', draftGradient);
+                if (nextFillMode === 'gradient') {
+                  onUpdate('backgroundGradient', draftGradient);
 
-                return;
-              }
+                  return;
+                }
 
-              onUpdate('backgroundGradient', '');
-            }}
-          />
-        </PropertyField>
-      : null}
+                onUpdate('backgroundGradient', '');
+              }}
+            />
+          : undefined
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0, width: '100%' }}>
+          <PropertyField propertyKey="backgroundColor" defaultValue={backgroundColor}>
+            <ColorInput
+              label="Fill color"
+              value={backgroundColor}
+              onChange={(v) => {
+                onUpdate('backgroundColor', v);
+              }}
+            />
+          </PropertyField>
+          {showGradient === true && fillMode === 'gradient' ?
+            <PropertyField propertyKey="backgroundGradient" defaultValue={effectiveGradient}>
+              <GradientEditor
+                label="Gradient"
+                value={effectiveGradient}
+                onChange={(nextGradient) => {
+                  setDraftGradient(nextGradient);
+                  onUpdate('backgroundGradient', nextGradient);
+                }}
+              />
+            </PropertyField>
+          : null}
+        </div>
+      </FieldRow>
 
-      <PropertyField propertyKey="backgroundColor" defaultValue={backgroundColor}>
-        <ColorInput
-          label="Fill color"
-          value={backgroundColor}
-          onChange={(v) => {
-            onUpdate('backgroundColor', v);
-          }}
-        />
-      </PropertyField>
-      {showGradient === true && fillMode === 'gradient' ?
-        <PropertyField propertyKey="backgroundGradient" defaultValue={effectiveGradient}>
-          <GradientEditor
-            label="Gradient"
-            value={effectiveGradient}
-            onChange={(nextGradient) => {
-              setDraftGradient(nextGradient);
-              onUpdate('backgroundGradient', nextGradient);
-            }}
-          />
-        </PropertyField>
-      : null}
-
-      <PropertyField propertyKey="opacity" defaultValue={opacity}>
-        <div className="flex flex-col gap-1">
+      <FieldRow
+        label="Opacity"
+        trailing={<span style={{ color: color('muted'), fontSize: font('label') }}>{opacityPercent}</span>}
+      >
+        <PropertyField propertyKey="opacity" defaultValue={opacity}>
           <Slider
             aria-label="Opacity"
             maxValue={1}
@@ -509,98 +485,77 @@ export function AppearancePanel({
               <Slider.Thumb />
             </Slider.Track>
           </Slider>
-          <p style={{ color: color('muted'), fontSize: font('label'), margin: 0 }}>{opacityPercent}</p>
-        </div>
-      </PropertyField>
+        </PropertyField>
+      </FieldRow>
 
-      <PropertyField propertyKey="borderWidth" defaultValue={borderWidth}>
-        <NumField
-          label="Border width"
-          value={borderWidth}
-          min={0}
-          onChange={(v) => {
-            onUpdate('borderWidth', v);
-          }}
-        />
-      </PropertyField>
-      <PropertyField propertyKey="borderColor" defaultValue={borderColor}>
-        <ColorInput
-          label="Border color"
-          value={borderColor}
-          onChange={(v) => {
-            onUpdate('borderColor', v);
-          }}
-        />
-      </PropertyField>
-
-      <PropertyField propertyKey="borderStyle" defaultValue={borderStyle}>
-        <SelectField
-          label="Border style"
-          value={borderStyle}
-          options={[...BORDER_STYLE_OPTIONS]}
-          onUpdate={onUpdate}
-          updateKey="borderStyle"
-        />
-      </PropertyField>
-      <PropertyField propertyKey="blendMode" defaultValue={blendMode}>
-        <SelectField
-          label="Blend mode"
-          value={blendMode}
-          options={[...MIX_BLEND_MODE_OPTIONS]}
-          onUpdate={onUpdate}
-          updateKey="blendMode"
-        />
-      </PropertyField>
-
-      <PropertyField propertyKey="borderRadius" defaultValue={borderRadius}>
-        <div className="flex flex-col gap-2">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: sp('sp-02') }}>
-            <NumField
-              label="Border radius TL"
-              value={borderRadius[0]}
-              min={0}
-              onChange={(v) => {
-                updateBorderRadius(0, v);
-              }}
-            />
-            <NumField
-              label="Border radius TR"
-              value={borderRadius[1]}
-              min={0}
-              onChange={(v) => {
-                updateBorderRadius(1, v);
-              }}
-            />
-            <NumField
-              label="Border radius BR"
-              value={borderRadius[2]}
-              min={0}
-              onChange={(v) => {
-                updateBorderRadius(2, v);
-              }}
-            />
-            <NumField
-              label="Border radius BL"
-              value={borderRadius[3]}
-              min={0}
-              onChange={(v) => {
-                updateBorderRadius(3, v);
-              }}
-            />
-          </div>
-          <Button
-            aria-label="Link corners"
-            size="sm"
-            variant="ghost"
-            onPress={() => {
-              setLinkedCorners((current) => !current);
+      <FieldRow label="Border">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0, width: '100%' }}>
+          <div
+            style={{
+              display: 'grid',
+              gap: sp('sp-02'),
+              gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+              minWidth: 0,
             }}
           >
-            {linkedCorners ?
-              <Link2 size={ICON_SIZE} />
-            : <Unlink2 size={ICON_SIZE} />}
-          </Button>
+            <PropertyField propertyKey="borderWidth" defaultValue={borderWidth}>
+              <NumField
+                compact
+                label="Border width"
+                value={borderWidth}
+                min={0}
+                onChange={(v) => {
+                  onUpdate('borderWidth', v);
+                }}
+              />
+            </PropertyField>
+            <PropertyField propertyKey="borderColor" defaultValue={borderColor}>
+              <ColorInput
+                compact
+                label="Border color"
+                value={borderColor}
+                onChange={(v) => {
+                  onUpdate('borderColor', v);
+                }}
+              />
+            </PropertyField>
+          </div>
+          <PropertyField propertyKey="borderStyle" defaultValue={borderStyle}>
+            <SelectField
+              label="Border style"
+              value={borderStyle}
+              options={[...BORDER_STYLE_OPTIONS]}
+              onUpdate={onUpdate}
+              updateKey="borderStyle"
+            />
+          </PropertyField>
         </div>
+      </FieldRow>
+
+      <FieldRow label="Blend">
+        <PropertyField propertyKey="blendMode" defaultValue={blendMode}>
+          <SelectField
+            label="Blend mode"
+            value={blendMode}
+            options={[...MIX_BLEND_MODE_OPTIONS]}
+            onUpdate={onUpdate}
+            updateKey="blendMode"
+          />
+        </PropertyField>
+      </FieldRow>
+
+      <PropertyField propertyKey="borderRadius" defaultValue={borderRadius}>
+        <QuadInput
+          label="Corner radius"
+          mode="corners"
+          value={borderRadius}
+          min={0}
+          onChange={(next) => {
+            onUpdate('borderRadius', next);
+          }}
+          linkToggle={{ isLinked: linkedCorners, onToggle: setLinkedCorners, ariaLabel: 'Link corners' }}
+          cellAriaLabels={['Border radius TL', 'Border radius TR', 'Border radius BR', 'Border radius BL']}
+        />
       </PropertyField>
     </section>
   );
@@ -613,49 +568,23 @@ export interface SpacingPanelProps {
 
 export function SpacingPanel({ padding, onUpdate }: SpacingPanelProps): JSX.Element {
   const [linked, setLinked] = useState(false);
-  const labels = ['Padding top', 'Padding right', 'Padding bottom', 'Padding left'] as const;
-
-  const handlePaddingChange = useCallback(
-    (index: number, value: number) => {
-      if (linked) {
-        onUpdate('padding', [value, value, value, value]);
-      } else {
-        const next: [number, number, number, number] = [...padding] as [number, number, number, number];
-
-        next[index] = value;
-        onUpdate('padding', next);
-      }
-    },
-    [linked, onUpdate, padding],
-  );
 
   return (
-    <section aria-label="Spacing" role="region" className="flex flex-col gap-2">
-      <div className="grid grid-cols-2 gap-2">
-        {labels.map((label, idx) => (
-          <NumField
-            key={label}
-            label={label}
-            value={padding[idx] ?? 0}
-            min={0}
-            onChange={(v) => {
-              handlePaddingChange(idx, v);
-            }}
-          />
-        ))}
-      </div>
-      <Button
-        aria-label="Link padding"
-        size="sm"
-        variant="ghost"
-        onPress={() => {
-          setLinked((s) => !s);
+    <section
+      aria-label="Spacing"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0, width: '100%' }}
+    >
+      <QuadInput
+        label="Padding"
+        mode="TRBL"
+        value={padding}
+        min={0}
+        onChange={(next) => {
+          onUpdate('padding', next);
         }}
-      >
-        {linked ?
-          <Link2 size={ICON_SIZE} />
-        : <Unlink2 size={ICON_SIZE} />}
-      </Button>
+        linkToggle={{ isLinked: linked, onToggle: setLinked }}
+      />
     </section>
   );
 }
@@ -680,46 +609,68 @@ export function BoxEffectsPanel({
   onUpdate,
 }: BoxEffectsPanelProps): JSX.Element {
   return (
-    <section aria-label="Box Effects" role="region" className="flex flex-col gap-2">
-      <ShadowEditor
-        label="Box shadow"
-        mode="box"
-        value={boxShadow}
-        onChange={(v) => {
-          onUpdate('boxShadow', v);
-        }}
-      />
-      <FilterEditor
-        label="Filter"
-        value={filter}
-        onChange={(v) => {
-          onUpdate('filter', v);
-        }}
-      />
-      <FilterEditor
-        label="Backdrop filter"
-        value={backdropFilter}
-        onChange={(v) => {
-          onUpdate('backdropFilter', v);
-        }}
-      />
+    <section
+      aria-label="Box Effects"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
+    >
+      <FieldRow label="Shadow">
+        <ShadowEditor
+          label="Box shadow"
+          mode="box"
+          value={boxShadow}
+          onChange={(v) => {
+            onUpdate('boxShadow', v);
+          }}
+        />
+      </FieldRow>
+
+      <FieldRow label="Effects">
+        <FilterEditor
+          label="Filter"
+          value={filter}
+          onChange={(v) => {
+            onUpdate('filter', v);
+          }}
+        />
+      </FieldRow>
+
+      <FieldRow label="Background effects">
+        <FilterEditor
+          label="Backdrop filter"
+          value={backdropFilter}
+          onChange={(v) => {
+            onUpdate('backdropFilter', v);
+          }}
+        />
+      </FieldRow>
+
       {documentMode === 'screen' ?
-        <>
-          <SelectField
-            label="Mix blend mode"
-            value={mixBlendMode}
-            options={[...MIX_BLEND_MODE_OPTIONS]}
-            onUpdate={onUpdate}
-            updateKey="mixBlendMode"
-          />
-          <SelectField
-            label="Isolation"
-            value={isolation}
-            options={[...ISOLATION_OPTIONS]}
-            onUpdate={onUpdate}
-            updateKey="isolation"
-          />
-        </>
+        <FieldRow label="Compositing">
+          <div
+            style={{
+              display: 'grid',
+              gap: sp('sp-02'),
+              gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+              minWidth: 0,
+            }}
+          >
+            <SelectField
+              label="Mix blend mode"
+              value={mixBlendMode}
+              options={[...MIX_BLEND_MODE_OPTIONS]}
+              onUpdate={onUpdate}
+              updateKey="mixBlendMode"
+            />
+            <SelectField
+              label="Isolation"
+              value={isolation}
+              options={[...ISOLATION_OPTIONS]}
+              onUpdate={onUpdate}
+              updateKey="isolation"
+            />
+          </div>
+        </FieldRow>
       : null}
     </section>
   );
@@ -812,68 +763,53 @@ export function ClipPathPanel({
   };
 
   return (
-    <section aria-label="Clip Path" role="region" className="flex flex-col gap-2">
-      <div
-        style={{
-          display: 'grid',
-          gap: sp('sp-02'),
-          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-        }}
-      >
-        {MASK_SHAPE_CHOICES.map((choice) => (
-          <Button
-            key={choice}
-            aria-label={choice}
-            size="sm"
-            variant={selectedChoice === choice ? 'primary' : 'ghost'}
-            {...(selectedChoice === choice ?
-              {
-                style: {
-                  borderColor: color('accent'),
-                  boxShadow: `0 0 0 1px ${color('accent')}`,
-                },
-              }
-            : {})}
-            onPress={() => {
-              applyMaskChoice(choice);
-            }}
-          >
-            <span style={{ alignItems: 'center', display: 'flex', gap: 6 }}>
-              {getMaskIcon(choice)}
-              {choice}
-            </span>
-          </Button>
-        ))}
-      </div>
-
-      <FieldShell label="Mask shape">
-        <Select
-          aria-label="Mask shape"
-          value={selectedChoice}
-          onChange={(selection) => {
-            if (selection !== null) {
-              applyMaskChoice(String(selection));
-            }
+    <section
+      aria-label="Clip Path"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0, width: '100%' }}
+    >
+      <FieldRow label="Mask">
+        <div
+          style={{
+            display: 'grid',
+            gap: sp('sp-01'),
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            minWidth: 0,
+            width: '100%',
           }}
         >
-          <Select.Trigger>
-            <Select.Value />
-            <Select.Indicator />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox>
-              {MASK_SHAPE_CHOICES.map((choice) => (
-                <ListBox.Item id={choice} key={choice} textValue={choice}>
-                  {choice}
-                </ListBox.Item>
-              ))}
-            </ListBox>
-          </Select.Popover>
-        </Select>
-      </FieldShell>
+          {MASK_SHAPE_CHOICES.map((choice) => (
+            <Button
+              key={choice}
+              aria-label={choice}
+              aria-pressed={selectedChoice === choice}
+              size="sm"
+              variant={selectedChoice === choice ? 'secondary' : 'ghost'}
+              style={{ height: '2.25rem', minWidth: 0, padding: '0 0.25rem' }}
+              onPress={() => {
+                applyMaskChoice(choice);
+              }}
+            >
+              <span
+                style={{
+                  alignItems: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  fontSize: '0.625rem',
+                  gap: 2,
+                  lineHeight: 1.1,
+                }}
+              >
+                {getMaskIcon(choice)}
+                {choice}
+              </span>
+            </Button>
+          ))}
+        </div>
+      </FieldRow>
 
       {isCustomChoice ?
-        <div className="flex gap-2">
+        <div style={{ display: 'flex', gap: sp('sp-02'), minWidth: 0 }}>
           <Button
             aria-label="Start editing clip path"
             size="sm"
@@ -882,7 +818,7 @@ export function ClipPathPanel({
               onStartEditingClipPath?.();
             }}
           >
-            Start editing clip path
+            Start editing
           </Button>
           <Button
             aria-label="Reset shape"
@@ -904,6 +840,7 @@ export function ClipPathPanel({
         aria-label="Advanced"
         size="sm"
         variant="ghost"
+        style={{ alignSelf: 'flex-start' }}
         onPress={() => {
           setIsAdvancedOpen((current) => !current);
         }}
