@@ -41,7 +41,3 @@ export function serializePath(segments: readonly PathSegment[]): string {
 
   return parts.join(' ');
 }
-
-export function roundPathCoordinate(value: number): number {
-  return roundCoord(value);
-}
