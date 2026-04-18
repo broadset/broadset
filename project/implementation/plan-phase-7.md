@@ -14,7 +14,7 @@ provides a professional animation editing experience.
 ### ⚠️ MANDATORY — HeroUI component library
 
 All UI components **MUST** use `@heroui/react`. See `AGENTS.md` and
-`.github/instructions/heroui.instructions.md`.
+`agents/instructions/heroui.instructions.md`.
 
 ---
 

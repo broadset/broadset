@@ -14,7 +14,7 @@ distribution, right-click context menu. Everything is polished and responsive.
 ### ⚠️ MANDATORY — HeroUI component library
 
 All UI components **MUST** use `@heroui/react`. See `AGENTS.md` and
-`.github/instructions/heroui.instructions.md`.
+`agents/instructions/heroui.instructions.md`.
 
 ---
 

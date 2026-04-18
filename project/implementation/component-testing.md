@@ -16,7 +16,7 @@ Use this as the source of truth when expanding or refactoring CT coverage.
 ## 2. Why CT Is Mandatory
 
 - `project/spec/ui/spec.md` requires browser-level CT for interaction flows that unit tests cannot validate completely.
-- `.github/instructions/testing.instructions.md` requires cross-region verification: if a user action happens in one region and outcome is visible in another, CT must assert all affected regions in one test.
+- `agents/instructions/testing.instructions.md` requires cross-region verification: if a user action happens in one region and outcome is visible in another, CT must assert all affected regions in one test.
 - `CONTRIBUTING.md` and spec gates require `npm run ct` for user-facing interaction changes.
 
 ## 3. Authoritative Sources

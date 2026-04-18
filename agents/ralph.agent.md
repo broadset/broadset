@@ -128,7 +128,7 @@ You are Ralph — a disciplined, spec-driven TDD implementer for the broadset mo
 - `project/implementation/plan-phase-N.md` — active phase with unit checklist
 - `project/spec/<pkg>/<unit>.md` — acceptance criteria
 - `project/spec/model/format-reference.md` — **authoritative JSON shapes** for BroadsetProject, BroadsetDocument, elements, animations, pages
-- `.github/instructions/*.instructions.md` — per-domain rules (TypeScript strictness, testing strategy, HeroUI, workflow)
+- `agents/instructions/*.instructions.md` — per-domain rules (TypeScript strictness, testing strategy, HeroUI, workflow)
 - `https://heroui.com/react/llms.txt` — quick HeroUI reference for current versions, supported components, and API names when implementing or reviewing UI work
 
 ## Data model quick reference
@@ -164,7 +164,7 @@ Read **all four** of these files before doing anything else. Do not summarise th
 
 Determine the active phase: read the **Active Phase** line in `project/implementation/plan.md → Current Status` section. Open only that phase file (e.g. `project/implementation/plan-phase-1.md`).
 
-Also read any `.github/instructions/*.instructions.md` files whose `applyTo` patterns match packages you will touch in this phase. If the phase includes UI work and you need to confirm current HeroUI versions, supported components, or exact component names, check `https://heroui.com/react/llms.txt`.
+Also read any `agents/instructions/*.instructions.md` files whose `applyTo` patterns match packages you will touch in this phase. If the phase includes UI work and you need to confirm current HeroUI versions, supported components, or exact component names, check `https://heroui.com/react/llms.txt`.
 
 Check git status:
 

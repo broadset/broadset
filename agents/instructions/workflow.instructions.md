@@ -1,5 +1,6 @@
 ---
 description: 'Use when committing code, managing version control, or following development workflow. Covers pre-commit checks, commit message format, and implementation order.'
+applyTo: '**'
 ---
 
 # Workflow & Version Control

@@ -15,7 +15,7 @@
 
 1. Never ship a panel behavior not covered by Jest + (where cross-region) Playwright CT tests.
 2. Never weaken lint / type / test gates to force green (see `AGENTS.md` §"No cutting corners").
-3. Never replace HeroUI components with raw HTML controls when a HeroUI equivalent exists (see `.github/instructions/heroui.instructions.md`).
+3. Never replace HeroUI components with raw HTML controls when a HeroUI equivalent exists (see `agents/instructions/heroui.instructions.md`).
 4. Never change model semantics silently to fit UI convenience — update spec first, then model, then UI.
 5. Never mark a unit complete unless **all** required command gates pass (§6).
 6. Never edit unrelated files in the same unit's commits.
@@ -119,7 +119,7 @@ If requirements conflict, resolve in this order:
 
 1. `project/spec/**` (behavior is specified here first)
 2. `project/implementation/architecture.md` (package boundaries are non-negotiable)
-3. `.github/instructions/heroui.instructions.md` (HeroUI component mapping)
+3. `agents/instructions/heroui.instructions.md` (HeroUI component mapping)
 4. `../dom-compositor` (behavior reference only; never normative)
 
 If spec and previous app disagree, follow the spec, or update the spec additively (§8).

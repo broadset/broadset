@@ -26,8 +26,8 @@ A unit is complete only when both boxes are checked and the listed validation co
 ## Source of Truth
 
 - project/implementation/plan.md
-- .github/instructions/testing.instructions.md
-- .github/instructions/typescript.instructions.md
+- agents/instructions/testing.instructions.md
+- agents/instructions/typescript.instructions.md
 - CONTRIBUTING.md
 - AGENTS.md
 

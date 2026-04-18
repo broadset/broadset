@@ -14,7 +14,7 @@ and glass-morphism. This is the "it’s a real editor" moment.
 ### ⚠️ MANDATORY — HeroUI component library
 
 All UI components in this phase **MUST** be built with `@heroui/react` — not raw
-HTML elements. See `AGENTS.md` and `.github/instructions/heroui.instructions.md`.
+HTML elements. See `AGENTS.md` and `agents/instructions/heroui.instructions.md`.
 
 | Instead of                      | Use                          |
 | ------------------------------- | ---------------------------- |

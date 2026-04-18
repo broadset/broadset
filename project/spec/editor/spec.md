@@ -98,7 +98,7 @@ Unit tests verify pure logic in isolation. The following editor interactions inv
 
 ### Cross-layer integration flows
 
-In addition to the single-region tests above, every spec scenario where a user action in one UI region produces a visible outcome in a different region MUST have a CT test that verifies **all** affected regions. See `.github/instructions/testing.instructions.md` → "CT Derivation Rule" for the systematic method.
+In addition to the single-region tests above, every spec scenario where a user action in one UI region produces a visible outcome in a different region MUST have a CT test that verifies **all** affected regions. See `agents/instructions/testing.instructions.md` → "CT Derivation Rule" for the systematic method.
 
 The following are representative examples from this spec domain — the full set MUST be derived by scanning all GIVEN/WHEN/THEN blocks in the editor sub-specs:
 

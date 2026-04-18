@@ -19,11 +19,11 @@ Run the relevant verification before considering work complete:
 
 ## Cross-Region CT Gate
 
-Every spec scenario where a user action in one UI region produces a visible outcome in a different region MUST have a Playwright CT test that verifies **all** affected regions in a single test. UI regions are: canvas, transform widget, properties panel, layers panel, toolbar, timeline, modal, bottom bar. The agent MUST systematically scan GIVEN/WHEN/THEN blocks in all spec files to derive the full set — manually listed examples in specs are illustrative, not exhaustive. See `.github/instructions/testing.instructions.md` → "CT Derivation Rule" for the full procedure.
+Every spec scenario where a user action in one UI region produces a visible outcome in a different region MUST have a Playwright CT test that verifies **all** affected regions in a single test. UI regions are: canvas, transform widget, properties panel, layers panel, toolbar, timeline, modal, bottom bar. The agent MUST systematically scan GIVEN/WHEN/THEN blocks in all spec files to derive the full set — manually listed examples in specs are illustrative, not exhaustive. See `agents/instructions/testing.instructions.md` → "CT Derivation Rule" for the full procedure.
 
 ## HeroUI Compliance Gate
 
-All React components in `packages/ui` and `packages/demo` **MUST** use `@heroui/react` components for UI chrome. Before committing, verify that no raw HTML elements (`<button>`, `<input>`, `<select>`, `<textarea>`) are used where HeroUI equivalents exist. See `AGENTS.md` and `.github/instructions/heroui.instructions.md` for the full checklist.
+All React components in `packages/ui` and `packages/demo` **MUST** use `@heroui/react` components for UI chrome. Before committing, verify that no raw HTML elements (`<button>`, `<input>`, `<select>`, `<textarea>`) are used where HeroUI equivalents exist. See `AGENTS.md` and `agents/instructions/heroui.instructions.md` for the full checklist.
 
 ## Package Boundary Gate
 

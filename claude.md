@@ -1,1 +1,7 @@
-Read AGENTS.md for instructions and follow links and references to other files there. .github directory also includes many important details.
+@AGENTS.md
+@CONTRIBUTING.md
+@agents/instructions/ways-of-working.instructions.md
+@agents/instructions/typescript.instructions.md
+@agents/instructions/testing.instructions.md
+@agents/instructions/heroui.instructions.md
+@agents/instructions/workflow.instructions.md

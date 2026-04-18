@@ -106,7 +106,7 @@ UI transitions MUST use consistent durations:
 
 Unit tests verify rendering output and callback wiring in isolation. The following UI interactions involve user input flows, focus management, and cross-component state that **cannot** be fully verified by unit tests alone. Each MUST have at least one Playwright Component Test (CT) that exercises the real behavior in a browser.
 
-Every spec scenario where a user action in one UI region produces a visible outcome in a **different** region MUST also have a CT test that verifies all affected regions. See `.github/instructions/testing.instructions.md` → "CT Derivation Rule" for the systematic method and the full derivation procedure. The lists below are representative — the full set MUST be derived by scanning all GIVEN/WHEN/THEN blocks in the UI sub-specs.
+Every spec scenario where a user action in one UI region produces a visible outcome in a **different** region MUST also have a CT test that verifies all affected regions. See `agents/instructions/testing.instructions.md` → "CT Derivation Rule" for the systematic method and the full derivation procedure. The lists below are representative — the full set MUST be derived by scanning all GIVEN/WHEN/THEN blocks in the UI sub-specs.
 
 ### Toolbar and navigation
 

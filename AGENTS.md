@@ -87,7 +87,7 @@ Before committing any file under `packages/ui/src/` or any React component in `p
 - No custom toggle/switch — use HeroUI `Switch`
 - `@heroui/react` is listed in the package's `peerDependencies` or `dependencies`
 
-See `.github/instructions/heroui.instructions.md` for the full component mapping and design token rules.
+See `agents/instructions/heroui.instructions.md` for the full component mapping and design token rules.
 
 ## Data model essentials
 
