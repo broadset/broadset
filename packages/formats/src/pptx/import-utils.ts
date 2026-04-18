@@ -133,7 +133,7 @@ function createImportedElement(
     textPathElementId: null,
     booleanOperation: null,
     extensions: {},
-  } as BroadsetElement;
+  } satisfies BroadsetElement;
 }
 
 export function importShapeElement(

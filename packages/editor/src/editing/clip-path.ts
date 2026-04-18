@@ -9,7 +9,7 @@ const POLYGON_POINT_PATTERN = /(-?\d+(?:\.\d+)?%?)\s+(-?\d+(?:\.\d+)?%?)/g;
 function parsePolygonPoints(clipPath: string): { readonly x: number; readonly y: number }[] | null {
   const polygonMatch = /^polygon\(([^)]*)\)$/i.exec(clipPath.trim());
 
-  if (polygonMatch === null || polygonMatch[1] === undefined) {
+  if (polygonMatch?.[1] === undefined) {
     return null;
   }
 

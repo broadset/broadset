@@ -47,9 +47,7 @@ let formatsCache: FormatsModule | null = null;
 
 /** Load the formats module on first use and cache it for subsequent calls. */
 export async function loadFormats(): Promise<FormatsModule> {
-  if (formatsCache === null) {
-    formatsCache = await import('@broadset/formats');
-  }
+  formatsCache ??= await import('@broadset/formats');
 
   return formatsCache;
 }

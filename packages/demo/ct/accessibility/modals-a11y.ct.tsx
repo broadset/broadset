@@ -186,7 +186,7 @@ test('About modal traps focus and restores trigger focus on escape', async ({ mo
           const active = document.activeElement;
           const modal = document.querySelector('[role="dialog"][aria-label="Broadset"]');
 
-          return active !== null && modal !== null && modal.contains(active);
+          return active !== null && modal?.contains(active) === true;
         }),
       )
       .toBe(true);

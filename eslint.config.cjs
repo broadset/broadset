@@ -271,11 +271,22 @@ module.exports = [
       'react-hooks/you-might-not-need-an-effect': 'off',
     },
   },
-  // Tests and CT may use unbound methods (Jest matchers, mock helpers).
+  // Tests and CT helpers may use unbound methods (Jest matchers, mock helpers)
+  // and object-literal type assertions (fixtures frequently construct
+  // partial objects cast to a full type to avoid the ergonomic cost of
+  // enumerating every required field).
   {
-    files: ['**/src/**/*.test.ts', '**/src/**/*.test.tsx', '**/ct/**/*.ts', '**/ct/**/*.tsx'],
+    files: [
+      '**/src/**/*.test.ts',
+      '**/src/**/*.test.tsx',
+      '**/ct/**/*.ts',
+      '**/ct/**/*.tsx',
+      '**/test-helpers.ts',
+      '**/test-helpers.tsx',
+    ],
     rules: {
       '@typescript-eslint/unbound-method': 'off',
+      '@typescript-eslint/consistent-type-assertions': 'off',
     },
   },
 
@@ -303,12 +314,6 @@ module.exports = [
       'jsx-a11y': jsxA11yPlugin,
     },
     rules: {
-      // Phase 3 — typescript-eslint preferences (~40 violations, mostly auto-fixable)
-      '@typescript-eslint/consistent-type-assertions': 'off',
-      '@typescript-eslint/prefer-optional-chain': 'off',
-      '@typescript-eslint/prefer-nullish-coalescing': 'off',
-      '@typescript-eslint/prefer-string-starts-ends-with': 'off',
-
       // Phase 4 — sonarjs code smells / refactors (~30 violations)
       'sonarjs/cognitive-complexity': 'off',
       'sonarjs/no-identical-functions': 'off',

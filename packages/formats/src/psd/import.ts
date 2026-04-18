@@ -57,7 +57,7 @@ function createImportedElement(
     textPathElementId: null,
     booleanOperation: null,
     extensions: {},
-  } as BroadsetElement;
+  } satisfies BroadsetElement;
 }
 
 function detectLayerColor(
@@ -170,7 +170,7 @@ function layerToElement(layer: Layer): BroadsetElement | undefined {
           ),
         }
       : undefined),
-    } as Partial<BroadsetElementStyle>);
+    } satisfies Partial<BroadsetElementStyle>);
   }
 
   if (layer.placedLayer) {
@@ -197,7 +197,7 @@ function layerToElement(layer: Layer): BroadsetElement | undefined {
   if (layer.vectorMask?.paths) {
     const firstPath = layer.vectorMask.paths[0];
 
-    if (firstPath && firstPath.open) {
+    if (firstPath?.open) {
       const d = bezierPathToSvgD(firstPath, width, height);
 
       if (d) {
@@ -213,7 +213,7 @@ function layerToElement(layer: Layer): BroadsetElement | undefined {
     return createImportedElement('rectangle', '', position, width, height, {
       ...style,
       ...(bgColor ? { backgroundColor: bgColor } : undefined),
-    } as Partial<BroadsetElementStyle>);
+    } satisfies Partial<BroadsetElementStyle>);
   }
 
   if (layer.children && layer.children.length > 0) {
@@ -306,5 +306,5 @@ export function importPsd(data: Uint8Array): BroadsetDocument {
     pages,
     animations: [],
     dataSchema: { fields: [] },
-  } as BroadsetDocument;
+  } satisfies BroadsetDocument;
 }

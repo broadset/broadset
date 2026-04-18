@@ -100,7 +100,7 @@ export function isValidSvgPathData(pathData: string): boolean {
     return true;
   }
 
-  if (trimmed[0] !== 'M' && trimmed[0] !== 'm') {
+  if (!trimmed.startsWith('M') && !trimmed.startsWith('m')) {
     return false;
   }
 

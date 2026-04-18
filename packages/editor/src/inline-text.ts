@@ -14,7 +14,7 @@ export function startInlineTextEditing(store: EditorStore, elementId: string): v
   const state = store.getState();
   const element = state.document.elements.find((candidate) => candidate.id === elementId);
 
-  if (element === undefined || element.type !== 'text') {
+  if (element?.type !== 'text') {
     return;
   }
 

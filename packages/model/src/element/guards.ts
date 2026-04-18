@@ -13,7 +13,7 @@ export function isValidVisibleWhenExpression(expression: string | null | undefin
   const trimmed = expression.replace(/\s+/g, '');
   const tokens = trimmed.match(VISIBLE_WHEN_TOKEN_RE);
 
-  if (tokens === null || tokens.join('') !== trimmed) {
+  if (tokens?.join('') !== trimmed) {
     return false;
   }
 

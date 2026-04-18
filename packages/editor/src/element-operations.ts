@@ -266,10 +266,8 @@ function pasteAsTextElement(store: EditorStore, text: string, viewportCenter: Po
   store.getState().addElement(textElement);
 }
 
-const IMAGE_DATA_URL_PATTERN = /^data:image\//;
-
 function isImageDataUrl(text: string): boolean {
-  return IMAGE_DATA_URL_PATTERN.test(text);
+  return text.startsWith("data:image/");
 }
 
 function pasteAsImageElement(store: EditorStore, dataUrl: string, viewportCenter: Point): void {

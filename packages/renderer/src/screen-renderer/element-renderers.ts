@@ -150,7 +150,7 @@ export function computeBooleanPath(children: readonly BroadsetElement[], operati
       const combined = pathBoolean(resultPath, FillRule.NonZero, nextPath, FillRule.NonZero, op);
       const firstCombined = combined[0];
 
-      resultPath = firstCombined !== undefined ? firstCombined : [];
+      resultPath = firstCombined ?? [];
     }
 
     return pathToPathData(resultPath);

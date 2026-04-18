@@ -50,6 +50,6 @@ export function ensureCanvasInitialized(): void {
         width,
         height,
         colorSpace: 'srgb',
-      }) as ImageData,
+      }) satisfies ImageData,
   );
 }

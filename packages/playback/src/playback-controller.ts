@@ -328,7 +328,7 @@ export function createPlaybackController(options: CreatePlaybackControllerOption
         const container =
           target.dataset['elementId'] !== undefined ? target : target.closest<HTMLElement>('[data-element-id]');
 
-        if (container === null || container.dataset['elementId'] === undefined) {
+        if (container?.dataset['elementId'] === undefined) {
           continue;
         }
 

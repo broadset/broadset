@@ -173,6 +173,7 @@ export function buildTimelineOptions(
   return [...timelines]
     .map((timeline) => ({
       id: timeline.id,
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty-string name should also fall back to id, so `||` is intentional
       label: timeline.name?.trim() || timeline.id,
     }))
     .sort((left, right) => left.label.localeCompare(right.label));

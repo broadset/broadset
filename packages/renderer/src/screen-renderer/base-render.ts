@@ -205,8 +205,7 @@ class DOMScreenRenderer implements ScreenRendererController {
     const hasChildren = node.children.length > 0;
     const previousElement = this.previousElementsById.get(node.element.id);
     const shouldUpdate =
-      previousElement === undefined ||
-      previousElement.type !== node.element.type ||
+      previousElement?.type !== node.element.type ||
       !areElementsEquivalent(previousElement, node.element);
 
     activeIds.add(node.element.id);
@@ -231,7 +230,7 @@ class DOMScreenRenderer implements ScreenRendererController {
   private getOrCreateRecord(documentData: BroadsetDocument, element: BroadsetElement): RendererRecord {
     const existingRecord = this.rendererRecords.get(element.id);
 
-    if (existingRecord !== undefined && existingRecord.type === element.type) {
+    if (existingRecord?.type === element.type) {
       return existingRecord;
     }
 
