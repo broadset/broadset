@@ -7,12 +7,13 @@ applyTo: '**'
 
 ## Pre-Commit Requirements
 
-Before every commit, successfully run:
+Quality gates run automatically:
 
-1. `npm run format` (lint fix + prettier)
-2. `npm run typecheck` (strict TypeScript compiler)
+- **Pre-commit (husky)** — three checks in order: [gitleaks-check.sh](../hooks/gitleaks-check.sh) (secret scan, staged files), [quality-gate.sh](../hooks/quality-gate.sh) (`format + typecheck + quality:strict`), [actionlint-check.sh](../hooks/actionlint-check.sh) (workflow YAML lint). gitleaks and actionlint gracefully skip locally if the binaries aren't installed; CI enforces both unconditionally.
+- **Pre-push (husky)** — `npm run gate:full`: `quality:strict + lint:dead (knip) + lint:typecoverage (>= 99.95%) + ct (ui + demo) + build`.
+- **CI** — same gate plus `gitleaks-action` and `actionlint-action` as separate steps for failure visibility.
 
-Code that does not format cleanly or pass the TypeScript compiler must not be committed.
+If you want an early signal before commit, run `agents/hooks/quality-gate.sh` manually. Code that fails the gate must not be committed.
 
 ## Commit Frequency
 
@@ -25,9 +26,11 @@ Commit like a professional senior full-stack developer:
 
 ## Commit Messages
 
-- Use conventional prefixes: `feat:`, `fix:`, `chore:`, `refactor:`, `test:`
-- Keep messages very short — no paragraphs.
-- Examples: `feat: add onscreen toggle to BroadsetElements`, `fix: correct anchor math on center cross`, `chore: update subjx wrapper cleanup`
+Commit message format is enforced by **commitlint** via the [.husky/commit-msg](../../.husky/commit-msg) hook. Commits that don't match are rejected.
+
+- Use conventional prefixes: `feat`, `fix`, `chore`, `refactor`, `test`, `docs`, `style`, `perf`, `build`, `ci`, `revert`, `dev`. Optional scope: `feat(ui): ...`, `chore(hooks): ...`.
+- Keep the subject line short — no paragraphs.
+- Examples: `feat(ui): add onscreen toggle to BroadsetElements`, `fix(editor): correct anchor math on center cross`, `chore(renderer): update subjx wrapper cleanup`.
 
 ## Implementation Order
 
@@ -55,9 +58,24 @@ When feature is done, mark that task with [DONE]
 
 ## Quality Gates
 
-- Run `npm run quality:strict` (lint strict + prettier check + strict typecheck + tests) before merging or concluding a feature block.
-- Run `npm run ct` before every 25th commit or before concluding a major feature block.
-- **When a quality gate fails, fix the code — never weaken the check.** Do not add suppression flags, ignore comments, or config changes that make the check more lenient.
+Two gates, both automatic:
+
+- `npm run quality:strict` — lint:strict + prettier:check + typecheck + jest. Fires on every commit via husky pre-commit.
+- `npm run gate:full` — `quality:strict` + `lint:dead` (knip dead-code/unused-deps) + `lint:typecoverage` (≥ 99.95% explicit types) + `ct:all` (Playwright CT in `packages/ui` and `packages/demo`) + `build`. Fires on every push via husky pre-push, and on every PR / main push via CI.
+
+**When a quality gate fails, fix the code — never weaken the check.** Do not add suppression flags, ignore comments, raised warning thresholds, or config changes that make the check more lenient. See [AGENTS.md](../../AGENTS.md) → "No cutting corners".
+
+There is a tracked exception: a set of newly-introduced ESLint rules is currently disabled per [project/implementation/lint-strictness-plan.md](../../project/implementation/lint-strictness-plan.md). Re-enable phases there as described, never with silent global disables.
+
+## Persistent Memory (Claude Code)
+
+Claude Code maintains a per-project memory store at `~/.claude/projects/<workspace>/memory/`. Use it to capture durable, non-obvious learnings that should survive across sessions:
+
+- User preferences specific to this project ("user prefers single bundled PRs over splits in this area").
+- Project quirks and invariants ("the `.bsp` format requires unit declaration in canvas, not at element level").
+- Decisions and their rationale that aren't already in code or git history.
+
+Do **not** save things derivable from the code, git log, or files in `agents/instructions/` — read those instead. See your `auto memory` system instructions for the full save/recall protocol.
 
 ## Keep working
 

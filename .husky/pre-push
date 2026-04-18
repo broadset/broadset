@@ -1,2 +1,2 @@
 #!/bin/sh
-npm run quality:all
+npm run gate:full

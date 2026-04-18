@@ -1,2 +1,4 @@
 #!/bin/sh
+agents/hooks/gitleaks-check.sh
 agents/hooks/quality-gate.sh
+agents/hooks/actionlint-check.sh

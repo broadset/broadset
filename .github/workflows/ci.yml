@@ -13,6 +13,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks (secret scan)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: actionlint (workflow lint)
+        uses: raven-actions/actionlint@v2
 
       - uses: actions/setup-node@v4
         with:
@@ -20,7 +30,16 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
-      - name: Quality — all packages
-        run: npm run quality:all
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Knip (dead code / unused deps)
+        run: npm run lint:dead
+
+      - name: Type coverage (>= 99.95%)
+        run: npm run lint:typecoverage
+
+      - name: Full gate (quality:strict + ct + build)
+        run: npm run gate:full
