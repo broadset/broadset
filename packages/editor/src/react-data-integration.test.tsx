@@ -1,6 +1,12 @@
 /** @jest-environment jsdom */
 /// <reference types="@testing-library/jest-dom" />
 
+/* eslint-disable react-hooks/globals --
+   Each `it` block declares an inline Consumer component that uses selector
+   hooks to observe context. The rule fires because the component is declared
+   inside a non-hook function (the `it` callback); that's idiomatic RTL, not
+   a real violation. */
+
 import { describe, expect, it, jest } from '@jest/globals';
 import { act, render, screen } from '@testing-library/react';
 import React, { type ReactNode } from 'react';

@@ -228,6 +228,11 @@ export function ScreenPreview({
       rendererRef.current = null;
       onPlaybackControllerChange?.(null);
     };
+    // This effect intentionally uses `documentData` only for the initial
+    // setup; subsequent updates flow through the dedicated effect below, so
+    // re-running this one on every documentData change would tear down and
+    // rebuild the playback + renderer controllers needlessly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onPlaybackControllerChange]);
 
   useEffect(() => {

@@ -44,7 +44,7 @@ Fix every error it surfaces in the same PR. Only when `lint:strict` is clean acr
 
 **Acceptance:** all five rules removed from PHASED RE-ENABLEMENT block; `npm run quality:strict` passes.
 
-- [ ] Phase 1 complete
+- [x] Phase 1 complete
 
 ---
 

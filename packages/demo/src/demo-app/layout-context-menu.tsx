@@ -44,6 +44,7 @@ export function LayoutContextMenu(props: DemoAppLayoutProps): React.JSX.Element 
           {contextMenuElement === null ?
             <Dropdown.Item
               key="paste-selection"
+              // eslint-disable-next-line react-hooks/refs -- context menu opens via `contextMenu` state change, so render always sees the latest clipboard length
               isDisabled={clipboardRef.current.length === 0}
               onAction={pasteClipboardElements}
             >
@@ -74,6 +75,7 @@ export function LayoutContextMenu(props: DemoAppLayoutProps): React.JSX.Element 
               </Dropdown.Item>
               <Dropdown.Item
                 key="paste-selection"
+                // eslint-disable-next-line react-hooks/refs -- context menu opens via `contextMenu` state change, so render always sees the latest clipboard length
                 isDisabled={clipboardRef.current.length === 0}
                 onAction={pasteClipboardElements}
               >

@@ -125,7 +125,9 @@ const PlaybackContext = createContext<PlaybackState | null>(null);
 export function PlaybackProvider({ children }: { readonly children: ReactNode }): React.JSX.Element {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const speedRef = useRef(1);
+  // Playback speed is fixed at 1.0 for now. Wrap in useState if dynamic
+  // playback speed (e.g. 0.5x / 2x scrubbing) is ever added.
+  const speed = 1;
   const rafRef = useRef<number | null>(null);
   const lastFrameRef = useRef<number | null>(null);
 
@@ -143,7 +145,7 @@ export function PlaybackProvider({ children }: { readonly children: ReactNode })
 
     const tick = (now: number): void => {
       if (lastFrameRef.current !== null) {
-        const delta = (now - lastFrameRef.current) * speedRef.current;
+        const delta = (now - lastFrameRef.current) * speed;
 
         setCurrentTime((prev) => prev + delta);
       }
@@ -183,7 +185,7 @@ export function PlaybackProvider({ children }: { readonly children: ReactNode })
     () => ({
       isPlaying,
       currentTime,
-      speed: speedRef.current,
+      speed,
       play,
       pause,
       seek,

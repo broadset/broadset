@@ -99,12 +99,36 @@ function areEditorStateEqualIgnoringCanvas(
   return true;
 }
 
-export function DemoApp(): React.JSX.Element {
-  const storeRef = useRef<EditorStore | null>(null);
-  const dataStoreRef = useRef<ReturnType<typeof createDataStore> | null>(null);
-  const changeStreamRef = useRef<ChangeStream | null>(null);
+const SAMPLE_MEDIA_ASSETS: readonly MediaAsset[] = (() => {
+  const parsedProject = broadsetProjectSchema.safeParse(SAMPLE_PROJECT);
 
-  if (storeRef.current === null) {
+  if (!parsedProject.success) {
+    return [];
+  }
+
+  return parsedProject.data.assets.flatMap((asset) => {
+    const sourceUrl =
+      asset.source.type === 'url' ? asset.source.url
+      : asset.source.type === 'embedded' ? asset.source.dataUri
+      : null;
+
+    if (sourceUrl === null) {
+      return [];
+    }
+
+    return [
+      {
+        id: asset.id,
+        name: asset.name,
+        url: sourceUrl,
+        category: asset.kind,
+      },
+    ];
+  });
+})();
+
+export function DemoApp(): React.JSX.Element {
+  const [editorStore] = useState<EditorStore>(() => {
     const store = createEditorStore({ config: DEMO_EDITOR_CONFIG });
     const initialDocument = loadSavedDocument();
     const initialSelectionId = initialDocument.elements.find((element) => !element.locked)?.id ?? null;
@@ -115,20 +139,10 @@ export function DemoApp(): React.JSX.Element {
       store.getState().selectElement(initialSelectionId);
     }
 
-    storeRef.current = store;
-  }
-
-  if (dataStoreRef.current === null) {
-    dataStoreRef.current = createDataStore();
-  }
-
-  if (changeStreamRef.current === null) {
-    changeStreamRef.current = createChangeStream();
-  }
-
-  const editorStore = storeRef.current;
-  const dataStore = dataStoreRef.current;
-  const changeStream = changeStreamRef.current;
+    return store;
+  });
+  const [dataStore] = useState(() => createDataStore());
+  const [changeStream] = useState<ChangeStream>(() => createChangeStream());
 
   const shouldLogChangeStream = isChangeStreamDebugEnabled();
 
@@ -275,33 +289,7 @@ export function DemoApp(): React.JSX.Element {
     () => buildLayerInfoList(currentDocument, editorState.activePageIndex),
     [currentDocument, editorState.activePageIndex],
   );
-  const mediaAssets = useMemo<readonly MediaAsset[]>(() => {
-    const parsedProject = broadsetProjectSchema.safeParse(SAMPLE_PROJECT);
-
-    if (!parsedProject.success) {
-      return [];
-    }
-
-    return parsedProject.data.assets.flatMap((asset) => {
-      const sourceUrl =
-        asset.source.type === 'url' ? asset.source.url
-        : asset.source.type === 'embedded' ? asset.source.dataUri
-        : null;
-
-      if (sourceUrl === null) {
-        return [];
-      }
-
-      return [
-        {
-          id: asset.id,
-          name: asset.name,
-          url: sourceUrl,
-          category: asset.kind,
-        },
-      ];
-    });
-  }, []);
+  const mediaAssets = SAMPLE_MEDIA_ASSETS;
 
   const pushToast = useCallback((severity: ToastSeverity, message: string): void => {
     const options = { timeout: TOAST_DISMISS_MS[severity] };

@@ -264,13 +264,13 @@ function TemplateGroupAddMember({
   const [selectedDoc, setSelectedDoc] = useState('');
   const [selectedRole, setSelectedRole] = useState<TemplateGroupRole>('16:9');
 
-  const handleAdd = useCallback(() => {
+  const handleAdd = (): void => {
     if (selectedDoc.length > 0) {
       onAddMember(groupId, selectedDoc, selectedRole);
       setSelectedDoc('');
       setSelectedRole('16:9');
     }
-  }, [groupId, selectedDoc, selectedRole, onAddMember]);
+  };
 
   if (unassigned.length === 0) {
     return <span style={{ color: color('muted'), fontSize: font('label') }}>All documents assigned</span>;

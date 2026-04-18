@@ -303,13 +303,6 @@ module.exports = [
       'jsx-a11y': jsxA11yPlugin,
     },
     rules: {
-      // Phase 1 — react-hooks bug-finders (~44 violations across UI/demo)
-      'react-hooks/rules-of-hooks': 'off',
-      'react-hooks/exhaustive-deps': 'off',
-      'react-hooks/refs': 'off',
-      'react-hooks/globals': 'off',
-      'react-hooks/preserve-manual-memoization': 'off',
-
       // Phase 2 — accessibility (~16 violations, mostly UI panels)
       'jsx-a11y/no-static-element-interactions': 'off',
       'jsx-a11y/click-events-have-key-events': 'off',

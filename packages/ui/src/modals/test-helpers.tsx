@@ -74,7 +74,7 @@ function mockNumberFieldRoot(p: Record<string, unknown>) {
   );
 }
 
-function mockNumberFieldInput(p: Record<string, unknown>) {
+function MockNumberFieldInput(p: Record<string, unknown>) {
   const ctx = React.useContext(mockNumCtx);
   const { maxValue: _maxValue, minValue: _minValue, ...rest } = p;
 
@@ -251,7 +251,7 @@ function mockListBoxItem(p: Record<string, unknown>) {
   return React.createElement('option', rest, (children as React.ReactNode) ?? null);
 }
 
-function mockTableRow(p: Record<string, unknown>) {
+function MockTableRow(p: Record<string, unknown>) {
   const tableCtx = React.useContext(mockTableCtx);
   const { children, onPress: _onPress, ...rest } = p;
 
@@ -295,7 +295,7 @@ jest.mock(
       Body: mockWrap(),
       Footer: mockWrap('footer'),
     }),
-    NumberField: Object.assign(mockNumberFieldRoot, { Group: mockWrap(), Input: mockNumberFieldInput }),
+    NumberField: Object.assign(mockNumberFieldRoot, { Group: mockWrap(), Input: MockNumberFieldInput }),
     Progress: mockProgress,
     ProgressBar: Object.assign(mockProgress, {
       Track: mockWrap(),
@@ -316,7 +316,7 @@ jest.mock(
       Header: mockTableHeader,
       Body: mockWrap('tbody'),
       Column: mockWrap('th'),
-      Row: mockTableRow,
+      Row: MockTableRow,
       Cell: mockWrap('td'),
     }),
     Tabs: Object.assign(mockTabs, { List: mockWrap(), Tab: mockTab }),

@@ -90,8 +90,13 @@ export function NumField({
 
   if (!isDirty && value !== localValue) {
     setLocalValue(value);
-    lastValid.current = value;
   }
+
+  useEffect(() => {
+    if (!isDirty) {
+      lastValid.current = value;
+    }
+  }, [isDirty, value]);
 
   const displayValue = Number(localValue.toFixed(DECIMAL_DISPLAY_PRECISION));
 

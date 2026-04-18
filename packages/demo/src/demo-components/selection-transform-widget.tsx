@@ -103,7 +103,7 @@ export function SelectionTransformWidget({
         startAngle: Math.atan2(event.clientY - centerY, event.clientX - centerX),
       };
     },
-    [element.height, element.position.x, element.position.y, element.rotation, element.width, effectiveZoom],
+    [element.rotation],
   );
 
   const handlePointerMove = useCallback(
@@ -165,7 +165,7 @@ export function SelectionTransformWidget({
       gesture.lastUpdate = update;
       onPreviewUpdate(element.id, update);
     },
-    [element.height, element.id, element.position, element.rotation, element.width, onPreviewUpdate, effectiveZoom],
+    [element.id, element.rotation, onPreviewUpdate, effectiveZoom],
   );
 
   const finishGesture = useCallback(
