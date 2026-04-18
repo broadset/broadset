@@ -300,28 +300,5 @@ module.exports = [
   // test/CT files are restricted from importing it (message says as much).
   sampleDocumentRestrictionConfig,
 
-  // ============================================================
-  // PHASED RE-ENABLEMENT — see project/implementation/lint-strictness-plan.md
-  // ============================================================
-  // Each block below is temporarily disabled so WIP can land cleanly.
-  // Removing a block re-enables those rules and gates the codebase on them.
-  // The plan document tracks remaining violations and acceptance criteria
-  // per phase. DO NOT add new disables here without recording them in the
-  // plan; spot-fix the violation site instead.
-  {
-    files: ['**/*.{ts,tsx,jsx}'],
-    plugins: {
-      '@typescript-eslint': tsPlugin,
-      sonarjs: sonarjsPlugin,
-      react: reactPlugin,
-      'react-hooks': reactHooksPlugin,
-      'jsx-a11y': jsxA11yPlugin,
-    },
-    rules: {
-      // Phase 5 — react polish (1 violation: missing displayName on a memo)
-      'react/display-name': 'off',
-    },
-  },
-
   eslintConfigPrettier,
 ];

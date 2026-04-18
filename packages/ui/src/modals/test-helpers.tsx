@@ -19,11 +19,15 @@ const mockTableCtx = React.createContext({
 });
 
 function mockWrap(tag = 'div') {
-  return (p: Record<string, unknown>) => {
+  const Wrap = (p: Record<string, unknown>): React.ReactNode => {
     const { children, ...rest } = p;
 
     return React.createElement(tag, rest, (children as React.ReactNode) ?? null);
   };
+
+  Wrap.displayName = `MockWrap(${tag})`;
+
+  return Wrap;
 }
 
 function mockButton(p: Record<string, unknown>) {

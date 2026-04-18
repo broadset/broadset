@@ -65,8 +65,6 @@ Two gates, both automatic:
 
 **When a quality gate fails, fix the code — never weaken the check.** Do not add suppression flags, ignore comments, raised warning thresholds, or config changes that make the check more lenient. See [AGENTS.md](../../AGENTS.md) → "No cutting corners".
 
-There is a tracked exception: a set of newly-introduced ESLint rules is currently disabled per [project/implementation/lint-strictness-plan.md](../../project/implementation/lint-strictness-plan.md). Re-enable phases there as described, never with silent global disables.
-
 ## Persistent Memory (Claude Code)
 
 Claude Code maintains a per-project memory store at `~/.claude/projects/<workspace>/memory/`. Use it to capture durable, non-obvious learnings that should survive across sessions:
