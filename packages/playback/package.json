@@ -17,10 +17,12 @@
     "quality:strict": "npm run lint:strict && npm run typecheck && npm run test -- --runInBand"
   },
   "devDependencies": {
+    "@types/flubber": "^0.4.0",
     "typescript": "^6.0.2"
   },
   "dependencies": {
     "@broadset/model": "^0.1.0",
+    "flubber": "^0.4.2",
     "svg-path-properties": "^2.0.2"
   }
 }

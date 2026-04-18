@@ -9,10 +9,11 @@ import {
   interpolateNumber,
   isNumericString,
 } from './interpolation/number';
+import { interpolatePathD, type InterpolatePathDOptions, isSvgPathD } from './interpolation/path-morph';
 import { interpolatePath, type InterpolatePathOptions } from './interpolation/tuple-path';
 
-export type { CountingFormat, InterpolatePathOptions };
-export { applyEasing, interpolatePath };
+export type { CountingFormat, InterpolatePathDOptions, InterpolatePathOptions };
+export { applyEasing, interpolatePath, interpolatePathD };
 
 export interface InterpolateValueOptions {
   readonly from: unknown;
@@ -68,6 +69,10 @@ export function interpolateValue(options: InterpolateValueOptions): unknown {
       const value = interpolateNumber(Number(options.from), Number(options.to), easedProgress);
 
       return formatSimpleNumber(value);
+    }
+
+    if (isSvgPathD(options.from) && isSvgPathD(options.to)) {
+      return interpolatePathD({ fromD: options.from, toD: options.to, progress: easedProgress });
     }
 
     return easedProgress >= 1 ? options.to : options.from;
