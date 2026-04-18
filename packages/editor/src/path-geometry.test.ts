@@ -369,6 +369,27 @@ describe('refitPathBounds', () => {
   });
 
   /**
+   * @description Cubic Bézier bounds MUST reflect the true curve extrema, not
+   * the axis-aligned box over control points. For M 0 0 C 50 100 100 100 150 0,
+   * off-curve controls at y=100 extend above the curve, whose true max y is 75.
+   */
+  it('computes true Bézier curve bounds, not control-point bounds', () => {
+    const result = refitPathBounds({
+      pathData: 'M 0 0 C 50 100 100 100 150 0',
+      strokeWidth: 0,
+      currentX: 0,
+      currentY: 0,
+      currentWidth: 200,
+      currentHeight: 200,
+    });
+
+    expect(result.x).toBe(0);
+    expect(result.y).toBe(0);
+    expect(result.width).toBe(150);
+    expect(result.height).toBe(75);
+  });
+
+  /**
    * @description An empty path MUST update content without geometry changes.
    */
   it('does not mutate geometry for empty path', () => {

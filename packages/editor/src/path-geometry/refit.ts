@@ -1,4 +1,5 @@
-import { computeCoordBounds } from './measure';
+import { svgPathBbox } from 'svg-path-bbox';
+
 import { rebaseSegments } from './normalize';
 import { parsePath, serializePath } from './parse';
 import type { RefitPathBoundsFromSvgInput, RefitPathBoundsInput, RefitPathBoundsResult } from './types';
@@ -16,9 +17,9 @@ export function refitPathBounds(input: RefitPathBoundsInput): RefitPathBoundsRes
     };
   }
 
-  const bounds = computeCoordBounds(segments);
+  const [minX, minY, maxX, maxY] = svgPathBbox(input.pathData);
 
-  if (bounds === null) {
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
     return {
       x: input.currentX,
       y: input.currentY,
@@ -30,12 +31,12 @@ export function refitPathBounds(input: RefitPathBoundsInput): RefitPathBoundsRes
 
   const padding = input.strokeWidth / 2;
 
-  const x = bounds.minX - padding;
-  const y = bounds.minY - padding;
-  const width = bounds.maxX - bounds.minX + input.strokeWidth;
-  const height = bounds.maxY - bounds.minY + input.strokeWidth;
+  const x = minX - padding;
+  const y = minY - padding;
+  const width = maxX - minX + input.strokeWidth;
+  const height = maxY - minY + input.strokeWidth;
 
-  const rebased = rebaseSegments(segments, bounds.minX, bounds.minY);
+  const rebased = rebaseSegments(segments, minX, minY);
   const pathData = serializePath(rebased);
 
   return { x, y, width, height, pathData };
