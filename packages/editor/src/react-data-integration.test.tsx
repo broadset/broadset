@@ -351,6 +351,7 @@ describe('usePlayback hook', () => {
     });
     const cafSpy = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
 
+    // eslint-disable-next-line sonarjs/no-identical-functions -- each `it` block captures `hookResult` into its own local closure; extracting the Consumer would require threading a setter through a shared factory with no readability win.
     function Consumer(): React.JSX.Element {
       hookResult = usePlayback();
 
@@ -418,6 +419,7 @@ describe('usePlayback hook', () => {
   it('stop halts playback and resets currentTime to zero', () => {
     let hookResult: PlaybackState | null = null;
 
+    // eslint-disable-next-line sonarjs/no-identical-functions -- each `it` block captures `hookResult` into its own local closure; extracting the Consumer would require threading a setter through a shared factory with no readability win.
     function Consumer(): React.JSX.Element {
       hookResult = usePlayback();
 

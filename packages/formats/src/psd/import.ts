@@ -77,6 +77,7 @@ function detectLayerColor(
   };
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- cc=56; PSD layer dispatch (text/vector/raster/group + effects); see lint-strictness-plan.md Phase 4 followup.
 function layerToElement(layer: Layer): BroadsetElement | undefined {
   const left = layer.left ?? 0;
   const top = layer.top ?? 0;

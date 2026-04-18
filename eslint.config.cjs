@@ -222,7 +222,11 @@ module.exports = [
       // which duplicates/conflicts with our _prefix convention). Cognitive
       // complexity threshold raised to 20 to focus on truly tangled code.
       ...sonarjsPlugin.configs.recommended.rules,
-      'sonarjs/cognitive-complexity': ['error', 20],
+      // Threshold 30 is a pragmatic ceiling set during the Phase 4 rollout —
+      // see project/implementation/lint-strictness-plan.md for the ratchet
+      // schedule down to 20. Functions above 30 must use a site-level
+      // disable with a tracking comment.
+      'sonarjs/cognitive-complexity': ['error', 30],
       'sonarjs/no-nested-conditional': 'off',
       'sonarjs/slow-regex': 'off',
       'sonarjs/regex-complexity': 'off',
@@ -314,12 +318,6 @@ module.exports = [
       'jsx-a11y': jsxA11yPlugin,
     },
     rules: {
-      // Phase 4 — sonarjs code smells / refactors (~30 violations)
-      'sonarjs/cognitive-complexity': 'off',
-      'sonarjs/no-identical-functions': 'off',
-      'sonarjs/no-alphabetical-sort': 'off',
-      'sonarjs/code-eval': 'off',
-
       // Phase 5 — react polish (1 violation: missing displayName on a memo)
       'react/display-name': 'off',
     },

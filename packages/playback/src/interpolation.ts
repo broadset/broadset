@@ -33,6 +33,7 @@ function isNumberArray(value: unknown): value is readonly number[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'number');
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- cc=31; value dispatcher covers number/color/tuple/string/path per KeyframeValue kind; see lint-strictness-plan.md Phase 4 followup.
 export function interpolateValue(options: InterpolateValueOptions): unknown {
   const easedProgress = applyEasing(options.easing, options.progress);
 

@@ -5,6 +5,7 @@ function isVisibleWhenOperand(token: string): boolean {
   return /^(?:true|false|-?\d+(?:\.\d+)?|'[^']*'|[a-zA-Z_][a-zA-Z0-9_]*)$/.test(token);
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- cc=31; expression-language validator walks tokens with multi-state grammar; see lint-strictness-plan.md Phase 4 followup.
 export function isValidVisibleWhenExpression(expression: string | null | undefined): boolean {
   if (expression === null || expression === undefined || expression.trim() === '') {
     return true;

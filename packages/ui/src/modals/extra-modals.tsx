@@ -184,7 +184,7 @@ export function TemplateBrowserModal({
     return acc;
   }, {});
 
-  const sortedCategories = Object.keys(groupedTemplates).sort();
+  const sortedCategories = Object.keys(groupedTemplates).sort((a, b) => a.localeCompare(b));
 
   const handleCreate = useCallback(() => {
     if (selectedTemplate === null) return;

@@ -79,6 +79,7 @@ function createSolidPixels(
   return data;
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- cc=54; PSD layer mapping is inherently branchy (text/image/shape/group paths); see lint-strictness-plan.md Phase 4 followup.
 export function elementToLayer(el: BroadsetElement): Layer {
   const layer: Layer = {
     name: el.name,

@@ -22,7 +22,7 @@ function evaluateExpression(raw: string): number | null {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- `trimmed` has already been regex-gated to numeric expressions with single operators; evaluator is confined to returning a number
     const evaluator = new Function(`"use strict"; return (${trimmed});`) as () => unknown;
     const result: unknown = evaluator();
 

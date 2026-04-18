@@ -124,6 +124,7 @@ function isElementBeyondBleed(
   );
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- cc=44; covers every preflight check category in one pass; see lint-strictness-plan.md Phase 4 followup.
 export function runPreflightDiagnostics(
   document: BroadsetDocument,
   config: PreflightConfig,

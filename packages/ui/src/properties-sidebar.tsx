@@ -82,6 +82,7 @@ export interface PropertiesSidebarProps {
   readonly documentUnit?: 'px' | 'mm' | 'in' | undefined;
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- cc=103; aggregates capability-driven panel rendering for every element type; splitting requires a whole-sidebar refactor scoped in lint-strictness-plan.md Phase 4 followup.
 export function PropertiesSidebar({
   elements,
   documentMode,

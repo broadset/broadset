@@ -136,7 +136,7 @@ describe('computeTextSegments', () => {
     expect(segments).toHaveLength(5);
 
     // All segments should be present with their text
-    const texts = segments.map((s: TextAnimatorSegment) => s.text).sort();
+    const texts = segments.map((s: TextAnimatorSegment) => s.text).sort((a, b) => a.localeCompare(b));
 
     expect(texts).toEqual(['A', 'B', 'C', 'D', 'E']);
 

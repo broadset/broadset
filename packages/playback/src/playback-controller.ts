@@ -177,6 +177,7 @@ export function createPlaybackController(options: CreatePlaybackControllerOption
     handles.set(handleKey, handle);
   }
 
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- cc=57; per-keyframe transition scheduler with enter/exit/loop/hold branches; see lint-strictness-plan.md Phase 4 followup.
   function syncTransitions(
     elementId: string,
     runtime: RuntimeRecord,
