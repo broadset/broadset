@@ -194,6 +194,7 @@ export function SelectionTransformWidget({
   );
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- transform widget is a canvas overlay; onClick only exists to swallow click propagation so the canvas click handler doesn't fire. Keyboard interaction happens on the parent canvas (role="application").
     <div
       ref={widgetRef}
       data-testid="demo-transform-widget"

@@ -29,7 +29,6 @@ export function VideoPanel({
   return (
     <section
       aria-label="Video"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
     >
       <FieldRow label="Source URL">
@@ -135,7 +134,6 @@ export function ClockPanel({
   return (
     <section
       aria-label="Clock"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
     >
       <FieldRow label="Format">
@@ -262,7 +260,6 @@ export function TickerPanel({
   return (
     <section
       aria-label="Ticker"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
     >
       <FieldRow label="Items">

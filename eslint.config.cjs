@@ -303,14 +303,6 @@ module.exports = [
       'jsx-a11y': jsxA11yPlugin,
     },
     rules: {
-      // Phase 2 — accessibility (~16 violations, mostly UI panels)
-      'jsx-a11y/no-static-element-interactions': 'off',
-      'jsx-a11y/click-events-have-key-events': 'off',
-      'jsx-a11y/no-redundant-roles': 'off',
-      'jsx-a11y/no-noninteractive-tabindex': 'off',
-      'jsx-a11y/no-noninteractive-element-interactions': 'off',
-      'jsx-a11y/no-autofocus': 'off',
-
       // Phase 3 — typescript-eslint preferences (~40 violations, mostly auto-fixable)
       '@typescript-eslint/consistent-type-assertions': 'off',
       '@typescript-eslint/prefer-optional-chain': 'off',

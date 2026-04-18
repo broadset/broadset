@@ -70,7 +70,7 @@ Fix every error it surfaces in the same PR. Only when `lint:strict` is clean acr
 
 **Acceptance:** all six rules removed; `npm run quality:strict` passes.
 
-- [ ] Phase 2 complete
+- [x] Phase 2 complete
 
 ---
 

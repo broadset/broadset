@@ -135,6 +135,7 @@ export function GuidePositionModal({
         <span style={{ flex: 1, fontWeight: 700 }}>Guide Position</span>
       </Modal.Header>
       <Modal.Body>
+        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- wrapper only exists to capture Escape for the inner NumField; the modal's default Escape handler is reserved for dismissing the dialog. */}
         <div onKeyDown={handleKeyDown}>
           <NumField label={`Position (${unit})`} value={localPosition} onChange={setLocalPosition} onCommit={onApply} />
         </div>

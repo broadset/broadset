@@ -265,6 +265,7 @@ export function TimelineEditor(props: TimelineEditorProps): JSX.Element {
         ))}
       </div>
 
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- timeline track is a pointer-scrub widget; keyboard navigation of keyframes happens at the editor level via shortcuts rather than per-track key events */}
       <div
         ref={trackRef}
         data-testid="timeline-track"

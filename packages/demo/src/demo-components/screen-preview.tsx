@@ -470,11 +470,17 @@ export function ScreenPreview({
   }, [handleWheel]);
 
   return (
+    /* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/role-supports-aria-props, jsx-a11y/click-events-have-key-events --
+       Canvas preview is a complex pointer-driven editing surface. role="application"
+       signals to assistive tech that key/mouse events are handled by this widget;
+       canvas-level keyboard shortcuts are wired at the editor store level, not as
+       per-element keydown handlers. */
     <div
       ref={containerRef}
       aria-description="Mouse wheel zooms, ctrl or command wheel pans horizontally, Alt pans vertically, and Shift-drag or middle-click pans the view."
       aria-label={`Screen preview for ${documentData.name}`}
       className="h-full w-full overflow-hidden"
+      role="application"
       onClick={handlePreviewClick}
       onContextMenu={onCanvasContextMenu}
       onPointerCancel={handlePointerUp}

@@ -24,6 +24,10 @@ export function SegmentedSwitcher<TValue extends string>({
   const selectedIndex = options.findIndex((option) => option.value === value);
 
   return (
+    /* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex --
+       segmented switcher needs keyboard arrow-nav on the group itself to move
+       focus between its buttons; role="group" is the accurate semantic (not
+       radiogroup, because children are Buttons, not radios). */
     <div
       role="group"
       aria-label={ariaLabel}
@@ -76,5 +80,6 @@ export function SegmentedSwitcher<TValue extends string>({
         ))}
       </ButtonGroup>
     </div>
+    /* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */
   );
 }

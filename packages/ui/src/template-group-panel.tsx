@@ -113,6 +113,7 @@ export function TemplateGroupPanel({
                   {editingGroupId === group.groupId ?
                     <Input
                       aria-label="Rename group"
+                      // eslint-disable-next-line jsx-a11y/no-autofocus -- user-initiated rename flow; focus is expected so typing starts immediately
                       autoFocus
                       value={editingName}
                       onBlur={commitRename}
