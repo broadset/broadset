@@ -39,12 +39,14 @@ describe('parsePath', () => {
 
   /**
    * @description Relative (lowercase) commands MUST be parsed alongside absolute
-   * commands. The parser preserves the original command letter.
+   * commands. The parser preserves the original command letter, except the
+   * leading moveto, which SVG spec treats as absolute regardless of case.
    */
   it('parses relative commands (lowercase) preserving command letter', () => {
     const segments = parsePath('m 5 5 l 10 10 h 20 v 30 c 1 2 3 4 5 6 s 7 8 9 10 q 11 12 13 14 a 5 5 0 1 0 10 0 z');
 
-    expect(segments[0]).toEqual({ command: 'm', coords: [5, 5] });
+    // Leading moveto is always absolute per SVG spec (https://www.w3.org/TR/SVG11/paths.html#PathDataMovetoCommands).
+    expect(segments[0]).toEqual({ command: 'M', coords: [5, 5] });
     expect(segments[1]).toEqual({ command: 'l', coords: [10, 10] });
     expect(segments[2]).toEqual({ command: 'h', coords: [20] });
     expect(segments[3]).toEqual({ command: 'v', coords: [30] });

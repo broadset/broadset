@@ -64,22 +64,22 @@ describe('Clip-path serialization', () => {
 describe('Path zoom scaling', () => {
   /** @description Regular line coordinates scale linearly with the provided zoom factor. */
   it('scales path coordinates by zoom factor', () => {
-    expect(scalePathData('M 0 0 L 100 50', 2)).toBe('M 0 0 L 200 100');
-    expect(scalePathData('M 10 20 L 30 40', 1)).toBe('M 10 20 L 30 40');
+    expect(scalePathData('M 0 0 L 100 50', 2)).toBe('M0 0L200 100');
+    expect(scalePathData('M 10 20 L 30 40', 1)).toBe('M10 20L30 40');
   });
 
   /** @description Fractional scaling results must be rounded to two decimals for stability. */
   it('rounds fractional coordinates to 2 decimals', () => {
     const result = scalePathData('M 10 10', 0.333);
 
-    expect(result).toMatch(/^M 3\.33 3\.33$/);
+    expect(result).toBe('M3.33 3.33');
   });
 
-  /** @description Arc rotations and flags must remain unscaled while coordinate values still scale. */
+  /** @description Arc radii and endpoints scale; rotation and flags stay unchanged. */
   it('preserves arc command flags when scaling', () => {
-    expect(scalePathData('M 0 0 A 10 20 30 0 1 50 60', 2)).toBe('M 0 0 A 20 40 30 0 1 100 120');
-    expect(scalePathData('A 10 20 30 0 1 50 60 10 20 30 0 1 70 80', 2)).toBe(
-      'A 20 40 30 0 1 100 120 20 40 30 0 1 140 160',
+    expect(scalePathData('M 0 0 A 10 20 30 0 1 50 60', 2)).toBe('M0 0A20 40 30 0 1 100 120');
+    expect(scalePathData('M 0 0 A 10 20 30 0 1 50 60 10 20 30 0 1 70 80', 2)).toBe(
+      'M0 0A20 40 30 0 1 100 120 20 40 30 0 1 140 160',
     );
   });
 });

@@ -20,6 +20,7 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
+    "svgpath": "^2.6.0",
     "zod": "^4.3.0"
   }
 }

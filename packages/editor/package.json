@@ -26,6 +26,7 @@
     "@broadset/playback": "^0.1.0",
     "@broadset/renderer": "^0.1.0",
     "svg-path-bbox": "^2.1.0",
+    "svgpath": "^2.6.0",
     "zod": "^4.3.6",
     "zundo": "^2.3.0",
     "zustand": "^5.0.12"

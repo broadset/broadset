@@ -1,9 +1,11 @@
+import svgpath from 'svgpath';
+
 export type AnchorX = 'left' | 'right';
 export type AnchorY = 'top' | 'bottom';
 
 const MILLIMETRES_PER_INCH = 25.4;
 const DEFAULT_DPI = 96;
-const DEFAULT_SCALE_PRECISION = 100;
+const PATH_SCALE_PRECISION = 2;
 const MIN_CLIP_DIMENSION = 1;
 
 export interface ElementRect {
@@ -55,67 +57,12 @@ export function serializeClipPath(pathData: string): string {
   return `path("${escapedPathData}")`;
 }
 
-const SVG_PARAM_COUNTS: Readonly<Record<string, number>> = {
-  M: 2,
-  m: 2,
-  L: 2,
-  l: 2,
-  H: 1,
-  h: 1,
-  V: 1,
-  v: 1,
-  C: 6,
-  c: 6,
-  S: 4,
-  s: 4,
-  Q: 4,
-  q: 4,
-  T: 2,
-  t: 2,
-  A: 7,
-  a: 7,
-  Z: 0,
-  z: 0,
-};
-
-const ARC_NON_SCALED_PARAMETER_INDICES = new Set([2, 3, 4]);
-
 /**
- * Scales numeric coordinates inside an SVG path string by `zoom`.
- * Arc rotation and arc flags are preserved unscaled.
+ * Scales numeric coordinates inside an SVG path string by `zoom`, delegating
+ * to svgpath so arc radii scale while arc rotation and flags are preserved.
  */
 export function scalePathData(pathData: string, zoom: number): string {
-  let currentCommand = '';
-  let parameterIndex = 0;
-
-  return pathData.replace(/[MmLlHhVvCcSsQqTtAaZz]|-?\d+(?:\.\d+)?/g, (token) => {
-    if (token.length === 1 && token in SVG_PARAM_COUNTS) {
-      currentCommand = token;
-      parameterIndex = 0;
-
-      return token;
-    }
-
-    const isArcCommand = currentCommand === 'A' || currentCommand === 'a';
-    const shouldScale = !(isArcCommand && ARC_NON_SCALED_PARAMETER_INDICES.has(parameterIndex));
-
-    parameterIndex += 1;
-
-    const parameterCount = SVG_PARAM_COUNTS[currentCommand];
-
-    if (parameterCount !== undefined && parameterCount > 0 && parameterIndex >= parameterCount) {
-      parameterIndex = 0;
-    }
-
-    if (!shouldScale) {
-      return token;
-    }
-
-    const scaledValue = Number(token) * zoom;
-    const roundedValue = Math.round(scaledValue * DEFAULT_SCALE_PRECISION) / DEFAULT_SCALE_PRECISION;
-
-    return String(roundedValue);
-  });
+  return svgpath(pathData).scale(zoom).round(PATH_SCALE_PRECISION).toString();
 }
 
 /** Generates a rectangle clip-path with a minimum non-zero size. */

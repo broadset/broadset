@@ -1,13 +1,16 @@
 import { svgPathBbox } from 'svg-path-bbox';
+import svgpath from 'svgpath';
 
-import { rebaseSegments } from './normalize';
-import { parsePath, serializePath } from './parse';
 import type { RefitPathBoundsFromSvgInput, RefitPathBoundsInput, RefitPathBoundsResult } from './types';
 
-export function refitPathBounds(input: RefitPathBoundsInput): RefitPathBoundsResult {
-  const segments = parsePath(input.pathData);
+const REBASE_PRECISION = 2;
 
-  if (segments.length === 0) {
+function rebasePath(pathData: string, offsetX: number, offsetY: number): string {
+  return svgpath(pathData).abs().translate(-offsetX, -offsetY).round(REBASE_PRECISION).toString();
+}
+
+export function refitPathBounds(input: RefitPathBoundsInput): RefitPathBoundsResult {
+  if (input.pathData.trim() === '') {
     return {
       x: input.currentX,
       y: input.currentY,
@@ -31,29 +34,24 @@ export function refitPathBounds(input: RefitPathBoundsInput): RefitPathBoundsRes
 
   const padding = input.strokeWidth / 2;
 
-  const x = minX - padding;
-  const y = minY - padding;
-  const width = maxX - minX + input.strokeWidth;
-  const height = maxY - minY + input.strokeWidth;
-
-  const rebased = rebaseSegments(segments, minX, minY);
-  const pathData = serializePath(rebased);
-
-  return { x, y, width, height, pathData };
+  return {
+    x: minX - padding,
+    y: minY - padding,
+    width: maxX - minX + input.strokeWidth,
+    height: maxY - minY + input.strokeWidth,
+    pathData: rebasePath(input.pathData, minX, minY),
+  };
 }
 
 export function refitPathBoundsFromSvg(input: RefitPathBoundsFromSvgInput): RefitPathBoundsResult {
-  const segments = parsePath(input.pathData);
   const padding = input.strokeWidth / 2;
   const { svgBBox } = input;
 
-  const x = svgBBox.x - padding;
-  const y = svgBBox.y - padding;
-  const width = svgBBox.width + input.strokeWidth;
-  const height = svgBBox.height + input.strokeWidth;
-
-  const rebased = rebaseSegments(segments, svgBBox.x, svgBBox.y);
-  const pathData = serializePath(rebased);
-
-  return { x, y, width, height, pathData };
+  return {
+    x: svgBBox.x - padding,
+    y: svgBBox.y - padding,
+    width: svgBBox.width + input.strokeWidth,
+    height: svgBBox.height + input.strokeWidth,
+    pathData: rebasePath(input.pathData, svgBBox.x, svgBBox.y),
+  };
 }
