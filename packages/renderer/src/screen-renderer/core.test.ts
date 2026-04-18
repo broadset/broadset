@@ -310,6 +310,109 @@ describe('renderer core', () => {
     expect(node.dataset['gradient']).toBeUndefined();
   });
 
+  /** @description Empty-string gradient must not wipe the solid backgroundColor. Regression for the Solid/Gradient fill toggle that used to render the element invisible after switching back to Solid. */
+  it('treats an empty-string gradient as "no gradient" and applies backgroundColor instead', () => {
+    const node = document.createElement('div');
+
+    applyBackgroundStyle(node, {
+      ...createDefaultStyle(),
+      backgroundGradient: '',
+      backgroundColor: '#abcdef',
+    });
+
+    expect(node.style.backgroundColor).toBe('rgb(171, 205, 239)');
+    expect(node.style.backgroundImage).toBe('');
+    expect(node.dataset['gradient']).toBeUndefined();
+  });
+
+  /** @description Mask preset must apply a CSS clip-path so the element visually reflects the chosen shape. Regression for a past state where the properties panel let users pick masks but the renderer never applied them. */
+  it('applies customClipPath to the element content host when maskType is set', () => {
+    const host = createHost();
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument([
+        createElement({
+          id: 'masked-rect',
+          type: 'rectangle',
+          style: { ...createDefaultStyle(), maskType: 'custom', customClipPath: 'circle(50%)' },
+        }),
+      ]),
+    });
+
+    const elementNode = host.querySelector<HTMLElement>(`[${DATA_ATTRIBUTES.elementId}="masked-rect"]`);
+    const contentNode = elementNode?.querySelector<HTMLElement>('[data-element-content]');
+
+    expect(contentNode?.style.clipPath).toBe('circle(50%)');
+
+    controller.destroy();
+  });
+
+  /** @description Opacity must render as 1 when a style omits the field — fixture JSON and externally-authored elements frequently leave it off. Regression for a bug where String(undefined) leaked "undefined" to CSS, so the opacity slider silently had no visible effect on affected elements. */
+  it('defaults opacity host style to 1 when the style omits the opacity field', () => {
+    const host = createHost();
+    const defaultStyle = createDefaultStyle();
+
+    // Simulate a JSON-authored element that never set opacity. We spread
+    // createDefaultStyle but scrub the field afterwards to match production
+    // fixtures like sampleDocument.json where "style" can omit opacity.
+    const styleWithoutOpacity: Record<string, unknown> = { ...defaultStyle };
+
+    delete styleWithoutOpacity['opacity'];
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument([
+        createElement({
+          id: 'rect-no-opacity',
+          type: 'rectangle',
+          style: styleWithoutOpacity as unknown as typeof defaultStyle,
+        }),
+      ]),
+    });
+
+    const opacityNode = host.querySelector<HTMLElement>(
+      `[${DATA_ATTRIBUTES.elementId}="rect-no-opacity"] [${DATA_ATTRIBUTES.opacityTarget}]`,
+    );
+
+    expect(opacityNode?.style.opacity).toBe('1');
+
+    controller.destroy();
+  });
+
+  /** @description Switching maskType back to 'none' must clear the clip-path so the element becomes unmasked. */
+  it('clears clip-path when maskType reverts to none', () => {
+    const host = createHost();
+
+    const controller = createScreenRenderer({
+      host,
+      document: createDocument([
+        createElement({
+          id: 'masked-rect',
+          type: 'rectangle',
+          style: { ...createDefaultStyle(), maskType: 'custom', customClipPath: 'circle(50%)' },
+        }),
+      ]),
+    });
+
+    controller.updateDocument(
+      createDocument([
+        createElement({
+          id: 'masked-rect',
+          type: 'rectangle',
+          style: { ...createDefaultStyle(), maskType: 'none', customClipPath: '' },
+        }),
+      ]),
+    );
+
+    const elementNode = host.querySelector<HTMLElement>(`[${DATA_ATTRIBUTES.elementId}="masked-rect"]`);
+    const contentNode = elementNode?.querySelector<HTMLElement>('[data-element-content]');
+
+    expect(contentNode?.style.clipPath).toBe('');
+
+    controller.destroy();
+  });
+
   it('resolves capabilities in plugin, built-in, then all-false priority order', () => {
     const plugin: RendererPlugin = {
       type: 'countdown',

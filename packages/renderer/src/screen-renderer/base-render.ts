@@ -295,6 +295,11 @@ class DOMScreenRenderer implements ScreenRendererController {
     host.style.transform = transforms;
     host.style.transformOrigin = 'center center';
     host.style.pointerEvents = 'none';
+    // mix-blend-mode must live on the outermost per-element host so the element
+    // blends against sibling elements behind it. Placing it on an inner node
+    // (inside opacityHost, which creates a new stacking context when opacity<1)
+    // would isolate the blend to that stacking context and paint as no-op.
+    host.style.mixBlendMode = style.mixBlendMode ?? '';
 
     opacityHost.style.width = '100%';
     opacityHost.style.height = '100%';
@@ -306,6 +311,14 @@ class DOMScreenRenderer implements ScreenRendererController {
     contentHost.style.height = '100%';
     contentHost.style.boxSizing = 'border-box';
     contentHost.style.overflow = style.clipChildren === true ? 'hidden' : 'visible';
+
+    const maskValue =
+      style.maskType === 'none' || style.maskType === undefined || style.customClipPath === undefined ?
+        ''
+      : style.customClipPath.trim() === '' ? ''
+      : style.customClipPath;
+
+    contentHost.style.clipPath = maskValue;
     // Parented elements use model-space coordinates relative to their parent's top-left.
     // Applying parent padding on the same host shifts that coordinate origin.
     contentHost.style.padding = hasChildren ? '0px' : formatPadding(style);
@@ -316,7 +329,6 @@ class DOMScreenRenderer implements ScreenRendererController {
     contentHost.style.boxShadow = style.boxShadow ?? '';
     contentHost.style.filter = style.filter ?? '';
     contentHost.style.backdropFilter = style.backdropFilter ?? '';
-    contentHost.style.mixBlendMode = style.mixBlendMode ?? '';
     contentHost.style.isolation = style.isolation ?? '';
     contentHost.style.color = style.fontColor ?? '';
     contentHost.style.fontFamily = style.fontFamily ?? '';

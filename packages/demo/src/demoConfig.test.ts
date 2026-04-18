@@ -26,7 +26,7 @@ describe('Demo Editor Configuration (9-G)', () => {
         expect(font.family).toBeTruthy();
         expect(font.source).toBeDefined();
 
-        if (font.source !== undefined && font.source.kind === 'url') {
+        if (font.source?.kind === 'url') {
           expect(font.source.url).toContain('http');
         } else {
           // All demo fonts must be URL-sourced

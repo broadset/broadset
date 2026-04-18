@@ -312,7 +312,7 @@ export function buildLayerInfoList(document: BroadsetDocument, activePageIndex: 
 
   const includedRootElements = (activePage?.elements ?? [])
     .map((instance) => elementsById.get(instance.elementId))
-    .filter((element): element is BroadsetElement => element !== undefined && element.parentId === null)
+    .filter((element): element is BroadsetElement => element?.parentId === null)
     .sort((left, right) => {
       const leftIndex = layerOrderIndexById.get(left.id) ?? Number.MAX_SAFE_INTEGER;
       const rightIndex = layerOrderIndexById.get(right.id) ?? Number.MAX_SAFE_INTEGER;
@@ -528,7 +528,7 @@ export function reorderDocumentLayers(
   const changed = nextElements.some((element, index) => {
     const current = document.elements[index];
 
-    return current === undefined || current.id !== element.id || current.parentId !== element.parentId;
+    return current?.id !== element.id || current.parentId !== element.parentId;
   });
 
   if (!changed) {
@@ -646,7 +646,6 @@ export function toPanelElement(element: BroadsetElement, instance?: PageElementI
     borderStyle: typeof element.style.borderStyle === 'string' ? element.style.borderStyle : 'solid',
     borderRadius: borderRadiusValue,
     opacity: element.style.opacity,
-    blendMode: typeof element.style.mixBlendMode === 'string' ? element.style.mixBlendMode : 'normal',
     mixBlendMode: typeof element.style.mixBlendMode === 'string' ? element.style.mixBlendMode : 'normal',
     isolation: element.style.isolation ?? 'auto',
     boxShadow: element.style.boxShadow ?? '',

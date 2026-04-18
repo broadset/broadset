@@ -1,9 +1,9 @@
 import type { BooleanOperation } from '@broadset/model';
-import { Accordion, Button, Input, ListBox, Select, Slider, Switch, TextArea } from '@heroui/react';
+import { Accordion, Button, Input, ListBox, Select, Slider, TextArea } from '@heroui/react';
 import type { JSX } from 'react';
 import { useState } from 'react';
 
-import { ColorInput, FieldRow, NumField, SegmentedSwitcher } from '../inputs';
+import { ColorInput, FieldRow, NumField, SegmentedSwitcher, ToggleSwitch } from '../inputs';
 import { type MediaAsset, MediaLibraryModal } from '../modals';
 import type { PropertyValue } from '../panel-types';
 import {
@@ -100,7 +100,6 @@ export function PathPropertiesPanel({
   return (
     <section
       aria-label="Path Properties"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
     >
       <div style={{ display: 'flex', gap: sp('sp-02'), minWidth: 0 }}>
@@ -369,15 +368,15 @@ export function PathPropertiesPanel({
                       value={content.trim() === '' ? '(empty path)' : content}
                     />
                   </FieldRow>
-                  <Switch
-                    aria-label="Show path source"
+                  <ToggleSwitch
+                    ariaLabel="Show path source"
                     isSelected={showPathSource}
                     onChange={(nextValue) => {
                       setShowPathSource(nextValue);
                     }}
                   >
                     Show path source
-                  </Switch>
+                  </ToggleSwitch>
                   {showPathSource ?
                     <FieldRow label="Shape source">
                       <TextArea
@@ -402,6 +401,7 @@ export interface ImagePanelProps {
   readonly content: string;
   readonly assetId?: string | null | undefined;
   readonly assets?: readonly MediaAsset[] | undefined;
+  readonly objectFit?: string | undefined;
   readonly onUploadRequest?: (() => void) | undefined;
   readonly onUpdate: (key: string, value: string | number) => void;
 }
@@ -431,6 +431,7 @@ export function ImagePanel({
   content,
   assetId = null,
   assets = [],
+  objectFit,
   onUploadRequest,
   onUpdate,
 }: ImagePanelProps): JSX.Element {
@@ -442,12 +443,18 @@ export function ImagePanel({
       assets.find((asset) => asset.id === assetId)
     : assets.find((asset) => asset.url === content);
   const selectedName = selectedAsset?.name ?? getImageFilename(content);
+  // Prefer the resolved asset URL for the thumbnail so elements whose `content`
+  // is an empty string but whose `assetId` points at a known asset still show
+  // a live preview instead of a broken-image icon. Falls through to `content`
+  // (which may be a direct URL typed by the user) when no asset matches.
+  const thumbnailSrc = selectedAsset?.url ?? content;
   const categories = ['All', ...Array.from(new Set(assets.map((asset) => asset.category)))];
+  const currentObjectFit: ObjectFitValue =
+    OBJECT_FIT_OPTIONS_WITH_LABELS.find((option) => option.value === objectFit)?.value ?? 'contain';
 
   return (
     <section
       aria-label="Image"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0, width: '100%' }}
     >
       <div
@@ -463,8 +470,8 @@ export function ImagePanel({
         }}
       >
         <img
-          alt="Selected image thumbnail"
-          src={content}
+          alt="Selected thumbnail"
+          src={thumbnailSrc}
           style={{ borderRadius: 4, flex: '0 0 auto', height: 36, objectFit: 'cover', width: 36 }}
         />
         <span
@@ -518,6 +525,19 @@ export function ImagePanel({
         </FieldRow>
       : null}
 
+      {objectFit !== undefined ?
+        <FieldRow label="Fit">
+          <SegmentedSwitcher
+            ariaLabel="Object fit"
+            value={currentObjectFit}
+            options={OBJECT_FIT_OPTIONS_WITH_LABELS.map((option) => ({ label: option.label, value: option.value }))}
+            onChange={(nextValue) => {
+              onUpdate('objectFit', nextValue);
+            }}
+          />
+        </FieldRow>
+      : null}
+
       {isMediaLibraryOpen ?
         <MediaLibraryModal
           isOpen={isMediaLibraryOpen}
@@ -550,7 +570,6 @@ export function ObjectFitPanel({ objectFit, onUpdate }: ObjectFitPanelProps): JS
   return (
     <section
       aria-label="Object Fit"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0, width: '100%' }}
     >
       <FieldRow label="Fit">
@@ -585,7 +604,6 @@ export function QrCodePanel({
   return (
     <section
       aria-label="QR Code"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
     >
       <FieldRow label="Content">
@@ -600,6 +618,7 @@ export function QrCodePanel({
 
       <FieldRow label="Error correction">
         <SelectField
+          hideLabel
           label="Error correction"
           value={errorCorrection}
           options={[...ERROR_CORRECTION_OPTIONS]}
@@ -662,7 +681,6 @@ export function GroupPanel({
   return (
     <section
       aria-label="Group"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
     >
       <FieldShell label="Group name">
@@ -702,8 +720,8 @@ export function GroupPanel({
 
       <FieldRow label="Clip">
         <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-01'), minWidth: 0 }}>
-          <Switch
-            aria-label="Clip children to group bounds"
+          <ToggleSwitch
+            ariaLabel="Clip children to group bounds"
             isDisabled={isPrintMode}
             isSelected={clipChildren}
             onChange={(v) => {
@@ -711,7 +729,7 @@ export function GroupPanel({
             }}
           >
             Clip children to group bounds
-          </Switch>
+          </ToggleSwitch>
           {isPrintMode ?
             <span style={{ color: color('muted'), fontSize: font('label') }}>
               Clip children is not available in this document mode.
@@ -722,6 +740,7 @@ export function GroupPanel({
 
       <FieldRow label="Boolean operation">
         <SelectField
+          hideLabel
           label="Boolean operation"
           value={booleanOperation ?? 'none'}
           options={[...BOOLEAN_OPERATION_OPTIONS]}

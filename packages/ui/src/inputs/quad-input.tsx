@@ -228,6 +228,7 @@ export function QuadInput({
               />
               <NumField
                 compact
+                embedded
                 label={ariaLabel}
                 value={cellValue}
                 min={min}

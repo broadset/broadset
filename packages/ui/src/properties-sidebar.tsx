@@ -136,9 +136,14 @@ export function PropertiesSidebar({
   const isMulti = elements.length > 1;
   const isLocked = primary.locked === true;
   const selectionCountLabel = isMulti ? `${String(elements.length)} elements` : undefined;
-  const contextLabel = isMulti ? 'Multiple selection' : primary.name || primary.id;
-  const contextSubtitle = isMulti ? 'Common properties' : primary.id;
+  const contextLabel = isMulti ? 'Multiple selection' : primary.name || getElementTypeLabel(primary.type);
   const typeChipLabel = isMulti ? undefined : getElementTypeLabel(primary.type);
+  const onLabelChange =
+    isMulti ? undefined : (
+      (nextName: string) => {
+        onUpdate('name', nextName);
+      }
+    );
 
   const CustomPanel = customPanels?.[primary.type];
 
@@ -148,7 +153,7 @@ export function PropertiesSidebar({
         <SidebarContextHeader
           icon={<Type size={ICON_SIZE} />}
           label={contextLabel}
-          subtitle={contextSubtitle}
+          {...(onLabelChange !== undefined ? { onLabelChange } : {})}
           typeChipLabel={typeChipLabel}
           countChipLabel={selectionCountLabel}
           isLocked={isLocked}
@@ -198,7 +203,7 @@ export function PropertiesSidebar({
       <SidebarContextHeader
         icon={<Type size={ICON_SIZE} />}
         label={contextLabel}
-        subtitle={contextSubtitle}
+        {...(onLabelChange !== undefined ? { onLabelChange } : {})}
         typeChipLabel={typeChipLabel}
         countChipLabel={selectionCountLabel}
         isLocked={isLocked}
@@ -266,7 +271,6 @@ export function PropertiesSidebar({
                     borderStyle={primary.borderStyle}
                     borderRadius={primary.borderRadius}
                     opacity={primary.opacity}
-                    blendMode={primary.blendMode}
                     onUpdate={onUpdate}
                   />
                 </Accordion.Panel>
@@ -291,6 +295,9 @@ export function PropertiesSidebar({
                     verticalAlignment={primary.verticalAlignment}
                     textDecoration={primary.textDecoration}
                     textTransform={primary.textTransform}
+                    lineHeight={primary.lineHeight}
+                    letterSpacing={primary.letterSpacing}
+                    wordSpacing={primary.wordSpacing}
                     isAnimationMode={false}
                     onUpdate={onUpdate}
                   />
@@ -306,9 +313,6 @@ export function PropertiesSidebar({
                 </Accordion.Heading>
                 <Accordion.Panel>
                   <TextEffectsPanel
-                    letterSpacing={primary.letterSpacing}
-                    lineHeight={primary.lineHeight}
-                    wordSpacing={primary.wordSpacing}
                     textStroke={primary.textStroke}
                     textShadow={primary.textShadow}
                     textTransform={primary.textTransform}
@@ -409,14 +413,17 @@ export function PropertiesSidebar({
                     content={primary.content}
                     assetId={primary.assetId}
                     assets={mediaAssets}
+                    objectFit={primary.objectFit}
                     onUpdate={onUpdate}
                   />
                 </Accordion.Panel>
               </Accordion.Item>
             : null}
 
-            {/* 10. Object Fit */}
-            {profile.objectFit ?
+            {/* 10. Object Fit — inline inside ImagePanel for image elements;
+                 a standalone accordion is kept for the other fit-capable types
+                 (svg, video) so they don't lose access to the control. */}
+            {profile.objectFit && !isImage ?
               <Accordion.Item id="object-fit">
                 <Accordion.Heading>
                   <Accordion.Trigger>Object Fit</Accordion.Trigger>
@@ -532,7 +539,7 @@ export function PropertiesSidebar({
                   <Accordion.Trigger>Animation Builder</Accordion.Trigger>
                 </Accordion.Heading>
                 <Accordion.Panel>
-                  <section aria-label="Animation Builder" role="region" className="flex flex-col gap-2">
+                  <section aria-label="Animation Builder" className="flex flex-col gap-2">
                     <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>
                       Animation builder controls
                     </p>

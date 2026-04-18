@@ -138,7 +138,7 @@ export function createKeyframeAdapter(
     updateValue(key: string, value: PropertyValue): void {
       const keyframe = getKeyframe();
 
-      if (keyframe === undefined || keyframe.properties[key] === undefined) {
+      if (keyframe?.properties[key] === undefined) {
         return;
       }
 
@@ -156,27 +156,31 @@ export function createKeyframeAdapter(
               ...existing,
               type: 'tuple',
               value: [value[0], value[1], value[2], value[3]],
-            } as KeyframeValue,
+            } satisfies KeyframeValue,
           };
         }
 
         if (typeof value === 'boolean') {
           return {
             ...properties,
-            [key]: { ...existing, type: 'number', value: value ? 1 : 0 } as KeyframeValue,
+            [key]: { ...existing, type: 'number', value: value ? 1 : 0 } satisfies KeyframeValue,
           };
         }
 
         if (typeof value === 'string') {
           return {
             ...properties,
-            [key]: { ...existing, type: existing.type === 'string' ? 'string' : 'color', value } as KeyframeValue,
+            [key]: {
+              ...existing,
+              type: existing.type === 'string' ? 'string' : 'color',
+              value,
+            } satisfies KeyframeValue,
           };
         }
 
         return {
           ...properties,
-          [key]: { ...existing, type: 'number', value } as KeyframeValue,
+          [key]: { ...existing, type: 'number', value } satisfies KeyframeValue,
         };
       });
     },

@@ -23,7 +23,6 @@ export const BASE_ELEMENT: PanelElement = {
   backgroundColor: '#ffffff',
   backgroundGradient: '',
   backdropFilter: '',
-  blendMode: 'normal',
   booleanOperation: null,
   borderColor: '#000000',
   borderRadius: [0, 0, 0, 0],

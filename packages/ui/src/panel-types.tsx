@@ -113,7 +113,6 @@ export interface PanelElement {
   readonly borderStyle: string;
   readonly borderRadius: readonly [number, number, number, number];
   readonly opacity: number;
-  readonly blendMode: string;
   readonly mixBlendMode: string;
   readonly isolation: string;
   readonly boxShadow: string;
@@ -316,40 +315,47 @@ export function SelectField({
   options,
   onUpdate,
   updateKey,
+  hideLabel,
 }: {
   readonly label: string;
   readonly value: string;
   readonly options: readonly string[];
   readonly onUpdate: (key: string, value: string | number) => void;
   readonly updateKey: string;
+  /** When true, omits the FieldShell visible label (aria-label on Select still set). Use inside FieldRow/other labeled wrappers. */
+  readonly hideLabel?: boolean | undefined;
 }): JSX.Element {
-  return (
-    <FieldShell label={label}>
-      <Select
-        aria-label={label}
-        value={value}
-        onChange={(key) => {
-          if (key !== null) {
-            onUpdate(updateKey, String(key));
-          }
-        }}
-      >
-        <Select.Trigger>
-          <Select.Value />
-          <Select.Indicator />
-        </Select.Trigger>
-        <Select.Popover>
-          <ListBox>
-            {options.map((opt) => (
-              <ListBox.Item id={opt} key={opt} textValue={opt}>
-                {opt}
-              </ListBox.Item>
-            ))}
-          </ListBox>
-        </Select.Popover>
-      </Select>
-    </FieldShell>
+  const select = (
+    <Select
+      aria-label={label}
+      value={value}
+      onChange={(key) => {
+        if (key !== null) {
+          onUpdate(updateKey, String(key));
+        }
+      }}
+    >
+      <Select.Trigger>
+        <Select.Value />
+        <Select.Indicator />
+      </Select.Trigger>
+      <Select.Popover>
+        <ListBox>
+          {options.map((opt) => (
+            <ListBox.Item id={opt} key={opt} textValue={opt}>
+              {opt}
+            </ListBox.Item>
+          ))}
+        </ListBox>
+      </Select.Popover>
+    </Select>
   );
+
+  if (hideLabel === true) {
+    return select;
+  }
+
+  return <FieldShell label={label}>{select}</FieldShell>;
 }
 
 /** Compute property values for multi-element selection */

@@ -34,18 +34,24 @@ function serializeGradient(gradient: string | BroadsetGradient): string {
 }
 
 export function applyBackgroundStyle(node: HTMLElement, style: BroadsetElementStyle): void {
-  if (style.backgroundGradient !== undefined) {
-    node.style.backgroundColor = '';
-    node.style.background = serializeGradient(style.backgroundGradient);
+  const gradient = style.backgroundGradient;
+  const hasGradient =
+    gradient !== undefined && (typeof gradient !== 'string' || gradient.trim() !== '');
 
-    if (typeof style.backgroundGradient !== 'string') {
-      node.dataset['gradient'] = JSON.stringify(style.backgroundGradient);
+  if (hasGradient) {
+    node.style.backgroundColor = '';
+    node.style.background = serializeGradient(gradient);
+
+    if (typeof gradient !== 'string') {
+      node.dataset['gradient'] = JSON.stringify(gradient);
     } else {
       delete node.dataset['gradient'];
     }
 
     return;
   }
+
+  delete node.dataset['gradient'];
 
   if (style.backgroundColor !== undefined) {
     node.style.background = '';

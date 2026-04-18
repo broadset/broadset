@@ -28,14 +28,14 @@ export interface PreflightPanelProps {
 export function PreflightPanel({ issues }: PreflightPanelProps): JSX.Element {
   if (issues.length === 0) {
     return (
-      <section aria-label="Preflight" role="region" className="flex flex-col gap-2">
+      <section aria-label="Preflight" className="flex flex-col gap-2">
         <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>No issues found</p>
       </section>
     );
   }
 
   return (
-    <section aria-label="Preflight" role="region" className="flex flex-col gap-2">
+    <section aria-label="Preflight" className="flex flex-col gap-2">
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {issues.map((issue) => (
           <li
@@ -145,6 +145,9 @@ export function AnimationModePropertiesPanel({
                   verticalAlignment={element.verticalAlignment}
                   textDecoration={element.textDecoration}
                   textTransform={element.textTransform}
+                  lineHeight={element.lineHeight}
+                  letterSpacing={element.letterSpacing}
+                  wordSpacing={element.wordSpacing}
                   onUpdate={handleAnimationUpdate}
                 />
               </Accordion.Panel>
@@ -164,7 +167,6 @@ export function AnimationModePropertiesPanel({
                   borderStyle={element.borderStyle}
                   borderRadius={element.borderRadius}
                   opacity={element.opacity}
-                  blendMode={element.blendMode}
                   onUpdate={handleAnimationUpdate}
                 />
               </Accordion.Panel>

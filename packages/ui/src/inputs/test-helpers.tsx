@@ -128,15 +128,30 @@ jest.mock(
         Input(props: MockHeroUiProps): React.JSX.Element {
           const context = ReactActual.useContext(NumberFieldContext);
           const domProps = pickSafeDomProps(props as Record<string, unknown>);
+          const propOnChange = (props as { readonly onChange?: unknown }).onChange;
 
           return ReactActual.createElement('input', {
             ...domProps,
             'aria-label': context.label,
             onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
-              context.onChange?.(Number(event.currentTarget.value));
+              if (typeof propOnChange === 'function') {
+                (propOnChange as (event: React.ChangeEvent<HTMLInputElement>) => void)(event);
+              }
+
+              const numeric = Number(event.currentTarget.value);
+
+              if (Number.isFinite(numeric)) {
+                context.onChange?.(numeric);
+              } else {
+                context.onChange?.(Number.NaN);
+              }
             },
             role: 'spinbutton',
-            type: 'number',
+            // HeroUI / react-aria-components render a type="text" input so
+            // locale-aware parsing (e.g. decimal commas) can run. Using
+            // type="number" in the mock swallows non-numeric drafts before
+            // custom blur parsing ever sees them.
+            type: 'text',
             value: String(context.value),
           });
         },
@@ -352,7 +367,12 @@ jest.mock(
       Select,
       SelectItem,
       Slider,
-      Switch,
+      Switch: Object.assign(Switch, {
+        Control: createWrapper('span'),
+        Thumb: createWrapper('span'),
+        Content: createWrapper('span'),
+        Icon: createWrapper('span'),
+      }),
       ButtonGroup: createWrapper(),
       Popover: Object.assign(createWrapper(), {
         Trigger: createWrapper(),

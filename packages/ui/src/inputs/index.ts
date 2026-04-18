@@ -1,4 +1,5 @@
 export { AnchorPad, type AnchorPadProps } from './anchor-pad';
+export { AngleDial, type AngleDialProps } from './angle-dial';
 export {
   type AxisCell,
   type AxisColor,
@@ -23,3 +24,4 @@ export { CssLengthInput, type CssLengthInputProps, NumField, type NumFieldProps 
 export { QuadInput, type QuadInputProps, type QuadMode } from './quad-input';
 export { SegmentedSwitcher, type SegmentedSwitcherProps } from './segmented-switcher';
 export { ToggleRow, type ToggleRowItem, type ToggleRowProps } from './toggle-row';
+export { ToggleSwitch, type ToggleSwitchProps } from './toggle-switch';

@@ -1,8 +1,8 @@
-import { Button, ButtonGroup, Checkbox, Input, Label, Modal, ProgressBar, Select, Slider, Switch } from '@heroui/react';
+import { Button, ButtonGroup, Checkbox, Input, Label, Modal, ProgressBar, Select, Slider } from '@heroui/react';
 import { X } from 'lucide-react';
 import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { NumField } from '../inputs';
+import { NumField, ToggleSwitch } from '../inputs';
 import { color, sp } from '../tokens';
 import { EXPORTER_CATEGORIES, VIEW_MODES } from './constants';
 import { ModalShell } from './modal-shell';
@@ -106,9 +106,9 @@ export function CanvasSettingsModal({
 
         <section aria-label="Canvas" style={{ marginTop: sp('sp-04') }}>
           <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: sp('sp-02') }}>Canvas</h3>
-          <Switch aria-label="Show rulers" isSelected={showRulers} onChange={onRulerChange}>
+          <ToggleSwitch ariaLabel="Show rulers" isSelected={showRulers} onChange={onRulerChange}>
             Show rulers
-          </Switch>
+          </ToggleSwitch>
           <div style={{ marginTop: sp('sp-02') }}>
             <Select
               aria-label="Ruler units"
@@ -160,15 +160,15 @@ export function CanvasSettingsModal({
 
         <section aria-label="Grid" style={{ marginTop: sp('sp-04') }}>
           <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: sp('sp-02') }}>Grid</h3>
-          <Switch
-            aria-label="Show grid"
+          <ToggleSwitch
+            ariaLabel="Show grid"
             isSelected={showGrid}
             onChange={(value: boolean) => {
               onGridChange({ showGrid: value });
             }}
           >
             Show grid
-          </Switch>
+          </ToggleSwitch>
           <div style={{ marginTop: sp('sp-02') }}>
             <NumField
               label="Grid size"
@@ -178,15 +178,15 @@ export function CanvasSettingsModal({
               }}
             />
           </div>
-          <Switch
-            aria-label="Snap to grid"
+          <ToggleSwitch
+            ariaLabel="Snap to grid"
             isSelected={snapToGrid}
             onChange={(value: boolean) => {
               onGridChange({ snapToGrid: value });
             }}
           >
             Snap to grid
-          </Switch>
+          </ToggleSwitch>
           <div style={{ marginTop: sp('sp-02') }}>
             <NumField
               label="Snap threshold"
@@ -420,9 +420,13 @@ export function ExportModal({
             )}
 
             <section aria-label="Advanced export options" style={{ marginTop: sp('sp-02') }}>
-              <Switch aria-label="Show advanced export options" isSelected={showAdvanced} onChange={setShowAdvanced}>
+              <ToggleSwitch
+                ariaLabel="Show advanced export options"
+                isSelected={showAdvanced}
+                onChange={setShowAdvanced}
+              >
                 Advanced export options
-              </Switch>
+              </ToggleSwitch>
 
               {showAdvanced && (
                 <div

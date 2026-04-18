@@ -18,7 +18,6 @@ describe('AppearancePanel', () => {
         borderStyle="solid"
         borderRadius={[6, 6, 6, 6]}
         opacity={0.75}
-        blendMode="normal"
         onUpdate={onUpdate}
       />,
     );
@@ -41,14 +40,13 @@ describe('AppearancePanel', () => {
         borderStyle="solid"
         borderRadius={[6, 6, 6, 6]}
         opacity={0.75}
-        blendMode="normal"
         onUpdate={onUpdate}
       />,
     );
 
     const opacitySlider = screen.getByRole('slider');
 
-    fireEvent.change(opacitySlider, { target: { value: '0.5' } });
+    fireEvent.change(opacitySlider, { target: { value: '50' } });
     expect(onUpdate).toHaveBeenCalledWith('opacity', 0.5);
   });
 
@@ -62,7 +60,6 @@ describe('AppearancePanel', () => {
         borderStyle="solid"
         borderRadius={[6, 6, 6, 6]}
         opacity={0.75}
-        blendMode="normal"
         onUpdate={() => undefined}
       />,
     );
@@ -71,6 +68,29 @@ describe('AppearancePanel', () => {
     const region = screen.getByRole('region', { name: 'Appearance' });
 
     expect(within(region).queryAllByText('solid').length).toBeGreaterThanOrEqual(1);
+  });
+
+  /** @description Switching from Gradient back to Solid must clear the gradient so the renderer falls back to backgroundColor. Regression for a past bug where an empty-string gradient wiped the background entirely. */
+  it('clears gradient value when switching back to Solid', () => {
+    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+
+    render(
+      <AppearancePanel
+        backgroundColor="#ff0000"
+        backgroundGradient="linear-gradient(#fff, #000)"
+        showGradient
+        borderWidth={1}
+        borderColor="#000000"
+        borderStyle="solid"
+        borderRadius={[6, 6, 6, 6]}
+        opacity={1}
+        onUpdate={onUpdate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Solid' }));
+
+    expect(onUpdate).toHaveBeenCalledWith('backgroundGradient', '');
   });
 
   /** @description Fill mode must be an explicit visual choice (Solid/Gradient), and gradient mode must avoid raw CSS-string text fields. */
@@ -85,7 +105,6 @@ describe('AppearancePanel', () => {
         borderStyle="solid"
         borderRadius={[6, 6, 6, 6]}
         opacity={0.75}
-        blendMode="normal"
         onUpdate={() => undefined}
       />,
     );
@@ -111,7 +130,6 @@ describe('AppearancePanel', () => {
         borderStyle="solid"
         borderRadius={[6, 8, 10, 12]}
         opacity={0.75}
-        blendMode="normal"
         onUpdate={() => undefined}
       />,
     );
@@ -133,7 +151,6 @@ describe('AppearancePanel', () => {
         borderStyle="solid"
         borderRadius={[6, 6, 6, 6]}
         opacity={0.75}
-        blendMode="normal"
         onUpdate={() => undefined}
       />,
     );
@@ -154,7 +171,6 @@ describe('AppearancePanel', () => {
         borderStyle="solid"
         borderRadius={[6, 8, 10, 12]}
         opacity={0.75}
-        blendMode="normal"
         onUpdate={onUpdate}
       />,
     );
@@ -181,7 +197,6 @@ describe('AppearancePanel', () => {
         borderStyle="solid"
         borderRadius={[6, 8, 10, 12]}
         opacity={0.75}
-        blendMode="normal"
         onUpdate={onUpdate}
       />,
     );

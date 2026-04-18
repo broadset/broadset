@@ -25,7 +25,6 @@ describe('Multi-element editing', () => {
     render(<PropertiesSidebar elements={[el1, el2]} documentMode="screen" onUpdate={() => undefined} />);
 
     expect(screen.getByText('Multiple selection')).not.toBeNull();
-    expect(screen.getByText('Common properties')).not.toBeNull();
   });
 
   /** @description Editing a property in multi-select mode must apply the new value to all selected elements. */

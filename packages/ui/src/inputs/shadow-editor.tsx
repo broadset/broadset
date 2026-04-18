@@ -1,11 +1,13 @@
-import { Button, NumberField, Slider, Switch } from '@heroui/react';
-import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
-import type { JSX } from 'react';
+import { Button, Slider } from '@heroui/react';
+import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
+import type { CSSProperties, JSX } from 'react';
 import { useCallback, useRef, useState } from 'react';
 
-import { sp } from '../tokens';
+import { color, sp } from '../tokens';
 import { parseShadow } from '../utilities';
 import { ColorInput } from './color-input';
+import { NumField } from './number-inputs';
+import { ToggleSwitch } from './toggle-switch';
 
 interface ShadowLayer {
   readonly offsetX: number;
@@ -25,26 +27,52 @@ const DEFAULT_SHADOW_LAYER: Readonly<ShadowLayer> = {
   inset: false,
 };
 
+/**
+ * Split a CSS shadow list on top-level commas only. A plain `.split(',')` also
+ * cuts inside `rgba(r, g, b, a)` — e.g. a 2-shadow string containing two
+ * `rgba()` colors splits into 8 fragments, and the UI used to render that as
+ * 8 garbled "shadows". Tracks paren depth to keep function-arg commas intact.
+ */
+function splitShadowList(value: string): readonly string[] {
+  const result: string[] = [];
+  let depth = 0;
+  let start = 0;
+
+  for (let i = 0; i < value.length; i += 1) {
+    const char = value[i];
+
+    if (char === '(') {
+      depth += 1;
+    } else if (char === ')') {
+      depth = Math.max(0, depth - 1);
+    } else if (char === ',' && depth === 0) {
+      result.push(value.slice(start, i));
+      start = i + 1;
+    }
+  }
+
+  result.push(value.slice(start));
+
+  return result.map((segment) => segment.trim()).filter((segment) => segment !== '');
+}
+
 function parseShadowLayers(value: string): readonly ShadowLayer[] {
   if (value === 'none' || value.trim() === '') {
     return [];
   }
 
-  return value
-    .split(',')
-    .map((segment) => segment.trim())
-    .map((segment) => {
-      const parsed = parseShadow(segment);
+  return splitShadowList(value).map((segment) => {
+    const parsed = parseShadow(segment);
 
-      return {
-        offsetX: parsed.offsetX,
-        offsetY: parsed.offsetY,
-        blur: parsed.blur,
-        spread: parsed.spread,
-        color: parsed.color,
-        inset: parsed.inset,
-      };
-    });
+    return {
+      offsetX: parsed.offsetX,
+      offsetY: parsed.offsetY,
+      blur: parsed.blur,
+      spread: parsed.spread,
+      color: parsed.color,
+      inset: parsed.inset,
+    };
+  });
 }
 
 function buildShadowString(layers: readonly ShadowLayer[], mode: 'box' | 'text'): string {
@@ -75,6 +103,37 @@ export interface ShadowEditorProps {
   readonly label: string;
 }
 
+function layerFrameStyle(): CSSProperties {
+  return {
+    background: color('field-background'),
+    border: `1px solid ${color('border')}`,
+    borderRadius: '0.375rem',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: sp('sp-02'),
+    minWidth: 0,
+    padding: sp('sp-02'),
+    width: '100%',
+  };
+}
+
+function subheadStyle(): CSSProperties {
+  return {
+    color: color('muted'),
+    fontSize: '0.625rem',
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  };
+}
+
+function iconButtonStyle(): CSSProperties {
+  return {
+    height: '1.5rem',
+    minWidth: '1.5rem',
+    padding: '0 0.25rem',
+  };
+}
+
 export function ShadowEditor({ value, mode, onChange, label }: ShadowEditorProps): JSX.Element {
   const [layers, setLayers] = useState<readonly ShadowLayer[]>(() => parseShadowLayers(value));
   const [enabled, setEnabled] = useState(value !== 'none' && value.trim() !== '');
@@ -103,193 +162,239 @@ export function ShadowEditor({ value, mode, onChange, label }: ShadowEditorProps
     applyLayers(restored);
   }, [applyLayers, enabled, layers, onChange]);
 
+  const updateLayer = useCallback(
+    (index: number, patch: Partial<ShadowLayer>): void => {
+      applyLayers(layers.map((entry, entryIndex) => (entryIndex === index ? { ...entry, ...patch } : entry)));
+    },
+    [applyLayers, layers],
+  );
+
+  const moveLayer = useCallback(
+    (index: number, direction: -1 | 1): void => {
+      const target = index + direction;
+
+      if (target < 0 || target >= layers.length) return;
+
+      const next = [...layers];
+      const a = next[index];
+      const b = next[target];
+
+      if (a === undefined || b === undefined) return;
+
+      next[index] = b;
+      next[target] = a;
+      applyLayers(next);
+    },
+    [applyLayers, layers],
+  );
+
+  const removeLayer = useCallback(
+    (index: number): void => {
+      applyLayers(layers.filter((_entry, entryIndex) => entryIndex !== index));
+    },
+    [applyLayers, layers],
+  );
+
   return (
-    <fieldset aria-label={label} style={{ border: 'none', margin: 0, padding: 0 }}>
-      <div style={{ alignItems: 'center', display: 'flex', gap: sp('sp-03') }}>
-        <span>{label}</span>
-        <Switch
-          aria-label="Enable shadow"
-          isSelected={enabled}
-          onChange={() => {
-            handleToggle();
-          }}
-        />
+    <fieldset
+      aria-label={label}
+      style={{ border: 'none', display: 'flex', flexDirection: 'column', gap: sp('sp-02'), margin: 0, minWidth: 0, padding: 0, width: '100%' }}
+    >
+      <div
+        style={{
+          alignItems: 'center',
+          display: 'flex',
+          gap: sp('sp-02'),
+          justifyContent: 'space-between',
+          minWidth: 0,
+        }}
+      >
+        <span style={{ color: color('muted'), fontSize: '0.75rem' }}>{label}</span>
+        <div style={{ alignItems: 'center', display: 'flex', gap: sp('sp-02') }}>
+          <ToggleSwitch
+            ariaLabel="Enable shadow"
+            isSelected={enabled}
+            onChange={() => {
+              handleToggle();
+            }}
+          />
+          {enabled ?
+            <Button
+              aria-label="Add shadow layer"
+              size="sm"
+              variant="ghost"
+              style={iconButtonStyle()}
+              onPress={() => {
+                applyLayers([...layers, DEFAULT_SHADOW_LAYER]);
+              }}
+            >
+              <Plus size={12} />
+            </Button>
+          : null}
+        </div>
       </div>
 
       {enabled ?
-        layers.map((layer, index) => (
-          <div
-            key={[layer.offsetX, layer.offsetY, index].map((value) => String(value)).join('-')}
-            data-testid="shadow-layer"
-            style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02') }}
-          >
-            <NumberField
-              aria-label="Offset X"
-              value={layer.offsetX}
-              onChange={(numberValue) => {
-                applyLayers(
-                  layers.map((entry, entryIndex) =>
-                    entryIndex === index ?
-                      { ...entry, offsetX: typeof numberValue === 'number' ? numberValue : Number(numberValue) }
-                    : entry,
-                  ),
-                );
-              }}
-            >
-              <NumberField.Group>
-                <NumberField.Input />
-              </NumberField.Group>
-            </NumberField>
+        layers.map((layer, index) => {
+          const key = `shadow-layer-${String(index)}`;
 
-            <NumberField
-              aria-label="Offset Y"
-              value={layer.offsetY}
-              onChange={(numberValue) => {
-                applyLayers(
-                  layers.map((entry, entryIndex) =>
-                    entryIndex === index ?
-                      { ...entry, offsetY: typeof numberValue === 'number' ? numberValue : Number(numberValue) }
-                    : entry,
-                  ),
-                );
-              }}
-            >
-              <NumberField.Group>
-                <NumberField.Input />
-              </NumberField.Group>
-            </NumberField>
-
-            <Slider
-              aria-label="Blur"
-              minValue={0}
-              maxValue={100}
-              value={layer.blur}
-              onChange={(sliderValue: number | readonly number[]) => {
-                applyLayers(
-                  layers.map((entry, entryIndex) =>
-                    entryIndex === index ?
-                      { ...entry, blur: typeof sliderValue === 'number' ? sliderValue : Number(sliderValue) }
-                    : entry,
-                  ),
-                );
-              }}
-            >
-              <Slider.Track>
-                <Slider.Fill />
-                <Slider.Thumb />
-              </Slider.Track>
-            </Slider>
-
-            {mode === 'box' ?
-              <Slider
-                aria-label="Spread"
-                minValue={-50}
-                maxValue={50}
-                value={layer.spread}
-                onChange={(sliderValue: number | readonly number[]) => {
-                  applyLayers(
-                    layers.map((entry, entryIndex) =>
-                      entryIndex === index ?
-                        { ...entry, spread: typeof sliderValue === 'number' ? sliderValue : Number(sliderValue) }
-                      : entry,
-                    ),
-                  );
+          return (
+            <div key={key} data-testid="shadow-layer" style={layerFrameStyle()}>
+              <div
+                style={{
+                  alignItems: 'center',
+                  display: 'flex',
+                  gap: sp('sp-02'),
+                  justifyContent: 'space-between',
+                  minWidth: 0,
                 }}
               >
-                <Slider.Track>
-                  <Slider.Fill />
-                  <Slider.Thumb />
-                </Slider.Track>
-              </Slider>
-            : null}
+                <span style={subheadStyle()}>Layer {String(index + 1)}</span>
+                <div style={{ alignItems: 'center', display: 'flex', gap: sp('sp-01') }}>
+                  <Button
+                    aria-label={`Move layer ${String(index + 1)} up`}
+                    isDisabled={index === 0}
+                    size="sm"
+                    variant="ghost"
+                    style={iconButtonStyle()}
+                    onPress={() => {
+                      moveLayer(index, -1);
+                    }}
+                  >
+                    <ArrowUp size={12} />
+                  </Button>
+                  <Button
+                    aria-label={`Move layer ${String(index + 1)} down`}
+                    isDisabled={index === layers.length - 1}
+                    size="sm"
+                    variant="ghost"
+                    style={iconButtonStyle()}
+                    onPress={() => {
+                      moveLayer(index, 1);
+                    }}
+                  >
+                    <ArrowDown size={12} />
+                  </Button>
+                  <Button
+                    aria-label={`Remove layer ${String(index + 1)}`}
+                    size="sm"
+                    variant="ghost"
+                    style={iconButtonStyle()}
+                    onPress={() => {
+                      removeLayer(index);
+                    }}
+                  >
+                    <X size={12} />
+                  </Button>
+                </div>
+              </div>
 
-            <ColorInput
-              label={`Layer ${String(index + 1)} color`}
-              value={layer.color}
-              onChange={(nextColor) => {
-                applyLayers(
-                  layers.map((entry, entryIndex) => (entryIndex === index ? { ...entry, color: nextColor } : entry)),
-                );
-              }}
-            />
-
-            {mode === 'box' ?
-              <Switch
-                aria-label="Inset"
-                isSelected={layer.inset}
-                onChange={() => {
-                  applyLayers(
-                    layers.map((entry, entryIndex) =>
-                      entryIndex === index ? { ...entry, inset: !entry.inset } : entry,
-                    ),
-                  );
+              <div
+                style={{
+                  display: 'grid',
+                  gap: sp('sp-02'),
+                  gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+                  minWidth: 0,
                 }}
               >
-                Inset
-              </Switch>
-            : null}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-01'), minWidth: 0 }}>
+                  <span style={subheadStyle()}>Offset X</span>
+                  <NumField
+                    compact
+                    label={`Layer ${String(index + 1)} offset X`}
+                    value={layer.offsetX}
+                    onChange={(next) => {
+                      updateLayer(index, { offsetX: next });
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-01'), minWidth: 0 }}>
+                  <span style={subheadStyle()}>Offset Y</span>
+                  <NumField
+                    compact
+                    label={`Layer ${String(index + 1)} offset Y`}
+                    value={layer.offsetY}
+                    onChange={(next) => {
+                      updateLayer(index, { offsetY: next });
+                    }}
+                  />
+                </div>
+              </div>
 
-            <Button
-              aria-label={`Move layer ${String(index + 1)} up`}
-              isDisabled={index === 0}
-              onPress={() => {
-                const nextLayers = [...layers];
-                const current = nextLayers[index];
-                const previous = nextLayers[index - 1];
+              <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-01'), minWidth: 0 }}>
+                <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={subheadStyle()}>Blur</span>
+                  <span style={{ color: color('muted'), fontSize: '0.6875rem' }}>{String(layer.blur)}px</span>
+                </div>
+                <Slider
+                  aria-label={`Layer ${String(index + 1)} blur`}
+                  minValue={0}
+                  maxValue={100}
+                  value={layer.blur}
+                  onChange={(sliderValue: number | readonly number[]) => {
+                    updateLayer(index, {
+                      blur: typeof sliderValue === 'number' ? sliderValue : (sliderValue[0] ?? 0),
+                    });
+                  }}
+                >
+                  <Slider.Track>
+                    <Slider.Fill />
+                    <Slider.Thumb />
+                  </Slider.Track>
+                </Slider>
+              </div>
 
-                if (current === undefined || previous === undefined) {
-                  return;
-                }
+              {mode === 'box' ?
+                <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-01'), minWidth: 0 }}>
+                  <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={subheadStyle()}>Spread</span>
+                    <span style={{ color: color('muted'), fontSize: '0.6875rem' }}>{String(layer.spread)}px</span>
+                  </div>
+                  <Slider
+                    aria-label={`Layer ${String(index + 1)} spread`}
+                    minValue={-50}
+                    maxValue={50}
+                    value={layer.spread}
+                    onChange={(sliderValue: number | readonly number[]) => {
+                      updateLayer(index, {
+                        spread: typeof sliderValue === 'number' ? sliderValue : (sliderValue[0] ?? 0),
+                      });
+                    }}
+                  >
+                    <Slider.Track>
+                      <Slider.Fill />
+                      <Slider.Thumb />
+                    </Slider.Track>
+                  </Slider>
+                </div>
+              : null}
 
-                nextLayers[index - 1] = current;
-                nextLayers[index] = previous;
-                applyLayers(nextLayers);
-              }}
-            >
-              <ChevronUp size={12} />
-            </Button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-01'), minWidth: 0 }}>
+                <span style={subheadStyle()}>Color</span>
+                <ColorInput
+                  compact
+                  label={`Layer ${String(index + 1)} color`}
+                  value={layer.color}
+                  onChange={(nextColor) => {
+                    updateLayer(index, { color: nextColor });
+                  }}
+                />
+              </div>
 
-            <Button
-              aria-label={`Move layer ${String(index + 1)} down`}
-              isDisabled={index === layers.length - 1}
-              onPress={() => {
-                const nextLayers = [...layers];
-                const current = nextLayers[index];
-                const following = nextLayers[index + 1];
-
-                if (current === undefined || following === undefined) {
-                  return;
-                }
-
-                nextLayers[index + 1] = current;
-                nextLayers[index] = following;
-                applyLayers(nextLayers);
-              }}
-            >
-              <ChevronDown size={12} />
-            </Button>
-
-            <Button
-              aria-label={`Remove layer ${String(index + 1)}`}
-              onPress={() => {
-                applyLayers(layers.filter((_entry, entryIndex) => entryIndex !== index));
-              }}
-            >
-              <X size={12} />
-            </Button>
-          </div>
-        ))
-      : null}
-
-      {enabled ?
-        <Button
-          aria-label="Add shadow layer"
-          onPress={() => {
-            applyLayers([...layers, DEFAULT_SHADOW_LAYER]);
-          }}
-        >
-          <Plus size={12} /> Add layer
-        </Button>
+              {mode === 'box' ?
+                <ToggleSwitch
+                  ariaLabel={`Layer ${String(index + 1)} inner shadow`}
+                  isSelected={layer.inset}
+                  onChange={(nextValue) => {
+                    updateLayer(index, { inset: nextValue });
+                  }}
+                >
+                  Inner shadow
+                </ToggleSwitch>
+              : null}
+            </div>
+          );
+        })
       : null}
     </fieldset>
   );

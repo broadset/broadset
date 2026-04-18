@@ -1,9 +1,9 @@
-import { Button, Input, Switch } from '@heroui/react';
+import { Button, Input } from '@heroui/react';
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, GripVertical, Plus, Trash2 } from 'lucide-react';
 import type { DragEvent as ReactDragEvent, JSX } from 'react';
 import { useState } from 'react';
 
-import { FieldRow, NumField, ToggleRow } from '../inputs';
+import { FieldRow, NumField, ToggleRow, ToggleSwitch } from '../inputs';
 import { CLOCK_MODES, FieldShell, ICON_SIZE, SelectField, TICKER_DIRECTIONS } from '../panel-types';
 import { sp } from '../tokens';
 
@@ -48,33 +48,33 @@ export function VideoPanel({
           aria-label="Playback flags"
           style={{ display: 'flex', flexWrap: 'wrap', gap: sp('sp-03'), minWidth: 0 }}
         >
-          <Switch
-            aria-label="Autoplay"
+          <ToggleSwitch
+            ariaLabel="Autoplay"
             isSelected={autoplay}
             onChange={(v) => {
               onUpdate('autoplay', v);
             }}
           >
             Autoplay
-          </Switch>
-          <Switch
-            aria-label="Loop"
+          </ToggleSwitch>
+          <ToggleSwitch
+            ariaLabel="Loop"
             isSelected={loop}
             onChange={(v) => {
               onUpdate('loop', v);
             }}
           >
             Loop
-          </Switch>
-          <Switch
-            aria-label="Muted"
+          </ToggleSwitch>
+          <ToggleSwitch
+            ariaLabel="Muted"
             isSelected={muted}
             onChange={(v) => {
               onUpdate('muted', v);
             }}
           >
             Muted
-          </Switch>
+          </ToggleSwitch>
         </div>
       </FieldRow>
 
@@ -150,6 +150,7 @@ export function ClockPanel({
 
       <FieldRow label="Mode">
         <SelectField
+          hideLabel
           label="Mode"
           options={[...CLOCK_MODES]}
           updateKey="mode"
@@ -377,15 +378,15 @@ export function TickerPanel({
       </FieldRow>
 
       <FieldRow label="Playback">
-        <Switch
-          aria-label="Paused"
+        <ToggleSwitch
+          ariaLabel="Paused"
           isSelected={paused}
           onChange={(v) => {
             onUpdate('paused', v);
           }}
         >
           Paused
-        </Switch>
+        </ToggleSwitch>
       </FieldRow>
     </section>
   );

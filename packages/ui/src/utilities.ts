@@ -25,21 +25,30 @@ export function parseShadow(str: string): ShadowData {
 
   const inset = trimmed.startsWith('inset');
   const working = inset ? trimmed.slice('inset'.length).trim() : trimmed;
-  const match =
-    /^(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px(?:\s+(-?\d+(?:\.\d+)?)px)?(?:\s+(-?\d+(?:\.\d+)?)px)?\s*(.*)$/u.exec(
-      working,
-    );
+  // CSS accepts bare `0` (no unit) alongside `0px`, so the `px` suffix is
+  // optional on every component. Without this, common multi-shadow values
+  // from real documents (e.g. `0 2px 32px rgba(...)`) failed the regex and
+  // the ShadowEditor fell back to all-zero defaults even when the element
+  // style was populated.
+  const NUMBER_WITH_OPTIONAL_PX = '(-?\\d+(?:\\.\\d+)?)(?:px)?';
+  const pattern = new RegExp(
+    `^${NUMBER_WITH_OPTIONAL_PX}\\s+${NUMBER_WITH_OPTIONAL_PX}(?:\\s+${NUMBER_WITH_OPTIONAL_PX})?(?:\\s+${NUMBER_WITH_OPTIONAL_PX})?\\s*(.*)$`,
+    'u',
+  );
+  const match = pattern.exec(working);
 
   if (match === null) {
     return SHADOW_DEFAULTS;
   }
+
+  const trimmedColor = match[5]?.trim() ?? '';
 
   return {
     offsetX: Number.parseFloat(match[1] ?? '0'),
     offsetY: Number.parseFloat(match[2] ?? '0'),
     blur: Number.parseFloat(match[3] ?? '0'),
     spread: Number.parseFloat(match[4] ?? '0'),
-    color: match[5]?.trim() || SHADOW_DEFAULTS.color,
+    color: trimmedColor === '' ? SHADOW_DEFAULTS.color : trimmedColor,
     inset,
   };
 }

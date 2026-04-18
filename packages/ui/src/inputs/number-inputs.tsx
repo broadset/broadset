@@ -1,5 +1,5 @@
 import { ListBox, NumberField, Select } from '@heroui/react';
-import type { FocusEvent, JSX, KeyboardEvent } from 'react';
+import type { ChangeEvent, FocusEvent, JSX, KeyboardEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { sp } from '../tokens';
@@ -37,7 +37,11 @@ function parseRawNumber(rawValue: unknown): number | null {
     return null;
   }
 
-  const stringValue = String(rawValue).replace(/,/g, '').trim();
+  // Treat comma as the decimal separator (European/locale input) rather than a
+  // thousands separator. Design-tool inputs are small numbers (0–10k) where
+  // thousands grouping is rare, but decimals like `100,1` are typed regularly.
+  // Previous behavior stripped commas entirely, so `100,1` became `1001`.
+  const stringValue = String(rawValue).replace(/,/g, '.').trim();
   const parsed = Number(stringValue);
 
   if (Number.isFinite(parsed)) {
@@ -55,8 +59,10 @@ export interface NumFieldProps {
   readonly step?: number | undefined;
   readonly min?: number | undefined;
   readonly max?: number | undefined;
-  /** When true, renders without inc/dec buttons and with tighter padding. Designed for dense grids. */
+  /** Dense grid mode: 28px tall, tight padding. Still renders HeroUI chrome (border + bg). */
   readonly compact?: boolean | undefined;
+  /** Strips the HeroUI NumberField frame (border, background, radius, shadow, inc/dec buttons) so a parent cell can provide the visible frame. Only meaningful when `compact` is also true. */
+  readonly embedded?: boolean | undefined;
   readonly isDisabled?: boolean | undefined;
 }
 
@@ -69,12 +75,18 @@ export function NumField({
   min,
   max,
   compact,
+  embedded,
   isDisabled,
 }: NumFieldProps): JSX.Element {
   const [localValue, setLocalValue] = useState(value);
   const [isDirty, setIsDirty] = useState(false);
   const lastValid = useRef(value);
   const skipNextBlurCommit = useRef(false);
+  // Tracks the most recent raw text the user typed into the inner input so the
+  // blur/enter handlers can parse it with locale-aware rules (decimal commas,
+  // arithmetic expressions). Without this, a controlled `value` prop snaps the
+  // DOM input back to the committed value before blur ever reads it.
+  const draftTextRef = useRef<string | null>(null);
 
   if (!isDirty && value !== localValue) {
     setLocalValue(value);
@@ -131,18 +143,6 @@ export function NumField({
     [clamp, onChange, onCommit],
   );
 
-  const handleBlur = useCallback(
-    (event: FocusEvent) => {
-      const emitCommit = !skipNextBlurCommit.current;
-      const keySource = event.currentTarget as { readonly value?: unknown };
-      const parsedDraft = parseRawNumber(keySource.value);
-
-      skipNextBlurCommit.current = false;
-      commitValue(parsedDraft ?? localValue, { emitCommit });
-    },
-    [commitValue, localValue],
-  );
-
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (event.key === 'Enter') {
@@ -172,90 +172,129 @@ export function NumField({
   );
 
   const isCompact = compact === true;
+  const isEmbedded = isCompact && embedded === true;
+  const compactButtonStyle = {
+    borderRadius: 0,
+    height: '100%',
+    minWidth: 0,
+    padding: 0,
+    width: '1.25rem',
+  } as const;
 
-  if (isCompact) {
-    return (
-      <input
-        type="text"
-        inputMode="decimal"
-        role="textbox"
-        aria-label={label}
-        value={String(displayValue)}
-        disabled={isDisabled === true}
-        onChange={(event) => {
-          const parsed = Number(event.currentTarget.value);
+  // HeroUI's NumberField root element has no `.value`, and the inner controlled
+  // input snaps back to the committed value on re-render. Capture every raw
+  // keystroke via onInput into a ref, then re-parse that draft on blur/enter
+  // with locale-aware rules (decimal commas, arithmetic expressions).
+  const handleInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    draftTextRef.current = event.currentTarget.value;
+  }, []);
 
-          if (Number.isFinite(parsed)) {
-            handleChange(parsed);
-          } else {
-            // still store as dirty; commit will re-parse expression later
-            handleChange(Number.NaN);
-          }
-        }}
-        onBlur={(event) => {
-          const parsedDraft = parseRawNumber(event.currentTarget.value);
-          const emitCommit = !skipNextBlurCommit.current;
+  const handleInputBlur = useCallback(
+    (event: FocusEvent<HTMLInputElement>) => {
+      const emitCommit = !skipNextBlurCommit.current;
+      const rawDraft = draftTextRef.current ?? event.currentTarget.value;
+      const parsedDraft = parseRawNumber(rawDraft);
 
-          skipNextBlurCommit.current = false;
-          commitValue(parsedDraft ?? lastValid.current, { emitCommit });
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            const parsedDraft = parseRawNumber(event.currentTarget.value);
+      skipNextBlurCommit.current = false;
+      draftTextRef.current = null;
+      commitValue(parsedDraft ?? localValue, { emitCommit });
+    },
+    [commitValue, localValue],
+  );
 
-            commitValue(parsedDraft ?? lastValid.current);
-            skipNextBlurCommit.current = true;
+  const handleInputKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter') {
+        const rawDraft = draftTextRef.current ?? event.currentTarget.value;
+        const parsedDraft = parseRawNumber(rawDraft);
 
-            return;
-          }
+        draftTextRef.current = null;
+        commitValue(parsedDraft ?? localValue);
+        skipNextBlurCommit.current = true;
 
-          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-            event.preventDefault();
+        return;
+      }
 
-            const direction = event.key === 'ArrowUp' ? 1 : -1;
-            const multiplier =
-              event.shiftKey ? 10
-              : event.altKey ? 0.1
-              : 1;
-
-            commitValue(lastValid.current + direction * step * multiplier);
-            skipNextBlurCommit.current = true;
-          }
-        }}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          color: 'inherit',
-          flex: 1,
-          fontFamily: 'inherit',
-          fontSize: '0.8125rem',
-          height: '100%',
-          minWidth: 0,
-          outline: 'none',
-          padding: '0 0.5rem',
-          textAlign: 'right',
-          width: '100%',
-        }}
-      />
-    );
-  }
+      handleKeyDown(event as KeyboardEvent);
+    },
+    [commitValue, handleKeyDown, localValue],
+  );
 
   return (
     <NumberField
       aria-label={label}
       value={displayValue}
       onChange={handleChange}
-      onBlur={handleBlur}
-      onKeyDown={handleKeyDown}
       {...(min !== undefined ? { minValue: min } : {})}
       {...(max !== undefined ? { maxValue: max } : {})}
       {...(isDisabled === true ? { isDisabled: true } : {})}
       step={step}
+      data-compact={isCompact ? 'true' : undefined}
+      data-embedded={isEmbedded ? 'true' : undefined}
     >
-      <NumberField.Group>
-        <NumberField.DecrementButton />
-        <NumberField.Input />
-        <NumberField.IncrementButton />
+      <NumberField.Group
+        {...(isEmbedded ?
+          {
+            style: {
+              background: 'transparent',
+              border: 'none',
+              borderRadius: 0,
+              boxShadow: 'none',
+              gridTemplateColumns: 'minmax(0, 1fr)',
+              height: '100%',
+              minWidth: 0,
+            },
+          }
+        : isCompact ?
+          {
+            style: {
+              gridTemplateColumns: '1.25rem 1fr 1.25rem',
+              height: '1.75rem',
+              minWidth: 0,
+            },
+          }
+        : {})}
+      >
+        {isEmbedded ? null : (
+          <NumberField.DecrementButton
+            {...(isCompact ? { 'aria-label': `Decrement ${label}`, style: compactButtonStyle } : {})}
+          />
+        )}
+        <NumberField.Input
+          onChange={handleInputChange}
+          onBlur={handleInputBlur}
+          onKeyDown={handleInputKeyDown}
+          {...(isEmbedded ?
+            {
+              style: {
+                background: 'transparent',
+                fontSize: '0.8125rem',
+                fontVariantNumeric: 'tabular-nums',
+                height: '100%',
+                minWidth: 0,
+                padding: '0 0.375rem',
+                textAlign: 'right' as const,
+                width: '100%',
+              },
+            }
+          : isCompact ?
+            {
+              style: {
+                background: 'transparent',
+                fontSize: '0.8125rem',
+                fontVariantNumeric: 'tabular-nums',
+                height: '100%',
+                padding: '0 0.25rem',
+                textAlign: 'center' as const,
+              },
+            }
+          : {})}
+        />
+        {isEmbedded ? null : (
+          <NumberField.IncrementButton
+            {...(isCompact ? { 'aria-label': `Increment ${label}`, style: compactButtonStyle } : {})}
+          />
+        )}
       </NumberField.Group>
     </NumberField>
   );
@@ -323,8 +362,6 @@ export function CssLengthInput({ value, onChange, label }: CssLengthInputProps):
 
         setLocalNum(parsedDraft);
         onChange(formatCssLength(parsedDraft, unit));
-
-        return;
       }
     },
     [handleCommit, onChange, unit],

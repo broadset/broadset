@@ -1,9 +1,7 @@
+import { Button } from '@heroui/react';
 import type { CSSProperties, JSX } from 'react';
 
-import { color, sp } from '../tokens';
-
-export type AnchorHorizontal = 'left' | 'center' | 'right';
-export type AnchorVertical = 'top' | 'middle' | 'bottom';
+import { color } from '../tokens';
 
 export interface AnchorPadProps {
   readonly anchorX: 'left' | 'right';
@@ -11,86 +9,83 @@ export interface AnchorPadProps {
   readonly onChange: (anchor: { readonly x: 'left' | 'right'; readonly y: 'top' | 'bottom' }) => void;
 }
 
-const PAD_SIZE = '1.75rem';
-const DOT_SIZE = '0.3125rem';
-
-const POSITIONS: readonly {
-  readonly x: AnchorHorizontal;
-  readonly y: AnchorVertical;
+const CORNERS: readonly {
+  readonly x: 'left' | 'right';
+  readonly y: 'top' | 'bottom';
+  readonly ariaLabel: string;
 }[] = [
-  { x: 'left', y: 'top' },
-  { x: 'center', y: 'top' },
-  { x: 'right', y: 'top' },
-  { x: 'left', y: 'middle' },
-  { x: 'center', y: 'middle' },
-  { x: 'right', y: 'middle' },
-  { x: 'left', y: 'bottom' },
-  { x: 'center', y: 'bottom' },
-  { x: 'right', y: 'bottom' },
+  { x: 'left', y: 'top', ariaLabel: 'Anchor top-left' },
+  { x: 'right', y: 'top', ariaLabel: 'Anchor top-right' },
+  { x: 'left', y: 'bottom', ariaLabel: 'Anchor bottom-left' },
+  { x: 'right', y: 'bottom', ariaLabel: 'Anchor bottom-right' },
 ];
 
-function padStyle(): CSSProperties {
+function cellButtonStyle(isActive: boolean, isTop: boolean, isLeft: boolean): CSSProperties {
   return {
-    alignItems: 'center',
-    background: color('field-background'),
-    border: `1px solid ${color('border')}`,
-    borderRadius: '0.25rem',
-    display: 'grid',
-    gap: 0,
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gridTemplateRows: 'repeat(3, 1fr)',
-    height: PAD_SIZE,
-    justifyItems: 'center',
-    padding: sp('sp-01'),
-    width: PAD_SIZE,
+    alignItems: isTop ? 'flex-start' : 'flex-end',
+    background: isActive ? color('accent') : 'transparent',
+    borderRadius: 0,
+    display: 'flex',
+    height: '100%',
+    justifyContent: isLeft ? 'flex-start' : 'flex-end',
+    minWidth: 0,
+    padding: '3px',
+    width: '100%',
   };
 }
 
-function dotStyle(isActive: boolean, isBindable: boolean): CSSProperties {
+function dotStyle(isActive: boolean): CSSProperties {
   return {
-    background: isActive ? color('accent') : color('muted'),
-    border: 'none',
+    background: isActive ? color('foreground') : color('muted'),
     borderRadius: '50%',
-    cursor: isBindable ? 'pointer' : 'default',
-    height: DOT_SIZE,
-    opacity:
-      isActive ? 1
-      : isBindable ? 0.7
-      : 0.3,
-    padding: 0,
-    transform: isActive ? 'scale(1.5)' : 'scale(1)',
-    transition: 'transform 80ms ease-out, opacity 80ms ease-out, background 80ms ease-out',
-    width: DOT_SIZE,
+    height: 5,
+    opacity: isActive ? 1 : 0.6,
+    width: 5,
   };
 }
 
-function anchorAriaLabel(x: AnchorHorizontal, y: AnchorVertical): string {
-  return `Anchor ${y}-${x}`;
-}
-
+/**
+ * Compact 2×2 anchor-origin picker. Selects which canvas edges the element's
+ * X/Y coordinates are measured from (CSS left/right + top/bottom). Built on
+ * HeroUI `Button`s arranged in a 2×2 grid.
+ */
 export function AnchorPad({ anchorX, anchorY, onChange }: AnchorPadProps): JSX.Element {
   return (
-    <div role="group" aria-label="Anchor origin" style={padStyle()}>
-      {POSITIONS.map((pos) => {
-        const bindableX = pos.x === 'left' || pos.x === 'right' ? pos.x : null;
-        const bindableY = pos.y === 'top' || pos.y === 'bottom' ? pos.y : null;
-        const isBindable = bindableX !== null && bindableY !== null;
-        const resolvedActive = isBindable && bindableX === anchorX && bindableY === anchorY;
+    <div
+      role="group"
+      aria-label="Anchor origin"
+      style={{
+        background: color('field-background'),
+        border: `1px solid ${color('border')}`,
+        borderRadius: 4,
+        display: 'grid',
+        gap: 1,
+        gridTemplateColumns: '1fr 1fr',
+        gridTemplateRows: '1fr 1fr',
+        height: '2rem',
+        overflow: 'hidden',
+        width: '2rem',
+      }}
+    >
+      {CORNERS.map((corner) => {
+        const isActive = corner.x === anchorX && corner.y === anchorY;
+        const isTop = corner.y === 'top';
+        const isLeft = corner.x === 'left';
 
         return (
-          <button
-            key={`${pos.x}-${pos.y}`}
-            aria-label={anchorAriaLabel(pos.x, pos.y)}
-            aria-pressed={resolvedActive}
-            disabled={!isBindable}
-            type="button"
-            style={dotStyle(resolvedActive, isBindable)}
-            onClick={() => {
-              if (bindableX === null || bindableY === null) return;
-
-              onChange({ x: bindableX, y: bindableY });
+          <Button
+            key={corner.ariaLabel}
+            aria-label={corner.ariaLabel}
+            aria-pressed={isActive}
+            size="sm"
+            variant="ghost"
+            style={cellButtonStyle(isActive, isTop, isLeft)}
+            onPress={() => {
+              onChange({ x: corner.x, y: corner.y });
             }}
-          />
+          >
+            <span style={dotStyle(isActive)} />
+          </Button>
         );
       })}
     </div>

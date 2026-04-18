@@ -477,27 +477,35 @@ jest.mock(
         },
         { Fill: createWrapper('span'), Thumb: createWrapper('span'), Track: createWrapper() },
       ),
-      Switch(props: MockHeroUiProps): React.JSX.Element {
-        const { children, isSelected, onChange, ...restProps } = props;
-        const domProps = sanitizeDomProps(restProps);
+      Switch: Object.assign(
+        function SwitchRoot(props: MockHeroUiProps): React.JSX.Element {
+          const { children, isSelected, onChange, ...restProps } = props;
+          const domProps = sanitizeDomProps(restProps);
 
-        return ReactActual.createElement(
-          'label',
-          domProps,
-          ReactActual.createElement('input', {
-            'aria-label': props['aria-label'],
-            checked: Boolean(isSelected),
-            onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
-              if (typeof onChange === 'function') {
-                (onChange as (mockChecked: boolean) => void)(event.currentTarget.checked);
-              }
-            },
-            role: 'switch',
-            type: 'checkbox',
-          }),
-          children ?? null,
-        );
-      },
+          return ReactActual.createElement(
+            'label',
+            domProps,
+            ReactActual.createElement('input', {
+              'aria-label': props['aria-label'],
+              checked: Boolean(isSelected),
+              onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+                if (typeof onChange === 'function') {
+                  (onChange as (mockChecked: boolean) => void)(event.currentTarget.checked);
+                }
+              },
+              role: 'switch',
+              type: 'checkbox',
+            }),
+            children ?? null,
+          );
+        },
+        {
+          Control: createWrapper('span'),
+          Thumb: createWrapper('span'),
+          Content: createWrapper('span'),
+          Icon: createWrapper('span'),
+        },
+      ),
       Table: Object.assign(createWrapper('table'), {
         Body: createWrapper('tbody'),
         Cell: createWrapper('td'),

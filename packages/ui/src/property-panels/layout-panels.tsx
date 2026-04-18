@@ -1,6 +1,6 @@
 import { Button, ButtonGroup, Input, Slider } from '@heroui/react';
 import { ArrowDownUp, Circle, Lock, Minimize2, PenTool, Square, Star, Triangle, Unlink2 } from 'lucide-react';
-import type { JSX } from 'react';
+import type { CSSProperties, JSX } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { AxisCell } from '../inputs';
@@ -34,6 +34,16 @@ const CLIP_PATH_ERROR_MESSAGE = "This shape can't be read. Try a preset, or rese
 const CLIP_PATH_NONE = 'None';
 const CLIP_PATH_CUSTOM = 'Custom';
 
+function borderRowLabelStyle(): CSSProperties {
+  return {
+    alignSelf: 'center',
+    color: color('muted'),
+    fontSize: font('label'),
+    letterSpacing: '0.02em',
+    minWidth: 0,
+  };
+}
+
 const MASK_SHAPE_CHOICES = [CLIP_PATH_NONE, 'Circle', 'Squircle', 'Triangle', 'Star', CLIP_PATH_CUSTOM] as const;
 
 export interface GeometryPanelProps {
@@ -59,7 +69,6 @@ export interface GeometryPanelProps {
 }
 
 export function GeometryPanel({
-  name,
   x,
   y,
   width,
@@ -79,7 +88,6 @@ export function GeometryPanel({
   onUpdate,
   documentMode,
 }: GeometryPanelProps): JSX.Element {
-  const [nameDraft, setNameDraft] = useState(name ?? '');
   const [activeAnchorX, setActiveAnchorX] = useState<'left' | 'right'>(anchorX);
   const [activeAnchorY, setActiveAnchorY] = useState<'top' | 'bottom'>(anchorY);
   const [isAspectLinked, setIsAspectLinked] = useState(false);
@@ -111,10 +119,6 @@ export function GeometryPanel({
   // has any 3D rotation authored we keep Z on `rotateZ` so the two stay in sync.
   const rotationZKey = has3DValues && rotateZ !== undefined ? 'rotateZ' : 'rotation';
   const rotationZValue = rotationZKey === 'rotateZ' ? (rotateZ ?? 0) : rotation;
-
-  const commitNameDraft = useCallback(() => {
-    onUpdate('name', nameDraft);
-  }, [nameDraft, onUpdate]);
 
   const handleXChange = useCallback(
     (nextDisplayX: number) => {
@@ -223,7 +227,6 @@ export function GeometryPanel({
   return (
     <section
       aria-label="Geometry"
-      role="region"
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -232,23 +235,6 @@ export function GeometryPanel({
         width: '100%',
       }}
     >
-      <PropertyField propertyKey="name" defaultValue={nameDraft}>
-        <Input
-          aria-label="Element name"
-          placeholder="Element name"
-          value={nameDraft}
-          onChange={(event) => {
-            setNameDraft(event.currentTarget.value);
-          }}
-          onBlur={commitNameDraft}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              commitNameDraft();
-            }
-          }}
-        />
-      </PropertyField>
-
       <PropertyField propertyKey="x" defaultValue={x}>
         <AxisTriplet label="Position" unit={documentUnit} axes={positionAxes} />
       </PropertyField>
@@ -342,9 +328,8 @@ export function GeometryPanel({
 
       <FieldRow
         label="Anchor"
-        trailing={<span style={{ color: color('muted'), fontSize: font('label') }}>{anchorLabel}</span>}
       >
-        <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'flex-start', minWidth: 0 }}>
+        <div style={{ alignItems: 'center', display: 'flex', gap: sp('sp-02'), minWidth: 0 }}>
           <AnchorPad
             anchorX={activeAnchorX}
             anchorY={activeAnchorY}
@@ -360,6 +345,9 @@ export function GeometryPanel({
               }
             }}
           />
+          <span style={{ color: color('foreground'), fontSize: font('label'), textTransform: 'capitalize' }}>
+            {anchorLabel.toLowerCase()}
+          </span>
         </div>
       </FieldRow>
     </section>
@@ -375,7 +363,6 @@ export interface AppearancePanelProps {
   readonly borderStyle: string;
   readonly borderRadius: readonly [number, number, number, number];
   readonly opacity: number;
-  readonly blendMode: string;
   readonly onUpdate: (key: string, value: string | number | readonly [number, number, number, number]) => void;
 }
 
@@ -388,7 +375,6 @@ export function AppearancePanel({
   borderStyle,
   borderRadius,
   opacity,
-  blendMode,
   onUpdate,
 }: AppearancePanelProps): JSX.Element {
   const [fillMode, setFillMode] = useState<'solid' | 'gradient'>(
@@ -411,7 +397,6 @@ export function AppearancePanel({
   return (
     <section
       aria-label="Appearance"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
     >
       <FieldRow
@@ -441,15 +426,17 @@ export function AppearancePanel({
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0, width: '100%' }}>
-          <PropertyField propertyKey="backgroundColor" defaultValue={backgroundColor}>
-            <ColorInput
-              label="Fill color"
-              value={backgroundColor}
-              onChange={(v) => {
-                onUpdate('backgroundColor', v);
-              }}
-            />
-          </PropertyField>
+          {fillMode === 'solid' ?
+            <PropertyField propertyKey="backgroundColor" defaultValue={backgroundColor}>
+              <ColorInput
+                label="Fill color"
+                value={backgroundColor}
+                onChange={(v) => {
+                  onUpdate('backgroundColor', v);
+                }}
+              />
+            </PropertyField>
+          : null}
           {showGradient === true && fillMode === 'gradient' ?
             <PropertyField propertyKey="backgroundGradient" defaultValue={effectiveGradient}>
               <GradientEditor
@@ -472,13 +459,16 @@ export function AppearancePanel({
         <PropertyField propertyKey="opacity" defaultValue={opacity}>
           <Slider
             aria-label="Opacity"
-            maxValue={1}
+            maxValue={100}
             minValue={0}
-            step={0.01}
-            value={opacity}
+            step={1}
+            value={Math.round(opacity * 100)}
             onChange={(v: number | readonly number[]) => {
-              onUpdate('opacity', typeof v === 'number' ? v : Number(v));
+              const percent = typeof v === 'number' ? v : (v[0] ?? 0);
+
+              onUpdate('opacity', percent / 100);
             }}
+            style={{ width: '100%' }}
           >
             <Slider.Track>
               <Slider.Fill />
@@ -489,39 +479,46 @@ export function AppearancePanel({
       </FieldRow>
 
       <FieldRow label="Border">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0, width: '100%' }}>
-          <div
-            style={{
-              display: 'grid',
-              gap: sp('sp-02'),
-              gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-              minWidth: 0,
-            }}
-          >
-            <PropertyField propertyKey="borderWidth" defaultValue={borderWidth}>
-              <NumField
-                compact
-                label="Border width"
-                value={borderWidth}
-                min={0}
-                onChange={(v) => {
-                  onUpdate('borderWidth', v);
-                }}
-              />
-            </PropertyField>
-            <PropertyField propertyKey="borderColor" defaultValue={borderColor}>
-              <ColorInput
-                compact
-                label="Border color"
-                value={borderColor}
-                onChange={(v) => {
-                  onUpdate('borderColor', v);
-                }}
-              />
-            </PropertyField>
-          </div>
+        <div
+          style={{
+            background: color('field-background'),
+            border: `1px solid ${color('border')}`,
+            borderRadius: '0.375rem',
+            display: 'grid',
+            gap: sp('sp-02'),
+            gridTemplateColumns: '4.25rem minmax(0, 1fr)',
+            minWidth: 0,
+            padding: sp('sp-02'),
+            rowGap: sp('sp-02'),
+          }}
+        >
+          <span style={borderRowLabelStyle()}>Width</span>
+          <PropertyField propertyKey="borderWidth" defaultValue={borderWidth}>
+            <NumField
+              compact
+              label="Border width"
+              value={borderWidth}
+              min={0}
+              onChange={(v) => {
+                onUpdate('borderWidth', v);
+              }}
+            />
+          </PropertyField>
+          <span style={borderRowLabelStyle()}>Color</span>
+          <PropertyField propertyKey="borderColor" defaultValue={borderColor}>
+            <ColorInput
+              compact
+              label="Border color"
+              value={borderColor}
+              onChange={(v) => {
+                onUpdate('borderColor', v);
+              }}
+            />
+          </PropertyField>
+          <span style={borderRowLabelStyle()}>Style</span>
           <PropertyField propertyKey="borderStyle" defaultValue={borderStyle}>
             <SelectField
+              hideLabel
               label="Border style"
               value={borderStyle}
               options={[...BORDER_STYLE_OPTIONS]}
@@ -530,18 +527,6 @@ export function AppearancePanel({
             />
           </PropertyField>
         </div>
-      </FieldRow>
-
-      <FieldRow label="Blend">
-        <PropertyField propertyKey="blendMode" defaultValue={blendMode}>
-          <SelectField
-            label="Blend mode"
-            value={blendMode}
-            options={[...MIX_BLEND_MODE_OPTIONS]}
-            onUpdate={onUpdate}
-            updateKey="blendMode"
-          />
-        </PropertyField>
       </FieldRow>
 
       <PropertyField propertyKey="borderRadius" defaultValue={borderRadius}>
@@ -572,7 +557,6 @@ export function SpacingPanel({ padding, onUpdate }: SpacingPanelProps): JSX.Elem
   return (
     <section
       aria-label="Spacing"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0, width: '100%' }}
     >
       <QuadInput
@@ -611,7 +595,6 @@ export function BoxEffectsPanel({
   return (
     <section
       aria-label="Box Effects"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
     >
       <FieldRow label="Shadow">
@@ -765,7 +748,6 @@ export function ClipPathPanel({
   return (
     <section
       aria-label="Clip Path"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), minWidth: 0, width: '100%' }}
     >
       <FieldRow label="Mask">

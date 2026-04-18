@@ -186,6 +186,7 @@ function AxisCellView({ cell }: { readonly cell: AxisCell }): JSX.Element {
       />
       <NumField
         compact
+        embedded
         label={cell.ariaLabel}
         value={cell.value}
         onChange={cell.onChange}

@@ -93,6 +93,33 @@ describe('NumField', () => {
     fireEvent.blur(input);
     expect(onChange).toHaveBeenCalledWith(11);
   });
+
+  /** @description Comma must be treated as the decimal separator. Regression for a bug where `100,1` parsed to `1001` after blur because the raw-number parser stripped commas as thousands separators and HeroUI's default parsing fell back to integer-only. */
+  it('treats comma as the decimal separator on blur', () => {
+    const onChange = jest.fn<(value: number) => void>();
+
+    render(<NumField value={50} step={0.1} onChange={onChange} label="Width" />);
+
+    const input = screen.getByLabelText('Width', { selector: 'input' });
+
+    fireEvent.change(input, { target: { value: '100,1' } });
+    fireEvent.blur(input);
+
+    expect(onChange).toHaveBeenLastCalledWith(100.1);
+  });
+
+  /** @description Compact mode must ship the HeroUI NumberField inc/dec buttons so standalone number fields read as proper number inputs with shared HeroUI chrome. */
+  it('compact mode renders HeroUI increment and decrement buttons', () => {
+    const onChange = jest.fn<(value: number) => void>();
+
+    render(<NumField compact value={10} step={1} onChange={onChange} label="Border width" />);
+
+    const incButton = screen.getByLabelText(/(?:Increase|Increment) Border width/);
+    const decButton = screen.getByLabelText(/(?:Decrease|Decrement) Border width/);
+
+    expect(incButton).toBeTruthy();
+    expect(decButton).toBeTruthy();
+  });
 });
 
 /* ============================================================

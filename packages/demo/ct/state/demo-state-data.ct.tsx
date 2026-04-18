@@ -395,7 +395,7 @@ test('surfaces import and export failure workflows with descriptive toasts', asy
       const hasFailureToast = Array.from(document.querySelectorAll('*')).some((node) => {
         const text = node.textContent;
 
-        return typeof text === 'string' && /Export failed:/.test(text);
+        return typeof text === 'string' && text.includes('Export failed:');
       });
 
       return (

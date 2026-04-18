@@ -44,18 +44,26 @@ describe('SidebarContextHeader', () => {
     expect(header.style.borderBottom).toContain('1px solid');
   });
 
-  /** @description When no subtitle is provided, only the label and icon render */
-  it('renders without subtitle by default', () => {
+  /** @description Header never leaks the element id to the user; the label alone is authoritative. */
+  it('renders with just the label and icon by default', () => {
     const { container } = render(<SidebarContextHeader icon={<span />} label="Layers" />);
 
     expect(container.querySelectorAll('[data-testid="sidebar-context-subtitle"]')).toHaveLength(0);
   });
 
-  /** @description When a subtitle is provided, it renders below the label for extra context */
-  it('renders subtitle when provided', () => {
-    render(<SidebarContextHeader icon={<span />} label="Properties" subtitle="Rectangle — element-1" />);
+  /** @description When onLabelChange is provided the label turns into an inline editable input for fast renames. */
+  it('renders an editable name input when onLabelChange is provided', () => {
+    render(
+      <SidebarContextHeader
+        icon={<span />}
+        label="Score bug"
+        onLabelChange={() => {
+          /* no-op for this test */
+        }}
+      />,
+    );
 
-    expect(screen.getByText('Rectangle — element-1')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Element name' })).toBeInTheDocument();
   });
 
   /** @description Type and count chips must render when supplied so selection context stays visible in the header. */
@@ -86,6 +94,19 @@ describe('SidebarContextHeader', () => {
     render(<SidebarContextHeader icon={<span />} label="Properties" isLocked onToggleLock={() => undefined} />);
 
     expect(screen.getByRole('button', { name: 'Unlock element' })).toBeInTheDocument();
+  });
+
+  /** @description Lock button must expose aria-pressed so screen readers and tests can see the current state, and the button visual must differ per state. */
+  it('reflects lock state via aria-pressed on the lock button', () => {
+    const { rerender } = render(
+      <SidebarContextHeader icon={<span />} label="Properties" isLocked={false} onToggleLock={() => undefined} />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Lock element' }).getAttribute('aria-pressed')).toBe('false');
+
+    rerender(<SidebarContextHeader icon={<span />} label="Properties" isLocked onToggleLock={() => undefined} />);
+
+    expect(screen.getByRole('button', { name: 'Unlock element' }).getAttribute('aria-pressed')).toBe('true');
   });
 
   /** @description Animation mode chip must appear only when explicitly enabled and use fallback label text when omitted. */

@@ -111,7 +111,7 @@ function mockSlider(p: Record<string, unknown>) {
   );
 }
 
-function mockSwitch(p: Record<string, unknown>) {
+function mockSwitchBase(p: Record<string, unknown>) {
   const { children, isSelected, onChange, ...rest } = p;
 
   return React.createElement(
@@ -131,6 +131,13 @@ function mockSwitch(p: Record<string, unknown>) {
     (children as React.ReactNode) ?? null,
   );
 }
+
+const mockSwitch = Object.assign(mockSwitchBase, {
+  Control: mockWrap('span'),
+  Thumb: mockWrap('span'),
+  Content: mockWrap('span'),
+  Icon: mockWrap('span'),
+});
 
 function mockModal(p: Record<string, unknown>) {
   const { children, isOpen, onClose, onOpenChange: _onOpenChange, size: _s, ...rest } = p;
@@ -358,9 +365,31 @@ function mockColorInput(p: Record<string, unknown>) {
   });
 }
 
+function mockToggleSwitch(p: Record<string, unknown>) {
+  const ariaLabel = (p['ariaLabel'] as string | undefined) ?? '';
+
+  return React.createElement(
+    'label',
+    { 'data-ariaLabel': ariaLabel },
+    React.createElement('input', {
+      'aria-label': ariaLabel,
+      checked: Boolean(p['isSelected']),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (typeof p['onChange'] === 'function') {
+          (p['onChange'] as (v: boolean) => void)(e.currentTarget.checked);
+        }
+      },
+      role: 'switch',
+      type: 'checkbox',
+    }),
+    (p['children'] as React.ReactNode) ?? null,
+  );
+}
+
 jest.mock('../inputs', () => ({
   ColorInput: mockColorInput,
   NumField: mockNumField,
+  ToggleSwitch: mockToggleSwitch,
 }));
 
 /* ================================================================== */

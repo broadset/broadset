@@ -24,16 +24,18 @@ describe('PropertiesSidebar', () => {
     expect(screen.getByText(/select an element/i)).not.toBeNull();
   });
 
-  /** @description Header must show the selected element name and a plain-English type chip for fast context recognition. */
-  it('renders context header with element name and type chip', () => {
+  /** @description Header must expose the selected element name as an inline-editable input plus a plain-English type chip. */
+  it('renders inline-editable element name and type chip in the header', () => {
     render(<PropertiesSidebar elements={[BASE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
 
-    expect(screen.getByText('Base Element')).not.toBeNull();
+    const nameInput = screen.getByRole('textbox', { name: 'Element name' });
+
+    expect(nameInput.getAttribute('value')).toBe('Base Element');
     expect(screen.getByText('Rectangle')).not.toBeNull();
   });
 
-  /** @description Header must fall back to the element id when display name is empty so context remains visible. */
-  it('falls back to element id when name is empty', () => {
+  /** @description Header must fall back to the plain-English type label when the element has no name — the id must never leak to the user. */
+  it('falls back to type label when name is empty and never shows element id', () => {
     render(
       <PropertiesSidebar
         elements={[{ ...BASE_ELEMENT, id: 'fallback-id', name: '' }]}
@@ -42,7 +44,11 @@ describe('PropertiesSidebar', () => {
       />,
     );
 
-    expect(screen.getAllByText('fallback-id').length).toBeGreaterThan(0);
+    expect(screen.queryByText('fallback-id')).toBeNull();
+
+    const nameInput = screen.getByRole('textbox', { name: 'Element name' });
+
+    expect(nameInput.getAttribute('value')).toBe('Rectangle');
   });
 
   /** @description Lock button in the header must toggle the element locked state through onUpdate. */
@@ -133,7 +139,6 @@ describe('PropertiesSidebar', () => {
 
     expect(screen.getByText('3 elements')).not.toBeNull();
     expect(screen.getByText('Multiple selection')).not.toBeNull();
-    expect(screen.getByText('Common properties')).not.toBeNull();
     expect(screen.queryByText('Rectangle')).toBeNull();
     expect(screen.queryByRole('button', { name: /lock|unlock/i })).toBeNull();
   });
@@ -210,11 +215,11 @@ describe('PropertiesSidebar', () => {
     expect(screen.getAllByText('Image').length).toBeGreaterThan(0);
   });
 
-  /** @description ObjectFit panel must appear for elements with objectFit capability. */
-  it('shows object fit panel for image elements', () => {
+  /** @description Object-fit control must be reachable for image elements. It now lives inline inside the Image panel (not behind a second accordion click) so users see source + fit in one glance; we assert the Fit field is rendered. */
+  it('renders the object fit control inline for image elements', () => {
     render(<PropertiesSidebar elements={[IMAGE_ELEMENT]} documentMode="screen" onUpdate={() => undefined} />);
 
-    expect(screen.getByText('Object Fit')).not.toBeNull();
+    expect(screen.getByLabelText('Object fit')).not.toBeNull();
   });
 
   /** @description QR code panel must appear for qrcode elements. */

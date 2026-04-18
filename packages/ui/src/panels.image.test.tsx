@@ -97,7 +97,7 @@ describe('ImagePanel', () => {
       />,
     );
 
-    expect(screen.getByRole('img', { name: /selected image thumbnail/i })).not.toBeNull();
+    expect(screen.getByRole('img', { name: /selected thumbnail/i })).not.toBeNull();
     expect(screen.getByText('Headline Frame')).not.toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /choose from library/i }));

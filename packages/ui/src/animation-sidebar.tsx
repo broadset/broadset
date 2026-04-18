@@ -1,7 +1,8 @@
-import { Accordion, Button, ButtonGroup, Chip, ListBox, Select, Switch } from '@heroui/react';
+import { Accordion, Button, ButtonGroup, Chip, ListBox, Select } from '@heroui/react';
 import { Copy, Lock, Pencil, Plus, Trash2, Type } from 'lucide-react';
 import type { JSX } from 'react';
 
+import { ToggleSwitch } from './inputs';
 import type { PanelElement } from './panel-types';
 import { ICON_SIZE } from './panel-types';
 import { color, font, glassPanelStyle, sp } from './tokens';
@@ -240,8 +241,9 @@ export function AnimationSidebar({
                   </span>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-01') }}>
                     {availableModifiers.map((m) => (
-                      <Switch
+                      <ToggleSwitch
                         key={m}
+                        ariaLabel={`Toggle ${m}`}
                         isDisabled={isLocked}
                         isSelected={activeModifiers.includes(m)}
                         onChange={() => {
@@ -249,7 +251,7 @@ export function AnimationSidebar({
                         }}
                       >
                         {m}
-                      </Switch>
+                      </ToggleSwitch>
                     ))}
                   </div>
                 </div>

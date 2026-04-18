@@ -33,10 +33,8 @@ describe('GeometryPanel', () => {
     expect(onUpdate).toHaveBeenCalledWith('x', 42);
   });
 
-  /** @description Element name editing must commit through onUpdate on blur and Enter for keyboard and pointer workflows. */
-  it('commits element name on blur and Enter', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
-
+  /** @description Element name editing lives inline in the properties header, not inside the geometry panel; the panel must not render a name field. */
+  it('does not render a duplicate name input', () => {
     render(
       <GeometryPanel
         name="Hero Title"
@@ -45,18 +43,12 @@ describe('GeometryPanel', () => {
         width={100}
         height={50}
         rotation={0}
-        onUpdate={onUpdate}
+        onUpdate={() => undefined}
         documentMode="screen"
       />,
     );
 
-    const nameInput = screen.getByRole('textbox', { name: 'Element name' });
-
-    fireEvent.change(nameInput, { target: { value: 'Updated Title' } });
-    fireEvent.keyDown(nameInput, { key: 'Enter' });
-    fireEvent.blur(nameInput);
-
-    expect(onUpdate).toHaveBeenCalledWith('name', 'Updated Title');
+    expect(screen.queryByRole('textbox', { name: 'Element name' })).toBeNull();
   });
 
   /** @description Print mode must hide the 3D axes because 3D controls are screen-only. */

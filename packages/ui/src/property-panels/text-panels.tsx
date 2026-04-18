@@ -53,6 +53,9 @@ export interface TypographyPanelProps {
   readonly verticalAlignment: VerticalAlignment;
   readonly textDecoration: string;
   readonly textTransform: string;
+  readonly lineHeight: string;
+  readonly letterSpacing: number;
+  readonly wordSpacing: number;
   readonly isAnimationMode?: boolean | undefined;
   readonly onUpdate: (key: string, value: string | number) => void;
 }
@@ -68,6 +71,9 @@ export function TypographyPanel({
   verticalAlignment,
   textDecoration,
   textTransform,
+  lineHeight,
+  letterSpacing,
+  wordSpacing,
   isAnimationMode = false,
   onUpdate,
 }: TypographyPanelProps): JSX.Element {
@@ -83,7 +89,6 @@ export function TypographyPanel({
   return (
     <section
       aria-label="Typography"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
     >
       {!isAnimationMode ?
@@ -95,6 +100,7 @@ export function TypographyPanel({
       <FieldRow label="Font">
         <PropertyField propertyKey="fontFamily" defaultValue={fontFamily}>
           <SelectField
+            hideLabel
             label="Font family"
             value={fontFamily}
             options={fontFamilyOptions}
@@ -206,6 +212,48 @@ export function TypographyPanel({
         </PropertyField>
       </FieldRow>
 
+      <FieldRow label="Line height">
+        <PropertyField propertyKey="lineHeight" defaultValue={lineHeight}>
+          <CssLengthInput
+            label="Line height"
+            value={lineHeight}
+            onChange={(v) => {
+              onUpdate('lineHeight', v);
+            }}
+          />
+        </PropertyField>
+      </FieldRow>
+
+      <FieldRow label="Spacing">
+        <div
+          style={{
+            display: 'grid',
+            gap: sp('sp-02'),
+            gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+            minWidth: 0,
+          }}
+        >
+          <PropertyField propertyKey="letterSpacing" defaultValue={letterSpacing}>
+            <CssLengthInput
+              label="Letter spacing"
+              value={String(letterSpacing)}
+              onChange={(v) => {
+                onUpdate('letterSpacing', v);
+              }}
+            />
+          </PropertyField>
+          <PropertyField propertyKey="wordSpacing" defaultValue={wordSpacing}>
+            <CssLengthInput
+              label="Word spacing"
+              value={String(wordSpacing)}
+              onChange={(v) => {
+                onUpdate('wordSpacing', v);
+              }}
+            />
+          </PropertyField>
+        </div>
+      </FieldRow>
+
       <Button
         aria-label="Advanced"
         size="sm"
@@ -238,6 +286,7 @@ export function TypographyPanel({
           <FieldRow label="Case">
             <PropertyField propertyKey="textTransform" defaultValue={textTransform}>
               <SelectField
+                hideLabel
                 label="Case"
                 value={textTransform}
                 options={[...TEXT_TRANSFORM_OPTIONS]}
@@ -253,113 +302,42 @@ export function TypographyPanel({
 }
 
 export interface TextEffectsPanelProps {
-  readonly letterSpacing: number;
-  readonly lineHeight: string;
-  readonly wordSpacing: number;
   readonly textStroke: string;
   readonly textShadow: string;
   readonly textTransform: string;
   readonly onUpdate: (key: string, value: string | number) => void;
 }
 
-export function TextEffectsPanel({
-  letterSpacing,
-  lineHeight,
-  wordSpacing,
-  textStroke,
-  textShadow,
-  onUpdate,
-}: TextEffectsPanelProps): JSX.Element {
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
+export function TextEffectsPanel({ textStroke, textShadow, onUpdate }: TextEffectsPanelProps): JSX.Element {
   return (
     <section
       aria-label="Text Effects"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}
     >
-      <Button
-        aria-label="Advanced"
-        size="sm"
-        variant="ghost"
-        style={{ alignSelf: 'flex-start' }}
-        onPress={() => {
-          setShowAdvanced((s) => !s);
-        }}
-      >
-        Advanced
-      </Button>
-
-      {showAdvanced ?
-        <>
-          <FieldRow label="Line height">
-            <PropertyField propertyKey="lineHeight" defaultValue={lineHeight}>
-              <CssLengthInput
-                label="Line height"
-                value={lineHeight}
-                onChange={(v) => {
-                  onUpdate('lineHeight', v);
-                }}
-              />
-            </PropertyField>
-          </FieldRow>
-
-          <FieldRow label="Spacing">
-            <div
-              style={{
-                display: 'grid',
-                gap: sp('sp-02'),
-                gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-                minWidth: 0,
-              }}
-            >
-              <PropertyField propertyKey="letterSpacing" defaultValue={letterSpacing}>
-                <CssLengthInput
-                  label="Letter spacing"
-                  value={String(letterSpacing)}
-                  onChange={(v) => {
-                    onUpdate('letterSpacing', v);
-                  }}
-                />
-              </PropertyField>
-              <PropertyField propertyKey="wordSpacing" defaultValue={wordSpacing}>
-                <CssLengthInput
-                  label="Word spacing"
-                  value={String(wordSpacing)}
-                  onChange={(v) => {
-                    onUpdate('wordSpacing', v);
-                  }}
-                />
-              </PropertyField>
-            </div>
-          </FieldRow>
-
-          <FieldRow label="Outline">
-            <PropertyField propertyKey="textStroke" defaultValue={textStroke}>
-              <TextStrokeInput
-                label="Text stroke"
-                width={textStroke ? parseInt(textStroke, 10) : 0}
-                color={textStroke.split(' ')[1] ?? '#000000'}
-                onChange={(v) => {
-                  onUpdate('textStroke', v);
-                }}
-              />
-            </PropertyField>
-          </FieldRow>
-          <FieldRow label="Shadow">
-            <PropertyField propertyKey="textShadow" defaultValue={textShadow}>
-              <ShadowEditor
-                label="Text shadow"
-                mode="text"
-                value={textShadow}
-                onChange={(v) => {
-                  onUpdate('textShadow', v);
-                }}
-              />
-            </PropertyField>
-          </FieldRow>
-        </>
-      : null}
+      <FieldRow label="Outline">
+        <PropertyField propertyKey="textStroke" defaultValue={textStroke}>
+          <TextStrokeInput
+            label="Text stroke"
+            width={textStroke ? parseInt(textStroke, 10) : 0}
+            color={textStroke.split(' ')[1] ?? '#000000'}
+            onChange={(v) => {
+              onUpdate('textStroke', v);
+            }}
+          />
+        </PropertyField>
+      </FieldRow>
+      <FieldRow label="Shadow">
+        <PropertyField propertyKey="textShadow" defaultValue={textShadow}>
+          <ShadowEditor
+            label="Text shadow"
+            mode="text"
+            value={textShadow}
+            onChange={(v) => {
+              onUpdate('textShadow', v);
+            }}
+          />
+        </PropertyField>
+      </FieldRow>
     </section>
   );
 }

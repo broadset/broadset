@@ -265,10 +265,8 @@ export function useCommandHandlers({
         return;
       }
 
-      const styleKey = key === 'blendMode' ? 'mixBlendMode' : key;
-
       editorStore.getState().updateElementStyle(selectedElement.id, {
-        [styleKey]: value,
+        [key]: value,
       });
     },
     [editorStore, selectedElement],
@@ -276,13 +274,7 @@ export function useCommandHandlers({
 
   const handleSidebarTabToggle = useCallback(
     (nextTab: SidebarTab): void => {
-      setIsSidebarOpen((currentValue) => {
-        if (currentValue && sidebarTab === nextTab) {
-          return false;
-        }
-
-        return true;
-      });
+      setIsSidebarOpen((currentValue) => !(currentValue && sidebarTab === nextTab));
       setSidebarTab(nextTab);
     },
     [setIsSidebarOpen, setSidebarTab, sidebarTab],

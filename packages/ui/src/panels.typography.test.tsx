@@ -21,6 +21,9 @@ describe('TypographyPanel', () => {
         verticalAlignment="top"
         textDecoration=""
         textTransform="none"
+        lineHeight="1.5"
+        letterSpacing={0}
+        wordSpacing={0}
         onUpdate={onUpdate}
       />,
     );
@@ -48,6 +51,9 @@ describe('TypographyPanel', () => {
         verticalAlignment="top"
         textDecoration=""
         textTransform="none"
+        lineHeight="1.5"
+        letterSpacing={0}
+        wordSpacing={0}
         onUpdate={() => undefined}
       />,
     );
@@ -74,6 +80,9 @@ describe('TypographyPanel', () => {
         verticalAlignment="top"
         textDecoration=""
         textTransform="none"
+        lineHeight="1.5"
+        letterSpacing={0}
+        wordSpacing={0}
         onUpdate={() => undefined}
       />,
     );
@@ -100,6 +109,9 @@ describe('TypographyPanel', () => {
         verticalAlignment="top"
         textDecoration=""
         textTransform="none"
+        lineHeight="1.5"
+        letterSpacing={0}
+        wordSpacing={0}
         onUpdate={onUpdate}
       />,
     );
@@ -120,6 +132,9 @@ describe('TypographyPanel', () => {
         verticalAlignment="top"
         textDecoration=""
         textTransform="none"
+        lineHeight="1.5"
+        letterSpacing={0}
+        wordSpacing={0}
         onUpdate={onUpdate}
       />,
     );
@@ -141,6 +156,9 @@ describe('TypographyPanel', () => {
         verticalAlignment="top"
         textDecoration=""
         textTransform="none"
+        lineHeight="1.5"
+        letterSpacing={0}
+        wordSpacing={0}
         isAnimationMode
         onUpdate={() => undefined}
       />,
@@ -164,6 +182,9 @@ describe('TypographyPanel', () => {
         verticalAlignment="top"
         textDecoration=""
         textTransform="none"
+        lineHeight="1.5"
+        letterSpacing={0}
+        wordSpacing={0}
         onUpdate={onUpdate}
       />,
     );

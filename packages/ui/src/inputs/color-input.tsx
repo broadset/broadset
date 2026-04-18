@@ -234,7 +234,8 @@ export function ColorInput({ value, onChange, label, compact }: ColorInputProps)
   const errorId = useId();
 
   const parsed = useMemo(() => parseColorToRgba(value), [value]);
-  const isTransparent = parsed !== null && parsed.a === 0;
+  const isEmpty = value.trim() === '';
+  const isTransparent = isEmpty || (parsed !== null && parsed.a === 0);
 
   const ariaColor = useMemo(
     () => (parsed !== null ? toAriaColor(parsed.r, parsed.g, parsed.b, parsed.a) : parseColor('#000000')),
@@ -336,9 +337,10 @@ export function ColorInput({ value, onChange, label, compact }: ColorInputProps)
             data-transparent={isTransparent ? 'true' : 'false'}
             aria-label={`${label} color swatch`}
             style={{
+              alignSelf: 'center',
               width: swatchSize,
               height: swatchSize,
-              borderRadius: 4,
+              borderRadius: '50%',
               border: `1px solid ${colorToken('border')}`,
               backgroundColor: isTransparent ? 'transparent' : value,
               backgroundImage:
@@ -349,6 +351,7 @@ export function ColorInput({ value, onChange, label, compact }: ColorInputProps)
               backgroundPosition: isTransparent ? '0 0, 4px 4px' : undefined,
               padding: 0,
               minWidth: swatchSize,
+              flexShrink: 0,
             }}
           />
         </Popover.Trigger>
@@ -453,43 +456,25 @@ export function ColorInput({ value, onChange, label, compact }: ColorInputProps)
         </Popover.Content>
       </Popover>
 
-      {isCompact ?
-        <input
-          aria-label={`${label} color text`}
-          aria-invalid={draftInvalid || undefined}
-          aria-describedby={draftInvalid ? errorId : undefined}
-          type="text"
-          value={displayValue}
-          onChange={(e) => {
-            handleTextChange(e);
-          }}
-          onBlur={handleTextBlur}
-          onKeyDown={handleTextKeyDown}
-          style={{
-            background: colorToken('field-background'),
-            border: `1px solid ${colorToken('border')}`,
-            borderRadius: '0.25rem',
-            color: 'inherit',
-            flex: 1,
-            fontFamily: 'inherit',
-            fontSize: '0.75rem',
-            height: '1.75rem',
-            minWidth: 0,
-            outline: 'none',
-            padding: '0 0.5rem',
-            width: '100%',
-          }}
-        />
-      : <Input
-          aria-label={`${label} color text`}
-          aria-invalid={draftInvalid || undefined}
-          aria-describedby={draftInvalid ? errorId : undefined}
-          value={displayValue}
-          onChange={handleTextChange}
-          onBlur={handleTextBlur}
-          onKeyDown={handleTextKeyDown}
-        />
-      }
+      <Input
+        aria-label={`${label} color text`}
+        aria-invalid={draftInvalid || undefined}
+        aria-describedby={draftInvalid ? errorId : undefined}
+        value={displayValue}
+        onChange={handleTextChange}
+        onBlur={handleTextBlur}
+        onKeyDown={handleTextKeyDown}
+        {...(isCompact ?
+          {
+            style: {
+              fontSize: '0.75rem',
+              height: '1.75rem',
+              minWidth: 0,
+              padding: '0 0.5rem',
+            },
+          }
+        : {})}
+      />
       {draftInvalid && (
         <span
           id={errorId}
