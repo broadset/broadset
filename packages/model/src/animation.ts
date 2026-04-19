@@ -216,6 +216,60 @@ const keyframePropertySchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('tuple'), value: z.array(z.number()), easing: easingModeSchema }),
 ]);
 
+type KeyframeProperty = z.infer<typeof keyframePropertySchema>;
+
+function validateMotionPath(motionPath: KeyframeProperty | undefined, context: z.RefinementCtx): void {
+  if (motionPath === undefined) return;
+
+  if (motionPath.type !== 'string') {
+    context.addIssue({
+      code: 'custom',
+      message: 'motionPath must use a string keyframe value',
+      path: ['properties', 'motionPath'],
+    });
+
+    return;
+  }
+
+  if (!isValidSvgPathData(motionPath.value)) {
+    context.addIssue({
+      code: 'custom',
+      message: 'motionPath must be valid SVG path data',
+      path: ['properties', 'motionPath'],
+    });
+  }
+}
+
+function validateGradientPropertyType(key: string, prop: KeyframeProperty, context: z.RefinementCtx): void {
+  const fixedType = GRADIENT_TARGET_TYPES[key];
+
+  if (fixedType !== undefined) {
+    if (prop.type !== fixedType) {
+      context.addIssue({
+        code: 'custom',
+        message: `${key} must use a '${fixedType}' keyframe value`,
+        path: ['properties', key],
+      });
+    }
+
+    return;
+  }
+
+  const stopMatch = GRADIENT_STOP_RE.exec(key);
+
+  if (stopMatch === null) return;
+
+  const expectedType = stopMatch[2] === 'color' ? 'color' : 'number';
+
+  if (prop.type !== expectedType) {
+    context.addIssue({
+      code: 'custom',
+      message: `${key} must use a '${expectedType}' keyframe value`,
+      path: ['properties', key],
+    });
+  }
+}
+
 export const keyframeSchema: z.ZodType<Keyframe> = z
   .object({
     name: z.string(),
@@ -227,53 +281,10 @@ export const keyframeSchema: z.ZodType<Keyframe> = z
     timecodeAnnotation: timecodeAnnotationSchema.optional(),
   })
   .superRefine((value, context) => {
-    const motionPath = value.properties['motionPath'];
-
-    if (motionPath !== undefined) {
-      if (motionPath.type !== 'string') {
-        context.addIssue({
-          code: 'custom',
-          message: 'motionPath must use a string keyframe value',
-          path: ['properties', 'motionPath'],
-        });
-      } else if (!isValidSvgPathData(motionPath.value)) {
-        context.addIssue({
-          code: 'custom',
-          message: 'motionPath must be valid SVG path data',
-          path: ['properties', 'motionPath'],
-        });
-      }
-    }
+    validateMotionPath(value.properties['motionPath'], context);
 
     for (const [key, prop] of Object.entries(value.properties)) {
-      const fixedType = GRADIENT_TARGET_TYPES[key];
-
-      if (fixedType !== undefined) {
-        if (prop.type !== fixedType) {
-          context.addIssue({
-            code: 'custom',
-            message: `${key} must use a '${fixedType}' keyframe value`,
-            path: ['properties', key],
-          });
-        }
-
-        continue;
-      }
-
-      const stopMatch = GRADIENT_STOP_RE.exec(key);
-
-      if (stopMatch !== null) {
-        const field = stopMatch[2];
-        const expectedType = field === 'color' ? 'color' : 'number';
-
-        if (prop.type !== expectedType) {
-          context.addIssue({
-            code: 'custom',
-            message: `${key} must use a '${expectedType}' keyframe value`,
-            path: ['properties', key],
-          });
-        }
-      }
+      validateGradientPropertyType(key, prop, context);
     }
   });
 
