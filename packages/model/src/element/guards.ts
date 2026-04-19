@@ -1,10 +1,16 @@
-const VISIBLE_WHEN_TOKEN_RE =
-  /&&|\|\||==|!=|>=|<=|>|<|!|\(|\)|true|false|-?\d+(?:\.\d+)?|'[^']*'|[a-zA-Z_]\w*/g;
+// Composed from named fragments to keep each subexpression simple.
+const VISIBLE_WHEN_OPERATORS = String.raw`&&|\|\||==|!=|>=|<=|>|<|!|\(|\)`;
+const VISIBLE_WHEN_LITERAL = String.raw`true|false|-?\d+(?:\.\d+)?|'[^']*'`;
+const VISIBLE_WHEN_IDENTIFIER = String.raw`[a-zA-Z_]\w*`;
+const VISIBLE_WHEN_OPERAND = `${VISIBLE_WHEN_LITERAL}|${VISIBLE_WHEN_IDENTIFIER}`;
+
+const VISIBLE_WHEN_TOKEN_RE = new RegExp(`${VISIBLE_WHEN_OPERATORS}|${VISIBLE_WHEN_OPERAND}`, 'g');
+const VISIBLE_WHEN_OPERAND_RE = new RegExp(`^(?:${VISIBLE_WHEN_OPERAND})$`);
 
 const VISIBLE_WHEN_BINARY_OPERATORS = new Set(['&&', '||', '==', '!=', '>=', '<=', '>', '<']);
 
 function isVisibleWhenOperand(token: string): boolean {
-  return /^(?:true|false|-?\d+(?:\.\d+)?|'[^']*'|[a-zA-Z_]\w*)$/.test(token);
+  return VISIBLE_WHEN_OPERAND_RE.test(token);
 }
 
 interface VisibleWhenParserState {

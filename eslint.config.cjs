@@ -230,7 +230,6 @@ module.exports = [
       // Bug-finders to enable one rule at a time after fixing existing violations.
       'sonarjs/no-nested-conditional': 'off',
       'sonarjs/slow-regex': 'off',
-      'sonarjs/regex-complexity': 'off',
       'sonarjs/pseudo-random': 'off',
       // Conflicts with @typescript-eslint/no-non-null-assertion — the
       // non-null-assertion ban is stricter, keep that one.

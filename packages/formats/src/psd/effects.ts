@@ -14,10 +14,18 @@ interface ParsedGlow {
   readonly color: RgbaColor;
 }
 
+// Shared regex fragments. Composed via template strings so each individual
+// expression stays under sonarjs/regex-complexity (default 20).
+const SIGNED_PX = String.raw`(-?\d+(?:\.\d+)?)px`;
+const RGBA_BODY = String.raw`rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)`;
+const SHADOW_OFFSETS = `${SIGNED_PX}\\s+${SIGNED_PX}\\s+${SIGNED_PX}(?:\\s+${SIGNED_PX})?`;
+
+const SHADOW_RGBA_RE = new RegExp(`${SHADOW_OFFSETS}\\s+${RGBA_BODY}`);
+const SHADOW_HEX_RE = new RegExp(`${SHADOW_OFFSETS}\\s+(#[\\da-fA-F]{3,8})`);
+const FILTER_GLOW_RE = new RegExp(String.raw`drop-shadow\(\s*0\s+0\s+(\d+(?:\.\d+)?)px\s+${RGBA_BODY}\s*\)`);
+
 export function parseBoxShadow(shadow: string): ParsedShadow | undefined {
-  const rgbaMatch = shadow.match(
-    /(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px(?:\s+(-?\d+(?:\.\d+)?)px)?\s+rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/,
-  );
+  const rgbaMatch = SHADOW_RGBA_RE.exec(shadow);
 
   if (rgbaMatch) {
     return {
@@ -34,9 +42,7 @@ export function parseBoxShadow(shadow: string): ParsedShadow | undefined {
     };
   }
 
-  const hexMatch = shadow.match(
-    /(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px(?:\s+(-?\d+(?:\.\d+)?)px)?\s+(#[\da-fA-F]{3,8})/,
-  );
+  const hexMatch = SHADOW_HEX_RE.exec(shadow);
 
   if (hexMatch) {
     const color = parseHexColor(hexMatch[5] ?? '#000000');
@@ -54,9 +60,7 @@ export function parseBoxShadow(shadow: string): ParsedShadow | undefined {
 }
 
 export function parseFilterGlow(filter: string): ParsedGlow | undefined {
-  const match = filter.match(
-    /drop-shadow\(\s*0\s+0\s+(\d+(?:\.\d+)?)px\s+rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)\s*\)/,
-  );
+  const match = FILTER_GLOW_RE.exec(filter);
 
   if (!match) {
     return undefined;
