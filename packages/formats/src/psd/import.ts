@@ -310,6 +310,62 @@ function layerToElement(layer: Layer): BroadsetElement | undefined {
   );
 }
 
+type PsdPage = {
+  readonly id: string;
+  readonly name: string;
+  readonly elements: readonly [];
+  readonly locale: null;
+  readonly extensions: Readonly<Record<string, unknown>>;
+};
+
+function populateLinkedFiles(psd: ReturnType<typeof readPsd>): void {
+  for (const lf of psd.linkedFiles ?? []) {
+    if (lf.id && lf.data) {
+      importLinkedFiles.set(lf.id, { data: lf.data, type: lf.type ?? 'image/png' });
+    }
+  }
+}
+
+function collectChildElements(children: readonly Layer[] | undefined): BroadsetElement[] {
+  const elements: BroadsetElement[] = [];
+
+  for (const child of children ?? []) {
+    const el = layerToElement(child);
+
+    if (el) elements.push(el);
+  }
+
+  return elements;
+}
+
+function makePage(index: number, name: string): PsdPage {
+  return { id: `page-${String(index + 1)}`, name, elements: [], locale: null, extensions: {} };
+}
+
+function buildPagesAndElements(psd: ReturnType<typeof readPsd>): {
+  readonly pages: PsdPage[];
+  readonly elements: BroadsetElement[];
+} {
+  const artboardLayers = (psd.children ?? []).filter((child) => child.artboard);
+
+  if (artboardLayers.length === 0) {
+    return {
+      pages: [makePage(0, 'Page 1')],
+      elements: collectChildElements(psd.children),
+    };
+  }
+
+  const pages: PsdPage[] = [];
+  const elements: BroadsetElement[] = [];
+
+  for (const artboard of artboardLayers) {
+    pages.push(makePage(pages.length, artboard.name ?? `Page ${String(pages.length + 1)}`));
+    elements.push(...collectChildElements(artboard.children));
+  }
+
+  return { pages, elements };
+}
+
 /** Import a PSD file and recover BroadsetDocument elements. */
 export function importPsd(data: Uint8Array): BroadsetDocument {
   ensureCanvasInitialized();
@@ -322,15 +378,7 @@ export function importPsd(data: Uint8Array): BroadsetDocument {
 
   importIdCounter = 0;
   importLinkedFiles = new Map();
-
-  for (const lf of psd.linkedFiles ?? []) {
-    if (lf.id && lf.data) {
-      importLinkedFiles.set(lf.id, {
-        data: lf.data,
-        type: lf.type ?? 'image/png',
-      });
-    }
-  }
+  populateLinkedFiles(psd);
 
   const canvas: Canvas = {
     width: psd.width,
@@ -340,49 +388,7 @@ export function importPsd(data: Uint8Array): BroadsetDocument {
     padding: [0, 0, 0, 0],
     backgroundMode: 'solid',
   };
-
-  const elements: BroadsetElement[] = [];
-  const pages: Array<{
-    readonly id: string;
-    readonly name: string;
-    readonly elements: readonly [];
-    readonly locale: null;
-    readonly extensions: Readonly<Record<string, unknown>>;
-  }> = [];
-
-  const artboardLayers = (psd.children ?? []).filter((child) => child.artboard);
-
-  if (artboardLayers.length > 0) {
-    for (const artboard of artboardLayers) {
-      pages.push({
-        id: `page-${String(pages.length + 1)}`,
-        name: artboard.name ?? `Page ${String(pages.length + 1)}`,
-        elements: [],
-        locale: null,
-        extensions: {},
-      });
-
-      for (const child of artboard.children ?? []) {
-        const el = layerToElement(child);
-
-        if (el) elements.push(el);
-      }
-    }
-  } else {
-    pages.push({
-      id: 'page-1',
-      name: 'Page 1',
-      elements: [],
-      locale: null,
-      extensions: {},
-    });
-
-    for (const child of psd.children ?? []) {
-      const el = layerToElement(child);
-
-      if (el) elements.push(el);
-    }
-  }
+  const { pages, elements } = buildPagesAndElements(psd);
 
   return {
     id: 'imported-psd',
