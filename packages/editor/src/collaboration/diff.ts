@@ -86,6 +86,45 @@ function diffElements(prev: BroadsetDocument, next: BroadsetDocument, out: Docum
   diffElementOrder(prev, next, out);
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function emitObjectDiff(
+  documentId: string,
+  elementId: string,
+  key: string,
+  prevObj: Record<string, unknown>,
+  nextObj: Record<string, unknown>,
+  out: DocumentChange[],
+): void {
+  for (const subKey of Object.keys(nextObj)) {
+    if (!deepEqual(prevObj[subKey], nextObj[subKey])) {
+      out.push({
+        type: 'element:update',
+        documentId,
+        elementId,
+        path: `${key}.${subKey}`,
+        oldValue: prevObj[subKey],
+        newValue: nextObj[subKey],
+      } satisfies ElementUpdateChange);
+    }
+  }
+
+  for (const subKey of Object.keys(prevObj)) {
+    if (!(subKey in nextObj)) {
+      out.push({
+        type: 'element:update',
+        documentId,
+        elementId,
+        path: `${key}.${subKey}`,
+        oldValue: prevObj[subKey],
+        newValue: undefined,
+      } satisfies ElementUpdateChange);
+    }
+  }
+}
+
 function diffElementProperties(
   documentId: string,
   prevEl: BroadsetElement,
@@ -103,52 +142,19 @@ function diffElementProperties(
 
     if (deepEqual(prevVal, nextVal)) continue;
 
-    if (
-      typeof nextVal === 'object' &&
-      nextVal !== null &&
-      !Array.isArray(nextVal) &&
-      typeof prevVal === 'object' &&
-      prevVal !== null &&
-      !Array.isArray(prevVal)
-    ) {
-      const prevObj = prevVal as Record<string, unknown>;
-      const nextObj = nextVal as Record<string, unknown>;
-
-      for (const subKey of Object.keys(nextObj)) {
-        if (!deepEqual(prevObj[subKey], nextObj[subKey])) {
-          out.push({
-            type: 'element:update',
-            documentId,
-            elementId: nextEl.id,
-            path: `${key}.${subKey}`,
-            oldValue: prevObj[subKey],
-            newValue: nextObj[subKey],
-          } satisfies ElementUpdateChange);
-        }
-      }
-
-      for (const subKey of Object.keys(prevObj)) {
-        if (!(subKey in nextObj)) {
-          out.push({
-            type: 'element:update',
-            documentId,
-            elementId: nextEl.id,
-            path: `${key}.${subKey}`,
-            oldValue: prevObj[subKey],
-            newValue: undefined,
-          } satisfies ElementUpdateChange);
-        }
-      }
-    } else {
-      out.push({
-        type: 'element:update',
-        documentId,
-        elementId: nextEl.id,
-        path: key,
-        oldValue: prevVal,
-        newValue: nextVal,
-      } satisfies ElementUpdateChange);
+    if (isPlainObject(prevVal) && isPlainObject(nextVal)) {
+      emitObjectDiff(documentId, nextEl.id, key, prevVal, nextVal, out);
+      continue;
     }
+
+    out.push({
+      type: 'element:update',
+      documentId,
+      elementId: nextEl.id,
+      path: key,
+      oldValue: prevVal,
+      newValue: nextVal,
+    } satisfies ElementUpdateChange);
   }
 }
 
