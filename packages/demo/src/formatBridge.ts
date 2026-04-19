@@ -6,7 +6,7 @@ import { broadsetDocumentSchema } from '@broadset/model';
 /*  Types                                                             */
 /* ------------------------------------------------------------------ */
 
-type FormatsModule = typeof FormatsNS;
+export type FormatsModule = typeof FormatsNS;
 
 export type ExportFormat =
   | 'html'

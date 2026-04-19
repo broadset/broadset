@@ -11,7 +11,11 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ActiveDialog } from '../demo-types';
 import { DOCUMENT_STORAGE_KEY } from '../demo-types';
 import { downloadJsonFile } from '../demo-utils';
-import type { ExportFormat } from '../formatBridge';
+import type { exportDocument, ExportFormat, FormatsModule, loadFormats } from '../formatBridge';
+
+type LoadFormats = typeof loadFormats;
+type ExportDocument = typeof exportDocument;
+type FormatBridge = { readonly loadFormats: LoadFormats; readonly exportDocument: ExportDocument };
 
 interface UseDemoFileHandlersOptions {
   readonly editorStore: EditorStore;
@@ -212,6 +216,155 @@ async function createStreamingExportSession(options: {
   return { encoderCanvas, renderFrame, dispose };
 }
 
+interface ParsedExportOptions {
+  readonly pixelRatio: number | undefined;
+  readonly jpegQuality: number | undefined;
+  readonly videoFrameRate: number | undefined;
+  readonly videoQuality: number | undefined;
+  readonly videoFrameRateActual: number;
+  readonly selectedAnimationIds: ReadonlySet<string> | null;
+}
+
+function parseExportOptions(data: Readonly<Record<string, unknown>>): ParsedExportOptions {
+  const videoFrameRate = getOptionalNumber(data, 'videoFrameRate');
+  const rawSelectedIds = data['selectedAnimationIds'];
+  const selectedAnimationIds =
+    Array.isArray(rawSelectedIds) ? new Set(rawSelectedIds.filter((id): id is string => typeof id === 'string')) : null;
+
+  return {
+    pixelRatio: getOptionalNumber(data, 'pixelRatio'),
+    jpegQuality: getOptionalNumber(data, 'jpegQuality'),
+    videoFrameRate,
+    videoQuality: getOptionalNumber(data, 'videoQuality'),
+    videoFrameRateActual: videoFrameRate ?? 30,
+    selectedAnimationIds,
+  };
+}
+
+function buildOptionalExportArgs(options: ParsedExportOptions): Record<string, number> {
+  const args: Record<string, number> = {};
+
+  if (options.pixelRatio !== undefined) args['pixelRatio'] = options.pixelRatio;
+  if (options.jpegQuality !== undefined) args['jpegQuality'] = options.jpegQuality;
+  if (options.videoFrameRate !== undefined) args['videoFrameRate'] = options.videoFrameRate;
+  if (options.videoQuality !== undefined) args['videoQuality'] = options.videoQuality;
+
+  return args;
+}
+
+function filterAnimations(
+  animations: BroadsetDocument['animations'],
+  selectedIds: ReadonlySet<string> | null,
+): BroadsetDocument['animations'] {
+  if (selectedIds === null || selectedIds.size === 0) return animations;
+
+  return animations.filter((a) => selectedIds.has(a.elementId));
+}
+
+async function loadBridgeWithTimeout(
+  setExportProgress: Dispatch<SetStateAction<ExportProgress | null>>,
+  isVideoFormat: boolean,
+): Promise<FormatBridge> {
+  document.body.setAttribute('data-export-status', 'loading');
+  setExportProgress(isVideoFormat ? { progress: 0, stage: 'Loading export engine…' } : null);
+
+  const bridge = await import('../formatBridge');
+
+  document.body.setAttribute('data-export-status', 'bridge-loaded');
+  document.body.setAttribute('data-export-status', 'formats-loading');
+
+  await Promise.race([
+    bridge.loadFormats(),
+    new Promise<never>((_, reject) => {
+      window.setTimeout(() => {
+        reject(new Error('Timed out while loading export formats.'));
+      }, FORMATS_LOAD_TIMEOUT_MS);
+    }),
+  ]);
+
+  return bridge;
+}
+
+async function acquireRasterSnapshotCanvas(
+  formats: FormatsModule,
+  doc: { readonly canvas: { readonly width: number; readonly height: number } },
+): Promise<HTMLCanvasElement | undefined> {
+  const direct = formats.discoverCanvasElement() ?? undefined;
+
+  if (direct !== undefined) return direct;
+
+  const rendererRoot = formats.discoverRendererRoot();
+
+  if (rendererRoot === null) return undefined;
+
+  return formats.captureElementToCanvas(rendererRoot, doc.canvas.width, doc.canvas.height);
+}
+
+interface VideoSessionResult {
+  readonly session: StreamingExportSession;
+  readonly renderFrame: (timeMs: number) => Promise<void>;
+  readonly playbackDurationMs: number;
+}
+
+async function setupVideoSession(args: {
+  readonly renderDocument: BroadsetDocument;
+  readonly exportAnimations: BroadsetDocument['animations'];
+  readonly videoFrameRate: number;
+  readonly createBatchCapture: (
+    el: HTMLElement,
+    w: number,
+    h: number,
+  ) => Promise<{ readonly capture: () => Promise<HTMLCanvasElement>; readonly destroy: () => void }>;
+  readonly setExportProgress: Dispatch<SetStateAction<ExportProgress | null>>;
+}): Promise<VideoSessionResult> {
+  const { renderDocument, exportAnimations, videoFrameRate, createBatchCapture, setExportProgress } = args;
+  const exportWidth = ensureEven(renderDocument.canvas.width);
+  const exportHeight = ensureEven(renderDocument.canvas.height);
+  const playbackDurationMs = Math.max(
+    1000,
+    ...exportAnimations
+      .flatMap((a) => a.config.timelines.map((t) => computeTimelineLoopDuration(t)))
+      .filter((d) => Number.isFinite(d)),
+  );
+  const totalFrames = Math.ceil((playbackDurationMs / 1000) * videoFrameRate);
+
+  setExportProgress({ progress: 0.1, stage: `Preparing ${String(totalFrames)} frames…` });
+  document.body.setAttribute('data-export-status', 'rendering');
+
+  const session = await createStreamingExportSession({
+    doc: { ...renderDocument, animations: [...exportAnimations] },
+    width: exportWidth,
+    height: exportHeight,
+    createBatchCapture,
+  });
+
+  let framesEncoded = 0;
+  const renderFrame = async (timeMs: number): Promise<void> => {
+    await session.renderFrame(timeMs);
+    framesEncoded += 1;
+    document.body.setAttribute('data-export-progress', `${String(framesEncoded)}/${String(totalFrames)}`);
+
+    const ratio = totalFrames > 0 ? framesEncoded / totalFrames : 1;
+
+    setExportProgress({
+      progress: 0.1 + 0.8 * ratio,
+      stage: `Encoding frame ${String(framesEncoded)} / ${String(totalFrames)}`,
+    });
+  };
+
+  return { session, renderFrame, playbackDurationMs };
+}
+
+function makeFinalizeProgressHandler(
+  setExportProgress: Dispatch<SetStateAction<ExportProgress | null>>,
+): (progress: number, stage?: string) => void {
+  return (progress, stage) => {
+    if (stage === 'Finalizing' || stage === 'Complete') {
+      setExportProgress({ progress: 0.9 + 0.1 * progress, stage });
+    }
+  };
+}
+
 export function useDemoFileHandlers({
   editorStore,
   currentDocument,
@@ -364,159 +517,51 @@ export function useDemoFileHandlers({
       }
 
       const doExport = async (): Promise<void> => {
-        document.body.setAttribute('data-export-status', 'loading');
-        setExportProgress(isVideoFormat ? { progress: 0, stage: 'Loading export engine…' } : null);
-
-        const bridge = await import('../formatBridge');
-
-        document.body.setAttribute('data-export-status', 'bridge-loaded');
-        document.body.setAttribute('data-export-status', 'formats-loading');
-
-        const formats = await Promise.race([
-          bridge.loadFormats(),
-          new Promise<never>((_, reject) => {
-            window.setTimeout(() => {
-              reject(new Error('Timed out while loading export formats.'));
-            }, FORMATS_LOAD_TIMEOUT_MS);
-          }),
-        ]);
+        const bridge = await loadBridgeWithTimeout(setExportProgress, isVideoFormat);
+        const formats = await bridge.loadFormats();
 
         document.body.setAttribute('data-export-status', 'formats-loaded');
         setExportProgress(isVideoFormat ? { progress: 0.05, stage: 'Preparing export…' } : null);
 
-        const pixelRatio = getOptionalNumber(data, 'pixelRatio');
-        const jpegQuality = getOptionalNumber(data, 'jpegQuality');
-        const videoFrameRate = getOptionalNumber(data, 'videoFrameRate');
-        const videoQuality = getOptionalNumber(data, 'videoQuality');
+        const options = parseExportOptions(data);
+        const exportAnimations = filterAnimations(currentDocument.animations, options.selectedAnimationIds);
 
-        const videoFrameRateActual = videoFrameRate ?? 30;
+        let snapshotCanvas = isVideoFormat ? undefined : await acquireRasterSnapshotCanvas(formats, currentDocument);
 
-        // Parse selected animation IDs from export data.
-        const rawSelectedIds = data['selectedAnimationIds'];
-        const selectedAnimationIds =
-          Array.isArray(rawSelectedIds) ?
-            new Set(rawSelectedIds.filter((id): id is string => typeof id === 'string'))
-          : null;
-
-        // Filter animations to only selected ones (for video export).
-        const exportAnimations =
-          selectedAnimationIds !== null && selectedAnimationIds.size > 0 ?
-            currentDocument.animations.filter((a) => selectedAnimationIds.has(a.elementId))
-          : currentDocument.animations;
-
-        // For raster exports, try native <canvas> first, then DOM renderer root.
-        // Video exports use a streaming session and don't need this snapshot.
-        let snapshotCanvas: HTMLCanvasElement | undefined;
-
-        if (!isVideoFormat) {
-          snapshotCanvas = formats.discoverCanvasElement() ?? undefined;
-
-          const rendererRoot = snapshotCanvas === undefined ? formats.discoverRendererRoot() : null;
-
-          if (snapshotCanvas === undefined && rendererRoot !== null) {
-            snapshotCanvas = await formats.captureElementToCanvas(
-              rendererRoot,
-              currentDocument.canvas.width,
-              currentDocument.canvas.height,
-            );
-          }
-        }
-
-        // Fail fast if WebCodecs is unavailable — don't waste time
-        // preparing the streaming session only to discover we can't encode.
         if (isVideoFormat && !formats.isVideoExportSupported()) {
           throw new Error('Video export is not supported: VideoEncoder API is unavailable in this browser.');
         }
 
-        let renderFrame: ((timeMs: number) => void | Promise<void>) | undefined;
-        let playbackDurationMs: number | undefined;
-        let streamingSession: StreamingExportSession | undefined;
-        let totalFrames = 0;
-        let framesEncoded = 0;
+        const videoSession =
+          isVideoFormat ?
+            await setupVideoSession({
+              renderDocument,
+              exportAnimations,
+              videoFrameRate: options.videoFrameRateActual,
+              createBatchCapture: formats.createBatchCapture,
+              setExportProgress,
+            })
+          : null;
 
-        if (isVideoFormat) {
-          // Force even dimensions for H.264 codec compatibility.
-          const exportWidth = ensureEven(renderDocument.canvas.width);
-          const exportHeight = ensureEven(renderDocument.canvas.height);
-
-          // Compute the playback duration from the selected animations.
-          playbackDurationMs = Math.max(
-            1000,
-            ...exportAnimations
-              .flatMap((a) => a.config.timelines.map((t) => computeTimelineLoopDuration(t)))
-              .filter((d) => Number.isFinite(d)),
-          );
-
-          totalFrames = Math.ceil((playbackDurationMs / 1000) * videoFrameRateActual);
-
-          setExportProgress({ progress: 0.1, stage: `Preparing ${String(totalFrames)} frames…` });
-          document.body.setAttribute('data-export-status', 'rendering');
-
-          // Build a document with only the selected animations so seek()
-          // only drives the chosen timelines. All elements still render.
-          const exportDoc: BroadsetDocument = {
-            ...renderDocument,
-            animations: [...exportAnimations],
-          };
-
-          // Streaming session: one offscreen renderer + one batch-capture
-          // context reused across every frame. Per-frame work is only
-          // seek + DOM clone + encoder blit — no ImageData buffering.
-          streamingSession = await createStreamingExportSession({
-            doc: exportDoc,
-            width: exportWidth,
-            height: exportHeight,
-            createBatchCapture: formats.createBatchCapture,
-          });
-
-          snapshotCanvas = streamingSession.encoderCanvas;
-
-          const session = streamingSession;
-
-          renderFrame = async (timeMs: number): Promise<void> => {
-            await session.renderFrame(timeMs);
-
-            framesEncoded += 1;
-            document.body.setAttribute('data-export-progress', `${String(framesEncoded)}/${String(totalFrames)}`);
-
-            // Reserve 0.1–0.9 for streaming render+encode, 0.9–1 for finalize.
-            const ratio = totalFrames > 0 ? framesEncoded / totalFrames : 1;
-            const progress = 0.1 + 0.8 * ratio;
-
-            setExportProgress({
-              progress,
-              stage: `Encoding frame ${String(framesEncoded)} / ${String(totalFrames)}`,
-            });
-          };
-        }
+        if (videoSession !== null) snapshotCanvas = videoSession.session.encoderCanvas;
 
         try {
           await bridge.exportDocument(exporter as ExportFormat, {
             document: renderDocument,
-            ...(pixelRatio !== undefined ? { pixelRatio } : {}),
-            ...(jpegQuality !== undefined ? { jpegQuality } : {}),
-            ...(videoFrameRate !== undefined ? { videoFrameRate } : {}),
-            ...(videoQuality !== undefined ? { videoQuality } : {}),
+            ...buildOptionalExportArgs(options),
             ...(snapshotCanvas !== undefined ? { snapshotCanvas } : {}),
-            ...(renderFrame !== undefined ? { renderFrame } : {}),
-            ...(playbackDurationMs !== undefined ? { playbackDurationMs } : {}),
-            onProgress: (progress: number, stage?: string) => {
-              // Only honor encoder progress callbacks for the finalization
-              // stretch (0.9–1). The render/encode loop already reports
-              // per-frame progress via `renderFrame` above.
-              if (stage === 'Finalizing' || stage === 'Complete') {
-                const finalizeProgress = 0.9 + 0.1 * progress;
-
-                setExportProgress({ progress: finalizeProgress, stage: stage });
-              }
-            },
+            ...(videoSession?.renderFrame !== undefined ? { renderFrame: videoSession.renderFrame } : {}),
+            ...(videoSession?.playbackDurationMs !== undefined ?
+              { playbackDurationMs: videoSession.playbackDurationMs }
+            : {}),
+            onProgress: makeFinalizeProgressHandler(setExportProgress),
           });
 
           setExportProgress({ progress: 1, stage: 'Done!' });
           pushToast('success', `Exported as ${exporter.toUpperCase()}.`);
           document.body.setAttribute('data-export-status', 'done');
         } finally {
-          streamingSession?.dispose();
+          videoSession?.session.dispose();
         }
       };
 
