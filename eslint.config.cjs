@@ -220,9 +220,8 @@ module.exports = [
       // SonarJS code-smell detection — recommended preset minus the most
       // false-positive-prone rules (regex shape, ternary style, unused-vars
       // which duplicates/conflicts with our _prefix convention). Cognitive
-      // complexity threshold raised to 20 to focus on truly tangled code.
+      // complexity uses the SonarJS default (15).
       ...sonarjsPlugin.configs.recommended.rules,
-      'sonarjs/cognitive-complexity': ['error', 25],
       'sonarjs/no-nested-conditional': 'off',
       'sonarjs/slow-regex': 'off',
       'sonarjs/regex-complexity': 'off',
