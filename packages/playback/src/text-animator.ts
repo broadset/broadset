@@ -72,8 +72,10 @@ export function computeTextSegments(content: string, animator: TextAnimator): re
   const orderIndices = segments.map((_, i) => i);
 
   if (animator.randomOrder) {
-    // Fisher-Yates shuffle
+    // Fisher-Yates shuffle. Math.random is fine here: text-animator stagger order
+    // is a presentation effect, not a security or fairness primitive.
     for (let i = orderIndices.length - 1; i > 0; i -= 1) {
+      // eslint-disable-next-line sonarjs/pseudo-random
       const j = Math.floor(Math.random() * (i + 1));
       const temp = orderIndices[i];
 

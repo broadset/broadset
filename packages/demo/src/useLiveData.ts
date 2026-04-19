@@ -78,7 +78,9 @@ export function simulateLiveUpdate(previous: LiveDataValues): LiveDataValues {
     nextClock = 'Q4 · 00:00';
   }
 
-  // ~5% chance home scores, ~5% chance away scores (mutually exclusive per tick)
+  // ~5% chance home scores, ~5% chance away scores (mutually exclusive per tick).
+  // Math.random is fine here: demo-only sports-ticker simulation, no security or fairness concern.
+  // eslint-disable-next-line sonarjs/pseudo-random
   const scoreChance = Math.random();
   const homeScoreDelta = scoreChance < SCORE_PROBABILITY ? 1 : 0;
   const awayScoreDelta = scoreChance >= SCORE_PROBABILITY && scoreChance < SCORE_PROBABILITY * 2 ? 1 : 0;

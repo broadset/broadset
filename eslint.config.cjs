@@ -230,7 +230,6 @@ module.exports = [
       // Bug-finders to enable one rule at a time after fixing existing violations.
       'sonarjs/no-nested-conditional': 'off',
       'sonarjs/slow-regex': 'off',
-      'sonarjs/pseudo-random': 'off',
       // Conflicts with @typescript-eslint/no-non-null-assertion — the
       // non-null-assertion ban is stricter, keep that one.
       '@typescript-eslint/non-nullable-type-assertion-style': 'off',
@@ -281,6 +280,9 @@ module.exports = [
     rules: {
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/consistent-type-assertions': 'off',
+      // Test fixtures legitimately use Math.random() for hash suffixes,
+      // sample data, and so on; nothing security-sensitive.
+      'sonarjs/pseudo-random': 'off',
     },
   },
 
