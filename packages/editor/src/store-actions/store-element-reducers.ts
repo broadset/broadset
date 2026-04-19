@@ -9,6 +9,19 @@ export type ReorderDirection = 'forward' | 'backward' | 'front' | 'back';
  * Returns a reordered copy of the elements array, or `null` when no change is
  * needed (e.g. the element is already at the requested boundary).
  */
+function targetIndexFor(direction: ReorderDirection, currentIndex: number, lastIndex: number): number | null {
+  switch (direction) {
+    case 'forward':
+      return currentIndex >= lastIndex ? null : currentIndex + 1;
+    case 'backward':
+      return currentIndex <= 0 ? null : currentIndex - 1;
+    case 'front':
+      return currentIndex === lastIndex ? null : lastIndex;
+    case 'back':
+      return currentIndex === 0 ? null : 0;
+  }
+}
+
 export function reorderElementInList(
   elements: readonly BroadsetElement[],
   elementId: string,
@@ -16,73 +29,18 @@ export function reorderElementInList(
 ): readonly BroadsetElement[] | null {
   const currentIndex = elements.findIndex((element) => element.id === elementId);
 
-  if (currentIndex === -1) {
-    return null;
-  }
+  if (currentIndex === -1) return null;
+
+  const targetIndex = targetIndexFor(direction, currentIndex, elements.length - 1);
+
+  if (targetIndex === null) return null;
 
   const nextElements = [...elements];
+  const [element] = nextElements.splice(currentIndex, 1);
 
-  switch (direction) {
-    case 'forward': {
-      if (currentIndex >= nextElements.length - 1) {
-        return null;
-      }
+  if (element === undefined) return null;
 
-      const [element] = nextElements.splice(currentIndex, 1);
-
-      if (element === undefined) {
-        return null;
-      }
-
-      nextElements.splice(currentIndex + 1, 0, element);
-      break;
-    }
-
-    case 'backward': {
-      if (currentIndex <= 0) {
-        return null;
-      }
-
-      const [element] = nextElements.splice(currentIndex, 1);
-
-      if (element === undefined) {
-        return null;
-      }
-
-      nextElements.splice(currentIndex - 1, 0, element);
-      break;
-    }
-
-    case 'front': {
-      if (currentIndex === nextElements.length - 1) {
-        return null;
-      }
-
-      const [element] = nextElements.splice(currentIndex, 1);
-
-      if (element === undefined) {
-        return null;
-      }
-
-      nextElements.push(element);
-      break;
-    }
-
-    case 'back': {
-      if (currentIndex === 0) {
-        return null;
-      }
-
-      const [element] = nextElements.splice(currentIndex, 1);
-
-      if (element === undefined) {
-        return null;
-      }
-
-      nextElements.unshift(element);
-      break;
-    }
-  }
+  nextElements.splice(targetIndex, 0, element);
 
   return nextElements;
 }
