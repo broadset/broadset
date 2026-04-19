@@ -29,89 +29,88 @@ function parseSvgPath(d: string): readonly SvgCommand[] {
   return commands;
 }
 
+interface PathScale {
+  readonly scaleX: number;
+  readonly scaleY: number;
+}
+
+function straightKnot(x: number, y: number, scale: PathScale): BezierKnot {
+  const sy = y * scale.scaleY;
+  const sx = x * scale.scaleX;
+
+  return { linked: true, points: [sy, sx, sy, sx, sy, sx] };
+}
+
+function applyMoveCommand(args: readonly number[], scale: PathScale, knots: BezierKnot[]): void {
+  if (args.length < 2) return;
+
+  knots.push(straightKnot(args[0] ?? 0, args[1] ?? 0, scale));
+}
+
+function applyLineCommand(args: readonly number[], scale: PathScale, knots: BezierKnot[]): void {
+  for (let i = 0; i + 1 < args.length; i += 2) {
+    knots.push(straightKnot(args[i] ?? 0, args[i + 1] ?? 0, scale));
+  }
+}
+
+function appendOutgoingControl(prev: BezierKnot, cp1x: number, cp1y: number, scale: PathScale): BezierKnot {
+  const newPoints = [...prev.points];
+
+  newPoints[4] = cp1y * scale.scaleY;
+  newPoints[5] = cp1x * scale.scaleX;
+
+  return { linked: false, points: newPoints };
+}
+
+function applyCurveCommand(args: readonly number[], scale: PathScale, knots: BezierKnot[]): void {
+  for (let i = 0; i + 5 < args.length; i += 6) {
+    const cp1x = args[i] ?? 0;
+    const cp1y = args[i + 1] ?? 0;
+    const cp2x = args[i + 2] ?? 0;
+    const cp2y = args[i + 3] ?? 0;
+    const ex = args[i + 4] ?? 0;
+    const ey = args[i + 5] ?? 0;
+    const prev = knots[knots.length - 1];
+
+    if (prev) {
+      knots[knots.length - 1] = appendOutgoingControl(prev, cp1x, cp1y, scale);
+    }
+
+    knots.push({
+      linked: false,
+      points: [
+        cp2y * scale.scaleY,
+        cp2x * scale.scaleX,
+        ey * scale.scaleY,
+        ex * scale.scaleX,
+        ey * scale.scaleY,
+        ex * scale.scaleX,
+      ],
+    });
+  }
+}
+
 /** Convert SVG path data to a PSD BezierPath for vector mask use. */
 export function svgPathToPsdVectorMask(d: string, width: number, height: number): BezierPath | null {
   if (!d.trim()) return null;
 
   const commands = parseSvgPath(d);
-
-  if (commands.length === 0) return null;
-
   const firstCmd = commands[0];
 
   if (!firstCmd || (firstCmd.cmd !== 'M' && firstCmd.cmd !== 'm')) return null;
 
+  const scale: PathScale = {
+    scaleX: width > 0 ? PSD_COORD_MAX / width : 1,
+    scaleY: height > 0 ? PSD_COORD_MAX / height : 1,
+  };
   const knots: BezierKnot[] = [];
   let isClosed = false;
 
-  const scaleX = width > 0 ? PSD_COORD_MAX / width : 1;
-  const scaleY = height > 0 ? PSD_COORD_MAX / height : 1;
-
   for (const { cmd, args } of commands) {
-    switch (cmd) {
-      case 'M':
-        if (args.length >= 2) {
-          const mx = args[0] ?? 0;
-          const my = args[1] ?? 0;
-
-          knots.push({
-            linked: true,
-            points: [my * scaleY, mx * scaleX, my * scaleY, mx * scaleX, my * scaleY, mx * scaleX],
-          });
-        }
-
-        break;
-
-      case 'L':
-        for (let i = 0; i + 1 < args.length; i += 2) {
-          const lx = args[i] ?? 0;
-          const ly = args[i + 1] ?? 0;
-
-          knots.push({
-            linked: true,
-            points: [ly * scaleY, lx * scaleX, ly * scaleY, lx * scaleX, ly * scaleY, lx * scaleX],
-          });
-        }
-
-        break;
-
-      case 'C':
-        for (let i = 0; i + 5 < args.length; i += 6) {
-          const cp1x = args[i] ?? 0;
-          const cp1y = args[i + 1] ?? 0;
-          const cp2x = args[i + 2] ?? 0;
-          const cp2y = args[i + 3] ?? 0;
-          const ex = args[i + 4] ?? 0;
-          const ey = args[i + 5] ?? 0;
-
-          if (knots.length > 0) {
-            const prev = knots[knots.length - 1];
-
-            if (prev) {
-              const newPoints = [...prev.points];
-
-              newPoints[4] = cp1y * scaleY;
-              newPoints[5] = cp1x * scaleX;
-              knots[knots.length - 1] = { linked: false, points: newPoints };
-            }
-          }
-
-          knots.push({
-            linked: false,
-            points: [cp2y * scaleY, cp2x * scaleX, ey * scaleY, ex * scaleX, ey * scaleY, ex * scaleX],
-          });
-        }
-
-        break;
-
-      case 'Z':
-      case 'z':
-        isClosed = true;
-        break;
-
-      default:
-        break;
-    }
+    if (cmd === 'M') applyMoveCommand(args, scale, knots);
+    else if (cmd === 'L') applyLineCommand(args, scale, knots);
+    else if (cmd === 'C') applyCurveCommand(args, scale, knots);
+    else if (cmd === 'Z' || cmd === 'z') isClosed = true;
   }
 
   if (knots.length < 2) return null;

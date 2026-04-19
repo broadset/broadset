@@ -267,78 +267,93 @@ export function resolveAnimationTargets(): AnimationTargetsResolver {
     }
   }
 
+  function applyOneStyle(
+    propertyName: string,
+    value: unknown,
+    targets: ResolvedAnimationTargets,
+    gradientUpdates: GradientPropertyUpdate[],
+  ): void {
+    if (isGradientAnimationTarget(propertyName)) {
+      const parsed = parseGradientTarget(propertyName);
+
+      if (parsed !== null) {
+        gradientUpdates.push({ target: parsed, value });
+      }
+
+      return;
+    }
+
+    if (propertyName === 'opacity') {
+      rememberBaseline(targets.opacityTarget, 'opacity', targets.opacityTarget.style.opacity);
+      targets.opacityTarget.style.opacity = String(value);
+
+      return;
+    }
+
+    if (propertyName === 'content' || propertyName === 'textContent') {
+      rememberBaseline(targets.contentTarget, 'textContent', targets.contentTarget.textContent);
+      targets.contentTarget.textContent = String(value);
+
+      return;
+    }
+
+    if (propertyName === 'transform') {
+      rememberBaseline(targets.contentTarget, 'transform', targets.contentTarget.style.transform);
+      transforms.delete(targets.contentTarget);
+      targets.contentTarget.style.transform = String(value);
+
+      return;
+    }
+
+    if (propertyName === 'd') {
+      const pathElement = findPathElement(targets.contentTarget);
+
+      if (pathElement !== null) {
+        rememberBaseline(pathElement, 'd', pathElement.getAttribute('d'));
+      }
+
+      applyPathValue(targets.contentTarget, String(value));
+
+      return;
+    }
+
+    if (isTransformProperty(propertyName)) {
+      rememberBaseline(targets.contentTarget, 'transform', targets.contentTarget.style.transform);
+      updateTransform(targets.contentTarget, propertyName, value);
+
+      return;
+    }
+
+    if (isTrimPathProperty(propertyName)) {
+      const pathEl = findPathElement(targets.contentTarget);
+
+      if (pathEl !== null) {
+        rememberBaseline(pathEl, 'stroke-dasharray', pathEl.getAttribute('stroke-dasharray'));
+        rememberBaseline(pathEl, 'stroke-dashoffset', pathEl.getAttribute('stroke-dashoffset'));
+      }
+
+      updateTrimPath(targets.contentTarget, propertyName, value);
+
+      return;
+    }
+
+    const cssPropertyName = toKebabCase(propertyName);
+
+    rememberBaseline(
+      targets.contentTarget,
+      cssPropertyName,
+      targets.contentTarget.style.getPropertyValue(cssPropertyName),
+    );
+    targets.contentTarget.style.setProperty(cssPropertyName, String(value));
+  }
+
   return {
     applyStyles(container: HTMLElement, styles: Readonly<Record<string, unknown>>): void {
       const targets = getTargets(container);
       const gradientUpdates: GradientPropertyUpdate[] = [];
 
       for (const [propertyName, value] of Object.entries(styles)) {
-        if (isGradientAnimationTarget(propertyName)) {
-          const parsed = parseGradientTarget(propertyName);
-
-          if (parsed !== null) {
-            gradientUpdates.push({ target: parsed, value });
-          }
-
-          continue;
-        }
-
-        if (propertyName === 'opacity') {
-          rememberBaseline(targets.opacityTarget, 'opacity', targets.opacityTarget.style.opacity);
-          targets.opacityTarget.style.opacity = String(value);
-          continue;
-        }
-
-        if (propertyName === 'content' || propertyName === 'textContent') {
-          rememberBaseline(targets.contentTarget, 'textContent', targets.contentTarget.textContent);
-          targets.contentTarget.textContent = String(value);
-          continue;
-        }
-
-        if (propertyName === 'transform') {
-          rememberBaseline(targets.contentTarget, 'transform', targets.contentTarget.style.transform);
-          transforms.delete(targets.contentTarget);
-          targets.contentTarget.style.transform = String(value);
-          continue;
-        }
-
-        if (propertyName === 'd') {
-          const pathElement = findPathElement(targets.contentTarget);
-
-          if (pathElement !== null) {
-            rememberBaseline(pathElement, 'd', pathElement.getAttribute('d'));
-          }
-
-          applyPathValue(targets.contentTarget, String(value));
-          continue;
-        }
-
-        if (isTransformProperty(propertyName)) {
-          rememberBaseline(targets.contentTarget, 'transform', targets.contentTarget.style.transform);
-          updateTransform(targets.contentTarget, propertyName, value);
-          continue;
-        }
-
-        if (isTrimPathProperty(propertyName)) {
-          const pathEl = findPathElement(targets.contentTarget);
-
-          if (pathEl !== null) {
-            rememberBaseline(pathEl, 'stroke-dasharray', pathEl.getAttribute('stroke-dasharray'));
-            rememberBaseline(pathEl, 'stroke-dashoffset', pathEl.getAttribute('stroke-dashoffset'));
-          }
-
-          updateTrimPath(targets.contentTarget, propertyName, value);
-          continue;
-        }
-
-        const cssPropertyName = toKebabCase(propertyName);
-
-        rememberBaseline(
-          targets.contentTarget,
-          cssPropertyName,
-          targets.contentTarget.style.getPropertyValue(cssPropertyName),
-        );
-        targets.contentTarget.style.setProperty(cssPropertyName, String(value));
+        applyOneStyle(propertyName, value, targets, gradientUpdates);
       }
 
       if (gradientUpdates.length > 0) {
