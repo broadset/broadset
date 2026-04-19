@@ -124,112 +124,185 @@ function isElementBeyondBleed(
   );
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity -- cc=44; covers every preflight check category in one pass; see lint-strictness-plan.md Phase 4 followup.
+interface PreflightContext {
+  readonly canvasWidth: number;
+  readonly canvasHeight: number;
+  readonly isPrint: boolean;
+  readonly bleedMm: number;
+  readonly allowedFontFamilies: ReadonlySet<string>;
+  readonly enforceAllowedFonts: boolean;
+}
+
+function isTextLikeElement(element: BroadsetElement): boolean {
+  return element.type === 'text' || element.type === 'ticker' || element.type === 'clock';
+}
+
+type RuleCheck = (element: BroadsetElement, ctx: PreflightContext) => readonly PreflightDiagnostic[];
+
+function checkTitleSafe(element: BroadsetElement, ctx: PreflightContext): readonly PreflightDiagnostic[] {
+  const applies = isTextLikeElement(element) || element.type === 'image' || element.type === 'svg';
+
+  if (!applies || !isElementOutsideTitleSafe(element, ctx.canvasWidth, ctx.canvasHeight)) {
+    return [];
+  }
+
+  return [
+    {
+      rule: 'title-safe',
+      severity: 'warning',
+      elementName: element.name,
+      message: `"${element.name}" extends beyond the title-safe area`,
+    },
+  ];
+}
+
+function checkDpiResolution(element: BroadsetElement): readonly PreflightDiagnostic[] {
+  if (element.type !== 'image' || (element.width <= MIN_DPI_DIMENSION_PX && element.height <= MIN_DPI_DIMENSION_PX)) {
+    return [];
+  }
+
+  const rendered = Math.round(Math.max(element.width, element.height));
+
+  return [
+    {
+      rule: 'dpi-resolution',
+      severity: 'info',
+      elementName: element.name,
+      message: `"${element.name}" is rendered at ${String(rendered)}px — recommend source resolution of at least 1.5× rendered size`,
+    },
+  ];
+}
+
+function checkBleed(element: BroadsetElement, ctx: PreflightContext): readonly PreflightDiagnostic[] {
+  if (!ctx.isPrint || !isElementBeyondBleed(element, ctx.canvasWidth, ctx.canvasHeight, ctx.bleedMm)) {
+    return [];
+  }
+
+  return [
+    {
+      rule: 'bleed',
+      severity: 'warning',
+      elementName: element.name,
+      message: `"${element.name}" extends beyond canvas bounds + ${String(ctx.bleedMm)}mm bleed margin`,
+    },
+  ];
+}
+
+function checkSmallText(element: BroadsetElement, ctx: PreflightContext): readonly PreflightDiagnostic[] {
+  if (!ctx.isPrint || !isTextLikeElement(element)) {
+    return [];
+  }
+
+  const fontSize = element.style.fontSize ?? 0;
+
+  if (fontSize <= 0 || fontSize >= MIN_PRINT_FONT_SIZE_PT) {
+    return [];
+  }
+
+  return [
+    {
+      rule: 'small-text',
+      severity: 'warning',
+      elementName: element.name,
+      message: `"${element.name}" has font size ${String(fontSize)}pt — minimum recommended is ${String(MIN_PRINT_FONT_SIZE_PT)}pt for print`,
+    },
+  ];
+}
+
+function checkColorMode(element: BroadsetElement, ctx: PreflightContext): readonly PreflightDiagnostic[] {
+  if (!ctx.isPrint) {
+    return [];
+  }
+
+  const hasFluorescent =
+    isFluorescentColor(element.style.backgroundColor) || isFluorescentColor(element.style.borderColor);
+
+  if (!hasFluorescent) {
+    return [];
+  }
+
+  return [
+    {
+      rule: 'color-mode',
+      severity: 'info',
+      elementName: element.name,
+      message: `"${element.name}" uses a fluorescent or out-of-gamut color that may not reproduce accurately in print`,
+    },
+  ];
+}
+
+function checkUnsupportedProperty(element: BroadsetElement, ctx: PreflightContext): readonly PreflightDiagnostic[] {
+  if (!ctx.isPrint) {
+    return [];
+  }
+
+  return SCREEN_ONLY_STYLE_PROPERTIES.flatMap((property) => {
+    const value = element.style[property];
+
+    if (typeof value !== 'number' || value === 0) {
+      return [];
+    }
+
+    return [
+      {
+        rule: 'unsupported-property',
+        severity: 'warning',
+        elementName: element.name,
+        message: `"${element.name}" uses "${property}" which is not supported in print mode`,
+      },
+    ];
+  });
+}
+
+function checkMissingFont(element: BroadsetElement, ctx: PreflightContext): readonly PreflightDiagnostic[] {
+  if (!ctx.enforceAllowedFonts || !isTextLikeElement(element)) {
+    return [];
+  }
+
+  const fontFamily = element.style.fontFamily;
+
+  if (fontFamily === undefined || fontFamily === '') {
+    return [];
+  }
+
+  const normalized = fontFamily.toLowerCase();
+
+  if (SYSTEM_FALLBACK_FONTS.has(normalized) || ctx.allowedFontFamilies.has(normalized)) {
+    return [];
+  }
+
+  return [
+    {
+      rule: 'missing-font',
+      severity: 'warning',
+      elementName: element.name,
+      message: `"${element.name}" uses font "${fontFamily}" which is not in the allowed fonts list`,
+    },
+  ];
+}
+
+const PREFLIGHT_RULES: readonly RuleCheck[] = [
+  checkTitleSafe,
+  checkDpiResolution,
+  checkBleed,
+  checkSmallText,
+  checkColorMode,
+  checkUnsupportedProperty,
+  checkMissingFont,
+];
+
 export function runPreflightDiagnostics(
   document: BroadsetDocument,
   config: PreflightConfig,
 ): readonly PreflightDiagnostic[] {
-  const issues: PreflightDiagnostic[] = [];
-  const { canvas, documentMode, elements } = document;
-  const isPrint = documentMode === 'print';
-  const bleedMm = config.bleedMarginMm ?? DEFAULT_BLEED_MARGIN_MM;
+  const ctx: PreflightContext = {
+    canvasWidth: document.canvas.width,
+    canvasHeight: document.canvas.height,
+    isPrint: document.documentMode === 'print',
+    bleedMm: config.bleedMarginMm ?? DEFAULT_BLEED_MARGIN_MM,
+    allowedFontFamilies: new Set((config.allowedFonts ?? []).map((font) => font.family.toLowerCase())),
+    enforceAllowedFonts: config.allowedFonts !== undefined,
+  };
 
-  const allowedFontFamilies: ReadonlySet<string> = new Set(
-    (config.allowedFonts ?? []).map((font) => font.family.toLowerCase()),
-  );
-
-  for (const element of elements) {
-    const isTextLike = element.type === 'text' || element.type === 'ticker' || element.type === 'clock';
-
-    if (
-      (isTextLike || element.type === 'image' || element.type === 'svg') &&
-      isElementOutsideTitleSafe(element, canvas.width, canvas.height)
-    ) {
-      issues.push({
-        rule: 'title-safe',
-        severity: 'warning',
-        elementName: element.name,
-        message: `"${element.name}" extends beyond the title-safe area`,
-      });
-    }
-
-    if (element.type === 'image' && (element.width > MIN_DPI_DIMENSION_PX || element.height > MIN_DPI_DIMENSION_PX)) {
-      issues.push({
-        rule: 'dpi-resolution',
-        severity: 'info',
-        elementName: element.name,
-        message: `"${element.name}" is rendered at ${String(Math.round(Math.max(element.width, element.height)))}px — recommend source resolution of at least 1.5× rendered size`,
-      });
-    }
-
-    if (isPrint && isElementBeyondBleed(element, canvas.width, canvas.height, bleedMm)) {
-      issues.push({
-        rule: 'bleed',
-        severity: 'warning',
-        elementName: element.name,
-        message: `"${element.name}" extends beyond canvas bounds + ${String(bleedMm)}mm bleed margin`,
-      });
-    }
-
-    if (isPrint && isTextLike) {
-      const fontSize = element.style.fontSize ?? 0;
-
-      if (fontSize > 0 && fontSize < MIN_PRINT_FONT_SIZE_PT) {
-        issues.push({
-          rule: 'small-text',
-          severity: 'warning',
-          elementName: element.name,
-          message: `"${element.name}" has font size ${String(fontSize)}pt — minimum recommended is ${String(MIN_PRINT_FONT_SIZE_PT)}pt for print`,
-        });
-      }
-    }
-
-    if (isPrint) {
-      const bgColor = element.style.backgroundColor;
-      const borderColor = element.style.borderColor;
-
-      if (isFluorescentColor(bgColor) || isFluorescentColor(borderColor)) {
-        issues.push({
-          rule: 'color-mode',
-          severity: 'info',
-          elementName: element.name,
-          message: `"${element.name}" uses a fluorescent or out-of-gamut color that may not reproduce accurately in print`,
-        });
-      }
-    }
-
-    if (isPrint) {
-      for (const property of SCREEN_ONLY_STYLE_PROPERTIES) {
-        const value = element.style[property];
-
-        if (typeof value === 'number' && value !== 0) {
-          issues.push({
-            rule: 'unsupported-property',
-            severity: 'warning',
-            elementName: element.name,
-            message: `"${element.name}" uses "${property}" which is not supported in print mode`,
-          });
-        }
-      }
-    }
-
-    if (isTextLike && config.allowedFonts !== undefined) {
-      const fontFamily = element.style.fontFamily;
-
-      if (fontFamily !== undefined && fontFamily !== '') {
-        const normalized = fontFamily.toLowerCase();
-
-        if (!SYSTEM_FALLBACK_FONTS.has(normalized) && !allowedFontFamilies.has(normalized)) {
-          issues.push({
-            rule: 'missing-font',
-            severity: 'warning',
-            elementName: element.name,
-            message: `"${element.name}" uses font "${fontFamily}" which is not in the allowed fonts list`,
-          });
-        }
-      }
-    }
-  }
-
-  return issues;
+  return document.elements.flatMap((element) => PREFLIGHT_RULES.flatMap((rule) => rule(element, ctx)));
 }
