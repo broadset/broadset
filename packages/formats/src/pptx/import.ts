@@ -36,15 +36,12 @@ function uint8ToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-export function importPptx(data: Uint8Array): BroadsetDocument {
-  const zip = new PizZip(data);
-
-  const presXml = zip.file('ppt/presentation.xml')?.asText() ?? '';
+function parseSlideCanvas(presXml: string): Canvas {
   const sldSzMatch = presXml.match(/<p:sldSz\s+cx="(\d+)"\s+cy="(\d+)"\/>/);
   const cxEmu = sldSzMatch ? parseInt(sldSzMatch[1] ?? '0', 10) : 0;
   const cyEmu = sldSzMatch ? parseInt(sldSzMatch[2] ?? '0', 10) : 0;
 
-  const canvas: Canvas = {
+  return {
     width: cxEmu / MM_TO_EMU,
     height: cyEmu / MM_TO_EMU,
     unit: 'mm',
@@ -52,12 +49,27 @@ export function importPptx(data: Uint8Array): BroadsetDocument {
     padding: [0, 0, 0, 0],
     backgroundMode: 'solid',
   };
+}
 
-  const slideRelsXml = zip.file('ppt/slides/_rels/slide1.xml.rels')?.asText() ?? '';
-  const relMap = parseSlideRelationships(slideRelsXml);
+interface MediaMaps {
+  readonly svg: Map<string, string>;
+  readonly images: Map<string, string>;
+}
 
-  const svgMediaMap = new Map<string, string>();
-  const imageMediaMap = new Map<string, string>();
+function registerImageMedia(zip: PizZip, relId: string, mediaPath: string, mime: string, images: Map<string, string>): void {
+  const entry = zip.file(mediaPath);
+
+  if (!entry) return;
+
+  const raw: unknown = entry.asUint8Array();
+  const bytes = raw as Uint8Array;
+
+  images.set(relId, `data:${mime};base64,${uint8ToBase64(bytes)}`);
+}
+
+function buildMediaMaps(zip: PizZip, relMap: ReadonlyMap<string, string>): MediaMaps {
+  const svg = new Map<string, string>();
+  const images = new Map<string, string>();
 
   for (const [relId, target] of relMap) {
     const mediaPath = resolveMediaPath(target);
@@ -66,49 +78,42 @@ export function importPptx(data: Uint8Array): BroadsetDocument {
     if (ext === '.svg') {
       const svgContent = zip.file(mediaPath)?.asText();
 
-      if (svgContent) {
-        svgMediaMap.set(relId, svgContent);
-      }
-    } else {
-      const mime = IMAGE_MIME.get(ext);
-
-      if (mime) {
-        const entry = zip.file(mediaPath);
-
-        if (entry) {
-          const raw: unknown = entry.asUint8Array();
-          const bytes = raw as Uint8Array;
-          const dataUri = `data:${mime};base64,${uint8ToBase64(bytes)}`;
-
-          imageMediaMap.set(relId, dataUri);
-        }
-      }
+      if (svgContent) svg.set(relId, svgContent);
+      continue;
     }
+
+    const mime = IMAGE_MIME.get(ext);
+
+    if (mime) registerImageMedia(zip, relId, mediaPath, mime, images);
   }
 
-  const slideXml = zip.file('ppt/slides/slide1.xml')?.asText() ?? '';
+  return { svg, images };
+}
 
+function importShapesFromSlide(slideXml: string, canvas: Canvas, media: MediaMaps): BroadsetElement[] {
   const elements: BroadsetElement[] = [];
+  const shapeXmls = [
+    ...extractAll(slideXml, /<p:sp>[\s\S]*?<\/p:sp>/),
+    ...extractAll(slideXml, /<p:pic>[\s\S]*?<\/p:pic>/),
+  ];
 
-  const spShapes = extractAll(slideXml, /<p:sp>[\s\S]*?<\/p:sp>/);
+  for (const shapeXml of shapeXmls) {
+    const el = importShapeElement(shapeXml, canvas, media.svg, media.images);
 
-  for (const shapeXml of spShapes) {
-    const el = importShapeElement(shapeXml, canvas, svgMediaMap, imageMediaMap);
-
-    if (el) {
-      elements.push(el);
-    }
+    if (el) elements.push(el);
   }
 
-  const picShapes = extractAll(slideXml, /<p:pic>[\s\S]*?<\/p:pic>/);
+  return elements;
+}
 
-  for (const picXml of picShapes) {
-    const el = importShapeElement(picXml, canvas, svgMediaMap, imageMediaMap);
-
-    if (el) {
-      elements.push(el);
-    }
-  }
+export function importPptx(data: Uint8Array): BroadsetDocument {
+  const zip = new PizZip(data);
+  const presXml = zip.file('ppt/presentation.xml')?.asText() ?? '';
+  const canvas = parseSlideCanvas(presXml);
+  const slideRelsXml = zip.file('ppt/slides/_rels/slide1.xml.rels')?.asText() ?? '';
+  const media = buildMediaMaps(zip, parseSlideRelationships(slideRelsXml));
+  const slideXml = zip.file('ppt/slides/slide1.xml')?.asText() ?? '';
+  const elements = importShapesFromSlide(slideXml, canvas, media);
 
   return {
     id: 'imported-doc',
