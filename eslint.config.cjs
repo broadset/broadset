@@ -222,10 +222,9 @@ module.exports = [
       // which duplicates/conflicts with our _prefix convention). Cognitive
       // complexity threshold raised to 20 to focus on truly tangled code.
       ...sonarjsPlugin.configs.recommended.rules,
-      // Threshold 30 is a pragmatic ceiling set during the Phase 4 rollout —
-      // see project/implementation/lint-strictness-plan.md for the ratchet
-      // schedule down to 20. Functions above 30 must use a site-level
-      // disable with a tracking comment.
+      // Threshold 30 is the in-flight ratchet ceiling — see
+      // project/implementation/lint-strictness-plan.md for the schedule
+      // down to the SonarJS default of 15.
       'sonarjs/cognitive-complexity': ['error', 30],
       'sonarjs/no-nested-conditional': 'off',
       'sonarjs/slow-regex': 'off',

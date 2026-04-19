@@ -8,7 +8,6 @@ The five-phase strictness rollout (react-hooks bug-finders → jsx-a11y → type
 
 | File | Function | Score |
 |---|---|---|
-| [packages/ui/src/properties-sidebar.tsx](../../packages/ui/src/properties-sidebar.tsx) | `PropertiesSidebar` | 103 |
 
 ## Ratchet plan
 
@@ -20,4 +19,3 @@ The five-phase strictness rollout (react-hooks bug-finders → jsx-a11y → type
 
 ## Refactoring notes
 
-- `PropertiesSidebar`: split per element-type into smaller dispatcher components; keep capability-driven visibility intact.

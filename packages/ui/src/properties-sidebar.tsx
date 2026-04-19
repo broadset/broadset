@@ -1,7 +1,7 @@
 import { getCapabilityProfile } from '@broadset/model';
 import { Accordion } from '@heroui/react';
 import { Type } from 'lucide-react';
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 import type { MediaAsset } from './modals';
 import type { CustomPanelComponent, PanelElement, PropertyValue } from './panel-types';
@@ -82,139 +82,81 @@ export interface PropertiesSidebarProps {
   readonly documentUnit?: 'px' | 'mm' | 'in' | undefined;
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity -- cc=103; aggregates capability-driven panel rendering for every element type; splitting requires a whole-sidebar refactor scoped in lint-strictness-plan.md Phase 4 followup.
-export function PropertiesSidebar({
-  elements,
-  documentMode,
-  availableFonts,
-  showAnimations,
-  onUpdate,
-  customPanels,
-  onStartDrawing,
-  onStopDrawing,
-  onStartEditing,
-  onStopEditing,
-  isDrawing = false,
-  isEditing = false,
-  mediaAssets,
-  onStartClipPathEditing,
-  canvasWidth,
-  canvasHeight,
-  documentUnit,
-}: PropertiesSidebarProps): JSX.Element {
-  if (elements.length === 0) {
-    return (
-      <aside
-        aria-label="Properties"
-        role="region"
-        className="p-3"
-        style={{ ...glassPanelStyle(), alignItems: 'center', display: 'flex', justifyContent: 'center' }}
-      >
-        <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>
-          Select an element to edit its properties
-        </p>
-      </aside>
-    );
-  }
+type UpdateFn = PropertiesSidebarProps['onUpdate'];
 
-  const primary = elements[0];
+interface SelectionContext {
+  readonly primary: PanelElement;
+  readonly isMulti: boolean;
+  readonly isLocked: boolean;
+  readonly selectionCountLabel: string | undefined;
+  readonly contextLabel: string;
+  readonly typeChipLabel: string | undefined;
+  readonly onLabelChange: ((next: string) => void) | undefined;
+  readonly onToggleLock: (() => void) | undefined;
+}
 
-  if (primary === undefined) {
-    return (
-      <aside
-        aria-label="Properties"
-        role="region"
-        className="p-3"
-        style={{ ...glassPanelStyle(), alignItems: 'center', display: 'flex', justifyContent: 'center' }}
-      >
-        <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>
-          Select an element to edit its properties
-        </p>
-      </aside>
-    );
-  }
-
+function makeSelectionContext(
+  elements: readonly PanelElement[],
+  primary: PanelElement,
+  onUpdate: UpdateFn,
+): SelectionContext {
   const isMulti = elements.length > 1;
   const isLocked = primary.locked === true;
-  const selectionCountLabel = isMulti ? `${String(elements.length)} elements` : undefined;
-  const contextLabel = isMulti ? 'Multiple selection' : primary.name || getElementTypeLabel(primary.type);
-  const typeChipLabel = isMulti ? undefined : getElementTypeLabel(primary.type);
-  const onLabelChange =
-    isMulti ? undefined : (
-      (nextName: string) => {
-        onUpdate('name', nextName);
-      }
-    );
 
-  const CustomPanel = customPanels?.[primary.type];
+  return {
+    primary,
+    isMulti,
+    isLocked,
+    selectionCountLabel: isMulti ? `${String(elements.length)} elements` : undefined,
+    contextLabel: isMulti ? 'Multiple selection' : primary.name || getElementTypeLabel(primary.type),
+    typeChipLabel: isMulti ? undefined : getElementTypeLabel(primary.type),
+    onLabelChange: isMulti
+      ? undefined
+      : (nextName: string): void => {
+          onUpdate('name', nextName);
+        },
+    onToggleLock: isMulti
+      ? undefined
+      : (): void => {
+          onUpdate('locked', !isLocked);
+        },
+  };
+}
 
-  if (CustomPanel !== undefined) {
-    return (
-      <aside aria-label="Properties" role="region" className="p-3" style={glassPanelStyle()}>
-        <SidebarContextHeader
-          icon={<Type size={ICON_SIZE} />}
-          label={contextLabel}
-          {...(onLabelChange !== undefined ? { onLabelChange } : {})}
-          typeChipLabel={typeChipLabel}
-          countChipLabel={selectionCountLabel}
-          isLocked={isLocked}
-          onToggleLock={
-            isMulti ? undefined : (
-              () => {
-                onUpdate('locked', !isLocked);
-              }
-            )
-          }
-        />
-        {isLocked && (
-          <p style={{ color: color('muted'), fontSize: font('label'), margin: 0, marginBottom: sp('sp-03') }}>
-            Element is locked. Unlock to edit properties.
-          </p>
-        )}
-        <div
-          aria-label="Properties controls"
-          aria-disabled={isLocked}
-          inert={isLocked}
-          style={isLocked ? { pointerEvents: 'none' } : undefined}
-        >
-          <fieldset disabled={isLocked} style={{ border: 0, margin: 0, minWidth: 0, padding: 0 }}>
-            <CustomPanel documentMode={documentMode} element={primary} onUpdate={onUpdate} />
-          </fieldset>
-        </div>
-      </aside>
-    );
-  }
+function EmptyPropertiesAside(): JSX.Element {
+  return (
+    <aside
+      aria-label="Properties"
+      role="region"
+      className="p-3"
+      style={{ ...glassPanelStyle(), alignItems: 'center', display: 'flex', justifyContent: 'center' }}
+    >
+      <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>
+        Select an element to edit its properties
+      </p>
+    </aside>
+  );
+}
 
-  const profile = getCapabilityProfile(primary.type);
-  const isScreenMode = documentMode === 'screen';
-  const showGradient = isScreenMode && primary.type === 'rectangle';
-  const isQrCode = primary.type === 'qrcode';
-  const isGroup = primary.type === 'group';
-  const isImage = primary.type === 'image';
-  const isVideo = primary.type === 'video';
-  const isClock = primary.type === 'clock';
-  const isTicker = primary.type === 'ticker';
-  const showSpacing = profile.typography || isGroup;
-  const showPathProperties = profile.svgStrokeFill || profile.pathEditing || primary.type === 'svg';
-
-  const defaultExpanded = getDefaultExpandedKeys(primary.type);
+function PropertiesAsideShell({
+  context,
+  children,
+}: {
+  readonly context: SelectionContext;
+  readonly children: ReactNode;
+}): JSX.Element {
+  const { isLocked } = context;
 
   return (
     <aside aria-label="Properties" role="region" className="p-3" style={glassPanelStyle()}>
       <SidebarContextHeader
         icon={<Type size={ICON_SIZE} />}
-        label={contextLabel}
-        {...(onLabelChange !== undefined ? { onLabelChange } : {})}
-        typeChipLabel={typeChipLabel}
-        countChipLabel={selectionCountLabel}
+        label={context.contextLabel}
+        {...(context.onLabelChange !== undefined ? { onLabelChange: context.onLabelChange } : {})}
+        typeChipLabel={context.typeChipLabel}
+        countChipLabel={context.selectionCountLabel}
         isLocked={isLocked}
-        onToggleLock={
-          isMulti ? undefined : (
-            () => {
-              onUpdate('locked', !isLocked);
-            }
-          )
-        }
+        onToggleLock={context.onToggleLock}
       />
       {isLocked && (
         <p style={{ color: color('muted'), fontSize: font('label'), margin: 0, marginBottom: sp('sp-03') }}>
@@ -228,329 +170,409 @@ export function PropertiesSidebar({
         style={isLocked ? { pointerEvents: 'none' } : undefined}
       >
         <fieldset disabled={isLocked} style={{ border: 0, margin: 0, minWidth: 0, padding: 0 }}>
-          <Accordion allowsMultipleExpanded defaultExpandedKeys={defaultExpanded}>
-            <Accordion.Item id="geometry">
-              <Accordion.Heading>
-                <Accordion.Trigger>Geometry</Accordion.Trigger>
-              </Accordion.Heading>
-              <Accordion.Panel>
-                <GeometryPanel
-                  name={primary.name}
-                  x={primary.x}
-                  y={primary.y}
-                  width={primary.width}
-                  height={primary.height}
-                  rotation={primary.rotation}
-                  rotateX={primary.rotateX}
-                  rotateY={primary.rotateY}
-                  rotateZ={primary.rotateZ}
-                  translateZ={primary.translateZ}
-                  autoSize={primary.autoSize}
-                  elementType={primary.type}
-                  onUpdate={onUpdate}
-                  documentMode={documentMode}
-                  {...(canvasWidth !== undefined ? { canvasWidth } : {})}
-                  {...(canvasHeight !== undefined ? { canvasHeight } : {})}
-                  {...(documentUnit !== undefined ? { documentUnit } : {})}
-                />
-              </Accordion.Panel>
-            </Accordion.Item>
-
-            {/* 2. Appearance */}
-            {profile.appearance ?
-              <Accordion.Item id="appearance">
-                <Accordion.Heading>
-                  <Accordion.Trigger>Appearance</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <AppearancePanel
-                    backgroundColor={primary.backgroundColor}
-                    backgroundGradient={primary.backgroundGradient}
-                    showGradient={showGradient}
-                    borderWidth={primary.borderWidth}
-                    borderColor={primary.borderColor}
-                    borderStyle={primary.borderStyle}
-                    borderRadius={primary.borderRadius}
-                    opacity={primary.opacity}
-                    onUpdate={onUpdate}
-                  />
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-
-            {/* 3. Typography */}
-            {profile.typography ?
-              <Accordion.Item id="typography">
-                <Accordion.Heading>
-                  <Accordion.Trigger>Typography</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <TypographyPanel
-                    fontFamily={primary.fontFamily}
-                    availableFonts={availableFonts}
-                    fontSize={primary.fontSize}
-                    fontColor={primary.fontColor}
-                    fontWeight={primary.fontWeight}
-                    fontStyle={primary.fontStyle}
-                    textAlignment={primary.textAlignment}
-                    verticalAlignment={primary.verticalAlignment}
-                    textDecoration={primary.textDecoration}
-                    textTransform={primary.textTransform}
-                    lineHeight={primary.lineHeight}
-                    letterSpacing={primary.letterSpacing}
-                    wordSpacing={primary.wordSpacing}
-                    isAnimationMode={false}
-                    onUpdate={onUpdate}
-                  />
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-
-            {/* 4. Text Effects */}
-            {profile.typography ?
-              <Accordion.Item id="text-effects">
-                <Accordion.Heading>
-                  <Accordion.Trigger>Text Effects</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <TextEffectsPanel
-                    textStroke={primary.textStroke}
-                    textShadow={primary.textShadow}
-                    textTransform={primary.textTransform}
-                    onUpdate={onUpdate}
-                  />
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-
-            {/* 5. Spacing */}
-            {showSpacing ?
-              <Accordion.Item id="spacing">
-                <Accordion.Heading>
-                  <Accordion.Trigger>Spacing</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <SpacingPanel padding={primary.padding} onUpdate={onUpdate} />
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-
-            {/* 6. Box Effects */}
-            {profile.boxEffects ?
-              <Accordion.Item id="box-effects">
-                <Accordion.Heading>
-                  <Accordion.Trigger>Box Effects</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <BoxEffectsPanel
-                    boxShadow={primary.boxShadow}
-                    filter={primary.filter}
-                    backdropFilter={primary.backdropFilter}
-                    mixBlendMode={primary.mixBlendMode}
-                    isolation={primary.isolation}
-                    documentMode={documentMode}
-                    onUpdate={onUpdate}
-                  />
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-
-            {/* 7. Clip Path */}
-            {profile.clipPath && isScreenMode ?
-              <Accordion.Item id="clip-path">
-                <Accordion.Heading>
-                  <Accordion.Trigger>Clip Path</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <ClipPathPanel
-                    maskType={primary.maskType}
-                    customClipPath={primary.customClipPath}
-                    onStartEditingClipPath={onStartClipPathEditing}
-                    onUpdate={onUpdate}
-                  />
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-
-            {/* 8. Path Properties */}
-            {showPathProperties ?
-              <Accordion.Item id="path-stroke">
-                <Accordion.Heading>
-                  <Accordion.Trigger>Path Properties</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <PathPropertiesPanel
-                    stroke={primary.stroke}
-                    strokeWidth={primary.strokeWidth}
-                    strokeOpacity={primary.strokeOpacity}
-                    strokeDasharray={primary.strokeDasharray}
-                    strokeDashoffset={primary.strokeDashoffset}
-                    strokeLinecap={primary.strokeLinecap}
-                    strokeLinejoin={primary.strokeLinejoin}
-                    fill={primary.fill}
-                    fillOpacity={primary.fillOpacity}
-                    fillRule={primary.fillRule}
-                    content={primary.content}
-                    onUpdate={onUpdate}
-                    onStartDrawing={onStartDrawing ?? (() => undefined)}
-                    onStopDrawing={onStopDrawing ?? (() => undefined)}
-                    onStartEditing={onStartEditing ?? (() => undefined)}
-                    onStopEditing={onStopEditing ?? (() => undefined)}
-                    isDrawing={isDrawing}
-                    isEditing={isEditing}
-                  />
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-
-            {/* 9. Image */}
-            {isImage ?
-              <Accordion.Item id="image-source">
-                <Accordion.Heading>
-                  <Accordion.Trigger>Image</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <ImagePanel
-                    content={primary.content}
-                    assetId={primary.assetId}
-                    assets={mediaAssets}
-                    objectFit={primary.objectFit}
-                    onUpdate={onUpdate}
-                  />
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-
-            {/* 10. Object Fit — inline inside ImagePanel for image elements;
-                 a standalone accordion is kept for the other fit-capable types
-                 (svg, video) so they don't lose access to the control. */}
-            {profile.objectFit && !isImage ?
-              <Accordion.Item id="object-fit">
-                <Accordion.Heading>
-                  <Accordion.Trigger>Object Fit</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <ObjectFitPanel objectFit={primary.objectFit} onUpdate={onUpdate} />
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-
-            {/* 11. QR Code */}
-            {isQrCode ?
-              <Accordion.Item id="qrcode">
-                <Accordion.Heading>
-                  <Accordion.Trigger>QR Code</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <QrCodePanel
-                    content={primary.content}
-                    errorCorrection={primary.errorCorrection}
-                    foregroundColor={primary.qrForegroundColor}
-                    backgroundColor={primary.qrBackgroundColor}
-                    onUpdate={onUpdate}
-                  />
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-
-            {/* 12. Group */}
-            {isGroup ?
-              <Accordion.Item id="group-settings">
-                <Accordion.Heading>
-                  <Accordion.Trigger>Group</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <GroupPanel
-                    name={primary.name}
-                    opacity={primary.opacity}
-                    clipChildren={primary.clipChildren}
-                    booleanOperation={primary.booleanOperation}
-                    documentMode={documentMode}
-                    onUpdate={onUpdate}
-                  />
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-
-            {/* Video */}
-            {isVideo ?
-              <Accordion.Item id="video">
-                <Accordion.Heading>
-                  <Accordion.Trigger>Video</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <VideoPanel
-                    sourceUrl={primary.content}
-                    autoplay={primary.videoAutoplay ?? false}
-                    loop={primary.videoLoop ?? false}
-                    muted={primary.videoMuted ?? false}
-                    startTime={primary.videoStartTime ?? 0}
-                    endTime={primary.videoEndTime ?? 0}
-                    onUpdate={onUpdate}
-                  />
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-
-            {/* Clock */}
-            {isClock ?
-              <Accordion.Item id="clock">
-                <Accordion.Heading>
-                  <Accordion.Trigger>Clock</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <ClockPanel
-                    format={primary.content}
-                    mode={primary.clockMode ?? 'realtime'}
-                    startValue={primary.clockStartValue ?? ''}
-                    targetValue={primary.clockTargetValue ?? ''}
-                    countdownTo={primary.clockCountdownTo ?? ''}
-                    onUpdate={onUpdate}
-                  />
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-
-            {/* Ticker */}
-            {isTicker ?
-              <Accordion.Item id="ticker">
-                <Accordion.Heading>
-                  <Accordion.Trigger>Ticker</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <TickerPanel
-                    items={primary.tickerItems ?? ['New item']}
-                    speed={primary.tickerSpeed ?? 100}
-                    direction={primary.tickerDirection ?? 'left'}
-                    gap={primary.tickerGap ?? 20}
-                    paused={primary.tickerPaused ?? false}
-                    onUpdate={onUpdate}
-                    onUpdateItems={(items) => {
-                      onUpdate('tickerItems', JSON.stringify(items));
-                    }}
-                  />
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-
-            {/* 13. Animation Builder — rendered when showAnimations is enabled */}
-            {showAnimations === true ?
-              <Accordion.Item id="animation-builder">
-                <Accordion.Heading>
-                  <Accordion.Trigger>Animation Builder</Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <section aria-label="Animation Builder" className="flex flex-col gap-2">
-                    <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>
-                      Animation builder controls
-                    </p>
-                  </section>
-                </Accordion.Panel>
-              </Accordion.Item>
-            : null}
-          </Accordion>
+          {children}
         </fieldset>
       </div>
     </aside>
+  );
+}
+
+interface PanelDescriptor {
+  readonly id: string;
+  readonly title: string;
+  readonly render: () => JSX.Element;
+}
+
+type CapabilityProfile = ReturnType<typeof getCapabilityProfile>;
+
+interface PanelBuildContext {
+  readonly props: PropertiesSidebarProps;
+  readonly primary: PanelElement;
+  readonly profile: CapabilityProfile;
+  readonly isScreenMode: boolean;
+}
+
+/**
+ * Factory for one accordion item. Returns null to mean "hide this panel for
+ * this selection". Kept as a list so the orchestrator is a straight map +
+ * filter — no nested conditionals, low cognitive complexity.
+ */
+type PanelFactory = (ctx: PanelBuildContext) => PanelDescriptor | null;
+
+const GEOMETRY_PANEL: PanelFactory = ({ props, primary }) => ({
+  id: 'geometry',
+  title: 'Geometry',
+  render: () => (
+    <GeometryPanel
+      name={primary.name}
+      x={primary.x}
+      y={primary.y}
+      width={primary.width}
+      height={primary.height}
+      rotation={primary.rotation}
+      rotateX={primary.rotateX}
+      rotateY={primary.rotateY}
+      rotateZ={primary.rotateZ}
+      translateZ={primary.translateZ}
+      autoSize={primary.autoSize}
+      elementType={primary.type}
+      onUpdate={props.onUpdate}
+      documentMode={props.documentMode}
+      {...(props.canvasWidth !== undefined ? { canvasWidth: props.canvasWidth } : {})}
+      {...(props.canvasHeight !== undefined ? { canvasHeight: props.canvasHeight } : {})}
+      {...(props.documentUnit !== undefined ? { documentUnit: props.documentUnit } : {})}
+    />
+  ),
+});
+
+const APPEARANCE_PANEL: PanelFactory = ({ props, primary, profile, isScreenMode }) =>
+  !profile.appearance
+    ? null
+    : {
+        id: 'appearance',
+        title: 'Appearance',
+        render: () => (
+          <AppearancePanel
+            backgroundColor={primary.backgroundColor}
+            backgroundGradient={primary.backgroundGradient}
+            showGradient={isScreenMode && primary.type === 'rectangle'}
+            borderWidth={primary.borderWidth}
+            borderColor={primary.borderColor}
+            borderStyle={primary.borderStyle}
+            borderRadius={primary.borderRadius}
+            opacity={primary.opacity}
+            onUpdate={props.onUpdate}
+          />
+        ),
+      };
+
+const TYPOGRAPHY_PANEL: PanelFactory = ({ props, primary, profile }) =>
+  !profile.typography
+    ? null
+    : {
+        id: 'typography',
+        title: 'Typography',
+        render: () => (
+          <TypographyPanel
+            fontFamily={primary.fontFamily}
+            availableFonts={props.availableFonts}
+            fontSize={primary.fontSize}
+            fontColor={primary.fontColor}
+            fontWeight={primary.fontWeight}
+            fontStyle={primary.fontStyle}
+            textAlignment={primary.textAlignment}
+            verticalAlignment={primary.verticalAlignment}
+            textDecoration={primary.textDecoration}
+            textTransform={primary.textTransform}
+            lineHeight={primary.lineHeight}
+            letterSpacing={primary.letterSpacing}
+            wordSpacing={primary.wordSpacing}
+            isAnimationMode={false}
+            onUpdate={props.onUpdate}
+          />
+        ),
+      };
+
+const TEXT_EFFECTS_PANEL: PanelFactory = ({ props, primary, profile }) =>
+  !profile.typography
+    ? null
+    : {
+        id: 'text-effects',
+        title: 'Text Effects',
+        render: () => (
+          <TextEffectsPanel
+            textStroke={primary.textStroke}
+            textShadow={primary.textShadow}
+            textTransform={primary.textTransform}
+            onUpdate={props.onUpdate}
+          />
+        ),
+      };
+
+const SPACING_PANEL: PanelFactory = ({ props, primary, profile }) =>
+  !profile.typography && primary.type !== 'group'
+    ? null
+    : {
+        id: 'spacing',
+        title: 'Spacing',
+        render: () => <SpacingPanel padding={primary.padding} onUpdate={props.onUpdate} />,
+      };
+
+const BOX_EFFECTS_PANEL: PanelFactory = ({ props, primary, profile }) =>
+  !profile.boxEffects
+    ? null
+    : {
+        id: 'box-effects',
+        title: 'Box Effects',
+        render: () => (
+          <BoxEffectsPanel
+            boxShadow={primary.boxShadow}
+            filter={primary.filter}
+            backdropFilter={primary.backdropFilter}
+            mixBlendMode={primary.mixBlendMode}
+            isolation={primary.isolation}
+            documentMode={props.documentMode}
+            onUpdate={props.onUpdate}
+          />
+        ),
+      };
+
+const CLIP_PATH_PANEL: PanelFactory = ({ props, primary, profile, isScreenMode }) =>
+  !profile.clipPath || !isScreenMode
+    ? null
+    : {
+        id: 'clip-path',
+        title: 'Clip Path',
+        render: () => (
+          <ClipPathPanel
+            maskType={primary.maskType}
+            customClipPath={primary.customClipPath}
+            onStartEditingClipPath={props.onStartClipPathEditing}
+            onUpdate={props.onUpdate}
+          />
+        ),
+      };
+
+const PATH_PROPERTIES_PANEL: PanelFactory = ({ props, primary, profile }) =>
+  !profile.svgStrokeFill && !profile.pathEditing && primary.type !== 'svg'
+    ? null
+    : {
+        id: 'path-stroke',
+        title: 'Path Properties',
+        render: () => (
+          <PathPropertiesPanel
+            stroke={primary.stroke}
+            strokeWidth={primary.strokeWidth}
+            strokeOpacity={primary.strokeOpacity}
+            strokeDasharray={primary.strokeDasharray}
+            strokeDashoffset={primary.strokeDashoffset}
+            strokeLinecap={primary.strokeLinecap}
+            strokeLinejoin={primary.strokeLinejoin}
+            fill={primary.fill}
+            fillOpacity={primary.fillOpacity}
+            fillRule={primary.fillRule}
+            content={primary.content}
+            onUpdate={props.onUpdate}
+            onStartDrawing={props.onStartDrawing ?? ((): void => undefined)}
+            onStopDrawing={props.onStopDrawing ?? ((): void => undefined)}
+            onStartEditing={props.onStartEditing ?? ((): void => undefined)}
+            onStopEditing={props.onStopEditing ?? ((): void => undefined)}
+            isDrawing={props.isDrawing ?? false}
+            isEditing={props.isEditing ?? false}
+          />
+        ),
+      };
+
+const IMAGE_PANEL: PanelFactory = ({ props, primary }) =>
+  primary.type !== 'image'
+    ? null
+    : {
+        id: 'image-source',
+        title: 'Image',
+        render: () => (
+          <ImagePanel
+            content={primary.content}
+            assetId={primary.assetId}
+            assets={props.mediaAssets}
+            objectFit={primary.objectFit}
+            onUpdate={props.onUpdate}
+          />
+        ),
+      };
+
+// Object Fit is inlined in ImagePanel for images; standalone accordion kept
+// for other fit-capable types (svg, video) so they keep the control.
+const OBJECT_FIT_PANEL: PanelFactory = ({ props, primary, profile }) =>
+  !profile.objectFit || primary.type === 'image'
+    ? null
+    : {
+        id: 'object-fit',
+        title: 'Object Fit',
+        render: () => <ObjectFitPanel objectFit={primary.objectFit} onUpdate={props.onUpdate} />,
+      };
+
+const QR_CODE_PANEL: PanelFactory = ({ props, primary }) =>
+  primary.type !== 'qrcode'
+    ? null
+    : {
+        id: 'qrcode',
+        title: 'QR Code',
+        render: () => (
+          <QrCodePanel
+            content={primary.content}
+            errorCorrection={primary.errorCorrection}
+            foregroundColor={primary.qrForegroundColor}
+            backgroundColor={primary.qrBackgroundColor}
+            onUpdate={props.onUpdate}
+          />
+        ),
+      };
+
+const GROUP_PANEL_FACTORY: PanelFactory = ({ props, primary }) =>
+  primary.type !== 'group'
+    ? null
+    : {
+        id: 'group-settings',
+        title: 'Group',
+        render: () => (
+          <GroupPanel
+            name={primary.name}
+            opacity={primary.opacity}
+            clipChildren={primary.clipChildren}
+            booleanOperation={primary.booleanOperation}
+            documentMode={props.documentMode}
+            onUpdate={props.onUpdate}
+          />
+        ),
+      };
+
+const VIDEO_PANEL_FACTORY: PanelFactory = ({ props, primary }) =>
+  primary.type !== 'video'
+    ? null
+    : {
+        id: 'video',
+        title: 'Video',
+        render: () => (
+          <VideoPanel
+            sourceUrl={primary.content}
+            autoplay={primary.videoAutoplay ?? false}
+            loop={primary.videoLoop ?? false}
+            muted={primary.videoMuted ?? false}
+            startTime={primary.videoStartTime ?? 0}
+            endTime={primary.videoEndTime ?? 0}
+            onUpdate={props.onUpdate}
+          />
+        ),
+      };
+
+const CLOCK_PANEL_FACTORY: PanelFactory = ({ props, primary }) =>
+  primary.type !== 'clock'
+    ? null
+    : {
+        id: 'clock',
+        title: 'Clock',
+        render: () => (
+          <ClockPanel
+            format={primary.content}
+            mode={primary.clockMode ?? 'realtime'}
+            startValue={primary.clockStartValue ?? ''}
+            targetValue={primary.clockTargetValue ?? ''}
+            countdownTo={primary.clockCountdownTo ?? ''}
+            onUpdate={props.onUpdate}
+          />
+        ),
+      };
+
+const TICKER_PANEL_FACTORY: PanelFactory = ({ props, primary }) =>
+  primary.type !== 'ticker'
+    ? null
+    : {
+        id: 'ticker',
+        title: 'Ticker',
+        render: () => (
+          <TickerPanel
+            items={primary.tickerItems ?? ['New item']}
+            speed={primary.tickerSpeed ?? 100}
+            direction={primary.tickerDirection ?? 'left'}
+            gap={primary.tickerGap ?? 20}
+            paused={primary.tickerPaused ?? false}
+            onUpdate={props.onUpdate}
+            onUpdateItems={(items): void => {
+              props.onUpdate('tickerItems', JSON.stringify(items));
+            }}
+          />
+        ),
+      };
+
+const ANIMATION_BUILDER_PANEL: PanelFactory = ({ props }) =>
+  props.showAnimations !== true
+    ? null
+    : {
+        id: 'animation-builder',
+        title: 'Animation Builder',
+        render: () => (
+          <section aria-label="Animation Builder" className="flex flex-col gap-2">
+            <p style={{ color: color('muted'), fontSize: font('body-compact'), margin: 0 }}>
+              Animation builder controls
+            </p>
+          </section>
+        ),
+      };
+
+const PANEL_FACTORIES: readonly PanelFactory[] = [
+  GEOMETRY_PANEL,
+  APPEARANCE_PANEL,
+  TYPOGRAPHY_PANEL,
+  TEXT_EFFECTS_PANEL,
+  SPACING_PANEL,
+  BOX_EFFECTS_PANEL,
+  CLIP_PATH_PANEL,
+  PATH_PROPERTIES_PANEL,
+  IMAGE_PANEL,
+  OBJECT_FIT_PANEL,
+  QR_CODE_PANEL,
+  GROUP_PANEL_FACTORY,
+  VIDEO_PANEL_FACTORY,
+  CLOCK_PANEL_FACTORY,
+  TICKER_PANEL_FACTORY,
+  ANIMATION_BUILDER_PANEL,
+];
+
+function buildPanelDescriptors(props: PropertiesSidebarProps, primary: PanelElement): readonly PanelDescriptor[] {
+  const ctx: PanelBuildContext = {
+    props,
+    primary,
+    profile: getCapabilityProfile(primary.type),
+    isScreenMode: props.documentMode === 'screen',
+  };
+
+  return PANEL_FACTORIES.map((factory) => factory(ctx)).filter((d): d is PanelDescriptor => d !== null);
+}
+
+function PropertiesAccordion({
+  descriptors,
+  defaultExpanded,
+}: {
+  readonly descriptors: readonly PanelDescriptor[];
+  readonly defaultExpanded: readonly string[];
+}): JSX.Element {
+  return (
+    <Accordion allowsMultipleExpanded defaultExpandedKeys={defaultExpanded}>
+      {descriptors.map((descriptor) => (
+        <Accordion.Item id={descriptor.id} key={descriptor.id}>
+          <Accordion.Heading>
+            <Accordion.Trigger>{descriptor.title}</Accordion.Trigger>
+          </Accordion.Heading>
+          <Accordion.Panel>{descriptor.render()}</Accordion.Panel>
+        </Accordion.Item>
+      ))}
+    </Accordion>
+  );
+}
+
+export function PropertiesSidebar(props: PropertiesSidebarProps): JSX.Element {
+  const primary = props.elements[0];
+
+  if (props.elements.length === 0 || primary === undefined) {
+    return <EmptyPropertiesAside />;
+  }
+
+  const context = makeSelectionContext(props.elements, primary, props.onUpdate);
+  const CustomPanel = props.customPanels?.[primary.type];
+
+  if (CustomPanel !== undefined) {
+    return (
+      <PropertiesAsideShell context={context}>
+        <CustomPanel documentMode={props.documentMode} element={primary} onUpdate={props.onUpdate} />
+      </PropertiesAsideShell>
+    );
+  }
+
+  const descriptors = buildPanelDescriptors(props, primary);
+
+  return (
+    <PropertiesAsideShell context={context}>
+      <PropertiesAccordion descriptors={descriptors} defaultExpanded={getDefaultExpandedKeys(primary.type)} />
+    </PropertiesAsideShell>
   );
 }
