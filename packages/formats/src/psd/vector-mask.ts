@@ -208,54 +208,82 @@ export function polygonToVectorMask(coords: string, width: number, height: numbe
   return { open: false, knots, fillRule: DEFAULT_FILL_RULE };
 }
 
+const KNOT_PRECEDING_Y = 0;
+const KNOT_PRECEDING_X = 1;
+const KNOT_ANCHOR_Y = 2;
+const KNOT_ANCHOR_X = 3;
+const KNOT_LEAVING_Y = 4;
+const KNOT_LEAVING_X = 5;
+
+interface CoordScale {
+  readonly toX: (v: number) => number;
+  readonly toY: (v: number) => number;
+}
+
+interface ResolvedKnotPoints {
+  readonly cp1x: number;
+  readonly cp1y: number;
+  readonly cp2x: number;
+  readonly cp2y: number;
+  readonly prevAx: number;
+  readonly prevAy: number;
+}
+
+function resolveCurveControlPoints(prevKnot: BezierKnot, knot: BezierKnot, scale: CoordScale): ResolvedKnotPoints {
+  return {
+    cp1x: scale.toX(prevKnot.points[KNOT_LEAVING_X] ?? 0),
+    cp1y: scale.toY(prevKnot.points[KNOT_LEAVING_Y] ?? 0),
+    cp2x: scale.toX(knot.points[KNOT_PRECEDING_X] ?? 0),
+    cp2y: scale.toY(knot.points[KNOT_PRECEDING_Y] ?? 0),
+    prevAx: scale.toX(prevKnot.points[KNOT_ANCHOR_X] ?? 0),
+    prevAy: scale.toY(prevKnot.points[KNOT_ANCHOR_Y] ?? 0),
+  };
+}
+
+function buildKnotSegment(
+  knot: BezierKnot,
+  prevKnot: BezierKnot | undefined,
+  scale: CoordScale,
+  ax: number,
+  ay: number,
+): string {
+  if (prevKnot && !knot.linked) {
+    const { cp1x, cp1y, cp2x, cp2y, prevAx, prevAy } = resolveCurveControlPoints(prevKnot, knot, scale);
+
+    if (cp1x !== prevAx || cp1y !== prevAy || cp2x !== ax || cp2y !== ay) {
+      return `C ${String(cp1x)} ${String(cp1y)} ${String(cp2x)} ${String(cp2y)} ${String(ax)} ${String(ay)}`;
+    }
+  }
+
+  return `L ${String(ax)} ${String(ay)}`;
+}
+
 export function bezierPathToSvgD(path: BezierPath, width: number, height: number): string | undefined {
   if (path.knots.length < 2) return undefined;
 
+  const scale: CoordScale = {
+    toX: (v) => Math.round((v / PSD_COORD_MAX) * width),
+    toY: (v) => Math.round((v / PSD_COORD_MAX) * height),
+  };
   const parts: string[] = [];
-  const PRECEDING_Y = 0;
-  const PRECEDING_X = 1;
-  const ANCHOR_Y = 2;
-  const ANCHOR_X = 3;
-  const LEAVING_Y = 4;
-  const LEAVING_X = 5;
-
-  const toX = (v: number): number => Math.round((v / PSD_COORD_MAX) * width);
-  const toY = (v: number): number => Math.round((v / PSD_COORD_MAX) * height);
 
   for (let i = 0; i < path.knots.length; i++) {
     const knot = path.knots[i];
 
     if (!knot) continue;
 
-    const ax = toX(knot.points[ANCHOR_X] ?? 0);
-    const ay = toY(knot.points[ANCHOR_Y] ?? 0);
+    const ax = scale.toX(knot.points[KNOT_ANCHOR_X] ?? 0);
+    const ay = scale.toY(knot.points[KNOT_ANCHOR_Y] ?? 0);
 
     if (i === 0) {
       parts.push(`M ${String(ax)} ${String(ay)}`);
-    } else {
-      const prevKnot = path.knots[i - 1];
-
-      if (prevKnot && !knot.linked) {
-        const cp1x = toX(prevKnot.points[LEAVING_X] ?? 0);
-        const cp1y = toY(prevKnot.points[LEAVING_Y] ?? 0);
-        const cp2x = toX(knot.points[PRECEDING_X] ?? 0);
-        const cp2y = toY(knot.points[PRECEDING_Y] ?? 0);
-        const prevAx = toX(prevKnot.points[ANCHOR_X] ?? 0);
-        const prevAy = toY(prevKnot.points[ANCHOR_Y] ?? 0);
-
-        if (cp1x !== prevAx || cp1y !== prevAy || cp2x !== ax || cp2y !== ay) {
-          parts.push(`C ${String(cp1x)} ${String(cp1y)} ${String(cp2x)} ${String(cp2y)} ${String(ax)} ${String(ay)}`);
-          continue;
-        }
-      }
-
-      parts.push(`L ${String(ax)} ${String(ay)}`);
+      continue;
     }
+
+    parts.push(buildKnotSegment(knot, path.knots[i - 1], scale, ax, ay));
   }
 
-  if (!path.open) {
-    parts.push('Z');
-  }
+  if (!path.open) parts.push('Z');
 
   return parts.join(' ');
 }
