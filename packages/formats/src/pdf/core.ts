@@ -537,15 +537,19 @@ async function renderImage(
   }
 }
 
+function labelForNonStaticElement(el: BroadsetElement): string {
+  if (el.type === 'clock') return el.content || '00:00';
+  if (el.type === 'ticker') return el.content || 'Ticker';
+
+  return 'Video';
+}
+
 function renderNonStaticElement(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
   renderRectangle(page, el, canvas, heightPt);
 
   const xPt = elementToPoints(canvas, el.position.x) + 4;
   const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height) + 4;
-  const label =
-    el.type === 'clock' ? el.content || '00:00'
-    : el.type === 'ticker' ? el.content || 'Ticker'
-    : 'Video';
+  const label = labelForNonStaticElement(el);
 
   page.drawText(label, {
     x: xPt,

@@ -99,6 +99,17 @@ function areEditorStateEqualIgnoringCanvas(
   return true;
 }
 
+function resolveAssetSourceUrl(source: {
+  readonly type: string;
+  readonly url?: string;
+  readonly dataUri?: string;
+}): string | null {
+  if (source.type === 'url') return source.url ?? null;
+  if (source.type === 'embedded') return source.dataUri ?? null;
+
+  return null;
+}
+
 const SAMPLE_MEDIA_ASSETS: readonly MediaAsset[] = (() => {
   const parsedProject = broadsetProjectSchema.safeParse(SAMPLE_PROJECT);
 
@@ -107,10 +118,7 @@ const SAMPLE_MEDIA_ASSETS: readonly MediaAsset[] = (() => {
   }
 
   return parsedProject.data.assets.flatMap((asset) => {
-    const sourceUrl =
-      asset.source.type === 'url' ? asset.source.url
-      : asset.source.type === 'embedded' ? asset.source.dataUri
-      : null;
+    const sourceUrl = resolveAssetSourceUrl(asset.source);
 
     if (sourceUrl === null) {
       return [];

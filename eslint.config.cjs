@@ -231,8 +231,6 @@ module.exports = [
       // bounded by literals, single-`+` quantifiers). Replaced by the prose
       // guidance in agents/instructions/typescript.instructions.md.
       'sonarjs/slow-regex': 'off',
-      // Bug-finders to enable one rule at a time after fixing existing violations.
-      'sonarjs/no-nested-conditional': 'off',
       // Conflicts with @typescript-eslint/no-non-null-assertion — the
       // non-null-assertion ban is stricter, keep that one.
       '@typescript-eslint/non-nullable-type-assertion-style': 'off',

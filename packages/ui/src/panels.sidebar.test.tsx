@@ -16,6 +16,13 @@ import {
   TEXT_ELEMENT,
 } from './panels-test-helpers';
 
+function pickAccessibleName(ariaLabel: string | null, labelText: string, controlText: string): string {
+  if (ariaLabel !== null && ariaLabel.length > 0) return ariaLabel;
+  if (labelText.length > 0) return labelText;
+
+  return controlText;
+}
+
 describe('PropertiesSidebar', () => {
   /** @description Empty state must display a placeholder message when no element is selected. */
   it('shows empty state when no elements provided', () => {
@@ -309,10 +316,7 @@ describe('PropertiesSidebar', () => {
         control.id.length > 0 ? region.querySelector<HTMLLabelElement>(`label[for="${control.id}"]`) : null;
       const labelText = labelElement === null ? '' : labelElement.textContent.trim();
       const controlText = control.textContent.trim();
-      const accessibleName =
-        ariaLabel !== null && ariaLabel.length > 0 ? ariaLabel
-        : labelText.length > 0 ? labelText
-        : controlText;
+      const accessibleName = pickAccessibleName(ariaLabel, labelText, controlText);
 
       expect(accessibleName.length).toBeGreaterThan(0);
     }

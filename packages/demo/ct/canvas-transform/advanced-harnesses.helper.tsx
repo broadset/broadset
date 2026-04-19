@@ -462,10 +462,8 @@ export function ViewportInteractionHarness(): JSX.Element {
             return;
           }
 
-          const nextZoom =
-            event.deltaMode === 0 ?
-              clampZoom(zoom - event.deltaY * 0.002)
-            : clampZoom(zoom + (event.deltaY < 0 ? 0.1 : -0.1));
+          const zoomStep = event.deltaY < 0 ? 0.1 : -0.1;
+          const nextZoom = event.deltaMode === 0 ? clampZoom(zoom - event.deltaY * 0.002) : clampZoom(zoom + zoomStep);
 
           if (nextZoom === zoom) {
             return;

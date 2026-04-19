@@ -147,6 +147,13 @@ function renderClipPathDef(elementId: string, clipPath: string): string {
   return `<clipPath id="${clipId}"><path d="${escapeXml(clipPath)}"/></clipPath>`;
 }
 
+function textAnchorForAlignment(alignment: string): string {
+  if (alignment === 'left') return 'start';
+  if (alignment === 'right') return 'end';
+
+  return 'middle';
+}
+
 function buildTextAttrs(style: BroadsetElementStyle): string {
   const attrs: string[] = [];
 
@@ -171,12 +178,7 @@ function buildTextAttrs(style: BroadsetElementStyle): string {
   }
 
   if (style.textAlignment) {
-    const anchor =
-      style.textAlignment === 'left' ? 'start'
-      : style.textAlignment === 'right' ? 'end'
-      : 'middle';
-
-    attrs.push(`text-anchor="${anchor}"`);
+    attrs.push(`text-anchor="${textAnchorForAlignment(style.textAlignment)}"`);
   }
 
   if (style.textDecoration) {

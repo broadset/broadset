@@ -1,6 +1,6 @@
 import { sanitizeTextContent } from '@broadset/model';
 
-import type { EditorStore } from './store-actions';
+import type { EditingMode, EditorStore } from './store-actions';
 
 export type FormattingType = 'bold' | 'italic' | 'underline' | 'color' | 'fontSize';
 
@@ -41,12 +41,16 @@ export function stopInlineTextEditing(store: EditorStore): void {
 
   store.setState({
     inlineTextEditingElementId: null,
-    editingMode:
-      state.pendingPlacementType !== null ? { type: 'placement', elementType: state.pendingPlacementType }
-      : state.pathEditingElementId !== null ? { type: 'path-editing', elementId: state.pathEditingElementId }
-      : state.pathDrawingElementId !== null ? { type: 'path-drawing', elementId: state.pathDrawingElementId }
-      : { type: 'none' },
+    editingMode: nextEditingModeAfterInlineText(state),
   });
+}
+
+function nextEditingModeAfterInlineText(state: ReturnType<EditorStore['getState']>): EditingMode {
+  if (state.pendingPlacementType !== null) return { type: 'placement', elementType: state.pendingPlacementType };
+  if (state.pathEditingElementId !== null) return { type: 'path-editing', elementId: state.pathEditingElementId };
+  if (state.pathDrawingElementId !== null) return { type: 'path-drawing', elementId: state.pathDrawingElementId };
+
+  return { type: 'none' };
 }
 
 /**

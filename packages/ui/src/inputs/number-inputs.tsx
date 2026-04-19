@@ -95,6 +95,19 @@ const COMPACT_INPUT_STYLE = {
   textAlign: 'center' as const,
 };
 
+function arrowStepMultiplier(event: { readonly shiftKey: boolean; readonly altKey: boolean }): number {
+  if (event.shiftKey) return 10;
+  if (event.altKey) return 0.1;
+
+  return 1;
+}
+
+function pickButtonProps(isCompact: boolean, ariaLabel: string): Record<string, unknown> {
+  if (!isCompact) return {};
+
+  return { 'aria-label': ariaLabel, style: COMPACT_BUTTON_STYLE };
+}
+
 function pickGroupStyle(isEmbedded: boolean, isCompact: boolean): { readonly style?: Record<string, unknown> } {
   if (isEmbedded) return { style: EMBEDDED_GROUP_STYLE };
   if (isCompact) return { style: COMPACT_GROUP_STYLE };
@@ -222,12 +235,8 @@ export function NumField({
         event.preventDefault();
 
         const direction = event.key === 'ArrowUp' ? 1 : -1;
-        const multiplier =
-          event.shiftKey ? 10
-          : event.altKey ? 0.1
-          : 1;
 
-        commitValue(localValue + direction * step * multiplier);
+        commitValue(localValue + direction * step * arrowStepMultiplier(event));
         skipNextBlurCommit.current = true;
       }
     },
@@ -289,22 +298,14 @@ export function NumField({
       data-embedded={isEmbedded ? 'true' : undefined}
     >
       <NumberField.Group {...pickGroupStyle(isEmbedded, isCompact)}>
-        {isEmbedded ? null : (
-          <NumberField.DecrementButton
-            {...(isCompact ? { 'aria-label': `Decrement ${label}`, style: COMPACT_BUTTON_STYLE } : {})}
-          />
-        )}
+        {isEmbedded ? null : <NumberField.DecrementButton {...pickButtonProps(isCompact, `Decrement ${label}`)} />}
         <NumberField.Input
           onChange={handleInputChange}
           onBlur={handleInputBlur}
           onKeyDown={handleInputKeyDown}
           {...pickInputStyle(isEmbedded, isCompact)}
         />
-        {isEmbedded ? null : (
-          <NumberField.IncrementButton
-            {...(isCompact ? { 'aria-label': `Increment ${label}`, style: COMPACT_BUTTON_STYLE } : {})}
-          />
-        )}
+        {isEmbedded ? null : <NumberField.IncrementButton {...pickButtonProps(isCompact, `Increment ${label}`)} />}
       </NumberField.Group>
     </NumberField>
   );

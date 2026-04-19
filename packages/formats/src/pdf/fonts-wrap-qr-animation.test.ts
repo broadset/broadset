@@ -4,6 +4,15 @@ import { describe, expect, it } from '@jest/globals';
 import { drawQrOnPage, exportPdfBytes, normalizeFontFamily, resolveGoogleFontUrl, wrapText } from './index';
 import { makeDocument, makeElement, makeStyle } from './test-helpers';
 
+type FetchInput = string | Request | URL;
+
+function urlFromFetchInput(input: FetchInput): string {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.href;
+
+  return input.url;
+}
+
 describe('Font Embedding', () => {
   /**
    * @description Font family names must be normalized for deduplication:
@@ -34,10 +43,7 @@ describe('Font Embedding', () => {
   it('deduplicates font fetches for duplicate family names', async () => {
     const fetchCalls: string[] = [];
     const mockFetch = (input: string | Request | URL): Promise<Response> => {
-      const url =
-        typeof input === 'string' ? input
-        : input instanceof URL ? input.href
-        : input.url;
+      const url = urlFromFetchInput(input);
 
       fetchCalls.push(url);
 
@@ -75,11 +81,7 @@ describe('Font Embedding', () => {
   it('uses standard font without fetch for known families', async () => {
     const fetchCalls: string[] = [];
     const mockFetch = (input: string | Request | URL): Promise<Response> => {
-      fetchCalls.push(
-        typeof input === 'string' ? input
-        : input instanceof URL ? input.href
-        : input.url,
-      );
+      fetchCalls.push(urlFromFetchInput(input));
 
       return Promise.resolve(new Response('', { status: 404 }));
     };

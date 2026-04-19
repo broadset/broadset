@@ -1,7 +1,7 @@
 import { createDefaultElement, type EditorConfig, editorConfigSchema } from '@broadset/model';
 
 import { getElementDefaults, type PluginDefaults } from '../element-defaults';
-import type { EditorStore } from '../store-actions';
+import type { EditingMode, EditorStore } from '../store-actions';
 
 const COORDINATE_PRECISION = 2;
 
@@ -99,15 +99,18 @@ export function startPathEditing(store: EditorStore, elementId: string): void {
   });
 }
 
-export function stopPathEditing(store: EditorStore): void {
-  const state = store.getState();
+function resolveEditingMode(state: ReturnType<EditorStore['getState']>, options: { readonly excludeDrawing?: boolean; readonly excludeEditing?: boolean }): EditingMode {
+  if (state.pendingPlacementType !== null) return { type: 'placement', elementType: state.pendingPlacementType };
+  if (!options.excludeDrawing && state.pathDrawingElementId !== null) return { type: 'path-drawing', elementId: state.pathDrawingElementId };
+  if (!options.excludeEditing && state.pathEditingElementId !== null) return { type: 'path-editing', elementId: state.pathEditingElementId };
 
+  return { type: 'none' };
+}
+
+export function stopPathEditing(store: EditorStore): void {
   store.setState({
     pathEditingElementId: null,
-    editingMode:
-      state.pendingPlacementType !== null ? { type: 'placement', elementType: state.pendingPlacementType }
-      : state.pathDrawingElementId !== null ? { type: 'path-drawing', elementId: state.pathDrawingElementId }
-      : { type: 'none' },
+    editingMode: resolveEditingMode(store.getState(), { excludeEditing: true }),
   });
 }
 
@@ -125,14 +128,9 @@ export function startPathDrawing(store: EditorStore, elementId: string): void {
 }
 
 export function stopPathDrawing(store: EditorStore): void {
-  const state = store.getState();
-
   store.setState({
     pathDrawingElementId: null,
-    editingMode:
-      state.pendingPlacementType !== null ? { type: 'placement', elementType: state.pendingPlacementType }
-      : state.pathEditingElementId !== null ? { type: 'path-editing', elementId: state.pathEditingElementId }
-      : { type: 'none' },
+    editingMode: resolveEditingMode(store.getState(), { excludeDrawing: true }),
   });
 }
 

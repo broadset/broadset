@@ -18,6 +18,21 @@ export interface ToggleRowProps<V extends string> {
   readonly onToggle?: ((value: V, nextActive: boolean) => void) | undefined;
 }
 
+function renderToggleContent<V extends string>(item: ToggleRowItem<V>): ReactNode {
+  if (item.icon !== undefined) {
+    return (
+      <span style={{ alignItems: 'center', display: 'inline-flex', gap: 4 }}>
+        {item.icon}
+        {item.label !== undefined ? <span>{item.label}</span> : null}
+      </span>
+    );
+  }
+
+  if (item.label !== undefined) return <span>{item.label}</span>;
+
+  return null;
+}
+
 /**
  * Dense horizontal cluster of icon toggle buttons. Used for:
  *  - Text formatting (B/I/U/S) — independent toggles via onToggle
@@ -48,16 +63,7 @@ export function ToggleRow<V extends string>({
             }
           }}
         >
-          {item.icon !== undefined ?
-            <span style={{ alignItems: 'center', display: 'inline-flex', gap: 4 }}>
-              {item.icon}
-              {item.label !== undefined ?
-                <span>{item.label}</span>
-              : null}
-            </span>
-          : item.label !== undefined ?
-            <span>{item.label}</span>
-          : null}
+          {renderToggleContent(item)}
         </Button>
       ))}
     </ButtonGroup>

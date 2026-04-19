@@ -140,15 +140,19 @@ export function computeGridLines(options: GridLineOptions): readonly GridLine[] 
 }
 
 /** Computes ruler tick positions and labels using a readable nice-step interval for the current zoom level. */
+function pixelsPerUnitFor(unit: 'mm' | 'in' | 'px'): number {
+  if (unit === 'mm') return PX_PER_MM;
+  if (unit === 'in') return PX_PER_INCH;
+
+  return 1;
+}
+
 export function computeRulerTicks(options: RulerTickOptions): readonly RulerTick[] {
   if (options.zoom <= 0 || options.length <= 0) {
     return [];
   }
 
-  const pixelsPerUnit =
-    options.unit === 'mm' ? PX_PER_MM
-    : options.unit === 'in' ? PX_PER_INCH
-    : 1;
+  const pixelsPerUnit = pixelsPerUnitFor(options.unit);
   const targetPixelGap = 80;
   const rawUnitGap = targetPixelGap / (pixelsPerUnit * options.zoom);
   const tickInterval = snapToNiceInterval(rawUnitGap);

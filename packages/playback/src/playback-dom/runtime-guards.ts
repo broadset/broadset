@@ -12,6 +12,13 @@ function isKnownVisibility(value: string | undefined): value is VisibilityState 
   return value === 'onscreen' || value === 'offscreen';
 }
 
+function resolveVisibility(dataVisibility: string | undefined, classList: DOMTokenList): VisibilityState {
+  if (isKnownVisibility(dataVisibility)) return dataVisibility;
+  if (classList.contains('offscreen')) return 'offscreen';
+
+  return 'onscreen';
+}
+
 export function findContentTarget(container: HTMLElement): HTMLElement {
   const target = container.querySelector<HTMLElement>('[data-element-content]');
 
@@ -37,10 +44,7 @@ export function parseElementRuntimeState(args: {
   readonly config: ElementAnimationConfig;
 }): ParsedElementRuntimeState {
   const dataVisibility = args.element.dataset['visibility'];
-  const visibility =
-    isKnownVisibility(dataVisibility) ? dataVisibility
-    : args.element.classList.contains('offscreen') ? 'offscreen'
-    : 'onscreen';
+  const visibility = resolveVisibility(dataVisibility, args.element.classList);
 
   let activeState: string | null = null;
 

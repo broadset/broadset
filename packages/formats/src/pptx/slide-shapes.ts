@@ -70,6 +70,13 @@ function decodeDataUriForPptx(uri: string): DecodedData | undefined {
   return { mime, bytes: encoder.encode(decodeURIComponent(data)) };
 }
 
+function extensionForMime(mime: string): string {
+  if (mime.includes('png')) return 'png';
+  if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpg';
+
+  return 'png';
+}
+
 function escapeXml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -233,10 +240,7 @@ function buildImagePicXml(
     return buildRectShapeXml(el, x, y, cx, cy, rot);
   }
 
-  const ext =
-    decoded.mime.includes('png') ? 'png'
-    : decoded.mime.includes('jpeg') || decoded.mime.includes('jpg') ? 'jpg'
-    : 'png';
+  const ext = extensionForMime(decoded.mime);
   const mediaName = `image${String(ctx.nextMediaId)}.${ext}`;
 
   ctx.nextMediaId++;

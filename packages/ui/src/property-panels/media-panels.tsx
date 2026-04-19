@@ -212,6 +212,14 @@ export interface TickerPanelProps {
   readonly onUpdateItems: (items: readonly string[]) => void;
 }
 
+function tickerDirectionIcon(dir: (typeof TICKER_DIRECTIONS)[number]): JSX.Element {
+  if (dir === 'left') return <ArrowLeft size={ICON_SIZE} />;
+  if (dir === 'right') return <ArrowRight size={ICON_SIZE} />;
+  if (dir === 'up') return <ArrowUp size={ICON_SIZE} />;
+
+  return <ArrowDown size={ICON_SIZE} />;
+}
+
 export function TickerPanel({
   items,
   speed,
@@ -361,11 +369,7 @@ export function TickerPanel({
           items={TICKER_DIRECTIONS.map((dir) => ({
             value: dir,
             ariaLabel: `Direction ${dir}`,
-            icon:
-              dir === 'left' ? <ArrowLeft size={ICON_SIZE} />
-              : dir === 'right' ? <ArrowRight size={ICON_SIZE} />
-              : dir === 'up' ? <ArrowUp size={ICON_SIZE} />
-              : <ArrowDown size={ICON_SIZE} />,
+            icon: tickerDirectionIcon(dir),
             isActive: direction === dir,
           }))}
           onChange={(nextValue) => {

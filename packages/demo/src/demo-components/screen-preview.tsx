@@ -88,10 +88,11 @@ function applyWheelZoom(
   onViewportChange: ViewportChangeFn,
 ): void {
   const { panX: currentPanX, panY: currentPanY, zoom: currentZoom } = viewport;
+  const zoomStep = event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
   const nextZoom =
     event.deltaMode === 0 ?
       clampCanvasZoom(currentZoom - event.deltaY * 0.002)
-    : clampCanvasZoom(currentZoom + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
+    : clampCanvasZoom(currentZoom + zoomStep);
 
   if (nextZoom === currentZoom) return;
 

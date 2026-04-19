@@ -138,6 +138,13 @@ function ScrubChip({
   );
 }
 
+function stepMultiplier(modifier: { readonly shift: boolean; readonly alt: boolean }): number {
+  if (modifier.shift) return 10;
+  if (modifier.alt) return 0.1;
+
+  return 1;
+}
+
 function cellFrameStyle(isDisabled: boolean): CSSProperties {
   return {
     alignItems: 'stretch',
@@ -162,10 +169,7 @@ function AxisCellView({ cell }: { readonly cell: AxisCell }): JSX.Element {
         return;
       }
 
-      const multiplier =
-        modifier.shift ? 10
-        : modifier.alt ? 0.1
-        : 1;
+      const multiplier = stepMultiplier(modifier);
       const next = cell.value + delta * step * multiplier;
       const clampMin = cell.min !== undefined ? Math.max(cell.min, next) : next;
       const clamped = cell.max !== undefined ? Math.min(cell.max, clampMin) : clampMin;

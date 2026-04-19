@@ -182,10 +182,9 @@ jest.mock(
           value = 0,
           ...restProps
         } = props;
-        const resolvedLabel =
-          typeof props['aria-label'] === 'string' ? props['aria-label']
-          : typeof label === 'string' ? label
-          : '';
+        const ariaLabel = typeof props['aria-label'] === 'string' ? props['aria-label'] : null;
+        const labelString = typeof label === 'string' ? label : '';
+        const resolvedLabel = ariaLabel ?? labelString;
         const domProps = sanitizeDomProps(restProps);
 
         return ReactActual.createElement(

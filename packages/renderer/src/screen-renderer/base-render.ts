@@ -311,11 +311,7 @@ class DOMScreenRenderer implements ScreenRendererController {
     contentHost.style.boxSizing = 'border-box';
     contentHost.style.overflow = style.clipChildren === true ? 'hidden' : 'visible';
 
-    const maskValue =
-      style.maskType === 'none' || style.maskType === undefined || style.customClipPath === undefined ?
-        ''
-      : style.customClipPath.trim() === '' ? ''
-      : style.customClipPath;
+    const maskValue = resolveClipPathValue(style.maskType, style.customClipPath);
 
     contentHost.style.clipPath = maskValue;
     // Parented elements use model-space coordinates relative to their parent's top-left.
@@ -367,6 +363,13 @@ class DOMScreenRenderer implements ScreenRendererController {
     this.canvasScaleShell.style.height = toPixelValue(this.currentDocument.canvas.height * safeScale);
     this.canvasRoot.style.transform = `scale(${String(safeScale)})`;
   }
+}
+
+function resolveClipPathValue(maskType: string | undefined, customClipPath: string | undefined): string {
+  if (maskType === 'none' || maskType === undefined || customClipPath === undefined) return '';
+  if (customClipPath.trim() === '') return '';
+
+  return customClipPath;
 }
 
 function buildTransformList(element: BroadsetElement, style: BroadsetElementStyle): string {

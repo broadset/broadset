@@ -2,6 +2,7 @@ import {
   type BroadsetDocument,
   broadsetDocumentSchema,
   type BroadsetElement,
+  type BroadsetGradient,
   type BroadsetProject,
   type PageElementInstance,
 } from '@broadset/model';
@@ -352,12 +353,53 @@ function isDescendantOf(
   return false;
 }
 
+function serializeBackgroundGradient(value: string | BroadsetGradient | undefined): string {
+  if (typeof value === 'string') return value;
+  if (value === undefined) return '';
+
+  return JSON.stringify(value);
+}
+
 function isTargetOrDescendant(
   candidateId: string,
   targetId: string,
   elementsById: ReadonlyMap<string, BroadsetElement>,
 ): boolean {
   return candidateId === targetId || isDescendantOf(candidateId, targetId, elementsById);
+}
+
+function findEndOfSubtreeIndex(
+  startIndex: number,
+  layerOrderIds: readonly string[],
+  targetId: string,
+  elementsById: ReadonlyMap<string, BroadsetElement>,
+): number {
+  let lastSubtreeIndex = startIndex;
+
+  for (let index = startIndex + 1; index < layerOrderIds.length; index += 1) {
+    const candidateId = layerOrderIds[index];
+
+    if (candidateId === undefined || !isTargetOrDescendant(candidateId, targetId, elementsById)) {
+      break;
+    }
+
+    lastSubtreeIndex = index;
+  }
+
+  return lastSubtreeIndex + 1;
+}
+
+function computeInsertionIndex(
+  position: LayerDropPosition,
+  targetIndex: number,
+  layerOrderIds: readonly string[],
+  targetId: string,
+  elementsById: ReadonlyMap<string, BroadsetElement>,
+): number {
+  if (position === 'before') return targetIndex + 1;
+  if (position !== 'after') return targetIndex;
+
+  return findEndOfSubtreeIndex(targetIndex, layerOrderIds, targetId, elementsById);
 }
 
 export function reorderDocumentLayers(
@@ -409,24 +451,7 @@ export function reorderDocumentLayers(
     return document;
   }
 
-  const insertionIndex =
-    position === 'before' ? targetIndex + 1
-    : position !== 'after' ? targetIndex
-    : (() => {
-        let lastSubtreeIndex = targetIndex;
-
-        for (let index = targetIndex + 1; index < remainingLayerOrderIds.length; index += 1) {
-          const candidateId = remainingLayerOrderIds[index];
-
-          if (candidateId === undefined || !isTargetOrDescendant(candidateId, targetId, elementsById)) {
-            break;
-          }
-
-          lastSubtreeIndex = index;
-        }
-
-        return lastSubtreeIndex + 1;
-      })();
+  const insertionIndex = computeInsertionIndex(position, targetIndex, remainingLayerOrderIds, targetId, elementsById);
 
   const nextLayerOrderIds = [
     ...remainingLayerOrderIds.slice(0, insertionIndex),
@@ -570,10 +595,7 @@ export function toPanelElement(element: BroadsetElement, instance?: PageElementI
     height: element.height,
     rotation: instance !== undefined ? instance.transform.rotation.z : element.rotation,
     backgroundColor: element.style.backgroundColor ?? '',
-    backgroundGradient:
-      typeof element.style.backgroundGradient === 'string' ? element.style.backgroundGradient
-      : element.style.backgroundGradient === undefined ? ''
-      : JSON.stringify(element.style.backgroundGradient),
+    backgroundGradient: serializeBackgroundGradient(element.style.backgroundGradient),
     borderWidth: element.style.borderWidth ?? 0,
     borderColor: element.style.borderColor ?? '',
     borderStyle: typeof element.style.borderStyle === 'string' ? element.style.borderStyle : 'solid',

@@ -46,15 +46,24 @@ function mockInput(p: Record<string, unknown>) {
   return React.createElement('input', {
     ...rest,
     'aria-label': p['aria-label'] ?? label,
-    onChange:
-      typeof onValueChange === 'function' ?
-        (e: React.ChangeEvent<HTMLInputElement>) => {
-          (onValueChange as (v: string) => void)(e.currentTarget.value);
-        }
-      : typeof onChange === 'function' ? onChange
-      : undefined,
+    onChange: resolveTextInputChangeHandler(onValueChange, onChange),
     value: p['value'] ?? '',
   });
+}
+
+function resolveTextInputChangeHandler(
+  onValueChange: unknown,
+  onChange: unknown,
+): ((e: React.ChangeEvent<HTMLInputElement>) => void) | undefined {
+  if (typeof onValueChange === 'function') {
+    return (e: React.ChangeEvent<HTMLInputElement>) => {
+      (onValueChange as (v: string) => void)(e.currentTarget.value);
+    };
+  }
+
+  if (typeof onChange === 'function') return onChange as (e: React.ChangeEvent<HTMLInputElement>) => void;
+
+  return undefined;
 }
 
 function mockNumberFieldRoot(p: Record<string, unknown>) {

@@ -8,6 +8,13 @@ const ARROW_STEP = 1;
 const SHIFT_MULTIPLIER = 10;
 const ALT_MULTIPLIER = 0.1;
 
+function arrowMultiplier(event: { readonly shiftKey: boolean; readonly altKey: boolean }): number {
+  if (event.shiftKey) return SHIFT_MULTIPLIER;
+  if (event.altKey) return ALT_MULTIPLIER;
+
+  return 1;
+}
+
 export interface AngleDialProps {
   readonly value: number;
   readonly onChange: (next: number) => void;
@@ -125,16 +132,10 @@ export function AngleDial({ value, onChange, ariaLabel, size = 56, isDisabled }:
 
     if (event.key === 'ArrowUp' || event.key === 'ArrowRight') {
       event.preventDefault();
-
-      const multiplier = event.shiftKey ? SHIFT_MULTIPLIER : event.altKey ? ALT_MULTIPLIER : 1;
-
-      onChange(normalizeAngle(value + ARROW_STEP * multiplier));
+      onChange(normalizeAngle(value + ARROW_STEP * arrowMultiplier(event)));
     } else if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') {
       event.preventDefault();
-
-      const multiplier = event.shiftKey ? SHIFT_MULTIPLIER : event.altKey ? ALT_MULTIPLIER : 1;
-
-      onChange(normalizeAngle(value - ARROW_STEP * multiplier));
+      onChange(normalizeAngle(value - ARROW_STEP * arrowMultiplier(event)));
     } else if (event.key === 'Home') {
       event.preventDefault();
       onChange(0);

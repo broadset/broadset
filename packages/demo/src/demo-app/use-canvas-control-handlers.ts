@@ -148,21 +148,25 @@ export function useCanvasControlHandlers({
       const centerX = left + (right - left) / 2;
       const centerY = top + (bottom - top) / 2;
 
+      const xFor = (element: { readonly width: number; readonly position: { readonly x: number } }): number => {
+        if (action === 'left') return left;
+        if (action === 'center-x') return centerX - element.width / 2;
+        if (action === 'right') return right - element.width;
+
+        return element.position.x;
+      };
+      const yFor = (element: { readonly height: number; readonly position: { readonly y: number } }): number => {
+        if (action === 'top') return top;
+        if (action === 'center-y') return centerY - element.height / 2;
+        if (action === 'bottom') return bottom - element.height;
+
+        return element.position.y;
+      };
+
       editorStore.getState().commitGroupMove(
         selectedMovableElements.map((element) => ({
           elementId: element.id,
-          position: {
-            x:
-              action === 'left' ? left
-              : action === 'center-x' ? centerX - element.width / 2
-              : action === 'right' ? right - element.width
-              : element.position.x,
-            y:
-              action === 'top' ? top
-              : action === 'center-y' ? centerY - element.height / 2
-              : action === 'bottom' ? bottom - element.height
-              : element.position.y,
-          },
+          position: { x: xFor(element), y: yFor(element) },
         })),
       );
       pushToast('success', 'Aligned the selected elements.');

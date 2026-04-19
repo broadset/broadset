@@ -31,6 +31,13 @@ const CORNERS_DEFAULT_LABELS = [
 
 const SCRUB_STEP_PX = 2;
 
+function scrubMultiplier(modifier: { readonly shift: boolean; readonly alt: boolean }): number {
+  if (modifier.shift) return 10;
+  if (modifier.alt) return 0.1;
+
+  return 1;
+}
+
 function chipStyle(isDisabled: boolean): CSSProperties {
   return {
     alignItems: 'center',
@@ -217,11 +224,7 @@ export function QuadInput({
                 chip={chip}
                 ariaLabel={ariaLabel}
                 onScrub={(delta, modifier) => {
-                  const multiplier =
-                    modifier.shift ? 10
-                    : modifier.alt ? 0.1
-                    : 1;
-                  const next = Math.max(min, cellValue + delta * multiplier);
+                  const next = Math.max(min, cellValue + delta * scrubMultiplier(modifier));
 
                   handleCellChange(index, next);
                 }}

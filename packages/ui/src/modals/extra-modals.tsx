@@ -160,6 +160,66 @@ export interface TemplateBrowserModalProps {
   readonly onClose: () => void;
 }
 
+interface TemplatePickerProps {
+  readonly templates: readonly TemplateEntry[];
+  readonly filteredTemplates: readonly TemplateEntry[];
+  readonly sortedCategories: readonly string[];
+  readonly groupedTemplates: Record<string, TemplateEntry[]>;
+  readonly selectedTemplate: TemplateEntry | null;
+  readonly setSelectedTemplate: (t: TemplateEntry) => void;
+}
+
+function renderTemplatePicker({
+  templates,
+  filteredTemplates,
+  sortedCategories,
+  groupedTemplates,
+  selectedTemplate,
+  setSelectedTemplate,
+}: TemplatePickerProps): JSX.Element | readonly JSX.Element[] {
+  if (templates.length === 0) {
+    return <p style={{ color: color('muted'), textAlign: 'center', padding: sp('sp-05') }}>No templates available</p>;
+  }
+
+  if (filteredTemplates.length === 0) {
+    return <p style={{ color: color('muted'), textAlign: 'center', padding: sp('sp-05') }}>No templates found</p>;
+  }
+
+  return sortedCategories.map((category) => (
+    <div key={category} style={{ marginTop: sp('sp-04') }}>
+      <h4 style={{ fontWeight: 600, marginBottom: sp('sp-02') }}>{category}</h4>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+          gap: sp('sp-03'),
+        }}
+      >
+        {groupedTemplates[category]?.map((template) => (
+          <Button
+            key={template.id}
+            aria-label={template.name}
+            style={{
+              border: selectedTemplate?.id === template.id ? `2px solid ${color('accent')}` : '1px solid transparent',
+              padding: sp('sp-02'),
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}
+            variant="ghost"
+            onPress={() => {
+              setSelectedTemplate(template);
+            }}
+          >
+            <img alt={template.name} src={template.thumbnail} style={{ width: '100%', height: 'auto' }} />
+            <span>{template.name}</span>
+          </Button>
+        ))}
+      </div>
+    </div>
+  ));
+}
+
 export function TemplateBrowserModal({
   isOpen,
   templates,
@@ -216,45 +276,14 @@ export function TemplateBrowserModal({
           }}
         />
 
-        {templates.length === 0 ?
-          <p style={{ color: color('muted'), textAlign: 'center', padding: sp('sp-05') }}>No templates available</p>
-        : filteredTemplates.length === 0 ?
-          <p style={{ color: color('muted'), textAlign: 'center', padding: sp('sp-05') }}>No templates found</p>
-        : sortedCategories.map((category) => (
-            <div key={category} style={{ marginTop: sp('sp-04') }}>
-              <h4 style={{ fontWeight: 600, marginBottom: sp('sp-02') }}>{category}</h4>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-                  gap: sp('sp-03'),
-                }}
-              >
-                {groupedTemplates[category]?.map((template) => (
-                  <Button
-                    key={template.id}
-                    aria-label={template.name}
-                    style={{
-                      border:
-                        selectedTemplate?.id === template.id ? `2px solid ${color('accent')}` : '1px solid transparent',
-                      padding: sp('sp-02'),
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                    }}
-                    variant="ghost"
-                    onPress={() => {
-                      setSelectedTemplate(template);
-                    }}
-                  >
-                    <img alt={template.name} src={template.thumbnail} style={{ width: '100%', height: 'auto' }} />
-                    <span>{template.name}</span>
-                  </Button>
-                ))}
-              </div>
-            </div>
-          ))
-        }
+        {renderTemplatePicker({
+          templates,
+          filteredTemplates,
+          sortedCategories,
+          groupedTemplates,
+          selectedTemplate,
+          setSelectedTemplate,
+        })}
 
         {showConfirmation && (
           <div

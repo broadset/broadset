@@ -49,6 +49,8 @@ export interface BroadsetGradient {
   readonly center?: readonly [number, number] | undefined;
 }
 
+export type BackgroundGradientValue = string | BroadsetGradient | undefined;
+
 export interface BroadsetElementStyle {
   readonly opacity: number;
   readonly fontFamily?: string | undefined;
@@ -65,7 +67,7 @@ export interface BroadsetElementStyle {
   readonly textStroke?: string | undefined;
   readonly textShadow?: string | undefined;
   readonly backgroundColor?: string | undefined;
-  readonly backgroundGradient?: string | BroadsetGradient | undefined;
+  readonly backgroundGradient?: BackgroundGradientValue;
   readonly borderWidth?: number | undefined;
   readonly borderColor?: string | undefined;
   readonly borderRadius?: BorderRadiusTuple | undefined;
@@ -156,6 +158,19 @@ function maybeNormalizeColor(value: string | undefined): string | undefined {
   } catch {
     return value;
   }
+}
+
+function normalizeBackgroundGradient(value: BackgroundGradientValue): BackgroundGradientValue {
+  if (typeof value === 'string') return value;
+  if (value === undefined) return undefined;
+
+  return {
+    ...value,
+    stops: value.stops.map((stop) => ({
+      color: maybeNormalizeColor(stop.color) ?? stop.color,
+      position: stop.position,
+    })),
+  };
 }
 
 function normalizeFontWeight(value: number | undefined): FontWeight | undefined {
@@ -315,16 +330,7 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
     }
   })
   .transform((value): BroadsetElementStyle => {
-    const normalizedBackgroundGradient: string | BroadsetGradient | undefined =
-      typeof value.backgroundGradient === 'string' ? value.backgroundGradient
-      : value.backgroundGradient === undefined ? undefined
-      : {
-          ...value.backgroundGradient,
-          stops: value.backgroundGradient.stops.map((stop) => ({
-            color: maybeNormalizeColor(stop.color) ?? stop.color,
-            position: stop.position,
-          })),
-        };
+    const normalizedBackgroundGradient = normalizeBackgroundGradient(value.backgroundGradient);
 
     return {
       opacity: value.opacity,
