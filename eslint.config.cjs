@@ -217,24 +217,22 @@ module.exports = [
       '@typescript-eslint/no-unnecessary-boolean-literal-compare': 'error',
       // Circular-dependency detection — uses the existing import-x plugin.
       'import/no-cycle': ['error', { maxDepth: 10, ignoreExternal: true }],
-      // SonarJS code-smell detection — recommended preset minus the most
-      // false-positive-prone rules (regex shape, ternary style, unused-vars
-      // which duplicates/conflicts with our _prefix convention). Cognitive
-      // complexity uses the SonarJS default (15).
+      // SonarJS code-smell detection — recommended preset.
       ...sonarjsPlugin.configs.recommended.rules,
+      // Duplicates unused-imports/no-unused-vars (which honours our _prefix convention).
+      'sonarjs/no-unused-vars': 'off',
+      // Stylistic-only rules; don't earn their keep on this codebase. Real
+      // bug-finders (no-dead-store, no-all-duplicated-branches, etc.) remain on.
+      'sonarjs/prefer-regexp-exec': 'off',
+      'sonarjs/no-nested-functions': 'off',
+      'sonarjs/no-nested-template-literals': 'off',
+      'sonarjs/function-return-type': 'off',
+      // Bug-finders to enable one rule at a time after fixing existing violations.
       'sonarjs/no-nested-conditional': 'off',
       'sonarjs/slow-regex': 'off',
       'sonarjs/regex-complexity': 'off',
       'sonarjs/concise-regex': 'off',
-      'sonarjs/no-unused-vars': 'off',
-      // Subjective / stylistic sonarjs rules that don't earn their keep on an
-      // active codebase. Real bug-finders (no-dead-store, no-all-duplicated-branches,
-      // no-identical-conditions, etc.) remain on.
-      'sonarjs/prefer-regexp-exec': 'off',
-      'sonarjs/no-nested-functions': 'off',
       'sonarjs/pseudo-random': 'off',
-      'sonarjs/no-nested-template-literals': 'off',
-      'sonarjs/function-return-type': 'off',
       // Conflicts with @typescript-eslint/no-non-null-assertion — the
       // non-null-assertion ban is stricter, keep that one.
       '@typescript-eslint/non-nullable-type-assertion-style': 'off',
