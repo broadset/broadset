@@ -11,6 +11,108 @@ import { SelectionTransformWidget } from './selection-transform-widget';
 
 const WHEEL_GESTURE_LOCK_MS = 140;
 
+type ViewportChangeFn = (settings: { readonly panX?: number; readonly panY?: number; readonly zoom?: number }) => void;
+type PanWriteFn = (panX: number, panY: number) => void;
+type WheelIntent = 'pan' | 'zoom' | 'none';
+type WheelGesture = { readonly expiresAt: number; readonly intent: 'pan' | 'zoom' | null };
+type Viewport = { panX: number; panY: number; zoom: number };
+
+function handleLegacyWheelPan(
+  event: WheelEvent,
+  currentPanX: number,
+  currentPanY: number,
+  writePan: PanWriteFn,
+  onViewportChange: ViewportChangeFn,
+): boolean {
+  if (event.deltaMode === 0) return false;
+
+  if (event.ctrlKey || event.metaKey) {
+    event.preventDefault();
+
+    const nextPanX = currentPanX - event.deltaY;
+
+    writePan(nextPanX, currentPanY);
+    onViewportChange({ panX: nextPanX, panY: currentPanY });
+
+    return true;
+  }
+
+  if (event.altKey) {
+    event.preventDefault();
+
+    const nextPanY = currentPanY - event.deltaY;
+
+    writePan(currentPanX, nextPanY);
+    onViewportChange({ panX: currentPanX, panY: nextPanY });
+
+    return true;
+  }
+
+  return false;
+}
+
+function resolveWheelIntent(event: WheelEvent, gesture: WheelGesture): WheelIntent {
+  const rawIntent = classifyWheelInput({
+    altKey: event.altKey,
+    ctrlKey: event.ctrlKey || event.metaKey,
+    deltaMode: event.deltaMode,
+    deltaX: event.deltaX,
+    deltaY: event.deltaY,
+  });
+  const now = event.timeStamp;
+  const hasActiveWheelLock = gesture.intent !== null && now <= gesture.expiresAt;
+  const absoluteDeltaX = Math.abs(event.deltaX);
+  const absoluteDeltaY = Math.abs(event.deltaY);
+  const shouldPreferZoomLock =
+    hasActiveWheelLock &&
+    gesture.intent === 'zoom' &&
+    rawIntent === 'pan' &&
+    absoluteDeltaX <= 1 &&
+    absoluteDeltaY >= absoluteDeltaX * 2;
+
+  return shouldPreferZoomLock ? 'zoom' : rawIntent;
+}
+
+function resolveWheelBounds(event: WheelEvent, container: HTMLElement | null): DOMRect | null {
+  if (container !== null) return container.getBoundingClientRect();
+  if (event.target instanceof Element) return event.target.getBoundingClientRect();
+
+  return null;
+}
+
+function applyWheelZoom(
+  event: WheelEvent,
+  viewport: Viewport,
+  container: HTMLElement | null,
+  writePan: PanWriteFn,
+  onViewportChange: ViewportChangeFn,
+): void {
+  const { panX: currentPanX, panY: currentPanY, zoom: currentZoom } = viewport;
+  const nextZoom =
+    event.deltaMode === 0 ?
+      clampCanvasZoom(currentZoom - event.deltaY * 0.002)
+    : clampCanvasZoom(currentZoom + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
+
+  if (nextZoom === currentZoom) return;
+
+  const bounds = resolveWheelBounds(event, container);
+
+  if (bounds === null) return;
+
+  const cursorX = event.clientX - bounds.left;
+  const cursorY = event.clientY - bounds.top;
+  const worldX = (cursorX - currentPanX) / currentZoom;
+  const worldY = (cursorY - currentPanY) / currentZoom;
+  const nextPanX = cursorX - worldX * nextZoom;
+  const nextPanY = cursorY - worldY * nextZoom;
+
+  writePan(nextPanX, nextPanY);
+  viewport.panX = nextPanX;
+  viewport.panY = nextPanY;
+  viewport.zoom = nextZoom;
+  onViewportChange({ panX: nextPanX, panY: nextPanY, zoom: nextZoom });
+}
+
 interface ScreenPreviewProps {
   readonly allElements: readonly BroadsetElement[];
   readonly selectedElement: BroadsetElement | null;
@@ -350,61 +452,17 @@ export function ScreenPreview({
       // Must be attached as a non-passive native listener so preventDefault actually suppresses scroll.
       event.preventDefault();
 
-      const isLegacyWheel = event.deltaMode !== 0;
-      const { panX: currentPanX, panY: currentPanY, zoom: currentZoom } = viewportRef.current;
+      const { panX: currentPanX, panY: currentPanY } = viewportRef.current;
 
-      if (isLegacyWheel && (event.ctrlKey || event.metaKey)) {
-        event.preventDefault();
+      if (handleLegacyWheelPan(event, currentPanX, currentPanY, writePanLayerTransformNow, onViewportChange)) return;
 
-        const nextPanX = currentPanX - event.deltaY;
-
-        writePanLayerTransformNow(nextPanX, currentPanY);
-        onViewportChange({ panX: nextPanX, panY: currentPanY });
-
-        return;
-      }
-
-      if (isLegacyWheel && event.altKey) {
-        event.preventDefault();
-
-        const nextPanY = currentPanY - event.deltaY;
-
-        writePanLayerTransformNow(currentPanX, nextPanY);
-        onViewportChange({ panX: currentPanX, panY: nextPanY });
-
-        return;
-      }
-
-      const rawIntent = classifyWheelInput({
-        altKey: event.altKey,
-        ctrlKey: event.ctrlKey || event.metaKey,
-        deltaMode: event.deltaMode,
-        deltaX: event.deltaX,
-        deltaY: event.deltaY,
-      });
-
-      const now = event.timeStamp;
-      const hasActiveWheelLock = wheelGestureRef.current.intent !== null && now <= wheelGestureRef.current.expiresAt;
-      const absoluteDeltaX = Math.abs(event.deltaX);
-      const absoluteDeltaY = Math.abs(event.deltaY);
-      const shouldPreferZoomLock =
-        hasActiveWheelLock &&
-        wheelGestureRef.current.intent === 'zoom' &&
-        rawIntent === 'pan' &&
-        absoluteDeltaX <= 1 &&
-        absoluteDeltaY >= absoluteDeltaX * 2;
-      const intent = shouldPreferZoomLock ? 'zoom' : rawIntent;
+      const intent = resolveWheelIntent(event, wheelGestureRef.current);
 
       if (intent !== 'none') {
-        wheelGestureRef.current = {
-          expiresAt: now + WHEEL_GESTURE_LOCK_MS,
-          intent,
-        };
+        wheelGestureRef.current = { expiresAt: event.timeStamp + WHEEL_GESTURE_LOCK_MS, intent };
       }
 
-      if (intent === 'none') {
-        return;
-      }
+      if (intent === 'none') return;
 
       if (intent === 'pan') {
         const nextPanX = currentPanX - event.deltaX;
@@ -416,41 +474,7 @@ export function ScreenPreview({
         return;
       }
 
-      const nextZoom =
-        event.deltaMode === 0 ?
-          clampCanvasZoom(currentZoom - event.deltaY * 0.002)
-        : clampCanvasZoom(currentZoom + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
-
-      if (nextZoom === currentZoom) {
-        return;
-      }
-
-      const container = containerRef.current;
-      const bounds =
-        container === null ?
-          event.target instanceof Element ?
-            event.target.getBoundingClientRect()
-          : null
-        : container.getBoundingClientRect();
-
-      if (bounds === null) {
-        return;
-      }
-
-      const cursorX = event.clientX - bounds.left;
-      const cursorY = event.clientY - bounds.top;
-      const worldX = (cursorX - currentPanX) / currentZoom;
-      const worldY = (cursorY - currentPanY) / currentZoom;
-      const nextPanX = cursorX - worldX * nextZoom;
-      const nextPanY = cursorY - worldY * nextZoom;
-
-      writePanLayerTransformNow(nextPanX, nextPanY);
-      viewportRef.current = { panX: nextPanX, panY: nextPanY, zoom: nextZoom };
-      onViewportChange({
-        panX: nextPanX,
-        panY: nextPanY,
-        zoom: nextZoom,
-      });
+      applyWheelZoom(event, viewportRef.current, containerRef.current, writePanLayerTransformNow, onViewportChange);
     },
     [onViewportChange, writePanLayerTransformNow],
   );
