@@ -10,8 +10,6 @@ The five-phase strictness rollout (react-hooks bug-finders → jsx-a11y → type
 |---|---|---|
 | [packages/ui/src/properties-sidebar.tsx](../../packages/ui/src/properties-sidebar.tsx) | `PropertiesSidebar` | 103 |
 | [packages/playback/src/playback-controller.ts](../../packages/playback/src/playback-controller.ts) | `syncTransitions` | 57 |
-| [packages/formats/src/psd/import.ts](../../packages/formats/src/psd/import.ts) | `layerToElement` | 56 |
-| [packages/formats/src/psd/export-layer.ts](../../packages/formats/src/psd/export-layer.ts) | `elementToLayer` | 54 |
 
 ## Ratchet plan
 
@@ -25,4 +23,3 @@ The five-phase strictness rollout (react-hooks bug-finders → jsx-a11y → type
 
 - `PropertiesSidebar`: split per element-type into smaller dispatcher components; keep capability-driven visibility intact.
 - `syncTransitions`: extract per-direction (enter/exit/loop/hold) handlers into named helpers.
-- `layerToElement` / `elementToLayer` (PSD): split text / vector / raster / group paths into separate functions.

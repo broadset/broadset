@@ -77,16 +77,86 @@ function detectLayerColor(
   };
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity -- cc=56; PSD layer dispatch (text/vector/raster/group + effects); see lint-strictness-plan.md Phase 4 followup.
-function layerToElement(layer: Layer): BroadsetElement | undefined {
+interface LayerGeometry {
+  readonly position: { readonly x: number; readonly y: number };
+  readonly width: number;
+  readonly height: number;
+}
+
+function extractGeometry(layer: Layer): LayerGeometry {
   const left = layer.left ?? 0;
   const top = layer.top ?? 0;
   const right = layer.right ?? left;
   const bottom = layer.bottom ?? top;
-  const width = Math.max(1, right - left);
-  const height = Math.max(1, bottom - top);
 
-  const position = { x: left, y: top };
+  return {
+    position: { x: left, y: top },
+    width: Math.max(1, right - left),
+    height: Math.max(1, bottom - top),
+  };
+}
+
+function extractDropShadow(effects: NonNullable<Layer['effects']>): string | undefined {
+  const shadow = effects.dropShadow?.[0];
+
+  if (!shadow?.enabled || !shadow.color || !isRgbaColor(shadow.color)) {
+    return undefined;
+  }
+
+  const angle = (shadow.angle ?? 0) * (Math.PI / 180);
+  const dist = shadow.distance?.value ?? 0;
+  const blur = shadow.size?.value ?? 0;
+  const opacity = shadow.opacity ?? 1;
+  const ox = Math.round(Math.cos(angle) * dist);
+  const oy = Math.round(Math.sin(angle) * dist);
+
+  return `${String(ox)}px ${String(oy)}px ${String(blur)}px rgba(${String(shadow.color.r)},${String(shadow.color.g)},${String(shadow.color.b)},${String(opacity)})`;
+}
+
+function extractOuterGlowFilter(effects: NonNullable<Layer['effects']>): string | undefined {
+  const glow = effects.outerGlow;
+
+  if (!glow?.enabled || !glow.color || !isRgbaColor(glow.color)) {
+    return undefined;
+  }
+
+  const glowBlur = glow.size?.value ?? 0;
+  const glowOpacity = glow.opacity ?? 1;
+
+  return `drop-shadow(0 0 ${String(glowBlur)}px rgba(${String(glow.color.r)},${String(glow.color.g)},${String(glow.color.b)},${String(glowOpacity)}))`;
+}
+
+function extractVectorMaskStyle(
+  layer: Layer,
+  width: number,
+): Partial<{ readonly borderRadius: readonly number[]; readonly customClipPath: string }> {
+  const firstPath = layer.vectorMask?.paths[0];
+
+  if (!firstPath || firstPath.open) {
+    return {};
+  }
+
+  if (firstPath.knots.length === 8) {
+    const knot0 = firstPath.knots[0];
+
+    if (!knot0) return {};
+
+    const radiusPx = Math.round(((knot0.points[1] ?? 0) / PSD_COORD_MAX) * width);
+
+    return { borderRadius: [radiusPx, radiusPx, radiusPx, radiusPx] };
+  }
+
+  const points = firstPath.knots.map((knot) => {
+    const px = ((knot.points[1] ?? 0) / PSD_COORD_MAX) * 100;
+    const py = ((knot.points[0] ?? 0) / PSD_COORD_MAX) * 100;
+
+    return `${String(Math.round(px))}% ${String(Math.round(py))}%`;
+  });
+
+  return points.length >= 3 ? { customClipPath: `polygon(${points.join(', ')})` } : {};
+}
+
+function buildStyleFromLayer(layer: Layer, width: number): Record<string, unknown> {
   const style: Record<string, unknown> = {};
 
   if (layer.opacity !== undefined) {
@@ -102,126 +172,142 @@ function layerToElement(layer: Layer): BroadsetElement | undefined {
   }
 
   if (layer.effects) {
-    const shadow = layer.effects.dropShadow?.[0];
+    const boxShadow = extractDropShadow(layer.effects);
 
-    if (shadow?.enabled) {
-      const angle = (shadow.angle ?? 0) * (Math.PI / 180);
-      const dist = shadow.distance?.value ?? 0;
-      const blur = shadow.size?.value ?? 0;
-      const color = shadow.color;
-      const opacity = shadow.opacity ?? 1;
-      const ox = Math.round(Math.cos(angle) * dist);
-      const oy = Math.round(Math.sin(angle) * dist);
-
-      if (color && isRgbaColor(color)) {
-        style['boxShadow'] =
-          `${String(ox)}px ${String(oy)}px ${String(blur)}px rgba(${String(color.r)},${String(color.g)},${String(color.b)},${String(opacity)})`;
-      }
+    if (boxShadow !== undefined) {
+      style['boxShadow'] = boxShadow;
     }
 
-    const glow = layer.effects.outerGlow;
+    const filter = extractOuterGlowFilter(layer.effects);
 
-    if (glow?.enabled) {
-      const glowBlur = glow.size?.value ?? 0;
-      const glowColor = glow.color;
-      const glowOpacity = glow.opacity ?? 1;
-
-      if (glowColor && isRgbaColor(glowColor)) {
-        style['filter'] =
-          `drop-shadow(0 0 ${String(glowBlur)}px rgba(${String(glowColor.r)},${String(glowColor.g)},${String(glowColor.b)},${String(glowOpacity)}))`;
-      }
+    if (filter !== undefined) {
+      style['filter'] = filter;
     }
   }
 
-  if (layer.vectorMask?.paths) {
-    const firstPath = layer.vectorMask.paths[0];
+  Object.assign(style, extractVectorMaskStyle(layer, width));
 
-    if (firstPath && !firstPath.open && firstPath.knots.length === 8) {
-      const knot0 = firstPath.knots[0];
+  return style;
+}
 
-      if (knot0) {
-        const radiusPx = Math.round(((knot0.points[1] ?? 0) / PSD_COORD_MAX) * width);
+function importTextLayer(
+  layer: Layer & { readonly text: NonNullable<Layer['text']> },
+  geometry: LayerGeometry,
+  style: Record<string, unknown>,
+): BroadsetElement {
+  const fontSize = layer.text.style?.fontSize ? { fontSize: layer.text.style.fontSize } : undefined;
+  const fillColor = layer.text.style?.fillColor;
+  const fontColor =
+    fillColor && isRgbaColor(fillColor) ? { fontColor: rgbaToHex(fillColor.r, fillColor.g, fillColor.b) } : undefined;
 
-        style['borderRadius'] = [radiusPx, radiusPx, radiusPx, radiusPx];
-      }
-    } else if (firstPath && !firstPath.open) {
-      const points = firstPath.knots.map((knot) => {
-        const px = ((knot.points[1] ?? 0) / PSD_COORD_MAX) * 100;
-        const py = ((knot.points[0] ?? 0) / PSD_COORD_MAX) * 100;
+  return createImportedElement('text', layer.text.text, geometry.position, geometry.width, geometry.height, {
+    ...style,
+    ...fontSize,
+    ...fontColor,
+  } satisfies Partial<BroadsetElementStyle>);
+}
 
-        return `${String(Math.round(px))}% ${String(Math.round(py))}%`;
-      });
+function importPlacedLayer(layer: Layer, geometry: LayerGeometry, style: Record<string, unknown>): BroadsetElement {
+  const placedId = layer.placedLayer?.id;
+  const linkedFileData = placedId === undefined ? undefined : importLinkedFiles.get(placedId);
+  let content = '';
 
-      if (points.length >= 3) {
-        style['customClipPath'] = `polygon(${points.join(', ')})`;
-      }
-    }
+  if (linkedFileData) {
+    content = bytesToDataUri(linkedFileData.data, linkedFileData.type);
+  } else if (layer.imageData) {
+    const bytes =
+      layer.imageData.data instanceof Uint8Array ? layer.imageData.data : new Uint8Array(layer.imageData.data);
+
+    content = bytesToDataUri(bytes, 'image/png');
   }
+
+  return createImportedElement(
+    'image',
+    content,
+    geometry.position,
+    geometry.width,
+    geometry.height,
+    style as Partial<BroadsetElementStyle>,
+  );
+}
+
+function importOpenVectorPath(
+  layer: Layer,
+  geometry: LayerGeometry,
+  style: Record<string, unknown>,
+): BroadsetElement | undefined {
+  const firstPath = layer.vectorMask?.paths[0];
+
+  if (!firstPath?.open) return undefined;
+
+  const d = bezierPathToSvgD(firstPath, geometry.width, geometry.height);
+
+  if (d === undefined) return undefined;
+
+  return createImportedElement(
+    'path',
+    d,
+    geometry.position,
+    geometry.width,
+    geometry.height,
+    style as Partial<BroadsetElementStyle>,
+  );
+}
+
+function importImageDataRectangle(layer: Layer, geometry: LayerGeometry, style: Record<string, unknown>): BroadsetElement {
+  const hasColor = detectLayerColor(layer);
+  const bgColor = hasColor ? rgbaToHex(hasColor.r, hasColor.g, hasColor.b, hasColor.a) : undefined;
+
+  return createImportedElement('rectangle', '', geometry.position, geometry.width, geometry.height, {
+    ...style,
+    ...(bgColor ? { backgroundColor: bgColor } : undefined),
+  } satisfies Partial<BroadsetElementStyle>);
+}
+
+function layerToElement(layer: Layer): BroadsetElement | undefined {
+  const geometry = extractGeometry(layer);
+  const style = buildStyleFromLayer(layer, geometry.width);
 
   if (layer.text) {
-    return createImportedElement('text', layer.text.text, position, width, height, {
-      ...style,
-      ...(layer.text.style?.fontSize ? { fontSize: layer.text.style.fontSize } : undefined),
-      ...(layer.text.style?.fillColor && isRgbaColor(layer.text.style.fillColor) ?
-        {
-          fontColor: rgbaToHex(
-            layer.text.style.fillColor.r,
-            layer.text.style.fillColor.g,
-            layer.text.style.fillColor.b,
-          ),
-        }
-      : undefined),
-    } satisfies Partial<BroadsetElementStyle>);
+    return importTextLayer(layer as Layer & { readonly text: NonNullable<Layer['text']> }, geometry, style);
   }
 
   if (layer.placedLayer) {
-    let content = '';
-
-    const linkedFileData = importLinkedFiles.get(layer.placedLayer.id);
-
-    if (linkedFileData) {
-      content = bytesToDataUri(linkedFileData.data, linkedFileData.type);
-    } else if (layer.imageData) {
-      content = bytesToDataUri(
-        layer.imageData.data instanceof Uint8Array ? layer.imageData.data : new Uint8Array(layer.imageData.data),
-        'image/png',
-      );
-    }
-
-    return createImportedElement('image', content, position, width, height, style as Partial<BroadsetElementStyle>);
+    return importPlacedLayer(layer, geometry, style);
   }
 
   if (style['borderRadius']) {
-    return createImportedElement('rectangle', '', position, width, height, style as Partial<BroadsetElementStyle>);
+    return createImportedElement(
+      'rectangle',
+      '',
+      geometry.position,
+      geometry.width,
+      geometry.height,
+      style as Partial<BroadsetElementStyle>,
+    );
   }
 
-  if (layer.vectorMask?.paths) {
-    const firstPath = layer.vectorMask.paths[0];
+  const openPath = importOpenVectorPath(layer, geometry, style);
 
-    if (firstPath?.open) {
-      const d = bezierPathToSvgD(firstPath, width, height);
-
-      if (d) {
-        return createImportedElement('path', d, position, width, height, style as Partial<BroadsetElementStyle>);
-      }
-    }
-  }
+  if (openPath) return openPath;
 
   if (layer.imageData) {
-    const hasColor = detectLayerColor(layer);
-    const bgColor = hasColor ? rgbaToHex(hasColor.r, hasColor.g, hasColor.b, hasColor.a) : undefined;
-
-    return createImportedElement('rectangle', '', position, width, height, {
-      ...style,
-      ...(bgColor ? { backgroundColor: bgColor } : undefined),
-    } satisfies Partial<BroadsetElementStyle>);
+    return importImageDataRectangle(layer, geometry, style);
   }
 
+  // Group layers (have children, no own pixels): caller flattens via recursion.
   if (layer.children && layer.children.length > 0) {
     return undefined;
   }
 
-  return createImportedElement('rectangle', '', position, width, height, style as Partial<BroadsetElementStyle>);
+  return createImportedElement(
+    'rectangle',
+    '',
+    geometry.position,
+    geometry.width,
+    geometry.height,
+    style as Partial<BroadsetElementStyle>,
+  );
 }
 
 /** Import a PSD file and recover BroadsetDocument elements. */
