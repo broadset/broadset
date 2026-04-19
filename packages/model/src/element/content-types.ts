@@ -89,6 +89,12 @@ const SVG_PATH_COMMANDS = new Set([
   'z',
 ]);
 
+const NUMERIC_TOKEN_RE = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
+function isNumericToken(token: string): boolean {
+  return NUMERIC_TOKEN_RE.test(token);
+}
+
 export function isValidSvgPathData(pathData: string): boolean {
   if (pathData === '') {
     return true;
@@ -111,7 +117,7 @@ export function isValidSvgPathData(pathData: string): boolean {
       continue;
     }
 
-    if (/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(token)) {
+    if (isNumericToken(token)) {
       continue;
     }
 
@@ -121,11 +127,7 @@ export function isValidSvgPathData(pathData: string): boolean {
       continue;
     }
 
-    if (
-      token.length > 1 &&
-      SVG_PATH_COMMANDS.has(firstCharacter) &&
-      /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(token.slice(1))
-    ) {
+    if (token.length > 1 && SVG_PATH_COMMANDS.has(firstCharacter) && isNumericToken(token.slice(1))) {
       continue;
     }
 
