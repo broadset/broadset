@@ -231,7 +231,6 @@ module.exports = [
       'sonarjs/no-nested-conditional': 'off',
       'sonarjs/slow-regex': 'off',
       'sonarjs/regex-complexity': 'off',
-      'sonarjs/concise-regex': 'off',
       'sonarjs/pseudo-random': 'off',
       // Conflicts with @typescript-eslint/no-non-null-assertion — the
       // non-null-assertion ban is stricter, keep that one.

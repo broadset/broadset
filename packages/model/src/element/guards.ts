@@ -1,10 +1,10 @@
 const VISIBLE_WHEN_TOKEN_RE =
-  /&&|\|\||==|!=|>=|<=|>|<|!|\(|\)|true|false|-?\d+(?:\.\d+)?|'[^']*'|[a-zA-Z_][a-zA-Z0-9_]*/g;
+  /&&|\|\||==|!=|>=|<=|>|<|!|\(|\)|true|false|-?\d+(?:\.\d+)?|'[^']*'|[a-zA-Z_]\w*/g;
 
 const VISIBLE_WHEN_BINARY_OPERATORS = new Set(['&&', '||', '==', '!=', '>=', '<=', '>', '<']);
 
 function isVisibleWhenOperand(token: string): boolean {
-  return /^(?:true|false|-?\d+(?:\.\d+)?|'[^']*'|[a-zA-Z_][a-zA-Z0-9_]*)$/.test(token);
+  return /^(?:true|false|-?\d+(?:\.\d+)?|'[^']*'|[a-zA-Z_]\w*)$/.test(token);
 }
 
 interface VisibleWhenParserState {
