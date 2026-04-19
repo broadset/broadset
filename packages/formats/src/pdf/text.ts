@@ -6,50 +6,43 @@ const FALLBACK_CHAR_WIDTH_PT = 8;
  * Explicit newlines are preserved including empty lines.
  * Falls back to per-character measurement when full-string measurement throws.
  */
-export function wrapText(text: string, maxWidth: number, measure: (text: string) => number): readonly string[] {
+function safeMeasure(candidate: string, measure: (t: string) => number): number {
+  try {
+    return measure(candidate);
+  } catch {
+    return measurePerChar(candidate, measure);
+  }
+}
+
+function wrapParagraph(paragraph: string, maxWidth: number, measure: (t: string) => number): readonly string[] {
+  if (paragraph === '') return [''];
+
+  const words = paragraph.split(/\s+/).filter(Boolean);
+
+  if (words.length === 0) return [''];
+
   const lines: string[] = [];
-  const paragraphs = text.split('\n');
+  let currentLine = '';
 
-  for (const paragraph of paragraphs) {
-    if (paragraph === '') {
-      lines.push('');
-      continue;
-    }
+  for (const word of words) {
+    const candidate = currentLine === '' ? word : `${currentLine} ${word}`;
+    const width = safeMeasure(candidate, measure);
 
-    const words = paragraph.split(/\s+/).filter(Boolean);
-
-    if (words.length === 0) {
-      lines.push('');
-      continue;
-    }
-
-    let currentLine = '';
-
-    for (const word of words) {
-      const candidate = currentLine === '' ? word : `${currentLine} ${word}`;
-
-      let width: number;
-
-      try {
-        width = measure(candidate);
-      } catch {
-        width = measurePerChar(candidate, measure);
-      }
-
-      if (width <= maxWidth || currentLine === '') {
-        currentLine = candidate;
-      } else {
-        lines.push(currentLine);
-        currentLine = word;
-      }
-    }
-
-    if (currentLine !== '') {
+    if (width <= maxWidth || currentLine === '') {
+      currentLine = candidate;
+    } else {
       lines.push(currentLine);
+      currentLine = word;
     }
   }
 
+  if (currentLine !== '') lines.push(currentLine);
+
   return lines;
+}
+
+export function wrapText(text: string, maxWidth: number, measure: (text: string) => number): readonly string[] {
+  return text.split('\n').flatMap((paragraph) => wrapParagraph(paragraph, maxWidth, measure));
 }
 
 function measurePerChar(text: string, measure: (t: string) => number): number {
