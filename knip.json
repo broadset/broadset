@@ -2,11 +2,23 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "entry": ["commitlint.config.cjs", "eslint.config.cjs", "jest.config.cjs"],
-      "ignoreDependencies": ["husky", "@commitlint/cli", "@commitlint/config-conventional"]
+      "entry": [
+        "commitlint.config.cjs",
+        "eslint.config.cjs",
+        "jest.config.cjs",
+        "test/jest.setup.js"
+      ],
+      "ignoreDependencies": [
+        "husky",
+        "@commitlint/cli",
+        "@commitlint/config-conventional",
+        "vite",
+        "playwright",
+        "type-coverage"
+      ]
     },
     "packages/demo": {
-      "entry": ["src/main.tsx", "src/index.css", "src/**/*.test.{ts,tsx}", "ct/**/*.ct.tsx"],
+      "entry": ["src/main.tsx", "src/index.css", "src/**/*.test.{ts,tsx}", "ct/**/*.ct.tsx", "vite.config.ts"],
       "project": ["src/**/*.{ts,tsx}"],
       "vite": false
     },

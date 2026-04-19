@@ -16,8 +16,8 @@
     "typecheck": "tsc -b",
     "test": "jest --config jest.config.cjs --passWithNoTests",
     "test:ct": "npm run ct",
-    "ct": "npx playwright test -c playwright-ct.config.ts --pass-with-no-tests",
-    "ct:ui": "npx playwright test -c playwright-ct.config.ts --ui",
+    "ct": "npx playwright test --config=playwright-ct.config.ts --pass-with-no-tests",
+    "ct:ui": "npx playwright test --config=playwright-ct.config.ts --ui",
     "quality": "npm run lint && npm run prettier:check && npm run typecheck && npm run test -- --runInBand",
     "quality:strict": "npm run lint:strict && npm run prettier:check && npm run typecheck && npm run test -- --runInBand",
     "preview": "vite preview"
@@ -36,6 +36,7 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "@jest/globals": "^30.3.0",
     "@playwright/experimental-ct-react": "^1.59.1",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/vite": "^4.2.2",

@@ -13,23 +13,23 @@
     "lint:strict": "npm run lint -- --no-cache --max-warnings 0",
     "typecheck": "tsc -b",
     "test": "jest --config jest.config.cjs --passWithNoTests",
-    "ct": "npx playwright test -c playwright-ct.config.ts --pass-with-no-tests",
+    "ct": "npx playwright test --config=playwright-ct.config.ts --pass-with-no-tests",
     "quality": "npm run lint && npm run typecheck && npm run test -- --runInBand",
     "quality:strict": "npm run lint:strict && npm run typecheck && npm run test -- --runInBand"
   },
   "devDependencies": {
+    "@jest/globals": "^30.3.0",
     "@playwright/experimental-ct-react": "^1.59.1",
     "@playwright/test": "^1.59.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-    "@vitejs/plugin-react": "^6.0.1",
-    "vite": "^8.0.3",
     "typescript": "^6.0.2"
   },
   "dependencies": {
     "@heroui/react": "^3.0.2",
-    "lucide-react": "^1.7.0"
+    "lucide-react": "^1.7.0",
+    "react-aria-components": "^1.16.0"
   },
   "peerDependencies": {
     "@broadset/editor": "^0.1.0",

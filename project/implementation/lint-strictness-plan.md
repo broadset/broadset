@@ -32,5 +32,3 @@ The five-phase strictness rollout (react-hooks bug-finders → jsx-a11y → type
 - `runPreflightDiagnostics`: split per-rule check functions and aggregate results.
 - `isValidVisibleWhenExpression`: replace ad-hoc tokenizer with a small state machine or parser-combinator.
 - `interpolateValue`: dispatch on `KeyframeValue` kind to type-specific interpolators.
-
-Don't refactor for the score alone — refactor when you're already touching the file for related work, and bring tests and behavior parity along.

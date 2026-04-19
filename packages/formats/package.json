@@ -17,14 +17,13 @@
     "quality:strict": "npm run lint:strict && npm run typecheck && npm run test -- --runInBand"
   },
   "devDependencies": {
+    "@jest/globals": "^30.3.0",
     "typescript": "^6.0.2"
   },
   "dependencies": {
     "@broadset/model": "^0.1.0",
-    "@broadset/playback": "^0.1.0",
     "@libpdf/core": "^0.3.4",
     "ag-psd": "^30.1.0",
-    "jszip": "^3.10.1",
     "mediabunny": "^1.40.1",
     "modern-screenshot": "^4.6.8",
     "pizzip": "^3.2.0",

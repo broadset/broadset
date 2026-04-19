@@ -28,10 +28,6 @@
     "gate:full": "npm run quality:strict && npm run lint:dead && npm run lint:typecoverage && npm run ct:all && npm run build",
     "prepare": "husky"
   },
-  "lint-staged": {
-    "!(*.test|*.spec).{ts,tsx}": "eslint --fix --no-cache --max-warnings 0",
-    "*.{ts,tsx,js,jsx,cjs,mjs,json,md,yml,yaml,css,html}": "prettier --config .prettierrc.json --ignore-path .prettierignore --write"
-  },
   "devDependencies": {
     "@babel/core": "^7.29.0",
     "@babel/plugin-transform-react-jsx": "^7.28.6",
@@ -43,7 +39,6 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@types/jest": "^30.0.0",
     "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.58.0",
     "babel-jest": "^30.3.0",
@@ -61,8 +56,10 @@
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
     "knip": "^6.4.1",
-    "lint-staged": "^16.4.0",
+    "playwright": "^1.59.1",
     "prettier": "^3.8.1",
-    "type-coverage": "^2.29.7"
+    "svg-path-properties": "^2.0.0",
+    "type-coverage": "^2.29.7",
+    "vite": "^8.0.3"
   }
 }
