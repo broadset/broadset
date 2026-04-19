@@ -139,7 +139,7 @@ export function createPlaybackController(options: CreatePlaybackControllerOption
     handles.delete(handleKey);
   }
 
-  function playResolvedTimeline(args: {
+  function playTimeline(args: {
     readonly elementId: string;
     readonly timeline: Timeline;
     readonly restart?: boolean | undefined;
@@ -177,139 +177,149 @@ export function createPlaybackController(options: CreatePlaybackControllerOption
     handles.set(handleKey, handle);
   }
 
-  // eslint-disable-next-line sonarjs/cognitive-complexity -- cc=57; per-keyframe transition scheduler with enter/exit/loop/hold branches; see lint-strictness-plan.md Phase 4 followup.
+  /**
+   * Either play a timeline as a transition, or jump straight to its end when
+   * `options.suppressTransitions` is set. Used by every transition phase in
+   * `syncTransitions` to keep the suppress/play decision in one place.
+   */
+  function runOrSeekTimeline(
+    elementId: string,
+    timeline: Timeline,
+    onComplete?: () => void,
+  ): void {
+    if (options.suppressTransitions === true) {
+      seekTimelineInternal({
+        elementId,
+        timelineId: timeline.id,
+        timeMs: computeTimelineLoopDuration(timeline),
+      });
+      onComplete?.();
+    } else {
+      playTimeline({ elementId, timeline, restart: true, onComplete });
+    }
+  }
+
+  function clearTimelineForElement(runtime: RuntimeRecord, elementId: string, timeline: Timeline): void {
+    cancelHandle(getHandleKey(elementId, timeline.id));
+    clearTimelineStyles({
+      root: options.root,
+      targetsResolver,
+      container: runtime.container,
+      timeline,
+    });
+  }
+
+  function syncVisibility(
+    elementId: string,
+    runtime: RuntimeRecord,
+    previousState: ParsedElementRuntimeState,
+    nextState: ParsedElementRuntimeState,
+  ): void {
+    if (nextState.visibility === previousState.visibility) return;
+
+    if (nextState.visibility === 'onscreen') {
+      applyVisibility(runtime.container, 'onscreen');
+
+      // Only auto-fire the IN timeline when no explicit state will run one shortly.
+      if (nextState.activeState !== null) return;
+
+      const inTimeline = resolveStateTimeline(runtime.config, 'IN');
+
+      if (inTimeline !== null) {
+        runOrSeekTimeline(elementId, inTimeline);
+      }
+
+      return;
+    }
+
+    const outTimeline = resolveStateTimeline(runtime.config, 'OUT');
+
+    if (outTimeline === null) {
+      applyVisibility(runtime.container, 'offscreen');
+
+      return;
+    }
+
+    runOrSeekTimeline(elementId, outTimeline, () => {
+      applyVisibility(runtime.container, 'offscreen');
+    });
+  }
+
+  function syncActiveState(
+    elementId: string,
+    runtime: RuntimeRecord,
+    previousState: ParsedElementRuntimeState,
+    nextState: ParsedElementRuntimeState,
+  ): void {
+    if (nextState.activeState === previousState.activeState) return;
+
+    if (previousState.activeState !== null) {
+      const previousTimeline = resolveStateTimeline(runtime.config, previousState.activeState);
+
+      if (previousTimeline !== null) {
+        clearTimelineForElement(runtime, elementId, previousTimeline);
+      }
+    }
+
+    // IN/OUT are driven by the visibility phase; don't double-fire here.
+    if (nextState.activeState === null || nextState.activeState === 'IN' || nextState.activeState === 'OUT') {
+      return;
+    }
+
+    const nextTimeline = resolveStateTimeline(runtime.config, nextState.activeState);
+
+    if (nextTimeline !== null) {
+      runOrSeekTimeline(elementId, nextTimeline);
+    }
+  }
+
+  function syncModifiersAdded(
+    elementId: string,
+    runtime: RuntimeRecord,
+    previousState: ParsedElementRuntimeState,
+    nextState: ParsedElementRuntimeState,
+  ): void {
+    for (const modifier of nextState.modifiers) {
+      if (previousState.modifiers.has(modifier)) continue;
+
+      const inTimeline = resolveModifierTimeline(runtime.config, modifier, 'in');
+
+      if (inTimeline !== null) {
+        runOrSeekTimeline(elementId, inTimeline);
+      }
+    }
+  }
+
+  function syncModifiersRemoved(
+    elementId: string,
+    runtime: RuntimeRecord,
+    previousState: ParsedElementRuntimeState,
+    nextState: ParsedElementRuntimeState,
+  ): void {
+    for (const modifier of previousState.modifiers) {
+      if (nextState.modifiers.has(modifier)) continue;
+
+      const outTimeline = resolveModifierTimeline(runtime.config, modifier, 'out');
+      const inTimeline = resolveModifierTimeline(runtime.config, modifier, 'in');
+
+      if (outTimeline !== null) {
+        runOrSeekTimeline(elementId, outTimeline);
+      } else if (inTimeline !== null) {
+        clearTimelineForElement(runtime, elementId, inTimeline);
+      }
+    }
+  }
+
   function syncTransitions(
     elementId: string,
     runtime: RuntimeRecord,
     previousState: ParsedElementRuntimeState,
     nextState: ParsedElementRuntimeState,
   ): void {
-    if (nextState.visibility !== previousState.visibility) {
-      if (nextState.visibility === 'onscreen') {
-        applyVisibility(runtime.container, 'onscreen');
-
-        if (nextState.activeState === null) {
-          const inTimeline = resolveStateTimeline(runtime.config, 'IN');
-
-          if (inTimeline !== null) {
-            if (options.suppressTransitions === true) {
-              seekTimelineInternal({
-                elementId,
-                timelineId: inTimeline.id,
-                timeMs: computeTimelineLoopDuration(inTimeline),
-              });
-            } else {
-              playResolvedTimeline({ elementId, timeline: inTimeline, restart: true });
-            }
-          }
-        }
-      } else {
-        const outTimeline = resolveStateTimeline(runtime.config, 'OUT');
-
-        if (outTimeline === null) {
-          applyVisibility(runtime.container, 'offscreen');
-        } else if (options.suppressTransitions === true) {
-          seekTimelineInternal({
-            elementId,
-            timelineId: outTimeline.id,
-            timeMs: computeTimelineLoopDuration(outTimeline),
-          });
-          applyVisibility(runtime.container, 'offscreen');
-        } else {
-          playResolvedTimeline({
-            elementId,
-            timeline: outTimeline,
-            restart: true,
-            onComplete: () => {
-              applyVisibility(runtime.container, 'offscreen');
-            },
-          });
-        }
-      }
-    }
-
-    if (nextState.activeState !== previousState.activeState) {
-      if (previousState.activeState !== null) {
-        const previousTimeline = resolveStateTimeline(runtime.config, previousState.activeState);
-
-        if (previousTimeline !== null) {
-          cancelHandle(getHandleKey(elementId, previousTimeline.id));
-          clearTimelineStyles({
-            root: options.root,
-            targetsResolver,
-            container: runtime.container,
-            timeline: previousTimeline,
-          });
-        }
-      }
-
-      if (nextState.activeState !== null && nextState.activeState !== 'IN' && nextState.activeState !== 'OUT') {
-        const nextTimeline = resolveStateTimeline(runtime.config, nextState.activeState);
-
-        if (nextTimeline !== null) {
-          if (options.suppressTransitions === true) {
-            seekTimelineInternal({
-              elementId,
-              timelineId: nextTimeline.id,
-              timeMs: computeTimelineLoopDuration(nextTimeline),
-            });
-          } else {
-            playResolvedTimeline({ elementId, timeline: nextTimeline, restart: true });
-          }
-        }
-      }
-    }
-
-    for (const modifier of nextState.modifiers) {
-      if (previousState.modifiers.has(modifier)) {
-        continue;
-      }
-
-      const inTimeline = resolveModifierTimeline(runtime.config, modifier, 'in');
-
-      if (inTimeline === null) {
-        continue;
-      }
-
-      if (options.suppressTransitions === true) {
-        seekTimelineInternal({
-          elementId,
-          timelineId: inTimeline.id,
-          timeMs: computeTimelineLoopDuration(inTimeline),
-        });
-      } else {
-        playResolvedTimeline({ elementId, timeline: inTimeline, restart: true });
-      }
-    }
-
-    for (const modifier of previousState.modifiers) {
-      if (nextState.modifiers.has(modifier)) {
-        continue;
-      }
-
-      const outTimeline = resolveModifierTimeline(runtime.config, modifier, 'out');
-      const inTimeline = resolveModifierTimeline(runtime.config, modifier, 'in');
-
-      if (outTimeline !== null) {
-        if (options.suppressTransitions === true) {
-          seekTimelineInternal({
-            elementId,
-            timelineId: outTimeline.id,
-            timeMs: computeTimelineLoopDuration(outTimeline),
-          });
-        } else {
-          playResolvedTimeline({ elementId, timeline: outTimeline, restart: true });
-        }
-      } else if (inTimeline !== null) {
-        cancelHandle(getHandleKey(elementId, inTimeline.id));
-        clearTimelineStyles({
-          root: options.root,
-          targetsResolver,
-          container: runtime.container,
-          timeline: inTimeline,
-        });
-      }
-    }
+    syncVisibility(elementId, runtime, previousState, nextState);
+    syncActiveState(elementId, runtime, previousState, nextState);
+    syncModifiersAdded(elementId, runtime, previousState, nextState);
+    syncModifiersRemoved(elementId, runtime, previousState, nextState);
   }
 
   function observeMutations(): void {
@@ -427,7 +437,7 @@ export function createPlaybackController(options: CreatePlaybackControllerOption
 
       for (const entry of animations) {
         for (const timeline of getDefaultTimelines(entry.config)) {
-          playResolvedTimeline({ elementId: entry.elementId, timeline });
+          playTimeline({ elementId: entry.elementId, timeline });
         }
       }
     },
