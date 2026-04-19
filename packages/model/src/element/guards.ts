@@ -1,11 +1,45 @@
 const VISIBLE_WHEN_TOKEN_RE =
   /&&|\|\||==|!=|>=|<=|>|<|!|\(|\)|true|false|-?\d+(?:\.\d+)?|'[^']*'|[a-zA-Z_][a-zA-Z0-9_]*/g;
 
+const VISIBLE_WHEN_BINARY_OPERATORS = new Set(['&&', '||', '==', '!=', '>=', '<=', '>', '<']);
+
 function isVisibleWhenOperand(token: string): boolean {
   return /^(?:true|false|-?\d+(?:\.\d+)?|'[^']*'|[a-zA-Z_][a-zA-Z0-9_]*)$/.test(token);
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity -- cc=31; expression-language validator walks tokens with multi-state grammar; see lint-strictness-plan.md Phase 4 followup.
+interface VisibleWhenParserState {
+  readonly depth: number;
+  readonly expectsOperand: boolean;
+}
+
+/**
+ * Advance the visible-when parser state by one token. Returns the next
+ * state, or null if the token is illegal in the current position.
+ */
+function stepVisibleWhenParser(token: string, state: VisibleWhenParserState): VisibleWhenParserState | null {
+  if (token === '(') {
+    return state.expectsOperand ? { depth: state.depth + 1, expectsOperand: true } : null;
+  }
+
+  if (token === ')') {
+    return !state.expectsOperand && state.depth > 0
+      ? { depth: state.depth - 1, expectsOperand: false }
+      : null;
+  }
+
+  if (token === '!') {
+    return state.expectsOperand ? state : null;
+  }
+
+  if (VISIBLE_WHEN_BINARY_OPERATORS.has(token)) {
+    return state.expectsOperand ? null : { depth: state.depth, expectsOperand: true };
+  }
+
+  return state.expectsOperand && isVisibleWhenOperand(token)
+    ? { depth: state.depth, expectsOperand: false }
+    : null;
+}
+
 export function isValidVisibleWhenExpression(expression: string | null | undefined): boolean {
   if (expression === null || expression === undefined || expression.trim() === '') {
     return true;
@@ -18,62 +52,19 @@ export function isValidVisibleWhenExpression(expression: string | null | undefin
     return false;
   }
 
-  let depth = 0;
-  let expectsOperand = true;
+  let state: VisibleWhenParserState = { depth: 0, expectsOperand: true };
 
   for (const token of tokens) {
-    if (token === '(') {
-      if (!expectsOperand) {
-        return false;
-      }
+    const next = stepVisibleWhenParser(token, state);
 
-      depth += 1;
-      continue;
-    }
-
-    if (token === ')') {
-      if (expectsOperand || depth === 0) {
-        return false;
-      }
-
-      depth -= 1;
-      continue;
-    }
-
-    if (token === '!') {
-      if (!expectsOperand) {
-        return false;
-      }
-
-      continue;
-    }
-
-    if (token === '&&' || token === '||') {
-      if (expectsOperand) {
-        return false;
-      }
-
-      expectsOperand = true;
-      continue;
-    }
-
-    if (token === '==' || token === '!=' || token === '>=' || token === '<=' || token === '>' || token === '<') {
-      if (expectsOperand) {
-        return false;
-      }
-
-      expectsOperand = true;
-      continue;
-    }
-
-    if (!isVisibleWhenOperand(token) || !expectsOperand) {
+    if (next === null) {
       return false;
     }
 
-    expectsOperand = false;
+    state = next;
   }
 
-  return depth === 0 && !expectsOperand;
+  return state.depth === 0 && !state.expectsOperand;
 }
 
 export function isLikelyUrlLikeContent(value: string): boolean {
