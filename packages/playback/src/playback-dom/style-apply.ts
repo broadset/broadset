@@ -347,6 +347,61 @@ export function resolveAnimationTargets(): AnimationTargetsResolver {
     targets.contentTarget.style.setProperty(cssPropertyName, String(value));
   }
 
+  function restorePathDBaseline(target: HTMLElement): void {
+    const pathElement = findPathElement(target);
+
+    if (pathElement === null) return;
+
+    const baselineValue = readBaseline(pathElement, 'd');
+
+    if (baselineValue === '') {
+      pathElement.removeAttribute('d');
+    } else {
+      pathElement.setAttribute('d', baselineValue);
+    }
+  }
+
+  function clearOneStyle(propertyName: string, targets: ResolvedAnimationTargets): void {
+    if (isGradientAnimationTarget(propertyName)) {
+      baselineGradients.delete(targets.contentTarget);
+      restoreCssProperty(targets.contentTarget, 'background');
+
+      return;
+    }
+
+    if (propertyName === 'opacity') {
+      targets.opacityTarget.style.opacity = readBaseline(targets.opacityTarget, 'opacity');
+
+      return;
+    }
+
+    if (propertyName === 'content' || propertyName === 'textContent') {
+      targets.contentTarget.textContent = readBaseline(targets.contentTarget, 'textContent');
+
+      return;
+    }
+
+    if (propertyName === 'd') {
+      restorePathDBaseline(targets.contentTarget);
+
+      return;
+    }
+
+    if (propertyName === 'transform' || isTransformProperty(propertyName)) {
+      clearTransformProperty(targets.contentTarget, propertyName);
+
+      return;
+    }
+
+    if (isTrimPathProperty(propertyName)) {
+      clearTrimPathProperty(targets.contentTarget, propertyName);
+
+      return;
+    }
+
+    restoreCssProperty(targets.contentTarget, toKebabCase(propertyName));
+  }
+
   return {
     applyStyles(container: HTMLElement, styles: Readonly<Record<string, unknown>>): void {
       const targets = getTargets(container);
@@ -375,52 +430,9 @@ export function resolveAnimationTargets(): AnimationTargetsResolver {
     },
     clearStyles(container: HTMLElement, propertyNames: readonly string[]): void {
       const targets = getTargets(container);
-      const uniquePropertyNames = new Set(propertyNames);
 
-      for (const propertyName of uniquePropertyNames) {
-        if (isGradientAnimationTarget(propertyName)) {
-          baselineGradients.delete(targets.contentTarget);
-          restoreCssProperty(targets.contentTarget, 'background');
-          continue;
-        }
-
-        if (propertyName === 'opacity') {
-          targets.opacityTarget.style.opacity = readBaseline(targets.opacityTarget, 'opacity');
-          continue;
-        }
-
-        if (propertyName === 'content' || propertyName === 'textContent') {
-          targets.contentTarget.textContent = readBaseline(targets.contentTarget, 'textContent');
-          continue;
-        }
-
-        if (propertyName === 'd') {
-          const pathElement = findPathElement(targets.contentTarget);
-
-          if (pathElement !== null) {
-            const baselineValue = readBaseline(pathElement, 'd');
-
-            if (baselineValue === '') {
-              pathElement.removeAttribute('d');
-            } else {
-              pathElement.setAttribute('d', baselineValue);
-            }
-          }
-
-          continue;
-        }
-
-        if (propertyName === 'transform' || isTransformProperty(propertyName)) {
-          clearTransformProperty(targets.contentTarget, propertyName);
-          continue;
-        }
-
-        if (isTrimPathProperty(propertyName)) {
-          clearTrimPathProperty(targets.contentTarget, propertyName);
-          continue;
-        }
-
-        restoreCssProperty(targets.contentTarget, toKebabCase(propertyName));
+      for (const propertyName of new Set(propertyNames)) {
+        clearOneStyle(propertyName, targets);
       }
     },
     invalidate(container: HTMLElement): void {
