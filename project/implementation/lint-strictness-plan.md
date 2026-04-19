@@ -13,7 +13,6 @@ The five-phase strictness rollout (react-hooks bug-finders → jsx-a11y → type
 | [packages/formats/src/psd/import.ts](../../packages/formats/src/psd/import.ts) | `layerToElement` | 56 |
 | [packages/formats/src/psd/export-layer.ts](../../packages/formats/src/psd/export-layer.ts) | `elementToLayer` | 54 |
 | [packages/editor/src/editing/preflight.ts](../../packages/editor/src/editing/preflight.ts) | `runPreflightDiagnostics` | 44 |
-| [packages/playback/src/interpolation.ts](../../packages/playback/src/interpolation.ts) | `interpolateValue` | 31 |
 
 ## Ratchet plan
 
@@ -29,4 +28,3 @@ The five-phase strictness rollout (react-hooks bug-finders → jsx-a11y → type
 - `syncTransitions`: extract per-direction (enter/exit/loop/hold) handlers into named helpers.
 - `layerToElement` / `elementToLayer` (PSD): split text / vector / raster / group paths into separate functions.
 - `runPreflightDiagnostics`: split per-rule check functions and aggregate results.
-- `interpolateValue`: dispatch on `KeyframeValue` kind to type-specific interpolators.

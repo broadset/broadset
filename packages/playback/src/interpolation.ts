@@ -33,53 +33,69 @@ function isNumberArray(value: unknown): value is readonly number[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'number');
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity -- cc=31; value dispatcher covers number/color/tuple/string/path per KeyframeValue kind; see lint-strictness-plan.md Phase 4 followup.
+function step<T>(from: T, to: T, easedProgress: number): T {
+  return easedProgress >= 1 ? to : from;
+}
+
+function interpolateNumberArrayPair(
+  from: readonly number[],
+  to: readonly number[],
+  easedProgress: number,
+): readonly number[] {
+  return from.map((item, index) => interpolateNumber(item, to[index] ?? item, easedProgress));
+}
+
+function interpolateStringPair(
+  from: string,
+  to: string,
+  easedProgress: number,
+  easing: string,
+  countingFormat: CountingFormat | undefined,
+): string {
+  if (easing === 'counting') {
+    if (!isNumericString(from) || !isNumericString(to)) {
+      return step(from, to, easedProgress);
+    }
+
+    return formatCountingNumber(interpolateNumber(Number(from), Number(to), easedProgress), countingFormat);
+  }
+
+  if (isHexColor(from) && isHexColor(to)) {
+    return interpolateHexColor(from, to, easedProgress);
+  }
+
+  if (isNumericString(from) && isNumericString(to)) {
+    return formatSimpleNumber(interpolateNumber(Number(from), Number(to), easedProgress));
+  }
+
+  if (isSvgPathD(from) && isSvgPathD(to)) {
+    return interpolatePathD({ fromD: from, toD: to, progress: easedProgress });
+  }
+
+  return step(from, to, easedProgress);
+}
+
 export function interpolateValue(options: InterpolateValueOptions): unknown {
   const easedProgress = applyEasing(options.easing, options.progress);
+  const { from, to } = options;
 
-  if (typeof options.from === 'number' && typeof options.to === 'number') {
-    return interpolateNumber(options.from, options.to, easedProgress);
+  if (typeof from === 'number' && typeof to === 'number') {
+    return interpolateNumber(from, to, easedProgress);
   }
 
-  if (typeof options.from === 'boolean' && typeof options.to === 'boolean') {
-    return easedProgress >= 1 ? options.to : options.from;
+  if (typeof from === 'boolean' && typeof to === 'boolean') {
+    return step(from, to, easedProgress);
   }
 
-  if (isNumberArray(options.from) && isNumberArray(options.to)) {
-    const targetValues = options.to;
-
-    return options.from.map((item, index) => interpolateNumber(item, targetValues[index] ?? item, easedProgress));
+  if (isNumberArray(from) && isNumberArray(to)) {
+    return interpolateNumberArrayPair(from, to, easedProgress);
   }
 
-  if (typeof options.from === 'string' && typeof options.to === 'string') {
-    if (options.easing === 'counting') {
-      if (!isNumericString(options.from) || !isNumericString(options.to)) {
-        return easedProgress >= 1 ? options.to : options.from;
-      }
-
-      const value = interpolateNumber(Number(options.from), Number(options.to), easedProgress);
-
-      return formatCountingNumber(value, options.countingFormat);
-    }
-
-    if (isHexColor(options.from) && isHexColor(options.to)) {
-      return interpolateHexColor(options.from, options.to, easedProgress);
-    }
-
-    if (isNumericString(options.from) && isNumericString(options.to)) {
-      const value = interpolateNumber(Number(options.from), Number(options.to), easedProgress);
-
-      return formatSimpleNumber(value);
-    }
-
-    if (isSvgPathD(options.from) && isSvgPathD(options.to)) {
-      return interpolatePathD({ fromD: options.from, toD: options.to, progress: easedProgress });
-    }
-
-    return easedProgress >= 1 ? options.to : options.from;
+  if (typeof from === 'string' && typeof to === 'string') {
+    return interpolateStringPair(from, to, easedProgress, options.easing, options.countingFormat);
   }
 
-  return easedProgress >= 1 ? options.to : options.from;
+  return step(from, to, easedProgress);
 }
 
 function getCountingFormat(value: KeyframeValue): CountingFormat | undefined {
