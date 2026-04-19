@@ -69,83 +69,88 @@ function hslToRgb(hue: number, saturation: number, lightness: number): readonly 
   return [clampByte((red + match) * 255), clampByte((green + match) * 255), clampByte((blue + match) * 255)];
 }
 
+function rgbToHexString(red: number, green: number, blue: number, alpha: number | undefined): string {
+  const hex = `#${byteToHex(red)}${byteToHex(green)}${byteToHex(blue)}`;
+
+  return alpha === undefined ? hex : `${hex}${byteToHex(alpha * 255)}`;
+}
+
+function parseHexColor(trimmed: string): string | null {
+  if (!trimmed.startsWith('#')) return null;
+
+  const hex = trimmed.slice(1);
+
+  if (!/^[0-9a-f]+$/i.test(hex)) {
+    throw new Error(`Unable to normalize color: "#${hex}"`);
+  }
+
+  if (hex.length === 3 || hex.length === 4) {
+    const expanded = hex
+      .split('')
+      .map((character) => `${character}${character}`)
+      .join('');
+
+    return `#${expanded}`;
+  }
+
+  if (hex.length === 6 || hex.length === 8) {
+    return trimmed;
+  }
+
+  return null;
+}
+
+function parseRgbColor(trimmed: string): string | null {
+  const match = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(trimmed);
+
+  if (match === null) return null;
+
+  const red = Number(match[1]);
+  const green = Number(match[2]);
+  const blue = Number(match[3]);
+  const alpha = match[4] === undefined ? undefined : Number(match[4]);
+  const alphaValid = alpha === undefined || isFiniteInRange(alpha, 0, 1);
+
+  if (!isFiniteInRange(red, 0, 255) || !isFiniteInRange(green, 0, 255) || !isFiniteInRange(blue, 0, 255) || !alphaValid) {
+    throw new Error(`Unable to normalize color: "${trimmed}"`);
+  }
+
+  return rgbToHexString(red, green, blue, alpha);
+}
+
+function parseHslColor(trimmed: string): string | null {
+  const match = /^hsla?\(\s*(\d+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(trimmed);
+
+  if (match === null) return null;
+
+  const hue = Number(match[1]);
+  const saturation = Number(match[2]);
+  const lightness = Number(match[3]);
+  const alpha = match[4] === undefined ? undefined : Number(match[4]);
+  const alphaValid = alpha === undefined || isFiniteInRange(alpha, 0, 1);
+
+  if (!isFiniteInRange(saturation, 0, 100) || !isFiniteInRange(lightness, 0, 100) || !alphaValid) {
+    throw new Error(`Unable to normalize color: "${trimmed}"`);
+  }
+
+  const [red, green, blue] = hslToRgb(hue, saturation, lightness);
+
+  return rgbToHexString(red, green, blue, alpha);
+}
+
 /**
  * Normalizes supported CSS color inputs to canonical `#RRGGBB` or `#RRGGBBAA`
  * hex strings at the model boundary.
  */
 export function normalizeColor(input: string): string {
   const trimmed = input.trim().toLowerCase();
-
   const namedColor = CSS_NAMED_COLORS[trimmed];
 
-  if (namedColor !== undefined) {
-    return namedColor;
-  }
+  if (namedColor !== undefined) return namedColor;
 
-  if (trimmed.startsWith('#')) {
-    const hex = trimmed.slice(1);
+  const parsed = parseHexColor(trimmed) ?? parseRgbColor(trimmed) ?? parseHslColor(trimmed);
 
-    if (!/^[0-9a-f]+$/i.test(hex)) {
-      throw new Error(`Unable to normalize color: "${input}"`);
-    }
-
-    if (hex.length === 3 || hex.length === 4) {
-      const expanded = hex
-        .split('')
-        .map((character) => `${character}${character}`)
-        .join('');
-
-      return `#${expanded}`;
-    }
-
-    if (hex.length === 6 || hex.length === 8) {
-      return trimmed;
-    }
-  }
-
-  const rgbMatch = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(trimmed);
-
-  if (rgbMatch !== null) {
-    const red = Number(rgbMatch[1]);
-    const green = Number(rgbMatch[2]);
-    const blue = Number(rgbMatch[3]);
-    const alpha = rgbMatch[4] === undefined ? undefined : Number(rgbMatch[4]);
-
-    if (
-      !isFiniteInRange(red, 0, 255) ||
-      !isFiniteInRange(green, 0, 255) ||
-      !isFiniteInRange(blue, 0, 255) ||
-      (alpha !== undefined && !isFiniteInRange(alpha, 0, 1))
-    ) {
-      throw new Error(`Unable to normalize color: "${input}"`);
-    }
-
-    const hex = `#${byteToHex(red)}${byteToHex(green)}${byteToHex(blue)}`;
-
-    return alpha === undefined ? hex : `${hex}${byteToHex(alpha * 255)}`;
-  }
-
-  const hslMatch = /^hsla?\(\s*(\d+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(trimmed);
-
-  if (hslMatch !== null) {
-    const hue = Number(hslMatch[1]);
-    const saturation = Number(hslMatch[2]);
-    const lightness = Number(hslMatch[3]);
-    const alpha = hslMatch[4] === undefined ? undefined : Number(hslMatch[4]);
-
-    if (
-      !isFiniteInRange(saturation, 0, 100) ||
-      !isFiniteInRange(lightness, 0, 100) ||
-      (alpha !== undefined && !isFiniteInRange(alpha, 0, 1))
-    ) {
-      throw new Error(`Unable to normalize color: "${input}"`);
-    }
-
-    const [red, green, blue] = hslToRgb(hue, saturation, lightness);
-    const hex = `#${byteToHex(red)}${byteToHex(green)}${byteToHex(blue)}`;
-
-    return alpha === undefined ? hex : `${hex}${byteToHex(alpha * 255)}`;
-  }
+  if (parsed !== null) return parsed;
 
   throw new Error(`Unable to normalize color: "${input}"`);
 }
