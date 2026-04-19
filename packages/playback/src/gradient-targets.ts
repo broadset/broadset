@@ -58,64 +58,80 @@ export function parseGradientTarget(propertyName: string): ParsedGradientTarget 
  * a new gradient object. Out-of-bounds stop indices are silently ignored.
  * The original gradient is not mutated.
  */
+function parseCenterValue(value: unknown): readonly [number, number] | null {
+  if (!Array.isArray(value) || value.length < 2) return null;
+
+  const x: unknown = value[0];
+  const y: unknown = value[1];
+
+  if (typeof x !== 'number' || typeof y !== 'number') return null;
+
+  return [x, y];
+}
+
+function applyStopUpdate(
+  stops: BroadsetGradientStop[],
+  target: { readonly index: number; readonly field: 'color' | 'position' },
+  value: unknown,
+): void {
+  const { index, field } = target;
+
+  if (index < 0 || index >= stops.length) return;
+
+  const stop = stops[index];
+
+  if (stop === undefined) return;
+
+  if (field === 'color' && typeof value === 'string') {
+    stops[index] = { ...stop, color: value };
+  } else if (field === 'position' && typeof value === 'number') {
+    stops[index] = { ...stop, position: value };
+  }
+}
+
+interface GradientAccumulator {
+  angle: number | undefined;
+  center: readonly [number, number] | undefined;
+  readonly stops: BroadsetGradientStop[];
+}
+
+function applyOneGradientUpdate(acc: GradientAccumulator, update: GradientPropertyUpdate): void {
+  const { target, value } = update;
+
+  if (target.kind === 'angle') {
+    if (typeof value === 'number') acc.angle = value;
+
+    return;
+  }
+
+  if (target.kind === 'center') {
+    const parsed = parseCenterValue(value);
+
+    if (parsed !== null) acc.center = parsed;
+
+    return;
+  }
+
+  applyStopUpdate(acc.stops, target, value);
+}
+
 export function applyGradientPropertyUpdates(
   gradient: BroadsetGradient,
   updates: readonly GradientPropertyUpdate[],
 ): BroadsetGradient {
-  let angle = gradient.angle;
-  let center = gradient.center;
-  const stops: BroadsetGradientStop[] = gradient.stops.map((stop) => ({ ...stop }));
+  const acc: GradientAccumulator = {
+    angle: gradient.angle,
+    center: gradient.center,
+    stops: gradient.stops.map((stop) => ({ ...stop })),
+  };
 
-  for (const update of updates) {
-    switch (update.target.kind) {
-      case 'angle':
-        if (typeof update.value === 'number') {
-          angle = update.value;
-        }
-
-        break;
-
-      case 'center':
-        if (
-          Array.isArray(update.value) &&
-          update.value.length >= 2 &&
-          typeof update.value[0] === 'number' &&
-          typeof update.value[1] === 'number'
-        ) {
-          center = [update.value[0], update.value[1]];
-        }
-
-        break;
-
-      case 'stop': {
-        const { index, field } = update.target;
-
-        if (index < 0 || index >= stops.length) {
-          break;
-        }
-
-        const stop = stops[index];
-
-        if (stop === undefined) {
-          break;
-        }
-
-        if (field === 'color' && typeof update.value === 'string') {
-          stops[index] = { ...stop, color: update.value };
-        } else if (field === 'position' && typeof update.value === 'number') {
-          stops[index] = { ...stop, position: update.value };
-        }
-
-        break;
-      }
-    }
-  }
+  for (const update of updates) applyOneGradientUpdate(acc, update);
 
   return {
     type: gradient.type,
-    stops,
-    ...(angle !== undefined ? { angle } : {}),
-    ...(center !== undefined ? { center } : {}),
+    stops: acc.stops,
+    ...(acc.angle !== undefined ? { angle: acc.angle } : {}),
+    ...(acc.center !== undefined ? { center: acc.center } : {}),
   };
 }
 
