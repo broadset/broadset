@@ -133,37 +133,42 @@ export function clearTimelineStyles(args: {
   }
 }
 
+function collectTriggeredReferences(entry: AnimationDefinition): Set<string> {
+  const references = new Set<string>();
+
+  for (const binding of entry.config.stateTimelineBindings) {
+    references.add(binding.timelineId);
+  }
+
+  for (const binding of entry.config.modifierTimelineBindings) {
+    references.add(binding.inTimelineId);
+
+    if (binding.outTimelineId !== undefined) references.add(binding.outTimelineId);
+  }
+
+  return references;
+}
+
+function assertNoSelfTargetingActions(entry: AnimationDefinition, reference: string): void {
+  const timeline = findTimelineByReference(entry.config.timelines, reference);
+
+  if (timeline === null) return;
+
+  for (const keyframe of timeline.keyframes) {
+    if (keyframe.action === 'none') continue;
+
+    if (keyframe.target === undefined || keyframe.target === entry.elementId) {
+      throw new Error(
+        `Circular dependency detected: triggered timeline "${timeline.name}" for element "${entry.elementId}" contains a self-targeting action marker.`,
+      );
+    }
+  }
+}
+
 export function validateAnimationDefinitions(definitions: readonly AnimationDefinition[]): void {
   for (const entry of definitions) {
-    const triggeredReferences = new Set<string>();
-
-    for (const binding of entry.config.stateTimelineBindings) {
-      triggeredReferences.add(binding.timelineId);
-    }
-
-    for (const binding of entry.config.modifierTimelineBindings) {
-      triggeredReferences.add(binding.inTimelineId);
-      binding.outTimelineId !== undefined && triggeredReferences.add(binding.outTimelineId);
-    }
-
-    for (const reference of triggeredReferences) {
-      const timeline = findTimelineByReference(entry.config.timelines, reference);
-
-      if (timeline === null) {
-        continue;
-      }
-
-      for (const keyframe of timeline.keyframes) {
-        if (keyframe.action === 'none') {
-          continue;
-        }
-
-        if (keyframe.target === undefined || keyframe.target === entry.elementId) {
-          throw new Error(
-            `Circular dependency detected: triggered timeline "${timeline.name}" for element "${entry.elementId}" contains a self-targeting action marker.`,
-          );
-        }
-      }
+    for (const reference of collectTriggeredReferences(entry)) {
+      assertNoSelfTargetingActions(entry, reference);
     }
   }
 }
