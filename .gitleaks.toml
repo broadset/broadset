@@ -1,0 +1,19 @@
+# Repo-level gitleaks config.
+#
+# Pre-commit (agents/hooks/gitleaks-check.sh) and CI (gitleaks-action) only
+# scan staged content / committed history, so this file mostly exists to keep
+# manual `gitleaks detect` runs noise-free for paths that we know never get
+# committed (build artefacts, vendored bundles, Playwright caches).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Build/cache artefacts that contain bundled third-party code matching generic API key patterns (e.g. PDF/crypto libraries with `privateKey`/`encryptedKey` field names)."
+paths = [
+  '''(?i)/playwright/\.cache/''',
+  '''(?i)/dist/''',
+  '''(?i)/coverage/''',
+  '''(?i)/playwright-report/''',
+  '''(?i)/test-results/''',
+]
