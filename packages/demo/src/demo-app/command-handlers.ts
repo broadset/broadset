@@ -12,6 +12,62 @@ import {
 } from '../demo-types';
 import { getElementLabel } from './helpers';
 
+type PropertyUpdateContext = {
+  readonly store: EditorStore;
+  readonly element: BroadsetElement;
+  readonly value: PropertyValue;
+};
+
+const VALID_BOOLEAN_OPS = new Set<string>(['union', 'subtract', 'intersect', 'exclude']);
+
+function resolveBooleanOperation(stringValue: string): BooleanOperation | null {
+  if (stringValue === '' || stringValue === 'none') return null;
+  if (VALID_BOOLEAN_OPS.has(stringValue)) return stringValue as BooleanOperation;
+
+  return null;
+}
+
+const PROPERTY_UPDATE_HANDLERS: Readonly<Record<string, (ctx: PropertyUpdateContext) => void>> = {
+  x: ({ store, element, value }) => {
+    store.getState().commitElementUpdate(element.id, {
+      position: { ...element.position, x: Number(value) },
+    });
+  },
+  y: ({ store, element, value }) => {
+    store.getState().commitElementUpdate(element.id, {
+      position: { ...element.position, y: Number(value) },
+    });
+  },
+  width: ({ store, element, value }) => {
+    store.getState().commitElementUpdate(element.id, { width: Number(value) });
+  },
+  height: ({ store, element, value }) => {
+    store.getState().commitElementUpdate(element.id, { height: Number(value) });
+  },
+  rotation: ({ store, element, value }) => {
+    store.getState().commitElementUpdate(element.id, { rotation: Number(value) });
+  },
+  name: ({ store, element, value }) => {
+    store.getState().commitElementUpdate(element.id, { name: String(value) });
+  },
+  content: ({ store, element, value }) => {
+    store.getState().commitElementUpdate(element.id, { content: String(value) });
+  },
+  assetId: ({ store, element, value }) => {
+    const trimmed = String(value).trim();
+
+    store.getState().commitElementUpdate(element.id, { assetId: trimmed === '' ? null : trimmed });
+  },
+  locked: ({ store, element, value }) => {
+    if (element.locked !== Boolean(value)) store.getState().toggleLock(element.id);
+  },
+  booleanOperation: ({ store, element, value }) => {
+    store.getState().commitElementUpdate(element.id, {
+      booleanOperation: resolveBooleanOperation(String(value)),
+    });
+  },
+};
+
 interface UseCommandHandlersOptions {
   readonly currentDocumentCanvas: {
     readonly width: number;
@@ -192,82 +248,17 @@ export function useCommandHandlers({
 
   const handlePropertyUpdate = useCallback(
     (key: string, value: PropertyValue): void => {
-      if (selectedElement === null) {
-        return;
-      }
+      if (selectedElement === null) return;
 
-      if (key === 'x' || key === 'y') {
-        editorStore.getState().commitElementUpdate(selectedElement.id, {
-          position: {
-            ...selectedElement.position,
-            [key]: Number(value),
-          },
-        });
+      const handler = PROPERTY_UPDATE_HANDLERS[key];
+
+      if (handler !== undefined) {
+        handler({ store: editorStore, element: selectedElement, value });
 
         return;
       }
 
-      if (key === 'width' || key === 'height' || key === 'rotation') {
-        editorStore.getState().commitElementUpdate(selectedElement.id, {
-          [key]: Number(value),
-        });
-
-        return;
-      }
-
-      if (key === 'name') {
-        editorStore.getState().commitElementUpdate(selectedElement.id, {
-          name: String(value),
-        });
-
-        return;
-      }
-
-      if (key === 'content') {
-        editorStore.getState().commitElementUpdate(selectedElement.id, {
-          content: String(value),
-        });
-
-        return;
-      }
-
-      if (key === 'assetId') {
-        const assetIdValue = String(value).trim();
-
-        editorStore.getState().commitElementUpdate(selectedElement.id, {
-          assetId: assetIdValue === '' ? null : assetIdValue,
-        });
-
-        return;
-      }
-
-      if (key === 'locked') {
-        const nextLocked = Boolean(value);
-
-        if (selectedElement.locked !== nextLocked) {
-          editorStore.getState().toggleLock(selectedElement.id);
-        }
-
-        return;
-      }
-
-      if (key === 'booleanOperation') {
-        const validOps = new Set<string>(['union', 'subtract', 'intersect', 'exclude']);
-        const stringValue = String(value);
-
-        editorStore.getState().commitElementUpdate(selectedElement.id, {
-          booleanOperation:
-            stringValue === '' || stringValue === 'none' ? null
-            : validOps.has(stringValue) ? (stringValue as BooleanOperation)
-            : null,
-        });
-
-        return;
-      }
-
-      editorStore.getState().updateElementStyle(selectedElement.id, {
-        [key]: value,
-      });
+      editorStore.getState().updateElementStyle(selectedElement.id, { [key]: value });
     },
     [editorStore, selectedElement],
   );
