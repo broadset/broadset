@@ -67,6 +67,32 @@ export function useShellBrowserEffects({
       setContextMenu(null);
     };
 
+    const handleEscape = (event: KeyboardEvent): void => {
+      setContextMenu(null);
+
+      if (editorStore.getState().pendingPlacementType !== null) {
+        event.preventDefault();
+        cancelPlacement(editorStore);
+      }
+    };
+
+    const handleDeleteSelection = (event: KeyboardEvent): boolean => {
+      const ids = editorStore.getState().activeElementIds;
+
+      if (ids.length === 0) return false;
+
+      event.preventDefault();
+      for (const elementId of ids) editorStore.getState().removeElement(elementId);
+
+      return true;
+    };
+
+    const handleUndoRedo = (event: KeyboardEvent): void => {
+      event.preventDefault();
+      if (event.shiftKey) editorStore.getState().redo();
+      else editorStore.getState().undo();
+    };
+
     const handleGlobalKeydown = (event: KeyboardEvent): void => {
       const normalizedKey = event.key.toLowerCase();
       const usesModifier = event.ctrlKey || event.metaKey;
@@ -81,28 +107,15 @@ export function useShellBrowserEffects({
       }
 
       if (event.key === 'Escape') {
-        setContextMenu(null);
-
-        if (editorStore.getState().pendingPlacementType !== null) {
-          event.preventDefault();
-          cancelPlacement(editorStore);
-        }
+        handleEscape(event);
 
         return;
       }
 
-      if (isEditableTarget(event.target)) {
-        return;
-      }
+      if (isEditableTarget(event.target)) return;
 
-      if ((event.key === 'Backspace' || event.key === 'Delete') && editorStore.getState().activeElementIds.length > 0) {
-        event.preventDefault();
-
-        for (const elementId of editorStore.getState().activeElementIds) {
-          editorStore.getState().removeElement(elementId);
-        }
-
-        return;
+      if (event.key === 'Backspace' || event.key === 'Delete') {
+        if (handleDeleteSelection(event)) return;
       }
 
       if (usesModifier && normalizedKey === 's') {
@@ -112,15 +125,7 @@ export function useShellBrowserEffects({
         return;
       }
 
-      if (usesModifier && normalizedKey === 'z') {
-        event.preventDefault();
-
-        if (event.shiftKey) {
-          editorStore.getState().redo();
-        } else {
-          editorStore.getState().undo();
-        }
-      }
+      if (usesModifier && normalizedKey === 'z') handleUndoRedo(event);
     };
 
     html.classList.add('dark');
