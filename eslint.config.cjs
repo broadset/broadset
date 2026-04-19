@@ -268,11 +268,10 @@ module.exports = [
       'react/react-in-jsx-scope': 'off',
       // TypeScript provides type checking; PropTypes are unused.
       'react/prop-types': 'off',
-      // Experimental rules from eslint-plugin-react-hooks 6.x — both are high
+      // Experimental rule in eslint-plugin-react-hooks 6.x — high
       // false-positive rate on legitimate patterns (effect-based reducers,
-      // sync state bridges). Disabling until the rules stabilise.
+      // sync state bridges). Disable until the rule stabilises.
       'react-hooks/set-state-in-effect': 'off',
-      'react-hooks/you-might-not-need-an-effect': 'off',
     },
   },
   // Tests and CT helpers may use unbound methods (Jest matchers, mock helpers)
