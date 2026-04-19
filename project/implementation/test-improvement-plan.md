@@ -1,10 +1,34 @@
 # Test Improvement Plan (Ralph-Compatible)
 
 Date: 2026-04-15
+Reviewed: 2026-04-20
 Owner: Follow-up implementation agent
-Status: ready for Ralph loop execution
+Status: queued behind `project/implementation/vitest-switch.md`
 
 This file is intentionally formatted like a phase plan so Ralph can execute it unit-by-unit using its normal red/green loop.
+
+## Prerequisite
+
+**Do not start any unit in this plan until `project/implementation/vitest-switch.md` is complete** (all VS-\* units checked, `gate:full` green). Every unit below rewrites, relocates, or authors test code; running them against the old Jest-based runner will produce churn that conflicts with the Vitest migration.
+
+Before starting the first unit, verify the prerequisite:
+
+- `rg -n "@jest-environment|@jest/globals|(?<![A-Za-z0-9_])jest\." packages/*/src` returns zero matches
+- `rg -n "runInBand|NODE_OPTIONS=--experimental-vm-modules" packages package.json` returns zero matches
+- every package's `package.json` `test` script is `vitest run --passWithNoTests`
+
+If any of these fail, stop and resume the Vitest switch plan instead.
+
+## Authoring Conventions (post-Vitest switch)
+
+All new or rewritten unit tests produced by this plan MUST follow the repo's post-migration Vitest conventions. These are enforced by tests and by the Vitest config chosen in `vitest.base.ts`; Ralph should not reinvent them.
+
+- Explicit imports from `vitest` — `import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';`. Globals are disabled.
+- Environment pragma only when a file needs to override the package default: `/** @vitest-environment jsdom */` or `/** @vitest-environment node */` on line 1.
+- Mocks use `vi.fn`, `vi.mock`, `vi.spyOn`. `await vi.importActual(...)` for partial-mock composition.
+- Fake timers via `vi.useFakeTimers()` / `vi.advanceTimersByTime(...)` / `vi.useRealTimers()`. Per-test timeout via `it('…', { timeout: N }, …)` or `vi.setConfig({ testTimeout })` at suite scope; do not call the old `jest.setTimeout`.
+- DOM matchers come from `@testing-library/jest-dom/vitest` — already wired up in `test/vitest.setup.ts`; no per-file import needed.
+- Do not introduce `.skip`, `.todo`, `eslint-disable`, `@ts-ignore`, or mock-everything shortcuts to make a rewritten test green. If the assertion genuinely needs the browser, migrate the scenario to CT (split path in the decision matrix below).
 
 ## Ralph Loop Convention
 
@@ -44,7 +68,7 @@ A unit is complete only when both boxes are checked and the listed validation co
 
 - modal/focus/popover/listbox/select keyboard behavior
 - drag/resize/rotation pointer choreography
-- HeroUI interaction semantics hidden by jest mocks
+- HeroUI interaction semantics hidden by `vi.mock` wrappers or `test-helpers` shims
 - cross-region action and visible result flows
 - browser a11y behavior requiring real DOM/focus order
 
@@ -95,7 +119,7 @@ When using an explicit argument, use the exact unit id and title prefix from thi
 Scope:
 
 - create CT that validates snapshot save plus restore rollback semantics end-to-end
-- keep only minimal unit smoke in jest if needed
+- keep only minimal unit smoke in Vitest if needed (e.g. reducer/action shape for the store slice driving the flow)
 
 Primary files:
 
@@ -357,13 +381,14 @@ Acceptance criteria:
 - no known critical flow remains verified only via mocked wrappers
 - no known presence-only critical interaction tests remain in target files
 - all previous units in this plan are checked complete
-- full root gates pass
+- full root gates pass (including `lint:dead` and `lint:typecoverage`, which moved into `gate:full` after the Vitest switch)
 
 Validation:
 
 - npm run quality:all
 - npm run build
-- npm run ct
+- npm run ct:all
+- npm run gate:full
 
 ## Reporting Format for Ralph Runs
 
@@ -384,5 +409,6 @@ This plan is complete only when:
 1. all unit checkboxes are marked done
 2. browser-critical interactions are covered in CT
 3. target low-value tests are removed or rewritten with behavior assertions
-4. no gate suppression was introduced
-5. root quality, build, and ct commands pass
+4. no gate suppression was introduced (no new `.skip`/`.todo`, `eslint-disable`, `@ts-ignore`, or mock widening that hides browser-critical behavior)
+5. `npm run gate:full` passes from repository root
+6. no reintroduction of Jest APIs, `@jest-environment` pragmas, or `@jest/globals` imports (verify with `rg -n "@jest-environment|@jest/globals|(?<![A-Za-z0-9_])jest\." packages/*/src` returning zero)
