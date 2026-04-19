@@ -51,6 +51,64 @@ function parseRawNumber(rawValue: unknown): number | null {
   return evaluateExpression(stringValue);
 }
 
+const COMPACT_BUTTON_STYLE = {
+  borderRadius: 0,
+  height: '100%',
+  minWidth: 0,
+  padding: 0,
+  width: '1.25rem',
+} as const;
+
+const EMBEDDED_GROUP_STYLE = {
+  background: 'transparent',
+  border: 'none',
+  borderRadius: 0,
+  boxShadow: 'none',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  height: '100%',
+  minWidth: 0,
+} as const;
+
+const COMPACT_GROUP_STYLE = {
+  gridTemplateColumns: '1.25rem 1fr 1.25rem',
+  height: '1.75rem',
+  minWidth: 0,
+} as const;
+
+const EMBEDDED_INPUT_STYLE = {
+  background: 'transparent',
+  fontSize: '0.8125rem',
+  fontVariantNumeric: 'tabular-nums',
+  height: '100%',
+  minWidth: 0,
+  padding: '0 0.375rem',
+  textAlign: 'right' as const,
+  width: '100%',
+};
+
+const COMPACT_INPUT_STYLE = {
+  background: 'transparent',
+  fontSize: '0.8125rem',
+  fontVariantNumeric: 'tabular-nums',
+  height: '100%',
+  padding: '0 0.25rem',
+  textAlign: 'center' as const,
+};
+
+function pickGroupStyle(isEmbedded: boolean, isCompact: boolean): { readonly style?: Record<string, unknown> } {
+  if (isEmbedded) return { style: EMBEDDED_GROUP_STYLE };
+  if (isCompact) return { style: COMPACT_GROUP_STYLE };
+
+  return {};
+}
+
+function pickInputStyle(isEmbedded: boolean, isCompact: boolean): { readonly style?: Record<string, unknown> } {
+  if (isEmbedded) return { style: EMBEDDED_INPUT_STYLE };
+  if (isCompact) return { style: COMPACT_INPUT_STYLE };
+
+  return {};
+}
+
 export interface NumFieldProps {
   readonly value: number;
   readonly onChange: (value: number) => void;
@@ -178,13 +236,6 @@ export function NumField({
 
   const isCompact = compact === true;
   const isEmbedded = isCompact && embedded === true;
-  const compactButtonStyle = {
-    borderRadius: 0,
-    height: '100%',
-    minWidth: 0,
-    padding: 0,
-    width: '1.25rem',
-  } as const;
 
   // HeroUI's NumberField root element has no `.value`, and the inner controlled
   // input snaps back to the committed value on re-render. Capture every raw
@@ -237,67 +288,21 @@ export function NumField({
       data-compact={isCompact ? 'true' : undefined}
       data-embedded={isEmbedded ? 'true' : undefined}
     >
-      <NumberField.Group
-        {...(isEmbedded ?
-          {
-            style: {
-              background: 'transparent',
-              border: 'none',
-              borderRadius: 0,
-              boxShadow: 'none',
-              gridTemplateColumns: 'minmax(0, 1fr)',
-              height: '100%',
-              minWidth: 0,
-            },
-          }
-        : isCompact ?
-          {
-            style: {
-              gridTemplateColumns: '1.25rem 1fr 1.25rem',
-              height: '1.75rem',
-              minWidth: 0,
-            },
-          }
-        : {})}
-      >
+      <NumberField.Group {...pickGroupStyle(isEmbedded, isCompact)}>
         {isEmbedded ? null : (
           <NumberField.DecrementButton
-            {...(isCompact ? { 'aria-label': `Decrement ${label}`, style: compactButtonStyle } : {})}
+            {...(isCompact ? { 'aria-label': `Decrement ${label}`, style: COMPACT_BUTTON_STYLE } : {})}
           />
         )}
         <NumberField.Input
           onChange={handleInputChange}
           onBlur={handleInputBlur}
           onKeyDown={handleInputKeyDown}
-          {...(isEmbedded ?
-            {
-              style: {
-                background: 'transparent',
-                fontSize: '0.8125rem',
-                fontVariantNumeric: 'tabular-nums',
-                height: '100%',
-                minWidth: 0,
-                padding: '0 0.375rem',
-                textAlign: 'right' as const,
-                width: '100%',
-              },
-            }
-          : isCompact ?
-            {
-              style: {
-                background: 'transparent',
-                fontSize: '0.8125rem',
-                fontVariantNumeric: 'tabular-nums',
-                height: '100%',
-                padding: '0 0.25rem',
-                textAlign: 'center' as const,
-              },
-            }
-          : {})}
+          {...pickInputStyle(isEmbedded, isCompact)}
         />
         {isEmbedded ? null : (
           <NumberField.IncrementButton
-            {...(isCompact ? { 'aria-label': `Increment ${label}`, style: compactButtonStyle } : {})}
+            {...(isCompact ? { 'aria-label': `Increment ${label}`, style: COMPACT_BUTTON_STYLE } : {})}
           />
         )}
       </NumberField.Group>
