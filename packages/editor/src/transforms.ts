@@ -45,6 +45,65 @@ function getEdgesAndCenters(rect: Rect, axis: 'x' | 'y'): readonly number[] {
     : [rect.y, rect.y + rect.height / 2, rect.y + rect.height];
 }
 
+function pushIfWithinThreshold(
+  candidates: SnapCandidate[],
+  axis: 'x' | 'y',
+  draggedEdge: number,
+  targetPosition: number,
+  threshold: number,
+  priority: SnapPriority,
+): void {
+  const distance = Math.abs(draggedEdge - targetPosition);
+
+  if (distance <= threshold) {
+    candidates.push({ axis, position: targetPosition, distance, priority });
+  }
+}
+
+function collectElementCandidates(
+  draggedEdges: readonly number[],
+  others: readonly Rect[],
+  threshold: number,
+  axis: 'x' | 'y',
+): SnapCandidate[] {
+  const candidates: SnapCandidate[] = [];
+
+  for (const other of others) {
+    const [otherStart, otherCenter, otherEnd] = getEdgesAndCenters(other, axis);
+
+    if (otherStart === undefined || otherCenter === undefined || otherEnd === undefined) continue;
+
+    for (const draggedEdge of draggedEdges) {
+      pushIfWithinThreshold(candidates, axis, draggedEdge, otherCenter, threshold, ELEMENT_CENTER_PRIORITY);
+      pushIfWithinThreshold(candidates, axis, draggedEdge, otherStart, threshold, ELEMENT_EDGE_PRIORITY);
+      pushIfWithinThreshold(candidates, axis, draggedEdge, otherEnd, threshold, ELEMENT_EDGE_PRIORITY);
+    }
+  }
+
+  return candidates;
+}
+
+function collectGuideCandidates(
+  draggedEdges: readonly number[],
+  userGuides: readonly SnapGuide[],
+  threshold: number,
+  axis: 'x' | 'y',
+): SnapCandidate[] {
+  const candidates: SnapCandidate[] = [];
+
+  for (const guide of userGuides) {
+    if (guide.axis !== axis) continue;
+
+    const priority: SnapPriority = guide.priority ?? PAGE_EDGE_PRIORITY;
+
+    for (const draggedEdge of draggedEdges) {
+      pushIfWithinThreshold(candidates, axis, draggedEdge, guide.position, threshold, priority);
+    }
+  }
+
+  return candidates;
+}
+
 function findCandidateForAxis(
   dragged: Rect,
   others: readonly Rect[],
@@ -53,64 +112,12 @@ function findCandidateForAxis(
   axis: 'x' | 'y',
 ): SnapCandidate | undefined {
   const draggedEdges = getEdgesAndCenters(dragged, axis);
-  const candidates: SnapCandidate[] = [];
+  const candidates = [
+    ...collectElementCandidates(draggedEdges, others, threshold, axis),
+    ...collectGuideCandidates(draggedEdges, userGuides, threshold, axis),
+  ];
 
-  for (const other of others) {
-    const [otherStart, otherCenter, otherEnd] = getEdgesAndCenters(other, axis);
-
-    if (otherStart === undefined || otherCenter === undefined || otherEnd === undefined) {
-      continue;
-    }
-
-    for (const draggedEdge of draggedEdges) {
-      const centerDistance = Math.abs(draggedEdge - otherCenter);
-
-      if (centerDistance <= threshold) {
-        candidates.push({
-          axis,
-          position: otherCenter,
-          distance: centerDistance,
-          priority: ELEMENT_CENTER_PRIORITY,
-        });
-      }
-
-      for (const otherEdge of [otherStart, otherEnd]) {
-        const edgeDistance = Math.abs(draggedEdge - otherEdge);
-
-        if (edgeDistance <= threshold) {
-          candidates.push({
-            axis,
-            position: otherEdge,
-            distance: edgeDistance,
-            priority: ELEMENT_EDGE_PRIORITY,
-          });
-        }
-      }
-    }
-  }
-
-  for (const guide of userGuides) {
-    if (guide.axis !== axis) {
-      continue;
-    }
-
-    for (const draggedEdge of draggedEdges) {
-      const guideDistance = Math.abs(draggedEdge - guide.position);
-
-      if (guideDistance <= threshold) {
-        candidates.push({
-          axis,
-          position: guide.position,
-          distance: guideDistance,
-          priority: guide.priority ?? PAGE_EDGE_PRIORITY,
-        });
-      }
-    }
-  }
-
-  if (candidates.length === 0) {
-    return undefined;
-  }
+  if (candidates.length === 0) return undefined;
 
   return [...candidates].sort((left, right) => left.priority - right.priority || left.distance - right.distance)[0];
 }
