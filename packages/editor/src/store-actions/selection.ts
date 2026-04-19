@@ -2,7 +2,7 @@ import type { BroadsetDocument } from '@broadset/model';
 
 import type { EditingMode, EditorState } from './store';
 
-export function createEditingMode(
+function createEditingMode(
   pendingPlacementType: string | null,
   pathEditingElementId: string | null,
   pathDrawingElementId: string | null,

@@ -6,7 +6,7 @@ import { RulerStrip } from '../demo-components';
 import { RULER_SIZE } from '../demo-types';
 import { useCanvasViewport } from './helpers';
 
-export interface DemoRulersProps {
+interface DemoRulersProps {
   readonly editorStore: EditorStore;
   readonly documentCanvasWidth: number;
   readonly documentCanvasHeight: number;

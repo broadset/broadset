@@ -17,4 +17,4 @@ const SAMPLE_PROJECT: BroadsetProject = broadsetProjectSchema.parse({
 
 const DEMO_DOCUMENT: BroadsetDocument = broadsetDocumentSchema.parse(SAMPLE_DOCUMENT);
 
-export { DEMO_DOCUMENT, SAMPLE_DOCUMENT, SAMPLE_PROJECT, SAMPLE_SOCIAL_DOCUMENT };
+export { DEMO_DOCUMENT, SAMPLE_PROJECT };

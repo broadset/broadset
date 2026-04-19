@@ -4,7 +4,7 @@ import { createPlaybackController } from '@broadset/playback';
 import { createScreenRenderer } from '@broadset/renderer';
 import { act } from '@testing-library/react';
 
-export interface DemoShellMocks {
+interface DemoShellMocks {
   readonly mockedCreatePlaybackController: jest.MockedFunction<typeof createPlaybackController>;
   readonly mockedCreateScreenRenderer: jest.MockedFunction<typeof createScreenRenderer>;
 }

@@ -4,7 +4,7 @@ import { createContext, useContext } from 'react';
 
 import type { PropertyFieldAdapter, PropertyValue } from '../panel-types';
 
-export const PropertyEditingContext = createContext<PropertyFieldAdapter | null>(null);
+const PropertyEditingContext = createContext<PropertyFieldAdapter | null>(null);
 
 export interface PropertyEditingProviderProps {
   readonly adapter: PropertyFieldAdapter;
@@ -15,7 +15,7 @@ export function PropertyEditingProvider({ adapter, children }: PropertyEditingPr
   return <PropertyEditingContext.Provider value={adapter}>{children}</PropertyEditingContext.Provider>;
 }
 
-export function usePropertyEditingAdapter(): PropertyFieldAdapter | null {
+function usePropertyEditingAdapter(): PropertyFieldAdapter | null {
   return useContext(PropertyEditingContext);
 }
 

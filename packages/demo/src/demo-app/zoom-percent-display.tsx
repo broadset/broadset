@@ -3,7 +3,7 @@ import { color, font } from '@broadset/ui';
 
 import { useCanvasZoomPercent } from './helpers';
 
-export interface ZoomPercentDisplayProps {
+interface ZoomPercentDisplayProps {
   readonly editorStore: EditorStore;
 }
 

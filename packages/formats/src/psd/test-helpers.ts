@@ -1,6 +1,6 @@
 import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle, Canvas } from '@broadset/model';
 
-export function makeCanvas(overrides: Partial<Canvas> = {}): Canvas {
+function makeCanvas(overrides: Partial<Canvas> = {}): Canvas {
   return {
     width: 200,
     height: 100,

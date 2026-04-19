@@ -35,7 +35,6 @@ export type ActiveDialog =
   | 'shortcuts'
   | 'template-browser'
   | null;
-export type AlignmentAction = 'bottom' | 'center-x' | 'center-y' | 'left' | 'right' | 'top';
 
 export interface SidebarPreferences {
   readonly isOpen: boolean;

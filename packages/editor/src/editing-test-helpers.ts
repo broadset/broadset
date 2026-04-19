@@ -16,7 +16,7 @@ export function makeElement(overrides: ElementFactoryOverrides = {}): BroadsetEl
   return createDefaultElement(overrides.type ?? 'rectangle', overrides);
 }
 
-export function makeDocument(elements: readonly BroadsetElement[]): BroadsetDocument {
+function makeDocument(elements: readonly BroadsetElement[]): BroadsetDocument {
   const base = createEmptyBroadsetDocument();
 
   return {

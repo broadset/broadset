@@ -4,20 +4,6 @@ import type { PanelElement } from './panels';
 
 /** Shared fixtures for panel tests. */
 
-export function mockCallOnChange(p: Record<string, unknown>, ...args: readonly unknown[]): void {
-  if (typeof p['onChange'] === 'function') {
-    (p['onChange'] as (...a: readonly unknown[]) => void)(...args);
-  }
-}
-
-export function mockStr(v: unknown, fallback = ''): string {
-  return (
-    typeof v === 'string' ? v
-    : typeof v === 'number' ? String(v)
-    : fallback
-  );
-}
-
 export const BASE_ELEMENT: PanelElement = {
   autoSize: 'none',
   backgroundColor: '#ffffff',
@@ -135,25 +121,6 @@ export const GROUP_ELEMENT: PanelElement = {
   ...BASE_ELEMENT,
   content: 'Group',
   type: 'group',
-};
-
-export const VIDEO_ELEMENT: PanelElement = {
-  ...BASE_ELEMENT,
-  content: 'vid-1',
-  type: 'video',
-};
-
-export const CLOCK_ELEMENT: PanelElement = {
-  ...BASE_ELEMENT,
-  content: 'HH:mm',
-  type: 'clock',
-};
-
-export const TICKER_ELEMENT: PanelElement = {
-  ...BASE_ELEMENT,
-  content: 'Item 1,Item 2',
-  tickerItems: ['Item 1', 'Item 2'],
-  type: 'ticker',
 };
 
 export const ELLIPSE_ELEMENT: PanelElement = {

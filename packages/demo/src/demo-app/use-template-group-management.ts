@@ -10,13 +10,13 @@ import type { BroadsetDocument, BroadsetProject, TemplateGroup, TemplateGroupRol
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useMemo } from 'react';
 
-export interface UseTemplateGroupManagementOptions {
+interface UseTemplateGroupManagementOptions {
   readonly currentDocument: BroadsetDocument;
   readonly templateGroups: readonly TemplateGroup[];
   readonly setTemplateGroups: Dispatch<SetStateAction<TemplateGroup[]>>;
 }
 
-export interface TemplateGroupManagementResult {
+interface TemplateGroupManagementResult {
   readonly availableDocuments: readonly { readonly id: string; readonly name: string }[];
   readonly handleCreateGroup: (name: string) => void;
   readonly handleRemoveGroup: (groupId: string) => void;

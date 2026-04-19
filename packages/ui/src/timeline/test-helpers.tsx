@@ -107,7 +107,7 @@ jest.mock(
   { virtual: true },
 );
 
-export interface TimelineTestModules {
+interface TimelineTestModules {
   readonly AnimationBindingSections: React.ComponentType<AnimationBindingSectionsProps>;
   readonly EasingGraphEditor: React.ComponentType<EasingGraphEditorProps>;
   readonly PerPropertyLanes: React.ComponentType<PerPropertyLanesProps>;

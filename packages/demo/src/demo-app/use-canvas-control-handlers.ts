@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import { clampCanvasZoom } from '../demo-utils';
 
-export type AlignmentAction = 'bottom' | 'center-x' | 'center-y' | 'left' | 'right' | 'top';
+type AlignmentAction = 'bottom' | 'center-x' | 'center-y' | 'left' | 'right' | 'top';
 
 type CanvasViewportSettings = {
   readonly panX?: number;
@@ -13,7 +13,7 @@ type CanvasViewportSettings = {
   readonly zoom?: number;
 };
 
-export interface UseCanvasControlHandlersOptions {
+interface UseCanvasControlHandlersOptions {
   readonly editorStore: EditorStore;
   readonly selectedMovableElements: readonly BroadsetElement[];
   readonly pushToast: (severity: 'error' | 'info' | 'success', message: string) => void;
@@ -21,7 +21,7 @@ export interface UseCanvasControlHandlersOptions {
   readonly setResetToken: Dispatch<SetStateAction<number>>;
 }
 
-export interface CanvasControlHandlers {
+interface CanvasControlHandlers {
   readonly handleAlignSelection: (action: AlignmentAction) => void;
   readonly handleCanvasViewportChange: (settings: CanvasViewportSettings) => void;
   readonly handleDistributeSelection: (axis: 'horizontal' | 'vertical') => void;

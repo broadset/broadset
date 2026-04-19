@@ -11,7 +11,7 @@ import { SelectionTransformWidget } from './selection-transform-widget';
 
 const WHEEL_GESTURE_LOCK_MS = 140;
 
-export interface ScreenPreviewProps {
+interface ScreenPreviewProps {
   readonly allElements: readonly BroadsetElement[];
   readonly selectedElement: BroadsetElement | null;
   readonly onElementTransformPreview: (elementId: string, updates: ElementUpdate) => void;

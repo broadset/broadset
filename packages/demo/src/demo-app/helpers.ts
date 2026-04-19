@@ -3,17 +3,6 @@ import { useCallback, useRef, useSyncExternalStore } from 'react';
 
 import { ELEMENT_TOOL_TYPES } from './constants';
 
-export function useEditorSnapshot(store: EditorStore) {
-  return useSyncExternalStore(
-    (onStoreChange) =>
-      store.subscribe(() => {
-        onStoreChange();
-      }),
-    () => store.getState(),
-    () => store.getState(),
-  );
-}
-
 type SnapshotSelector<TSelected> = (state: ReturnType<EditorStore['getState']>) => TSelected;
 type SnapshotEquality<TSelected> = (left: TSelected, right: TSelected) => boolean;
 
@@ -47,7 +36,7 @@ export function useEditorSelector<TSelected>(
   );
 }
 
-export interface CanvasViewportSnapshot {
+interface CanvasViewportSnapshot {
   readonly zoom: number;
   readonly panX: number;
   readonly panY: number;

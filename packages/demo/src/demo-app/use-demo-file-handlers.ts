@@ -13,7 +13,7 @@ import { DOCUMENT_STORAGE_KEY } from '../demo-types';
 import { downloadJsonFile } from '../demo-utils';
 import type { ExportFormat } from '../formatBridge';
 
-export interface UseDemoFileHandlersOptions {
+interface UseDemoFileHandlersOptions {
   readonly editorStore: EditorStore;
   readonly currentDocument: ReturnType<EditorStore['getState']>['document'];
   readonly renderDocument: BroadsetDocument;
@@ -40,7 +40,7 @@ function formatImportWarningMessage(warnings: readonly string[]): string {
   return 'Import completed with warnings.';
 }
 
-export interface DemoFileHandlers {
+interface DemoFileHandlers {
   readonly exportProgress: ExportProgress | null;
   readonly handleCreateFromPreset: (preset: DocumentPreset) => void;
   readonly handleDebugSnapshotDownload: () => void;

@@ -15,9 +15,3 @@ export const FIXTURE_IDS = {
   clock: 'el-clock',
   ticker: 'el-ticker',
 } as const;
-
-export const FIXTURE_LAYER_LABELS = {
-  liveOrb: 'Live Orb',
-  accentSvg: 'Accent SVG',
-  finalScene: 'Final',
-} as const;

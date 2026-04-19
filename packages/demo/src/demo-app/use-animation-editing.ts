@@ -39,7 +39,7 @@ interface UseAnimationEditingOptions {
   readonly setEditingTimelineSelectedKf: React.Dispatch<React.SetStateAction<number | null>>;
 }
 
-export interface AnimationEditingController {
+interface AnimationEditingController {
   readonly activeModifiers: readonly string[];
   readonly activeState: string | null;
   readonly currentTimeMs: number;

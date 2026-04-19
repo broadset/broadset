@@ -5,7 +5,7 @@ import type { PlaybackController } from '@broadset/playback';
 import { ScreenPreview } from '../demo-components';
 import { useCanvasViewport } from './helpers';
 
-export interface DemoCanvasSurfaceProps {
+interface DemoCanvasSurfaceProps {
   readonly editorStore: EditorStore;
   readonly allElements: readonly BroadsetElement[];
   readonly selectedElement: BroadsetElement | null;

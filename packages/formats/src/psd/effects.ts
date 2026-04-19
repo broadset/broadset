@@ -1,7 +1,7 @@
 import type { RgbaColor } from './color-utils';
 import { parseHexColor } from './color-utils';
 
-export interface ParsedShadow {
+interface ParsedShadow {
   readonly offsetX: number;
   readonly offsetY: number;
   readonly blur: number;
@@ -9,7 +9,7 @@ export interface ParsedShadow {
   readonly color: RgbaColor;
 }
 
-export interface ParsedGlow {
+interface ParsedGlow {
   readonly blur: number;
   readonly color: RgbaColor;
 }

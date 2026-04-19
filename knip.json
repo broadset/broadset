@@ -2,20 +2,8 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "entry": [
-        "commitlint.config.cjs",
-        "eslint.config.cjs",
-        "jest.config.cjs",
-        "test/jest.setup.js"
-      ],
-      "ignoreDependencies": [
-        "husky",
-        "@commitlint/cli",
-        "@commitlint/config-conventional",
-        "vite",
-        "playwright",
-        "type-coverage"
-      ]
+      "entry": ["jest.config.cjs", "test/jest.setup.js"],
+      "ignoreDependencies": ["vite"]
     },
     "packages/demo": {
       "entry": ["src/main.tsx", "src/index.css", "src/**/*.test.{ts,tsx}", "ct/**/*.ct.tsx", "vite.config.ts"],
@@ -23,36 +11,28 @@
       "vite": false
     },
     "packages/ui": {
-      "entry": ["src/index.ts", "src/**/*.test.{ts,tsx}", "ct/**/*.ct.tsx"],
+      "entry": ["src/**/*.test.{ts,tsx}", "ct/**/*.ct.tsx"],
       "project": ["src/**/*.{ts,tsx}"]
     },
     "packages/editor": {
-      "entry": ["src/index.ts", "src/**/*.test.{ts,tsx}"],
+      "entry": ["src/**/*.test.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}"]
     },
     "packages/model": {
-      "entry": ["src/index.ts", "src/**/*.test.{ts,tsx}"],
+      "entry": ["src/**/*.test.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}"]
     },
     "packages/playback": {
-      "entry": ["src/index.ts", "src/**/*.test.{ts,tsx}"],
+      "entry": ["src/**/*.test.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}"]
     },
     "packages/renderer": {
-      "entry": ["src/index.ts", "src/**/*.test.{ts,tsx}"],
+      "entry": ["src/**/*.test.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}"]
     },
     "packages/formats": {
-      "entry": ["src/index.ts", "src/**/*.test.{ts,tsx}"],
+      "entry": ["src/**/*.test.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}"]
     }
-  },
-  "ignoreBinaries": ["actionlint", "gitleaks"],
-  "ignore": [
-    "**/vite.config.ts",
-    "**/playwright-ct.config.ts",
-    "**/jest.config.cjs",
-    "**/playwright/index.ts",
-    "**/playwright/index.html"
-  ]
+  }
 }

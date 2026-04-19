@@ -5,12 +5,12 @@ import { writePsdUint8Array } from 'ag-psd';
 import { elementToLayer, getPendingLinkedFiles, resetExportState, setPrefetchedUrlImages } from './export-layer';
 import { ensureCanvasInitialized } from './runtime-canvas';
 
-export interface PsdImageBytes {
+interface PsdImageBytes {
   readonly mime: string;
   readonly bytes: Uint8Array;
 }
 
-export interface ExportPsdSyncOptions {
+interface ExportPsdSyncOptions {
   readonly prefetchedUrlImages?: ReadonlyMap<string, PsdImageBytes>;
 }
 

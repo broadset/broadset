@@ -70,7 +70,7 @@ function decodeDataUriForPptx(uri: string): DecodedData | undefined {
   return { mime, bytes: encoder.encode(decodeURIComponent(data)) };
 }
 
-export function escapeXml(text: string): string {
+function escapeXml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

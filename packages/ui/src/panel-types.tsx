@@ -1,7 +1,7 @@
 import type { BooleanOperation, TemplateGroupRole, VerticalAlignment } from '@broadset/model';
-import { ListBox, NumberField, Select } from '@heroui/react';
+import { ListBox, Select } from '@heroui/react';
 import type { JSX, ReactNode } from 'react';
-import { cloneElement, createContext, isValidElement, useId } from 'react';
+import { cloneElement, isValidElement, useId } from 'react';
 
 import { color, font } from './tokens';
 
@@ -42,21 +42,16 @@ export const MIX_BLEND_MODE_OPTIONS = [
   'luminosity',
 ] as const;
 
-export const OBJECT_FIT_OPTIONS = ['fill', 'contain', 'cover', 'none', 'scale-down'] as const;
-
 export const LINECAP_OPTIONS = ['butt', 'round', 'square'] as const;
 export const LINEJOIN_OPTIONS = ['miter', 'round', 'bevel'] as const;
-export const FILL_RULE_OPTIONS = ['nonzero', 'evenodd'] as const;
 export const ERROR_CORRECTION_OPTIONS = ['L', 'M', 'Q', 'H'] as const;
 export const TEXT_TRANSFORM_OPTIONS = ['none', 'uppercase', 'lowercase', 'capitalize'] as const;
-export const TEXT_DECORATION_OPTIONS = ['', 'underline', 'overline', 'line-through'] as const;
-export const TEXT_ALIGNMENT_OPTIONS = ['left', 'center', 'right', 'justify'] as const;
 export const VERTICAL_ALIGNMENT_OPTIONS = ['top', 'middle', 'bottom'] as const;
-export const FONT_STYLE_OPTIONS = ['normal', 'italic'] as const;
 export const ISOLATION_OPTIONS = ['auto', 'isolate'] as const;
 
 export const TEMPLATE_GROUP_ROLE_OPTIONS = ['16:9', '9:16', '1:1', '4:3', 'custom'] as const;
-export const VALID_TEMPLATE_GROUP_ROLES = new Set<string>(TEMPLATE_GROUP_ROLE_OPTIONS);
+
+const VALID_TEMPLATE_GROUP_ROLES = new Set<string>(TEMPLATE_GROUP_ROLE_OPTIONS);
 
 export function isTemplateGroupRole(value: string): value is TemplateGroupRole {
   return VALID_TEMPLATE_GROUP_ROLES.has(value);
@@ -199,8 +194,6 @@ export interface PropertyFieldAdapter {
 /** Union of all property value types passed through onUpdate callbacks. */
 export type PropertyValue = string | number | boolean | readonly [number, number, number, number];
 
-export const AdapterContext = createContext<PropertyFieldAdapter | null>(null);
-
 /* ------------------------------------------------------------------ */
 /*  Shared Helpers                                                     */
 /* ------------------------------------------------------------------ */
@@ -271,44 +264,6 @@ export function FieldShell({
   );
 }
 
-export function NumericField({
-  label,
-  value,
-  onValueChange,
-  step,
-  minValue,
-  maxValue,
-  isDisabled,
-}: {
-  readonly label: string;
-  readonly value: number;
-  readonly onValueChange: (value: number) => void;
-  readonly step?: number | undefined;
-  readonly minValue?: number | undefined;
-  readonly maxValue?: number | undefined;
-  readonly isDisabled?: boolean | undefined;
-}): JSX.Element {
-  return (
-    <FieldShell label={label}>
-      <NumberField
-        aria-label={label}
-        isDisabled={isDisabled ?? false}
-        value={value}
-        onChange={(nextValue) => {
-          onValueChange(typeof nextValue === 'number' ? nextValue : Number(nextValue));
-        }}
-        {...(maxValue !== undefined ? { maxValue } : {})}
-        {...(minValue !== undefined ? { minValue } : {})}
-        {...(step !== undefined ? { step } : {})}
-      >
-        <NumberField.Group>
-          <NumberField.Input />
-        </NumberField.Group>
-      </NumberField>
-    </FieldShell>
-  );
-}
-
 export function SelectField({
   label,
   value,
@@ -358,44 +313,6 @@ export function SelectField({
   return <FieldShell label={label}>{select}</FieldShell>;
 }
 
-/** Compute property values for multi-element selection */
-export function computeMultiValue(
-  elements: readonly PanelElement[],
-  key: keyof PanelElement,
-): { readonly value: PanelElement[keyof PanelElement]; readonly isMixed: boolean } {
-  if (elements.length === 0) {
-    return { value: '' as PanelElement[keyof PanelElement], isMixed: false };
-  }
-
-  const firstEl = elements[0];
-
-  if (firstEl === undefined) {
-    return { value: '' as PanelElement[keyof PanelElement], isMixed: false };
-  }
-
-  const first = firstEl[key];
-
-  for (let i = 1; i < elements.length; i++) {
-    const el = elements[i];
-
-    if (el === undefined) {
-      continue;
-    }
-
-    const current = el[key];
-
-    if (Array.isArray(first) && Array.isArray(current)) {
-      if (first.length !== current.length || first.some((v, idx) => v !== current[idx])) {
-        return { value: first, isMixed: true };
-      }
-    } else if (current !== first) {
-      return { value: first, isMixed: true };
-    }
-  }
-
-  return { value: first, isMixed: false };
-}
-
 /* ------------------------------------------------------------------ */
 /*  CustomPanel types                                                  */
 /* ------------------------------------------------------------------ */
@@ -408,8 +325,3 @@ export interface CustomPanelProps {
 
 export type CustomPanelComponent = (props: CustomPanelProps) => JSX.Element;
 
-/* ------------------------------------------------------------------ */
-/*  Re-export for convenience (not used internally, aids external consumers) */
-/* ------------------------------------------------------------------ */
-
-export type { ReactNode };

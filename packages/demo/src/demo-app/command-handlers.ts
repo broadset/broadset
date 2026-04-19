@@ -30,7 +30,7 @@ interface UseCommandHandlersOptions {
   readonly setSidebarTab: Dispatch<SetStateAction<SidebarTab>>;
 }
 
-export interface CommandHandlers {
+interface CommandHandlers {
   readonly handleCanvasClick: (event: MouseEvent<HTMLDivElement>) => void;
   readonly handleCanvasContextMenu: (event: MouseEvent<HTMLDivElement>) => void;
   readonly handleCopySelection: () => void;

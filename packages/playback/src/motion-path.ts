@@ -5,7 +5,7 @@ interface Point {
   readonly y: number;
 }
 
-export interface MotionSample extends Point {
+interface MotionSample extends Point {
   readonly angleDegrees: number;
 }
 

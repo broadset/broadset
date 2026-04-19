@@ -1,4 +1,3 @@
-import type { ResizeHandle } from '@broadset/editor';
 import {
   type BroadsetDocument,
   broadsetDocumentSchema,
@@ -15,46 +14,10 @@ import {
   MAX_SIDEBAR_WIDTH,
   MIN_CANVAS_ZOOM,
   MIN_SIDEBAR_WIDTH,
-  MIN_TRANSFORM_SIZE,
   SIDEBAR_STORAGE_KEY,
   type SidebarPreferences,
 } from './demo-types';
 import { DEMO_DOCUMENT } from './sampleDocument';
-
-export function normalizeTransformRect(
-  rect: {
-    readonly x: number;
-    readonly y: number;
-    readonly width: number;
-    readonly height: number;
-  },
-  handle: ResizeHandle,
-): {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-} {
-  let { x, y, width, height } = rect;
-
-  if (width < MIN_TRANSFORM_SIZE) {
-    if (handle.includes('w')) {
-      x += width - MIN_TRANSFORM_SIZE;
-    }
-
-    width = MIN_TRANSFORM_SIZE;
-  }
-
-  if (height < MIN_TRANSFORM_SIZE) {
-    if (handle.includes('n')) {
-      y += height - MIN_TRANSFORM_SIZE;
-    }
-
-    height = MIN_TRANSFORM_SIZE;
-  }
-
-  return { x, y, width, height };
-}
 
 export function clampSidebarWidth(width: number): number {
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width));
@@ -80,10 +43,6 @@ export function loadSavedDocument(): BroadsetDocument {
   } catch {
     return DEMO_DOCUMENT;
   }
-}
-
-export function normalizeDocumentForEditMode(document: BroadsetDocument): BroadsetDocument {
-  return document;
 }
 
 function buildPageElementInstanceMap(
@@ -227,32 +186,6 @@ export function buildRenderableDocumentForActivePage(
   };
 }
 
-export function getElementWorldPosition(
-  elements: readonly BroadsetElement[],
-  elementId: string,
-): {
-  readonly x: number;
-  readonly y: number;
-} {
-  const elementsById = new Map(elements.map((element) => [element.id, element]));
-  let currentElement = elementsById.get(elementId);
-  let x = 0;
-  let y = 0;
-
-  while (currentElement !== undefined) {
-    x += currentElement.position.x;
-    y += currentElement.position.y;
-
-    if (currentElement.parentId === null) {
-      break;
-    }
-
-    currentElement = elementsById.get(currentElement.parentId);
-  }
-
-  return { x, y };
-}
-
 export function buildLayerInfoList(document: BroadsetDocument, activePageIndex: number): readonly LayerInfo[] {
   const activePage = document.pages[activePageIndex] ?? document.pages[0];
   const elementsById = new Map(document.elements.map((element) => [element.id, element]));
@@ -353,7 +286,7 @@ export function buildLayerInfoList(document: BroadsetDocument, activePageIndex: 
   });
 }
 
-export type LayerDropPosition = 'before' | 'inside' | 'after';
+type LayerDropPosition = 'before' | 'inside' | 'after';
 
 function buildChildrenByParentId(elements: readonly BroadsetElement[]): ReadonlyMap<string, readonly string[]> {
   const mutable = new Map<string, string[]>();
@@ -700,7 +633,7 @@ export function toPanelElement(element: BroadsetElement, instance?: PageElementI
   };
 }
 
-export function toLayerInfo(
+function toLayerInfo(
   element: BroadsetElement,
   visible: boolean,
   metadata?: {
@@ -723,7 +656,7 @@ export function toLayerInfo(
   };
 }
 
-export function greatestCommonDivisor(left: number, right: number): number {
+function greatestCommonDivisor(left: number, right: number): number {
   if (right === 0) {
     return left;
   }
