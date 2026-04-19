@@ -241,6 +241,48 @@ function selectStandardFontVariant(
  * Attempts standard font match first, then Google Fonts fetch+embed, then falls back
  * to Helvetica.
  */
+async function tryEmbedGoogleFont(
+  family: string,
+  pdf: PDF,
+  fetchFn: typeof globalThis.fetch,
+): Promise<FontInput | null> {
+  try {
+    const cssUrl = resolveGoogleFontUrl(family);
+    const cssResponse = await fetchFn(cssUrl);
+    const cssText = await cssResponse.text();
+    const urlMatch = cssText.match(/url\(([^)]+\.(?:ttf|woff2?))\)/);
+    const fontUrl = urlMatch?.[1];
+
+    if (!fontUrl) return null;
+
+    const fontResponse = await fetchFn(fontUrl);
+    const fontBytes = new Uint8Array(await fontResponse.arrayBuffer());
+
+    return pdf.embedFont(fontBytes);
+  } catch {
+    return null;
+  }
+}
+
+async function resolveSingleFont(
+  family: string,
+  pdf: PDF,
+  fetchFn?: typeof globalThis.fetch,
+): Promise<FontInput> {
+  const normalized = normalizeFontFamily(family);
+  const standard = STANDARD_FONT_MAP.get(normalized);
+
+  if (standard) return standard;
+
+  if (fetchFn) {
+    const embedded = await tryEmbedGoogleFont(family, pdf, fetchFn);
+
+    if (embedded !== null) return embedded;
+  }
+
+  return StandardFonts.Helvetica;
+}
+
 async function resolveFonts(
   doc: BroadsetDocument,
   pdf: PDF,
@@ -261,43 +303,7 @@ async function resolveFonts(
     if (seen.has(normalized)) continue;
     seen.add(normalized);
 
-    // Check standard fonts first
-    const standard = STANDARD_FONT_MAP.get(normalized);
-
-    if (standard) {
-      fontMap.set(normalized, standard);
-      continue;
-    }
-
-    // Try Google Fonts fetch+embed
-    if (fetchFn) {
-      try {
-        const cssUrl = resolveGoogleFontUrl(family);
-        const cssResponse = await fetchFn(cssUrl);
-        const cssText = await cssResponse.text();
-
-        // Extract first .ttf or .woff2 URL from the CSS
-        const urlMatch = cssText.match(/url\(([^)]+\.(?:ttf|woff2?))\)/);
-
-        if (urlMatch) {
-          const fontUrl = urlMatch[1];
-
-          if (fontUrl) {
-            const fontResponse = await fetchFn(fontUrl);
-            const fontBytes = new Uint8Array(await fontResponse.arrayBuffer());
-            const embedded = pdf.embedFont(fontBytes);
-
-            fontMap.set(normalized, embedded);
-            continue;
-          }
-        }
-      } catch {
-        // Fall through to default
-      }
-    }
-
-    // Fall back to Helvetica
-    fontMap.set(normalized, StandardFonts.Helvetica);
+    fontMap.set(normalized, await resolveSingleFont(family, pdf, fetchFn));
   }
 
   return fontMap;
