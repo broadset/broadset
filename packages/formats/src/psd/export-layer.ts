@@ -79,7 +79,204 @@ function createSolidPixels(
   return data;
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity -- cc=54; PSD layer mapping is inherently branchy (text/image/shape/group paths); see lint-strictness-plan.md Phase 4 followup.
+function applyBlendMode(layer: Layer, el: BroadsetElement): void {
+  if (!el.style.mixBlendMode) return;
+
+  const psdMode = BLEND_MODE_MAP[el.style.mixBlendMode];
+
+  if (psdMode) {
+    layer.blendMode = psdMode;
+  }
+}
+
+function applyVectorMasks(layer: Layer, el: BroadsetElement): void {
+  if (el.style.borderRadius) {
+    const [a, b, c, d] = el.style.borderRadius;
+    const maskPath = buildRoundedRectMask(el.width, el.height, [a, b, c, d]);
+
+    layer.vectorMask = { paths: [maskPath] };
+  }
+
+  if (!el.style.customClipPath) return;
+
+  const polyMatch = el.style.customClipPath.match(/polygon\(([^)]+)\)/);
+
+  if (!polyMatch) return;
+
+  const clipPath = polygonToVectorMask(polyMatch[1] ?? '', el.width, el.height);
+
+  if (!clipPath) return;
+
+  const existing = layer.vectorMask?.paths ?? [];
+
+  layer.vectorMask = { paths: [...existing, { ...clipPath, operation: 'intersect' }] };
+}
+
+function applyBoxShadow(layer: Layer, el: BroadsetElement): void {
+  if (!el.style.boxShadow) return;
+
+  const shadow = parseBoxShadow(el.style.boxShadow);
+
+  if (!shadow) return;
+
+  layer.effects = {
+    ...layer.effects,
+    dropShadow: [
+      {
+        present: true,
+        enabled: true,
+        color: { r: shadow.color.r, g: shadow.color.g, b: shadow.color.b },
+        opacity: shadow.color.a,
+        angle: Math.round(Math.atan2(shadow.offsetY, shadow.offsetX) * (180 / Math.PI)),
+        distance: { units: 'Pixels', value: Math.sqrt(shadow.offsetX ** 2 + shadow.offsetY ** 2) },
+        size: { units: 'Pixels', value: shadow.blur },
+        ...(shadow.spread ? { choke: { units: 'Pixels', value: shadow.spread } } : undefined),
+      },
+    ],
+  };
+}
+
+function applyFilterGlow(layer: Layer, el: BroadsetElement): void {
+  if (!el.style.filter) return;
+
+  const glow = parseFilterGlow(el.style.filter);
+
+  if (!glow) return;
+
+  layer.effects = {
+    ...layer.effects,
+    outerGlow: {
+      present: true,
+      enabled: true,
+      color: { r: glow.color.r, g: glow.color.g, b: glow.color.b },
+      opacity: glow.color.a,
+      size: { units: 'Pixels', value: glow.blur },
+    },
+  };
+}
+
+function applyTextContent(layer: Layer, el: BroadsetElement): void {
+  const fontSize = el.style.fontSize ?? 12;
+  const color = el.style.fontColor ? parseHexColor(el.style.fontColor) : undefined;
+
+  layer.text = {
+    text: el.content,
+    style: color ? { fontSize, fillColor: color } : { fontSize },
+  };
+}
+
+function applyImageContent(layer: Layer, el: BroadsetElement): void {
+  if (!el.content) return;
+
+  const decoded = decodeDataUri(el.content);
+  const urlContent = exportState.prefetchedUrlImages.get(el.id);
+  const imageBytes = decoded ?? urlContent;
+
+  if (!imageBytes) return;
+
+  const w = Math.max(1, Math.round(el.width));
+  const h = Math.max(1, Math.round(el.height));
+  const guid = elementIdToGuid(el.id);
+
+  layer.imageData = {
+    width: w,
+    height: h,
+    data: createSolidPixels(w, h, { r: 200, g: 200, b: 200, a: 255 }),
+  };
+
+  layer.placedLayer = {
+    id: guid,
+    type: 'raster',
+    width: w,
+    height: h,
+    transform: [
+      el.position.x,
+      el.position.y,
+      el.position.x + el.width,
+      el.position.y,
+      el.position.x + el.width,
+      el.position.y + el.height,
+      el.position.x,
+      el.position.y + el.height,
+    ],
+  };
+
+  exportState.pendingLinkedFiles.push({
+    id: guid,
+    name: el.name || 'image',
+    data: imageBytes.bytes,
+    type: imageBytes.mime,
+  });
+}
+
+function applyPathContent(layer: Layer, el: BroadsetElement): void {
+  if (!el.content) return;
+
+  const pathMask = svgPathToPsdVectorMask(el.content, el.width, el.height);
+
+  if (!pathMask) return;
+
+  layer.vectorMask = { paths: [pathMask] };
+
+  if (!pathMask.open) return;
+
+  layer.vectorStroke = { fillEnabled: false, strokeEnabled: true };
+
+  if (!el.style.borderColor) return;
+
+  const strokeColor = parseHexColor(el.style.borderColor);
+
+  if (strokeColor) {
+    layer.vectorFill = { type: 'color', color: strokeColor };
+  }
+}
+
+function applyShapeFill(layer: Layer, el: BroadsetElement): void {
+  if (!el.style.backgroundColor) return;
+
+  const color = parseHexColor(el.style.backgroundColor);
+
+  if (!color) return;
+
+  const w = Math.max(1, Math.round(el.width));
+  const h = Math.max(1, Math.round(el.height));
+
+  layer.imageData = {
+    width: w,
+    height: h,
+    data: createSolidPixels(w, h, {
+      r: color.r,
+      g: color.g,
+      b: color.b,
+      a: Math.round(color.a * 255),
+    }),
+  };
+}
+
+function applyTypeContent(layer: Layer, el: BroadsetElement): void {
+  switch (el.type) {
+    case 'text':
+      applyTextContent(layer, el);
+
+      return;
+    case 'image':
+      applyImageContent(layer, el);
+
+      return;
+    case 'path':
+      applyPathContent(layer, el);
+
+      return;
+    case 'rectangle':
+    case 'ellipse':
+      applyShapeFill(layer, el);
+
+      return;
+    default:
+      return;
+  }
+}
+
 export function elementToLayer(el: BroadsetElement): Layer {
   const layer: Layer = {
     name: el.name,
@@ -91,189 +288,11 @@ export function elementToLayer(el: BroadsetElement): Layer {
     hidden: false,
   };
 
-  if (el.style.mixBlendMode) {
-    const psdMode = BLEND_MODE_MAP[el.style.mixBlendMode];
-
-    if (psdMode) {
-      layer.blendMode = psdMode;
-    }
-  }
-
-  if (el.style.borderRadius) {
-    const [a, b, c, d] = el.style.borderRadius;
-    const maskPath = buildRoundedRectMask(el.width, el.height, [a, b, c, d]);
-
-    layer.vectorMask = { paths: [maskPath] };
-  }
-
-  if (el.style.customClipPath) {
-    const polyMatch = el.style.customClipPath.match(/polygon\(([^)]+)\)/);
-
-    if (polyMatch) {
-      const clipPath = polygonToVectorMask(polyMatch[1] ?? '', el.width, el.height);
-
-      if (clipPath) {
-        const existing = layer.vectorMask?.paths ?? [];
-
-        layer.vectorMask = {
-          paths: [...existing, { ...clipPath, operation: 'intersect' }],
-        };
-      }
-    }
-  }
-
-  if (el.style.boxShadow) {
-    const shadow = parseBoxShadow(el.style.boxShadow);
-
-    if (shadow) {
-      layer.effects = {
-        ...layer.effects,
-        dropShadow: [
-          {
-            present: true,
-            enabled: true,
-            color: { r: shadow.color.r, g: shadow.color.g, b: shadow.color.b },
-            opacity: shadow.color.a,
-            angle: Math.round(Math.atan2(shadow.offsetY, shadow.offsetX) * (180 / Math.PI)),
-            distance: { units: 'Pixels', value: Math.sqrt(shadow.offsetX ** 2 + shadow.offsetY ** 2) },
-            size: { units: 'Pixels', value: shadow.blur },
-            ...(shadow.spread ? { choke: { units: 'Pixels', value: shadow.spread } } : undefined),
-          },
-        ],
-      };
-    }
-  }
-
-  if (el.style.filter) {
-    const glow = parseFilterGlow(el.style.filter);
-
-    if (glow) {
-      layer.effects = {
-        ...layer.effects,
-        outerGlow: {
-          present: true,
-          enabled: true,
-          color: { r: glow.color.r, g: glow.color.g, b: glow.color.b },
-          opacity: glow.color.a,
-          size: { units: 'Pixels', value: glow.blur },
-        },
-      };
-    }
-  }
-
-  switch (el.type) {
-    case 'text': {
-      const color = el.style.fontColor ? parseHexColor(el.style.fontColor) : undefined;
-
-      layer.text = {
-        text: el.content,
-        style: color ? { fontSize: el.style.fontSize ?? 12, fillColor: color } : { fontSize: el.style.fontSize ?? 12 },
-      };
-      break;
-    }
-
-    case 'image':
-      if (el.content) {
-        const decoded = decodeDataUri(el.content);
-        const urlContent = exportState.prefetchedUrlImages.get(el.id);
-        const imageBytes = decoded ?? urlContent;
-
-        if (imageBytes) {
-          const w = Math.max(1, Math.round(el.width));
-          const h = Math.max(1, Math.round(el.height));
-          const guid = elementIdToGuid(el.id);
-
-          layer.imageData = {
-            width: w,
-            height: h,
-            data: createSolidPixels(w, h, { r: 200, g: 200, b: 200, a: 255 }),
-          };
-
-          layer.placedLayer = {
-            id: guid,
-            type: 'raster',
-            width: w,
-            height: h,
-            transform: [
-              el.position.x,
-              el.position.y,
-              el.position.x + el.width,
-              el.position.y,
-              el.position.x + el.width,
-              el.position.y + el.height,
-              el.position.x,
-              el.position.y + el.height,
-            ],
-          };
-
-          exportState.pendingLinkedFiles.push({
-            id: guid,
-            name: el.name || 'image',
-            data: imageBytes.bytes,
-            type: imageBytes.mime,
-          });
-        }
-      }
-
-      break;
-
-    case 'path':
-      if (el.content) {
-        const pathMask = svgPathToPsdVectorMask(el.content, el.width, el.height);
-
-        if (pathMask) {
-          const isOpen = pathMask.open;
-
-          layer.vectorMask = { paths: [pathMask] };
-
-          if (isOpen) {
-            layer.vectorStroke = {
-              fillEnabled: false,
-              strokeEnabled: true,
-            };
-
-            if (el.style.borderColor) {
-              const strokeColor = parseHexColor(el.style.borderColor);
-
-              if (strokeColor) {
-                layer.vectorFill = {
-                  type: 'color',
-                  color: strokeColor,
-                };
-              }
-            }
-          }
-        }
-      }
-
-      break;
-
-    case 'rectangle':
-    case 'ellipse':
-      if (el.style.backgroundColor) {
-        const color = parseHexColor(el.style.backgroundColor);
-        const w = Math.max(1, Math.round(el.width));
-        const h = Math.max(1, Math.round(el.height));
-
-        if (color) {
-          layer.imageData = {
-            width: w,
-            height: h,
-            data: createSolidPixels(w, h, {
-              r: color.r,
-              g: color.g,
-              b: color.b,
-              a: Math.round(color.a * 255),
-            }),
-          };
-        }
-      }
-
-      break;
-
-    default:
-      break;
-  }
+  applyBlendMode(layer, el);
+  applyVectorMasks(layer, el);
+  applyBoxShadow(layer, el);
+  applyFilterGlow(layer, el);
+  applyTypeContent(layer, el);
 
   return layer;
 }
