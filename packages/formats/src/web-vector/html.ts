@@ -164,56 +164,34 @@ function renderHtmlGroup(
   return `<div ${dataAttr} style="${style}">${childHtml}</div>`;
 }
 
-function buildCssStyle(el: BroadsetElement): string {
-  const parts: string[] = [
-    'position:absolute',
-    `left:${String(el.position.x)}px`,
-    `top:${String(el.position.y)}px`,
-    `width:${String(el.width)}px`,
-    `height:${String(el.height)}px`,
-  ];
-
-  if (el.style.opacity !== 1) {
-    parts.push(`opacity:${String(el.style.opacity)}`);
-  }
-
+function buildTransformParts(el: BroadsetElement): string[] {
   const transforms: string[] = [];
 
-  if (el.rotation !== 0) {
-    transforms.push(`rotate(${String(el.rotation)}deg)`);
-  }
+  if (el.rotation !== 0) transforms.push(`rotate(${String(el.rotation)}deg)`);
+  if (el.style.rotateX) transforms.push(`rotateX(${String(el.style.rotateX)}deg)`);
+  if (el.style.rotateY) transforms.push(`rotateY(${String(el.style.rotateY)}deg)`);
+  if (el.style.rotateZ) transforms.push(`rotateZ(${String(el.style.rotateZ)}deg)`);
+  if (el.style.translateZ) transforms.push(`translateZ(${String(el.style.translateZ)}px)`);
 
-  if (el.style.rotateX) {
-    transforms.push(`rotateX(${String(el.style.rotateX)}deg)`);
-  }
+  return transforms.length > 0 ? [`transform:${transforms.join(' ')}`] : [];
+}
 
-  if (el.style.rotateY) {
-    transforms.push(`rotateY(${String(el.style.rotateY)}deg)`);
-  }
+function buildBackgroundParts(el: BroadsetElement): string[] {
+  const parts: string[] = [];
 
-  if (el.style.rotateZ) {
-    transforms.push(`rotateZ(${String(el.style.rotateZ)}deg)`);
-  }
-
-  if (el.style.translateZ) {
-    transforms.push(`translateZ(${String(el.style.translateZ)}px)`);
-  }
-
-  if (transforms.length > 0) {
-    parts.push(`transform:${transforms.join(' ')}`);
-  }
-
-  if (el.style.backgroundColor) {
-    parts.push(`background:${el.style.backgroundColor}`);
-  }
+  if (el.style.backgroundColor) parts.push(`background:${el.style.backgroundColor}`);
 
   if (el.style.backgroundGradient !== undefined) {
     const gradient = resolveGradientCss(el.style.backgroundGradient);
 
-    if (gradient !== null) {
-      parts.push(`background:${gradient}`);
-    }
+    if (gradient !== null) parts.push(`background:${gradient}`);
   }
+
+  return parts;
+}
+
+function buildBorderParts(el: BroadsetElement): string[] {
+  const parts: string[] = [];
 
   if (el.style.borderRadius) {
     const [tl, tr, br, bl] = el.style.borderRadius;
@@ -225,42 +203,42 @@ function buildCssStyle(el: BroadsetElement): string {
     parts.push(`border-width:${String(el.style.borderWidth)}px`);
     parts.push(`border-style:${el.style.borderStyle ?? 'solid'}`);
 
-    if (el.style.borderColor) {
-      parts.push(`border-color:${el.style.borderColor}`);
-    }
+    if (el.style.borderColor) parts.push(`border-color:${el.style.borderColor}`);
   }
 
-  if (el.style.boxShadow) {
-    parts.push(`box-shadow:${el.style.boxShadow}`);
-  }
+  return parts;
+}
 
-  if (el.style.textStroke) {
-    parts.push(`-webkit-text-stroke:${el.style.textStroke}`);
-  }
+function buildEffectParts(el: BroadsetElement): string[] {
+  const parts: string[] = [];
 
-  if (el.style.textShadow) {
-    parts.push(`text-shadow:${el.style.textShadow}`);
-  }
+  if (el.style.boxShadow) parts.push(`box-shadow:${el.style.boxShadow}`);
+  if (el.style.textStroke) parts.push(`-webkit-text-stroke:${el.style.textStroke}`);
+  if (el.style.textShadow) parts.push(`text-shadow:${el.style.textShadow}`);
+  if (el.style.textTransform) parts.push(`text-transform:${el.style.textTransform}`);
+  if (el.style.filter) parts.push(`filter:${el.style.filter}`);
+  if (el.style.backdropFilter) parts.push(`backdrop-filter:${el.style.backdropFilter}`);
+  if (el.style.mixBlendMode) parts.push(`mix-blend-mode:${el.style.mixBlendMode}`);
+  if (el.style.customClipPath) parts.push(`clip-path:path('${el.style.customClipPath}')`);
 
-  if (el.style.textTransform) {
-    parts.push(`text-transform:${el.style.textTransform}`);
-  }
+  return parts;
+}
 
-  if (el.style.filter) {
-    parts.push(`filter:${el.style.filter}`);
-  }
+function buildCssStyle(el: BroadsetElement): string {
+  const parts: string[] = [
+    'position:absolute',
+    `left:${String(el.position.x)}px`,
+    `top:${String(el.position.y)}px`,
+    `width:${String(el.width)}px`,
+    `height:${String(el.height)}px`,
+  ];
 
-  if (el.style.backdropFilter) {
-    parts.push(`backdrop-filter:${el.style.backdropFilter}`);
-  }
+  if (el.style.opacity !== 1) parts.push(`opacity:${String(el.style.opacity)}`);
 
-  if (el.style.mixBlendMode) {
-    parts.push(`mix-blend-mode:${el.style.mixBlendMode}`);
-  }
-
-  if (el.style.customClipPath) {
-    parts.push(`clip-path:path('${el.style.customClipPath}')`);
-  }
+  parts.push(...buildTransformParts(el));
+  parts.push(...buildBackgroundParts(el));
+  parts.push(...buildBorderParts(el));
+  parts.push(...buildEffectParts(el));
 
   return parts.join(';');
 }
