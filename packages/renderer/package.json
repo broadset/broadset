@@ -17,6 +17,7 @@
     "quality:strict": "npm run lint:strict && npm run typecheck && npm run test -- --runInBand"
   },
   "devDependencies": {
+    "jest": "^30.3.0",
     "typescript": "^6.0.2"
   },
   "dependencies": {
