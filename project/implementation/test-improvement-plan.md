@@ -2,8 +2,9 @@
 
 Date: 2026-04-15
 Reviewed: 2026-04-20
+Completed: 2026-04-20
 Owner: Follow-up implementation agent
-Status: queued behind `project/implementation/vitest-switch.md`
+Status: complete — all 14 TI units shipped in commits `b5d2e18` (TI-1.1 – TI-4.1) and `5ee1459` (HeroUI mock consolidation follow-up). `gate:full` green.
 
 This file is intentionally formatted like a phase plan so Ralph can execute it unit-by-unit using its normal red/green loop.
 
@@ -113,8 +114,8 @@ When using an explicit argument, use the exact unit id and title prefix from thi
 
 ### Unit TI-1.1 Snapshot save/restore semantics (migrate core flow to CT)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Scope:
 
@@ -140,8 +141,8 @@ Validation:
 
 ### Unit TI-1.2 ObjectFit panel test rewrite (behavior, not presence)
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Primary files:
 
@@ -159,8 +160,8 @@ Validation:
 
 ### Unit TI-1.3 Multi-edit routing rewrite
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Primary files:
 
@@ -178,8 +179,8 @@ Validation:
 
 ### Unit TI-1.4 Spacing link/sync rewrite
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Primary files:
 
@@ -197,8 +198,8 @@ Validation:
 
 ### Unit TI-1.5 Typography intent alignment rewrite
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Primary files:
 
@@ -216,8 +217,8 @@ Validation:
 
 ### Unit TI-2.1 Appearance panel completeness rewrite
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Primary files:
 
@@ -235,8 +236,8 @@ Validation:
 
 ### Unit TI-2.2 Box effects panel behavior rewrite
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Primary files:
 
@@ -253,8 +254,8 @@ Validation:
 
 ### Unit TI-2.3 Animation mode panel behavior rewrite
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Primary files:
 
@@ -271,8 +272,8 @@ Validation:
 
 ### Unit TI-2.4 Scene-help duplicate cleanup and stronger mapping assertion
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Primary files:
 
@@ -289,8 +290,8 @@ Validation:
 
 ### Unit TI-2.5 Modal integration assertions upgrade
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Primary files:
 
@@ -307,8 +308,8 @@ Validation:
 
 ### Unit TI-3.1 Modal keyboard/focus CT in real browser
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Primary files:
 
@@ -328,8 +329,8 @@ Validation:
 
 ### Unit TI-3.2 Panel interaction parity CT
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Primary files:
 
@@ -349,8 +350,8 @@ Validation:
 
 ### Unit TI-3.3 Reduce mock blind spots while preserving unit speed
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Primary files:
 
@@ -373,8 +374,8 @@ Validation:
 
 ### Unit TI-4.1 Final repository gate and residual-risk closure
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Acceptance criteria:
 
