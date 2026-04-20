@@ -24,72 +24,54 @@ interface MockHeroUiProps {
   readonly [key: string]: unknown;
 }
 
-vi.mock(
-  '@heroui/react',
-  async () => {
-    const ReactActual = await vi.importActual<typeof React>('react');
+vi.mock('@heroui/react', async () => {
+  const ReactActual = await vi.importActual<typeof React>('react');
+  const { buildCommonHeroUi } = await import('../testing/heroui-mock-common');
 
-    function pickSafeDomProps(rest: Record<string, unknown>): Record<string, unknown> {
-      const allowedKeys = new Set([
-        'checked',
-        'className',
-        'disabled',
-        'id',
-        'max',
-        'min',
-        'name',
-        'onBlur',
-        'onChange',
-        'onFocus',
-        'onInput',
-        'onKeyDown',
-        'onKeyUp',
-        'onMouseDown',
-        'onMouseMove',
-        'onMouseUp',
-        'onPointerCancel',
-        'onPointerDown',
-        'onPointerMove',
-        'onPointerUp',
-        'placeholder',
-        'role',
-        'step',
-        'style',
-        'tabIndex',
-        'type',
-        'value',
-      ]);
+  function pickSafeDomProps(rest: Record<string, unknown>): Record<string, unknown> {
+    const allowedKeys = new Set([
+      'checked',
+      'className',
+      'disabled',
+      'id',
+      'max',
+      'min',
+      'name',
+      'onBlur',
+      'onChange',
+      'onFocus',
+      'onInput',
+      'onKeyDown',
+      'onKeyUp',
+      'onMouseDown',
+      'onMouseMove',
+      'onMouseUp',
+      'onPointerCancel',
+      'onPointerDown',
+      'onPointerMove',
+      'onPointerUp',
+      'placeholder',
+      'role',
+      'step',
+      'style',
+      'tabIndex',
+      'type',
+      'value',
+    ]);
 
-      const allowedEntries = Object.entries(rest).filter(([key]) => {
-        if (key.startsWith('aria-') || key.startsWith('data-')) {
-          return true;
-        }
+    const allowedEntries = Object.entries(rest).filter(([key]) => {
+      if (key.startsWith('aria-') || key.startsWith('data-')) {
+        return true;
+      }
 
-        return allowedKeys.has(key);
-      });
+      return allowedKeys.has(key);
+    });
 
-      return Object.fromEntries(allowedEntries);
-    }
+    return Object.fromEntries(allowedEntries);
+  }
 
-    function createWrapper(tagName = 'div') {
-      return function Wrapper(props: MockHeroUiProps): React.JSX.Element {
-        const { children, ...rest } = props;
-        const domProps = pickSafeDomProps(rest as Record<string, unknown>);
-
-        return ReactActual.createElement(tagName, domProps, children ?? null);
-      };
-    }
-
-    function Button(props: MockHeroUiProps): React.JSX.Element {
-      const { children, isDisabled, onPress, ...rest } = props;
-      const domProps = pickSafeDomProps(rest as Record<string, unknown>);
-
-      return ReactActual.createElement(
-        'button',
-        { ...domProps, disabled: isDisabled, onClick: typeof onPress === 'function' ? onPress : undefined },
-        children ?? null,
-      );
-    }
+  const common = buildCommonHeroUi(ReactActual, { sanitize: pickSafeDomProps });
+  const { Button, createWrapper } = common;
 
     function Input(props: MockHeroUiProps): React.JSX.Element {
       const { label, onChange, value = '', ...rest } = props;
@@ -398,4 +380,4 @@ vi.mock(
       ColorSwatch,
       parseColor: mockParseColor,
     };
-  });
+});

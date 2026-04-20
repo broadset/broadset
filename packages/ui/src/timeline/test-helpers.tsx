@@ -25,85 +25,67 @@ interface MockHeroUiProps {
   readonly [key: string]: unknown;
 }
 
-vi.mock(
-  '@heroui/react',
-  async () => {
-    const ReactActual = await vi.importActual<typeof React>('react');
+vi.mock('@heroui/react', async () => {
+  const ReactActual = await vi.importActual<typeof React>('react');
+  const { buildCommonHeroUi } = await import('../testing/heroui-mock-common');
+  const common = buildCommonHeroUi(ReactActual);
 
-    function createWrapper(tagName = 'div') {
-      return function Wrapper(props: MockHeroUiProps): React.JSX.Element {
-        const { children, ...rest } = props;
-
-        return ReactActual.createElement(tagName, rest, children ?? null);
-      };
-    }
-
-    function Button(props: MockHeroUiProps): React.JSX.Element {
-      const { children, isDisabled, isIconOnly: _isIconOnly, onPress, ...rest } = props;
-
-      return ReactActual.createElement(
-        'button',
-        { ...rest, disabled: isDisabled, onClick: typeof onPress === 'function' ? onPress : undefined },
-        children ?? null,
-      );
-    }
-
-    const Tooltip = Object.assign(createWrapper(), {
-      Trigger: createWrapper(),
-      Content: createWrapper('span'),
-    });
-
-    function SelectRoot(props: MockHeroUiProps): React.JSX.Element {
-      const { children, onChange, value, ...rest } = props;
-
-      return ReactActual.createElement(
-        'select',
-        {
-          ...rest,
-          onChange: (event: React.ChangeEvent<HTMLSelectElement>) => {
-            if (typeof onChange === 'function') {
-              onChange(event.currentTarget.value);
-            }
-          },
-          value: value ?? '',
-        },
-        children ?? null,
-      );
-    }
-
-    function createFragment(props: MockHeroUiProps): React.JSX.Element {
-      return ReactActual.createElement(ReactActual.Fragment, null, props.children ?? null);
-    }
-
-    const Select = Object.assign(SelectRoot, {
-      Trigger: createFragment,
-      Value: createFragment,
-      Indicator: createFragment,
-      Popover: createFragment,
-    });
-
-    function ListBoxItem(props: MockHeroUiProps): React.JSX.Element {
-      const { children } = props;
-
-      return ReactActual.createElement(
-        'option',
-        { value: props['id'] ?? (typeof children === 'string' ? children : '') },
-        children ?? null,
-      );
-    }
-
-    return {
-      Button,
-      ListBox: Object.assign(createFragment, {
-        Item: ListBoxItem,
-        Section: createWrapper(),
-        ItemIndicator: createWrapper('span'),
-      }),
-      ListBoxItem,
-      Select,
-      Tooltip,
-    };
+  const Tooltip = Object.assign(common.createWrapper(), {
+    Trigger: common.createWrapper(),
+    Content: common.createWrapper('span'),
   });
+
+  function SelectRoot(props: MockHeroUiProps): React.JSX.Element {
+    const { children, onChange, value, ...rest } = props;
+
+    return ReactActual.createElement(
+      'select',
+      {
+        ...rest,
+        onChange: (event: React.ChangeEvent<HTMLSelectElement>) => {
+          if (typeof onChange === 'function') {
+            onChange(event.currentTarget.value);
+          }
+        },
+        value: value ?? '',
+      },
+      children ?? null,
+    );
+  }
+
+  function createFragment(props: MockHeroUiProps): React.JSX.Element {
+    return ReactActual.createElement(ReactActual.Fragment, null, props.children ?? null);
+  }
+
+  const Select = Object.assign(SelectRoot, {
+    Trigger: createFragment,
+    Value: createFragment,
+    Indicator: createFragment,
+    Popover: createFragment,
+  });
+
+  function ListBoxItem(props: MockHeroUiProps): React.JSX.Element {
+    const { children } = props;
+
+    return ReactActual.createElement(
+      'option',
+      { value: props['id'] ?? (typeof children === 'string' ? children : '') },
+      children ?? null,
+    );
+  }
+
+  return {
+    Button: common.Button,
+    ListBox: Object.assign(createFragment, {
+      Item: ListBoxItem,
+      Section: common.createWrapper(),
+      ItemIndicator: common.createWrapper('span'),
+    }),
+    ListBoxItem,
+    Select,
+    Tooltip,
+  };
+});
 
 interface TimelineTestModules {
   readonly AnimationBindingSections: React.ComponentType<AnimationBindingSectionsProps>;

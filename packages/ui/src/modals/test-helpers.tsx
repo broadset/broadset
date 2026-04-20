@@ -3,6 +3,12 @@
 import * as React from 'react';
 import { vi } from 'vitest';
 
+import { buildCommonHeroUi } from '../testing/heroui-mock-common';
+
+// Prefixed with `mock` so Vitest's hoist rule lets the vi.mock factory below
+// reference the shared primitives without needing an async dynamic import.
+const mockCommonHeroUi = buildCommonHeroUi(React);
+
 /* ------------------------------------------------------------------ */
 /*  HeroUI mock — all helpers use mock prefix to pass vi.mock hoist    */
 /*                                                                    */
@@ -30,27 +36,8 @@ const mockTableCtx = React.createContext({
   onRowAction: undefined as ((key: string) => void) | undefined,
 });
 
-function mockWrap(tag = 'div') {
-  const Wrap = (p: Record<string, unknown>): React.ReactNode => {
-    const { children, ...rest } = p;
-
-    return React.createElement(tag, rest, (children as React.ReactNode) ?? null);
-  };
-
-  Wrap.displayName = `MockWrap(${tag})`;
-
-  return Wrap;
-}
-
-function mockButton(p: Record<string, unknown>) {
-  const { children, isDisabled, isIconOnly: _isIconOnly, onPress, ...rest } = p;
-
-  return React.createElement(
-    'button',
-    { ...rest, disabled: isDisabled, onClick: typeof onPress === 'function' ? onPress : undefined },
-    (children as React.ReactNode) ?? null,
-  );
-}
+const mockWrap = mockCommonHeroUi.createWrapper;
+const mockButton = mockCommonHeroUi.Button;
 
 function mockInput(p: Record<string, unknown>) {
   const { label, onChange, onValueChange, ...rest } = p;

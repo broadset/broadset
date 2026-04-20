@@ -22,6 +22,7 @@ interface MockHeroUiProps {
 
 vi.mock('@heroui/react', async () => {
   const ReactActual: typeof React = await vi.importActual('react');
+  const { buildCommonHeroUi } = await import('@broadset/ui/testing/heroui-mock-common');
   const TabsContext = ReactActual.createContext<{
     readonly onSelectionChange?: ((key: string | number | null) => void) | undefined;
     readonly selectedKey: string;
@@ -92,34 +93,8 @@ vi.mock('@heroui/react', async () => {
     }, {});
   };
 
-  function createWrapper(tagName = 'div') {
-    return function Wrapper(props: MockHeroUiProps): React.JSX.Element {
-      const {
-        allowsMultipleExpanded: _allowsMultipleExpanded,
-        children,
-        defaultExpandedKeys: _defaultExpandedKeys,
-        isIconOnly: _isIconOnly,
-        ...restProps
-      } = props;
-
-      const domProps = sanitizeDomProps(restProps);
-
-      return ReactActual.createElement(tagName, domProps, children ?? null);
-    };
-  }
-
-  const Button = (props: MockHeroUiProps): React.JSX.Element => {
-    const { children, isDisabled, isIconOnly: _isIconOnly, onPress, startContent, ...restProps } = props;
-    const onClick = typeof onPress === 'function' ? onPress : undefined;
-    const domProps = sanitizeDomProps(restProps);
-
-    return ReactActual.createElement(
-      'button',
-      { ...domProps, disabled: isDisabled, onClick },
-      startContent ?? null,
-      children ?? null,
-    );
-  };
+  const common = buildCommonHeroUi(ReactActual, { sanitize: sanitizeDomProps });
+  const { Button, createWrapper } = common;
 
   const Tabs = Object.assign(
     function TabsRoot(props: MockHeroUiProps): React.JSX.Element {
