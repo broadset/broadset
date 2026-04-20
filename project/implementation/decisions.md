@@ -43,3 +43,32 @@
 1. Keep visibility solely capability-profile driven (`profile.svgStrokeFill || profile.pathEditing`) and remove SVG defaults from the expanded-section map.
 2. Leave SVG in the defaults map but tolerate the missing panel for some capability-profile configurations.
    **Rationale:** Unit 10's default-expanded behavior explicitly includes SVG under `path-stroke`. Showing the panel for SVG avoids a mismatch where defaults point to a non-rendered section, and preserves a consistent first-edit workflow for vector elements.
+
+### IO-D-01 through IO-D-18 — IO Format Prerequisites
+
+**Decision:** Ratify the 18 cross-format design decisions that gate PSD, PDF, PPTX, SVG, and PDF/A work. Full table lives in [io-prereqs-plan.md](./io-prereqs-plan.md) §Cross-format design decisions. The **IO-D-** prefix namespaces these from the unrelated `Unit N.0` series above; they are referenced by number throughout the four format-support plans and the PDF/A compliance plan.
+
+Headline decisions (full rationale in the source table):
+
+- **IO-D-01 Runs, not HTML** — text stored as `TextBody`/`Paragraph`/`Run`; HTML only at export boundaries.
+- **IO-D-02 Bake-to-path for non-trivial affine** — no `scale`/`skew` on elements.
+- **IO-D-03 Structured filter primitives** — CSS filter string becomes a discriminated union; string is a derived view.
+- **IO-D-04 `fill` is a discriminated union** — solid / gradient / pattern / picture / none.
+- **IO-D-05 `BroadsetColor` is a discriminated union; never silently downgrade** — RGB (with space + originalColor preservation) / theme (with mods). Preflight warns on unsupported target.
+- **IO-D-06 `TextRun[]` type lands before run-edit UI** — importers have somewhere to put data; editor catches up in Phase 5.
+- **IO-D-07 Cross-format logic under `_shared/`; format-only libraries direct** — no pointless wrappers; `_shared/*` is for logic serving ≥2 formats.
+- **IO-D-08 Shared `broadset:` XMP namespace** — one Broadset footprint across every carrier.
+- **IO-D-09 `@font-face` embedding default-on** — reference / flatten are opt-ins.
+- **IO-D-10 Properties-panel exposure gates every round-trippable field.**
+- **IO-D-11 `extensions.<format>` validated at load time** — central Zod registry; fail loudly on stale `.bsp`.
+- **IO-D-12 Run-editor keyboard shortcuts deferred** — Ctrl-B etc. land later; range selection + panel suffices.
+- **IO-D-13 Color mode is per-document.**
+- **IO-D-14 Preflight warns and proceeds** — never blocks export.
+- **IO-D-15 Gradient editor UI ships with the model additions** — per D-10.
+- **IO-D-16 Export emits the fully-entered "IN" state; animations discarded unless native** — PPTX exempts the `<p:timing>`-mappable subset; PDF/PSD/SVG are static carriers.
+- **IO-D-17 No sidecars** — round-trip metadata lives inside the format file using the format's own extension mechanism.
+- **IO-D-18 No silent drops** — every importer maps to a native element or preserves under `extensions.<format>.raw` / opaque fragment with a warning.
+
+**Alternatives considered** (per decision, in the source table).
+
+**Rationale:** Each decision emerged from the cross-format audit in [io-prereqs-plan.md](./io-prereqs-plan.md). Keeping the full table there avoids duplication; this entry is the formal ratification marker and the namespace reservation for `IO-D-` prefixed references.
