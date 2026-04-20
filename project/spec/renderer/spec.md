@@ -323,7 +323,9 @@ Custom component plugin types MUST render via their provided rendererFactory. Th
 
 ### Requirement: 3D Transform Rendering
 
-Elements with rotateX, rotateY, rotateZ, or translateZ screen properties MUST render with CSS 3D transform. Perspective MUST be applied from CanvasSettings.perspective.
+Elements with rotateX, rotateY, rotateZ, or translateZ screen properties MUST render with CSS 3D transform. Perspective MUST be applied from `CanvasSettings.perspective`, accepted via the renderer's `RenderSettings` on create or via `updateSettings({ perspective })`. The renderer MUST apply this perspective on the canvas coordinate layer that contains both element content and editor chrome, so 3D projection is identical for elements and any overlay chrome (e.g. the selection transform widget).
+
+The transform token sequence for each element MUST be stable: `rotate(Xdeg) rotateX(Xdeg) rotateY(Xdeg) rotateZ(Xdeg) translateZ(Xpx)`, with zero-valued tokens omitted. This stable string is the single source of truth — the editor's transform widget consumes the exact same token builder so the widget and the element never drift.
 
 #### Scenario: 3D transform applied
 
@@ -333,14 +335,16 @@ Elements with rotateX, rotateY, rotateZ, or translateZ screen properties MUST re
 
 #### Scenario: Perspective from settings
 
-- GIVEN CanvasSettings with perspective=1000
+- GIVEN `CanvasSettings.perspective = 1000` passed to the renderer as `RenderSettings.perspective`
 - WHEN elements with 3D transforms are rendered
-- THEN the parent container applies CSS perspective of 1000px
+- THEN the canvas coordinate layer applies CSS `perspective: 1000px`
 
 #### Acceptance Criteria
 
 - [ ] Given 3D screen properties, a CSS 3D transform is applied to the element
-- [ ] Given CanvasSettings.perspective, the perspective value is applied to the parent container
+- [ ] Given `RenderSettings.perspective` (sourced from `CanvasSettings.perspective`), the perspective value is applied to the canvas coordinate layer
+- [ ] Zero-valued 3D transform components (`rotateX=0`, `rotateY=0`, `rotateZ=0`, `translateZ=0`) are omitted from the transform string
+- [ ] The renderer exposes `getOverlayRoot()` returning a DOM node in the same coordinate space as element hosts, so editor chrome (e.g. the selection widget) can portal in and inherit identical scale, pan, and perspective without duplicating transform math
 
 ---
 

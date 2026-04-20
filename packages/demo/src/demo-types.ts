@@ -77,33 +77,6 @@ export type TransformGesture =
       lastUpdate: ElementUpdate | null;
     };
 
-export const TRANSFORM_HANDLE_POSITIONS: Readonly<Record<ResizeHandle, React.CSSProperties>> = {
-  e: { right: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`, top: '50%', transform: 'translate(50%, -50%)' },
-  n: { left: '50%', top: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`, transform: 'translate(-50%, -50%)' },
-  ne: {
-    right: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
-    top: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
-    transform: 'translate(50%, -50%)',
-  },
-  nw: {
-    left: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
-    top: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
-    transform: 'translate(-50%, -50%)',
-  },
-  s: { bottom: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`, left: '50%', transform: 'translate(-50%, 50%)' },
-  se: {
-    bottom: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
-    right: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
-    transform: 'translate(50%, 50%)',
-  },
-  sw: {
-    bottom: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
-    left: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`,
-    transform: 'translate(-50%, 50%)',
-  },
-  w: { left: `${String(-TRANSFORM_HANDLE_SIZE / 2)}px`, top: '50%', transform: 'translate(-50%, -50%)' },
-};
-
 export const TRANSFORM_HANDLE_CURSORS: Readonly<Record<ResizeHandle, React.CSSProperties['cursor']>> = {
   e: 'ew-resize',
   n: 'ns-resize',

@@ -248,10 +248,16 @@ describe('DemoApp chrome and menu integration', () => {
     const { mockedCreateScreenRenderer } = setupDemoShellMocks();
     const updateDocument = vi.fn();
 
+    const overlayRoot = document.body.appendChild(document.createElement('div'));
+
     mockedCreateScreenRenderer.mockReturnValue({
-      destroy: vi.fn(),
+      destroy: vi.fn(() => {
+        overlayRoot.remove();
+      }),
+      getOverlayRoot: vi.fn(() => overlayRoot),
       host: document.createElement('div'),
       updateDocument,
+      updateSettings: vi.fn(),
     });
 
     render(<DemoApp />);

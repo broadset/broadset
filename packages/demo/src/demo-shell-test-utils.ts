@@ -27,10 +27,23 @@ export function setupDemoShellMocks(): DemoShellMocks {
   const mockedCreateScreenRenderer = vi.mocked(createScreenRenderer);
   const mockedCreatePlaybackController = vi.mocked(createPlaybackController);
 
+  const overlayRoot = document.createElement('div');
+
+  overlayRoot.setAttribute('data-broadset-overlay-root', 'true');
+  // React portals only render into DOM nodes attached to the document. The
+  // real renderer attaches overlayRoot inside canvasRoot; in unit tests we
+  // append it to document.body so Testing Library's queries can reach the
+  // widget.
+  document.body.appendChild(overlayRoot);
+
   mockedCreateScreenRenderer.mockReturnValue({
-    destroy: vi.fn(),
+    destroy: vi.fn(() => {
+      overlayRoot.remove();
+    }),
+    getOverlayRoot: vi.fn(() => overlayRoot),
     host: document.createElement('div'),
     updateDocument: vi.fn(),
+    updateSettings: vi.fn(),
   });
   mockedCreatePlaybackController.mockReturnValue({
     attach: vi.fn(),

@@ -40,10 +40,16 @@ interface CanvasViewportSnapshot {
   readonly zoom: number;
   readonly panX: number;
   readonly panY: number;
+  readonly perspective: number;
 }
 
 function areViewportsEqual(left: CanvasViewportSnapshot, right: CanvasViewportSnapshot): boolean {
-  return left.zoom === right.zoom && left.panX === right.panX && left.panY === right.panY;
+  return (
+    left.zoom === right.zoom &&
+    left.panX === right.panX &&
+    left.panY === right.panY &&
+    left.perspective === right.perspective
+  );
 }
 
 export function useCanvasViewport(store: EditorStore): CanvasViewportSnapshot {
@@ -52,6 +58,7 @@ export function useCanvasViewport(store: EditorStore): CanvasViewportSnapshot {
       panX: state.canvasSettings.panX,
       panY: state.canvasSettings.panY,
       zoom: state.canvasSettings.zoom,
+      perspective: state.canvasSettings.perspective,
     }),
     [],
   );

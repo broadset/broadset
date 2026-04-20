@@ -23,10 +23,17 @@ describe('DemoApp playback shell lifecycle', () => {
     const stopTimeline = vi.fn();
     const { mockedCreatePlaybackController, mockedCreateScreenRenderer } = setupDemoShellMocks();
 
+    const overlayRoot = document.body.appendChild(document.createElement('div'));
+
     mockedCreateScreenRenderer.mockReturnValue({
-      destroy: rendererDestroy,
+      destroy: vi.fn(() => {
+        overlayRoot.remove();
+        rendererDestroy();
+      }),
+      getOverlayRoot: vi.fn(() => overlayRoot),
       host: document.createElement('div'),
       updateDocument,
+      updateSettings: vi.fn(),
     });
     mockedCreatePlaybackController.mockReturnValue({
       attach,
@@ -266,10 +273,16 @@ describe('DemoApp playback shell lifecycle', () => {
     const fixtureDocument = createDemoAppPlaybackTestDocument();
     const replayElementId = 'el-live-ellipse';
 
+    const overlayRoot = document.body.appendChild(document.createElement('div'));
+
     mockedCreateScreenRenderer.mockReturnValue({
-      destroy: vi.fn(),
+      destroy: vi.fn(() => {
+        overlayRoot.remove();
+      }),
+      getOverlayRoot: vi.fn(() => overlayRoot),
       host: document.createElement('div'),
       updateDocument,
+      updateSettings: vi.fn(),
     });
     window.localStorage.setItem(
       'broadset:demo-document:v1',

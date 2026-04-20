@@ -307,21 +307,21 @@ test('rotation handle stays above widget top-center after rotation', async ({ mo
 
   expect(Math.abs(rotationDeg)).toBeGreaterThan(5);
 
-  // The rotation handle is positioned via CSS top: -28px + translate(-50%,-50%)
-  // inside the rotated widget div. In screen space, the bounding box of the
-  // handle shifts with the rotation, but the handle should still be ABOVE
-  // the widget's own bounding box top edge (in screen space, roughly).
+  // The rotation handle is positioned via CSS top: -rotationOffsetPx
+  // + translate(-50%,-50%) inside the rotated widget div. The inline `top`
+  // is expressed in canvas units (counter-scaled so the handle stays the
+  // same screen size under any zoom/letterbox), while its CSS `left`
+  // remains percent-based relative to the widget.
   const rotationHandle = page.getByTestId('transform-rotation-handle');
 
   await expect(rotationHandle).toBeVisible();
 
-  // The handle's center in widget-local space should be at (50%, -28px).
-  // We verify this by reading the CSS positioning directly.
   const handleStyle = await rotationHandle.evaluate((el) => ({
     left: el.style.left,
     top: el.style.top,
   }));
 
   expect(handleStyle.left).toBe('50%');
-  expect(handleStyle.top).toBe('-28px');
+  expect(handleStyle.top).toMatch(/^-\d+(\.\d+)?px$/);
+  expect(parseFloat(handleStyle.top)).toBeLessThan(0);
 });

@@ -126,6 +126,7 @@ interface ScreenPreviewProps {
   readonly panX: number;
   readonly panY: number;
   readonly zoom: number;
+  readonly perspective: number;
   readonly onCanvasClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   readonly onCanvasContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
   readonly onViewportChange: (settings: {
@@ -148,6 +149,7 @@ export function ScreenPreview({
   panX,
   panY,
   zoom,
+  perspective,
   onCanvasClick,
   onCanvasContextMenu,
   onViewportChange,
@@ -157,9 +159,9 @@ export function ScreenPreview({
   const panLayerRef = useRef<HTMLDivElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<ScreenRendererController | null>(null);
+  const [overlayRoot, setOverlayRoot] = useState<HTMLElement | null>(null);
   const playbackRef = useRef<PlaybackController | null>(null);
   const [isPanning, setIsPanning] = useState(false);
-  const [contentScale, setContentScale] = useState(1);
   const panGestureRef = useRef<{
     readonly originPanX: number;
     readonly originPanY: number;
@@ -271,42 +273,8 @@ export function ScreenPreview({
     [elementsById, localizePositionUpdate, onElementTransformCommit],
   );
 
-  useEffect(() => {
-    const container = containerRef.current;
-
-    if (container === null) {
-      return undefined;
-    }
-
-    const updateContentScale = (): void => {
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-
-      if (w <= 0 || h <= 0) {
-        return;
-      }
-
-      const scale = Math.min(w / documentData.canvas.width, h / documentData.canvas.height);
-
-      setContentScale(Number.isFinite(scale) && scale > 0 ? scale : 1);
-    };
-
-    updateContentScale();
-
-    if (typeof ResizeObserver === 'undefined') {
-      return undefined;
-    }
-
-    const resizeObserver = new ResizeObserver(updateContentScale);
-
-    resizeObserver.observe(container);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [documentData.canvas.width, documentData.canvas.height]);
-
   const documentDataRef = useRef(documentData);
+  const perspectiveRef = useRef(perspective);
 
   useEffect(() => {
     documentDataRef.current = documentData;
@@ -320,7 +288,7 @@ export function ScreenPreview({
     }
 
     const initialDocument = documentDataRef.current;
-    const rendererController = createScreenRenderer({ host });
+    const rendererController = createScreenRenderer({ host, settings: { perspective: perspectiveRef.current } });
     const playbackController = createPlaybackController({ root: host, animations: initialDocument.animations });
 
     rendererRef.current = rendererController;
@@ -328,17 +296,24 @@ export function ScreenPreview({
     onPlaybackControllerChange?.(playbackController);
 
     rendererController.updateDocument(initialDocument);
+    setOverlayRoot(rendererController.getOverlayRoot());
     playbackController.attach();
     playbackController.seek(Infinity);
 
     return () => {
       playbackController.destroy();
       rendererController.destroy();
+      setOverlayRoot(null);
       playbackRef.current = null;
       rendererRef.current = null;
       onPlaybackControllerChange?.(null);
     };
   }, [onPlaybackControllerChange]);
+
+  useEffect(() => {
+    perspectiveRef.current = perspective;
+    rendererRef.current?.updateSettings({ perspective });
+  }, [perspective]);
 
   useEffect(() => {
     rendererRef.current?.updateDocument(documentData);
@@ -545,16 +520,15 @@ export function ScreenPreview({
             willChange: 'transform',
           }}
         />
-        {selectedWorldElement === null ? null : (
-          <SelectionTransformWidget
-            contentScale={contentScale}
-            element={selectedWorldElement}
-            zoom={zoom}
-            onCommitUpdate={handleCommitTransform}
-            onPreviewUpdate={handlePreviewTransform}
-          />
-        )}
       </div>
+      {selectedWorldElement === null || overlayRoot === null ? null : (
+        <SelectionTransformWidget
+          element={selectedWorldElement}
+          overlayRoot={overlayRoot}
+          onCommitUpdate={handleCommitTransform}
+          onPreviewUpdate={handlePreviewTransform}
+        />
+      )}
     </div>
   );
 }

@@ -543,6 +543,7 @@ vi.mock('@heroui/react', async () => {
 });
 
 vi.mock('@broadset/renderer', () => ({
+  buildElementTransform: vi.fn(() => ''),
   createScreenRenderer: vi.fn(),
 }));
 

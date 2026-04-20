@@ -58,6 +58,7 @@ export function DemoCanvasSurface({
       onElementTransformCommit={onElementTransformCommit}
       onElementTransformPreview={onElementTransformPreview}
       onViewportChange={onViewportChange}
+      perspective={viewport.perspective}
       resetToken={resetToken}
     />
   );

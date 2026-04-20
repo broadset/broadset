@@ -6,34 +6,116 @@ import {
   type ResizeHandle,
 } from '@broadset/editor';
 import type { BroadsetElement } from '@broadset/model';
-import { useCallback, useRef, useState } from 'react';
+import { buildElementTransform } from '@broadset/renderer';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import {
   MIN_TRANSFORM_SIZE,
   ROTATION_HANDLE_OFFSET,
   TRANSFORM_HANDLE_CURSORS,
-  TRANSFORM_HANDLE_POSITIONS,
   TRANSFORM_HANDLE_SIZE,
   type TransformGesture,
 } from '../demo-types';
 
+/**
+ * Resize-handle positions inside the widget, expressed in canvas units. The
+ * widget itself lives in canvas-unit space (so it tracks the element under
+ * any zoom, pan, or 3D transform), but handle chips need a constant on-screen
+ * size. We counter-scale by `screenPxPerCanvasUnit = 1 / (zoom * contentScale)`
+ * so a 10px handle with a -5px offset on screen resolves to
+ * (10 * screenPxPerCanvasUnit) and (-5 * screenPxPerCanvasUnit) in canvas units.
+ */
+function measureOverlayRatio(overlayRoot: HTMLElement): number {
+  const rect = overlayRoot.getBoundingClientRect();
+  const logicalWidth = overlayRoot.offsetWidth;
+
+  if (logicalWidth <= 0 || rect.width <= 0) {
+    return 1;
+  }
+
+  const ratio = rect.width / logicalWidth;
+
+  return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+}
+
+function buildHandlePositions(screenPxPerCanvasUnit: number): Readonly<Record<ResizeHandle, React.CSSProperties>> {
+  const halfSize = (TRANSFORM_HANDLE_SIZE * screenPxPerCanvasUnit) / 2;
+  const edgeOffset = `${String(-halfSize)}px`;
+
+  return {
+    e: { right: edgeOffset, top: '50%', transform: 'translate(50%, -50%)' },
+    n: { left: '50%', top: edgeOffset, transform: 'translate(-50%, -50%)' },
+    ne: { right: edgeOffset, top: edgeOffset, transform: 'translate(50%, -50%)' },
+    nw: { left: edgeOffset, top: edgeOffset, transform: 'translate(-50%, -50%)' },
+    s: { bottom: edgeOffset, left: '50%', transform: 'translate(-50%, 50%)' },
+    se: { bottom: edgeOffset, right: edgeOffset, transform: 'translate(50%, 50%)' },
+    sw: { bottom: edgeOffset, left: edgeOffset, transform: 'translate(-50%, 50%)' },
+    w: { left: edgeOffset, top: '50%', transform: 'translate(-50%, -50%)' },
+  };
+}
+
+/**
+ * The selection transform widget renders inside the renderer's overlay layer
+ * (sibling of the element layer, inside canvasRoot). Because the overlay
+ * shares the same transform chain as elements — translate(panX, panY) from
+ * the demo's pan layer, scale(zoom) from the host, placeItems:center and
+ * scale(contentScale) from the renderer, perspective from canvasSettings —
+ * the widget uses raw canvas coordinates for its layout box and the full
+ * element transform string for its CSS transform. No arithmetic duplicates
+ * anything done by the renderer, so the widget cannot drift pixel-wise.
+ */
 export function SelectionTransformWidget({
-  contentScale,
   element,
-  zoom,
+  overlayRoot,
   onPreviewUpdate,
   onCommitUpdate,
 }: {
-  readonly contentScale: number;
   readonly element: BroadsetElement;
-  readonly zoom: number;
+  readonly overlayRoot: HTMLElement;
   readonly onPreviewUpdate: (elementId: string, updates: ElementUpdate) => void;
   readonly onCommitUpdate: (elementId: string, updates: ElementUpdate) => void;
-}): React.JSX.Element {
+}): React.ReactPortal {
   const widgetRef = useRef<HTMLDivElement | null>(null);
   const gestureRef = useRef<TransformGesture | null>(null);
   const [isRotating, setIsRotating] = useState(false);
-  const effectiveZoom = zoom * contentScale;
+  // Scale ratio between rendered screen pixels and canvas units, measured
+  // directly off the overlay root's client rect. This is authoritative — it
+  // reflects the cumulative effect of canvasRoot's scale, hostRef's zoom, and
+  // any DPI scaling, without having to agree with separately-computed state.
+  // Initialize synchronously on first render (overlayRoot is a prop and
+  // already exists in the DOM) so handle sizes render correctly on the very
+  // first paint — no stale-scale flash.
+  const [pointerToCanvas, setPointerToCanvas] = useState(() => measureOverlayRatio(overlayRoot));
+
+  useLayoutEffect(() => {
+    const measure = (): void => {
+      const nextRatio = measureOverlayRatio(overlayRoot);
+
+      setPointerToCanvas((previous) => (nextRatio === previous ? previous : nextRatio));
+    };
+
+    measure();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+
+    const observer = new ResizeObserver(measure);
+
+    observer.observe(overlayRoot);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [overlayRoot]);
+
+  // Inverse ratio used to keep chrome (handles, rotation arm) a constant size
+  // on screen even though the widget lives in canvas-unit space.
+  const screenPxPerCanvasUnit = 1 / pointerToCanvas;
+  const handleSizePx = TRANSFORM_HANDLE_SIZE * screenPxPerCanvasUnit;
+  const rotationOffsetPx = ROTATION_HANDLE_OFFSET * screenPxPerCanvasUnit;
+  const handlePositions = buildHandlePositions(screenPxPerCanvasUnit);
 
   const beginDrag = useCallback(
     (event: React.PointerEvent<HTMLDivElement>): void => {
@@ -122,7 +204,7 @@ export function SelectionTransformWidget({
           position: applyDragTranslation(
             gesture.initialPosition,
             { dx: event.clientX - gesture.startX, dy: event.clientY - gesture.startY },
-            effectiveZoom,
+            pointerToCanvas,
           ),
         } satisfies ElementUpdate;
 
@@ -138,7 +220,7 @@ export function SelectionTransformWidget({
           gesture.handle,
           event.clientX - gesture.startX,
           event.clientY - gesture.startY,
-          effectiveZoom,
+          pointerToCanvas,
           element.rotation,
           MIN_TRANSFORM_SIZE,
         );
@@ -165,7 +247,7 @@ export function SelectionTransformWidget({
       gesture.lastUpdate = update;
       onPreviewUpdate(element.id, update);
     },
-    [element.id, element.rotation, onPreviewUpdate, effectiveZoom],
+    [element.id, element.rotation, onPreviewUpdate, pointerToCanvas],
   );
 
   const finishGesture = useCallback(
@@ -193,7 +275,9 @@ export function SelectionTransformWidget({
     [element.id, onCommitUpdate],
   );
 
-  return (
+  const elementTransform = buildElementTransform(element, element.style);
+
+  return createPortal(
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- transform widget is a canvas overlay; onClick only exists to swallow click propagation so the canvas click handler doesn't fire. Keyboard interaction happens on the parent canvas (role="application").
     <div
       ref={widgetRef}
@@ -205,15 +289,14 @@ export function SelectionTransformWidget({
       onPointerMove={handlePointerMove}
       onPointerUp={finishGesture}
       style={{
-        height: `${String(Math.max(element.height * effectiveZoom, 1))}px`,
-        left: `${String(element.position.x * effectiveZoom)}px`,
+        height: `${String(Math.max(element.height, 1))}px`,
+        left: `${String(element.position.x)}px`,
         pointerEvents: 'auto',
         position: 'absolute',
-        top: `${String(element.position.y * effectiveZoom)}px`,
-        transform: `rotate(${String(element.rotation)}deg)`,
+        top: `${String(element.position.y)}px`,
+        transform: elementTransform,
         transformOrigin: 'center center',
-        width: `${String(Math.max(element.width * effectiveZoom, 1))}px`,
-        zIndex: 2,
+        width: `${String(Math.max(element.width, 1))}px`,
       }}
     >
       <div
@@ -235,14 +318,14 @@ export function SelectionTransformWidget({
           data-testid={`transform-handle-${handle}`}
           onPointerDown={beginResize(handle)}
           style={{
-            ...TRANSFORM_HANDLE_POSITIONS[handle],
+            ...handlePositions[handle],
             background: '#ffffff',
             border: '1px solid rgba(37, 99, 235, 0.95)',
             borderRadius: '9999px',
             cursor: TRANSFORM_HANDLE_CURSORS[handle],
-            height: `${String(TRANSFORM_HANDLE_SIZE)}px`,
+            height: `${String(handleSizePx)}px`,
             position: 'absolute',
-            width: `${String(TRANSFORM_HANDLE_SIZE)}px`,
+            width: `${String(handleSizePx)}px`,
           }}
         />
       ))}
@@ -250,13 +333,13 @@ export function SelectionTransformWidget({
         aria-hidden="true"
         style={{
           background: 'rgba(59, 130, 246, 0.8)',
-          height: `${String(ROTATION_HANDLE_OFFSET - 6)}px`,
+          height: `${String((ROTATION_HANDLE_OFFSET - 6) * screenPxPerCanvasUnit)}px`,
           left: '50%',
           pointerEvents: 'none',
           position: 'absolute',
-          top: `${String(-ROTATION_HANDLE_OFFSET + 8)}px`,
+          top: `${String((-ROTATION_HANDLE_OFFSET + 8) * screenPxPerCanvasUnit)}px`,
           transform: 'translateX(-50%)',
-          width: '1px',
+          width: `${String(screenPxPerCanvasUnit)}px`,
         }}
       />
       <div
@@ -268,14 +351,15 @@ export function SelectionTransformWidget({
           borderRadius: '9999px',
           boxShadow: '0 4px 10px rgba(15, 23, 42, 0.24)',
           cursor: isRotating ? 'grabbing' : 'grab',
-          height: `${String(TRANSFORM_HANDLE_SIZE + 2)}px`,
+          height: `${String((TRANSFORM_HANDLE_SIZE + 2) * screenPxPerCanvasUnit)}px`,
           left: '50%',
           position: 'absolute',
-          top: `${String(-ROTATION_HANDLE_OFFSET)}px`,
+          top: `${String(-rotationOffsetPx)}px`,
           transform: 'translate(-50%, -50%)',
-          width: `${String(TRANSFORM_HANDLE_SIZE + 2)}px`,
+          width: `${String((TRANSFORM_HANDLE_SIZE + 2) * screenPxPerCanvasUnit)}px`,
         }}
       />
-    </div>
+    </div>,
+    overlayRoot,
   );
 }

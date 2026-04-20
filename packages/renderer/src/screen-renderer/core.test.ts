@@ -441,10 +441,7 @@ describe('renderer core', () => {
       document: createDocument([createElement({ id: 'frame-1', type: 'rectangle' })]),
     });
 
-    const canvasScaleShell = host.firstElementChild;
-    const canvasRoot = canvasScaleShell?.firstElementChild;
-
-    expect(canvasRoot).not.toBeNull();
+    const canvasRoot = host.querySelector('[data-broadset-canvas-root="true"]');
 
     if (!(canvasRoot instanceof HTMLElement)) {
       throw new Error('Canvas root element is missing');

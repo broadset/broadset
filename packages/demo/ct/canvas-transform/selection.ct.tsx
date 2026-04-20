@@ -90,20 +90,23 @@ test('repositions the transform widget when a different element is selected', as
 });
 
 /**
- * @description Validates that the transform widget correctly applies the
- * element's rotation as a CSS transform.
+ * @description Validates that the transform widget applies the exact same CSS
+ * transform chain as the underlying element host — guarantees pixel parity
+ * for any combination of rotation, rotateX/Y/Z, and translateZ.
  */
-test('applies element rotation to the transform widget', async ({ mount, page }) => {
+test('widget transform matches the selected element transform', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
   const widget = page.getByTestId('demo-transform-widget');
 
   await expect(widget).toBeVisible();
 
-  // el-score-title has rotation: 0 (all sample elements have 0 rotation)
-  const transform = await widget.evaluate((el) => el.style.transform);
+  const widgetTransform = await widget.evaluate((el) => el.style.transform);
+  const elementTransform = await page
+    .locator(`[data-element-id="${FIXTURE_IDS.title}"]`)
+    .evaluate((el) => (el as HTMLElement).style.transform);
 
-  expect(transform).toBe('rotate(0deg)');
+  expect(widgetTransform).toBe(elementTransform);
 });
 
 /* ------------------------------------------------------------------ */

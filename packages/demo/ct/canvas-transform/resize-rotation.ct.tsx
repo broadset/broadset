@@ -225,10 +225,11 @@ test('dragging the rotation handle changes the widget rotation', async ({ mount,
 
   await expect(widget).toBeVisible();
 
-  // Initial rotation should be 0deg
+  // Element starts unrotated in the sample document; the shared transform
+  // builder emits an empty string when rotation and 3D transforms are absent.
   const initialTransform = await widget.evaluate((el) => el.style.transform);
 
-  expect(initialTransform).toBe('rotate(0deg)');
+  expect(initialTransform).toBe('');
 
   const rotationHandle = page.getByTestId('transform-rotation-handle');
   const rotationBox = await rotationHandle.boundingBox();
@@ -249,7 +250,7 @@ test('dragging the rotation handle changes the widget rotation', async ({ mount,
   let newTransform = await widget.evaluate((el) => el.style.transform);
 
   // In CI the first drag can occasionally land on the 0deg axis.
-  if (newTransform === 'rotate(0deg)') {
+  if (newTransform === '' || newTransform === 'rotate(0deg)') {
     await page.mouse.move(startX, startY);
     await page.mouse.down();
     await page.mouse.move(startX - 90, startY + 45, { steps: 12 });
