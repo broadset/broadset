@@ -1,20 +1,20 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import './toolbar-nav-heroui-mock';
 
-import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_ELEMENT_TYPES, EditorToolbar, ElementLibrary, PageSorter } from './toolbar-nav';
 
 describe('EditorToolbar', () => {
   /** @description The main toolbar must expose undo/redo and view toggles with proper disabled states so the editor shell behaves like a real design tool. */
   it('renders a HeroUI toolbar and wires actions for undo, redo, save, and toggles', () => {
-    const onUndo = jest.fn<() => void>();
-    const onRedo = jest.fn<() => void>();
-    const onSave = jest.fn<() => void>();
-    const onToggleGrid = jest.fn<() => void>();
-    const onToggleGuides = jest.fn<() => void>();
+    const onUndo = vi.fn<() => void>();
+    const onRedo = vi.fn<() => void>();
+    const onSave = vi.fn<() => void>();
+    const onToggleGrid = vi.fn<() => void>();
+    const onToggleGuides = vi.fn<() => void>();
 
     render(
       <EditorToolbar
@@ -80,7 +80,7 @@ describe('EditorToolbar', () => {
 describe('ElementLibrary', () => {
   /** @description The element library must render all built-in tiles plus any custom plugin tiles in a two-column grid and start placement on click. */
   it('renders built-in and custom element tiles and forwards selection', () => {
-    const onSelect = jest.fn<(type: string) => void>();
+    const onSelect = vi.fn<(type: string) => void>();
 
     render(
       <ElementLibrary
@@ -102,9 +102,9 @@ describe('ElementLibrary', () => {
 describe('PageSorter', () => {
   /** @description Scene tabs must mirror the document pages, allow switching, and expose add/remove controls while protecting single-scene documents. */
   it('lists scenes, highlights the active one, and wires add/remove actions', () => {
-    const onPageSelect = jest.fn<(index: number) => void>();
-    const onPageAdd = jest.fn<() => void>();
-    const onPageRemove = jest.fn<(index: number) => void>();
+    const onPageSelect = vi.fn<(index: number) => void>();
+    const onPageAdd = vi.fn<() => void>();
+    const onPageRemove = vi.fn<(index: number) => void>();
 
     render(
       <PageSorter

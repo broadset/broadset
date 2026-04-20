@@ -1,6 +1,6 @@
-/** @jest-environment jsdom */
-import { describe, expect, it, jest } from '@jest/globals';
+/** @vitest-environment jsdom */
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { PropertyValue } from './panels';
 import { QrCodePanel } from './panels';
@@ -8,7 +8,7 @@ import { QrCodePanel } from './panels';
 describe('QrCodePanel', () => {
   /** @description QR code elements must have editable content, error correction level, and colors. */
   it('renders content and error correction inputs', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <QrCodePanel

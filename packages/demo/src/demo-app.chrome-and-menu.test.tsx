@@ -1,7 +1,8 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import { createDefaultElement } from '@broadset/model';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { dispatchDeleteKey, setupDemoShellMocks } from './demo-shell-test-utils';
 import { DemoApp } from './DemoApp';
@@ -155,7 +156,7 @@ describe('DemoApp chrome and menu integration', () => {
     fireEvent.dragStart(dragHandle, {
       dataTransfer: {
         effectAllowed: 'move',
-        setDragImage: jest.fn(),
+        setDragImage: vi.fn(),
       },
     });
     fireEvent.dragOver(dropTarget, { clientY: 15 });
@@ -232,7 +233,7 @@ describe('DemoApp chrome and menu integration', () => {
     fireEvent.dragStart(dragHandle, {
       dataTransfer: {
         effectAllowed: 'move',
-        setDragImage: jest.fn(),
+        setDragImage: vi.fn(),
       },
     });
 
@@ -245,10 +246,10 @@ describe('DemoApp chrome and menu integration', () => {
   /** @description Sidebar visibility toggles must immediately force element visibility in edit mode and feed an updated document to the renderer. */
   it('updates renderer document when toggling layer visibility in edit mode', () => {
     const { mockedCreateScreenRenderer } = setupDemoShellMocks();
-    const updateDocument = jest.fn();
+    const updateDocument = vi.fn();
 
     mockedCreateScreenRenderer.mockReturnValue({
-      destroy: jest.fn(),
+      destroy: vi.fn(),
       host: document.createElement('div'),
       updateDocument,
     });
@@ -389,10 +390,10 @@ describe('DemoApp chrome and menu integration', () => {
     fireEvent.click(preview);
     fireEvent.contextMenu(preview);
 
-    expect(screen.getByRole('button', { name: /^paste\b/i })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /^cut\b/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /^copy\b/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /^duplicate\b/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /^paste/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^cut/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^copy/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^duplicate/i })).toBeNull();
   });
 
   /** @description Ensures locked elements cannot be cut, duplicated, or deleted from the context menu. */
@@ -423,9 +424,9 @@ describe('DemoApp chrome and menu integration', () => {
     rendererHost.appendChild(lockedElementNode);
     fireEvent.contextMenu(lockedElementNode);
 
-    expect(screen.getByRole('button', { name: /^cut\b/i }).hasAttribute('disabled')).toBe(true);
-    expect(screen.getByRole('button', { name: /^duplicate\b/i }).hasAttribute('disabled')).toBe(true);
-    expect(screen.getByRole('button', { name: /^delete\b/i }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: /^cut/i }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: /^duplicate/i }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: /^delete/i }).hasAttribute('disabled')).toBe(true);
   });
 
   /** @description Confirms the floating sidebar toolbar disables element-specific tabs when nothing is selected. */
@@ -441,7 +442,7 @@ describe('DemoApp chrome and menu integration', () => {
   /** @description 9-A demo milestone: EditorErrorBoundary catches child errors and shows a recovery UI with reload option. */
   it('shows recovery UI when the editor canvas subtree throws', () => {
     const { mockedCreateScreenRenderer } = setupDemoShellMocks();
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     mockedCreateScreenRenderer.mockImplementation(() => {
       throw new Error('Canvas renderer exploded');
@@ -462,7 +463,7 @@ describe('DemoApp chrome and menu integration', () => {
     setupDemoShellMocks();
     window.localStorage.setItem('broadset:debug-change-stream', '1');
 
-    const consoleSpy = jest.spyOn(console, 'info').mockImplementation(() => undefined);
+    const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
 
     try {
       render(<DemoApp />);

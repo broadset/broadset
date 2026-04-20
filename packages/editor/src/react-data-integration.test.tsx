@@ -1,4 +1,4 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 /// <reference types="@testing-library/jest-dom" />
 
 /* eslint-disable react-hooks/globals --
@@ -7,9 +7,9 @@
    inside a non-hook function (the `it` callback); that's idiomatic RTL, not
    a real violation. */
 
-import { describe, expect, it, jest } from '@jest/globals';
 import { act, render, screen } from '@testing-library/react';
 import React, { type ReactNode } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createDataStore } from './data-store';
 import {
@@ -84,7 +84,7 @@ describe('provider-scoped data access', () => {
 describe('provider boundary enforcement', () => {
   /** @description Using the selector hook outside its provider must throw immediately so integration mistakes fail fast during development. */
   it('throws when useElementData is called outside the provider', () => {
-    const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     function BadConsumer(): React.JSX.Element {
       useElementData('el-1');
@@ -209,7 +209,7 @@ describe('editor provider and error boundary', () => {
 
   /** @description The error boundary must catch render crashes, show the recovery UI, and log the error details for debugging instead of crashing the whole app. */
   it('shows fallback UI and logs when a child throws', () => {
-    const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     function Bomb(): React.JSX.Element {
       throw new Error('kaboom');
@@ -280,7 +280,7 @@ describe('usePlayback hook', () => {
 
   /** @description usePlayback must throw outside its provider to fail fast on integration mistakes. */
   it('throws when used outside PlaybackProvider', () => {
-    const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     function BadConsumer(): React.JSX.Element {
       usePlayback();
@@ -296,12 +296,12 @@ describe('usePlayback hook', () => {
   it('play sets isPlaying to true and advances currentTime', () => {
     let hookResult: PlaybackState | null = null;
     const rafCallbacks: Array<(time: number) => void> = [];
-    const rafSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
       rafCallbacks.push(cb as (time: number) => void);
 
       return rafCallbacks.length;
     });
-    const cafSpy = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+    const cafSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
 
     function Consumer(): React.JSX.Element {
       hookResult = usePlayback();
@@ -344,12 +344,12 @@ describe('usePlayback hook', () => {
   it('pause stops playback and preserves currentTime', () => {
     let hookResult: PlaybackState | null = null;
     const rafCallbacks: Array<(time: number) => void> = [];
-    const rafSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
       rafCallbacks.push(cb as (time: number) => void);
 
       return rafCallbacks.length;
     });
-    const cafSpy = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+    const cafSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
 
     // eslint-disable-next-line sonarjs/no-identical-functions -- each `it` block captures `hookResult` into its own local closure; extracting the Consumer would require threading a setter through a shared factory with no readability win.
     function Consumer(): React.JSX.Element {

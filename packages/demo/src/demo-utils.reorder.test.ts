@@ -4,6 +4,7 @@ import {
   createDefaultElement,
   createEmptyBroadsetDocument,
 } from '@broadset/model';
+import { describe, expect, it } from 'vitest';
 
 import { buildLayerInfoList, buildRenderableDocumentForActivePage, reorderDocumentLayers } from './demo-utils';
 

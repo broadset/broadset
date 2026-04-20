@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createKeyboardHandler, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from './keyboard';
 import { makeDocument, makeElement, pressKey } from './keyboard-test-helpers';
@@ -86,7 +86,7 @@ describe('keyboard', () => {
   describe('Save Shortcut', () => {
     /** @description Ctrl+S with onSave configured invokes the callback. */
     it('Ctrl+S invokes onSave callback', () => {
-      const onSave = jest.fn();
+      const onSave = vi.fn();
       const store = createEditorStore({ config: { onSave } });
       const doc = makeDocument([makeElement('a')]);
 
@@ -103,8 +103,7 @@ describe('keyboard', () => {
       const store = createEditorStore();
       const handler = createKeyboardHandler(store, {});
 
-      // Should not throw
-      handler(pressKey('s', { ctrlKey: true }));
+      expect(() => { handler(pressKey('s', { ctrlKey: true })); }).not.toThrow();
     });
   });
 

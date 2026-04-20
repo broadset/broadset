@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { SidebarContextHeader } from './sidebar-context-header';
 
@@ -78,7 +79,7 @@ describe('SidebarContextHeader', () => {
 
   /** @description Lock button must expose a stable aria-label and trigger onToggleLock for keyboard and pointer users. */
   it('renders lock button and invokes callback', () => {
-    const onToggleLock = jest.fn(() => undefined);
+    const onToggleLock = vi.fn(() => undefined);
 
     render(<SidebarContextHeader icon={<span />} label="Properties" isLocked={false} onToggleLock={onToggleLock} />);
 

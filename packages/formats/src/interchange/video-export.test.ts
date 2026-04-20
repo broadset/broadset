@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { exportVideoBlob, isVideoExportSupported } from './index';
 
@@ -11,7 +11,7 @@ import { exportVideoBlob, isVideoExportSupported } from './index';
  * Captures constructor args and method calls for assertion.
  *
  * The mock state object is declared with `var` so it is hoisted above
- * the `jest.mock` factory (which babel hoists to the top of the file).
+ * the `vi.mock` factory (which babel hoists to the top of the file).
  */
 
 interface MockCanvasSourceCall {
@@ -43,42 +43,51 @@ var mockState: MockState = {
   webmFormatCreated: false,
 };
 
-jest.mock('mediabunny', () => ({
-  BufferTarget: jest.fn().mockImplementation(() => ({
-    get buffer() {
-      return mockState.bufferContents;
-    },
-  })),
-  CanvasSource: jest.fn().mockImplementation((_canvas, config) => {
-    mockState.canvasSourceConfig = config;
-
-    return {
-      add: jest.fn().mockImplementation((timestamp, duration) => {
-        mockState.canvasSourceCalls.push({ timestamp, duration });
-
-        return Promise.resolve();
-      }),
-    };
+vi.mock('mediabunny', () => ({
+  BufferTarget: vi.fn(function MockBufferTarget(this: { buffer: ArrayBuffer | null }) {
+    Object.defineProperty(this, 'buffer', {
+      get() {
+        return mockState.bufferContents;
+      },
+    });
   }),
-  Mp4OutputFormat: jest.fn().mockImplementation((options) => {
+  CanvasSource: vi.fn(function MockCanvasSource(
+    this: { add: (timestamp: unknown, duration: unknown) => Promise<void> },
+    _canvas: unknown,
+    config: unknown,
+  ) {
+    mockState.canvasSourceConfig = config;
+    this.add = vi.fn().mockImplementation((timestamp: unknown, duration: unknown) => {
+      mockState.canvasSourceCalls.push({ timestamp, duration });
+
+      return Promise.resolve();
+    });
+  }),
+  Mp4OutputFormat: vi.fn(function MockMp4OutputFormat(
+    this: { type: string; options: unknown },
+    options: unknown,
+  ) {
     mockState.mp4FormatCreated = true;
     mockState.mp4FormatOptions = options;
-
-    return { type: 'mp4', options };
+    this.type = 'mp4';
+    this.options = options;
   }),
-  WebMOutputFormat: jest.fn().mockImplementation(() => {
+  WebMOutputFormat: vi.fn(function MockWebMOutputFormat(this: { type: string }) {
     mockState.webmFormatCreated = true;
-
-    return { type: 'webm' };
+    this.type = 'webm';
   }),
-  Output: jest.fn().mockImplementation(() => ({
-    addVideoTrack: jest.fn(),
-    start: jest.fn().mockImplementation(() => {
+  Output: vi.fn(function MockOutput(this: {
+    addVideoTrack: () => void;
+    start: () => Promise<void>;
+    finalize: () => Promise<void>;
+  }) {
+    this.addVideoTrack = vi.fn();
+    this.start = vi.fn().mockImplementation(() => {
       mockState.outputStarted = true;
 
       return Promise.resolve();
-    }),
-    finalize: jest.fn().mockImplementation(() => {
+    });
+    this.finalize = vi.fn().mockImplementation(() => {
       if (mockState.finalizeError) {
         return Promise.reject(mockState.finalizeError);
       }
@@ -87,8 +96,8 @@ jest.mock('mediabunny', () => ({
       mockState.bufferContents = new ArrayBuffer(64);
 
       return Promise.resolve();
-    }),
-  })),
+    });
+  }),
 }));
 
 /* ------------------------------------------------------------------ */
@@ -143,7 +152,7 @@ describe('exportVideoBlob', () => {
     mockState.mp4FormatCreated = false;
     mockState.mp4FormatOptions = undefined;
     mockState.webmFormatCreated = false;
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {

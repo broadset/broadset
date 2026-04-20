@@ -1,6 +1,7 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { setupDemoShellMocks } from './demo-shell-test-utils';
 import { DemoApp } from './DemoApp';
@@ -20,7 +21,7 @@ describe('DemoApp named snapshots integration (9-E)', () => {
 
   /** @description Saving a snapshot via prompt must increase the snapshot counter in the File menu action. */
   it('saves a named snapshot and shows it in the File menu', () => {
-    const promptSpy = jest.spyOn(window, 'prompt').mockReturnValue('My Checkpoint');
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('My Checkpoint');
 
     renderDemoApp();
 
@@ -37,7 +38,7 @@ describe('DemoApp named snapshots integration (9-E)', () => {
 
   /** @description Saving then selecting a restore entry must be possible through the generated restore action item. */
   it('restores a snapshot by clicking it in the menu', () => {
-    const promptSpy = jest.spyOn(window, 'prompt').mockReturnValue('Before Edit');
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Before Edit');
 
     renderDemoApp();
 

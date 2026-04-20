@@ -1,7 +1,7 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
-import { jest } from '@jest/globals';
 import type * as React from 'react';
+import { vi } from 'vitest';
 
 import type { CanvasContextMenuProps } from './toolbar-nav';
 
@@ -19,10 +19,10 @@ interface MockHeroUiProps {
   readonly [mockKey: string]: unknown;
 }
 
-jest.mock(
+vi.mock(
   '@heroui/react',
-  () => {
-    const ReactActual = jest.requireActual<typeof React>('react');
+  async () => {
+    const ReactActual = await vi.importActual<typeof React>('react');
     const TabsContext = ReactActual.createContext<{
       readonly selectedKey: string;
       readonly onSelectionChange?: ((key: string | number | null) => void) | undefined;
@@ -208,9 +208,7 @@ jest.mock(
       },
       Tooltip,
     };
-  },
-  { virtual: true },
-);
+  });
 
 export function defaultContextMenuProps(overrides: Partial<CanvasContextMenuProps> = {}): CanvasContextMenuProps {
   return {
@@ -224,21 +222,21 @@ export function defaultContextMenuProps(overrides: Partial<CanvasContextMenuProp
     isPathElement: false,
     hasClipPathCapability: false,
     hasClipboard: false,
-    onCut: jest.fn<() => void>(),
-    onCopy: jest.fn<() => void>(),
-    onPaste: jest.fn<() => void>(),
-    onDuplicate: jest.fn<() => void>(),
-    onDelete: jest.fn<() => void>(),
-    onBringToFront: jest.fn<() => void>(),
-    onBringForward: jest.fn<() => void>(),
-    onSendBackward: jest.fn<() => void>(),
-    onSendToBack: jest.fn<() => void>(),
-    onGroup: jest.fn<() => void>(),
-    onUngroup: jest.fn<() => void>(),
-    onToggleLock: jest.fn<() => void>(),
-    onEditClipPath: jest.fn<() => void>(),
-    onEditPathPoints: jest.fn<() => void>(),
-    onClose: jest.fn<() => void>(),
+    onCut: vi.fn<() => void>(),
+    onCopy: vi.fn<() => void>(),
+    onPaste: vi.fn<() => void>(),
+    onDuplicate: vi.fn<() => void>(),
+    onDelete: vi.fn<() => void>(),
+    onBringToFront: vi.fn<() => void>(),
+    onBringForward: vi.fn<() => void>(),
+    onSendBackward: vi.fn<() => void>(),
+    onSendToBack: vi.fn<() => void>(),
+    onGroup: vi.fn<() => void>(),
+    onUngroup: vi.fn<() => void>(),
+    onToggleLock: vi.fn<() => void>(),
+    onEditClipPath: vi.fn<() => void>(),
+    onEditPathPoints: vi.fn<() => void>(),
+    onClose: vi.fn<() => void>(),
     ...overrides,
   };
 }

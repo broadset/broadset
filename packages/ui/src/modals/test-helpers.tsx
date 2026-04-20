@@ -1,10 +1,10 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
-import { jest } from '@jest/globals';
 import * as React from 'react';
+import { vi } from 'vitest';
 
 /* ------------------------------------------------------------------ */
-/*  HeroUI mock — all helpers use mock prefix to pass jest-hoist       */
+/*  HeroUI mock — all helpers use mock prefix to pass vi.mock hoist    */
 /* ------------------------------------------------------------------ */
 
 const mockNumCtx = React.createContext({
@@ -292,7 +292,7 @@ function MockTableRow(p: Record<string, unknown>) {
   );
 }
 
-jest.mock(
+vi.mock(
   '@heroui/react',
   () => ({
     Button: mockButton,
@@ -333,9 +333,7 @@ jest.mock(
       Cell: mockWrap('td'),
     }),
     Tabs: Object.assign(mockTabs, { List: mockWrap(), Tab: mockTab }),
-  }),
-  { virtual: true },
-);
+  }));
 
 /* ------------------------------------------------------------------ */
 /*  Mock ./inputs                                                      */
@@ -399,7 +397,7 @@ function mockToggleSwitch(p: Record<string, unknown>) {
   );
 }
 
-jest.mock('../inputs', () => ({
+vi.mock('../inputs', () => ({
   ColorInput: mockColorInput,
   NumField: mockNumField,
   ToggleSwitch: mockToggleSwitch,

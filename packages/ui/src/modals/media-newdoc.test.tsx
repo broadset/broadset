@@ -1,9 +1,9 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import './test-helpers';
 
-import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { MediaLibraryModalProps, NewDocumentModalProps } from './index';
 import { MediaLibraryModal, NewDocumentModal } from './index';
@@ -32,8 +32,8 @@ describe('MediaLibraryModal', () => {
       isOpen: true,
       assets: [...sampleAssets],
       categories: ['All', 'Logos', 'Backgrounds'],
-      onSelect: jest.fn(),
-      onClose: jest.fn(),
+      onSelect: vi.fn(),
+      onClose: vi.fn(),
       ...overrides,
     };
   }
@@ -64,7 +64,7 @@ describe('MediaLibraryModal', () => {
 
   /** @description Selecting asset and confirming fires onSelect with the asset */
   it('selects an asset and confirms', () => {
-    const onSelect = jest.fn();
+    const onSelect = vi.fn();
 
     render(<MediaLibraryModal {...makeProps({ onSelect })} />);
     fireEvent.click(screen.getByText('Logo'));
@@ -93,7 +93,7 @@ describe('MediaLibraryModal', () => {
     const { rerender } = render(<MediaLibraryModal {...makeProps()} />);
 
     expect(screen.queryByRole('button', { name: /upload/i })).toBeNull();
-    rerender(<MediaLibraryModal {...makeProps({ onUploadRequest: jest.fn() })} />);
+    rerender(<MediaLibraryModal {...makeProps({ onUploadRequest: vi.fn() })} />);
     expect(screen.getByRole('button', { name: /upload/i })).toBeTruthy();
   });
 
@@ -105,14 +105,14 @@ describe('MediaLibraryModal', () => {
 
   /** @description Double-clicking an asset selects and confirms in one action */
   it('double-click on asset calls onSelect directly', () => {
-    const onSelect = jest.fn();
+    const onSelect = vi.fn();
 
     render(<MediaLibraryModal {...makeProps({ onSelect })} />);
 
     const logoBtn = screen.getByRole('button', { name: 'Logo' });
 
     // First click — selects; mock Date.now to control timing
-    const now = jest.spyOn(Date, 'now');
+    const now = vi.spyOn(Date, 'now');
 
     now.mockReturnValue(1000);
     fireEvent.click(logoBtn);
@@ -167,15 +167,15 @@ describe('NewDocumentModal', () => {
     return {
       isOpen: true,
       presets: [...samplePresets],
-      onCreateDocument: jest.fn(),
-      onClose: jest.fn(),
+      onCreateDocument: vi.fn(),
+      onClose: vi.fn(),
       ...overrides,
     };
   }
 
   /** @description Preset selection and Create fires onCreateDocument with mode */
   it('creates document from selected preset', () => {
-    const onCreateDocument = jest.fn();
+    const onCreateDocument = vi.fn();
 
     render(<NewDocumentModal {...makeProps({ onCreateDocument })} />);
 

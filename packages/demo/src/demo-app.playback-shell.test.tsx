@@ -1,6 +1,7 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { setupDemoShellMocks } from './demo-shell-test-utils';
 import { DemoApp } from './DemoApp';
@@ -9,17 +10,17 @@ import { createDemoAppPlaybackTestDocument } from './test-fixtures';
 describe('DemoApp playback shell lifecycle', () => {
   /** @description Guards against rebuilding the animated preview controller when the demo shell rerenders. */
   it('does not recreate the renderer or playback controller when the shell rerenders with the same document', () => {
-    const rendererDestroy = jest.fn();
-    const updateDocument = jest.fn();
-    const playbackDestroy = jest.fn();
-    const attach = jest.fn();
-    const pause = jest.fn();
-    const play = jest.fn();
-    const seek = jest.fn();
-    const setAnimations = jest.fn();
-    const setSpeed = jest.fn();
-    const seekTimeline = jest.fn();
-    const stopTimeline = jest.fn();
+    const rendererDestroy = vi.fn();
+    const updateDocument = vi.fn();
+    const playbackDestroy = vi.fn();
+    const attach = vi.fn();
+    const pause = vi.fn();
+    const play = vi.fn();
+    const seek = vi.fn();
+    const setAnimations = vi.fn();
+    const setSpeed = vi.fn();
+    const seekTimeline = vi.fn();
+    const stopTimeline = vi.fn();
     const { mockedCreatePlaybackController, mockedCreateScreenRenderer } = setupDemoShellMocks();
 
     mockedCreateScreenRenderer.mockReturnValue({
@@ -30,7 +31,7 @@ describe('DemoApp playback shell lifecycle', () => {
     mockedCreatePlaybackController.mockReturnValue({
       attach,
       destroy: playbackDestroy,
-      detach: jest.fn(),
+      detach: vi.fn(),
       pause,
       play,
       seek,
@@ -62,7 +63,7 @@ describe('DemoApp playback shell lifecycle', () => {
 
   /** @description Change-batch console logging must stay disabled by default so interactive editing does not flood logs or slow tests. */
   it('does not emit change-batch logs by default', () => {
-    const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {
       /* no-op */
     });
 
@@ -82,21 +83,21 @@ describe('DemoApp playback shell lifecycle', () => {
   /** @description Proves the play, pause, and reset controls dispatch the expected playback API calls. */
   it('wires the play/pause toggle and reset controls to the playback controller', () => {
     const { mockedCreatePlaybackController } = setupDemoShellMocks();
-    const play = jest.fn();
-    const pause = jest.fn();
-    const seek = jest.fn();
+    const play = vi.fn();
+    const pause = vi.fn();
+    const seek = vi.fn();
 
     mockedCreatePlaybackController.mockReturnValue({
-      attach: jest.fn(),
-      destroy: jest.fn(),
-      detach: jest.fn(),
+      attach: vi.fn(),
+      destroy: vi.fn(),
+      detach: vi.fn(),
       pause,
       play,
       seek,
-      seekTimeline: jest.fn(),
-      setAnimations: jest.fn(),
-      setSpeed: jest.fn(),
-      stopTimeline: jest.fn(),
+      seekTimeline: vi.fn(),
+      setAnimations: vi.fn(),
+      setSpeed: vi.fn(),
+      stopTimeline: vi.fn(),
     });
 
     render(<DemoApp />);
@@ -114,19 +115,19 @@ describe('DemoApp playback shell lifecycle', () => {
   /** @description The animation sidebar and timeline editor must mutate the selected element timeline and drive targeted preview seeks instead of showing placeholder toasts. */
   it('adds keyframes and seeks the selected timeline from the animation editor', async () => {
     const { mockedCreatePlaybackController } = setupDemoShellMocks();
-    const seekTimeline = jest.fn(() => null);
+    const seekTimeline = vi.fn(() => null);
 
     mockedCreatePlaybackController.mockReturnValue({
-      attach: jest.fn(),
-      destroy: jest.fn(),
-      detach: jest.fn(),
-      pause: jest.fn(),
-      play: jest.fn(),
-      seek: jest.fn(),
+      attach: vi.fn(),
+      destroy: vi.fn(),
+      detach: vi.fn(),
+      pause: vi.fn(),
+      play: vi.fn(),
+      seek: vi.fn(),
       seekTimeline,
-      setAnimations: jest.fn(),
-      setSpeed: jest.fn(),
-      stopTimeline: jest.fn(),
+      setAnimations: vi.fn(),
+      setSpeed: vi.fn(),
+      stopTimeline: vi.fn(),
     });
 
     const playbackDocument = createDemoAppPlaybackTestDocument();
@@ -172,19 +173,19 @@ describe('DemoApp playback shell lifecycle', () => {
   /** @description Pressing play at the end of a non-loop timeline must restart preview from 0 so users can replay without manually seeking backward first. */
   it('restarts non-loop timeline playback from 0 when play is pressed at the end of the track', async () => {
     const { mockedCreatePlaybackController } = setupDemoShellMocks();
-    const seekTimeline = jest.fn(() => null);
+    const seekTimeline = vi.fn(() => null);
 
     mockedCreatePlaybackController.mockReturnValue({
-      attach: jest.fn(),
-      destroy: jest.fn(),
-      detach: jest.fn(),
-      pause: jest.fn(),
-      play: jest.fn(),
-      seek: jest.fn(),
+      attach: vi.fn(),
+      destroy: vi.fn(),
+      detach: vi.fn(),
+      pause: vi.fn(),
+      play: vi.fn(),
+      seek: vi.fn(),
       seekTimeline,
-      setAnimations: jest.fn(),
-      setSpeed: jest.fn(),
-      stopTimeline: jest.fn(),
+      setAnimations: vi.fn(),
+      setSpeed: vi.fn(),
+      stopTimeline: vi.fn(),
     });
 
     const playbackDocument = createDemoAppPlaybackTestDocument();
@@ -261,12 +262,12 @@ describe('DemoApp playback shell lifecycle', () => {
   /** @description Opening a document in edit mode must force all elements visible by default, even when imported pages contain persisted visibility-off overrides. */
   it('applies page visibility overrides to the canvas preview', () => {
     const { mockedCreateScreenRenderer } = setupDemoShellMocks();
-    const updateDocument = jest.fn();
+    const updateDocument = vi.fn();
     const fixtureDocument = createDemoAppPlaybackTestDocument();
     const replayElementId = 'el-live-ellipse';
 
     mockedCreateScreenRenderer.mockReturnValue({
-      destroy: jest.fn(),
+      destroy: vi.fn(),
       host: document.createElement('div'),
       updateDocument,
     });
@@ -415,7 +416,7 @@ describe('DemoApp playback shell lifecycle', () => {
     });
     Object.defineProperty(document.documentElement, 'requestFullscreen', {
       configurable: true,
-      value: jest.fn().mockImplementation(() => {
+      value: vi.fn().mockImplementation(() => {
         fullscreenElement = document.documentElement;
         document.dispatchEvent(new Event('fullscreenchange'));
 
@@ -424,7 +425,7 @@ describe('DemoApp playback shell lifecycle', () => {
     });
     Object.defineProperty(document, 'exitFullscreen', {
       configurable: true,
-      value: jest.fn().mockImplementation(() => {
+      value: vi.fn().mockImplementation(() => {
         fullscreenElement = null;
         document.dispatchEvent(new Event('fullscreenchange'));
 

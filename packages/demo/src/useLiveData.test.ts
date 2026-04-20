@@ -1,6 +1,6 @@
 import { createDataStore } from '@broadset/editor';
-import { describe, expect, it, jest } from '@jest/globals';
 import { act, renderHook } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   applyLiveUpdate,
@@ -87,11 +87,11 @@ describe('live data injection — periodic updates', () => {
 
 describe('useLiveData hook lifecycle', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   /** @description The hook MUST seed the data store with initial values on mount so elements render non-empty content immediately. */
@@ -119,7 +119,7 @@ describe('useLiveData hook lifecycle', () => {
     const clockBefore = store.getState().elements[LIVE_DATA_ELEMENT_IDS.clock]?.['text'];
 
     act(() => {
-      jest.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(1000);
     });
 
     const clockAfter = store.getState().elements[LIVE_DATA_ELEMENT_IDS.clock]?.['text'];
@@ -141,7 +141,7 @@ describe('useLiveData hook lifecycle', () => {
 
     // Advance timer after unmount — clock should NOT change
     act(() => {
-      jest.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(5000);
     });
 
     const clockAfterUnmount = store.getState().elements[LIVE_DATA_ELEMENT_IDS.clock]?.['text'];

@@ -1,5 +1,5 @@
 import { type AnimationDefinition, createEmptyBroadsetDocument, type DocumentChange } from '@broadset/model';
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 import { applyRemoteChanges, createChangeStream } from './collaboration';
 import { makeDocument, makeElement } from './collaboration-test-helpers';
@@ -50,7 +50,7 @@ describe('applyRemoteChanges', () => {
   /** @description Remote changes MUST NOT re-emit through the change stream. */
   it('does not re-emit through change stream', () => {
     const stream = createChangeStream();
-    const listener = jest.fn<(changes: readonly DocumentChange[]) => void>();
+    const listener = vi.fn<(changes: readonly DocumentChange[]) => void>();
 
     stream.subscribe(listener);
 

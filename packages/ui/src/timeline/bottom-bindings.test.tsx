@@ -1,8 +1,8 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
-import { beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { AnimationBindingSectionsProps, TimelineBottomPanelProps } from './index';
 import {
@@ -91,7 +91,7 @@ describe('TimelineBottomPanel', () => {
    */
   it('translates off-screen when closed and to natural position when open', () => {
     const { container, rerender } = render(
-      <TimelineBottomPanel isOpen={false} onClose={jest.fn()}>
+      <TimelineBottomPanel isOpen={false} onClose={vi.fn()}>
         <div>Editor</div>
       </TimelineBottomPanel>,
     );
@@ -101,7 +101,7 @@ describe('TimelineBottomPanel', () => {
     expect(panelClosed.style.transform).toBe('translateY(100%)');
 
     rerender(
-      <TimelineBottomPanel isOpen={true} onClose={jest.fn()}>
+      <TimelineBottomPanel isOpen={true} onClose={vi.fn()}>
         <div>Editor</div>
       </TimelineBottomPanel>,
     );

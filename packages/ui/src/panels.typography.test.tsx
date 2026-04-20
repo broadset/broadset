@@ -1,6 +1,6 @@
-/** @jest-environment jsdom */
-import { describe, expect, it, jest } from '@jest/globals';
+/** @vitest-environment jsdom */
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { PropertyValue } from './panels';
 import { TypographyPanel } from './panels';
@@ -8,7 +8,7 @@ import { TypographyPanel } from './panels';
 describe('TypographyPanel', () => {
   /** @description Typography panel must expose fast formatting controls and segmented alignment controls without requiring advanced disclosure. */
   it('renders toggle formatting controls and segmented alignment controls', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <TypographyPanel
@@ -96,7 +96,7 @@ describe('TypographyPanel', () => {
 
   /** @description Font size control must enforce configured min/max bounds so text size cannot drift outside safe limits. */
   it('clamps font size updates at min and max bounds', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     const { rerender } = render(
       <TypographyPanel
@@ -169,7 +169,7 @@ describe('TypographyPanel', () => {
 
   /** @description Toggle controls must mutate the expected model fields and avoid exposing raw internal property names to users. */
   it('forwards toggle edits and avoids raw style property labels', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <TypographyPanel

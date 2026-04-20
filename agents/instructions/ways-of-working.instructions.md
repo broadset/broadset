@@ -41,7 +41,7 @@ For the headed/UI portion of the application, User Experience is the primary dri
 
 Code is not complete unless it is heavily tested. You will write tests that prove the math, state, and UI work perfectly.
 
-### 1. Unit Testing (Vitest / Jest + React Testing Library)
+### 1. Unit Testing (Vitest + React Testing Library)
 
 - **The Math:** Write exhaustive unit tests for `packages/model/src/units.ts` (`pxToMm`, `mmToPx`). You must test the edge-anchoring math (`calculateEdgeAnchors`) with multiple simulated canvas sizes and cross-center-line coordinates to guarantee the logic never fails.
 - **The Zustand Store:** Test the vanilla store (`packages/model/src/store.ts`) independently of React. Write tests that prove `updateElementEphemeral` updates coordinates, `commitElementChange` recalculates anchors, and `reorderElement` correctly shifts array indexes without data loss.

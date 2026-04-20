@@ -1,7 +1,7 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import type { AnimationDefinition } from '@broadset/model';
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createPlaybackController } from './playback-controller';
 import { createConfig, createHostElement, createKeyframe, createTimeline } from './playback-controller-test-helpers';
@@ -184,7 +184,7 @@ describe('createPlaybackController', () => {
   });
 
   it('resumes paused default timelines from the paused position instead of restarting them', () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
 
     try {
       const { opacityTarget, root } = createHostElement('hero');
@@ -219,23 +219,23 @@ describe('createPlaybackController', () => {
 
       controller.attach();
       controller.play();
-      jest.advanceTimersByTime(250);
+      vi.advanceTimersByTime(250);
 
       const pausedOpacity = Number(opacityTarget.style.opacity);
 
       controller.pause();
-      jest.advanceTimersByTime(150);
+      vi.advanceTimersByTime(150);
 
       expect(Number(opacityTarget.style.opacity)).toBeCloseTo(pausedOpacity, 3);
 
       controller.play();
-      jest.advanceTimersByTime(150);
+      vi.advanceTimersByTime(150);
 
       expect(Number(opacityTarget.style.opacity)).toBeGreaterThan(pausedOpacity);
 
       controller.destroy();
     } finally {
-      jest.useRealTimers();
+      vi.useRealTimers();
     }
   });
 
@@ -299,7 +299,7 @@ describe('createPlaybackController', () => {
 
   /** @description play() must trigger the IN timeline for elements with IN/OUT state bindings so the entrance animation plays when the user clicks the global play button. */
   it('plays the IN timeline on play() for elements with IN/OUT state bindings', () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
 
     try {
       const { opacityTarget, root } = createHostElement('hero');
@@ -355,13 +355,13 @@ describe('createPlaybackController', () => {
 
       controller.attach();
       controller.play();
-      jest.advanceTimersByTime(600);
+      vi.advanceTimersByTime(600);
 
       expect(Number(opacityTarget.style.opacity)).toBeCloseTo(1, 1);
 
       controller.destroy();
     } finally {
-      jest.useRealTimers();
+      vi.useRealTimers();
     }
   });
 

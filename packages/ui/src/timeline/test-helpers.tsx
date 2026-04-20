@@ -1,8 +1,8 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import type { EasingMode, Keyframe, Timeline } from '@broadset/model';
-import { jest } from '@jest/globals';
 import type * as React from 'react';
+import { vi } from 'vitest';
 
 import type {
   AnimationBindingSectionsProps,
@@ -25,10 +25,10 @@ interface MockHeroUiProps {
   readonly [key: string]: unknown;
 }
 
-jest.mock(
+vi.mock(
   '@heroui/react',
-  () => {
-    const ReactActual = jest.requireActual<typeof React>('react');
+  async () => {
+    const ReactActual = await vi.importActual<typeof React>('react');
 
     function createWrapper(tagName = 'div') {
       return function Wrapper(props: MockHeroUiProps): React.JSX.Element {
@@ -103,9 +103,7 @@ jest.mock(
       Select,
       Tooltip,
     };
-  },
-  { virtual: true },
-);
+  });
 
 interface TimelineTestModules {
   readonly AnimationBindingSections: React.ComponentType<AnimationBindingSectionsProps>;
@@ -162,13 +160,13 @@ export function defaultEditorProps(overrides: Partial<TimelineEditorProps> = {})
   return {
     timeline: makeTimeline(),
     selectedKeyframeIndex: null,
-    onSelectKeyframe: jest.fn<(index: number) => void>(),
-    onAddKeyframe: jest.fn<() => void>(),
-    onMoveKeyframe: jest.fn<(index: number, offsetMs: number) => void>(),
-    onChangeEasing: jest.fn<(index: number, easing: EasingMode) => void>(),
-    onPlayTimeline: jest.fn<() => void>(),
-    onStopTimeline: jest.fn<() => void>(),
-    onSeekTimeline: jest.fn<(timeMs: number) => void>(),
+    onSelectKeyframe: vi.fn<(index: number) => void>(),
+    onAddKeyframe: vi.fn<() => void>(),
+    onMoveKeyframe: vi.fn<(index: number, offsetMs: number) => void>(),
+    onChangeEasing: vi.fn<(index: number, easing: EasingMode) => void>(),
+    onPlayTimeline: vi.fn<() => void>(),
+    onStopTimeline: vi.fn<() => void>(),
+    onSeekTimeline: vi.fn<(timeMs: number) => void>(),
     currentTimeMs: 0,
     isPlaying: false,
     ...overrides,
@@ -178,7 +176,7 @@ export function defaultEditorProps(overrides: Partial<TimelineEditorProps> = {})
 export function defaultBottomPanelProps(overrides: Partial<TimelineBottomPanelProps> = {}): TimelineBottomPanelProps {
   return {
     isOpen: false,
-    onClose: jest.fn<() => void>(),
+    onClose: vi.fn<() => void>(),
     ...overrides,
   };
 }
@@ -190,11 +188,11 @@ export function defaultBindingSectionsProps(
     stateBindings: [],
     modifierBindings: [],
     timelines: [],
-    onAddStateBinding: jest.fn<(stateName: string, timelineId: string) => void>(),
-    onRemoveStateBinding: jest.fn<(stateName: string) => void>(),
-    onRenameStateBinding: jest.fn<(oldName: string, newName: string) => void>(),
-    onAddModifierBinding: jest.fn<(modifierName: string, inTimelineId: string, outTimelineId: string) => void>(),
-    onRemoveModifierBinding: jest.fn<(modifierName: string) => void>(),
+    onAddStateBinding: vi.fn<(stateName: string, timelineId: string) => void>(),
+    onRemoveStateBinding: vi.fn<(stateName: string) => void>(),
+    onRenameStateBinding: vi.fn<(oldName: string, newName: string) => void>(),
+    onAddModifierBinding: vi.fn<(modifierName: string, inTimelineId: string, outTimelineId: string) => void>(),
+    onRemoveModifierBinding: vi.fn<(modifierName: string) => void>(),
     ...overrides,
   };
 }
@@ -202,7 +200,7 @@ export function defaultBindingSectionsProps(
 export function defaultEasingGraphProps(overrides: Partial<EasingGraphEditorProps> = {}): EasingGraphEditorProps {
   return {
     easing: 'ease' as EasingMode,
-    onChange: jest.fn<(easing: EasingMode) => void>(),
+    onChange: vi.fn<(easing: EasingMode) => void>(),
     isPlaying: false,
     playbackProgress: 0,
     ...overrides,
@@ -227,8 +225,8 @@ export function defaultPerPropertyLanesProps(overrides: Partial<PerPropertyLanes
   return {
     keyframes: [],
     durationMs: 3000,
-    onAddPropertyKeyframe: jest.fn<(offsetMs: number, property: string) => void>(),
-    onMovePropertyKeyframe: jest.fn<(fromIndex: number, property: string, toOffsetMs: number) => void>(),
+    onAddPropertyKeyframe: vi.fn<(offsetMs: number, property: string) => void>(),
+    onMovePropertyKeyframe: vi.fn<(fromIndex: number, property: string, toOffsetMs: number) => void>(),
     ...overrides,
   };
 }

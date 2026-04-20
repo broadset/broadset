@@ -1,5 +1,5 @@
 import type { BroadsetProject } from '@broadset/model';
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { exportProjectJson, generateQrSvgFragment, sanitizeFilename } from './index';
 import { makeProject } from './test-helpers';

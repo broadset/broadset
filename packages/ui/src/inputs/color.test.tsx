@@ -1,16 +1,16 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import './test-helpers';
 
-import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { ColorInput } from './index';
 
 describe('ColorInput', () => {
   /** @description Typing a valid hex value in the text field must emit the color string via onChange. */
   it('accepts valid hex text input and emits value', () => {
-    const onChange = jest.fn<(value: string) => void>();
+    const onChange = vi.fn<(value: string) => void>();
 
     render(<ColorInput value="#ff0000" onChange={onChange} label="Fill" />);
 
@@ -23,7 +23,7 @@ describe('ColorInput', () => {
 
   /** @description A saturation/brightness area and hue slider must be available for visual color picking. */
   it('renders saturation/brightness area and hue slider', () => {
-    render(<ColorInput value="#ff0000" onChange={jest.fn()} label="Fill" />);
+    render(<ColorInput value="#ff0000" onChange={vi.fn()} label="Fill" />);
     // Open picker
     fireEvent.click(screen.getByTestId('color-swatch'));
     expect(screen.getByLabelText('Hue')).toBeTruthy();
@@ -32,7 +32,7 @@ describe('ColorInput', () => {
 
   /** @description Alpha adjustment must include opacity in the emitted color value. */
   it('supports alpha adjustment', () => {
-    const onChange = jest.fn<(value: string) => void>();
+    const onChange = vi.fn<(value: string) => void>();
 
     render(<ColorInput value="rgba(255,0,0,1)" onChange={onChange} label="Fill" />);
     fireEvent.click(screen.getByTestId('color-swatch'));
@@ -45,7 +45,7 @@ describe('ColorInput', () => {
 
   /** @description Invalid color strings must revert to last valid color on blur. */
   it('reverts to last valid color on invalid input blur', () => {
-    const onChange = jest.fn<(value: string) => void>();
+    const onChange = vi.fn<(value: string) => void>();
 
     render(<ColorInput value="#ff0000" onChange={onChange} label="Fill" />);
 
@@ -59,7 +59,7 @@ describe('ColorInput', () => {
 
   /** @description Format toggle must convert the displayed value to the selected format. */
   it('toggles display format between hex/rgb/hsl', () => {
-    render(<ColorInput value="#ff0000" onChange={jest.fn()} label="Fill" />);
+    render(<ColorInput value="#ff0000" onChange={vi.fn()} label="Fill" />);
     fireEvent.click(screen.getByTestId('color-swatch'));
 
     const formatToggle = screen.getByLabelText('Color format');
@@ -69,7 +69,7 @@ describe('ColorInput', () => {
 
   /** @description Fully transparent color must show checkerboard pattern on the swatch. */
   it('shows checkerboard for fully transparent color', () => {
-    render(<ColorInput value="rgba(0,0,0,0)" onChange={jest.fn()} label="Fill" />);
+    render(<ColorInput value="rgba(0,0,0,0)" onChange={vi.fn()} label="Fill" />);
 
     const swatch = screen.getByTestId('color-swatch');
 
@@ -80,7 +80,7 @@ describe('ColorInput', () => {
 
   /** @description Saved palette colors must be removable individually. */
   it('supports palette save and remove', () => {
-    render(<ColorInput value="#ff0000" onChange={jest.fn()} label="Fill" />);
+    render(<ColorInput value="#ff0000" onChange={vi.fn()} label="Fill" />);
     fireEvent.click(screen.getByTestId('color-swatch'));
 
     const addButton = screen.getByLabelText('Add to palette');

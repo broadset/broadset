@@ -39,8 +39,9 @@ export function applyBackgroundStyle(node: HTMLElement, style: BroadsetElementSt
     gradient !== undefined && (typeof gradient !== 'string' || gradient.trim() !== '');
 
   if (hasGradient) {
+    node.style.background = '';
     node.style.backgroundColor = '';
-    node.style.background = serializeGradient(gradient);
+    node.style.backgroundImage = serializeGradient(gradient);
 
     if (typeof gradient !== 'string') {
       node.dataset['gradient'] = JSON.stringify(gradient);
@@ -55,13 +56,13 @@ export function applyBackgroundStyle(node: HTMLElement, style: BroadsetElementSt
 
   if (style.backgroundColor !== undefined) {
     node.style.background = '';
+    node.style.backgroundImage = '';
     node.style.backgroundColor = style.backgroundColor;
-    delete node.dataset['gradient'];
 
     return;
   }
 
   node.style.background = '';
+  node.style.backgroundImage = '';
   node.style.backgroundColor = '';
-  delete node.dataset['gradient'];
 }

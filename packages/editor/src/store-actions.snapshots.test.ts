@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { createEditorStore, type NamedSnapshot } from './store-actions';
 import { makeDocument, makeElement } from './store-actions-test-helpers';

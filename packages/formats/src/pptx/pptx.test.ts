@@ -1,6 +1,6 @@
 import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle, Canvas } from '@broadset/model';
-import { describe, expect, it } from '@jest/globals';
 import PizZip from 'pizzip';
+import { describe, expect, it } from 'vitest';
 
 import { exportPptxBytes, importPptx } from './index';
 

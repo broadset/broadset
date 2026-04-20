@@ -1,9 +1,9 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import './test-helpers';
 
-import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { convertLength, isCssUnit, toCssUnit } from './css-length';
 import { CssLengthInput, NumField, TextStrokeInput } from './index';
@@ -11,7 +11,7 @@ import { CssLengthInput, NumField, TextStrokeInput } from './index';
 describe('NumField', () => {
   /** @description Arrow Up/Down keys must increment/decrement by the configured step. */
   it('increments value on arrow up', () => {
-    const onChange = jest.fn<(value: number) => void>();
+    const onChange = vi.fn<(value: number) => void>();
 
     render(<NumField value={50} step={1} onChange={onChange} label="X" />);
 
@@ -23,7 +23,7 @@ describe('NumField', () => {
 
   /** @description Arrow Down key must decrement by the configured step. */
   it('decrements value on arrow down', () => {
-    const onChange = jest.fn<(value: number) => void>();
+    const onChange = vi.fn<(value: number) => void>();
 
     render(<NumField value={50} step={1} onChange={onChange} label="Y" />);
 
@@ -35,7 +35,7 @@ describe('NumField', () => {
 
   /** @description Blur must commit the current value to the store. */
   it('commits value on blur', () => {
-    const onChange = jest.fn<(value: number) => void>();
+    const onChange = vi.fn<(value: number) => void>();
 
     render(<NumField value={50} step={1} onChange={onChange} label="Width" />);
 
@@ -47,7 +47,7 @@ describe('NumField', () => {
 
   /** @description Invalid text input must revert to the last valid value on blur. */
   it('reverts invalid input on blur', () => {
-    const onChange = jest.fn<(value: number) => void>();
+    const onChange = vi.fn<(value: number) => void>();
 
     render(<NumField value={50} step={1} onChange={onChange} label="Height" />);
 
@@ -67,7 +67,7 @@ describe('NumField', () => {
 
   /** @description Displayed value must have at most 2 decimal places. */
   it('formats value with max 2 decimal places', () => {
-    render(<NumField value={3.14159} step={0.01} onChange={jest.fn()} label="Val" />);
+    render(<NumField value={3.14159} step={0.01} onChange={vi.fn()} label="Val" />);
 
     const input = screen.getByLabelText('Val', { selector: 'input' });
     // The displayed value should be limited to 2 decimals
@@ -78,7 +78,7 @@ describe('NumField', () => {
 
   /** @description Increment/decrement button clicks must commit immediately. */
   it('commits on increment button click', () => {
-    const onChange = jest.fn<(value: number) => void>();
+    const onChange = vi.fn<(value: number) => void>();
 
     render(<NumField value={10} step={1} onChange={onChange} label="Size" />);
 
@@ -96,7 +96,7 @@ describe('NumField', () => {
 
   /** @description Comma must be treated as the decimal separator. Regression for a bug where `100,1` parsed to `1001` after blur because the raw-number parser stripped commas as thousands separators and HeroUI's default parsing fell back to integer-only. */
   it('treats comma as the decimal separator on blur', () => {
-    const onChange = jest.fn<(value: number) => void>();
+    const onChange = vi.fn<(value: number) => void>();
 
     render(<NumField value={50} step={0.1} onChange={onChange} label="Width" />);
 
@@ -110,7 +110,7 @@ describe('NumField', () => {
 
   /** @description Compact mode must ship the HeroUI NumberField inc/dec buttons so standalone number fields read as proper number inputs with shared HeroUI chrome. */
   it('compact mode renders HeroUI increment and decrement buttons', () => {
-    const onChange = jest.fn<(value: number) => void>();
+    const onChange = vi.fn<(value: number) => void>();
 
     render(<NumField compact value={10} step={1} onChange={onChange} label="Border width" />);
 
@@ -144,7 +144,7 @@ describe('CssLengthInput', () => {
 
   /** @description Blur should emit the current numeric value in the active unit. */
   it('accepts numeric input in the current unit', () => {
-    const onChange = jest.fn<(value: string) => void>();
+    const onChange = vi.fn<(value: string) => void>();
 
     render(<CssLengthInput value="50px" onChange={onChange} label="Height" />);
 
@@ -162,7 +162,7 @@ describe('CssLengthInput', () => {
 describe('TextStrokeInput', () => {
   /** @description Width and color inputs must emit a valid CSS text-stroke shorthand. */
   it('emits CSS text-stroke shorthand', () => {
-    const onChange = jest.fn<(value: string) => void>();
+    const onChange = vi.fn<(value: string) => void>();
 
     render(<TextStrokeInput width={2} color="#000000" onChange={onChange} label="Text Stroke" />);
 

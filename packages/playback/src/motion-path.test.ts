@@ -1,3 +1,5 @@
+import { describe, expect, it } from 'vitest';
+
 import { sampleMotionPath } from './motion-path';
 
 describe('sampleMotionPath', () => {

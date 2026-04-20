@@ -12,19 +12,17 @@
     "lint": "eslint .",
     "lint:strict": "npm run lint -- --no-cache --max-warnings 0",
     "typecheck": "tsc -b",
-    "test": "jest --config jest.config.cjs --passWithNoTests",
+    "test": "vitest run --passWithNoTests",
     "ct": "npx playwright test --config=playwright-ct.config.ts --pass-with-no-tests",
-    "quality": "npm run lint && npm run typecheck && npm run test -- --runInBand",
-    "quality:strict": "npm run lint:strict && npm run typecheck && npm run test -- --runInBand"
+    "quality": "npm run lint && npm run typecheck && npm run test",
+    "quality:strict": "npm run lint:strict && npm run typecheck && npm run test"
   },
   "devDependencies": {
-    "@jest/globals": "^30.3.0",
     "@playwright/experimental-ct-react": "^1.59.1",
     "@playwright/test": "^1.59.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-    "jest": "^30.3.0",
     "typescript": "^6.0.2"
   },
   "dependencies": {

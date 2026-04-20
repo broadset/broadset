@@ -1,6 +1,7 @@
-/** @jest-environment node */
+/** @vitest-environment node */
 
 import type { ComponentPlugin, FontDefinition, GridSettings, MediaSourceConfig } from '@broadset/model';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   COUNTDOWN_PLUGIN,
@@ -152,7 +153,7 @@ describe('Demo Editor Configuration (9-G)', () => {
 
     /** @description Each batch of changes must be logged with a cumulative count. */
     it('logs batches with a cumulative count', () => {
-      const spy = jest.spyOn(console, 'info').mockImplementation(() => {});
+      const spy = vi.spyOn(console, 'info').mockImplementation(() => {});
 
       demoOnChanges([{ type: 'add' }]);
       demoOnChanges([{ type: 'update' }]);

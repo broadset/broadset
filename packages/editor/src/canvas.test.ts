@@ -1,5 +1,5 @@
 import { type BroadsetDocument, type BroadsetElement, createDefaultElement } from '@broadset/model';
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import {
   computeGridLines,

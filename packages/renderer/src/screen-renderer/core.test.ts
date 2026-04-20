@@ -1,6 +1,7 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import { createDefaultStyle } from '@broadset/model';
+import { describe, expect, it } from 'vitest';
 
 import {
   ALL_DISABLED_CAPABILITIES,

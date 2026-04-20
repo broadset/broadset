@@ -1,5 +1,5 @@
 import { createDefaultFeatureConfig } from '@broadset/model';
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { createEditorStore } from './store-actions';
 import { findElement, getElements, makeDocument, makeElement, storeWithElements } from './store-actions-test-helpers';

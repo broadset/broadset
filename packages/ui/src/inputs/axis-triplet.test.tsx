@@ -1,7 +1,7 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
-import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { AxisTriplet, PairInput } from './axis-triplet';
 
@@ -13,9 +13,9 @@ describe('AxisTriplet', () => {
         label="Position"
         unit="mm"
         axes={[
-          { chip: 'X', color: 'x', ariaLabel: 'Position X (mm)', value: 10, onChange: jest.fn() },
-          { chip: 'Y', color: 'y', ariaLabel: 'Position Y (mm)', value: 20, onChange: jest.fn() },
-          { chip: 'Z', color: 'z', ariaLabel: 'Position Z (mm)', value: 0, onChange: jest.fn() },
+          { chip: 'X', color: 'x', ariaLabel: 'Position X (mm)', value: 10, onChange: vi.fn() },
+          { chip: 'Y', color: 'y', ariaLabel: 'Position Y (mm)', value: 20, onChange: vi.fn() },
+          { chip: 'Z', color: 'z', ariaLabel: 'Position Z (mm)', value: 0, onChange: vi.fn() },
         ]}
       />,
     );
@@ -28,9 +28,9 @@ describe('AxisTriplet', () => {
 
   /** @description Each axis cell must emit only its own onChange so coordinate edits stay scoped to one axis. */
   it('routes changes to the correct axis handler', () => {
-    const onX = jest.fn<(value: number) => void>();
-    const onY = jest.fn<(value: number) => void>();
-    const onZ = jest.fn<(value: number) => void>();
+    const onX = vi.fn<(value: number) => void>();
+    const onY = vi.fn<(value: number) => void>();
+    const onZ = vi.fn<(value: number) => void>();
 
     render(
       <AxisTriplet
@@ -60,9 +60,9 @@ describe('AxisTriplet', () => {
       <AxisTriplet
         label="Rotation"
         axes={[
-          { chip: 'X', color: 'x', ariaLabel: 'Rotation X', value: 0, onChange: jest.fn(), isHidden: true },
-          { chip: 'Y', color: 'y', ariaLabel: 'Rotation Y', value: 0, onChange: jest.fn(), isHidden: true },
-          { chip: 'Z', color: 'z', ariaLabel: 'Rotation Z', value: 0, onChange: jest.fn() },
+          { chip: 'X', color: 'x', ariaLabel: 'Rotation X', value: 0, onChange: vi.fn(), isHidden: true },
+          { chip: 'Y', color: 'y', ariaLabel: 'Rotation Y', value: 0, onChange: vi.fn(), isHidden: true },
+          { chip: 'Z', color: 'z', ariaLabel: 'Rotation Z', value: 0, onChange: vi.fn() },
         ]}
       />,
     );
@@ -81,8 +81,8 @@ describe('PairInput', () => {
         label="Size"
         unit="px"
         axes={[
-          { chip: 'W', color: 'neutral', ariaLabel: 'Size W (px)', value: 300, onChange: jest.fn() },
-          { chip: 'H', color: 'neutral', ariaLabel: 'Size H (px)', value: 200, onChange: jest.fn() },
+          { chip: 'W', color: 'neutral', ariaLabel: 'Size W (px)', value: 300, onChange: vi.fn() },
+          { chip: 'H', color: 'neutral', ariaLabel: 'Size H (px)', value: 200, onChange: vi.fn() },
         ]}
       />,
     );
@@ -99,10 +99,10 @@ describe('PairInput', () => {
         label="Size"
         unit="px"
         axes={[
-          { chip: 'W', color: 'neutral', ariaLabel: 'Size W (px)', value: 400, onChange: jest.fn() },
-          { chip: 'H', color: 'neutral', ariaLabel: 'Size H (px)', value: 300, onChange: jest.fn() },
+          { chip: 'W', color: 'neutral', ariaLabel: 'Size W (px)', value: 400, onChange: vi.fn() },
+          { chip: 'H', color: 'neutral', ariaLabel: 'Size H (px)', value: 300, onChange: vi.fn() },
         ]}
-        linkToggle={{ isLinked: false, onToggle: jest.fn(), ariaLabel: 'Link aspect ratio' }}
+        linkToggle={{ isLinked: false, onToggle: vi.fn(), ariaLabel: 'Link aspect ratio' }}
       />,
     );
 
@@ -111,8 +111,8 @@ describe('PairInput', () => {
 
   /** @description With the link toggle active, editing one axis must also scale the paired axis so aspect ratio is preserved. */
   it('preserves aspect ratio when linked', () => {
-    const onW = jest.fn<(value: number) => void>();
-    const onH = jest.fn<(value: number) => void>();
+    const onW = vi.fn<(value: number) => void>();
+    const onH = vi.fn<(value: number) => void>();
 
     render(
       <PairInput
@@ -122,7 +122,7 @@ describe('PairInput', () => {
           { chip: 'W', color: 'neutral', ariaLabel: 'Size W (px)', value: 400, onChange: onW },
           { chip: 'H', color: 'neutral', ariaLabel: 'Size H (px)', value: 200, onChange: onH },
         ]}
-        linkToggle={{ isLinked: true, onToggle: jest.fn(), ariaLabel: 'Link aspect ratio' }}
+        linkToggle={{ isLinked: true, onToggle: vi.fn(), ariaLabel: 'Link aspect ratio' }}
       />,
     );
 

@@ -1,4 +1,5 @@
 import type { EasingMode, KeyframeValue } from '@broadset/model';
+import { describe, expect, it } from 'vitest';
 
 import { applyEasing, interpolateKeyframeProperties, interpolatePath, interpolateValue } from './interpolation';
 

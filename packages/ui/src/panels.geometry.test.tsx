@@ -1,6 +1,6 @@
-/** @jest-environment jsdom */
-import { describe, expect, it, jest } from '@jest/globals';
+/** @vitest-environment jsdom */
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { PropertyValue } from './panels';
 import { GeometryPanel } from './panels';
@@ -8,7 +8,7 @@ import { GeometryPanel } from './panels';
 describe('GeometryPanel', () => {
   /** @description Geometry labels must include document units and numeric edits must still emit numeric model updates. */
   it('renders transform fields with unit labels and reports numeric updates', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <GeometryPanel
@@ -117,7 +117,7 @@ describe('GeometryPanel', () => {
 
   /** @description Anchor-relative positioning: right anchor should display position from right edge. */
   it('displays right-anchored X relative to canvas right edge', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <GeometryPanel
@@ -148,7 +148,7 @@ describe('GeometryPanel', () => {
 
   /** @description Anchor-relative positioning: bottom anchor should display position from bottom edge. */
   it('displays and commits bottom-anchored Y relative to canvas bottom edge', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <GeometryPanel
@@ -179,7 +179,7 @@ describe('GeometryPanel', () => {
 
   /** @description 9-dot anchor pad must emit both anchorX and anchorY in a single interaction when a corner dot is clicked. */
   it('emits anchor mode changes from the 9-dot anchor pad', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <GeometryPanel

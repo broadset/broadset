@@ -1,32 +1,33 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import type { Mock } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createTimelinePlaybackCoordinator } from './timeline-playback';
 
 interface MockController {
-  readonly play: jest.Mock;
-  readonly pause: jest.Mock;
-  readonly seek: jest.Mock;
-  readonly seekTimeline: jest.Mock;
-  readonly stopTimeline: jest.Mock;
-  readonly setSpeed: jest.Mock;
-  readonly setRegistry: jest.Mock;
-  readonly attach: jest.Mock;
-  readonly detach: jest.Mock;
-  readonly destroy: jest.Mock;
+  readonly play: Mock;
+  readonly pause: Mock;
+  readonly seek: Mock;
+  readonly seekTimeline: Mock;
+  readonly stopTimeline: Mock;
+  readonly setSpeed: Mock;
+  readonly setRegistry: Mock;
+  readonly attach: Mock;
+  readonly detach: Mock;
+  readonly destroy: Mock;
 }
 
 function createMockController(): MockController {
   return {
-    play: jest.fn(),
-    pause: jest.fn(),
-    seek: jest.fn(),
-    seekTimeline: jest.fn().mockReturnValue(null),
-    stopTimeline: jest.fn(),
-    setSpeed: jest.fn(),
-    setRegistry: jest.fn(),
-    attach: jest.fn(),
-    detach: jest.fn(),
-    destroy: jest.fn(),
+    play: vi.fn(),
+    pause: vi.fn(),
+    seek: vi.fn(),
+    seekTimeline: vi.fn().mockReturnValue(null),
+    stopTimeline: vi.fn(),
+    setSpeed: vi.fn(),
+    setRegistry: vi.fn(),
+    attach: vi.fn(),
+    detach: vi.fn(),
+    destroy: vi.fn(),
   };
 }
 
@@ -54,7 +55,7 @@ describe('timeline-playback coordinator', () => {
       coordinator.registerController(controller);
       coordinator.setSnapshot(snapshot);
 
-      const restoreCallback = jest.fn();
+      const restoreCallback = vi.fn();
 
       coordinator.onRestore(restoreCallback);
       coordinator.play('el-1', 'tl-1');
@@ -71,7 +72,7 @@ describe('timeline-playback coordinator', () => {
       coordinator.registerController(controller);
       coordinator.setSnapshot(snapshot);
 
-      const restoreCallback = jest.fn();
+      const restoreCallback = vi.fn();
 
       coordinator.onRestore(restoreCallback);
       coordinator.seek('el-1', 'tl-1', 500);
@@ -109,7 +110,7 @@ describe('timeline-playback coordinator', () => {
       coordinator.setSnapshot(snapshot);
       coordinator.setEditingTarget('el-1', 'tl-1');
 
-      const restoreCallback = jest.fn();
+      const restoreCallback = vi.fn();
 
       coordinator.onRestore(restoreCallback);
       coordinator.closeEditing();
@@ -131,7 +132,7 @@ describe('timeline-playback coordinator', () => {
       coordinator.closeEditing();
 
       // Second close should be no-op (no target)
-      const restoreCallback = jest.fn();
+      const restoreCallback = vi.fn();
 
       coordinator.onRestore(restoreCallback);
       coordinator.closeEditing();
@@ -148,7 +149,7 @@ describe('timeline-playback coordinator', () => {
 
       coordinator.setSnapshot(snapshot);
 
-      const restoreCallback = jest.fn();
+      const restoreCallback = vi.fn();
 
       coordinator.onRestore(restoreCallback);
 
@@ -162,7 +163,7 @@ describe('timeline-playback coordinator', () => {
     it('no-ops seek when no controller is registered', () => {
       const coordinator = createTimelinePlaybackCoordinator();
 
-      const restoreCallback = jest.fn();
+      const restoreCallback = vi.fn();
 
       coordinator.onRestore(restoreCallback);
 
@@ -175,8 +176,7 @@ describe('timeline-playback coordinator', () => {
     it('no-ops stop when no controller is registered', () => {
       const coordinator = createTimelinePlaybackCoordinator();
 
-      // Should not throw
-      coordinator.stop('el-1', 'tl-1');
+      expect(() => { coordinator.stop('el-1', 'tl-1'); }).not.toThrow();
     });
   });
 

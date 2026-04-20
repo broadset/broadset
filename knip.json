@@ -2,11 +2,10 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "entry": ["jest.config.cjs", "test/jest.setup.js"],
-      "ignoreDependencies": ["vite"]
+      "entry": ["vitest.base.ts", "test/vitest.setup.ts", "tsconfig.vitest.json"]
     },
     "packages/demo": {
-      "entry": ["src/main.tsx", "src/index.css", "src/**/*.test.{ts,tsx}", "ct/**/*.ct.tsx", "vite.config.ts"],
+      "entry": ["src/index.css", "src/**/*.test.{ts,tsx}", "ct/**/*.ct.tsx", "vite.config.ts"],
       "project": ["src/**/*.{ts,tsx}"],
       "vite": false
     },

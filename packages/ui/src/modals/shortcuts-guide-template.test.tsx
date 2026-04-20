@@ -1,9 +1,9 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import './test-helpers';
 
-import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { GuidePositionModalProps, TemplateBrowserModalProps } from './index';
 import { GuidePositionModal, ShortcutHelpModal, TemplateBrowserModal } from './index';
@@ -11,14 +11,14 @@ import { GuidePositionModal, ShortcutHelpModal, TemplateBrowserModal } from './i
 describe('ShortcutHelpModal', () => {
   /** @description Confirms modal does not render when closed */
   it('does not render when closed', () => {
-    const { container } = render(<ShortcutHelpModal isOpen={false} onClose={jest.fn()} />);
+    const { container } = render(<ShortcutHelpModal isOpen={false} onClose={vi.fn()} />);
 
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
   /** @description All five shortcut groups are displayed with Kbd elements */
   it('renders all five shortcut groups with kbd elements', () => {
-    render(<ShortcutHelpModal isOpen={true} onClose={jest.fn()} />);
+    render(<ShortcutHelpModal isOpen={true} onClose={vi.fn()} />);
     // 5 groups: Clipboard & Selection, Nudge, Layer Order, Grouping & Lock, Zoom & History
     expect(screen.getByText(/clipboard & selection/i)).toBeTruthy();
     expect(screen.getByText(/^Nudge$/)).toBeTruthy();
@@ -34,7 +34,7 @@ describe('ShortcutHelpModal', () => {
 
   /** @description Close button calls onClose */
   it('calls onClose on close button', () => {
-    const onClose = jest.fn();
+    const onClose = vi.fn();
 
     render(<ShortcutHelpModal isOpen={true} onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /close/i }));
@@ -47,7 +47,7 @@ describe('ShortcutHelpModal', () => {
       'Clipboard & Selection': [{ action: 'Custom Copy', keys: ['Ctrl', 'Shift', 'C'] }],
     };
 
-    render(<ShortcutHelpModal isOpen={true} shortcuts={customShortcuts} onClose={jest.fn()} />);
+    render(<ShortcutHelpModal isOpen={true} shortcuts={customShortcuts} onClose={vi.fn()} />);
     expect(screen.getByText('Custom Copy')).toBeTruthy();
   });
 });
@@ -62,16 +62,16 @@ describe('GuidePositionModal', () => {
       isOpen: true,
       position: 50,
       unit: 'mm',
-      onApply: jest.fn(),
-      onDelete: jest.fn(),
-      onClose: jest.fn(),
+      onApply: vi.fn(),
+      onDelete: vi.fn(),
+      onClose: vi.fn(),
       ...overrides,
     };
   }
 
   /** @description Edit guide position and click Apply repositions the guide */
   it('edits position and fires onApply', () => {
-    const onApply = jest.fn();
+    const onApply = vi.fn();
 
     render(<GuidePositionModal {...makeProps({ onApply })} />);
 
@@ -84,7 +84,7 @@ describe('GuidePositionModal', () => {
 
   /** @description Delete button removes the guide */
   it('fires onDelete when Delete is clicked', () => {
-    const onDelete = jest.fn();
+    const onDelete = vi.fn();
 
     render(<GuidePositionModal {...makeProps({ onDelete })} />);
     fireEvent.click(screen.getByRole('button', { name: /delete/i }));
@@ -93,7 +93,7 @@ describe('GuidePositionModal', () => {
 
   /** @description Enter key applies the position */
   it('applies position on Enter key', () => {
-    const onApply = jest.fn();
+    const onApply = vi.fn();
 
     render(<GuidePositionModal {...makeProps({ onApply })} />);
 
@@ -106,8 +106,8 @@ describe('GuidePositionModal', () => {
 
   /** @description Escape key closes without changes */
   it('closes on Escape without applying', () => {
-    const onClose = jest.fn();
-    const onApply = jest.fn();
+    const onClose = vi.fn();
+    const onApply = vi.fn();
 
     render(<GuidePositionModal {...makeProps({ onClose, onApply })} />);
 
@@ -136,8 +136,8 @@ describe('TemplateBrowserModal', () => {
       isOpen: true,
       templates: [...sampleTemplates],
       hasUnsavedChanges: false,
-      onSelectTemplate: jest.fn(),
-      onClose: jest.fn(),
+      onSelectTemplate: vi.fn(),
+      onClose: vi.fn(),
       ...overrides,
     };
   }
@@ -179,7 +179,7 @@ describe('TemplateBrowserModal', () => {
 
   /** @description Selecting and creating from template fires onSelectTemplate */
   it('selects and creates from template', () => {
-    const onSelectTemplate = jest.fn();
+    const onSelectTemplate = vi.fn();
 
     render(<TemplateBrowserModal {...makeProps({ onSelectTemplate })} />);
     fireEvent.click(screen.getByText('Sports Score'));
@@ -192,7 +192,7 @@ describe('TemplateBrowserModal', () => {
 
   /** @description When hasUnsavedChanges is true, confirmation dialog appears */
   it('shows confirmation when unsaved changes exist', () => {
-    const onSelectTemplate = jest.fn();
+    const onSelectTemplate = vi.fn();
 
     render(<TemplateBrowserModal {...makeProps({ hasUnsavedChanges: true, onSelectTemplate })} />);
     fireEvent.click(screen.getByText('Sports Score'));

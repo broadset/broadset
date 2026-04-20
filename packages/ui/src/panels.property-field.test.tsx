@@ -1,6 +1,6 @@
-/** @jest-environment jsdom */
-import { describe, expect, it, jest } from '@jest/globals';
+/** @vitest-environment jsdom */
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { PropertyField } from './panels';
 
@@ -18,7 +18,7 @@ describe('PropertyField', () => {
 
   /** @description In keyframe mode, include/remove toggle must call toggleProperty. */
   it('calls toggleProperty when include/remove is toggled', () => {
-    const toggle = jest.fn();
+    const toggle = vi.fn();
 
     render(
       <PropertyField
@@ -27,7 +27,7 @@ describe('PropertyField', () => {
           isIncluded: () => false,
           getValue: () => 0.5,
           toggleProperty: toggle,
-          updateValue: jest.fn(),
+          updateValue: vi.fn(),
         }}
       >
         <span>Opacity control</span>
@@ -48,8 +48,8 @@ describe('PropertyField', () => {
         adapter={{
           isIncluded: () => false,
           getValue: () => 0.5,
-          toggleProperty: jest.fn(),
-          updateValue: jest.fn(),
+          toggleProperty: vi.fn(),
+          updateValue: vi.fn(),
         }}
       >
         <span>Opacity control</span>

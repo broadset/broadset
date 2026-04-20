@@ -1,9 +1,9 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import './test-helpers';
 
-import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { SegmentedSwitcher } from './index';
 
@@ -18,7 +18,7 @@ describe('SegmentedSwitcher', () => {
           { value: 'solid', label: 'Solid' },
           { value: 'gradient', label: 'Gradient' },
         ]}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
       />,
     );
 
@@ -29,7 +29,7 @@ describe('SegmentedSwitcher', () => {
 
   /** @description Clicking an option must emit the corresponding value for immediate panel updates. */
   it('emits selected value on click', () => {
-    const onChange = jest.fn<(value: string) => void>();
+    const onChange = vi.fn<(value: string) => void>();
 
     render(
       <SegmentedSwitcher
@@ -51,7 +51,7 @@ describe('SegmentedSwitcher', () => {
 
   /** @description Arrow keys must switch adjacent options to satisfy keyboard-first accessibility. */
   it('supports arrow-key navigation', () => {
-    const onChange = jest.fn<(value: string) => void>();
+    const onChange = vi.fn<(value: string) => void>();
 
     render(
       <SegmentedSwitcher

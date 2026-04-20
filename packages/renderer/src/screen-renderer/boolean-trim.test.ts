@@ -1,6 +1,7 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import type { BroadsetElement } from '@broadset/model';
+import { describe, expect, it } from 'vitest';
 
 import { computeBooleanPath, computeTrimPathAttributes } from '../index';
 import { createElement } from './test-helpers';

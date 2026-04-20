@@ -1,9 +1,9 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import './toolbar-nav-heroui-mock';
 
-import { describe, expect, it } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 
 import { CanvasContextMenu } from './toolbar-nav';
 import { defaultContextMenuProps } from './toolbar-nav-test-helpers';

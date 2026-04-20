@@ -60,7 +60,7 @@ When feature is done, mark that task with [DONE]
 
 Two gates, both automatic:
 
-- `npm run quality:strict` — lint:strict + prettier:check + typecheck + jest. Fires on every commit via husky pre-commit.
+- `npm run quality:strict` — lint:strict + prettier:check + typecheck + vitest. Fires on every commit via husky pre-commit.
 - `npm run gate:full` — `quality:strict` + `lint:dead` (knip dead-code/unused-deps) + `lint:typecoverage` (≥ 99.95% explicit types) + `ct:all` (Playwright CT in `packages/ui` and `packages/demo`) + `build`. Fires on every push via husky pre-push, and on every PR / main push via CI.
 
 **When a quality gate fails, fix the code — never weaken the check.** Do not add suppression flags, ignore comments, raised warning thresholds, or config changes that make the check more lenient. See [AGENTS.md](../../AGENTS.md) → "No cutting corners".

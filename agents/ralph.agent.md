@@ -229,7 +229,7 @@ Before writing any implementation, explicitly verify coverage: list each spec cr
 Run the tests:
 
 ```bash
-cd packages/<pkg> && npx jest --testPathPattern=<unit> --no-coverage
+cd packages/<pkg> && npx vitest run <unit>
 ```
 
 Confirm they fail before continuing. If they all pass already, the unit is already implemented. Mark its boxes as `[x]` in the plan, commit with `chore(<pkg>): mark unit <N.M> as complete (already implemented)`, and go to the next unchecked unit.

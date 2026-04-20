@@ -1,9 +1,9 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import type { EasingMode } from '@broadset/model';
-import { beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { EasingGraphEditorProps } from './index';
 import { defaultEasingGraphProps, loadTimelineTestModules } from './test-helpers';
@@ -137,7 +137,7 @@ describe('EasingGraphEditor', () => {
    * the graph editor MUST invoke onClose (e.g. for click-outside behavior).
    */
   it('invokes onClose callback when provided', () => {
-    const onClose = jest.fn<() => void>();
+    const onClose = vi.fn<() => void>();
     const props = defaultEasingGraphProps({ onClose });
 
     render(<EasingGraphEditor {...props} />);
@@ -166,7 +166,7 @@ describe('EasingGraphEditor', () => {
    * The spec requires "The graph editor closes when clicking outside it."
    */
   it('closes on click outside via document mousedown', () => {
-    const onClose = jest.fn<() => void>();
+    const onClose = vi.fn<() => void>();
     const props = defaultEasingGraphProps({ onClose });
 
     render(
@@ -186,7 +186,7 @@ describe('EasingGraphEditor', () => {
    * @description Clicking inside the graph editor MUST NOT close it.
    */
   it('does not close when clicking inside', () => {
-    const onClose = jest.fn<() => void>();
+    const onClose = vi.fn<() => void>();
     const props = defaultEasingGraphProps({ onClose });
 
     render(<EasingGraphEditor {...props} />);

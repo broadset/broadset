@@ -1,9 +1,9 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import './test-helpers';
 
-import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { CssLengthInput } from './index';
 
@@ -24,7 +24,7 @@ describe('CssLengthInput behavior', () => {
 
   /** @description Changing unit must convert the current numeric value to preserve the same physical length. */
   it('converts value when unit changes', () => {
-    const onChange = jest.fn<(value: string) => void>();
+    const onChange = vi.fn<(value: string) => void>();
 
     render(<CssLengthInput label="Length" value="96px" onChange={onChange} />);
 
@@ -40,7 +40,7 @@ describe('CssLengthInput behavior', () => {
 
   /** @description Enter key must commit the current draft immediately for keyboard-driven editing workflows. */
   it('commits value on Enter', () => {
-    const onChange = jest.fn<(value: string) => void>();
+    const onChange = vi.fn<(value: string) => void>();
 
     const { container } = render(<CssLengthInput label="Length" value="50px" onChange={onChange} />);
 
@@ -73,7 +73,7 @@ describe('CssLengthInput behavior', () => {
 
   /** @description Empty or unitless values should show an em dash marker in the unit selector to avoid ambiguous state. */
   it('shows em dash unit marker for unitless value', () => {
-    render(<CssLengthInput label="Length" value="12" onChange={jest.fn()} />);
+    render(<CssLengthInput label="Length" value="12" onChange={vi.fn()} />);
 
     const unit = screen.getByLabelText('Unit');
 

@@ -1,5 +1,5 @@
 import type { BroadsetElement } from '@broadset/model';
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { runPreflightDiagnostics } from './editing';
 import { makeElement, makePrintDoc, makeScreenDoc } from './editing-test-helpers';

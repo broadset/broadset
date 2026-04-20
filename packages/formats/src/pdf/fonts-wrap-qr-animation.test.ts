@@ -1,5 +1,5 @@
 import type { BroadsetElementStyle } from '@broadset/model';
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { drawQrOnPage, exportPdfBytes, normalizeFontFamily, resolveGoogleFontUrl, wrapText } from './index';
 import { makeDocument, makeElement, makeStyle } from './test-helpers';

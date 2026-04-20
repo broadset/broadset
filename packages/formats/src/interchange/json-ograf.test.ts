@@ -1,5 +1,5 @@
 import { broadsetProjectSchema } from '@broadset/model';
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { exportProjectJson, generateOGrafPackages } from './index';
 import { first, makeDocument, makeElement, makeProject } from './test-helpers';

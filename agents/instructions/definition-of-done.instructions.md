@@ -15,7 +15,7 @@ A task is **not** done until every box below is true. Apply this checklist befor
 
 ## Quality gates pass
 
-- [ ] `npm run quality:strict` passes for every touched package (lint:strict + prettier:check + typecheck + jest).
+- [ ] `npm run quality:strict` passes for every touched package (lint:strict + prettier:check + typecheck + vitest).
 - [ ] `npm run ct -w @broadset/ui` and `npm run ct -w @broadset/demo` pass when UI/demo source changed.
 - [ ] `npm run build` passes when packaging or bundling-relevant code changed.
 - [ ] No quality gate was weakened, suppressed, or bypassed (no new `@ts-ignore`, `eslint-disable`, `--no-verify`, raised warning thresholds, widened ignore patterns). See [AGENTS.md](../../AGENTS.md) → "No cutting corners".

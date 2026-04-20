@@ -1,9 +1,9 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import './test-helpers';
 
-import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { CanvasSettingsModalProps, ExportModalProps } from './index';
 import { AboutModal, CanvasSettingsModal, ExportModal } from './index';
@@ -11,14 +11,14 @@ import { AboutModal, CanvasSettingsModal, ExportModal } from './index';
 describe('AboutModal', () => {
   /** @description Ensures the modal does not render any content when closed */
   it('does not render when closed', () => {
-    const { container } = render(<AboutModal isOpen={false} version="1.0.0" onClose={jest.fn()} />);
+    const { container } = render(<AboutModal isOpen={false} version="1.0.0" onClose={vi.fn()} />);
 
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
   /** @description Verifies all content zones render when the modal is open: title, description, stack info, and version */
   it('renders about content when open', () => {
-    render(<AboutModal isOpen={true} version="2.3.1" onClose={jest.fn()} />);
+    render(<AboutModal isOpen={true} version="2.3.1" onClose={vi.fn()} />);
     expect(screen.getByLabelText('Broadset')).toBeTruthy();
     expect(screen.getByText(/2\.3\.1/)).toBeTruthy();
     // Stack info: React, Zustand, HeroUI v3
@@ -29,7 +29,7 @@ describe('AboutModal', () => {
 
   /** @description Validates that clicking the close button fires the onClose callback */
   it('calls onClose when close button is clicked', () => {
-    const onClose = jest.fn();
+    const onClose = vi.fn();
 
     render(<AboutModal isOpen={true} version="1.0.0" onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /close/i }));
@@ -54,13 +54,13 @@ describe('CanvasSettingsModal', () => {
       gridSize: 10,
       snapToGrid: false,
       snapThreshold: 5,
-      onDocumentNameChange: jest.fn(),
-      onRulerChange: jest.fn(),
-      onRulerUnitChange: jest.fn(),
-      onViewModeChange: jest.fn(),
-      onPerspectiveChange: jest.fn(),
-      onGridChange: jest.fn(),
-      onClose: jest.fn(),
+      onDocumentNameChange: vi.fn(),
+      onRulerChange: vi.fn(),
+      onRulerUnitChange: vi.fn(),
+      onViewModeChange: vi.fn(),
+      onPerspectiveChange: vi.fn(),
+      onGridChange: vi.fn(),
+      onClose: vi.fn(),
       ...overrides,
     };
   }
@@ -74,7 +74,7 @@ describe('CanvasSettingsModal', () => {
 
   /** @description Validates document name input calls the onDocumentNameChange callback */
   it('fires document name change callback', () => {
-    const onDocumentNameChange = jest.fn();
+    const onDocumentNameChange = vi.fn();
 
     render(<CanvasSettingsModal {...makeProps({ onDocumentNameChange })} />);
 
@@ -86,7 +86,7 @@ describe('CanvasSettingsModal', () => {
 
   /** @description Validates view mode button group fires onViewModeChange */
   it('shows all three view mode buttons and fires onViewModeChange', () => {
-    const onViewModeChange = jest.fn();
+    const onViewModeChange = vi.fn();
 
     render(<CanvasSettingsModal {...makeProps({ onViewModeChange })} />);
 
@@ -99,7 +99,7 @@ describe('CanvasSettingsModal', () => {
 
   /** @description Validates grid toggle calls onGridChange */
   it('toggles show grid and calls onGridChange', () => {
-    const onGridChange = jest.fn();
+    const onGridChange = vi.fn();
 
     render(<CanvasSettingsModal {...makeProps({ onGridChange })} />);
 
@@ -111,7 +111,7 @@ describe('CanvasSettingsModal', () => {
 
   /** @description Validates snap to grid toggle calls onGridChange */
   it('toggles snap to grid and calls onGridChange', () => {
-    const onGridChange = jest.fn();
+    const onGridChange = vi.fn();
 
     render(<CanvasSettingsModal {...makeProps({ onGridChange })} />);
 
@@ -123,7 +123,7 @@ describe('CanvasSettingsModal', () => {
 
   /** @description Validates Done button fires onClose */
   it('Done button fires onClose', () => {
-    const onClose = jest.fn();
+    const onClose = vi.fn();
 
     render(<CanvasSettingsModal {...makeProps({ onClose })} />);
     fireEvent.click(screen.getByRole('button', { name: /done/i }));
@@ -141,8 +141,8 @@ describe('ExportModal', () => {
       isOpen: true,
       enabledExporters: ['html', 'png', 'pdf'],
       dynamicData: {},
-      onExport: jest.fn(),
-      onClose: jest.fn(),
+      onExport: vi.fn(),
+      onClose: vi.fn(),
       ...overrides,
     };
   }
@@ -158,7 +158,7 @@ describe('ExportModal', () => {
 
   /** @description Submit with a selected exporter passes exporter plus advanced export settings and dynamic data. */
   it('fires onExport with exporter and dynamic data on submit', () => {
-    const onExport = jest.fn();
+    const onExport = vi.fn();
 
     render(<ExportModal {...makeProps({ enabledExporters: ['png'], onExport })} />);
     fireEvent.click(screen.getByRole('button', { name: /png/i }));
@@ -180,7 +180,7 @@ describe('ExportModal', () => {
 
   /** @description Advanced export controls must update payload values so output tuning is applied without leaving the export modal. */
   it('updates advanced export values in onExport payload', () => {
-    const onExport = jest.fn();
+    const onExport = vi.fn();
 
     render(<ExportModal {...makeProps({ enabledExporters: ['jpeg', 'webm'], onExport })} />);
 

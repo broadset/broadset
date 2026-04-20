@@ -5,7 +5,7 @@ import {
   type Keyframe,
   type Timeline,
 } from '@broadset/model';
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { applyAnimationConfigUpdate, getElementAnimationConfig } from './animation-adapter';
 

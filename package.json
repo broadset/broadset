@@ -16,7 +16,7 @@
     "lint:strict": "npm run lint:strict --workspaces --if-present",
     "format": "npm run format --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "vitest run",
     "ct": "npm run ct -w @broadset/demo",
     "ct:all": "npm run ct -w @broadset/ui && npm run ct -w @broadset/demo",
     "quality": "npm run quality --workspaces --if-present",
@@ -29,19 +29,15 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@babel/core": "^7.29.0",
-    "@babel/plugin-transform-react-jsx": "^7.28.6",
-    "@babel/preset-env": "^7.29.0",
-    "@babel/preset-typescript": "^7.28.5",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^6.6.3",
-    "@types/jest": "^30.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.58.0",
-    "babel-jest": "^30.3.0",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import-x": "^4.16.2",
@@ -53,12 +49,13 @@
     "eslint-plugin-unused-imports": "^4.4.1",
     "globals": "^17.4.0",
     "husky": "^9.1.7",
-    "jest-environment-jsdom": "^30.3.0",
+    "jsdom": "^29.0.2",
     "knip": "^6.4.1",
     "playwright": "^1.59.1",
     "prettier": "^3.8.1",
     "svg-path-properties": "^2.0.0",
     "type-coverage": "^2.29.7",
-    "vite": "^8.0.3"
+    "vite": "^8.0.3",
+    "vitest": "^4.1.4"
   }
 }

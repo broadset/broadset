@@ -1,3 +1,3 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import './toolbar-nav-test-helpers';

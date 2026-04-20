@@ -5,7 +5,7 @@ import {
   createEmptyBroadsetDocument,
   type ElementOverrides,
 } from '@broadset/model';
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import {
   alignElements,

@@ -1,4 +1,6 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
+
+import { describe, expect, it } from 'vitest';
 
 import { createScreenRenderer, DATA_ATTRIBUTES } from '../index';
 import { createDocument, createElement } from './test-helpers';

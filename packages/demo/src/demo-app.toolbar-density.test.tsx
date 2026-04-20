@@ -1,6 +1,7 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import { render, screen, within } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 
 import { setupDemoShellMocks } from './demo-shell-test-utils';
 import { DemoApp } from './DemoApp';

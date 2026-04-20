@@ -1,5 +1,5 @@
 import { createDefaultAnimationConfig, type ElementAnimationConfig, type Timeline } from '@broadset/model';
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import {
   addTimelineKeyframe,

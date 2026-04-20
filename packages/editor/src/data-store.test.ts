@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createDataStore } from './data-store';
 
@@ -71,7 +71,7 @@ describe('bulk update', () => {
   /** @description Bulk update MUST apply all element changes atomically with exactly one subscription notification so subscribers do not see partial states. */
   it('updates multiple elements in one batch with a single notification', () => {
     const store = createDataStore();
-    const listener = jest.fn();
+    const listener = vi.fn();
 
     store.subscribe(listener);
 
@@ -107,7 +107,7 @@ describe('selector isolation', () => {
       'el-1': { text: 'alpha' },
       'el-2': { text: 'beta' },
     });
-    const listener = jest.fn();
+    const listener = vi.fn();
 
     store.subscribe(
       (state) => state.elements['el-1'],
@@ -126,7 +126,7 @@ describe('selector isolation', () => {
   /** @description A selector watching el-1 MUST fire when el-1's data actually changes. */
   it('fires a selector watching el-1 when el-1 is updated', () => {
     const store = createDataStore({ 'el-1': { text: 'alpha' } });
-    const listener = jest.fn();
+    const listener = vi.fn();
 
     store.subscribe(
       (state) => state.elements['el-1'],

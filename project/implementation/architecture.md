@@ -29,7 +29,8 @@ Snapshot date: 2026-04-05
 | TypeScript     | `^6.0.2`     | package manifests            |
 | React          | `^19.2.4`    | `ui`/`demo` peer/runtime     |
 | Vite           | `^8.0.3`     | `packages/demo/package.json` |
-| Jest           | `^30.3.0`    | root + package scripts       |
+| Vitest         | `^4.1.4`     | root + package scripts       |
+| jsdom          | `^29.0.2`    | root `package.json`          |
 | Playwright CT  | `^1.59.1`    | `packages/demo/package.json` |
 | ESLint         | `^10.1.0`    | root `package.json`          |
 | Prettier       | `^3.8.1`     | root `package.json`          |
@@ -146,7 +147,7 @@ Dependencies below are part of the current implemented architecture and package 
 | Demo UI styles       | `@heroui/styles`, `tailwindcss`, `@tailwindcss/vite`    | Host styling stack                                 |
 | Host runtime         | `react`, `react-dom`                                    | React host integration                             |
 | Demo build           | `vite`, `@vitejs/plugin-react`                          | Dev/build tooling                                  |
-| Unit testing         | `jest`, `babel-jest`                                    | Unit/integration tests                             |
+| Unit testing         | `vitest`, `jsdom`, `@testing-library/jest-dom`          | Unit/integration tests                             |
 | Browser CT           | `@playwright/experimental-ct-react`, `@playwright/test` | Component browser tests                            |
 
 ---

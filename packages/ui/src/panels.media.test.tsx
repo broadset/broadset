@@ -1,6 +1,6 @@
-/** @jest-environment jsdom */
-import { describe, expect, it, jest } from '@jest/globals';
+/** @vitest-environment jsdom */
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { ClockPanel, TickerPanel, VideoPanel } from './panels';
 
@@ -29,7 +29,7 @@ describe('VideoPanel', () => {
 
   /** @description Toggling autoplay must fire onUpdate with the boolean value. */
   it('fires onUpdate when autoplay is toggled', () => {
-    const onUpdate = jest.fn<(k: string, v: string | number | boolean) => void>();
+    const onUpdate = vi.fn<(k: string, v: string | number | boolean) => void>();
 
     render(
       <VideoPanel
@@ -112,7 +112,7 @@ describe('TickerPanel', () => {
 
   /** @description Adding an item must call onUpdateItems with the new list. */
   it('adds a new item when Add Item is clicked', () => {
-    const onUpdateItems = jest.fn<(items: readonly string[]) => void>();
+    const onUpdateItems = vi.fn<(items: readonly string[]) => void>();
 
     render(
       <TickerPanel

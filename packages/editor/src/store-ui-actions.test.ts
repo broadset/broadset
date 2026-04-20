@@ -1,7 +1,7 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import type { BroadsetDocument, Page } from '@broadset/model';
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createEditorStore, createEmptyEditorDocument } from './store-actions';
 

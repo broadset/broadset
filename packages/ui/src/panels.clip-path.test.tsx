@@ -1,6 +1,6 @@
-/** @jest-environment jsdom */
-import { describe, expect, it, jest } from '@jest/globals';
+/** @vitest-environment jsdom */
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { PropertyValue } from './panels';
 import { ClipPathPanel } from './panels';
@@ -20,7 +20,7 @@ describe('ClipPathPanel', () => {
 
   /** @description Choosing a visual mask preset must set both customClipPath and maskType in one action. */
   it('applies star preset from the mask grid', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(<ClipPathPanel maskType="none" customClipPath="" onUpdate={onUpdate} />);
 
@@ -35,8 +35,8 @@ describe('ClipPathPanel', () => {
 
   /** @description Selecting custom mask mode must switch maskType to custom and trigger clip-path edit mode entrypoint. */
   it('starts clip path editing when custom mask is selected', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
-    const onStartEditingClipPath = jest.fn<() => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
+    const onStartEditingClipPath = vi.fn<() => void>();
 
     render(
       <ClipPathPanel
@@ -55,7 +55,7 @@ describe('ClipPathPanel', () => {
 
   /** @description None preset must clear the clip-path and set maskType to none so no stale clipping remains. */
   it('clears clip-path with None preset', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(<ClipPathPanel maskType="custom" customClipPath="circle(50%)" onUpdate={onUpdate} />);
 
@@ -66,7 +66,7 @@ describe('ClipPathPanel', () => {
 
   /** @description Custom preset in select mode must expose edit and reset actions without forcing raw CSS editing. */
   it('shows custom actions for the custom mask shape', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(<ClipPathPanel maskType="custom" customClipPath="path('M 0 0 L 1 1 Z')" onUpdate={onUpdate} />);
 
@@ -79,7 +79,7 @@ describe('ClipPathPanel', () => {
 
   /** @description Raw CSS entry is advanced-only and must provide friendly validation feedback when invalid. */
   it('validates advanced clip-path css with a friendly error message', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(<ClipPathPanel maskType="custom" customClipPath="" onUpdate={onUpdate} />);
 
@@ -99,7 +99,7 @@ describe('ClipPathPanel', () => {
 
   /** @description Valid advanced CSS must still be accepted for power users once advanced mode is opened. */
   it('accepts valid advanced clip-path css', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(<ClipPathPanel maskType="custom" customClipPath="" onUpdate={onUpdate} />);
 

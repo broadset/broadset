@@ -1,5 +1,5 @@
 import { type AnimationDefinition, createEmptyBroadsetDocument } from '@broadset/model';
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { applyRemoteChanges, diffDocuments } from './collaboration';
 import { makeDocument, makeElement } from './collaboration-test-helpers';

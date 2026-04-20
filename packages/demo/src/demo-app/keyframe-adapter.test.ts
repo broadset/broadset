@@ -6,7 +6,8 @@ import {
   type KeyframeValue,
   type Timeline,
 } from '@broadset/model';
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import type { Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createKeyframeAdapter } from './keyframe-adapter';
 
@@ -35,7 +36,7 @@ function makeConfig(timelines: readonly Timeline[]): ElementAnimationConfig {
 
 describe('createKeyframeAdapter', () => {
   let store: EditorStore;
-  let onTimelineUpdated: jest.Mock<(timeline: Timeline) => void>;
+  let onTimelineUpdated: Mock<(timeline: Timeline) => void>;
 
   beforeEach(() => {
     store = createEditorStore();
@@ -66,7 +67,7 @@ describe('createKeyframeAdapter', () => {
       },
     });
 
-    onTimelineUpdated = jest.fn<(timeline: Timeline) => void>();
+    onTimelineUpdated = vi.fn<(timeline: Timeline) => void>();
   });
 
   /** @description isIncluded must return true for properties that exist in the selected keyframe. */

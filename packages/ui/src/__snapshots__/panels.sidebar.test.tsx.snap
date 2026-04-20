@@ -1,6 +1,6 @@
-// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`PropertiesSidebar keeps top-to-bottom focusable order stable for text element panels: text-element-tab-order 1`] = `
+exports[`PropertiesSidebar > keeps top-to-bottom focusable order stable for text element panels > text-element-tab-order 1`] = `
 [
   "Element name",
   "Lock element",

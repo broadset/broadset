@@ -1,6 +1,6 @@
-/** @jest-environment jsdom */
-import { describe, expect, it } from '@jest/globals';
+/** @vitest-environment jsdom */
 import { render, screen, within } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 
 import { TextEffectsPanel } from './panels';
 

@@ -1,6 +1,6 @@
-/** @jest-environment jsdom */
-import { describe, expect, it, jest } from '@jest/globals';
+/** @vitest-environment jsdom */
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { PropertyValue } from './panels';
 import { SpacingPanel } from './panels';
@@ -8,7 +8,7 @@ import { SpacingPanel } from './panels';
 describe('SpacingPanel', () => {
   /** @description Padding values must be editable for selected elements. */
   it('renders padding inputs and forwards updates', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(<SpacingPanel padding={[10, 20, 10, 20]} onUpdate={onUpdate} />);
 
@@ -20,7 +20,7 @@ describe('SpacingPanel', () => {
 
   /** @description Link toggle must synchronize all four padding values when active. */
   it('synchronizes padding values via link toggle', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(<SpacingPanel padding={[10, 10, 10, 10]} onUpdate={onUpdate} />);
 

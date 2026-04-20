@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { BUILT_IN_ELEMENT_TYPES, createDefaultElement, elementSchema, sanitizeTextContent } from './index';
 

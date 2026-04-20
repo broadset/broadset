@@ -1,4 +1,5 @@
 import type { BroadsetGradient } from '@broadset/model';
+import { describe, expect, it } from 'vitest';
 
 import {
   applyGradientPropertyUpdates,

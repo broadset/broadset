@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildBoxShadow,
@@ -128,7 +128,7 @@ describe('keyframe property resolution', () => {
 
   /** @description String keyframe resolution must hand property edits back to the adapter so animation mode updates keyframes rather than the base element. */
   it('routes string changes through the adapter callback when included', () => {
-    const onChange = jest.fn<(property: string, value: string) => void>();
+    const onChange = vi.fn<(property: string, value: string) => void>();
     const resolved = resolveString({
       adapter: { content: { value: 'Intro' } },
       property: 'content',

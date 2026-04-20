@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WebMExportOptions } from './index';
 import {
@@ -37,38 +37,44 @@ var mockWebMState: WebMMockState = {
   webmFormatCreated: false,
 };
 
-jest.mock('mediabunny', () => ({
-  BufferTarget: jest.fn().mockImplementation(() => ({
-    get buffer() {
-      return mockWebMState.bufferContents;
-    },
-  })),
-  CanvasSource: jest.fn().mockImplementation((_canvas, config) => {
+vi.mock('mediabunny', () => ({
+  BufferTarget: vi.fn(function MockBufferTarget(this: { buffer: ArrayBuffer | null }) {
+    Object.defineProperty(this, 'buffer', {
+      get() {
+        return mockWebMState.bufferContents;
+      },
+    });
+  }),
+  CanvasSource: vi.fn(function MockCanvasSource(
+    this: { add: (timestamp: unknown, duration: unknown) => Promise<void> },
+    _canvas: unknown,
+    config: unknown,
+  ) {
     mockWebMState.canvasSourceConfig = config;
+    this.add = vi.fn().mockImplementation((timestamp: unknown, duration: unknown) => {
+      mockWebMState.canvasSourceCalls.push({ timestamp, duration });
 
-    return {
-      add: jest.fn().mockImplementation((timestamp, duration) => {
-        mockWebMState.canvasSourceCalls.push({ timestamp, duration });
-
-        return Promise.resolve();
-      }),
-    };
+      return Promise.resolve();
+    });
   }),
-  WebMOutputFormat: jest.fn().mockImplementation(() => {
+  WebMOutputFormat: vi.fn(function MockWebMOutputFormat(this: { type: string }) {
     mockWebMState.webmFormatCreated = true;
-
-    return { type: 'webm' };
+    this.type = 'webm';
   }),
-  Output: jest.fn().mockImplementation(() => ({
-    addVideoTrack: jest.fn(),
-    start: jest.fn().mockImplementation(() => Promise.resolve()),
-    finalize: jest.fn().mockImplementation(() => {
+  Output: vi.fn(function MockOutput(this: {
+    addVideoTrack: () => void;
+    start: () => Promise<void>;
+    finalize: () => Promise<void>;
+  }) {
+    this.addVideoTrack = vi.fn();
+    this.start = vi.fn().mockImplementation(() => Promise.resolve());
+    this.finalize = vi.fn().mockImplementation(() => {
       mockWebMState.outputFinalized = true;
       mockWebMState.bufferContents = new ArrayBuffer(64);
 
       return Promise.resolve();
-    }),
-  })),
+    });
+  }),
 }));
 
 /* ------------------------------------------------------------------ */
@@ -106,10 +112,10 @@ function readBlobAsText(blob: Blob): Promise<string> {
 
 const mockCtx = {
   fillStyle: '',
-  fillRect: jest.fn(),
-  drawImage: jest.fn(),
-  getImageData: jest.fn(),
-  putImageData: jest.fn(),
+  fillRect: vi.fn(),
+  drawImage: vi.fn(),
+  getImageData: vi.fn(),
+  putImageData: vi.fn(),
 };
 
 /* Patch HTMLCanvasElement prototype so dynamically-created canvases also work. */
@@ -310,7 +316,7 @@ describe('WebM Alpha Video Export', () => {
     mockWebMState.outputFinalized = false;
     mockWebMState.bufferContents = null;
     mockWebMState.webmFormatCreated = false;
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -463,10 +469,12 @@ describe('Renderer Root Discovery', () => {
 /*  returns a canvas with the requested size)                        */
 /* ------------------------------------------------------------------ */
 
-var mockDomToCanvas = jest.fn();
+var mockDomToCanvas = vi.fn();
 
-jest.mock('modern-screenshot', () => ({
+vi.mock('modern-screenshot', () => ({
   domToCanvas: mockDomToCanvas,
+  createContext: vi.fn().mockResolvedValue({}),
+  destroyContext: vi.fn(),
 }));
 
 /* ------------------------------------------------------------------ */
@@ -521,7 +529,7 @@ describe('Raster Download Wrapper', () => {
     let capturedDownload = '';
     let capturedHref = '';
 
-    jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
       capturedDownload = this.download;
       capturedHref = this.href;
     });
@@ -529,7 +537,7 @@ describe('Raster Download Wrapper', () => {
     (globalThis as Record<string, unknown>)['URL'] = {
       ...URL,
       createObjectURL: () => 'blob:mock-url',
-      revokeObjectURL: jest.fn(),
+      revokeObjectURL: vi.fn(),
     };
 
     const blob = new Blob(['test'], { type: 'image/png' });
@@ -539,6 +547,6 @@ describe('Raster Download Wrapper', () => {
     expect(capturedDownload).toBe('my-export.png');
     expect(capturedHref).toContain('blob:');
 
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 });

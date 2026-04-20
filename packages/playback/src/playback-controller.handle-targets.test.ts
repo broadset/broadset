@@ -1,23 +1,23 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
-import { describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createPlaybackHandle, resolveAnimationTargets } from './playback-controller';
 import { createHostElement } from './playback-controller-test-helpers';
 
 describe('createPlaybackHandle', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
-    jest.setSystemTime(Date.parse('2026-04-06T00:00:00Z'));
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.parse('2026-04-06T00:00:00Z'));
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('clamps seeks, respects cancel, and fires onComplete exactly once', () => {
-    const onFrame = jest.fn();
-    const onComplete = jest.fn();
+    const onFrame = vi.fn();
+    const onComplete = vi.fn();
     const handle = createPlaybackHandle({ durationMs: 800, onFrame, onComplete });
 
     handle.seek(-100);
@@ -28,7 +28,7 @@ describe('createPlaybackHandle', () => {
 
     handle.seek(0);
     handle.play();
-    jest.advanceTimersByTime(850);
+    vi.advanceTimersByTime(850);
 
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(handle.isActive).toBe(false);

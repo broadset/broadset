@@ -14,12 +14,12 @@
     "prettier:write": "prettier --config ../../.prettierrc.json --ignore-path ../../.prettierignore --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml,cjs,mjs,css,html}\"",
     "format": "npm run lint:fix && npm run prettier:write",
     "typecheck": "tsc -b",
-    "test": "jest --config jest.config.cjs --passWithNoTests",
+    "test": "vitest run --passWithNoTests",
     "test:ct": "npm run ct",
     "ct": "npx playwright test --config=playwright-ct.config.ts --pass-with-no-tests",
     "ct:ui": "npx playwright test --config=playwright-ct.config.ts --ui",
-    "quality": "npm run lint && npm run prettier:check && npm run typecheck && npm run test -- --runInBand",
-    "quality:strict": "npm run lint:strict && npm run prettier:check && npm run typecheck && npm run test -- --runInBand",
+    "quality": "npm run lint && npm run prettier:check && npm run typecheck && npm run test",
+    "quality:strict": "npm run lint:strict && npm run prettier:check && npm run typecheck && npm run test",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -36,7 +36,6 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
-    "@jest/globals": "^30.3.0",
     "@playwright/experimental-ct-react": "^1.59.1",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/vite": "^4.2.2",
@@ -45,7 +44,6 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
-    "jest": "^30.3.0",
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.2",
     "vite": "^8.0.3"

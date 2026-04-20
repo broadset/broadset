@@ -1,8 +1,8 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
-import { beforeAll, describe, expect, it } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { TimelineEditingContextValue, TimelineEditorProps } from './index';
 import { defaultEditorProps, loadTimelineTestModules, makeKeyframe, makeTimeline } from './test-helpers';

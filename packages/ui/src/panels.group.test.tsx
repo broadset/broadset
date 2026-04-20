@@ -1,6 +1,6 @@
-/** @jest-environment jsdom */
-import { describe, expect, it, jest } from '@jest/globals';
+/** @vitest-environment jsdom */
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { PropertyValue } from './panels';
 import { GroupPanel } from './panels';
@@ -8,7 +8,7 @@ import { GroupPanel } from './panels';
 describe('GroupPanel', () => {
   /** @description Group panel must expose opacity as a percent slider so group transparency can be edited without leaving the panel. */
   it('renders and updates group opacity slider', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <GroupPanel
@@ -32,7 +32,7 @@ describe('GroupPanel', () => {
 
   /** @description Clip children control must use the explicit group-bounds label and remain interactive in screen mode. */
   it('renders clip children switch with the group-bounds label in screen mode', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <GroupPanel
@@ -78,7 +78,7 @@ describe('GroupPanel', () => {
 
   /** @description Group name and boolean operation controls must remain available after adding new group-scoped controls. */
   it('renders boolean operation dropdown', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <GroupPanel
@@ -99,7 +99,7 @@ describe('GroupPanel', () => {
 
   /** @description Group name edits must still route through onUpdate so naming remains consistent with geometry panel behavior. */
   it('updates group name from the group name field', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <GroupPanel

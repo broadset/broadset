@@ -1,7 +1,7 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
-import { jest } from '@jest/globals';
 import type * as React from 'react';
+import { vi } from 'vitest';
 
 /* ---------- HeroUI mock (comprehensive for ColorInput, NumField, etc.) ---------- */
 
@@ -17,10 +17,10 @@ interface MockHeroUiProps {
   readonly [key: string]: unknown;
 }
 
-jest.mock(
+vi.mock(
   '@heroui/react',
-  () => {
-    const ReactActual = jest.requireActual<typeof React>('react');
+  async () => {
+    const ReactActual = await vi.importActual<typeof React>('react');
 
     function pickSafeDomProps(rest: Record<string, unknown>): Record<string, unknown> {
       const allowedKeys = new Set([
@@ -391,6 +391,4 @@ jest.mock(
       ColorSwatch,
       parseColor: mockParseColor,
     };
-  },
-  { virtual: true },
-);
+  });

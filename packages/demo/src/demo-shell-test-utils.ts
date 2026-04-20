@@ -3,32 +3,34 @@ import './demo-app-test-helpers';
 import { createPlaybackController } from '@broadset/playback';
 import { createScreenRenderer } from '@broadset/renderer';
 import { act } from '@testing-library/react';
+import type { MockedFunction } from 'vitest';
+import { vi } from 'vitest';
 
 interface DemoShellMocks {
-  readonly mockedCreatePlaybackController: jest.MockedFunction<typeof createPlaybackController>;
-  readonly mockedCreateScreenRenderer: jest.MockedFunction<typeof createScreenRenderer>;
+  readonly mockedCreatePlaybackController: MockedFunction<typeof createPlaybackController>;
+  readonly mockedCreateScreenRenderer: MockedFunction<typeof createScreenRenderer>;
 }
 
 export function setupDemoShellMocks(): DemoShellMocks {
-  const mockedCreateScreenRenderer = jest.mocked(createScreenRenderer);
-  const mockedCreatePlaybackController = jest.mocked(createPlaybackController);
+  const mockedCreateScreenRenderer = vi.mocked(createScreenRenderer);
+  const mockedCreatePlaybackController = vi.mocked(createPlaybackController);
 
   mockedCreateScreenRenderer.mockReturnValue({
-    destroy: jest.fn(),
+    destroy: vi.fn(),
     host: document.createElement('div'),
-    updateDocument: jest.fn(),
+    updateDocument: vi.fn(),
   });
   mockedCreatePlaybackController.mockReturnValue({
-    attach: jest.fn(),
-    destroy: jest.fn(),
-    detach: jest.fn(),
-    pause: jest.fn(),
-    play: jest.fn(),
-    seek: jest.fn(),
-    seekTimeline: jest.fn(),
-    setAnimations: jest.fn(),
-    setSpeed: jest.fn(),
-    stopTimeline: jest.fn(),
+    attach: vi.fn(),
+    destroy: vi.fn(),
+    detach: vi.fn(),
+    pause: vi.fn(),
+    play: vi.fn(),
+    seek: vi.fn(),
+    seekTimeline: vi.fn(),
+    setAnimations: vi.fn(),
+    setSpeed: vi.fn(),
+    stopTimeline: vi.fn(),
   });
 
   return { mockedCreatePlaybackController, mockedCreateScreenRenderer };

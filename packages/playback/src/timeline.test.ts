@@ -1,4 +1,5 @@
 import type { AnimationDefinition, ElementAnimationConfig, Keyframe, Timeline } from '@broadset/model';
+import { describe, expect, it } from 'vitest';
 
 import {
   computeElementTimelineFrames,

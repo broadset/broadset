@@ -1,5 +1,5 @@
 import { type AnimationDefinition, createEmptyBroadsetDocument, type DocumentChange } from '@broadset/model';
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type ChangeStream, createChangeStream, diffDocuments } from './collaboration';
 import { makeDocument, makeElement } from './collaboration-test-helpers';
@@ -44,15 +44,12 @@ describe('diffDocuments - element diffing', () => {
     );
 
     expect(updateChanges.length).toBeGreaterThan(0);
-    expect(updateChanges).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          type: 'element:update',
-          elementId: 'el-1',
-          path: expect.stringContaining('position'),
-        }),
-      ]),
+
+    const positionChange = updateChanges.find(
+      (change) => change.elementId === 'el-1' && change.path.includes('position'),
     );
+
+    expect(positionChange).toBeDefined();
   });
 
   /** @description When elements are reordered, the diff MUST include element:reorder changes. */
@@ -119,14 +116,11 @@ describe('diffDocuments - page and settings diffing', () => {
 
     const changes = diffDocuments(prev, next);
 
-    expect(changes).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          type: 'settings:update',
-          path: expect.stringContaining('canvas.width'),
-        }),
-      ]),
+    const canvasWidthChange = changes.find(
+      (change) => change.type === 'settings:update' && change.path.includes('canvas.width'),
     );
+
+    expect(canvasWidthChange).toBeDefined();
   });
 });
 
@@ -181,15 +175,12 @@ describe('diffDocuments - animation diffing', () => {
 
     const changes = diffDocuments(prev, next);
 
-    expect(changes).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          type: 'animation:update',
-          elementId: 'el-1',
-          path: expect.stringContaining('timelines'),
-        }),
-      ]),
+    const timelineChange = changes.find(
+      (change) =>
+        change.type === 'animation:update' && change.elementId === 'el-1' && change.path.includes('timelines'),
     );
+
+    expect(timelineChange).toBeDefined();
   });
 });
 
@@ -202,7 +193,7 @@ describe('createChangeStream', () => {
 
   /** @description A subscribed listener MUST receive emitted changes. */
   it('emits changes to subscriber', () => {
-    const listener = jest.fn<(changes: readonly DocumentChange[]) => void>();
+    const listener = vi.fn<(changes: readonly DocumentChange[]) => void>();
 
     stream.subscribe(listener);
 
@@ -222,7 +213,7 @@ describe('createChangeStream', () => {
 
   /** @description When suppression is active, the listener MUST NOT receive changes. */
   it('suppresses emission when suppressed', () => {
-    const listener = jest.fn<(changes: readonly DocumentChange[]) => void>();
+    const listener = vi.fn<(changes: readonly DocumentChange[]) => void>();
 
     stream.subscribe(listener);
     stream.suppress();
@@ -234,7 +225,7 @@ describe('createChangeStream', () => {
 
   /** @description After unsuppression, the listener MUST receive changes again. */
   it('resumes emission after unsuppress', () => {
-    const listener = jest.fn<(changes: readonly DocumentChange[]) => void>();
+    const listener = vi.fn<(changes: readonly DocumentChange[]) => void>();
 
     stream.subscribe(listener);
     stream.suppress();
@@ -247,7 +238,7 @@ describe('createChangeStream', () => {
 
   /** @description An empty change array MUST NOT be emitted to listeners. */
   it('does not emit empty arrays', () => {
-    const listener = jest.fn<(changes: readonly DocumentChange[]) => void>();
+    const listener = vi.fn<(changes: readonly DocumentChange[]) => void>();
 
     stream.subscribe(listener);
     stream.emit([]);
@@ -257,7 +248,7 @@ describe('createChangeStream', () => {
 
   /** @description Unsubscribed listener MUST NOT receive further emissions. */
   it('unsubscribe removes the listener', () => {
-    const listener = jest.fn<(changes: readonly DocumentChange[]) => void>();
+    const listener = vi.fn<(changes: readonly DocumentChange[]) => void>();
     const unsub = stream.subscribe(listener);
 
     unsub();
@@ -272,7 +263,7 @@ describe('createChangeStream - ephemeral vs committed', () => {
   /** @description Ephemeral updates MUST be suppressed and not emitted to the listener. */
   it('suppressed (ephemeral) updates are not emitted', () => {
     const stream = createChangeStream();
-    const listener = jest.fn<(changes: readonly DocumentChange[]) => void>();
+    const listener = vi.fn<(changes: readonly DocumentChange[]) => void>();
 
     stream.subscribe(listener);
     stream.suppress();
@@ -296,7 +287,7 @@ describe('createChangeStream - ephemeral vs committed', () => {
   /** @description After unsuppression, the committed diff MUST be emitted - the change stream itself just gates emission. The diffing of committed state is the caller's responsibility. */
   it('unsuppress allows the commit emission to reach listeners', () => {
     const stream = createChangeStream();
-    const listener = jest.fn<(changes: readonly DocumentChange[]) => void>();
+    const listener = vi.fn<(changes: readonly DocumentChange[]) => void>();
 
     stream.subscribe(listener);
     stream.suppress();

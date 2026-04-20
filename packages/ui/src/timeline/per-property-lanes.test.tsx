@@ -1,9 +1,9 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import type { Keyframe } from '@broadset/model';
-import { beforeAll, describe, expect, it } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { PerPropertyLanesProps } from './index';
 import { defaultPerPropertyLanesProps, loadTimelineTestModules, makePropertyKeyframe } from './test-helpers';

@@ -1,6 +1,6 @@
-/** @jest-environment jsdom */
-import { describe, expect, it, jest } from '@jest/globals';
+/** @vitest-environment jsdom */
 import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { PanelElement, PropertyValue } from './panels';
 import { PropertiesSidebar } from './panels';
@@ -29,7 +29,7 @@ describe('Multi-element editing', () => {
 
   /** @description Editing a property in multi-select mode must apply the new value to all selected elements. */
   it('routes multi-select updates through onUpdate', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     const el1: PanelElement = { ...BASE_ELEMENT, id: 'a' };
     const el2: PanelElement = { ...BASE_ELEMENT, id: 'b' };

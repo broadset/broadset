@@ -1,13 +1,13 @@
-/** @jest-environment jsdom */
-import { describe, expect, it, jest } from '@jest/globals';
+/** @vitest-environment jsdom */
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { JSX } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { PropertyValue } from './panels';
 import { ImagePanel, ObjectFitPanel } from './panels';
 
-jest.mock('./modals', () => {
-  const mockReact = jest.requireActual<{
+vi.mock('./modals', async () => {
+  const mockReact = await vi.importActual<{
     useState: <T>(initialValue: T) => readonly [T, (nextValue: T | ((currentValue: T) => T)) => void];
   }>('react');
 
@@ -86,7 +86,7 @@ describe('ImagePanel', () => {
 
   /** @description Image source workflow must show a thumbnail/name row and open the media library from a primary action. */
   it('renders selected source summary row and opens media library', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <ImagePanel
@@ -107,7 +107,7 @@ describe('ImagePanel', () => {
 
   /** @description Selecting media from the library must update both content and assetId to keep URL and asset linkage in sync. */
   it('updates content and assetId when media is selected from library', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(<ImagePanel content="https://example.com/photo.jpg" assets={mediaAssets} onUpdate={onUpdate} />);
 
@@ -121,7 +121,7 @@ describe('ImagePanel', () => {
 
   /** @description Raw URL entry must stay behind an explicit advanced action so library selection remains the default workflow. */
   it('reveals URL input only after Replace URL action is expanded', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(<ImagePanel content="https://example.com/photo.jpg" onUpdate={onUpdate} />);
 
@@ -138,7 +138,7 @@ describe('ImagePanel', () => {
 
   /** @description Object-fit options must use plain-English labels so users are never shown raw implementation tokens. */
   it('shows plain-English object-fit labels', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(<ObjectFitPanel objectFit="scale-down" onUpdate={onUpdate} />);
 

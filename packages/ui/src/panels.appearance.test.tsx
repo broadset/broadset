@@ -1,6 +1,6 @@
-/** @jest-environment jsdom */
-import { describe, expect, it, jest } from '@jest/globals';
+/** @vitest-environment jsdom */
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { PropertyValue } from './panels';
 import { AppearancePanel } from './panels';
@@ -8,7 +8,7 @@ import { AppearancePanel } from './panels';
 describe('AppearancePanel', () => {
   /** @description Fill, border, opacity, and blend mode must all be editable with proper update callbacks. */
   it('renders fill color and opacity controls', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <AppearancePanel
@@ -30,7 +30,7 @@ describe('AppearancePanel', () => {
 
   /** @description Opacity changes must be forwarded to the update callback. */
   it('forwards opacity updates', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <AppearancePanel
@@ -72,7 +72,7 @@ describe('AppearancePanel', () => {
 
   /** @description Switching from Gradient back to Solid must clear the gradient so the renderer falls back to backgroundColor. Regression for a past bug where an empty-string gradient wiped the background entirely. */
   it('clears gradient value when switching back to Solid', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <AppearancePanel
@@ -161,7 +161,7 @@ describe('AppearancePanel', () => {
 
   /** @description Linked corner mode must apply the same radius value to all four corners when one field changes. */
   it('updates all corner radii when corners are linked', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <AppearancePanel
@@ -187,7 +187,7 @@ describe('AppearancePanel', () => {
 
   /** @description Unlinked corner mode must only update the edited corner, preserving the other corner values. */
   it('updates only one corner radius when corners are unlinked', () => {
-    const onUpdate = jest.fn<(key: string, value: PropertyValue) => void>();
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <AppearancePanel

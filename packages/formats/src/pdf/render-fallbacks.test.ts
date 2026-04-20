@@ -1,5 +1,5 @@
 import type { BroadsetElementStyle } from '@broadset/model';
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { exportPdfBytes } from './index';
 import { makeDocument, makeElement, makeStyle } from './test-helpers';
@@ -10,7 +10,7 @@ const drawCalls = {
   text: [] as string[],
 };
 
-jest.mock('@libpdf/core', () => {
+vi.mock('@libpdf/core', () => {
   const page = {
     drawRectangle: (): void => {
       drawCalls.rectangles += 1;

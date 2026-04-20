@@ -6,8 +6,8 @@
  * structural properties where applicable.
  */
 import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle, BroadsetProject, Canvas } from '@broadset/model';
-import { describe, expect, it } from '@jest/globals';
 import PizZip from 'pizzip';
+import { describe, expect, it } from 'vitest';
 
 import { exportProjectJson, generateOGrafPackages } from './interchange';
 import { exportPdfBytes } from './pdf';

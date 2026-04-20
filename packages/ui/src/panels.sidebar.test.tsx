@@ -1,6 +1,6 @@
-/** @jest-environment jsdom */
-import { describe, expect, it, jest } from '@jest/globals';
+/** @vitest-environment jsdom */
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { CustomPanelProps } from './panels';
 import { PropertiesSidebar } from './panels';
@@ -61,7 +61,7 @@ describe('PropertiesSidebar', () => {
   /** @description Lock button in the header must toggle the element locked state through onUpdate. */
   it('toggles lock state from the header button', () => {
     const onUpdate =
-      jest.fn<(key: string, value: string | number | boolean | readonly [number, number, number, number]) => void>();
+      vi.fn<(key: string, value: string | number | boolean | readonly [number, number, number, number]) => void>();
 
     render(
       <PropertiesSidebar elements={[{ ...BASE_ELEMENT, locked: false }]} documentMode="screen" onUpdate={onUpdate} />,
@@ -75,7 +75,7 @@ describe('PropertiesSidebar', () => {
   /** @description Locked selections must expose an unlock action that emits locked=false. */
   it('toggles lock state off when element is already locked', () => {
     const onUpdate =
-      jest.fn<(key: string, value: string | number | boolean | readonly [number, number, number, number]) => void>();
+      vi.fn<(key: string, value: string | number | boolean | readonly [number, number, number, number]) => void>();
 
     render(
       <PropertiesSidebar elements={[{ ...BASE_ELEMENT, locked: true }]} documentMode="screen" onUpdate={onUpdate} />,

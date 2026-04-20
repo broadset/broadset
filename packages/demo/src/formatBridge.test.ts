@@ -1,8 +1,8 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import type { BroadsetDocument } from '@broadset/model';
 import { createEmptyBroadsetDocument } from '@broadset/model';
-import { describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type ExportContext, exportDocument, importDocument, loadFormats, resetFormatsCache } from './formatBridge';
 
@@ -10,34 +10,34 @@ import { type ExportContext, exportDocument, importDocument, loadFormats, resetF
 /*  Mock dynamic import('@broadset/formats')                          */
 /* ------------------------------------------------------------------ */
 
-const mockTriggerDownload = jest.fn();
-const mockSanitizeFilename = jest.fn((name: string) => name.replace(/\s+/g, '-'));
-const mockExportSvg = jest.fn(() => '<svg></svg>');
-const mockExportHtmlStandalone = jest.fn(() => '<html></html>');
-const mockExportPdfBytes = jest.fn(() => Promise.resolve(new Uint8Array([1, 2, 3])));
-const mockExportPptxBytes = jest.fn(() => new Uint8Array([4, 5, 6]));
-const mockExportPsdBytes = jest.fn(() => new Uint8Array([7, 8, 9]));
-const mockExportPsdBytesAsync = jest.fn(() => Promise.resolve(new Uint8Array([7, 8, 9])));
-const mockExportPngBlob = jest.fn(() => Promise.resolve(new Blob(['png'], { type: 'image/png' })));
-const mockExportJpegBlob = jest.fn(() => Promise.resolve(new Blob(['jpeg'], { type: 'image/jpeg' })));
-const mockExportEmbeddedSvgBlob = jest.fn(() => Promise.resolve(new Blob(['svg'], { type: 'image/svg+xml' })));
-const mockExportVideoBlob = jest.fn(() => Promise.resolve(new Blob(['video'], { type: 'video/webm' })));
-const mockExportWebMBlob = jest.fn(() => Promise.resolve(new Blob(['webm'], { type: 'video/webm' })));
-const mockGenerateOGrafPackages = jest.fn(() => []);
-const mockImportPsdDocument = jest.fn(() => ({
+const mockTriggerDownload = vi.fn();
+const mockSanitizeFilename = vi.fn((name: string) => name.replace(/\s+/g, '-'));
+const mockExportSvg = vi.fn(() => '<svg></svg>');
+const mockExportHtmlStandalone = vi.fn(() => '<html></html>');
+const mockExportPdfBytes = vi.fn(() => Promise.resolve(new Uint8Array([1, 2, 3])));
+const mockExportPptxBytes = vi.fn(() => new Uint8Array([4, 5, 6]));
+const mockExportPsdBytes = vi.fn(() => new Uint8Array([7, 8, 9]));
+const mockExportPsdBytesAsync = vi.fn(() => Promise.resolve(new Uint8Array([7, 8, 9])));
+const mockExportPngBlob = vi.fn(() => Promise.resolve(new Blob(['png'], { type: 'image/png' })));
+const mockExportJpegBlob = vi.fn(() => Promise.resolve(new Blob(['jpeg'], { type: 'image/jpeg' })));
+const mockExportEmbeddedSvgBlob = vi.fn(() => Promise.resolve(new Blob(['svg'], { type: 'image/svg+xml' })));
+const mockExportVideoBlob = vi.fn(() => Promise.resolve(new Blob(['video'], { type: 'video/webm' })));
+const mockExportWebMBlob = vi.fn(() => Promise.resolve(new Blob(['webm'], { type: 'video/webm' })));
+const mockGenerateOGrafPackages = vi.fn(() => []);
+const mockImportPsdDocument = vi.fn(() => ({
   document: { ...createEmptyBroadsetDocument(), name: 'Imported PSD' } satisfies BroadsetDocument,
   warnings: [] as string[],
 }));
-const mockImportPptxDocument = jest.fn(() => ({
+const mockImportPptxDocument = vi.fn(() => ({
   document: { ...createEmptyBroadsetDocument(), name: 'Imported PPTX' } satisfies BroadsetDocument,
   warnings: [] as string[],
 }));
-const mockImportSvgDocument = jest.fn(() => ({
+const mockImportSvgDocument = vi.fn(() => ({
   document: { ...createEmptyBroadsetDocument(), name: 'Imported SVG' } satisfies BroadsetDocument,
   warnings: [] as string[],
 }));
-const mockExportProjectJson = jest.fn(() => '{}');
-const mockDiscoverCanvasElement = jest.fn(() => null);
+const mockExportProjectJson = vi.fn(() => '{}');
+const mockDiscoverCanvasElement = vi.fn(() => null);
 
 const mockFormats = {
   discoverCanvasElement: mockDiscoverCanvasElement,
@@ -61,7 +61,7 @@ const mockFormats = {
   triggerDownload: mockTriggerDownload,
 };
 
-jest.mock('@broadset/formats', () => mockFormats);
+vi.mock('@broadset/formats', () => mockFormats);
 
 /**
  * JSDOM's File/Blob may not support `.text()` or `.arrayBuffer()`.
@@ -112,7 +112,7 @@ function createTestFile(content: string | Uint8Array, name: string, type: string
 }
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   resetFormatsCache();
 });
 
@@ -275,7 +275,7 @@ describe('export orchestration', () => {
 
   /** @description Video export (WebM) MUST require a renderFrame callback and durationMs. */
   it('exports WebM format with video settings', async () => {
-    const renderFrame = jest.fn<(timeMs: number) => void>();
+    const renderFrame = vi.fn<(timeMs: number) => void>();
     const canvas = document.createElement('canvas');
 
     await exportDocument(
@@ -298,7 +298,7 @@ describe('export orchestration', () => {
 
   /** @description WebM export must forward frame rate and quality overrides from export context. */
   it('forwards custom frame rate and quality for WebM export', async () => {
-    const renderFrame = jest.fn<(timeMs: number) => void>();
+    const renderFrame = vi.fn<(timeMs: number) => void>();
     const canvas = document.createElement('canvas');
 
     await exportDocument(
@@ -333,7 +333,7 @@ describe('export orchestration', () => {
 
   /** @description MP4 export uses exportVideoBlob with format:'mp4' and triggers download. */
   it('exports MP4 video and triggers download', async () => {
-    const renderFrame = jest.fn<(timeMs: number) => void>();
+    const renderFrame = vi.fn<(timeMs: number) => void>();
     const canvas = document.createElement('canvas');
 
     await exportDocument(
@@ -370,7 +370,7 @@ describe('export orchestration', () => {
 
   /** @description Video export with renderFrame and duration but no snapshotCanvas MUST raise a snapshot canvas error. This test reproduces the runtime bug where the DOM renderer has no <canvas> element, so discoverCanvasElement returns null and the snapshot canvas is undefined. */
   it('throws when video export has renderFrame and duration but no snapshot canvas', async () => {
-    const renderFrame = jest.fn<(timeMs: number) => void>();
+    const renderFrame = vi.fn<(timeMs: number) => void>();
 
     await expect(exportDocument('mp4', makeContext({ renderFrame, playbackDurationMs: 5000 }))).rejects.toThrow(
       /snapshot canvas/i,

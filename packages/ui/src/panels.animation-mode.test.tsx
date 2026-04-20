@@ -1,6 +1,6 @@
-/** @jest-environment jsdom */
-import { describe, expect, it, jest } from '@jest/globals';
+/** @vitest-environment jsdom */
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { PropertyFieldAdapter, PropertyValue } from './panels';
 import { AnimationModePropertiesPanel } from './panels';
@@ -12,8 +12,8 @@ describe('AnimationModePropertiesPanel', () => {
     const adapter: PropertyFieldAdapter = {
       isIncluded: () => true,
       getValue: () => 100,
-      toggleProperty: jest.fn(),
-      updateValue: jest.fn(),
+      toggleProperty: vi.fn(),
+      updateValue: vi.fn(),
     };
 
     render(
@@ -36,12 +36,12 @@ describe('AnimationModePropertiesPanel', () => {
   /** @description Included keyframe properties must route updates through the adapter so base element style is not mutated during keyframe edits. */
   it('routes included property edits to adapter.updateValue and not onUpdate', () => {
     const onUpdate =
-      jest.fn<(key: string, value: string | number | readonly [number, number, number, number]) => void>();
+      vi.fn<(key: string, value: string | number | readonly [number, number, number, number]) => void>();
     const adapter: PropertyFieldAdapter = {
       isIncluded: () => true,
       getValue: () => 0,
-      toggleProperty: jest.fn(),
-      updateValue: jest.fn(),
+      toggleProperty: vi.fn(),
+      updateValue: vi.fn(),
     };
 
     render(
@@ -64,7 +64,7 @@ describe('AnimationModePropertiesPanel', () => {
 
   /** @description Excluded properties must render disabled with include/remove controls so users can add keyframe-scoped properties in one click. */
   it('renders include toggle for excluded property and uses base element value when including', () => {
-    const toggleProperty = jest.fn<(key: string, include: boolean, defaultValue: PropertyValue) => void>();
+    const toggleProperty = vi.fn<(key: string, include: boolean, defaultValue: PropertyValue) => void>();
     const groupElementWithX = {
       ...GROUP_ELEMENT,
       x: 48,
@@ -77,7 +77,7 @@ describe('AnimationModePropertiesPanel', () => {
           isIncluded: (key: string) => key !== 'x',
           getValue: () => 0,
           toggleProperty,
-          updateValue: jest.fn(),
+          updateValue: vi.fn(),
         }}
         documentMode="screen"
         onUpdate={() => undefined}
@@ -102,7 +102,7 @@ describe('AnimationModePropertiesPanel', () => {
 
   /** @description Included keyframe properties must expose a remove action that calls toggleProperty with included=false. */
   it('calls toggleProperty with included=false when removing an included property', () => {
-    const toggleProperty = jest.fn<(key: string, include: boolean, defaultValue: PropertyValue) => void>();
+    const toggleProperty = vi.fn<(key: string, include: boolean, defaultValue: PropertyValue) => void>();
     const groupElementWithX = {
       ...GROUP_ELEMENT,
       x: 64,
@@ -115,7 +115,7 @@ describe('AnimationModePropertiesPanel', () => {
           isIncluded: (key: string) => key === 'x',
           getValue: () => groupElementWithX.x,
           toggleProperty,
-          updateValue: jest.fn(),
+          updateValue: vi.fn(),
         }}
         documentMode="screen"
         onUpdate={() => undefined}

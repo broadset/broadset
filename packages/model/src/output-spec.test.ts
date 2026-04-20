@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { frameDurationMs, outputSpecSchema, quantizeToFrame, VALID_FRAME_RATES } from './index';
 

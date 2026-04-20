@@ -1,4 +1,5 @@
 import { broadsetDocumentSchema } from '@broadset/model';
+import { describe, expect, it } from 'vitest';
 
 import { FIXTURE_IDS } from './ids';
 import {

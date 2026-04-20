@@ -1,11 +1,11 @@
 ---
-description: 'Use when writing or reviewing tests — unit tests (Jest + React Testing Library) and component tests (Playwright CT). Covers test strategy for math utilities, Zustand store, hooks, canvas interactions, and renderer parity.'
+description: 'Use when writing or reviewing tests — unit tests (Vitest + React Testing Library) and component tests (Playwright CT). Covers test strategy for math utilities, Zustand store, hooks, canvas interactions, and renderer parity.'
 applyTo: packages/*/src/**/*.test.*, ct/**
 ---
 
 # Testing Strategy
 
-## Unit Tests (Jest + React Testing Library)
+## Unit Tests (Vitest + React Testing Library)
 
 ### Math Utilities
 

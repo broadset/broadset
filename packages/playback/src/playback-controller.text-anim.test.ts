@@ -1,7 +1,7 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import type { ElementAnimationConfig } from '@broadset/model';
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { resolveAnimationTargets } from './playback-controller';
 import { createHostElement, createKeyframe, createTimeline } from './playback-controller-test-helpers';

@@ -1,16 +1,16 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import './test-helpers';
 
-import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { GradientEditor } from './index';
 
 describe('GradientEditor', () => {
   /** @description The gradient editor must provide a visual stop-based editing workflow so users never type raw CSS gradient syntax. */
   it('renders draggable stop controls and an angle slider', () => {
-    const onChange = jest.fn<(value: string) => void>();
+    const onChange = vi.fn<(value: string) => void>();
 
     render(
       <GradientEditor label="Gradient" value="linear-gradient(90deg, #ff0000 0%, #0000ff 100%)" onChange={onChange} />,
@@ -23,7 +23,7 @@ describe('GradientEditor', () => {
 
   /** @description Adding a stop must emit an updated gradient value immediately so canvas feedback remains instant. */
   it('adds a stop and emits a new gradient value', () => {
-    const onChange = jest.fn<(value: string) => void>();
+    const onChange = vi.fn<(value: string) => void>();
 
     render(
       <GradientEditor label="Gradient" value="linear-gradient(90deg, #ff0000 0%, #0000ff 100%)" onChange={onChange} />,
@@ -37,7 +37,7 @@ describe('GradientEditor', () => {
   /** @description The editor must enforce a minimum of 2 stops so users cannot create invalid gradients accidentally. */
   it('disables removing stops when only two remain', () => {
     render(
-      <GradientEditor label="Gradient" value="linear-gradient(90deg, #ff0000 0%, #0000ff 100%)" onChange={jest.fn()} />,
+      <GradientEditor label="Gradient" value="linear-gradient(90deg, #ff0000 0%, #0000ff 100%)" onChange={vi.fn()} />,
     );
 
     const removeButton = screen.getByRole('button', { name: 'Remove selected stop' });
@@ -51,7 +51,7 @@ describe('GradientEditor', () => {
 
   /** @description Stop handles must support drag updates so art direction work does not rely on numeric-only editing. */
   it('updates stop position when dragging a stop handle', () => {
-    const onChange = jest.fn<(value: string) => void>();
+    const onChange = vi.fn<(value: string) => void>();
 
     render(
       <GradientEditor label="Gradient" value="linear-gradient(90deg, #ff0000 0%, #0000ff 100%)" onChange={onChange} />,
@@ -87,7 +87,7 @@ describe('GradientEditor', () => {
 
   /** @description Drag tracking must continue for the full drag, not stop after the first few pixels. Regression for a bug where setPointerCapture on the handle Button stopped the parent track from receiving pointermove events after the first pixel, leaving drags frozen near the start. */
   it('continues tracking drag motion across many pointer moves', () => {
-    const onChange = jest.fn<(value: string) => void>();
+    const onChange = vi.fn<(value: string) => void>();
 
     render(
       <GradientEditor label="Gradient" value="linear-gradient(90deg, #ff0000 0%, #0000ff 100%)" onChange={onChange} />,
@@ -134,7 +134,7 @@ describe('GradientEditor', () => {
 
   /** @description Controlled updates from the parent must reset local gradient editor state when a different gradient is loaded. */
   it('syncs displayed stops when the value prop changes', () => {
-    const onChange = jest.fn<(value: string) => void>();
+    const onChange = vi.fn<(value: string) => void>();
     const { rerender } = render(
       <GradientEditor label="Gradient" value="linear-gradient(90deg, #ff0000 0%, #0000ff 100%)" onChange={onChange} />,
     );

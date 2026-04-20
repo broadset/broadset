@@ -1,16 +1,16 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import './test-helpers';
 
-import { describe, expect, it, jest } from '@jest/globals';
 import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('WCAG AA — Modal Accessibility', () => {
   /** @description Modal container must have role="dialog" and aria-modal="true" */
   it('modal has role="dialog" and aria-modal="true"', async () => {
     const { AboutModal } = await import('./index');
 
-    render(<AboutModal isOpen={true} version="1.0.0" onClose={jest.fn()} />);
+    render(<AboutModal isOpen={true} version="1.0.0" onClose={vi.fn()} />);
 
     const dialog = screen.getByRole('dialog');
 
@@ -22,7 +22,7 @@ describe('WCAG AA — Modal Accessibility', () => {
   it('escape key handled by HeroUI Modal', async () => {
     // HeroUI Modal handles Escape natively — we verify onClose is wired
     const { AboutModal } = await import('./index');
-    const onClose = jest.fn();
+    const onClose = vi.fn();
 
     render(<AboutModal isOpen={true} version="1.0.0" onClose={onClose} />);
     // In production HeroUI handles Escape. Our mock passes onClose to Modal.

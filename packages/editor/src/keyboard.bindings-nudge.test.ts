@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import {
   createKeyboardHandler,
@@ -93,8 +93,9 @@ describe('keyboard', () => {
       for (const testCase of cases) {
         const event = pressKey(testCase.key, testCase.modifiers ?? {});
 
-        // Just ensure no errors — deeper side-effect tests follow in dedicated describes
-        handler(event);
+        // Deeper side-effect assertions live in dedicated describes; here we only
+        // verify that each default binding resolves without throwing.
+        expect(() => { handler(event); }).not.toThrow();
       }
     });
 

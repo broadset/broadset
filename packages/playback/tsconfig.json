@@ -6,8 +6,7 @@
     "outDir": "./dist",
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
-    "types": ["jest"]
+    "sourceMap": true
   },
   "include": ["src"],
   "references": [{ "path": "../model" }]

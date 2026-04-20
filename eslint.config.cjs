@@ -128,7 +128,14 @@ module.exports = [
       sourceType: 'module',
       parser: tsParser,
       parserOptions: {
-        projectService: true,
+        projectService: {
+          allowDefaultProject: [
+            'vitest.config.ts',
+            'vitest.base.ts',
+            'test/vitest.setup.ts',
+            'packages/*/vitest.config.ts',
+          ],
+        },
         ecmaFeatures: {
           jsx: true,
         },

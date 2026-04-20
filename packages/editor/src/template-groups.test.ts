@@ -1,7 +1,8 @@
-/** @jest-environment jsdom */
+/** @vitest-environment jsdom */
 
 import type { BroadsetProject, TemplateGroupMember } from '@broadset/model';
 import { broadsetProjectSchema, createEmptyBroadsetDocument } from '@broadset/model';
+import { describe, expect, it } from 'vitest';
 
 import {
   addGroupMember,
