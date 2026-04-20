@@ -6,33 +6,35 @@ import type { PropertyValue } from './panels';
 import { SpacingPanel } from './panels';
 
 describe('SpacingPanel', () => {
-  /** @description Padding values must be editable for selected elements. */
-  it('renders padding inputs and forwards updates', () => {
+  /** @description Editing a single side while the link toggle is off must only change that side. The other three values must be preserved. */
+  it('edits a single side when link toggle is off', () => {
     const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
-    render(<SpacingPanel padding={[10, 20, 10, 20]} onUpdate={onUpdate} />);
+    render(<SpacingPanel padding={[10, 20, 30, 40]} onUpdate={onUpdate} />);
 
-    const topInput = screen.getByRole('textbox', { name: /Padding top/i });
+    const topInput = screen.getByRole('textbox', { name: 'Padding top' });
 
+    fireEvent.change(topInput, { target: { value: '99' } });
     fireEvent.blur(topInput);
-    expect(onUpdate).toHaveBeenCalled();
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith('padding', [99, 20, 30, 40]);
   });
 
-  /** @description Link toggle must synchronize all four padding values when active. */
-  it('synchronizes padding values via link toggle', () => {
+  /** @description Enabling the link toggle and editing one side must synchronize all four sides to the new value. */
+  it('synchronizes all four sides when link toggle is on', () => {
     const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(<SpacingPanel padding={[10, 10, 10, 10]} onUpdate={onUpdate} />);
 
-    // Enable link toggle (uniform padding)
-    const linkBtn = screen.getByRole('button', { name: /link padding/i });
+    fireEvent.click(screen.getByRole('button', { name: /link padding/i }));
 
-    fireEvent.click(linkBtn);
+    const rightInput = screen.getByRole('textbox', { name: 'Padding right' });
 
-    // Change one value — all should sync
-    const topInput = screen.getByRole('textbox', { name: /Padding top/i });
+    fireEvent.change(rightInput, { target: { value: '24' } });
+    fireEvent.blur(rightInput);
 
-    fireEvent.blur(topInput);
-    expect(onUpdate).toHaveBeenCalledWith('padding', [10, 10, 10, 10] as const);
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith('padding', [24, 24, 24, 24]);
   });
 });

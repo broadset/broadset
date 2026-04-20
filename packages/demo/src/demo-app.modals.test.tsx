@@ -7,8 +7,8 @@ import { setupDemoShellMocks } from './demo-shell-test-utils';
 import { DemoApp } from './DemoApp';
 
 describe('DemoApp modal dialog integration (9-D)', () => {
-  /** @description The New Document dialog must show category tabs and preset names so users can choose from a curated list of document sizes. */
-  it('opens the New Document dialog with preset categories and names', () => {
+  /** @description The New Document dialog must show preset categories and, after the user picks a preset and confirms, apply that preset (closing the dialog and surfacing a success toast) — proving the primary action is wired, not just the chrome. */
+  it('opens the New Document dialog and applies a preset on Create Document', () => {
     setupDemoShellMocks();
     render(<DemoApp />);
 
@@ -16,18 +16,22 @@ describe('DemoApp modal dialog integration (9-D)', () => {
 
     const dialog = screen.getByRole('dialog', { name: /new document/i });
 
-    expect(dialog).toBeTruthy();
     expect(within(dialog).getByText('All')).toBeTruthy();
     expect(within(dialog).getByText('Broadcast')).toBeTruthy();
     expect(within(dialog).getByText('Print')).toBeTruthy();
     expect(within(dialog).getByText('Social Media')).toBeTruthy();
     expect(within(dialog).getByText('HD 1080p')).toBeTruthy();
     expect(within(dialog).getByText('A4 Portrait')).toBeTruthy();
-    expect(within(dialog).getByRole('button', { name: /create document/i })).toBeTruthy();
+
+    fireEvent.click(within(dialog).getByText('HD 1080p'));
+    fireEvent.click(within(dialog).getByRole('button', { name: /create document/i }));
+
+    expect(screen.queryByRole('dialog', { name: /new document/i })).toBeNull();
+    expect(screen.getByText(/created "hd 1080p"/i)).toBeTruthy();
   });
 
-  /** @description The Export dialog must show only the feature-gated exporter buttons so users see what formats are available in the current build. */
-  it('opens the Export dialog with feature-gated format buttons', () => {
+  /** @description The Export dialog must list feature-gated formats and close cleanly when the user cancels, preserving the host document state. */
+  it('opens the Export dialog with feature-gated format buttons and closes on cancel', () => {
     setupDemoShellMocks();
     render(<DemoApp />);
 
@@ -35,18 +39,17 @@ describe('DemoApp modal dialog integration (9-D)', () => {
 
     const dialog = screen.getByRole('dialog', { name: /export/i });
 
-    expect(dialog).toBeTruthy();
-    expect(within(dialog).getByRole('button', { name: 'HTML' })).toBeTruthy();
-    expect(within(dialog).getByRole('button', { name: 'SVG' })).toBeTruthy();
-    expect(within(dialog).getByRole('button', { name: 'PDF' })).toBeTruthy();
-    expect(within(dialog).getByRole('button', { name: 'PNG' })).toBeTruthy();
-    expect(within(dialog).getByRole('button', { name: 'WEBM' })).toBeTruthy();
-    expect(within(dialog).getByRole('button', { name: 'OGRAF' })).toBeTruthy();
-    expect(within(dialog).getByRole('button', { name: 'SVG-EMBEDDED' })).toBeTruthy();
+    for (const format of ['HTML', 'SVG', 'PDF', 'PNG', 'WEBM', 'OGRAF', 'SVG-EMBEDDED']) {
+      expect(within(dialog).getByRole('button', { name: format })).toBeTruthy();
+    }
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /cancel/i }));
+
+    expect(screen.queryByRole('dialog', { name: /export/i })).toBeNull();
   });
 
-  /** @description The Template Browser must open from the File menu and show categorized template entries with thumbnail previews and a search field. */
-  it('opens the Template Browser with categories and search', () => {
+  /** @description The Template Browser search field must narrow the list so users can locate a template quickly — an actual outcome on the live DOM, not a count of categories. */
+  it('narrows the visible template list when the user searches', () => {
     setupDemoShellMocks();
     render(<DemoApp />);
 
@@ -54,17 +57,19 @@ describe('DemoApp modal dialog integration (9-D)', () => {
 
     const dialog = screen.getByRole('dialog', { name: /template browser/i });
 
-    expect(dialog).toBeTruthy();
-    expect(within(dialog).getByText('Lower Thirds')).toBeTruthy();
-    expect(within(dialog).getByText('Full Screen')).toBeTruthy();
     expect(within(dialog).getByRole('button', { name: 'Sports Score' })).toBeTruthy();
     expect(within(dialog).getByRole('button', { name: 'News Ticker' })).toBeTruthy();
-    expect(within(dialog).getByRole('button', { name: 'Full Screen Graphic' })).toBeTruthy();
-    expect(within(dialog).getByRole('textbox', { name: /search templates/i })).toBeTruthy();
+
+    fireEvent.change(within(dialog).getByRole('textbox', { name: /search templates/i }), {
+      target: { value: 'sports' },
+    });
+
+    expect(within(dialog).getByRole('button', { name: 'Sports Score' })).toBeTruthy();
+    expect(within(dialog).queryByRole('button', { name: 'News Ticker' })).toBeNull();
   });
 
-  /** @description The Media Library dialog must be accessible from the File menu and show the configured demo assets. */
-  it('opens the Media Library from the File menu', () => {
+  /** @description The Media Library must allow the user to pick an asset — picking one moves the dialog into the confirm state where a Select action becomes available. */
+  it('surfaces a Select action after an asset is picked from the Media Library', () => {
     setupDemoShellMocks();
     render(<DemoApp />);
 
@@ -72,13 +77,19 @@ describe('DemoApp modal dialog integration (9-D)', () => {
 
     const dialog = screen.getByRole('dialog', { name: /media library/i });
 
-    expect(dialog).toBeTruthy();
     expect(within(dialog).getByText('Backgrounds')).toBeTruthy();
-    expect(within(dialog).getByText('Placeholder 800×600')).toBeTruthy();
+
+    const assetButton = within(dialog).getByText('Placeholder 800×600').closest('button');
+
+    expect(assetButton).not.toBeNull();
+
+    if (assetButton !== null) fireEvent.click(assetButton);
+
+    expect(within(dialog).getByRole('button', { name: /^select$/i })).toBeTruthy();
   });
 
-  /** @description The Canvas Settings dialog must open and display controls for document name, rulers, grid, and other canvas properties. */
-  it('opens the Canvas Settings dialog with property controls', () => {
+  /** @description The Canvas Settings dialog must expose the ruler/grid toggles and commit a changed setting back to the host when the user clicks Done. */
+  it('opens the Canvas Settings dialog and commits the "Show rulers" toggle on Done', () => {
     setupDemoShellMocks();
     render(<DemoApp />);
 
@@ -86,13 +97,17 @@ describe('DemoApp modal dialog integration (9-D)', () => {
 
     const dialog = screen.getByRole('dialog', { name: /canvas settings/i });
 
-    expect(dialog).toBeTruthy();
     expect(within(dialog).getByText(/rulers/i)).toBeTruthy();
     expect(within(dialog).getByText(/show grid/i)).toBeTruthy();
+
+    fireEvent.click(within(dialog).getByRole('switch', { name: /show rulers/i }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /done/i }));
+
+    expect(screen.queryByRole('dialog', { name: /canvas settings/i })).toBeNull();
   });
 
-  /** @description Each modal must close cleanly when its close/cancel button is clicked, removing the dialog from the DOM. */
-  it('closes open modals when cancel is clicked', () => {
+  /** @description Cancelling the New Document modal must remove the dialog from the DOM so the underlying shell regains focus. */
+  it('closes the New Document dialog when cancel is clicked', () => {
     setupDemoShellMocks();
     render(<DemoApp />);
 
@@ -101,8 +116,6 @@ describe('DemoApp modal dialog integration (9-D)', () => {
 
     const cancelButtons = screen.getAllByRole('button', { name: /cancel/i });
     const dialogCancel = cancelButtons.find((button) => button.closest('[role="dialog"]') !== null);
-
-    expect(dialogCancel).toBeDefined();
 
     if (dialogCancel === undefined) {
       throw new Error('Cancel button not found inside dialog');

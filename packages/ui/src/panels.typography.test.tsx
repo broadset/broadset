@@ -5,199 +5,125 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PropertyValue } from './panels';
 import { TypographyPanel } from './panels';
 
+function renderPanel(overrides: {
+  readonly onUpdate?: (key: string, value: PropertyValue) => void;
+  readonly fontSize?: number;
+  readonly fontFamily?: string;
+  readonly availableFonts?: readonly string[];
+  readonly isAnimationMode?: boolean;
+}): void {
+  render(
+    <TypographyPanel
+      fontFamily={overrides.fontFamily ?? 'Inter'}
+      availableFonts={overrides.availableFonts}
+      fontSize={overrides.fontSize ?? 24}
+      fontColor="#333333"
+      fontWeight={400}
+      fontStyle="normal"
+      textAlignment="left"
+      verticalAlignment="top"
+      textDecoration=""
+      textTransform="none"
+      lineHeight="1.5"
+      letterSpacing={0}
+      wordSpacing={0}
+      isAnimationMode={overrides.isAnimationMode ?? false}
+      onUpdate={overrides.onUpdate ?? (() => undefined)}
+    />,
+  );
+}
+
 describe('TypographyPanel', () => {
-  /** @description Typography panel must expose fast formatting controls and segmented alignment controls without requiring advanced disclosure. */
-  it('renders toggle formatting controls and segmented alignment controls', () => {
+  /** @description Each quick-toggle formatting button must emit an update with the exact model field and value, so one click in the UI lands the right write on the model. */
+  it('bold, italic, underline, and strikethrough toggles emit exact model updates', () => {
     const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
-    render(
-      <TypographyPanel
-        fontFamily="Inter"
-        fontSize={24}
-        fontColor="#333333"
-        fontWeight={700}
-        fontStyle="normal"
-        textAlignment="center"
-        verticalAlignment="top"
-        textDecoration=""
-        textTransform="none"
-        lineHeight="1.5"
-        letterSpacing={0}
-        wordSpacing={0}
-        onUpdate={onUpdate}
-      />,
-    );
-
-    expect(screen.getByRole('button', { name: 'Bold' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Italic' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Underline' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Strikethrough' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Left' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Center' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Right' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Justify' })).not.toBeNull();
-  });
-
-  /** @description Primary typography surface must show a plain helper message for inline text editing while keeping advanced numeric controls hidden by default. */
-  it('shows inline text edit helper and keeps numeric weight hidden until advanced is opened', () => {
-    render(
-      <TypographyPanel
-        fontFamily="Inter"
-        fontSize={24}
-        fontColor="#333333"
-        fontWeight={400}
-        fontStyle="normal"
-        textAlignment="center"
-        verticalAlignment="top"
-        textDecoration=""
-        textTransform="none"
-        lineHeight="1.5"
-        letterSpacing={0}
-        wordSpacing={0}
-        onUpdate={() => undefined}
-      />,
-    );
-
-    expect(screen.getByText('Double-click the text on canvas to edit content inline.')).not.toBeNull();
-    expect(screen.queryByRole('textbox', { name: 'Weight' })).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
-
-    expect(screen.getByRole('textbox', { name: 'Weight' })).not.toBeNull();
-  });
-
-  /** @description Font family control must use curated available font options rather than freeform text entry. */
-  it('renders font family select options from available fonts', () => {
-    render(
-      <TypographyPanel
-        fontFamily="Inter"
-        availableFonts={['Inter', 'Roboto', 'Open Sans']}
-        fontSize={24}
-        fontColor="#333333"
-        fontWeight={400}
-        fontStyle="normal"
-        textAlignment="left"
-        verticalAlignment="top"
-        textDecoration=""
-        textTransform="none"
-        lineHeight="1.5"
-        letterSpacing={0}
-        wordSpacing={0}
-        onUpdate={() => undefined}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /Font family/i }));
-
-    expect(screen.getByRole('option', { name: 'Inter' })).not.toBeNull();
-    expect(screen.getByRole('option', { name: 'Roboto' })).not.toBeNull();
-    expect(screen.getByRole('option', { name: 'Open Sans' })).not.toBeNull();
-  });
-
-  /** @description Font size control must enforce configured min/max bounds so text size cannot drift outside safe limits. */
-  it('clamps font size updates at min and max bounds', () => {
-    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
-
-    const { rerender } = render(
-      <TypographyPanel
-        fontFamily="Inter"
-        fontSize={1}
-        fontColor="#333333"
-        fontWeight={400}
-        fontStyle="normal"
-        textAlignment="left"
-        verticalAlignment="top"
-        textDecoration=""
-        textTransform="none"
-        lineHeight="1.5"
-        letterSpacing={0}
-        wordSpacing={0}
-        onUpdate={onUpdate}
-      />,
-    );
-
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Font size (pt)' }), { key: 'ArrowDown' });
-    expect(onUpdate).toHaveBeenCalledWith('fontSize', 1);
-
-    onUpdate.mockClear();
-
-    rerender(
-      <TypographyPanel
-        fontFamily="Inter"
-        fontSize={512}
-        fontColor="#333333"
-        fontWeight={400}
-        fontStyle="normal"
-        textAlignment="left"
-        verticalAlignment="top"
-        textDecoration=""
-        textTransform="none"
-        lineHeight="1.5"
-        letterSpacing={0}
-        wordSpacing={0}
-        onUpdate={onUpdate}
-      />,
-    );
-
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Font size (pt)' }), { key: 'ArrowUp' });
-    expect(onUpdate).toHaveBeenCalledWith('fontSize', 512);
-  });
-
-  /** @description Inline edit helper must be hidden while animation mode is active to avoid conflicting editing guidance. */
-  it('hides inline text edit helper in animation mode', () => {
-    render(
-      <TypographyPanel
-        fontFamily="Inter"
-        fontSize={24}
-        fontColor="#333333"
-        fontWeight={400}
-        fontStyle="normal"
-        textAlignment="left"
-        verticalAlignment="top"
-        textDecoration=""
-        textTransform="none"
-        lineHeight="1.5"
-        letterSpacing={0}
-        wordSpacing={0}
-        isAnimationMode
-        onUpdate={() => undefined}
-      />,
-    );
-
-    expect(screen.queryByText('Double-click the text on canvas to edit content inline.')).toBeNull();
-  });
-
-  /** @description Toggle controls must mutate the expected model fields and avoid exposing raw internal property names to users. */
-  it('forwards toggle edits and avoids raw style property labels', () => {
-    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
-
-    render(
-      <TypographyPanel
-        fontFamily="Inter"
-        fontSize={24}
-        fontColor="#333333"
-        fontWeight={400}
-        fontStyle="normal"
-        textAlignment="center"
-        verticalAlignment="top"
-        textDecoration=""
-        textTransform="none"
-        lineHeight="1.5"
-        letterSpacing={0}
-        wordSpacing={0}
-        onUpdate={onUpdate}
-      />,
-    );
+    renderPanel({ onUpdate });
 
     fireEvent.click(screen.getByRole('button', { name: 'Bold' }));
     fireEvent.click(screen.getByRole('button', { name: 'Italic' }));
     fireEvent.click(screen.getByRole('button', { name: 'Underline' }));
     fireEvent.click(screen.getByRole('button', { name: 'Strikethrough' }));
 
-    expect(onUpdate).toHaveBeenCalledWith('fontWeight', 700);
-    expect(onUpdate).toHaveBeenCalledWith('fontStyle', 'italic');
-    expect(onUpdate).toHaveBeenCalledWith('textDecoration', 'underline');
-    expect(onUpdate).toHaveBeenCalledWith('textDecoration', 'line-through');
+    expect(onUpdate).toHaveBeenNthCalledWith(1, 'fontWeight', 700);
+    expect(onUpdate).toHaveBeenNthCalledWith(2, 'fontStyle', 'italic');
+    expect(onUpdate).toHaveBeenNthCalledWith(3, 'textDecoration', 'underline');
+    expect(onUpdate).toHaveBeenNthCalledWith(4, 'textDecoration', 'line-through');
+  });
+
+  /** @description The four segmented horizontal alignment buttons must be exposed in the primary panel and must emit textAlignment updates keyed by the canonical CSS value. */
+  it('alignment segmented buttons emit textAlignment updates with canonical CSS values', () => {
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
+
+    renderPanel({ onUpdate });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Center' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Right' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Justify' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Left' }));
+
+    expect(onUpdate).toHaveBeenCalledWith('textAlignment', 'center');
+    expect(onUpdate).toHaveBeenCalledWith('textAlignment', 'right');
+    expect(onUpdate).toHaveBeenCalledWith('textAlignment', 'justify');
+    expect(onUpdate).toHaveBeenCalledWith('textAlignment', 'left');
+  });
+
+  /** @description Numeric font-weight input must stay hidden until the user opens Advanced, and must appear as an editable textbox once opened. */
+  it('reveals numeric weight input only after Advanced is opened', () => {
+    renderPanel({});
+
+    expect(screen.queryByRole('textbox', { name: 'Weight' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+
+    expect(screen.getByRole('textbox', { name: 'Weight' })).toBeTruthy();
+  });
+
+  /** @description Font family control must be an option-picker sourced from availableFonts — not freeform text — so users can't typo a missing font. */
+  it('font family select lists the fonts supplied via availableFonts', () => {
+    renderPanel({ availableFonts: ['Inter', 'Roboto', 'Open Sans'] });
+
+    fireEvent.click(screen.getByRole('button', { name: /Font family/i }));
+
+    expect(screen.getByRole('option', { name: 'Inter' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Roboto' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Open Sans' })).toBeTruthy();
+  });
+
+  /** @description Arrow-key nudges on font size must clamp at the minimum so size cannot drift below the safe floor. */
+  it('clamps font size at the minimum when arrow-down is pressed at the floor', () => {
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
+
+    renderPanel({ onUpdate, fontSize: 1 });
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Font size (pt)' }), { key: 'ArrowDown' });
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith('fontSize', 1);
+  });
+
+  /** @description Arrow-key nudges on font size must clamp at the maximum so size cannot drift above the safe ceiling. */
+  it('clamps font size at the maximum when arrow-up is pressed at the ceiling', () => {
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
+
+    renderPanel({ onUpdate, fontSize: 512 });
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Font size (pt)' }), { key: 'ArrowUp' });
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith('fontSize', 512);
+  });
+
+  /** @description Inline-edit helper text must disappear in animation mode so the editing guidance does not conflict with keyframe authoring. */
+  it('hides the inline text edit helper in animation mode', () => {
+    renderPanel({ isAnimationMode: true });
+
+    expect(screen.queryByText('Double-click the text on canvas to edit content inline.')).toBeNull();
+  });
+
+  /** @description The panel must not surface raw internal style property names (fontWeight, textDecoration, etc.) to the user. */
+  it('does not expose raw style property names in the panel body', () => {
+    renderPanel({});
 
     const panel = screen.getByRole('region', { name: 'Typography' });
 

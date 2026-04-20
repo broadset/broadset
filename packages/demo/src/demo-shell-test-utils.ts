@@ -6,6 +6,18 @@ import { act } from '@testing-library/react';
 import type { MockedFunction } from 'vitest';
 import { vi } from 'vitest';
 
+/*
+ * SCOPE: this helper stubs the screen renderer and playback controller so
+ * unit-scope tests can mount <DemoApp /> without booting the full renderer.
+ * Real rendering and playback timing are intentionally not exercised here —
+ * those behaviors are validated end-to-end in
+ * `packages/demo/ct/state/demo-state-data.ct.tsx` and the snapshot and
+ * panel-to-canvas parity CTs in `packages/demo/ct/`.
+ *
+ * If a unit test depends on the real renderer's output, panel-to-canvas
+ * style propagation, or playback timing, it should be a CT, not a unit test.
+ */
+
 interface DemoShellMocks {
   readonly mockedCreatePlaybackController: MockedFunction<typeof createPlaybackController>;
   readonly mockedCreateScreenRenderer: MockedFunction<typeof createScreenRenderer>;

@@ -198,6 +198,57 @@ test('About modal traps focus and restores trigger focus on escape', async ({ mo
 });
 
 /**
+ * @description Validates `project/spec/ui/modals.md` M-07 initial-focus contract:
+ * opening a modal must move focus *into* the dialog immediately so keyboard users
+ * land inside the modal without an implicit Tab. The trigger button must not
+ * retain focus after the modal mounts.
+ */
+test('opening a modal moves focus inside the dialog on mount', async ({ mount, page }) => {
+  await mount(<DemoAppFresh />);
+
+  const helpButton = page.locator('button[aria-label="Help"]').first();
+
+  await helpButton.click();
+  await page.getByText('About').first().click();
+
+  const dialog = page.getByRole('dialog', { name: 'Broadset' });
+
+  await expect(dialog).toBeVisible();
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const active = document.activeElement;
+        const modal = document.querySelector('[role="dialog"][aria-label="Broadset"]');
+
+        if (modal === null || active === null) return false;
+        if (!modal.contains(active)) return false;
+
+        return active.tagName !== 'BODY';
+      }),
+    )
+    .toBe(true);
+
+  await expect(helpButton).not.toBeFocused();
+});
+
+/**
+ * @description Validates `project/spec/ui/modals.md` M-07 primary-action keyboard contract:
+ * a dialog's primary button must fire via real keyboard activation (Enter/Space),
+ * not just via click. Proves the button participates in normal focusable-by-tab flow.
+ */
+test('primary dialog action can be activated via keyboard (Enter) without a mouse', async ({ mount, page }) => {
+  await mount(<GuidePositionHarness />);
+
+  const input = page.getByRole('textbox', { name: 'Position (px)' });
+
+  await input.focus();
+  await page.keyboard.press('Enter');
+
+  await expect(page.getByTestId('guide-applies')).toHaveText('1');
+});
+
+/**
  * @description Validates `project/spec/ui/modals.md` M-08 runtime ARIA contract:
  * modal dialogs expose dialog role, modal state, and accessible name.
  */

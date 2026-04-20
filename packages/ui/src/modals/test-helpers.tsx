@@ -5,6 +5,18 @@ import { vi } from 'vitest';
 
 /* ------------------------------------------------------------------ */
 /*  HeroUI mock — all helpers use mock prefix to pass vi.mock hoist    */
+/*                                                                    */
+/*  SCOPE: this mock intentionally stubs HeroUI chrome to keep unit    */
+/*  tests fast and deterministic. Browser-critical behaviors that the  */
+/*  real HeroUI provides (focus trap, Tab/Escape semantics, popover    */
+/*  portals, ARIA state transitions) are **NOT** reproduced here —     */
+/*  they are validated against real HeroUI via Playwright CT in        */
+/*  `packages/demo/ct/accessibility/modals-a11y.ct.tsx` and            */
+/*  `packages/ui/ct/accessibility/modals-a11y.ct.tsx`.                 */
+/*                                                                    */
+/*  If you reach for a unit test to verify keyboard navigation,        */
+/*  focus order, portal layering, or a11y tree semantics, reach for    */
+/*  a CT instead — those concerns are outside this mock's scope.       */
 /* ------------------------------------------------------------------ */
 
 const mockNumCtx = React.createContext({

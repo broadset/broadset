@@ -3,7 +3,14 @@
 import type * as React from 'react';
 import { vi } from 'vitest';
 
-/* ---------- HeroUI mock (comprehensive for ColorInput, NumField, etc.) ---------- */
+/* ---------- HeroUI mock (comprehensive for ColorInput, NumField, etc.) ----------
+ *
+ * SCOPE: unit-scope chrome only. Browser-critical behaviors (keyboard
+ * nudge commits via Pressable, portal positioning for ColorInput, slider
+ * drag pointer events) are validated against real HeroUI via Playwright
+ * CT in `packages/demo/ct/accessibility/inputs-a11y.ct.tsx`. If a test
+ * needs those semantics, it is a CT, not a unit test.
+ * ------------------------------------------------------------------ */
 
 interface MockHeroUiProps {
   readonly children?: React.ReactNode;

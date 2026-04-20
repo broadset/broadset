@@ -5,85 +5,69 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PropertyValue } from './panels';
 import { AppearancePanel } from './panels';
 
+const BASE_PROPS = {
+  backgroundColor: '#ffffff',
+  borderWidth: 1,
+  borderColor: '#000000',
+  borderStyle: 'solid',
+  borderRadius: [6, 6, 6, 6] as const,
+  opacity: 0.75,
+} as const;
+
 describe('AppearancePanel', () => {
-  /** @description Fill, border, opacity, and blend mode must all be editable with proper update callbacks. */
-  it('renders fill color and opacity controls', () => {
+  /** @description Opacity slider must emit the CSS-canonical 0-1 value to onUpdate so the model stores normalized opacity, not a 0-100 percent. */
+  it('emits normalized 0-1 opacity when the percent slider moves', () => {
     const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
-    render(
-      <AppearancePanel
-        backgroundColor="#ffffff"
-        borderWidth={1}
-        borderColor="#000000"
-        borderStyle="solid"
-        borderRadius={[6, 6, 6, 6]}
-        opacity={0.75}
-        onUpdate={onUpdate}
-      />,
-    );
+    render(<AppearancePanel {...BASE_PROPS} onUpdate={onUpdate} />);
 
-    // ColorInput for fill color should be rendered (via mock)
-    const region = screen.getByRole('region', { name: 'Appearance' });
+    const slider = screen.getByRole('slider', { name: 'Opacity' });
 
-    expect(region).not.toBeNull();
-  });
+    fireEvent.change(slider, { target: { value: '50' } });
 
-  /** @description Opacity changes must be forwarded to the update callback. */
-  it('forwards opacity updates', () => {
-    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
-
-    render(
-      <AppearancePanel
-        backgroundColor="#ffffff"
-        borderWidth={1}
-        borderColor="#000000"
-        borderStyle="solid"
-        borderRadius={[6, 6, 6, 6]}
-        opacity={0.75}
-        onUpdate={onUpdate}
-      />,
-    );
-
-    const opacitySlider = screen.getByRole('slider');
-
-    fireEvent.change(opacitySlider, { target: { value: '50' } });
     expect(onUpdate).toHaveBeenCalledWith('opacity', 0.5);
   });
 
-  /** @description Full border style options must include all 9 CSS border styles. */
-  it('provides full border style options', () => {
-    render(
-      <AppearancePanel
-        backgroundColor="#ffffff"
-        borderWidth={1}
-        borderColor="#000000"
-        borderStyle="solid"
-        borderRadius={[6, 6, 6, 6]}
-        opacity={0.75}
-        onUpdate={() => undefined}
-      />,
-    );
+  /** @description Opacity must render as a percent readout so users never see raw 0-1 values. */
+  it('shows opacity as a percent readout', () => {
+    render(<AppearancePanel {...BASE_PROPS} onUpdate={() => undefined} />);
 
-    // Check that the border style Select is present
-    const region = screen.getByRole('region', { name: 'Appearance' });
-
-    expect(within(region).queryAllByText('solid').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('75%')).toBeTruthy();
   });
 
-  /** @description Switching from Gradient back to Solid must clear the gradient so the renderer falls back to backgroundColor. Regression for a past bug where an empty-string gradient wiped the background entirely. */
-  it('clears gradient value when switching back to Solid', () => {
+  /** @description All nine CSS border-style keywords must be selectable — the Select's listbox holds every value from the BORDER_STYLE_OPTIONS constant. */
+  it('exposes the full set of CSS border styles as selectable options', () => {
+    render(<AppearancePanel {...BASE_PROPS} onUpdate={() => undefined} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /border style/i }));
+
+    for (const style of ['none', 'solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset']) {
+      expect(screen.getByRole('option', { name: style })).toBeTruthy();
+    }
+  });
+
+  /** @description Selecting a new border style must emit a borderStyle update with the exact chosen keyword. */
+  it('emits the selected borderStyle keyword on option click', () => {
+    const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
+
+    render(<AppearancePanel {...BASE_PROPS} onUpdate={onUpdate} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /border style/i }));
+    fireEvent.click(screen.getByRole('option', { name: 'dashed' }));
+
+    expect(onUpdate).toHaveBeenCalledWith('borderStyle', 'dashed');
+  });
+
+  /** @description Switching from Gradient back to Solid must clear the gradient string so the renderer falls back to backgroundColor. Regression for a past bug where stale gradient wiped the background entirely. */
+  it('clears the gradient value when switching back to Solid', () => {
     const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
     render(
       <AppearancePanel
+        {...BASE_PROPS}
         backgroundColor="#ff0000"
         backgroundGradient="linear-gradient(#fff, #000)"
         showGradient
-        borderWidth={1}
-        borderColor="#000000"
-        borderStyle="solid"
-        borderRadius={[6, 6, 6, 6]}
-        opacity={1}
         onUpdate={onUpdate}
       />,
     );
@@ -93,25 +77,20 @@ describe('AppearancePanel', () => {
     expect(onUpdate).toHaveBeenCalledWith('backgroundGradient', '');
   });
 
-  /** @description Fill mode must be an explicit visual choice (Solid/Gradient), and gradient mode must avoid raw CSS-string text fields. */
-  it('supports fill mode switching without exposing raw CSS gradient input', () => {
+  /** @description Fill mode must be an explicit Solid/Gradient visual choice without exposing raw CSS gradient syntax anywhere on screen. */
+  it('renders fill mode buttons and gradient stops group without raw CSS fields', () => {
     render(
       <AppearancePanel
-        backgroundColor="#ffffff"
+        {...BASE_PROPS}
         backgroundGradient="linear-gradient(#fff, #000)"
         showGradient
-        borderWidth={1}
-        borderColor="#000000"
-        borderStyle="solid"
-        borderRadius={[6, 6, 6, 6]}
-        opacity={0.75}
         onUpdate={() => undefined}
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Solid' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Gradient' })).not.toBeNull();
-    expect(screen.getByRole('group', { name: 'Gradient stops' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Solid' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Gradient' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Gradient stops' })).toBeTruthy();
     expect(screen.queryByLabelText('CSS Gradient')).toBeNull();
 
     const panel = screen.getByRole('region', { name: 'Appearance' });
@@ -119,61 +98,11 @@ describe('AppearancePanel', () => {
     expect(within(panel).queryByText(/linear-gradient\(|rgba\(|#[0-9a-f]{6}/i)).toBeNull();
   });
 
-  /** @description Border radius editing must expose all four corners and a link toggle for predictable linked/unlinked behavior. */
-  it('renders four corner radius fields and a link toggle', () => {
-    render(
-      <AppearancePanel
-        backgroundColor="#ffffff"
-        showGradient
-        borderWidth={1}
-        borderColor="#000000"
-        borderStyle="solid"
-        borderRadius={[6, 8, 10, 12]}
-        opacity={0.75}
-        onUpdate={() => undefined}
-      />,
-    );
-
-    expect(screen.getByRole('textbox', { name: 'Border radius TL' })).not.toBeNull();
-    expect(screen.getByRole('textbox', { name: 'Border radius TR' })).not.toBeNull();
-    expect(screen.getByRole('textbox', { name: 'Border radius BR' })).not.toBeNull();
-    expect(screen.getByRole('textbox', { name: 'Border radius BL' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Link corners' })).not.toBeNull();
-  });
-
-  /** @description Opacity must be presented with a percent readout so users never see normalized 0-1 values. */
-  it('shows opacity with percent readout', () => {
-    render(
-      <AppearancePanel
-        backgroundColor="#ffffff"
-        borderWidth={1}
-        borderColor="#000000"
-        borderStyle="solid"
-        borderRadius={[6, 6, 6, 6]}
-        opacity={0.75}
-        onUpdate={() => undefined}
-      />,
-    );
-
-    expect(screen.getByRole('slider', { name: 'Opacity' })).not.toBeNull();
-    expect(screen.getByText('75%')).not.toBeNull();
-  });
-
-  /** @description Linked corner mode must apply the same radius value to all four corners when one field changes. */
-  it('updates all corner radii when corners are linked', () => {
+  /** @description Linked corner mode must broadcast the edited value to all four corners. */
+  it('updates all four corner radii when corners are linked', () => {
     const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
-    render(
-      <AppearancePanel
-        backgroundColor="#ffffff"
-        borderWidth={1}
-        borderColor="#000000"
-        borderStyle="solid"
-        borderRadius={[6, 8, 10, 12]}
-        opacity={0.75}
-        onUpdate={onUpdate}
-      />,
-    );
+    render(<AppearancePanel {...BASE_PROPS} borderRadius={[6, 8, 10, 12]} onUpdate={onUpdate} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Link corners' }));
 
@@ -185,21 +114,11 @@ describe('AppearancePanel', () => {
     expect(onUpdate).toHaveBeenCalledWith('borderRadius', [20, 20, 20, 20]);
   });
 
-  /** @description Unlinked corner mode must only update the edited corner, preserving the other corner values. */
-  it('updates only one corner radius when corners are unlinked', () => {
+  /** @description Unlinked corner mode must only update the edited corner and preserve the other three values. */
+  it('updates only the edited corner when corners are unlinked', () => {
     const onUpdate = vi.fn<(key: string, value: PropertyValue) => void>();
 
-    render(
-      <AppearancePanel
-        backgroundColor="#ffffff"
-        borderWidth={1}
-        borderColor="#000000"
-        borderStyle="solid"
-        borderRadius={[6, 8, 10, 12]}
-        opacity={0.75}
-        onUpdate={onUpdate}
-      />,
-    );
+    render(<AppearancePanel {...BASE_PROPS} borderRadius={[6, 8, 10, 12]} onUpdate={onUpdate} />);
 
     const topRight = screen.getByRole('textbox', { name: 'Border radius TR' });
 
