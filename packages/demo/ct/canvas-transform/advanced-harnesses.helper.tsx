@@ -1,7 +1,3 @@
-/* eslint-disable jsx-a11y/no-static-element-interactions --
-   Test harness. Simulates real UI surfaces for CT scenarios; production a11y
-   lives in the real components, not these fixtures. */
-
 import { classifyWheelInput } from '@broadset/ui';
 import { type JSX, useMemo, useState } from 'react';
 

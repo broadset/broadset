@@ -7,7 +7,6 @@ import type { ActiveDialog, ContextMenuState, SidebarTab } from '../demo-types';
 
 export interface DemoAppLayoutProps {
   readonly activeDialog: ActiveDialog;
-  readonly clipboardRef: { current: readonly BroadsetElement[] };
   readonly contextMenu: ContextMenuState | null;
   readonly contextMenuElement: BroadsetElement | null;
   readonly currentDocument: BroadsetDocument;

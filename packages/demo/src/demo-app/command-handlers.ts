@@ -177,11 +177,12 @@ export function useCommandHandlers({
 
       setContextMenu({
         elementId: contextElementId,
+        hasClipboardContents: clipboardRef.current.length > 0,
         x: Math.max(minX, Math.min(event.clientX, maxX)),
         y: Math.max(minY, Math.min(event.clientY, maxY)),
       });
     },
-    [editorStore, setContextMenu],
+    [clipboardRef, editorStore, setContextMenu],
   );
 
   const handleCopySelection = useCallback((): void => {

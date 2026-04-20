@@ -49,7 +49,6 @@ exports[`PropertiesSidebar > keeps top-to-bottom focusable order stable for text
   "Italic",
   "Underline",
   "Strikethrough",
-  "Text alignment",
   "Left",
   "Center",
   "Right",

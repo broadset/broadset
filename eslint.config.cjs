@@ -276,6 +276,13 @@ module.exports = [
   // and object-literal type assertions (fixtures frequently construct
   // partial objects cast to a full type to avoid the ergonomic cost of
   // enumerating every required field).
+  //
+  // jsx-a11y and a few `react-hooks` / `sonarjs` rules are also disabled here
+  // because test harnesses are not production UI: CT fixtures routinely attach
+  // pointer handlers to plain divs to simulate interaction surfaces, and unit
+  // tests declare inline Consumer components inside `it` blocks (idiomatic RTL,
+  // flagged by `react-hooks/globals`). Production accessibility is the real
+  // component's concern, not the harness's.
   {
     files: [
       '**/src/**/*.test.ts',
@@ -291,6 +298,17 @@ module.exports = [
       // Test fixtures legitimately use Math.random() for hash suffixes,
       // sample data, and so on; nothing security-sensitive.
       'sonarjs/pseudo-random': 'off',
+      // Test harnesses simulate interactive surfaces on static elements; the
+      // real components enforce a11y.
+      'jsx-a11y/no-static-element-interactions': 'off',
+      'jsx-a11y/no-noninteractive-element-interactions': 'off',
+      'jsx-a11y/no-noninteractive-tabindex': 'off',
+      'jsx-a11y/click-events-have-key-events': 'off',
+      // Inline Consumer components inside `it` blocks are idiomatic RTL and
+      // duplicated setup across nearby test cases is often clearer than the
+      // shared factory that would deduplicate it.
+      'react-hooks/globals': 'off',
+      'sonarjs/no-identical-functions': 'off',
     },
   },
 

@@ -171,11 +171,14 @@ export function buildTimelineOptions(
   timelines: readonly { readonly id: string; readonly name: string | null | undefined }[],
 ): readonly TimelineOption[] {
   return [...timelines]
-    .map((timeline) => ({
-      id: timeline.id,
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty-string name should also fall back to id, so `||` is intentional
-      label: timeline.name?.trim() || timeline.id,
-    }))
+    .map((timeline) => {
+      const trimmed = timeline.name?.trim() ?? '';
+
+      return {
+        id: timeline.id,
+        label: trimmed.length > 0 ? trimmed : timeline.id,
+      };
+    })
     .sort((left, right) => left.label.localeCompare(right.label));
 }
 

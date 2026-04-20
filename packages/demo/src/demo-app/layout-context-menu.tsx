@@ -8,7 +8,6 @@ import type { DemoAppLayoutProps } from './layout-types';
 
 export function LayoutContextMenu(props: DemoAppLayoutProps): React.JSX.Element | null {
   const {
-    clipboardRef,
     contextMenu,
     contextMenuElement,
     destructiveContextActionDisabled,
@@ -44,8 +43,7 @@ export function LayoutContextMenu(props: DemoAppLayoutProps): React.JSX.Element 
           {contextMenuElement === null ?
             <Dropdown.Item
               key="paste-selection"
-              // eslint-disable-next-line react-hooks/refs -- context menu opens via `contextMenu` state change, so render always sees the latest clipboard length
-              isDisabled={clipboardRef.current.length === 0}
+              isDisabled={!contextMenu.hasClipboardContents}
               onAction={pasteClipboardElements}
             >
               <span className="inline-flex w-full items-center gap-2">
@@ -75,8 +73,7 @@ export function LayoutContextMenu(props: DemoAppLayoutProps): React.JSX.Element 
               </Dropdown.Item>
               <Dropdown.Item
                 key="paste-selection"
-                // eslint-disable-next-line react-hooks/refs -- context menu opens via `contextMenu` state change, so render always sees the latest clipboard length
-                isDisabled={clipboardRef.current.length === 0}
+                isDisabled={!contextMenu.hasClipboardContents}
                 onAction={pasteClipboardElements}
               >
                 <span className="inline-flex w-full items-center gap-2">

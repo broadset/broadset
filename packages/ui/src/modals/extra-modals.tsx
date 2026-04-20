@@ -1,6 +1,6 @@
 import { Button, Input, Kbd, Modal } from '@heroui/react';
 import { X } from 'lucide-react';
-import { type ChangeEvent, type JSX, useCallback, useState } from 'react';
+import { type ChangeEvent, type JSX, useCallback, useEffect, useState } from 'react';
 
 import { NumField } from '../inputs';
 import { color, sp } from '../tokens';
@@ -118,16 +118,29 @@ export function GuidePositionModal({
     onApply(localPosition);
   }, [localPosition, onApply]);
 
-  const handleKeyDown = useCallback(
-    (event: { readonly key: string; preventDefault(): void; stopPropagation(): void }) => {
+  // react-aria-components' NumberField intercepts Escape at the Input layer
+  // before it reaches any React onKeyDown prop, so the modal's inner input
+  // never lets the event bubble to HeroUI Modal's native dismissal. Catch it
+  // at the document level while the modal is open instead.
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    const handleDocumentKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
         onClose();
       }
-    },
-    [onClose],
-  );
+    };
+
+    document.addEventListener('keydown', handleDocumentKeyDown, true);
+
+    return () => {
+      document.removeEventListener('keydown', handleDocumentKeyDown, true);
+    };
+  }, [isOpen, onClose]);
 
   return (
     <ModalShell isOpen={isOpen} size="sm" title="Guide Position" onClose={onClose}>
@@ -135,10 +148,12 @@ export function GuidePositionModal({
         <span style={{ flex: 1, fontWeight: 700 }}>Guide Position</span>
       </Modal.Header>
       <Modal.Body>
-        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- wrapper only exists to capture Escape for the inner NumField; the modal's default Escape handler is reserved for dismissing the dialog. */}
-        <div onKeyDown={handleKeyDown}>
-          <NumField label={`Position (${unit})`} value={localPosition} onChange={setLocalPosition} onCommit={onApply} />
-        </div>
+        <NumField
+          label={`Position (${unit})`}
+          value={localPosition}
+          onChange={setLocalPosition}
+          onCommit={onApply}
+        />
       </Modal.Body>
       <Modal.Footer>
         <Button aria-label="Delete guide" variant="danger" onPress={onDelete}>

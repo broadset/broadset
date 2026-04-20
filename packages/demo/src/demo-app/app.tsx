@@ -589,7 +589,6 @@ export function DemoApp(): React.JSX.Element {
     <DemoAppLayout
       activeDialog={activeDialog}
       canvasSettings={canvasSettings}
-      clipboardRef={clipboardRef}
       contextMenu={contextMenu}
       contextMenuElement={contextMenuElement}
       currentDocument={currentDocument}

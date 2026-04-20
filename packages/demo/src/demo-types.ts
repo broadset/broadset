@@ -44,6 +44,7 @@ export interface SidebarPreferences {
 
 export interface ContextMenuState {
   readonly elementId: string | null;
+  readonly hasClipboardContents: boolean;
   readonly x: number;
   readonly y: number;
 }

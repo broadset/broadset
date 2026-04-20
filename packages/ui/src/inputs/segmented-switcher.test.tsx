@@ -66,9 +66,9 @@ describe('SegmentedSwitcher', () => {
       />,
     );
 
-    const group = screen.getByRole('group', { name: 'Text align' });
+    const selectedButton = screen.getByRole('button', { name: 'Left' });
 
-    fireEvent.keyDown(group, { key: 'ArrowRight' });
+    fireEvent.keyDown(selectedButton, { key: 'ArrowRight' });
 
     expect(onChange).toHaveBeenCalledWith('center');
   });

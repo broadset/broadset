@@ -1,7 +1,3 @@
-/* eslint-disable jsx-a11y/no-static-element-interactions, jsx-a11y/no-noninteractive-tabindex --
-   Test harness. Hosts a TimelineEditor under a key-capture wrapper used only
-   in CT; production a11y is the TimelineEditor component's concern. */
-
 import type { Keyframe, Timeline } from '@broadset/model';
 import { TimelineEditor } from '@broadset/ui';
 import { type JSX, useMemo, useState } from 'react';

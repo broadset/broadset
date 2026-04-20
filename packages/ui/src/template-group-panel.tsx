@@ -2,7 +2,7 @@ import type { TemplateGroup, TemplateGroupRole } from '@broadset/model';
 import { Accordion, Button, Input, ListBox, Select } from '@heroui/react';
 import { Folder, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { JSX } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { FieldShell, ICON_SIZE, isTemplateGroupRole, TEMPLATE_GROUP_ROLE_OPTIONS } from './panel-types';
 import { color, font, glassPanelStyle, sp } from './tokens';
@@ -40,6 +40,13 @@ export function TemplateGroupPanel({
   const [newGroupName, setNewGroupName] = useState('');
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (editingGroupId !== null) {
+      renameInputRef.current?.focus();
+    }
+  }, [editingGroupId]);
 
   const handleCreateGroup = useCallback(() => {
     const trimmed = newGroupName.trim();
@@ -112,9 +119,8 @@ export function TemplateGroupPanel({
                 <Accordion.Trigger>
                   {editingGroupId === group.groupId ?
                     <Input
+                      ref={renameInputRef}
                       aria-label="Rename group"
-                      // eslint-disable-next-line jsx-a11y/no-autofocus -- user-initiated rename flow; focus is expected so typing starts immediately
-                      autoFocus
                       value={editingName}
                       onBlur={commitRename}
                       onKeyDown={(e) => {

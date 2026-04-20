@@ -4,33 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { sp } from '../tokens';
 import { parseCssLength } from '../utilities';
+import { evaluateArithmeticExpression } from './arithmetic';
 import { convertLength, CSS_LENGTH_UNITS, type CssUnit, isCssUnit, toCssUnit } from './css-length';
 
 const DECIMAL_DISPLAY_PRECISION = 2;
 const UNITLESS_MARKER = '—' as const;
 
 type DisplayCssUnit = CssUnit | typeof UNITLESS_MARKER;
-
-const EXPRESSION_RE = /^[\d+\-*/.() \t]+$/;
-
-/** Evaluate arithmetic expression like "200+50" or "(100+20)*2". Returns null for anything unsafe or unparseable. */
-function evaluateExpression(raw: string): number | null {
-  const trimmed = raw.trim();
-
-  if (trimmed === '' || !EXPRESSION_RE.test(trimmed) || /[+\-*/]{2,}/.test(trimmed)) {
-    return null;
-  }
-
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- `trimmed` has already been regex-gated to numeric expressions with single operators; evaluator is confined to returning a number
-    const evaluator = new Function(`"use strict"; return (${trimmed});`) as () => unknown;
-    const result: unknown = evaluator();
-
-    return typeof result === 'number' && Number.isFinite(result) ? result : null;
-  } catch {
-    return null;
-  }
-}
 
 function parseRawNumber(rawValue: unknown): number | null {
   if (typeof rawValue !== 'string' && typeof rawValue !== 'number') {
@@ -48,7 +28,7 @@ function parseRawNumber(rawValue: unknown): number | null {
     return parsed;
   }
 
-  return evaluateExpression(stringValue);
+  return evaluateArithmeticExpression(stringValue);
 }
 
 const COMPACT_BUTTON_STYLE = {

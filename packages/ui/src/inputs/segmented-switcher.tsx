@@ -1,5 +1,5 @@
 import { Button, ButtonGroup } from '@heroui/react';
-import type { JSX } from 'react';
+import type { JSX, KeyboardEvent } from 'react';
 
 import { sp } from '../tokens';
 
@@ -23,54 +23,45 @@ export function SegmentedSwitcher<TValue extends string>({
 }: SegmentedSwitcherProps<TValue>): JSX.Element {
   const selectedIndex = options.findIndex((option) => option.value === value);
 
+  const handleButtonKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
+    if (selectedIndex === -1 || options.length === 0) {
+      return;
+    }
+
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+
+      const nextIndex = (selectedIndex + 1) % options.length;
+      const nextOption = options[nextIndex];
+
+      if (nextOption !== undefined) {
+        onChange(nextOption.value);
+      }
+
+      return;
+    }
+
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+
+      const nextIndex = (selectedIndex - 1 + options.length) % options.length;
+      const nextOption = options[nextIndex];
+
+      if (nextOption !== undefined) {
+        onChange(nextOption.value);
+      }
+    }
+  };
+
   return (
-    /* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex --
-       segmented switcher needs keyboard arrow-nav on the group itself to move
-       focus between its buttons; role="group" is the accurate semantic (not
-       radiogroup, because children are Buttons, not radios). */
-    <div
-      role="group"
-      aria-label={ariaLabel}
-      tabIndex={0}
-      style={{ display: 'flex', gap: sp('sp-01') }}
-      onKeyDown={(event) => {
-        if (selectedIndex === -1 || options.length === 0) {
-          return;
-        }
-
-        if (event.key === 'ArrowRight') {
-          event.preventDefault();
-
-          const nextIndex = (selectedIndex + 1) % options.length;
-
-          const nextOption = options[nextIndex];
-
-          if (nextOption !== undefined) {
-            onChange(nextOption.value);
-          }
-
-          return;
-        }
-
-        if (event.key === 'ArrowLeft') {
-          event.preventDefault();
-
-          const nextIndex = (selectedIndex - 1 + options.length) % options.length;
-
-          const nextOption = options[nextIndex];
-
-          if (nextOption !== undefined) {
-            onChange(nextOption.value);
-          }
-        }
-      }}
-    >
+    <div role="group" aria-label={ariaLabel} style={{ display: 'flex', gap: sp('sp-01') }}>
       <ButtonGroup>
         {options.map((option) => (
           <Button
             key={option.value}
             aria-label={option.label}
             variant={option.value === value ? 'secondary' : 'ghost'}
+            onKeyDown={handleButtonKeyDown}
             onPress={() => {
               onChange(option.value);
             }}
@@ -80,6 +71,5 @@ export function SegmentedSwitcher<TValue extends string>({
         ))}
       </ButtonGroup>
     </div>
-    /* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */
   );
 }

@@ -306,6 +306,12 @@ export function ScreenPreview({
     };
   }, [documentData.canvas.width, documentData.canvas.height]);
 
+  const documentDataRef = useRef(documentData);
+
+  useEffect(() => {
+    documentDataRef.current = documentData;
+  }, [documentData]);
+
   useEffect(() => {
     const host = hostRef.current;
 
@@ -313,14 +319,15 @@ export function ScreenPreview({
       return undefined;
     }
 
+    const initialDocument = documentDataRef.current;
     const rendererController = createScreenRenderer({ host });
-    const playbackController = createPlaybackController({ root: host, animations: documentData.animations });
+    const playbackController = createPlaybackController({ root: host, animations: initialDocument.animations });
 
     rendererRef.current = rendererController;
     playbackRef.current = playbackController;
     onPlaybackControllerChange?.(playbackController);
 
-    rendererController.updateDocument(documentData);
+    rendererController.updateDocument(initialDocument);
     playbackController.attach();
     playbackController.seek(Infinity);
 
@@ -331,11 +338,6 @@ export function ScreenPreview({
       rendererRef.current = null;
       onPlaybackControllerChange?.(null);
     };
-    // This effect intentionally uses `documentData` only for the initial
-    // setup; subsequent updates flow through the dedicated effect below, so
-    // re-running this one on every documentData change would tear down and
-    // rebuild the playback + renderer controllers needlessly.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onPlaybackControllerChange]);
 
   useEffect(() => {
