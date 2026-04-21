@@ -6,7 +6,7 @@ const DEFAULT_CLIP_PATH = 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)';
 const MIN_CLIP_PATH_POINTS = 3;
 const POLYGON_POINT_PATTERN = /(-?\d+(?:\.\d+)?%?)\s+(-?\d+(?:\.\d+)?%?)/g;
 
-function parsePolygonPoints(clipPath: string): { readonly x: number; readonly y: number }[] | null {
+export function parsePolygonPoints(clipPath: string): { readonly x: number; readonly y: number }[] | null {
   const polygonMatch = /^polygon\(([^)]*)\)$/i.exec(clipPath.trim());
 
   if (polygonMatch?.[1] === undefined) {

@@ -1,4 +1,11 @@
-import { cancelPlacement, type EditorStore } from '@broadset/editor';
+import {
+  cancelPlacement,
+  closeAndStopPathDrawing,
+  commitAndStopPathDrawing,
+  type EditorStore,
+  stopClipPathEditing,
+  stopPathEditing,
+} from '@broadset/editor';
 import type { Dispatch, SetStateAction } from 'react';
 import { useEffect } from 'react';
 
@@ -70,10 +77,42 @@ export function useShellBrowserEffects({
     const handleEscape = (event: KeyboardEvent): void => {
       setContextMenu(null);
 
-      if (editorStore.getState().pendingPlacementType !== null) {
+      const state = editorStore.getState();
+
+      if (state.pathDrawingElementId !== null) {
+        event.preventDefault();
+        commitAndStopPathDrawing(editorStore);
+
+        return;
+      }
+
+      if (state.pathEditingElementId !== null) {
+        event.preventDefault();
+        stopPathEditing(editorStore);
+
+        return;
+      }
+
+      if (state.clipPathEditingElementId !== null) {
+        event.preventDefault();
+        stopClipPathEditing(editorStore);
+
+        return;
+      }
+
+      if (state.pendingPlacementType !== null) {
         event.preventDefault();
         cancelPlacement(editorStore);
       }
+    };
+
+    const handlePathDrawingEnter = (event: KeyboardEvent): boolean => {
+      if (editorStore.getState().pathDrawingElementId === null) return false;
+
+      event.preventDefault();
+      closeAndStopPathDrawing(editorStore);
+
+      return true;
     };
 
     const handleDeleteSelection = (event: KeyboardEvent): boolean => {
@@ -113,6 +152,10 @@ export function useShellBrowserEffects({
       }
 
       if (isEditableTarget(event.target)) return;
+
+      if (event.key === 'Enter') {
+        if (handlePathDrawingEnter(event)) return;
+      }
 
       if (event.key === 'Backspace' || event.key === 'Delete') {
         if (handleDeleteSelection(event)) return;

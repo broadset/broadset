@@ -1,4 +1,4 @@
-import type { ElementUpdate } from '@broadset/editor';
+import type { EditorStore, ElementUpdate } from '@broadset/editor';
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 import { createPlaybackController, type PlaybackController } from '@broadset/playback';
 import { createScreenRenderer, type ScreenRendererController } from '@broadset/renderer';
@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ZOOM_STEP } from '../demo-types';
 import { clampCanvasZoom } from '../demo-utils';
+import { ClipPathEditingOverlay } from './clip-path-editing-overlay';
+import { PathEditingOverlay } from './path-editing-overlay';
 import { SelectionTransformWidget } from './selection-transform-widget';
 
 const WHEEL_GESTURE_LOCK_MS = 140;
@@ -117,6 +119,9 @@ function applyWheelZoom(
 interface ScreenPreviewProps {
   readonly allElements: readonly BroadsetElement[];
   readonly selectedElement: BroadsetElement | null;
+  readonly pathEditingElement: BroadsetElement | null;
+  readonly clipPathEditingElement: BroadsetElement | null;
+  readonly editorStore: EditorStore;
   readonly onElementTransformPreview: (elementId: string, updates: ElementUpdate) => void;
   readonly onElementTransformCommit: (elementId: string, updates: ElementUpdate) => void;
   readonly documentData: BroadsetDocument;
@@ -140,6 +145,9 @@ interface ScreenPreviewProps {
 export function ScreenPreview({
   allElements,
   selectedElement,
+  pathEditingElement,
+  clipPathEditingElement,
+  editorStore,
   onElementTransformPreview,
   onElementTransformCommit,
   documentData,
@@ -212,6 +220,22 @@ export function ScreenPreview({
       {
         ...selectedElement,
         position: getElementWorldOffset(selectedElement),
+      }
+    );
+
+  const pathEditingWorldElement =
+    pathEditingElement === null ? null : (
+      {
+        ...pathEditingElement,
+        position: getElementWorldOffset(pathEditingElement),
+      }
+    );
+
+  const clipPathEditingWorldElement =
+    clipPathEditingElement === null ? null : (
+      {
+        ...clipPathEditingElement,
+        position: getElementWorldOffset(clipPathEditingElement),
       }
     );
 
@@ -527,6 +551,16 @@ export function ScreenPreview({
           overlayRoot={overlayRoot}
           onCommitUpdate={handleCommitTransform}
           onPreviewUpdate={handlePreviewTransform}
+        />
+      )}
+      {pathEditingWorldElement === null || overlayRoot === null ? null : (
+        <PathEditingOverlay editorStore={editorStore} element={pathEditingWorldElement} overlayRoot={overlayRoot} />
+      )}
+      {clipPathEditingWorldElement === null || overlayRoot === null ? null : (
+        <ClipPathEditingOverlay
+          editorStore={editorStore}
+          element={clipPathEditingWorldElement}
+          overlayRoot={overlayRoot}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-import { cancelPlacement, type EditorStore, placeElement, startPlacement } from '@broadset/editor';
+import { appendPathPoint, cancelPlacement, type EditorStore, placeElement, startPlacement } from '@broadset/editor';
 import type { BooleanOperation, BroadsetElement } from '@broadset/model';
 import type { PropertyValue } from '@broadset/ui';
 import { type Dispatch, type MouseEvent, type SetStateAction, useCallback } from 'react';
@@ -116,6 +116,16 @@ export function useCommandHandlers({
       const target =
         event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-element-id]') : null;
       const state = editorStore.getState();
+
+      if (state.pathDrawingElementId !== null) {
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const docX = ((event.clientX - bounds.left) / Math.max(bounds.width, 1)) * currentDocumentCanvas.width;
+        const docY = ((event.clientY - bounds.top) / Math.max(bounds.height, 1)) * currentDocumentCanvas.height;
+
+        appendPathPoint(editorStore, docX, docY);
+
+        return;
+      }
 
       if (state.pendingPlacementType !== null) {
         const bounds = event.currentTarget.getBoundingClientRect();

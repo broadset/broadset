@@ -86,7 +86,18 @@ export function DemoAppLayout(props: DemoAppLayoutProps): React.JSX.Element {
                   >
                     <DemoCanvasSurface
                       allElements={currentDocument.elements}
-                      cursor={editorState.pendingPlacementType === null ? 'default' : 'crosshair'}
+                      clipPathEditingElement={
+                        editorState.clipPathEditingElementId === null ?
+                          null
+                        : (currentDocument.elements.find(
+                            (candidate) => candidate.id === editorState.clipPathEditingElementId,
+                          ) ?? null)
+                      }
+                      cursor={
+                        editorState.pendingPlacementType !== null || editorState.pathDrawingElementId !== null ?
+                          'crosshair'
+                        : 'default'
+                      }
                       editorStore={editorStore}
                       isPlaying={isPlaying}
                       onCanvasClick={handleCanvasClick}
@@ -95,6 +106,13 @@ export function DemoAppLayout(props: DemoAppLayoutProps): React.JSX.Element {
                       onElementTransformPreview={handleElementTransformPreview}
                       onPlaybackControllerChange={props.setPreviewPlaybackController}
                       onViewportChange={handleCanvasViewportChange}
+                      pathEditingElement={
+                        editorState.pathEditingElementId === null ?
+                          null
+                        : (currentDocument.elements.find(
+                            (candidate) => candidate.id === editorState.pathEditingElementId,
+                          ) ?? null)
+                      }
                       renderDocument={renderDocument}
                       resetToken={resetToken}
                       selectedElement={selectedElement}

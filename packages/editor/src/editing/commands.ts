@@ -1,4 +1,10 @@
-import { createDefaultElement, type EditorConfig, editorConfigSchema } from '@broadset/model';
+import {
+  type BroadsetElement,
+  createDefaultElement,
+  type EditorConfig,
+  editorConfigSchema,
+  type PageElementInstance,
+} from '@broadset/model';
 
 import { getElementDefaults, type PluginDefaults } from '../element-defaults';
 import type { EditingMode, EditorStore } from '../store-actions';
@@ -28,6 +34,18 @@ export function cancelPlacement(store: EditorStore): void {
     pendingPlacementType: null,
     editingMode: { type: 'none' },
   });
+}
+
+function createRootPageInstance(element: BroadsetElement): PageElementInstance {
+  return {
+    elementId: element.id,
+    transform: {
+      position: { x: element.position.x, y: element.position.y, z: 0 },
+      rotation: { x: 0, y: 0, z: element.rotation },
+      scale: { x: 1, y: 1, z: 1 },
+    },
+    visible: true,
+  };
 }
 
 export function placeElement(
@@ -67,11 +85,15 @@ export function placeElement(
     content: defaults.content,
   });
   const entersPathDrawing = elementType === 'path';
+  const newInstance = createRootPageInstance(newElement);
 
   store.setState({
     document: {
       ...state.document,
       elements: [...state.document.elements, newElement],
+      pages: state.document.pages.map((page, pageIndex) =>
+        pageIndex === state.activePageIndex ? { ...page, elements: [...page.elements, newInstance] } : page,
+      ),
     },
     activeElementIds: [newElement.id],
     pendingPlacementType: null,

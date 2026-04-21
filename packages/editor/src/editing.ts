@@ -1,6 +1,7 @@
 export {
   deleteClipPathPoint,
   insertClipPathPoint,
+  parsePolygonPoints,
   startClipPathEditing,
   stopClipPathEditing,
   updateClipPathPoint,

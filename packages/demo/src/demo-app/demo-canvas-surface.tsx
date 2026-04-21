@@ -9,6 +9,8 @@ interface DemoCanvasSurfaceProps {
   readonly editorStore: EditorStore;
   readonly allElements: readonly BroadsetElement[];
   readonly selectedElement: BroadsetElement | null;
+  readonly pathEditingElement: BroadsetElement | null;
+  readonly clipPathEditingElement: BroadsetElement | null;
   readonly renderDocument: BroadsetDocument;
   readonly isPlaying: boolean;
   readonly resetToken: number;
@@ -29,6 +31,8 @@ export function DemoCanvasSurface({
   editorStore,
   allElements,
   selectedElement,
+  pathEditingElement,
+  clipPathEditingElement,
   renderDocument,
   isPlaying,
   resetToken,
@@ -45,12 +49,15 @@ export function DemoCanvasSurface({
   return (
     <ScreenPreview
       allElements={allElements}
+      clipPathEditingElement={clipPathEditingElement}
       cursor={cursor}
       documentData={renderDocument}
+      editorStore={editorStore}
       isPlaying={isPlaying}
       onPlaybackControllerChange={onPlaybackControllerChange}
       panX={viewport.panX}
       panY={viewport.panY}
+      pathEditingElement={pathEditingElement}
       selectedElement={selectedElement}
       zoom={viewport.zoom}
       onCanvasClick={onCanvasClick}
