@@ -7,17 +7,6 @@ import { setupDemoShellMocks } from './demo-shell-test-utils';
 import { DemoApp } from './DemoApp';
 
 describe('DemoApp toolbar density rebalance', () => {
-  /** @description The document info (name + resolution) must be in the canvas chrome, not the primary toolbar, to shorten the toolbar scan path. */
-  it('displays document info in the canvas chrome instead of the primary toolbar', () => {
-    setupDemoShellMocks();
-    render(<DemoApp />);
-
-    const canvasChrome = screen.getByTestId('canvas-info-strip');
-
-    expect(canvasChrome).toBeTruthy();
-    expect(canvasChrome.textContent).toMatch(/\d+\s*[×x]\s*\d+/);
-  });
-
   /** @description The main toolbar must have visual separators between action clusters for clearer task-category grouping. */
   it('renders separators between toolbar action clusters', () => {
     setupDemoShellMocks();
@@ -40,8 +29,8 @@ describe('DemoApp toolbar density rebalance', () => {
     expect(infoStrip).toBeNull();
   });
 
-  /** @description High-frequency controls (undo/redo/play/zoom) must remain in the primary toolbar for immediate access. */
-  it('keeps high-frequency controls in the primary toolbar', () => {
+  /** @description High-frequency editing controls (undo/redo/zoom) must remain in the primary toolbar for immediate access. */
+  it('keeps high-frequency editing controls in the primary toolbar', () => {
     setupDemoShellMocks();
     render(<DemoApp />);
 
@@ -49,8 +38,23 @@ describe('DemoApp toolbar density rebalance', () => {
 
     expect(within(toolbar).getByRole('button', { name: /undo/i })).toBeTruthy();
     expect(within(toolbar).getByRole('button', { name: /redo/i })).toBeTruthy();
-    expect(within(toolbar).getByRole('button', { name: /play playback/i })).toBeTruthy();
     expect(within(toolbar).getByRole('button', { name: /zoom in/i })).toBeTruthy();
     expect(within(toolbar).getByRole('button', { name: /zoom out/i })).toBeTruthy();
+  });
+
+  /** @description Animation controls (play/pause, reset, timeline toggle) must live in the canvas bottom toolbar, not the primary toolbar. */
+  it('moves animation controls out of the primary toolbar and into the canvas bottom toolbar', () => {
+    setupDemoShellMocks();
+    render(<DemoApp />);
+
+    const primaryToolbar = screen.getByRole('toolbar', { name: /main editor toolbar/i });
+    const animationToolbar = screen.getByRole('toolbar', { name: /animation toolbar/i });
+
+    expect(within(primaryToolbar).queryByRole('button', { name: /play playback/i })).toBeNull();
+    expect(within(primaryToolbar).queryByRole('button', { name: /reset playback/i })).toBeNull();
+
+    expect(within(animationToolbar).getByRole('button', { name: /play playback/i })).toBeTruthy();
+    expect(within(animationToolbar).getByRole('button', { name: /reset playback/i })).toBeTruthy();
+    expect(within(animationToolbar).getByRole('button', { name: /open timeline view/i })).toBeTruthy();
   });
 });

@@ -41,7 +41,6 @@ function createTimeline(keyframes: readonly Keyframe[]): Timeline {
 export function TimelineHarness(): JSX.Element {
   const [timeline, setTimeline] = useState(createTimeline(BASE_KEYFRAMES));
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
 
   return (
@@ -92,21 +91,13 @@ export function TimelineHarness(): JSX.Element {
 
           setTimeline(createTimeline(keyframes));
         }}
-        onPlayTimeline={() => {
-          setIsPlaying(true);
-        }}
-        onStopTimeline={() => {
-          setIsPlaying(false);
-        }}
         onSeekTimeline={(timeMs) => {
           setCurrentTimeMs(timeMs);
         }}
         currentTimeMs={currentTimeMs}
-        isPlaying={isPlaying}
       />
       <output data-testid="timeline-offsets">{timeline.keyframes.map((frame) => frame.offsetMs).join(',')}</output>
       <output data-testid="timeline-selected">{selectedIndex === null ? 'none' : String(selectedIndex)}</output>
-      <output data-testid="timeline-playing">{String(isPlaying)}</output>
       <output data-testid="timeline-time">{String(currentTimeMs)}</output>
     </div>
   );

@@ -221,7 +221,7 @@ describe('DemoApp playback shell lifecycle', () => {
     fireEvent.click(screen.getByTestId('timeline-track'), { clientX: 99_999 });
 
     seekTimeline.mockClear();
-    fireEvent.click(screen.getByLabelText('Play'));
+    fireEvent.click(screen.getByTestId('demo-playback-toggle'));
 
     await waitFor(() => {
       expect(seekTimeline).toHaveBeenCalledWith(
@@ -261,7 +261,7 @@ describe('DemoApp playback shell lifecycle', () => {
     setupDemoShellMocks();
     render(<DemoApp />);
 
-    expect(screen.getByText('Recovered demo layout')).toBeTruthy();
+    expect(screen.getByLabelText(/Screen preview for Recovered demo layout/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /^save$/i })).toBeNull();
     expect(screen.getByRole('button', { name: /save as json/i })).toBeTruthy();
   });

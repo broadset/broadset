@@ -4,8 +4,8 @@ import type { JSX, ReactNode } from 'react';
 
 import { color, font, radius, sp, zLayer } from '../tokens';
 
-const DEFAULT_HEIGHT_PX = 240;
-const PANEL_INSET = sp('sp-04');
+export const TIMELINE_BOTTOM_PANEL_HEIGHT_PX = 240;
+export const TIMELINE_BOTTOM_PANEL_SIDE_INSET_PX = 16;
 
 export interface TimelineBottomPanelProps {
   readonly isOpen: boolean;
@@ -16,7 +16,7 @@ export interface TimelineBottomPanelProps {
 }
 
 export function TimelineBottomPanel(props: TimelineBottomPanelProps): JSX.Element {
-  const { isOpen, onClose, height = DEFAULT_HEIGHT_PX, className, children } = props;
+  const { isOpen, onClose, height = TIMELINE_BOTTOM_PANEL_HEIGHT_PX, className, children } = props;
 
   return (
     <div
@@ -26,8 +26,8 @@ export function TimelineBottomPanel(props: TimelineBottomPanelProps): JSX.Elemen
       style={{
         position: 'fixed',
         bottom: 0,
-        left: PANEL_INSET,
-        right: PANEL_INSET,
+        left: `${String(TIMELINE_BOTTOM_PANEL_SIDE_INSET_PX)}px`,
+        right: `${String(TIMELINE_BOTTOM_PANEL_SIDE_INSET_PX)}px`,
         height: `${String(height)}px`,
         zIndex: zLayer('overlay'),
         backgroundColor: color('surface'),

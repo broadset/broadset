@@ -1,6 +1,6 @@
 import { sp } from '@broadset/ui';
 import { Separator } from '@heroui/react';
-import { Maximize2, Minimize2, Minus, Pause, Play, Plus, RotateCcw } from 'lucide-react';
+import { Maximize2, Minimize2, Minus, Plus, RotateCcw } from 'lucide-react';
 
 import { IconToolButton } from '../demo-components';
 import { ZOOM_STEP } from '../demo-types';
@@ -12,14 +12,11 @@ export function LayoutToolbarActions(props: DemoAppLayoutProps): React.JSX.Eleme
     editorStore,
     handleAlignSelection,
     handleDistributeSelection,
-    handleResetPlayback,
     handleToggleFullscreen,
-    handleTogglePlayback,
     handleZoomStep,
     handleZoomToFit,
     hasGroupedSelection,
     isFullscreen,
-    isPlaying,
     selectedElements,
     selectedMovableElements,
     temporalState,
@@ -53,18 +50,6 @@ export function LayoutToolbarActions(props: DemoAppLayoutProps): React.JSX.Eleme
           }}
         >
           <RotateCcw size={16} style={{ transform: 'scaleX(-1)' }} />
-        </IconToolButton>
-        <IconToolButton
-          label={isPlaying ? 'Pause playback' : 'Play playback'}
-          testId="demo-playback-toggle"
-          onPress={handleTogglePlayback}
-        >
-          {isPlaying ?
-            <Pause size={16} />
-          : <Play size={16} />}
-        </IconToolButton>
-        <IconToolButton label="Reset playback" testId="demo-playback-reset" onPress={handleResetPlayback}>
-          <RotateCcw size={16} />
         </IconToolButton>
       </div>
 

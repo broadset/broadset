@@ -319,40 +319,5 @@ describe('TimelineEditor — keyframe drag', () => {
 });
 
 /* ---------------------------------------------------------------------------
- * TimelineEditor — Playback
- * --------------------------------------------------------------------------- */
-
-describe('TimelineEditor — playback controls', () => {
-  /**
-   * @description The play button must call onPlayTimeline without passing an onComplete callback.
-   */
-  it('calls onPlayTimeline without onComplete when play is pressed', () => {
-    const kf = makeKeyframe({ offsetMs: 0 });
-    const timeline = makeTimeline({ keyframes: [kf] });
-    const props = defaultEditorProps({ timeline });
-
-    render(<TimelineEditor {...props} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /play/i }));
-
-    expect(props.onPlayTimeline).toHaveBeenCalledTimes(1);
-    expect(props.onPlayTimeline).toHaveBeenCalledWith();
-  });
-
-  /**
-   * @description When playing, a stop button must be available.
-   */
-  it('shows stop button while playing', () => {
-    const kf = makeKeyframe({ offsetMs: 0 });
-    const timeline = makeTimeline({ keyframes: [kf] });
-    const props = defaultEditorProps({ timeline, isPlaying: true });
-
-    render(<TimelineEditor {...props} />);
-
-    expect(screen.getByRole('button', { name: /stop/i })).toBeDefined();
-  });
-});
-
-/* ---------------------------------------------------------------------------
  * TimelineBottomPanel
  * --------------------------------------------------------------------------- */

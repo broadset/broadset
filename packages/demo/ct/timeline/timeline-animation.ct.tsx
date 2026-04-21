@@ -67,25 +67,6 @@ test('dragging a keyframe marker commits a new offset', async ({ mount, page }) 
 });
 
 /**
- * @description Validates `project/spec/ui/timeline.md` L-04: timeline playback
- * controls switch between play and pause/stop states and update runtime state.
- */
-test('playback controls toggle play and stop states', async ({ mount, page }) => {
-  await mount(<TimelineHarness />);
-
-  await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
-  await page.getByRole('button', { name: 'Play' }).click();
-
-  await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
-  await expect(page.getByTestId('timeline-playing')).toHaveText('true');
-
-  await page.getByRole('button', { name: 'Stop' }).click();
-  await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
-  await expect(page.getByTestId('timeline-playing')).toHaveText('false');
-});
-
-/**
  * @description Validates `project/spec/ui/timeline.md` L-06: animation binding
  * sections support add/remove operations for both state and modifier bindings.
  */

@@ -33,7 +33,6 @@ function createTimeline(keyframes: readonly Keyframe[]): Timeline {
 export function TimelineDeleteUndoHarness(): JSX.Element {
   const [timeline, setTimeline] = useState(createTimeline(BASE_KEYFRAMES));
   const [selectedIndex, setSelectedIndex] = useState<number | null>(1);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
   const [undoStack, setUndoStack] = useState<readonly Timeline[]>([]);
 
@@ -119,15 +118,8 @@ export function TimelineDeleteUndoHarness(): JSX.Element {
 
           setTimeline(next);
         }}
-        onPlayTimeline={() => {
-          setIsPlaying(true);
-        }}
-        onStopTimeline={() => {
-          setIsPlaying(false);
-        }}
         onSeekTimeline={setCurrentTimeMs}
         currentTimeMs={currentTimeMs}
-        isPlaying={isPlaying}
       />
       <button aria-label="Delete keyframe" onClick={deleteSelected} type="button">
         Delete keyframe
@@ -249,7 +241,6 @@ export function TimelineSnapshotRestoreHarness(): JSX.Element {
   const [timeline, setTimeline] = useState(createTimeline(BASE_KEYFRAMES));
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [events, setEvents] = useState<readonly string[]>([]);
 
   const record = (entry: string): void => {
@@ -287,22 +278,12 @@ export function TimelineSnapshotRestoreHarness(): JSX.Element {
           setTimeline(next);
         }}
         onChangeEasing={() => undefined}
-        onPlayTimeline={() => {
-          restoreSnapshot();
-          record('play');
-          setIsPlaying(true);
-        }}
-        onStopTimeline={() => {
-          setIsPlaying(false);
-          record('stop');
-        }}
         onSeekTimeline={(nextTimeMs) => {
           restoreSnapshot();
           record('seek');
           setCurrentTimeMs(nextTimeMs);
         }}
         currentTimeMs={currentTimeMs}
-        isPlaying={isPlaying}
       />
       <output data-testid="snapshot-sequence">{events.join('>')}</output>
     </div>

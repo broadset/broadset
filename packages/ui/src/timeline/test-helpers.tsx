@@ -146,11 +146,8 @@ export function defaultEditorProps(overrides: Partial<TimelineEditorProps> = {})
     onAddKeyframe: vi.fn<() => void>(),
     onMoveKeyframe: vi.fn<(index: number, offsetMs: number) => void>(),
     onChangeEasing: vi.fn<(index: number, easing: EasingMode) => void>(),
-    onPlayTimeline: vi.fn<() => void>(),
-    onStopTimeline: vi.fn<() => void>(),
     onSeekTimeline: vi.fn<(timeMs: number) => void>(),
     currentTimeMs: 0,
-    isPlaying: false,
     ...overrides,
   };
 }

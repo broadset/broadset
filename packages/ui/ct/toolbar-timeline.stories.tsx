@@ -82,13 +82,10 @@ export function TimelineHarness(): React.JSX.Element {
         }}
         onMoveKeyframe={() => undefined}
         onChangeEasing={() => undefined}
-        onPlayTimeline={() => undefined}
-        onStopTimeline={() => undefined}
         onSeekTimeline={(timeMs) => {
           setSeekValue(String(timeMs));
         }}
         currentTimeMs={0}
-        isPlaying={false}
       />
       <output aria-label="Seek value">{seekValue}</output>
     </div>

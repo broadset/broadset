@@ -280,6 +280,7 @@ export function resolveString(input: ResolveStringInput): ResolvedString {
 }
 
 export type WheelAction = 'pan' | 'zoom' | 'none';
+export type WheelDevice = 'mouse-wheel' | 'trackpad';
 
 interface WheelInput {
   readonly deltaX: number;
@@ -287,7 +288,47 @@ interface WheelInput {
   readonly deltaMode: number;
   readonly ctrlKey: boolean;
   readonly altKey: boolean;
+  readonly wheelDeltaY?: number | undefined;
   readonly screenReaderActive?: boolean | undefined;
+}
+
+const MOUSE_WHEEL_DELTA_STEP = 120;
+const MOUSE_WHEEL_PIXEL_FALLBACK_THRESHOLD = 80;
+
+/**
+ * Identifies whether a WheelEvent originated from a physical mouse wheel vs. a trackpad.
+ *
+ * Magnitude-based heuristics alone are unreliable on macOS Chrome/Safari, where a single
+ * physical wheel click fires a burst of pixel-mode events whose deltaY values vary wildly
+ * due to kinetic scroll acceleration — some events would clear an `|deltaY| >= 80` gate,
+ * some wouldn't, producing a confused mix of zoom and pan within one gesture.
+ *
+ * The reliable signals used here:
+ *   1. `deltaMode !== 0` — Firefox (and older browsers) report mouse wheels in line/page
+ *      mode; trackpads always use pixel mode.
+ *   2. `wheelDeltaY` is a non-zero multiple of 120 — Chrome/Safari emit this non-standard
+ *      property for every mouse-wheel event regardless of the accelerated `deltaY` value.
+ *   3. Fallback for environments without `wheelDeltaY`: integer `deltaY`, `deltaX === 0`,
+ *      and magnitude >= 80 (per the canvas spec).
+ */
+export function classifyWheelDevice(input: WheelInput): WheelDevice {
+  if (input.deltaMode !== 0) return 'mouse-wheel';
+
+  const wheelDeltaY = input.wheelDeltaY;
+
+  if (typeof wheelDeltaY === 'number' && wheelDeltaY !== 0 && wheelDeltaY % MOUSE_WHEEL_DELTA_STEP === 0) {
+    return 'mouse-wheel';
+  }
+
+  if (
+    input.deltaX === 0 &&
+    Number.isInteger(input.deltaY) &&
+    Math.abs(input.deltaY) >= MOUSE_WHEEL_PIXEL_FALLBACK_THRESHOLD
+  ) {
+    return 'mouse-wheel';
+  }
+
+  return 'trackpad';
 }
 
 export function classifyWheelInput(input: WheelInput): WheelAction {
@@ -295,30 +336,12 @@ export function classifyWheelInput(input: WheelInput): WheelAction {
     return 'none';
   }
 
-  if (input.deltaMode !== 0) {
-    if (input.ctrlKey || input.altKey) {
-      return 'pan';
-    }
-
-    return 'zoom';
+  if (classifyWheelDevice(input) === 'mouse-wheel') {
+    // Physical mouse wheel: no modifier zooms; ctrl/meta/alt remap to pan per canvas spec.
+    return input.ctrlKey || input.altKey ? 'pan' : 'zoom';
   }
 
-  if (input.ctrlKey || input.altKey) {
-    return 'zoom';
-  }
-
-  const absoluteDeltaX = Math.abs(input.deltaX);
-  const absoluteDeltaY = Math.abs(input.deltaY);
-
-  // macOS browsers can report physical mouse-wheel steps as large pixel deltas instead of line deltas.
-  // Treat those coarse vertical jumps as zoom so plain mouse-wheel scrolling still follows the canvas spec.
-  if (absoluteDeltaY >= 60 && absoluteDeltaY >= absoluteDeltaX * 2) {
-    return 'zoom';
-  }
-
-  if (absoluteDeltaX > 0.5) {
-    return 'pan';
-  }
-
-  return absoluteDeltaY >= 60 ? 'zoom' : 'pan';
+  // Trackpad: natural two-finger scroll pans; modifier keys (including browser-synthesized
+  // ctrlKey on pinch) zoom.
+  return input.ctrlKey || input.altKey ? 'zoom' : 'pan';
 }

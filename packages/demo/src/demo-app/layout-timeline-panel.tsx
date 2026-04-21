@@ -9,10 +9,7 @@ export function LayoutTimelinePanel(props: DemoAppLayoutProps): React.JSX.Elemen
     handleAnimationAddKeyframe,
     handleAnimationChangeEasing,
     handleAnimationMoveKeyframe,
-    handleAnimationPlayTimeline,
     handleAnimationSeekTimeline,
-    handleAnimationStopTimeline,
-    isTimelinePreviewPlaying,
     setEditingTimeline,
     setEditingTimelineSelectedKf,
     timelinePreviewCurrentTimeMs,
@@ -34,11 +31,8 @@ export function LayoutTimelinePanel(props: DemoAppLayoutProps): React.JSX.Elemen
           onAddKeyframe={handleAnimationAddKeyframe}
           onMoveKeyframe={handleAnimationMoveKeyframe}
           onChangeEasing={handleAnimationChangeEasing}
-          onPlayTimeline={handleAnimationPlayTimeline}
-          onStopTimeline={handleAnimationStopTimeline}
           onSeekTimeline={handleAnimationSeekTimeline}
           currentTimeMs={timelinePreviewCurrentTimeMs}
-          isPlaying={isTimelinePreviewPlaying}
         />
       )}
     </TimelineBottomPanel>

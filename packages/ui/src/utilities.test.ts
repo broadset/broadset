@@ -5,6 +5,7 @@ import {
   buildFilter,
   buildTextShadow,
   buildTimelineOptions,
+  classifyWheelDevice,
   classifyWheelInput,
   getModifierBindings,
   getStateBindings,
@@ -154,5 +155,54 @@ describe('wheel input classification', () => {
     expect(classifyWheelInput({ deltaX: 0, deltaY: 3, deltaMode: 1, ctrlKey: false, altKey: false })).toBe('zoom');
     expect(classifyWheelInput({ deltaX: 0, deltaY: 3, deltaMode: 1, ctrlKey: true, altKey: false })).toBe('pan');
     expect(classifyWheelInput({ deltaX: 0, deltaY: 3, deltaMode: 1, ctrlKey: false, altKey: true })).toBe('pan');
+  });
+
+  /** @description On macOS Chrome/Safari, a physical mouse wheel fires pixel-mode events with variable deltaY due to kinetic acceleration. wheelDeltaY is always a multiple of 120 for mouse wheels, so it must take precedence over deltaY magnitude — otherwise tail events with small deltaY would flip from zoom to pan mid-scroll. */
+  it('treats Chrome/Safari mouse-wheel pixel-mode events with wheelDeltaY as zoom regardless of accelerated deltaY magnitude', () => {
+    const tailEvent = { deltaX: 0, deltaY: -4, deltaMode: 0, ctrlKey: false, altKey: false, wheelDeltaY: 120 };
+    const midEvent = { deltaX: 0, deltaY: -40, deltaMode: 0, ctrlKey: false, altKey: false, wheelDeltaY: 120 };
+    const burstEvent = { deltaX: 0, deltaY: -220, deltaMode: 0, ctrlKey: false, altKey: false, wheelDeltaY: 360 };
+
+    expect(classifyWheelDevice(tailEvent)).toBe('mouse-wheel');
+    expect(classifyWheelDevice(midEvent)).toBe('mouse-wheel');
+    expect(classifyWheelDevice(burstEvent)).toBe('mouse-wheel');
+    expect(classifyWheelInput(tailEvent)).toBe('zoom');
+    expect(classifyWheelInput(midEvent)).toBe('zoom');
+    expect(classifyWheelInput(burstEvent)).toBe('zoom');
+  });
+
+  /** @description Trackpads produce fractional deltaY and non-120-divisible wheelDeltaY. Those events must classify as trackpad so small vertical swipes pan the canvas instead of zooming. */
+  it('classifies trackpad pixel-mode events as trackpad even when deltaY is larger than the pixel-fallback threshold', () => {
+    const flickEvent = { deltaX: 0, deltaY: 96.5, deltaMode: 0, ctrlKey: false, altKey: false, wheelDeltaY: -64 };
+    const smallEvent = { deltaX: 0, deltaY: 14, deltaMode: 0, ctrlKey: false, altKey: false, wheelDeltaY: -18 };
+
+    expect(classifyWheelDevice(flickEvent)).toBe('trackpad');
+    expect(classifyWheelDevice(smallEvent)).toBe('trackpad');
+    expect(classifyWheelInput(flickEvent)).toBe('pan');
+    expect(classifyWheelInput(smallEvent)).toBe('pan');
+  });
+
+  /** @description Mouse wheel + Ctrl/Meta maps to horizontal pan and Mouse wheel + Alt maps to vertical pan per the canvas spec. The classifier must return 'pan' for those cases so the canvas handler routes into the directional-pan branch. */
+  it('classifies mouse-wheel modifier combinations as pan so the handler can route directional pans', () => {
+    expect(
+      classifyWheelInput({ deltaX: 0, deltaY: 120, deltaMode: 0, ctrlKey: true, altKey: false, wheelDeltaY: -120 }),
+    ).toBe('pan');
+    expect(
+      classifyWheelInput({ deltaX: 0, deltaY: 120, deltaMode: 0, ctrlKey: false, altKey: true, wheelDeltaY: -120 }),
+    ).toBe('pan');
+  });
+
+  /** @description Screen reader mode must opt the canvas out of wheel-driven zoom/pan entirely so assistive tech can use the wheel for document reading. */
+  it('returns none when a screen reader is active', () => {
+    expect(
+      classifyWheelInput({
+        altKey: false,
+        ctrlKey: false,
+        deltaMode: 0,
+        deltaX: 0,
+        deltaY: 120,
+        screenReaderActive: true,
+      }),
+    ).toBe('none');
   });
 });

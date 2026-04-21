@@ -1,6 +1,6 @@
 import type { EasingMode, Keyframe, Timeline } from '@broadset/model';
 import { Button, ListBox, Select, Tooltip } from '@heroui/react';
-import { Pause, Play, Plus, Square } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { type JSX, type PointerEvent as ReactPointerEvent, useCallback, useMemo, useRef, useState } from 'react';
 
 import { color, type ColorToken, sp } from '../tokens';
@@ -70,11 +70,8 @@ export interface TimelineEditorProps {
   readonly onAddKeyframe: () => void;
   readonly onMoveKeyframe: (index: number, offsetMs: number) => void;
   readonly onChangeEasing: (index: number, easing: EasingMode) => void;
-  readonly onPlayTimeline: () => void;
-  readonly onStopTimeline: () => void;
   readonly onSeekTimeline: (timeMs: number) => void;
   readonly currentTimeMs: number;
-  readonly isPlaying: boolean;
 }
 
 export function TimelineEditor(props: TimelineEditorProps): JSX.Element {
@@ -85,11 +82,8 @@ export function TimelineEditor(props: TimelineEditorProps): JSX.Element {
     onAddKeyframe,
     onMoveKeyframe,
     onChangeEasing,
-    onPlayTimeline,
-    onStopTimeline,
     onSeekTimeline,
     currentTimeMs,
-    isPlaying,
   } = props;
 
   const { keyframes } = timeline;
@@ -193,41 +187,6 @@ export function TimelineEditor(props: TimelineEditorProps): JSX.Element {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), width: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: sp('sp-02'), padding: `0 ${sp('sp-03')}` }}>
-        {isPlaying ?
-          <>
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label="Pause"
-              onPress={() => {
-                onStopTimeline();
-              }}
-            >
-              <Pause size={14} />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label="Stop"
-              onPress={() => {
-                onStopTimeline();
-              }}
-            >
-              <Square size={14} />
-            </Button>
-          </>
-        : <Button
-            size="sm"
-            variant="ghost"
-            aria-label="Play"
-            onPress={() => {
-              onPlayTimeline();
-            }}
-          >
-            <Play size={14} />
-          </Button>
-        }
-
         <Button
           size="sm"
           variant="ghost"

@@ -51,13 +51,10 @@ test('property edit target switches between keyframe and base contexts', async (
 
 /**
  * @description Validates `project/spec/editor/timeline-playback.md` L-10:
- * snapshot restore executes before play and seek timeline actions.
+ * snapshot restore executes before seek timeline actions.
  */
-test('snapshot restore runs before play and seek actions', async ({ mount, page }) => {
+test('snapshot restore runs before seek actions', async ({ mount, page }) => {
   await mount(<TimelineSnapshotRestoreHarness />);
-
-  await page.getByRole('button', { name: 'Play' }).click();
-  await expect(page.getByTestId('snapshot-sequence')).toHaveText('restore>play');
 
   const track = page.getByTestId('timeline-track');
   const trackBox = await track.boundingBox();
@@ -68,5 +65,5 @@ test('snapshot restore runs before play and seek actions', async ({ mount, page 
 
   await track.click({ position: { x: trackBox.width * 0.55, y: trackBox.height * 0.5 } });
 
-  await expect(page.getByTestId('snapshot-sequence')).toContainText('restore>play>restore>seek');
+  await expect(page.getByTestId('snapshot-sequence')).toContainText('restore>seek');
 });
