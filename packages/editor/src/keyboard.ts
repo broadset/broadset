@@ -80,7 +80,7 @@ export const DEFAULT_SHORTCUT_MAP: ShortcutMap = {
   selectAll: { key: 'a', ctrlKey: true },
   group: { key: 'g', ctrlKey: true },
   ungroup: { key: 'g', ctrlKey: true, shiftKey: true },
-  toggleLock: { key: 'l', ctrlKey: true, shiftKey: true },
+  toggleLock: { key: 'l', ctrlKey: true },
   zoomIn: { key: '=', ctrlKey: true },
   zoomOut: { key: '-', ctrlKey: true },
   zoomReset: { key: '0', ctrlKey: true },
@@ -92,10 +92,10 @@ export const DEFAULT_SHORTCUT_MAP: ShortcutMap = {
   nudgeLargeDown: { key: 'ArrowDown', shiftKey: true },
   nudgeLargeLeft: { key: 'ArrowLeft', shiftKey: true },
   nudgeLargeRight: { key: 'ArrowRight', shiftKey: true },
-  layerForward: { key: ']' },
-  layerBackward: { key: '[' },
-  layerFront: { key: ']', ctrlKey: true },
-  layerBack: { key: '[', ctrlKey: true },
+  layerForward: { key: ']', ctrlKey: true },
+  layerBackward: { key: '[', ctrlKey: true },
+  layerFront: { key: ']', ctrlKey: true, shiftKey: true },
+  layerBack: { key: '[', ctrlKey: true, shiftKey: true },
 };
 
 /**
@@ -109,6 +109,13 @@ const DELETE_ALIAS_KEY = 'Backspace';
  * Handled as a special case because the shortcut map has exactly one binding per action.
  */
 const REDO_ALT_BINDING: ShortcutBinding = { key: 'z', ctrlKey: true, shiftKey: true };
+
+/**
+ * Alternative zoomIn binding: Ctrl + "+" (which is Ctrl+Shift+= on most layouts).
+ * The canonical binding is Ctrl+= for a single-key press; this alias catches users
+ * who instinctively type Shift-Plus.
+ */
+const ZOOM_IN_PLUS_ALIAS_BINDING: ShortcutBinding = { key: '+', ctrlKey: true, shiftKey: true };
 
 // ---------------------------------------------------------------------------
 // Shortcut resolution
@@ -148,18 +155,34 @@ function bindingMatches(binding: ShortcutBinding, event: KeyboardEvent): boolean
   const wantAlt = binding.altKey === true;
   const wantMeta = binding.metaKey === true;
 
-  // Exact modifier matching: each specified modifier must be active and no
-  // unspecified modifiers may be active. ctrlKey and metaKey are compared
-  // independently (no aliasing).
-  return (
-    event.ctrlKey === wantCtrl && event.shiftKey === wantShift && event.altKey === wantAlt && event.metaKey === wantMeta
-  );
+  // Platform-aware modifier matching: when a binding asks for Ctrl (without
+  // also requesting Meta), accept either ctrlKey OR metaKey so macOS users can
+  // use Cmd as a Ctrl substitute. When a binding explicitly requests Meta, it
+  // must be Meta specifically. Shift and Alt are compared exactly.
+  if (event.shiftKey !== wantShift || event.altKey !== wantAlt) {
+    return false;
+  }
+
+  if (wantMeta) {
+    return event.metaKey === wantMeta && event.ctrlKey === wantCtrl;
+  }
+
+  if (wantCtrl) {
+    return (event.ctrlKey || event.metaKey) && !(event.ctrlKey && event.metaKey);
+  }
+
+  return !event.ctrlKey && !event.metaKey;
 }
 
 function findAction(shortcuts: ShortcutMap, event: KeyboardEvent): ShortcutAction | null {
   // Check alternative redo binding first (Ctrl+Shift+Z)
   if (bindingMatches(REDO_ALT_BINDING, event)) {
     return 'redo';
+  }
+
+  // Check alternative zoomIn binding (Ctrl+Shift+= → "+")
+  if (bindingMatches(ZOOM_IN_PLUS_ALIAS_BINDING, event)) {
+    return 'zoomIn';
   }
 
   // Check Backspace alias for delete

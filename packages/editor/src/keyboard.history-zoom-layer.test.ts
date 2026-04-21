@@ -170,42 +170,8 @@ describe('keyboard', () => {
   // Layer Reorder Shortcuts
   // =========================================================================
   describe('Layer Reorder Shortcuts', () => {
-    /** @description ] brings selected element forward one position. */
-    it('] moves element forward', () => {
-      const store = createEditorStore();
-      const doc = makeDocument([makeElement('a'), makeElement('b'), makeElement('c')]);
-
-      store.getState().loadTemplate(doc);
-      store.getState().selectElement('a');
-
-      const handler = createKeyboardHandler(store, {});
-
-      handler(pressKey(']'));
-
-      const ids = store.getState().document.elements.map((e) => e.id);
-
-      expect(ids).toEqual(['b', 'a', 'c']);
-    });
-
-    /** @description [ sends selected element backward one position. */
-    it('[ moves element backward', () => {
-      const store = createEditorStore();
-      const doc = makeDocument([makeElement('a'), makeElement('b'), makeElement('c')]);
-
-      store.getState().loadTemplate(doc);
-      store.getState().selectElement('b');
-
-      const handler = createKeyboardHandler(store, {});
-
-      handler(pressKey('['));
-
-      const ids = store.getState().document.elements.map((e) => e.id);
-
-      expect(ids).toEqual(['b', 'a', 'c']);
-    });
-
-    /** @description Ctrl+] brings selected to front. */
-    it('Ctrl+] moves element to front', () => {
+    /** @description Ctrl+] brings selected element forward one position. */
+    it('Ctrl+] moves element forward', () => {
       const store = createEditorStore();
       const doc = makeDocument([makeElement('a'), makeElement('b'), makeElement('c')]);
 
@@ -218,11 +184,45 @@ describe('keyboard', () => {
 
       const ids = store.getState().document.elements.map((e) => e.id);
 
+      expect(ids).toEqual(['b', 'a', 'c']);
+    });
+
+    /** @description Ctrl+[ sends selected element backward one position. */
+    it('Ctrl+[ moves element backward', () => {
+      const store = createEditorStore();
+      const doc = makeDocument([makeElement('a'), makeElement('b'), makeElement('c')]);
+
+      store.getState().loadTemplate(doc);
+      store.getState().selectElement('b');
+
+      const handler = createKeyboardHandler(store, {});
+
+      handler(pressKey('[', { ctrlKey: true }));
+
+      const ids = store.getState().document.elements.map((e) => e.id);
+
+      expect(ids).toEqual(['b', 'a', 'c']);
+    });
+
+    /** @description Ctrl+Shift+] brings selected to front. */
+    it('Ctrl+Shift+] moves element to front', () => {
+      const store = createEditorStore();
+      const doc = makeDocument([makeElement('a'), makeElement('b'), makeElement('c')]);
+
+      store.getState().loadTemplate(doc);
+      store.getState().selectElement('a');
+
+      const handler = createKeyboardHandler(store, {});
+
+      handler(pressKey(']', { ctrlKey: true, shiftKey: true }));
+
+      const ids = store.getState().document.elements.map((e) => e.id);
+
       expect(ids).toEqual(['b', 'c', 'a']);
     });
 
-    /** @description Ctrl+[ sends selected to back. */
-    it('Ctrl+[ moves element to back', () => {
+    /** @description Ctrl+Shift+[ sends selected to back. */
+    it('Ctrl+Shift+[ moves element to back', () => {
       const store = createEditorStore();
       const doc = makeDocument([makeElement('a'), makeElement('b'), makeElement('c')]);
 
@@ -231,7 +231,7 @@ describe('keyboard', () => {
 
       const handler = createKeyboardHandler(store, {});
 
-      handler(pressKey('[', { ctrlKey: true }));
+      handler(pressKey('[', { ctrlKey: true, shiftKey: true }));
 
       const ids = store.getState().document.elements.map((e) => e.id);
 
@@ -247,7 +247,7 @@ describe('keyboard', () => {
 
       const handler = createKeyboardHandler(store, {});
 
-      handler(pressKey(']'));
+      handler(pressKey(']', { ctrlKey: true }));
 
       const ids = store.getState().document.elements.map((e) => e.id);
 
@@ -259,7 +259,7 @@ describe('keyboard', () => {
   // Toggle Lock Shortcut
   // =========================================================================
   describe('Toggle Lock Shortcut', () => {
-    /** @description Ctrl+Shift+L locks an unlocked element. */
+    /** @description Ctrl+L locks an unlocked element. */
     it('locks an unlocked element', () => {
       const store = createEditorStore();
       const doc = makeDocument([makeElement('a', { locked: false })]);
@@ -269,11 +269,11 @@ describe('keyboard', () => {
 
       const handler = createKeyboardHandler(store, {});
 
-      handler(pressKey('l', { ctrlKey: true, shiftKey: true }));
+      handler(pressKey('l', { ctrlKey: true }));
       expect(store.getState().document.elements[0]?.locked).toBe(true);
     });
 
-    /** @description Ctrl+Shift+L unlocks a locked element. */
+    /** @description Ctrl+L unlocks a locked element. */
     it('unlocks a locked element', () => {
       const store = createEditorStore();
       const doc = makeDocument([makeElement('a', { locked: true })]);
@@ -283,11 +283,11 @@ describe('keyboard', () => {
 
       const handler = createKeyboardHandler(store, {});
 
-      handler(pressKey('l', { ctrlKey: true, shiftKey: true }));
+      handler(pressKey('l', { ctrlKey: true }));
       expect(store.getState().document.elements[0]?.locked).toBe(false);
     });
 
-    /** @description Ctrl+Shift+L with no selection is a no-op. */
+    /** @description Ctrl+L with no selection is a no-op. */
     it('no selection is a no-op', () => {
       const store = createEditorStore();
       const doc = makeDocument([makeElement('a', { locked: false })]);
@@ -296,7 +296,7 @@ describe('keyboard', () => {
 
       const handler = createKeyboardHandler(store, {});
 
-      handler(pressKey('l', { ctrlKey: true, shiftKey: true }));
+      handler(pressKey('l', { ctrlKey: true }));
       expect(store.getState().document.elements[0]?.locked).toBe(false);
     });
   });

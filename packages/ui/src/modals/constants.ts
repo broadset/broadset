@@ -50,9 +50,9 @@ export const DEFAULT_SHORTCUTS: ShortcutMap = {
     { action: 'Lock / Unlock', keys: ['Ctrl', 'L'] },
   ],
   'Zoom & History': [
-    { action: 'Zoom in', keys: ['Ctrl', '+'] },
+    { action: 'Zoom in', keys: ['Ctrl', '='] },
     { action: 'Zoom out', keys: ['Ctrl', '-'] },
-    { action: 'Fit to screen', keys: ['Ctrl', '0'] },
+    { action: 'Reset zoom', keys: ['Ctrl', '0'] },
     { action: 'Undo', keys: ['Ctrl', 'Z'] },
     { action: 'Redo', keys: ['Ctrl', 'Shift', 'Z'] },
   ],

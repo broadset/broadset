@@ -71,7 +71,7 @@ describe('keyboard', () => {
         { action: 'selectAll', key: 'a', modifiers: { ctrlKey: true } },
         { action: 'group', key: 'g', modifiers: { ctrlKey: true } },
         { action: 'ungroup', key: 'g', modifiers: { ctrlKey: true, shiftKey: true } },
-        { action: 'toggleLock', key: 'l', modifiers: { ctrlKey: true, shiftKey: true } },
+        { action: 'toggleLock', key: 'l', modifiers: { ctrlKey: true } },
         { action: 'save', key: 's', modifiers: { ctrlKey: true } },
         { action: 'zoomIn', key: '=', modifiers: { ctrlKey: true } },
         { action: 'zoomOut', key: '-', modifiers: { ctrlKey: true } },
@@ -84,10 +84,10 @@ describe('keyboard', () => {
         { action: 'nudgeLargeDown', key: 'ArrowDown', modifiers: { shiftKey: true } },
         { action: 'nudgeLargeLeft', key: 'ArrowLeft', modifiers: { shiftKey: true } },
         { action: 'nudgeLargeRight', key: 'ArrowRight', modifiers: { shiftKey: true } },
-        { action: 'layerForward', key: ']' },
-        { action: 'layerBackward', key: '[' },
-        { action: 'layerFront', key: ']', modifiers: { ctrlKey: true } },
-        { action: 'layerBack', key: '[', modifiers: { ctrlKey: true } },
+        { action: 'layerForward', key: ']', modifiers: { ctrlKey: true } },
+        { action: 'layerBackward', key: '[', modifiers: { ctrlKey: true } },
+        { action: 'layerFront', key: ']', modifiers: { ctrlKey: true, shiftKey: true } },
+        { action: 'layerBack', key: '[', modifiers: { ctrlKey: true, shiftKey: true } },
       ];
 
       for (const testCase of cases) {
