@@ -108,9 +108,32 @@ export function useCanvasControlHandlers({
     };
   }, []);
 
+  const snapUpdatesToGrid = useCallback(
+    (updates: ElementUpdate): ElementUpdate => {
+      const { gridSettings } = editorStore.getState();
+
+      if (!gridSettings.snapToGrid || gridSettings.gridSize <= 0) {
+        return updates;
+      }
+
+      const { gridSize } = gridSettings;
+      const snapTo = (value: number): number => Math.round(value / gridSize) * gridSize;
+
+      return {
+        ...updates,
+        ...(updates.position === undefined ?
+          {}
+        : { position: { x: snapTo(updates.position.x), y: snapTo(updates.position.y) } }),
+        ...(updates.width === undefined ? {} : { width: snapTo(updates.width) }),
+        ...(updates.height === undefined ? {} : { height: snapTo(updates.height) }),
+      };
+    },
+    [editorStore],
+  );
+
   const handleElementTransformPreview = useCallback(
     (elementId: string, updates: ElementUpdate): void => {
-      pendingPreviewRef.current = { elementId, updates };
+      pendingPreviewRef.current = { elementId, updates: snapUpdatesToGrid(updates) };
 
       if (rafIdRef.current === 0) {
         rafIdRef.current = requestAnimationFrame(() => {
@@ -125,29 +148,14 @@ export function useCanvasControlHandlers({
         });
       }
     },
-    [editorStore],
+    [editorStore, snapUpdatesToGrid],
   );
 
   const handleElementTransformCommit = useCallback(
     (elementId: string, updates: ElementUpdate): void => {
-      const { gridSettings } = editorStore.getState();
-      const shouldSnap = gridSettings.snapToGrid && gridSettings.gridSize > 0;
-      const snapTo = (value: number): number => Math.round(value / gridSettings.gridSize) * gridSettings.gridSize;
-      const snappedUpdates: ElementUpdate =
-        shouldSnap ?
-          {
-            ...updates,
-            ...(updates.position === undefined ?
-              {}
-            : { position: { x: snapTo(updates.position.x), y: snapTo(updates.position.y) } }),
-            ...(updates.width === undefined ? {} : { width: snapTo(updates.width) }),
-            ...(updates.height === undefined ? {} : { height: snapTo(updates.height) }),
-          }
-        : updates;
-
-      editorStore.getState().commitElementUpdate(elementId, snappedUpdates);
+      editorStore.getState().commitElementUpdate(elementId, snapUpdatesToGrid(updates));
     },
-    [editorStore],
+    [editorStore, snapUpdatesToGrid],
   );
 
   const handleAlignSelection = useCallback(
