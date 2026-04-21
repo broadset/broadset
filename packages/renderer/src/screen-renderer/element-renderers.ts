@@ -258,9 +258,31 @@ function createGroupRenderer(): ElementRendererFactory {
       path.setAttribute('vector-effect', 'non-scaling-stroke');
 
       if (firstChild !== undefined) {
-        path.setAttribute('stroke', firstChild.style.stroke ?? 'none');
-        path.setAttribute('stroke-width', String(firstChild.style.strokeWidth ?? 2));
-        path.setAttribute('fill', firstChild.style.fill ?? 'none');
+        const childStyle = firstChild.style;
+
+        path.setAttribute('stroke', childStyle.stroke ?? 'none');
+        path.setAttribute('stroke-width', String(childStyle.strokeWidth ?? 2));
+        path.setAttribute('fill', childStyle.fill ?? 'none');
+
+        if (childStyle.strokeOpacity !== undefined) {
+          path.setAttribute('stroke-opacity', String(childStyle.strokeOpacity));
+        }
+
+        if (childStyle.fillOpacity !== undefined) {
+          path.setAttribute('fill-opacity', String(childStyle.fillOpacity));
+        }
+
+        if (childStyle.strokeLinecap !== undefined) {
+          path.setAttribute('stroke-linecap', childStyle.strokeLinecap);
+        }
+
+        if (childStyle.strokeLinejoin !== undefined) {
+          path.setAttribute('stroke-linejoin', childStyle.strokeLinejoin);
+        }
+
+        if (childStyle.fillRule !== undefined) {
+          path.setAttribute('fill-rule', childStyle.fillRule);
+        }
       }
 
       svg.appendChild(path);
@@ -384,6 +406,26 @@ const createPathRenderer = createSimpleRenderer((host, element) => {
   path.setAttribute('stroke', element.style.stroke ?? '#f8fafc');
   path.setAttribute('stroke-width', String(element.style.strokeWidth ?? 2));
   path.setAttribute('fill', element.style.fill ?? 'none');
+
+  if (element.style.strokeOpacity !== undefined) {
+    path.setAttribute('stroke-opacity', String(element.style.strokeOpacity));
+  }
+
+  if (element.style.fillOpacity !== undefined) {
+    path.setAttribute('fill-opacity', String(element.style.fillOpacity));
+  }
+
+  if (element.style.strokeLinecap !== undefined) {
+    path.setAttribute('stroke-linecap', element.style.strokeLinecap);
+  }
+
+  if (element.style.strokeLinejoin !== undefined) {
+    path.setAttribute('stroke-linejoin', element.style.strokeLinejoin);
+  }
+
+  if (element.style.fillRule !== undefined) {
+    path.setAttribute('fill-rule', element.style.fillRule);
+  }
 
   if (element.style.strokeDasharray !== undefined) {
     path.setAttribute('stroke-dasharray', element.style.strokeDasharray);
