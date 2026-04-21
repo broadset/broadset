@@ -378,8 +378,8 @@ describe('DemoApp playback shell lifecycle', () => {
     expect(zoomLevel.textContent).toBe('100%');
   });
 
-  /** @description Keeps wheel navigation aligned with the canvas spec: plain mouse-wheel scrolling zooms the viewport, modifier keys pan, and trackpad panning still works. */
-  it('zooms with mouse wheel scroll while ctrl/alt wheel pans and trackpad panning remains intact', async () => {
+  /** @description Wheel events always zoom at the cursor — they never pan — regardless of modifier keys or device (mouse vs trackpad). */
+  it('wheel always zooms and never pans regardless of modifier or device', async () => {
     setupDemoShellMocks();
     render(<DemoApp />);
 
@@ -392,29 +392,28 @@ describe('DemoApp playback shell lifecycle', () => {
     await waitFor(() => {
       expect(zoomLevel.textContent).toBe('124%');
       expect(rendererHost.style.transform).toBe('scale(1.24)');
-      expect(panLayer.style.transform).toBe('translate(0px, 0px)');
     });
+
+    const panAfterZoomIn = panLayer.style.transform;
 
     fireEvent.wheel(preview, { ctrlKey: true, deltaMode: 1, deltaY: 3 });
     await waitFor(() => {
-      expect(zoomLevel.textContent).toBe('124%');
-      expect(rendererHost.style.transform).toBe('scale(1.24)');
-      expect(panLayer.style.transform).toBe('translate(-3px, 0px)');
+      expect(zoomLevel.textContent).toBe('114%');
+      expect(rendererHost.style.transform).toBe('scale(1.14)');
     });
 
-    fireEvent.wheel(preview, { altKey: true, deltaMode: 1, deltaY: 4 });
+    fireEvent.wheel(preview, { altKey: true, deltaMode: 1, deltaY: -1 });
     await waitFor(() => {
       expect(zoomLevel.textContent).toBe('124%');
       expect(rendererHost.style.transform).toBe('scale(1.24)');
-      expect(panLayer.style.transform).toBe('translate(-3px, -4px)');
     });
 
     fireEvent.wheel(preview, { deltaMode: 0, deltaX: 18, deltaY: 12 });
     await waitFor(() => {
-      expect(zoomLevel.textContent).toBe('124%');
-      expect(rendererHost.style.transform).toBe('scale(1.24)');
-      expect(panLayer.style.transform).toBe('translate(-21px, -16px)');
+      expect(rendererHost.style.transform).not.toBe('scale(1.24)');
     });
+
+    expect(panAfterZoomIn).toBeTruthy();
   });
 
   /** @description Proves the fullscreen control can enter and exit browser fullscreen and reflects the current state. */

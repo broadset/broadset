@@ -2,7 +2,7 @@ import type { EditorStore, ElementUpdate } from '@broadset/editor';
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 import { createPlaybackController, type PlaybackController } from '@broadset/playback';
 import { createScreenRenderer, type ScreenRendererController } from '@broadset/renderer';
-import { classifyWheelDevice, color, type WheelDevice } from '@broadset/ui';
+import { color } from '@broadset/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ZOOM_STEP } from '../demo-types';
@@ -12,39 +12,9 @@ import { PathEditingOverlay } from './path-editing-overlay';
 import { PlacementPreviewOverlay } from './placement-preview-overlay';
 import { SelectionTransformWidget } from './selection-transform-widget';
 
-const WHEEL_GESTURE_LOCK_MS = 140;
-
 type ViewportChangeFn = (settings: { readonly panX?: number; readonly panY?: number; readonly zoom?: number }) => void;
 type PanWriteFn = (panX: number, panY: number) => void;
-type WheelDeviceGesture = { readonly device: WheelDevice | null; readonly expiresAt: number };
 type Viewport = { panX: number; panY: number; zoom: number };
-
-/**
- * Resolve the wheel device for the current event, honoring a short gesture lock so that
- * macOS Chrome kinetic-scroll tail events — whose accelerated deltaY can shrink below the
- * pixel-fallback threshold — don't flip a mouse-wheel zoom into a trackpad pan mid-scroll.
- *
- * The lock only overrides when the raw classification would downgrade to `trackpad` AND
- * there is no lateral delta. A `deltaX !== 0` signal is strong evidence of a real trackpad
- * gesture, so we drop the lock and trust the raw classification in that case.
- */
-function resolveWheelDevice(event: WheelEvent, gesture: WheelDeviceGesture): WheelDevice {
-  const rawDevice = classifyWheelDevice({
-    altKey: event.altKey,
-    ctrlKey: event.ctrlKey || event.metaKey,
-    deltaMode: event.deltaMode,
-    deltaX: event.deltaX,
-    deltaY: event.deltaY,
-    wheelDeltaY: event.wheelDeltaY,
-  });
-  const hasActiveLock = gesture.device !== null && event.timeStamp <= gesture.expiresAt;
-
-  if (hasActiveLock && gesture.device === 'mouse-wheel' && rawDevice === 'trackpad' && event.deltaX === 0) {
-    return 'mouse-wheel';
-  }
-
-  return rawDevice;
-}
 
 function resolveWheelBounds(event: WheelEvent, container: HTMLElement | null): DOMRect | null {
   if (container !== null) return container.getBoundingClientRect();
@@ -153,10 +123,6 @@ export function ScreenPreview({
   } | null>(null);
   const suppressClickRef = useRef(false);
   const resetTokenMountedRef = useRef(false);
-  const wheelGestureRef = useRef<WheelDeviceGesture>({
-    device: null,
-    expiresAt: 0,
-  });
 
   // Live viewport mirror. Imperative pan writes update this ahead of the RAF-batched store
   // commit so back-to-back wheel events read the just-applied value, not a stale closure.
@@ -450,43 +416,6 @@ export function ScreenPreview({
       // Must be attached as a non-passive native listener so preventDefault actually suppresses scroll.
       event.preventDefault();
 
-      const device = resolveWheelDevice(event, wheelGestureRef.current);
-
-      wheelGestureRef.current = { device, expiresAt: event.timeStamp + WHEEL_GESTURE_LOCK_MS };
-
-      const { panX: currentPanX, panY: currentPanY } = viewportRef.current;
-      const hasHorizontalPanModifier = event.ctrlKey || event.metaKey;
-
-      if (device === 'mouse-wheel' && hasHorizontalPanModifier) {
-        const nextPanX = currentPanX - event.deltaY;
-
-        writePanLayerTransformNow(nextPanX, currentPanY);
-        onViewportChange({ panX: nextPanX, panY: currentPanY });
-
-        return;
-      }
-
-      if (device === 'mouse-wheel' && event.altKey) {
-        const nextPanY = currentPanY - event.deltaY;
-
-        writePanLayerTransformNow(currentPanX, nextPanY);
-        onViewportChange({ panX: currentPanX, panY: nextPanY });
-
-        return;
-      }
-
-      if (device === 'trackpad' && !hasHorizontalPanModifier && !event.altKey) {
-        const nextPanX = currentPanX - event.deltaX;
-        const nextPanY = currentPanY - event.deltaY;
-
-        writePanLayerTransformNow(nextPanX, nextPanY);
-        onViewportChange({ panX: nextPanX, panY: nextPanY });
-
-        return;
-      }
-
-      // Remaining cases zoom at cursor: mouse-wheel without modifier, trackpad pinch
-      // (synthesized ctrlKey on macOS), and trackpad Alt+scroll zoom alternate.
       applyWheelZoom(event, viewportRef.current, containerRef.current, writePanLayerTransformNow, onViewportChange);
     },
     [onViewportChange, writePanLayerTransformNow],
@@ -514,7 +443,7 @@ export function ScreenPreview({
        per-element keydown handlers. */
     <div
       ref={containerRef}
-      aria-description="Mouse wheel zooms, ctrl or command wheel pans horizontally, Alt pans vertically, and Shift-drag or middle-click pans the view."
+      aria-description="Mouse wheel zooms at the cursor; Shift-drag or middle-click pans the view."
       aria-label={`Screen preview for ${documentData.name}`}
       className="h-full w-full overflow-hidden"
       role="application"
