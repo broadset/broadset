@@ -2,7 +2,7 @@ import { type EditorStore, type ElementUpdate, startInlineTextEditing } from '@b
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 import { createPlaybackController, type PlaybackController } from '@broadset/playback';
 import { createScreenRenderer, type ScreenRendererController } from '@broadset/renderer';
-import { classifyWheelDevice, color } from '@broadset/ui';
+import { color } from '@broadset/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ZOOM_STEP } from '../demo-types';
@@ -465,39 +465,41 @@ export function ScreenPreview({
       // Must be attached as a non-passive native listener so preventDefault actually suppresses scroll.
       event.preventDefault();
 
-      const device = classifyWheelDevice({
-        altKey: event.altKey,
-        ctrlKey: event.ctrlKey || event.metaKey,
-        deltaMode: event.deltaMode,
-        deltaX: event.deltaX,
-        deltaY: event.deltaY,
-        wheelDeltaY: event.wheelDeltaY,
-      });
-
-      // Mouse-wheel rotation: always zoom at the cursor, never pan. Modifiers
-      // are intentionally ignored so stray Ctrl/Alt presses can't flip the wheel
-      // into a pan.
-      if (device === 'mouse-wheel') {
-        applyWheelZoom(event, viewportRef.current, containerRef.current, writePanLayerTransformNow, onViewportChange);
-
-        return;
-      }
-
-      // Trackpad pinch is reported with a synthesized ctrlKey on macOS/Windows
-      // browsers — treat that as zoom at the cursor.
+      // Trackpad pinch zoom: browsers synthesize ctrlKey regardless of physical modifier.
+      // Always route to zoom-at-cursor.
       if (event.ctrlKey) {
         applyWheelZoom(event, viewportRef.current, containerRef.current, writePanLayerTransformNow, onViewportChange);
 
         return;
       }
 
-      // Plain trackpad scroll pans both axes.
-      const { panX: currentPanX, panY: currentPanY } = viewportRef.current;
-      const nextPanX = currentPanX - event.deltaX;
-      const nextPanY = currentPanY - event.deltaY;
+      // Distinguish mouse-wheel rotation from trackpad scroll with the only signals
+      // browsers actually expose:
+      //   - Line/page deltaMode → Firefox mouse wheel.
+      //   - wheelDeltaY is a non-zero multiple of 120 → Chrome/Safari mouse wheel.
+      //   - Any horizontal delta → trackpad (or a rare tilt wheel; treat as pan).
+      //   - Fractional deltaY → trackpad momentum.
+      //   - Everything else → assume mouse wheel so Ctrl-less zoom keeps working on
+      //     high-DPI mice that don't emit canonical 120-multiple wheelDeltaY values.
+      const isHorizontalScroll = event.deltaX !== 0;
+      const hasFractionalDelta = !Number.isInteger(event.deltaY);
+      const isTrackpadScroll = isHorizontalScroll || hasFractionalDelta;
 
-      writePanLayerTransformNow(nextPanX, nextPanY);
-      onViewportChange({ panX: nextPanX, panY: nextPanY });
+      if (isTrackpadScroll) {
+        const { panX: currentPanX, panY: currentPanY } = viewportRef.current;
+        const nextPanX = currentPanX - event.deltaX;
+        const nextPanY = currentPanY - event.deltaY;
+
+        writePanLayerTransformNow(nextPanX, nextPanY);
+        onViewportChange({ panX: nextPanX, panY: nextPanY });
+
+        return;
+      }
+
+      // Mouse-wheel rotation: always zoom at the cursor. Stray Ctrl/Alt presses
+      // are intentionally not remapped to pan — the canvas spec says the wheel
+      // may only zoom, and mouse-wheel press + drag (middle-click) already pans.
+      applyWheelZoom(event, viewportRef.current, containerRef.current, writePanLayerTransformNow, onViewportChange);
     },
     [onViewportChange, writePanLayerTransformNow],
   );
