@@ -1,5 +1,4 @@
 import { Button, Input, Kbd, Modal } from '@heroui/react';
-import { X } from 'lucide-react';
 import { type ChangeEvent, type JSX, useCallback, useEffect, useState } from 'react';
 
 import { NumField } from '../inputs';
@@ -20,10 +19,7 @@ export function ShortcutHelpModal({ isOpen, onClose, shortcuts }: ShortcutHelpMo
   return (
     <ModalShell isOpen={isOpen} size="lg" title="Keyboard Shortcuts" onClose={onClose}>
       <Modal.Header>
-        <span style={{ flex: 1, fontWeight: 700 }}>Keyboard Shortcuts</span>
-        <Button aria-label="Close" isIconOnly size="sm" variant="ghost" onPress={onClose}>
-          <X size={16} />
-        </Button>
+        <span style={{ fontWeight: 700 }}>Keyboard Shortcuts</span>
       </Modal.Header>
       <Modal.Body>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: sp('sp-05') }}>
@@ -148,12 +144,7 @@ export function GuidePositionModal({
         <span style={{ flex: 1, fontWeight: 700 }}>Guide Position</span>
       </Modal.Header>
       <Modal.Body>
-        <NumField
-          label={`Position (${unit})`}
-          value={localPosition}
-          onChange={setLocalPosition}
-          onCommit={onApply}
-        />
+        <NumField label={`Position (${unit})`} value={localPosition} onChange={setLocalPosition} onCommit={onApply} />
       </Modal.Body>
       <Modal.Footer>
         <Button aria-label="Delete guide" variant="danger" onPress={onDelete}>

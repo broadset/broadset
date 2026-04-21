@@ -1,5 +1,4 @@
 import { Button, ButtonGroup, Checkbox, Input, Label, Modal, ProgressBar, Select, Slider } from '@heroui/react';
-import { X } from 'lucide-react';
 import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { NumField, ToggleSwitch } from '../inputs';
@@ -17,10 +16,7 @@ export function AboutModal({ isOpen, version, onClose }: AboutModalProps): JSX.E
   return (
     <ModalShell isOpen={isOpen} size="md" title="Broadset" onClose={onClose}>
       <Modal.Header>
-        <span style={{ flex: 1, fontWeight: 700 }}>Broadset</span>
-        <Button aria-label="Close" isIconOnly size="sm" variant="ghost" onPress={onClose}>
-          <X size={16} />
-        </Button>
+        <span style={{ fontWeight: 700 }}>Broadset</span>
       </Modal.Header>
       <Modal.Body>
         <p>

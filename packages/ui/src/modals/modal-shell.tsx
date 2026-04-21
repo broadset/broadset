@@ -49,6 +49,7 @@ export function ModalShell({
               <h2 id={titleId} style={VISUALLY_HIDDEN_HEADING_STYLE}>
                 {title}
               </h2>
+              <Modal.CloseTrigger aria-label="Close" />
               {children}
             </Modal.Dialog>
           </div>

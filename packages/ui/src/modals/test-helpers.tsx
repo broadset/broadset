@@ -151,14 +151,51 @@ const mockSwitch = Object.assign(mockSwitchBase, {
   Icon: mockWrap('span'),
 });
 
+const mockModalCtx = React.createContext({
+  onClose: () => {
+    // placeholder; replaced by Modal's concrete onClose
+  },
+});
+
 function mockModal(p: Record<string, unknown>) {
-  const { children, isOpen, onClose, onOpenChange: _onOpenChange, size: _s, ...rest } = p;
+  const { children, isOpen, onClose, onOpenChange, size: _s, ...rest } = p;
 
   if (!isOpen) return null;
 
+  const dispatchClose = (): void => {
+    if (typeof onClose === 'function') (onClose as () => void)();
+    else if (typeof onOpenChange === 'function') (onOpenChange as (open: boolean) => void)(false);
+  };
+
   return React.createElement(
-    'div',
-    { ...rest, 'aria-modal': 'true', role: 'dialog' },
+    mockModalCtx.Provider,
+    { value: { onClose: dispatchClose } },
+    React.createElement(
+      'div',
+      { ...rest, 'aria-modal': 'true', role: 'dialog' },
+      (children as React.ReactNode) ?? null,
+    ),
+  );
+}
+
+function MockModalCloseTrigger(p: Record<string, unknown>) {
+  const ctx = React.useContext(mockModalCtx);
+  const { children, onClick, ...rest } = p;
+
+  return React.createElement(
+    'button',
+    {
+      ...rest,
+      'aria-label': p['aria-label'] ?? 'Close',
+      type: 'button',
+      onClick: (event: React.MouseEvent<HTMLButtonElement>) => {
+        if (typeof onClick === 'function') {
+          (onClick as (e: React.MouseEvent<HTMLButtonElement>) => void)(event);
+        }
+
+        ctx.onClose();
+      },
+    },
     (children as React.ReactNode) ?? null,
   );
 }
@@ -291,48 +328,47 @@ function MockTableRow(p: Record<string, unknown>) {
   );
 }
 
-vi.mock(
-  '@heroui/react',
-  () => ({
-    Button: mockButton,
-    ButtonGroup: mockWrap(),
-    Input: mockInput,
-    Kbd: mockKbd,
-    ListBoxItem: mockListBoxItem,
-    Modal: Object.assign(mockModal, {
-      Backdrop: mockWrap(),
-      Container: mockWrap(),
-      Dialog: mockWrap(),
-      Header: mockWrap('header'),
-      Body: mockWrap(),
-      Footer: mockWrap('footer'),
-    }),
-    NumberField: Object.assign(mockNumberFieldRoot, { Group: mockWrap(), Input: MockNumberFieldInput }),
-    Progress: mockProgress,
-    ProgressBar: Object.assign(mockProgress, {
-      Track: mockWrap(),
-      Fill: mockWrap(),
-      Output: mockWrap('output'),
-    }),
-    Select: Object.assign(mockSelect, {
-      Trigger: mockWrap(),
-      Value: mockWrap('span'),
-      Popover: mockWrap(),
-    }),
-    Slider: Object.assign(mockSlider, { Track: mockWrap(), Fill: mockWrap(), Thumb: mockWrap() }),
-    Spinner: mockSpinner,
-    Switch: mockSwitch,
-    Tab: mockTab,
-    Table: Object.assign(mockTable, {
-      Content: mockTableContent,
-      Header: mockTableHeader,
-      Body: mockWrap('tbody'),
-      Column: mockWrap('th'),
-      Row: MockTableRow,
-      Cell: mockWrap('td'),
-    }),
-    Tabs: Object.assign(mockTabs, { List: mockWrap(), Tab: mockTab }),
-  }));
+vi.mock('@heroui/react', () => ({
+  Button: mockButton,
+  ButtonGroup: mockWrap(),
+  Input: mockInput,
+  Kbd: mockKbd,
+  ListBoxItem: mockListBoxItem,
+  Modal: Object.assign(mockModal, {
+    Backdrop: mockWrap(),
+    Container: mockWrap(),
+    Dialog: mockWrap(),
+    Header: mockWrap('header'),
+    Body: mockWrap(),
+    Footer: mockWrap('footer'),
+    CloseTrigger: MockModalCloseTrigger,
+  }),
+  NumberField: Object.assign(mockNumberFieldRoot, { Group: mockWrap(), Input: MockNumberFieldInput }),
+  Progress: mockProgress,
+  ProgressBar: Object.assign(mockProgress, {
+    Track: mockWrap(),
+    Fill: mockWrap(),
+    Output: mockWrap('output'),
+  }),
+  Select: Object.assign(mockSelect, {
+    Trigger: mockWrap(),
+    Value: mockWrap('span'),
+    Popover: mockWrap(),
+  }),
+  Slider: Object.assign(mockSlider, { Track: mockWrap(), Fill: mockWrap(), Thumb: mockWrap() }),
+  Spinner: mockSpinner,
+  Switch: mockSwitch,
+  Tab: mockTab,
+  Table: Object.assign(mockTable, {
+    Content: mockTableContent,
+    Header: mockTableHeader,
+    Body: mockWrap('tbody'),
+    Column: mockWrap('th'),
+    Row: MockTableRow,
+    Cell: mockWrap('td'),
+  }),
+  Tabs: Object.assign(mockTabs, { List: mockWrap(), Tab: mockTab }),
+}));
 
 /* ------------------------------------------------------------------ */
 /*  Mock ./inputs                                                      */
