@@ -1,5 +1,6 @@
 import { commitInlineText, type EditorStore, stopInlineTextEditing } from '@broadset/editor';
-import type { BroadsetElement } from '@broadset/model';
+import type { BroadsetElement, BroadsetElementStyle } from '@broadset/model';
+import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -48,6 +49,27 @@ function useInlineTextSnapshot(store: EditorStore): InlineTextSnapshot {
   );
 }
 
+function mapVerticalAlignmentToFlex(value: BroadsetElementStyle['verticalAlignment']): CSSProperties['alignItems'] {
+  if (value === 'middle') return 'center';
+  if (value === 'bottom') return 'flex-end';
+
+  return 'flex-start';
+}
+
+function mapHorizontalAlignmentToFlex(value: BroadsetElementStyle['textAlignment']): CSSProperties['justifyContent'] {
+  if (value === 'center') return 'center';
+  if (value === 'right') return 'flex-end';
+  if (value === 'justify') return 'space-between';
+
+  return 'flex-start';
+}
+
+function formatPaddingValue(style: BroadsetElementStyle): string {
+  if (style.padding === undefined) return '0px';
+
+  return style.padding.map((value) => `${String(value)}px`).join(' ');
+}
+
 interface InlineTextOverlayProps {
   readonly editorStore: EditorStore;
   readonly overlayRoot: HTMLElement;
@@ -75,6 +97,7 @@ export function InlineTextOverlay({
     const selection = window.getSelection();
 
     range.selectNodeContents(node);
+    range.collapse(false);
     selection?.removeAllRanges();
     selection?.addRange(range);
   }, [snapshot.elementId, snapshot.element]);
@@ -115,57 +138,75 @@ export function InlineTextOverlay({
     }
   };
 
+  // Container matches the element's renderer contentHost + host chain: outer
+  // box carries font and text styling, inner contentEditable is a flex item
+  // that positions the actual caret/text the same way per-character spans are
+  // laid out in the rendered element. This keeps the visible glyphs in the
+  // exact same position and typography when editing as when rendered.
+  const containerStyle: CSSProperties = {
+    position: 'absolute',
+    left: `${String(worldElement.position.x)}px`,
+    top: `${String(worldElement.position.y)}px`,
+    width: `${String(Math.max(element.width, 1))}px`,
+    height: `${String(Math.max(element.height, 1))}px`,
+    padding: formatPaddingValue(style),
+    boxSizing: 'border-box',
+    margin: 0,
+    overflow: 'hidden',
+    outline: '2px dashed rgba(66, 133, 244, 0.85)',
+    outlineOffset: '-1px',
+    pointerEvents: 'auto',
+    cursor: 'text',
+    color: style.fontColor ?? 'inherit',
+    fontFamily: style.fontFamily ?? 'inherit',
+    fontSize: style.fontSize === undefined ? undefined : `${String(style.fontSize)}px`,
+    fontWeight: style.fontWeight ?? 'inherit',
+    fontStyle: style.fontStyle ?? 'normal',
+    letterSpacing: style.letterSpacing === undefined ? undefined : `${String(style.letterSpacing)}px`,
+    lineHeight: style.lineHeight === undefined ? undefined : String(style.lineHeight),
+    textDecoration: style.textDecoration ?? 'none',
+    textTransform: style.textTransform ?? 'none',
+    fontVariationSettings: style.fontVariationSettings ?? 'normal',
+    display: 'flex',
+    alignItems: mapVerticalAlignmentToFlex(style.verticalAlignment),
+    justifyContent: mapHorizontalAlignmentToFlex(style.textAlignment),
+    wordBreak: 'break-word',
+    whiteSpace: 'pre-wrap',
+    textAlign: style.textAlignment ?? 'left',
+  };
+
   return createPortal(
-    <div
-      ref={editorRef}
-      aria-label="Inline text editor"
-      contentEditable
-      data-testid="inline-text-editor"
-      dangerouslySetInnerHTML={{ __html: element.content }}
-      role="textbox"
-      spellCheck
-      tabIndex={0}
-      style={{
-        position: 'absolute',
-        left: `${String(worldElement.position.x)}px`,
-        top: `${String(worldElement.position.y)}px`,
-        width: `${String(element.width)}px`,
-        height: `${String(element.height)}px`,
-        boxSizing: 'border-box',
-        padding: '0px',
-        margin: 0,
-        overflow: 'hidden',
-        outline: '2px solid rgba(66, 133, 244, 0.8)',
-        outlineOffset: '0px',
-        pointerEvents: 'auto',
-        cursor: 'text',
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
-        color: style.fontColor ?? 'inherit',
-        fontFamily: style.fontFamily ?? 'inherit',
-        fontSize: style.fontSize === undefined ? undefined : `${String(style.fontSize)}px`,
-        fontWeight: style.fontWeight ?? 'inherit',
-        fontStyle: style.fontStyle ?? 'normal',
-        letterSpacing: style.letterSpacing === undefined ? undefined : `${String(style.letterSpacing)}px`,
-        lineHeight: style.lineHeight === undefined ? undefined : String(style.lineHeight),
-        textAlign: style.textAlignment ?? 'left',
-        textDecoration: style.textDecoration ?? 'none',
-        textTransform: style.textTransform ?? 'none',
-        background: 'rgba(15, 23, 42, 0.55)',
-      }}
-      suppressContentEditableWarning
-      onBlur={commit}
-      onKeyDown={handleKeyDown}
-      onMouseDown={(event) => {
-        event.stopPropagation();
-      }}
-      onPointerDown={(event) => {
-        event.stopPropagation();
-      }}
-      onClick={(event) => {
-        event.stopPropagation();
-      }}
-    />,
+    <div data-testid="inline-text-editor-container" style={containerStyle}>
+      <div
+        ref={editorRef}
+        aria-label="Inline text editor"
+        contentEditable
+        data-testid="inline-text-editor"
+        dangerouslySetInnerHTML={{ __html: element.content }}
+        role="textbox"
+        spellCheck
+        tabIndex={0}
+        style={{
+          outline: 'none',
+          minWidth: '1ch',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          flex: '0 1 auto',
+        }}
+        suppressContentEditableWarning
+        onBlur={commit}
+        onKeyDown={handleKeyDown}
+        onMouseDown={(event) => {
+          event.stopPropagation();
+        }}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+        }}
+        onClick={(event) => {
+          event.stopPropagation();
+        }}
+      />
+    </div>,
     overlayRoot,
   );
 }
