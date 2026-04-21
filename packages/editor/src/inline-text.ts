@@ -20,7 +20,8 @@ export function startInlineTextEditing(store: EditorStore, elementId: string): v
 
   store.setState({
     activeElementIds: [elementId],
-    pendingPlacementType: null,
+    placement: null,
+    placementPreview: null,
     pathEditingElementId: null,
     pathDrawingElementId: null,
     inlineTextEditingElementId: elementId,
@@ -46,7 +47,7 @@ export function stopInlineTextEditing(store: EditorStore): void {
 }
 
 function nextEditingModeAfterInlineText(state: ReturnType<EditorStore['getState']>): EditingMode {
-  if (state.pendingPlacementType !== null) return { type: 'placement', elementType: state.pendingPlacementType };
+  if (state.placement !== null) return state.placement;
   if (state.pathEditingElementId !== null) return { type: 'path-editing', elementId: state.pathEditingElementId };
   if (state.pathDrawingElementId !== null) return { type: 'path-drawing', elementId: state.pathDrawingElementId };
 

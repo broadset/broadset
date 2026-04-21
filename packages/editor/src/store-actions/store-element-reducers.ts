@@ -1,6 +1,7 @@
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 
 import { createInteractionState } from './selection';
+import type { PlacementState } from './store';
 import { collectDescendantIds } from './transform';
 
 export type ReorderDirection = 'forward' | 'backward' | 'front' | 'back';
@@ -48,7 +49,7 @@ export function reorderElementInList(
 interface RemovalStateInput {
   readonly document: BroadsetDocument;
   readonly activeElementIds: readonly string[];
-  readonly pendingPlacementType: string | null;
+  readonly placement: PlacementState | null;
   readonly pathEditingElementId: string | null;
   readonly pathDrawingElementId: string | null;
   readonly clipPathEditingElementId: string | null;
@@ -102,7 +103,7 @@ export function computeRemoveElementState(
     document: nextDocument,
     ...createInteractionState(
       state.activeElementIds.filter((activeId) => !deletedIds.has(activeId)),
-      state.pendingPlacementType,
+      state.placement,
       cleanInteractionId(state.pathEditingElementId, deletedIds),
       cleanInteractionId(state.pathDrawingElementId, deletedIds),
       cleanInteractionId(state.inlineTextEditingElementId, deletedIds),
@@ -159,7 +160,7 @@ export function computeRemoveElementsState(
     document: nextDocument,
     ...createInteractionState(
       state.activeElementIds.filter((activeId) => !allDeletedIds.has(activeId)),
-      state.pendingPlacementType,
+      state.placement,
       cleanInteractionId(state.pathEditingElementId, allDeletedIds),
       cleanInteractionId(state.pathDrawingElementId, allDeletedIds),
       cleanInteractionId(state.inlineTextEditingElementId, allDeletedIds),

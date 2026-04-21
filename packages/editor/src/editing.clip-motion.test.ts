@@ -38,7 +38,7 @@ describe('clip-path editing — start and stop', () => {
     startClipPathEditing(store, rect.id);
     expect(store.getState().pathEditingElementId).toBeNull();
     expect(store.getState().pathDrawingElementId).toBeNull();
-    expect(store.getState().pendingPlacementType).toBeNull();
+    expect(store.getState().placement).toBeNull();
     expect(store.getState().clipPathEditingElementId).toBe(rect.id);
   });
 
@@ -259,7 +259,7 @@ describe('motion path editing — start and stop', () => {
     expect(store.getState().pathEditingElementId).toBeNull();
     expect(store.getState().pathDrawingElementId).toBeNull();
     expect(store.getState().clipPathEditingElementId).toBeNull();
-    expect(store.getState().pendingPlacementType).toBeNull();
+    expect(store.getState().placement).toBeNull();
     expect(store.getState().motionPathEditingElementId).toBe(rect.id);
   });
 

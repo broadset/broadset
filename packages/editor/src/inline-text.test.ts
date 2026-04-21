@@ -7,7 +7,7 @@ import {
 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
-import { startPathDrawing, startPathEditing, startPlacement } from './editing';
+import { beginPlacement, startPathDrawing, startPathEditing } from './editing';
 import {
   commitInlineText,
   detectBold,
@@ -100,7 +100,7 @@ describe('startInlineTextEditing', () => {
 
     expect(state.pathEditingElementId).toBeNull();
     expect(state.pathDrawingElementId).toBeNull();
-    expect(state.pendingPlacementType).toBeNull();
+    expect(state.placement).toBeNull();
     expect(state.editingMode).toEqual({ type: 'inline-text', elementId: text.id });
   });
 
@@ -124,12 +124,12 @@ describe('startInlineTextEditing', () => {
     const text = makeElement({ type: 'text', content: 'Hello' });
     const store = storeWithElements(text);
 
-    startPlacement(store, 'rectangle');
-    expect(store.getState().pendingPlacementType).toBe('rectangle');
+    beginPlacement(store, 'rectangle');
+    expect(store.getState().placement).toEqual({ type: 'placement-anchor', elementType: 'rectangle' });
 
     startInlineTextEditing(store, text.id);
 
-    expect(store.getState().pendingPlacementType).toBeNull();
+    expect(store.getState().placement).toBeNull();
     expect(store.getState().editingMode).toEqual({ type: 'inline-text', elementId: text.id });
   });
 
@@ -308,9 +308,9 @@ describe('mutex with other editing modes', () => {
     startInlineTextEditing(store, text.id);
     expect(store.getState().editingMode.type).toBe('inline-text');
 
-    startPlacement(store, 'rectangle');
+    beginPlacement(store, 'rectangle');
 
-    expect(store.getState().editingMode.type).toBe('placement');
+    expect(store.getState().editingMode.type).toBe('placement-anchor');
     expect(store.getState().inlineTextEditingElementId).toBeNull();
   });
 });

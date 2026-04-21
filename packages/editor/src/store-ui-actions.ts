@@ -9,7 +9,7 @@ import {
   type Page,
 } from '@broadset/model';
 
-import type { EditingMode } from './store-actions';
+import type { EditingMode, PlacementState } from './store-actions';
 
 const PALETTE_STORAGE_KEY = 'broadset:palette';
 
@@ -18,7 +18,8 @@ interface HostState {
   readonly activePageIndex: number;
   readonly activeElementIds: readonly string[];
   readonly editingMode: EditingMode;
-  readonly pendingPlacementType: string | null;
+  readonly placement: PlacementState | null;
+  readonly placementPreview: { readonly x: number; readonly y: number } | null;
   readonly pathEditingElementId: string | null;
   readonly pathDrawingElementId: string | null;
   readonly canvasSettings: CanvasSettings;
@@ -130,7 +131,8 @@ export function createUIActionsSlice(
           activePageIndex: index,
           activeElementIds: [],
           editingMode: { type: 'none' },
-          pendingPlacementType: null,
+          placement: null,
+          placementPreview: null,
           pathEditingElementId: null,
           pathDrawingElementId: null,
         };
@@ -161,7 +163,8 @@ export function createUIActionsSlice(
           activePageIndex: nextActivePageIndex,
           activeElementIds: [],
           editingMode: { type: 'none' },
-          pendingPlacementType: null,
+          placement: null,
+          placementPreview: null,
           pathEditingElementId: null,
           pathDrawingElementId: null,
         };

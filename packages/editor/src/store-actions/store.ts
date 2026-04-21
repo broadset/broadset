@@ -34,9 +34,31 @@ import {
 
 const DEFAULT_MAX_UNDO_STEPS = 50;
 
+export interface PlacementPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+export type PlacementState =
+  | { readonly type: 'placement-anchor'; readonly elementType: string }
+  | { readonly type: 'placement-extent'; readonly elementType: string; readonly anchor: PlacementPoint }
+  | { readonly type: 'placement-ellipse-radius'; readonly anchor: PlacementPoint }
+  | {
+      readonly type: 'placement-ellipse-rotation';
+      readonly anchor: PlacementPoint;
+      readonly radius: { readonly rx: number; readonly ry: number };
+    };
+
 export type EditingMode =
   | { readonly type: 'none' }
-  | { readonly type: 'placement'; readonly elementType: string }
+  | { readonly type: 'placement-anchor'; readonly elementType: string }
+  | { readonly type: 'placement-extent'; readonly elementType: string; readonly anchor: PlacementPoint }
+  | { readonly type: 'placement-ellipse-radius'; readonly anchor: PlacementPoint }
+  | {
+      readonly type: 'placement-ellipse-rotation';
+      readonly anchor: PlacementPoint;
+      readonly radius: { readonly rx: number; readonly ry: number };
+    }
   | { readonly type: 'path-editing'; readonly elementId: string }
   | { readonly type: 'path-drawing'; readonly elementId: string }
   | { readonly type: 'inline-text'; readonly elementId: string }
@@ -75,7 +97,8 @@ export interface EditorState extends UIActionsState {
   readonly featureConfig: EditorFeatureConfig;
   readonly activeElementIds: readonly string[];
   readonly activePageIndex: number;
-  readonly pendingPlacementType: string | null;
+  readonly placement: PlacementState | null;
+  readonly placementPreview: PlacementPoint | null;
   readonly pathEditingElementId: string | null;
   readonly pathDrawingElementId: string | null;
   readonly clipPathEditingElementId: string | null;
@@ -138,7 +161,8 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
         featureConfig: createDefaultFeatureConfig('screen'),
         activeElementIds: [],
         activePageIndex: 0,
-        pendingPlacementType: null,
+        placement: null,
+        placementPreview: null,
         pathEditingElementId: null,
         pathDrawingElementId: null,
         clipPathEditingElementId: null,
@@ -156,6 +180,7 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
             featureConfig: createDefaultFeatureConfig(document.documentMode),
             activePageIndex: 0,
             snapshots: [],
+            placementPreview: null,
             ...createInteractionState([], null, null, null),
           });
           temporalRef.current?.getState().clear();
@@ -284,14 +309,13 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
               (() => {
                 const defaults = getElementDefaults(typeOrElement);
 
-                return {
-                  ...createDefaultElement(typeOrElement, {
-                    width: defaults.width,
-                    height: defaults.height,
-                    content: defaults.content,
-                  }),
-                  name: typeOrElement,
-                };
+                return createDefaultElement(typeOrElement, {
+                  name: defaults.name,
+                  width: defaults.width,
+                  height: defaults.height,
+                  content: defaults.content,
+                  style: defaults.style,
+                });
               })()
             : typeOrElement;
           const entersPathDrawing = nextElement.type === 'path' && nextElement.content.trim() === '';
@@ -410,6 +434,7 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
                 state.featureConfig
               : createDefaultFeatureConfig(newDocumentMode),
             activePageIndex: 0,
+            placementPreview: null,
             ...createInteractionState([], null, null, null),
           });
         },

@@ -74,7 +74,8 @@ export function startClipPathEditing(store: EditorStore, elementId: string): voi
   store.setState({
     document: nextDocument,
     activeElementIds: [elementId],
-    pendingPlacementType: null,
+    placement: null,
+    placementPreview: null,
     pathEditingElementId: null,
     pathDrawingElementId: null,
     clipPathEditingElementId: elementId,

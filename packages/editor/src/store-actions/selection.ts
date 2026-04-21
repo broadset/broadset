@@ -1,9 +1,9 @@
 import type { BroadsetDocument } from '@broadset/model';
 
-import type { EditingMode, EditorState } from './store';
+import type { EditingMode, EditorState, PlacementState } from './store';
 
 function createEditingMode(
-  pendingPlacementType: string | null,
+  placement: PlacementState | null,
   pathEditingElementId: string | null,
   pathDrawingElementId: string | null,
   inlineTextEditingElementId: string | null,
@@ -30,8 +30,8 @@ function createEditingMode(
     return { type: 'path-editing', elementId: pathEditingElementId };
   }
 
-  if (pendingPlacementType !== null) {
-    return { type: 'placement', elementType: pendingPlacementType };
+  if (placement !== null) {
+    return placement;
   }
 
   return { type: 'none' };
@@ -48,7 +48,7 @@ export function filterSelectionToExisting(
 
 export function createInteractionState(
   activeElementIds: readonly string[],
-  pendingPlacementType: string | null,
+  placement: PlacementState | null,
   pathEditingElementId: string | null,
   pathDrawingElementId: string | null,
   inlineTextEditingElementId: string | null = null,
@@ -57,7 +57,7 @@ export function createInteractionState(
 ): Pick<
   EditorState,
   | 'activeElementIds'
-  | 'pendingPlacementType'
+  | 'placement'
   | 'pathEditingElementId'
   | 'pathDrawingElementId'
   | 'clipPathEditingElementId'
@@ -67,14 +67,14 @@ export function createInteractionState(
 > {
   return {
     activeElementIds,
-    pendingPlacementType,
+    placement,
     pathEditingElementId,
     pathDrawingElementId,
     clipPathEditingElementId,
     motionPathEditingElementId,
     inlineTextEditingElementId,
     editingMode: createEditingMode(
-      pendingPlacementType,
+      placement,
       pathEditingElementId,
       pathDrawingElementId,
       inlineTextEditingElementId,
@@ -87,7 +87,7 @@ export function createInteractionState(
 export function applySelectionSideEffects(
   state: Pick<
     EditorState,
-    | 'pendingPlacementType'
+    | 'placement'
     | 'pathEditingElementId'
     | 'pathDrawingElementId'
     | 'clipPathEditingElementId'
@@ -98,7 +98,7 @@ export function applySelectionSideEffects(
 ): Pick<
   EditorState,
   | 'activeElementIds'
-  | 'pendingPlacementType'
+  | 'placement'
   | 'pathEditingElementId'
   | 'pathDrawingElementId'
   | 'clipPathEditingElementId'
@@ -126,11 +126,11 @@ export function applySelectionSideEffects(
     state.inlineTextEditingElementId !== null && nextActiveElementIds.includes(state.inlineTextEditingElementId) ?
       state.inlineTextEditingElementId
     : null;
-  const nextPendingPlacementType = nextActiveElementIds.length === 0 ? state.pendingPlacementType : null;
+  const nextPlacement = nextActiveElementIds.length === 0 ? state.placement : null;
 
   return createInteractionState(
     nextActiveElementIds,
-    nextPendingPlacementType,
+    nextPlacement,
     nextPathEditingElementId,
     nextPathDrawingElementId,
     nextInlineTextEditingElementId,
