@@ -1,7 +1,6 @@
 import { EditorErrorBoundary, EditorProvider } from '@broadset/editor';
-import { color, sp, TimelineEditingProvider } from '@broadset/ui';
+import { color, TimelineEditingProvider } from '@broadset/ui';
 
-import { RULER_SIZE } from '../demo-types';
 import { COUNTDOWN_PLUGIN } from '../demoConfig';
 import { DemoCanvasSurface } from './demo-canvas-surface';
 import { DemoRulers } from './demo-rulers';
@@ -62,17 +61,8 @@ export function DemoAppLayout(props: DemoAppLayoutProps): React.JSX.Element {
           : null}
 
           <EditorErrorBoundary>
-            <div
-              className="h-full w-full overflow-hidden"
-              style={{ paddingLeft: `${String(RULER_SIZE)}px`, paddingTop: `${String(RULER_SIZE)}px` }}
-            >
-              <section
-                className="relative h-full overflow-hidden"
-                style={{
-                  padding: sp('sp-04'),
-                  paddingRight: sp('sp-04'),
-                }}
-              >
+            <div className="h-full w-full overflow-hidden">
+              <section className="relative h-full overflow-hidden">
                 <LayoutOverlayControls {...props} />
 
                 <div className="h-full w-full overflow-hidden">
