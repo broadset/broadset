@@ -100,7 +100,7 @@ export function useShellBrowserEffects({
         return;
       }
 
-      if (state.pendingPlacementType !== null) {
+      if (state.placement !== null) {
         event.preventDefault();
         cancelPlacement(editorStore);
       }

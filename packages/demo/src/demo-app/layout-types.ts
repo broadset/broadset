@@ -21,6 +21,7 @@ export interface DemoAppLayoutProps {
   readonly fileInputRef: { current: HTMLInputElement | null };
   readonly handleCanvasClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   readonly handleCanvasContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
+  readonly handleCanvasPointerMove: (event: React.MouseEvent<HTMLDivElement>) => void;
   readonly handleCanvasViewportChange: (settings: {
     readonly panX?: number;
     readonly panY?: number;

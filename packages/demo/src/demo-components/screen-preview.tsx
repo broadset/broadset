@@ -2,77 +2,48 @@ import type { EditorStore, ElementUpdate } from '@broadset/editor';
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 import { createPlaybackController, type PlaybackController } from '@broadset/playback';
 import { createScreenRenderer, type ScreenRendererController } from '@broadset/renderer';
-import { classifyWheelInput, color } from '@broadset/ui';
+import { classifyWheelDevice, color, type WheelDevice } from '@broadset/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ZOOM_STEP } from '../demo-types';
 import { clampCanvasZoom } from '../demo-utils';
 import { ClipPathEditingOverlay } from './clip-path-editing-overlay';
 import { PathEditingOverlay } from './path-editing-overlay';
+import { PlacementPreviewOverlay } from './placement-preview-overlay';
 import { SelectionTransformWidget } from './selection-transform-widget';
 
 const WHEEL_GESTURE_LOCK_MS = 140;
 
 type ViewportChangeFn = (settings: { readonly panX?: number; readonly panY?: number; readonly zoom?: number }) => void;
 type PanWriteFn = (panX: number, panY: number) => void;
-type WheelIntent = 'pan' | 'zoom' | 'none';
-type WheelGesture = { readonly expiresAt: number; readonly intent: 'pan' | 'zoom' | null };
+type WheelDeviceGesture = { readonly device: WheelDevice | null; readonly expiresAt: number };
 type Viewport = { panX: number; panY: number; zoom: number };
 
-function handleLegacyWheelPan(
-  event: WheelEvent,
-  currentPanX: number,
-  currentPanY: number,
-  writePan: PanWriteFn,
-  onViewportChange: ViewportChangeFn,
-): boolean {
-  if (event.deltaMode === 0) return false;
-
-  if (event.ctrlKey || event.metaKey) {
-    event.preventDefault();
-
-    const nextPanX = currentPanX - event.deltaY;
-
-    writePan(nextPanX, currentPanY);
-    onViewportChange({ panX: nextPanX, panY: currentPanY });
-
-    return true;
-  }
-
-  if (event.altKey) {
-    event.preventDefault();
-
-    const nextPanY = currentPanY - event.deltaY;
-
-    writePan(currentPanX, nextPanY);
-    onViewportChange({ panX: currentPanX, panY: nextPanY });
-
-    return true;
-  }
-
-  return false;
-}
-
-function resolveWheelIntent(event: WheelEvent, gesture: WheelGesture): WheelIntent {
-  const rawIntent = classifyWheelInput({
+/**
+ * Resolve the wheel device for the current event, honoring a short gesture lock so that
+ * macOS Chrome kinetic-scroll tail events — whose accelerated deltaY can shrink below the
+ * pixel-fallback threshold — don't flip a mouse-wheel zoom into a trackpad pan mid-scroll.
+ *
+ * The lock only overrides when the raw classification would downgrade to `trackpad` AND
+ * there is no lateral delta. A `deltaX !== 0` signal is strong evidence of a real trackpad
+ * gesture, so we drop the lock and trust the raw classification in that case.
+ */
+function resolveWheelDevice(event: WheelEvent, gesture: WheelDeviceGesture): WheelDevice {
+  const rawDevice = classifyWheelDevice({
     altKey: event.altKey,
     ctrlKey: event.ctrlKey || event.metaKey,
     deltaMode: event.deltaMode,
     deltaX: event.deltaX,
     deltaY: event.deltaY,
+    wheelDeltaY: event.wheelDeltaY,
   });
-  const now = event.timeStamp;
-  const hasActiveWheelLock = gesture.intent !== null && now <= gesture.expiresAt;
-  const absoluteDeltaX = Math.abs(event.deltaX);
-  const absoluteDeltaY = Math.abs(event.deltaY);
-  const shouldPreferZoomLock =
-    hasActiveWheelLock &&
-    gesture.intent === 'zoom' &&
-    rawIntent === 'pan' &&
-    absoluteDeltaX <= 1 &&
-    absoluteDeltaY >= absoluteDeltaX * 2;
+  const hasActiveLock = gesture.device !== null && event.timeStamp <= gesture.expiresAt;
 
-  return shouldPreferZoomLock ? 'zoom' : rawIntent;
+  if (hasActiveLock && gesture.device === 'mouse-wheel' && rawDevice === 'trackpad' && event.deltaX === 0) {
+    return 'mouse-wheel';
+  }
+
+  return rawDevice;
 }
 
 function resolveWheelBounds(event: WheelEvent, container: HTMLElement | null): DOMRect | null {
@@ -121,6 +92,7 @@ interface ScreenPreviewProps {
   readonly selectedElement: BroadsetElement | null;
   readonly pathEditingElement: BroadsetElement | null;
   readonly clipPathEditingElement: BroadsetElement | null;
+  readonly isTransformWidgetSuppressed: boolean;
   readonly editorStore: EditorStore;
   readonly onElementTransformPreview: (elementId: string, updates: ElementUpdate) => void;
   readonly onElementTransformCommit: (elementId: string, updates: ElementUpdate) => void;
@@ -134,6 +106,7 @@ interface ScreenPreviewProps {
   readonly perspective: number;
   readonly onCanvasClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   readonly onCanvasContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
+  readonly onCanvasPointerMove: (event: React.MouseEvent<HTMLDivElement>) => void;
   readonly onViewportChange: (settings: {
     readonly panX?: number;
     readonly panY?: number;
@@ -147,6 +120,7 @@ export function ScreenPreview({
   selectedElement,
   pathEditingElement,
   clipPathEditingElement,
+  isTransformWidgetSuppressed,
   editorStore,
   onElementTransformPreview,
   onElementTransformCommit,
@@ -160,6 +134,7 @@ export function ScreenPreview({
   perspective,
   onCanvasClick,
   onCanvasContextMenu,
+  onCanvasPointerMove,
   onViewportChange,
   onPlaybackControllerChange,
 }: ScreenPreviewProps): React.JSX.Element {
@@ -178,9 +153,9 @@ export function ScreenPreview({
   } | null>(null);
   const suppressClickRef = useRef(false);
   const resetTokenMountedRef = useRef(false);
-  const wheelGestureRef = useRef<{ readonly expiresAt: number; readonly intent: 'pan' | 'zoom' | null }>({
+  const wheelGestureRef = useRef<WheelDeviceGesture>({
+    device: null,
     expiresAt: 0,
-    intent: null,
   });
 
   // Live viewport mirror. Imperative pan writes update this ahead of the RAF-batched store
@@ -190,6 +165,17 @@ export function ScreenPreview({
   useEffect(() => {
     viewportRef.current = { panX, panY, zoom };
   }, [panX, panY, zoom]);
+
+  // When the cursor becomes 'crosshair' (placement or drawing mode activates),
+  // clear any stale click-suppression flag left over from a prior gesture. A
+  // Shift-drag pan that ends without firing a synthetic click leaves
+  // suppressClickRef true; without this reset the very first click of the new
+  // placement/drawing session gets swallowed and the user's point is lost.
+  useEffect(() => {
+    if (cursor === 'crosshair') {
+      suppressClickRef.current = false;
+    }
+  }, [cursor]);
 
   const elementsById = useMemo(() => new Map(allElements.map((entry) => [entry.id, entry])), [allElements]);
 
@@ -383,6 +369,14 @@ export function ScreenPreview({
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>): void => {
+      // Any new pointer-down starts a fresh interaction — any stale "suppress
+      // the synthetic click that follows a drag" flag from a PREVIOUS gesture
+      // must be cleared so it can't swallow the click this interaction fires.
+      // If this new interaction turns out to be a drag with movement, the
+      // pointer-move handler will re-set the flag below before the trailing
+      // click arrives, and handlePreviewClick will consume it then.
+      suppressClickRef.current = false;
+
       if (cursor === 'crosshair' || (!event.shiftKey && event.button !== 1)) {
         return;
       }
@@ -417,6 +411,8 @@ export function ScreenPreview({
       const gesture = panGestureRef.current;
 
       if (gesture === null) {
+        onCanvasPointerMove(event);
+
         return;
       }
 
@@ -435,7 +431,7 @@ export function ScreenPreview({
       writePanLayerTransformNow(nextPanX, nextPanY);
       onViewportChange({ panX: nextPanX, panY: nextPanY });
     },
-    [onViewportChange, writePanLayerTransformNow],
+    [onCanvasPointerMove, onViewportChange, writePanLayerTransformNow],
   );
 
   const handlePointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>): void => {
@@ -454,19 +450,32 @@ export function ScreenPreview({
       // Must be attached as a non-passive native listener so preventDefault actually suppresses scroll.
       event.preventDefault();
 
+      const device = resolveWheelDevice(event, wheelGestureRef.current);
+
+      wheelGestureRef.current = { device, expiresAt: event.timeStamp + WHEEL_GESTURE_LOCK_MS };
+
       const { panX: currentPanX, panY: currentPanY } = viewportRef.current;
+      const hasHorizontalPanModifier = event.ctrlKey || event.metaKey;
 
-      if (handleLegacyWheelPan(event, currentPanX, currentPanY, writePanLayerTransformNow, onViewportChange)) return;
+      if (device === 'mouse-wheel' && hasHorizontalPanModifier) {
+        const nextPanX = currentPanX - event.deltaY;
 
-      const intent = resolveWheelIntent(event, wheelGestureRef.current);
+        writePanLayerTransformNow(nextPanX, currentPanY);
+        onViewportChange({ panX: nextPanX, panY: currentPanY });
 
-      if (intent !== 'none') {
-        wheelGestureRef.current = { expiresAt: event.timeStamp + WHEEL_GESTURE_LOCK_MS, intent };
+        return;
       }
 
-      if (intent === 'none') return;
+      if (device === 'mouse-wheel' && event.altKey) {
+        const nextPanY = currentPanY - event.deltaY;
 
-      if (intent === 'pan') {
+        writePanLayerTransformNow(currentPanX, nextPanY);
+        onViewportChange({ panX: currentPanX, panY: nextPanY });
+
+        return;
+      }
+
+      if (device === 'trackpad' && !hasHorizontalPanModifier && !event.altKey) {
         const nextPanX = currentPanX - event.deltaX;
         const nextPanY = currentPanY - event.deltaY;
 
@@ -476,6 +485,8 @@ export function ScreenPreview({
         return;
       }
 
+      // Remaining cases zoom at cursor: mouse-wheel without modifier, trackpad pinch
+      // (synthesized ctrlKey on macOS), and trackpad Alt+scroll zoom alternate.
       applyWheelZoom(event, viewportRef.current, containerRef.current, writePanLayerTransformNow, onViewportChange);
     },
     [onViewportChange, writePanLayerTransformNow],
@@ -545,7 +556,7 @@ export function ScreenPreview({
           }}
         />
       </div>
-      {selectedWorldElement === null || overlayRoot === null ? null : (
+      {selectedWorldElement === null || overlayRoot === null || isTransformWidgetSuppressed ? null : (
         <SelectionTransformWidget
           element={selectedWorldElement}
           overlayRoot={overlayRoot}
@@ -563,6 +574,7 @@ export function ScreenPreview({
           overlayRoot={overlayRoot}
         />
       )}
+      {overlayRoot === null ? null : <PlacementPreviewOverlay editorStore={editorStore} overlayRoot={overlayRoot} />}
     </div>
   );
 }

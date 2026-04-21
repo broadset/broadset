@@ -11,12 +11,14 @@ interface DemoCanvasSurfaceProps {
   readonly selectedElement: BroadsetElement | null;
   readonly pathEditingElement: BroadsetElement | null;
   readonly clipPathEditingElement: BroadsetElement | null;
+  readonly isTransformWidgetSuppressed: boolean;
   readonly renderDocument: BroadsetDocument;
   readonly isPlaying: boolean;
   readonly resetToken: number;
   readonly cursor: 'crosshair' | 'default';
   readonly onCanvasClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   readonly onCanvasContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
+  readonly onCanvasPointerMove: (event: React.MouseEvent<HTMLDivElement>) => void;
   readonly onViewportChange: (settings: {
     readonly panX?: number;
     readonly panY?: number;
@@ -33,12 +35,14 @@ export function DemoCanvasSurface({
   selectedElement,
   pathEditingElement,
   clipPathEditingElement,
+  isTransformWidgetSuppressed,
   renderDocument,
   isPlaying,
   resetToken,
   cursor,
   onCanvasClick,
   onCanvasContextMenu,
+  onCanvasPointerMove,
   onViewportChange,
   onElementTransformPreview,
   onElementTransformCommit,
@@ -51,6 +55,7 @@ export function DemoCanvasSurface({
       allElements={allElements}
       clipPathEditingElement={clipPathEditingElement}
       cursor={cursor}
+      isTransformWidgetSuppressed={isTransformWidgetSuppressed}
       documentData={renderDocument}
       editorStore={editorStore}
       isPlaying={isPlaying}
@@ -62,6 +67,7 @@ export function DemoCanvasSurface({
       zoom={viewport.zoom}
       onCanvasClick={onCanvasClick}
       onCanvasContextMenu={onCanvasContextMenu}
+      onCanvasPointerMove={onCanvasPointerMove}
       onElementTransformCommit={onElementTransformCommit}
       onElementTransformPreview={onElementTransformPreview}
       onViewportChange={onViewportChange}

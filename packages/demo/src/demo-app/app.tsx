@@ -5,6 +5,7 @@ import {
   createEditorStore,
   diffDocuments,
   type EditorStore,
+  type PluginDefaults,
   runPreflightDiagnostics,
 } from '@broadset/editor';
 import {
@@ -37,7 +38,7 @@ import {
   loadSidebarPreferences,
   reorderDocumentLayers,
 } from '../demo-utils';
-import { DEMO_EDITOR_CONFIG } from '../demoConfig';
+import { COUNTDOWN_PLUGIN, DEMO_EDITOR_CONFIG } from '../demoConfig';
 import { SAMPLE_PROJECT } from '../sampleDocument';
 import { useLiveData } from '../useLiveData';
 import { useCommandHandlers } from './command-handlers';
@@ -147,6 +148,12 @@ export function DemoApp(): React.JSX.Element {
       store.getState().selectElement(initialSelectionId);
     }
 
+    // Expose the store on window for CT tests to drive store-level state
+    // (pan, zoom, selection) without relying on pointer-gesture plumbing.
+    if (typeof window !== 'undefined') {
+      (window as unknown as { __broadsetEditorStore?: EditorStore }).__broadsetEditorStore = store;
+    }
+
     return store;
   });
   const [dataStore] = useState(() => createDataStore());
@@ -249,7 +256,9 @@ export function DemoApp(): React.JSX.Element {
     return definition?.config ?? null;
   }, [currentDocument, selectedElementId]);
 
-  const placementLabel = getElementLabel(editorState.pendingPlacementType);
+  const activePlacementType =
+    editorState.placement !== null && 'elementType' in editorState.placement ? editorState.placement.elementType : null;
+  const placementLabel = getElementLabel(activePlacementType);
   const clipboardRef = useRef<readonly BroadsetElement[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const playbackControllerRef = useRef<PlaybackController | null>(null);
@@ -387,15 +396,28 @@ export function DemoApp(): React.JSX.Element {
       editingMode: { type: 'none' },
       pathDrawingElementId: null,
       pathEditingElementId: null,
-      pendingPlacementType: null,
+      placement: null,
+      placementPreview: null,
     }));
     setContextMenu(null);
     pushToast('success', `Pasted ${String(clonedElements.length)} element${clonedElements.length === 1 ? '' : 's'}.`);
   }, [currentDocument.canvas.width, editorStore, pushToast]);
 
+  const placementPlugins = useMemo<readonly PluginDefaults[]>(
+    () => [
+      {
+        type: COUNTDOWN_PLUGIN.type,
+        label: COUNTDOWN_PLUGIN.label,
+        ...(COUNTDOWN_PLUGIN.defaults === undefined ? {} : { defaults: COUNTDOWN_PLUGIN.defaults }),
+      },
+    ],
+    [],
+  );
+
   const {
     handleCanvasClick,
     handleCanvasContextMenu,
+    handleCanvasPointerMove,
     handleCopySelection,
     handleCutSelection,
     handleDuplicateSelection,
@@ -409,6 +431,7 @@ export function DemoApp(): React.JSX.Element {
     currentDocumentElements: currentDocument.elements,
     editorStore,
     pasteClipboardElements,
+    placementPlugins,
     pushToast,
     selectedElement,
     setContextMenu,
@@ -620,6 +643,7 @@ export function DemoApp(): React.JSX.Element {
       handleAlignSelection={handleAlignSelection}
       handleCanvasClick={handleCanvasClick}
       handleCanvasContextMenu={handleCanvasContextMenu}
+      handleCanvasPointerMove={handleCanvasPointerMove}
       handleCanvasViewportChange={handleCanvasViewportChange}
       handleCopySelection={handleCopySelection}
       handleCreateFromPreset={handleCreateFromPreset}

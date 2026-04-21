@@ -1,4 +1,16 @@
-import { appendPathPoint, cancelPlacement, type EditorStore, placeElement, startPlacement } from '@broadset/editor';
+import {
+  appendPathPoint,
+  beginPlacement,
+  cancelPlacement,
+  commitEllipseRotation,
+  commitPlacementExtent,
+  type EditorStore,
+  type PlacementState,
+  type PluginDefaults,
+  setEllipseRadius,
+  setPlacementAnchor,
+  updatePlacementPreview,
+} from '@broadset/editor';
 import type { BooleanOperation, BroadsetElement } from '@broadset/model';
 import type { PropertyValue } from '@broadset/ui';
 import { type Dispatch, type MouseEvent, type SetStateAction, useCallback } from 'react';
@@ -80,6 +92,7 @@ interface UseCommandHandlersOptions {
   readonly sidebarTab: SidebarTab;
   readonly clipboardRef: { current: readonly BroadsetElement[] };
   readonly pasteClipboardElements: () => void;
+  readonly placementPlugins: readonly PluginDefaults[];
   readonly pushToast: (severity: 'error' | 'info' | 'success', message: string) => void;
   readonly setContextMenu: Dispatch<SetStateAction<ContextMenuState | null>>;
   readonly setIsSidebarOpen: Dispatch<SetStateAction<boolean>>;
@@ -88,6 +101,7 @@ interface UseCommandHandlersOptions {
 
 interface CommandHandlers {
   readonly handleCanvasClick: (event: MouseEvent<HTMLDivElement>) => void;
+  readonly handleCanvasPointerMove: (event: MouseEvent<HTMLDivElement>) => void;
   readonly handleCanvasContextMenu: (event: MouseEvent<HTMLDivElement>) => void;
   readonly handleCopySelection: () => void;
   readonly handleCutSelection: () => void;
@@ -97,6 +111,70 @@ interface CommandHandlers {
   readonly handleSidebarTabToggle: (nextTab: SidebarTab) => void;
 }
 
+function toDocumentCoordinates(
+  event: MouseEvent<HTMLDivElement>,
+  canvas: { readonly width: number; readonly height: number },
+): { readonly x: number; readonly y: number } {
+  // Convert viewport-pixel clientX/Y to document units by measuring the
+  // actually-rendered canvas-root on screen. The canvas-root rect folds pan,
+  // zoom, and auto-fit scaling into a single ratio so no transform chain needs
+  // to be re-composed here.
+  const currentTarget = event.currentTarget;
+  const canvasRoot = currentTarget.querySelector<HTMLElement>('[data-broadset-canvas-root]');
+  const rect = (canvasRoot ?? currentTarget).getBoundingClientRect();
+  const safeWidth = Math.max(rect.width, 1);
+  const safeHeight = Math.max(rect.height, 1);
+  const docX = ((event.clientX - rect.left) / safeWidth) * canvas.width;
+  const docY = ((event.clientY - rect.top) / safeHeight) * canvas.height;
+
+  return { x: docX, y: docY };
+}
+
+function dispatchPlacementClick(
+  store: EditorStore,
+  placement: PlacementState,
+  x: number,
+  y: number,
+  plugins: readonly PluginDefaults[],
+): void {
+  switch (placement.type) {
+    case 'placement-anchor':
+      setPlacementAnchor(store, x, y, plugins);
+
+      return;
+    case 'placement-extent':
+      commitPlacementExtent(store, x, y);
+
+      return;
+    case 'placement-ellipse-radius':
+      setEllipseRadius(store, x, y);
+
+      return;
+    case 'placement-ellipse-rotation':
+      commitEllipseRotation(store, x, y);
+
+      return;
+  }
+}
+
+function selectFromCanvasClick(
+  event: MouseEvent<HTMLDivElement>,
+  target: HTMLElement,
+  state: ReturnType<EditorStore['getState']>,
+): void {
+  const elementId = target.dataset['elementId'];
+
+  if (typeof elementId !== 'string' || elementId === '') {
+    return;
+  }
+
+  if (event.metaKey || event.ctrlKey || event.shiftKey) {
+    state.toggleSelectElement(elementId);
+  } else {
+    state.selectElement(elementId);
+  }
+}
+
 export function useCommandHandlers({
   activeElementIds,
   clipboardRef,
@@ -104,6 +182,7 @@ export function useCommandHandlers({
   currentDocumentElements,
   editorStore,
   pasteClipboardElements,
+  placementPlugins,
   pushToast,
   selectedElement,
   setContextMenu,
@@ -113,47 +192,53 @@ export function useCommandHandlers({
 }: UseCommandHandlersOptions): CommandHandlers {
   const handleCanvasClick = useCallback(
     (event: MouseEvent<HTMLDivElement>): void => {
-      const target =
-        event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-element-id]') : null;
+      // `event.target` can be an SVGElement (path/svg child of a path or svg
+      // element host), not just an HTMLElement. Accepting Element here lets
+      // `closest('[data-element-id]')` walk up from svg children to the
+      // element host so paths and other SVG-backed elements are selectable.
+      const target = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-element-id]') : null;
       const state = editorStore.getState();
 
       if (state.pathDrawingElementId !== null) {
-        const bounds = event.currentTarget.getBoundingClientRect();
-        const docX = ((event.clientX - bounds.left) / Math.max(bounds.width, 1)) * currentDocumentCanvas.width;
-        const docY = ((event.clientY - bounds.top) / Math.max(bounds.height, 1)) * currentDocumentCanvas.height;
+        const { x, y } = toDocumentCoordinates(event, currentDocumentCanvas);
 
-        appendPathPoint(editorStore, docX, docY);
+        appendPathPoint(editorStore, x, y);
 
         return;
       }
 
-      if (state.pendingPlacementType !== null) {
-        const bounds = event.currentTarget.getBoundingClientRect();
-        const docX = ((event.clientX - bounds.left) / Math.max(bounds.width, 1)) * currentDocumentCanvas.width;
-        const docY = ((event.clientY - bounds.top) / Math.max(bounds.height, 1)) * currentDocumentCanvas.height;
+      if (state.placement !== null) {
+        const { x, y } = toDocumentCoordinates(event, currentDocumentCanvas);
 
-        placeElement(editorStore, docX, docY);
+        dispatchPlacementClick(editorStore, state.placement, x, y, placementPlugins);
 
         return;
       }
 
       if (target !== null) {
-        const elementId = target.dataset['elementId'];
-
-        if (typeof elementId === 'string' && elementId !== '') {
-          if (event.metaKey || event.ctrlKey || event.shiftKey) {
-            state.toggleSelectElement(elementId);
-          } else {
-            state.selectElement(elementId);
-          }
-        }
+        selectFromCanvasClick(event, target, state);
 
         return;
       }
 
       state.selectElement(null);
     },
-    [currentDocumentCanvas.height, currentDocumentCanvas.width, editorStore],
+    [currentDocumentCanvas, editorStore, placementPlugins],
+  );
+
+  const handleCanvasPointerMove = useCallback(
+    (event: MouseEvent<HTMLDivElement>): void => {
+      const state = editorStore.getState();
+
+      if (state.placement === null && state.pathDrawingElementId === null) {
+        return;
+      }
+
+      const { x, y } = toDocumentCoordinates(event, currentDocumentCanvas);
+
+      updatePlacementPreview(editorStore, x, y);
+    },
+    [currentDocumentCanvas, editorStore],
   );
 
   const handleCanvasContextMenu = useCallback(
@@ -161,8 +246,7 @@ export function useCommandHandlers({
       event.preventDefault();
       event.stopPropagation();
 
-      const target =
-        event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-element-id]') : null;
+      const target = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-element-id]') : null;
       const hitElementId =
         typeof target?.dataset['elementId'] === 'string' && target.dataset['elementId'] !== '' ?
           target.dataset['elementId']
@@ -241,16 +325,18 @@ export function useCommandHandlers({
 
   const handleElementSelect = useCallback(
     (elementType: string): void => {
-      const pendingType = editorStore.getState().pendingPlacementType;
+      const activePlacement = editorStore.getState().placement;
+      const activePlacementType =
+        activePlacement !== null && 'elementType' in activePlacement ? activePlacement.elementType : null;
 
-      if (pendingType === elementType) {
+      if (activePlacementType === elementType) {
         cancelPlacement(editorStore);
         pushToast('info', `${getElementLabel(elementType)} placement cancelled.`);
 
         return;
       }
 
-      startPlacement(editorStore, elementType);
+      beginPlacement(editorStore, elementType);
       setIsSidebarOpen(true);
       pushToast('info', `${getElementLabel(elementType)} placement is ready.`);
     },
@@ -285,6 +371,7 @@ export function useCommandHandlers({
   return {
     handleCanvasClick,
     handleCanvasContextMenu,
+    handleCanvasPointerMove,
     handleCopySelection,
     handleCutSelection,
     handleDuplicateSelection,

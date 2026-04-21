@@ -22,6 +22,7 @@ export function DemoAppLayout(props: DemoAppLayoutProps): React.JSX.Element {
     fileInputRef,
     handleCanvasClick,
     handleCanvasContextMenu,
+    handleCanvasPointerMove,
     handleCanvasViewportChange,
     handleElementTransformCommit,
     handleElementTransformPreview,
@@ -94,14 +95,21 @@ export function DemoAppLayout(props: DemoAppLayoutProps): React.JSX.Element {
                           ) ?? null)
                       }
                       cursor={
-                        editorState.pendingPlacementType !== null || editorState.pathDrawingElementId !== null ?
+                        editorState.placement !== null || editorState.pathDrawingElementId !== null ?
                           'crosshair'
                         : 'default'
                       }
                       editorStore={editorStore}
+                      isTransformWidgetSuppressed={
+                        editorState.placement !== null ||
+                        editorState.pathDrawingElementId !== null ||
+                        editorState.pathEditingElementId !== null ||
+                        editorState.clipPathEditingElementId !== null
+                      }
                       isPlaying={isPlaying}
                       onCanvasClick={handleCanvasClick}
                       onCanvasContextMenu={handleCanvasContextMenu}
+                      onCanvasPointerMove={handleCanvasPointerMove}
                       onElementTransformCommit={handleElementTransformCommit}
                       onElementTransformPreview={handleElementTransformPreview}
                       onPlaybackControllerChange={props.setPreviewPlaybackController}

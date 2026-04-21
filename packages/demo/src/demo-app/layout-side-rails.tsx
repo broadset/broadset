@@ -1,6 +1,5 @@
-import { cancelPlacement } from '@broadset/editor';
-import { color, font, glassPanelStyle, sp } from '@broadset/ui';
-import { Button, Card, CardContent, Chip, Toolbar, Tooltip } from '@heroui/react';
+import { color, glassPanelStyle, sp } from '@broadset/ui';
+import { Button, Toolbar, Tooltip } from '@heroui/react';
 import { Layers, LayoutTemplate, Plus, ShieldCheck, Sliders, Workflow, X } from 'lucide-react';
 
 import { IconToolButton } from '../demo-components';
@@ -11,16 +10,17 @@ import type { DemoAppLayoutProps } from './layout-types';
 export function LayoutSideRails(props: DemoAppLayoutProps): React.JSX.Element {
   const {
     editorState,
-    editorStore,
     handleElementSelect,
     handleSidebarTabToggle,
     isSidebarOpen,
-    placementLabel,
-    pushToast,
     selectedElement,
     setIsSidebarOpen,
     sidebarTab,
   } = props;
+
+  const activePlacement = editorState.placement;
+  const activePlacementType =
+    activePlacement !== null && 'elementType' in activePlacement ? activePlacement.elementType : null;
 
   return (
     <>
@@ -52,7 +52,7 @@ export function LayoutSideRails(props: DemoAppLayoutProps): React.JSX.Element {
                 <Tooltip.Trigger>
                   <span>
                     <IconToolButton
-                      isActive={editorState.pendingPlacementType === elementType.type}
+                      isActive={activePlacementType === elementType.type}
                       label={elementType.label}
                       onPress={() => {
                         handleElementSelect(elementType.type);
@@ -69,39 +69,6 @@ export function LayoutSideRails(props: DemoAppLayoutProps): React.JSX.Element {
           })}
         </Toolbar>
       </div>
-
-      {editorState.pendingPlacementType ?
-        <div
-          className="pointer-events-none absolute z-30"
-          data-testid="placement-mode-banner"
-          style={{
-            left: `${String(FLOATING_OFFSET + 72)}px`,
-            top: `${String(FLOATING_OFFSET + 44)}px`,
-          }}
-        >
-          <Card className="pointer-events-auto" style={glassPanelStyle()} variant="secondary">
-            <CardContent className="flex items-center gap-3 p-3">
-              <Chip color="warning" size="sm" variant="soft">
-                Placement mode
-              </Chip>
-              <span style={{ color: color('foreground'), fontSize: font('body-compact') }}>
-                {placementLabel} placement is active. Click the canvas to add a new element.
-              </span>
-              <Button
-                aria-label="Cancel placement"
-                size="sm"
-                variant="ghost"
-                onPress={() => {
-                  cancelPlacement(editorStore);
-                  pushToast('info', `${placementLabel} placement cancelled.`);
-                }}
-              >
-                Cancel placement
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      : null}
 
       <div
         className="pointer-events-none absolute z-30"
