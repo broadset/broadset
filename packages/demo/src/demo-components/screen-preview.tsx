@@ -2,7 +2,7 @@ import { type EditorStore, type ElementUpdate, startInlineTextEditing } from '@b
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 import { createPlaybackController, type PlaybackController } from '@broadset/playback';
 import { createScreenRenderer, type ScreenRendererController } from '@broadset/renderer';
-import { color } from '@broadset/ui';
+import { classifyWheelDevice, color } from '@broadset/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ZOOM_STEP } from '../demo-types';
@@ -23,6 +23,17 @@ function resolveWheelBounds(event: WheelEvent, container: HTMLElement | null): D
   if (event.target instanceof Element) return event.target.getBoundingClientRect();
 
   return null;
+}
+
+function resolvePreviewCursor(
+  isPanning: boolean,
+  isSpacePanActive: boolean,
+  baseCursor: 'crosshair' | 'default',
+): string {
+  if (isPanning) return 'grabbing';
+  if (isSpacePanActive) return 'grab';
+
+  return baseCursor;
 }
 
 function applyWheelZoom(
@@ -125,6 +136,8 @@ export function ScreenPreview({
   } | null>(null);
   const suppressClickRef = useRef(false);
   const resetTokenMountedRef = useRef(false);
+  const isSpaceHeldRef = useRef(false);
+  const [isSpacePanActive, setIsSpacePanActive] = useState(false);
 
   // Live viewport mirror. Imperative pan writes update this ahead of the RAF-batched store
   // commit so back-to-back wheel events read the just-applied value, not a stale closure.
@@ -367,7 +380,9 @@ export function ScreenPreview({
       // click arrives, and handlePreviewClick will consume it then.
       suppressClickRef.current = false;
 
-      if (cursor === 'crosshair' || (!event.shiftKey && event.button !== 1)) {
+      const shouldPan = event.shiftKey || event.button === 1 || isSpaceHeldRef.current;
+
+      if (cursor === 'crosshair' || !shouldPan) {
         return;
       }
 
@@ -440,7 +455,39 @@ export function ScreenPreview({
       // Must be attached as a non-passive native listener so preventDefault actually suppresses scroll.
       event.preventDefault();
 
-      applyWheelZoom(event, viewportRef.current, containerRef.current, writePanLayerTransformNow, onViewportChange);
+      const device = classifyWheelDevice({
+        altKey: event.altKey,
+        ctrlKey: event.ctrlKey || event.metaKey,
+        deltaMode: event.deltaMode,
+        deltaX: event.deltaX,
+        deltaY: event.deltaY,
+        wheelDeltaY: event.wheelDeltaY,
+      });
+
+      // Mouse-wheel rotation: always zoom at the cursor, never pan. Modifiers
+      // are intentionally ignored so stray Ctrl/Alt presses can't flip the wheel
+      // into a pan.
+      if (device === 'mouse-wheel') {
+        applyWheelZoom(event, viewportRef.current, containerRef.current, writePanLayerTransformNow, onViewportChange);
+
+        return;
+      }
+
+      // Trackpad pinch is reported with a synthesized ctrlKey on macOS/Windows
+      // browsers — treat that as zoom at the cursor.
+      if (event.ctrlKey) {
+        applyWheelZoom(event, viewportRef.current, containerRef.current, writePanLayerTransformNow, onViewportChange);
+
+        return;
+      }
+
+      // Plain trackpad scroll pans both axes.
+      const { panX: currentPanX, panY: currentPanY } = viewportRef.current;
+      const nextPanX = currentPanX - event.deltaX;
+      const nextPanY = currentPanY - event.deltaY;
+
+      writePanLayerTransformNow(nextPanX, nextPanY);
+      onViewportChange({ panX: nextPanX, panY: nextPanY });
     },
     [onViewportChange, writePanLayerTransformNow],
   );
@@ -459,6 +506,57 @@ export function ScreenPreview({
     };
   }, [handleWheel]);
 
+  // Space-held pan: when space is pressed while the canvas has focus (and the
+  // event target is not editable), treat subsequent drags as pan gestures.
+  useEffect(() => {
+    const isEditable = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+
+      return (
+        target.isContentEditable ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT'
+      );
+    };
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.code !== 'Space' || isEditable(event.target)) return;
+
+      if (isSpaceHeldRef.current) {
+        event.preventDefault();
+
+        return;
+      }
+
+      isSpaceHeldRef.current = true;
+      setIsSpacePanActive(true);
+      event.preventDefault();
+    };
+
+    const handleKeyUp = (event: KeyboardEvent): void => {
+      if (event.code !== 'Space') return;
+
+      isSpaceHeldRef.current = false;
+      setIsSpacePanActive(false);
+    };
+
+    const handleBlur = (): void => {
+      isSpaceHeldRef.current = false;
+      setIsSpacePanActive(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
+
   return (
     /* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/role-supports-aria-props, jsx-a11y/click-events-have-key-events --
        Canvas preview is a complex pointer-driven editing surface. role="application"
@@ -467,7 +565,7 @@ export function ScreenPreview({
        per-element keydown handlers. */
     <div
       ref={containerRef}
-      aria-description="Mouse wheel zooms at the cursor; Shift-drag or middle-click pans the view."
+      aria-description="Mouse wheel zooms at the cursor; trackpad scroll pans and pinch zooms; Shift-drag, Space-drag, or middle-click pans the view."
       aria-label={`Screen preview for ${documentData.name}`}
       className="h-full w-full overflow-hidden"
       role="application"
@@ -480,7 +578,7 @@ export function ScreenPreview({
       onPointerUp={handlePointerUp}
       style={{
         backgroundColor: color('surface-secondary'),
-        cursor: isPanning ? 'grabbing' : cursor,
+        cursor: resolvePreviewCursor(isPanning, isSpacePanActive, cursor),
         position: 'relative',
         touchAction: 'none',
       }}

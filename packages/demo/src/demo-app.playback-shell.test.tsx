@@ -378,8 +378,8 @@ describe('DemoApp playback shell lifecycle', () => {
     expect(zoomLevel.textContent).toBe('100%');
   });
 
-  /** @description Wheel events always zoom at the cursor — they never pan — regardless of modifier keys or device (mouse vs trackpad). */
-  it('wheel always zooms and never pans regardless of modifier or device', async () => {
+  /** @description Mouse-wheel rotation always zooms (never pans), trackpad scroll pans, and trackpad pinch (ctrlKey-synthesized) zooms. */
+  it('mouse-wheel zooms, trackpad scroll pans, trackpad pinch zooms', async () => {
     setupDemoShellMocks();
     render(<DemoApp />);
 
@@ -388,32 +388,30 @@ describe('DemoApp playback shell lifecycle', () => {
     const rendererHost = screen.getByTestId('screen-renderer-host');
     const panLayer = screen.getByTestId('screen-pan-layer');
 
-    fireEvent.wheel(preview, { deltaMode: 0, deltaY: -120 });
+    // Physical mouse wheel: one notch up → zoom in, pan stays at origin.
+    fireEvent.wheel(preview, { deltaMode: 0, deltaY: -120, wheelDeltaY: 120 });
     await waitFor(() => {
       expect(zoomLevel.textContent).toBe('124%');
       expect(rendererHost.style.transform).toBe('scale(1.24)');
+      expect(panLayer.style.transform).toBe('translate(0px, 0px)');
     });
 
-    const panAfterZoomIn = panLayer.style.transform;
-
-    fireEvent.wheel(preview, { ctrlKey: true, deltaMode: 1, deltaY: 3 });
-    await waitFor(() => {
-      expect(zoomLevel.textContent).toBe('114%');
-      expect(rendererHost.style.transform).toBe('scale(1.14)');
-    });
-
-    fireEvent.wheel(preview, { altKey: true, deltaMode: 1, deltaY: -1 });
-    await waitFor(() => {
-      expect(zoomLevel.textContent).toBe('124%');
-      expect(rendererHost.style.transform).toBe('scale(1.24)');
-    });
-
+    // Trackpad two-finger scroll: no ctrl, small non-integer delta → pans,
+    // zoom unchanged.
     fireEvent.wheel(preview, { deltaMode: 0, deltaX: 18, deltaY: 12 });
     await waitFor(() => {
-      expect(rendererHost.style.transform).not.toBe('scale(1.24)');
+      expect(zoomLevel.textContent).toBe('124%');
+      expect(rendererHost.style.transform).toBe('scale(1.24)');
+      expect(panLayer.style.transform).toBe('translate(-18px, -12px)');
     });
 
-    expect(panAfterZoomIn).toBeTruthy();
+    // Trackpad pinch: browsers synthesize ctrlKey for pinch → zoom at cursor.
+    fireEvent.wheel(preview, { ctrlKey: true, deltaMode: 0, deltaY: -50 });
+    await waitFor(() => {
+      const percent = Number.parseInt(zoomLevel.textContent, 10);
+
+      expect(percent).toBeGreaterThan(124);
+    });
   });
 
   /** @description Proves the fullscreen control can enter and exit browser fullscreen and reflects the current state. */
