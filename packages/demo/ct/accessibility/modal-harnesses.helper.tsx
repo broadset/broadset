@@ -32,6 +32,7 @@ export function CanvasSettingsHarness(): JSX.Element {
   const [rulerUnit, setRulerUnit] = useState<'in' | 'mm' | 'px'>('px');
   const [viewMode, setViewMode] = useState<'broadcast' | 'none' | 'print'>('broadcast');
   const [showGrid, setShowGrid] = useState(true);
+  const [showExperimentalFeatures, setShowExperimentalFeatures] = useState(true);
 
   return (
     <>
@@ -46,6 +47,7 @@ export function CanvasSettingsHarness(): JSX.Element {
         gridSize={10}
         snapToGrid
         snapThreshold={8}
+        showExperimentalFeatures={showExperimentalFeatures}
         onDocumentNameChange={setDocumentName}
         onRulerChange={setShowRulers}
         onRulerUnitChange={(unit) => {
@@ -59,6 +61,7 @@ export function CanvasSettingsHarness(): JSX.Element {
           }
         }}
         onPerspectiveChange={() => undefined}
+        onShowExperimentalFeaturesChange={setShowExperimentalFeatures}
         onGridChange={(changes) => {
           if (changes.showGrid !== undefined) {
             setShowGrid(changes.showGrid);

@@ -48,11 +48,13 @@ export interface CanvasSettingsModalProps {
   readonly gridSize: number;
   readonly snapToGrid: boolean;
   readonly snapThreshold: number;
+  readonly showExperimentalFeatures: boolean;
   readonly onDocumentNameChange: (name: string) => void;
   readonly onRulerChange: (show: boolean) => void;
   readonly onRulerUnitChange: (unit: string) => void;
   readonly onViewModeChange: (mode: string) => void;
   readonly onPerspectiveChange: (value: number) => void;
+  readonly onShowExperimentalFeaturesChange: (value: boolean) => void;
   readonly onGridChange: (
     changes: Partial<{
       showGrid: boolean;
@@ -75,11 +77,13 @@ export function CanvasSettingsModal({
   gridSize,
   snapToGrid,
   snapThreshold,
+  showExperimentalFeatures,
   onDocumentNameChange,
   onRulerChange,
   onRulerUnitChange,
   onViewModeChange,
   onPerspectiveChange,
+  onShowExperimentalFeaturesChange,
   onGridChange,
   onClose,
 }: CanvasSettingsModalProps): JSX.Element | null {
@@ -105,35 +109,50 @@ export function CanvasSettingsModal({
           <ToggleSwitch ariaLabel="Show rulers" isSelected={showRulers} onChange={onRulerChange}>
             Show rulers
           </ToggleSwitch>
-          <div style={{ marginTop: sp('sp-02') }}>
-            <Select
-              aria-label="Ruler units"
-              value={rulerUnit}
-              onChange={(key) => {
-                onRulerUnitChange(String(key));
-              }}
-            >
-              <option value="px">px</option>
-              <option value="mm">mm</option>
-              <option value="in">in</option>
-            </Select>
-          </div>
-          <div style={{ marginTop: sp('sp-02') }}>
-            <ButtonGroup>
-              {VIEW_MODES.map((mode) => (
-                <Button
-                  key={mode}
-                  aria-label={mode}
-                  variant={viewMode === mode ? 'primary' : 'ghost'}
-                  onPress={() => {
-                    onViewModeChange(mode);
-                  }}
-                >
-                  {mode}
-                </Button>
-              ))}
-            </ButtonGroup>
-          </div>
+          {showExperimentalFeatures ?
+            <div style={{ marginTop: sp('sp-02') }}>
+              <Select
+                aria-label="Ruler units"
+                value={rulerUnit}
+                onChange={(key) => {
+                  onRulerUnitChange(String(key));
+                }}
+              >
+                <option value="px">px</option>
+                <option value="mm">mm</option>
+                <option value="in">in</option>
+              </Select>
+            </div>
+          : null}
+          {showExperimentalFeatures ?
+            <div style={{ marginTop: sp('sp-02') }}>
+              <ButtonGroup>
+                {VIEW_MODES.map((mode) => (
+                  <Button
+                    key={mode}
+                    aria-label={mode}
+                    variant={viewMode === mode ? 'primary' : 'ghost'}
+                    onPress={() => {
+                      onViewModeChange(mode);
+                    }}
+                  >
+                    {mode}
+                  </Button>
+                ))}
+              </ButtonGroup>
+            </div>
+          : null}
+        </section>
+
+        <section aria-label="Experimental features" style={{ marginTop: sp('sp-04') }}>
+          <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: sp('sp-02') }}>Experimental</h3>
+          <ToggleSwitch
+            ariaLabel="Show experimental features"
+            isSelected={showExperimentalFeatures}
+            onChange={onShowExperimentalFeaturesChange}
+          >
+            Show experimental features
+          </ToggleSwitch>
         </section>
 
         <section aria-label="3D Perspective" style={{ marginTop: sp('sp-04') }}>

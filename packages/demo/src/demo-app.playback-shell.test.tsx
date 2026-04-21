@@ -3,7 +3,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { setupDemoShellMocks } from './demo-shell-test-utils';
+import { enableExperimentalFeatures, setupDemoShellMocks } from './demo-shell-test-utils';
 import { DemoApp } from './DemoApp';
 import { createDemoAppPlaybackTestDocument } from './test-fixtures';
 
@@ -77,6 +77,7 @@ describe('DemoApp playback shell lifecycle', () => {
     try {
       setupDemoShellMocks();
       render(<DemoApp />);
+      enableExperimentalFeatures();
 
       fireEvent.click(screen.getByRole('button', { name: /animation/i }));
       fireEvent.click(screen.getByRole('button', { name: /add timeline/i }));
@@ -155,6 +156,7 @@ describe('DemoApp playback shell lifecycle', () => {
     window.localStorage.setItem('broadset:demo-document:v1', JSON.stringify(reorderedDocument));
 
     render(<DemoApp />);
+    enableExperimentalFeatures();
 
     fireEvent.click(screen.getByRole('button', { name: /animation/i }));
     fireEvent.click(screen.getByRole('button', { name: /edit live pulse/i }));
@@ -213,6 +215,7 @@ describe('DemoApp playback shell lifecycle', () => {
     window.localStorage.setItem('broadset:demo-document:v1', JSON.stringify(reorderedDocument));
 
     render(<DemoApp />);
+    enableExperimentalFeatures();
 
     fireEvent.click(screen.getByRole('button', { name: /animation/i }));
     fireEvent.click(screen.getByRole('button', { name: /add timeline/i }));

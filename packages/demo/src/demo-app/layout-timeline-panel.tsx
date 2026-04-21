@@ -2,8 +2,9 @@ import { TimelineBottomPanel, TimelineEditor } from '@broadset/ui';
 
 import type { DemoAppLayoutProps } from './layout-types';
 
-export function LayoutTimelinePanel(props: DemoAppLayoutProps): React.JSX.Element {
+export function LayoutTimelinePanel(props: DemoAppLayoutProps): React.JSX.Element | null {
   const {
+    canvasSettings,
     editingTimeline,
     editingTimelineSelectedKf,
     handleAnimationAddKeyframe,
@@ -14,6 +15,10 @@ export function LayoutTimelinePanel(props: DemoAppLayoutProps): React.JSX.Elemen
     setEditingTimelineSelectedKf,
     timelinePreviewCurrentTimeMs,
   } = props;
+
+  if (!canvasSettings.showExperimentalFeatures) {
+    return null;
+  }
 
   return (
     <TimelineBottomPanel

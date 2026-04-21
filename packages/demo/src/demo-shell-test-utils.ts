@@ -1,5 +1,6 @@
 import './demo-app-test-helpers';
 
+import type { EditorStore } from '@broadset/editor';
 import { createPlaybackController } from '@broadset/playback';
 import { createScreenRenderer } from '@broadset/renderer';
 import { act } from '@testing-library/react';
@@ -64,5 +65,24 @@ export function setupDemoShellMocks(): DemoShellMocks {
 export function dispatchDeleteKey(): void {
   act(() => {
     window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Delete' }));
+  });
+}
+
+/**
+ * Enables the experimental-features flag on the active demo editor store so
+ * tests that depend on experimental UI surfaces (animation sidebar, preflight,
+ * export modal, template browser, unit/view-mode pickers, motion path, etc.)
+ * can see those surfaces. The flag defaults to `false` in production; tests
+ * that exercise those surfaces must opt in.
+ */
+export function enableExperimentalFeatures(): void {
+  const globalStore = (window as unknown as { readonly __broadsetEditorStore?: EditorStore }).__broadsetEditorStore;
+
+  if (globalStore === undefined) {
+    throw new Error('enableExperimentalFeatures must be called after DemoApp is mounted');
+  }
+
+  act(() => {
+    globalStore.getState().updateCanvasSettings({ showExperimentalFeatures: true });
   });
 }

@@ -8,6 +8,7 @@ import type { DemoAppLayoutProps } from './layout-types';
 
 export function LayoutContextMenu(props: DemoAppLayoutProps): React.JSX.Element | null {
   const {
+    canvasSettings,
     contextMenu,
     contextMenuElement,
     destructiveContextActionDisabled,
@@ -20,6 +21,8 @@ export function LayoutContextMenu(props: DemoAppLayoutProps): React.JSX.Element 
     pushToast,
     setContextMenu,
   } = props;
+
+  const isExperimental = canvasSettings.showExperimentalFeatures;
 
   if (contextMenu === null) {
     return null;
@@ -200,15 +203,17 @@ export function LayoutContextMenu(props: DemoAppLayoutProps): React.JSX.Element 
               >
                 Edit path points
               </Dropdown.Item>
-              <Dropdown.Item
-                key="edit-motion-path"
-                onAction={() => {
-                  startMotionPathEditing(editorStore, contextMenuElement.id);
-                  setContextMenu(null);
-                }}
-              >
-                Edit motion path
-              </Dropdown.Item>
+              {isExperimental ?
+                <Dropdown.Item
+                  key="edit-motion-path"
+                  onAction={() => {
+                    startMotionPathEditing(editorStore, contextMenuElement.id);
+                    setContextMenu(null);
+                  }}
+                >
+                  Edit motion path
+                </Dropdown.Item>
+              : null}
               <Dropdown.Item
                 key="delete-selection"
                 isDisabled={destructiveContextActionDisabled}

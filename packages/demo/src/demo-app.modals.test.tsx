@@ -3,7 +3,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { setupDemoShellMocks } from './demo-shell-test-utils';
+import { enableExperimentalFeatures, setupDemoShellMocks } from './demo-shell-test-utils';
 import { DemoApp } from './DemoApp';
 
 describe('DemoApp modal dialog integration (9-D)', () => {
@@ -34,6 +34,7 @@ describe('DemoApp modal dialog integration (9-D)', () => {
   it('opens the Export dialog with feature-gated format buttons and closes on cancel', () => {
     setupDemoShellMocks();
     render(<DemoApp />);
+    enableExperimentalFeatures();
 
     fireEvent.click(screen.getByRole('button', { name: /^export$/i }));
 
@@ -52,6 +53,7 @@ describe('DemoApp modal dialog integration (9-D)', () => {
   it('narrows the visible template list when the user searches', () => {
     setupDemoShellMocks();
     render(<DemoApp />);
+    enableExperimentalFeatures();
 
     fireEvent.click(screen.getByRole('button', { name: /browse templates/i }));
 

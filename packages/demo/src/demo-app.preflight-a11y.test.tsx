@@ -3,7 +3,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { setupDemoShellMocks } from './demo-shell-test-utils';
+import { enableExperimentalFeatures, setupDemoShellMocks } from './demo-shell-test-utils';
 import { DemoApp } from './DemoApp';
 
 describe('9-F: Preflight Diagnostics', () => {
@@ -15,6 +15,7 @@ describe('9-F: Preflight Diagnostics', () => {
   /** @description The Pre-flight sidebar tab must show the preflight panel with issue results. */
   it('shows the preflight panel when the Pre-flight tab is clicked', () => {
     renderDemoApp();
+    enableExperimentalFeatures();
 
     const sidebarToolbar = screen.getByRole('toolbar', { name: /sidebar toolbar/i });
     const preflightButton = within(sidebarToolbar).getByRole('button', { name: /pre-flight/i });
@@ -31,6 +32,7 @@ describe('9-F: Preflight Diagnostics', () => {
   /** @description The sample document has elements outside title-safe, so issues must be shown. */
   it('shows preflight issues for the sample document', () => {
     renderDemoApp();
+    enableExperimentalFeatures();
 
     const sidebarToolbar = screen.getByRole('toolbar', { name: /sidebar toolbar/i });
     const preflightButton = within(sidebarToolbar).getByRole('button', { name: /pre-flight/i });

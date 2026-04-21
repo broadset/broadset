@@ -4,7 +4,7 @@ import { createDefaultElement } from '@broadset/model';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { dispatchDeleteKey, setupDemoShellMocks } from './demo-shell-test-utils';
+import { dispatchDeleteKey, enableExperimentalFeatures, setupDemoShellMocks } from './demo-shell-test-utils';
 import { DemoApp } from './DemoApp';
 import { createDemoAppChromeTestDocument, createParentingTransformTestDocument } from './test-fixtures';
 
@@ -328,6 +328,7 @@ describe('DemoApp chrome and menu integration', () => {
   it('renders the phase 4 file and view menu actions defined by the spec', () => {
     setupDemoShellMocks();
     render(<DemoApp />);
+    enableExperimentalFeatures();
 
     expect(screen.getByRole('button', { name: /new document/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /save as json/i })).toBeTruthy();
@@ -439,6 +440,7 @@ describe('DemoApp chrome and menu integration', () => {
   it('disables the Properties and Animation sidebar buttons after the selection is cleared', () => {
     setupDemoShellMocks();
     render(<DemoApp />);
+    enableExperimentalFeatures();
     fireEvent.click(screen.getByLabelText(/screen preview for/i));
 
     expect(screen.getByRole('button', { name: /properties/i }).hasAttribute('disabled')).toBe(true);

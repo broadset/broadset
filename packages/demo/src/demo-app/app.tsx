@@ -73,7 +73,8 @@ function areCanvasSettingsEqualIgnoringViewport(left: CanvasSettings, right: Can
     left.originX === right.originX &&
     left.originY === right.originY &&
     left.guides === right.guides &&
-    left.grid === right.grid
+    left.grid === right.grid &&
+    left.showExperimentalFeatures === right.showExperimentalFeatures
   );
 }
 
@@ -230,8 +231,9 @@ export function DemoApp(): React.JSX.Element {
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarPreferences.isOpen);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(initialSidebarPreferences.tab);
   const [sidebarWidth, setSidebarWidth] = useState(initialSidebarPreferences.width);
+  const isExperimental = canvasSettings.showExperimentalFeatures;
   const preflightIssues = useMemo<readonly PreflightIssue[]>(() => {
-    if (sidebarTab !== 'preflight') {
+    if (!isExperimental || sidebarTab !== 'preflight') {
       return [];
     }
 
@@ -244,7 +246,7 @@ export function DemoApp(): React.JSX.Element {
       elementName: d.elementName,
       ruleId: d.rule,
     }));
-  }, [currentDocument, sidebarTab]);
+  }, [currentDocument, isExperimental, sidebarTab]);
 
   const animationConfig = useMemo(() => {
     if (selectedElementId === null) {
@@ -526,7 +528,7 @@ export function DemoApp(): React.JSX.Element {
         mediaAssets={mediaAssets}
         canvasWidth={currentDocument.canvas.width}
         canvasHeight={currentDocument.canvas.height}
-        documentUnit={currentDocument.canvas.unit}
+        documentUnit={isExperimental ? currentDocument.canvas.unit : 'px'}
       />
     ),
     [
@@ -561,6 +563,7 @@ export function DemoApp(): React.JSX.Element {
       handleRemoveMember,
       handleRenameGroup,
       handleUpdateMemberRole,
+      isExperimental,
       layers,
       mediaAssets,
       preflightIssues,
@@ -593,6 +596,25 @@ export function DemoApp(): React.JSX.Element {
       setSidebarTab('layers');
     }
   }, [selectedElement, sidebarTab]);
+
+  useEffect(() => {
+    if (isExperimental) {
+      return;
+    }
+
+    if (sidebarTab === 'animation' || sidebarTab === 'preflight' || sidebarTab === 'template-groups') {
+      setSidebarTab('layers');
+    }
+
+    if (editingTimeline !== null) {
+      setEditingTimeline(null);
+      setEditingTimelineSelectedKf(null);
+    }
+
+    if (activeDialog === 'export' || activeDialog === 'template-browser') {
+      setActiveDialog(null);
+    }
+  }, [activeDialog, editingTimeline, isExperimental, sidebarTab]);
 
   useEffect(() => {
     return () => {

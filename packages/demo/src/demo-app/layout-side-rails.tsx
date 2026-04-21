@@ -9,6 +9,7 @@ import type { DemoAppLayoutProps } from './layout-types';
 
 export function LayoutSideRails(props: DemoAppLayoutProps): React.JSX.Element {
   const {
+    canvasSettings,
     editorState,
     handleElementSelect,
     handleSidebarTabToggle,
@@ -17,6 +18,8 @@ export function LayoutSideRails(props: DemoAppLayoutProps): React.JSX.Element {
     setIsSidebarOpen,
     sidebarTab,
   } = props;
+
+  const isExperimental = canvasSettings.showExperimentalFeatures;
 
   const activePlacement = editorState.placement;
   const activePlacementType =
@@ -143,37 +146,43 @@ export function LayoutSideRails(props: DemoAppLayoutProps): React.JSX.Element {
           >
             <Sliders size={16} />
           </IconToolButton>
-          <IconToolButton
-            isActive={isSidebarOpen && sidebarTab === 'animation'}
-            isDisabled={selectedElement === null}
-            label="Animation"
-            onPress={() => {
-              handleSidebarTabToggle('animation');
-            }}
-            tooltipPlacement="bottom"
-          >
-            <Workflow size={16} />
-          </IconToolButton>
-          <IconToolButton
-            isActive={isSidebarOpen && sidebarTab === 'preflight'}
-            label="Pre-flight"
-            onPress={() => {
-              handleSidebarTabToggle('preflight');
-            }}
-            tooltipPlacement="bottom"
-          >
-            <ShieldCheck size={16} />
-          </IconToolButton>
-          <IconToolButton
-            isActive={isSidebarOpen && sidebarTab === 'template-groups'}
-            label="Template Groups"
-            onPress={() => {
-              handleSidebarTabToggle('template-groups');
-            }}
-            tooltipPlacement="bottom"
-          >
-            <LayoutTemplate size={16} />
-          </IconToolButton>
+          {isExperimental ?
+            <IconToolButton
+              isActive={isSidebarOpen && sidebarTab === 'animation'}
+              isDisabled={selectedElement === null}
+              label="Animation"
+              onPress={() => {
+                handleSidebarTabToggle('animation');
+              }}
+              tooltipPlacement="bottom"
+            >
+              <Workflow size={16} />
+            </IconToolButton>
+          : null}
+          {isExperimental ?
+            <IconToolButton
+              isActive={isSidebarOpen && sidebarTab === 'preflight'}
+              label="Pre-flight"
+              onPress={() => {
+                handleSidebarTabToggle('preflight');
+              }}
+              tooltipPlacement="bottom"
+            >
+              <ShieldCheck size={16} />
+            </IconToolButton>
+          : null}
+          {isExperimental ?
+            <IconToolButton
+              isActive={isSidebarOpen && sidebarTab === 'template-groups'}
+              label="Template Groups"
+              onPress={() => {
+                handleSidebarTabToggle('template-groups');
+              }}
+              tooltipPlacement="bottom"
+            >
+              <LayoutTemplate size={16} />
+            </IconToolButton>
+          : null}
         </Toolbar>
       </div>
     </>

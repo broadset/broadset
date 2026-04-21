@@ -71,6 +71,7 @@ export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
         gridSize={editorState.gridSettings.gridSize}
         snapToGrid={editorState.gridSettings.snapToGrid}
         snapThreshold={editorState.gridSettings.snapThreshold}
+        showExperimentalFeatures={canvasSettings.showExperimentalFeatures}
         onDocumentNameChange={(name: string) => {
           editorStore.getState().loadTemplate({ ...currentDocument, name });
         }}
@@ -86,6 +87,9 @@ export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
         onPerspectiveChange={(value: number) => {
           editorStore.getState().updateCanvasSettings({ perspective: value });
         }}
+        onShowExperimentalFeaturesChange={(value: boolean) => {
+          editorStore.getState().updateCanvasSettings({ showExperimentalFeatures: value });
+        }}
         onGridChange={(changes: {
           gridSize?: number;
           showGrid?: boolean;
@@ -99,17 +103,19 @@ export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
         }}
       />
 
-      <ExportModal
-        isOpen={activeDialog === 'export'}
-        enabledExporters={ENABLED_EXPORTERS}
-        dynamicData={{}}
-        animations={exportAnimations}
-        exportProgress={exportProgress}
-        onExport={handleExportFormat}
-        onClose={() => {
-          setActiveDialog(null);
-        }}
-      />
+      {canvasSettings.showExperimentalFeatures ?
+        <ExportModal
+          isOpen={activeDialog === 'export'}
+          enabledExporters={ENABLED_EXPORTERS}
+          dynamicData={{}}
+          animations={exportAnimations}
+          exportProgress={exportProgress}
+          onExport={handleExportFormat}
+          onClose={() => {
+            setActiveDialog(null);
+          }}
+        />
+      : null}
 
       <ShortcutHelpModal
         isOpen={activeDialog === 'shortcuts'}
@@ -136,15 +142,17 @@ export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
         }}
       />
 
-      <TemplateBrowserModal
-        isOpen={activeDialog === 'template-browser'}
-        templates={DEMO_TEMPLATES}
-        hasUnsavedChanges={false}
-        onSelectTemplate={handleTemplateSelect}
-        onClose={() => {
-          setActiveDialog(null);
-        }}
-      />
+      {canvasSettings.showExperimentalFeatures ?
+        <TemplateBrowserModal
+          isOpen={activeDialog === 'template-browser'}
+          templates={DEMO_TEMPLATES}
+          hasUnsavedChanges={false}
+          onSelectTemplate={handleTemplateSelect}
+          onClose={() => {
+            setActiveDialog(null);
+          }}
+        />
+      : null}
 
       <Toast.Provider className="bottom-7 right-7 z-40" placement="bottom end" />
     </>
