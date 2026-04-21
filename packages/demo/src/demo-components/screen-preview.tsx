@@ -18,6 +18,14 @@ type ViewportChangeFn = (settings: { readonly panX?: number; readonly panY?: num
 type PanWriteFn = (panX: number, panY: number) => void;
 type Viewport = { panX: number; panY: number; zoom: number };
 
+/**
+ * Once a wheel event with horizontal delta lands on the canvas, subsequent
+ * events within this window also pan — trackpad scrolls often include a
+ * handful of pure-vertical events (fingers slightly lifting) that would
+ * otherwise be misclassified as mouse-wheel zoom.
+ */
+const TRACKPAD_GESTURE_LOCK_MS = 400;
+
 function resolveWheelBounds(event: WheelEvent, container: HTMLElement | null): DOMRect | null {
   if (container !== null) return container.getBoundingClientRect();
   if (event.target instanceof Element) return event.target.getBoundingClientRect();
@@ -138,6 +146,11 @@ export function ScreenPreview({
   const resetTokenMountedRef = useRef(false);
   const isSpaceHeldRef = useRef(false);
   const [isSpacePanActive, setIsSpacePanActive] = useState(false);
+  // Trackpad gesture lock: when we see a wheel event with any horizontal
+  // delta (a very reliable trackpad signal), remember it for a short window so
+  // subsequent pure-vertical events in the same stream (e.g. the user lifts
+  // one finger) stay on the pan route instead of flipping to zoom.
+  const trackpadLockExpiresAtRef = useRef(0);
 
   // Live viewport mirror. Imperative pan writes update this ahead of the RAF-batched store
   // commit so back-to-back wheel events read the just-applied value, not a stale closure.
@@ -473,19 +486,19 @@ export function ScreenPreview({
         return;
       }
 
-      // Distinguish mouse-wheel rotation from trackpad scroll with the only signals
-      // browsers actually expose:
-      //   - Line/page deltaMode → Firefox mouse wheel.
-      //   - wheelDeltaY is a non-zero multiple of 120 → Chrome/Safari mouse wheel.
-      //   - Any horizontal delta → trackpad (or a rare tilt wheel; treat as pan).
-      //   - Fractional deltaY → trackpad momentum.
-      //   - Everything else → assume mouse wheel so Ctrl-less zoom keeps working on
-      //     high-DPI mice that don't emit canonical 120-multiple wheelDeltaY values.
-      const isHorizontalScroll = event.deltaX !== 0;
-      const hasFractionalDelta = !Number.isInteger(event.deltaY);
-      const isTrackpadScroll = isHorizontalScroll || hasFractionalDelta;
+      // Distinguishing mouse-wheel rotation from trackpad scroll is hard because
+      // modern Chrome emits fractional, non-120-multiple delta values for both
+      // sources (smooth scrolling on the wheel, momentum on the trackpad). The
+      // one signal that stays reliable is `deltaX` — trackpad scrolls almost
+      // always produce at least one horizontal-delta event per gesture, while
+      // mouse wheels don't. A short time-based lock keeps the rest of the
+      // trackpad stream (which may well be pure-vertical) on the pan route.
+      const hasHorizontalDelta = event.deltaX !== 0;
+      const hasTrackpadLock = event.timeStamp < trackpadLockExpiresAtRef.current;
 
-      if (isTrackpadScroll) {
+      if (hasHorizontalDelta || hasTrackpadLock) {
+        trackpadLockExpiresAtRef.current = event.timeStamp + TRACKPAD_GESTURE_LOCK_MS;
+
         const { panX: currentPanX, panY: currentPanY } = viewportRef.current;
         const nextPanX = currentPanX - event.deltaX;
         const nextPanY = currentPanY - event.deltaY;
