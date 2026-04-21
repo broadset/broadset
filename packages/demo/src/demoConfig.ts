@@ -160,7 +160,7 @@ export const COUNTDOWN_PLUGIN: ComponentPlugin = {
 export const DEMO_GRID_DEFAULTS: GridSettings = {
   gridSize: 10,
   showGrid: false,
-  snapToGrid: true,
+  snapToGrid: false,
   snapThreshold: 5,
 };
 

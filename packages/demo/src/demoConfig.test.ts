@@ -169,12 +169,12 @@ describe('Demo Editor Configuration (9-G)', () => {
   });
 
   describe('Grid and Undo Defaults', () => {
-    /** @description Grid defaults must be gridSize=10, snapToGrid=true. */
-    it('sets gridSize=10 and snapToGrid=true', () => {
+    /** @description Grid defaults must be gridSize=10, snapToGrid=false so dragging isn't forced onto the grid until the user opts in. */
+    it('sets gridSize=10 and snapToGrid=false', () => {
       const grid: GridSettings = DEMO_GRID_DEFAULTS;
 
       expect(grid.gridSize).toBe(10);
-      expect(grid.snapToGrid).toBe(true);
+      expect(grid.snapToGrid).toBe(false);
     });
 
     /** @description maxUndoSteps must be 50. */
