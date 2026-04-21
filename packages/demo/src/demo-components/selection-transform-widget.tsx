@@ -70,14 +70,17 @@ export function SelectionTransformWidget({
   overlayRoot,
   onPreviewUpdate,
   onCommitUpdate,
+  onDoubleClick,
 }: {
   readonly element: BroadsetElement;
   readonly overlayRoot: HTMLElement;
   readonly onPreviewUpdate: (elementId: string, updates: ElementUpdate) => void;
   readonly onCommitUpdate: (elementId: string, updates: ElementUpdate) => void;
+  readonly onDoubleClick?: (elementId: string) => void;
 }): React.ReactPortal {
   const widgetRef = useRef<HTMLDivElement | null>(null);
   const gestureRef = useRef<TransformGesture | null>(null);
+  const gestureScaleRef = useRef(1);
   const [isRotating, setIsRotating] = useState(false);
   // Scale ratio between rendered screen pixels and canvas units, measured
   // directly off the overlay root's client rect. This is authoritative — it
@@ -117,6 +120,13 @@ export function SelectionTransformWidget({
   const rotationOffsetPx = ROTATION_HANDLE_OFFSET * screenPxPerCanvasUnit;
   const handlePositions = buildHandlePositions(screenPxPerCanvasUnit);
 
+  const captureGestureScale = useCallback((): void => {
+    const ratio = measureOverlayRatio(overlayRoot);
+
+    gestureScaleRef.current = ratio;
+    setPointerToCanvas((previous) => (ratio === previous ? previous : ratio));
+  }, [overlayRoot]);
+
   const beginDrag = useCallback(
     (event: React.PointerEvent<HTMLDivElement>): void => {
       if (event.button !== 0) {
@@ -126,6 +136,7 @@ export function SelectionTransformWidget({
       event.preventDefault();
       event.stopPropagation();
       event.currentTarget.setPointerCapture(event.pointerId);
+      captureGestureScale();
       gestureRef.current = {
         initialPosition: { ...element.position },
         kind: 'drag',
@@ -134,7 +145,7 @@ export function SelectionTransformWidget({
         startY: event.clientY,
       };
     },
-    [element.position],
+    [captureGestureScale, element.position],
   );
 
   const beginResize = useCallback(
@@ -147,6 +158,7 @@ export function SelectionTransformWidget({
         event.preventDefault();
         event.stopPropagation();
         event.currentTarget.setPointerCapture(event.pointerId);
+        captureGestureScale();
         gestureRef.current = {
           handle,
           initialRect: {
@@ -161,7 +173,7 @@ export function SelectionTransformWidget({
           startY: event.clientY,
         };
       },
-    [element.height, element.position.x, element.position.y, element.width],
+    [captureGestureScale, element.height, element.position.x, element.position.y, element.width],
   );
 
   const beginRotation = useCallback(
@@ -177,6 +189,7 @@ export function SelectionTransformWidget({
       event.preventDefault();
       event.stopPropagation();
       event.currentTarget.setPointerCapture(event.pointerId);
+      captureGestureScale();
       setIsRotating(true);
       gestureRef.current = {
         initialRotation: element.rotation,
@@ -185,7 +198,7 @@ export function SelectionTransformWidget({
         startAngle: Math.atan2(event.clientY - centerY, event.clientX - centerX),
       };
     },
-    [element.rotation],
+    [captureGestureScale, element.rotation],
   );
 
   const handlePointerMove = useCallback(
@@ -199,12 +212,14 @@ export function SelectionTransformWidget({
       event.preventDefault();
       event.stopPropagation();
 
+      const activeScale = gestureScaleRef.current;
+
       if (gesture.kind === 'drag') {
         const update = {
           position: applyDragTranslation(
             gesture.initialPosition,
             { dx: event.clientX - gesture.startX, dy: event.clientY - gesture.startY },
-            pointerToCanvas,
+            activeScale,
           ),
         } satisfies ElementUpdate;
 
@@ -220,7 +235,7 @@ export function SelectionTransformWidget({
           gesture.handle,
           event.clientX - gesture.startX,
           event.clientY - gesture.startY,
-          pointerToCanvas,
+          activeScale,
           element.rotation,
           MIN_TRANSFORM_SIZE,
         );
@@ -247,7 +262,7 @@ export function SelectionTransformWidget({
       gesture.lastUpdate = update;
       onPreviewUpdate(element.id, update);
     },
-    [element.id, element.rotation, onPreviewUpdate, pointerToCanvas],
+    [element.id, element.rotation, onPreviewUpdate],
   );
 
   const finishGesture = useCallback(
@@ -284,6 +299,10 @@ export function SelectionTransformWidget({
       data-testid="demo-transform-widget"
       onClick={(event) => {
         event.stopPropagation();
+      }}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        onDoubleClick?.(element.id);
       }}
       onPointerCancel={finishGesture}
       onPointerMove={handlePointerMove}

@@ -348,6 +348,21 @@ export function ScreenPreview({
     [onCanvasClick],
   );
 
+  const tryStartInlineTextEditing = useCallback(
+    (elementId: string): boolean => {
+      const element = elementsById.get(elementId);
+
+      if (element?.type !== 'text') {
+        return false;
+      }
+
+      startInlineTextEditing(editorStore, elementId);
+
+      return true;
+    },
+    [editorStore, elementsById],
+  );
+
   const handlePreviewDoubleClick = useCallback(
     (event: React.MouseEvent<HTMLDivElement>): void => {
       const target = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-element-id]') : null;
@@ -357,17 +372,12 @@ export function ScreenPreview({
         return;
       }
 
-      const element = elementsById.get(elementId);
-
-      if (element?.type !== 'text') {
-        return;
+      if (tryStartInlineTextEditing(elementId)) {
+        event.preventDefault();
+        event.stopPropagation();
       }
-
-      event.preventDefault();
-      event.stopPropagation();
-      startInlineTextEditing(editorStore, elementId);
     },
-    [editorStore, elementsById],
+    [tryStartInlineTextEditing],
   );
 
   const handlePointerDown = useCallback(
@@ -613,6 +623,7 @@ export function ScreenPreview({
           element={selectedWorldElement}
           overlayRoot={overlayRoot}
           onCommitUpdate={handleCommitTransform}
+          onDoubleClick={tryStartInlineTextEditing}
           onPreviewUpdate={handlePreviewTransform}
         />
       )}
