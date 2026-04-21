@@ -2,8 +2,10 @@ import {
   cancelPlacement,
   closeAndStopPathDrawing,
   commitAndStopPathDrawing,
+  createKeyboardHandler,
   type EditorStore,
   stopClipPathEditing,
+  stopInlineTextEditing,
   stopPathEditing,
 } from '@broadset/editor';
 import type { Dispatch, SetStateAction } from 'react';
@@ -79,6 +81,13 @@ export function useShellBrowserEffects({
 
       const state = editorStore.getState();
 
+      if (state.inlineTextEditingElementId !== null) {
+        event.preventDefault();
+        stopInlineTextEditing(editorStore);
+
+        return;
+      }
+
       if (state.pathDrawingElementId !== null) {
         event.preventDefault();
         commitAndStopPathDrawing(editorStore);
@@ -115,36 +124,13 @@ export function useShellBrowserEffects({
       return true;
     };
 
-    const handleDeleteSelection = (event: KeyboardEvent): boolean => {
-      const ids = editorStore.getState().activeElementIds;
-
-      if (ids.length === 0) return false;
-
-      event.preventDefault();
-      for (const elementId of ids) editorStore.getState().removeElement(elementId);
-
-      return true;
-    };
-
-    const handleUndoRedo = (event: KeyboardEvent): void => {
-      event.preventDefault();
-      if (event.shiftKey) editorStore.getState().redo();
-      else editorStore.getState().undo();
-    };
+    const keyboardHandler = createKeyboardHandler(editorStore, {
+      onSave: () => {
+        handleSaveDocument();
+      },
+    });
 
     const handleGlobalKeydown = (event: KeyboardEvent): void => {
-      const normalizedKey = event.key.toLowerCase();
-      const usesModifier = event.ctrlKey || event.metaKey;
-
-      if (
-        usesModifier &&
-        (normalizedKey === '+' || normalizedKey === '-' || normalizedKey === '=' || normalizedKey === '0')
-      ) {
-        event.preventDefault();
-
-        return;
-      }
-
       if (event.key === 'Escape') {
         handleEscape(event);
 
@@ -157,18 +143,7 @@ export function useShellBrowserEffects({
         if (handlePathDrawingEnter(event)) return;
       }
 
-      if (event.key === 'Backspace' || event.key === 'Delete') {
-        if (handleDeleteSelection(event)) return;
-      }
-
-      if (usesModifier && normalizedKey === 's') {
-        event.preventDefault();
-        handleSaveDocument();
-
-        return;
-      }
-
-      if (usesModifier && normalizedKey === 'z') handleUndoRedo(event);
+      keyboardHandler(event);
     };
 
     html.classList.add('dark');
@@ -226,6 +201,7 @@ export function useShellBrowserEffects({
       window.removeEventListener('gesturestart', preventSafariGesture);
       window.removeEventListener('gesturechange', preventSafariGesture);
       window.removeEventListener('gestureend', preventSafariGesture);
+      keyboardHandler.destroy();
     };
   }, [editorStore, handleSaveDocument, setContextMenu, setViewportSize]);
 }
