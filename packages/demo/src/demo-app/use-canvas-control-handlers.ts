@@ -130,7 +130,22 @@ export function useCanvasControlHandlers({
 
   const handleElementTransformCommit = useCallback(
     (elementId: string, updates: ElementUpdate): void => {
-      editorStore.getState().commitElementUpdate(elementId, updates);
+      const { gridSettings } = editorStore.getState();
+      const shouldSnap = gridSettings.snapToGrid && gridSettings.gridSize > 0;
+      const snapTo = (value: number): number => Math.round(value / gridSettings.gridSize) * gridSettings.gridSize;
+      const snappedUpdates: ElementUpdate =
+        shouldSnap ?
+          {
+            ...updates,
+            ...(updates.position === undefined ?
+              {}
+            : { position: { x: snapTo(updates.position.x), y: snapTo(updates.position.y) } }),
+            ...(updates.width === undefined ? {} : { width: snapTo(updates.width) }),
+            ...(updates.height === undefined ? {} : { height: snapTo(updates.height) }),
+          }
+        : updates;
+
+      editorStore.getState().commitElementUpdate(elementId, snappedUpdates);
     },
     [editorStore],
   );
