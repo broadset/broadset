@@ -1,4 +1,4 @@
-import type { EditorStore, ElementUpdate } from '@broadset/editor';
+import { type EditorStore, type ElementUpdate, startInlineTextEditing } from '@broadset/editor';
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 import { createPlaybackController, type PlaybackController } from '@broadset/playback';
 import { createScreenRenderer, type ScreenRendererController } from '@broadset/renderer';
@@ -8,6 +8,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ZOOM_STEP } from '../demo-types';
 import { clampCanvasZoom } from '../demo-utils';
 import { ClipPathEditingOverlay } from './clip-path-editing-overlay';
+import { GridOverlay } from './grid-overlay';
+import { InlineTextOverlay } from './inline-text-overlay';
 import { PathEditingOverlay } from './path-editing-overlay';
 import { PlacementPreviewOverlay } from './placement-preview-overlay';
 import { SelectionTransformWidget } from './selection-transform-widget';
@@ -333,6 +335,28 @@ export function ScreenPreview({
     [onCanvasClick],
   );
 
+  const handlePreviewDoubleClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>): void => {
+      const target = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-element-id]') : null;
+      const elementId = target?.dataset['elementId'];
+
+      if (typeof elementId !== 'string' || elementId === '') {
+        return;
+      }
+
+      const element = elementsById.get(elementId);
+
+      if (element?.type !== 'text') {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      startInlineTextEditing(editorStore, elementId);
+    },
+    [editorStore, elementsById],
+  );
+
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>): void => {
       // Any new pointer-down starts a fresh interaction — any stale "suppress
@@ -448,6 +472,7 @@ export function ScreenPreview({
       className="h-full w-full overflow-hidden"
       role="application"
       onClick={handlePreviewClick}
+      onDoubleClick={handlePreviewDoubleClick}
       onContextMenu={onCanvasContextMenu}
       onPointerCancel={handlePointerUp}
       onPointerDown={handlePointerDown}
@@ -504,6 +529,10 @@ export function ScreenPreview({
         />
       )}
       {overlayRoot === null ? null : <PlacementPreviewOverlay editorStore={editorStore} overlayRoot={overlayRoot} />}
+      {overlayRoot === null ? null : <GridOverlay editorStore={editorStore} overlayRoot={overlayRoot} />}
+      {overlayRoot === null ? null : (
+        <InlineTextOverlay editorStore={editorStore} overlayRoot={overlayRoot} worldElement={selectedWorldElement} />
+      )}
     </div>
   );
 }

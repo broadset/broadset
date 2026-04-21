@@ -94,7 +94,8 @@ export function DemoAppLayout(props: DemoAppLayoutProps): React.JSX.Element {
                         editorState.placement !== null ||
                         editorState.pathDrawingElementId !== null ||
                         editorState.pathEditingElementId !== null ||
-                        editorState.clipPathEditingElementId !== null
+                        editorState.clipPathEditingElementId !== null ||
+                        editorState.inlineTextEditingElementId !== null
                       }
                       isPlaying={isPlaying}
                       onCanvasClick={handleCanvasClick}
