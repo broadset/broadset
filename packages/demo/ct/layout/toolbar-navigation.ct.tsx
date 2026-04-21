@@ -61,7 +61,9 @@ test('toolbar zoom controls clamp at 400% max and 10% min', async ({ mount, page
 
 /**
  * @description Validates `project/spec/editor/editing.md` C-09 + `project/spec/demo/layout.md`:
- * Escape cancels placement mode, hides the banner, and restores the default preview cursor.
+ * Escape cancels placement mode and restores the default preview cursor. The
+ * placement banner MUST NOT be rendered — only the crosshair cursor + active
+ * toolbar button communicate placement state.
  */
 test('Escape cancels placement mode and restores default preview cursor', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
@@ -69,7 +71,7 @@ test('Escape cancels placement mode and restores default preview cursor', async 
   const preview = page.getByLabel(/screen preview for/i);
 
   await page.locator('button[aria-label="Rectangle"]').first().click();
-  await expect(page.getByTestId('placement-mode-banner')).toContainText('Rectangle');
+  await expect(page.getByTestId('placement-mode-banner')).toHaveCount(0);
 
   const placementCursor = await preview.evaluate((element) => getComputedStyle(element).cursor);
 
@@ -79,7 +81,6 @@ test('Escape cancels placement mode and restores default preview cursor', async 
     window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
   });
 
-  await expect.poll(async () => page.getByTestId('placement-mode-banner').isVisible()).toBe(false);
   await expect.poll(async () => preview.evaluate((element) => getComputedStyle(element).cursor)).toBe('default');
 });
 
@@ -126,19 +127,26 @@ test('view toggles switch rulers/grid and ruler ticks react to zoom and pan', as
 /**
  * @description Validates `project/spec/ui/toolbar-nav.md` T-06 +
  * `project/spec/editor/editing.md` C-07: built-in and plugin library tools
- * activate placement mode and expose clear placement affordances.
+ * activate placement mode and expose the crosshair cursor as the only placement
+ * affordance (no banner).
  */
 test('element library built-ins and plugin tools activate placement mode', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
 
-  await page.locator('button[aria-label="Text"]').first().click();
-  await expect(page.getByTestId('placement-mode-banner')).toContainText('Text');
+  const preview = page.getByLabel(/screen preview for/i);
+  const textButton = page.locator('button[aria-label="Text"]').first();
+  const countdownButton = page.locator('button[aria-label="Countdown"]').first();
 
-  await page.locator('button[aria-label="Cancel placement"]').first().click();
-  await expect(page.getByTestId('placement-mode-banner')).toBeHidden();
+  await textButton.click();
+  await expect(page.getByTestId('placement-mode-banner')).toHaveCount(0);
+  await expect.poll(async () => preview.evaluate((element) => getComputedStyle(element).cursor)).toBe('crosshair');
 
-  await page.locator('button[aria-label="Countdown"]').first().click();
-  await expect(page.getByTestId('placement-mode-banner')).toContainText('Countdown');
+  // Clicking the same toolbar button again toggles placement off.
+  await textButton.click();
+  await expect.poll(async () => preview.evaluate((element) => getComputedStyle(element).cursor)).toBe('default');
+
+  await countdownButton.click();
+  await expect.poll(async () => preview.evaluate((element) => getComputedStyle(element).cursor)).toBe('crosshair');
 });
 
 /**

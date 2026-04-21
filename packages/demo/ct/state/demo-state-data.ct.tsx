@@ -220,17 +220,27 @@ test('keeps the sidebar inset and the context menu within the visible viewport',
 });
 
 /**
- * @description Validates the Phase 4 placement-mode affordance from
- * `project/spec/demo/layout.md` so activating a tool shows a clear banner and cancel path.
+ * @description Validates `project/spec/editor/editing.md` → the floating
+ * placement-mode banner MUST NOT be rendered. Activating a tool communicates
+ * placement state via the crosshair cursor and active toolbar button only.
  */
-test('shows a placement-mode banner when the user activates an element tool', async ({ mount, page }) => {
+test('placement mode uses the crosshair cursor + active toolbar button instead of a banner', async ({
+  mount,
+  page,
+}) => {
   await mount(<DemoApp />);
 
-  await page.locator('button[aria-label="Rectangle"]').first().click();
-  await expect(page.getByTestId('placement-mode-banner')).toContainText('Rectangle');
+  const preview = page.getByLabel(/screen preview for/i);
+  const rectangleButton = page.locator('button[aria-label="Rectangle"]').first();
 
-  await page.locator('button[aria-label="Cancel placement"]').first().click();
-  await expect(page.getByTestId('placement-mode-banner')).toBeHidden();
+  await rectangleButton.click();
+
+  await expect(page.getByTestId('placement-mode-banner')).toHaveCount(0);
+  await expect.poll(async () => preview.evaluate((element) => getComputedStyle(element).cursor)).toBe('crosshair');
+
+  await rectangleButton.click();
+
+  await expect.poll(async () => preview.evaluate((element) => getComputedStyle(element).cursor)).toBe('default');
 });
 
 /**
