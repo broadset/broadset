@@ -285,10 +285,12 @@ const createShapeRenderer = createSimpleRenderer((host, element) => {
   host.textContent = '';
 });
 
-function renderImageFallback(host: HTMLElement, element: BroadsetElement): void {
+function renderMediaPlaceholder(host: HTMLElement, element: BroadsetElement, kind: 'image' | 'video'): void {
   const placeholder = document.createElement('div');
+  const label = kind === 'image' ? 'Image' : 'Video';
 
-  placeholder.textContent = element.content.trim() === '' ? 'Image unavailable' : `Image unavailable: ${element.name}`;
+  placeholder.textContent =
+    element.content.trim() === '' ? `${label} unavailable` : `${label} unavailable: ${element.name}`;
   placeholder.setAttribute('aria-label', `${element.name} placeholder`);
   placeholder.style.width = '100%';
   placeholder.style.height = '100%';
@@ -308,7 +310,7 @@ function renderImageFallback(host: HTMLElement, element: BroadsetElement): void 
 
 const createImageRenderer = createSimpleRenderer((host, element) => {
   if (element.content.trim() === '') {
-    renderImageFallback(host, element);
+    renderMediaPlaceholder(host, element, 'image');
 
     return;
   }
@@ -340,7 +342,7 @@ const createImageRenderer = createSimpleRenderer((host, element) => {
     applyStyle(fallbackImage);
     fallbackImage.src = element.content;
     fallbackImage.addEventListener('error', () => {
-      renderImageFallback(host, element);
+      renderMediaPlaceholder(host, element, 'image');
     });
     host.replaceChildren(fallbackImage);
   });
@@ -416,6 +418,12 @@ const createQrCodeRenderer = createSimpleRenderer((host, element) => {
 });
 
 const createVideoRenderer = createSimpleRenderer((host, element) => {
+  if (element.content.trim() === '') {
+    renderMediaPlaceholder(host, element, 'video');
+
+    return;
+  }
+
   const video = document.createElement('video');
   const typeConfig = element.typeConfig;
 
