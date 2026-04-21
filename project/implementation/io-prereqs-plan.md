@@ -15,6 +15,28 @@ Four forces justify a single cross-format prereqs document:
 
 Scope guard: every item in this plan is structured to serve at least two formats. Format-specific prereqs live in the format-support plans themselves.
 
+## User-facing outputs
+
+io-prereqs is motivated by format round-trip, but most of what it lands also shows up as a first-class product feature in the editor. Detailed UX specs for each feature live in [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md); the list here is the headline map from plumbing to user value:
+
+- **Design-token / theme system** — the `BroadsetColor.theme` variant (IO-D-05) + swatches panel lets users define accent1–6, lights, darks, and recolor the whole document by swapping the theme.
+- **Rich text editor** — runs + paragraphs + bullets + hyperlinks + per-run `lang` + per-run styling. Range-select inside a text element and style just that range.
+- **Filter stack editor** — drag-reorder stack of drop-shadow / blur / color-matrix / brightness / contrast / saturate / hue-rotate / grayscale / sepia / invert / opacity primitives. Multiple filters per element with live preview.
+- **Picture fill & pattern fill** — any rectangle / ellipse / path fillable with an image asset or repeating pattern. Stretch or tile; no cropping (importers bake crops into the source image so the stored asset is already the final crop).
+- **Arrow endings on strokes** — `strokeHeadEnd` / `strokeTailEnd` turns lines into arrows / flowchart connectors.
+- **Per-corner border radius** — four independent corner inputs with a chain toggle.
+- **Custom font upload** — users drop `.woff2` / `.ttf` / `.otf`, fonts become project assets, embed-permission is visible.
+- **Print / prepress mode** — canvas bleed / trim / safe-area guides + per-document color mode (RGB / CMYK / spot) + ICC profile picker + preflight panel.
+- **Conic gradient editor** — real conic gradients with panel-editable center point (fractional 0–1 x/y) + start-angle input + per-stop colors. No on-canvas overlay handles.
+- **Unit-aware dimension inputs** — type "2cm" or "24pt" in any dimension field; auto-converts to canvas unit.
+- **Page sorter upgrade** — reorder / duplicate / delete via drag + per-page visibility toggle. (Multi-page already exists; this is a UX upgrade.)
+- **Per-page speaker notes** — free-form text box per page, accessed from a menu entry (intentionally hidden, not on the sorter). Round-trips to PPTX `notesSlide*.xml` and PDF speaker-notes annotations; ignored by PSD / SVG.
+- **Export preflight panel** — pre-export diagnostics: missing fonts, out-of-gamut colors, overflow-bleed, embed-permission issues.
+- **Document info panel** — title, author, subject, keywords, rights, producer (Dublin Core).
+- **Import warnings + reconciliation UI** — diff view with accept/reject per element, deletion-confirmation modal, conflict indicators in the layers panel for elements that diverged in an external edit.
+
+Pure plumbing (no UI surface): content-hash identity, extensions typing + dirty-flag middleware, importer contract + security contract, `_shared/*` modules, bundle-size assertion, chain-CT harness, preserved-blob stress test, renderer safe-DOM builder.
+
 ## What already exists — do not redo
 
 Quick inventory confirmed against the current code before writing this plan:
@@ -43,7 +65,7 @@ Ratify in [decisions.md](./decisions.md) during Phase 0 before any code lands.
 | IO-D-01 | **Runs, not HTML, for text storage.** | Structured runs + paragraphs are the canonical representation. PSD, PPTX, Word, Figma, Sketch, every typography engine uses runs. HTML↔runs translation is lossy both ways, and HTML from an attacker-supplied importer is the unsafe-DOM surface flagged in [typescript.instructions.md](../../agents/instructions/typescript.instructions.md). If HTML is needed at an export boundary (PDF text, clipboard, SVG `<foreignObject>`), serialize runs→HTML at that boundary — never let HTML into the store. |
 | IO-D-02 | **Bake-to-path for non-trivial affine transforms.** | Do not add `scale` or `skew` to elements. When an importer hits a transform that can't be expressed by `position` + `rotation`, convert the shape to a path and bake the transform into `d`. Matches user intuition; keeps the model small. |
 | IO-D-03 | **Structured filter primitives replace the CSS filter string.** | The `filter`/`backdropFilter` strings on style today become a discriminated union of filter primitives (`drop-shadow`, `blur`, `color-matrix`, …). Renderer derives the CSS string view. Canonical form is typed primitives, not strings. |
-| IO-D-04 | **`fill` becomes a discriminated union.** | `{ kind: 'none' } \| { kind: 'solid'; color } \| { kind: 'gradient'; gradient } \| { kind: 'pattern'; … } \| { kind: 'picture'; assetId; stretch?; tile?; crop? }`. Cleaner than bolting fill types onto flat color fields. |
+| IO-D-04 | **`fill` becomes a discriminated union.** | `{ kind: 'none' } \| { kind: 'solid'; color } \| { kind: 'gradient'; gradient } \| { kind: 'pattern'; … } \| { kind: 'picture'; assetId; mode: 'stretch' \| 'tile'; preserveAspectRatio?; tile? }`. Cleaner than bolting fill types onto flat color fields. No cropping in the model — importers bake crops into the source image on import. |
 | IO-D-05 | **Color becomes a discriminated union; never silently downgrade color space.** | `{ kind: 'rgb'; hex } \| { kind: 'theme'; slot; mods? }`. Unlocks PPTX theme-color round-trip, and color-space-preserving stops for SVG/PDF when `kind: 'rgb'` is extended with optional `space` and `originalColor` preservation strings. Export rule: when the target format cannot represent the source color space (e.g. OKLCH → PPTX sRGB), preserve `originalColor` on re-import and surface a preflight warning. No silent flattening to sRGB hex. |
 | IO-D-06 | **`TextRun[]` as type now, editor support staged.** | Land the paragraphs/runs types with Phase 1 so every importer has somewhere to put mixed-run text. Full run-edit UI lands in Phase 5. Imported multi-run text editable only at whole-element level until the UI lands — surfaced via a "this text has multiple runs" modal. |
 | IO-D-07 | **Cross-format logic lives under `packages/formats/src/_shared/`; format-specific libraries may be imported directly.** | `_shared/*` is for logic or library wrappers that serve ≥2 formats (color math, font subsetting, XMP parsing, reconcile, fingerprint, sanitize, shape-classifier, text-layout). Not a separate package — keeps the change surface small. Format-only libraries (`pdf-lib`, `pdfjs-dist`, `ag-psd`, `svgpath`, `css-tree`, `transformation-matrix`, `fflate`, `svgo`, …) are imported directly by the format package that needs them — no pointless wrapper. If a format's "private" library later turns out to be shared, factor into `_shared/` when the second consumer lands, not before. |
@@ -125,10 +147,10 @@ type BroadsetFill =
   | { kind: 'solid'; color: BroadsetColor }
   | { kind: 'gradient'; gradient: BroadsetGradient }
   | { kind: 'pattern'; assetId: string; repeat?: 'repeat' | 'repeat-x' | 'repeat-y' | 'no-repeat'; transform?: AffineMatrix }
-  | { kind: 'picture'; assetId: string; stretch?: true; tile?: TileInfo; crop?: CropInfo };
+  | { kind: 'picture'; assetId: string; mode: 'stretch' | 'tile'; preserveAspectRatio?: 'none' | 'meet' | 'slice'; tile?: TileInfo };
 ```
 
-- Picture fill: rectangles/ellipses/paths can reference an image asset as their fill (PPTX `<a:blipFill>`, SVG `<image>`-in-pattern, PDF tiling patterns).
+- Picture fill: rectangles/ellipses/paths can reference an image asset as their fill (PPTX `<a:blipFill>`, SVG `<image>`-in-pattern, PDF tiling patterns). Stretch or tile modes only; no cropping. Importers that arrive with crop information bake the crop into the source image on import so the stored asset is already cropped — no downstream complexity.
 - Pattern fill: SVG `<pattern>` round-trip, PPTX pattern fills, PDF tiling patterns.
 
 **Gradient enhancements**
@@ -269,6 +291,10 @@ Spec update: [project/spec/model/assets.md](../spec/model/assets.md) documents t
 
 Every new round-trippable model field gets a user-editable control per IO-D-10. Uses `@heroui/react` per [heroui.instructions.md](../../agents/instructions/heroui.instructions.md). Every cross-region scenario gets a CT per [testing.instructions.md](../../agents/instructions/testing.instructions.md) §CT Derivation Rule.
 
+This phase splits into **new product features** (standalone user value — specified in detail in [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md)) and **format-round-trip UI** (export options, import warnings, reconciliation — only exists to serve the format pipelines).
+
+#### New product features
+
 **Text**
 
 - **Run-edit mode.** Click text element → enter run-edit mode → select a character range → properties panel surfaces the run-applicable subset of text-style controls (family, size, weight, italic, color, tracking, underline, strike, lang, hyperlink). Minimum scope: per-run styling via properties panel. On-canvas inline editing deferred to a later polish pass. Scope guard: no nested paragraph features beyond bullets + lists.
@@ -286,7 +312,7 @@ Every new round-trippable model field gets a user-editable control per IO-D-10. 
 - **ICC profile attached to document** (binds `document.outputIntent`). Picker supports: (a) upload a user-provided `.icc` / `.icm` file → becomes an `icc-profile` asset; (b) select one of the bundled `_shared/color/defaultProfiles/` (sRGB2014, USWebCoatedSWOP, GrayGamma22). Target color space (`rgb` / `cmyk` / `gray` / `lab`) picked alongside. Feeds PDF `/OutputIntent`, PDF/A-2b mandatory embedding, and PSD's CMYK/Lab ICC profile slot.
 - **Gradient editor upgrade.** Conic center + startAngle controls, per-stop `BroadsetColor` picker (including theme slots + mods), per-stop color-space preservation.
 - **Pattern fill picker.** Selects a pattern asset; tile / repeat / transform controls.
-- **Picture fill picker.** Selects an image asset; stretch / tile / crop.
+- **Picture fill picker.** Selects an image asset; stretch or tile (no cropping — importers bake crops at import time).
 
 **Stroke + shape**
 
@@ -310,19 +336,20 @@ Every new round-trippable model field gets a user-editable control per IO-D-10. 
 - **Custom font upload.** Writes a font asset; surfaces embed-permission warnings.
 - **Font-asset picker** in the typography section. Shows both system candidates (best-effort match) and embedded assets.
 
-**Import / export UX**
+- **Preflight panel.** Missing fonts, out-of-gamut colors, overflow-bleed, image resolution, embed-permission issues. Warn-and-proceed per IO-D-14.
+- **Document info panel** — Dublin Core fields bound to `document.metadata`.
+- **Page sorter UX upgrade** — reorder / duplicate / delete via drag, per-page visibility toggle. Multi-page support itself already exists in the model + toolbar.
+- **Speaker notes per page** — free-form textarea bound to `Page.notes`, reached from a menu entry (hidden by default; no sorter surface).
+
+#### Format-round-trip UI
 
 - **Import dispatcher accepts `.pdf` / `.pptx` / `.psd` / `.svg`** with progress indicator.
 - **Export options modal.** Per-format options (color space, OCG on/off, subsetting, fidelity tier). HeroUI `Modal` + `Tabs`.
-- **Preflight panel.** Missing fonts, out-of-gamut colors, overflow-bleed, image resolution, embed-permission issues. Warn-and-proceed by default (open question — see below).
 - **Import warnings modal.** Surfaces `SvgSanitizationReport`, opaque-fragment warnings, mixed-run text notices, dropped-feature warnings per format.
 - **"Imported from external file" staging page.** Home for operator-extracted elements that didn't match anything in preserved metadata. Shared across every operator-level import: PDF Phase 3b, PSD Phase 3b, SVG Phase 3b, PPTX Phase 3b. The page title adapts to the source format ("Imported from PDF", "Imported from SVG", …).
 - **Inline preview (thumbnail) after export.** PDF via `pdfjs-dist` (added in the PDF plan's libs); PPTX/PSD later.
-
-**Reconciliation**
-
-- **Diff view with accept/reject per element.** Phase 4 of each format plan is unusable without this.
-- **Deletion confirmation modal.** When preserved metadata knows about elements missing from the stream, confirm before dropping. Prevents silent data loss.
+- **Diff view with accept/reject per element** for external-edit reconciliation.
+- **Deletion confirmation modal.** When preserved metadata knows about elements missing from the stream, confirm before dropping.
 - **Element-level conflict indicator** in the layers panel and on canvas. "This element diverged in external edit."
 
 ### Phase 6 — Testing infrastructure

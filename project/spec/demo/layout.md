@@ -354,20 +354,65 @@ The context menu MUST display only:
 
 ---
 
+### Requirement: Animation Bottom Toolbar
+
+The bottom area of the canvas MUST host a single floating Animation toolbar that owns all animation controls. It MUST render as a HeroUI `Toolbar` centered horizontally near the bottom edge and MUST contain, in order: Play/Pause playback, Reset playback, and a timeline view toggle. Animation controls MUST NOT appear anywhere else in the shell — the primary (top) toolbar MUST NOT contain playback buttons, and the TimelineEditor panel MUST NOT render its own Play/Pause/Stop buttons.
+
+**Toolbar Positioning:**
+
+When the timeline panel is closed, the Animation toolbar MUST float at `bottom: FLOATING_OFFSET` (8px) from the viewport bottom. When the timeline panel is open, the toolbar MUST lift above the panel to `bottom: TIMELINE_BOTTOM_PANEL_HEIGHT_PX + FLOATING_OFFSET` so playback controls remain visible. The transition between the two positions MUST use the same `--transition-panel` token the panel itself uses so the two elements animate in sync. The toolbar MUST render above the panel's overlay z-layer (`zLayer('overlay') + 1`) so it is never occluded during the slide animation.
+
+The Play/Pause and Reset buttons MUST operate on whichever playback context is currently active:
+
+- When a timeline is open in the bottom panel, they MUST drive timeline playback (play the edited timeline, pause/stop it, reset to the start of that timeline).
+- When no timeline is open, they MUST drive the document-level animation preview on the canvas.
+
+The timeline view toggle MUST be disabled when no selected element has any timelines. When enabled and the panel is closed, activating it MUST open the first timeline of the selected element's animation config. When the panel is open, activating it MUST close the panel.
+
+#### Scenario: Animation toolbar controls
+
+- GIVEN the demo shell is loaded
+- WHEN the canvas area renders
+- THEN a floating toolbar is visible near the bottom-center with Play/Pause, Reset, and a timeline toggle button
+
+#### Scenario: Timeline toggle enabled state
+
+- GIVEN a selected element has at least one timeline
+- WHEN the bottom toolbar renders
+- THEN the timeline toggle is enabled; activating it opens the first timeline
+
+#### Scenario: Playback controls defer to timeline context
+
+- GIVEN a timeline is currently being edited
+- WHEN the user presses Play in the bottom toolbar
+- THEN timeline-scoped playback starts (not document-level animation preview)
+
+#### Acceptance Criteria
+
+- [ ] Given the demo shell loads, a floating Animation toolbar renders near the bottom-center with Play/Pause, Reset, and a timeline toggle
+- [ ] Given no selected element with timelines, the timeline toggle is disabled
+- [ ] Given a timeline is open, pressing Play calls the timeline playback handler (not document playback)
+- [ ] Given a timeline is open, pressing Reset stops the timeline and resets its playhead to 0
+- [ ] Given no timeline is open, pressing Play toggles document-level animation preview
+- [ ] Given the primary toolbar, no Play/Pause or Reset playback buttons are present
+- [ ] Given the TimelineEditor is open, no internal Play/Pause/Stop buttons are present inside it
+- [ ] Given the timeline panel is open, the Animation toolbar lifts to sit above the panel so its buttons remain visible
+- [ ] Given the Animation toolbar, its z-index is above the timeline panel's overlay layer
+
+---
+
 ### Requirement: Timeline Panel
 
-The bottom area of the canvas MUST contain only the timeline. When no timeline is being edited, a single toggle button MUST be visible to open the timeline. When a timeline is opened, the TimelineBottomPanel MUST render at the bottom of the canvas area. It MUST receive play, seek, and stop callbacks from the timeline playback hook. No other controls (undo/redo, scene sorter, grid toggle, zoom, playback) belong in the bottom bar — these MUST be located in the floating main toolbar or sidebar.
+When a timeline is opened, the TimelineBottomPanel MUST render at the bottom of the viewport, flush with the bottom edge but inset on the left and right by `TIMELINE_BOTTOM_PANEL_SIDE_INSET_PX` (16px). This gives the panel visibly distinct breathing room on both sides so it reads as a contained floating panel rather than a full-width strip, even though its underlying chrome layer shares the same floating-toolbar origin.
 
 **Timeline Panel Positioning:**
-
-The timeline panel MUST be fixed-positioned at the bottom of the viewport. It MUST span nearly the full viewport width, inset on each side by the ruler thickness plus a gap (`RULER_SIZE + 8px = 28px`). This ensures it aligns with the canvas area between the rulers.
 
 | Property        | Value                                       |
 | --------------- | ------------------------------------------- |
 | `position`      | `fixed`                                     |
 | `bottom`        | `0`                                         |
-| `left`          | `28px` (ruler thickness + gap)              |
-| `right`         | `28px` (ruler thickness + gap)              |
+| `left`          | `16px` (`TIMELINE_BOTTOM_PANEL_SIDE_INSET_PX`) |
+| `right`         | `16px` (`TIMELINE_BOTTOM_PANEL_SIDE_INSET_PX`) |
 | Default height  | `240px`                                     |
 | `z-index`       | Above canvas overlays (e.g., `8000`)        |
 | `background`    | `var(--surface)`                            |
@@ -377,31 +422,24 @@ The timeline panel MUST be fixed-positioned at the bottom of the viewport. It MU
 
 When closed, the panel MUST be off-screen via `translateY(100%)` with `pointer-events: none`. When open, it MUST slide to `translateY(0)` using the `--transition-panel` token.
 
-#### Scenario: Timeline toggle when closed
-
-- GIVEN no timeline is being edited
-- WHEN the bottom area renders
-- THEN only a timeline toggle button is visible
-
 #### Scenario: Timeline panel appears when editing
 
 - GIVEN a timeline is opened for editing
 - WHEN the panel renders
-- THEN the TimelineBottomPanel is visible at the bottom with playback controls
+- THEN the TimelineBottomPanel is visible at the bottom with 16px side insets
 
-#### Scenario: Timeline panel spans canvas width
+#### Scenario: Timeline panel side insets
 
 - GIVEN a timeline is opened for editing
 - WHEN the panel renders
-- THEN it is fixed at the bottom, inset left and right by 28px (ruler + gap)
+- THEN it is fixed at the bottom with `left: 16px` and `right: 16px`
 
 #### Acceptance Criteria
 
-- [ ] Given no timeline being edited, only a timeline toggle button is visible at the bottom
 - [ ] Given a timeline being edited, the TimelineBottomPanel is visible at the bottom
-- [ ] Given the bottom area, no undo/redo, scene sorter, grid, zoom, or playback buttons are present
-- [ ] Given the timeline panel is open, it is fixed-positioned at bottom:0, left:28px, right:28px
+- [ ] Given the timeline panel is open, it is fixed-positioned at `bottom: 0`, `left: 16px`, `right: 16px`
 - [ ] Given the timeline panel, its default height is 240px
+- [ ] Given the timeline panel is open, only its top corners are rounded
 
 ---
 

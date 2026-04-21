@@ -138,7 +138,18 @@ The canvas MUST distinguish between different input devices and modifier keys to
 
 **Trackpad Detection Heuristic:**
 
-To distinguish trackpad from mouse wheel: if `deltaMode === 0` AND (`deltaX > 0` OR `|deltaY| < 80` OR `deltaY` is fractional), the input is likely a trackpad. Mouse wheels typically produce `deltaMode === 1` (line) or large integer pixel deltas.
+The canvas MUST detect the input device in the following order:
+
+1. If `deltaMode !== 0` (Firefox and some other browsers), treat as **mouse wheel**.
+2. Else if the non-standard `wheelDeltaY` is present and is a non-zero multiple of 120 (Chrome and Safari emit this for every physical mouse-wheel event regardless of OS-level scroll acceleration), treat as **mouse wheel**.
+3. Else if `deltaX === 0` AND `deltaY` is a non-zero integer AND `|deltaY| >= 80`, treat as **mouse wheel**.
+4. Otherwise treat as **trackpad**.
+
+Magnitude-based heuristics alone are unreliable on macOS Chrome/Safari, where a single physical wheel click fires a burst of pixel-mode events whose `deltaY` values vary wildly due to kinetic scroll; the `wheelDeltaY` signal must take precedence so the whole burst is treated as mouse-wheel zoom instead of flipping to pan mid-gesture.
+
+**Gesture Lock:**
+
+Once a wheel event's device has been resolved, subsequent events within a short window (≤ 140 ms) MUST keep the same device classification. This prevents kinetic-scroll tail events — whose `wheelDeltaY` signal may degrade — from flipping the gesture interpretation mid-scroll.
 
 #### Scenario: Zoom changes viewport scale
 

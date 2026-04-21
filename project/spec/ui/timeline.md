@@ -18,7 +18,7 @@ The timeline editor MUST be composed of these visual zones:
 
 | Zone              | Position      | Content                                                                                                                                                   |
 | ----------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Playback controls | Top-left      | Play/Pause toggle, Stop button, Loop toggle                                                                                                               |
+| Editor controls   | Top-left      | Add-keyframe button. Play/Pause and Stop buttons MUST NOT render inside the editor — playback is owned by the host shell's animation toolbar              |
 | Timeline ruler    | Top, spanning | Horizontal ruler with time markers (step interval configurable, default every 500ms). Grid lines at snap intervals (default 100ms)                        |
 | Keyframe track    | Center        | Horizontal track where keyframe markers are positioned at their time offsets. Clicking an empty area of the track MUST position the playhead at that time |
 | Playhead          | Vertical line | Red/accent-colored vertical line indicating current playback time. Draggable for timeline scrubbing. Synced with playback engine time                     |
@@ -122,13 +122,14 @@ Dragging a keyframe marker along the timeline MUST reposition it to a new time o
 
 The system MUST support starting playback. When starting playback, the system MUST NOT pass an onComplete callback.
 
-**Playback Controls:**
+**Playback Controls (Host Shell Responsibility):**
 
-| Control    | Icon         | Behavior                                              |
-| ---------- | ------------ | ----------------------------------------------------- |
-| Play/Pause | Play / Pause | Starts playback from playhead position; toggles pause |
-| Stop       | Square       | Stops playback, resets playhead to start              |
-| Loop       | Repeat       | Toggles loop mode (repeat when timeline ends)         |
+Timeline playback controls MUST live in the host shell's Animation toolbar (see `project/spec/demo/layout.md` → Animation Bottom Toolbar), not inside the TimelineEditor. The host shell MUST expose Play/Pause and Reset controls whose behavior switches to timeline-scoped handlers whenever a timeline is open.
+
+| Control    | Icon         | Behavior                                                                                   |
+| ---------- | ------------ | ------------------------------------------------------------------------------------------ |
+| Play/Pause | Play / Pause | Starts playback from playhead position; toggles pause                                      |
+| Reset      | RotateCcw    | Stops playback and resets the timeline playhead to the start                               |
 
 The playhead MUST animate in sync with the playback engine via `requestAnimationFrame`. When playback reaches the end without loop mode, it MUST stop automatically.
 
@@ -139,23 +140,24 @@ Before starting playback or seeking, the system MUST restore the element to its 
 #### Scenario: Playback start
 
 - GIVEN a timeline with keyframes
-- WHEN playback is started
-- THEN onPlayTimeline is called without onComplete
+- WHEN playback is started via the host Animation toolbar
+- THEN the timeline playback handler is invoked without an onComplete callback
 
 #### Acceptance Criteria
 
-- [ ] Given a timeline with keyframes, onPlayTimeline is called without onComplete
+- [ ] Given a timeline with keyframes, the timeline playback handler is invoked without onComplete
 - [ ] Given playback starting, the element is restored to its base snapshot state before animation begins
+- [ ] Given the TimelineEditor is open, it does not render its own Play/Pause/Stop buttons
 
 ---
 
 ### Requirement: Timeline Bottom Panel
 
-The system MUST render with `aria-hidden` when no timeline is being edited. When a timeline is open, the TimelineEditor MUST be rendered. Closing the panel MUST call onClose. Custom height and className props MUST be respected. Play/stop timeline callbacks MUST be threaded to the editor.
+The system MUST render with `aria-hidden` when no timeline is being edited. When a timeline is open, the TimelineEditor MUST be rendered. Closing the panel MUST call onClose. Custom height and className props MUST be respected.
 
 **Visual Behavior:**
 
-The bottom panel MUST be fixed-positioned at the bottom of the viewport, spanning nearly the full width — inset on each side by `28px` (ruler thickness + gap) to align with the canvas area. See `project/spec/demo/layout.md` → Timeline Panel for the full positioning table.
+The bottom panel MUST be fixed-positioned at the bottom of the viewport, with 16px side insets (`TIMELINE_BOTTOM_PANEL_SIDE_INSET_PX`). See `project/spec/demo/layout.md` → Timeline Panel for the full positioning table.
 
 The panel MUST slide up from the bottom edge using a CSS transform transition. When closed, it MUST be translated off-screen (`translateY(100%)`) with `pointer-events: none` to avoid blocking canvas interaction. When open, it MUST translate to its natural position (`translateY(0)`) with full interactivity.
 

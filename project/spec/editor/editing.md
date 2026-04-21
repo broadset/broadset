@@ -271,64 +271,100 @@ The system MUST append SVG path commands during drawing mode. The first point MU
 
 ### Requirement: Element Placement Mode
 
-The system MUST track a `pendingPlacementType`. Starting placement MUST clear any active path editing, path drawing, or clip-path editing. Cancelling MUST clear the pending type.
+The system MUST track a `placement` state — a discriminated union that captures which sub-phase of placement the user is in (anchor, extent, ellipse-radius, ellipse-rotation) or `null` when inactive. The system MUST also track a `placementPreview` pointer coordinate (ephemeral, never part of history). Starting placement MUST clear any active path editing, path drawing, inline-text, clip-path, or motion-path editing. Cancelling MUST set `placement` back to `null`.
 
-**Draw-to-canvas interaction:** When placement is active, the user clicks and drags on the canvas to define the new element's bounding box. The mousedown position sets the anchor corner; mousemove updates the opposite corner as a live preview rectangle; mouseup commits the element at the drawn position and dimensions. The element is placed with its top-left at `min(anchorX, currentX)` and top-left at `min(anchorY, currentY)`, with width and height as the absolute drag extent.
+**Two-click (and three-click) placement model:** Every built-in placement is driven by explicit user clicks. The user's clicks always determine the element's size — built-ins MUST NOT fall back to factory-default dimensions. If the extent click equals the anchor click, it MUST be ignored and the system MUST remain in the sizing sub-state.
 
-**Minimum size threshold:** If the drag extent is smaller than **5mm** in either dimension (e.g., a quick click without dragging), the system MUST fall back to the element type's factory default dimensions, centered at the click position.
+**Anchor semantics per element type:**
+
+| Element | Mode | Click 1 | Click 2 | Click 3 |
+|---|---|---|---|---|
+| rectangle, image, svg, video, qrcode, clock, ticker, group, text | two-click (corner) | top-left corner | bottom-right corner | — |
+| ellipse | three-click (center+radius+theta) | center | `rx = \|Δx\|`, `ry = \|Δy\|` from center | `rotation = atan2(Δy, Δx)` in degrees |
+| path | multi-click | first vertex (M) | second vertex (L) | further clicks keep adding; Enter/Esc commits |
+| external plugin element types | single-click | place at plugin's declared default size at click point | — | — |
+
+For corner types the element is placed with its top-left at `(min(anchorX, extentX), min(anchorY, extentY))` and its `width`/`height` at `|Δx|`/`|Δy|`. Negative drags (down-left, up-right, etc.) are normalised.
+
+For ellipse the anchor is the visual centre; `rx`/`ry` come from the component-wise deltas so a diagonal phase-2 click produces an oval and a near-horizontal one a flat oval. The element's top-left is `(anchor.x − rx, anchor.y − ry)` with `width = 2·rx`, `height = 2·ry`. Phase 3 stamps `rotation` (degrees) using `atan2(Δy, Δx)` of the pointer vs. the centre.
+
+For path the first click creates the path element with a single `M0,0` point at the click and enters `path-drawing`; subsequent clicks dispatch to `appendPathPoint`. Enter commits, Escape cancels.
+
+External plugins use single-click placement at the plugin's declared default size. They are the only path allowed to create an element at a factory-declared default size.
+
+**Cursor/affordance:** Placement is communicated by the crosshair cursor and the active toolbar button highlight. There MUST NOT be a floating placement-mode banner.
 
 **API surface:**
 
-- `startPlacement(type)` — enters placement mode, sets `pendingPlacementType`
-- `cancelPlacement()` — exits placement mode, clears `pendingPlacementType`
-- `placeElement(x, y, w, h)` — creates the element at position (x, y) with dimensions (w, h), selects it, and clears `pendingPlacementType`. The UI layer is responsible for computing (x, y, w, h) from the drag gesture as described above.
+- `beginPlacement(store, elementType)` — enters `{ type: 'placement-anchor', elementType }`, clears all other editing modes
+- `cancelPlacement(store)` — resets `placement` and `placementPreview` to `null`, returns `editingMode` to `{ type: 'none' }`
+- `setPlacementAnchor(store, x, y)` — transitions from `placement-anchor` to the correct next sub-state (`placement-extent`, `placement-ellipse-radius`), or — for path — creates the path element with a single `M0,0` point and enters `path-drawing`, or — for external plugins — creates the element at the plugin default size and clears placement
+- `updatePlacementPreview(store, x, y)` — ephemeral preview pointer update (no history)
+- `commitPlacementExtent(store, x, y)` — corner types only: creates the element from the anchor/extent bounds, selects it, and clears placement. No-op if `(x, y)` equals the anchor
+- `setEllipseRadius(store, x, y)` — ellipse only: transitions `placement-ellipse-radius` → `placement-ellipse-rotation`. No-op if `(x, y)` equals the anchor
+- `commitEllipseRotation(store, x, y)` — ellipse only: creates the ellipse with the accumulated radius and the rotation derived from `atan2`, selects it, and clears placement
 
-Placing with no pending type MUST be a no-op.
+Dispatching any of these actions while `placement` is in the wrong sub-state MUST be a no-op.
 
 #### Scenario: Start and cancel
 
-- GIVEN no pending placement
-- WHEN `startPlacement("text")` then `cancelPlacement()` is called
-- THEN `pendingPlacementType` goes from `"text"` to `null`
+- GIVEN no active placement
+- WHEN `beginPlacement(store, "text")` then `cancelPlacement(store)` is called
+- THEN `placement` goes from `{ type: 'placement-anchor', elementType: 'text' }` to `null`
 
 #### Scenario: Placement clears editing modes
 
 - GIVEN path editing is active
-- WHEN `startPlacement("rectangle")` is called
-- THEN both `pathEditingElementId` and `pathDrawingElementId` are `null`
+- WHEN `beginPlacement(store, "rectangle")` is called
+- THEN `pathEditingElementId`, `pathDrawingElementId`, `inlineTextEditingElementId`, `clipPathEditingElementId`, `motionPathEditingElementId` are all `null`
 
-#### Scenario: Draw element at position with custom size
+#### Scenario: Two-click rectangle
 
-- GIVEN `pendingPlacementType` is `"rectangle"`
-- WHEN the user drags from (50, 30) to (110, 70)
-- THEN `placeElement(50, 30, 60, 40)` is called, creating a 60×40 rectangle at position (50, 30)
+- GIVEN `placement` is `{ type: 'placement-anchor', elementType: 'rectangle' }`
+- WHEN `setPlacementAnchor(store, 50, 30)` then `commitPlacementExtent(store, 110, 70)` is called
+- THEN a 60×40 rectangle is created at position (50, 30) and `placement` is `null`
 
-#### Scenario: Quick click falls back to default size
+#### Scenario: Extent click equal to anchor is ignored
 
-- GIVEN `pendingPlacementType` is `"text"`
-- WHEN the user clicks at (100, 50) with drag extent below 5mm
-- THEN `placeElement(60, 40, 80, 20)` is called, centering default text dimensions (80×20) at the click point
+- GIVEN `placement` is `{ type: 'placement-extent', elementType: 'rectangle', anchor: { x: 100, y: 50 } }`
+- WHEN `commitPlacementExtent(store, 100, 50)` is called
+- THEN no element is created and `placement` is unchanged
 
-#### Scenario: Place path enters drawing mode
+#### Scenario: Three-click ellipse
 
-- GIVEN `pendingPlacementType` is `"path"`
-- WHEN `placeElement(100, 50, 80, 50)` is called
-- THEN the path element is created and `pathDrawingElementId` is set
+- GIVEN `placement` is `{ type: 'placement-anchor', elementType: 'ellipse' }`
+- WHEN `setPlacementAnchor(store, 100, 100)`, then `setEllipseRadius(store, 130, 120)`, then `commitEllipseRotation(store, 150, 100)` is called
+- THEN an ellipse is created with `rx = 30`, `ry = 20`, position `(70, 80)`, `width = 60`, `height = 40`, and `rotation` in degrees from `atan2(0, 50)`
 
-#### Scenario: No-op without pending placement
+#### Scenario: Path enters drawing on first click
 
-- GIVEN `pendingPlacementType` is `null`
-- WHEN `placeElement(100, 50, 60, 40)` is called
-- THEN no element is created
+- GIVEN `placement` is `{ type: 'placement-anchor', elementType: 'path' }`
+- WHEN `setPlacementAnchor(store, 120, 80)` is called
+- THEN a path element is created at `(120, 80)` with content `"M0,0"`, `placement` is `null`, and `pathDrawingElementId` is set to the new element
+
+#### Scenario: Plugin single-click creates at default size
+
+- GIVEN `placement` is `{ type: 'placement-anchor', elementType: 'countdown' }` and the plugin declares width 144, height 96
+- WHEN `setPlacementAnchor(store, 200, 100)` is called
+- THEN a countdown element is created at `(200, 100)` sized 144×96 and `placement` is `null`
+
+#### Scenario: Escape cancels from any sub-state
+
+- GIVEN `placement` is in any of `placement-anchor`, `placement-extent`, `placement-ellipse-radius`, `placement-ellipse-rotation`
+- WHEN `cancelPlacement(store)` is called
+- THEN `placement` and `placementPreview` are `null`, `editingMode` is `{ type: 'none' }`, and no element is created by the cancellation
 
 #### Acceptance Criteria
 
-- [ ] Given no pending placement, `pendingPlacementType` goes from `"text"` to `null`
-- [ ] Given path editing is active, both `pathEditingElementId` and `pathDrawingElementId` are `null`
-- [ ] Given a drag from (50,30) to (110,70) with `pendingPlacementType` `"rectangle"`, a 60×40 element is created at position (50,30)
-- [ ] Given a click with drag extent below 5mm and `pendingPlacementType` `"text"`, the element uses default dimensions centered at the click point
-- [ ] Given `pendingPlacementType` is `"path"`, the path element is created and `pathDrawingElementId` is set
-- [ ] Given `pendingPlacementType` is `null`, no element is created
+- [ ] `beginPlacement("text")` followed by `cancelPlacement()` transitions `placement` from the anchor sub-state to `null`
+- [ ] `beginPlacement("rectangle")` while any other editing mode is active clears that mode and enters `placement-anchor`
+- [ ] Two-click rectangle placement from (50,30) to (110,70) creates a 60×40 element at (50,30)
+- [ ] `commitPlacementExtent(anchor, anchor)` is a no-op and leaves `placement` unchanged
+- [ ] Three-click ellipse with anchor (100,100), radius click (130,120) and rotation click (150,100) creates an ellipse with `rx=30`, `ry=20`, top-left (70,80), and rotation derived from `atan2(Δy, Δx)` in degrees
+- [ ] Path first click creates a path element with `"M0,0"` content, selects it, enters `path-drawing`, and clears `placement`
+- [ ] External plugin single-click placement creates the element at the plugin's declared default size
+- [ ] Built-in placements MUST NOT fall back to factory default dimensions when the user's extent click lands on the anchor
+- [ ] The floating placement-mode banner MUST NOT be rendered while placement is active
 
 ---
 

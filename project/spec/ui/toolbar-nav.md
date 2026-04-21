@@ -312,7 +312,7 @@ Disabled items MUST be visually dimmed and non-interactive.
 
 ### Requirement: Element Library
 
-The system MUST render tiles for all 11 built-in element types with labels. Clicking a tile MUST call startPlacement with the type. Custom types from the registry MUST be included with their icons. Grid layout MUST use 2 columns.
+The system MUST render tiles for all 11 built-in element types with labels. Clicking a tile MUST call beginPlacement with the type. Custom types from the registry MUST be included with their icons. Grid layout MUST use 2 columns.
 
 **Built-In Element Types and Icons:**
 
@@ -352,12 +352,12 @@ Custom plugin types MUST appear after the built-in types. If a plugin provides a
 
 - GIVEN a registry with a custom `countdown` type
 - WHEN the library renders
-- THEN a countdown tile is shown and clicking it calls startPlacement
+- THEN a countdown tile is shown and clicking it calls beginPlacement
 
 #### Acceptance Criteria
 
 - [ ] Given a default component registry, 11 built-in element tiles with labels are shown
-- [ ] Given a registry with a custom `countdown` type, a countdown tile is shown and clicking it calls startPlacement
+- [ ] Given a registry with a custom `countdown` type, a countdown tile is shown and clicking it calls beginPlacement
 
 ---
 

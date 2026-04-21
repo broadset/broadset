@@ -60,7 +60,7 @@ Three layers, all standard:
 - **Visual layer (what any PPTX reader draws).**
   - Text as real `<a:r>`/`<a:p>` runs and paragraphs with full run properties (`<a:rPr>` — font, size, bold, italic, underline, color, language, hyperlink) and paragraph properties (`<a:pPr>` — alignment, indent, margin, line spacing, bullets/numbering).
   - Shapes as preset geometries (`<a:prstGeom prst="…">`) when Broadset's element maps to one of PPTX's ~180 presets, otherwise as `<a:custGeom>` with native PPTX path operators (`moveTo`, `lnTo`, `cubicBezTo`, `arcTo`, `close`). Vectors stay vectors — no SVG rasterization for arbitrary paths.
-  - Fills including `<a:solidFill>`, `<a:gradFill>` (linear, radial, and path gradients with full stop lists, `lumMod`/`lumOff`/`tint`/`shade` modifiers), `<a:blipFill>` (picture fill with stretch/tile/crop), `<a:pattFill>`, and theme-color references (`<a:schemeClr>`).
+  - Fills including `<a:solidFill>`, `<a:gradFill>` (linear, radial, and path gradients with full stop lists, `lumMod`/`lumOff`/`tint`/`shade` modifiers), `<a:blipFill>` (picture fill with stretch / tile; OOXML `srcRect` crop is baked into the source image on import per the io-prereqs picture-fill rule, so the stored asset is already the final crop), `<a:pattFill>`, and theme-color references (`<a:schemeClr>`).
   - Strokes as `<a:ln>` with width, dash, join, cap, and head/tail arrow endings.
   - Images as `<p:pic>` with proper relationships, preserving original compression (JPEG pass-through, PNG pass-through, no re-encode).
   - Groups as native `<p:grpSp>` with proper child-relative coordinates and cumulative group transform — not flattened.
