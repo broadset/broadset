@@ -152,6 +152,7 @@ export function PathPropertiesPanel({
                 >
                   <ColorInput
                     compact
+                    allowAlpha={false}
                     label="Stroke"
                     value={stroke}
                     onChange={(v) => {
@@ -277,6 +278,7 @@ export function PathPropertiesPanel({
             <div style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04'), minWidth: 0, width: '100%' }}>
               <FieldRow label="Fill">
                 <ColorInput
+                  allowAlpha={false}
                   label="Fill"
                   value={fill}
                   onChange={(v) => {

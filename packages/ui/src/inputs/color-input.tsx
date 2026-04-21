@@ -221,9 +221,16 @@ export interface ColorInputProps {
   readonly label: string;
   /** When true, renders a 28px-tall row that aligns with compact NumField in dense grids. */
   readonly compact?: boolean | undefined;
+  /**
+   * When `false`, the picker emits only solid colors (6-digit hex) and strips any
+   * alpha channel on input — use this for fields that have a separate opacity
+   * control (e.g. stroke/fill on path elements) so picking a color does not
+   * silently override the opacity slider.
+   */
+  readonly allowAlpha?: boolean | undefined;
 }
 
-export function ColorInput({ value, onChange, label, compact }: ColorInputProps): JSX.Element {
+export function ColorInput({ value, onChange, label, compact, allowAlpha = true }: ColorInputProps): JSX.Element {
   const isCompact = compact === true;
   const swatchSize = isCompact ? 22 : 28;
   const [draft, setDraft] = useState('');
@@ -262,14 +269,15 @@ export function ColorInput({ value, onChange, label, compact }: ColorInputProps)
     const result = parseColorToRgba(draft);
 
     if (result !== null) {
-      const hex = rgbaToHex(result.r, result.g, result.b, result.a);
+      const alpha = allowAlpha ? result.a : 1;
+      const hex = rgbaToHex(result.r, result.g, result.b, alpha);
 
       lastValidRef.current = hex;
       onChange(hex);
     }
 
     setIsDrafting(false);
-  }, [isDrafting, draft, onChange]);
+  }, [isDrafting, draft, onChange, allowAlpha]);
 
   const handleTextKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -282,22 +290,22 @@ export function ColorInput({ value, onChange, label, compact }: ColorInputProps)
 
   const handleColorChange = useCallback(
     (color: Color) => {
-      const hex = color.toString('hexa');
+      const hex = allowAlpha ? color.toString('hexa') : color.toString('hex');
 
       lastValidRef.current = hex;
       onChange(hex);
     },
-    [onChange],
+    [onChange, allowAlpha],
   );
 
   const handleSwatchSelect = useCallback(
     (color: Color) => {
-      const hex = color.toString('hexa');
+      const hex = allowAlpha ? color.toString('hexa') : color.toString('hex');
 
       lastValidRef.current = hex;
       onChange(hex);
     },
-    [onChange],
+    [onChange, allowAlpha],
   );
 
   const handleFormatChange = useCallback((key: string | number | null) => {
@@ -385,11 +393,13 @@ export function ColorInput({ value, onChange, label, compact }: ColorInputProps)
                 </ColorSlider.Track>
               </ColorSlider>
 
-              <ColorSlider aria-label="Alpha" channel="alpha" value={ariaColor} onChange={handleColorChange}>
-                <ColorSlider.Track>
-                  <ColorSlider.Thumb />
-                </ColorSlider.Track>
-              </ColorSlider>
+              {allowAlpha ?
+                <ColorSlider aria-label="Alpha" channel="alpha" value={ariaColor} onChange={handleColorChange}>
+                  <ColorSlider.Track>
+                    <ColorSlider.Thumb />
+                  </ColorSlider.Track>
+                </ColorSlider>
+              : null}
 
               <Select aria-label="Color format" value={format} onChange={handleFormatChange}>
                 <Select.Trigger>
