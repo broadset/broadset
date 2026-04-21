@@ -139,10 +139,10 @@ export function InlineTextOverlay({
   };
 
   // Container matches the element's renderer contentHost + host chain: outer
-  // box carries font and text styling, inner contentEditable is a flex item
-  // that positions the actual caret/text the same way per-character spans are
-  // laid out in the rendered element. This keeps the visible glyphs in the
-  // exact same position and typography when editing as when rendered.
+  // box carries font and text styling and positions an inner contentEditable
+  // via flex alignment. The inner editor wraps long lines within the element
+  // width (flex-wrap on the renderer side does the same for per-character
+  // spans), so visible glyphs sit on the same lines whether editing or not.
   const containerStyle: CSSProperties = {
     position: 'absolute',
     left: `${String(worldElement.position.x)}px`,
@@ -170,9 +170,8 @@ export function InlineTextOverlay({
     display: 'flex',
     alignItems: mapVerticalAlignmentToFlex(style.verticalAlignment),
     justifyContent: mapHorizontalAlignmentToFlex(style.textAlignment),
-    wordBreak: 'break-word',
-    whiteSpace: 'pre-wrap',
     textAlign: style.textAlignment ?? 'left',
+    wordBreak: 'break-word',
   };
 
   return createPortal(
@@ -189,6 +188,7 @@ export function InlineTextOverlay({
         style={{
           outline: 'none',
           minWidth: '1ch',
+          maxWidth: '100%',
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
           flex: '0 1 auto',

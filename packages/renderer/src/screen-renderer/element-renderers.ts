@@ -215,8 +215,14 @@ export function createQrCodeMarkup(payload: string): string | null {
 
 const createTextRenderer = createSimpleRenderer((host, element) => {
   renderPerCharacterSpans(host, element.content);
+  // Flex-wrap + matching alignContent lets the per-character spans flow onto
+  // multiple lines when they exceed the element width while keeping horizontal
+  // (justifyContent) and vertical (alignItems single-line / alignContent
+  // multi-line) alignment under the element style's control.
   host.style.display = 'flex';
+  host.style.flexWrap = 'wrap';
   host.style.alignItems = mapVerticalAlignment(element.style.verticalAlignment);
+  host.style.alignContent = mapVerticalAlignment(element.style.verticalAlignment);
   host.style.justifyContent = mapTextAlignment(element.style.textAlignment);
   host.style.wordBreak = 'break-word';
 });
