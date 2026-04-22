@@ -246,6 +246,237 @@ describe('No hard page or element limits', () => {
 });
 
 /** @description Animation definitions are stored as a flat document-level array keyed by elementId. */
+/**
+ * @description Print prepress boxes (bleed, trim, safeArea) ride on the canvas
+ * alongside the screen safeAreas field so a single document can target PDF
+ * (BleedBox / TrimBox / MediaBox / CropBox) and broadcast (title-safe,
+ * action-safe) simultaneously without either format's concept interfering with
+ * the other.
+ */
+describe('Canvas prepress insets', () => {
+  /** @description All three insets are optional — a canvas without any prepress still validates. */
+  it('accepts a canvas with no prepress insets', () => {
+    const doc = makeValidDoc();
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(true);
+  });
+
+  /** @description Every inset is a [top, right, bottom, left] tuple of non-negative numbers in the canvas-declared unit. */
+  it('accepts valid bleed, trim, and safeArea tuples', () => {
+    const base = createEmptyBroadsetDocument();
+    const doc = makeValidDoc({
+      canvas: {
+        ...base.canvas,
+        bleed: [3, 3, 3, 3],
+        trim: [0, 0, 0, 0],
+        safeArea: [5, 10, 5, 10],
+      },
+    });
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(true);
+  });
+
+  /** @description Negative inset values must be rejected since a prepress box can never extend past the media box. */
+  it('rejects negative bleed values', () => {
+    const base = createEmptyBroadsetDocument();
+    const doc = makeValidDoc({
+      canvas: {
+        ...base.canvas,
+        bleed: [-1, 3, 3, 3],
+      },
+    });
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(false);
+  });
+
+  /** @description A non-tuple shape for any prepress inset must be rejected. */
+  it('rejects non-tuple prepress values', () => {
+    const base = createEmptyBroadsetDocument();
+    const doc = makeValidDoc({
+      canvas: {
+        ...base.canvas,
+        trim: '3 3 3 3',
+      },
+    });
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(false);
+  });
+
+  /** @description Prepress insets and the existing broadcast `safeAreas` field coexist on the same canvas. */
+  it('accepts prepress insets alongside broadcast safeAreas', () => {
+    const base = createEmptyBroadsetDocument();
+    const doc = makeValidDoc({
+      canvas: {
+        ...base.canvas,
+        bleed: [3, 3, 3, 3],
+        safeAreas: {
+          actionSafe: [3, 3, 3, 3],
+          titleSafe: [5, 5, 5, 5],
+        },
+      },
+    });
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(true);
+  });
+});
+
+/**
+ * @description Page speaker notes ride on the `Page` entry so PPTX
+ * `notesSlide*.xml` and PDF speaker-note annotations round-trip against a
+ * single universal shape. PSD and SVG exporters ignore this field.
+ */
+describe('Page speaker notes', () => {
+  /** @description `notes` is optional; an omitted value validates. */
+  it('accepts a page without notes', () => {
+    const doc = makeValidDoc();
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(true);
+  });
+
+  /** @description A string value validates and is preserved through parse. */
+  it('accepts string speaker notes and preserves them', () => {
+    const base = createEmptyBroadsetDocument();
+    const doc = makeValidDoc({
+      pages: base.pages.map((page) => ({ ...page, notes: 'Presenter reminder: slow down on this slide.' })),
+    });
+    const result = broadsetDocumentSchema.safeParse(doc);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.data.pages[0]?.notes).toBe('Presenter reminder: slow down on this slide.');
+    }
+  });
+
+  /** @description Non-string notes must be rejected (TextBody support lands with the text-model unit; until then, string only). */
+  it('rejects non-string notes values', () => {
+    const base = createEmptyBroadsetDocument();
+    const doc = makeValidDoc({
+      pages: base.pages.map((page) => ({ ...page, notes: 123 })),
+    });
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(false);
+  });
+});
+
+/**
+ * @description Dublin Core metadata lets importers and exporters round-trip
+ * title / author / subject / keywords / rights / producer across every
+ * format — PDF XMP, PSD XMP, SVG `<metadata>`, PPTX `docProps/core.xml`.
+ */
+describe('Document metadata', () => {
+  /** @description Metadata is optional; an omitted value validates. */
+  it('accepts a document without metadata', () => {
+    expect(broadsetDocumentSchema.safeParse(makeValidDoc()).success).toBe(true);
+  });
+
+  /** @description Every Dublin Core field accepts a string; `keywords` is an array of strings. */
+  it('accepts a fully populated metadata block', () => {
+    const doc = makeValidDoc({
+      metadata: {
+        title: 'Quarterly Report',
+        author: 'Jane Doe',
+        subject: 'Q4 results',
+        keywords: ['finance', 'Q4', '2026'],
+        rights: '© 2026 Acme Corp',
+        producer: 'Broadset',
+      },
+    });
+    const result = broadsetDocumentSchema.safeParse(doc);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.data.metadata?.title).toBe('Quarterly Report');
+      expect(result.data.metadata?.keywords).toEqual(['finance', 'Q4', '2026']);
+    }
+  });
+
+  /** @description `keywords` must be an array of strings, not a comma-separated string, so importers / exporters can round-trip lossless. */
+  it('rejects a non-array keywords value', () => {
+    const doc = makeValidDoc({
+      metadata: { keywords: 'finance, Q4' },
+    });
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(false);
+  });
+
+  /** @description Empty metadata object is accepted — every field is individually optional. */
+  it('accepts an empty metadata object', () => {
+    const doc = makeValidDoc({ metadata: {} });
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(true);
+  });
+});
+
+/**
+ * @description Output intent carries a document-level ICC profile reference
+ * plus target color space — fed to PDF `/OutputIntent`, PSD's embedded ICC
+ * on CMYK/Lab documents, and any other format that needs a canonical
+ * document color space. The `iccProfileAssetId` references an asset added
+ * in Phase 4; for now the validator accepts any non-empty string.
+ */
+describe('Document output intent', () => {
+  /** @description Output intent is optional; omitted → no constraint. */
+  it('accepts a document without outputIntent', () => {
+    expect(broadsetDocumentSchema.safeParse(makeValidDoc()).success).toBe(true);
+  });
+
+  /** @description All four supported color spaces validate. */
+  it.each(['rgb', 'cmyk', 'gray', 'lab'])('accepts colorSpace %s', (colorSpace) => {
+    const doc = makeValidDoc({
+      outputIntent: { iccProfileAssetId: 'asset-1', colorSpace },
+    });
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(true);
+  });
+
+  /** @description The optional `identifier` (e.g. `"sRGB IEC61966-2.1"`) is preserved. */
+  it('preserves the identifier string', () => {
+    const doc = makeValidDoc({
+      outputIntent: {
+        iccProfileAssetId: 'asset-srgb-2014',
+        colorSpace: 'rgb',
+        identifier: 'sRGB IEC61966-2.1',
+      },
+    });
+    const result = broadsetDocumentSchema.safeParse(doc);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.data.outputIntent?.identifier).toBe('sRGB IEC61966-2.1');
+    }
+  });
+
+  /** @description `iccProfileAssetId` is required when outputIntent is set — omitting it fails validation. */
+  it('rejects outputIntent without iccProfileAssetId', () => {
+    const doc = makeValidDoc({
+      outputIntent: { colorSpace: 'rgb' },
+    });
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(false);
+  });
+
+  /** @description An empty `iccProfileAssetId` string is not a valid reference — reject it as well. */
+  it('rejects outputIntent with an empty iccProfileAssetId', () => {
+    const doc = makeValidDoc({
+      outputIntent: { iccProfileAssetId: '', colorSpace: 'rgb' },
+    });
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(false);
+  });
+
+  /** @description Unknown color spaces are rejected. */
+  it('rejects unknown colorSpace values', () => {
+    const doc = makeValidDoc({
+      outputIntent: { iccProfileAssetId: 'asset-1', colorSpace: 'xyz' },
+    });
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(false);
+  });
+});
+
 describe('Document animations integrity', () => {
   /** @description Duplicate animation entries for the same element must be rejected. */
   it('rejects duplicate elementId in animations', () => {

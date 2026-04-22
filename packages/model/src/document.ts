@@ -21,6 +21,9 @@ export interface SafeAreas {
     | undefined;
 }
 
+/** `[top, right, bottom, left]` inset tuple for a print prepress box, expressed in the canvas-declared unit. */
+export type PrepressInset = readonly [number, number, number, number];
+
 export interface Canvas {
   readonly width: number;
   readonly height: number;
@@ -30,6 +33,9 @@ export interface Canvas {
   readonly backgroundColor?: string | undefined;
   readonly backgroundMode: 'transparent' | 'solid';
   readonly safeAreas?: SafeAreas | undefined;
+  readonly bleed?: PrepressInset | undefined;
+  readonly trim?: PrepressInset | undefined;
+  readonly safeArea?: PrepressInset | undefined;
 }
 
 export interface Vector3 {
@@ -56,6 +62,7 @@ export interface Page {
   readonly elements: readonly PageElementInstance[];
   readonly locale: string | null;
   readonly extensions: Readonly<Record<string, unknown>>;
+  readonly notes?: string | undefined;
 }
 
 export interface DataSchemaField {
@@ -72,6 +79,23 @@ export interface DataSchema {
   readonly fields: readonly DataSchemaField[];
 }
 
+export interface DocumentMetadata {
+  readonly title?: string | undefined;
+  readonly author?: string | undefined;
+  readonly subject?: string | undefined;
+  readonly keywords?: readonly string[] | undefined;
+  readonly rights?: string | undefined;
+  readonly producer?: string | undefined;
+}
+
+export type OutputColorSpace = 'rgb' | 'cmyk' | 'gray' | 'lab';
+
+export interface DocumentOutputIntent {
+  readonly iccProfileAssetId: string;
+  readonly colorSpace: OutputColorSpace;
+  readonly identifier?: string | undefined;
+}
+
 export interface BroadsetDocument {
   readonly id: string;
   readonly name: string;
@@ -82,6 +106,8 @@ export interface BroadsetDocument {
   readonly pages: readonly Page[];
   readonly dataSchema: DataSchema;
   readonly output?: OutputSpec | undefined;
+  readonly metadata?: DocumentMetadata | undefined;
+  readonly outputIntent?: DocumentOutputIntent | undefined;
   readonly extensions?: Readonly<Record<string, unknown>> | undefined;
 }
 
@@ -107,6 +133,13 @@ const safeAreasSchema = z.object({
     .optional(),
 });
 
+const prepressInsetSchema = z.tuple([
+  z.number().nonnegative(),
+  z.number().nonnegative(),
+  z.number().nonnegative(),
+  z.number().nonnegative(),
+]);
+
 const canvasSchema = z.object({
   width: z.number().positive(),
   height: z.number().positive(),
@@ -121,6 +154,9 @@ const canvasSchema = z.object({
   backgroundColor: z.string().optional(),
   backgroundMode: z.enum(['transparent', 'solid']).optional(),
   safeAreas: safeAreasSchema.optional(),
+  bleed: prepressInsetSchema.optional(),
+  trim: prepressInsetSchema.optional(),
+  safeArea: prepressInsetSchema.optional(),
 });
 
 const vector3Schema: z.ZodType<Vector3> = z.object({
@@ -147,6 +183,7 @@ const pageSchema: z.ZodType<Page> = z.object({
   elements: z.array(pageElementInstanceSchema),
   locale: z.string().nullable().default(null),
   extensions: z.record(z.string(), z.unknown()).default({}),
+  notes: z.string().optional(),
 });
 
 const dataSchemaFieldSchema: z.ZodType<DataSchemaField> = z.object({
@@ -161,6 +198,23 @@ const dataSchemaFieldSchema: z.ZodType<DataSchemaField> = z.object({
 const dataSchemaSchema: z.ZodType<DataSchema> = z.object({
   description: z.string().optional(),
   fields: z.array(dataSchemaFieldSchema).default([]),
+});
+
+const documentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
+  title: z.string().optional(),
+  author: z.string().optional(),
+  subject: z.string().optional(),
+  keywords: z.array(z.string()).optional(),
+  rights: z.string().optional(),
+  producer: z.string().optional(),
+});
+
+const outputColorSpaceSchema: z.ZodType<OutputColorSpace> = z.enum(['rgb', 'cmyk', 'gray', 'lab']);
+
+const documentOutputIntentSchema: z.ZodType<DocumentOutputIntent> = z.object({
+  iccProfileAssetId: z.string().min(1),
+  colorSpace: outputColorSpaceSchema,
+  identifier: z.string().optional(),
 });
 
 const DEFAULT_SCREEN_CANVAS_DPI = 96;
@@ -187,6 +241,9 @@ function defaultCanvasForMode(mode: 'screen' | 'print', canvas: z.infer<typeof c
     backgroundColor: canvas.backgroundColor,
     backgroundMode: canvas.backgroundMode ?? (mode === 'screen' ? 'transparent' : 'solid'),
     safeAreas: canvas.safeAreas,
+    bleed: canvas.bleed,
+    trim: canvas.trim,
+    safeArea: canvas.safeArea,
   };
 }
 
@@ -201,6 +258,8 @@ export const broadsetDocumentSchema: z.ZodType<BroadsetDocument> = z
     animations: animationsSchema,
     dataSchema: dataSchemaSchema,
     output: outputSpecSchema.optional(),
+    metadata: documentMetadataSchema.optional(),
+    outputIntent: documentOutputIntentSchema.optional(),
     extensions: z.record(z.string(), z.unknown()).optional(),
   })
   .superRefine((value, context) => {
@@ -250,6 +309,8 @@ export const broadsetDocumentSchema: z.ZodType<BroadsetDocument> = z
         pages: value.pages,
         dataSchema: value.dataSchema,
         output: value.output,
+        metadata: value.metadata,
+        outputIntent: value.outputIntent,
         extensions: value.extensions,
       }),
   );

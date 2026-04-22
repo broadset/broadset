@@ -61,7 +61,10 @@ Every document MUST have a `canvas` with:
 - `padding`: 4-tuple `[top, right, bottom, left]` of non-negative numbers
 - `backgroundColor` (optional): CSS color string for canvas background
 - `backgroundMode`: `'transparent'` | `'solid'` — default `'transparent'` for screen, `'solid'` for print
-- `safeAreas` (optional): action-safe and title-safe insets (see Safe Areas below)
+- `safeAreas` (optional): broadcast action-safe and title-safe insets as percentages (see Safe Areas below)
+- `bleed` (optional): print prepress bleed inset as `[top, right, bottom, left]` of non-negative numbers in the canvas-declared unit — maps to PDF `BleedBox`
+- `trim` (optional): print prepress trim inset with the same shape — maps to PDF `TrimBox`
+- `safeArea` (optional): print prepress safe-area inset with the same shape — the editor-surfaced "keep content inside" guide
 
 Screen-mode documents SHOULD use `unit: 'px'` with pixel dimensions (e.g., `1920 × 1080`). Print-mode documents SHOULD use `unit: 'mm'` or `unit: 'in'` with physical dimensions (e.g., `210 × 297 mm`).
 
@@ -97,6 +100,38 @@ Screen-mode documents SHOULD use `unit: 'px'` with pixel dimensions (e.g., `1920
 - [ ] Given a canvas with `unit: 'mm'`, all spatial values are in millimeters
 - [ ] Given a screen-mode document, default backgroundMode is `'transparent'`
 - [ ] Given a print-mode document, default backgroundMode is `'solid'`
+
+---
+
+### Requirement: Prepress Insets (Bleed / Trim / Safe Area)
+
+The canvas MAY declare `bleed`, `trim`, and `safeArea` insets for print prepress workflows. Each inset is a `[top, right, bottom, left]` tuple of non-negative numbers expressed in the canvas-declared unit. Negative values MUST be rejected. The PDF exporter maps `bleed` → `BleedBox`, `trim` → `TrimBox`, and the MediaBox is always the canvas dimensions; the `safeArea` inset is an editor guide and does NOT emit into PDF boxes. PPTX, PSD, and SVG exporters ignore these fields. The broadcast `safeAreas` (percentage-based, title-safe / action-safe) and the prepress `safeArea` (unit-valued) are independent and MAY coexist.
+
+#### Scenario: Uniform bleed on every side
+
+- GIVEN a canvas with `bleed: [3, 3, 3, 3]` in a millimetre-unit canvas
+- WHEN the document is validated
+- THEN validation succeeds
+
+#### Scenario: Negative bleed rejected
+
+- GIVEN a canvas with `bleed: [-1, 3, 3, 3]`
+- WHEN the document is validated
+- THEN validation fails
+
+#### Scenario: Prepress and broadcast safe areas coexist
+
+- GIVEN a canvas carrying both `safeAreas.actionSafe` and a prepress `safeArea`
+- WHEN the document is validated
+- THEN validation succeeds and both fields are preserved
+
+#### Acceptance Criteria
+
+- [ ] Given a canvas with no prepress insets, validation succeeds
+- [ ] Given valid `bleed`, `trim`, and `safeArea` 4-tuples of non-negative numbers, validation succeeds
+- [ ] Given a negative value in any prepress inset, validation fails
+- [ ] Given a non-tuple value for `bleed`, `trim`, or `safeArea`, validation fails
+- [ ] Prepress `safeArea` and broadcast `safeAreas` coexist without interference
 
 ---
 
@@ -238,6 +273,7 @@ Each page has:
 - `elements`: array of `PageElementInstance`, each referencing a template element by `elementId`
 - `locale` (optional): BCP 47 language tag for localization
 - `extensions` (optional): vendor extension data
+- `notes` (optional): speaker-notes / presenter-reminder text — string in Phase 1, upgrading to `string | TextBody` once the rich-text model lands. Round-trips to PPTX `notesSlide*.xml` and PDF speaker-notes annotations; PSD and SVG exporters ignore it.
 
 A document MUST have at least one page. Pages list only root-level template elements; child relationships are inherited from the document template.
 
@@ -273,6 +309,8 @@ A document MUST have at least one page. Pages list only root-level template elem
 - [ ] Given a page with different instance transforms, the page displays elements with those transforms
 - [ ] Given a page instance referencing a non-existent element, validation fails or it is ignored
 - [ ] Given duplicate page IDs within a document, validation fails
+- [ ] Given a page with a string `notes` value, it is preserved on round-trip
+- [ ] Given a page with a non-string `notes` value, validation fails
 
 ---
 
@@ -297,6 +335,79 @@ When absent, the consumer picks its own output profile. When present, animation 
 
 - [ ] Given a valid output spec with supported frame rate and color space, validation succeeds
 - [ ] Given no output spec, the document is still valid
+
+---
+
+### Requirement: Document Metadata (Optional)
+
+A document MAY carry a `metadata` object carrying Dublin Core descriptive fields — consumed by PDF XMP, PSD XMP, SVG `<metadata>`, and PPTX `docProps/core.xml`. Every field is individually optional and may be omitted. The `keywords` field MUST be a string array (not a comma-separated string) so importers and exporters round-trip lossless.
+
+Fields:
+
+- `title` (optional, string): document title
+- `author` (optional, string): author name or agency
+- `subject` (optional, string): subject or abstract
+- `keywords` (optional, string array): searchable keywords
+- `rights` (optional, string): copyright / licence statement
+- `producer` (optional, string): producing tool — typically `"Broadset"` on export
+
+#### Scenario: Fully populated metadata
+
+- GIVEN a document with every Dublin Core field set
+- WHEN the document is validated
+- THEN validation succeeds and every field is preserved
+
+#### Scenario: Comma-separated keywords rejected
+
+- GIVEN `metadata: { keywords: "a, b, c" }`
+- WHEN the document is validated
+- THEN validation fails — keywords MUST be a string array
+
+#### Acceptance Criteria
+
+- [ ] Given a document without metadata, validation succeeds
+- [ ] Given a document with every Dublin Core field populated, validation succeeds
+- [ ] Given metadata with `keywords` as an array of strings, values are preserved
+- [ ] Given metadata with `keywords` as a non-array (string, object, number), validation fails
+- [ ] Given an empty `metadata` object, validation succeeds
+
+---
+
+### Requirement: Document Output Intent (Optional)
+
+A document MAY carry an `outputIntent` object declaring a document-level ICC profile + target color space. It feeds:
+
+- PDF `/OutputIntent` dictionary (mandatory for PDF/A-2b)
+- PSD embedded ICC profile on CMYK / Lab / Grayscale documents
+- Any other format needing a canonical document color space
+
+Fields:
+
+- `iccProfileAssetId` (required, string): references an asset of type `icc-profile` in the asset registry (the `icc-profile` asset type lands in Phase 4; the validator currently accepts any non-empty string and will tighten once the asset type exists)
+- `colorSpace` (required): `'rgb'` | `'cmyk'` | `'gray'` | `'lab'`
+- `identifier` (optional, string): human-readable profile identifier such as `"sRGB IEC61966-2.1"`
+
+SVG and PPTX exporters ignore this field. When absent, each format falls back to its own default (PDF → bundled sRGB 2014; PSD → U.S. Web Coated SWOP for CMYK, ISO Coated v2 Grayscale for Grayscale).
+
+#### Scenario: sRGB output intent
+
+- GIVEN `outputIntent: { iccProfileAssetId: 'asset-srgb-2014', colorSpace: 'rgb', identifier: 'sRGB IEC61966-2.1' }`
+- WHEN the document is validated
+- THEN validation succeeds
+
+#### Scenario: Missing asset reference rejected
+
+- GIVEN `outputIntent: { colorSpace: 'rgb' }`
+- WHEN the document is validated
+- THEN validation fails — `iccProfileAssetId` is required when `outputIntent` is set
+
+#### Acceptance Criteria
+
+- [ ] Given a document without `outputIntent`, validation succeeds
+- [ ] Given every supported `colorSpace` value (`rgb`, `cmyk`, `gray`, `lab`), validation succeeds
+- [ ] Given an unknown `colorSpace`, validation fails
+- [ ] Given `outputIntent` without `iccProfileAssetId`, validation fails
+- [ ] Given the optional `identifier`, it is preserved on round-trip
 
 ---
 
