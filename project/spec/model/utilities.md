@@ -129,6 +129,93 @@ The system MUST convert between pixels and millimetres using the document's `can
 
 ---
 
+### Requirement: Cross-Unit Length Conversion
+
+The system MUST convert between pixels and PostScript points using the document's `canvas.dpi` value via the formulas `px × (72 / dpi)` and `pt × (dpi / 72)`. The system MUST convert between inches and millimetres using the canonical constant `1 in = 25.4 mm`, with no DPI involvement. The system MUST convert `em` values to pixels against a caller-supplied base font size in pixels via `em × fontSizePx`. Each helper MUST preserve the sign of its input and return `0` for a `0` input without DPI coupling.
+
+#### Scenario: px to pt at 96 DPI
+
+- GIVEN a pixel value of 96 and `canvas.dpi: 96`
+- WHEN converted to points
+- THEN the result is 72
+
+#### Scenario: pt to px at 300 DPI
+
+- GIVEN a point value of 72 and `canvas.dpi: 300`
+- WHEN converted to pixels
+- THEN the result is 300
+
+#### Scenario: inch to mm round-trip
+
+- GIVEN a value of 1 inch
+- WHEN converted to millimetres and back to inches
+- THEN the intermediate value is 25.4 and the round-trip result is 1
+
+#### Scenario: em to px against a base font size
+
+- GIVEN an em value of 1.5 and a base font size of 16 pixels
+- WHEN converted to pixels
+- THEN the result is 24
+
+#### Acceptance Criteria
+
+- [ ] Given 96 pixels at 96 DPI, the point result is 72
+- [ ] Given 72 points at 300 DPI, the pixel result is 300
+- [ ] Given 1 inch, the millimetre result is 25.4
+- [ ] Given 25.4 millimetres, the inch result is 1
+- [ ] Given 1.5 em at base font size 16 px, the pixel result is 24
+- [ ] Given a negative em value, the pixel result preserves the sign
+
+---
+
+### Requirement: Unit-Aware Length Parsing
+
+The system MUST parse user-typed length strings of the form `<number><unit>` into a structured `{ value, unit }` pair, where `unit` is one of `px | mm | in | pt | em`. Leading and trailing whitespace, a single optional whitespace between the number and the unit, and uppercase unit suffixes MUST be tolerated. Signed decimals (e.g. `-12px`, `+0.5mm`), fractional values (e.g. `0.5in`), and leading-dot fractions (e.g. `.25pt`) MUST parse. Inputs that do not match the supported grammar — empty strings, unit-less numbers, unknown units (including `cm`), or malformed decimals — MUST return `null`; the parser MUST NOT silently coerce invalid input to a default unit.
+
+#### Scenario: integer with unit
+
+- GIVEN the input `"24px"`
+- WHEN parsed
+- THEN the result is `{ value: 24, unit: 'px' }`
+
+#### Scenario: decimal with unit
+
+- GIVEN the input `"0.5in"`
+- WHEN parsed
+- THEN the result is `{ value: 0.5, unit: 'in' }`
+
+#### Scenario: signed decimal
+
+- GIVEN the input `"-12px"`
+- WHEN parsed
+- THEN the result is `{ value: -12, unit: 'px' }`
+
+#### Scenario: whitespace and uppercase
+
+- GIVEN the input `"  24 PX  "`
+- WHEN parsed
+- THEN the result is `{ value: 24, unit: 'px' }`
+
+#### Scenario: invalid input
+
+- GIVEN an input without a recognised unit suffix (e.g. `"24"`, `"24cm"`, `""`)
+- WHEN parsed
+- THEN the result is `null`
+
+#### Acceptance Criteria
+
+- [ ] Given `"24px"`, the result is `{ value: 24, unit: 'px' }`
+- [ ] Given `"0.5in"`, the result is `{ value: 0.5, unit: 'in' }`
+- [ ] Given `".25pt"`, the result is `{ value: 0.25, unit: 'pt' }`
+- [ ] Given `"-12px"`, the result is `{ value: -12, unit: 'px' }`
+- [ ] Given `"+0.5mm"`, the result is `{ value: 0.5, unit: 'mm' }`
+- [ ] Given `"  24 PX  "`, the result is `{ value: 24, unit: 'px' }`
+- [ ] Given `"24"` (missing unit), the result is `null`
+- [ ] Given `"24cm"` (unsupported unit), the result is `null`
+- [ ] Given `""` or `"abc"`, the result is `null`
+
+---
+
 ### Requirement: Edge Anchor Inference
 
 The system MUST compute anchorX (`left` or `right`) and anchorY (`top` or `bottom`) by comparing the element's center-point to the canvas center-point. This is a **runtime-only** helper used by the editor for responsive positioning — anchor values are NOT serialized in the document model (the `screen` object no longer exists). If the element center is left of the canvas center, anchorX MUST be `left`; otherwise `right`. If the element center is above the canvas center, anchorY MUST be `top`; otherwise `bottom`.

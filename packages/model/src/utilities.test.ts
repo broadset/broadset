@@ -4,10 +4,16 @@ import {
   computeEdgeAnchors,
   createEmptyBroadsetDocument,
   deepClone,
+  emToPx,
   generateDefaultClipPath,
+  inToMm,
+  mmToIn,
   mmToPx,
   parseClipPathData,
+  parseLength,
+  ptToPx,
   pxToMm,
+  pxToPt,
   scalePathData,
   serializeClipPath,
 } from './index';
@@ -131,4 +137,99 @@ describe('Unit conversion', () => {
     expect(pxToMm(0)).toBe(0);
     expect(mmToPx(0)).toBe(0);
   });
+});
+
+/**
+ * @description Cross-unit conversions (px/pt/in/mm/em) underpin every importer and
+ * exporter that crosses the print/screen boundary (PDF, PSD, SVG, PPTX). Each
+ * conversion must be exact against the canonical constants — 1 in = 25.4 mm,
+ * 1 in = 72 pt — and honour the document's `canvas.dpi` when pixels are involved.
+ */
+describe('Cross-unit conversion helpers', () => {
+  /** @description Pixels ↔ points must be 1:1 with the canonical 72 pt/in ratio at 96 DPI. */
+  it('converts between px and pt using the provided DPI', () => {
+    expect(pxToPt(96)).toBeCloseTo(72, 10);
+    expect(ptToPx(72)).toBeCloseTo(96, 10);
+    expect(pxToPt(0)).toBe(0);
+    expect(ptToPx(0)).toBe(0);
+  });
+
+  /** @description At a 300 DPI print profile, 300 px still equals 72 pt (1 in). */
+  it('honours non-default DPI for px↔pt', () => {
+    expect(pxToPt(300, 300)).toBeCloseTo(72, 10);
+    expect(ptToPx(72, 300)).toBeCloseTo(300, 10);
+  });
+
+  /** @description Inches and millimetres use the canonical 25.4 constant with no DPI involvement. */
+  it('converts between inches and millimetres using 25.4', () => {
+    expect(inToMm(1)).toBeCloseTo(25.4, 10);
+    expect(mmToIn(25.4)).toBeCloseTo(1, 10);
+    expect(inToMm(0)).toBe(0);
+    expect(mmToIn(0)).toBe(0);
+    expect(inToMm(-2)).toBeCloseTo(-50.8, 10);
+  });
+
+  /** @description em values multiply the base font size in pixels. */
+  it('converts em to px against a base font size', () => {
+    expect(emToPx(1, 16)).toBe(16);
+    expect(emToPx(1.5, 16)).toBe(24);
+    expect(emToPx(0, 16)).toBe(0);
+    expect(emToPx(2, 12)).toBe(24);
+  });
+
+  /** @description Negative em or font-size values must be preserved (caller-owned policy). */
+  it('preserves sign for em conversions', () => {
+    expect(emToPx(-1, 16)).toBe(-16);
+    expect(emToPx(2, -8)).toBe(-16);
+  });
+});
+
+/**
+ * @description `parseLength` powers unit-aware dimension inputs in the editor — a
+ * user types `2cm`, `24pt`, `0.5in`, `1.5em`, etc. into any dimension field and
+ * the value is interpreted in its declared unit. The parser must accept the five
+ * supported units (px/mm/in/pt/em), signed/unsigned decimals, and lead/trail
+ * whitespace — and reject anything else rather than silently coercing.
+ */
+describe('parseLength', () => {
+  /** @description All five supported unit suffixes must parse against an integer value. */
+  it('parses integer values with each supported unit', () => {
+    expect(parseLength('24px')).toEqual({ value: 24, unit: 'px' });
+    expect(parseLength('2mm')).toEqual({ value: 2, unit: 'mm' });
+    expect(parseLength('1in')).toEqual({ value: 1, unit: 'in' });
+    expect(parseLength('12pt')).toEqual({ value: 12, unit: 'pt' });
+    expect(parseLength('3em')).toEqual({ value: 3, unit: 'em' });
+  });
+
+  /** @description Decimal values must parse, including leading-dot and trailing-digit forms. */
+  it('parses decimal values', () => {
+    expect(parseLength('0.5in')).toEqual({ value: 0.5, unit: 'in' });
+    expect(parseLength('1.5em')).toEqual({ value: 1.5, unit: 'em' });
+    expect(parseLength('.25pt')).toEqual({ value: 0.25, unit: 'pt' });
+  });
+
+  /** @description Explicit sign tokens are supported for dimensions that may be negative. */
+  it('parses signed values', () => {
+    expect(parseLength('-12px')).toEqual({ value: -12, unit: 'px' });
+    expect(parseLength('+0.5mm')).toEqual({ value: 0.5, unit: 'mm' });
+  });
+
+  /** @description Surrounding whitespace and casing differences are tolerated. */
+  it('tolerates whitespace and uppercase units', () => {
+    expect(parseLength('  24px  ')).toEqual({ value: 24, unit: 'px' });
+    expect(parseLength('24 PX')).toEqual({ value: 24, unit: 'px' });
+    expect(parseLength('12 Pt')).toEqual({ value: 12, unit: 'pt' });
+  });
+
+  /** @description Inputs missing a unit suffix, with unknown units, or malformed, must return null. */
+  it('returns null for invalid or unit-less input', () => {
+    expect(parseLength('24')).toBeNull();
+    expect(parseLength('')).toBeNull();
+    expect(parseLength('abc')).toBeNull();
+    expect(parseLength('24cm')).toBeNull();
+    expect(parseLength('24 px 50')).toBeNull();
+    expect(parseLength('px')).toBeNull();
+    expect(parseLength('24..5px')).toBeNull();
+  });
+
 });
