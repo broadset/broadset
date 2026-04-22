@@ -9,6 +9,8 @@ import {
   type EditorConfig,
   type EditorFeatureConfig,
   type ElementPosition,
+  type Page,
+  type PageElementInstance,
 } from '@broadset/model';
 import { temporal, type TemporalState } from 'zundo';
 import { createStore, type StoreApi } from 'zustand/vanilla';
@@ -33,6 +35,39 @@ import {
 } from './transform';
 
 const DEFAULT_MAX_UNDO_STEPS = 50;
+
+/**
+ * Root elements must have a matching page instance on the active page so the
+ * renderer and layer flows include them. Children (non-root) inherit their
+ * root's instance, so they do not get a direct page instance.
+ */
+function createRootPageInstance(element: BroadsetElement): PageElementInstance {
+  return {
+    elementId: element.id,
+    transform: {
+      position: { x: element.position.x, y: element.position.y, z: 0 },
+      rotation: { x: 0, y: 0, z: element.rotation },
+      scale: { x: 1, y: 1, z: 1 },
+    },
+    visible: true,
+  };
+}
+
+function insertRootElementIntoActivePage(
+  pages: readonly Page[],
+  activePageIndex: number,
+  element: BroadsetElement,
+): readonly Page[] {
+  if (element.parentId !== null) {
+    return pages;
+  }
+
+  const instance = createRootPageInstance(element);
+
+  return pages.map((page, pageIndex) =>
+    pageIndex === activePageIndex ? { ...page, elements: [...page.elements, instance] } : page,
+  );
+}
 
 export interface PlacementPoint {
   readonly x: number;
@@ -186,12 +221,18 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
           temporalRef.current?.getState().clear();
         },
         setDocument(document: BroadsetDocument): void {
-          set((state) => ({
-            document,
-            documentMode: document.documentMode,
-            featureConfig: createDefaultFeatureConfig(document.documentMode),
-            activeElementIds: filterSelectionToExisting(document, state.activeElementIds),
-          }));
+          set((state) => {
+            const maxPageIndex = Math.max(0, document.pages.length - 1);
+            const clampedActivePageIndex = Math.min(Math.max(0, state.activePageIndex), maxPageIndex);
+
+            return {
+              document,
+              documentMode: document.documentMode,
+              featureConfig: createDefaultFeatureConfig(document.documentMode),
+              activeElementIds: filterSelectionToExisting(document, state.activeElementIds),
+              activePageIndex: clampedActivePageIndex,
+            };
+          });
         },
         getDocument(): BroadsetDocument {
           return get().document;
@@ -324,6 +365,7 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
             document: {
               ...state.document,
               elements: [...state.document.elements, nextElement],
+              pages: insertRootElementIntoActivePage(state.document.pages, state.activePageIndex, nextElement),
             },
             ...createInteractionState([nextElement.id], null, null, entersPathDrawing ? nextElement.id : null),
           }));

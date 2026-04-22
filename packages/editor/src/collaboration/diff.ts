@@ -234,6 +234,22 @@ function diffSettings(prev: BroadsetDocument, next: BroadsetDocument, out: Docum
       } satisfies SettingsUpdateChange);
     }
   }
+
+  // Emit removals for keys present on the previous canvas but missing on the
+  // next canvas. Without this, clearing an optional field (e.g.
+  // backgroundColor, safeAreas, backgroundPdf) would fail to propagate and
+  // peers would keep a stale value.
+  for (const key of Object.keys(prevCanvas)) {
+    if (key in nextCanvas) continue;
+
+    out.push({
+      type: 'settings:update',
+      documentId: next.id,
+      path: `canvas.${key}`,
+      oldValue: prevCanvas[key],
+      newValue: undefined,
+    } satisfies SettingsUpdateChange);
+  }
 }
 
 function diffAnimations(prev: BroadsetDocument, next: BroadsetDocument, out: DocumentChange[]): void {
