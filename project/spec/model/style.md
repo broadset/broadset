@@ -10,6 +10,42 @@ Defines the shape and semantics of `BroadsetElementStyle` — the visual propert
 
 ## Requirements
 
+### Requirement: Color values use `BroadsetColor`
+
+Every color-valued style field on an element style or settings palette is a `BroadsetColor` — a discriminated union owned by [`packages/model/src/broadset-color.ts`](../../../packages/model/src/broadset-color.ts):
+
+```ts
+type BroadsetColor =
+  | { kind: 'rgb'; hex: `#${string}`; space?: BroadsetColorSpace; originalColor?: string }
+  | { kind: 'theme'; slot: ThemeSlot; mods?: ColorMods };
+
+type BroadsetColorSpace = 'srgb' | 'display-p3' | 'oklch' | 'oklab';
+type ThemeSlot =
+  | 'accent1' | 'accent2' | 'accent3' | 'accent4' | 'accent5' | 'accent6'
+  | 'lt1' | 'lt2' | 'dk1' | 'dk2' | 'hlink' | 'folHlink';
+type ColorMods = { lumMod?: number; lumOff?: number; tint?: number; shade?: number; alpha?: number };
+```
+
+`originalColor` preserves the source CSS string verbatim so non-sRGB inputs (`oklch(...)`, `color(display-p3 ...)`) round-trip without flattening; the `hex` field is always a canonical sRGB approximation. Theme references resolve through a `ThemePalette` at render or export time, with `mods` applied by `_shared/color/applyMods` (Phase 2).
+
+Per IO-D-05 in [decisions.md](../../implementation/decisions.md), Broadset MUST NOT silently downgrade color spaces or modifiers — preflight surfaces unsupported targets to the user.
+
+#### Acceptance Criteria
+
+- [ ] `BroadsetColor` is a discriminated union with `kind: 'rgb'` and `kind: 'theme'` branches
+- [ ] An RGB color preserves its source CSS string in `originalColor` when `space` is non-sRGB
+- [ ] A theme color references one of the 12 OOXML theme slots and is rejected for any other slot value
+- [ ] `ColorMods` values outside `[0, 1]` are rejected by validation
+- [ ] `colorToCss(themeColor, ctx)` throws when the resolution context lacks a `ThemePalette` (no silent downgrade)
+- [ ] `colorToCss(themeColorWithMods, ctx)` throws when `ctx.applyMods` is not provided (mods application is Phase 2 owned)
+- [ ] `parseColor(cssString)` returns a `BroadsetColor` for any sRGB / Color Level 4 CSS color literal accepted by `normalizeColor`
+
+#### Spec Gaps
+
+- Color-valued fields on `BroadsetElementStyle` (`fontColor`, `backgroundColor`, `borderColor`, `stroke`, `fill`, gradient stop colors) are still typed as `string` in the persisted model. Migration to `BroadsetColor` is the second commit of Phase 1 unit #3 — the type tables below describe the in-flight target shape.
+
+---
+
 ### Requirement: Opacity (Required)
 
 Every element MUST have `opacity`: a number in the range [0, 1] inclusive. This is the only required style property. Default: `1`. Values outside [0, 1] MUST be rejected by validation.
