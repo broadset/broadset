@@ -60,21 +60,21 @@ The model is in strong shape. The gaps are in (1) text model, (2) color model, (
 
 Ratify in [decisions.md](./decisions.md) during Phase 0 before any code lands.
 
-| # | Decision | Recommended resolution |
-|---|---|---|
-| IO-D-01 | **Runs, not HTML, for text storage.** | Structured runs + paragraphs are the canonical representation. PSD, PPTX, Word, Figma, Sketch, every typography engine uses runs. HTML↔runs translation is lossy both ways, and HTML from an attacker-supplied importer is the unsafe-DOM surface flagged in [typescript.instructions.md](../../agents/instructions/typescript.instructions.md). If HTML is needed at an export boundary (PDF text, clipboard, SVG `<foreignObject>`), serialize runs→HTML at that boundary — never let HTML into the store. |
-| IO-D-02 | **Bake-to-path for non-trivial affine transforms.** | Do not add `scale` or `skew` to elements. When an importer hits a transform that can't be expressed by `position` + `rotation`, convert the shape to a path and bake the transform into `d`. Matches user intuition; keeps the model small. |
-| IO-D-03 | **Structured filter primitives replace the CSS filter string.** | The `filter`/`backdropFilter` strings on style today become a discriminated union of filter primitives (`drop-shadow`, `blur`, `color-matrix`, …). Renderer derives the CSS string view. Canonical form is typed primitives, not strings. |
-| IO-D-04 | **`fill` becomes a discriminated union.** | `{ kind: 'none' } \| { kind: 'solid'; color } \| { kind: 'gradient'; gradient } \| { kind: 'pattern'; … } \| { kind: 'picture'; assetId; mode: 'stretch' \| 'tile'; preserveAspectRatio?; tile? }`. Cleaner than bolting fill types onto flat color fields. No cropping in the model — importers bake crops into the source image on import. |
-| IO-D-05 | **Color becomes a discriminated union; never silently downgrade color space.** | `{ kind: 'rgb'; hex } \| { kind: 'theme'; slot; mods? }`. Unlocks PPTX theme-color round-trip, and color-space-preserving stops for SVG/PDF when `kind: 'rgb'` is extended with optional `space` and `originalColor` preservation strings. Export rule: when the target format cannot represent the source color space (e.g. OKLCH → PPTX sRGB), preserve `originalColor` on re-import and surface a preflight warning. No silent flattening to sRGB hex. |
-| IO-D-06 | **`TextRun[]` as type now, editor support staged.** | Land the paragraphs/runs types with Phase 1 so every importer has somewhere to put mixed-run text. Full run-edit UI lands in Phase 5. Imported multi-run text editable only at whole-element level until the UI lands — surfaced via a "this text has multiple runs" modal. |
-| IO-D-07 | **Cross-format logic lives under `packages/formats/src/_shared/`; format-specific libraries may be imported directly.** | `_shared/*` is for logic or library wrappers that serve ≥2 formats (color math, font subsetting, XMP parsing, reconcile, fingerprint, sanitize, shape-classifier, text-layout). Not a separate package — keeps the change surface small. Format-only libraries (`pdf-lib`, `pdfjs-dist`, `ag-psd`, `svgpath`, `css-tree`, `transformation-matrix`, `fflate`, `svgo`, …) are imported directly by the format package that needs them — no pointless wrapper. If a format's "private" library later turns out to be shared, factor into `_shared/` when the second consumer lands, not before. |
-| IO-D-08 | **`broadset:` XMP namespace shared across carriers.** | Same XMP namespace in PDF XMP, PSD XMP, SVG `<metadata>`, TIFF XMP. Downstream tooling sees one Broadset footprint regardless of container. |
-| IO-D-09 | **`@font-face` embedding is the default for Broadset-owned exports.** | SVG export, PDF export, and PPTX export embed subsetted fonts by default. `reference` / `flatten` are opt-ins per-format. |
-| IO-D-10 | **Properties-panel exposure gates every new round-trippable field.** | No shipping a model field without a user-editable UI on it, except fields explicitly documented as "imported-only, no UI surface" (e.g. low-level filter primitives a user would never hand-author). Principle: if the user can import it but can't edit it, round-trip through editing is broken. |
+| #       | Decision                                                                                                                         | Recommended resolution                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IO-D-01 | **Runs, not HTML, for text storage.**                                                                                            | Structured runs + paragraphs are the canonical representation. PSD, PPTX, Word, Figma, Sketch, every typography engine uses runs. HTML↔runs translation is lossy both ways, and HTML from an attacker-supplied importer is the unsafe-DOM surface flagged in [typescript.instructions.md](../../agents/instructions/typescript.instructions.md). If HTML is needed at an export boundary (PDF text, clipboard, SVG `<foreignObject>`), serialize runs→HTML at that boundary — never let HTML into the store.                                                                                                                                                                 |
+| IO-D-02 | **Bake-to-path for non-trivial affine transforms.**                                                                              | Do not add `scale` or `skew` to elements. When an importer hits a transform that can't be expressed by `position` + `rotation`, convert the shape to a path and bake the transform into `d`. Matches user intuition; keeps the model small.                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| IO-D-03 | **Structured filter primitives replace the CSS filter string.**                                                                  | The `filter`/`backdropFilter` strings on style today become a discriminated union of filter primitives (`drop-shadow`, `blur`, `color-matrix`, …). Renderer derives the CSS string view. Canonical form is typed primitives, not strings.                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| IO-D-04 | **`fill` becomes a discriminated union.**                                                                                        | `{ kind: 'none' } \| { kind: 'solid'; color } \| { kind: 'gradient'; gradient } \| { kind: 'pattern'; … } \| { kind: 'picture'; assetId; mode: 'stretch' \| 'tile'; preserveAspectRatio?; tile? }`. Cleaner than bolting fill types onto flat color fields. No cropping in the model — importers bake crops into the source image on import.                                                                                                                                                                                                                                                                                                                                 |
+| IO-D-05 | **Color becomes a discriminated union; never silently downgrade color space.**                                                   | `{ kind: 'rgb'; hex } \| { kind: 'theme'; slot; mods? }`. Unlocks PPTX theme-color round-trip, and color-space-preserving stops for SVG/PDF when `kind: 'rgb'` is extended with optional `space` and `originalColor` preservation strings. Export rule: when the target format cannot represent the source color space (e.g. OKLCH → PPTX sRGB), preserve `originalColor` on re-import and surface a preflight warning. No silent flattening to sRGB hex.                                                                                                                                                                                                                    |
+| IO-D-06 | **`TextRun[]` as type now, editor support staged.**                                                                              | Land the paragraphs/runs types with Phase 1 so every importer has somewhere to put mixed-run text. Full run-edit UI lands in Phase 5. Imported multi-run text editable only at whole-element level until the UI lands — surfaced via a "this text has multiple runs" modal.                                                                                                                                                                                                                                                                                                                                                                                                  |
+| IO-D-07 | **Cross-format logic lives under `packages/formats/src/_shared/`; format-specific libraries may be imported directly.**          | `_shared/*` is for logic or library wrappers that serve ≥2 formats (color math, font subsetting, XMP parsing, reconcile, fingerprint, sanitize, shape-classifier, text-layout). Not a separate package — keeps the change surface small. Format-only libraries (`pdf-lib`, `pdfjs-dist`, `ag-psd`, `svgpath`, `css-tree`, `transformation-matrix`, `fflate`, `svgo`, …) are imported directly by the format package that needs them — no pointless wrapper. If a format's "private" library later turns out to be shared, factor into `_shared/` when the second consumer lands, not before.                                                                                 |
+| IO-D-08 | **`broadset:` XMP namespace shared across carriers.**                                                                            | Same XMP namespace in PDF XMP, PSD XMP, SVG `<metadata>`, TIFF XMP. Downstream tooling sees one Broadset footprint regardless of container.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| IO-D-09 | **`@font-face` embedding is the default for Broadset-owned exports.**                                                            | SVG export, PDF export, and PPTX export embed subsetted fonts by default. `reference` / `flatten` are opt-ins per-format.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| IO-D-10 | **Properties-panel exposure gates every new round-trippable field.**                                                             | No shipping a model field without a user-editable UI on it, except fields explicitly documented as "imported-only, no UI surface" (e.g. low-level filter primitives a user would never hand-author). Principle: if the user can import it but can't edit it, round-trip through editing is broken.                                                                                                                                                                                                                                                                                                                                                                           |
 | IO-D-16 | **Animation export policy: emit the fully-entered "IN" state; discard animations that don't map to the target format natively.** | Exporters render each element in its fully-entered state — the visual state where all entry keyframes have completed and no exit keyframe has started, i.e. the resting composition a viewer would see mid-presentation. Animation data itself is **not** serialized into the target file unless the format supports animations natively and the Broadset animation maps cleanly onto the format's own model (e.g. PPTX `<p:timing>` for mappable entries). Unmappable animations are discarded silently on export; the `.bsp` remains the source of truth. No XMP / custom-XML / `<metadata>` round-trip for animation data. Documented as known-lossy in each format spec. |
-| IO-D-17 | **No sidecars. Standards-only round-trip carriers.** | Every format's round-trip metadata lives inside the format file using mechanisms the format's native specification already documents: PDF XMP + marked content, PSD XMP + `additionalInfo`, PPTX `<p:extLst>` + custom XML parts + shape names, SVG `<metadata>` RDF + `data-bs-*` + namespaced attributes. No out-of-package sidecar JSON, no embedded-file attachments used as sidecars, no app-private streams outside the format's own documented extension mechanism. This makes Broadset exports survive any chain where the intermediate tool respects the format's own spec. |
-| IO-D-18 | **No silent drops. Unknown content preserved as `extensions.<format>.raw` or opaque fragment.** | Every importer either maps a source construct to a native Broadset element, or preserves the raw source fragment for lossless re-emission when the element's `extensions.<format>.dirty === false`. SVG uses opaque `svg`-type elements; PDF/PSD/PPTX use `extensions.<format>.raw` under the typed-namespace contract. Every preservation path emits a warning in the import report. Enforced by tests in each format plan's Phase 5. |
+| IO-D-17 | **No sidecars. Standards-only round-trip carriers.**                                                                             | Every format's round-trip metadata lives inside the format file using mechanisms the format's native specification already documents: PDF XMP + marked content, PSD XMP + `additionalInfo`, PPTX `<p:extLst>` + custom XML parts + shape names, SVG `<metadata>` RDF + `data-bs-*` + namespaced attributes. No out-of-package sidecar JSON, no embedded-file attachments used as sidecars, no app-private streams outside the format's own documented extension mechanism. This makes Broadset exports survive any chain where the intermediate tool respects the format's own spec.                                                                                         |
+| IO-D-18 | **No silent drops. Unknown content preserved as `extensions.<format>.raw` or opaque fragment.**                                  | Every importer either maps a source construct to a native Broadset element, or preserves the raw source fragment for lossless re-emission when the element's `extensions.<format>.dirty === false`. SVG uses opaque `svg`-type elements; PDF/PSD/PPTX use `extensions.<format>.raw` under the typed-namespace contract. Every preservation path emits a warning in the import report. Enforced by tests in each format plan's Phase 5.                                                                                                                                                                                                                                       |
 
 ## Phase plan
 
@@ -111,13 +111,17 @@ Every bullet updates [project/spec/model/](../spec/model/) in the same commit as
   };
   type Run = { readonly text: string; readonly props?: RunProps };
   type RunProps = Partial<TextStyle> & {
-    readonly lang?: string;            // BCP 47
+    readonly lang?: string; // BCP 47
     readonly hyperlink?: { url: string; tooltip?: string; target?: '_blank' | '_self' };
   };
   type Bullet =
     | { kind: 'none' }
     | { kind: 'char'; char: string; font?: string; color?: BroadsetColor }
-    | { kind: 'auto'; format: 'arabicPeriod' | 'arabicParenR' | 'romanUcPeriod' | 'alphaLcPeriod' | string; startAt?: number };
+    | {
+        kind: 'auto';
+        format: 'arabicPeriod' | 'arabicParenR' | 'romanUcPeriod' | 'alphaLcPeriod' | string;
+        startAt?: number;
+      };
   ```
 
 - Validator: reject overlapping runs, negative offsets, and empty paragraphs. Spec gap: paragraph count upper bound (TBD after fixture analysis).
@@ -131,8 +135,19 @@ Every bullet updates [project/spec/model/](../spec/model/) in the same commit as
 type BroadsetColor =
   | { kind: 'rgb'; hex: `#${string}`; space?: 'srgb' | 'display-p3' | 'oklch' | 'oklab'; originalColor?: string }
   | { kind: 'theme'; slot: ThemeSlot; mods?: ColorMods };
-type ThemeSlot = 'accent1' | 'accent2' | 'accent3' | 'accent4' | 'accent5' | 'accent6'
-               | 'lt1' | 'lt2' | 'dk1' | 'dk2' | 'hlink' | 'folHlink';
+type ThemeSlot =
+  | 'accent1'
+  | 'accent2'
+  | 'accent3'
+  | 'accent4'
+  | 'accent5'
+  | 'accent6'
+  | 'lt1'
+  | 'lt2'
+  | 'dk1'
+  | 'dk2'
+  | 'hlink'
+  | 'folHlink';
 type ColorMods = { lumMod?: number; lumOff?: number; tint?: number; shade?: number; alpha?: number };
 ```
 
@@ -146,8 +161,19 @@ type BroadsetFill =
   | { kind: 'none' }
   | { kind: 'solid'; color: BroadsetColor }
   | { kind: 'gradient'; gradient: BroadsetGradient }
-  | { kind: 'pattern'; assetId: string; repeat?: 'repeat' | 'repeat-x' | 'repeat-y' | 'no-repeat'; transform?: AffineMatrix }
-  | { kind: 'picture'; assetId: string; mode: 'stretch' | 'tile'; preserveAspectRatio?: 'none' | 'meet' | 'slice'; tile?: TileInfo };
+  | {
+      kind: 'pattern';
+      assetId: string;
+      repeat?: 'repeat' | 'repeat-x' | 'repeat-y' | 'no-repeat';
+      transform?: AffineMatrix;
+    }
+  | {
+      kind: 'picture';
+      assetId: string;
+      mode: 'stretch' | 'tile';
+      preserveAspectRatio?: 'none' | 'meet' | 'slice';
+      tile?: TileInfo;
+    };
 ```
 
 - Picture fill: rectangles/ellipses/paths can reference an image asset as their fill (PPTX `<a:blipFill>`, SVG `<image>`-in-pattern, PDF tiling patterns). Stretch or tile modes only; no cropping. Importers that arrive with crop information bake the crop into the source image on import so the stored asset is already cropped — no downstream complexity.
@@ -172,9 +198,12 @@ Replace `filter: string` and `backdropFilter: string` with:
 type FilterPrimitive =
   | { kind: 'drop-shadow'; offsetX: number; offsetY: number; blur: number; color: BroadsetColor }
   | { kind: 'blur'; stdDeviation: number }
-  | { kind: 'color-matrix'; matrix: readonly number[] }          // 4x5 or 5x5
-  | { kind: 'brightness' | 'contrast' | 'saturate' | 'hue-rotate' | 'grayscale' | 'sepia' | 'invert' | 'opacity'; amount: number }
-  | { kind: 'custom-svg'; svg: string };                          // escape hatch
+  | { kind: 'color-matrix'; matrix: readonly number[] } // 4x5 or 5x5
+  | {
+      kind: 'brightness' | 'contrast' | 'saturate' | 'hue-rotate' | 'grayscale' | 'sepia' | 'invert' | 'opacity';
+      amount: number;
+    }
+  | { kind: 'custom-svg'; svg: string }; // escape hatch
 type FilterStack = readonly FilterPrimitive[];
 ```
 
@@ -232,18 +261,18 @@ All cross-format dependencies added in a single commit so the lazy-load graph is
 
 **Library additions**
 
-| Library | Wrapping module | Lazy? |
-|---|---|---|
-| `culori` | `_shared/color` | Eager (small, always used) |
-| `lcms-wasm` | `_shared/color` | Lazy — first CMYK/Lab call |
-| `fontkit` | `_shared/fonts` | Eager (every text path) |
-| `linebreak` | `_shared/text-layout` | Eager (every wrap) |
-| `bidi-js` | `_shared/text-layout` | Eager (every text path) |
-| `harfbuzzjs` | `_shared/text-layout` | Lazy — first non-Latin shape |
-| `fast-xml-parser` | `_shared/xmp` | Eager (import only; export writes RDF/XML as a string) |
-| `xxhash-wasm` | `_shared/fingerprint` | Eager (small) |
-| `microdiff` | `_shared/reconcile` | Eager (~1 KB) |
-| `dompurify` | `_shared/sanitize` | Eager (every SVG/`svg`-type path) |
+| Library           | Wrapping module       | Lazy?                                                  |
+| ----------------- | --------------------- | ------------------------------------------------------ |
+| `culori`          | `_shared/color`       | Eager (small, always used)                             |
+| `lcms-wasm`       | `_shared/color`       | Lazy — first CMYK/Lab call                             |
+| `fontkit`         | `_shared/fonts`       | Eager (every text path)                                |
+| `linebreak`       | `_shared/text-layout` | Eager (every wrap)                                     |
+| `bidi-js`         | `_shared/text-layout` | Eager (every text path)                                |
+| `harfbuzzjs`      | `_shared/text-layout` | Lazy — first non-Latin shape                           |
+| `fast-xml-parser` | `_shared/xmp`         | Eager (import only; export writes RDF/XML as a string) |
+| `xxhash-wasm`     | `_shared/fingerprint` | Eager (small)                                          |
+| `microdiff`       | `_shared/reconcile`   | Eager (~1 KB)                                          |
+| `dompurify`       | `_shared/sanitize`    | Eager (every SVG/`svg`-type path)                      |
 
 Bundle-size assertion test in Phase 2 ensures Latin-only sRGB users never download `lcms-wasm` or `harfbuzzjs`.
 
@@ -365,60 +394,60 @@ One-time scaffolding every format plan's fixture corpus relies on.
 
 Which prereqs phase unblocks which format-plan phase. Read each format plan together with its row here — no bullet in any format plan should land before its prereq has shipped.
 
-| Format plan phase | Needs from this plan |
-|---|---|
-| **PSD Phase 0 (spec)** | Phase 0 decisions. |
-| **PSD Phase 1 (types + deps spike)** | Phase 1 text model + `BroadsetColor` + `BroadsetFill` + structured filter primitives + extensions typing + dirty flag + content hash + importer contract; Phase 2 `color` + `fonts` + `text-layout` + `xmp` + `fingerprint` + `reconcile` + `shape-classifier` shared modules. (No `sanitize` — PSD stores text as runs, not HTML; nothing foreign enters via PSD.) |
-| **PSD Phase 2a (parity rebuild)** | Phase 3 renderer refactor (native filter primitives; nested group composition). |
-| **PSD Phase 2b (surpass prior art)** | Phase 4 asset pipeline (font asset type, image bytes, subsetting, embed-permission, ICC preservation, content-hash dedup); Phase 5 run-edit UI (PSD text-run round-trip is meaningless without run editing), swatches + ICC picker, export options modal. |
-| **PSD Phase 3a (XMP + additionalInfo fast-path)** | Phase 1 content hash; Phase 2 `xmp` + `fingerprint` + `reconcile`. |
-| **PSD Phase 3b (layer-level extraction)** | Phase 2 `shape-classifier`; Phase 5 "Imported from PSD" staging page. |
-| **PSD Phase 4 (reconciliation)** | Phase 2 `reconcile` + `fingerprint`; Phase 5 diff view + deletion-confirmation modal + conflict indicators. |
-| **PSD Phase 5 (tests)** | Phase 6 external-tool fixture convention + `assertReImportableBy` + chain CT harness + preserved-blob stress test. |
-| **PSD Phase 6 (UI wiring)** | Phase 5 import dispatcher + export options modal + import-warnings modal + reconciliation UI. |
-| **PDF Phase 1 (types + pdf-lib swap)** | Phase 0 decisions; Phase 1 text model + `BroadsetColor` + `BroadsetFill` + structured filter primitives + canvas bleed/trim/safe-area + document metadata + extensions typing + dirty flag + content hash + unit utilities; Phase 2 `color` + `fonts` + `text-layout` + `xmp` + `fingerprint` + `reconcile` + `shape-classifier` shared modules. |
-| **PDF Phase 2a (export parity)** | Phase 1 font asset type, structured filters, picture fill, per-corner radii, unit utilities; Phase 3 renderer refactor (per-corner radii, safe DOM-builder, nested group composition); Phase 4 custom font upload, subsetting, embed-permission surface; Phase 5 clip-path editor, per-corner radii UI. |
-| **PDF Phase 2b (surpass prior art)** | Phase 1 color union, ICC preservation, canvas bleed/trim/safe-area, document metadata; Phase 2 `color` module with `lcms-wasm`; Phase 4 image bytes + ICC preservation; Phase 5 color-mode selector, swatches, gradient editor, gamut warnings, preflight, export options modal, multi-page sorter, bleed guides, document metadata editor. |
-| **PDF Phase 3a (XMP fast-path)** | Phase 1 content hash; Phase 2 `xmp` + `fingerprint` + `reconcile`. |
-| **PDF Phase 3b (operator-level)** | Phase 2 `shape-classifier`; Phase 5 "Imported from PDF" staging page. |
-| **PDF Phase 4 (reconciliation)** | Phase 2 `reconcile`; Phase 5 diff view + deletion-confirmation modal + conflict indicators. |
-| **PDF Phase 5 (tests)** | Phase 6 external-tool fixture convention + `assertReImportableBy` + chain CT harness + preserved-blob stress test. |
-| **PDF Phase 6 (UI wiring)** | Phase 5 import dispatcher + export options modal + preflight + inline preview. |
-| **PDF/A-2b compliance pass** (see [pdf-pdfa-compliance-plan.md](./pdf-pdfa-compliance-plan.md)) | Phase 1 `document.outputIntent`; Phase 2 `_shared/color/defaultProfiles/` (bundled sRGB/SWOP/Gray); Phase 2 `_shared/fonts/getGlyphToUnicodeMap()`; Phase 4 `icc-profile` asset type; Phase 5 output-intent picker in canvas settings. PDF/A-specific work (veraPDF in CI, LZW/JS/encryption strip, transparency group declarations, standard-14 font refusal, `pdfaid:` XMP, `/ID` trailer, annotation appearance streams) stays in the followup plan. |
-| **PPTX Phase 1 (types + deps swap)** | Phase 0 decisions; Phase 1 text model (runs + hyperlinks + lang + bullets), `BroadsetColor` (theme slots + mods), `BroadsetFill` (picture variant), `BroadsetGradientStop.mods`, stroke arrow ends, `Page.notes`, extensions typing + dirty flag, content hash; Phase 2 `color` + `fonts` + `xmp` + `fingerprint` + `reconcile` + `shape-classifier` shared modules. |
-| **PPTX Phase 2a (export parity)** | Phase 1 text runs + hyperlinks + lang + bullets; Phase 3 renderer (nested group transform composition — "groups stay groups"); Phase 4 font subsetting + embed-permission; Phase 5 run-edit UI + bullets editor. |
-| **PPTX Phase 2b (generated theme)** | Phase 1 color union (theme slots + mods), `Page.notes`, document metadata; Phase 4 image bytes; Phase 5 swatches + theme-aware color picker + document metadata editor + export options modal. |
-| **PPTX Phase 3a (fast-path)** | Phase 1 content hash; Phase 2 `xmp` + `fingerprint` + `reconcile`. |
-| **PPTX Phase 3b (operator-level)** | Phase 1 text runs + theme colors + picture fill + gradient mods; Phase 2 `shape-classifier`; Phase 5 picture-fill picker + "Imported from PPTX" staging page. |
-| **PPTX Phase 4 (reconciliation)** | Phase 2 `reconcile`; Phase 5 diff view + deletion-confirmation modal + conflict indicators. |
-| **PPTX Phase 5 (tests)** | Phase 6 external-tool fixture convention + `assertReImportableBy` + chain CT harness + preserved-blob stress test. |
-| **PPTX Phase 6 (UI wiring)** | Phase 5 import dispatcher + export options modal + import-warnings modal. |
-| **PPTX degradation items (tables, charts, connectors, transitions, comments, pattern fill, arrowheads)** | Phase 1 extensions typing + dirty flag — preserved blobs ride under typed namespaces. `Page.notes` lands in Phase 1. Arrowheads land in Phase 1 stroke additions. |
-| **SVG Phase 0 (spec)** | Phase 0 decisions. |
-| **SVG Phase 1 (types + arch)** | Phase 0 decisions + Phase 1 model additions (text runs, `BroadsetColor`, `BroadsetFill`, strokeMiterlimit, structured filter primitives, content hash, unit utilities) + Phase 2 `_shared/*` modules (SVG types reference both). |
-| **SVG Phase 2a (parity + critical-bug fix)** | Phase 1 strokeMiterlimit, content hash, script rejection, unit utilities; Phase 2 `sanitize`; Phase 3 safe DOM-builder. |
-| **SVG Phase 2b (surpass prior art)** | Phase 1 conic center/angle, color union with space preservation, structured filter primitives, pattern fill, text fidelity fields; Phase 2 `color` + `fonts` + `text-layout` + `xmp`; Phase 3 renderer native paths + font-asset awareness; Phase 4 font asset + subsetting + image bytes + dedup. |
-| **SVG Phase 3a (metadata fast-path)** | Phase 1 content hash; Phase 2 `xmp` + `fingerprint` + `sanitize` + `reconcile`. |
-| **SVG Phase 3b (arbitrary SVG)** | Phase 2 `shape-classifier` + `sanitize`; Phase 5 "Imported from SVG" staging page. |
-| **SVG Phase 4 (reconciliation)** | Phase 2 `reconcile` + `fingerprint`; Phase 5 diff view + deletion-confirmation modal + conflict indicators. |
-| **SVG Phase 5 (tests)** | Phase 6 external-tool fixture convention + `assertReImportableBy` + chain CT harness + preserved-blob stress test. |
-| **SVG Phase 6 (UI wiring)** | Phase 5 stroke subpanel, gradient editor, filter editor, pattern picker, text fidelity subpanel, font-asset picker, import-warnings modal, import dispatcher + export options modal. |
+| Format plan phase                                                                                        | Needs from this plan                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PSD Phase 0 (spec)**                                                                                   | Phase 0 decisions.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **PSD Phase 1 (types + deps spike)**                                                                     | Phase 1 text model + `BroadsetColor` + `BroadsetFill` + structured filter primitives + extensions typing + dirty flag + content hash + importer contract; Phase 2 `color` + `fonts` + `text-layout` + `xmp` + `fingerprint` + `reconcile` + `shape-classifier` shared modules. (No `sanitize` — PSD stores text as runs, not HTML; nothing foreign enters via PSD.)                                                                                     |
+| **PSD Phase 2a (parity rebuild)**                                                                        | Phase 3 renderer refactor (native filter primitives; nested group composition).                                                                                                                                                                                                                                                                                                                                                                         |
+| **PSD Phase 2b (surpass prior art)**                                                                     | Phase 4 asset pipeline (font asset type, image bytes, subsetting, embed-permission, ICC preservation, content-hash dedup); Phase 5 run-edit UI (PSD text-run round-trip is meaningless without run editing), swatches + ICC picker, export options modal.                                                                                                                                                                                               |
+| **PSD Phase 3a (XMP + additionalInfo fast-path)**                                                        | Phase 1 content hash; Phase 2 `xmp` + `fingerprint` + `reconcile`.                                                                                                                                                                                                                                                                                                                                                                                      |
+| **PSD Phase 3b (layer-level extraction)**                                                                | Phase 2 `shape-classifier`; Phase 5 "Imported from PSD" staging page.                                                                                                                                                                                                                                                                                                                                                                                   |
+| **PSD Phase 4 (reconciliation)**                                                                         | Phase 2 `reconcile` + `fingerprint`; Phase 5 diff view + deletion-confirmation modal + conflict indicators.                                                                                                                                                                                                                                                                                                                                             |
+| **PSD Phase 5 (tests)**                                                                                  | Phase 6 external-tool fixture convention + `assertReImportableBy` + chain CT harness + preserved-blob stress test.                                                                                                                                                                                                                                                                                                                                      |
+| **PSD Phase 6 (UI wiring)**                                                                              | Phase 5 import dispatcher + export options modal + import-warnings modal + reconciliation UI.                                                                                                                                                                                                                                                                                                                                                           |
+| **PDF Phase 1 (types + pdf-lib swap)**                                                                   | Phase 0 decisions; Phase 1 text model + `BroadsetColor` + `BroadsetFill` + structured filter primitives + canvas bleed/trim/safe-area + document metadata + extensions typing + dirty flag + content hash + unit utilities; Phase 2 `color` + `fonts` + `text-layout` + `xmp` + `fingerprint` + `reconcile` + `shape-classifier` shared modules.                                                                                                        |
+| **PDF Phase 2a (export parity)**                                                                         | Phase 1 font asset type, structured filters, picture fill, per-corner radii, unit utilities; Phase 3 renderer refactor (per-corner radii, safe DOM-builder, nested group composition); Phase 4 custom font upload, subsetting, embed-permission surface; Phase 5 clip-path editor, per-corner radii UI.                                                                                                                                                 |
+| **PDF Phase 2b (surpass prior art)**                                                                     | Phase 1 color union, ICC preservation, canvas bleed/trim/safe-area, document metadata; Phase 2 `color` module with `lcms-wasm`; Phase 4 image bytes + ICC preservation; Phase 5 color-mode selector, swatches, gradient editor, gamut warnings, preflight, export options modal, multi-page sorter, bleed guides, document metadata editor.                                                                                                             |
+| **PDF Phase 3a (XMP fast-path)**                                                                         | Phase 1 content hash; Phase 2 `xmp` + `fingerprint` + `reconcile`.                                                                                                                                                                                                                                                                                                                                                                                      |
+| **PDF Phase 3b (operator-level)**                                                                        | Phase 2 `shape-classifier`; Phase 5 "Imported from PDF" staging page.                                                                                                                                                                                                                                                                                                                                                                                   |
+| **PDF Phase 4 (reconciliation)**                                                                         | Phase 2 `reconcile`; Phase 5 diff view + deletion-confirmation modal + conflict indicators.                                                                                                                                                                                                                                                                                                                                                             |
+| **PDF Phase 5 (tests)**                                                                                  | Phase 6 external-tool fixture convention + `assertReImportableBy` + chain CT harness + preserved-blob stress test.                                                                                                                                                                                                                                                                                                                                      |
+| **PDF Phase 6 (UI wiring)**                                                                              | Phase 5 import dispatcher + export options modal + preflight + inline preview.                                                                                                                                                                                                                                                                                                                                                                          |
+| **PDF/A-2b compliance pass** (see [pdf-pdfa-compliance-plan.md](./pdf-pdfa-compliance-plan.md))          | Phase 1 `document.outputIntent`; Phase 2 `_shared/color/defaultProfiles/` (bundled sRGB/SWOP/Gray); Phase 2 `_shared/fonts/getGlyphToUnicodeMap()`; Phase 4 `icc-profile` asset type; Phase 5 output-intent picker in canvas settings. PDF/A-specific work (veraPDF in CI, LZW/JS/encryption strip, transparency group declarations, standard-14 font refusal, `pdfaid:` XMP, `/ID` trailer, annotation appearance streams) stays in the followup plan. |
+| **PPTX Phase 1 (types + deps swap)**                                                                     | Phase 0 decisions; Phase 1 text model (runs + hyperlinks + lang + bullets), `BroadsetColor` (theme slots + mods), `BroadsetFill` (picture variant), `BroadsetGradientStop.mods`, stroke arrow ends, `Page.notes`, extensions typing + dirty flag, content hash; Phase 2 `color` + `fonts` + `xmp` + `fingerprint` + `reconcile` + `shape-classifier` shared modules.                                                                                    |
+| **PPTX Phase 2a (export parity)**                                                                        | Phase 1 text runs + hyperlinks + lang + bullets; Phase 3 renderer (nested group transform composition — "groups stay groups"); Phase 4 font subsetting + embed-permission; Phase 5 run-edit UI + bullets editor.                                                                                                                                                                                                                                        |
+| **PPTX Phase 2b (generated theme)**                                                                      | Phase 1 color union (theme slots + mods), `Page.notes`, document metadata; Phase 4 image bytes; Phase 5 swatches + theme-aware color picker + document metadata editor + export options modal.                                                                                                                                                                                                                                                          |
+| **PPTX Phase 3a (fast-path)**                                                                            | Phase 1 content hash; Phase 2 `xmp` + `fingerprint` + `reconcile`.                                                                                                                                                                                                                                                                                                                                                                                      |
+| **PPTX Phase 3b (operator-level)**                                                                       | Phase 1 text runs + theme colors + picture fill + gradient mods; Phase 2 `shape-classifier`; Phase 5 picture-fill picker + "Imported from PPTX" staging page.                                                                                                                                                                                                                                                                                           |
+| **PPTX Phase 4 (reconciliation)**                                                                        | Phase 2 `reconcile`; Phase 5 diff view + deletion-confirmation modal + conflict indicators.                                                                                                                                                                                                                                                                                                                                                             |
+| **PPTX Phase 5 (tests)**                                                                                 | Phase 6 external-tool fixture convention + `assertReImportableBy` + chain CT harness + preserved-blob stress test.                                                                                                                                                                                                                                                                                                                                      |
+| **PPTX Phase 6 (UI wiring)**                                                                             | Phase 5 import dispatcher + export options modal + import-warnings modal.                                                                                                                                                                                                                                                                                                                                                                               |
+| **PPTX degradation items (tables, charts, connectors, transitions, comments, pattern fill, arrowheads)** | Phase 1 extensions typing + dirty flag — preserved blobs ride under typed namespaces. `Page.notes` lands in Phase 1. Arrowheads land in Phase 1 stroke additions.                                                                                                                                                                                                                                                                                       |
+| **SVG Phase 0 (spec)**                                                                                   | Phase 0 decisions.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **SVG Phase 1 (types + arch)**                                                                           | Phase 0 decisions + Phase 1 model additions (text runs, `BroadsetColor`, `BroadsetFill`, strokeMiterlimit, structured filter primitives, content hash, unit utilities) + Phase 2 `_shared/*` modules (SVG types reference both).                                                                                                                                                                                                                        |
+| **SVG Phase 2a (parity + critical-bug fix)**                                                             | Phase 1 strokeMiterlimit, content hash, script rejection, unit utilities; Phase 2 `sanitize`; Phase 3 safe DOM-builder.                                                                                                                                                                                                                                                                                                                                 |
+| **SVG Phase 2b (surpass prior art)**                                                                     | Phase 1 conic center/angle, color union with space preservation, structured filter primitives, pattern fill, text fidelity fields; Phase 2 `color` + `fonts` + `text-layout` + `xmp`; Phase 3 renderer native paths + font-asset awareness; Phase 4 font asset + subsetting + image bytes + dedup.                                                                                                                                                      |
+| **SVG Phase 3a (metadata fast-path)**                                                                    | Phase 1 content hash; Phase 2 `xmp` + `fingerprint` + `sanitize` + `reconcile`.                                                                                                                                                                                                                                                                                                                                                                         |
+| **SVG Phase 3b (arbitrary SVG)**                                                                         | Phase 2 `shape-classifier` + `sanitize`; Phase 5 "Imported from SVG" staging page.                                                                                                                                                                                                                                                                                                                                                                      |
+| **SVG Phase 4 (reconciliation)**                                                                         | Phase 2 `reconcile` + `fingerprint`; Phase 5 diff view + deletion-confirmation modal + conflict indicators.                                                                                                                                                                                                                                                                                                                                             |
+| **SVG Phase 5 (tests)**                                                                                  | Phase 6 external-tool fixture convention + `assertReImportableBy` + chain CT harness + preserved-blob stress test.                                                                                                                                                                                                                                                                                                                                      |
+| **SVG Phase 6 (UI wiring)**                                                                              | Phase 5 stroke subpanel, gradient editor, filter editor, pattern picker, text fidelity subpanel, font-asset picker, import-warnings modal, import dispatcher + export options modal.                                                                                                                                                                                                                                                                    |
 
 ## Degradation items — preserved through `extensions`
 
 For features that are too large to build natively in this plan's scope but still need to round-trip when unedited, the pattern is: import preserves the raw format blob under `extensions.<format>.*`, dirty flag starts `false`, re-export re-emits the blob verbatim when the flag is still `false`. Once a feature graduates to a first-class model type, it stops using the preservation path.
 
-| Feature | Preservation key | Graduation path |
-|---|---|---|
-| Tables (PPTX `<a:tbl>`) | `extensions.pptx.table` | First-class `table` element — major model change, tracked separately. |
-| Charts (PPTX `<c:chart>`) | `extensions.pptx.chart` | First-class `chart` element — major model change. Until then, render embedded fallback PNG. |
-| Connectors (PPTX `<p:cxnSp>`) | `extensions.pptx.connector` | First-class connector with endpoint references + reflow. Defer until editor supports drag-endpoint UX. |
-| Page transitions (PPTX) | `extensions.pptx.transition` on `Page` | Low priority; PPTX-specific. |
-| Comments / annotations | `extensions.<format>.comments` | Cross-cutting collaboration feature — tracked separately. |
-| Unknown OOXML shapes | `extensions.pptx.raw` | Preserved indefinitely; never graduates (unknown-by-definition). |
-| Unknown PDF operator sequences | `extensions.pdf.raw` | Preserved indefinitely for text/image extraction fallback. |
-| Unknown PSD layer effects | `extensions.psd.raw` | Some effects may graduate as the filter primitives list grows. |
-| Speaker notes (until `Page.notes` lands) | `extensions.pptx.notes` on `Page` | Graduates to `Page.notes` in Phase 1. |
+| Feature                                  | Preservation key                       | Graduation path                                                                                        |
+| ---------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Tables (PPTX `<a:tbl>`)                  | `extensions.pptx.table`                | First-class `table` element — major model change, tracked separately.                                  |
+| Charts (PPTX `<c:chart>`)                | `extensions.pptx.chart`                | First-class `chart` element — major model change. Until then, render embedded fallback PNG.            |
+| Connectors (PPTX `<p:cxnSp>`)            | `extensions.pptx.connector`            | First-class connector with endpoint references + reflow. Defer until editor supports drag-endpoint UX. |
+| Page transitions (PPTX)                  | `extensions.pptx.transition` on `Page` | Low priority; PPTX-specific.                                                                           |
+| Comments / annotations                   | `extensions.<format>.comments`         | Cross-cutting collaboration feature — tracked separately.                                              |
+| Unknown OOXML shapes                     | `extensions.pptx.raw`                  | Preserved indefinitely; never graduates (unknown-by-definition).                                       |
+| Unknown PDF operator sequences           | `extensions.pdf.raw`                   | Preserved indefinitely for text/image extraction fallback.                                             |
+| Unknown PSD layer effects                | `extensions.psd.raw`                   | Some effects may graduate as the filter primitives list grows.                                         |
+| Speaker notes (until `Page.notes` lands) | `extensions.pptx.notes` on `Page`      | Graduates to `Page.notes` in Phase 1.                                                                  |
 
 ## Sequencing
 
@@ -467,12 +496,12 @@ Steps (1), (2), (4), (5), (10), (11), (12), (13), (14), (15), (16) are small-to-
 
 Inventory taken against the current `main`-equivalent tree. Numbers will drift as commits land; they inform sizing, not acceptance.
 
-| Area | Files | Occurrences | Notes |
-|---|---|---|---|
-| Color / fill literals (`backgroundColor`, `fontColor`, `fill: '#…'`) | 69 | 233 | Heaviest: [sampleDocument.json](../../packages/demo/src/sampleDocument.json) (46), UI panels (`property-panels/*`, `inputs/color-input.tsx`, `panel-types.tsx`, `timeline/*`), renderer (`background.ts`, `screen-renderer/*`), format IO (`psd/import.ts`, `psd/export-layer.ts`, `pptx/slide-shapes.ts`, `pptx/svg-fallback.ts`, `pptx/import-utils.ts`, `web-vector/html.ts`, `web-vector/svg.ts`, `pdf/core.ts`), fixtures. |
-| Text `content: '…'` literals | 38 | 213 | Heaviest: UI (`properties-sidebar.tsx`, `panels-test-helpers.tsx`), editor (`element-defaults.ts`, `editing.path-modes.test.ts`, `inline-text.test.ts`), renderer tests, format tests, demo fixtures. Two-shape transition (`string | TextBody`) softens the cascade — plain-string elements don't need to change. |
-| Canonical test fixtures (TS) | 4 | ~269 lines | [base-document.ts](../../packages/demo/src/test-fixtures/base-document.ts), [fixture-chrome.ts](../../packages/demo/src/test-fixtures/fixture-chrome.ts), [fixture-combinations.ts](../../packages/demo/src/test-fixtures/fixture-combinations.ts), [fixture-parenting.ts](../../packages/demo/src/test-fixtures/fixture-parenting.ts), [fixture-playback.ts](../../packages/demo/src/test-fixtures/fixture-playback.ts), [panel-elements.ts](../../packages/demo/src/test-fixtures/panel-elements.ts). Migrate alongside each breaking type change. |
-| Canonical demo document | [sampleDocument.json](../../packages/demo/src/sampleDocument.json) | 5,491 lines | Regenerated in one pass once `BroadsetColor` + `BroadsetFill` + optional `TextBody` land. Keep color literals as `{ kind: 'solid', color: { kind: 'rgb', hex: '#…' } }`. |
+| Area                                                                 | Files                                                              | Occurrences | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Color / fill literals (`backgroundColor`, `fontColor`, `fill: '#…'`) | 69                                                                 | 233         | Heaviest: [sampleDocument.json](../../packages/demo/src/sampleDocument.json) (46), UI panels (`property-panels/*`, `inputs/color-input.tsx`, `panel-types.tsx`, `timeline/*`), renderer (`background.ts`, `screen-renderer/*`), format IO (`psd/import.ts`, `psd/export-layer.ts`, `pptx/slide-shapes.ts`, `pptx/svg-fallback.ts`, `pptx/import-utils.ts`, `web-vector/html.ts`, `web-vector/svg.ts`, `pdf/core.ts`), fixtures.                                                                                                                      |
+| Text `content: '…'` literals                                         | 38                                                                 | 213         | Heaviest: UI (`properties-sidebar.tsx`, `panels-test-helpers.tsx`), editor (`element-defaults.ts`, `editing.path-modes.test.ts`, `inline-text.test.ts`), renderer tests, format tests, demo fixtures. Two-shape transition (`string                                                                                                                                                                                                                                                                                                                  | TextBody`) softens the cascade — plain-string elements don't need to change. |
+| Canonical test fixtures (TS)                                         | 4                                                                  | ~269 lines  | [base-document.ts](../../packages/demo/src/test-fixtures/base-document.ts), [fixture-chrome.ts](../../packages/demo/src/test-fixtures/fixture-chrome.ts), [fixture-combinations.ts](../../packages/demo/src/test-fixtures/fixture-combinations.ts), [fixture-parenting.ts](../../packages/demo/src/test-fixtures/fixture-parenting.ts), [fixture-playback.ts](../../packages/demo/src/test-fixtures/fixture-playback.ts), [panel-elements.ts](../../packages/demo/src/test-fixtures/panel-elements.ts). Migrate alongside each breaking type change. |
+| Canonical demo document                                              | [sampleDocument.json](../../packages/demo/src/sampleDocument.json) | 5,491 lines | Regenerated in one pass once `BroadsetColor` + `BroadsetFill` + optional `TextBody` land. Keep color literals as `{ kind: 'solid', color: { kind: 'rgb', hex: '#…' } }`.                                                                                                                                                                                                                                                                                                                                                                             |
 
 **Migration strategy.** Every breaking commit in Phase 1 updates its own fixtures and tests in the same commit. Greenfield per [AGENTS.md](../../AGENTS.md) §Greenfield — no compatibility shims, no migration code in the hot path. Where a one-shot migrator function helps the cascade (e.g. `migrateLegacyColor`, `migrateLegacyFill`), it lives in a `migrations/` submodule under `@broadset/model` and is called at a single site (the document loader's initial validation pass), not sprinkled across consumers.
 
@@ -533,3 +562,156 @@ Ratified in Phase 0. Repeated here for quick reference.
 - **IO-D-17 No sidecars.** Every format's round-trip metadata lives inside the format file using the format's own documented extension mechanism. No out-of-package JSON, no embedded-file sidecars, no app-private streams.
 - **IO-D-18 No silent drops.** Every importer maps to a native Broadset element or preserves the raw source fragment under `extensions.<format>.raw` (or an opaque `svg`-type element for SVG). Every preservation path emits a warning.
 - **Importer security contract** applied by every format importer (entity hardening, size/depth/entry caps, no executable surface reaches the renderer, `security-reviewer` on every importer diff). See the dedicated section under Phase 1.
+
+---
+
+## Progress tracker
+
+Ralph-loop convention per [plan.md](./plan.md): every unit carries `[ ] tests: red` and `[ ] impl: green`. A unit is **done** only when both boxes are checked and the package's `npm run quality` gate is green. Completed units reference the landing commit SHA in parentheses.
+
+### Phase 0 — Decisions + spec-first updates
+
+- [x] IO-D-01 through IO-D-18 ratified in [decisions.md](./decisions.md)
+- [ ] Pre-emptive model spec updates for every Phase 1 field shape (partially landed alongside individual Phase 1 commits per `CONTRIBUTING.md` §Backpropagate Into Specs)
+
+### Phase 1 — Core model additions
+
+Landing order from §"Phase 1 internal landing order" above.
+
+- [x] **1. Unit utilities + `parseLength`** — `pxToPt`, `ptToPx`, `inToMm`, `mmToIn`, `emToPx`, `parseLength` on `@broadset/model`
+  - [x] tests: red
+  - [x] impl: green (`7807cd7`)
+- [x] **2. Importer security contract spec** — `project/spec/formats/spec.md` floor (entity hardening, size/depth/entry caps, cycle caps, no execution surface, warnings-not-exceptions, worker sandboxing, `security-reviewer` before merge)
+  - [x] tests: red — spec-only, no tests
+  - [x] impl: green (`9b0376c`)
+- [ ] **3. `BroadsetColor` discriminated union** — `{ kind: 'rgb'; hex; space?; originalColor? } | { kind: 'theme'; slot; mods? }`. Cascade: migrator + renderer → editor → formats → ui → demo consumers. Plan: 3–4 commits.
+  - [ ] tests: red
+  - [ ] impl: green
+- [ ] **4. Content-hash identity** — `element.contentHash` derived field (body in `_shared/fingerprint/` lands Phase 2)
+  - [ ] tests: red
+  - [ ] impl: green
+- [x] **5. Stroke enhancements** — `strokeMiterlimit`, `strokeHeadEnd`, `strokeTailEnd` with `ArrowEnd` shape/size vocabulary
+  - [x] tests: red
+  - [x] impl: green (`2f13198`)
+- [ ] **6. Filter primitives (`FilterStack`)** — discriminated union replaces `filter`/`backdropFilter` strings; renderer derives CSS view
+  - [ ] tests: red
+  - [ ] impl: green
+- [ ] **7. Gradient enhancements** — conic `center` + `startAngle`; stop colors become `BroadsetColor`; `mods?` per stop (depends on #3)
+  - [ ] tests: red
+  - [ ] impl: green
+- [ ] **8. `BroadsetFill` discriminated union** — `none | solid | gradient | pattern | picture`; replaces flat `fill`/`backgroundColor`/`backgroundGradient` (depends on #3, #7). Cascade comparable to #3.
+  - [ ] tests: red
+  - [ ] impl: green
+- [ ] **9. Text model — `TextBody` / `Paragraph` / `Run`** — `content: string | TextBody`; model-only, editor catches up Phase 5. Plan: 2–3 commits. Depends on #3.
+  - [ ] tests: red
+  - [ ] impl: green
+- [ ] **10. Text-on-path reference** — `textPathElementId` as first-class field with existence + cycle validation (depends on #9)
+  - [ ] tests: red
+  - [ ] impl: green
+- [ ] **11. Text fidelity fields** — `textAnchor`, `textLength`, `lengthAdjust`, `wordSpacing`, `textTransform`, `lineHeight` additions to `TextStyle` (depends on #9)
+  - [ ] tests: red
+  - [ ] impl: green
+- [x] **12. Model-level script rejection** — Zod guard rejects `<script>` and event-handler attrs in `text`/`svg` content
+  - [x] tests: red
+  - [x] impl: green (`a3e256a`)
+- [ ] **13. Extensions typing** — `packages/model/src/extensions-types.ts` + central Zod registry per IO-D-11
+  - [ ] tests: red
+  - [ ] impl: green
+- [ ] **14. Dirty flag + store middleware** — `extensions.<format>.dirty` + `packages/editor` middleware flipping every present flag on element-mutating actions (depends on #13)
+  - [ ] tests: red
+  - [ ] impl: green
+- [ ] **15. Page + canvas + document additions** — `Page.notes`, `Canvas.bleed`/`trim`/`safeArea`, `document.metadata`, `document.outputIntent`
+  - [ ] tests: red
+  - [ ] impl: green
+- [x] **16. Importer contract spec update** — `parentId`-tree requirement, `dirty = false` on hydrate, `TextBody` for mixed-run text, IO-D-18 preservation rule appended to `project/spec/formats/spec.md` (landed together with #2)
+  - [x] tests: red — spec-only, no tests
+  - [x] impl: green (`9b0376c`)
+
+### Phase 2 — Library stack + shared modules
+
+All shared modules under `packages/formats/src/_shared/<name>/` with Vitest unit tests. Library table in §Phase 2 above.
+
+- [ ] **`_shared/color/`** — `culori` eager + `lcms-wasm` lazy; `parseColor`, `toRGB`, `toCMYK`, `gamutMap`, `applyMods`; bundled `defaultProfiles/` (sRGB2014, SWOP, Gray22)
+- [ ] **`_shared/fonts/`** — `fontkit` wrapper; `resolveFont`, `getMetrics`, `listAvailable`, `subsetFont`, `readEmbedPermission`, `getGlyphToUnicodeMap`
+- [ ] **`_shared/text-layout/`** — `linebreak` + `bidi-js` eager, `harfbuzzjs` lazy; `wrapRuns`, `shapeRuns`
+- [ ] **`_shared/xmp/`** — `fast-xml-parser` read + explicit RDF/XML write; `readBroadsetXmp`, `writeBroadsetXmp`
+- [ ] **`_shared/fingerprint/`** — `xxhash-wasm`; `fingerprintElement`
+- [ ] **`_shared/reconcile/`** — `microdiff`; `reconcile({ preservedMetadata, currentVisual, fingerprintsByElementId })`
+- [ ] **`_shared/shape-classifier/`** — `classifyPath(d, styleHints)` with rectangle/ellipse/path heuristics
+- [ ] **`_shared/sanitize/`** — `dompurify` with Broadset policy; `sanitizeSvg`
+- [ ] **Bundle-size assertion test** — ensure Latin-only sRGB users never download `lcms-wasm` or `harfbuzzjs`
+
+### Phase 3 — Renderer refactor
+
+- [ ] Safe DOM-builder for `svg`-type elements (replaces `host.innerHTML = element.content`) consuming `SvgFragmentAst` from `_shared/sanitize`
+- [ ] Native renderer paths for structured filter primitives, conic `center`/`startAngle`, pattern fill, picture fill
+- [ ] Font-asset-aware rendering — inject `@font-face` per font-asset at mount time
+- [ ] Per-corner border radius rendering
+- [ ] Nested group transform composition audit + CT coverage (A1)
+
+### Phase 4 — Asset pipeline
+
+- [ ] Font asset type (`woff2`/`ttf`/`otf` bytes + `postScriptName` + `familyName` + `subsetRanges?`)
+- [ ] Custom font upload UI (listed in Phase 5; asset type blocks it)
+- [ ] Image assets become `{ assetId, bytes, mime, width, height, iccProfile? }` — bytes, not URLs
+- [ ] ICC profile preservation on image assets
+- [ ] `icc-profile` asset type (referenced by `document.outputIntent`, image-asset `iccProfile`)
+- [ ] Subsetting pipeline (`_shared/fonts/subset.ts` — `subsetFont(asset, glyphsUsed)`)
+- [ ] Font embed-permission surface (`fontkit` `OS/2.fsType` → asset panel + preflight)
+- [ ] Asset deduplication on import via `registerAssetByContentHash`
+
+### Phase 5 — Editor UI surface
+
+Each new round-trippable model field gets a user-editable control per IO-D-10, using `@heroui/react`. Every cross-region scenario gets a CT per testing-instructions §CT Derivation Rule. Detail lives in [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md); the list here is the headline map.
+
+**New product features**
+
+- [ ] Run-edit mode + `applyRunStyle(elementId, range, overrides)` store action
+- [ ] Bullets + numbered lists editor
+- [ ] Text fidelity subpanel
+- [ ] Text-on-path picker
+- [ ] RTL caret/selection awareness
+- [ ] Swatches panel
+- [ ] Color mode selector (per-document RGB/CMYK/spot)
+- [ ] CSS Color Level 4 color picker (`oklch`, `color(display-p3 …)`)
+- [ ] ICC profile picker on canvas settings (uploads + bundled defaults)
+- [ ] Gradient editor upgrade — conic center + startAngle + per-stop color + color-space preservation
+- [ ] Pattern fill picker
+- [ ] Picture fill picker (stretch/tile, no crop)
+- [ ] Stroke subpanel (miter limit + arrow endings + existing controls)
+- [ ] Per-corner border radius UI
+- [ ] Clip-path editor (circle/polygon/inset/custom path)
+- [ ] SVG path boolean operations (union/subtract/intersect)
+- [ ] Filter editor (drag-reorder primitive stack)
+- [ ] Canvas settings panel (unit + DPI + bleed/trim/safe-area + guides)
+- [ ] Document metadata editor (Dublin Core)
+- [ ] Multi-page sorter upgrade (reorder/duplicate/delete + visibility toggle)
+- [ ] Custom font upload
+- [ ] Font-asset picker
+- [ ] Preflight panel (missing fonts, gamut, bleed, resolution, embed permission)
+- [ ] Document info panel
+- [ ] Speaker notes per page
+
+**Format round-trip UI**
+
+- [ ] Import dispatcher accepting `.pdf` / `.pptx` / `.psd` / `.svg`
+- [ ] Export options modal (per-format)
+- [ ] Import warnings modal
+- [ ] "Imported from external file" staging page (shared across PDF/PSD/SVG/PPTX operator-level imports)
+- [ ] Inline export preview (PDF via `pdfjs-dist`; PPTX/PSD later)
+- [ ] Reconciliation diff view (accept/reject per element)
+- [ ] Deletion confirmation modal
+- [ ] Element-level conflict indicator (layers panel + canvas)
+
+### Phase 6 — Testing infrastructure
+
+- [ ] External-tool fixture convention (`packages/formats/src/<format>/__fixtures__/` + `MANIFEST.md` + <1 MB + smoke tests)
+- [ ] Structural integrity helper `assertReImportableBy(reader, bytes)`
+- [ ] Chain CT harness `packages/ui/ct/_shared/chain-round-trip.helper.ts`
+- [ ] Preserved-blob stress test (Audit A2)
+
+### Session log
+
+Recorded as units land.
+
+- **2026-04-22** — Units 1, 2, 5, 12, 16 of Phase 1 landed (`7807cd7`, `9b0376c`, `2f13198`, `a3e256a`). Model test count grew from 271 → 308 (+37 tests). Full quality gate green after every commit.
