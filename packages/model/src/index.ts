@@ -1,5 +1,6 @@
 export * from './animation';
 export * from './broadset-color';
+export * from './broadset-fill';
 export * from './capabilities';
 export * from './changes';
 export * from './color';

@@ -196,6 +196,53 @@ The system MUST support SVG-specific properties for path and SVG elements: `stro
 
 ---
 
+### Requirement: Structured Fill (`BroadsetFill`)
+
+Per IO-D-04 and Phase 1 unit #8, the canonical fill model is a `BroadsetFill` discriminated union. The flat `fill`, `backgroundColor`, and `backgroundGradient` fields on `BroadsetElementStyle` will be replaced by a single `fill: BroadsetFill` field in a later sub-commit once renderer / editor / formats consumers have been migrated; this requirement defines the union, schema, and factory surface that the eventual flip will consume.
+
+```ts
+type BroadsetFill =
+  | { kind: 'none' }
+  | { kind: 'solid'; color: BroadsetColor }
+  | { kind: 'gradient'; gradient: BroadsetGradient }
+  | { kind: 'pattern'; assetId: string; repeat?: PatternRepeat; transform?: AffineMatrix }
+  | {
+      kind: 'picture';
+      assetId: string;
+      mode: 'stretch' | 'tile';
+      preserveAspectRatio?: 'none' | 'meet' | 'slice';
+      tile?: TileInfo;
+    };
+
+type PatternRepeat = 'repeat' | 'repeat-x' | 'repeat-y' | 'no-repeat';
+type AffineMatrix = readonly [number, number, number, number, number, number]; // 2x3
+type TileInfo = { scaleX?: number; scaleY?: number; offsetX?: number; offsetY?: number };
+```
+
+Contract:
+
+- The discriminator is closed. Unknown `kind` values MUST be rejected.
+- `solid.color` MUST be a full `BroadsetColor` — not a bare string — so theme references and non-sRGB literals survive the round-trip per IO-D-05.
+- `pattern.repeat` is restricted to the four CSS / SVG keywords above; arbitrary strings are rejected so the renderer never receives a repeat value it cannot implement.
+- `picture.mode` is closed to `stretch` or `tile`. Importers MUST bake any crop rectangle into the source image asset at import time — the persisted model does not carry crop geometry.
+- `pattern.assetId` and `picture.assetId` reference an entry in the shared asset registry. Both fields are required non-empty strings; missing them is a schema error.
+
+Factories `noneFill()`, `solidFill(color)`, `gradientFill(gradient)`, `patternFill(options)`, and `pictureFill(options)` produce canonical shapes. Type guards `isNoneFill` / `isSolidFill` / `isGradientFill` / `isPatternFill` / `isPictureFill` narrow the union for downstream consumers so `switch (fill.kind)` paths can drop the `default:` fallback.
+
+#### Acceptance Criteria
+
+- [ ] Given every valid fill kind (`none`, `solid`, `gradient`, `pattern`, `picture`), schema validation succeeds
+- [ ] Given a fill with an unknown `kind`, schema validation fails
+- [ ] Given `solid` without a structured `BroadsetColor` (missing, or a bare string), schema validation fails
+- [ ] Given `pattern` without `assetId`, schema validation fails
+- [ ] Given `picture` without `assetId` or without `mode`, schema validation fails
+- [ ] Given `pattern.repeat` set to an unknown keyword, schema validation fails
+- [ ] Given `picture.mode` set to anything other than `stretch` or `tile`, schema validation fails
+- [ ] Each factory (`noneFill` / `solidFill` / `gradientFill` / `patternFill` / `pictureFill`) produces the canonical shape for its kind and preserves optional fields when provided
+- [ ] Each type guard returns `true` for the matching kind and `false` for every other kind
+
+---
+
 ### Requirement: Structured Filter Primitives (`FilterStack`)
 
 Per IO-D-03 and Phase 1 unit #6, the canonical filter model is a structured `FilterStack` (discriminated-union array) — the opaque `filter` / `backdropFilter` CSS strings currently on `BroadsetElementStyle` are a derived view. PSD's ten layer effects, SVG `<filter>` primitives, and PDF ExtGState blend chains all map into this union symmetrically so importers can round-trip without flattening.
