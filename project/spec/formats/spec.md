@@ -44,3 +44,148 @@ Specifically:
 ### Export: maximise external tool compatibility
 
 All exporters MUST produce files that open correctly in the canonical external tool (PowerPoint for PPTX, Photoshop for PSD, browsers for SVG/HTML, etc.) — not just files that re-import cleanly into Broadset.
+
+---
+
+### Importer Contract
+
+Every format importer MUST satisfy the following contract in addition to the format-specific behaviour in its sub-spec. These rules derive from [io-prereqs-plan.md](../../implementation/io-prereqs-plan.md) decisions IO-D-17 and IO-D-18, and exist so that multi-format round-trip, reconciliation, and preservation behave uniformly across PDF, PSD, PPTX, and SVG.
+
+- **Group-preserving tree.** Every importer MUST build a `parentId` element tree that mirrors the source file's grouping (PSD layer groups, PPTX group shapes, SVG `<g>` / nested SVG, PDF marked-content parents). Flattening groups on import is a bug, not an option.
+- **Preservation by default.** Every importer MUST either map a source construct to a native Broadset element or preserve the raw source fragment for lossless re-emission. Preservation uses typed namespaces under `extensions.<format>.<key>` (PDF, PSD, PPTX) or an opaque `svg`-type element (SVG). Silent drops are prohibited.
+- **Dirty flag initialisation.** Every hydrated element — including SVG opaque elements, which carry the flag under `extensions.svg.dirty` — MUST have its `extensions.<format>.dirty` set to `false` so exporters can distinguish untouched imports (re-emit original blob byte-for-byte) from edited elements (re-emit from current Broadset state).
+- **Structured text by default.** When a source file carries mixed-run text (multiple character-level styles within a paragraph), the importer MUST populate `content` as a `TextBody` rather than flattening to a single string.
+- **Warnings, not exceptions.** Content that cannot be imported MUST surface as an import warning; the importer MUST NOT throw for content it doesn't recognise. The surrounding elements MUST still import.
+
+---
+
+### Importer Security Contract
+
+Every format importer operates on attacker-influenceable input — a user may open any file from any source. The following floor applies to all importers (PDF, PSD, PPTX, SVG, and any future format). Each format sub-spec MAY add format-specific mitigations in its risk register, but MUST NOT weaken this floor and is not required to restate it.
+
+#### Requirement: Entity Expansion Hardening
+
+Every XML-based parser path (XMP, SVG metadata, OOXML parts) MUST disable DTD processing and external entity resolution so that billion-laughs, entity-expansion, and XXE attacks cannot reach the importer.
+
+#### Scenario: DTD and external entity processing is disabled
+
+- GIVEN an input file carrying a DTD with nested entity declarations
+- WHEN the importer parses XML-bearing parts
+- THEN the parser MUST NOT expand the entities and MUST NOT fetch external resources
+
+#### Acceptance Criteria
+
+- [ ] XML parser options disable DTD processing
+- [ ] XML parser options disable external entity resolution
+- [ ] A billion-laughs fixture completes parsing without unbounded memory growth
+
+---
+
+#### Requirement: Input Size, Depth, and Entry Caps
+
+Every importer MUST cap total input size, per-part size (ZIP entries for PPTX, OOXML parts, PSD layer channels), decoded-output size, entry count for ZIP-based archives, and parser recursion / tree depth. A declared-but-absurd size in the file MUST NOT drive an unbounded allocation.
+
+#### Scenario: Oversize input is rejected before allocation
+
+- GIVEN an input file whose declared total size exceeds the configured cap
+- WHEN the importer begins parsing
+- THEN parsing MUST stop with an import warning and MUST NOT allocate memory proportional to the declared size
+
+#### Scenario: Excessive nesting is rejected
+
+- GIVEN an input tree nested beyond the configured depth cap
+- WHEN the importer walks the tree
+- THEN the importer MUST emit a warning at the cap and MUST NOT recurse further
+
+#### Acceptance Criteria
+
+- [ ] Total input size cap enforced before allocation
+- [ ] Per-part size cap enforced for archive entries in PPTX and for PSD layer channels
+- [ ] Decoded-output size cap enforced so compressed-to-decoded expansion cannot exhaust memory
+- [ ] Archive entry-count cap enforced for ZIP-based formats (PPTX)
+- [ ] Parser recursion depth cap enforced with a default of 100
+- [ ] Element-tree depth cap enforced with the same default
+
+---
+
+#### Requirement: Reference-Cycle and Follow Caps
+
+Every importer MUST detect and cap reference-cycle follow depth for constructs that can recursively reference other parts of the source file — SVG `<use>` / `<symbol>`, PSD clipping-mask chains, PPTX placeholder inheritance chains, PDF object-reference graphs. Unbounded follow is prohibited.
+
+#### Scenario: Self-referential `<use>` is detected
+
+- GIVEN an SVG with `<use xlink:href="#A"/>` inside `<symbol id="A">`
+- WHEN the importer resolves references
+- THEN the cycle MUST be detected and MUST emit a warning without recursing indefinitely
+
+#### Acceptance Criteria
+
+- [ ] SVG `<use>` / `<symbol>` follow depth is capped and cycles are detected
+- [ ] PSD clipping-mask chains cap follow depth and detect cycles
+- [ ] PPTX placeholder inheritance caps follow depth and detects cycles
+- [ ] PDF indirect-object reference graph detects cycles
+
+---
+
+#### Requirement: No Execution Surface Reaches the Renderer
+
+Every importer MUST strip or reject any active content — `<script>`, `on*=` event-handler attributes, `javascript:` URLs, active `<foreignObject>` content, PDF JavaScript, PPTX VBA / macros (`vbaProject.bin`) — before any downstream package (editor, renderer, formats) sees the content. The renderer MUST NOT receive importer output capable of executing code in the host page.
+
+#### Scenario: Inline script is stripped from imported SVG
+
+- GIVEN an SVG input containing a `<script>` element
+- WHEN the importer sanitises it
+- THEN the `<script>` element MUST be removed before the content reaches the renderer
+
+#### Scenario: VBA macros are rejected from imported PPTX
+
+- GIVEN a PPTX input containing a `vbaProject.bin` part
+- WHEN the importer opens the archive
+- THEN the macro part MUST be rejected and a warning emitted
+
+#### Acceptance Criteria
+
+- [ ] `<script>` elements and `on*=` attributes are stripped from all SVG content
+- [ ] `javascript:` URLs are stripped from all href / src attributes
+- [ ] `<foreignObject>` content is sanitised or rejected
+- [ ] PDF JavaScript actions are stripped
+- [ ] PPTX `vbaProject.bin` and macro-bearing content types are rejected with a warning
+
+---
+
+#### Requirement: Resource-Limit Failures Emit Warnings
+
+Every importer MUST surface resource-limit enforcement as an import warning, not as an exception. Partial imports are preferable to crashes; the user MUST see what was dropped and why.
+
+#### Scenario: Partial import after hitting a cap
+
+- GIVEN an input file that exceeds one or more caps (size, depth, cycles, entries)
+- WHEN the importer enforces the cap
+- THEN the remaining unaffected content MUST still import and the cap violation MUST appear in the import report
+
+#### Acceptance Criteria
+
+- [ ] Resource-limit violations emit warnings, never thrown exceptions
+- [ ] The import report lists the violated cap, the part or element affected, and the fact that content was dropped
+- [ ] Elements that were successfully imported remain in the document
+
+---
+
+#### Requirement: Worker Sandboxing Where Available
+
+Importers MUST use the sandboxing that the underlying parser offers. PDF parsing (via `pdfjs-dist`) MUST run in its own worker. Other importers (SVG, PPTX, PSD) run on the main thread; they MUST NOT `eval`, `new Function`, or otherwise execute imported content.
+
+#### Acceptance Criteria
+
+- [ ] PDF parsing runs in a dedicated worker
+- [ ] No importer evaluates imported content as JavaScript
+
+---
+
+#### Requirement: Security Review Before Merge
+
+Every change to an importer MUST go through the `security-reviewer` agent before merge. Sub-specs MAY document format-specific concerns (PSD's bounded layer streams, PPTX's macro rejection, SVG's `<foreignObject>` policy) but the shared floor above is non-negotiable.
+
+#### Acceptance Criteria
+
+- [ ] PR touching any importer includes evidence of `security-reviewer` sign-off
