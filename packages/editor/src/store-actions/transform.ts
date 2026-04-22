@@ -1,5 +1,6 @@
 import type { BroadsetDocument, BroadsetElement, PageElementInstance, Vector3 } from '@broadset/model';
 
+import { markElementExtensionsDirty } from '../extensions-dirty';
 import type { ElementUpdate } from './store';
 
 export function applyElementUpdate(element: BroadsetElement, updates: ElementUpdate): BroadsetElement {
@@ -16,6 +17,12 @@ export function applyElementUpdate(element: BroadsetElement, updates: ElementUpd
   };
 }
 
+/**
+ * Applies `updater` to the matching element and funnels the result through
+ * `markElementExtensionsDirty` so every element-mutating store action flips
+ * the per-format dirty flag per unit #14. When the updater returns the same
+ * reference the element is untouched and the dirty flag is left alone.
+ */
 export function updateDocumentElement(
   document: BroadsetDocument,
   elementId: string,
@@ -23,10 +30,18 @@ export function updateDocumentElement(
 ): BroadsetDocument {
   return {
     ...document,
-    elements: document.elements.map((element) => (element.id === elementId ? updater(element) : element)),
+    elements: document.elements.map((element) =>
+      element.id === elementId ? markDirtyIfChanged(element, updater(element)) : element,
+    ),
   };
 }
 
+/**
+ * Batched version of {@link updateDocumentElement}. Applies `updater` to each
+ * element whose id is in the set and funnels the result through
+ * `markElementExtensionsDirty` so multi-element mutations (group move, group
+ * assign, batch style) flip every touched element's dirty flag.
+ */
 export function updateDocumentElements(
   document: BroadsetDocument,
   elementIds: ReadonlySet<string>,
@@ -34,8 +49,24 @@ export function updateDocumentElements(
 ): BroadsetDocument {
   return {
     ...document,
-    elements: document.elements.map((element) => (elementIds.has(element.id) ? updater(element) : element)),
+    elements: document.elements.map((element) =>
+      elementIds.has(element.id) ? markDirtyIfChanged(element, updater(element)) : element,
+    ),
   };
+}
+
+/**
+ * Only calls `markElementExtensionsDirty` when the updater actually produced a
+ * new element reference. Returning the original reference when nothing
+ * changed lets Zustand's referential equality skip spurious re-renders and
+ * keeps dirty flags from flipping on no-op updaters.
+ */
+function markDirtyIfChanged(previous: BroadsetElement, next: BroadsetElement): BroadsetElement {
+  if (next === previous) {
+    return previous;
+  }
+
+  return markElementExtensionsDirty(next);
 }
 
 export function collectDescendantIds(document: BroadsetDocument, rootElementId: string): ReadonlySet<string> {

@@ -5,6 +5,7 @@ export * from './data-store';
 export * from './editing';
 export * from './element-defaults';
 export * from './element-operations';
+export * from './extensions-dirty';
 export * from './inline-text';
 export * from './keyboard';
 export * from './path-geometry';

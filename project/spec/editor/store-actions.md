@@ -479,6 +479,49 @@ The editor MUST support saving named snapshots of the current document state, in
 
 ---
 
+### Requirement: Per-Format Extensions Dirty Flag
+
+Every element-mutating store action MUST flip `extensions.<format>.dirty` to `true` for every Broadset format namespace (`psd`, `pdf`, `pptx`, `svg`) that is present on the mutated element. The per-format dirty flag is the sole signal format exporters consult to decide between re-emitting the element from the current Broadset state (dirty) and re-emitting the preserved original blob byte-for-byte (clean). This mechanism lives in `packages/editor/src/extensions-dirty.ts` as `markElementExtensionsDirty(element)` and is funneled through `updateDocumentElement`, `updateDocumentElements`, `commitGroupMove`, and `commitInlineText` so no element-mutating code path can bypass it.
+
+Rules:
+
+- An action MUST flip every present format namespace in one pass — partial flips silently corrupt round-trip for whichever format slipped through.
+- Unknown namespaces (outside the four Broadset format ids) MUST pass through unchanged. Third-party extensions on an element are not owned by this middleware.
+- When every present flag is already `true`, the element reference MUST be returned unchanged so Zustand's referential equality checks can skip spurious re-renders.
+- Non-element-mutating actions (`reorderElement`, `toggleVisibility`, `selectElement`, snapshot/page/canvas actions) MUST NOT flip the flag.
+- Document-replacement actions (`setDocument`, `loadTemplate`, `restoreSnapshot`) MUST NOT flip the flag. A just-loaded document's flags represent the authoritative imported baseline; overwriting them with `true` would force an unnecessary re-emit on first export.
+- Undo/redo MUST restore the prior dirty state verbatim — the temporal history is authoritative for each snapshot.
+
+#### Scenario: Commit style update flips dirty
+
+- GIVEN an element with `extensions.psd.dirty: false`
+- WHEN `updateElementStyle` is called on that element
+- THEN the element's `extensions.psd.dirty` is `true`
+
+#### Scenario: Reorder preserves dirty
+
+- GIVEN an element with `extensions.psd.dirty: false`
+- WHEN `reorderElement` moves it forward in the element array
+- THEN the element's `extensions.psd.dirty` remains `false`
+
+#### Scenario: Unknown namespace preserved
+
+- GIVEN an element with `extensions.customTool.dirty: false`
+- WHEN any element-mutating action runs
+- THEN `extensions.customTool.dirty` remains `false` (only the four Broadset format ids flip)
+
+#### Acceptance Criteria
+
+- [ ] Given any of `updateElementEphemeral`, `commitElementUpdate`, `commitGroupMove`, `updateElementStyle`, `groupElements`, `ungroupElements`, `toggleLock`, or `commitInlineText`, every present `extensions.<format>.dirty` on the mutated element flips to `true`
+- [ ] Given `reorderElement` or `toggleVisibility`, no dirty flags flip
+- [ ] Given `setDocument`, `loadTemplate`, or `restoreSnapshot`, no dirty flags flip
+- [ ] Given `undo` after a mutating action, the prior dirty state is restored
+- [ ] Given a mutation of element A, dirty flags on element B are unchanged
+- [ ] Given unknown namespaces in `extensions`, they pass through unchanged
+- [ ] Given a non-plain-object value at a format slot, the middleware skips it defensively without crashing
+
+---
+
 ### Requirement: System Clipboard Integration
 
 Copy and paste operations MUST use the system clipboard (Clipboard API) when available, enabling cross-document and cross-tab element transfer. On copy or cut, the selected elements MUST be serialized as a JSON string and written to the system clipboard using a Broadset-specific MIME type (`application/x-broadset-elements`). On paste, the system MUST read the clipboard and detect whether it contains Broadset element JSON. If Broadset data is found, the elements are deserialized, assigned new unique IDs, and placed at the center of the current viewport. If the clipboard contains plain text (no Broadset JSON detected), it MUST be pasted as a new text element at the viewport center with default text element styling. If the clipboard contains an image data URL, it MUST be pasted as a new image element. When the Clipboard API is unavailable (e.g., denied permission, insecure context), the system MUST fall back to an internal in-memory clipboard that works within the current editor session. Cut MUST copy elements to clipboard and then delete them from the document (as an atomic undoable action).

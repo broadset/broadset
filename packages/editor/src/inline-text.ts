@@ -1,5 +1,6 @@
 import { sanitizeTextContent } from '@broadset/model';
 
+import { markElementExtensionsDirty } from './extensions-dirty';
 import type { EditingMode, EditorStore } from './store-actions';
 
 export type FormattingType = 'bold' | 'italic' | 'underline' | 'color' | 'fontSize';
@@ -73,7 +74,7 @@ export function commitInlineText(store: EditorStore, elementId: string, content:
     document: {
       ...state.document,
       elements: state.document.elements.map((element) =>
-        element.id === elementId ? { ...element, content: sanitized } : element,
+        element.id === elementId ? markElementExtensionsDirty({ ...element, content: sanitized }) : element,
       ),
     },
   });

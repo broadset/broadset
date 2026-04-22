@@ -308,14 +308,15 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
         ): void {
           set((state) => {
             const positionsById = new Map(updates.map((update) => [update.elementId, update.position]));
-            let nextDocument: BroadsetDocument = {
-              ...state.document,
-              elements: state.document.elements.map((element) => {
+            let nextDocument = updateDocumentElements(
+              state.document,
+              new Set(positionsById.keys()),
+              (element) => {
                 const nextPosition = positionsById.get(element.id);
 
                 return nextPosition === undefined ? element : { ...element, position: nextPosition };
-              }),
-            };
+              },
+            );
 
             nextDocument = applyPageInstancePositionBatch(
               nextDocument,
