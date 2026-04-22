@@ -9,7 +9,12 @@ These files describe **how the project is structured**, not the behavioral sourc
 - `project.md` — implementation context and technical constitution
 - `plan.md` — execution order and current implementation status
 - `renderer-refactor-plan.md` — detailed plan to split a generic renderer core from the Broadset adapter and close renderer-spec drift
-- `carry-over-plan-progress.md` — additive-only parity-plus execution board and task tracking for carry-over phases
+- `plan-progress.md` — per-task execution board for the master roadmap
+
+## Tracking split
+
+- `plan.md` owns execution order and phase-level status
+- `plan-progress.md` owns task-by-task execution tracking
 
 ## Scope boundary
 

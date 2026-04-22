@@ -20,6 +20,11 @@ Detailed task-level planning still lives in the dedicated companion files:
 Use this file for sequencing. Use the companion files for detailed unit scope,
 acceptance criteria, and risk notes.
 
+Current planning status is recorded in the [Status](#status) section near the
+end of this file. Update that section whenever any companion plan changes state.
+Per-task execution tracking lives in [plan-progress.md](./plan-progress.md).
+Update that file whenever an individual task moves.
+
 For repo guidance, see `../../README.md` and `../../AGENTS.md`.
 
 ## TDD Convention
@@ -668,7 +673,7 @@ deferred-after-main-program: package-split
 
 Status is collected here so this file is the single place to check planning state.
 
-As of 2026-04-22:
+As of 2026-04-23:
 
 - **io-prereqs:** draft — pre-Phase 0
 - **renderer refactor:** draft — extracted from io-prereqs Phase 3 into its own detailed plan

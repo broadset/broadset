@@ -1,0 +1,199 @@
+# Master Roadmap Task Board
+
+Status: active per-task tracker for [plan.md](./plan.md).
+
+This file is the single per-task tracker for the unfinished implementation
+roadmap.
+
+Use it like this:
+
+- `plan.md` owns sequencing and phase-level status
+- this file owns task-by-task execution tracking
+- companion plans own acceptance criteria, detailed scope, and risk notes
+- when a task changes state, update this file and [plan.md](./plan.md) in the
+  same change
+
+As of 2026-04-23:
+
+## Shared foundation
+
+### Phase 0 — Shared decisions and spec lock
+
+Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md)
+
+- [x] P0.1 Ratify IO-D-01 through IO-D-18 in [decisions.md](./decisions.md)
+- [ ] P0.2 Finish pre-emptive model spec updates for every remaining Phase 1 field shape
+- [x] P0.3 Land the importer security contract baseline in [../spec/formats/spec.md](../spec/formats/spec.md)
+- [x] P0.4 Land the importer contract baseline updates in [../spec/formats/spec.md](../spec/formats/spec.md)
+- [ ] P0.5 Close remaining plan-level formats-spec updates (`no-sidecar`, `no-silent-drops`)
+
+### Phase 1 — Shared model additions
+
+Source of truth: [io-prereqs-plan.md](./io-prereqs-plan.md)
+
+- [x] P1.1 Unit utilities plus `parseLength`
+- [x] P1.2 Importer security contract spec update
+- [ ] P1.3 `BroadsetColor` discriminated union and migration path
+- [x] P1.4 Content-hash identity field
+- [x] P1.5 Stroke enhancements
+- [ ] P1.6 Structured filter primitives (`FilterStack`)
+- [ ] P1.7 Gradient enhancements
+- [ ] P1.8 `BroadsetFill` discriminated union
+- [ ] P1.9 Text model (`string | TextBody`)
+- [ ] P1.10 Text-on-path reference
+- [ ] P1.11 Text fidelity fields
+- [x] P1.12 Model-level script rejection
+- [ ] P1.13 Extensions typing registry
+- [ ] P1.14 Per-format dirty flag and editor middleware
+- [x] P1.15 Page, canvas, and document additions (`notes`, bleed/trim/safe-area, metadata, output intent)
+- [x] P1.16 Importer contract spec closeout
+
+### Phase 2 — Shared libraries and `_shared` modules
+
+Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md)
+
+- [ ] P2.1 `_shared/color/`
+- [ ] P2.2 `_shared/fonts/`
+- [ ] P2.3 `_shared/text-layout/`
+- [ ] P2.4 `_shared/xmp/`
+- [ ] P2.5 `_shared/fingerprint/`
+- [ ] P2.6 `_shared/reconcile/`
+- [ ] P2.7 `_shared/shape-classifier/`
+- [ ] P2.8 `_shared/sanitize/`
+- [ ] P2.9 Bundle-size assertion coverage for heavy lazy-loaded paths
+
+### Phase 3 — Renderer refactor
+
+Source of truth: [plan.md](./plan.md), [renderer-refactor-plan.md](./renderer-refactor-plan.md)
+
+- [ ] P3.0 Contract cleanup
+- [ ] P3.1 Internal layer split
+- [ ] P3.2 Keyed reconciliation
+- [ ] P3.3 Semantic renderers and safe builders
+- [ ] P3.4 Runtime services
+- [ ] P3.5 Broadset adapter migration
+- [ ] P3.6 Spec closure and hardening
+
+### Phase 4 — Shared asset pipeline
+
+Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md)
+
+- [ ] P4.1 Font asset type
+- [ ] P4.2 Image assets normalized to bytes plus metadata
+- [ ] P4.3 ICC profile preservation on image assets
+- [ ] P4.4 `icc-profile` asset type
+- [ ] P4.5 Shared font subsetting pipeline
+- [ ] P4.6 Font embed-permission surface
+- [ ] P4.7 Content-hash asset deduplication on import
+
+## Interleaved shared tasks
+
+Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md), [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md)
+
+- [ ] I5.1 Land the PSD-required io-prereqs Phase 5 UI slice
+- [ ] I6.1 Land the PDF-required io-prereqs Phase 5 UI slice
+- [ ] I7.1 Land the SVG-required io-prereqs Phase 5 UI slice
+- [ ] I8.1 Land the PPTX-required io-prereqs Phase 5 UI slice
+- [ ] I6.2 Introduce the shared io-prereqs Phase 6 testing infrastructure on first PSD need
+
+## Format tracks
+
+### Phase 5 — PSD track
+
+Source of truth: [plan.md](./plan.md), [psd-support-plan.md](./psd-support-plan.md)
+
+- [ ] P5.0 PSD spec and scope lock
+- [ ] P5.1 PSD types and de-risking spike
+- [ ] P5.2 PSD export parity rebuild
+- [ ] P5.3 PSD export beyond prior art
+- [ ] P5.4a PSD import fast path (`XMP + additionalInfo`)
+- [ ] P5.4b PSD arbitrary third-party import
+- [ ] P5.5 PSD reconciliation
+- [ ] P5.6 PSD tests and UI wiring
+
+### Phase 6 — PDF track
+
+Source of truth: [plan.md](./plan.md), [pdf-support-plan.md](./pdf-support-plan.md)
+
+- [ ] P6.0 PDF spec and scope lock
+- [ ] P6.1 PDF types and dependency swap
+- [ ] P6.2 PDF export parity rebuild
+- [ ] P6.3 PDF export beyond prior art
+- [ ] P6.4a PDF import fast path (`XMP + marked content`)
+- [ ] P6.4b PDF arbitrary third-party import
+- [ ] P6.5 PDF reconciliation
+- [ ] P6.6 PDF tests and UI wiring
+
+### Phase 7 — SVG track
+
+Source of truth: [plan.md](./plan.md), [svg-support-plan.md](./svg-support-plan.md)
+
+- [ ] P7.0 SVG spec and scope lock
+- [ ] P7.1 SVG types and architecture
+- [ ] P7.2 SVG export parity and critical bug fix
+- [ ] P7.3 SVG export beyond prior art
+- [ ] P7.4a SVG import fast path (`metadata + data-bs-*`)
+- [ ] P7.4b SVG arbitrary third-party import
+- [ ] P7.5 SVG reconciliation
+- [ ] P7.6 SVG tests and UI wiring
+
+### Phase 8 — PPTX track
+
+Source of truth: [plan.md](./plan.md), [pptx-support-plan.md](./pptx-support-plan.md)
+
+- [ ] P8.0 PPTX spec and scope lock
+- [ ] P8.1 PPTX types, package architecture, and parser swap
+- [ ] P8.2 PPTX export parity rebuild
+- [ ] P8.3 PPTX export beyond prior art
+- [ ] P8.4a PPTX import fast path (custom XML plus shape tags)
+- [ ] P8.4b PPTX arbitrary third-party import
+- [ ] P8.5 PPTX reconciliation
+- [ ] P8.6 PPTX tests and UI wiring
+
+### Phase 9 — PDF/A-2b followup
+
+Source of truth: [plan.md](./plan.md), [pdf-pdfa-compliance-plan.md](./pdf-pdfa-compliance-plan.md)
+
+- [ ] P9.0 PDF/A audit and spec update
+- [ ] P9.1 Font embedding totality
+- [ ] P9.2 Color-management and output-intent enforcement
+- [ ] P9.3 Forbidden-feature gating
+- [ ] P9.4 PDF/A metadata and trailer correctness
+- [ ] P9.5 Validator integration and CI
+- [ ] P9.6 Round-trip support for PDF/A exports
+
+## Supporting tracks
+
+### Parallel Track A — Coverage reporting
+
+Source of truth: [plan.md](./plan.md), [coverage-reporting.md](./coverage-reporting.md)
+
+- [ ] A.1 Wire `@vitest/coverage-v8` into shared Vitest config
+- [ ] A.2 Add exclusion rules and per-package overrides
+- [ ] A.3 Add root coverage scripts and ignore rules
+- [ ] A.4 Capture and document the baseline report
+- [ ] A.5 Update docs and testing guidance
+- [ ] A.6 Evaluate a follow-up threshold proposal from baseline numbers
+
+### Parallel Track B — Cross-region CT audit
+
+Source of truth: [plan.md](./plan.md), [cross-region-ct-audit.md](./cross-region-ct-audit.md)
+
+- [ ] B.1 Inventory cross-region scenarios in `project/spec/editor/**`
+- [ ] B.2 Inventory cross-region scenarios in `project/spec/ui/**`
+- [ ] B.3 Inventory cross-region scenarios in `project/spec/demo/**`
+- [ ] B.4 Consolidate the gap list
+- [ ] B.5 Land missing CT coverage in focused batches
+- [ ] B.6 Run final regression and gate closeout
+
+## Deferred structural track
+
+### Deferred Track C — Package split
+
+Source of truth: [plan.md](./plan.md), [package-split.md](./package-split.md)
+
+- [ ] C.1 Prep and API freeze
+- [ ] C.2 Formats split
+- [ ] C.3 Editor split
+- [ ] C.4 Optional UI tokens split
+- [ ] C.5 Cleanup and hardening
