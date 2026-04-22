@@ -33,13 +33,13 @@ Source of truth: [io-prereqs-plan.md](./io-prereqs-plan.md)
 
 - [x] P1.1 Unit utilities plus `parseLength`
 - [x] P1.2 Importer security contract spec update
-- [ ] P1.3 `BroadsetColor` discriminated union and migration path
+- [ ] P1.3 `BroadsetColor` discriminated union and migration path (3a types done `c79baa1`, 3b migrator done `20c2c6e`; 3c consumer migration pending)
 - [x] P1.4 Content-hash identity field
 - [x] P1.5 Stroke enhancements
-- [ ] P1.6 Structured filter primitives (`FilterStack`)
-- [ ] P1.7 Gradient enhancements
-- [ ] P1.8 `BroadsetFill` discriminated union
-- [ ] P1.9 Text model (`string | TextBody`)
+- [ ] P1.6 Structured filter primitives (`FilterStack`) (6a types + resolver done `aef2537`; 6b field flip + renderer pending)
+- [ ] P1.7 Gradient enhancements (7a `startAngle` done `ac89992`; 7b stop-color flip + mods pending — depends on P1.3c)
+- [ ] P1.8 `BroadsetFill` discriminated union (8a types done `4b29e4b`; 8b field flip pending — depends on P1.3c and P1.7b)
+- [ ] P1.9 Text model (`string | TextBody`) (9a types done `4dfd2d8`; 9b field flip + renderer dual-path pending)
 - [x] P1.10 Text-on-path reference
 - [x] P1.11 Text fidelity fields
 - [x] P1.12 Model-level script rejection
