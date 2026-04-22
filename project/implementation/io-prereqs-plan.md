@@ -589,9 +589,9 @@ Landing order from §"Phase 1 internal landing order" above.
 - [ ] **3. `BroadsetColor` discriminated union** — `{ kind: 'rgb'; hex; space?; originalColor? } | { kind: 'theme'; slot; mods? }`. Cascade: migrator + renderer → editor → formats → ui → demo consumers. Plan: 3–4 commits.
   - [ ] tests: red
   - [ ] impl: green
-- [ ] **4. Content-hash identity** — `element.contentHash` derived field (body in `_shared/fingerprint/` lands Phase 2)
-  - [ ] tests: red
-  - [ ] impl: green
+- [x] **4. Content-hash identity** — `element.contentHash` derived field (body in `_shared/fingerprint/` lands Phase 2)
+  - [x] tests: red
+  - [x] impl: green (`72d23a6`)
 - [x] **5. Stroke enhancements** — `strokeMiterlimit`, `strokeHeadEnd`, `strokeTailEnd` with `ArrowEnd` shape/size vocabulary
   - [x] tests: red
   - [x] impl: green (`2f13198`)
@@ -622,9 +622,9 @@ Landing order from §"Phase 1 internal landing order" above.
 - [ ] **14. Dirty flag + store middleware** — `extensions.<format>.dirty` + `packages/editor` middleware flipping every present flag on element-mutating actions (depends on #13)
   - [ ] tests: red
   - [ ] impl: green
-- [ ] **15. Page + canvas + document additions** — `Page.notes`, `Canvas.bleed`/`trim`/`safeArea`, `document.metadata`, `document.outputIntent`
-  - [ ] tests: red
-  - [ ] impl: green
+- [x] **15. Page + canvas + document additions** — `Page.notes`, `Canvas.bleed`/`trim`/`safeArea`, `document.metadata`, `document.outputIntent`
+  - [x] tests: red
+  - [x] impl: green (`77d3284`)
 - [x] **16. Importer contract spec update** — `parentId`-tree requirement, `dirty = false` on hydrate, `TextBody` for mixed-run text, IO-D-18 preservation rule appended to `project/spec/formats/spec.md` (landed together with #2)
   - [x] tests: red — spec-only, no tests
   - [x] impl: green (`9b0376c`)
