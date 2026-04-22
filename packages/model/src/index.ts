@@ -8,6 +8,7 @@ export * from './content-hash';
 export * from './document';
 export * from './element';
 export * from './extensions-types';
+export * from './filter-stack';
 export * from './format-reference';
 export * from './migrations';
 export * from './output-spec';

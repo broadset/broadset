@@ -41,7 +41,7 @@ Source of truth: [io-prereqs-plan.md](./io-prereqs-plan.md)
 - [ ] P1.8 `BroadsetFill` discriminated union
 - [ ] P1.9 Text model (`string | TextBody`)
 - [x] P1.10 Text-on-path reference
-- [ ] P1.11 Text fidelity fields
+- [x] P1.11 Text fidelity fields
 - [x] P1.12 Model-level script rejection
 - [x] P1.13 Extensions typing registry
 - [x] P1.14 Per-format dirty flag and editor middleware

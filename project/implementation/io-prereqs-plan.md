@@ -610,9 +610,9 @@ Landing order from §"Phase 1 internal landing order" above.
 - [x] **10. Text-on-path reference** — `textPathElementId` as first-class field with existence + cycle validation (depends on #9)
   - [x] tests: red
   - [x] impl: green (`9262266`)
-- [ ] **11. Text fidelity fields** — `textAnchor`, `textLength`, `lengthAdjust`, `wordSpacing`, `textTransform`, `lineHeight` additions to `TextStyle` (depends on #9)
-  - [ ] tests: red
-  - [ ] impl: green
+- [x] **11. Text fidelity fields** — `textAnchor`, `textLength`, `lengthAdjust`, `wordSpacing`, `textTransform`, `lineHeight` additions to `TextStyle` (depends on #9)
+  - [x] tests: red
+  - [x] impl: green (`ae562be`)
 - [x] **12. Model-level script rejection** — Zod guard rejects `<script>` and event-handler attrs in `text`/`svg` content
   - [x] tests: red
   - [x] impl: green (`a3e256a`)

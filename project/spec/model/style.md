@@ -196,6 +196,48 @@ The system MUST support SVG-specific properties for path and SVG elements: `stro
 
 ---
 
+### Requirement: Structured Filter Primitives (`FilterStack`)
+
+Per IO-D-03 and Phase 1 unit #6, the canonical filter model is a structured `FilterStack` (discriminated-union array) — the opaque `filter` / `backdropFilter` CSS strings currently on `BroadsetElementStyle` are a derived view. PSD's ten layer effects, SVG `<filter>` primitives, and PDF ExtGState blend chains all map into this union symmetrically so importers can round-trip without flattening.
+
+```ts
+type FilterPrimitive =
+  | { kind: 'drop-shadow'; offsetX: number; offsetY: number; blur: number; color: BroadsetColor }
+  | { kind: 'blur'; stdDeviation: number }
+  | { kind: 'color-matrix'; matrix: readonly number[] } // 4x5 or 5x5 (SVG feColorMatrix)
+  | { kind: 'brightness' | 'contrast' | 'saturate' | 'hue-rotate' | 'grayscale' | 'sepia' | 'invert' | 'opacity'; amount: number }
+  | { kind: 'custom-svg'; svg: string }; // escape hatch
+type FilterStack = readonly FilterPrimitive[];
+```
+
+Contract:
+
+- The primitive discriminator set (`SIMPLE_FILTER_KINDS` plus `'drop-shadow'`, `'blur'`, `'color-matrix'`, `'custom-svg'`) is closed. Unknown kinds MUST be rejected.
+- `blur.stdDeviation` and `drop-shadow.blur` MUST be non-negative (SVG Gaussian radii cannot be negative).
+- `drop-shadow.color` MUST be a full `BroadsetColor` — theme references and non-sRGB literals survive the round-trip per IO-D-05.
+- `color-matrix.matrix` is preserved verbatim (SVG's feColorMatrix accepts either 4x5 or 5x5 layouts; the model does not second-guess the caller).
+- `custom-svg.svg` is preserved verbatim and sanitized at the renderer boundary, not at the model boundary.
+
+A companion `filterStackToCss(stack, ctx?)` resolver renders the primitives to a CSS filter string for the renderer. Primitives without a direct CSS function (`color-matrix`, `custom-svg`) are skipped by the resolver — the renderer routes those through an SVG `<filter>` reference. `drop-shadow` with a theme color requires a `ColorResolutionContext.palette`; absence throws per IO-D-05.
+
+The field-type flip on `BroadsetElementStyle.filter` / `backdropFilter` (from `string` to `FilterStack`) lands in a later sub-commit once renderer / editor consumers are updated. This requirement defines the primitive surface that the flip will consume.
+
+#### Acceptance Criteria
+
+- [ ] Given every primitive kind (`drop-shadow`, `blur`, `color-matrix`, `custom-svg`, and all eight amount-based kinds), schema validation succeeds
+- [ ] Given a primitive with an unknown `kind`, schema validation fails
+- [ ] Given `blur` or `drop-shadow` with a negative `stdDeviation` / `blur`, schema validation fails
+- [ ] Given a `drop-shadow` missing `color` (or any other required field), schema validation fails
+- [ ] Given an empty stack, `filterStackToCss` returns the empty string
+- [ ] Given a stack of amount-based primitives, `filterStackToCss` emits `fn(amount)` tokens in order; `hue-rotate` additionally appends the `deg` unit
+- [ ] Given `blur(stdDeviation)`, `filterStackToCss` emits `blur(<stdDeviation>px)` with the CSS pixel unit
+- [ ] Given `drop-shadow`, `filterStackToCss` emits `drop-shadow(<x>px <y>px <blur>px <resolved-color>)`
+- [ ] Given primitives without a direct CSS equivalent (`color-matrix`, `custom-svg`), `filterStackToCss` skips them silently
+- [ ] Given a `drop-shadow` with a theme color but no palette context, `filterStackToCss` throws
+- [ ] `SIMPLE_FILTER_KINDS` enumerates exactly `brightness`, `contrast`, `saturate`, `hue-rotate`, `grayscale`, `sepia`, `invert`, `opacity`
+
+---
+
 ### Requirement: Text Fidelity Fields (SVG text attributes)
 
 The element style MUST support the remaining SVG text attributes that PDF, PPTX, and PSD importers need to round-trip through Broadset without information loss. `wordSpacing`, `textTransform`, and `lineHeight` are already defined under *Typography Properties*; this requirement adds the last three fields called for in Phase 1 unit #11:
