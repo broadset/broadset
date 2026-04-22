@@ -9,6 +9,7 @@ export * from './document';
 export * from './element';
 export * from './extensions-types';
 export * from './format-reference';
+export * from './migrations';
 export * from './output-spec';
 export * from './page-validation';
 export * from './style';

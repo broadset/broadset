@@ -42,7 +42,34 @@ Per IO-D-05 in [decisions.md](../../implementation/decisions.md), Broadset MUST 
 
 #### Spec Gaps
 
-- Color-valued fields on `BroadsetElementStyle` (`fontColor`, `backgroundColor`, `borderColor`, `stroke`, `fill`, gradient stop colors) are still typed as `string` in the persisted model. Migration to `BroadsetColor` is the second commit of Phase 1 unit #3 — the type tables below describe the in-flight target shape.
+- Color-valued fields on `BroadsetElementStyle` (`fontColor`, `backgroundColor`, `borderColor`, `stroke`, `fill`, gradient stop colors) are still typed as `string` in the persisted model. The conversion helper that flips those fields (`migrateLegacyColor`, see below) lands in the second commit of Phase 1 unit #3; the field-type migration itself lands in the third commit — the type tables below describe the in-flight target shape.
+
+---
+
+### Requirement: Legacy color migration helper
+
+The model MUST expose a one-site `migrateLegacyColor(input: string | null | undefined) → BroadsetColor | undefined` helper under `packages/model/src/migrations/` so the eventual field-type migration can be performed at a single place (the document loader's initial validation pass) rather than sprinkled across consumers.
+
+Contract:
+
+- Absent inputs (`undefined`, `null`, empty strings, whitespace-only strings) MUST map to `undefined` — legacy fixtures treat `''` as "unset" and that semantics MUST survive migration.
+- Any CSS color literal accepted by `parseColor` (hex, `rgb()`, `rgba()`, `hsl()`, `hsla()`, CSS named colors, Color Level 4 literals) MUST become an `RgbBroadsetColor`. Non-sRGB inputs (`oklch(...)`, `oklab(...)`, `color(display-p3 ...)`) MUST additionally set `space` and preserve the source syntax in `originalColor` per IO-D-05.
+- Legacy strings MUST NEVER produce `kind: 'theme'` output. Theme references only enter the model through importers that know the source theme palette.
+- Unparseable strings MUST throw. Per IO-D-18 ("no silent drops") the document loader is responsible for surfacing the failure as an import warning; the migrator MUST NOT substitute a neutral fallback hex.
+
+#### Acceptance Criteria
+
+- [ ] Given `undefined` or `null`, the migrator returns `undefined`
+- [ ] Given an empty or whitespace-only string, the migrator returns `undefined`
+- [ ] Given a `#RRGGBB` or `#RRGGBBAA` hex, the migrator returns `{ kind: 'rgb', hex }` with the lowercase hex value
+- [ ] Given a 3- or 4-digit hex shorthand, the migrator expands the hex to canonical 6/8-digit form
+- [ ] Given an `rgb()` / `rgba()` / `hsl()` / `hsla()` literal, the migrator returns an sRGB `BroadsetColor` with a valid hex
+- [ ] Given a CSS named color (including `transparent`), the migrator returns its canonical hex form
+- [ ] Given whitespace or mixed-case input, the migrator normalizes the result
+- [ ] Given a non-sRGB Color Level 4 literal, the migrator tags `space` and preserves the source in `originalColor`
+- [ ] Given an unparseable string, the migrator throws (no silent fallback)
+- [ ] Every successful output passes `broadsetColorSchema`
+- [ ] The migrator never emits `kind: 'theme'` output for any string input
 
 ---
 
