@@ -7,6 +7,8 @@ export type StrokeLinejoin = 'miter' | 'round' | 'bevel';
 export type FillRule = 'nonzero' | 'evenodd';
 export type ArrowEndShape = 'triangle' | 'stealth' | 'diamond' | 'oval' | 'none';
 export type ArrowEndSize = 'sm' | 'md' | 'lg';
+export type TextAnchor = 'start' | 'middle' | 'end';
+export type LengthAdjust = 'spacing' | 'spacingAndGlyphs';
 
 export interface ArrowEnd {
   readonly shape: ArrowEndShape;
@@ -67,7 +69,10 @@ export interface BroadsetElementStyle {
   readonly fontWeight?: FontWeight | undefined;
   readonly fontStyle?: FontStyle | undefined;
   readonly textAlignment?: TextAlignment | undefined;
+  readonly textAnchor?: TextAnchor | undefined;
   readonly textDecoration?: string | undefined;
+  readonly textLength?: number | undefined;
+  readonly lengthAdjust?: LengthAdjust | undefined;
   readonly textTransform?: string | undefined;
   readonly letterSpacing?: number | undefined;
   readonly lineHeight?: number | string | undefined;
@@ -280,7 +285,10 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
     fontWeight: z.number().int().optional(),
     fontStyle: z.enum(['normal', 'italic', 'oblique']).optional(),
     textAlignment: z.enum(['left', 'center', 'right', 'justify']).optional(),
+    textAnchor: z.enum(['start', 'middle', 'end']).optional(),
     textDecoration: z.string().optional(),
+    textLength: z.number().nonnegative().optional(),
+    lengthAdjust: z.enum(['spacing', 'spacingAndGlyphs']).optional(),
     textTransform: z.string().optional(),
     letterSpacing: z.number().optional(),
     lineHeight: z.union([z.number(), z.string()]).optional(),
@@ -363,7 +371,10 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
       fontWeight: normalizeFontWeight(value.fontWeight),
       fontStyle: value.fontStyle,
       textAlignment: value.textAlignment,
+      textAnchor: value.textAnchor,
       textDecoration: value.textDecoration,
+      textLength: value.textLength,
+      lengthAdjust: value.lengthAdjust,
       textTransform: value.textTransform,
       letterSpacing: normalizeSpacing(value.letterSpacing),
       lineHeight: value.lineHeight,

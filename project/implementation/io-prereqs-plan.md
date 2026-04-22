@@ -607,9 +607,9 @@ Landing order from §"Phase 1 internal landing order" above.
 - [ ] **9. Text model — `TextBody` / `Paragraph` / `Run`** — `content: string | TextBody`; model-only, editor catches up Phase 5. Plan: 2–3 commits. Depends on #3.
   - [ ] tests: red
   - [ ] impl: green
-- [ ] **10. Text-on-path reference** — `textPathElementId` as first-class field with existence + cycle validation (depends on #9)
-  - [ ] tests: red
-  - [ ] impl: green
+- [x] **10. Text-on-path reference** — `textPathElementId` as first-class field with existence + cycle validation (depends on #9)
+  - [x] tests: red
+  - [x] impl: green (`9262266`)
 - [ ] **11. Text fidelity fields** — `textAnchor`, `textLength`, `lengthAdjust`, `wordSpacing`, `textTransform`, `lineHeight` additions to `TextStyle` (depends on #9)
   - [ ] tests: red
   - [ ] impl: green

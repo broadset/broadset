@@ -408,6 +408,113 @@ describe('Masking and clipping properties', () => {
   });
 });
 
+/**
+ * Phase 1 unit #11 — adds the remaining SVG-originating text-fidelity
+ * fields that PDF, PPTX, and PSD importers need somewhere to round-trip
+ * their text layout. `textAnchor`, `textLength`, and `lengthAdjust`
+ * join the already-present `wordSpacing`, `textTransform`, and
+ * `lineHeight` so every SVG text attribute worth preserving has a
+ * first-class home on `BroadsetElementStyle`.
+ */
+describe('Text fidelity properties (unit #11)', () => {
+  /**
+   * @description Every `textAnchor` value in the SVG spec must validate.
+   * `start`/`middle`/`end` map directly to SVG `text-anchor`, and round-
+   * trip through PDF's text-show operators and PPTX's
+   * `<a:pPr algn="…">` so the preserved value is identical on the
+   * way back out of an importer.
+   */
+  it.each(['start', 'middle', 'end'] as const)('accepts textAnchor value %s', (value) => {
+    const result = styleSchema.safeParse({ opacity: 1, textAnchor: value });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.data.textAnchor).toBe(value);
+    }
+  });
+
+  /**
+   * @description Arbitrary strings must be rejected. The SVG spec
+   * names the three values exhaustively — accepting anything else
+   * silently corrupts importer output and turns a validation bug into
+   * a rendering bug.
+   */
+  it('rejects unknown textAnchor values', () => {
+    expect(styleSchema.safeParse({ opacity: 1, textAnchor: 'center' }).success).toBe(false);
+    expect(styleSchema.safeParse({ opacity: 1, textAnchor: '' }).success).toBe(false);
+    expect(styleSchema.safeParse({ opacity: 1, textAnchor: 0 }).success).toBe(false);
+  });
+
+  /**
+   * @description `textLength` is the SVG attribute that pins a piece
+   * of text to a specific advance length (in document units). It must
+   * be non-negative — negative lengths are malformed per the SVG
+   * spec — and finite.
+   */
+  it('accepts non-negative textLength values', () => {
+    expect(styleSchema.safeParse({ opacity: 1, textLength: 0 }).success).toBe(true);
+    expect(styleSchema.safeParse({ opacity: 1, textLength: 120 }).success).toBe(true);
+    expect(styleSchema.safeParse({ opacity: 1, textLength: 0.5 }).success).toBe(true);
+  });
+
+  /**
+   * @description Negative, NaN, or infinite textLength must be
+   * rejected — the SVG spec forbids negative advance, and `NaN` /
+   * `Infinity` would poison any renderer that reads the attribute.
+   */
+  it('rejects negative or non-finite textLength values', () => {
+    expect(styleSchema.safeParse({ opacity: 1, textLength: -1 }).success).toBe(false);
+    expect(styleSchema.safeParse({ opacity: 1, textLength: Number.NaN }).success).toBe(false);
+    expect(styleSchema.safeParse({ opacity: 1, textLength: Number.POSITIVE_INFINITY }).success).toBe(false);
+  });
+
+  /**
+   * @description `lengthAdjust` controls how SVG distributes the
+   * advance between glyph spacing and glyph stretching. The two
+   * values `spacing` (default) and `spacingAndGlyphs` are the entire
+   * SVG vocabulary — nothing else is valid.
+   */
+  it.each(['spacing', 'spacingAndGlyphs'] as const)('accepts lengthAdjust value %s', (value) => {
+    const result = styleSchema.safeParse({ opacity: 1, lengthAdjust: value });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.data.lengthAdjust).toBe(value);
+    }
+  });
+
+  /**
+   * @description Unknown `lengthAdjust` strings must be rejected.
+   * Accepting arbitrary values would let the attribute round-trip as
+   * an unknown literal and surface as a renderer failure later.
+   */
+  it('rejects unknown lengthAdjust values', () => {
+    expect(styleSchema.safeParse({ opacity: 1, lengthAdjust: 'spacingOnly' }).success).toBe(false);
+    expect(styleSchema.safeParse({ opacity: 1, lengthAdjust: '' }).success).toBe(false);
+  });
+
+  /**
+   * @description When none of the unit #11 fields are provided the
+   * parsed style must omit them (undefined) so callers can tell "user
+   * did not set a value" from "user explicitly chose start / zero /
+   * spacing", which matters for preflight warnings and exporter
+   * decisions about whether to emit the SVG attribute at all.
+   */
+  it('omits unit #11 fields when not provided', () => {
+    const result = styleSchema.safeParse({ opacity: 1 });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.data.textAnchor).toBeUndefined();
+      expect(result.data.textLength).toBeUndefined();
+      expect(result.data.lengthAdjust).toBeUndefined();
+    }
+  });
+});
+
 /** @description fontVariationSettings stores a CSS font-variation-settings string on the element style. */
 describe('fontVariationSettings', () => {
   /** @description A valid axis tag and numeric value string is accepted. */

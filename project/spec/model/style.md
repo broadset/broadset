@@ -196,6 +196,28 @@ The system MUST support SVG-specific properties for path and SVG elements: `stro
 
 ---
 
+### Requirement: Text Fidelity Fields (SVG text attributes)
+
+The element style MUST support the remaining SVG text attributes that PDF, PPTX, and PSD importers need to round-trip through Broadset without information loss. `wordSpacing`, `textTransform`, and `lineHeight` are already defined under *Typography Properties*; this requirement adds the last three fields called for in Phase 1 unit #11:
+
+- `textAnchor?: 'start' | 'middle' | 'end'` — mirrors SVG `text-anchor`. Drives horizontal alignment of the text baseline relative to the element's reference point. The three values are exhaustive; arbitrary strings MUST be rejected.
+- `textLength?: number` — mirrors SVG `textLength`. A non-negative, finite number (in the canvas-declared unit) that pins the displayed advance to a specific length. Negative, `NaN`, or `Infinity` MUST be rejected.
+- `lengthAdjust?: 'spacing' | 'spacingAndGlyphs'` — mirrors SVG `lengthAdjust`. Controls how `textLength` is distributed between glyph spacing (`'spacing'`, the SVG default) and glyph stretching (`'spacingAndGlyphs'`). Arbitrary strings MUST be rejected.
+
+All three fields are optional. Absent values parse as `undefined` so exporters can distinguish "user did not set" from "user explicitly chose start / zero / spacing" — relevant for preflight and for deciding whether to emit the SVG attribute at all.
+
+#### Acceptance Criteria
+
+- [ ] Given `textAnchor` set to `start`, `middle`, or `end`, validation succeeds and the value round-trips verbatim
+- [ ] Given `textAnchor` set to any other string (including `center` or the empty string), validation fails
+- [ ] Given `textLength` set to a non-negative finite number (including zero), validation succeeds
+- [ ] Given `textLength` set to a negative, NaN, or infinite number, validation fails
+- [ ] Given `lengthAdjust` set to `spacing` or `spacingAndGlyphs`, validation succeeds and the value round-trips verbatim
+- [ ] Given `lengthAdjust` set to any other string, validation fails
+- [ ] Given a style with none of these fields provided, the parsed result exposes them as `undefined`
+
+---
+
 ### Requirement: Stroke Arrow Endings
 
 The system MUST support optional arrow endings on both ends of a stroked path or line via `strokeHeadEnd` and `strokeTailEnd`. Each ending is an `ArrowEnd` object containing a required `shape` (`'triangle'` | `'stealth'` | `'diamond'` | `'oval'` | `'none'`), an optional `width` (`'sm'` | `'md'` | `'lg'`), and an optional `length` (`'sm'` | `'md'` | `'lg'`). The discrete vocabulary is chosen to round-trip PPTX `<a:headEnd>` / `<a:tailEnd>`, PDF line-ending styles, SVG `marker-start` / `marker-end`, and PSD shape-layer arrowheads. Arbitrary strings MUST be rejected.
