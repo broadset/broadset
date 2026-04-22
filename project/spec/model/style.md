@@ -380,7 +380,7 @@ All must be finite numbers. These are separate from the element-level `rotation`
 
 ### Requirement: Structured Gradient Model
 
-Background gradients MUST support a structured `BroadsetGradient` object format in addition to CSS gradient strings. A `BroadsetGradient` MUST contain `type` (`'linear'` | `'radial'` | `'conic'`), `stops` (array of `{ color: string, position: number }` with at least 2 entries, positions in ascending order 0–100), and type-specific geometry: `angle` (0–360 degrees) for linear gradients, `center` (`[x%, y%]`) for radial and conic gradients.
+Background gradients MUST support a structured `BroadsetGradient` object format in addition to CSS gradient strings. A `BroadsetGradient` MUST contain `type` (`'linear'` | `'radial'` | `'conic'`), `stops` (array of `{ color: string, position: number }` with at least 2 entries, positions in ascending order 0–100), and type-specific geometry: `angle` (0–360 degrees) for linear gradients, `center` (`[x%, y%]`) for radial and conic gradients, and `startAngle` (0–360 degrees, conic-only) for CSS `conic-gradient(from <angle>, …)` support. `startAngle` is ignored on linear and radial gradients; out-of-range values MUST be rejected by validation.
 
 #### Acceptance Criteria
 
@@ -388,6 +388,8 @@ Background gradients MUST support a structured `BroadsetGradient` object format 
 - [ ] Given a structured radial gradient with center, the renderer produces a correct CSS `radial-gradient` string
 - [ ] Given a plain CSS gradient string, it is used directly
 - [ ] Given fewer than 2 stops, validation fails
+- [ ] Given a conic gradient with `startAngle` in [0, 360], validation succeeds
+- [ ] Given `startAngle` below 0 or above 360, validation fails
 
 ---
 

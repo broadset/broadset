@@ -141,6 +141,51 @@ describe('Background properties', () => {
       }).success,
     ).toBe(true);
   });
+
+  /**
+   * @description Phase 1 unit #7 — conic gradients now accept a
+   * `startAngle` (0-360°) for CSS `conic-gradient(from <angle>, …)`
+   * support. Additive field; omitted values parse as undefined and
+   * linear / radial gradients ignore the attribute.
+   */
+  it('accepts a conic gradient with startAngle', () => {
+    const result = styleSchema.safeParse({
+      opacity: 1,
+      backgroundGradient: {
+        type: 'conic',
+        stops: [
+          { color: '#ff0000', position: 0 },
+          { color: '#0000ff', position: 100 },
+        ],
+        center: [50, 50],
+        startAngle: 45,
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  /**
+   * @description `startAngle` is constrained to 0-360 inclusive. Out-
+   * of-range values must fail validation so wrap-around is handled by
+   * the renderer rather than silently accepted at the model boundary.
+   */
+  it('rejects startAngle outside 0..360', () => {
+    const invalid = (startAngle: number): unknown => ({
+      opacity: 1,
+      backgroundGradient: {
+        type: 'conic',
+        stops: [
+          { color: '#ff0000', position: 0 },
+          { color: '#0000ff', position: 100 },
+        ],
+        startAngle,
+      },
+    });
+
+    expect(styleSchema.safeParse(invalid(-1)).success).toBe(false);
+    expect(styleSchema.safeParse(invalid(361)).success).toBe(false);
+  });
 });
 
 /** @description Border helpers support uniform or per-corner radius values and expose normalization utilities. */

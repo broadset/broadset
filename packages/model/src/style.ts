@@ -57,6 +57,13 @@ export interface BroadsetGradient {
   readonly stops: readonly BroadsetGradientStop[];
   readonly angle?: number | undefined;
   readonly center?: readonly [number, number] | undefined;
+  /**
+   * Conic-gradient-only starting angle in degrees, measured clockwise from
+   * the positive x-axis (CSS `conic-gradient(from <angle>, …)`). Ignored on
+   * linear and radial gradients. Range 0-360 inclusive; wrap-around past
+   * 360° is applied by the renderer, not the validator.
+   */
+  readonly startAngle?: number | undefined;
 }
 
 export type BackgroundGradientValue = string | BroadsetGradient | undefined;
@@ -262,6 +269,7 @@ const broadsetGradientSchema = z
       .min(2),
     angle: z.number().min(0).max(360).optional(),
     center: z.tuple([z.number().min(0).max(100), z.number().min(0).max(100)]).optional(),
+    startAngle: z.number().min(0).max(360).optional(),
   })
   .refine((value) => hasAscendingGradientStops(value.stops), {
     message: 'Gradient stop positions must be in ascending order',
