@@ -5,6 +5,14 @@ import { normalizeColor } from './color';
 export type StrokeLinecap = 'butt' | 'round' | 'square';
 export type StrokeLinejoin = 'miter' | 'round' | 'bevel';
 export type FillRule = 'nonzero' | 'evenodd';
+export type ArrowEndShape = 'triangle' | 'stealth' | 'diamond' | 'oval' | 'none';
+export type ArrowEndSize = 'sm' | 'md' | 'lg';
+
+export interface ArrowEnd {
+  readonly shape: ArrowEndShape;
+  readonly width?: ArrowEndSize | undefined;
+  readonly length?: ArrowEndSize | undefined;
+}
 export type BorderStyle = 'none' | 'solid' | 'dashed' | 'dotted' | 'double' | 'groove' | 'ridge' | 'inset' | 'outset';
 export type TextAlignment = 'left' | 'center' | 'right' | 'justify';
 export type FontStyle = 'normal' | 'italic' | 'oblique';
@@ -85,7 +93,10 @@ export interface BroadsetElementStyle {
   readonly strokeDashoffset?: number | undefined;
   readonly strokeLinecap?: StrokeLinecap | undefined;
   readonly strokeLinejoin?: StrokeLinejoin | undefined;
+  readonly strokeMiterlimit?: number | undefined;
   readonly strokeOpacity?: number | undefined;
+  readonly strokeHeadEnd?: ArrowEnd | undefined;
+  readonly strokeTailEnd?: ArrowEnd | undefined;
   readonly fill?: string | undefined;
   readonly fillOpacity?: number | undefined;
   readonly fillRule?: FillRule | undefined;
@@ -251,6 +262,15 @@ const broadsetGradientSchema = z
     message: 'Gradient stop positions must be in ascending order',
   });
 
+const ARROW_END_SHAPE_VALUES = ['triangle', 'stealth', 'diamond', 'oval', 'none'] as const;
+const ARROW_END_SIZE_VALUES = ['sm', 'md', 'lg'] as const;
+
+const arrowEndSchema: z.ZodType<ArrowEnd> = z.object({
+  shape: z.enum(ARROW_END_SHAPE_VALUES),
+  width: z.enum(ARROW_END_SIZE_VALUES).optional(),
+  length: z.enum(ARROW_END_SIZE_VALUES).optional(),
+});
+
 export const styleSchema: z.ZodType<BroadsetElementStyle> = z
   .object({
     opacity: z.number().min(0).max(1),
@@ -286,7 +306,10 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
     strokeDashoffset: z.number().optional(),
     strokeLinecap: z.enum(['butt', 'round', 'square']).optional(),
     strokeLinejoin: z.enum(['miter', 'round', 'bevel']).optional(),
+    strokeMiterlimit: z.number().min(1).optional(),
     strokeOpacity: z.number().min(0).max(1).optional(),
+    strokeHeadEnd: arrowEndSchema.optional(),
+    strokeTailEnd: arrowEndSchema.optional(),
     fill: z.string().optional(),
     fillOpacity: z.number().min(0).max(1).optional(),
     fillRule: z.enum(['nonzero', 'evenodd']).optional(),
@@ -366,7 +389,10 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
       strokeDashoffset: value.strokeDashoffset,
       strokeLinecap: value.strokeLinecap,
       strokeLinejoin: value.strokeLinejoin,
+      strokeMiterlimit: value.strokeMiterlimit,
       strokeOpacity: value.strokeOpacity,
+      strokeHeadEnd: value.strokeHeadEnd,
+      strokeTailEnd: value.strokeTailEnd,
       fill: maybeNormalizeColor(value.fill),
       fillOpacity: value.fillOpacity,
       fillRule: value.fillRule,

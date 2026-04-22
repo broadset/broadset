@@ -121,13 +121,42 @@ The system MUST support:
 
 ### Requirement: SVG Stroke and Fill Properties
 
-The system MUST support SVG-specific properties for path and SVG elements: `stroke` (color), `strokeWidth` (numeric), `strokeDasharray` (pattern string), `strokeDashoffset` (numeric), `strokeLinecap` (`'butt'` | `'round'` | `'square'`), `strokeLinejoin` (`'miter'` | `'round'` | `'bevel'`), `strokeOpacity` (0–1), `fill` (color), `fillOpacity` (0–1), `fillRule` (`'nonzero'` | `'evenodd'`). All are optional and animatable.
+The system MUST support SVG-specific properties for path and SVG elements: `stroke` (color), `strokeWidth` (numeric), `strokeDasharray` (pattern string), `strokeDashoffset` (numeric), `strokeLinecap` (`'butt'` | `'round'` | `'square'`), `strokeLinejoin` (`'miter'` | `'round'` | `'bevel'`), `strokeMiterlimit` (numeric, `>= 1`), `strokeOpacity` (0–1), `fill` (color), `fillOpacity` (0–1), `fillRule` (`'nonzero'` | `'evenodd'`). All are optional and animatable. `strokeMiterlimit` MUST reject values below `1` to match the SVG specification minimum.
 
 #### Acceptance Criteria
 
 - [ ] Given a path element with stroke properties, all are applied to the SVG rendering
 - [ ] Given an SVG element with a fillRule, the winding rule is applied
 - [ ] Given strokeLinecap as an invalid string, validation fails
+- [ ] Given strokeMiterlimit equal to or above 1, validation succeeds
+- [ ] Given strokeMiterlimit below 1 (including 0 and negative values), validation fails
+
+---
+
+### Requirement: Stroke Arrow Endings
+
+The system MUST support optional arrow endings on both ends of a stroked path or line via `strokeHeadEnd` and `strokeTailEnd`. Each ending is an `ArrowEnd` object containing a required `shape` (`'triangle'` | `'stealth'` | `'diamond'` | `'oval'` | `'none'`), an optional `width` (`'sm'` | `'md'` | `'lg'`), and an optional `length` (`'sm'` | `'md'` | `'lg'`). The discrete vocabulary is chosen to round-trip PPTX `<a:headEnd>` / `<a:tailEnd>`, PDF line-ending styles, SVG `marker-start` / `marker-end`, and PSD shape-layer arrowheads. Arbitrary strings MUST be rejected.
+
+#### Scenario: Triangle arrow tail
+
+- GIVEN a line element with `style: { strokeTailEnd: { shape: 'triangle', width: 'md', length: 'md' } }`
+- WHEN the element is rendered
+- THEN the line terminates in a medium triangle arrowhead
+
+#### Scenario: Shape is required
+
+- GIVEN an `ArrowEnd` object with `width` but no `shape`
+- WHEN the style is validated
+- THEN validation fails because `shape` is required
+
+#### Acceptance Criteria
+
+- [ ] Given `strokeHeadEnd` or `strokeTailEnd` with any supported shape keyword, validation succeeds
+- [ ] Given `ArrowEnd` with supported `width` and `length` size keywords, validation succeeds
+- [ ] Given `ArrowEnd` without a `shape` field, validation fails
+- [ ] Given an unknown `shape` keyword, validation fails
+- [ ] Given an unknown size keyword for `width` or `length`, validation fails
+- [ ] Both endings are independently optional and may be set on the same element
 
 ---
 

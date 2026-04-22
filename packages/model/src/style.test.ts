@@ -227,6 +227,115 @@ describe('SVG stroke and fill properties', () => {
   });
 });
 
+/**
+ * @description Stroke miter limit and arrow endings round-trip into PPTX connectors,
+ * PDF line terminators, SVG `marker-start`/`marker-end`, and PSD shape layers.
+ * The model must validate the SVG-compatible floor (miterlimit >= 1) and the
+ * discrete `ArrowEnd` vocabulary so every importer/exporter speaks the same
+ * shapes and sizes.
+ */
+describe('Stroke enhancements', () => {
+  /** @description The SVG default of 4 must validate cleanly. */
+  it('accepts strokeMiterlimit at the SVG default value', () => {
+    const result = styleSchema.safeParse({ opacity: 1, strokeMiterlimit: 4 });
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description Larger finite miter limits must validate so steep-angle joins remain sharp. */
+  it('accepts strokeMiterlimit values above 1', () => {
+    expect(styleSchema.safeParse({ opacity: 1, strokeMiterlimit: 1 }).success).toBe(true);
+    expect(styleSchema.safeParse({ opacity: 1, strokeMiterlimit: 10 }).success).toBe(true);
+    expect(styleSchema.safeParse({ opacity: 1, strokeMiterlimit: 100 }).success).toBe(true);
+  });
+
+  /** @description Values below 1 (and 0) must be rejected — SVG spec forbids them. */
+  it('rejects strokeMiterlimit below 1', () => {
+    expect(styleSchema.safeParse({ opacity: 1, strokeMiterlimit: 0 }).success).toBe(false);
+    expect(styleSchema.safeParse({ opacity: 1, strokeMiterlimit: 0.5 }).success).toBe(false);
+    expect(styleSchema.safeParse({ opacity: 1, strokeMiterlimit: -4 }).success).toBe(false);
+  });
+
+  /** @description Every ArrowEnd shape keyword must validate for both head and tail. */
+  it.each([
+    ['strokeHeadEnd', 'triangle'],
+    ['strokeHeadEnd', 'stealth'],
+    ['strokeHeadEnd', 'diamond'],
+    ['strokeHeadEnd', 'oval'],
+    ['strokeHeadEnd', 'none'],
+    ['strokeTailEnd', 'triangle'],
+    ['strokeTailEnd', 'stealth'],
+    ['strokeTailEnd', 'diamond'],
+    ['strokeTailEnd', 'oval'],
+    ['strokeTailEnd', 'none'],
+  ])('accepts %s with shape %s', (key, shape) => {
+    const result = styleSchema.safeParse({
+      opacity: 1,
+      [key]: { shape },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description Size keywords must validate on width and length for both ends. */
+  it('accepts ArrowEnd width and length size keywords', () => {
+    const result = styleSchema.safeParse({
+      opacity: 1,
+      strokeHeadEnd: { shape: 'triangle', width: 'md', length: 'lg' },
+      strokeTailEnd: { shape: 'diamond', width: 'sm', length: 'sm' },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description Unknown ArrowEnd shapes must be rejected. */
+  it('rejects unknown ArrowEnd shapes', () => {
+    expect(
+      styleSchema.safeParse({ opacity: 1, strokeHeadEnd: { shape: 'arrow' } }).success,
+    ).toBe(false);
+    expect(
+      styleSchema.safeParse({ opacity: 1, strokeTailEnd: { shape: '' } }).success,
+    ).toBe(false);
+  });
+
+  /** @description Unknown ArrowEnd size keywords must be rejected. */
+  it('rejects unknown ArrowEnd size keywords', () => {
+    expect(
+      styleSchema.safeParse({
+        opacity: 1,
+        strokeHeadEnd: { shape: 'triangle', width: 'xl' },
+      }).success,
+    ).toBe(false);
+    expect(
+      styleSchema.safeParse({
+        opacity: 1,
+        strokeTailEnd: { shape: 'triangle', length: 'huge' },
+      }).success,
+    ).toBe(false);
+  });
+
+  /** @description Missing the required `shape` field must be rejected. */
+  it('rejects ArrowEnd objects without a shape', () => {
+    expect(
+      styleSchema.safeParse({ opacity: 1, strokeHeadEnd: { width: 'md' } }).success,
+    ).toBe(false);
+  });
+
+  /** @description The parsed value must preserve the provided shape and sizes verbatim. */
+  it('preserves the ArrowEnd object on parse', () => {
+    const parsed = styleSchema.parse({
+      opacity: 1,
+      strokeMiterlimit: 8,
+      strokeHeadEnd: { shape: 'stealth', width: 'lg', length: 'md' },
+      strokeTailEnd: { shape: 'none' },
+    });
+
+    expect(parsed.strokeMiterlimit).toBe(8);
+    expect(parsed.strokeHeadEnd).toEqual({ shape: 'stealth', width: 'lg', length: 'md' });
+    expect(parsed.strokeTailEnd).toEqual({ shape: 'none' });
+  });
+});
+
 /** @description Padding values must stay non-negative and use the required four-number tuple format. */
 describe('Padding validation', () => {
   /** @description Four-value non-negative padding tuples must be accepted. */
