@@ -1,7 +1,7 @@
 import { Button, Slider } from '@heroui/react';
 import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 import type { CSSProperties, JSX } from 'react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { color, sp } from '../tokens';
 import { parseShadow } from '../utilities';
@@ -138,11 +138,37 @@ export function ShadowEditor({ value, mode, onChange, label }: ShadowEditorProps
   const [layers, setLayers] = useState<readonly ShadowLayer[]>(() => parseShadowLayers(value));
   const [enabled, setEnabled] = useState(value !== 'none' && value.trim() !== '');
   const stashedRef = useRef(layers);
+  // Track the serialized value we last emitted so an external `value` change
+  // (selection switch, undo/redo, remote apply) can be distinguished from our
+  // own onChange round-trip and resynced without feedback looping.
+  const lastEmittedRef = useRef(value);
+
+  useEffect(() => {
+    if (value === lastEmittedRef.current) {
+      return;
+    }
+
+    lastEmittedRef.current = value;
+
+    const nextEnabled = value !== 'none' && value.trim() !== '';
+    const nextLayers = parseShadowLayers(value);
+
+    setEnabled(nextEnabled);
+    setLayers(nextLayers);
+
+    if (nextLayers.length > 0) {
+      stashedRef.current = nextLayers;
+    }
+  }, [value]);
 
   const applyLayers = useCallback(
     (nextLayers: readonly ShadowLayer[]): void => {
       setLayers(nextLayers);
-      onChange(buildShadowString(nextLayers, mode));
+
+      const serialized = buildShadowString(nextLayers, mode);
+
+      lastEmittedRef.current = serialized;
+      onChange(serialized);
     },
     [mode, onChange],
   );
@@ -151,6 +177,7 @@ export function ShadowEditor({ value, mode, onChange, label }: ShadowEditorProps
     if (enabled) {
       stashedRef.current = layers;
       setEnabled(false);
+      lastEmittedRef.current = 'none';
       onChange('none');
 
       return;

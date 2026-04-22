@@ -12,7 +12,7 @@ import {
 } from '@heroui/react';
 import { X } from 'lucide-react';
 import type { JSX } from 'react';
-import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { Color } from 'react-aria-components';
 
 import { color as colorToken, sp } from '../tokens';
@@ -239,6 +239,21 @@ export function ColorInput({ value, onChange, label, compact, allowAlpha = true 
   const [palette, setPalette] = useState<readonly string[]>([]);
   const lastValidRef = useRef(value);
   const errorId = useId();
+
+  // Discard any in-progress draft when the incoming `value` prop changes to
+  // something the user didn't just commit — e.g. selection switch, undo/redo,
+  // or remote collaboration apply. Without this, a mid-edit draft on element
+  // A would silently carry over onto element B and could commit the wrong
+  // color on blur.
+  useEffect(() => {
+    if (value === lastValidRef.current) {
+      return;
+    }
+
+    lastValidRef.current = value;
+    setIsDrafting(false);
+    setDraft('');
+  }, [value]);
 
   const parsed = useMemo(() => parseColorToRgba(value), [value]);
   const isEmpty = value.trim() === '';

@@ -1,6 +1,6 @@
 import { NumberField } from '@heroui/react';
 import type { JSX } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { ColorInput } from './color-input';
 
@@ -17,6 +17,17 @@ export interface TextStrokeInputProps {
 export function TextStrokeInput({ width, color, onChange, label }: TextStrokeInputProps): JSX.Element {
   const [localWidth, setLocalWidth] = useState(width);
   const [localColor, setLocalColor] = useState(color);
+
+  // Resync local draft state when the controlled props change — e.g. after a
+  // selection switch, undo/redo, or remote collaboration apply — so the input
+  // reflects the new target element instead of the previous value.
+  useEffect(() => {
+    setLocalWidth(width);
+  }, [width]);
+
+  useEffect(() => {
+    setLocalColor(color);
+  }, [color]);
 
   const emit = useCallback(
     (w: number, c: string) => {
