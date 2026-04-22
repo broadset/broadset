@@ -1,33 +1,699 @@
 # Master Implementation Plan
 
-Each plan lives in its own file to keep agent context
-small when working on a single phase.
+This file is the consolidated execution roadmap across the shared prerequisites,
+renderer refactor, and all format tracks.
+
+Detailed task-level planning still lives in the dedicated companion files:
+
+- [io-prereqs-plan.md](./io-prereqs-plan.md)
+- [renderer-refactor-plan.md](./renderer-refactor-plan.md)
+- [psd-support-plan.md](./psd-support-plan.md)
+- [pdf-support-plan.md](./pdf-support-plan.md)
+- [svg-support-plan.md](./svg-support-plan.md)
+- [pptx-support-plan.md](./pptx-support-plan.md)
+- [pdf-pdfa-compliance-plan.md](./pdf-pdfa-compliance-plan.md)
+- [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md)
+- [coverage-reporting.md](./coverage-reporting.md)
+- [cross-region-ct-audit.md](./cross-region-ct-audit.md)
+- [package-split.md](./package-split.md)
+
+Use this file for sequencing. Use the companion files for detailed unit scope,
+acceptance criteria, and risk notes.
 
 For repo guidance, see `../../README.md` and `../../AGENTS.md`.
 
----
+## TDD Convention
 
-## TDD Convention (“Ralph Loop”)
+Every implementation unit in this roadmap is executed test-first using the
+acceptance criteria in the relevant spec file and the current repo test stack
+(Vitest for unit tests, Playwright CT where required).
 
-Every unit below is implemented test-first using the acceptance criteria in the
-corresponding spec file:
+1. **Red** — translate the spec acceptance criteria into failing tests.
+2. **Green** — implement the minimum production code to pass them.
+3. **Refactor** — clean up without breaking tests or weakening checks.
 
-1. **Red** — translate the spec’s `- [ ]` acceptance criteria into failing Jest tests
-2. **Green** — write the minimum production code to make them pass
-3. **Refactor** — clean up without breaking tests; commit
+Each unit is complete only when:
 
-Each checklist item therefore has two sub-checks:
+- the targeted tests are green
+- the relevant package `quality` command is green
+- any required CT for cross-region UI behavior is green
 
+## Planning rules
+
+1. **Phases 0 through 4 are hard prerequisites.** Do not start format work before the shared foundation is in place.
+2. **Format priority is product-driven and fixed here:** PSD, then PDF, then SVG, then PPTX.
+3. **io-prereqs Phase 5 is interleaved, not front-loaded.** Land only the UI slices needed by the active format track, then reuse them downstream.
+4. **io-prereqs Phase 6 lands at first need.** The first format track that needs the shared fixture convention, chain harness, and preserved-blob stress test introduces them once for everyone.
+5. **The renderer refactor is its own workstream.** Treat it as the detailed execution of io-prereqs Phase 3.
+6. **PDF/A-2b is deferred.** It starts only after the main PDF track has reached Phase 5 completion.
+7. **Every phase ends green.** Use `npm run gate:full` as the closing gate, with `npm run ct` added for UI-visible phases.
+
+## Master order
+
+```text
+Phase 0  → Shared decisions and spec lock
+Phase 1  → Shared model additions
+Phase 2  → Shared libraries and _shared modules
+Phase 3  → Renderer refactor
+Phase 4  → Shared asset pipeline
+Phase 5  → PSD track
+Phase 6  → PDF track
+Phase 7  → SVG track
+Phase 8  → PPTX track
+Phase 9  → PDF/A-2b followup
+Parallel A → Coverage reporting
+Parallel B → Cross-region CT audit
+Deferred C → Package split
 ```
-- [ ] tests: red   ← spec ACs translated into a failing test file
-- [ ] impl: green  ← production code written; all tests pass
+
+## Phase 0 — Shared decisions and spec lock
+
+Source of truth: [io-prereqs-plan.md](./io-prereqs-plan.md)
+
+This phase is docs and decisions only. No production code lands here.
+
+Deliverables:
+
+- ratify cross-format decisions IO-D-01 through IO-D-18 in [decisions.md](./decisions.md)
+- update model specs in `project/spec/model/` for every Phase 1 shape change
+- update [project/spec/formats/spec.md](../spec/formats/spec.md) with the importer contract, importer security contract, no-sidecar rule, and no-silent-drops rule
+- keep format-specific behavior in the format spec files, not here
+
+Exit condition:
+
+- specs and decisions are updated and internally consistent
+- no code changes yet
+
+## Phase 1 — Shared model additions
+
+Source of truth: [io-prereqs-plan.md](./io-prereqs-plan.md)
+
+This phase lands the shared data-model work all four formats depend on.
+
+### Phase 1 landing order
+
+1. Unit utilities plus `parseLength`
+2. Importer security contract spec update
+3. `BroadsetColor` discriminated union and migration path
+4. Content-hash identity field
+5. Stroke enhancements (`strokeMiterlimit`, head/tail arrow ends)
+6. Structured filter primitives (`FilterStack`)
+7. Gradient enhancements (conic center/start angle, color mods)
+8. `BroadsetFill` discriminated union
+9. Text model (`string | TextBody`)
+10. Text-on-path reference
+11. Text fidelity fields
+12. Model-level script rejection
+13. Extensions typing registry
+14. Per-format dirty flag and editor middleware
+15. Page, canvas, and document additions (`notes`, bleed/trim/safe-area, metadata, output intent)
+16. Importer contract spec closeout
+
+### Phase 1 notes
+
+- The three largest cascades are `BroadsetColor`, `BroadsetFill`, and the text-model upgrade.
+- Update fixtures and tests in the same commits as breaking type changes.
+- Do not preserve Broadset-owned backwards compatibility shims; this repo is greenfield.
+
+Exit condition:
+
+- model and validators support the shared format work
+- affected packages compile and pass their relevant quality gates
+
+## Phase 2 — Shared libraries and `_shared` modules
+
+Source of truth: [io-prereqs-plan.md](./io-prereqs-plan.md)
+
+This phase adds the shared format infrastructure under `packages/formats/src/_shared/`.
+
+Deliverables:
+
+- `_shared/color/`
+- `_shared/fonts/`
+- `_shared/text-layout/`
+- `_shared/xmp/`
+- `_shared/fingerprint/`
+- `_shared/reconcile/`
+- `_shared/shape-classifier/`
+- `_shared/sanitize/`
+- bundle-size assertion coverage for the heavy lazy-loaded paths
+
+Exit condition:
+
+- shared modules exist with narrow public APIs and unit coverage
+- format plans can consume them directly without re-implementing the same logic
+
+## Phase 3 — Renderer refactor
+
+Source of truth: [renderer-refactor-plan.md](./renderer-refactor-plan.md)
+
+This phase is the detailed execution of the renderer refactor needed by the
+format work.
+
+### Phase 3 subphases
+
+#### Phase 3.0 — Contract cleanup
+
+- separate generic renderer contracts from Broadset adapter contracts
+- resolve spec drift around renderer-owned data attributes and group semantics
+
+#### Phase 3.1 — Internal layer split
+
+- split the current monolith into controller, host policy, layout, DOM, and adapter layers
+- keep `createScreenRenderer` compatibility intact during the split
+
+#### Phase 3.2 — Keyed reconciliation
+
+- replace whole-layer DOM replacement with keyed reconciliation
+- replace `JSON.stringify` change detection with explicit dirty-node classification
+
+#### Phase 3.3 — Semantic renderers and safe builders
+
+- replace unsafe markup paths with safe AST-to-DOM builders
+- separate semantic text rendering from character-level instrumentation
+- separate generic groups from boolean/composite behavior
+
+#### Phase 3.4 — Runtime services
+
+- add time, data, state, font, and asset service seams
+- stop treating runtime behavior as document replacement
+
+#### Phase 3.5 — Broadset adapter migration
+
+- move Broadset-specific data attributes, overlay-root behavior, and compatibility wrappers into the adapter layer
+
+#### Phase 3.6 — Spec closure and hardening
+
+- align renderer specs, exports, DOM-stability tests, and performance checks with the refactored shape
+
+Exit condition:
+
+- renderer core is generic enough to consume a normalized scene graph
+- Broadset behavior remains available through the compatibility adapter
+
+## Phase 4 — Shared asset pipeline
+
+Source of truth: [io-prereqs-plan.md](./io-prereqs-plan.md)
+
+This phase lands the shared asset capabilities all format tracks depend on.
+
+Deliverables:
+
+- font asset type
+- image assets normalized to bytes + metadata
+- ICC profile preservation on image assets
+- `icc-profile` asset type
+- shared font subsetting pipeline
+- font embed-permission surface
+- content-hash asset deduplication on import
+
+Exit condition:
+
+- fonts, images, ICC profiles, and dedup semantics are available to every format exporter/importer
+
+## Phase 5 — PSD track
+
+Source of truth: [psd-support-plan.md](./psd-support-plan.md)
+
+This is the first format track by explicit product priority.
+
+### Phase 5 sequence
+
+#### Phase 5.0 — PSD spec and scope lock
+
+- rewrite the PSD spec around native layers, metadata layer, groups, masks, effects, and round-trip guarantees
+
+#### Phase 5.1 — PSD types and de-risking spike
+
+- add PSD types and namespace schema
+- verify `ag-psd` metadata-channel viability and Photoshop preservation of custom signatures and XMP
+
+#### Phase 5.2 — PSD export parity rebuild
+
+- preserve groups
+- add full path grammar and rotation export
+- restore meaningful effect coverage
+
+#### Phase 5.3 — PSD export beyond prior art
+
+- native shape layers
+- full text-run export
+- all layer-effect coverage
+- bitmap masks, clipping masks, linked smart objects, ICC-aware color handling
+- XMP + `additionalInfo` metadata layer
+
+#### Phase 5.4 — PSD import
+
+- 5.4a fast path: XMP + `additionalInfo`
+- 5.4b third-party layer-level extraction
+
+#### Phase 5.5 — PSD reconciliation
+
+- reconcile metadata defaults with current layer-tree edits
+- recover identity by hash when tags are stripped
+
+#### Phase 5.6 — PSD tests and UI wiring
+
+- external-tool fixtures and chain tests
+- import/export UI wiring and warning surfaces
+
+### Phase 5 interleaves
+
+During the PSD track, land the first tranche of io-prereqs Phase 5 UI work that PSD needs:
+
+- run-edit mode
+- bullets and paragraph editing
+- swatches + ICC picker
+- export options modal
+- import warnings and reconciliation UI
+
+Trigger io-prereqs Phase 6 during this track when PSD first needs the shared test harness and fixture convention.
+
+Exit condition:
+
+- PSD import/export/reconciliation/UI track is complete and green
+
+## Phase 6 — PDF track
+
+Source of truth: [pdf-support-plan.md](./pdf-support-plan.md)
+
+This is the second format track by explicit product priority.
+
+### Phase 6 sequence
+
+#### Phase 6.0 — PDF spec and scope lock
+
+- expand the PDF spec to import, round-trip, metadata, marked content, and external interop
+
+#### Phase 6.1 — PDF types and dependency swap
+
+- swap `@libpdf/core` to `pdf-lib`
+- add `pdfjs-dist` and `@pdf-lib/fontkit`
+
+#### Phase 6.2 — PDF export parity rebuild
+
+- parent-child flattening
+- rotation composition
+- per-corner radii
+- clip-path and mask fidelity
+
+#### Phase 6.3 — PDF export beyond prior art
+
+- real gradients and color-space handling
+- OCGs by page
+- marked content tagging
+- XMP packet and richer export structure
+
+#### Phase 6.4 — PDF import
+
+- 6.4a fast path: XMP + marked content
+- 6.4b third-party operator-level extraction
+
+#### Phase 6.5 — PDF reconciliation
+
+- reconcile visual edits against XMP defaults and hash recovery
+
+#### Phase 6.6 — PDF tests and UI wiring
+
+- external-tool fixtures and chain tests
+- import/export UI, preflight, and preview surfaces
+
+### Phase 6 interleaves
+
+Land the additional io-prereqs Phase 5 slices PDF needs during this track:
+
+- color mode selector
+- gradient editor
+- bleed/trim/safe-area canvas UI
+- preflight panel
+- document metadata editor
+- multi-page sorter
+- custom font upload surface
+
+Reuse the shared test infrastructure introduced during the PSD track.
+
+Exit condition:
+
+- PDF import/export/reconciliation/UI track is complete and green
+
+## Phase 7 — SVG track
+
+Source of truth: [svg-support-plan.md](./svg-support-plan.md)
+
+This is the third format track by explicit product priority.
+
+### Phase 7 sequence
+
+#### Phase 7.0 — SVG spec and scope lock
+
+- split or rewrite the SVG spec to cover import, export, metadata, sanitization, and external interop
+
+#### Phase 7.1 — SVG types and architecture
+
+- add SVG types and direct-format dependencies
+- verify metadata preservation in Illustrator and Inkscape
+
+#### Phase 7.2 — SVG export parity and critical bug fix
+
+- recursive group export
+- stroke coverage
+- transform handling
+- safe sanitized output
+
+#### Phase 7.3 — SVG export beyond prior art
+
+- embedded fonts
+- conic fallback + metadata
+- OKLCH/display-p3 preservation
+- full tagging and metadata path
+
+#### Phase 7.4 — SVG import
+
+- 7.4a fast path: metadata + `data-bs-*`
+- 7.4b arbitrary third-party SVG import
+
+#### Phase 7.5 — SVG reconciliation
+
+- reconcile visual edits against metadata defaults and content-hash fallback
+
+#### Phase 7.6 — SVG tests and UI wiring
+
+- external-tool fixtures and chain tests
+- SVG-specific import/export UI affordances
+
+### Phase 7 interleaves
+
+Land the remaining io-prereqs Phase 5 slices SVG needs during this track:
+
+- stroke subpanel
+- pattern fill picker
+- filter editor
+- text fidelity subpanel
+- font-asset picker
+- import warnings modal refinements
+
+Reuse the existing shared test infrastructure.
+
+Exit condition:
+
+- SVG import/export/reconciliation/UI track is complete and green
+
+## Phase 8 — PPTX track
+
+Source of truth: [pptx-support-plan.md](./pptx-support-plan.md)
+
+This is the fourth format track by explicit product priority.
+
+### Phase 8 sequence
+
+#### Phase 8.0 — PPTX spec and scope lock
+
+- rewrite the PPTX spec around OOXML-native geometry, theme, metadata, and round-trip strategy
+
+#### Phase 8.1 — PPTX types, package architecture, and parser swap
+
+- replace regex parsing with namespace-safe OOXML parsing
+- add PPTX types and package helpers
+
+#### Phase 8.2 — PPTX export parity rebuild
+
+- real text runs
+- grouped export that preserves groups
+- proper relationship handling and geometry helpers
+
+#### Phase 8.3 — PPTX export beyond prior art
+
+- multi-slide support
+- generated theme/master/layout
+- native paths and gradients
+- notes, QR, and shape-tag metadata layers
+
+#### Phase 8.4 — PPTX import
+
+- 8.4a fast path: custom XML + shape tags
+- 8.4b arbitrary third-party PPTX extraction
+
+#### Phase 8.5 — PPTX reconciliation
+
+- reconcile visual edits against custom XML defaults and interop ledger hashes
+
+#### Phase 8.6 — PPTX tests and UI wiring
+
+- external-tool fixtures and chain tests
+- final import/export UI wiring for the PowerPoint flow
+
+### Phase 8 interleaves
+
+Land any remaining io-prereqs Phase 5 slices PPTX needs during this track:
+
+- theme-aware color workflow
+- picture-fill picker
+- speaker notes UI
+- final export options and import warning variants for PPTX
+
+By the time this track starts, most of the required UI surface should already exist from PSD, PDF, and SVG.
+
+Exit condition:
+
+- PPTX import/export/reconciliation/UI track is complete and green
+
+## Phase 9 — PDF/A-2b followup
+
+Source of truth: [pdf-pdfa-compliance-plan.md](./pdf-pdfa-compliance-plan.md)
+
+This phase is intentionally deferred until the main PDF track is mature enough.
+
+### Phase 9 sequence
+
+#### Phase 9.0 — PDF/A audit and spec update
+#### Phase 9.1 — font embedding totality
+#### Phase 9.2 — color-management and output-intent enforcement
+#### Phase 9.3 — forbidden-feature gating
+#### Phase 9.4 — PDF/A metadata and trailer correctness
+#### Phase 9.5 — validator integration and CI
+#### Phase 9.6 — round-trip support for PDF/A exports
+
+Start this phase only after the PDF track has reached Phase 6.5 or later and the exporter/importer behavior is already stable.
+
+## Parallel Track A — Coverage reporting
+
+Source of truth: [coverage-reporting.md](./coverage-reporting.md)
+
+This is an active supporting track, not a core dependency phase.
+
+Purpose:
+
+- add non-gating Vitest runtime coverage reporting
+- establish a baseline report for untested production paths
+- support future audit and prioritization work without blocking PRs on thresholds
+
+Start conditions:
+
+- Vitest migration complete
+- `npm run gate:full` green on the branch
+
+Recommended slot:
+
+- can start immediately
+- preferably complete before the cross-region CT audit is deep into gap triage, since its baseline is useful signal
+- safe to run in parallel with shared foundation work because it is mostly test tooling and reporting
+
+### Parallel Track A sequence
+
+#### A.1 — wire `@vitest/coverage-v8` into shared Vitest config
+#### A.2 — add exclusion rules and per-package overrides
+#### A.3 — add root coverage scripts and ignore rules
+#### A.4 — capture and document the baseline report
+#### A.5 — update docs and testing guidance
+#### A.6 — optional follow-up threshold proposal based on baseline numbers
+
+Exit condition:
+
+- coverage reporting is available and documented
+- coverage remains non-gating in this track
+
+## Parallel Track B — Cross-region CT audit
+
+Source of truth: [cross-region-ct-audit.md](./cross-region-ct-audit.md)
+
+This is an active supporting track, not a replacement for the main format roadmap.
+
+Purpose:
+
+- systematically inventory cross-region scenarios required by the CT Derivation Rule
+- identify missing CT coverage from the specs
+- land missing CTs or explicit spec-gap waivers
+
+Start conditions:
+
+- `test-improvement-plan.md` already complete
+- `npm run gate:full` green on the branch
+
+Recommended slot:
+
+- start after or alongside Parallel Track A so the team has coverage baseline signal
+- run before and during the PSD/PDF/SVG/PPTX tracks so CT gaps are identified early and closed continuously
+- especially relevant once io-prereqs Phase 5 UI slices start landing
+
+### Parallel Track B sequence
+
+#### B.1 — inventory cross-region scenarios in `project/spec/editor/**`
+#### B.2 — inventory cross-region scenarios in `project/spec/ui/**`
+#### B.3 — inventory cross-region scenarios in `project/spec/demo/**`
+#### B.4 — consolidate into one gap list
+#### B.5 — land missing CT coverage in focused batches
+#### B.6 — final regression and gate closeout
+
+Exit condition:
+
+- every identified cross-region scenario has CT coverage or an explicit documented waiver in the owning spec
+
+## Deferred Track C — Package split
+
+Source of truth: [package-split.md](./package-split.md)
+
+This is a real unfinished plan, but it is intentionally not on the critical path for the current platform and format program.
+
+Rationale for deferral:
+
+- the main roadmap is already restructuring `@broadset/renderer`, `@broadset/formats`, and editor internals substantially
+- mixing facade/package moves into the active feature-delivery phases would create avoidable churn and merge-conflict pressure
+- the package split will be easier and cleaner after the format and renderer work stabilizes the new ownership boundaries
+
+Recommended slot:
+
+- start after Phase 8 completes
+- if PDF/A becomes urgent, still keep package split after the feature-complete format program unless there is a specific build-scaling emergency
+
+### Deferred Track C sequence
+
+#### C.1 — prep and API freeze
+
+- inventory current public exports for `@broadset/formats` and `@broadset/editor`
+- define the facade compatibility contract
+
+#### C.2 — formats split
+
+- create `formats-core`
+- create specialized format packages
+- keep `@broadset/formats` as a stable facade
+
+#### C.3 — editor split
+
+- create `editor-store`
+- create `editor-interaction`
+- keep `@broadset/editor` as a stable facade
+
+#### C.4 — optional UI tokens split
+
+- only if reuse justifies it after the larger splits settle
+
+#### C.5 — cleanup and hardening
+
+- remove duplicates
+- update architecture docs and package READMEs
+- verify root validation chain
+
+Exit condition:
+
+- facades remain stable
+- new internal packages are introduced with clear ownership and architecture docs reflect the final graph
+
+## Interleave rules for io-prereqs Phase 5 and Phase 6
+
+### io-prereqs Phase 5 — editor UI surface
+
+Do not try to finish all of Phase 5 before format work starts.
+
+Instead:
+
+- land the PSD-required UI slice during Phase 5
+- extend it with the PDF-required slice during Phase 6
+- extend it with the SVG-required slice during Phase 7
+- finish the remaining PPTX-specific needs during Phase 8
+
+This keeps the UI work aligned to the active format track and avoids overbuilding unused controls early.
+
+### io-prereqs Phase 6 — testing infrastructure
+
+Land Phase 6 once, at first need, during the PSD track:
+
+- external-tool fixture convention
+- `assertReImportableBy(...)`
+- chain CT harness
+- preserved-blob stress test
+
+Then reuse it unchanged across PDF, SVG, and PPTX except for format-specific fixture additions.
+
+## Recommended execution summary
+
+```text
+Shared foundation:
+	Phase 0 → Phase 1 → Phase 2 → Phase 3 → Phase 4
+
+Formats in priority order:
+	Phase 5 PSD
+	Phase 6 PDF
+	Phase 7 SVG
+	Phase 8 PPTX
+
+Followup:
+	Phase 9 PDF/A-2b
+
+Supporting tracks:
+	Parallel A Coverage reporting
+	Parallel B Cross-region CT audit
+
+Deferred structural track:
+	Deferred C Package split
 ```
 
-A unit is **done** only when both boxes are checked and `npm run quality` passes in
-its package.
+More detailed sequence:
 
----
+```text
+io-prereqs 0 → 1 → 2 → renderer-refactor → io-prereqs 4
+→ PSD 0 → 1 → 2a → 2b → io-prereqs 5 slice A → PSD 3a → 3b → 4 → io-prereqs 6 → PSD 5 → 6
+→ PDF 0 → 1 → 2a → 2b → io-prereqs 5 slice B → PDF 3a → 3b → 4 → 5 → 6
+→ SVG 0 → 1 → 2a → 2b → io-prereqs 5 slice C → SVG 3a → 3b → 4 → 5 → 6
+→ PPTX 0 → 1 → 2a → 2b → io-prereqs 5 slice D → PPTX 3a → 3b → 4 → 5 → 6
+→ PDF/A-2b
 
-## Current Status
+parallel: coverage-reporting
+parallel: cross-region-ct-audit
 
-Agent is told by the user at the start what plan to follow.
+deferred-after-main-program: package-split
+```
+
+## Status
+
+Status is collected here so this file is the single place to check planning state.
+
+As of 2026-04-22:
+
+- **io-prereqs:** draft — pre-Phase 0
+- **renderer refactor:** draft — extracted from io-prereqs Phase 3 into its own detailed plan
+- **PSD support:** draft — pre-Phase 0
+- **PDF support:** draft — pre-Phase 0
+- **SVG support:** draft — pre-Phase 0
+- **PPTX support:** draft — pre-Phase 0
+- **PDF/A-2b compliance:** draft followup — blocked on main PDF track completion
+- **io-prereqs UI features:** draft companion plan — consumed during io-prereqs Phase 5 interleaves
+- **coverage reporting:** ready for Ralph loop execution
+- **cross-region CT audit:** ready for Ralph loop execution
+- **package split:** proposed planning-only followup — deferred until after the main format program
+
+Completed reference:
+
+- **test improvement plan:** complete — not part of the unfinished roadmap
+
+Current master-plan state:
+
+- Shared foundation phases 0 through 4: not started
+- PSD track: not started
+- PDF track: not started
+- SVG track: not started
+- PPTX track: not started
+- PDF/A-2b followup: not started
+- Coverage reporting: not started
+- Cross-region CT audit: not started
+- Package split: deferred, not started
