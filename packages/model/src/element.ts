@@ -70,6 +70,28 @@ const typeConfigSchema = z
   .union([videoTypeConfigSchema, clockTypeConfigSchema, tickerTypeConfigSchema, z.record(z.string(), z.unknown())])
   .nullable();
 
+/**
+ * Matches a `<script` tag opening (including `<script>`, `<script type="…">`,
+ * `<SCRIPT>`). Linear time — a literal string followed by a word boundary.
+ */
+const SCRIPT_TAG_RE = /<\s*script\b/i;
+
+/**
+ * Matches an HTML event-handler attribute inside an open tag — `<tag on*="…">`
+ * or `<tag on*='…'>` or unquoted `<tag on*=handler>`. The `<[^>]*` prefix is
+ * bounded by the negative class `[^>]`, so the expression runs in time linear
+ * to the input length and avoids the "onion=cheese" false positive because it
+ * requires the match to occur inside a tag.
+ */
+const HTML_EVENT_HANDLER_RE = /<[^>]*\son[a-z]+\s*=/i;
+
+/** Element types whose `content` flows into an HTML / SVG rendering path. */
+const HTML_RENDERED_ELEMENT_TYPES: ReadonlySet<string> = new Set(['text', 'svg']);
+
+function containsScriptMarkers(content: string): boolean {
+  return SCRIPT_TAG_RE.test(content) || HTML_EVENT_HANDLER_RE.test(content);
+}
+
 export const elementSchema: z.ZodType<BroadsetElement> = z
   .object({
     id: z.string().min(1),
@@ -149,6 +171,14 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
       context.addIssue({
         code: 'custom',
         message: 'Ticker content must be a JSON array of strings',
+        path: ['content'],
+      });
+    }
+
+    if (HTML_RENDERED_ELEMENT_TYPES.has(value.type) && containsScriptMarkers(value.content)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'content must not contain <script> tags or HTML event-handler attributes',
         path: ['content'],
       });
     }

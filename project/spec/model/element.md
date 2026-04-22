@@ -223,21 +223,61 @@ Element position fields `x` and `y` MUST be finite numbers. `NaN` and `Infinity`
 
 Element content MUST be validated at the model boundary based on the element's type:
 
-- **text**: content MUST be sanitized to strip disallowed HTML tags. Allowed tags: `<b>`, `<i>`, `<u>`, `<br>`, `<span>`, `<strong>`, `<em>`. All other tags and all attributes except `style` MUST be stripped.
+- **text**: content MUST be sanitized to strip disallowed HTML tags. Allowed tags: `<b>`, `<i>`, `<u>`, `<br>`, `<span>`, `<strong>`, `<em>`. All other non-script tags and all attributes except `style` MUST be silently stripped. Raw `<script>` tags and HTML event-handler attributes in text content MUST be rejected by validation (see "Script Marker Rejection" below).
 - **image**: content MUST be a valid URL string (absolute or relative path). Empty string is allowed (placeholder image).
 - **path**: content MUST be a syntactically valid SVG path `d` attribute string. An empty string produces an empty path. Non-empty paths MUST begin with an `M` or `m` command. The valid command set is: `M`, `m`, `L`, `l`, `H`, `h`, `V`, `v`, `C`, `c`, `S`, `s`, `Q`, `q`, `T`, `t`, `A`, `a`, `Z`, `z`. Any non-numeric token that is not in the valid command set MUST cause validation to fail.
-- **svg**: content MUST be well-formed SVG markup.
+- **svg**: content MUST be well-formed SVG markup. Raw `<script>` tags and HTML event-handler attributes MUST be rejected by validation.
 - **qrcode**: content MUST be a non-empty string (the data to encode).
 - **rectangle**, **ellipse**, **group**: content SHOULD be empty or undefined.
 
 #### Acceptance Criteria
 
-- [ ] Given a text element with script tags in content, the tags are stripped during validation
+- [ ] Given a text element with disallowed non-script tags (style, iframe, object, embed, form) in content, the tags are silently stripped during validation
 - [ ] Given a text element with allowed tags (b, i, u, br, span, strong, em), the tags are preserved
 - [ ] Given an image element with a valid URL, validation succeeds
 - [ ] Given a path element with valid SVG d attribute syntax, validation succeeds
 - [ ] Given a path element with invalid d attribute syntax, validation fails
 - [ ] Given a qrcode element with empty content, validation fails
+
+---
+
+### Requirement: Script Marker Rejection
+
+The element schema MUST reject `content` strings that include a raw `<script>` tag opening or an HTML event-handler attribute (e.g. `onclick="…"`, `onload='…'`, `onError=handler`) for element types whose content flows through an HTML / SVG rendering path — specifically `text` and `svg`. Rejection MUST be case-insensitive. The event-handler detection MUST only trigger inside a tag (so plain prose like `"onion=cheese"` passes), achieved by requiring the pattern `<…on[a-z]+\s*=` to appear within an open tag. This guard is a last line of defense after importer-level sanitization: if DOMPurify or `sanitizeTextContent` fail or are bypassed, the schema fails loudly instead of allowing executable markup to reach the renderer.
+
+#### Scenario: Raw script tag in text content is rejected
+
+- GIVEN a text element with `content: "<script>alert(1)</script>Hello"`
+- WHEN the element is validated
+- THEN validation fails with a `content` path error
+
+#### Scenario: Event-handler attribute in svg content is rejected
+
+- GIVEN an svg element with `content: "<svg><g onload='alert(1)'/></svg>"`
+- WHEN the element is validated
+- THEN validation fails with a `content` path error
+
+#### Scenario: Benign text is accepted
+
+- GIVEN a text element with `content: "The onion=cheese sandwich"`
+- WHEN the element is validated
+- THEN validation succeeds because `on[word]=` does not appear inside an open tag
+
+#### Scenario: Non-HTML-rendered types are not affected
+
+- GIVEN an image element whose content is a URL with `?onclick=1` in its query string
+- WHEN the element is validated
+- THEN validation succeeds because the image path does not render content as HTML
+
+#### Acceptance Criteria
+
+- [ ] Given a text element with a raw `<script>` tag, validation fails
+- [ ] Given a text element with case-variant `<ScRiPt>` or `<SCRIPT>`, validation fails
+- [ ] Given a text element with an HTML event-handler attribute like `onclick="…"`, validation fails
+- [ ] Given an svg element with a `<script>` child or `onload=…` attribute, validation fails
+- [ ] Given a text element with safe inline tags (`<b>`, `<i>`, `<strong>`, etc.), validation succeeds
+- [ ] Given plain text containing `"onion=cheese"` outside any tag, validation succeeds
+- [ ] Given an image, qrcode, path, or other non-HTML-rendered element whose content happens to include `on*=` or `script` substrings, validation succeeds
 
 ---
 

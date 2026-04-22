@@ -202,11 +202,11 @@ describe('Element default values', () => {
 
 /** @description Text content is sanitized for safety, and type-specific content validation rules must hold. */
 describe('Content validation by element type', () => {
-  /** @description Script tags must be removed while allowed inline markup remains intact. */
+  /** @description Dangerous-but-non-script tags (style/iframe/embed) must still be silently stripped by the transform while allowed inline markup remains intact. */
   it('sanitizes text content while preserving allowed tags and style attributes', () => {
     const sanitizedResult = elementSchema.safeParse(
       createDefaultElement('text', {
-        content: "<script>alert('xss')</script>Hello",
+        content: '<style>body{display:none}</style>Hello',
       }),
     );
 
@@ -246,6 +246,76 @@ describe('Content validation by element type', () => {
     const quotedStyleResult = sanitizeTextContent(`<span style='color: "red"'>text</span>`);
 
     expect(quotedStyleResult).toContain('style="color: &quot;red&quot;"');
+  });
+
+  /**
+   * @description Script-markers in rendered content are the classic XSS surface.
+   * The element schema MUST reject raw `<script>` tags and HTML event-handler
+   * attributes in text and svg element content so that any importer bypass of
+   * DOMPurify / sanitizeTextContent fails loudly instead of reaching the
+   * renderer.
+   */
+  it.each([
+    ["<script>alert('x')</script>", 'text'],
+    ['<script type="text/javascript">evil()</script>', 'text'],
+    ['<SCRIPT>Xss</SCRIPT>', 'text'],
+    ['<ScRiPt>mixed</ScRiPt>', 'text'],
+    ['<span onclick="alert(1)">bad</span>', 'text'],
+    ['<img src="x" onerror="alert(1)"/>', 'text'],
+    ['<a onCLICK="x">link</a>', 'text'],
+    ['<svg><script>alert(2)</script></svg>', 'svg'],
+    ['<svg><g onload="alert(1)"/></svg>', 'svg'],
+  ])('rejects content %s on type %s as an XSS vector', (content, type) => {
+    const result = elementSchema.safeParse(createDefaultElement(type, { content }));
+
+    expect(result.success).toBe(false);
+  });
+
+  /** @description Benign inline markup without script markers MUST still validate. */
+  it.each([
+    ['<b>bold</b>', 'text'],
+    ['<i>italic</i>', 'text'],
+    ['<span>plain</span>', 'text'],
+    ['<strong>strong</strong>', 'text'],
+    ['<em>emphasis</em><u>underline</u>', 'text'],
+    ['Just plain text', 'text'],
+    ['', 'text'],
+    ['<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>', 'svg'],
+  ])('accepts safe content %s on type %s', (content, type) => {
+    const result = elementSchema.safeParse(createDefaultElement(type, { content }));
+
+    expect(result.success).toBe(true);
+  });
+
+  /**
+   * @description The `on*=` event-handler guard MUST match only attribute-shaped
+   * occurrences inside a tag — plain text like `onion=cheese` MUST NOT trigger
+   * rejection because it cannot execute in any renderer path.
+   */
+  it('does not false-positive on plain text that happens to start with "on"', () => {
+    const result = elementSchema.safeParse(
+      createDefaultElement('text', { content: 'The onion=cheese sandwich' }),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  /**
+   * @description Content types whose content does NOT flow through an HTML
+   * rendering path (image URLs, QR payloads, ticker JSON, path `d` data) must
+   * still pass validation even when their text happens to contain `on*=`
+   * patterns or angle-bracket-free script keywords. The element-type-specific
+   * validators already enforce the shape they need.
+   */
+  it('does not reject non-HTML-rendered content containing benign on=/"script" substrings', () => {
+    expect(
+      elementSchema.safeParse(
+        createDefaultElement('image', { content: 'https://example.com/img.png?onclick=1' }),
+      ).success,
+    ).toBe(true);
+    expect(
+      elementSchema.safeParse(createDefaultElement('qrcode', { content: 'Buy onions' })).success,
+    ).toBe(true);
   });
 
   /** @description Image placeholders, valid path data, and QR-code payload requirements must all validate correctly. */
