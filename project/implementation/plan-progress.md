@@ -43,8 +43,8 @@ Source of truth: [io-prereqs-plan.md](./io-prereqs-plan.md)
 - [ ] P1.10 Text-on-path reference
 - [ ] P1.11 Text fidelity fields
 - [x] P1.12 Model-level script rejection
-- [ ] P1.13 Extensions typing registry
-- [ ] P1.14 Per-format dirty flag and editor middleware
+- [x] P1.13 Extensions typing registry
+- [x] P1.14 Per-format dirty flag and editor middleware
 - [x] P1.15 Page, canvas, and document additions (`notes`, bleed/trim/safe-area, metadata, output intent)
 - [x] P1.16 Importer contract spec closeout
 

@@ -10,6 +10,7 @@ import {
   hasValidPageElementReferences,
   hasValidParentIds,
 } from './page-validation';
+import { hasValidTextPathReferences } from './text-path-validation';
 
 export interface SafeAreas {
   readonly actionSafe?: readonly [number, number, number, number] | undefined;
@@ -295,6 +296,15 @@ export const broadsetDocumentSchema: z.ZodType<BroadsetDocument> = z
         code: 'custom',
         message: 'Page elements must reference document root elements',
         path: ['pages'],
+      });
+    }
+
+    if (!hasValidTextPathReferences(effectiveElements)) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'textPathElementId must be set only on text elements and point to an existing path element in the same document',
+        path: ['elements'],
       });
     }
 

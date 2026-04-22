@@ -619,9 +619,9 @@ Landing order from §"Phase 1 internal landing order" above.
 - [x] **13. Extensions typing** — `packages/model/src/extensions-types.ts` + central Zod registry per IO-D-11
   - [x] tests: red
   - [x] impl: green
-- [ ] **14. Dirty flag + store middleware** — `extensions.<format>.dirty` + `packages/editor` middleware flipping every present flag on element-mutating actions (depends on #13)
-  - [ ] tests: red
-  - [ ] impl: green
+- [x] **14. Dirty flag + store middleware** — `extensions.<format>.dirty` + `packages/editor` middleware flipping every present flag on element-mutating actions (depends on #13)
+  - [x] tests: red
+  - [x] impl: green (`6f17a26`)
 - [x] **15. Page + canvas + document additions** — `Page.notes`, `Canvas.bleed`/`trim`/`safeArea`, `document.metadata`, `document.outputIntent`
   - [x] tests: red
   - [x] impl: green (`77d3284`)

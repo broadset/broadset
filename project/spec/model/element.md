@@ -431,11 +431,25 @@ Validation MUST reject `typeConfig` fields that do not match the expected shape 
 
 Text elements MAY reference a path element in the same document via an optional `textPathElementId` field. When present and referencing a valid path element, the text MUST render along the path shape. When the referenced element does not exist or is not a path-type element, `textPathElementId` is ignored and text renders normally.
 
+Beyond the per-element field declaration, the document-level validator MUST enforce the following invariants so a corrupt reference fails loudly at load time rather than degrading silently at render time:
+
+- Only elements of `type: 'text'` may carry a non-null `textPathElementId`. A non-text element with the field set is a structural error.
+- The referenced id MUST match an element present in the same document.
+- The referenced element MUST be of `type: 'path'`.
+- Self-references (`textPathElementId === id`) MUST be rejected.
+
+Because the reference target is always a `path` (and paths cannot themselves carry `textPathElementId`), the reference graph is acyclic by construction — an explicit cycle walk is unnecessary once the target-type invariant is enforced. The validator lives in `packages/model/src/text-path-validation.ts` as `hasValidTextPathReferences(items)` and is invoked from `broadsetDocumentSchema.superRefine`.
+
 #### Acceptance Criteria
 
 - [ ] Given a valid `textPathElementId`, text renders along the referenced path shape
 - [ ] Given an invalid or missing `textPathElementId`, text renders normally
 - [ ] Given a text-on-path element, typography settings are still applied
+- [ ] Given a `textPathElementId` pointing to a non-existent element id, document validation fails with an `elements` path issue
+- [ ] Given a `textPathElementId` pointing to a non-path element, document validation fails
+- [ ] Given a non-text element with `textPathElementId` set, document validation fails
+- [ ] Given an element whose `textPathElementId` equals its own id, document validation fails
+- [ ] Given multiple text elements referencing the same path, document validation succeeds
 
 ---
 
