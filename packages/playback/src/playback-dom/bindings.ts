@@ -60,24 +60,23 @@ function applyTextAnimator(args: {
   const segments = computeTextSegments(textContent, textAnimator);
 
   for (const segment of segments) {
-    const span = charSpans[segment.index];
-
-    if (span === undefined) {
-      continue;
-    }
-
     const segmentTimeMs = args.frame.timeMs - segment.startTimeMs;
+    // Apply segment styles to every char span covered by the segment's
+    // character range so `rangeMode: 'words' | 'lines'` animates whole
+    // words/lines — not only the first N character spans.
+    const frameProperties =
+      segmentTimeMs < 0 ?
+        computeTimelineFrame({ timeline, timeMs: 0 }).properties
+      : computeTimelineFrame({ timeline, timeMs: segmentTimeMs }).properties;
 
-    if (segmentTimeMs < 0) {
-      // Segment hasn't started yet; apply keyframe zero to keep initial character state stable.
-      const startFrame = computeTimelineFrame({ timeline, timeMs: 0 });
+    for (let charIndex = segment.charStartIndex; charIndex < segment.charEndIndex; charIndex += 1) {
+      const span = charSpans[charIndex];
 
-      args.targetsResolver.applyStyles(span, startFrame.properties);
-      continue;
+      if (span === undefined) {
+        continue;
+      }
+
+      args.targetsResolver.applyStyles(span, frameProperties);
     }
-
-    const segmentFrame = computeTimelineFrame({ timeline, timeMs: segmentTimeMs });
-
-    args.targetsResolver.applyStyles(span, segmentFrame.properties);
   }
 }

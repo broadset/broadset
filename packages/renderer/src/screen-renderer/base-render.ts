@@ -411,7 +411,12 @@ class DOMScreenRenderer implements ScreenRendererController {
 
     opacityHost.style.width = '100%';
     opacityHost.style.height = '100%';
-    opacityHost.style.opacity = String(style.opacity);
+    // Guard against undefined/NaN opacity: `String(undefined)` is the literal
+    // "undefined", which is an invalid CSS value and silently drops the
+    // opacity style. Default to fully opaque (1) when the style payload
+    // omits it.
+    opacityHost.style.opacity =
+      typeof style.opacity === 'number' && Number.isFinite(style.opacity) ? String(style.opacity) : '1';
 
     contentHost.style.position = 'relative';
     contentHost.style.display = 'block';

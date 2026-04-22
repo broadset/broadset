@@ -9,11 +9,11 @@ describe('segmentText', () => {
     const segments = segmentText('HELLO', 'characters');
 
     expect(segments).toEqual([
-      { index: 0, text: 'H' },
-      { index: 1, text: 'E' },
-      { index: 2, text: 'L' },
-      { index: 3, text: 'L' },
-      { index: 4, text: 'O' },
+      { index: 0, text: 'H', charStartIndex: 0, charEndIndex: 1 },
+      { index: 1, text: 'E', charStartIndex: 1, charEndIndex: 2 },
+      { index: 2, text: 'L', charStartIndex: 2, charEndIndex: 3 },
+      { index: 3, text: 'L', charStartIndex: 3, charEndIndex: 4 },
+      { index: 4, text: 'O', charStartIndex: 4, charEndIndex: 5 },
     ]);
   });
 
@@ -22,9 +22,9 @@ describe('segmentText', () => {
     const segments = segmentText('Breaking News Update', 'words');
 
     expect(segments).toEqual([
-      { index: 0, text: 'Breaking' },
-      { index: 1, text: 'News' },
-      { index: 2, text: 'Update' },
+      { index: 0, text: 'Breaking', charStartIndex: 0, charEndIndex: 8 },
+      { index: 1, text: 'News', charStartIndex: 9, charEndIndex: 13 },
+      { index: 2, text: 'Update', charStartIndex: 14, charEndIndex: 20 },
     ]);
   });
 
@@ -33,9 +33,9 @@ describe('segmentText', () => {
     const segments = segmentText('Line One\nLine Two\nLine Three', 'lines');
 
     expect(segments).toEqual([
-      { index: 0, text: 'Line One' },
-      { index: 1, text: 'Line Two' },
-      { index: 2, text: 'Line Three' },
+      { index: 0, text: 'Line One', charStartIndex: 0, charEndIndex: 8 },
+      { index: 1, text: 'Line Two', charStartIndex: 9, charEndIndex: 17 },
+      { index: 2, text: 'Line Three', charStartIndex: 18, charEndIndex: 28 },
     ]);
   });
 
@@ -50,7 +50,7 @@ describe('segmentText', () => {
   it('handles single character text', () => {
     const segments = segmentText('A', 'characters');
 
-    expect(segments).toEqual([{ index: 0, text: 'A' }]);
+    expect(segments).toEqual([{ index: 0, text: 'A', charStartIndex: 0, charEndIndex: 1 }]);
   });
 
   /** @description Multiple spaces between words are condensed — each word is a separate segment. */
@@ -58,8 +58,8 @@ describe('segmentText', () => {
     const segments = segmentText('Hello   World', 'words');
 
     expect(segments).toEqual([
-      { index: 0, text: 'Hello' },
-      { index: 1, text: 'World' },
+      { index: 0, text: 'Hello', charStartIndex: 0, charEndIndex: 5 },
+      { index: 1, text: 'World', charStartIndex: 8, charEndIndex: 13 },
     ]);
   });
 
@@ -68,8 +68,8 @@ describe('segmentText', () => {
     const segments = segmentText('<b>Hi</b>', 'characters');
 
     expect(segments).toEqual([
-      { index: 0, text: 'H' },
-      { index: 1, text: 'i' },
+      { index: 0, text: 'H', charStartIndex: 0, charEndIndex: 1 },
+      { index: 1, text: 'i', charStartIndex: 1, charEndIndex: 2 },
     ]);
   });
 
@@ -77,7 +77,7 @@ describe('segmentText', () => {
   it('returns single segment for single line in lines mode', () => {
     const segments = segmentText('Hello World', 'lines');
 
-    expect(segments).toEqual([{ index: 0, text: 'Hello World' }]);
+    expect(segments).toEqual([{ index: 0, text: 'Hello World', charStartIndex: 0, charEndIndex: 11 }]);
   });
 });
 
@@ -144,6 +144,26 @@ describe('computeTextSegments', () => {
     const startTimes = segments.map((s: TextAnimatorSegment) => s.startTimeMs).sort((a: number, b: number) => a - b);
 
     expect(startTimes).toEqual([0, 50, 100, 150, 200]);
+  });
+
+  /** @description Random order must be stable across calls with identical inputs so playback doesn't reshuffle per frame. */
+  it('produces a stable shuffle across repeat calls for the same content', () => {
+    const first = computeTextSegments('ABCDEFGHIJ', {
+      rangeMode: 'characters',
+      staggerDelayMs: 25,
+      randomOrder: true,
+      timelineId: 'tl-1',
+    });
+    const second = computeTextSegments('ABCDEFGHIJ', {
+      rangeMode: 'characters',
+      staggerDelayMs: 25,
+      randomOrder: true,
+      timelineId: 'tl-1',
+    });
+
+    expect(first.map((s: TextAnimatorSegment) => s.startTimeMs)).toEqual(
+      second.map((s: TextAnimatorSegment) => s.startTimeMs),
+    );
   });
 
   /** @description Zero stagger delay means all segments start simultaneously at 0ms. */

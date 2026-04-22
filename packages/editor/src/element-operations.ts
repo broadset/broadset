@@ -180,17 +180,21 @@ function computeDistributedPositions(
 
 /**
  * Copies the currently selected elements to a clipboard result.
- * Does not modify the store. Returns the serialized elements for
- * writing to the system clipboard.
+ * Does not modify the store. Returns a deep snapshot of the selected
+ * elements so later edits to the live store cannot mutate what will be
+ * pasted. Also returns the serialized JSON for writing to the system
+ * clipboard.
  */
 export function copyElements(store: EditorStore): ClipboardResult {
   const state = store.getState();
   const selectedIds = new Set(state.activeElementIds);
   const selectedElements = state.document.elements.filter((element) => selectedIds.has(element.id));
+  const snapshotJson = JSON.stringify(selectedElements);
+  const snapshotElements = JSON.parse(snapshotJson) as readonly BroadsetElement[];
 
   return {
-    elements: selectedElements,
-    json: JSON.stringify(selectedElements),
+    elements: snapshotElements,
+    json: snapshotJson,
   };
 }
 

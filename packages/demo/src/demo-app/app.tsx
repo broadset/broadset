@@ -379,15 +379,20 @@ export function DemoApp(): React.JSX.Element {
     }
 
     const pasteOffset = Math.min(currentDocument.canvas.width * 0.05, 24);
-    const clonedElements = clipboardRef.current.map((element) => ({
-      ...element,
-      id: crypto.randomUUID(),
-      name: `${element.name} Copy`,
-      position: {
-        x: element.position.x + pasteOffset,
-        y: element.position.y + pasteOffset,
-      },
-    }));
+    // Deep-clone each element so pasted copies do not share nested mutable
+    // state (style, transforms…). Without this, editing a nested field on one
+    // pasted copy would mutate its siblings.
+    const clonedElements = (JSON.parse(JSON.stringify(clipboardRef.current)) as readonly BroadsetElement[]).map(
+      (element) => ({
+        ...element,
+        id: crypto.randomUUID(),
+        name: `${element.name} Copy`,
+        position: {
+          x: element.position.x + pasteOffset,
+          y: element.position.y + pasteOffset,
+        },
+      }),
+    );
 
     editorStore.setState((state) => ({
       activeElementIds: clonedElements.map((element) => element.id),

@@ -39,6 +39,17 @@ function resolveBooleanOperation(stringValue: string): BooleanOperation | null {
   return null;
 }
 
+/**
+ * Produces a deep-cloned snapshot of the given elements so the clipboard
+ * holds values that are stable against later edits to the live store and so
+ * nested mutable fields (position, style, transforms…) cannot leak between
+ * pasted copies. JSON round-trip is adequate because BroadsetElement is a
+ * plain serializable JSON shape.
+ */
+function cloneBroadsetElements(elements: readonly BroadsetElement[]): readonly BroadsetElement[] {
+  return JSON.parse(JSON.stringify(elements)) as readonly BroadsetElement[];
+}
+
 const PROPERTY_UPDATE_HANDLERS: Readonly<Record<string, (ctx: PropertyUpdateContext) => void>> = {
   x: ({ store, element, value }) => {
     store.getState().commitElementUpdate(element.id, {
@@ -288,11 +299,7 @@ export function useCommandHandlers({
       return;
     }
 
-    clipboardRef.current = selectedElements.map((element) => ({
-      ...element,
-      position: { ...element.position },
-      style: { ...element.style },
-    }));
+    clipboardRef.current = cloneBroadsetElements(selectedElements);
     setContextMenu(null);
     pushToast(
       'success',
@@ -319,7 +326,7 @@ export function useCommandHandlers({
       return;
     }
 
-    clipboardRef.current = selectedElements;
+    clipboardRef.current = cloneBroadsetElements(selectedElements);
     pasteClipboardElements();
   }, [activeElementIds, clipboardRef, currentDocumentElements, pasteClipboardElements, pushToast]);
 
