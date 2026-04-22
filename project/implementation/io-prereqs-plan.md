@@ -293,6 +293,8 @@ Public APIs are intentionally narrow (four-to-six functions per module). Interna
 
 ### Phase 3 — Renderer refactor
 
+Detailed execution plan: [renderer-refactor-plan.md](./renderer-refactor-plan.md). This section remains the cross-format dependency summary.
+
 The renderer must stop round-tripping foreign markup through `innerHTML`, stop rendering filters/gradients/patterns as CSS strings when the model now carries structured primitives, and start consuming font-asset bytes.
 
 - **Safe DOM-builder for `svg`-type elements.** [screen-renderer/element-renderers.ts:352-364](../../packages/renderer/src/screen-renderer/element-renderers.ts) currently does `host.innerHTML = element.content`. Replace with a parsed-AST path: the importer hands a structured `SvgFragmentAst` (from `_shared/sanitize`); the renderer constructs DOM nodes from the AST, never from a string. Eliminates the last XSS vector.
