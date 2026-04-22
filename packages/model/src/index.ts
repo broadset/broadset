@@ -15,5 +15,6 @@ export * from './migrations';
 export * from './output-spec';
 export * from './page-validation';
 export * from './style';
+export * from './text-body';
 export * from './text-path-validation';
 export * from './utilities';

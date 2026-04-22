@@ -92,6 +92,60 @@ Every element MUST have a position with numeric `x` and `y` coordinates, numeric
 
 ---
 
+### Requirement: Structured Text Model (`TextBody`)
+
+Per IO-D-01 and IO-D-06 and Phase 1 unit #9, text elements MUST support a structured run/paragraph representation (`TextBody`) alongside the flat plain-string `content`. The field on `BroadsetElement` will become `content: string | TextBody` once the renderer / editor dual-path is in place (a later sub-commit); this requirement defines the structured surface the flip will consume.
+
+```ts
+type TextBody = { paragraphs: readonly Paragraph[] };
+type Paragraph = { runs: readonly Run[]; props?: ParagraphProps };
+type ParagraphProps = {
+  align?: 'start' | 'end' | 'center' | 'justify';
+  indent?: number;
+  lineSpacing?: number;   // >= 0
+  spaceBefore?: number;   // >= 0
+  spaceAfter?: number;    // >= 0
+  bullet?: Bullet;
+  level?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+};
+type Run = { text: string; props?: RunProps };
+type RunProps = {
+  style?: Record<string, unknown>; // inline text-style overrides
+  lang?: string;                   // BCP 47 tag
+  hyperlink?: { url: string; tooltip?: string; target?: '_blank' | '_self' };
+};
+type Bullet =
+  | { kind: 'none' }
+  | { kind: 'char'; char: string; font?: string; color?: BroadsetColor }
+  | { kind: 'auto'; format: string; startAt?: number };
+```
+
+Contract:
+
+- `paragraphs` MUST contain at least one paragraph; a `TextBody` with zero paragraphs is a structural error.
+- Every paragraph MUST contain at least one run; empty-run arrays are rejected.
+- `ParagraphProps.level` MUST be an integer `0..8` (9-level OOXML outline cap).
+- `ParagraphProps.lineSpacing`, `spaceBefore`, `spaceAfter` MUST be non-negative.
+- `RunProps.lang`, when provided, MUST match the BCP 47 grammar (`[A-Za-z]{1,8}` followed by zero or more `-` subtags).
+- `RunProps.hyperlink.url` MUST be non-empty when `hyperlink` is present.
+- `Bullet.char` on a `char` bullet MUST be non-empty. `Bullet.format` on an `auto` bullet is a free-form string (canonical vocabulary in `CANONICAL_BULLET_FORMATS`) so format-owned extensions survive round-trip.
+- A promotion helper `textBodyFromPlainString(content)` MUST split on `\n` into paragraphs so fixtures migrating from `content: string` retain paragraph structure; empty input yields a single paragraph with a single empty run so every output is schema-valid.
+
+#### Acceptance Criteria
+
+- [ ] Given a minimal single-run body, `textBodySchema` accepts it
+- [ ] Given a multi-run paragraph with inline style, lang, and hyperlink, validation succeeds
+- [ ] Given an empty `paragraphs` array, validation fails
+- [ ] Given a paragraph with zero runs, validation fails
+- [ ] Given `RunProps.lang` that is not a BCP 47 tag, validation fails
+- [ ] Given a `hyperlink` missing its URL, validation fails
+- [ ] Given `ParagraphProps.level` outside `0..8`, validation fails
+- [ ] Given a `char` bullet with an empty `char`, validation fails
+- [ ] Given an unknown bullet `kind`, validation fails
+- [ ] `textBodyFromPlainString` splits on `\n` into paragraphs and handles the empty string as `[{ runs: [{ text: '' }] }]`
+
+---
+
 ### Requirement: Element Content Semantics
 
 The `content` field carries type-specific payload data. The system MUST interpret content according to the element type:
