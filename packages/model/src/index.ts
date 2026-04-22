@@ -3,6 +3,7 @@ export * from './capabilities';
 export * from './changes';
 export * from './color';
 export * from './config';
+export * from './content-hash';
 export * from './document';
 export * from './element';
 export * from './format-reference';

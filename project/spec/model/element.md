@@ -509,6 +509,52 @@ Every element MAY carry an `extensions` property — a `Record<string, unknown>`
 
 ---
 
+### Requirement: Content-Hash Identity
+
+The model MUST expose `computeElementContentHash(element)` — a pure function returning a deterministic string fingerprint derived from the element's visual identity fields. The fingerprint is used by cross-format reconciliation to recover element identity when an external tool strips `data-bs-*` tags, XMP entries, or PPTX shape names. The fingerprint MUST NOT be stored in `.bsp` — it is a view over other fields and is always recomputed on demand.
+
+**Fields that participate** in the hash (visual identity):
+
+- `type`
+- `position.x`, `position.y`, `width`, `height`, `rotation`
+- `content`
+- `style` — serialised with keys in ASCII-ascending order so literal-ordering differences do NOT change the hash
+
+**Fields that do NOT participate** (identity / container metadata that may differ across reconciliation matches):
+
+- `id`, `name`, `locked`, `parentId`, `groupId`
+- `extensions`, `dataField`, `visibleWhen`, `repeater`, `typeConfig`, `componentRef`, `autoSize`, `textPathElementId`, `booleanOperation`, `assetId`
+
+The Phase 1 body uses a simple deterministic non-cryptographic hash. The Phase 2 plan replaces the body with `xxhash-wasm` inside `packages/formats/src/_shared/fingerprint/`; the canonicalisation contract above MUST survive that swap.
+
+#### Scenario: Stable across byte-identical elements
+
+- GIVEN two `BroadsetElement`s whose visual-identity fields are identical
+- WHEN `computeElementContentHash` runs on each
+- THEN the returned strings are equal
+
+#### Scenario: Independent of container metadata
+
+- GIVEN two elements that differ only in `id`, `name`, `locked`, `parentId`, `groupId`, or `extensions`
+- WHEN the hash is computed for each
+- THEN the returned strings are equal
+
+#### Scenario: Sensitive to style literal order
+
+- GIVEN two elements whose `style` objects carry the same entries written in different literal order
+- WHEN the hash is computed for each
+- THEN the returned strings are equal because the style canonicalisation sorts keys
+
+#### Acceptance Criteria
+
+- [ ] Given two elements with identical visual-identity fields, the content hashes are equal
+- [ ] Given elements that differ in `type`, `position`, `width`, `height`, `rotation`, `content`, or any style value, the content hashes differ
+- [ ] Given elements that differ only in `id`, `name`, `locked`, `parentId`, `groupId`, or `extensions`, the content hashes are equal
+- [ ] Given two elements with the same style entries in different literal order, the content hashes are equal
+- [ ] The returned value is a non-empty string
+
+---
+
 ## Spec Gaps
 
 _None — all requirements have acceptance criteria._
