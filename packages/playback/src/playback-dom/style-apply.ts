@@ -39,7 +39,6 @@ export function resolveAnimationTargets(): AnimationTargetsResolver {
   const transforms = new WeakMap<HTMLElement, MutableTransformState>();
   const trimStates = new WeakMap<HTMLElement, MutableTrimPathState>();
   const baselines = new WeakMap<Element, Map<string, string>>();
-  const baselineGradients = new WeakMap<HTMLElement, BroadsetGradient>();
 
   function getTargets(container: HTMLElement): ResolvedAnimationTargets {
     const cached = cache.get(container);
@@ -248,12 +247,14 @@ export function resolveAnimationTargets(): AnimationTargetsResolver {
   }
 
   function readBaselineGradient(target: HTMLElement): BroadsetGradient | null {
-    const cached = baselineGradients.get(target);
-
-    if (cached !== undefined) {
-      return cached;
-    }
-
+    // Always read the baseline fresh from `data-gradient` so edits to the
+    // element's base gradient are reflected on the next animation frame. The
+    // prior implementation cached the first-parsed baseline and never
+    // invalidated it, so mid-animation edits (or chained animation segments
+    // that expected to see the current base gradient) interpolated against a
+    // stale reference. `data-gradient` is kept in sync by the renderer on
+    // element updates and JSON.parse on a short stringified gradient object
+    // is cheap enough to run per frame without measurable overhead.
     const gradientJson = target.dataset['gradient'];
 
     if (gradientJson === undefined) {
@@ -363,7 +364,6 @@ export function resolveAnimationTargets(): AnimationTargetsResolver {
 
   function clearOneStyle(propertyName: string, targets: ResolvedAnimationTargets): void {
     if (isGradientAnimationTarget(propertyName)) {
-      baselineGradients.delete(targets.contentTarget);
       restoreCssProperty(targets.contentTarget, 'background');
 
       return;
@@ -423,7 +423,6 @@ export function resolveAnimationTargets(): AnimationTargetsResolver {
         if (baseline !== null) {
           const updated = applyGradientPropertyUpdates(baseline, gradientUpdates);
 
-          baselineGradients.set(targets.contentTarget, baseline);
           targets.contentTarget.style.background = serializeGradientToCss(updated);
         }
       }
