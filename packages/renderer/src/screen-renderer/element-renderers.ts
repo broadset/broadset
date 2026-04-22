@@ -4,6 +4,7 @@ import { FillRule, pathBoolean, PathBooleanOperation, pathFromPathData, pathToPa
 import qrcode from 'qrcode-generator';
 
 import type { ElementRendererFactory } from './base-render';
+import { renderSanitizedSvgInto } from './svg-sanitize';
 
 // ---------------------------------------------------------------------------
 // Text / alignment helpers
@@ -380,17 +381,15 @@ const createImageRenderer = createSimpleRenderer((host, element) => {
 });
 
 const createSvgRenderer = createSimpleRenderer((host, element) => {
-  host.innerHTML = element.content;
+  const sanitizedRoot = renderSanitizedSvgInto(host, element.content);
 
-  const firstChild = host.firstElementChild;
-
-  if (!(firstChild instanceof SVGElement)) {
+  if (sanitizedRoot === null) {
     return;
   }
 
-  firstChild.setAttribute('width', '100%');
-  firstChild.setAttribute('height', '100%');
-  firstChild.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  sanitizedRoot.setAttribute('width', '100%');
+  sanitizedRoot.setAttribute('height', '100%');
+  sanitizedRoot.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 });
 
 const createPathRenderer = createSimpleRenderer((host, element) => {
