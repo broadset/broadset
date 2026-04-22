@@ -509,6 +509,27 @@ Every element MAY carry an `extensions` property — a `Record<string, unknown>`
 
 ---
 
+### Requirement: Format Extensions Registry (IO-D-11)
+
+In addition to free-form vendor extensions above, the model reserves four format-id namespaces — `extensions.psd`, `extensions.pdf`, `extensions.pptx`, `extensions.svg` — for round-trip metadata owned by the matching format package. Each format package registers a Zod schema for its namespace via `registerExtensionsSchema(formatId, schema)` (exported from [`packages/model/src/extensions-types.ts`](../../../packages/model/src/extensions-types.ts)). The element and document Zod schemas validate every present registered namespace at load time. A persisted shape that no longer matches its registered schema fails loudly per IO-D-11 — the model never silently drops or rewrites stale data.
+
+Every per-format extensions payload MUST extend the base `BroadsetFormatExtensions` interface, which mandates a boolean `dirty` flag. Importers MUST set `dirty = false` on every hydrated element / document; the editor middleware (Phase 1 unit #14) MUST flip every present `dirty` flag to `true` on any mutating action that touches the owning entity. Format exporters consult only their own flag: dirty → re-emit from current Broadset state; clean → re-emit the preserved original blob byte-for-byte.
+
+A format-id namespace whose schema has not been registered (e.g. the owning format package is not loaded) is preserved as `unknown` and not validated — forward-compatibility for stripped-down deployments. The four format ids and the registry behavior are owned by `@broadset/model`; concrete schemas live under `packages/formats/src/<format>/types.ts`.
+
+#### Acceptance Criteria
+
+- [ ] `BROADSET_FORMAT_IDS` enumerates exactly `psd`, `pdf`, `pptx`, `svg`
+- [ ] `broadsetFormatExtensionsBaseSchema` requires a boolean `dirty` field
+- [ ] `registerExtensionsSchema(formatId, schema)` stores (or replaces) the schema for that format
+- [ ] `validateExtensions(raw)` throws when a registered schema rejects the persisted shape
+- [ ] `validateExtensions(raw)` accepts (without validating) namespaces whose schema is not registered
+- [ ] Element parsing surfaces extensions validation failures as Zod issues with path `['extensions', <formatId>, …]`
+- [ ] Document parsing surfaces extensions validation failures as Zod issues with path `['extensions', <formatId>, …]`
+- [ ] Top-level keys outside the four reserved format ids are not validated by the registry
+
+---
+
 ### Requirement: Content-Hash Identity
 
 The model MUST expose `computeElementContentHash(element)` — a pure function returning a deterministic string fingerprint derived from the element's visual identity fields. The fingerprint is used by cross-format reconciliation to recover element identity when an external tool strips `data-bs-*` tags, XMP entries, or PPTX shape names. The fingerprint MUST NOT be stored in `.bsp` — it is a view over other fields and is always recomputed on demand.

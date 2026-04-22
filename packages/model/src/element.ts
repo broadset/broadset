@@ -4,6 +4,7 @@ import { isValidSvgPathData, sanitizeTextContent } from './element/content-types
 import { defaultContent, defaultTypeConfig } from './element/defaults';
 import { isLikelyUrlLikeContent, isTickerContent, isValidVisibleWhenExpression } from './element/guards';
 import { type BroadsetElement, type ElementOverrides } from './element/style-types';
+import { refineExtensionsAgainstRegistry } from './extensions-types';
 import { createDefaultStyle, styleSchema } from './style';
 
 export { isValidSvgPathData, sanitizeTextContent } from './element/content-types';
@@ -182,6 +183,8 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
         path: ['content'],
       });
     }
+
+    refineExtensionsAgainstRegistry(value.extensions, context);
   })
   .transform((value): BroadsetElement => {
     const normalizedStyle = styleSchema.safeParse({

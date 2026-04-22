@@ -72,3 +72,21 @@ Headline decisions (full rationale in the source table):
 **Alternatives considered** (per decision, in the source table).
 
 **Rationale:** Each decision emerged from the cross-format audit in [io-prereqs-plan.md](./io-prereqs-plan.md). Keeping the full table there avoids duplication; this entry is the formal ratification marker and the namespace reservation for `IO-D-` prefixed references.
+
+### Phase 1 Unit #13 — Extensions Registry Validates In-Element
+
+**Decision:** Wire `validateExtensions` into the existing element/document Zod `superRefine` rather than ship the registry as a standalone helper. Extracted to `refineExtensionsAgainstRegistry(raw, ctx)` so the call site stays one line and the surrounding cognitive complexity score stays under the project lint threshold.
+**Alternatives considered:**
+
+1. Keep `validateExtensions` as a standalone helper that callers invoke after `parse` (rejected — leaves IO-D-11 enforcement to discipline; importers and tests would skip it).
+2. Inline the try/catch directly into element.ts and document.ts (rejected — pushed cognitive complexity over the lint threshold and duplicated five lines of error fan-out across two files).
+   **Rationale:** IO-D-11 mandates "validated at load time". The only way to make that mechanical is to wire it into the existing `parse` call sites the rest of the codebase already uses. Extracting to a helper preserves single-responsibility on element.ts/document.ts while keeping the contract enforceable.
+
+### Phase 1 Unit #13 — Forward-Compat For Unregistered Format Namespaces
+
+**Decision:** When `extensions.<formatId>` is present but no schema is registered for that format id, accept the namespace without validation rather than reject the load.
+**Alternatives considered:**
+
+1. Reject any namespace whose schema is not registered (rejected — would prevent the model from loading documents whose owning format package is not in the consumer\u2019s deployment, defeating the purpose of an `extensions` field).
+2. Drop the namespace silently (rejected — violates IO-D-18 "no silent drops").
+   **Rationale:** The registry is a runtime concern. A standalone validator (CI tooling, lightweight hosts) may not load `@broadset/formats`; demanding registration would force every consumer to import every format package. Forward-compat preservation keeps the data intact while still failing loudly when the schema *is* registered and the data is stale.

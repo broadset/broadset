@@ -1,6 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import type { z } from 'zod';
 
-import { BUILT_IN_ELEMENT_TYPES, createDefaultElement, elementSchema, sanitizeTextContent } from './index';
+import {
+  BROADSET_FORMAT_IDS,
+  type BroadsetFormatExtensions,
+  broadsetFormatExtensionsBaseSchema,
+  BUILT_IN_ELEMENT_TYPES,
+  createDefaultElement,
+  elementSchema,
+  registerExtensionsSchema,
+  sanitizeTextContent,
+  unregisterExtensionsSchema,
+} from './index';
 
 /** @description The model exposes eleven built-in element types and still permits arbitrary plugin-defined types. */
 describe('Element type vocabulary', () => {
@@ -337,5 +348,60 @@ describe('Content validation by element type', () => {
     ).toBe(true);
     expect(elementSchema.safeParse(createDefaultElement('path', { content: 'not a path' })).success).toBe(false);
     expect(elementSchema.safeParse(createDefaultElement('qrcode', { content: '' })).success).toBe(false);
+  });
+});
+
+/** @description Element parsing wires the extensions registry per IO-D-11 — registered schemas fail loudly on stale data. */
+describe('Element extensions validation (IO-D-11)', () => {
+  afterEach(() => {
+    for (const id of BROADSET_FORMAT_IDS) {
+      unregisterExtensionsSchema(id);
+    }
+  });
+
+  /** @description An element with a registered extensions namespace + valid payload parses successfully. */
+  it('accepts valid registered extensions', () => {
+    registerExtensionsSchema(
+      'pdf',
+      broadsetFormatExtensionsBaseSchema as unknown as z.ZodType<BroadsetFormatExtensions>,
+    );
+
+    const element = {
+      ...createDefaultElement('rectangle'),
+      extensions: { pdf: { dirty: false } } as Readonly<Record<string, unknown>>,
+    };
+
+    expect(elementSchema.safeParse(element).success).toBe(true);
+  });
+
+  /** @description An element whose registered extensions payload fails its schema is rejected with an extensions-rooted issue path. */
+  it('rejects an element whose registered extensions payload is invalid', () => {
+    registerExtensionsSchema(
+      'pdf',
+      broadsetFormatExtensionsBaseSchema as unknown as z.ZodType<BroadsetFormatExtensions>,
+    );
+
+    const element = {
+      ...createDefaultElement('rectangle'),
+      extensions: { pdf: { dirty: 'not a boolean' } } as Readonly<Record<string, unknown>>,
+    };
+
+    const result = elementSchema.safeParse(element);
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.path[0] === 'extensions' && issue.path[1] === 'pdf')).toBe(true);
+    }
+  });
+
+  /** @description An element with an extensions namespace for which no schema is registered passes (forward-compat for deployments without that format package loaded). */
+  it('accepts extensions namespaces without a registered schema', () => {
+    const element = {
+      ...createDefaultElement('rectangle'),
+      extensions: { psd: { dirty: false, raw: 'unknown shape allowed' } } as Readonly<Record<string, unknown>>,
+    };
+
+    expect(elementSchema.safeParse(element).success).toBe(true);
   });
 });

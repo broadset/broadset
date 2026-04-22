@@ -1,10 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import type { z } from 'zod';
 
 import {
+  BROADSET_FORMAT_IDS,
   broadsetDocumentSchema,
+  type BroadsetFormatExtensions,
+  broadsetFormatExtensionsBaseSchema,
   createDefaultAnimationConfig,
   createDefaultElement,
   createEmptyBroadsetDocument,
+  registerExtensionsSchema,
+  unregisterExtensionsSchema,
 } from './index';
 
 function makePageElementInstance(elementId: string): Record<string, unknown> {
@@ -491,5 +497,53 @@ describe('Document animations integrity', () => {
     );
 
     expect(result.success).toBe(false);
+  });
+});
+
+/** @description Document parsing wires the extensions registry per IO-D-11 — registered schemas fail loudly on stale data. */
+describe('Document extensions validation (IO-D-11)', () => {
+  afterEach(() => {
+    for (const id of BROADSET_FORMAT_IDS) {
+      unregisterExtensionsSchema(id);
+    }
+  });
+
+  /** @description A document with a registered extensions namespace + valid payload parses successfully. */
+  it('accepts valid registered extensions', () => {
+    registerExtensionsSchema(
+      'pdf',
+      broadsetFormatExtensionsBaseSchema as unknown as z.ZodType<BroadsetFormatExtensions>,
+    );
+
+    const result = broadsetDocumentSchema.safeParse(makeValidDoc({ extensions: { pdf: { dirty: false } } }));
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @description A document whose registered extensions payload fails its schema is rejected with an extensions-rooted issue path that names the failing format id. */
+  it('rejects a document whose registered extensions payload is invalid and reports the formatId in the path', () => {
+    registerExtensionsSchema(
+      'pdf',
+      broadsetFormatExtensionsBaseSchema as unknown as z.ZodType<BroadsetFormatExtensions>,
+    );
+
+    const result = broadsetDocumentSchema.safeParse(
+      makeValidDoc({ extensions: { pdf: { dirty: 'not a boolean' } } }),
+    );
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.path[0] === 'extensions' && issue.path[1] === 'pdf')).toBe(true);
+    }
+  });
+
+  /** @description A document with an extensions namespace for which no schema is registered passes (forward-compat for deployments without that format package loaded). */
+  it('accepts extensions namespaces without a registered schema', () => {
+    const result = broadsetDocumentSchema.safeParse(
+      makeValidDoc({ extensions: { svg: { dirty: false, raw: 'unknown shape allowed' } } }),
+    );
+
+    expect(result.success).toBe(true);
   });
 });

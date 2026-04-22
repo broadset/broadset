@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { type AnimationDefinition, animationsSchema } from './animation';
 import { type BroadsetElement, elementSchema } from './element';
+import { refineExtensionsAgainstRegistry } from './extensions-types';
 import { type OutputSpec, outputSpecSchema } from './output-spec';
 import {
   hasAcyclicParentIds,
@@ -296,6 +297,8 @@ export const broadsetDocumentSchema: z.ZodType<BroadsetDocument> = z
         path: ['pages'],
       });
     }
+
+    refineExtensionsAgainstRegistry(value.extensions, context);
   })
   .transform(
     (value): BroadsetDocument =>

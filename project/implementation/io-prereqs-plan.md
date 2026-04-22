@@ -616,9 +616,9 @@ Landing order from §"Phase 1 internal landing order" above.
 - [x] **12. Model-level script rejection** — Zod guard rejects `<script>` and event-handler attrs in `text`/`svg` content
   - [x] tests: red
   - [x] impl: green (`a3e256a`)
-- [ ] **13. Extensions typing** — `packages/model/src/extensions-types.ts` + central Zod registry per IO-D-11
-  - [ ] tests: red
-  - [ ] impl: green
+- [x] **13. Extensions typing** — `packages/model/src/extensions-types.ts` + central Zod registry per IO-D-11
+  - [x] tests: red
+  - [x] impl: green
 - [ ] **14. Dirty flag + store middleware** — `extensions.<format>.dirty` + `packages/editor` middleware flipping every present flag on element-mutating actions (depends on #13)
   - [ ] tests: red
   - [ ] impl: green

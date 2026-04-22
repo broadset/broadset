@@ -7,6 +7,7 @@ export * from './config';
 export * from './content-hash';
 export * from './document';
 export * from './element';
+export * from './extensions-types';
 export * from './format-reference';
 export * from './output-spec';
 export * from './page-validation';
