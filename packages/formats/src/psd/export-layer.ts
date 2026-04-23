@@ -85,6 +85,39 @@ function createSolidPixels(
   return data;
 }
 
+/**
+ * Returns the 4 corners of an axis-aligned rectangle rotated by
+ * `rotationDeg` degrees around its centre. Format: `[tlx, tly, trx,
+ * try, brx, bry, blx, bly]` — the 8-number shape PSD `placedLayer`
+ * transforms use.
+ */
+function rotatedQuad(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  rotationDeg: number,
+): [number, number, number, number, number, number, number, number] {
+  const cx = x + width / 2;
+  const cy = y + height / 2;
+  const theta = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(theta);
+  const sin = Math.sin(theta);
+  const rotate = (px: number, py: number): [number, number] => {
+    const dx = px - cx;
+    const dy = py - cy;
+
+    return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos];
+  };
+
+  const [tlx, tly] = rotate(x, y);
+  const [trx, try_] = rotate(x + width, y);
+  const [brx, bry] = rotate(x + width, y + height);
+  const [blx, bly] = rotate(x, y + height);
+
+  return [tlx, tly, trx, try_, brx, bry, blx, bly];
+}
+
 function applyBlendMode(layer: Layer, el: BroadsetElement): void {
   if (!el.style.mixBlendMode) return;
 
@@ -200,16 +233,7 @@ function applyImageContent(layer: Layer, el: BroadsetElement): void {
     type: 'raster',
     width: w,
     height: h,
-    transform: [
-      el.position.x,
-      el.position.y,
-      el.position.x + el.width,
-      el.position.y,
-      el.position.x + el.width,
-      el.position.y + el.height,
-      el.position.x,
-      el.position.y + el.height,
-    ],
+    transform: rotatedQuad(el.position.x, el.position.y, el.width, el.height, el.rotation),
   };
 
   exportState.pendingLinkedFiles.push({
