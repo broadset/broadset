@@ -243,6 +243,49 @@ Factories `noneFill()`, `solidFill(color)`, `gradientFill(gradient)`, `patternFi
 
 ---
 
+### Requirement: Legacy fill migration helper
+
+The model MUST expose a one-site `migrateLegacyFill(input) → BroadsetFill` helper under `packages/model/src/migrations/` so the eventual field-type migration — which replaces the flat `fill`, `backgroundColor`, and `backgroundGradient` fields on `BroadsetElementStyle` with a single `fill: BroadsetFill` — can be performed at the document loader's initial validation pass rather than sprinkled across renderer / editor / formats / ui / demo consumers.
+
+```ts
+interface LegacyFillInput {
+  readonly fill?: BroadsetColor | undefined;
+  readonly backgroundColor?: BroadsetColor | undefined;
+  readonly backgroundGradient?: BroadsetGradient | string | undefined;
+}
+
+function migrateLegacyFill(input: LegacyFillInput): BroadsetFill;
+```
+
+Contract:
+
+- Priority (highest to lowest): structured `backgroundGradient` → `fill` → `backgroundColor`. When none of the three is set, the migrator returns `noneFill()`.
+- Structured `backgroundGradient` → `gradientFill(backgroundGradient)`. The input gradient MUST already be a `BroadsetGradient`; CSS-string gradients are rejected (see below).
+- A `fill` `BroadsetColor` becomes `solidFill(fill)`. SVG-paint semantics win over CSS-container `backgroundColor` so path / svg-typed elements migrate to `solid`.
+- A `backgroundColor` `BroadsetColor` with no higher-precedence paint becomes `solidFill(backgroundColor)`.
+- Legacy CSS-string `backgroundGradient` values (e.g. `"linear-gradient(to right, red, blue)"`) MUST throw. Per IO-D-18 ("no silent drops") the caller / document loader surfaces the failure as an import warning; the migrator MUST NOT substitute `noneFill()` or a neutral gradient fallback. The 8c field-type flip removes the string form from the model entirely.
+- The migrator MUST preserve `BroadsetColor` identity — including `kind: 'theme'` references and `originalColor` preservation for non-sRGB sources — so IO-D-05 round-trip guarantees survive migration.
+- The migrator MUST NOT emit `pattern` or `picture` kinds. Those fills only enter the model through importers that know the asset registry; a legacy style has no way to encode them.
+- Every successful output MUST pass `broadsetFillSchema`.
+
+#### Acceptance Criteria
+
+- [ ] Given an empty input (no `fill`, `backgroundColor`, or `backgroundGradient`), the migrator returns `noneFill()`
+- [ ] Given only `backgroundColor`, the migrator returns `solidFill(backgroundColor)`
+- [ ] Given only `fill`, the migrator returns `solidFill(fill)`
+- [ ] Given only a structured `backgroundGradient`, the migrator returns `gradientFill(backgroundGradient)`
+- [ ] Given both `fill` and `backgroundColor`, the migrator chooses `fill` (SVG-paint precedence)
+- [ ] Given both `backgroundColor` and a structured `backgroundGradient`, the migrator chooses the gradient
+- [ ] Given all three set, the migrator chooses the structured gradient
+- [ ] Given `backgroundGradient` as a non-empty CSS string, the migrator throws
+- [ ] Given `backgroundGradient` as an empty-or-whitespace string, the migrator treats it as absent
+- [ ] A theme-slot `BroadsetColor` survives migration unchanged (no conversion to `rgb`)
+- [ ] A non-sRGB `BroadsetColor` (with `space` and `originalColor`) survives migration unchanged
+- [ ] A gradient whose stops reference theme colors survives migration with the stops intact
+- [ ] Every successful output passes `broadsetFillSchema`
+
+---
+
 ### Requirement: Structured Filter Primitives (`FilterStack`)
 
 Per IO-D-03 and Phase 1 unit #6, the canonical filter model is a structured `FilterStack` (discriminated-union array) — the opaque `filter` / `backdropFilter` CSS strings currently on `BroadsetElementStyle` are a derived view. PSD's ten layer effects, SVG `<filter>` primitives, and PDF ExtGState blend chains all map into this union symmetrically so importers can round-trip without flattening.
