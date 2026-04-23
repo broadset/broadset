@@ -636,7 +636,7 @@ All shared modules under `packages/formats/src/_shared/<name>/` with Vitest unit
 - [ ] **`_shared/color/`** — `culori` eager + `lcms-wasm` lazy; `parseColor`, `toRGB`, `toCMYK`, `gamutMap`, `applyMods`; bundled `defaultProfiles/` (sRGB2014, SWOP, Gray22)
 - [ ] **`_shared/fonts/`** — `fontkit` wrapper; `resolveFont`, `getMetrics`, `listAvailable`, `subsetFont`, `readEmbedPermission`, `getGlyphToUnicodeMap`
 - [ ] **`_shared/text-layout/`** — `linebreak` + `bidi-js` eager, `harfbuzzjs` lazy; `wrapRuns`, `shapeRuns`
-- [ ] **`_shared/xmp/`** — `fast-xml-parser` read + explicit RDF/XML write; `readBroadsetXmp`, `writeBroadsetXmp`
+- [x] **`_shared/xmp/`** — `fast-xml-parser` read + explicit RDF/XML write; `readBroadsetXmp`, `writeBroadsetXmp` (`962bf21`)
 - [x] **`_shared/fingerprint/`** — `xxhash-wasm`; `fingerprintElement` (`41894a9`)
 - [x] **`_shared/reconcile/`** — `microdiff`; `reconcile({ preservedMetadata, currentVisual, fingerprintsByElementId })` (`e44618f`)
 - [x] **`_shared/shape-classifier/`** — `classifyPath(d, styleHints)` with rectangle/ellipse/path heuristics (`ac8bf9f`)

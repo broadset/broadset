@@ -4,6 +4,7 @@
  * than reaching into submodule paths. Each module exposes a narrow
  * public API (four-to-six functions) per the io-prereqs plan.
  */
+export * from './color';
 export * from './fingerprint';
 export * from './reconcile';
 export * from './sanitize';

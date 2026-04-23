@@ -370,3 +370,44 @@ Contract:
 - [ ] Reading malformed XML returns `null` without throwing
 - [ ] Reading RDF/XML without a `broadset:` description returns `null`
 - [ ] Reading accepts `Uint8Array` input and decodes it as UTF-8
+
+---
+
+### Requirement: Color operations (`_shared/color/`)
+
+The `_shared/color/` module wraps culori for the colour-space-aware operations every format exporter / importer depends on. The lcms-wasm / ICC-profile / CMYK surface is deferred to the Phase 4 asset pipeline; this module ships the pure-culori subset today.
+
+```ts
+interface ResolvedRgb {
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+  readonly alpha?: number;
+}
+
+function toRgb(color: BroadsetColor): ResolvedRgb;
+function gamutMap(color: BroadsetColor, targetSpace?: 'srgb'): BroadsetColor;
+function applyMods(color: BroadsetColor, mods: ColorMods | undefined): BroadsetColor;
+```
+
+Contract:
+
+- **toRgb** converts any `RgbBroadsetColor` into culori-parsed 0-1 channels plus optional alpha, honoring `originalColor` so non-sRGB sources (`oklch`, `display-p3`) pass through their source space before being projected to sRGB. Theme-slot colors MUST be resolved against a palette first; passing one throws.
+- **gamutMap** clamps any `BroadsetColor` into the destination gamut (sRGB today). Non-sRGB colors that fall outside sRGB are hue-preserving chroma-reduced via culori's `clampRgb`. Theme colors pass through unchanged (clamping happens after palette resolution).
+- **applyMods** applies PowerPoint-style color modifiers (`lumMod`, `lumOff`, `tint`, `shade`, `alpha`) to a color. Emits a fresh sRGB `RgbBroadsetColor` whose `originalColor` is dropped (the modification alters the source identity). Theme colors pass through unchanged — the palette-aware resolver is the canonical theme + mods path.
+- `applyMods(color, undefined)` and `applyMods(color, {})` are no-ops that return the input identity so callers can invoke unconditionally.
+
+#### Acceptance Criteria
+
+- [ ] `toRgb` converts an sRGB hex to the expected 0-1 channels
+- [ ] `toRgb` preserves alpha for an RGBA hex input
+- [ ] `toRgb` honors `originalColor` for non-sRGB sources (produces channels distinct from the sRGB-hex fallback)
+- [ ] `toRgb` throws when given a theme-slot color
+- [ ] `gamutMap` leaves an in-gamut sRGB color unchanged
+- [ ] `gamutMap` clamps a display-p3 red into a valid sRGB hex
+- [ ] `gamutMap` passes theme colors through unchanged
+- [ ] `applyMods` returns the input unchanged for `undefined` or empty `mods`
+- [ ] `applyMods` with `tint: 0.5` lightens the color toward white
+- [ ] `applyMods` with `shade: 0.5` darkens the color toward black
+- [ ] `applyMods` with `alpha: 0.5` reduces the output alpha channel
+- [ ] `applyMods` leaves theme colors as theme colors (palette-aware resolver handles them)

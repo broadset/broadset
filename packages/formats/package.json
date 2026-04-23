@@ -17,12 +17,14 @@
     "quality:strict": "npm run lint:strict && npm run typecheck && npm run test"
   },
   "devDependencies": {
+    "@types/culori": "^4.0.1",
     "typescript": "^6.0.2"
   },
   "dependencies": {
     "@broadset/model": "^0.1.0",
     "@libpdf/core": "^0.3.4",
     "ag-psd": "^30.1.0",
+    "culori": "^4.0.2",
     "dompurify": "^3.4.1",
     "fast-xml-parser": "^5.7.1",
     "mediabunny": "^1.40.1",
