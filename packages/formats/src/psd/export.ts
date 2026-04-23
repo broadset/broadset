@@ -4,6 +4,7 @@ import type { Layer, Psd } from 'ag-psd';
 import { writePsdUint8Array } from 'ag-psd';
 
 import { elementToLayer, getPendingLinkedFiles, resetExportState, setPrefetchedUrlImages } from './export-layer';
+import { writeBroadsetXmpForDocument } from './export-xmp';
 import { ensureCanvasInitialized } from './runtime-canvas';
 
 interface PsdImageBytes {
@@ -103,6 +104,9 @@ function exportPsdBytesCore(doc: BroadsetDocument): Uint8Array {
     height,
     colorMode: 3,
     children: [],
+    imageResources: {
+      xmpMetadata: writeBroadsetXmpForDocument(doc),
+    },
   };
 
   if (doc.pages.length > 1) {
