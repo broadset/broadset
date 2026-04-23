@@ -6,24 +6,77 @@ Defines the read-only display layer for broadset. The renderer converts a `Broad
 
 ---
 
+## Scope: Generic Core vs. Broadset Adapter
+
+The renderer package is split into two layered surfaces:
+
+- **Generic core** — a reusable HTML motion-graphics renderer. Consumes a normalized scene graph plus runtime services (`time`, `data`, `state`, `fonts`, `assets`). Knows nothing about `BroadsetDocument`, Broadset-specific `data-*` structural attributes, the overlay root, the checkerboard preview background, or custom-element registration. Produces semantic DOM: structural containers and per-type semantic renderers (text, image, svg, path, rectangle, ellipse, qrcode, group, video, clock, ticker).
+- **Broadset adapter** — maps `BroadsetDocument` and `CanvasSettings` into the normalized scene graph, attaches Broadset-owned `data-*` attributes via decorators, defines the `BroadsetScreenRendererElement` custom element wrapper, owns the preview checkerboard background policy, and exposes `getOverlayRoot()` for editor chrome portals. Wraps the generic core behind `createScreenRenderer`.
+
+Each requirement below is labeled `[Generic]` or `[Adapter]` to clarify which surface owns the behavior. Where a requirement is a cross-package contract with `@broadset/playback` or `@broadset/editor`, the requirement is labeled `[Cross-package]` and the contract is enforced through the Broadset adapter.
+
+Other packages MUST consume the renderer through its package root barrel; they MUST NOT reach into adapter internals or rely on undocumented internal file paths.
+
+---
+
 ### Data-Attribute Contract Registry
 
-The renderer owns the following data attributes, which form cross-package contracts:
+The renderer owns the following data attributes. Generic attributes are emitted by the generic core. Adapter attributes are emitted by the Broadset adapter layer.
 
-| Attribute              | Placed On             | Consumer                     | Purpose                               |
-| ---------------------- | --------------------- | ---------------------------- | ------------------------------------- |
-| `data-element-id`      | Element container     | Editor, Playback             | Identifies the element by document ID |
-| `data-element-content` | Inner content element | Playback (style writer)      | Marks the animation style target      |
-| `data-opacity-target`  | Opacity wrapper       | Playback (style writer)      | Target for opacity animation          |
-| `data-visibility`      | Element container     | Playback (state transitions) | Current visibility state              |
+#### Generic attributes
 
-Other packages MUST NOT invent new `data-*` attributes on rendered elements without updating this registry.
+| Attribute              | Placed On             | Consumer                     | Purpose                                                          |
+| ---------------------- | --------------------- | ---------------------------- | ---------------------------------------------------------------- |
+| `data-element-id`      | Element container     | Editor, Playback             | Identifies the element by document ID                            |
+| `data-element-content` | Inner content element | Playback (style writer)      | Marks the animation style target                                 |
+| `data-opacity-target`  | Opacity wrapper       | Playback (style writer)      | Target for opacity animation                                     |
+| `data-visibility`      | Element container     | Playback (state transitions) | Current visibility state                                         |
+| `data-char-index`      | Per-character `<span>` | Playback (animation targets) | Stable index for per-character text animation decorators         |
+
+#### Broadset-adapter attributes
+
+| Attribute                          | Placed On                      | Consumer                     | Purpose                                                                                            |
+| ---------------------------------- | ------------------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| `data-gradient`                    | Element content wrapper        | Playback (gradient animation) | JSON-encoded gradient spec for playback-driven gradient interpolation                             |
+| `data-broadset-canvas-transform`   | Canvas transform layer         | Export rasterizer, tests      | Marks the perspective/scale transform shell                                                        |
+| `data-broadset-canvas-root`        | Canvas content root             | Export rasterizer, tests      | Marks the semantic canvas content node (no editor chrome)                                          |
+| `data-broadset-element-layer`      | Element container layer         | Export rasterizer, tests      | Marks the element-only layer (for export snapshots that exclude editor chrome)                     |
+| `data-broadset-overlay-root`       | Overlay chrome root             | Editor chrome, tests          | Marks the portal container for editor chrome (selection widgets, snap indicators)                  |
+
+Other packages MUST NOT invent new `data-*` attributes on rendered elements without updating this registry. Adapter attributes MUST NOT be assumed to exist when the generic core is used without the Broadset adapter.
+
+---
+
+## DOM Stability Expectations
+
+The renderer MUST keep DOM node identity stable across document updates for any element whose rendered output did not change. This is a prerequisite for:
+
+- the 60fps performance target (see Rendering Performance)
+- editor-chrome portals that hold direct DOM references across updates
+- playback animation targets resolved once and cached by identity
+- automated DOM-stability tests that assert unchanged identity by `isSameNode` / `WeakRef` comparison
+
+### Identity rules
+
+- Each rendered element MUST have a single stable host node keyed by the element's `id` across updates.
+- An element's host node identity MUST be preserved when only its content or style changes.
+- An element's host node identity MUST be preserved when a sibling is added, removed, or reordered.
+- An element's host node MUST be remounted (identity replaced) when its `type` changes, because the inner renderer implementation changes.
+- Removing an element from the document MUST destroy its renderer and remove its host node.
+- Reparenting an element MUST move the existing host node into the new parent without remounting the renderer.
+
+### Incremental update rules
+
+- A single element property change MUST only mutate that element's host subtree; no sibling host MUST be touched.
+- A new element insertion MUST NOT remount existing siblings.
+- A composite renderer (e.g. boolean-group) MUST recompute only when its own element or one of its declared child-data dependencies changed; it MUST NOT recompute on unrelated sibling changes.
+- Whole-layer `replaceChildren()` of the element layer is only permitted on initial mount, on document replacement, or on page change.
 
 ---
 
 ## Requirements
 
-### Requirement: Component Capability Resolution
+### Requirement: Component Capability Resolution `[Generic]`
 
 The system MUST return built-in capability flags for known element types. Unknown types MUST return all-false capabilities. Plugin capabilities MUST merge on top of the base (built-in or default), overriding only the specified flags.
 
@@ -67,7 +120,7 @@ The system MUST return built-in capability flags for known element types. Unknow
 
 ---
 
-### Requirement: Background Style Application
+### Requirement: Background Style Application `[Generic]`
 
 The system MUST apply gradient backgrounds via the `background` shorthand and clear prior solid colors. Solid backgrounds MUST be applied via `backgroundColor` and clear prior gradients.
 
@@ -90,7 +143,7 @@ The system MUST apply gradient backgrounds via the `background` shorthand and cl
 
 ---
 
-### Requirement: Scene Tree Construction
+### Requirement: Scene Tree Construction `[Generic]`
 
 The system MUST build a hierarchical scene tree from the flat document element list by resolving parent references, promoting unresolved parents to roots, and preserving sibling order from document order.
 
@@ -113,7 +166,7 @@ The system MUST build a hierarchical scene tree from the flat document element l
 
 ---
 
-### Requirement: Renderer Resolution Priority
+### Requirement: Renderer Resolution Priority `[Generic]`
 
 The system MUST resolve renderers in priority order of plugin renderer, built-in renderer, then fallback renderer.
 
@@ -136,7 +189,7 @@ The system MUST resolve renderers in priority order of plugin renderer, built-in
 
 ---
 
-### Requirement: Element Renderer Lifecycle
+### Requirement: Element Renderer Lifecycle `[Generic]`
 
 The system MUST mount renderers for new elements, remount when element type changes, clear host output on destroy, and ignore updates after destroy.
 
@@ -159,7 +212,7 @@ The system MUST mount renderers for new elements, remount when element type chan
 
 ---
 
-### Requirement: Screen Renderer Custom Element Lifecycle
+### Requirement: Screen Renderer Custom Element Lifecycle `[Adapter]`
 
 The system MUST initialize rendering resources on connection, tear down resources on disconnection, and perform full document-driven rerender when document input is replaced.
 
@@ -175,7 +228,7 @@ The system MUST initialize rendering resources on connection, tear down resource
 
 ---
 
-### Requirement: Canvas Scaling Behavior
+### Requirement: Canvas Scaling Behavior `[Generic]`
 
 The system MUST compute base canvas size from document dimensions and update rendered scale responsively as container size changes.
 
@@ -191,7 +244,7 @@ The system MUST compute base canvas size from document dimensions and update ren
 
 ---
 
-### Requirement: Dynamic Data Substitution
+### Requirement: Dynamic Data Substitution `[Generic]`
 
 The system MUST substitute dynamic content values before delegating content to element renderers when dynamic mapping keys match element content tokens.
 
@@ -207,7 +260,7 @@ The system MUST substitute dynamic content values before delegating content to e
 
 ---
 
-### Requirement: Font Injection Idempotency
+### Requirement: Font Injection Idempotency `[Generic]`
 
 The system MUST avoid duplicate font loading for repeated font definitions sharing family, weight, and style.
 
@@ -223,7 +276,7 @@ The system MUST avoid duplicate font loading for repeated font definitions shari
 
 ---
 
-### Requirement: QR Code SVG Generation
+### Requirement: QR Code SVG Generation `[Generic]`
 
 The system MUST return null for empty QR payloads and responsive SVG output for non-empty payloads.
 
@@ -246,7 +299,7 @@ The system MUST return null for empty QR payloads and responsive SVG output for 
 
 ---
 
-### Requirement: Per-Type Renderer Output Contracts
+### Requirement: Per-Type Renderer Output Contracts `[Generic]`
 
 The system MUST render supported built-in element kinds and unknown kinds with stable observable output contracts.
 
@@ -269,7 +322,7 @@ The system MUST render supported built-in element kinds and unknown kinds with s
 
 ---
 
-### Requirement: Visibility Class Toggle
+### Requirement: Visibility Class Toggle `[Cross-package]`
 
 Toggling element visibility between onscreen and offscreen MUST add or remove the appropriate CSS class on the rendered DOM node. The element MUST remain in the DOM regardless of visibility state.
 
@@ -286,7 +339,7 @@ Toggling element visibility between onscreen and offscreen MUST add or remove th
 
 ---
 
-### Requirement: State Class Management
+### Requirement: State Class Management `[Cross-package]`
 
 Activating a named state on an element MUST add a state-specific CSS class to the rendered DOM node. Deactivating MUST remove it. Only one state class MUST be active at a time.
 
@@ -304,7 +357,7 @@ Activating a named state on an element MUST add a state-specific CSS class to th
 
 ---
 
-### Requirement: Custom Component Rendering
+### Requirement: Custom Component Rendering `[Generic]`
 
 Custom component plugin types MUST render via their provided rendererFactory. The factory receives element data and produces DOM output. If no factory is provided, fallback rendering is used.
 
@@ -321,7 +374,7 @@ Custom component plugin types MUST render via their provided rendererFactory. Th
 
 ---
 
-### Requirement: 3D Transform Rendering
+### Requirement: 3D Transform Rendering `[Generic]`
 
 Elements with rotateX, rotateY, rotateZ, or translateZ screen properties MUST render with CSS 3D transform. Perspective MUST be applied from `CanvasSettings.perspective`, accepted via the renderer's `RenderSettings` on create or via `updateSettings({ perspective })`. The renderer MUST apply this perspective on the canvas coordinate layer that contains both element content and editor chrome, so 3D projection is identical for elements and any overlay chrome (e.g. the selection transform widget).
 
@@ -348,7 +401,7 @@ The transform token sequence for each element MUST be stable: `rotate(Xdeg) rota
 
 ---
 
-### Requirement: Z-Order by Document Order
+### Requirement: Z-Order by Document Order `[Generic]`
 
 Element z-order MUST be determined solely by position in the document's `elements` array. Elements later in the array render on top. No explicit z-index property exists. The renderer MUST append DOM nodes in array order so that natural DOM stacking produces correct layering.
 
@@ -365,7 +418,7 @@ Element z-order MUST be determined solely by position in the document's `element
 
 ---
 
-### Requirement: Rendering Performance
+### Requirement: Rendering Performance `[Generic]`
 
 The renderer SHOULD sustain 60fps frame rate with up to 100 elements on reference hardware (modern desktop browser, discrete GPU). Implementations MUST NOT introduce O(n²) or worse rendering complexity. Performance testing SHOULD measure frame duration rather than absolute FPS to account for CI environment variability. Implementations SHOULD use surgical DOM updates (only mutating changed elements) rather than full re-renders to meet this target.
 
@@ -388,7 +441,7 @@ The renderer SHOULD sustain 60fps frame rate with up to 100 elements on referenc
 
 ---
 
-### Requirement: Animation Target Attribute Contract
+### Requirement: Animation Target Attribute Contract `[Cross-package]`
 
 Each rendered element MUST place a `data-element-content` attribute on the inner content element that is the target for animation style application. This attribute establishes a cross-package contract with the playback engine, which queries `[data-element-content]` to locate the animation target. The attribute MUST be present on exactly one descendant of the element's container node.
 
@@ -411,7 +464,7 @@ Each rendered element MUST place a `data-element-content` attribute on the inner
 
 ---
 
-### Requirement: Incremental Scene Tree Updates
+### Requirement: Incremental Scene Tree Updates `[Generic]`
 
 The renderer MUST support incremental updates to the scene tree. When an element is added, removed, or modified, only the affected subtree MUST be re-rendered. Full scene tree rebuilds MUST only occur on initial mount or when the page changes. This is required to meet the 60fps performance target.
 
@@ -434,7 +487,7 @@ The renderer MUST support incremental updates to the scene tree. When an element
 
 ---
 
-### Requirement: Broken Image Fallback
+### Requirement: Broken Image Fallback `[Generic]`
 
 When an image element's content URL fails to load (404, network error, malformed URL), the renderer MUST display a visible placeholder indicating the broken state. The placeholder MUST include the element's dimensions and a broken-image icon or text indicator. The renderer MUST NOT throw an error or leave an invisible gap.
 
@@ -465,22 +518,11 @@ Image loads use a two-phase strategy to maximize export compatibility: the rende
 - [ ] Given an empty image content, a placeholder is rendered
 - [ ] Given a broken image, no JavaScript error is thrown
 - [ ] Given a CORS-enabled image host, the rendered `<img>` has `crossOrigin="anonymous"` so the same URL can be re-fetched by exporters from the HTTP cache
-- [ ] Given a non-CORS image host, a plain `<img>` fallback loads the image for display after the CORS attempt errorsheaders
-- WHEN the CORS-enabled first attempt errors
-- THEN a plain-fetch fallback `<img>` loads the image for editor display
-- AND exports of this image render the broken-image placeholder
-
-#### Acceptance Criteria
-
-- [ ] Given a broken image URL, a visible placeholder is rendered at the element's dimensions
-- [ ] Given an empty image content, a placeholder is rendered
-- [ ] Given a broken image, no JavaScript error is thrown
-- [ ] Given a CORS-enabled image host, the rendered `<img>` has `crossOrigin="anonymous"` so the same URL can be re-fetched by exporters from the HTTP cache
 - [ ] Given a non-CORS image host, a plain `<img>` fallback loads the image for display after the CORS attempt errors
 
 ---
 
-### Requirement: Text Content Sanitization
+### Requirement: Text Content Sanitization `[Generic]`
 
 When rendering text elements, the renderer MUST sanitize HTML content to prevent XSS attacks. Only the following HTML tags are allowed: `<b>`, `<i>`, `<u>`, `<br>`, `<span>`, `<strong>`, `<em>`. All other tags MUST be stripped. Only the `style` attribute is allowed on permitted tags; all other attributes MUST be removed. This sanitization MUST occur at render time as a defense-in-depth measure (the model boundary also sanitizes).
 
@@ -504,31 +546,66 @@ When rendering text elements, the renderer MUST sanitize HTML content to prevent
 
 ---
 
-### Requirement: Group Element Rendering
+### Requirement: Plain Group Element Rendering `[Generic]`
 
-Group-type elements MUST render as a container `<div>` element. The container MUST have `data-element-id` set to the group's ID and `data-element-content` on itself. Child elements (those with `parentId` referencing the group) MUST be rendered as descendants within the group container. The group container MUST apply the group's position, rotation, and opacity but MUST NOT clip children by default.
+Group-type elements with `booleanOperation === null` MUST render as a container `<div>` element. The container MUST have `data-element-id` set to the group's ID and `data-element-content` on itself. Child elements (those with `parentId` referencing the group) MUST be rendered as descendants within the group container. The group container MUST apply the group's position, rotation, and opacity but MUST NOT clip children by default. A plain group is a structural container only; it MUST NOT compose child geometry into a single combined path.
 
 #### Scenario: Group with children
 
-- GIVEN a group element with two children
+- GIVEN a group element with two children and `booleanOperation: null`
 - WHEN rendered
 - THEN the group renders as a `<div>` containing both children
 
 #### Scenario: Group rotation applied
 
-- GIVEN a group element with rotation 45°
+- GIVEN a group element with rotation 45° and `booleanOperation: null`
 - WHEN rendered
 - THEN the rotation transform is applied to the group container
 
 #### Acceptance Criteria
 
-- [ ] Given a group element, it renders as a div container
-- [ ] Given a group with children, child elements render inside the group container
-- [ ] Given a group with rotation, the rotation is applied to the container transform
+- [ ] Given a plain group element (`booleanOperation: null`), it renders as a div container
+- [ ] Given a plain group with children, child elements render inside the group container
+- [ ] Given a plain group with rotation, the rotation is applied to the container transform
+- [ ] Given a plain group, no combined SVG path is emitted (plain grouping is structural-only)
 
 ---
 
-### Requirement: Dynamic Data Token Format
+### Requirement: Boolean Composite Group Rendering `[Generic]`
+
+Group-type elements with a non-null `booleanOperation` (`union`, `subtract`, `intersect`, `exclude`) MUST render a single combined SVG `<path>` produced by applying the boolean operation to the path data of all direct path children, in document order. The combined path MUST inherit stroke/fill styling from the first path child. When fewer than two path children contribute usable path data, the renderer MUST produce no visible geometry (empty host content) and MUST NOT throw.
+
+Boolean composite behavior is a separate responsibility from plain group containment; it is NOT expressed as a decorator on the plain group renderer. Only the top-level composite group's output is visible — child path elements themselves MUST NOT render directly when their parent group declares a boolean operation.
+
+#### Scenario: Union of two path children
+
+- GIVEN a group element with `booleanOperation: 'union'` and two path children
+- WHEN rendered
+- THEN a single SVG `<path>` combining both child paths is mounted inside the group container
+
+#### Scenario: Invalid boolean operation
+
+- GIVEN a group element with a `booleanOperation` value outside the supported set
+- WHEN rendered
+- THEN no combined path is emitted and the group container is empty
+
+#### Scenario: Insufficient path children
+
+- GIVEN a group element with `booleanOperation: 'union'` and zero or one path child
+- WHEN rendered
+- THEN no combined path is emitted and the group container is empty
+
+#### Acceptance Criteria
+
+- [ ] Given a group with `booleanOperation != null` and two or more path children, a single combined `<path>` is emitted
+- [ ] Given the combined path, its stroke, fill, and fill-rule are inherited from the first path child
+- [ ] Given a group with an unsupported `booleanOperation`, no combined path is emitted
+- [ ] Given a group with fewer than two usable path children, no combined path is emitted and the renderer does not throw
+- [ ] Given a boolean composite group, the child path elements' own visible rendering is suppressed (only the combined path is visible)
+
+---
+
+### Requirement: Dynamic Data Token Format `[Generic]`
 
 Dynamic data tokens in element content MUST use the format `{{key}}` where `key` is a dot-notation path into the data store (e.g., `{{score.home}}`, `{{player.name}}`). The renderer MUST replace tokens with their resolved values from the data store. Unresolved tokens (keys not found in the data store) MUST be rendered as the literal token string `{{key}}`.
 
@@ -552,7 +629,7 @@ Dynamic data tokens in element content MUST use the format `{{key}}` where `key`
 
 ---
 
-### Requirement: Video Element Rendering
+### Requirement: Video Element Rendering `[Generic]`
 
 Video elements MUST render a `<video>` tag within the element wrapper. The `src` attribute MUST be set to the element's `content` (video URL). The video element MUST NOT show browser-native controls (`controls` attribute MUST be absent). The `typeConfig` properties MUST map to video attributes: `loop` → `loop` attribute, `muted` → `muted` attribute, `autoplay` → `autoplay` attribute. The `data-element-content` marker MUST be placed on the `<video>` tag. When `typeConfig.startTimeS` is set, the video's `currentTime` MUST be set to the start time on load. When `typeConfig.endTimeS` is set, the video MUST pause or loop when reaching the end time. Object-fit MUST be applied via CSS on the `<video>` element. The video element MUST respect standard element styling (border-radius, box effects, clip-path, opacity).
 
@@ -584,7 +661,7 @@ Video elements MUST render a `<video>` tag within the element wrapper. The `src`
 
 ---
 
-### Requirement: Clock Element Rendering
+### Requirement: Clock Element Rendering `[Generic]`
 
 Clock elements MUST render a text display showing formatted time according to the element's `content` format pattern and `typeConfig.mode`. In `'realtime'` mode, the display MUST update every second (or fraction indicated by the format) showing the current local time. In `'countdown'` mode, the display MUST count down from `typeConfig.startValue` toward `typeConfig.targetValue`. In `'countup'` mode, the display counts up from `typeConfig.startValue`. In `'stopwatch'` mode, the display shows elapsed time from when the element's visibility became `'onscreen'` (derived from animation state). When `typeConfig.countdownTo` is set (ISO 8601 datetime), the clock MUST display remaining time until the target datetime, updating every second; when the target is in the past, the display MUST show `00:00:00` (formatted per the element's format pattern). The `countdownTo` field overrides `startValue`/`targetValue` when present. The format pattern uses `HH` (hours), `mm` (minutes), `ss` (seconds), `S` (tenths), `SS` (hundredths), `SSS` (milliseconds). The rendered output MUST use the same DOM structure as text elements (span with text content) and MUST respect typography capabilities (font, size, color, alignment). The `data-element-content` marker MUST be on the text span.
 
@@ -629,7 +706,7 @@ Clock elements MUST render a text display showing formatted time according to th
 
 ---
 
-### Requirement: Ticker Element Rendering
+### Requirement: Ticker Element Rendering `[Generic]`
 
 Ticker elements MUST render a continuously scrolling container of text items. Each item in the `content` JSON array MUST be rendered as an individual text span. Items scroll in the direction specified by `typeConfig.direction` at the speed of `typeConfig.speed` pixels per second with `typeConfig.gap` pixels between consecutive items. When the leading item fully scrolls out of view, it MUST be recycled to the trailing end, creating an infinite scroll effect. When `typeConfig.paused` is `true`, scrolling MUST stop at the current position. The ticker container MUST clip overflow content. The ticker MUST respect typography capabilities (font, size, color). Scrolling MUST use CSS transforms (translateX/translateY) animated via `requestAnimationFrame` for smooth, GPU-accelerated motion.
 
@@ -667,7 +744,7 @@ Ticker elements MUST render a continuously scrolling container of text items. Ea
 
 ---
 
-### Requirement: Alpha Background Rendering Mode
+### Requirement: Alpha Background Rendering Mode `[Adapter]`
 
 The renderer MUST support a transparent background mode for alpha-channel export. When the canvas element has `background: 'transparent'` or when an export requests alpha output, the canvas background MUST render with no background color (CSS `background: transparent` or equivalent). All elements MUST render with their specified opacity and backgrounds preserved — only the canvas root background is made transparent. This enables compositing the rendered output over external video feeds or other graphics layers. The alpha background mode MUST NOT affect element rendering, z-order, or any other visual behavior.
 
