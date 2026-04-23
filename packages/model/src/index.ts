@@ -1,4 +1,5 @@
 export * from './animation';
+export * from './asset';
 export * from './broadset-color';
 export * from './broadset-fill';
 export * from './broadset-gradient';

@@ -147,6 +147,57 @@ Font assets (`kind: 'font'`) carry the font file data used by text elements. Whe
 
 ---
 
+### Requirement: Font Asset Fidelity Fields
+
+Font assets MUST carry the metadata every format exporter (PDF, PPTX, SVG, PSD) needs to round-trip a font embed without re-parsing the byte blob. In addition to the shared asset base fields, each font asset MUST declare:
+
+- `format`: one of `'woff2' | 'ttf' | 'otf'` — the on-disk font format. Drives SVG `@font-face` `format(...)` hints, PDF `/Subtype` selection, and PPTX font embed routing.
+- `postScriptName`: the canonical PostScript name (e.g. `Inter-Regular`). Required for PDF `/BaseFont` and for cross-format identification. MUST match `[A-Za-z0-9._+-]+` — whitespace and reserved punctuation are rejected at the model boundary.
+- `familyName`: the human-readable CSS / display family name (e.g. `Inter`). Required for editor font pickers, CSS `font-family` keying, and PPTX `rPr` typeface attributes.
+- `subsetRanges?`: optional array of inclusive `{ start, end }` Unicode codepoint ranges declaring the font's glyph coverage. Consumed by the shared subsetting pipeline (`_shared/fonts/subset.ts`). Each endpoint MUST be an integer codepoint in `[0, 0x10FFFF]` with `start <= end`.
+
+#### Scenario: Well-formed font asset
+
+- GIVEN an asset `{ id: 'asset-inter', kind: 'font', name: 'Inter', mimeType: 'font/woff2', source: { type: 'embedded', dataUri: '...' }, format: 'woff2', postScriptName: 'Inter-Regular', familyName: 'Inter' }`
+- WHEN the asset is validated
+- THEN validation succeeds
+
+#### Scenario: Font asset without PostScript name
+
+- GIVEN a font asset missing the `postScriptName` field
+- WHEN the asset is validated
+- THEN validation fails
+
+#### Scenario: Font asset with whitespace in PostScript name
+
+- GIVEN a font asset with `postScriptName: 'Inter Regular'`
+- WHEN the asset is validated
+- THEN validation fails — PostScript names must not contain whitespace
+
+#### Scenario: Font asset with reversed subset range
+
+- GIVEN a font asset with `subsetRanges: [{ start: 100, end: 10 }]`
+- WHEN the asset is validated
+- THEN validation fails — range start MUST be <= end
+
+#### Scenario: Font asset with out-of-Unicode codepoint
+
+- GIVEN a font asset with `subsetRanges: [{ start: 0, end: 0x110000 }]`
+- WHEN the asset is validated
+- THEN validation fails — codepoints MUST be in `[0, 0x10FFFF]`
+
+#### Acceptance Criteria
+
+- [ ] Given a font asset with `format` ∈ `{woff2, ttf, otf}`, a non-empty PostScript name matching `[A-Za-z0-9._+-]+`, and a non-empty family name, validation succeeds
+- [ ] Given a font asset missing `format`, `postScriptName`, or `familyName`, validation fails
+- [ ] Given a font asset with a `format` value outside `{woff2, ttf, otf}`, validation fails
+- [ ] Given a `postScriptName` containing whitespace or reserved punctuation, validation fails
+- [ ] Given a `subsetRanges` entry where `start > end`, validation fails
+- [ ] Given a `subsetRanges` entry with a codepoint below 0 or above `0x10FFFF`, validation fails
+- [ ] Given a `subsetRanges` entry with a non-integer codepoint, validation fails
+
+---
+
 ## Spec Gaps
 
 _None — all requirements have acceptance criteria._

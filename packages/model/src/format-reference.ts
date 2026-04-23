@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { assetSchema } from './asset';
 import { broadsetDocumentSchema } from './document';
 
 export interface CanvasSizePreset {
@@ -51,22 +52,6 @@ const projectSettingsSchema = z.object({
     .default([]),
   palette: z.array(z.string()).default([]),
   defaultDocumentMode: z.enum(['screen', 'print']).default('screen'),
-});
-
-const assetSourceSchema = z.union([
-  z.object({ type: z.literal('url'), url: z.string().min(1) }),
-  z.object({ type: z.literal('embedded'), dataUri: z.string().min(1) }),
-  z.object({ type: z.literal('file'), path: z.string().min(1) }),
-]);
-
-const assetSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  kind: z.enum(['image', 'video', 'font', 'audio', 'data']),
-  mimeType: z.string().min(1),
-  source: assetSourceSchema,
-  fileSizeBytes: z.number().nonnegative().optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const templateGroupMemberSchema = z.object({
