@@ -66,7 +66,7 @@ Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md
 
 Source of truth: [plan.md](./plan.md), [renderer-refactor-plan.md](./renderer-refactor-plan.md)
 
-- [ ] P3.0 Contract cleanup
+- [x] P3.0 Contract cleanup
 - [ ] P3.1 Internal layer split
 - [ ] P3.2 Keyed reconciliation
 - [ ] P3.3 Semantic renderers and safe builders
