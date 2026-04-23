@@ -5,4 +5,5 @@
  * public API (four-to-six functions) per the io-prereqs plan.
  */
 export * from './fingerprint';
+export * from './reconcile';
 export * from './shape-classifier';

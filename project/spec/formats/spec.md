@@ -261,3 +261,40 @@ Contract:
 - [ ] Given two elements that differ in `width`, `height`, or `rotation`, the fingerprints differ
 - [ ] The WASM runtime is cached so subsequent calls do not re-initialize the module
 - [ ] A flat-string `content` hashes differently from an equivalent `TextBody` structure
+
+---
+
+### Requirement: Reconciliation (`_shared/reconcile/`)
+
+Every format importer (PSD / PDF / SVG / PPTX) produces a diff between the last-known Broadset state (preserved in XMP, `extensions.<format>`, or similar metadata) and the current visual document (what the external tool now shows). The reconciliation module unifies that diff into a canonical four-bucket result so downstream UI (import warnings, conflict markers) works against one shape regardless of source format.
+
+```ts
+interface ReconcileResult {
+  readonly modifications: readonly ElementModification[];
+  readonly additions: readonly BroadsetElement[];
+  readonly deletions: readonly BroadsetElement[];
+  readonly recoveredByHash: readonly RecoveredByHashEntry[];
+}
+
+function reconcile(input: ReconcileInput): ReconcileResult;
+```
+
+Contract:
+
+- **Modifications**: ids present on both sides with non-empty microdiff output. Carries `before` / `after` references and the raw `Difference[]` so UIs can render per-field conflict markers.
+- **Additions**: ids present only in `currentVisual` with no fingerprint match against any deletion.
+- **Deletions**: ids present only in `preservedMetadata` with no fingerprint match against any addition.
+- **Recovered by hash**: pairs where a deleted id and an added id share the same fingerprint — the external tool stripped the `data-bs-*` tag but visual identity survived. Prevents spurious delete + add events.
+- When multiple additions match a single deletion's fingerprint, only the first is recovered; the rest remain in `additions` so reconciliation never silently collapses distinct elements.
+- Field-level diff is produced via `microdiff` — the model is not walked by hand.
+
+#### Acceptance Criteria
+
+- [ ] Given two identical documents, every output bucket is empty
+- [ ] Given an id-matched pair with differing fields, the result contains a single `modifications` entry with the microdiff populated
+- [ ] Given an id only in `preservedMetadata` with no fingerprint match, the result records a `deletions` entry
+- [ ] Given an id only in `currentVisual` with no fingerprint match, the result records an `additions` entry
+- [ ] Given a deletion + addition pair that share a fingerprint, the result records a `recoveredByHash` entry and the buckets contain no delete / add for that pair
+- [ ] The recovery entry includes the microdiff when the two elements differ in any fields beyond the id
+- [ ] When multiple additions match a single deletion's fingerprint, only the first is recovered; the rest remain in `additions`
+- [ ] A mixed-change document partitions correctly across all four buckets
