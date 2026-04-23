@@ -68,6 +68,11 @@
       "Bash(npm run prettier:check)",
       "Bash(npm run ct)",
       "Bash(npm run ct -w *)",
+      "Bash(npm ls)",
+      "Bash(npm ls *)",
+      "Bash(npm view *)",
+      "Bash(npm info *)",
+      "Bash(bash agents/hooks/quality-gate.sh)",
       "mcp__chrome-devtools__take_snapshot"
     ]
   }
