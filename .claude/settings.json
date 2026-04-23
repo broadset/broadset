@@ -51,7 +51,24 @@
   },
   "permissions": {
     "allow": [
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(npm run quality)",
+      "Bash(npm run quality -w *)",
+      "Bash(npm run quality:all)",
+      "Bash(npm run quality:strict)",
+      "Bash(npm run lint)",
+      "Bash(npm run lint -w *)",
+      "Bash(npm run lint:strict)",
+      "Bash(npm run lint:dead)",
+      "Bash(npm run test)",
+      "Bash(npm run test -w *)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run typecheck -w *)",
+      "Bash(npm run gate:full)",
+      "Bash(npm run prettier:check)",
+      "Bash(npm run ct)",
+      "Bash(npm run ct -w *)",
+      "mcp__chrome-devtools__take_snapshot"
     ]
   }
 }
