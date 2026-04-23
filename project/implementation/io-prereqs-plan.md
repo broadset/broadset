@@ -604,9 +604,9 @@ Landing order from §"Phase 1 internal landing order" above.
 - [x] **8. `BroadsetFill` discriminated union** — `none | solid | gradient | pattern | picture`; replaces flat `fill`/`backgroundColor`/`backgroundGradient` (depends on #3, #7). Cascade comparable to #3.
   - [x] tests: red
   - [x] impl: green (`4b29e4b`, `e06ba43`, `a4dce68`)
-- [ ] **9. Text model — `TextBody` / `Paragraph` / `Run`** — `content: string | TextBody`; model-only, editor catches up Phase 5. Plan: 2–3 commits. Depends on #3.
+- [x] **9. Text model — `TextBody` / `Paragraph` / `Run`** — `content: string | TextBody`; model-only, editor catches up Phase 5. Plan: 2–3 commits. Depends on #3.
   - [x] tests: red
-  - [ ] impl: green (9a `4dfd2d8`, 9b `e314388`; 9c fixture migration pending)
+  - [x] impl: green (9a `4dfd2d8`, 9b `e314388`, 9c `4ae4160`)
 - [x] **10. Text-on-path reference** — `textPathElementId` as first-class field with existence + cycle validation (depends on #9)
   - [x] tests: red
   - [x] impl: green (`9262266`)
