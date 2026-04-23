@@ -136,6 +136,48 @@ File paths in asset sources use forward slashes and are relative to the archive 
 
 ---
 
+### Requirement: Image Asset Intrinsic Dimensions
+
+Image assets (`kind: 'image'`) MUST declare intrinsic pixel dimensions so exporters (SVG `<image>`, PDF image XObject bounding box, PPTX picture frame geometry) can emit coordinates without decoding the byte blob. The asset's `source` continues to locate the bytes (URL / embedded / file) but the dimensions MUST be present on the asset record:
+
+- `width`: positive integer — intrinsic pixel width
+- `height`: positive integer — intrinsic pixel height
+
+Both fields MUST be positive integers. Zero, negative, and non-integer values are rejected at the model boundary. Byte blobs remain `assetId`-keyed and elements reference them by ID (see existing `Element-to-Asset Reference` requirement above).
+
+#### Scenario: Well-formed image asset
+
+- GIVEN an asset `{ id: 'asset-logo', kind: 'image', name: 'Logo', mimeType: 'image/png', source: { type: 'url', url: '...' }, width: 512, height: 256 }`
+- WHEN the asset is validated
+- THEN validation succeeds
+
+#### Scenario: Image asset without width
+
+- GIVEN an image asset missing `width`
+- WHEN the asset is validated
+- THEN validation fails
+
+#### Scenario: Image asset with zero or negative dimension
+
+- GIVEN an image asset with `width: 0` or `height: -1`
+- WHEN the asset is validated
+- THEN validation fails
+
+#### Scenario: Image asset with non-integer dimension
+
+- GIVEN an image asset with `width: 1.5`
+- WHEN the asset is validated
+- THEN validation fails
+
+#### Acceptance Criteria
+
+- [ ] Given an image asset with positive integer width and height, validation succeeds
+- [ ] Given an image asset missing width or height, validation fails
+- [ ] Given an image asset with zero or negative dimensions, validation fails
+- [ ] Given an image asset with non-integer dimensions, validation fails
+
+---
+
 ### Requirement: Font Assets
 
 Font assets (`kind: 'font'`) carry the font file data used by text elements. When a document references a `fontFamily` that matches a font asset name, the font MUST be loaded from the asset before rendering. The project's `settings.fonts` array (see [project.md](project.md)) declares available font families; each font family SHOULD have corresponding font assets for used weights/styles.

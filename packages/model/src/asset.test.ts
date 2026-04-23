@@ -236,6 +236,128 @@ describe('Font asset schema validation', () => {
   });
 });
 
+describe('Image asset fidelity fields', () => {
+  /**
+   * @description Image assets MUST declare intrinsic pixel dimensions
+   * so SVG `<image>` `width`/`height`, PDF image XObject bounding box,
+   * and PPTX picture frame geometry can all be emitted without
+   * decoding the byte blob. Omission is a hard validation failure.
+   */
+  it('accepts an image asset with width and height', () => {
+    const asset = imageAsset({
+      id: 'asset-image-1',
+      name: 'Logo',
+      mimeType: 'image/png',
+      source: { type: 'embedded', dataUri: 'data:image/png;base64,AAAA' },
+      width: 512,
+      height: 256,
+    });
+
+    const parsed = assetSchema.safeParse(asset);
+
+    expect(parsed.success).toBe(true);
+    expect(asset.width).toBe(512);
+    expect(asset.height).toBe(256);
+  });
+
+  /**
+   * @description Missing `width` is rejected — exporters cannot infer
+   * image dimensions from a URL-sourced asset without decoding bytes,
+   * which defeats the purpose of the byte-addressable asset pipeline.
+   */
+  it('rejects an image asset missing width', () => {
+    const parsed = assetSchema.safeParse({
+      id: 'asset-image-1',
+      kind: 'image',
+      name: 'Logo',
+      mimeType: 'image/png',
+      source: { type: 'embedded', dataUri: 'data:image/png;base64,AAAA' },
+      height: 256,
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  /**
+   * @description Missing `height` is equally fatal — same reason.
+   */
+  it('rejects an image asset missing height', () => {
+    const parsed = assetSchema.safeParse({
+      id: 'asset-image-1',
+      kind: 'image',
+      name: 'Logo',
+      mimeType: 'image/png',
+      source: { type: 'embedded', dataUri: 'data:image/png;base64,AAAA' },
+      width: 512,
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  /**
+   * @description Dimensions MUST be positive — zero and negative
+   * values are meaningless for raster images and would silently
+   * propagate into exported coordinate math.
+   */
+  it.each([
+    ['zero width', { width: 0, height: 10 }],
+    ['zero height', { width: 10, height: 0 }],
+    ['negative width', { width: -1, height: 10 }],
+    ['negative height', { width: 10, height: -1 }],
+  ])('rejects image asset with %s', (_label, dims) => {
+    const parsed = assetSchema.safeParse({
+      id: 'asset-image-1',
+      kind: 'image',
+      name: 'Logo',
+      mimeType: 'image/png',
+      source: { type: 'embedded', dataUri: 'data:image/png;base64,AAAA' },
+      ...dims,
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  /**
+   * @description Pixel dimensions MUST be integers. Non-integer values
+   * arrive from buggy importers that mistakenly divide pixel counts —
+   * catching this at the boundary keeps the exported image XObject /
+   * `<image>` geometry clean.
+   */
+  it('rejects non-integer image dimensions', () => {
+    const parsed = assetSchema.safeParse({
+      id: 'asset-image-1',
+      kind: 'image',
+      name: 'Logo',
+      mimeType: 'image/png',
+      source: { type: 'embedded', dataUri: 'data:image/png;base64,AAAA' },
+      width: 1.5,
+      height: 10,
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  /**
+   * @description The `imageAsset` factory surfaces `width`/`height`
+   * as required parameters so callers cannot construct an
+   * under-specified image asset at compile time.
+   */
+  it('factory requires width and height', () => {
+    const asset = imageAsset({
+      id: 'asset-image-1',
+      name: 'Logo',
+      mimeType: 'image/png',
+      source: { type: 'url', url: 'https://cdn.example.com/logo.png' },
+      width: 100,
+      height: 50,
+    });
+
+    expect(asset.kind).toBe('image');
+    expect(asset.width).toBe(100);
+    expect(asset.height).toBe(50);
+  });
+});
+
 describe('Asset discriminated union', () => {
   /**
    * @description The schema narrows on `kind`, so TypeScript exhaustive
@@ -251,6 +373,8 @@ describe('Asset discriminated union', () => {
       name: 'Logo',
       mimeType: 'image/png',
       source: { type: 'url', url: 'https://cdn.example.com/logo.png' },
+      width: 200,
+      height: 200,
     });
     const videoInput: VideoAsset = {
       id: 'asset-video-1',
@@ -307,6 +431,8 @@ describe('Asset discriminated union', () => {
       name: 'Logo',
       mimeType: 'image/png',
       source: { type: 'url', url: 'https://cdn.example.com/logo.png' },
+      width: 10,
+      height: 10,
     });
 
     expect(parsed.success).toBe(false);
@@ -341,6 +467,8 @@ describe('Asset type guards', () => {
         name: 'Logo',
         mimeType: 'image/png',
         source: { type: 'url', url: 'https://cdn.example.com/logo.png' },
+        width: 200,
+        height: 200,
       }),
       {
         id: 'asset-video-1',

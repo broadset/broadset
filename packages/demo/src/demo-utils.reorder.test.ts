@@ -197,6 +197,8 @@ describe('buildRenderableDocumentForActivePage', () => {
           type: 'url',
           url: 'https://picsum.photos/id/206/150/150',
         },
+        width: 150,
+        height: 150,
       },
     ]);
 
@@ -229,6 +231,8 @@ describe('buildRenderableDocumentForActivePage', () => {
           type: 'url',
           url: 'https://picsum.photos/id/206/150/150',
         },
+        width: 150,
+        height: 150,
       },
     ]);
 

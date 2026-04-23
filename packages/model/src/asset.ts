@@ -74,6 +74,14 @@ export interface FontAsset extends AssetBase {
 
 export interface ImageAsset extends AssetBase {
   readonly kind: 'image';
+  /**
+   * Intrinsic pixel width. Required so exporters (SVG `<image>`, PDF
+   * image XObject, PPTX picture frame) can emit coordinates without
+   * decoding the byte blob.
+   */
+  readonly width: number;
+  /** Intrinsic pixel height. See `width` for rationale. */
+  readonly height: number;
 }
 
 export interface VideoAsset extends AssetBase {
@@ -144,9 +152,13 @@ const fontAssetSchema = z.object({
   subsetRanges: z.array(unicodeRangeSchema).optional(),
 });
 
+const pixelDimensionSchema = z.number().int().positive();
+
 const imageAssetSchema = z.object({
   ...assetBaseFields,
   kind: z.literal('image'),
+  width: pixelDimensionSchema,
+  height: pixelDimensionSchema,
 });
 
 const videoAssetSchema = z.object({
@@ -210,6 +222,8 @@ export interface ImageAssetInput {
   readonly name: string;
   readonly mimeType: string;
   readonly source: AssetSource;
+  readonly width: number;
+  readonly height: number;
   readonly fileSizeBytes?: number | undefined;
   readonly metadata?: Readonly<Record<string, unknown>> | undefined;
 }
@@ -221,6 +235,8 @@ export function imageAsset(input: ImageAssetInput): ImageAsset {
     name: input.name,
     mimeType: input.mimeType,
     source: input.source,
+    width: input.width,
+    height: input.height,
     ...(input.fileSizeBytes === undefined ? {} : { fileSizeBytes: input.fileSizeBytes }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
   };
