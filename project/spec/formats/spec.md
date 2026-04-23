@@ -411,3 +411,44 @@ Contract:
 - [ ] `applyMods` with `shade: 0.5` darkens the color toward black
 - [ ] `applyMods` with `alpha: 0.5` reduces the output alpha channel
 - [ ] `applyMods` leaves theme colors as theme colors (palette-aware resolver handles them)
+
+---
+
+### Requirement: Font operations (`_shared/fonts/`)
+
+The `_shared/fonts/` module wraps fontkit for the byte-aware font operations every format's font-embedding path calls. The Google Fonts fetch, system-font matching, and subsetting pipeline land with the Phase 4 asset pipeline; this module ships the capability surface available today.
+
+```ts
+interface FontMetrics {
+  readonly ascender: number;
+  readonly descender: number;
+  readonly lineGap: number;
+  readonly unitsPerEm: number;
+  readonly capHeight: number | undefined;
+  readonly xHeight: number | undefined;
+}
+
+type EmbedPermission = 'installable' | 'editable' | 'preview-print' | 'restricted';
+
+function getFontMetrics(bytes: Uint8Array | undefined): FontMetrics | null;
+function readEmbedPermission(bytes: Uint8Array | undefined): EmbedPermission | null;
+function getGlyphToUnicodeMap(bytes: Uint8Array | undefined): ReadonlyMap<number, readonly number[]>;
+```
+
+Contract:
+
+- **getFontMetrics** parses the font via fontkit and returns ascent / descent / line-gap / unitsPerEm plus optional cap-height / x-height. Returns `null` for absent / empty / unparseable input.
+- **readEmbedPermission** reads the OS/2 `fsType` bit field and maps to the coarsest Broadset permission bucket. Restricted bit (0x0002) → `'restricted'`; preview-print (0x0004) → `'preview-print'`; editable (0x0008) → `'editable'`; otherwise `'installable'`. Returns `'installable'` for fonts without an OS/2 table (OpenType default); `null` for invalid input.
+- **getGlyphToUnicodeMap** walks the font's character set and produces a glyph-id → codepoints map. Multiple codepoints per glyph are preserved (ligatures like `fi` yield `[0x66, 0x69]`). Returns an empty map for invalid input.
+- All three functions degrade gracefully on malformed byte input (never throw) so importers processing arbitrary uploads stay resilient per IO-D-18.
+
+#### Acceptance Criteria
+
+- [ ] `getFontMetrics` returns `null` for `undefined`, empty, and invalid (non-font) input
+- [ ] `readEmbedPermission` returns `null` for `undefined`, empty, and invalid input
+- [ ] `getGlyphToUnicodeMap` returns an empty map for `undefined`, empty, and invalid input
+
+#### Spec Gaps
+
+- Byte-level happy-path tests (reading metrics / fsType / CMap from a real TTF / OTF) land with the Phase 4 asset pipeline when a Google-Fonts-backed fixture becomes available.
+- `resolveFont` / `listAvailable` / `subsetFont` ship with the Phase 4 asset pipeline.
