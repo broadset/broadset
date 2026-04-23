@@ -4,4 +4,5 @@
  * than reaching into submodule paths. Each module exposes a narrow
  * public API (four-to-six functions) per the io-prereqs plan.
  */
+export * from './fingerprint';
 export * from './shape-classifier';

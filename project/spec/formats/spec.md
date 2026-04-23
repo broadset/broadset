@@ -233,3 +233,31 @@ Contract:
 - [ ] Given malformed or unsupported commands, the classifier returns `path` without throwing
 - [ ] Given a rounded rectangle (line + arc commands), the classifier returns `path`
 - [ ] Given a multi-subpath path, the classifier returns `path`
+
+---
+
+### Requirement: Element Fingerprint (`_shared/fingerprint/`)
+
+The element fingerprint is a stable cross-document hash used by reconciliation (PSD / PDF / SVG / PPTX re-import) to recover element identity when external tools strip `data-bs-*` tags, XMP entries, or shape-name markers. Visually identical elements MUST hash identically regardless of source-file formatting.
+
+```ts
+async function fingerprintElement(element: BroadsetElement): Promise<string>;
+```
+
+Contract:
+
+- Canonicalizes element `type`, `width`, `height`, `rotation`, `content` (flat string or serialized `TextBody`), and a key-sorted projection of `style` so source-file whitespace / attribute-ordering differences do not drift the hash.
+- Wraps `xxhash-wasm` — returns a 16-char lowercase hex `h64` digest.
+- The WASM runtime initializes lazily on first call and caches the API promise; subsequent calls reuse it.
+- Two elements that differ only in `id` (or other non-visible identity fields) MUST produce the same fingerprint.
+- Two elements that differ in `content`, geometry, rotation, or any persisted style field MUST produce different fingerprints.
+- Flat-string content and an equivalent `TextBody` structure intentionally hash differently — rich-text metadata (paragraph / run boundaries) is part of identity.
+
+#### Acceptance Criteria
+
+- [ ] Given a canonical text element, the fingerprint is a 16-char lowercase hex string
+- [ ] Given two elements that differ only in `id`, the fingerprints match
+- [ ] Given two elements that differ in `content`, the fingerprints differ
+- [ ] Given two elements that differ in `width`, `height`, or `rotation`, the fingerprints differ
+- [ ] The WASM runtime is cached so subsequent calls do not re-initialize the module
+- [ ] A flat-string `content` hashes differently from an equivalent `TextBody` structure
