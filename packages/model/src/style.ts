@@ -8,7 +8,9 @@ import {
   type ColorResolutionContext,
   colorToCss,
 } from './broadset-color';
+import { type FilterStack, filterStackSchema, filterStackToCss } from './filter-stack';
 import { migrateLegacyColor } from './migrations/migrate-legacy-color';
+import { migrateLegacyFilter } from './migrations/migrate-legacy-filter';
 
 export type StrokeLinecap = 'butt' | 'round' | 'square';
 export type StrokeLinejoin = 'miter' | 'round' | 'bevel';
@@ -108,8 +110,8 @@ export interface BroadsetElementStyle {
   readonly borderRadius?: BorderRadiusTuple | undefined;
   readonly borderStyle?: BorderStyle | undefined;
   readonly boxShadow?: string | undefined;
-  readonly filter?: string | undefined;
-  readonly backdropFilter?: string | undefined;
+  readonly filter?: FilterStack | undefined;
+  readonly backdropFilter?: FilterStack | undefined;
   readonly mixBlendMode?: MixBlendMode | undefined;
   readonly isolation?: Isolation | undefined;
   readonly padding?: PaddingTuple | undefined;
@@ -198,14 +200,33 @@ export function isBorderRadiusUniform(radius: BorderRadiusTuple): boolean {
  */
 export type BroadsetElementStyleInput = Omit<
   BroadsetElementStyle,
-  'fontColor' | 'backgroundColor' | 'borderColor' | 'stroke' | 'fill'
+  'fontColor' | 'backgroundColor' | 'borderColor' | 'stroke' | 'fill' | 'filter' | 'backdropFilter'
 > & {
   readonly fontColor?: BroadsetColor | string | undefined;
   readonly backgroundColor?: BroadsetColor | string | undefined;
   readonly borderColor?: BroadsetColor | string | undefined;
   readonly stroke?: BroadsetColor | string | undefined;
   readonly fill?: BroadsetColor | string | undefined;
+  readonly filter?: FilterStack | string | undefined;
+  readonly backdropFilter?: FilterStack | string | undefined;
 };
+
+/**
+ * Resolves an optional `FilterStack` to the CSS filter-function string
+ * view used by `style.filter` / `style.backdropFilter` in the DOM
+ * renderer and HTML / SVG exporters. Returns `undefined` when the
+ * stack is absent so callers preserve the "unset" shape.
+ */
+export function resolveStyleFilter(
+  stack: FilterStack | undefined,
+  ctx?: ColorResolutionContext & { readonly resolveTheme?: boolean },
+): string | undefined {
+  if (stack === undefined) {
+    return undefined;
+  }
+
+  return filterStackToCss(stack, ctx);
+}
 
 /**
  * Resolves an optional `BroadsetColor` to its CSS-string view for
@@ -361,6 +382,24 @@ const broadsetColorOrOptionalLegacyStringSchema = z.preprocess(
   broadsetColorSchema.optional(),
 );
 
+/**
+ * Optional filter stack: accepts either a structured `FilterStack` or a
+ * legacy CSS filter function list string. Strings are parsed by
+ * `migrateLegacyFilter`; unparseable content collapses to a single
+ * `custom-svg` primitive that preserves the raw source per IO-D-18.
+ */
+const filterStackOrLegacyStringSchema = z.preprocess((value) => {
+  if (typeof value === 'string') {
+    try {
+      return migrateLegacyFilter(value);
+    } catch {
+      return undefined;
+    }
+  }
+
+  return value;
+}, filterStackSchema.optional());
+
 const broadsetGradientSchema = z
   .object({
     type: z.enum(['linear', 'radial', 'conic']),
@@ -416,8 +455,8 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
     borderRadius: borderRadiusSchema.optional(),
     borderStyle: z.enum(BORDER_STYLE_VALUES).optional(),
     boxShadow: z.string().optional(),
-    filter: z.string().optional(),
-    backdropFilter: z.string().optional(),
+    filter: filterStackOrLegacyStringSchema,
+    backdropFilter: filterStackOrLegacyStringSchema,
     mixBlendMode: z.enum(BLEND_MODE_VALUES).optional(),
     isolation: z.enum(['auto', 'isolate']).optional(),
     padding: paddingSchema.optional(),

@@ -3,6 +3,7 @@ import {
   type BroadsetElement,
   type BroadsetElementStyle,
   resolveStyleColor,
+  resolveStyleFilter,
 } from '@broadset/model';
 
 import { applyBackgroundStyle } from '../background';
@@ -441,8 +442,8 @@ class DOMScreenRenderer implements ScreenRendererController {
     contentHost.style.borderStyle = style.borderWidth === undefined ? '' : (style.borderStyle ?? 'solid');
     contentHost.style.borderColor = resolveStyleColor(style.borderColor, { resolveTheme: false }) ?? '';
     contentHost.style.boxShadow = style.boxShadow ?? '';
-    contentHost.style.filter = style.filter ?? '';
-    contentHost.style.backdropFilter = style.backdropFilter ?? '';
+    contentHost.style.filter = resolveStyleFilter(style.filter, { resolveTheme: false }) ?? '';
+    contentHost.style.backdropFilter = resolveStyleFilter(style.backdropFilter, { resolveTheme: false }) ?? '';
     contentHost.style.isolation = style.isolation ?? '';
     contentHost.style.color = resolveStyleColor(style.fontColor, { resolveTheme: false }) ?? '';
     contentHost.style.fontFamily = style.fontFamily ?? '';

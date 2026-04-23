@@ -6,6 +6,7 @@ import {
   type BroadsetProject,
   type PageElementInstance,
   resolveStyleColor,
+  resolveStyleFilter,
 } from '@broadset/model';
 import type { LayerInfo, PanelElement } from '@broadset/ui';
 
@@ -605,8 +606,8 @@ export function toPanelElement(element: BroadsetElement, instance?: PageElementI
     mixBlendMode: typeof element.style.mixBlendMode === 'string' ? element.style.mixBlendMode : 'normal',
     isolation: element.style.isolation ?? 'auto',
     boxShadow: element.style.boxShadow ?? '',
-    filter: element.style.filter ?? '',
-    backdropFilter: element.style.backdropFilter ?? '',
+    filter: resolveStyleFilter(element.style.filter, { resolveTheme: false }) ?? '',
+    backdropFilter: resolveStyleFilter(element.style.backdropFilter, { resolveTheme: false }) ?? '',
     fontFamily: element.style.fontFamily ?? '',
     fontSize: element.style.fontSize ?? 16,
     fontColor: resolveStyleColor(element.style.fontColor, { resolveTheme: false }) ?? '#000000',

@@ -598,9 +598,9 @@ Landing order from §"Phase 1 internal landing order" above.
 - [ ] **6. Filter primitives (`FilterStack`)** — discriminated union replaces `filter`/`backdropFilter` strings; renderer derives CSS view
   - [ ] tests: red
   - [ ] impl: green
-- [ ] **7. Gradient enhancements** — conic `center` + `startAngle`; stop colors become `BroadsetColor`; `mods?` per stop (depends on #3)
-  - [ ] tests: red
-  - [ ] impl: green
+- [x] **7. Gradient enhancements** — conic `startAngle`; stop colors become `BroadsetColor`; `mods?` per stop (depends on #3)
+  - [x] tests: red
+  - [x] impl: green (`ac89992`, `c4b942e`, `f836609`)
 - [ ] **8. `BroadsetFill` discriminated union** — `none | solid | gradient | pattern | picture`; replaces flat `fill`/`backgroundColor`/`backgroundGradient` (depends on #3, #7). Cascade comparable to #3.
   - [ ] tests: red
   - [ ] impl: green

@@ -1,4 +1,4 @@
-import { type BroadsetElement, resolveStyleColor } from '@broadset/model';
+import { type BroadsetElement, resolveStyleColor, resolveStyleFilter } from '@broadset/model';
 import type { Layer } from 'ag-psd';
 
 import { parseHexColor } from './color-utils';
@@ -137,9 +137,11 @@ function applyBoxShadow(layer: Layer, el: BroadsetElement): void {
 }
 
 function applyFilterGlow(layer: Layer, el: BroadsetElement): void {
-  if (!el.style.filter) return;
+  const filterCss = resolveStyleFilter(el.style.filter, { resolveTheme: false });
 
-  const glow = parseFilterGlow(el.style.filter);
+  if (!filterCss) return;
+
+  const glow = parseFilterGlow(filterCss);
 
   if (!glow) return;
 

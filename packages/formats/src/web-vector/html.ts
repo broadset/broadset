@@ -4,6 +4,7 @@ import {
   type BroadsetGradient,
   colorToCss,
   resolveStyleColor,
+  resolveStyleFilter,
 } from '@broadset/model';
 
 import { generateQrSvgFragment } from '../interchange';
@@ -228,8 +229,14 @@ function buildEffectParts(el: BroadsetElement): string[] {
   if (el.style.textStroke) parts.push(`-webkit-text-stroke:${el.style.textStroke}`);
   if (el.style.textShadow) parts.push(`text-shadow:${el.style.textShadow}`);
   if (el.style.textTransform) parts.push(`text-transform:${el.style.textTransform}`);
-  if (el.style.filter) parts.push(`filter:${el.style.filter}`);
-  if (el.style.backdropFilter) parts.push(`backdrop-filter:${el.style.backdropFilter}`);
+
+  const filterCss = resolveStyleFilter(el.style.filter, { resolveTheme: false });
+
+  if (filterCss) parts.push(`filter:${filterCss}`);
+
+  const backdropFilterCss = resolveStyleFilter(el.style.backdropFilter, { resolveTheme: false });
+
+  if (backdropFilterCss) parts.push(`backdrop-filter:${backdropFilterCss}`);
   if (el.style.mixBlendMode) parts.push(`mix-blend-mode:${el.style.mixBlendMode}`);
   if (el.style.customClipPath) parts.push(`clip-path:path('${el.style.customClipPath}')`);
 
