@@ -653,7 +653,7 @@ All shared modules under `packages/formats/src/_shared/<name>/` with Vitest unit
 
 ### Phase 4 — Asset pipeline
 
-- [ ] Font asset type (`woff2`/`ttf`/`otf` bytes + `postScriptName` + `familyName` + `subsetRanges?`)
+- [x] Font asset type (`woff2`/`ttf`/`otf` bytes + `postScriptName` + `familyName` + `subsetRanges?`) — discriminated-union `Asset`; `FontAsset` on `packages/model` (`d3f091e`)
 - [ ] Custom font upload UI (listed in Phase 5; asset type blocks it)
 - [ ] Image assets become `{ assetId, bytes, mime, width, height, iccProfile? }` — bytes, not URLs
 - [ ] ICC profile preservation on image assets

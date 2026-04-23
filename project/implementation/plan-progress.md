@@ -78,7 +78,7 @@ Source of truth: [plan.md](./plan.md), [renderer-refactor-plan.md](./renderer-re
 
 Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md)
 
-- [ ] P4.1 Font asset type
+- [x] P4.1 Font asset type (discriminated union on `kind`; `FontAsset` + `format`/`postScriptName`/`familyName`/`subsetRanges?` `d3f091e`)
 - [ ] P4.2 Image assets normalized to bytes plus metadata
 - [ ] P4.3 ICC profile preservation on image assets
 - [ ] P4.4 `icc-profile` asset type
