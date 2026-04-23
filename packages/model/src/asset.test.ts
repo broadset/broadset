@@ -9,11 +9,15 @@ import {
   type FontAsset,
   fontAsset,
   type FontFormat,
+  type IccProfileAsset,
+  iccProfileAsset,
+  type IccProfileColorSpace,
   type ImageAsset,
   imageAsset,
   isAudioAsset,
   isDataAsset,
   isFontAsset,
+  isIccProfileAsset,
   isImageAsset,
   isVideoAsset,
   type UnicodeRange,
@@ -420,6 +424,118 @@ describe('Image asset fidelity fields', () => {
   });
 });
 
+describe('ICC profile asset', () => {
+  function baseIccProfileInput(): Parameters<typeof iccProfileAsset>[0] {
+    return {
+      id: 'asset-icc-srgb',
+      name: 'sRGB IEC61966-2.1',
+      mimeType: 'application/vnd.iccprofile',
+      source: { type: 'embedded', dataUri: 'data:application/vnd.iccprofile;base64,AAAA' },
+      colorSpace: 'rgb',
+    };
+  }
+
+  /**
+   * @description ICC profile assets carry the profile bytes needed for
+   * PDF `/OutputIntent`, PSD CMYK/Lab embedded profiles, and JPEG/PNG
+   * pass-through. `kind: 'icc-profile'` is the discriminator; other
+   * fields live beside the shared asset base.
+   */
+  it('produces an icc-profile asset with colorSpace', () => {
+    const asset = iccProfileAsset(baseIccProfileInput());
+
+    expect(asset.kind).toBe('icc-profile');
+    expect(asset.colorSpace).toBe('rgb');
+    expect(asset.description).toBeUndefined();
+    expect(asset.identifier).toBeUndefined();
+  });
+
+  /**
+   * @description `description` and `identifier` (MD5 fingerprint per
+   * ICC v4) survive the factory — exporters and importers compare
+   * identifiers to dedup profiles across projects.
+   */
+  it('preserves description and identifier', () => {
+    const asset = iccProfileAsset({
+      ...baseIccProfileInput(),
+      description: 'sRGB IEC61966-2.1',
+      identifier: '29F83DDEAFF255AE7842FAE4CA83390D',
+    });
+
+    expect(asset.description).toBe('sRGB IEC61966-2.1');
+    expect(asset.identifier).toBe('29F83DDEAFF255AE7842FAE4CA83390D');
+  });
+
+  /**
+   * @description All four colorSpace variants the ICC spec covers for
+   * graphic-arts workflows are accepted. Anything else would stall
+   * PDF output-intent emission.
+   */
+  it.each<IccProfileColorSpace>(['rgb', 'cmyk', 'gray', 'lab'])('accepts %s colorSpace', (colorSpace) => {
+    const parsed = assetSchema.safeParse(iccProfileAsset({ ...baseIccProfileInput(), colorSpace }));
+
+    expect(parsed.success).toBe(true);
+  });
+
+  /**
+   * @description Unknown colorSpaces are rejected so new ICC modes
+   * must land via spec + schema updates, not silent data drift.
+   */
+  it('rejects an unknown colorSpace', () => {
+    const asset = { ...iccProfileAsset(baseIccProfileInput()), colorSpace: 'hsl' };
+    const parsed = assetSchema.safeParse(asset);
+
+    expect(parsed.success).toBe(false);
+  });
+
+  /**
+   * @description `colorSpace` is required — without it, PDF/PSD cannot
+   * pick the right ICC handler at export time.
+   */
+  it('rejects an icc-profile asset missing colorSpace', () => {
+    const { colorSpace: _cs, ...rest } = iccProfileAsset(baseIccProfileInput());
+    const parsed = assetSchema.safeParse(rest);
+
+    expect(parsed.success).toBe(false);
+  });
+
+  /**
+   * @description Empty `description` or `identifier` would propagate
+   * to PDF `/Info` and PSD profile descriptor strings — reject at the
+   * boundary rather than emit blank tags.
+   */
+  it('rejects empty description or identifier', () => {
+    const parsedEmptyDesc = assetSchema.safeParse({
+      ...iccProfileAsset(baseIccProfileInput()),
+      description: '',
+    });
+    const parsedEmptyId = assetSchema.safeParse({
+      ...iccProfileAsset(baseIccProfileInput()),
+      identifier: '',
+    });
+
+    expect(parsedEmptyDesc.success).toBe(false);
+    expect(parsedEmptyId.success).toBe(false);
+  });
+
+  /**
+   * @description `isIccProfileAsset` narrows mixed asset arrays so
+   * PDF / PSD pipelines can pick the profile they need without unsafe
+   * casting.
+   */
+  it('narrows via isIccProfileAsset', () => {
+    const asset: Asset = iccProfileAsset(baseIccProfileInput());
+
+    expect(isIccProfileAsset(asset)).toBe(true);
+
+    if (isIccProfileAsset(asset)) {
+      const typed: IccProfileAsset = asset;
+
+      expect(typed.colorSpace).toBe('rgb');
+    }
+  });
+});
+
 describe('Asset discriminated union', () => {
   /**
    * @description The schema narrows on `kind`, so TypeScript exhaustive
@@ -459,8 +575,15 @@ describe('Asset discriminated union', () => {
       mimeType: 'application/json',
       source: { type: 'file', path: 'data/schedule.json' },
     };
+    const iccInput: IccProfileAsset = iccProfileAsset({
+      id: 'asset-icc-srgb',
+      name: 'sRGB IEC61966-2.1',
+      mimeType: 'application/vnd.iccprofile',
+      source: { type: 'embedded', dataUri: 'data:application/vnd.iccprofile;base64,AAAA' },
+      colorSpace: 'rgb',
+    });
 
-    for (const input of [fontInput, imageInput, videoInput, audioInput, dataInput]) {
+    for (const input of [fontInput, imageInput, videoInput, audioInput, dataInput, iccInput]) {
       expect(assetSchema.safeParse(input).success).toBe(true);
     }
   });
@@ -505,7 +628,7 @@ describe('Asset discriminated union', () => {
    * values so any future kind addition has to touch both call sites.
    */
   it('exposes the expected kinds via the AssetKind type', () => {
-    const expected: readonly AssetKind[] = ['image', 'video', 'font', 'audio', 'data'];
+    const expected: readonly AssetKind[] = ['image', 'video', 'font', 'audio', 'data', 'icc-profile'];
 
     // Type-level assertion: compile fails if AssetKind diverges.
     const sample: AssetKind = 'font';
@@ -553,6 +676,13 @@ describe('Asset type guards', () => {
         mimeType: 'application/json',
         source: { type: 'file', path: 'data/schedule.json' },
       },
+      iccProfileAsset({
+        id: 'asset-icc-srgb',
+        name: 'sRGB IEC61966-2.1',
+        mimeType: 'application/vnd.iccprofile',
+        source: { type: 'embedded', dataUri: 'data:application/vnd.iccprofile;base64,AAAA' },
+        colorSpace: 'rgb',
+      }),
     ];
 
     expect(assets.filter(isFontAsset)).toHaveLength(1);
@@ -560,5 +690,6 @@ describe('Asset type guards', () => {
     expect(assets.filter(isVideoAsset)).toHaveLength(1);
     expect(assets.filter(isAudioAsset)).toHaveLength(1);
     expect(assets.filter(isDataAsset)).toHaveLength(1);
+    expect(assets.filter(isIccProfileAsset)).toHaveLength(1);
   });
 });

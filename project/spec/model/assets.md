@@ -14,7 +14,7 @@ The `BroadsetProject` MUST carry an `assets` array. Each asset has:
 
 - `id`: non-empty string, unique within the project
 - `name`: human-readable display name
-- `kind`: `'image'` | `'video'` | `'font'` | `'audio'` | `'data'` — asset classification
+- `kind`: `'image'` | `'video'` | `'font'` | `'audio'` | `'data'` | `'icc-profile'` — asset classification
 - `mimeType`: MIME type string (e.g., `'image/png'`, `'video/mp4'`, `'font/woff2'`)
 - `source`: `AssetSource` — where the asset data comes from
 - `fileSizeBytes` (optional): file size for display/management purposes
@@ -212,6 +212,57 @@ The field name matches `document.outputIntent.iccProfileAssetId` so a single gre
 - [ ] Given an image asset with a non-empty `iccProfileAssetId`, validation succeeds
 - [ ] Given an image asset with no `iccProfileAssetId` field, validation succeeds
 - [ ] Given an image asset with an empty `iccProfileAssetId`, validation fails
+
+---
+
+### Requirement: ICC Profile Asset Type
+
+ICC profile assets (`kind: 'icc-profile'`) carry the color-management profile bytes every graphic-arts format exporter needs:
+
+- **PDF `/OutputIntent`** — the document-level output intent references an ICC profile asset via `document.outputIntent.iccProfileAssetId`.
+- **PDF/A-2b** — mandatory embedded output-intent profile.
+- **PSD CMYK / Lab** — the exporter embeds the referenced ICC profile on CMYK and Lab channel documents.
+- **Per-image overrides** — image assets reference an icc-profile via `ImageAsset.iccProfileAssetId`.
+
+An ICC profile asset MUST declare:
+
+- `kind: 'icc-profile'` — the discriminator.
+- Standard asset base: `id`, `name`, `mimeType`, `source` (locating the `.icc` / `.icm` bytes), plus optional `fileSizeBytes` / `metadata`.
+- `colorSpace`: one of `'rgb' | 'cmyk' | 'gray' | 'lab'` — the color space the profile targets. Matches `DocumentOutputIntent.colorSpace`.
+- `description` (optional): human-readable profile description (ICC `desc` tag). Non-empty when present.
+- `identifier` (optional): ICC v4 MD5 fingerprint — used for dedup and PDF `/Info`. Non-empty when present.
+
+#### Scenario: Well-formed ICC profile asset
+
+- GIVEN an asset `{ id: 'asset-icc-srgb', kind: 'icc-profile', name: 'sRGB IEC61966-2.1', mimeType: 'application/vnd.iccprofile', source: { type: 'embedded', dataUri: '...' }, colorSpace: 'rgb' }`
+- WHEN the asset is validated
+- THEN validation succeeds
+
+#### Scenario: ICC profile asset missing colorSpace
+
+- GIVEN an icc-profile asset with no `colorSpace` field
+- WHEN the asset is validated
+- THEN validation fails
+
+#### Scenario: ICC profile asset with unknown colorSpace
+
+- GIVEN an icc-profile asset with `colorSpace: 'hsl'`
+- WHEN the asset is validated
+- THEN validation fails — only `rgb | cmyk | gray | lab` are accepted
+
+#### Scenario: ICC profile asset with empty description or identifier
+
+- GIVEN an icc-profile asset with `description: ''` or `identifier: ''`
+- WHEN the asset is validated
+- THEN validation fails — optional fields must be absent or non-empty
+
+#### Acceptance Criteria
+
+- [ ] Given an icc-profile asset with `colorSpace` ∈ `{rgb, cmyk, gray, lab}`, validation succeeds
+- [ ] Given an icc-profile asset missing `colorSpace`, validation fails
+- [ ] Given an icc-profile asset with a `colorSpace` outside the accepted set, validation fails
+- [ ] Given an icc-profile asset with an empty `description` or `identifier`, validation fails
+- [ ] Given an icc-profile asset with no `description` or `identifier`, validation succeeds
 
 ---
 

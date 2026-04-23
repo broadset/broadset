@@ -24,7 +24,7 @@ export type AssetSource =
   | { readonly type: 'embedded'; readonly dataUri: string }
   | { readonly type: 'file'; readonly path: string };
 
-export type AssetKind = 'image' | 'video' | 'font' | 'audio' | 'data';
+export type AssetKind = 'image' | 'video' | 'font' | 'audio' | 'data' | 'icc-profile';
 
 export interface AssetBase {
   readonly id: string;
@@ -104,7 +104,27 @@ export interface DataAsset extends AssetBase {
   readonly kind: 'data';
 }
 
-export type Asset = FontAsset | ImageAsset | VideoAsset | AudioAsset | DataAsset;
+// ────────────────────────────────────────────────────────────────────────────
+// ICC profile asset (Phase 4 P4.4)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Color spaces an ICC profile can describe for graphic-arts workflows.
+ * Mirrors `DocumentOutputIntent.colorSpace` so a single grep finds
+ * every ICC mode in the model.
+ */
+export type IccProfileColorSpace = 'rgb' | 'cmyk' | 'gray' | 'lab';
+
+export interface IccProfileAsset extends AssetBase {
+  readonly kind: 'icc-profile';
+  readonly colorSpace: IccProfileColorSpace;
+  /** Human-readable profile description (ICC `desc` tag). */
+  readonly description?: string | undefined;
+  /** ICC profile identifier (MD5 fingerprint per ICC v4 spec) — used for dedup and PDF `/Info`. */
+  readonly identifier?: string | undefined;
+}
+
+export type Asset = FontAsset | ImageAsset | VideoAsset | AudioAsset | DataAsset | IccProfileAsset;
 
 // ────────────────────────────────────────────────────────────────────────────
 // Zod schemas
@@ -185,12 +205,23 @@ const dataAssetSchema = z.object({
   kind: z.literal('data'),
 });
 
+const iccProfileColorSpaceSchema = z.enum(['rgb', 'cmyk', 'gray', 'lab']);
+
+const iccProfileAssetSchema = z.object({
+  ...assetBaseFields,
+  kind: z.literal('icc-profile'),
+  colorSpace: iccProfileColorSpaceSchema,
+  description: z.string().min(1).optional(),
+  identifier: z.string().min(1).optional(),
+});
+
 export const assetSchema = z.discriminatedUnion('kind', [
   fontAssetSchema,
   imageAssetSchema,
   videoAssetSchema,
   audioAssetSchema,
   dataAssetSchema,
+  iccProfileAssetSchema,
 ]);
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -253,6 +284,33 @@ export function imageAsset(input: ImageAssetInput): ImageAsset {
   };
 }
 
+export interface IccProfileAssetInput {
+  readonly id: string;
+  readonly name: string;
+  readonly mimeType: string;
+  readonly source: AssetSource;
+  readonly colorSpace: IccProfileColorSpace;
+  readonly description?: string | undefined;
+  readonly identifier?: string | undefined;
+  readonly fileSizeBytes?: number | undefined;
+  readonly metadata?: Readonly<Record<string, unknown>> | undefined;
+}
+
+export function iccProfileAsset(input: IccProfileAssetInput): IccProfileAsset {
+  return {
+    id: input.id,
+    kind: 'icc-profile',
+    name: input.name,
+    mimeType: input.mimeType,
+    source: input.source,
+    colorSpace: input.colorSpace,
+    ...(input.description === undefined ? {} : { description: input.description }),
+    ...(input.identifier === undefined ? {} : { identifier: input.identifier }),
+    ...(input.fileSizeBytes === undefined ? {} : { fileSizeBytes: input.fileSizeBytes }),
+    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+  };
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Type guards
 // ────────────────────────────────────────────────────────────────────────────
@@ -275,4 +333,8 @@ export function isAudioAsset(asset: Asset): asset is AudioAsset {
 
 export function isDataAsset(asset: Asset): asset is DataAsset {
   return asset.kind === 'data';
+}
+
+export function isIccProfileAsset(asset: Asset): asset is IccProfileAsset {
+  return asset.kind === 'icc-profile';
 }
