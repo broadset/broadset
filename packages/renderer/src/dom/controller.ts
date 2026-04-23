@@ -13,6 +13,7 @@ import {
   type ScreenRendererOptions,
 } from '../core/contracts';
 import { classifyElementChange, type ElementChangeKind } from '../core/dirty';
+import type { RuntimeServices } from '../core/runtime';
 import { buildSceneTree, type SceneTreeNode } from '../scene-tree';
 import { BUILT_IN_RENDERERS, createFallbackRenderer } from '../screen-renderer/element-renderers';
 import { applyElementLayout, toPixelValue } from './layout';
@@ -35,6 +36,7 @@ export class DOMScreenRenderer implements ScreenRendererController {
   private readonly pluginsByType: ReadonlyMap<string, RendererPlugin>;
   private readonly rendererRecords = new Map<string, RendererRecord>();
   private readonly resizeObserver: ResizeObserver | null;
+  private readonly runtime: RuntimeServices | undefined;
   private currentDocument: BroadsetDocument | null = null;
   private previousElementsById = new Map<string, BroadsetElement>();
   private isDestroyed = false;
@@ -42,6 +44,7 @@ export class DOMScreenRenderer implements ScreenRendererController {
   constructor(options: ScreenRendererOptions) {
     this.host = options.host;
     this.pluginsByType = new Map((options.plugins ?? []).map((plugin) => [plugin.type, plugin]));
+    this.runtime = options.runtime;
 
     this.host.replaceChildren();
     this.host.style.position = 'relative';
@@ -316,7 +319,12 @@ export class DOMScreenRenderer implements ScreenRendererController {
     opacityHost.appendChild(contentHost);
 
     const rendererFactory = this.resolveRendererFactory(element.type);
-    const renderer = rendererFactory({ document: documentData, element, host: contentHost });
+    const renderer = rendererFactory({
+      document: documentData,
+      element,
+      host: contentHost,
+      ...(this.runtime === undefined ? {} : { runtime: this.runtime }),
+    });
     const record: RendererRecord = {
       host,
       opacityHost,

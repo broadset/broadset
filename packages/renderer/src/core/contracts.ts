@@ -1,6 +1,7 @@
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 
 import type { RendererCapabilityOverride } from '../capabilities';
+import type { RuntimeServices } from './runtime';
 
 /**
  * Default perspective in pixels applied to the canvas transform layer when the
@@ -49,6 +50,13 @@ export interface ElementRendererFactoryParams {
   readonly document: BroadsetDocument;
   readonly element: BroadsetElement;
   readonly host: HTMLElement;
+  /**
+   * Runtime services available to this mount. Optional so simple
+   * renderers that do not need runtime behavior (plain shapes, QR codes)
+   * can ignore it; motion-graphics renderers (clock, ticker, text with
+   * dynamic tokens) resolve services here and subscribe as needed.
+   */
+  readonly runtime?: RuntimeServices;
 }
 
 export interface ElementRendererInstance {
@@ -74,6 +82,14 @@ export interface ScreenRendererOptions {
   readonly document?: BroadsetDocument;
   readonly plugins?: readonly RendererPlugin[];
   readonly settings?: RenderSettings;
+  /**
+   * Runtime services for motion-graphics behavior. Passing `data`
+   * enables `{{key}}` token substitution in element content; `fonts`
+   * drives idempotent font loading; `time`, `state`, and `assets`
+   * are available to per-type renderers and plugins for richer
+   * motion behavior.
+   */
+  readonly runtime?: RuntimeServices;
 }
 
 export interface ScreenRendererController {

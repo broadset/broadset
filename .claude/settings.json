@@ -4,7 +4,11 @@
       {
         "matcher": "*",
         "hooks": [
-          { "type": "command", "command": "agents/hooks/session-context.sh", "timeout": 5 }
+          {
+            "type": "command",
+            "command": "agents/hooks/session-context.sh",
+            "timeout": 5
+          }
         ]
       }
     ],
@@ -12,7 +16,11 @@
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": "agents/hooks/gate-commit.sh", "timeout": 120 }
+          {
+            "type": "command",
+            "command": "agents/hooks/gate-commit.sh",
+            "timeout": 120
+          }
         ]
       }
     ],
@@ -20,7 +28,11 @@
       {
         "matcher": "*",
         "hooks": [
-          { "type": "command", "command": "agents/hooks/check-quality.sh", "timeout": 120 }
+          {
+            "type": "command",
+            "command": "agents/hooks/check-quality.sh",
+            "timeout": 120
+          }
         ]
       }
     ],
@@ -28,9 +40,18 @@
       {
         "matcher": "*",
         "hooks": [
-          { "type": "command", "command": "agents/hooks/quality-gate.sh", "timeout": 120 }
+          {
+            "type": "command",
+            "command": "agents/hooks/quality-gate.sh",
+            "timeout": 120
+          }
         ]
       }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m ' *)"
     ]
   }
 }
