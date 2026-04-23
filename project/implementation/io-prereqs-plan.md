@@ -595,9 +595,9 @@ Landing order from §"Phase 1 internal landing order" above.
 - [x] **5. Stroke enhancements** — `strokeMiterlimit`, `strokeHeadEnd`, `strokeTailEnd` with `ArrowEnd` shape/size vocabulary
   - [x] tests: red
   - [x] impl: green (`2f13198`)
-- [ ] **6. Filter primitives (`FilterStack`)** — discriminated union replaces `filter`/`backdropFilter` strings; renderer derives CSS view
-  - [ ] tests: red
-  - [ ] impl: green
+- [x] **6. Filter primitives (`FilterStack`)** — discriminated union replaces `filter`/`backdropFilter` strings; renderer derives CSS view
+  - [x] tests: red
+  - [x] impl: green (`aef2537`, `20e15c9`)
 - [x] **7. Gradient enhancements** — conic `startAngle`; stop colors become `BroadsetColor`; `mods?` per stop (depends on #3)
   - [x] tests: red
   - [x] impl: green (`ac89992`, `c4b942e`, `f836609`)
