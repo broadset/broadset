@@ -1,4 +1,4 @@
-import { type BroadsetElement, type Canvas, resolveStyleColor } from '@broadset/model';
+import { type BroadsetElement, type Canvas, getSolidFillColor, resolveStyleColor } from '@broadset/model';
 
 import { RELATIONSHIP_TYPES } from './constants';
 import { buildSvgForElement, needsSvgFallback } from './svg-fallback';
@@ -138,7 +138,7 @@ function buildTextShapeXml(el: BroadsetElement, x: number, y: number, cx: number
 }
 
 function buildRectShapeXml(el: BroadsetElement, x: number, y: number, cx: number, cy: number, rot: number): string {
-  const bgColorCss = resolveStyleColor(el.style.backgroundColor, { resolveTheme: false });
+  const bgColorCss = resolveStyleColor(getSolidFillColor(el.style.fill), { resolveTheme: false });
   const bgColor = bgColorCss ? hexToRgb(bgColorCss) : undefined;
 
   return [
@@ -157,7 +157,7 @@ function buildRectShapeXml(el: BroadsetElement, x: number, y: number, cx: number
 }
 
 function buildEllipseShapeXml(el: BroadsetElement, x: number, y: number, cx: number, cy: number, rot: number): string {
-  const bgColorCss = resolveStyleColor(el.style.backgroundColor, { resolveTheme: false });
+  const bgColorCss = resolveStyleColor(getSolidFillColor(el.style.fill), { resolveTheme: false });
   const bgColor = bgColorCss ? hexToRgb(bgColorCss) : undefined;
 
   return [

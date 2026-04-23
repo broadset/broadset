@@ -3,7 +3,10 @@ import {
   type BroadsetElement,
   type BroadsetGradient,
   colorToCss,
+  getGradientFillGradient,
+  getSolidFillColor,
   resolveStyleColor,
+  resolveStyleFillToSvgPaint,
   resolveStyleFilter,
 } from '@broadset/model';
 
@@ -14,11 +17,7 @@ import { escapeXml } from './shared';
 /*  Gradient CSS Resolution                                           */
 /* ------------------------------------------------------------------ */
 
-function resolveGradientCss(gradient: string | BroadsetGradient): string | null {
-  if (typeof gradient === 'string') {
-    return gradient;
-  }
-
+function resolveGradientCss(gradient: BroadsetGradient): string | null {
   const stops = gradient.stops.map((s) => `${colorToCss(s.color)} ${String(s.position * 100)}%`).join(', ');
 
   if (gradient.type === 'linear') {
@@ -154,7 +153,7 @@ function buildTextInlineStyle(el: BroadsetElement): string {
 /* ------------------------------------------------------------------ */
 
 function renderHtmlPath(el: BroadsetElement, dataAttr: string, containerStyle: string): string {
-  const fill = resolveStyleColor(el.style.fill, { resolveTheme: false }) ?? 'none';
+  const fill = resolveStyleFillToSvgPaint(el.style.fill, { resolveTheme: false });
   const stroke = resolveStyleColor(el.style.stroke, { resolveTheme: false }) ?? 'none';
   const strokeWidth = el.style.strokeWidth ?? 1;
 
@@ -188,15 +187,19 @@ function buildTransformParts(el: BroadsetElement): string[] {
 function buildBackgroundParts(el: BroadsetElement): string[] {
   const parts: string[] = [];
 
-  const backgroundCss = resolveStyleColor(el.style.backgroundColor, { resolveTheme: false });
+  const gradient = getGradientFillGradient(el.style.fill);
+
+  if (gradient !== undefined) {
+    const gradientCss = resolveGradientCss(gradient);
+
+    if (gradientCss !== null) parts.push(`background:${gradientCss}`);
+
+    return parts;
+  }
+
+  const backgroundCss = resolveStyleColor(getSolidFillColor(el.style.fill), { resolveTheme: false });
 
   if (backgroundCss !== undefined) parts.push(`background:${backgroundCss}`);
-
-  if (el.style.backgroundGradient !== undefined) {
-    const gradient = resolveGradientCss(el.style.backgroundGradient);
-
-    if (gradient !== null) parts.push(`background:${gradient}`);
-  }
 
   return parts;
 }

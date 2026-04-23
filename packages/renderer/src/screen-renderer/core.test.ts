@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createDefaultStyle, rgbColor } from '@broadset/model';
+import { createDefaultStyle, gradientFill, noneFill, rgbColor, solidFill } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -231,7 +231,14 @@ describe('renderer core', () => {
 
     applyBackgroundStyle(node, {
       ...createDefaultStyle(),
-      backgroundGradient: 'linear-gradient(90deg, #111111 0%, #ffffff 100%)',
+      fill: gradientFill({
+        type: 'linear',
+        stops: [
+          { color: rgbColor('#111111'), position: 0 },
+          { color: rgbColor('#ffffff'), position: 100 },
+        ],
+        angle: 90,
+      }),
     });
 
     expect(node.style.backgroundImage).toContain('linear-gradient');
@@ -239,7 +246,7 @@ describe('renderer core', () => {
 
     applyBackgroundStyle(node, {
       ...createDefaultStyle(),
-      backgroundColor: rgbColor('#123456'),
+      fill: solidFill(rgbColor('#123456')),
     });
 
     expect(node.style.backgroundColor).toBe('rgb(18, 52, 86)');
@@ -252,14 +259,14 @@ describe('renderer core', () => {
 
     applyBackgroundStyle(node, {
       ...createDefaultStyle(),
-      backgroundGradient: {
+      fill: gradientFill({
         type: 'linear',
         stops: [
           { color: rgbColor('#ff0000'), position: 0 },
           { color: rgbColor('#0000ff'), position: 100 },
         ],
         angle: 90,
-      },
+      }),
     });
 
     const parsed = JSON.parse(node.dataset['gradient'] ?? '{}') as {
@@ -273,15 +280,31 @@ describe('renderer core', () => {
     expect(parsed.angle).toBe(90);
   });
 
-  /** @description String gradients should not store data-gradient since they cannot be parsed back for per-stop animation. */
-  it('does not store data-gradient for string gradients', () => {
+  /**
+   * @description Switching from gradient to `none` (empty fill) clears
+   * every background property and the data-gradient attribute, so the
+   * element reverts to transparent without leftover styling.
+   */
+  it('clears every background property and data-gradient when switching to fill: none', () => {
     const node = document.createElement('div');
 
     applyBackgroundStyle(node, {
       ...createDefaultStyle(),
-      backgroundGradient: 'linear-gradient(90deg, red, blue)',
+      fill: gradientFill({
+        type: 'linear',
+        stops: [
+          { color: rgbColor('#ff0000'), position: 0 },
+          { color: rgbColor('#0000ff'), position: 100 },
+        ],
+      }),
     });
 
+    expect(node.dataset['gradient']).toBeDefined();
+
+    applyBackgroundStyle(node, { ...createDefaultStyle(), fill: noneFill() });
+
+    expect(node.style.backgroundColor).toBe('');
+    expect(node.style.backgroundImage).toBe('');
     expect(node.dataset['gradient']).toBeUndefined();
   });
 
@@ -291,38 +314,23 @@ describe('renderer core', () => {
 
     applyBackgroundStyle(node, {
       ...createDefaultStyle(),
-      backgroundGradient: {
+      fill: gradientFill({
         type: 'radial',
         stops: [
           { color: rgbColor('#ffffff'), position: 0 },
           { color: rgbColor('#000000'), position: 100 },
         ],
         center: [50, 50],
-      },
+      }),
     });
 
     expect(node.dataset['gradient']).toBeDefined();
 
     applyBackgroundStyle(node, {
       ...createDefaultStyle(),
-      backgroundColor: rgbColor('#000000'),
+      fill: solidFill(rgbColor('#000000')),
     });
 
-    expect(node.dataset['gradient']).toBeUndefined();
-  });
-
-  /** @description Empty-string gradient must not wipe the solid backgroundColor. Regression for the Solid/Gradient fill toggle that used to render the element invisible after switching back to Solid. */
-  it('treats an empty-string gradient as "no gradient" and applies backgroundColor instead', () => {
-    const node = document.createElement('div');
-
-    applyBackgroundStyle(node, {
-      ...createDefaultStyle(),
-      backgroundGradient: '',
-      backgroundColor: rgbColor('#abcdef'),
-    });
-
-    expect(node.style.backgroundColor).toBe('rgb(171, 205, 239)');
-    expect(node.style.backgroundImage).toBe('');
     expect(node.dataset['gradient']).toBeUndefined();
   });
 
@@ -618,7 +626,12 @@ describe('renderer core', () => {
       type: 'path',
       parentId: 'group-1',
       content: 'M0 0 L100 0 L100 100 L0 100 Z',
-      style: { ...createDefaultStyle(), stroke: rgbColor('#ff0000'), strokeWidth: 3, fill: rgbColor('#00ff00') },
+      style: {
+        ...createDefaultStyle(),
+        stroke: rgbColor('#ff0000'),
+        strokeWidth: 3,
+        fill: solidFill(rgbColor('#00ff00')),
+      },
     });
     const child2 = createElement({
       id: 'child-2',
@@ -701,7 +714,12 @@ describe('renderer core', () => {
       type: 'path',
       parentId: 'group-1',
       content: 'M0 0 L100 0 L100 100 L0 100 Z',
-      style: { ...createDefaultStyle(), stroke: rgbColor('#0000ff'), strokeWidth: 5, fill: rgbColor('#ff00ff') },
+      style: {
+        ...createDefaultStyle(),
+        stroke: rgbColor('#0000ff'),
+        strokeWidth: 5,
+        fill: solidFill(rgbColor('#ff00ff')),
+      },
     });
     const child2 = createElement({
       id: 'child-2',

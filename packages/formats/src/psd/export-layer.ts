@@ -1,4 +1,4 @@
-import { type BroadsetElement, resolveStyleColor, resolveStyleFilter } from '@broadset/model';
+import { type BroadsetElement, getSolidFillColor, resolveStyleColor, resolveStyleFilter } from '@broadset/model';
 import type { Layer } from 'ag-psd';
 
 import { parseHexColor } from './color-utils';
@@ -237,7 +237,7 @@ function applyPathContent(layer: Layer, el: BroadsetElement): void {
 }
 
 function applyShapeFill(layer: Layer, el: BroadsetElement): void {
-  const backgroundColorCss = resolveStyleColor(el.style.backgroundColor, { resolveTheme: false });
+  const backgroundColorCss = resolveStyleColor(getSolidFillColor(el.style.fill), { resolveTheme: false });
 
   if (!backgroundColorCss) return;
 

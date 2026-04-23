@@ -1,4 +1,10 @@
-import { type BroadsetDocument, type BroadsetElement, type FontDefinition, resolveStyleColor } from '@broadset/model';
+import {
+  type BroadsetDocument,
+  type BroadsetElement,
+  type FontDefinition,
+  getSolidFillColor,
+  resolveStyleColor,
+} from '@broadset/model';
 
 export type PreflightSeverity = 'error' | 'warning' | 'info';
 
@@ -219,7 +225,7 @@ function checkColorMode(element: BroadsetElement, ctx: PreflightContext): readon
   }
 
   const hasFluorescent =
-    isFluorescentColor(resolveStyleColor(element.style.backgroundColor, { resolveTheme: false })) ||
+    isFluorescentColor(resolveStyleColor(getSolidFillColor(element.style.fill), { resolveTheme: false })) ||
     isFluorescentColor(resolveStyleColor(element.style.borderColor, { resolveTheme: false }));
 
   if (!hasFluorescent) {

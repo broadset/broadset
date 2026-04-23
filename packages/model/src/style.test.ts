@@ -124,22 +124,149 @@ describe('Text effect properties', () => {
 
 /** @description Background styling supports both flat colors and gradient definitions. */
 describe('Background properties', () => {
-  /** @description Either a solid background or a solid+gradient combination must validate. */
-  it('accepts backgroundColor alone and with backgroundGradient', () => {
+  /** @description Legacy backgroundColor input still validates post-unit-8c — it folds into `fill: solid`. */
+  it('accepts legacy backgroundColor input', () => {
     expect(
       styleSchema.safeParse({
         opacity: 1,
         backgroundColor: '#ff0000',
       }).success,
     ).toBe(true);
+  });
 
-    expect(
-      styleSchema.safeParse({
+  /**
+   * @description Post-unit-8c, legacy CSS-string gradients throw at parse
+   * time per IO-D-18 rather than silently dropping to undefined. The
+   * schema surfaces the rejection so legacy fixtures must migrate to the
+   * structured `BroadsetGradient` shape.
+   */
+  it('rejects legacy CSS-string backgroundGradient input', () => {
+    expect(() =>
+      styleSchema.parse({
         opacity: 1,
         backgroundColor: '#ff0000',
         backgroundGradient: 'linear-gradient(to right, red, blue)',
-      }).success,
-    ).toBe(true);
+      }),
+    ).toThrow();
+  });
+
+  /**
+   * @description Phase 1 unit #8c — legacy `backgroundColor` strings
+   * must fold into the unified `fill: BroadsetFill` as `solid`, with
+   * the color migrated to a canonical `BroadsetColor`. The persisted
+   * style no longer exposes `backgroundColor` directly.
+   */
+  it('folds legacy backgroundColor into fill: solid', () => {
+    const style = styleSchema.parse({ opacity: 1, backgroundColor: '#ff0000' });
+
+    expect(style.fill.kind).toBe('solid');
+    expect('backgroundColor' in style).toBe(false);
+    expect('backgroundGradient' in style).toBe(false);
+
+    if (style.fill.kind !== 'solid') throw new Error('expected solid fill');
+
+    expect(style.fill.color).toEqual({ kind: 'rgb', hex: '#ff0000' });
+  });
+
+  /**
+   * @description Phase 1 unit #8c — a structured `backgroundGradient`
+   * input must fold into the unified `fill: BroadsetFill` as
+   * `gradient`, preserving every gradient attribute.
+   */
+  it('folds structured backgroundGradient into fill: gradient', () => {
+    const style = styleSchema.parse({
+      opacity: 1,
+      backgroundGradient: {
+        type: 'linear',
+        stops: [
+          { color: '#ff0000', position: 0 },
+          { color: '#0000ff', position: 100 },
+        ],
+        angle: 90,
+      },
+    });
+
+    expect(style.fill.kind).toBe('gradient');
+
+    if (style.fill.kind !== 'gradient') throw new Error('expected gradient fill');
+
+    expect(style.fill.gradient.type).toBe('linear');
+    expect(style.fill.gradient.stops).toHaveLength(2);
+    expect(style.fill.gradient.angle).toBe(90);
+  });
+
+  /**
+   * @description Phase 1 unit #8c — when both `backgroundColor` and a
+   * structured `backgroundGradient` are present, the gradient wins (the
+   * renderer's historical precedence). This matches `migrateLegacyFill`'s
+   * priority contract.
+   */
+  it('prefers backgroundGradient over backgroundColor when both are set', () => {
+    const style = styleSchema.parse({
+      opacity: 1,
+      backgroundColor: '#ff0000',
+      backgroundGradient: {
+        type: 'linear',
+        stops: [
+          { color: '#000000', position: 0 },
+          { color: '#ffffff', position: 100 },
+        ],
+      },
+    });
+
+    expect(style.fill.kind).toBe('gradient');
+  });
+
+  /**
+   * @description Phase 1 unit #8c — a raw `BroadsetColor` shape on
+   * `fill` is a valid construction-time shorthand; the preprocessor
+   * wraps it in a `solid` fill so consumers always see the canonical
+   * discriminated-union shape.
+   */
+  it('wraps a raw BroadsetColor fill input into fill: solid', () => {
+    const style = styleSchema.parse({
+      opacity: 1,
+      fill: { kind: 'rgb', hex: '#00ff00' },
+    });
+
+    expect(style.fill.kind).toBe('solid');
+
+    if (style.fill.kind !== 'solid') throw new Error('expected solid fill');
+
+    expect(style.fill.color).toEqual({ kind: 'rgb', hex: '#00ff00' });
+  });
+
+  /**
+   * @description Phase 1 unit #8c — a canonical `BroadsetFill` on
+   * `fill` passes through unchanged. Callers that already produce the
+   * new shape (importers in later phases) don't pay a conversion tax.
+   */
+  it('preserves a canonical BroadsetFill on fill', () => {
+    const style = styleSchema.parse({
+      opacity: 1,
+      fill: {
+        kind: 'picture',
+        assetId: 'asset-1',
+        mode: 'stretch',
+      },
+    });
+
+    expect(style.fill).toEqual({
+      kind: 'picture',
+      assetId: 'asset-1',
+      mode: 'stretch',
+    });
+  });
+
+  /**
+   * @description Phase 1 unit #8c — absence of every fill input
+   * yields `fill: { kind: 'none' }` so consumers never see undefined
+   * and can dispatch on `kind` without pre-checks.
+   */
+  it('yields fill: none when no paint input is supplied', () => {
+    const style = styleSchema.parse({ opacity: 1 });
+
+    expect(style.fill).toEqual({ kind: 'none' });
   });
 
   /**

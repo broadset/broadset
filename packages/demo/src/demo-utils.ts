@@ -4,6 +4,8 @@ import {
   type BroadsetElement,
   type BroadsetGradient,
   type BroadsetProject,
+  getGradientFillGradient,
+  getSolidFillColor,
   type PageElementInstance,
   resolveStyleColor,
   resolveStyleFilter,
@@ -355,8 +357,7 @@ function isDescendantOf(
   return false;
 }
 
-function serializeBackgroundGradient(value: string | BroadsetGradient | undefined): string {
-  if (typeof value === 'string') return value;
+function serializeBackgroundGradient(value: BroadsetGradient | undefined): string {
   if (value === undefined) return '';
 
   return JSON.stringify(value);
@@ -596,8 +597,8 @@ export function toPanelElement(element: BroadsetElement, instance?: PageElementI
     width: element.width,
     height: element.height,
     rotation: instance !== undefined ? instance.transform.rotation.z : element.rotation,
-    backgroundColor: resolveStyleColor(element.style.backgroundColor, { resolveTheme: false }) ?? '',
-    backgroundGradient: serializeBackgroundGradient(element.style.backgroundGradient),
+    backgroundColor: resolveStyleColor(getSolidFillColor(element.style.fill), { resolveTheme: false }) ?? '',
+    backgroundGradient: serializeBackgroundGradient(getGradientFillGradient(element.style.fill)),
     borderWidth: element.style.borderWidth ?? 0,
     borderColor: resolveStyleColor(element.style.borderColor, { resolveTheme: false }) ?? '',
     borderStyle: typeof element.style.borderStyle === 'string' ? element.style.borderStyle : 'solid',
@@ -635,7 +636,7 @@ export function toPanelElement(element: BroadsetElement, instance?: PageElementI
     strokeLinecap: element.style.strokeLinecap ?? 'butt',
     strokeLinejoin: element.style.strokeLinejoin ?? 'miter',
     strokeOpacity: element.style.strokeOpacity ?? 1,
-    fill: resolveStyleColor(element.style.fill, { resolveTheme: false }) ?? '',
+    fill: resolveStyleColor(getSolidFillColor(element.style.fill), { resolveTheme: false }) ?? '',
     fillOpacity: element.style.fillOpacity ?? 1,
     fillRule: element.style.fillRule ?? 'nonzero',
     trimStart: element.style.trimStart ?? 0,

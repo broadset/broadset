@@ -419,12 +419,11 @@ describe('placement writes visible default styling into new elements', () => {
 
     const placed = getElements(store)[0];
 
-    expect(placed?.style.backgroundColor).toBeDefined();
-    expect(placed?.style.backgroundColor).not.toBe('');
+    expect(placed?.style.fill.kind).toBe('solid');
   });
 
   /** @description Three-click ellipse placement must stamp the default fill so the new element is visible. */
-  it('commits ellipse placement with a visible backgroundColor', () => {
+  it('commits ellipse placement with a visible fill', () => {
     const store = createEditorStore();
 
     beginPlacement(store, 'ellipse');
@@ -434,7 +433,7 @@ describe('placement writes visible default styling into new elements', () => {
 
     const placed = getElements(store)[0];
 
-    expect(placed?.style.backgroundColor).toBeDefined();
+    expect(placed?.style.fill.kind).toBe('solid');
   });
 
   /** @description Path placement must stamp a default stroke so the path renders visibly before the user finishes drawing. */

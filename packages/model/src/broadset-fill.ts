@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-import { type BroadsetColor,broadsetColorSchema } from './broadset-color';
-import { type BroadsetGradient } from './style';
+import { type BroadsetColor, broadsetColorSchema } from './broadset-color';
+import { type BroadsetGradient, broadsetGradientSchema } from './broadset-gradient';
 
 /**
  * Phase 1 unit #8 — `BroadsetFill` is the discriminated union that
@@ -86,21 +86,6 @@ const tileInfoSchema = z.object({
   offsetY: z.number().optional(),
 });
 
-const gradientFillGradientSchema = z.object({
-  type: z.enum(['linear', 'radial', 'conic']),
-  stops: z
-    .array(
-      z.object({
-        color: broadsetColorSchema,
-        position: z.number().min(0).max(100),
-      }),
-    )
-    .min(2),
-  angle: z.number().min(0).max(360).optional(),
-  center: z.tuple([z.number().min(0).max(100), z.number().min(0).max(100)]).optional(),
-  startAngle: z.number().min(0).max(360).optional(),
-});
-
 const noneFillSchema = z.object({ kind: z.literal('none') });
 
 const solidFillSchema = z.object({
@@ -110,7 +95,7 @@ const solidFillSchema = z.object({
 
 const gradientFillSchema = z.object({
   kind: z.literal('gradient'),
-  gradient: gradientFillGradientSchema,
+  gradient: broadsetGradientSchema,
 });
 
 const patternFillSchema = z.object({

@@ -1,9 +1,13 @@
-import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
+import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle } from '@broadset/model';
 import { createDefaultStyle } from '@broadset/model';
 
-export function createElement(
-  overrides: Partial<BroadsetElement> & Pick<BroadsetElement, 'id' | 'type'>,
-): BroadsetElement {
+export interface CreateElementOverrides extends Partial<Omit<BroadsetElement, 'id' | 'type' | 'style'>> {
+  readonly id: BroadsetElement['id'];
+  readonly type: BroadsetElement['type'];
+  readonly style?: Partial<BroadsetElementStyle>;
+}
+
+export function createElement(overrides: CreateElementOverrides): BroadsetElement {
   return {
     id: overrides.id,
     type: overrides.type,

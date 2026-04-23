@@ -198,7 +198,7 @@ The system MUST support SVG-specific properties for path and SVG elements: `stro
 
 ### Requirement: Structured Fill (`BroadsetFill`)
 
-Per IO-D-04 and Phase 1 unit #8, the canonical fill model is a `BroadsetFill` discriminated union. The flat `fill`, `backgroundColor`, and `backgroundGradient` fields on `BroadsetElementStyle` will be replaced by a single `fill: BroadsetFill` field in a later sub-commit once renderer / editor / formats consumers have been migrated; this requirement defines the union, schema, and factory surface that the eventual flip will consume.
+Per IO-D-04 and Phase 1 unit #8, the canonical fill model is a `BroadsetFill` discriminated union. The flat `fill`, `backgroundColor`, and `backgroundGradient` fields on `BroadsetElementStyle` have been replaced by a single `fill: BroadsetFill` field — the unified paint serves both SVG-paint (paths, svg-type elements) and CSS-container-background (rectangles, ellipses, groups) consumers.
 
 ```ts
 type BroadsetFill =

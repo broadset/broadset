@@ -276,7 +276,14 @@ describe('PPTX Import with Path Recovery', () => {
         makeElement('rectangle', {
           style: makeStyle({
             backgroundColor: '#ff0000',
-            backgroundGradient: 'linear-gradient(90deg, #ff0000, #0000ff)',
+            backgroundGradient: {
+              type: 'linear',
+              angle: 90,
+              stops: [
+                { color: rgbColor('#ff0000'), position: 0 },
+                { color: rgbColor('#0000ff'), position: 100 },
+              ],
+            },
           }),
           width: 100,
           height: 50,
@@ -327,7 +334,14 @@ describe('PPTX Import with Path Recovery', () => {
         makeElement('rectangle', {
           style: makeStyle({
             backgroundColor: '#ff0000',
-            backgroundGradient: 'linear-gradient(90deg, #ff0000, #0000ff)',
+            backgroundGradient: {
+              type: 'linear',
+              angle: 90,
+              stops: [
+                { color: rgbColor('#ff0000'), position: 0 },
+                { color: rgbColor('#0000ff'), position: 100 },
+              ],
+            },
           }),
         }),
       ],

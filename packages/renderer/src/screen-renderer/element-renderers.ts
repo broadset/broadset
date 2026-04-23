@@ -1,5 +1,5 @@
 import type { BroadsetElement, BroadsetElementStyle } from '@broadset/model';
-import { resolveStyleColor, sanitizeTextContent } from '@broadset/model';
+import { resolveStyleColor, resolveStyleFillToSvgPaint, sanitizeTextContent } from '@broadset/model';
 import { FillRule, pathBoolean, PathBooleanOperation, pathFromPathData, pathToPathData } from 'path-bool';
 import qrcode from 'qrcode-generator';
 
@@ -263,7 +263,7 @@ function createGroupRenderer(): ElementRendererFactory {
 
         path.setAttribute('stroke', resolveStyleColor(childStyle.stroke, { resolveTheme: false }) ?? 'none');
         path.setAttribute('stroke-width', String(childStyle.strokeWidth ?? 2));
-        path.setAttribute('fill', resolveStyleColor(childStyle.fill, { resolveTheme: false }) ?? 'none');
+        path.setAttribute('fill', resolveStyleFillToSvgPaint(childStyle.fill, { resolveTheme: false }));
 
         if (childStyle.strokeOpacity !== undefined) {
           path.setAttribute('stroke-opacity', String(childStyle.strokeOpacity));
@@ -404,7 +404,7 @@ const createPathRenderer = createSimpleRenderer((host, element) => {
   path.setAttribute('vector-effect', 'non-scaling-stroke');
   path.setAttribute('stroke', resolveStyleColor(element.style.stroke, { resolveTheme: false }) ?? '#f8fafc');
   path.setAttribute('stroke-width', String(element.style.strokeWidth ?? 2));
-  path.setAttribute('fill', resolveStyleColor(element.style.fill, { resolveTheme: false }) ?? 'none');
+  path.setAttribute('fill', resolveStyleFillToSvgPaint(element.style.fill, { resolveTheme: false }));
 
   if (element.style.strokeOpacity !== undefined) {
     path.setAttribute('stroke-opacity', String(element.style.strokeOpacity));

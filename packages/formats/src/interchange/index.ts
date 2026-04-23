@@ -1,4 +1,10 @@
-import { type BroadsetDocument, type BroadsetElement, type BroadsetProject, resolveStyleColor } from '@broadset/model';
+import {
+  type BroadsetDocument,
+  type BroadsetElement,
+  type BroadsetProject,
+  getSolidFillColor,
+  resolveStyleColor,
+} from '@broadset/model';
 import type { VideoEncodingConfig } from 'mediabunny';
 import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, WebMOutputFormat } from 'mediabunny';
 import qrcode from 'qrcode-generator';
@@ -254,7 +260,7 @@ function buildElementStyle(element: BroadsetElement): string {
     parts.push(`opacity:${String(element.style.opacity)}`);
   }
 
-  const backgroundCss = resolveStyleColor(element.style.backgroundColor, { resolveTheme: false });
+  const backgroundCss = resolveStyleColor(getSolidFillColor(element.style.fill), { resolveTheme: false });
 
   if (backgroundCss !== undefined) {
     parts.push(`background:${backgroundCss}`);

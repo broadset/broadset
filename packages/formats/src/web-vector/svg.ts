@@ -4,7 +4,9 @@ import {
   type BroadsetElementStyle,
   type BroadsetGradient,
   colorToCss,
+  getGradientFillGradient,
   resolveStyleColor,
+  resolveStyleFillToSvgPaint,
 } from '@broadset/model';
 
 import { generateQrSvgFragment } from '../interchange';
@@ -17,11 +19,7 @@ const XLINK_XMLNS = 'http://www.w3.org/1999/xlink';
 /*  Gradient Defs                                                     */
 /* ------------------------------------------------------------------ */
 
-function renderGradientDef(elementId: string, gradient: string | BroadsetGradient): { id: string; def: string } | null {
-  if (typeof gradient === 'string') {
-    return null; // CSS gradient strings cannot be converted to SVG defs
-  }
-
+function renderGradientDef(elementId: string, gradient: BroadsetGradient): { id: string; def: string } | null {
   const gradId = `grad-${elementId}`;
   const stops = gradient.stops
     .map((s) => `<stop offset="${String(s.position * 100)}%" stop-color="${escapeXml(colorToCss(s.color))}"/>`)
@@ -121,9 +119,14 @@ function buildTransform(el: BroadsetElement): string {
 function buildStyleAttrs(style: BroadsetElementStyle): string {
   const attrs: string[] = [];
 
-  const fillCss = resolveStyleColor(style.fill, { resolveTheme: false });
+  // Only emit solid fill colors directly. Gradient fills are emitted via
+  // <defs> references elsewhere; pattern / picture fills require asset-
+  // registry plumbing that lands in Phase 4, so they are intentionally
+  // left to the caller's <defs> path — emitting a broken `url(#…)` here
+  // would hide the missing implementation behind an invalid SVG.
+  if (style.fill.kind === 'solid') {
+    const fillCss = resolveStyleFillToSvgPaint(style.fill, { resolveTheme: false });
 
-  if (fillCss !== undefined) {
     attrs.push(`fill="${escapeXml(fillCss)}"`);
   }
 
@@ -233,8 +236,10 @@ function renderElement(el: BroadsetElement, defs: string[]): string {
   }
 
   // Gradient fill
-  if (el.style.backgroundGradient !== undefined) {
-    const grad = renderGradientDef(el.id, el.style.backgroundGradient);
+  const gradientFill = getGradientFillGradient(el.style.fill);
+
+  if (gradientFill !== undefined) {
+    const grad = renderGradientDef(el.id, gradientFill);
 
     if (grad !== null) {
       defs.push(grad.def);

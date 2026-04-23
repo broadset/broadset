@@ -1,76 +1,63 @@
 import {
   type BroadsetElementStyle,
-  type BroadsetGradient,
-  type BroadsetGradientStop,
-  colorToCss,
+  type BroadsetFill,
+  gradientToCss,
   resolveStyleColor,
 } from '@broadset/model';
 
-function formatGradientStop(stop: BroadsetGradientStop): string {
-  return `${colorToCss(stop.color)} ${String(stop.position)}%`;
-}
-
-function serializeGradient(gradient: string | BroadsetGradient): string {
-  if (typeof gradient === 'string') {
-    return gradient;
-  }
-
-  const stops = gradient.stops.map(formatGradientStop).join(', ');
-
-  switch (gradient.type) {
-    case 'linear': {
-      const angle = gradient.angle ?? 180;
-
-      return `linear-gradient(${String(angle)}deg, ${stops})`;
-    }
-
-    case 'radial': {
-      const center = gradient.center ?? [50, 50];
-
-      return `radial-gradient(circle at ${String(center[0])}% ${String(center[1])}%, ${stops})`;
-    }
-
-    case 'conic': {
-      const angle = gradient.angle ?? 0;
-      const center = gradient.center ?? [50, 50];
-
-      return `conic-gradient(from ${String(angle)}deg at ${String(center[0])}% ${String(center[1])}%, ${stops})`;
-    }
-  }
-}
-
+/**
+ * Applies the element's canonical {@link BroadsetFill} to a DOM host as
+ * CSS `background-color` / `background-image`. Dispatches on
+ * `fill.kind` per Phase 1 unit #8:
+ *
+ * - `none`: clears every background property.
+ * - `solid`: writes `backgroundColor` from the canonical
+ *   {@link BroadsetColor}; clears `backgroundImage`.
+ * - `gradient`: writes the CSS gradient string to `backgroundImage`;
+ *   clears `backgroundColor`. Stores the structured gradient JSON on
+ *   `data-gradient` for playback animation targeting.
+ * - `pattern` / `picture`: asset-registry resolution lands in Phase 4;
+ *   for now, clears every background property and skips the
+ *   `data-gradient` attribute so preflight surfaces the unused fill.
+ */
 export function applyBackgroundStyle(node: HTMLElement, style: BroadsetElementStyle): void {
-  const gradient = style.backgroundGradient;
-  const hasGradient =
-    gradient !== undefined && (typeof gradient !== 'string' || gradient.trim() !== '');
+  const fill = style.fill;
 
-  if (hasGradient) {
+  if (fill.kind === 'gradient') {
     node.style.background = '';
     node.style.backgroundColor = '';
-    node.style.backgroundImage = serializeGradient(gradient);
-
-    if (typeof gradient !== 'string') {
-      node.dataset['gradient'] = JSON.stringify(gradient);
-    } else {
-      delete node.dataset['gradient'];
-    }
+    node.style.backgroundImage = gradientToCss(fill.gradient);
+    node.dataset['gradient'] = JSON.stringify(fill.gradient);
 
     return;
   }
 
   delete node.dataset['gradient'];
 
-  const backgroundColorCss = resolveStyleColor(style.backgroundColor, { resolveTheme: false });
+  if (fill.kind === 'solid') {
+    const backgroundColorCss = resolveStyleColor(fill.color, { resolveTheme: false });
 
-  if (backgroundColorCss !== undefined) {
-    node.style.background = '';
-    node.style.backgroundImage = '';
-    node.style.backgroundColor = backgroundColorCss;
+    if (backgroundColorCss !== undefined) {
+      node.style.background = '';
+      node.style.backgroundImage = '';
+      node.style.backgroundColor = backgroundColorCss;
 
-    return;
+      return;
+    }
   }
 
   node.style.background = '';
   node.style.backgroundImage = '';
   node.style.backgroundColor = '';
+}
+
+/**
+ * Convenience shorthand for tests and playback adapters that only
+ * need to know whether a fill is a solid color. Returns the canonical
+ * CSS color string, or `undefined` for any non-solid kind.
+ */
+export function fillToCssBackgroundColor(fill: BroadsetFill): string | undefined {
+  if (fill.kind !== 'solid') return undefined;
+
+  return resolveStyleColor(fill.color, { resolveTheme: false });
 }

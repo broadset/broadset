@@ -679,20 +679,16 @@ describe('HTML Runtime Feature Parity', () => {
 /* ------------------------------------------------------------------ */
 
 describe('HTML Standalone Style Enrichments', () => {
-  /** @description backgroundGradient CSS string must appear in the HTML output as a background property. */
-  it('exports backgroundGradient CSS strings', () => {
-    const doc = makeDocument({
-      elements: [
-        makeElement({
-          type: 'rectangle',
-          style: makeStyle({ backgroundGradient: 'linear-gradient(to right, red, blue)' }),
-        }),
-      ],
-    });
-
-    const html = exportHtmlStandalone(doc);
-
-    expect(html).toContain('background:linear-gradient(to right, red, blue)');
+  /**
+   * @description Post-unit-8c, legacy CSS-string gradients are no longer
+   * a supported model surface — the schema throws on parse per IO-D-18,
+   * so the exporter never sees one. This test pins the rejection at the
+   * model boundary rather than at the exporter.
+   */
+  it('rejects legacy CSS-string gradients at parse time', () => {
+    expect(() =>
+      makeStyle({ backgroundGradient: 'linear-gradient(to right, red, blue)' }),
+    ).toThrow();
   });
 
   /** @description Structured BroadsetGradient objects must be converted to valid CSS gradient strings. */

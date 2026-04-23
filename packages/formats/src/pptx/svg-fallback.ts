@@ -3,6 +3,8 @@ import {
   type BroadsetElementStyle,
   type BroadsetGradient,
   colorToCss,
+  getGradientFillGradient,
+  getSolidFillColor,
   resolveStyleColor,
 } from '@broadset/model';
 
@@ -27,7 +29,7 @@ function buildSvgGradientDef(grad: BroadsetGradient, id: string): string {
 }
 
 export function needsSvgFallback(style: BroadsetElementStyle): boolean {
-  if (style.backgroundGradient) {
+  if (style.fill.kind === 'gradient') {
     return true;
   }
 
@@ -62,19 +64,15 @@ export function buildSvgForElement(el: BroadsetElement): string {
   const defs: string[] = [];
   let fill = 'none';
 
-  if (style.backgroundGradient) {
-    const grad = style.backgroundGradient;
+  const gradient = getGradientFillGradient(style.fill);
 
-    if (typeof grad === 'string') {
-      fill = resolveStyleColor(style.backgroundColor, { resolveTheme: false }) ?? 'none';
-    } else {
-      const gradId = 'grad0';
+  if (gradient !== undefined) {
+    const gradId = 'grad0';
 
-      defs.push(buildSvgGradientDef(grad, gradId));
-      fill = `url(#${gradId})`;
-    }
+    defs.push(buildSvgGradientDef(gradient, gradId));
+    fill = `url(#${gradId})`;
   } else {
-    const backgroundCss = resolveStyleColor(style.backgroundColor, { resolveTheme: false });
+    const backgroundCss = resolveStyleColor(getSolidFillColor(style.fill), { resolveTheme: false });
 
     if (backgroundCss !== undefined) {
       fill = backgroundCss;

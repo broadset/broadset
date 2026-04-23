@@ -123,7 +123,7 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
   })
   .superRefine((value, context) => {
     const normalizedStyleResult = styleSchema.safeParse({
-      ...createDefaultStyle(),
+      opacity: 1,
       ...(value.style ?? {}),
     });
 
@@ -188,7 +188,7 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
   })
   .transform((value): BroadsetElement => {
     const normalizedStyle = styleSchema.safeParse({
-      ...createDefaultStyle(),
+      opacity: 1,
       ...(value.style ?? {}),
     });
 
@@ -230,7 +230,7 @@ export function createDefaultElement(type: string, overrides?: ElementOverrides)
     rotation: overrides?.rotation ?? 0,
     content: overrides?.content ?? defaultContent(type),
     style: styleSchema.parse({
-      ...createDefaultStyle(),
+      opacity: 1,
       ...(overrides?.style ?? {}),
     }),
     parentId: overrides?.parentId ?? null,

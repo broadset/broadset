@@ -3,13 +3,14 @@ import { z } from 'zod';
 import {
   type BroadsetColor,
   broadsetColorSchema,
-  type ColorMods,
-  colorModsSchema,
   type ColorResolutionContext,
   colorToCss,
 } from './broadset-color';
+import { type BroadsetFill, broadsetFillSchema } from './broadset-fill';
+import type { BroadsetGradient, BroadsetGradientStop } from './broadset-gradient';
 import { type FilterStack, filterStackSchema, filterStackToCss } from './filter-stack';
 import { migrateLegacyColor } from './migrations/migrate-legacy-color';
+import { migrateLegacyFill } from './migrations/migrate-legacy-fill';
 import { migrateLegacyFilter } from './migrations/migrate-legacy-filter';
 
 export type StrokeLinecap = 'butt' | 'round' | 'square';
@@ -57,32 +58,17 @@ export type BorderRadiusTuple = readonly [number, number, number, number];
 /** Padding order: [top, right, bottom, left]. */
 export type PaddingTuple = readonly [number, number, number, number];
 
-export interface BroadsetGradientStop {
-  readonly color: BroadsetColor;
-  readonly position: number;
-  /**
-   * Per-stop PowerPoint-style color modifiers. Applied on top of `color`
-   * at render/export time via `_shared/color/applyMods` (Phase 2). Enables
-   * theme-driven gradients where every stop inherits from the same slot
-   * and varies by `lumMod` / `lumOff` / `tint` / `shade` / `alpha`.
-   */
-  readonly mods?: ColorMods | undefined;
-}
+/** @deprecated Re-exported from `broadset-gradient.ts` for compatibility. */
+export type { BroadsetGradient, BroadsetGradientStop };
 
-export interface BroadsetGradient {
-  readonly type: 'linear' | 'radial' | 'conic';
-  readonly stops: readonly BroadsetGradientStop[];
-  readonly angle?: number | undefined;
-  readonly center?: readonly [number, number] | undefined;
-  /**
-   * Conic-gradient-only starting angle in degrees, measured clockwise from
-   * the positive x-axis (CSS `conic-gradient(from <angle>, …)`). Ignored on
-   * linear and radial gradients. Range 0-360 inclusive; wrap-around past
-   * 360° is applied by the renderer, not the validator.
-   */
-  readonly startAngle?: number | undefined;
-}
-
+/**
+ * Legacy construction-time shape for `backgroundGradient` accepted by
+ * `BroadsetElementStyleInput`. After Phase 1 unit #8c, the persisted
+ * `BroadsetElementStyle` no longer carries a `backgroundGradient` field —
+ * the schema preprocessor collapses it into the unified
+ * `fill: BroadsetFill`. The type alias remains exported so importers and
+ * legacy fixtures can still name the transitional input shape.
+ */
 export type BackgroundGradientValue = string | BroadsetGradient | undefined;
 
 export interface BroadsetElementStyle {
@@ -103,8 +89,15 @@ export interface BroadsetElementStyle {
   readonly wordSpacing?: number | undefined;
   readonly textStroke?: string | undefined;
   readonly textShadow?: string | undefined;
-  readonly backgroundColor?: BroadsetColor | undefined;
-  readonly backgroundGradient?: BackgroundGradientValue;
+  /**
+   * Canonical fill for the element. Replaces the legacy `fill`
+   * (SVG-paint), `backgroundColor` (CSS-container), and
+   * `backgroundGradient` trio per Phase 1 unit #8 / IO-D-04. Always
+   * present — defaults to `noneFill()` when the source had no paint.
+   * Renderer and exporters dispatch on `fill.kind`; the SVG-paint and
+   * CSS-background views share this single field.
+   */
+  readonly fill: BroadsetFill;
   readonly borderWidth?: number | undefined;
   readonly borderColor?: BroadsetColor | undefined;
   readonly borderRadius?: BorderRadiusTuple | undefined;
@@ -126,7 +119,6 @@ export interface BroadsetElementStyle {
   readonly strokeOpacity?: number | undefined;
   readonly strokeHeadEnd?: ArrowEnd | undefined;
   readonly strokeTailEnd?: ArrowEnd | undefined;
-  readonly fill?: BroadsetColor | undefined;
   readonly fillOpacity?: number | undefined;
   readonly fillRule?: FillRule | undefined;
   readonly maskType?: MaskStyleType | undefined;
@@ -189,27 +181,181 @@ export function isBorderRadiusUniform(radius: BorderRadiusTuple): boolean {
 }
 
 /**
- * Input-side style shape accepted by `styleSchema`: color-valued
- * fields may be either a canonical `BroadsetColor` or a legacy CSS
- * color string (hex / rgb / hsl / named / Color Level 4). The schema
- * preprocessor normalizes strings through `migrateLegacyColor` at
- * parse time so the persisted `BroadsetElementStyle` only ever
- * contains `BroadsetColor`. Construction-time callers (importers,
- * fixtures, test helpers) use this type so migration remains a
- * one-site concern.
+ * Input-side style shape accepted by `styleSchema`.
+ *
+ * - Color-valued fields may be either a canonical `BroadsetColor` or a
+ *   legacy CSS color string (hex / rgb / hsl / named / Color Level 4) —
+ *   the schema preprocessor normalizes strings through
+ *   `migrateLegacyColor` at parse time.
+ * - Fill is the Phase 1 unit #8 unified paint. Construction-time callers
+ *   may pass any of: a canonical `BroadsetFill`, a raw `BroadsetColor`
+ *   (shorthand for solid), a CSS color string (shorthand for solid), OR
+ *   the legacy trio `{ fill, backgroundColor, backgroundGradient }` as
+ *   separate sibling fields. The schema preprocessor collapses every
+ *   shape into a single `BroadsetFill` via `migrateLegacyFill`.
+ * - Filter stacks accept the legacy CSS filter-function string form.
+ *
+ * Construction-time callers (importers, fixtures, test helpers) use this
+ * type so migration remains a one-site concern; the persisted
+ * `BroadsetElementStyle` only ever contains the canonical shapes.
  */
 export type BroadsetElementStyleInput = Omit<
   BroadsetElementStyle,
-  'fontColor' | 'backgroundColor' | 'borderColor' | 'stroke' | 'fill' | 'filter' | 'backdropFilter'
+  'fontColor' | 'borderColor' | 'stroke' | 'fill' | 'filter' | 'backdropFilter'
 > & {
   readonly fontColor?: BroadsetColor | string | undefined;
-  readonly backgroundColor?: BroadsetColor | string | undefined;
   readonly borderColor?: BroadsetColor | string | undefined;
   readonly stroke?: BroadsetColor | string | undefined;
-  readonly fill?: BroadsetColor | string | undefined;
+  readonly fill?: BroadsetFill | BroadsetColor | string | undefined;
+  /** Legacy CSS-container background color. Folded into `fill` by the schema. */
+  readonly backgroundColor?: BroadsetColor | string | undefined;
+  /** Legacy CSS-container background gradient. Structured form folds into `fill`; strings are rejected. */
+  readonly backgroundGradient?: BackgroundGradientValue;
   readonly filter?: FilterStack | string | undefined;
   readonly backdropFilter?: FilterStack | string | undefined;
 };
+
+/**
+ * Serializes a structured {@link BroadsetGradient} to its canonical CSS
+ * gradient-function string. Callers that emit `background-image` assign
+ * the result directly. Mirrors the renderer's historical serializer so
+ * the CSS view stays stable across the unit #8 field-type flip.
+ */
+export function gradientToCss(gradient: BroadsetGradient): string {
+  const stops = gradient.stops.map((stop) => `${colorToCss(stop.color)} ${String(stop.position)}%`).join(', ');
+
+  switch (gradient.type) {
+    case 'linear': {
+      const angle = gradient.angle ?? 180;
+
+      return `linear-gradient(${String(angle)}deg, ${stops})`;
+    }
+
+    case 'radial': {
+      const center = gradient.center ?? [50, 50];
+
+      return `radial-gradient(circle at ${String(center[0])}% ${String(center[1])}%, ${stops})`;
+    }
+
+    case 'conic': {
+      const angle = gradient.startAngle ?? gradient.angle ?? 0;
+      const center = gradient.center ?? [50, 50];
+
+      return `conic-gradient(from ${String(angle)}deg at ${String(center[0])}% ${String(center[1])}%, ${stops})`;
+    }
+  }
+}
+
+/**
+ * CSS-view projection of a `BroadsetFill` for consumers that emit HTML
+ * backgrounds (rectangles, ellipses, groups, text containers). Each
+ * field maps 1:1 to a `style.background*` DOM / CSS property. A field
+ * that is `undefined` means "clear the corresponding DOM style".
+ */
+export interface ResolvedCssBackground {
+  readonly backgroundColor?: string | undefined;
+  readonly backgroundImage?: string | undefined;
+}
+
+/**
+ * Projects a {@link BroadsetFill} into the CSS container-background view
+ * used by the DOM renderer and HTML / SVG exporters. `solid` kinds emit
+ * `backgroundColor`; `gradient` kinds emit `backgroundImage`. The
+ * `pattern` / `picture` kinds currently project to `undefined` because
+ * the shared asset-registry plumbing lands in Phase 4 — consumers that
+ * receive `undefined` clear the DOM properties so preflight warnings
+ * surface instead of rendering a broken URL. `none` clears every
+ * property.
+ */
+export function resolveStyleFillToCssBackground(
+  fill: BroadsetFill,
+  ctx?: ColorResolutionContext,
+): ResolvedCssBackground {
+  switch (fill.kind) {
+    case 'none':
+      return {};
+
+    case 'solid': {
+      const css = colorToCss(fill.color, ctx);
+
+      return { backgroundColor: css };
+    }
+
+    case 'gradient':
+      return { backgroundImage: gradientToCss(fill.gradient) };
+
+    case 'pattern':
+    case 'picture':
+      return {};
+  }
+}
+
+/**
+ * Projects a {@link BroadsetFill} into the SVG-paint view used by
+ * renderers and exporters that emit `<path>` / `<rect>` / `<ellipse>`
+ * `fill=` attributes. `solid` kinds emit the CSS color string;
+ * `gradient` / `pattern` / `picture` kinds return a `url(#…)` reference
+ * the caller must back with an SVG `<defs>` entry in the same document.
+ * `none` emits `'none'` so the SVG-paint contract stays explicit.
+ *
+ * The `resolveTheme: false` opt-out mirrors {@link resolveStyleColor} —
+ * it lets non-theme-aware CSS writers emit the approximation `hex`
+ * rather than throwing while the palette plumbing catches up. `defsIdFor`
+ * lets advanced callers back a gradient / pattern / picture with an
+ * SVG `<defs>` reference instead of the default `none` fallback.
+ */
+function resolveFillReference(
+  fill: BroadsetFill,
+  defsIdFor?: (fill: BroadsetFill) => string,
+): string {
+  const id = defsIdFor?.(fill);
+
+  return id === undefined ? 'none' : `url(#${id})`;
+}
+
+export function resolveStyleFillToSvgPaint(
+  fill: BroadsetFill,
+  ctx?: ColorResolutionContext & {
+    readonly resolveTheme?: boolean;
+    readonly defsIdFor?: (fill: BroadsetFill) => string;
+  },
+): string {
+  switch (fill.kind) {
+    case 'none':
+      return 'none';
+
+    case 'solid': {
+      const resolved = resolveStyleColor(fill.color, ctx);
+
+      return resolved ?? 'none';
+    }
+
+    case 'gradient':
+    case 'pattern':
+    case 'picture':
+      return resolveFillReference(fill, ctx?.defsIdFor);
+  }
+}
+
+/**
+ * Convenience: returns the solid color if `fill` is `kind: 'solid'`,
+ * otherwise `undefined`. Call sites that previously read
+ * `style.backgroundColor` directly use this to recover the single-color
+ * shorthand when the fill is plausibly solid; other kinds signal that
+ * the consumer must switch on `fill.kind`.
+ */
+export function getSolidFillColor(fill: BroadsetFill): BroadsetColor | undefined {
+  return fill.kind === 'solid' ? fill.color : undefined;
+}
+
+/**
+ * Convenience: returns the structured gradient if `fill` is
+ * `kind: 'gradient'`, otherwise `undefined`. Used by exporters that
+ * previously read `style.backgroundGradient` directly.
+ */
+export function getGradientFillGradient(fill: BroadsetFill): BroadsetGradient | undefined {
+  return fill.kind === 'gradient' ? fill.gradient : undefined;
+}
 
 /**
  * Resolves an optional `FilterStack` to the CSS filter-function string
@@ -308,20 +454,6 @@ function normalizePadding(value: PaddingTuple | undefined): PaddingTuple | undef
   return value;
 }
 
-function hasAscendingGradientStops(stops: readonly BroadsetGradientStop[]): boolean {
-  let previousPosition = -1;
-
-  for (const stop of stops) {
-    if (stop.position < previousPosition) {
-      return false;
-    }
-
-    previousPosition = stop.position;
-  }
-
-  return true;
-}
-
 /** CSS clip-path function prefixes accepted alongside SVG path data. */
 const CLIP_PATH_FUNCTION_PREFIXES = ['polygon(', 'circle(', 'ellipse(', 'inset(', 'path('] as const;
 
@@ -383,6 +515,31 @@ const broadsetColorOrOptionalLegacyStringSchema = z.preprocess(
 );
 
 /**
+ * Narrows a partially-typed Zod input value to determine whether it has
+ * a `BroadsetFill` discriminator (`kind: 'none' | 'solid' | ...`) vs a
+ * `BroadsetColor` discriminator (`kind: 'rgb' | 'theme'`). Used by the
+ * fill preprocessor so shorthand callers (`fill: color`) don't collide
+ * with canonical-shape callers (`fill: { kind: 'solid', color }`).
+ */
+const FILL_KIND_VALUES: ReadonlySet<string> = new Set(['none', 'solid', 'gradient', 'pattern', 'picture']);
+
+function isFillShaped(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+
+  const kind = (value as { readonly kind?: unknown }).kind;
+
+  return typeof kind === 'string' && FILL_KIND_VALUES.has(kind);
+}
+
+function isColorShaped(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+
+  const kind = (value as { readonly kind?: unknown }).kind;
+
+  return kind === 'rgb' || kind === 'theme';
+}
+
+/**
  * Optional filter stack: accepts either a structured `FilterStack` or a
  * legacy CSS filter function list string. Strings are parsed by
  * `migrateLegacyFilter`; unparseable content collapses to a single
@@ -400,7 +557,17 @@ const filterStackOrLegacyStringSchema = z.preprocess((value) => {
   return value;
 }, filterStackSchema.optional());
 
-const broadsetGradientSchema = z
+/**
+ * Input-tolerant gradient schema used by the legacy `backgroundGradient`
+ * field — stop colors may be legacy CSS strings, the preprocessor inside
+ * `broadsetColorOrRequiredLegacyStringSchema` migrates them before the
+ * outer `.transform()` hands the gradient to `migrateLegacyFill`.
+ *
+ * The canonical `broadsetGradientSchema` imported from
+ * `./broadset-gradient` accepts only canonical `BroadsetColor` stops and
+ * is used downstream (inside `broadsetFillSchema.gradient`).
+ */
+const legacyBroadsetGradientInputSchema = z
   .object({
     type: z.enum(['linear', 'radial', 'conic']),
     stops: z
@@ -408,16 +575,12 @@ const broadsetGradientSchema = z
         z.object({
           color: broadsetColorOrRequiredLegacyStringSchema,
           position: z.number().min(0).max(100),
-          mods: colorModsSchema.optional(),
         }),
       )
       .min(2),
     angle: z.number().min(0).max(360).optional(),
     center: z.tuple([z.number().min(0).max(100), z.number().min(0).max(100)]).optional(),
     startAngle: z.number().min(0).max(360).optional(),
-  })
-  .refine((value) => hasAscendingGradientStops(value.stops), {
-    message: 'Gradient stop positions must be in ascending order',
   });
 
 const ARROW_END_SHAPE_VALUES = ['triangle', 'stealth', 'diamond', 'oval', 'none'] as const;
@@ -428,6 +591,36 @@ const arrowEndSchema: z.ZodType<ArrowEnd> = z.object({
   width: z.enum(ARROW_END_SIZE_VALUES).optional(),
   length: z.enum(ARROW_END_SIZE_VALUES).optional(),
 });
+
+/**
+ * Optional fill input. Accepts the canonical `BroadsetFill`, a raw
+ * `BroadsetColor` (shorthand for solid), or a legacy CSS color string
+ * (shorthand for solid via `migrateLegacyColor`). Every shape normalizes
+ * to `BroadsetFill`; `undefined` falls through so the schema's
+ * `.transform()` can combine `fill` with the legacy `backgroundColor` /
+ * `backgroundGradient` siblings via `migrateLegacyFill`.
+ */
+const fillInputSchema = z.preprocess((value) => {
+  if (value === undefined || value === null) return undefined;
+
+  if (isFillShaped(value)) return value;
+
+  if (isColorShaped(value)) {
+    return { kind: 'solid', color: value };
+  }
+
+  if (typeof value === 'string') {
+    try {
+      const migrated = migrateLegacyColor(value);
+
+      return migrated === undefined ? undefined : { kind: 'solid', color: migrated };
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
+}, broadsetFillSchema.optional());
 
 export const styleSchema: z.ZodType<BroadsetElementStyle> = z
   .object({
@@ -448,8 +641,10 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
     wordSpacing: z.number().optional(),
     textStroke: z.string().optional(),
     textShadow: z.string().optional(),
+    /** Legacy sibling folded into `fill` by the transform. */
     backgroundColor: broadsetColorOrOptionalLegacyStringSchema,
-    backgroundGradient: z.union([z.string(), broadsetGradientSchema]).optional(),
+    /** Legacy sibling folded into `fill` by the transform. */
+    backgroundGradient: z.union([z.string(), legacyBroadsetGradientInputSchema]).optional(),
     borderWidth: z.number().nonnegative().optional(),
     borderColor: broadsetColorOrOptionalLegacyStringSchema,
     borderRadius: borderRadiusSchema.optional(),
@@ -471,7 +666,7 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
     strokeOpacity: z.number().min(0).max(1).optional(),
     strokeHeadEnd: arrowEndSchema.optional(),
     strokeTailEnd: arrowEndSchema.optional(),
-    fill: broadsetColorOrOptionalLegacyStringSchema,
+    fill: fillInputSchema,
     fillOpacity: z.number().min(0).max(1).optional(),
     fillRule: z.enum(['nonzero', 'evenodd']).optional(),
     maskType: z.enum(['none', 'alpha', 'luminance', 'custom']).optional(),
@@ -514,7 +709,11 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
     }
   })
   .transform((value): BroadsetElementStyle => {
-    const normalizedBackgroundGradient = normalizeBackgroundGradient(value.backgroundGradient);
+    const fill = resolveFillFromInputs({
+      fill: value.fill,
+      backgroundColor: coerceBroadsetColor(value.backgroundColor),
+      backgroundGradient: normalizeBackgroundGradient(value.backgroundGradient),
+    });
 
     return {
       opacity: value.opacity,
@@ -534,8 +733,7 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
       wordSpacing: normalizeSpacing(value.wordSpacing),
       textStroke: value.textStroke,
       textShadow: value.textShadow,
-      backgroundColor: coerceBroadsetColor(value.backgroundColor),
-      ...(normalizedBackgroundGradient === undefined ? {} : { backgroundGradient: normalizedBackgroundGradient }),
+      fill,
       borderWidth: value.borderWidth,
       borderColor: coerceBroadsetColor(value.borderColor),
       borderRadius: value.borderRadius === undefined ? undefined : normalizeBorderRadius(value.borderRadius),
@@ -557,7 +755,6 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
       strokeOpacity: value.strokeOpacity,
       strokeHeadEnd: value.strokeHeadEnd,
       strokeTailEnd: value.strokeTailEnd,
-      fill: coerceBroadsetColor(value.fill),
       fillOpacity: value.fillOpacity,
       fillRule: value.fillRule,
       maskType: value.maskType ?? 'none',
@@ -575,6 +772,34 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
       trimOffset: value.trimOffset ?? 0,
     };
   });
+
+interface ResolveFillFromInputsArgs {
+  readonly fill?: BroadsetFill | undefined;
+  readonly backgroundColor?: BroadsetColor | undefined;
+  readonly backgroundGradient?: BackgroundGradientValue;
+}
+
+/**
+ * Combines the canonical `fill` input (if present) with the legacy
+ * `backgroundColor` / `backgroundGradient` siblings into a single
+ * `BroadsetFill`. `fill` wins when present — the legacy trio only
+ * participates when `fill` is absent, matching the IO-D-04 migration
+ * contract. `migrateLegacyFill` treats empty / whitespace `backgroundGradient`
+ * strings as absent and throws on populated ones per IO-D-18; the
+ * `.transform()` surfaces that throw as a schema error so callers see
+ * the failure at parse time rather than at render time.
+ */
+function resolveFillFromInputs(inputs: ResolveFillFromInputsArgs): BroadsetFill {
+  if (inputs.fill !== undefined) {
+    return inputs.fill;
+  }
+
+  return migrateLegacyFill({
+    fill: undefined,
+    backgroundColor: inputs.backgroundColor,
+    backgroundGradient: inputs.backgroundGradient,
+  });
+}
 
 /** Creates the canonical default style for new elements. */
 export function createDefaultStyle(): BroadsetElementStyle {

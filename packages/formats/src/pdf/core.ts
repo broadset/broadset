@@ -1,11 +1,12 @@
 import type {
+  BroadsetColor,
   BroadsetDocument,
   BroadsetElement,
   BroadsetElementStyle,
   BroadsetGradient,
   Canvas,
 } from '@broadset/model';
-import { colorToCss } from '@broadset/model';
+import { colorToCss, getGradientFillGradient, getSolidFillColor } from '@broadset/model';
 import { type EmbeddedFont, PDF, type PDFPage, rgb, type Standard14FontName, StandardFonts } from '@libpdf/core';
 
 import { parseCssColor } from './color';
@@ -75,23 +76,43 @@ function resolveGradientFallbackColor(gradient: string | BroadsetGradient): Retu
 /*  Element Rendering                                                  */
 /* ------------------------------------------------------------------ */
 
-function resolveColor(
-  style: Partial<BroadsetElementStyle>,
-  prop: 'fontColor' | 'backgroundColor' | 'borderColor' | 'fill' | 'stroke',
-): ReturnType<typeof rgb> | undefined {
-  const raw = style[prop];
+/**
+ * Resolves any `BroadsetColor` on an element style to a `pdf-lib` rgb
+ * color. Accepts an optional `BroadsetColor` directly so callers can
+ * funnel in the old `backgroundColor` / `fill` paths via
+ * `getSolidFillColor(style.fill)` after the unit #8 BroadsetFill flip.
+ */
+function colorToPdfRgb(color: BroadsetColor | undefined): ReturnType<typeof rgb> | undefined {
+  if (color === undefined) return undefined;
 
-  if (typeof raw !== 'string') {
-    return undefined;
-  }
+  const parsed = parseCssColor(colorToCss(color));
 
-  const parsed = parseCssColor(raw);
-
-  if (!parsed) {
-    return undefined;
-  }
+  if (!parsed) return undefined;
 
   return rgb(parsed.r, parsed.g, parsed.b);
+}
+
+function resolveStyleColor(
+  style: Partial<BroadsetElementStyle>,
+  prop: 'fontColor' | 'borderColor' | 'stroke',
+): ReturnType<typeof rgb> | undefined {
+  return colorToPdfRgb(style[prop]);
+}
+
+function resolveFillAsPdfRgb(style: Partial<BroadsetElementStyle>): ReturnType<typeof rgb> | undefined {
+  const fill = style.fill;
+
+  if (fill === undefined) return undefined;
+
+  return colorToPdfRgb(getSolidFillColor(fill));
+}
+
+function resolveFillGradient(style: Partial<BroadsetElementStyle>): BroadsetGradient | undefined {
+  const fill = style.fill;
+
+  if (fill === undefined) return undefined;
+
+  return getGradientFillGradient(fill);
 }
 
 function resolveOpacity(style: Partial<BroadsetElementStyle>): number {
@@ -351,7 +372,7 @@ function renderText(
 
   const xPt = elementToPoints(canvas, el.position.x);
   const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height);
-  const color = resolveColor(el.style, 'fontColor') ?? rgb(0, 0, 0);
+  const color = resolveStyleColor(el.style, 'fontColor') ?? rgb(0, 0, 0);
   const size = el.style.fontSize ? elementToPoints(canvas, el.style.fontSize) : 12;
   const opacity = resolveOpacity(el.style);
   const font = lookupFont(el, fontMap);
@@ -406,10 +427,9 @@ function renderRectangle(page: PDFPage, el: BroadsetElement, canvas: Canvas, hei
   const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height);
   const wPt = elementToPoints(canvas, el.width);
   const hPt = elementToPoints(canvas, el.height);
-  const bg =
-    resolveColor(el.style, 'backgroundColor') ??
-    (el.style.backgroundGradient !== undefined ? resolveGradientFallbackColor(el.style.backgroundGradient) : undefined);
-  const border = resolveColor(el.style, 'borderColor');
+  const fillGradient = resolveFillGradient(el.style);
+  const bg = resolveFillAsPdfRgb(el.style) ?? (fillGradient !== undefined ? resolveGradientFallbackColor(fillGradient) : undefined);
+  const border = resolveStyleColor(el.style, 'borderColor');
 
   page.drawRectangle({
     x: xPt,
@@ -426,10 +446,8 @@ function renderRectangle(page: PDFPage, el: BroadsetElement, canvas: Canvas, hei
 function renderEllipse(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
   const cx = elementToPoints(canvas, el.position.x + el.width / 2);
   const cy = heightPt - elementToPoints(canvas, el.position.y + el.height / 2);
-  const bg =
-    resolveColor(el.style, 'backgroundColor') ??
-    resolveColor(el.style, 'fill') ??
-    (el.style.backgroundGradient !== undefined ? resolveGradientFallbackColor(el.style.backgroundGradient) : undefined);
+  const ellipseGradient = resolveFillGradient(el.style);
+  const bg = resolveFillAsPdfRgb(el.style) ?? (ellipseGradient !== undefined ? resolveGradientFallbackColor(ellipseGradient) : undefined);
 
   page.drawEllipse({
     x: cx,
@@ -448,8 +466,8 @@ function renderPath(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt
 
   const xPt = elementToPoints(canvas, el.position.x);
   const yPt = heightPt - elementToPoints(canvas, el.position.y);
-  const fillColor = resolveColor(el.style, 'fill') ?? rgb(0, 0, 0);
-  const strokeColor = resolveColor(el.style, 'stroke');
+  const fillColor = resolveFillAsPdfRgb(el.style) ?? rgb(0, 0, 0);
+  const strokeColor = resolveStyleColor(el.style, 'stroke');
 
   page.drawSvgPath(el.content, {
     x: xPt,
