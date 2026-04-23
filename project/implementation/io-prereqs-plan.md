@@ -639,7 +639,7 @@ All shared modules under `packages/formats/src/_shared/<name>/` with Vitest unit
 - [ ] **`_shared/xmp/`** — `fast-xml-parser` read + explicit RDF/XML write; `readBroadsetXmp`, `writeBroadsetXmp`
 - [ ] **`_shared/fingerprint/`** — `xxhash-wasm`; `fingerprintElement`
 - [ ] **`_shared/reconcile/`** — `microdiff`; `reconcile({ preservedMetadata, currentVisual, fingerprintsByElementId })`
-- [ ] **`_shared/shape-classifier/`** — `classifyPath(d, styleHints)` with rectangle/ellipse/path heuristics
+- [x] **`_shared/shape-classifier/`** — `classifyPath(d, styleHints)` with rectangle/ellipse/path heuristics (`ac8bf9f`)
 - [ ] **`_shared/sanitize/`** — `dompurify` with Broadset policy; `sanitizeSvg`
 - [ ] **Bundle-size assertion test** — ensure Latin-only sRGB users never download `lcms-wasm` or `harfbuzzjs`
 
