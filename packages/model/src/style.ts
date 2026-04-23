@@ -3,6 +3,8 @@ import { z } from 'zod';
 import {
   type BroadsetColor,
   broadsetColorSchema,
+  type ColorMods,
+  colorModsSchema,
   type ColorResolutionContext,
   colorToCss,
 } from './broadset-color';
@@ -56,6 +58,13 @@ export type PaddingTuple = readonly [number, number, number, number];
 export interface BroadsetGradientStop {
   readonly color: BroadsetColor;
   readonly position: number;
+  /**
+   * Per-stop PowerPoint-style color modifiers. Applied on top of `color`
+   * at render/export time via `_shared/color/applyMods` (Phase 2). Enables
+   * theme-driven gradients where every stop inherits from the same slot
+   * and varies by `lumMod` / `lumOff` / `tint` / `shade` / `alpha`.
+   */
+  readonly mods?: ColorMods | undefined;
 }
 
 export interface BroadsetGradient {
@@ -360,6 +369,7 @@ const broadsetGradientSchema = z
         z.object({
           color: broadsetColorOrRequiredLegacyStringSchema,
           position: z.number().min(0).max(100),
+          mods: colorModsSchema.optional(),
         }),
       )
       .min(2),
