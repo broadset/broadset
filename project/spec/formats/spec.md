@@ -452,3 +452,50 @@ Contract:
 
 - Byte-level happy-path tests (reading metrics / fsType / CMap from a real TTF / OTF) land with the Phase 4 asset pipeline when a Google-Fonts-backed fixture becomes available.
 - `resolveFont` / `listAvailable` / `subsetFont` ship with the Phase 4 asset pipeline.
+
+---
+
+### Requirement: Text layout (`_shared/text-layout/`)
+
+The `_shared/text-layout/` module wraps `linebreak` (UAX #14 line breaking) and `bidi-js` (UAX #9 embedding levels) for the cross-format text-layout surface every exporter / importer needs. The `harfbuzzjs` shaping path is lazy-loaded by a future caller (first non-Latin shape); this module ships the eager subset today.
+
+```ts
+interface LineSegment {
+  readonly text: string;
+  readonly width: number;
+}
+
+interface BidiAnalysis {
+  readonly paragraphs: readonly BidiParagraph[];
+  readonly levels: Uint8Array;
+}
+
+type TextMeasure = (text: string) => number;
+
+function breakLines(text: string, boxWidth: number, measure: TextMeasure): readonly LineSegment[];
+function analyzeBidi(text: string, baseDirection?: 'ltr' | 'rtl'): BidiAnalysis;
+```
+
+Contract:
+
+- **breakLines** applies UAX #14 to find line-break opportunities, then greedily packs segments into `boxWidth` using the caller's `measure` callback. Mandatory breaks (hard newlines) always start a new line. Overflowing tokens that exceed the box are emitted unchanged — never dropped — per IO-D-18.
+- Every emitted `LineSegment` reports its measured width so the caller positions lines without re-measuring.
+- **analyzeBidi** runs UAX #9 on the full text and returns per-paragraph levels plus the per-character level array. `baseDirection` defaults to `'ltr'`; callers pass `'rtl'` for RTL-primary paragraphs.
+- Empty input returns empty results (no null guards required at call sites).
+
+#### Acceptance Criteria
+
+- [ ] `breakLines` returns an empty array for empty input
+- [ ] `breakLines` returns a single line when the text fits within the box
+- [ ] `breakLines` breaks long text into multiple lines at word-boundary opportunities
+- [ ] `breakLines` respects hard line breaks regardless of box width
+- [ ] `breakLines` reports the measured width on every emitted line
+- [ ] `breakLines` emits overflowing tokens unchanged instead of dropping them
+- [ ] `analyzeBidi` returns empty paragraphs + zero-length level array for empty input
+- [ ] `analyzeBidi` assigns level 0 across pure LTR text
+- [ ] `analyzeBidi` elevates levels for embedded RTL characters (mixed-script input produces at least one odd-level character)
+- [ ] `analyzeBidi` honors explicit `'rtl'` base direction (paragraph level is odd)
+
+#### Spec Gaps
+
+- `wrapRuns(runs, boxWidth, fontResolver)` and `shapeRuns(runs)` (harfbuzzjs-backed) land when the first PDF / PPTX importer surfaces a concrete need for run-aware layout. The eager `breakLines` / `analyzeBidi` surface above covers the single-style text paths every format emits today.
