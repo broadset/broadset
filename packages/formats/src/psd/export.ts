@@ -1,6 +1,6 @@
-import type { BroadsetDocument, Canvas } from '@broadset/model';
+import type { BroadsetDocument, BroadsetElement, Canvas } from '@broadset/model';
 import { resolveContentAsPlainString } from '@broadset/model';
-import type { Psd } from 'ag-psd';
+import type { Layer, Psd } from 'ag-psd';
 import { writePsdUint8Array } from 'ag-psd';
 
 import { elementToLayer, getPendingLinkedFiles, resetExportState, setPrefetchedUrlImages } from './export-layer';
@@ -13,6 +13,48 @@ interface PsdImageBytes {
 
 interface ExportPsdSyncOptions {
   readonly prefetchedUrlImages?: ReadonlyMap<string, PsdImageBytes>;
+}
+
+/**
+ * Builds PSD layers from a subset of `elements` whose parent matches
+ * `parentId`. Group elements recurse so the final PSD layer tree
+ * mirrors the Broadset `parentId` tree exactly. Orphan elements
+ * (parentId points at an element not in `elements`) surface at the
+ * root rather than being dropped, per IO-D-18.
+ */
+function buildLayersForParent(elements: readonly BroadsetElement[], parentId: string | null): Layer[] {
+  const layers: Layer[] = [];
+  const knownIds = new Set(elements.map((el) => el.id));
+
+  for (const el of elements) {
+    const effectiveParent = el.parentId ?? null;
+    const effectiveParentExists = effectiveParent === null || knownIds.has(effectiveParent);
+    const resolvedParent = effectiveParentExists ? effectiveParent : null;
+
+    if (resolvedParent !== parentId) continue;
+
+    if (el.type === 'group') {
+      const children = buildLayersForParent(elements, el.id);
+      const groupLayer: Layer = {
+        name: el.name,
+        left: Math.round(el.position.x),
+        top: Math.round(el.position.y),
+        right: Math.round(el.position.x + el.width),
+        bottom: Math.round(el.position.y + el.height),
+        opacity: el.style.opacity,
+        hidden: false,
+        opened: true,
+        children,
+      };
+
+      layers.push(groupLayer);
+      continue;
+    }
+
+    layers.push(elementToLayer(el));
+  }
+
+  return layers;
 }
 
 function canvasToPixels(canvas: Canvas, value: number): number {
@@ -96,13 +138,13 @@ function exportPsdBytesCore(doc: BroadsetDocument): Uint8Array {
         artboard: {
           rect: { top: 0, left: 0, bottom: height, right: width },
         },
-        children: visibleElements.map((el) => elementToLayer(el)),
+        children: buildLayersForParent(visibleElements, null),
       });
     }
 
     psd.children = artboardLayers;
   } else {
-    psd.children = doc.elements.map((el) => elementToLayer(el));
+    psd.children = buildLayersForParent(doc.elements, null);
   }
 
   const pendingLinkedFiles = getPendingLinkedFiles();
