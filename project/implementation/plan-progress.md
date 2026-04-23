@@ -72,7 +72,7 @@ Source of truth: [plan.md](./plan.md), [renderer-refactor-plan.md](./renderer-re
 - [x] P3.3 Semantic renderers and safe builders
 - [x] P3.4 Runtime services
 - [x] P3.5 Broadset adapter migration
-- [ ] P3.6 Spec closure and hardening
+- [x] P3.6 Spec closure and hardening
 
 ### Phase 4 — Shared asset pipeline
 

@@ -1,7 +1,7 @@
 # Renderer Refactor Plan
 
 Date: 2026-04-22
-Status: draft - extracted from [io-prereqs-plan.md](./io-prereqs-plan.md) Phase 3 and expanded into a dedicated renderer workstream
+Status: complete — all seven subphases (P3.0–P3.6) landed 2026-04-23 under Master Plan Phase 3
 
 This plan turns `@broadset/renderer` from a Broadset-centric preview DOM into a reusable HTML motion-graphics renderer with a thin Broadset adapter.
 

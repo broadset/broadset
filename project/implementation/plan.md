@@ -696,8 +696,8 @@ Current master-plan state:
 - **Phase 0 (decisions + spec-first updates):** complete
 - **Phase 1 (shared model additions):** complete — all 16 units shipped (IO-D-01 through IO-D-18 ratified; unit utilities, importer security, BroadsetColor / BroadsetFill / FilterStack unions, content-hash identity, stroke + gradient enhancements, TextBody + text-on-path + text fidelity, model-level script rejection, extensions typing + dirty-flag middleware, page / canvas / document additions, importer contract)
 - **Phase 2 (shared libraries + `_shared` modules):** complete — 9 units shipped (shape-classifier, fingerprint, reconcile, sanitize, xmp, color, fonts, text-layout, bundle-size guard). `lcms-wasm` / ICC / CMYK / `harfbuzzjs` / font-resolve / subsetting are spec-gapped and light up when Phase 4 asset pipeline or a concrete caller arrives.
-- **Phase 3 (renderer refactor):** not started — **next active phase**
-- Phase 4 (shared asset pipeline): not started
+- **Phase 3 (renderer refactor):** complete — all 7 subphases shipped (P3.0 contract cleanup, P3.1 internal layer split into core/dom/elements/adapters, P3.2 keyed reconciliation with composite child invalidation, P3.3 semantic renderers + safe builders removing innerHTML paths, P3.4 runtime service seams for time/data/state/fonts/assets, P3.5 generic `createHtmlMotionRenderer` entry + Broadset adapter, P3.6 performance tests + spec closure)
+- **Phase 4 (shared asset pipeline):** not started — **next active phase**
 - PSD track: not started
 - PDF track: not started
 - SVG track: not started

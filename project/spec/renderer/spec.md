@@ -781,8 +781,8 @@ The renderer MUST support a transparent background mode for alpha-channel export
 - [x] **Broken Image Fallback:** Automated renderer tests verify both the empty-content path and the image error-event path swap to a visible placeholder without leaving a broken `<img>` node (`packages/renderer/src/screen-renderer/core.test.ts`).
 - [x] **Text Content Sanitization:** Automated renderer tests verify text rendering strips script tags and inline event-handler markup before visible characters are emitted (`packages/renderer/src/screen-renderer/core.test.ts`).
 - [x] **Group Element Rendering:** Automated renderer tests verify both boolean-operation group rendering and normal group container behavior with child nodes (`packages/renderer/src/screen-renderer/core.test.ts`).
-- [ ] **Dynamic Data Token Format:** Existing dynamic-data substitution tests cover the substitution path but do not verify dot-notation key resolution or the literal fallback for missing keys. Tests for nested keys and unresolved tokens are needed.
-- [ ] **Rendering Performance (complexity):** No automated test measures per-frame DOM mutation count or verifies O(n) complexity. A mutation-counting harness for single-element updates against a populated scene is needed.
+- [x] **Dynamic Data Token Format:** Runtime `substituteDynamicTokens` + renderer-level tests verify direct-key resolution, nested dot-notation, and literal fallback for missing keys (`packages/renderer/src/core/runtime.test.ts`).
+- [x] **Rendering Performance (complexity):** Instrumented `insertBefore` mutation-count tests verify that single-element updates leave root-level children untouched, single insertions trigger exactly one reparent, and sibling reorders stay within O(n) moves (`packages/renderer/src/dom/performance.test.ts`).
 
 ---
 
