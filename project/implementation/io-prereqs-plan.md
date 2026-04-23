@@ -605,8 +605,8 @@ Landing order from §"Phase 1 internal landing order" above.
   - [x] tests: red
   - [x] impl: green (`4b29e4b`, `e06ba43`, `a4dce68`)
 - [ ] **9. Text model — `TextBody` / `Paragraph` / `Run`** — `content: string | TextBody`; model-only, editor catches up Phase 5. Plan: 2–3 commits. Depends on #3.
-  - [ ] tests: red
-  - [ ] impl: green
+  - [x] tests: red
+  - [ ] impl: green (9a `4dfd2d8`, 9b `e314388`; 9c fixture migration pending)
 - [x] **10. Text-on-path reference** — `textPathElementId` as first-class field with existence + cycle validation (depends on #9)
   - [x] tests: red
   - [x] impl: green (`9262266`)
