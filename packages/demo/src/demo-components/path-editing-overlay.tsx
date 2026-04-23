@@ -8,6 +8,7 @@ import {
   serializePath,
 } from '@broadset/editor';
 import type { BroadsetElement } from '@broadset/model';
+import { resolveContentAsPlainString } from '@broadset/model';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -145,7 +146,7 @@ export function PathEditingOverlay({
     };
   }, [overlayRoot]);
 
-  const segments = useMemo(() => parsePath(element.content), [element.content]);
+  const segments = useMemo(() => parsePath(resolveContentAsPlainString(element.content)), [element.content]);
   const handles = useMemo(() => extractHandles(segments), [segments]);
 
   const screenPxPerCanvasUnit = 1 / pointerToCanvas;
@@ -162,7 +163,7 @@ export function PathEditingOverlay({
         event.stopPropagation();
         event.currentTarget.setPointerCapture(event.pointerId);
 
-        const latestSegments = parsePath(elementRef.current.content);
+        const latestSegments = parsePath(resolveContentAsPlainString(elementRef.current.content));
         const segment = latestSegments[handle.segmentIndex];
         const startValueX = handle.xIndex >= 0 ? (segment?.coords[handle.xIndex] ?? 0) : Number.NaN;
         const startValueY = handle.yIndex >= 0 ? (segment?.coords[handle.yIndex] ?? 0) : Number.NaN;
@@ -241,7 +242,7 @@ export function PathEditingOverlay({
         if (!Number.isFinite(bbox.width) || !Number.isFinite(bbox.height)) return;
 
         const refit = refitPathBoundsFromSvg({
-          pathData: currentElement.content,
+          pathData: resolveContentAsPlainString(currentElement.content),
           strokeWidth: currentElement.style.strokeWidth ?? 1,
           svgBBox: { height: bbox.height, width: bbox.width, x: bbox.x, y: bbox.y },
         });
@@ -279,7 +280,7 @@ export function PathEditingOverlay({
       >
         <path
           ref={pathRef}
-          d={element.content}
+          d={resolveContentAsPlainString(element.content)}
           fill="none"
           stroke="transparent"
           strokeWidth={0}

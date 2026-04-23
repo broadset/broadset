@@ -601,9 +601,9 @@ Landing order from §"Phase 1 internal landing order" above.
 - [x] **7. Gradient enhancements** — conic `startAngle`; stop colors become `BroadsetColor`; `mods?` per stop (depends on #3)
   - [x] tests: red
   - [x] impl: green (`ac89992`, `c4b942e`, `f836609`)
-- [ ] **8. `BroadsetFill` discriminated union** — `none | solid | gradient | pattern | picture`; replaces flat `fill`/`backgroundColor`/`backgroundGradient` (depends on #3, #7). Cascade comparable to #3.
-  - [ ] tests: red
-  - [ ] impl: green
+- [x] **8. `BroadsetFill` discriminated union** — `none | solid | gradient | pattern | picture`; replaces flat `fill`/`backgroundColor`/`backgroundGradient` (depends on #3, #7). Cascade comparable to #3.
+  - [x] tests: red
+  - [x] impl: green (`4b29e4b`, `e06ba43`, `a4dce68`)
 - [ ] **9. Text model — `TextBody` / `Paragraph` / `Run`** — `content: string | TextBody`; model-only, editor catches up Phase 5. Plan: 2–3 commits. Depends on #3.
   - [ ] tests: red
   - [ ] impl: green

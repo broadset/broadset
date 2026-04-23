@@ -1,3 +1,4 @@
+import { resolveContentAsPlainString } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -79,7 +80,7 @@ describe('appendPathPoint', () => {
     expect(updated?.content).toMatch(/^M/);
     expect(updated?.content).toMatch(/L/);
 
-    const numbers = (updated?.content ?? '').match(/-?\d+\.?\d*/g) ?? [];
+    const numbers = resolveContentAsPlainString(updated?.content ?? '').match(/-?\d+\.?\d*/g) ?? [];
 
     for (const value of numbers) {
       const decimals = value.split('.')[1];

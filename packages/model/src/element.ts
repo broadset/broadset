@@ -6,6 +6,7 @@ import { isLikelyUrlLikeContent, isTickerContent, isValidVisibleWhenExpression }
 import { type BroadsetElement, type ElementOverrides } from './element/style-types';
 import { refineExtensionsAgainstRegistry } from './extensions-types';
 import { createDefaultStyle, styleSchema } from './style';
+import { resolveContentAsPlainString, type TextBody, textBodySchema } from './text-body';
 
 export { isValidSvgPathData, sanitizeTextContent } from './element/content-types';
 export {
@@ -93,6 +94,21 @@ function containsScriptMarkers(content: string): boolean {
   return SCRIPT_TAG_RE.test(content) || HTML_EVENT_HANDLER_RE.test(content);
 }
 
+/**
+ * Normalizes element content for persisted output. Text elements run
+ * the plain-string form through `sanitizeTextContent`; {@link TextBody}
+ * payloads are kept verbatim (run-level sanitization happens at the
+ * renderer boundary and on import). Non-text elements pass through
+ * unchanged.
+ */
+function normalizeContent(type: string, content: string | TextBody): string | TextBody {
+  if (type === 'text' && typeof content === 'string') {
+    return sanitizeTextContent(content);
+  }
+
+  return content;
+}
+
 export const elementSchema: z.ZodType<BroadsetElement> = z
   .object({
     id: z.string().min(1),
@@ -106,7 +122,7 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
     width: z.number().positive(),
     height: z.number().positive(),
     rotation: z.number(),
-    content: z.string().default(''),
+    content: z.union([z.string(), textBodySchema]).default(''),
     style: z.record(z.string(), z.unknown()).optional(),
     parentId: z.string().nullable().optional(),
     groupId: z.string().nullable().optional(),
@@ -144,7 +160,9 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
       });
     }
 
-    if ((value.type === 'image' || value.type === 'video') && !isLikelyUrlLikeContent(value.content)) {
+    const contentString = resolveContentAsPlainString(value.content);
+
+    if ((value.type === 'image' || value.type === 'video') && !isLikelyUrlLikeContent(contentString)) {
       context.addIssue({
         code: 'custom',
         message: 'Image and video content must be a valid URL or path',
@@ -152,7 +170,7 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
       });
     }
 
-    if (value.type === 'path' && value.content !== '' && !isValidSvgPathData(value.content)) {
+    if (value.type === 'path' && contentString !== '' && !isValidSvgPathData(contentString)) {
       context.addIssue({
         code: 'custom',
         message: 'Invalid SVG path data',
@@ -160,7 +178,7 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
       });
     }
 
-    if (value.type === 'qrcode' && value.content.trim() === '') {
+    if (value.type === 'qrcode' && contentString.trim() === '') {
       context.addIssue({
         code: 'custom',
         message: 'QR code content must not be empty',
@@ -168,7 +186,7 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
       });
     }
 
-    if (value.type === 'ticker' && !isTickerContent(value.content)) {
+    if (value.type === 'ticker' && !isTickerContent(contentString)) {
       context.addIssue({
         code: 'custom',
         message: 'Ticker content must be a JSON array of strings',
@@ -176,7 +194,7 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
       });
     }
 
-    if (HTML_RENDERED_ELEMENT_TYPES.has(value.type) && containsScriptMarkers(value.content)) {
+    if (HTML_RENDERED_ELEMENT_TYPES.has(value.type) && containsScriptMarkers(contentString)) {
       context.addIssue({
         code: 'custom',
         message: 'content must not contain <script> tags or HTML event-handler attributes',
@@ -201,7 +219,7 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
       width: value.width,
       height: value.height,
       rotation: value.rotation,
-      content: value.type === 'text' ? sanitizeTextContent(value.content) : value.content,
+      content: normalizeContent(value.type, value.content),
       style: normalizedStyle.success ? normalizedStyle.data : createDefaultStyle(),
       parentId: value.parentId ?? null,
       groupId: value.groupId ?? null,

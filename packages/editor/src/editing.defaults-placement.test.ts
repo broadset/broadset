@@ -1,3 +1,4 @@
+import { resolveContentAsPlainString } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -124,7 +125,7 @@ describe('path drawing round-trip', () => {
 
     expect(element).toBeDefined();
 
-    const pathContent = element?.content ?? '';
+    const pathContent = resolveContentAsPlainString(element?.content ?? '');
     const pointExpression = /([ML])\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/g;
     const actualVertices: { readonly x: number; readonly y: number }[] = [];
 
@@ -192,7 +193,7 @@ describe('path drawing round-trip', () => {
 
     const element = getElements(store)[0];
     const pointExpression = /([ML])\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/g;
-    const matches = Array.from((element?.content ?? '').matchAll(pointExpression));
+    const matches = Array.from(resolveContentAsPlainString(element?.content ?? '').matchAll(pointExpression));
 
     expect(matches).toHaveLength(clicks.length);
 
@@ -258,7 +259,7 @@ describe('path drawing round-trip', () => {
     expect(instance).not.toBeNull();
 
     const pointExpression = /([ML])\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/g;
-    const matches = Array.from((element?.content ?? '').matchAll(pointExpression));
+    const matches = Array.from(resolveContentAsPlainString(element?.content ?? '').matchAll(pointExpression));
     const reconstructed = matches.map((match) => ({
       x: (instance?.x ?? 0) + Number.parseFloat(match[2] ?? '0'),
       y: (instance?.y ?? 0) + Number.parseFloat(match[3] ?? '0'),
@@ -328,7 +329,7 @@ describe('path drawing round-trip', () => {
 
     const element = store.getState().document.elements[0];
     const pointExpression = /([ML])\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/g;
-    const matches = Array.from((element?.content ?? '').matchAll(pointExpression));
+    const matches = Array.from(resolveContentAsPlainString(element?.content ?? '').matchAll(pointExpression));
 
     expect(matches).toHaveLength(3);
   });

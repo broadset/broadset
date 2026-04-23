@@ -13,6 +13,7 @@ import {
   migrateLegacyColor,
   type Page,
   type PageElementInstance,
+  resolveContentAsPlainString,
 } from '@broadset/model';
 import { temporal, type TemporalState } from 'zundo';
 import { createStore, type StoreApi } from 'zustand/vanilla';
@@ -387,7 +388,8 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
                 });
               })()
             : typeOrElement;
-          const entersPathDrawing = nextElement.type === 'path' && nextElement.content.trim() === '';
+          const entersPathDrawing =
+            nextElement.type === 'path' && resolveContentAsPlainString(nextElement.content).trim() === '';
 
           set((state) => ({
             document: {

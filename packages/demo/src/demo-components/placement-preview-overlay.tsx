@@ -1,4 +1,5 @@
 import type { EditorStore, PlacementState } from '@broadset/editor';
+import { resolveContentAsPlainString } from '@broadset/model';
 import { useMemo, useRef, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -38,7 +39,7 @@ function readPathLastVertex(
   if (element === undefined) return null;
 
   // Find the last M/L point in content, map to world coords using element position.
-  const matches = Array.from(element.content.matchAll(PATH_POINT_EXPRESSION));
+  const matches = Array.from(resolveContentAsPlainString(element.content).matchAll(PATH_POINT_EXPRESSION));
   const last = matches.at(-1);
 
   if (last === undefined) return null;

@@ -1,4 +1,10 @@
-import { type BroadsetElement, type Canvas, getSolidFillColor, resolveStyleColor } from '@broadset/model';
+import {
+  type BroadsetElement,
+  type Canvas,
+  getSolidFillColor,
+  resolveContentAsPlainString,
+  resolveStyleColor,
+} from '@broadset/model';
 
 import { RELATIONSHIP_TYPES } from './constants';
 import { buildSvgForElement, needsSvgFallback } from './svg-fallback';
@@ -130,7 +136,7 @@ function buildTextShapeXml(el: BroadsetElement, x: number, y: number, cx: number
     `    <a:bodyPr wrap="square"/>`,
     `    <a:p><a:r>`,
     `      <a:rPr lang="en-US" sz="${String(fontSize)}"${color ? ` dirty="0"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:rPr` : '/'}>`,
-    `      <a:t>${escapeXml(el.content)}</a:t>`,
+    `      <a:t>${escapeXml(resolveContentAsPlainString(el.content))}</a:t>`,
     `    </a:r></a:p>`,
     `  </p:txBody>`,
     `</p:sp>`,
@@ -233,11 +239,13 @@ function buildImagePicXml(
   rot: number,
   ctx: SlideContext,
 ): string {
-  if (!el.content) {
+  const contentText = resolveContentAsPlainString(el.content);
+
+  if (!contentText) {
     return buildRectShapeXml(el, x, y, cx, cy, rot);
   }
 
-  const decoded = decodeDataUriForPptx(el.content);
+  const decoded = decodeDataUriForPptx(contentText);
 
   if (!decoded) {
     return buildRectShapeXml(el, x, y, cx, cy, rot);
@@ -277,7 +285,9 @@ function buildSvgMediaPicXml(
   rot: number,
   ctx: SlideContext,
 ): string {
-  if (!el.content) {
+  const svgContentText = resolveContentAsPlainString(el.content);
+
+  if (!svgContentText) {
     return buildRectShapeXml(el, x, y, cx, cy, rot);
   }
 
@@ -285,7 +295,7 @@ function buildSvgMediaPicXml(
 
   ctx.nextMediaId++;
 
-  const relId = addMediaRelationship(ctx, RELATIONSHIP_TYPES.image, mediaName, el.content);
+  const relId = addMediaRelationship(ctx, RELATIONSHIP_TYPES.image, mediaName, svgContentText);
 
   return [
     `<p:pic>`,

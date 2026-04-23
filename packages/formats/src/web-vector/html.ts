@@ -5,6 +5,7 @@ import {
   colorToCss,
   getGradientFillGradient,
   getSolidFillColor,
+  resolveContentAsPlainString,
   resolveStyleColor,
   resolveStyleFillToSvgPaint,
   resolveStyleFilter,
@@ -157,7 +158,7 @@ function renderHtmlPath(el: BroadsetElement, dataAttr: string, containerStyle: s
   const stroke = resolveStyleColor(el.style.stroke, { resolveTheme: false }) ?? 'none';
   const strokeWidth = el.style.strokeWidth ?? 1;
 
-  return `<div ${dataAttr} style="${containerStyle}"><svg width="${String(el.width)}" height="${String(el.height)}" style="overflow:visible"><path d="${escapeXml(el.content)}" fill="${fill}" stroke="${stroke}" stroke-width="${String(strokeWidth)}"/></svg></div>`;
+  return `<div ${dataAttr} style="${containerStyle}"><svg width="${String(el.width)}" height="${String(el.height)}" style="overflow:visible"><path d="${escapeXml(resolveContentAsPlainString(el.content))}" fill="${fill}" stroke="${stroke}" stroke-width="${String(strokeWidth)}"/></svg></div>`;
 }
 
 function renderHtmlGroup(
@@ -274,14 +275,14 @@ function renderHtmlElement(el: BroadsetElement, allElements: readonly BroadsetEl
       const textStyle = buildTextInlineStyle(el);
       const fullStyle = textStyle ? `${style};${textStyle}` : style;
 
-      return `<div ${dataAttr} style="${fullStyle}">${escapeXml(el.content)}</div>`;
+      return `<div ${dataAttr} style="${fullStyle}">${escapeXml(resolveContentAsPlainString(el.content))}</div>`;
     }
 
     case 'image':
-      return `<div ${dataAttr} style="${style}"><img src="${escapeXml(el.content)}" style="width:100%;height:100%;object-fit:${el.style.objectFit ?? 'cover'}"/></div>`;
+      return `<div ${dataAttr} style="${style}"><img src="${escapeXml(resolveContentAsPlainString(el.content))}" style="width:100%;height:100%;object-fit:${el.style.objectFit ?? 'cover'}"/></div>`;
 
     case 'svg':
-      return `<div ${dataAttr} style="${style}">${el.content}</div>`;
+      return `<div ${dataAttr} style="${style}">${resolveContentAsPlainString(el.content)}</div>`;
 
     case 'path':
       return renderHtmlPath(el, dataAttr, style);
@@ -291,7 +292,7 @@ function renderHtmlElement(el: BroadsetElement, allElements: readonly BroadsetEl
       return `<div ${dataAttr} style="${style}${el.type === 'ellipse' ? ';border-radius:50%' : ''}"></div>`;
 
     case 'qrcode': {
-      const qrSvg = generateQrSvgFragment(el.content);
+      const qrSvg = generateQrSvgFragment(resolveContentAsPlainString(el.content));
 
       return qrSvg !== null ?
           `<div ${dataAttr} style="${style}">${qrSvg}</div>`

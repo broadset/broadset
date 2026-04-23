@@ -1,4 +1,5 @@
 import type { BroadsetElement } from './element/style-types';
+import { resolveContentAsPlainString } from './text-body';
 
 /**
  * Content-hash identity for `BroadsetElement`.
@@ -70,7 +71,7 @@ function canonicalizeElement(element: BroadsetElement): string {
     `w:${String(element.width)}`,
     `h:${String(element.height)}`,
     `r:${String(element.rotation)}`,
-    `c:${element.content}`,
+    `c:${resolveContentAsPlainString(element.content)}`,
     `s:${canonicalizeStyle(element.style)}`,
   ].join(';');
 }

@@ -1,5 +1,10 @@
 import type { BroadsetElement, BroadsetElementStyle } from '@broadset/model';
-import { resolveStyleColor, resolveStyleFillToSvgPaint, sanitizeTextContent } from '@broadset/model';
+import {
+  resolveContentAsPlainString,
+  resolveStyleColor,
+  resolveStyleFillToSvgPaint,
+  sanitizeTextContent,
+} from '@broadset/model';
 import { FillRule, pathBoolean, PathBooleanOperation, pathFromPathData, pathToPathData } from 'path-bool';
 import qrcode from 'qrcode-generator';
 
@@ -125,7 +130,9 @@ export function computeBooleanPath(children: readonly BroadsetElement[], operati
   }
 
   const pathChildren = children.filter((child) => child.type === 'path');
-  const pathDataEntries = pathChildren.map((child) => child.content.trim()).filter((d) => d.length > 0);
+  const pathDataEntries = pathChildren
+    .map((child) => resolveContentAsPlainString(child.content).trim())
+    .filter((d) => d.length > 0);
 
   if (pathDataEntries.length < 2) {
     return null;
@@ -215,7 +222,7 @@ export function createQrCodeMarkup(payload: string): string | null {
 // ---------------------------------------------------------------------------
 
 const createTextRenderer = createSimpleRenderer((host, element) => {
-  renderPerCharacterSpans(host, element.content);
+  renderPerCharacterSpans(host, resolveContentAsPlainString(element.content));
   // Flex-wrap + matching alignContent lets the per-character spans flow onto
   // multiple lines when they exceed the element width while keeping horizontal
   // (justifyContent) and vertical (alignItems single-line / alignContent
@@ -317,9 +324,9 @@ const createShapeRenderer = createSimpleRenderer((host, element) => {
 function renderMediaPlaceholder(host: HTMLElement, element: BroadsetElement, kind: 'image' | 'video'): void {
   const placeholder = document.createElement('div');
   const label = kind === 'image' ? 'Image' : 'Video';
+  const contentText = resolveContentAsPlainString(element.content);
 
-  placeholder.textContent =
-    element.content.trim() === '' ? `${label} unavailable` : `${label} unavailable: ${element.name}`;
+  placeholder.textContent = contentText.trim() === '' ? `${label} unavailable` : `${label} unavailable: ${element.name}`;
   placeholder.setAttribute('aria-label', `${element.name} placeholder`);
   placeholder.style.width = '100%';
   placeholder.style.height = '100%';
@@ -338,7 +345,9 @@ function renderMediaPlaceholder(host: HTMLElement, element: BroadsetElement, kin
 }
 
 const createImageRenderer = createSimpleRenderer((host, element) => {
-  if (element.content.trim() === '') {
+  const contentText = resolveContentAsPlainString(element.content);
+
+  if (contentText.trim() === '') {
     renderMediaPlaceholder(host, element, 'image');
 
     return;
@@ -369,19 +378,19 @@ const createImageRenderer = createSimpleRenderer((host, element) => {
     const fallbackImage = document.createElement('img');
 
     applyStyle(fallbackImage);
-    fallbackImage.src = element.content;
+    fallbackImage.src = contentText;
     fallbackImage.addEventListener('error', () => {
       renderMediaPlaceholder(host, element, 'image');
     });
     host.replaceChildren(fallbackImage);
   });
 
-  corsImage.src = element.content;
+  corsImage.src = contentText;
   host.replaceChildren(corsImage);
 });
 
 const createSvgRenderer = createSimpleRenderer((host, element) => {
-  const sanitizedRoot = renderSanitizedSvgInto(host, element.content);
+  const sanitizedRoot = renderSanitizedSvgInto(host, resolveContentAsPlainString(element.content));
 
   if (sanitizedRoot === null) {
     return;
@@ -400,7 +409,7 @@ const createPathRenderer = createSimpleRenderer((host, element) => {
   svg.setAttribute('viewBox', `0 0 ${String(Math.max(element.width, 1))} ${String(Math.max(element.height, 1))}`);
   svg.setAttribute('width', '100%');
   svg.setAttribute('height', '100%');
-  path.setAttribute('d', element.content);
+  path.setAttribute('d', resolveContentAsPlainString(element.content));
   path.setAttribute('vector-effect', 'non-scaling-stroke');
   path.setAttribute('stroke', resolveStyleColor(element.style.stroke, { resolveTheme: false }) ?? '#f8fafc');
   path.setAttribute('stroke-width', String(element.style.strokeWidth ?? 2));
@@ -449,7 +458,7 @@ const createPathRenderer = createSimpleRenderer((host, element) => {
 });
 
 const createQrCodeRenderer = createSimpleRenderer((host, element) => {
-  const svgMarkup = createQrCodeMarkup(element.content);
+  const svgMarkup = createQrCodeMarkup(resolveContentAsPlainString(element.content));
 
   host.innerHTML = svgMarkup ?? '';
 
@@ -465,7 +474,9 @@ const createQrCodeRenderer = createSimpleRenderer((host, element) => {
 });
 
 const createVideoRenderer = createSimpleRenderer((host, element) => {
-  if (element.content.trim() === '') {
+  const contentText = resolveContentAsPlainString(element.content);
+
+  if (contentText.trim() === '') {
     renderMediaPlaceholder(host, element, 'video');
 
     return;
@@ -474,7 +485,7 @@ const createVideoRenderer = createSimpleRenderer((host, element) => {
   const video = document.createElement('video');
   const typeConfig = element.typeConfig;
 
-  video.src = element.content;
+  video.src = contentText;
   video.muted = typeConfig !== null && 'muted' in typeConfig ? Boolean(typeConfig.muted) : true;
   video.loop = typeConfig !== null && 'loop' in typeConfig ? Boolean(typeConfig.loop) : true;
   video.autoplay = typeConfig !== null && 'autoplay' in typeConfig ? Boolean(typeConfig.autoplay) : false;
@@ -489,14 +500,16 @@ const createVideoRenderer = createSimpleRenderer((host, element) => {
 });
 
 const createClockRenderer = createSimpleRenderer((host, element) => {
-  host.textContent = element.content === '' ? '00:00:00' : element.content;
+  const contentText = resolveContentAsPlainString(element.content);
+
+  host.textContent = contentText === '' ? '00:00:00' : contentText;
   host.style.display = 'flex';
   host.style.alignItems = 'center';
   host.style.justifyContent = mapTextAlignment(element.style.textAlignment);
 });
 
 const createTickerRenderer = createSimpleRenderer((host, element) => {
-  host.textContent = formatTickerText(element.content);
+  host.textContent = formatTickerText(resolveContentAsPlainString(element.content));
   host.style.display = 'flex';
   host.style.alignItems = 'center';
   host.style.justifyContent = 'flex-start';

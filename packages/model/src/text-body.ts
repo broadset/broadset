@@ -264,6 +264,29 @@ export function textBodyFromPlainString(content: string): TextBody {
   return textBody(content.split('\n').map((line) => paragraph([run(line)])));
 }
 
+/**
+ * Flattens a structured {@link TextBody} to its plain-text projection.
+ * Paragraphs join with `\n`; runs within a paragraph concatenate without
+ * separators so Unicode-aware character measurement paths (PDF text
+ * wrapping, HTML fallback, accessibility descriptions) see the same
+ * contiguous string the author typed. The converse of
+ * {@link textBodyFromPlainString}.
+ */
+export function textBodyToPlainString(body: TextBody): string {
+  return body.paragraphs.map((p) => p.runs.map((r) => r.text).join('')).join('\n');
+}
+
+/**
+ * Resolves the unit #9b `string | TextBody` content union into a plain
+ * string for consumers that only need the flat text (validators,
+ * measurement, PDF drawText, placeholder fallback). Exists so no
+ * consumer scatters `typeof` dispatch across the codebase; one site is
+ * the authoritative flattener.
+ */
+export function resolveContentAsPlainString(content: string | TextBody): string {
+  return typeof content === 'string' ? content : textBodyToPlainString(content);
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Type guards
 // ────────────────────────────────────────────────────────────────────────────

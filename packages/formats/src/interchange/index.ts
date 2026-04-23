@@ -3,6 +3,7 @@ import {
   type BroadsetElement,
   type BroadsetProject,
   getSolidFillColor,
+  resolveContentAsPlainString,
   resolveStyleColor,
 } from '@broadset/model';
 import type { VideoEncodingConfig } from 'mediabunny';
@@ -286,20 +287,22 @@ function buildElementStyle(element: BroadsetElement): string {
 function buildOGrafRuntime(element: BroadsetElement): string {
   const style = buildElementStyle(element);
 
+  const contentText = resolveContentAsPlainString(element.content);
+
   switch (element.type) {
     case 'qrcode': {
-      const svg = generateQrSvgFragment(element.content);
+      const svg = generateQrSvgFragment(contentText);
 
       return svg !== null ? `<div style="${style}">${svg}</div>` : '';
     }
 
     case 'svg':
-      return `<div style="${style}">${element.content}</div>`;
+      return `<div style="${style}">${contentText}</div>`;
     case 'image':
     case 'video':
       return `<div data-element-id="${element.id}" data-type="${element.type}" data-asset="true" style="${style}"></div>`;
     default:
-      return `<div data-element-id="${element.id}" data-type="${element.type}" style="${style}">${element.content}</div>`;
+      return `<div data-element-id="${element.id}" data-type="${element.type}" style="${style}">${contentText}</div>`;
   }
 }
 
@@ -310,9 +313,10 @@ function buildOGrafSchema(element: BroadsetElement): OGrafSchema {
   // Text content binding
   if (element.type === 'text') {
     const key = `${element.id}-content`;
+    const contentText = resolveContentAsPlainString(element.content);
 
-    defaults[key] = element.content;
-    inputs.push({ name: key, type: 'text', defaultValue: element.content });
+    defaults[key] = contentText;
+    inputs.push({ name: key, type: 'text', defaultValue: contentText });
   }
 
   // Data binding field

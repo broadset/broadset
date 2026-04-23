@@ -1,6 +1,13 @@
 /** @vitest-environment jsdom */
 
-import { createDefaultStyle, gradientFill, noneFill, rgbColor, solidFill } from '@broadset/model';
+import {
+  createDefaultStyle,
+  gradientFill,
+  noneFill,
+  resolveContentAsPlainString,
+  rgbColor,
+  solidFill,
+} from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -525,12 +532,12 @@ describe('renderer core', () => {
     const plugin: RendererPlugin = {
       type: 'custom',
       rendererFactory: ({ element, host: rendererHost }) => {
-        rendererHost.textContent = element.content;
+        rendererHost.textContent = resolveContentAsPlainString(element.content);
 
         return {
           update(nextElement) {
             updateCounts.set(nextElement.id, (updateCounts.get(nextElement.id) ?? 0) + 1);
-            rendererHost.textContent = nextElement.content;
+            rendererHost.textContent = resolveContentAsPlainString(nextElement.content);
           },
           destroy() {
             rendererHost.textContent = '';
@@ -575,11 +582,11 @@ describe('renderer core', () => {
       type: 'custom',
       rendererFactory: ({ element, host: rendererHost }) => {
         mountCounts.set(element.id, (mountCounts.get(element.id) ?? 0) + 1);
-        rendererHost.textContent = element.content;
+        rendererHost.textContent = resolveContentAsPlainString(element.content);
 
         return {
           update(nextElement) {
-            rendererHost.textContent = nextElement.content;
+            rendererHost.textContent = resolveContentAsPlainString(nextElement.content);
           },
           destroy() {
             rendererHost.textContent = '';

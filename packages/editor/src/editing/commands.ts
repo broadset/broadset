@@ -5,6 +5,7 @@ import {
   type EditorConfig,
   editorConfigSchema,
   type PageElementInstance,
+  resolveContentAsPlainString,
 } from '@broadset/model';
 
 import { getElementDefaults, type PluginDefaults } from '../element-defaults';
@@ -364,12 +365,14 @@ export function closeAndStopPathDrawing(store: EditorStore): void {
   if (drawingElementId !== null) {
     const element = state.document.elements.find((candidate) => candidate.id === drawingElementId);
 
-    if (element !== undefined && element.content.length > 0) {
+    if (element !== undefined && resolveContentAsPlainString(element.content).length > 0) {
       store.setState({
         document: {
           ...state.document,
           elements: state.document.elements.map((candidate) =>
-            candidate.id === drawingElementId ? { ...candidate, content: `${candidate.content} Z` } : candidate,
+            candidate.id === drawingElementId
+              ? { ...candidate, content: `${resolveContentAsPlainString(candidate.content)} Z` }
+              : candidate,
           ),
         },
       });
@@ -400,7 +403,8 @@ export function appendPathPoint(store: EditorStore, canvasX: number, canvasY: nu
   const strokeWidth = element.style.strokeWidth ?? 1;
   const padding = strokeWidth / 2;
   const pointExpression = /([ML])\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/g;
-  const existingPoints = Array.from(element.content.matchAll(pointExpression), (match) => ({
+  const contentText = resolveContentAsPlainString(element.content);
+  const existingPoints = Array.from(contentText.matchAll(pointExpression), (match) => ({
     x: element.position.x + Number.parseFloat(match[2] ?? '0'),
     y: element.position.y + Number.parseFloat(match[3] ?? '0'),
   }));

@@ -1,4 +1,5 @@
 import type { BroadsetElementStyle, BroadsetElementStyleInput } from '../style';
+import type { TextBody } from '../text-body';
 
 export const BUILT_IN_ELEMENT_TYPES = [
   'text',
@@ -81,7 +82,14 @@ export interface BroadsetElement {
   readonly width: number;
   readonly height: number;
   readonly rotation: number;
-  readonly content: string;
+  /**
+   * Element body content. Plain strings dominate simple text, image URLs,
+   * SVG paths, QR payloads, etc. Text elements may carry a structured
+   * {@link TextBody} for mixed-run / multi-paragraph content per Phase 1
+   * unit #9. Consumers that need a flat text view call
+   * `resolveContentAsPlainString` to flatten either shape.
+   */
+  readonly content: string | TextBody;
   readonly style: BroadsetElementStyle;
   readonly parentId: string | null;
   readonly groupId: string | null;

@@ -5,6 +5,7 @@ import {
   type BroadsetGradient,
   colorToCss,
   getGradientFillGradient,
+  resolveContentAsPlainString,
   resolveStyleColor,
   resolveStyleFillToSvgPaint,
 } from '@broadset/model';
@@ -209,7 +210,7 @@ function buildTextAttrs(style: BroadsetElementStyle): string {
 }
 
 function renderSvgPayload(el: BroadsetElement, transform: string): string {
-  const content = el.content;
+  const content = resolveContentAsPlainString(el.content);
 
   if (!content) {
     return `<g id="${escapeXml(el.id)}"${transform}/>`;
@@ -261,7 +262,7 @@ function renderElement(el: BroadsetElement, defs: string[]): string {
 
   switch (el.type) {
     case 'path':
-      return `<path id="${escapeXml(el.id)}" d="${escapeXml(el.content)}"${styleAttrs}${fillOverride}${transform}${extras}/>`;
+      return `<path id="${escapeXml(el.id)}" d="${escapeXml(resolveContentAsPlainString(el.content))}"${styleAttrs}${fillOverride}${transform}${extras}/>`;
 
     case 'rectangle':
       return `<rect id="${escapeXml(el.id)}" width="${String(el.width)}" height="${String(el.height)}"${styleAttrs}${fillOverride}${transform}${extras}/>`;
@@ -270,19 +271,19 @@ function renderElement(el: BroadsetElement, defs: string[]): string {
       return `<ellipse id="${escapeXml(el.id)}" cx="${String(el.width / 2)}" cy="${String(el.height / 2)}" rx="${String(el.width / 2)}" ry="${String(el.height / 2)}"${styleAttrs}${fillOverride}${transform}${extras}/>`;
 
     case 'text':
-      return `<text id="${escapeXml(el.id)}"${buildTextAttrs(el.style)}${transform}${extras}>${escapeXml(el.content)}</text>`;
+      return `<text id="${escapeXml(el.id)}"${buildTextAttrs(el.style)}${transform}${extras}>${escapeXml(resolveContentAsPlainString(el.content))}</text>`;
 
     case 'image': {
       const par = objectFitToPreserveAspectRatio(el.style.objectFit);
 
-      return `<image id="${escapeXml(el.id)}" href="${escapeXml(el.content)}" width="${String(el.width)}" height="${String(el.height)}" preserveAspectRatio="${par}"${transform}${extras}/>`;
+      return `<image id="${escapeXml(el.id)}" href="${escapeXml(resolveContentAsPlainString(el.content))}" width="${String(el.width)}" height="${String(el.height)}" preserveAspectRatio="${par}"${transform}${extras}/>`;
     }
 
     case 'svg':
       return renderSvgPayload(el, transform + styleAttrs + extras);
 
     case 'qrcode': {
-      const qrSvg = generateQrSvgFragment(el.content);
+      const qrSvg = generateQrSvgFragment(resolveContentAsPlainString(el.content));
 
       if (qrSvg === null) {
         return `<g id="${escapeXml(el.id)}"${transform}/>`;

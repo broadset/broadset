@@ -1,4 +1,10 @@
-import { type BroadsetElement, getSolidFillColor, resolveStyleColor, resolveStyleFilter } from '@broadset/model';
+import {
+  type BroadsetElement,
+  getSolidFillColor,
+  resolveContentAsPlainString,
+  resolveStyleColor,
+  resolveStyleFilter,
+} from '@broadset/model';
 import type { Layer } from 'ag-psd';
 
 import { parseHexColor } from './color-utils';
@@ -163,15 +169,17 @@ function applyTextContent(layer: Layer, el: BroadsetElement): void {
   const color = fontColorCss ? parseHexColor(fontColorCss) : undefined;
 
   layer.text = {
-    text: el.content,
+    text: resolveContentAsPlainString(el.content),
     style: color ? { fontSize, fillColor: color } : { fontSize },
   };
 }
 
 function applyImageContent(layer: Layer, el: BroadsetElement): void {
-  if (!el.content) return;
+  const contentText = resolveContentAsPlainString(el.content);
 
-  const decoded = decodeDataUri(el.content);
+  if (!contentText) return;
+
+  const decoded = decodeDataUri(contentText);
   const urlContent = exportState.prefetchedUrlImages.get(el.id);
   const imageBytes = decoded ?? urlContent;
 
@@ -213,9 +221,11 @@ function applyImageContent(layer: Layer, el: BroadsetElement): void {
 }
 
 function applyPathContent(layer: Layer, el: BroadsetElement): void {
-  if (!el.content) return;
+  const contentText = resolveContentAsPlainString(el.content);
 
-  const pathMask = svgPathToPsdVectorMask(el.content, el.width, el.height);
+  if (!contentText) return;
+
+  const pathMask = svgPathToPsdVectorMask(contentText, el.width, el.height);
 
   if (!pathMask) return;
 

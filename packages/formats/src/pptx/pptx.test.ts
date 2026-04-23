@@ -4,6 +4,7 @@ import {
   type BroadsetElementStyle,
   type BroadsetElementStyleInput,
   type Canvas,
+  resolveContentAsPlainString,
   rgbColor,
   styleSchema,
 } from '@broadset/model';
@@ -536,7 +537,7 @@ describe('PPTX Embedded Image Import', () => {
 
     expect(imageElements.length).toBeGreaterThanOrEqual(1);
 
-    const pngImage = imageElements.find((el) => el.content.includes('data:image/'));
+    const pngImage = imageElements.find((el) => resolveContentAsPlainString(el.content).includes('data:image/'));
 
     expect(pngImage).toBeDefined();
   });

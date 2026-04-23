@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
+import { resolveContentAsPlainString } from '@broadset/model';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -105,9 +106,10 @@ describe('Path tool: drawing interaction', () => {
     fireEvent.click(preview, { clientX: 30, clientY: 70 });
 
     const newPath = findNewPath(latestDocument(updateDocument), existingPathIds);
-    const commandMatches = newPath.content.match(/[MLZ]/g) ?? [];
+    const newPathContent = resolveContentAsPlainString(newPath.content);
+    const commandMatches = newPathContent.match(/[MLZ]/g) ?? [];
 
-    expect(newPath.content).toMatch(/^M/);
+    expect(newPathContent).toMatch(/^M/);
     expect(commandMatches.filter((c) => c === 'L').length).toBeGreaterThanOrEqual(1);
   });
 
@@ -129,7 +131,7 @@ describe('Path tool: drawing interaction', () => {
 
     const newPath = findNewPath(latestDocument(updateDocument), existingPathIds);
 
-    expect(newPath.content.trim().endsWith('Z')).toBe(true);
+    expect(resolveContentAsPlainString(newPath.content).trim().endsWith('Z')).toBe(true);
   });
 
   /** @description Escape while path drawing is active commits the current points without closing and exits drawing mode. */
@@ -148,8 +150,9 @@ describe('Path tool: drawing interaction', () => {
     });
 
     const newPath = findNewPath(latestDocument(updateDocument), existingPathIds);
+    const newPathContent = resolveContentAsPlainString(newPath.content);
 
-    expect(newPath.content.includes('Z')).toBe(false);
-    expect((newPath.content.match(/[ML]/g) ?? []).length).toBeGreaterThanOrEqual(1);
+    expect(newPathContent.includes('Z')).toBe(false);
+    expect((newPathContent.match(/[ML]/g) ?? []).length).toBeGreaterThanOrEqual(1);
   });
 });

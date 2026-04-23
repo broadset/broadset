@@ -6,7 +6,7 @@ import type {
   BroadsetGradient,
   Canvas,
 } from '@broadset/model';
-import { colorToCss, getGradientFillGradient, getSolidFillColor } from '@broadset/model';
+import { colorToCss, getGradientFillGradient, getSolidFillColor, resolveContentAsPlainString } from '@broadset/model';
 import { type EmbeddedFont, PDF, type PDFPage, rgb, type Standard14FontName, StandardFonts } from '@libpdf/core';
 
 import { parseCssColor } from './color';
@@ -390,7 +390,7 @@ function renderText(
     return font.widthOfTextAtSize(text, size);
   };
 
-  const lines = wrapText(el.content, maxWidthPt, measure);
+  const lines = wrapText(resolveContentAsPlainString(el.content), maxWidthPt, measure);
   const alignment = el.style.textAlignment ?? 'left';
 
   for (let i = 0; i < lines.length; i++) {
@@ -469,7 +469,7 @@ function renderPath(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt
   const fillColor = resolveFillAsPdfRgb(el.style) ?? rgb(0, 0, 0);
   const strokeColor = resolveStyleColor(el.style, 'stroke');
 
-  page.drawSvgPath(el.content, {
+  page.drawSvgPath(resolveContentAsPlainString(el.content), {
     x: xPt,
     y: yPt,
     color: fillColor,
@@ -516,8 +516,9 @@ async function renderImage(
   const hPt = elementToPoints(canvas, el.height);
   const opacity = resolveOpacity(el.style);
 
-  const decoded = el.content.startsWith('data:') ? decodeDataUri(el.content) : undefined;
-  const fetched = decoded === undefined ? await fetchImageBytes(el.content, fetchFn) : undefined;
+  const contentText = resolveContentAsPlainString(el.content);
+  const decoded = contentText.startsWith('data:') ? decodeDataUri(contentText) : undefined;
+  const fetched = decoded === undefined ? await fetchImageBytes(contentText, fetchFn) : undefined;
 
   if (decoded === undefined && fetched === undefined) {
     drawImagePlaceholder(page, xPt, yPt, wPt, hPt, opacity);
@@ -557,8 +558,10 @@ async function renderImage(
 }
 
 function labelForNonStaticElement(el: BroadsetElement): string {
-  if (el.type === 'clock') return el.content || '00:00';
-  if (el.type === 'ticker') return el.content || 'Ticker';
+  const contentText = resolveContentAsPlainString(el.content);
+
+  if (el.type === 'clock') return contentText || '00:00';
+  if (el.type === 'ticker') return contentText || 'Ticker';
 
   return 'Video';
 }
@@ -586,7 +589,7 @@ function renderQrCode(page: PDFPage, el: BroadsetElement, canvas: Canvas, height
   const wPt = elementToPoints(canvas, el.width);
   const hPt = elementToPoints(canvas, el.height);
 
-  drawQrOnPage(page, el.content, xPt, yPt, wPt, hPt);
+  drawQrOnPage(page, resolveContentAsPlainString(el.content), xPt, yPt, wPt, hPt);
 }
 
 async function renderElement(

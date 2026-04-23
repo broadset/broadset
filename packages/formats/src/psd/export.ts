@@ -1,4 +1,5 @@
 import type { BroadsetDocument, Canvas } from '@broadset/model';
+import { resolveContentAsPlainString } from '@broadset/model';
 import type { Psd } from 'ag-psd';
 import { writePsdUint8Array } from 'ag-psd';
 
@@ -125,7 +126,11 @@ function exportPsdBytesCore(doc: BroadsetDocument): Uint8Array {
 export function exportPsdBytes(doc: BroadsetDocument, options?: ExportPsdSyncOptions): Uint8Array {
   const prefetched = new Map(options?.prefetchedUrlImages ?? []);
   const missingUrlElementNames = doc.elements
-    .filter((el) => el.type === 'image' && el.content && isUrl(el.content) && !prefetched.has(el.id))
+    .filter((el) => {
+      const text = resolveContentAsPlainString(el.content);
+
+      return el.type === 'image' && text !== '' && isUrl(text) && !prefetched.has(el.id);
+    })
     .map((el) => el.name || el.id);
 
   if (missingUrlElementNames.length > 0) {
@@ -149,11 +154,15 @@ export async function exportPsdBytesAsync(
   fetchFn: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<Uint8Array> {
   const prefetched = new Map<string, { readonly mime: string; readonly bytes: Uint8Array }>();
-  const urlElements = doc.elements.filter((el) => el.type === 'image' && el.content && isUrl(el.content));
+  const urlElements = doc.elements.filter((el) => {
+    const text = resolveContentAsPlainString(el.content);
+
+    return el.type === 'image' && text !== '' && isUrl(text);
+  });
 
   const fetchResults = await Promise.all(
     urlElements.map(async (el) => {
-      const result = await fetchImageAsBytes(el.content, fetchFn);
+      const result = await fetchImageAsBytes(resolveContentAsPlainString(el.content), fetchFn);
 
       return { id: el.id, result };
     }),

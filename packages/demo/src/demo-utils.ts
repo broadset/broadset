@@ -7,6 +7,7 @@ import {
   getGradientFillGradient,
   getSolidFillColor,
   type PageElementInstance,
+  resolveContentAsPlainString,
   resolveStyleColor,
   resolveStyleFilter,
 } from '@broadset/model';
@@ -173,7 +174,7 @@ export function buildRenderableDocumentForActivePage(
   return {
     ...document,
     elements: pageElements.map((element) => {
-      if (element.type !== 'image' || element.content.trim() !== '') {
+      if (element.type !== 'image' || resolveContentAsPlainString(element.content).trim() !== '') {
         return element;
       }
 
@@ -590,7 +591,7 @@ export function toPanelElement(element: BroadsetElement, instance?: PageElementI
     id: element.id,
     type: element.type,
     name: element.name,
-    content: element.content,
+    content: resolveContentAsPlainString(element.content),
     assetId: element.assetId,
     x: instance !== undefined ? instance.transform.position.x : element.position.x,
     y: instance !== undefined ? instance.transform.position.y : element.position.y,
