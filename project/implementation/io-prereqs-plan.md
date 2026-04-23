@@ -659,7 +659,7 @@ All shared modules under `packages/formats/src/_shared/<name>/` with Vitest unit
 - [x] ICC profile preservation on image assets (`ImageAsset.iccProfileAssetId?` optional reference to an `icc-profile` asset, shared naming with `document.outputIntent.iccProfileAssetId`)
 - [x] `icc-profile` asset type (referenced by `document.outputIntent`, image-asset `iccProfile`) — `IccProfileAsset` variant with `colorSpace` + optional description/identifier
 - [x] Subsetting pipeline (`_shared/fonts/subset.ts` — `subsetFont(bytes, codepoints)`) — byte-first signature; fontkit-backed; codicon fixture under `__fixtures__/`
-- [ ] Font embed-permission surface (`fontkit` `OS/2.fsType` → asset panel + preflight)
+- [x] Font embed-permission surface (`fontkit` `OS/2.fsType` → asset panel + preflight) — `_shared/fonts/embed-policy.ts` `resolveEmbedDecision(permission)` returns `{ action, permission, warning?, reason? }`
 - [ ] Asset deduplication on import via `registerAssetByContentHash`
 
 ### Phase 5 — Editor UI surface

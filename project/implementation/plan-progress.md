@@ -83,7 +83,7 @@ Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md
 - [x] P4.3 ICC profile preservation on image assets (`ImageAsset.iccProfileAssetId?` matches `document.outputIntent.iccProfileAssetId`)
 - [x] P4.4 `icc-profile` asset type (`IccProfileAsset` variant on `Asset` union; `colorSpace` ∈ `{rgb, cmyk, gray, lab}`; optional description/identifier)
 - [x] P4.5 Shared font subsetting pipeline (`_shared/fonts/subset.ts` → `subsetFont(bytes, codepoints)` via fontkit; codicon TTF fixture)
-- [ ] P4.6 Font embed-permission surface
+- [x] P4.6 Font embed-permission surface (`_shared/fonts/embed-policy.ts` → `resolveEmbedDecision(permission)` — refuse restricted, warn preview-print)
 - [ ] P4.7 Content-hash asset deduplication on import
 
 ## Interleaved shared tasks
