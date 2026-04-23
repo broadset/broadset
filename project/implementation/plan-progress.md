@@ -33,7 +33,7 @@ Source of truth: [io-prereqs-plan.md](./io-prereqs-plan.md)
 
 - [x] P1.1 Unit utilities plus `parseLength`
 - [x] P1.2 Importer security contract spec update
-- [ ] P1.3 `BroadsetColor` discriminated union and migration path (3a types done `c79baa1`, 3b migrator done `20c2c6e`; 3c consumer migration pending)
+- [x] P1.3 `BroadsetColor` discriminated union and migration path (3a types `c79baa1`, 3b migrator `20c2c6e`, 3c consumer migration `c4b942e`)
 - [x] P1.4 Content-hash identity field
 - [x] P1.5 Stroke enhancements
 - [ ] P1.6 Structured filter primitives (`FilterStack`) (6a types + resolver done `aef2537`; 6b field flip + renderer pending)

@@ -586,9 +586,9 @@ Landing order from §"Phase 1 internal landing order" above.
 - [x] **2. Importer security contract spec** — `project/spec/formats/spec.md` floor (entity hardening, size/depth/entry caps, cycle caps, no execution surface, warnings-not-exceptions, worker sandboxing, `security-reviewer` before merge)
   - [x] tests: red — spec-only, no tests
   - [x] impl: green (`9b0376c`)
-- [ ] **3. `BroadsetColor` discriminated union** — `{ kind: 'rgb'; hex; space?; originalColor? } | { kind: 'theme'; slot; mods? }`. Cascade: migrator + renderer → editor → formats → ui → demo consumers. Plan: 3–4 commits.
-  - [ ] tests: red
-  - [ ] impl: green
+- [x] **3. `BroadsetColor` discriminated union** — `{ kind: 'rgb'; hex; space?; originalColor? } | { kind: 'theme'; slot; mods? }`. Cascade: types (3a) + migrator (3b) + consumer cascade (3c).
+  - [x] tests: red
+  - [x] impl: green (`c79baa1`, `20c2c6e`, `c4b942e`)
 - [x] **4. Content-hash identity** — `element.contentHash` derived field (body in `_shared/fingerprint/` lands Phase 2)
   - [x] tests: red
   - [x] impl: green (`72d23a6`)
