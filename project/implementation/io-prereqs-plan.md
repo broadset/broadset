@@ -641,7 +641,7 @@ All shared modules under `packages/formats/src/_shared/<name>/` with Vitest unit
 - [x] **`_shared/reconcile/`** — `microdiff`; `reconcile({ preservedMetadata, currentVisual, fingerprintsByElementId })` (`e44618f`)
 - [x] **`_shared/shape-classifier/`** — `classifyPath(d, styleHints)` with rectangle/ellipse/path heuristics (`ac8bf9f`)
 - [x] **`_shared/sanitize/`** — `dompurify` with Broadset policy; `sanitizeSvg` (`68572b9`)
-- [ ] **Bundle-size assertion test** — ensure Latin-only sRGB users never download `lcms-wasm` or `harfbuzzjs`
+- [x] **Bundle-size assertion test** — ensure Latin-only sRGB users never download `lcms-wasm` or `harfbuzzjs` (`0bb2435`)
 
 ### Phase 3 — Renderer refactor
 
