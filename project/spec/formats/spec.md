@@ -192,6 +192,53 @@ Every change to an importer MUST go through the `security-reviewer` agent before
 
 ---
 
+### Requirement: Format Round-Trip Metadata — XMP + Per-Element Tag + Hash Fallback
+
+Every layer-or-container format (PSD, PDF, PPTX, SVG) that Broadset round-trips MUST persist Broadset-native state inside the format file using a three-layer pattern so round-trip survives external edits, external-tool normalization, and aggressive tag strippers uniformly. No sidecar files and no app-private streams outside the format's documented extension mechanism (IO-D-17). No silent drops (IO-D-18).
+
+1. **Document XMP (ISO 16684-1) under a shared `broadset:` namespace** (IO-D-08). Every supporting format carries the document-level state (project settings, canvas, asset registry, data schema, page definitions + override maps, animations where preserveable, Dublin Core metadata from `document.metadata`) in a single XMP packet using the same namespace URI across formats. Read via `_shared/xmp/readBroadsetXmp()`; write via `_shared/xmp/writeBroadsetXmp()`.
+2. **Per-element tag under a format-native extension mechanism.** Each Broadset element's format-native carrier (PSD layer, PPTX shape, PDF marked-content range, SVG element) carries a tag containing the element's stable `id`, its `extensions.<format>.dirty` flag, data bindings, animation references, and the original-source blob for any feature the importer recognized but cannot represent natively. The tag carrier MUST be a mechanism the canonical external tool preserves across save (PSD `additionalInfo` under the `BsPs` 4-byte signature, PPTX custom `<ext>` elements, PDF marked-content custom properties, SVG `data-bs-*` attributes).
+3. **Content-hash fallback when tags are stripped.** When an external tool strips or rewrites the per-element tag (aggressive flatten, rasterize, "Export As" rebuild), the reconciliation pipeline recovers element identity by matching the fingerprint produced by `_shared/fingerprint/fingerprintElement()` against the preserved metadata. Elements that cannot be matched either way become new elements on re-import; elements present in the preserved metadata but missing from the stream surface as deletions that the user confirms.
+
+#### Scenario: Round-trip from Broadset through an external tool and back
+
+- GIVEN a Broadset project exported in a round-trippable format
+- AND the file is opened in the canonical external tool (Photoshop, PowerPoint, browser, Illustrator), saved, and re-imported
+- WHEN the format's reconciliation pipeline runs
+- THEN Broadset-native state (animations, data bindings, override maps) is hydrated from XMP
+- AND per-element identity survives via the per-element tag
+- AND when a tag is stripped, content-hash matching recovers identity
+
+#### Scenario: Dirty-flag discipline on re-export
+
+- GIVEN an element imported from a format file with `extensions.<format>.dirty === false`
+- AND the user has not touched the element in Broadset
+- WHEN the document is re-exported
+- THEN the original format-native blob is emitted byte-for-byte (no re-synthesis from current Broadset state)
+
+- GIVEN an element the user has edited in Broadset (dirty flag flipped to `true`)
+- WHEN the document is re-exported
+- THEN the element is re-synthesized from current Broadset state (the preserved blob is discarded)
+
+#### Scenario: No sidecar files
+
+- GIVEN any format exporter
+- WHEN the export produces output
+- THEN the output is a single file of the target format — no companion JSON, no ZIP of the file plus a metadata payload, no hidden filesystem artifact
+
+#### Acceptance Criteria
+
+- [ ] Every round-trippable format exporter writes a `broadset:` XMP packet using the shared namespace URI
+- [ ] Every round-trippable format exporter attaches a per-element tag carrying `id`, `dirty`, and preservation blob
+- [ ] Every round-trippable format importer prefers the per-element tag when present and falls back to `fingerprintElement()` when the tag is absent
+- [ ] Every round-trippable format importer hydrates document-level state (project settings, canvas, animations, page override maps, `document.metadata`) from XMP when present
+- [ ] Untouched elements (`extensions.<format>.dirty === false`) re-export byte-identical to the preserved blob
+- [ ] No exporter writes a sidecar file alongside the main format output
+- [ ] Reconciliation reports additions, deletions, and hash-recovered matches per `_shared/reconcile/` contract
+- [ ] Elements present in preserved metadata but missing from the stream surface as deletions that require user confirmation before being dropped
+
+---
+
 ## Shared utilities under `_shared/`
 
 Cross-format utilities live under `packages/formats/src/_shared/<module>/`. Format code imports only from the `_shared/index.ts` barrel; submodule internals stay unexported. Each module ships with its own Vitest unit tests and a narrow public API (four-to-six functions).
