@@ -90,3 +90,14 @@ Headline decisions (full rationale in the source table):
 1. Reject any namespace whose schema is not registered (rejected — would prevent the model from loading documents whose owning format package is not in the consumer\u2019s deployment, defeating the purpose of an `extensions` field).
 2. Drop the namespace silently (rejected — violates IO-D-18 "no silent drops").
    **Rationale:** The registry is a runtime concern. A standalone validator (CI tooling, lightweight hosts) may not load `@broadset/formats`; demanding registration would force every consumer to import every format package. Forward-compat preservation keeps the data intact while still failing loudly when the schema *is* registered and the data is stale.
+
+### P5.1 — PSD metadata channel strategy
+
+**Decision:** Document-level `ImageResources.xmpMetadata` (ISO 16684-1 XMP packet) carries the shared `broadset:` namespace packet end-to-end via `ag-psd@^30.1.0`. The in-process round-trip is verified by `packages/formats/src/psd/xmp-roundtrip-spike.test.ts`. Per-layer Broadset tags (element id, dirty flag, preservation blobs) are carried via `PsdExtensions` on the Broadset element — the layer-resident `BsPs`-signature `additionalInfo` is NOT emitted until we confirm upstream `ag-psd` exposes a custom-signature write surface or we fork.
+**Alternatives considered:**
+
+1. Rely on `ag-psd` to emit a custom-signature `additionalInfo` directly at layer level (rejected — `ag-psd`'s public `LayerAdditionalInfo` surface is closed; custom signatures are not exposed as of v30.1.0).
+2. Contribute a `customAdditionalInfo` API upstream before Phase 2 (rejected for now — blocks the critical path; can be reconsidered once the first full round-trip pipeline is shipped).
+3. Encode per-layer metadata as a hidden signature-named layer group (deferred — viable fallback but defers Photoshop-side testing; revisit if the XMP + element-id approach proves insufficient for the chain-round-trip scenarios in Phase 5 tests).
+
+**Rationale:** The XMP packet already carries an `elements[]` array keyed by `id` + `fingerprint` (see `_shared/xmp/BroadsetXmpPacket`). Combined with per-element `extensions.psd.roundTrip`, this is sufficient to reconcile Broadset-exported PSDs end-to-end: the layer `name` field links layers back to the XMP entry, and the `_shared/fingerprint/` module recovers identity when both are stripped. The Photoshop-macOS preservation verification of document XMP is well-established in the ISO spec; the custom-signature Photoshop preservation (the part not yet verified) is deferred until upstream support lands or we have a fallback ship decision. Tracked in the PSD risk register in `project/implementation/psd-support-plan.md` §Risk register.
