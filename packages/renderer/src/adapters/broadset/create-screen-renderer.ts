@@ -2,11 +2,13 @@ import type { ScreenRendererController, ScreenRendererOptions } from '../../core
 import { DOMScreenRenderer } from '../../dom/controller';
 
 /**
- * Broadset-compatibility entrypoint. Wraps the generic DOM controller in the
- * Broadset-opinionated preview host (checkerboard backdrop, overlay root,
- * Broadset-owned `data-*` attributes). Kept as a thin façade so callers that
- * historically imported `createScreenRenderer` continue to work unchanged
- * while the internal layering is re-homed in `dom/` and `adapters/broadset/`.
+ * Broadset-compatibility entrypoint. Wraps the DOM controller with
+ * Broadset-opinionated semantics: `updateDocument(BroadsetDocument)`,
+ * checkerboard preview backdrop policy, Broadset-owned structural
+ * `data-*` attributes, and the overlay root exposed for editor chrome
+ * portals. Generic consumers should use
+ * `createHtmlMotionRenderer` instead, which consumes a `SceneGraph`
+ * and knows nothing about `BroadsetDocument`.
  */
 export function createScreenRenderer(options: ScreenRendererOptions): ScreenRendererController {
   return new DOMScreenRenderer(options);
