@@ -693,7 +693,11 @@ Completed reference:
 
 Current master-plan state:
 
-- Shared foundation phases 0 through 4: not started
+- **Phase 0 (decisions + spec-first updates):** complete
+- **Phase 1 (shared model additions):** complete — all 16 units shipped (IO-D-01 through IO-D-18 ratified; unit utilities, importer security, BroadsetColor / BroadsetFill / FilterStack unions, content-hash identity, stroke + gradient enhancements, TextBody + text-on-path + text fidelity, model-level script rejection, extensions typing + dirty-flag middleware, page / canvas / document additions, importer contract)
+- **Phase 2 (shared libraries + `_shared` modules):** not started — **next active phase**
+- Phase 3 (renderer refactor): not started
+- Phase 4 (shared asset pipeline): not started
 - PSD track: not started
 - PDF track: not started
 - SVG track: not started
