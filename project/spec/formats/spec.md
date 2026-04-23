@@ -331,3 +331,42 @@ Contract:
 - [ ] Given empty or whitespace-only input, the result carries an empty markup, a null root, and `report.empty = true`
 - [ ] The `report.removed` list records each stripped element / attribute at least once
 - [ ] The AST `root` is a non-null `Element` whenever the sanitized markup is non-empty
+
+---
+
+### Requirement: Broadset XMP Packet (`_shared/xmp/`)
+
+The `_shared/xmp/` module reads and writes the canonical Broadset XMP packet under the shared `broadset:` namespace (`https://broadset.io/ns/xmp/1.0/`) per IO-D-08. One footprint across every carrier (PSD `XMPMetadata`, PDF `Metadata` dict, SVG `<metadata>`, PPTX `docProps/custom.xml`) so reconciliation recovers document identity regardless of source format.
+
+```ts
+interface BroadsetXmpPacket {
+  readonly documentId: string;
+  readonly version: string;
+  readonly exportedAt: string;
+  readonly elements: readonly { readonly id: string; readonly fingerprint: string }[];
+}
+
+function writeBroadsetXmp(packet: BroadsetXmpPacket): string;
+function readBroadsetXmp(input: string | Uint8Array): BroadsetXmpPacket | null;
+```
+
+Contract:
+
+- **Read** parses RDF/XML via `fast-xml-parser` with DTD and external-entity processing disabled (XXE / billion-laughs hardening intrinsic to the library). Accepts both `string` and `Uint8Array` input.
+- **Read** returns `null` for empty / whitespace-only / malformed input, input without a `broadset:` description, or data that fails Zod validation — callers treat null as "no preserved metadata".
+- **Write** composes RDF/XML as a deterministic string (no parser round-trip): stable ordering, canonical namespace declaration, explicit entity escaping for XML-special characters.
+- **Write** Zod-validates the packet before emission; buggy callers cannot emit an incomplete surface.
+- Round-trip stability is guaranteed: `readBroadsetXmp(writeBroadsetXmp(packet))` returns an equal packet (including order of element entries).
+
+#### Acceptance Criteria
+
+- [ ] A packet with a single element entry round-trips through write → read with no data loss
+- [ ] A packet with zero element entries round-trips as an empty `rdf:Seq` without loss
+- [ ] A packet with many element entries preserves order and per-element identity
+- [ ] XML-special characters in ids / fingerprints are entity-escaped by write and decoded by read
+- [ ] The rendered packet includes the canonical `broadset:` namespace URI
+- [ ] Writing a packet missing required fields throws a Zod validation error
+- [ ] Reading empty or whitespace-only input returns `null`
+- [ ] Reading malformed XML returns `null` without throwing
+- [ ] Reading RDF/XML without a `broadset:` description returns `null`
+- [ ] Reading accepts `Uint8Array` input and decodes it as UTF-8

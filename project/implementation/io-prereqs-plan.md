@@ -640,7 +640,7 @@ All shared modules under `packages/formats/src/_shared/<name>/` with Vitest unit
 - [x] **`_shared/fingerprint/`** — `xxhash-wasm`; `fingerprintElement` (`41894a9`)
 - [x] **`_shared/reconcile/`** — `microdiff`; `reconcile({ preservedMetadata, currentVisual, fingerprintsByElementId })` (`e44618f`)
 - [x] **`_shared/shape-classifier/`** — `classifyPath(d, styleHints)` with rectangle/ellipse/path heuristics (`ac8bf9f`)
-- [ ] **`_shared/sanitize/`** — `dompurify` with Broadset policy; `sanitizeSvg`
+- [x] **`_shared/sanitize/`** — `dompurify` with Broadset policy; `sanitizeSvg` (`68572b9`)
 - [ ] **Bundle-size assertion test** — ensure Latin-only sRGB users never download `lcms-wasm` or `harfbuzzjs`
 
 ### Phase 3 — Renderer refactor
