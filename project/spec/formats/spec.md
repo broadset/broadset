@@ -298,3 +298,36 @@ Contract:
 - [ ] The recovery entry includes the microdiff when the two elements differ in any fields beyond the id
 - [ ] When multiple additions match a single deletion's fingerprint, only the first is recovered; the rest remain in `additions`
 - [ ] A mixed-change document partitions correctly across all four buckets
+
+---
+
+### Requirement: SVG Sanitization (`_shared/sanitize/`)
+
+The SVG sanitizer wraps DOMPurify with a Broadset-specific policy so the SVG importer, the `svg`-type element re-render path, and any foreign-markup boundary never let an execution surface reach the renderer. Complements the importer security contract earlier in this spec.
+
+```ts
+function sanitizeSvg(input: string): {
+  readonly ast: { readonly markup: string; readonly root: Element | null };
+  readonly report: { readonly removed: readonly SvgSanitizationRemoval[]; readonly empty: boolean };
+};
+```
+
+Contract:
+
+- Strips `<script>` tags, `<foreignObject>` elements, inline event-handler attributes (`onload`, `onclick`, `onmouseover`, `onerror`, `onfocus`, `onblur`), `data-*` attributes, and `javascript:` URIs.
+- Accepts both full `<svg>` documents and bare fragments — fragments are wrapped in a synthetic `<svg>` root for sanitization and unwrapped in the output markup.
+- The `report.removed` list records what was stripped so importers surface "dropped element / attribute" warnings per IO-D-18.
+- The AST `root` carries the parsed SVG element for direct renderer consumption without re-parsing.
+- Empty and whitespace-only input returns an empty result (`report.empty = true`) without throwing.
+- Malformed markup MUST NOT throw — the sanitizer returns an empty or best-effort result and the caller continues processing the document.
+
+#### Acceptance Criteria
+
+- [ ] Given a benign SVG fragment (e.g. `<rect/>`), the sanitizer passes it through unchanged and reports `empty: false`
+- [ ] Given input containing `<script>` tags, the sanitized markup does not contain the script tag or its content
+- [ ] Given input containing inline event-handler attributes, the sanitized markup does not contain any `on*` attributes
+- [ ] Given input containing `<foreignObject>` elements, the sanitized markup does not contain the foreign object
+- [ ] Given input containing a `javascript:` href, the sanitized markup does not contain the `javascript:` URI
+- [ ] Given empty or whitespace-only input, the result carries an empty markup, a null root, and `report.empty = true`
+- [ ] The `report.removed` list records each stripped element / attribute at least once
+- [ ] The AST `root` is a non-null `Element` whenever the sanitized markup is non-empty

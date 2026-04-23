@@ -6,4 +6,5 @@
  */
 export * from './fingerprint';
 export * from './reconcile';
+export * from './sanitize';
 export * from './shape-classifier';

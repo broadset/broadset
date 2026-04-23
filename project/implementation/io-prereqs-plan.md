@@ -638,7 +638,7 @@ All shared modules under `packages/formats/src/_shared/<name>/` with Vitest unit
 - [ ] **`_shared/text-layout/`** — `linebreak` + `bidi-js` eager, `harfbuzzjs` lazy; `wrapRuns`, `shapeRuns`
 - [ ] **`_shared/xmp/`** — `fast-xml-parser` read + explicit RDF/XML write; `readBroadsetXmp`, `writeBroadsetXmp`
 - [x] **`_shared/fingerprint/`** — `xxhash-wasm`; `fingerprintElement` (`41894a9`)
-- [ ] **`_shared/reconcile/`** — `microdiff`; `reconcile({ preservedMetadata, currentVisual, fingerprintsByElementId })`
+- [x] **`_shared/reconcile/`** — `microdiff`; `reconcile({ preservedMetadata, currentVisual, fingerprintsByElementId })` (`e44618f`)
 - [x] **`_shared/shape-classifier/`** — `classifyPath(d, styleHints)` with rectangle/ellipse/path heuristics (`ac8bf9f`)
 - [ ] **`_shared/sanitize/`** — `dompurify` with Broadset policy; `sanitizeSvg`
 - [ ] **Bundle-size assertion test** — ensure Latin-only sRGB users never download `lcms-wasm` or `harfbuzzjs`
