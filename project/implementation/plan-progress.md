@@ -84,7 +84,7 @@ Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md
 - [x] P4.4 `icc-profile` asset type (`IccProfileAsset` variant on `Asset` union; `colorSpace` ∈ `{rgb, cmyk, gray, lab}`; optional description/identifier)
 - [x] P4.5 Shared font subsetting pipeline (`_shared/fonts/subset.ts` → `subsetFont(bytes, codepoints)` via fontkit; codicon TTF fixture)
 - [x] P4.6 Font embed-permission surface (`_shared/fonts/embed-policy.ts` → `resolveEmbedDecision(permission)` — refuse restricted, warn preview-print)
-- [ ] P4.7 Content-hash asset deduplication on import
+- [x] P4.7 Content-hash asset deduplication on import (`_shared/asset-dedup/` `AssetDeduplicator` + `contentHashHex` via xxhash-wasm)
 
 ## Interleaved shared tasks
 
