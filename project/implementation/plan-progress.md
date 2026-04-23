@@ -38,8 +38,8 @@ Source of truth: [io-prereqs-plan.md](./io-prereqs-plan.md)
 - [x] P1.5 Stroke enhancements
 - [x] P1.6 Structured filter primitives (`FilterStack`) (6a types + resolver `aef2537`; 6b field flip + migrator + consumer cascade `20e15c9`)
 - [x] P1.7 Gradient enhancements (7a `startAngle` `ac89992`; 7b stop-color flip via 3c `c4b942e`; 7b mods `f836609`)
-- [ ] P1.8 `BroadsetFill` discriminated union (8a types done `4b29e4b`; 8b field flip pending — depends on P1.3c and P1.7b)
-- [ ] P1.9 Text model (`string | TextBody`) (9a types done `4dfd2d8`; 9b field flip + renderer dual-path pending)
+- [x] P1.8 `BroadsetFill` discriminated union (8a types `4b29e4b`; 8b migrator `e06ba43`; 8c consumer cascade `a4dce68`)
+- [x] P1.9 Text model (`string | TextBody`) (9a types `4dfd2d8`; 9b field flip + dual-path consumer cascade `e314388`; 9c end-to-end renderer integration test `4ae4160`)
 - [x] P1.10 Text-on-path reference
 - [x] P1.11 Text fidelity fields
 - [x] P1.12 Model-level script rejection
@@ -52,22 +52,22 @@ Source of truth: [io-prereqs-plan.md](./io-prereqs-plan.md)
 
 Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md)
 
-- [ ] P2.1 `_shared/color/`
-- [ ] P2.2 `_shared/fonts/`
-- [ ] P2.3 `_shared/text-layout/`
-- [ ] P2.4 `_shared/xmp/`
-- [ ] P2.5 `_shared/fingerprint/`
-- [ ] P2.6 `_shared/reconcile/`
-- [ ] P2.7 `_shared/shape-classifier/`
-- [ ] P2.8 `_shared/sanitize/`
-- [ ] P2.9 Bundle-size assertion coverage for heavy lazy-loaded paths
+- [x] P2.1 `_shared/color/` (culori-backed `toRgb` / `gamutMap` / `applyMods` `7bb8a84`; lcms-wasm / ICC / CMYK deferred to P4)
+- [x] P2.2 `_shared/fonts/` (fontkit-backed `getFontMetrics` / `readEmbedPermission` / `getGlyphToUnicodeMap` `f59ee41`; `resolveFont` / `listAvailable` / `subsetFont` deferred to P4)
+- [x] P2.3 `_shared/text-layout/` (linebreak + bidi-js: `breakLines` / `analyzeBidi` `e6ef4e2`; harfbuzzjs + `wrapRuns` / `shapeRuns` deferred until first non-Latin caller)
+- [x] P2.4 `_shared/xmp/` (`readBroadsetXmp` / `writeBroadsetXmp` via fast-xml-parser `962bf21`)
+- [x] P2.5 `_shared/fingerprint/` (`fingerprintElement` via xxhash-wasm `41894a9`)
+- [x] P2.6 `_shared/reconcile/` (`reconcile` four-bucket result via microdiff `e44618f`)
+- [x] P2.7 `_shared/shape-classifier/` (`classifyPath` no external deps `ac8bf9f`)
+- [x] P2.8 `_shared/sanitize/` (`sanitizeSvg` via dompurify `68572b9`)
+- [x] P2.9 Bundle-size assertion coverage for heavy lazy-loaded paths (static-import scanner for lcms-wasm / harfbuzzjs `0bb2435`)
 
 ### Phase 3 — Renderer refactor
 
 Source of truth: [plan.md](./plan.md), [renderer-refactor-plan.md](./renderer-refactor-plan.md)
 
 - [x] P3.0 Contract cleanup
-- [ ] P3.1 Internal layer split
+- [x] P3.1 Internal layer split
 - [ ] P3.2 Keyed reconciliation
 - [ ] P3.3 Semantic renderers and safe builders
 - [ ] P3.4 Runtime services
