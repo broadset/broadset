@@ -1,4 +1,4 @@
-import type { BroadsetElement } from '@broadset/model';
+import { type BroadsetElement, resolveStyleColor } from '@broadset/model';
 import type { Layer } from 'ag-psd';
 
 import { parseHexColor } from './color-utils';
@@ -157,7 +157,8 @@ function applyFilterGlow(layer: Layer, el: BroadsetElement): void {
 
 function applyTextContent(layer: Layer, el: BroadsetElement): void {
   const fontSize = el.style.fontSize ?? 12;
-  const color = el.style.fontColor ? parseHexColor(el.style.fontColor) : undefined;
+  const fontColorCss = resolveStyleColor(el.style.fontColor, { resolveTheme: false });
+  const color = fontColorCss ? parseHexColor(fontColorCss) : undefined;
 
   layer.text = {
     text: el.content,
@@ -222,9 +223,11 @@ function applyPathContent(layer: Layer, el: BroadsetElement): void {
 
   layer.vectorStroke = { fillEnabled: false, strokeEnabled: true };
 
-  if (!el.style.borderColor) return;
+  const borderColorCss = resolveStyleColor(el.style.borderColor, { resolveTheme: false });
 
-  const strokeColor = parseHexColor(el.style.borderColor);
+  if (!borderColorCss) return;
+
+  const strokeColor = parseHexColor(borderColorCss);
 
   if (strokeColor) {
     layer.vectorFill = { type: 'color', color: strokeColor };
@@ -232,9 +235,11 @@ function applyPathContent(layer: Layer, el: BroadsetElement): void {
 }
 
 function applyShapeFill(layer: Layer, el: BroadsetElement): void {
-  if (!el.style.backgroundColor) return;
+  const backgroundColorCss = resolveStyleColor(el.style.backgroundColor, { resolveTheme: false });
 
-  const color = parseHexColor(el.style.backgroundColor);
+  if (!backgroundColorCss) return;
+
+  const color = parseHexColor(backgroundColorCss);
 
   if (!color) return;
 

@@ -1,4 +1,11 @@
-import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle, Canvas } from '@broadset/model';
+import {
+  type BroadsetDocument,
+  type BroadsetElement,
+  type BroadsetElementStyle,
+  type BroadsetElementStyleInput,
+  type Canvas,
+  styleSchema,
+} from '@broadset/model';
 
 function makeCanvas(overrides: Partial<Canvas> = {}): Canvas {
   return {
@@ -12,8 +19,8 @@ function makeCanvas(overrides: Partial<Canvas> = {}): Canvas {
   };
 }
 
-export function makeStyle(overrides: Partial<BroadsetElementStyle> = {}): Partial<BroadsetElementStyle> {
-  return { opacity: 1, ...overrides };
+export function makeStyle(overrides: Partial<BroadsetElementStyleInput> = {}): BroadsetElementStyle {
+  return styleSchema.parse({ opacity: 1, ...overrides });
 }
 
 export function makeElement(type: BroadsetElement['type'], overrides: Partial<BroadsetElement> = {}): BroadsetElement {
@@ -26,7 +33,7 @@ export function makeElement(type: BroadsetElement['type'], overrides: Partial<Br
     width: 100,
     height: 50,
     rotation: 0,
-    style: makeStyle() as BroadsetElementStyle,
+    style: makeStyle(),
     content: '',
     ...overrides,
   } as BroadsetElement;

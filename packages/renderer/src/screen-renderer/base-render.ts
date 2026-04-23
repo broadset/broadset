@@ -1,4 +1,9 @@
-import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle } from '@broadset/model';
+import {
+  type BroadsetDocument,
+  type BroadsetElement,
+  type BroadsetElementStyle,
+  resolveStyleColor,
+} from '@broadset/model';
 
 import { applyBackgroundStyle } from '../background';
 import type { RendererCapabilityOverride } from '../capabilities';
@@ -434,12 +439,12 @@ class DOMScreenRenderer implements ScreenRendererController {
     contentHost.style.borderRadius = formatBorderRadius(element, style);
     contentHost.style.borderWidth = style.borderWidth === undefined ? '' : toPixelValue(style.borderWidth);
     contentHost.style.borderStyle = style.borderWidth === undefined ? '' : (style.borderStyle ?? 'solid');
-    contentHost.style.borderColor = style.borderColor ?? '';
+    contentHost.style.borderColor = resolveStyleColor(style.borderColor, { resolveTheme: false }) ?? '';
     contentHost.style.boxShadow = style.boxShadow ?? '';
     contentHost.style.filter = style.filter ?? '';
     contentHost.style.backdropFilter = style.backdropFilter ?? '';
     contentHost.style.isolation = style.isolation ?? '';
-    contentHost.style.color = style.fontColor ?? '';
+    contentHost.style.color = resolveStyleColor(style.fontColor, { resolveTheme: false }) ?? '';
     contentHost.style.fontFamily = style.fontFamily ?? '';
     contentHost.style.fontSize = style.fontSize === undefined ? '' : toPixelValue(style.fontSize);
     contentHost.style.fontWeight = style.fontWeight === undefined ? '' : String(style.fontWeight);

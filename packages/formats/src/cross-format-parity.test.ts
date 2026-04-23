@@ -5,7 +5,16 @@
  * documents without errors, produce non-trivial output, and agree on basic
  * structural properties where applicable.
  */
-import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle, BroadsetProject, Canvas } from '@broadset/model';
+import {
+  type BroadsetDocument,
+  type BroadsetElement,
+  type BroadsetElementStyle,
+  type BroadsetElementStyleInput,
+  type BroadsetProject,
+  type Canvas,
+  rgbColor,
+  styleSchema,
+} from '@broadset/model';
 import PizZip from 'pizzip';
 import { describe, expect, it } from 'vitest';
 
@@ -31,8 +40,8 @@ function makeCanvas(overrides: Partial<Canvas> = {}): Canvas {
   };
 }
 
-function makeStyle(overrides: Partial<BroadsetElementStyle> = {}): BroadsetElementStyle {
-  return { opacity: 1, ...overrides } as BroadsetElementStyle;
+function makeStyle(overrides: Partial<BroadsetElementStyleInput> = {}): BroadsetElementStyle {
+  return styleSchema.parse({ opacity: 1, ...overrides });
 }
 
 function makeElement(type: BroadsetElement['type'], overrides: Partial<BroadsetElement> = {}): BroadsetElement {
@@ -339,9 +348,9 @@ describe('Cross-Format Stress Tests', () => {
               type: 'linear',
               angle: 45,
               stops: [
-                { color: '#ff0000', position: 0 },
-                { color: '#00ff00', position: 0.5 },
-                { color: '#0000ff', position: 1 },
+                { color: rgbColor('#ff0000'), position: 0 },
+                { color: rgbColor('#00ff00'), position: 0.5 },
+                { color: rgbColor('#0000ff'), position: 1 },
               ],
             },
             boxShadow: '5px 5px 10px rgba(0,0,0,0.5)',

@@ -3,12 +3,14 @@ import {
   type BroadsetDocument,
   type BroadsetElement,
   type BroadsetElementStyle,
+  type BroadsetElementStyleInput,
   createDefaultElement,
   createDefaultFeatureConfig,
   createEmptyBroadsetDocument,
   type EditorConfig,
   type EditorFeatureConfig,
   type ElementPosition,
+  migrateLegacyColor,
   type Page,
   type PageElementInstance,
 } from '@broadset/model';
@@ -35,6 +37,29 @@ import {
 } from './transform';
 
 const DEFAULT_MAX_UNDO_STEPS = 50;
+
+const STYLE_COLOR_FIELDS = ['fontColor', 'backgroundColor', 'borderColor', 'stroke', 'fill'] as const;
+
+/**
+ * Coerces any string values on color-valued fields of a style input
+ * to `BroadsetColor` via `migrateLegacyColor`. Callers may pass either
+ * the canonical structured form or a legacy CSS string — normalization
+ * happens once at the store boundary so the persisted `element.style`
+ * is always `BroadsetElementStyle`.
+ */
+function normalizeStyleInput(style: Partial<BroadsetElementStyleInput>): Partial<BroadsetElementStyle> {
+  const result: Record<string, unknown> = { ...style };
+
+  for (const field of STYLE_COLOR_FIELDS) {
+    const value = result[field];
+
+    if (typeof value === 'string') {
+      result[field] = migrateLegacyColor(value);
+    }
+  }
+
+  return result as Partial<BroadsetElementStyle>;
+}
 
 /**
  * Root elements must have a matching page instance on the active page so the
@@ -153,7 +178,7 @@ export interface EditorState extends UIActionsState {
   readonly commitGroupMove: (
     updates: ReadonlyArray<{ readonly elementId: string; readonly position: ElementPosition }>,
   ) => void;
-  readonly updateElementStyle: (elementId: string, style: Partial<BroadsetElementStyle>) => void;
+  readonly updateElementStyle: (elementId: string, style: Partial<BroadsetElementStyleInput>) => void;
   readonly reorderElement: (elementId: string, direction: ReorderDirection) => void;
   readonly addElement: (typeOrElement: string | BroadsetElement) => string;
   readonly removeElement: (elementId: string) => void;
@@ -327,13 +352,15 @@ export function createEditorStore(options: CreateEditorStoreOptions = {}): Edito
             return { document: nextDocument };
           });
         },
-        updateElementStyle(elementId: string, style: Partial<BroadsetElementStyle>): void {
+        updateElementStyle(elementId: string, style: Partial<BroadsetElementStyleInput>): void {
+          const normalized = normalizeStyleInput(style);
+
           set((state) => ({
             document: updateDocumentElement(state.document, elementId, (element) => ({
               ...element,
               style: {
                 ...element.style,
-                ...style,
+                ...normalized,
               },
             })),
           }));

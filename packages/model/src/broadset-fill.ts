@@ -91,13 +91,14 @@ const gradientFillGradientSchema = z.object({
   stops: z
     .array(
       z.object({
-        color: z.string(),
+        color: broadsetColorSchema,
         position: z.number().min(0).max(100),
       }),
     )
     .min(2),
   angle: z.number().min(0).max(360).optional(),
   center: z.tuple([z.number().min(0).max(100), z.number().min(0).max(100)]).optional(),
+  startAngle: z.number().min(0).max(360).optional(),
 });
 
 const noneFillSchema = z.object({ kind: z.literal('none') });

@@ -1,4 +1,4 @@
-import { type BroadsetDocument, createDefaultElement, createDefaultStyle } from '@broadset/model';
+import { type BroadsetDocument, createDefaultElement } from '@broadset/model';
 
 import { createBaseFixtureDocument, createRootPageInstances } from './base-document';
 import { FIXTURE_IDS } from './ids';
@@ -13,7 +13,6 @@ export function createDemoAppChromeTestDocument(): BroadsetDocument {
       width: 1920,
       height: 1080,
       style: {
-        ...createDefaultStyle(),
         backgroundColor: '#0b1320',
       },
     }),
@@ -25,7 +24,6 @@ export function createDemoAppChromeTestDocument(): BroadsetDocument {
       height: 80,
       content: '<b>CHROME TEST</b>',
       style: {
-        ...createDefaultStyle(),
         fontFamily: 'Inter',
         fontSize: 48,
         fontWeight: 700,

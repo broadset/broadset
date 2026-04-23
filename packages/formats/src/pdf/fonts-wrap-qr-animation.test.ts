@@ -1,4 +1,3 @@
-import type { BroadsetElementStyle } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { drawQrOnPage, exportPdfBytes, normalizeFontFamily, resolveGoogleFontUrl, wrapText } from './index';
@@ -58,11 +57,11 @@ describe('Font Embedding', () => {
       elements: [
         makeElement('text', {
           content: 'Hello',
-          style: makeStyle({ fontFamily: 'Inter', fontSize: 16 }) as BroadsetElementStyle,
+          style: makeStyle({ fontFamily: 'Inter', fontSize: 16 }),
         }),
         makeElement('text', {
           content: 'World',
-          style: makeStyle({ fontFamily: '"Inter"', fontSize: 14 }) as BroadsetElementStyle,
+          style: makeStyle({ fontFamily: '"Inter"', fontSize: 14 }),
         }),
       ],
     });
@@ -90,7 +89,7 @@ describe('Font Embedding', () => {
       elements: [
         makeElement('text', {
           content: 'Hello',
-          style: makeStyle({ fontFamily: 'Helvetica', fontSize: 16 }) as BroadsetElementStyle,
+          style: makeStyle({ fontFamily: 'Helvetica', fontSize: 16 }),
         }),
       ],
     });
@@ -196,7 +195,7 @@ describe('Animated Element Static Export', () => {
       makeElement('text', {
         id: 'el-1',
         content: 'Animated text',
-        style: makeStyle({ opacity: 1 }) as BroadsetElementStyle,
+        style: makeStyle({ opacity: 1 }),
       }),
     ];
 
@@ -245,7 +244,7 @@ describe('Animated Element Static Export', () => {
           id: 'rect-1',
           width: 50,
           height: 50,
-          style: makeStyle({ backgroundColor: '#ff0000' }) as BroadsetElementStyle,
+          style: makeStyle({ backgroundColor: '#ff0000' }),
         }),
       ],
     });

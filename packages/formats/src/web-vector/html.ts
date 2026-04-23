@@ -1,4 +1,10 @@
-import type { BroadsetDocument, BroadsetElement, BroadsetGradient } from '@broadset/model';
+import {
+  type BroadsetDocument,
+  type BroadsetElement,
+  type BroadsetGradient,
+  colorToCss,
+  resolveStyleColor,
+} from '@broadset/model';
 
 import { generateQrSvgFragment } from '../interchange';
 import { escapeXml } from './shared';
@@ -12,7 +18,7 @@ function resolveGradientCss(gradient: string | BroadsetGradient): string | null 
     return gradient;
   }
 
-  const stops = gradient.stops.map((s) => `${s.color} ${String(s.position * 100)}%`).join(', ');
+  const stops = gradient.stops.map((s) => `${colorToCss(s.color)} ${String(s.position * 100)}%`).join(', ');
 
   if (gradient.type === 'linear') {
     return `linear-gradient(${String(gradient.angle ?? 0)}deg, ${stops})`;
@@ -92,8 +98,10 @@ function buildTextInlineStyle(el: BroadsetElement): string {
     parts.push(`font-size:${String(el.style.fontSize)}px`);
   }
 
-  if (el.style.fontColor) {
-    parts.push(`color:${el.style.fontColor}`);
+  const fontColorCss = resolveStyleColor(el.style.fontColor, { resolveTheme: false });
+
+  if (fontColorCss !== undefined) {
+    parts.push(`color:${fontColorCss}`);
   }
 
   if (el.style.fontWeight) {
@@ -145,8 +153,8 @@ function buildTextInlineStyle(el: BroadsetElement): string {
 /* ------------------------------------------------------------------ */
 
 function renderHtmlPath(el: BroadsetElement, dataAttr: string, containerStyle: string): string {
-  const fill = el.style.fill ?? 'none';
-  const stroke = el.style.stroke ?? 'none';
+  const fill = resolveStyleColor(el.style.fill, { resolveTheme: false }) ?? 'none';
+  const stroke = resolveStyleColor(el.style.stroke, { resolveTheme: false }) ?? 'none';
   const strokeWidth = el.style.strokeWidth ?? 1;
 
   return `<div ${dataAttr} style="${containerStyle}"><svg width="${String(el.width)}" height="${String(el.height)}" style="overflow:visible"><path d="${escapeXml(el.content)}" fill="${fill}" stroke="${stroke}" stroke-width="${String(strokeWidth)}"/></svg></div>`;
@@ -179,7 +187,9 @@ function buildTransformParts(el: BroadsetElement): string[] {
 function buildBackgroundParts(el: BroadsetElement): string[] {
   const parts: string[] = [];
 
-  if (el.style.backgroundColor) parts.push(`background:${el.style.backgroundColor}`);
+  const backgroundCss = resolveStyleColor(el.style.backgroundColor, { resolveTheme: false });
+
+  if (backgroundCss !== undefined) parts.push(`background:${backgroundCss}`);
 
   if (el.style.backgroundGradient !== undefined) {
     const gradient = resolveGradientCss(el.style.backgroundGradient);
@@ -203,7 +213,9 @@ function buildBorderParts(el: BroadsetElement): string[] {
     parts.push(`border-width:${String(el.style.borderWidth)}px`);
     parts.push(`border-style:${el.style.borderStyle ?? 'solid'}`);
 
-    if (el.style.borderColor) parts.push(`border-color:${el.style.borderColor}`);
+    const borderColorCss = resolveStyleColor(el.style.borderColor, { resolveTheme: false });
+
+    if (borderColorCss !== undefined) parts.push(`border-color:${borderColorCss}`);
   }
 
   return parts;

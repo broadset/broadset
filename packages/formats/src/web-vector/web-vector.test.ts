@@ -1,4 +1,12 @@
-import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle, Canvas } from '@broadset/model';
+import {
+  type BroadsetDocument,
+  type BroadsetElement,
+  type BroadsetElementStyle,
+  type BroadsetElementStyleInput,
+  type Canvas,
+  rgbColor,
+  styleSchema,
+} from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { exportHtmlStandalone, exportSvg, importSvg } from './index';
@@ -20,11 +28,11 @@ function makeCanvas(overrides: Partial<Canvas> = {}): Canvas {
   };
 }
 
-function makeStyle(overrides: Partial<BroadsetElementStyle> = {}): BroadsetElementStyle {
-  return {
+function makeStyle(overrides: Partial<BroadsetElementStyleInput> = {}): BroadsetElementStyle {
+  return styleSchema.parse({
     opacity: 1,
     ...overrides,
-  };
+  });
 }
 
 function makeElement(overrides: Partial<BroadsetElement> = {}): BroadsetElement {
@@ -352,8 +360,8 @@ describe('SVG Export Style Enrichments', () => {
               type: 'linear',
               angle: 90,
               stops: [
-                { color: '#ff0000', position: 0 },
-                { color: '#0000ff', position: 1 },
+                { color: rgbColor('#ff0000'), position: 0 },
+                { color: rgbColor('#0000ff'), position: 1 },
               ],
             },
           }),
@@ -380,8 +388,8 @@ describe('SVG Export Style Enrichments', () => {
             backgroundGradient: {
               type: 'radial',
               stops: [
-                { color: '#00ff00', position: 0 },
-                { color: '#ff00ff', position: 1 },
+                { color: rgbColor('#00ff00'), position: 0 },
+                { color: rgbColor('#ff00ff'), position: 1 },
               ],
             },
           }),
@@ -698,8 +706,8 @@ describe('HTML Standalone Style Enrichments', () => {
               type: 'linear',
               angle: 90,
               stops: [
-                { color: '#ff0000', position: 0 },
-                { color: '#0000ff', position: 1 },
+                { color: rgbColor('#ff0000'), position: 0 },
+                { color: rgbColor('#0000ff'), position: 1 },
               ],
             },
           }),

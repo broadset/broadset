@@ -1,4 +1,4 @@
-import type { BroadsetElementStyle } from '@broadset/model';
+import { rgbColor } from '@broadset/model';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { exportPdfBytes } from './index';
@@ -99,7 +99,7 @@ describe('PDF Fidelity Upgrades (C10)', () => {
       elements: [
         makeElement('text', {
           content: 'Bold heading',
-          style: makeStyle({ fontWeight: 700, fontSize: 16 }) as BroadsetElementStyle,
+          style: makeStyle({ fontWeight: 700, fontSize: 16 }),
         }),
       ],
     });
@@ -116,7 +116,7 @@ describe('PDF Fidelity Upgrades (C10)', () => {
       elements: [
         makeElement('text', {
           content: 'Italic text',
-          style: makeStyle({ fontStyle: 'italic', fontSize: 14 }) as BroadsetElementStyle,
+          style: makeStyle({ fontStyle: 'italic', fontSize: 14 }),
         }),
       ],
     });
@@ -137,7 +137,7 @@ describe('PDF Fidelity Upgrades (C10)', () => {
             fontWeight: 800,
             fontStyle: 'italic',
             fontSize: 12,
-          }) as BroadsetElementStyle,
+          }),
         }),
       ],
     });
@@ -166,7 +166,7 @@ describe('PDF Fidelity Upgrades (C10)', () => {
           position: { x: 100, y: 100 },
           width: 200,
           height: 50,
-          style: makeStyle({ textAlignment: 'center', fontSize: 12 }) as BroadsetElementStyle,
+          style: makeStyle({ textAlignment: 'center', fontSize: 12 }),
         }),
       ],
     });
@@ -203,7 +203,7 @@ describe('PDF Fidelity Upgrades (C10)', () => {
           position: { x: 100, y: 100 },
           width: 200,
           height: 50,
-          style: makeStyle({ textAlignment: 'right', fontSize: 12 }) as BroadsetElementStyle,
+          style: makeStyle({ textAlignment: 'right', fontSize: 12 }),
         }),
       ],
     });
@@ -232,11 +232,11 @@ describe('PDF Fidelity Upgrades (C10)', () => {
               type: 'linear',
               angle: 90,
               stops: [
-                { color: '#ff0000', position: 0 },
-                { color: '#0000ff', position: 1 },
+                { color: rgbColor('#ff0000'), position: 0 },
+                { color: rgbColor('#0000ff'), position: 1 },
               ],
             },
-          }) as BroadsetElementStyle,
+          }),
         }),
       ],
     });
@@ -258,11 +258,11 @@ describe('PDF Fidelity Upgrades (C10)', () => {
             backgroundGradient: {
               type: 'radial',
               stops: [
-                { color: '#00ff00', position: 0 },
-                { color: '#ff00ff', position: 1 },
+                { color: rgbColor('#00ff00'), position: 0 },
+                { color: rgbColor('#ff00ff'), position: 1 },
               ],
             },
-          }) as BroadsetElementStyle,
+          }),
         }),
       ],
     });

@@ -1,4 +1,4 @@
-import type { BroadsetElementStyle } from '../style';
+import type { BroadsetElementStyle, BroadsetElementStyleInput } from '../style';
 
 export const BUILT_IN_ELEMENT_TYPES = [
   'text',
@@ -99,6 +99,6 @@ export interface BroadsetElement {
 
 export type ElementOverrides = Readonly<
   Partial<Omit<BroadsetElement, 'style' | 'type'>> & {
-    readonly style?: Partial<BroadsetElementStyle>;
+    readonly style?: Partial<BroadsetElementStyleInput>;
   }
 >;

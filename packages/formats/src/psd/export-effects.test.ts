@@ -1,4 +1,3 @@
-import type { BroadsetElementStyle } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { exportPsdBytes, importPsd } from './index';
@@ -14,7 +13,7 @@ describe('PSD Path Layer Export', () => {
       elements: [
         makeElement('path', {
           content: 'M 0 0 L 100 50',
-          style: makeStyle({ borderWidth: 2, borderColor: '#000000' }) as BroadsetElementStyle,
+          style: makeStyle({ borderWidth: 2, borderColor: '#000000' }),
         }),
       ],
     });
@@ -42,13 +41,13 @@ describe('PSD Clip-Path Mask Export', () => {
           style: makeStyle({
             backgroundColor: '#ff0000',
             customClipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)',
-          }) as BroadsetElementStyle,
+          }),
         }),
         makeElement('ellipse', {
           style: makeStyle({
             backgroundColor: '#00ff00',
             customClipPath: 'circle(50%)',
-          }) as BroadsetElementStyle,
+          }),
         }),
       ],
     });
@@ -74,7 +73,7 @@ describe('PSD Clip-Path Mask Export', () => {
             'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg==',
           style: makeStyle({
             customClipPath: 'polygon(10% 10%, 90% 10%, 90% 90%, 10% 90%)',
-          }) as BroadsetElementStyle,
+          }),
         }),
       ],
     });
@@ -98,7 +97,7 @@ describe('PSD Border Radius Export', () => {
             backgroundColor: '#0000ff',
             borderRadius: [10, 10, 10, 10],
             customClipPath: 'polygon(10% 0%, 90% 0%, 100% 100%, 0% 100%)',
-          }) as BroadsetElementStyle,
+          }),
         }),
       ],
     });
@@ -127,7 +126,7 @@ describe('PSD Layer Effects Export', () => {
           style: makeStyle({
             backgroundColor: '#ffffff',
             boxShadow: '4px 4px 8px rgba(0,0,0,0.5)',
-          }) as BroadsetElementStyle,
+          }),
         }),
       ],
     });
@@ -145,7 +144,7 @@ describe('PSD Layer Effects Export', () => {
           style: makeStyle({
             backgroundColor: '#ff0000',
             mixBlendMode: 'multiply',
-          }) as BroadsetElementStyle,
+          }),
         }),
       ],
     });
@@ -201,7 +200,7 @@ describe('PSD Artboard and Text Export', () => {
         { id: 'page-2', name: 'Page 2', elements: [], locale: null, extensions: {} },
       ],
       elements: [
-        makeElement('rectangle', { style: makeStyle({ backgroundColor: '#ff0000' }) as BroadsetElementStyle }),
+        makeElement('rectangle', { style: makeStyle({ backgroundColor: '#ff0000' }) }),
       ],
     });
 
@@ -217,7 +216,7 @@ describe('PSD Artboard and Text Export', () => {
       elements: [
         makeElement('text', {
           content: 'Hello PSD',
-          style: makeStyle({ fontSize: 24, fontColor: '#333333' }) as BroadsetElementStyle,
+          style: makeStyle({ fontSize: 24, fontColor: '#333333' }),
         }),
       ],
     });

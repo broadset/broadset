@@ -1,4 +1,4 @@
-import type { BroadsetElementStyle } from '@broadset/model';
+import type { BroadsetElementStyleInput } from '@broadset/model';
 
 export interface SvgImportResult {
   readonly elements: readonly ImportedElement[];
@@ -14,7 +14,7 @@ interface ImportedElement {
   readonly width: number;
   readonly height: number;
   readonly rotation: number;
-  readonly style: Partial<BroadsetElementStyle>;
+  readonly style: Partial<BroadsetElementStyleInput>;
 }
 
 interface TransformState {
@@ -122,7 +122,7 @@ function importElement(
   const clipPath = resolveClipPath(el, defsMap);
   const fill = getAttr(el, 'fill');
   const stroke = getAttr(el, 'stroke');
-  const baseStyle: Partial<BroadsetElementStyle> = {
+  const baseStyle: Partial<BroadsetElementStyleInput> = {
     ...(clipPath ? { customClipPath: clipPath } : undefined),
     ...(fill ? { fill } : undefined),
     ...(stroke ? { stroke } : undefined),

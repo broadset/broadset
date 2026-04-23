@@ -58,8 +58,8 @@ describe('BroadsetFill factories', () => {
     const gradient = {
       type: 'linear' as const,
       stops: [
-        { color: '#ffffff', position: 0 },
-        { color: '#000000', position: 100 },
+        { color: rgbColor('#ffffff'), position: 0 },
+        { color: rgbColor('#000000'), position: 100 },
       ],
       angle: 90,
     };
@@ -115,8 +115,8 @@ describe('BroadsetFill type guards', () => {
       gradientFill({
         type: 'linear',
         stops: [
-          { color: '#000000', position: 0 },
-          { color: '#ffffff', position: 100 },
+          { color: rgbColor('#000000'), position: 0 },
+          { color: rgbColor('#ffffff'), position: 100 },
         ],
       }),
       isGradientFill,
@@ -148,8 +148,8 @@ describe('broadsetFillSchema', () => {
     const gradient: BroadsetFill = gradientFill({
       type: 'radial',
       stops: [
-        { color: '#000000', position: 0 },
-        { color: '#ffffff', position: 100 },
+        { color: rgbColor('#000000'), position: 0 },
+        { color: rgbColor('#ffffff'), position: 100 },
       ],
       center: [50, 50],
     });

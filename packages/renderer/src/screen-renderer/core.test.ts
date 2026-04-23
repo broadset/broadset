@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { createDefaultStyle } from '@broadset/model';
+import { createDefaultStyle, rgbColor } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -239,7 +239,7 @@ describe('renderer core', () => {
 
     applyBackgroundStyle(node, {
       ...createDefaultStyle(),
-      backgroundColor: '#123456',
+      backgroundColor: rgbColor('#123456'),
     });
 
     expect(node.style.backgroundColor).toBe('rgb(18, 52, 86)');
@@ -255,8 +255,8 @@ describe('renderer core', () => {
       backgroundGradient: {
         type: 'linear',
         stops: [
-          { color: '#ff0000', position: 0 },
-          { color: '#0000ff', position: 100 },
+          { color: rgbColor('#ff0000'), position: 0 },
+          { color: rgbColor('#0000ff'), position: 100 },
         ],
         angle: 90,
       },
@@ -294,8 +294,8 @@ describe('renderer core', () => {
       backgroundGradient: {
         type: 'radial',
         stops: [
-          { color: '#ffffff', position: 0 },
-          { color: '#000000', position: 100 },
+          { color: rgbColor('#ffffff'), position: 0 },
+          { color: rgbColor('#000000'), position: 100 },
         ],
         center: [50, 50],
       },
@@ -305,7 +305,7 @@ describe('renderer core', () => {
 
     applyBackgroundStyle(node, {
       ...createDefaultStyle(),
-      backgroundColor: '#000000',
+      backgroundColor: rgbColor('#000000'),
     });
 
     expect(node.dataset['gradient']).toBeUndefined();
@@ -318,7 +318,7 @@ describe('renderer core', () => {
     applyBackgroundStyle(node, {
       ...createDefaultStyle(),
       backgroundGradient: '',
-      backgroundColor: '#abcdef',
+      backgroundColor: rgbColor('#abcdef'),
     });
 
     expect(node.style.backgroundColor).toBe('rgb(171, 205, 239)');
@@ -618,7 +618,7 @@ describe('renderer core', () => {
       type: 'path',
       parentId: 'group-1',
       content: 'M0 0 L100 0 L100 100 L0 100 Z',
-      style: { ...createDefaultStyle(), stroke: '#ff0000', strokeWidth: 3, fill: '#00ff00' },
+      style: { ...createDefaultStyle(), stroke: rgbColor('#ff0000'), strokeWidth: 3, fill: rgbColor('#00ff00') },
     });
     const child2 = createElement({
       id: 'child-2',
@@ -701,7 +701,7 @@ describe('renderer core', () => {
       type: 'path',
       parentId: 'group-1',
       content: 'M0 0 L100 0 L100 100 L0 100 Z',
-      style: { ...createDefaultStyle(), stroke: '#0000ff', strokeWidth: 5, fill: '#ff00ff' },
+      style: { ...createDefaultStyle(), stroke: rgbColor('#0000ff'), strokeWidth: 5, fill: rgbColor('#ff00ff') },
     });
     const child2 = createElement({
       id: 'child-2',

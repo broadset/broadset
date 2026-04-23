@@ -1,5 +1,5 @@
 import type { BroadsetElement, BuiltInElementType, Canvas } from '@broadset/model';
-import { BUILT_IN_ELEMENT_TYPES } from '@broadset/model';
+import { BUILT_IN_ELEMENT_TYPES, migrateLegacyColor } from '@broadset/model';
 
 import { emuToValue } from './units';
 
@@ -119,7 +119,7 @@ function createImportedElement(
     content,
     style: {
       opacity: 1,
-      ...(backgroundColor ? { backgroundColor } : undefined),
+      ...(backgroundColor ? { backgroundColor: migrateLegacyColor(backgroundColor) } : undefined),
     },
     parentId: null,
     groupId: null,

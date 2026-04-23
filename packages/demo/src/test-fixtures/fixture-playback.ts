@@ -1,9 +1,4 @@
-import {
-  type BroadsetDocument,
-  createDefaultAnimationConfig,
-  createDefaultElement,
-  createDefaultStyle,
-} from '@broadset/model';
+import { type BroadsetDocument, createDefaultAnimationConfig, createDefaultElement } from '@broadset/model';
 
 import { createBaseFixtureDocument, createRootPageInstances } from './base-document';
 import { FIXTURE_IDS } from './ids';
@@ -18,7 +13,6 @@ export function createDemoAppPlaybackTestDocument(): BroadsetDocument {
       width: 96,
       height: 96,
       style: {
-        ...createDefaultStyle(),
         backgroundColor: '#3da9fc',
       },
     }),
@@ -30,7 +24,6 @@ export function createDemoAppPlaybackTestDocument(): BroadsetDocument {
       height: 80,
       content: '<b>PLAYBACK TEST</b>',
       style: {
-        ...createDefaultStyle(),
         fontFamily: 'Inter',
         fontSize: 48,
         fontWeight: 700,

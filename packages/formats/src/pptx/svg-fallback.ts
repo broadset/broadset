@@ -1,7 +1,15 @@
-import type { BroadsetElement, BroadsetElementStyle, BroadsetGradient } from '@broadset/model';
+import {
+  type BroadsetElement,
+  type BroadsetElementStyle,
+  type BroadsetGradient,
+  colorToCss,
+  resolveStyleColor,
+} from '@broadset/model';
 
 function buildSvgGradientDef(grad: BroadsetGradient, id: string): string {
-  const stops = grad.stops.map((s) => `<stop offset="${String(s.position * 100)}%" stop-color="${s.color}"/>`).join('');
+  const stops = grad.stops
+    .map((s) => `<stop offset="${String(s.position * 100)}%" stop-color="${colorToCss(s.color)}"/>`)
+    .join('');
 
   if (grad.type === 'radial') {
     const cx = grad.center ? String(grad.center[0] * 100) : '50';
@@ -58,15 +66,19 @@ export function buildSvgForElement(el: BroadsetElement): string {
     const grad = style.backgroundGradient;
 
     if (typeof grad === 'string') {
-      fill = style.backgroundColor ?? 'none';
+      fill = resolveStyleColor(style.backgroundColor, { resolveTheme: false }) ?? 'none';
     } else {
       const gradId = 'grad0';
 
       defs.push(buildSvgGradientDef(grad, gradId));
       fill = `url(#${gradId})`;
     }
-  } else if (style.backgroundColor) {
-    fill = style.backgroundColor;
+  } else {
+    const backgroundCss = resolveStyleColor(style.backgroundColor, { resolveTheme: false });
+
+    if (backgroundCss !== undefined) {
+      fill = backgroundCss;
+    }
   }
 
   if (defs.length > 0) {

@@ -1,4 +1,3 @@
-import type { BroadsetElementStyle } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { buildMaskedSvgSource, canvasToPoints, decodeDataUri, exportPdfBytes, parseCssColor } from './index';
@@ -228,7 +227,7 @@ describe('CSS Color Parsing', () => {
 
   /** @description Style helper supports custom values used by rendering tests. */
   it('builds style helper objects with overrides', () => {
-    const style = makeStyle({ fontSize: 12 }) as BroadsetElementStyle;
+    const style = makeStyle({ fontSize: 12 });
 
     expect(style.opacity).toBe(1);
     expect(style.fontSize).toBe(12);

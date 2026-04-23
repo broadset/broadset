@@ -1,7 +1,13 @@
-import type { BroadsetElementStyle, BroadsetGradient, BroadsetGradientStop } from '@broadset/model';
+import {
+  type BroadsetElementStyle,
+  type BroadsetGradient,
+  type BroadsetGradientStop,
+  colorToCss,
+  resolveStyleColor,
+} from '@broadset/model';
 
 function formatGradientStop(stop: BroadsetGradientStop): string {
-  return `${stop.color} ${String(stop.position)}%`;
+  return `${colorToCss(stop.color)} ${String(stop.position)}%`;
 }
 
 function serializeGradient(gradient: string | BroadsetGradient): string {
@@ -54,10 +60,12 @@ export function applyBackgroundStyle(node: HTMLElement, style: BroadsetElementSt
 
   delete node.dataset['gradient'];
 
-  if (style.backgroundColor !== undefined) {
+  const backgroundColorCss = resolveStyleColor(style.backgroundColor, { resolveTheme: false });
+
+  if (backgroundColorCss !== undefined) {
     node.style.background = '';
     node.style.backgroundImage = '';
-    node.style.backgroundColor = style.backgroundColor;
+    node.style.backgroundColor = backgroundColorCss;
 
     return;
   }

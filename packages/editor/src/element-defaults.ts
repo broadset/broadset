@@ -1,11 +1,11 @@
-import type { BroadsetElementStyle } from '@broadset/model';
+import type { BroadsetElementStyleInput } from '@broadset/model';
 
 export interface ElementDefaults {
   readonly name: string;
   readonly width: number;
   readonly height: number;
   readonly content: string;
-  readonly style: Partial<BroadsetElementStyle>;
+  readonly style: Partial<BroadsetElementStyleInput>;
 }
 
 export interface PluginDefaults {
@@ -16,7 +16,7 @@ export interface PluginDefaults {
     readonly width?: number;
     readonly height?: number;
     readonly content?: string;
-    readonly style?: Partial<BroadsetElementStyle>;
+    readonly style?: Partial<BroadsetElementStyleInput>;
   };
 }
 

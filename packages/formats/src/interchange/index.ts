@@ -1,4 +1,4 @@
-import type { BroadsetDocument, BroadsetElement, BroadsetProject } from '@broadset/model';
+import { type BroadsetDocument, type BroadsetElement, type BroadsetProject, resolveStyleColor } from '@broadset/model';
 import type { VideoEncodingConfig } from 'mediabunny';
 import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, WebMOutputFormat } from 'mediabunny';
 import qrcode from 'qrcode-generator';
@@ -254,8 +254,10 @@ function buildElementStyle(element: BroadsetElement): string {
     parts.push(`opacity:${String(element.style.opacity)}`);
   }
 
-  if (element.style.backgroundColor) {
-    parts.push(`background:${element.style.backgroundColor}`);
+  const backgroundCss = resolveStyleColor(element.style.backgroundColor, { resolveTheme: false });
+
+  if (backgroundCss !== undefined) {
+    parts.push(`background:${backgroundCss}`);
   }
 
   if (element.style.fontFamily) {
@@ -266,8 +268,10 @@ function buildElementStyle(element: BroadsetElement): string {
     parts.push(`font-size:${String(element.style.fontSize)}px`);
   }
 
-  if (element.style.fontColor) {
-    parts.push(`color:${element.style.fontColor}`);
+  const fontColorCss = resolveStyleColor(element.style.fontColor, { resolveTheme: false });
+
+  if (fontColorCss !== undefined) {
+    parts.push(`color:${fontColorCss}`);
   }
 
   return parts.join(';');

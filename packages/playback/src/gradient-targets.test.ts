@@ -1,4 +1,4 @@
-import type { BroadsetGradient } from '@broadset/model';
+import { type BroadsetGradient, rgbColor } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -12,8 +12,8 @@ import {
 const TWO_STOP_GRADIENT: BroadsetGradient = {
   type: 'linear',
   stops: [
-    { color: '#ff0000', position: 0 },
-    { color: '#0000ff', position: 100 },
+    { color: rgbColor('#ff0000'), position: 0 },
+    { color: rgbColor('#0000ff'), position: 100 },
   ],
   angle: 180,
 };
@@ -21,8 +21,8 @@ const TWO_STOP_GRADIENT: BroadsetGradient = {
 const RADIAL_GRADIENT: BroadsetGradient = {
   type: 'radial',
   stops: [
-    { color: '#ffffff', position: 0 },
-    { color: '#000000', position: 100 },
+    { color: rgbColor('#ffffff'), position: 0 },
+    { color: rgbColor('#000000'), position: 100 },
   ],
   center: [50, 50],
 };
@@ -108,8 +108,8 @@ describe('applyGradientPropertyUpdates', () => {
     ];
     const result = applyGradientPropertyUpdates(TWO_STOP_GRADIENT, updates);
 
-    expect(result.stops[0]?.color).toBe('#00ff00');
-    expect(result.stops[1]?.color).toBe('#0000ff');
+    expect(result.stops[0]?.color).toEqual(rgbColor('#00ff00'));
+    expect(result.stops[1]?.color).toEqual(rgbColor('#0000ff'));
   });
 
   /** @description Stop position updates replace the position of the addressed stop. */
@@ -147,7 +147,7 @@ describe('applyGradientPropertyUpdates', () => {
     ];
     const result = applyGradientPropertyUpdates(TWO_STOP_GRADIENT, updates);
 
-    expect(result.stops[0]?.color).toBe('#00ff00');
+    expect(result.stops[0]?.color).toEqual(rgbColor('#00ff00'));
     expect(result.angle).toBe(45);
   });
 
@@ -169,6 +169,6 @@ describe('applyGradientPropertyUpdates', () => {
 
     applyGradientPropertyUpdates(TWO_STOP_GRADIENT, updates);
 
-    expect(TWO_STOP_GRADIENT.stops[0]?.color).toBe('#ff0000');
+    expect(TWO_STOP_GRADIENT.stops[0]?.color).toEqual(rgbColor('#ff0000'));
   });
 });

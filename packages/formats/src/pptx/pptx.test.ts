@@ -1,4 +1,12 @@
-import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle, Canvas } from '@broadset/model';
+import {
+  type BroadsetDocument,
+  type BroadsetElement,
+  type BroadsetElementStyle,
+  type BroadsetElementStyleInput,
+  type Canvas,
+  rgbColor,
+  styleSchema,
+} from '@broadset/model';
 import PizZip from 'pizzip';
 import { describe, expect, it } from 'vitest';
 
@@ -20,8 +28,8 @@ function makeCanvas(overrides: Partial<Canvas> = {}): Canvas {
   };
 }
 
-function makeStyle(overrides: Partial<BroadsetElementStyle> = {}): Partial<BroadsetElementStyle> {
-  return { opacity: 1, ...overrides };
+function makeStyle(overrides: Partial<BroadsetElementStyleInput> = {}): BroadsetElementStyle {
+  return styleSchema.parse({ opacity: 1, ...overrides });
 }
 
 function makeElement(type: BroadsetElement['type'], overrides: Partial<BroadsetElement> = {}): BroadsetElement {
@@ -35,7 +43,7 @@ function makeElement(type: BroadsetElement['type'], overrides: Partial<BroadsetE
     width: 100,
     height: 50,
     rotation: 0,
-    style: makeStyle() as BroadsetElementStyle,
+    style: makeStyle(),
     content: '',
     ...overrides,
   } as BroadsetElement;
@@ -83,11 +91,11 @@ describe('PPTX Export with SVG Picture Fallback', () => {
               type: 'linear',
               angle: 90,
               stops: [
-                { color: '#ff0000', position: 0 },
-                { color: '#0000ff', position: 1 },
+                { color: rgbColor('#ff0000'), position: 0 },
+                { color: rgbColor('#0000ff'), position: 1 },
               ],
             },
-          }) as BroadsetElementStyle,
+          }),
         }),
       ],
     });
@@ -120,7 +128,7 @@ describe('PPTX Export with SVG Picture Fallback', () => {
     const doc = makeDocument({
       elements: [
         makeElement('rectangle', {
-          style: makeStyle({ backgroundColor: '#ff0000' }) as BroadsetElementStyle,
+          style: makeStyle({ backgroundColor: '#ff0000' }),
         }),
       ],
     });
@@ -150,7 +158,7 @@ describe('PPTX Export with SVG Picture Fallback', () => {
           style: makeStyle({
             backgroundColor: '#00ff00',
             borderRadius: [10, 0, 10, 0],
-          }) as BroadsetElementStyle,
+          }),
         }),
       ],
     });
@@ -173,7 +181,7 @@ describe('PPTX Text, Image, and Group Export', () => {
     const groupEl = makeElement('group', { id: 'grp-1' });
     const childRect = makeElement('rectangle', {
       groupId: 'grp-1',
-      style: makeStyle({ backgroundColor: '#0000ff' }) as BroadsetElementStyle,
+      style: makeStyle({ backgroundColor: '#0000ff' }),
     });
 
     const doc = makeDocument({
@@ -237,7 +245,7 @@ describe('PPTX Import with Path Recovery', () => {
     const doc = makeDocument({
       elements: [
         makeElement('rectangle', {
-          style: makeStyle({ backgroundColor: '#ff0000' }) as BroadsetElementStyle,
+          style: makeStyle({ backgroundColor: '#ff0000' }),
         }),
         makeElement('text', { content: 'Test text' }),
         makeElement('image', { content: 'data:image/png;base64,iVBORw0KGgo=' }),
@@ -269,7 +277,7 @@ describe('PPTX Import with Path Recovery', () => {
           style: makeStyle({
             backgroundColor: '#ff0000',
             backgroundGradient: 'linear-gradient(90deg, #ff0000, #0000ff)',
-          }) as BroadsetElementStyle,
+          }),
           width: 100,
           height: 50,
         }),
@@ -320,7 +328,7 @@ describe('PPTX Import with Path Recovery', () => {
           style: makeStyle({
             backgroundColor: '#ff0000',
             backgroundGradient: 'linear-gradient(90deg, #ff0000, #0000ff)',
-          }) as BroadsetElementStyle,
+          }),
         }),
       ],
     });
@@ -363,11 +371,11 @@ describe('PPTX Round-Trip Fidelity', () => {
     const doc = makeDocument({
       elements: [
         makeElement('rectangle', {
-          style: makeStyle({ backgroundColor: '#ff0000' }) as BroadsetElementStyle,
+          style: makeStyle({ backgroundColor: '#ff0000' }),
         }),
         makeElement('text', { content: 'Round-trip text' }),
         makeElement('rectangle', {
-          style: makeStyle({ backgroundColor: '#00ff00' }) as BroadsetElementStyle,
+          style: makeStyle({ backgroundColor: '#00ff00' }),
         }),
       ],
     });
@@ -388,7 +396,7 @@ describe('PPTX Round-Trip Fidelity', () => {
       position: { x: 25.4, y: 12.7 },
       width: 76.2,
       height: 50.8,
-      style: makeStyle({ backgroundColor: '#ff0000' }) as BroadsetElementStyle,
+      style: makeStyle({ backgroundColor: '#ff0000' }),
     });
 
     const doc = makeDocument({ elements: [rect] });
@@ -491,11 +499,11 @@ describe('PPTX Embedded Image Import', () => {
               type: 'linear',
               angle: 90,
               stops: [
-                { color: '#ff0000', position: 0 },
-                { color: '#0000ff', position: 1 },
+                { color: rgbColor('#ff0000'), position: 0 },
+                { color: rgbColor('#0000ff'), position: 1 },
               ],
             },
-          }) as BroadsetElementStyle,
+          }),
         }),
         makeElement('image', { content: 'data:image/png;base64,iVBORw0KGgo=' }),
       ],

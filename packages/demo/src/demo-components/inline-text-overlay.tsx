@@ -1,5 +1,5 @@
 import { commitInlineText, type EditorStore, stopInlineTextEditing } from '@broadset/editor';
-import type { BroadsetElement, BroadsetElementStyle } from '@broadset/model';
+import { type BroadsetElement, type BroadsetElementStyle, resolveStyleColor } from '@broadset/model';
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
@@ -157,7 +157,7 @@ export function InlineTextOverlay({
     outlineOffset: '-1px',
     pointerEvents: 'auto',
     cursor: 'text',
-    color: style.fontColor ?? 'inherit',
+    color: resolveStyleColor(style.fontColor, { resolveTheme: false }) ?? 'inherit',
     fontFamily: style.fontFamily ?? 'inherit',
     fontSize: style.fontSize === undefined ? undefined : `${String(style.fontSize)}px`,
     fontWeight: style.fontWeight ?? 'inherit',

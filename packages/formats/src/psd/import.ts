@@ -1,11 +1,11 @@
 import type {
   BroadsetDocument,
   BroadsetElement,
-  BroadsetElementStyle,
+  BroadsetElementStyleInput,
   BuiltInElementType,
   Canvas,
 } from '@broadset/model';
-import { BUILT_IN_ELEMENT_TYPES } from '@broadset/model';
+import { BUILT_IN_ELEMENT_TYPES, styleSchema } from '@broadset/model';
 import type { Layer } from 'ag-psd';
 import { readPsd } from 'ag-psd';
 
@@ -28,7 +28,7 @@ function createImportedElement(
   position: { readonly x: number; readonly y: number },
   width: number,
   height: number,
-  style: Partial<BroadsetElementStyle> = {},
+  style: Partial<BroadsetElementStyleInput> = {},
 ): BroadsetElement {
   const validType = isValidElementType(type) ? type : 'rectangle';
 
@@ -44,7 +44,7 @@ function createImportedElement(
     height,
     rotation: 0,
     content,
-    style: { opacity: 1, ...style },
+    style: styleSchema.parse({ opacity: 1, ...style }),
     parentId: null,
     groupId: null,
     assetId: null,
@@ -204,7 +204,7 @@ function importTextLayer(
     ...style,
     ...fontSize,
     ...fontColor,
-  } satisfies Partial<BroadsetElementStyle>);
+  } satisfies Partial<BroadsetElementStyleInput>);
 }
 
 function importPlacedLayer(layer: Layer, geometry: LayerGeometry, style: Record<string, unknown>): BroadsetElement {
@@ -227,7 +227,7 @@ function importPlacedLayer(layer: Layer, geometry: LayerGeometry, style: Record<
     geometry.position,
     geometry.width,
     geometry.height,
-    style as Partial<BroadsetElementStyle>,
+    style as Partial<BroadsetElementStyleInput>,
   );
 }
 
@@ -250,7 +250,7 @@ function importOpenVectorPath(
     geometry.position,
     geometry.width,
     geometry.height,
-    style as Partial<BroadsetElementStyle>,
+    style as Partial<BroadsetElementStyleInput>,
   );
 }
 
@@ -261,7 +261,7 @@ function importImageDataRectangle(layer: Layer, geometry: LayerGeometry, style: 
   return createImportedElement('rectangle', '', geometry.position, geometry.width, geometry.height, {
     ...style,
     ...(bgColor ? { backgroundColor: bgColor } : undefined),
-  } satisfies Partial<BroadsetElementStyle>);
+  } satisfies Partial<BroadsetElementStyleInput>);
 }
 
 function layerToElement(layer: Layer): BroadsetElement | undefined {
@@ -283,7 +283,7 @@ function layerToElement(layer: Layer): BroadsetElement | undefined {
       geometry.position,
       geometry.width,
       geometry.height,
-      style as Partial<BroadsetElementStyle>,
+      style as Partial<BroadsetElementStyleInput>,
     );
   }
 
@@ -306,7 +306,7 @@ function layerToElement(layer: Layer): BroadsetElement | undefined {
     geometry.position,
     geometry.width,
     geometry.height,
-    style as Partial<BroadsetElementStyle>,
+    style as Partial<BroadsetElementStyleInput>,
   );
 }
 

@@ -1,6 +1,6 @@
 import {
   type BroadsetElement,
-  type BroadsetElementStyle,
+  type BroadsetElementStyleInput,
   createDefaultElement,
   type EditorConfig,
   editorConfigSchema,
@@ -89,7 +89,7 @@ interface CreateElementOptions {
   readonly rotation?: number;
   readonly name?: string;
   readonly content?: string;
-  readonly style?: Partial<BroadsetElementStyle>;
+  readonly style?: Partial<BroadsetElementStyleInput>;
 }
 
 function insertElement(store: EditorStore, options: CreateElementOptions): { readonly elementId: string } {

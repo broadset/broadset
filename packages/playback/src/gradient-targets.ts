@@ -1,4 +1,9 @@
-import type { BroadsetGradient, BroadsetGradientStop } from '@broadset/model';
+import {
+  type BroadsetGradient,
+  type BroadsetGradientStop,
+  colorToCss,
+  migrateLegacyColor,
+} from '@broadset/model';
 
 const GRADIENT_STOP_RE = /^backgroundGradient\.stops\[(\d+)\]\.(color|position)$/;
 const GRADIENT_FIXED_TARGETS = new Set(['backgroundGradient.angle', 'backgroundGradient.center']);
@@ -83,7 +88,18 @@ function applyStopUpdate(
   if (stop === undefined) return;
 
   if (field === 'color' && typeof value === 'string') {
-    stops[index] = { ...stop, color: value };
+    const color = migrateLegacyColor(value);
+
+    if (color !== undefined) {
+      stops[index] = { ...stop, color };
+    }
+  } else if (
+    field === 'color' &&
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in (value as Record<string, unknown>)
+  ) {
+    stops[index] = { ...stop, color: value as BroadsetGradientStop['color'] };
   } else if (field === 'position' && typeof value === 'number') {
     stops[index] = { ...stop, position: value };
   }
@@ -137,7 +153,9 @@ export function applyGradientPropertyUpdates(
 
 /** Serialize a BroadsetGradient to a CSS gradient string. */
 export function serializeGradientToCss(gradient: BroadsetGradient): string {
-  const stops = gradient.stops.map((stop) => `${stop.color} ${String(stop.position)}%`).join(', ');
+  const stops = gradient.stops
+    .map((stop) => `${colorToCss(stop.color)} ${String(stop.position)}%`)
+    .join(', ');
 
   switch (gradient.type) {
     case 'linear': {

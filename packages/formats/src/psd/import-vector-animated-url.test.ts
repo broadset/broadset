@@ -1,4 +1,3 @@
-import type { BroadsetElementStyle } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { exportPsdBytes, exportPsdBytesAsync, importPsd, svgPathToPsdVectorMask } from './index';
@@ -13,7 +12,7 @@ describe('PSD Import', () => {
           style: makeStyle({
             backgroundColor: '#0000ff',
             borderRadius: [20, 20, 20, 20],
-          }) as BroadsetElementStyle,
+          }),
         }),
       ],
     });
@@ -38,7 +37,7 @@ describe('PSD Import', () => {
             opacity: 0.75,
             backgroundColor: '#00ff00',
             borderRadius: [15, 15, 15, 15],
-          }) as BroadsetElementStyle,
+          }),
         }),
       ],
     });
@@ -103,7 +102,7 @@ describe('PSD Animated Element Static Export', () => {
       elements: [
         makeElement('rectangle', {
           id: 'anim-el',
-          style: makeStyle({ backgroundColor: '#ff0000', opacity: 0.8 }) as BroadsetElementStyle,
+          style: makeStyle({ backgroundColor: '#ff0000', opacity: 0.8 }),
         }),
       ],
       animations: [
@@ -161,7 +160,7 @@ describe('PSD URL Image Fetch Export', () => {
         makeElement('image', {
           id: 'url-img-missing',
           content: 'https://example.com/photo.png',
-          style: makeStyle() as BroadsetElementStyle,
+          style: makeStyle(),
         }),
       ],
     });
@@ -177,7 +176,7 @@ describe('PSD URL Image Fetch Export', () => {
         makeElement('image', {
           id: 'url-img-sync',
           content: 'https://example.com/sync-photo.png',
-          style: makeStyle() as BroadsetElementStyle,
+          style: makeStyle(),
         }),
       ],
     });
@@ -231,7 +230,7 @@ describe('PSD URL Image Fetch Export', () => {
         makeElement('image', {
           id: 'url-img',
           content: 'https://example.com/photo.png',
-          style: makeStyle() as BroadsetElementStyle,
+          style: makeStyle(),
         }),
       ],
     });

@@ -5,6 +5,7 @@ import type {
   BroadsetGradient,
   Canvas,
 } from '@broadset/model';
+import { colorToCss } from '@broadset/model';
 import { type EmbeddedFont, PDF, type PDFPage, rgb, type Standard14FontName, StandardFonts } from '@libpdf/core';
 
 import { parseCssColor } from './color';
@@ -61,7 +62,7 @@ function resolveGradientFallbackColor(gradient: string | BroadsetGradient): Retu
     return undefined;
   }
 
-  const parsed = parseCssColor(firstStop.color);
+  const parsed = parseCssColor(colorToCss(firstStop.color));
 
   if (parsed) {
     return rgb(parsed.r, parsed.g, parsed.b);

@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import { normalizeColor } from './color';
+import {
+  type BroadsetColor,
+  broadsetColorSchema,
+  type ColorResolutionContext,
+  colorToCss,
+} from './broadset-color';
+import { migrateLegacyColor } from './migrations/migrate-legacy-color';
 
 export type StrokeLinecap = 'butt' | 'round' | 'square';
 export type StrokeLinejoin = 'miter' | 'round' | 'bevel';
@@ -48,7 +54,7 @@ export type BorderRadiusTuple = readonly [number, number, number, number];
 export type PaddingTuple = readonly [number, number, number, number];
 
 export interface BroadsetGradientStop {
-  readonly color: string;
+  readonly color: BroadsetColor;
   readonly position: number;
 }
 
@@ -72,7 +78,7 @@ export interface BroadsetElementStyle {
   readonly opacity: number;
   readonly fontFamily?: string | undefined;
   readonly fontSize?: number | undefined;
-  readonly fontColor?: string | undefined;
+  readonly fontColor?: BroadsetColor | undefined;
   readonly fontWeight?: FontWeight | undefined;
   readonly fontStyle?: FontStyle | undefined;
   readonly textAlignment?: TextAlignment | undefined;
@@ -86,10 +92,10 @@ export interface BroadsetElementStyle {
   readonly wordSpacing?: number | undefined;
   readonly textStroke?: string | undefined;
   readonly textShadow?: string | undefined;
-  readonly backgroundColor?: string | undefined;
+  readonly backgroundColor?: BroadsetColor | undefined;
   readonly backgroundGradient?: BackgroundGradientValue;
   readonly borderWidth?: number | undefined;
-  readonly borderColor?: string | undefined;
+  readonly borderColor?: BroadsetColor | undefined;
   readonly borderRadius?: BorderRadiusTuple | undefined;
   readonly borderStyle?: BorderStyle | undefined;
   readonly boxShadow?: string | undefined;
@@ -99,7 +105,7 @@ export interface BroadsetElementStyle {
   readonly isolation?: Isolation | undefined;
   readonly padding?: PaddingTuple | undefined;
   readonly objectFit?: ObjectFit | undefined;
-  readonly stroke?: string | undefined;
+  readonly stroke?: BroadsetColor | undefined;
   readonly strokeWidth?: number | undefined;
   readonly strokeDasharray?: string | undefined;
   readonly strokeDashoffset?: number | undefined;
@@ -109,7 +115,7 @@ export interface BroadsetElementStyle {
   readonly strokeOpacity?: number | undefined;
   readonly strokeHeadEnd?: ArrowEnd | undefined;
   readonly strokeTailEnd?: ArrowEnd | undefined;
-  readonly fill?: string | undefined;
+  readonly fill?: BroadsetColor | undefined;
   readonly fillOpacity?: number | undefined;
   readonly fillRule?: FillRule | undefined;
   readonly maskType?: MaskStyleType | undefined;
@@ -171,16 +177,76 @@ export function isBorderRadiusUniform(radius: BorderRadiusTuple): boolean {
   return radius[0] === radius[1] && radius[1] === radius[2] && radius[2] === radius[3];
 }
 
-function maybeNormalizeColor(value: string | undefined): string | undefined {
-  if (value === undefined) {
+/**
+ * Input-side style shape accepted by `styleSchema`: color-valued
+ * fields may be either a canonical `BroadsetColor` or a legacy CSS
+ * color string (hex / rgb / hsl / named / Color Level 4). The schema
+ * preprocessor normalizes strings through `migrateLegacyColor` at
+ * parse time so the persisted `BroadsetElementStyle` only ever
+ * contains `BroadsetColor`. Construction-time callers (importers,
+ * fixtures, test helpers) use this type so migration remains a
+ * one-site concern.
+ */
+export type BroadsetElementStyleInput = Omit<
+  BroadsetElementStyle,
+  'fontColor' | 'backgroundColor' | 'borderColor' | 'stroke' | 'fill'
+> & {
+  readonly fontColor?: BroadsetColor | string | undefined;
+  readonly backgroundColor?: BroadsetColor | string | undefined;
+  readonly borderColor?: BroadsetColor | string | undefined;
+  readonly stroke?: BroadsetColor | string | undefined;
+  readonly fill?: BroadsetColor | string | undefined;
+};
+
+/**
+ * Resolves an optional `BroadsetColor` to its CSS-string view for
+ * renderer, editor, formats, and demo consumers that still assign the
+ * result directly onto DOM `style` properties or CSS export strings.
+ *
+ * Returns `undefined` when the color is absent so callers can preserve
+ * the "unset" shape through `?? ''` or nullish fallbacks. Theme colors
+ * require a `ColorResolutionContext` with a palette — passing
+ * `{ resolveTheme: false }` returns the approximation `hex` instead of
+ * throwing so non-theme-aware consumers (e.g. generic CSS writers)
+ * stay functional when the palette isn't wired yet.
+ */
+export function resolveStyleColor(
+  color: BroadsetColor | undefined,
+  ctx?: ColorResolutionContext & { readonly resolveTheme?: boolean },
+): string | undefined {
+  if (color === undefined) return undefined;
+
+  if (color.kind === 'rgb') {
+    return color.originalColor ?? color.hex;
+  }
+
+  if (ctx?.resolveTheme === false) {
     return undefined;
   }
 
-  try {
-    return normalizeColor(value);
-  } catch {
-    return value;
+  return colorToCss(color, ctx);
+}
+
+/**
+ * Accepts either a `BroadsetColor` or a legacy string (hex, rgb, hsl,
+ * named color, Color Level 4 literal) and returns a canonical
+ * `BroadsetColor`. Unrecognized strings fall back to the legacy
+ * `normalizeColor` output wrapped in an `rgb` color so importer round-
+ * trip never silently drops a value — schema validation happens
+ * separately through `broadsetColorSchema`.
+ */
+function coerceBroadsetColor(value: unknown): BroadsetColor | undefined {
+  if (value === undefined || value === null) return undefined;
+
+  if (typeof value === 'string') {
+    return migrateLegacyColor(value);
   }
+
+  if (typeof value === 'object' && 'kind' in (value as Record<string, unknown>)) {
+    return value as BroadsetColor;
+  }
+
+  return undefined;
 }
 
 function normalizeBackgroundGradient(value: BackgroundGradientValue): BackgroundGradientValue {
@@ -190,7 +256,7 @@ function normalizeBackgroundGradient(value: BackgroundGradientValue): Background
   return {
     ...value,
     stops: value.stops.map((stop) => ({
-      color: maybeNormalizeColor(stop.color) ?? stop.color,
+      color: coerceBroadsetColor(stop.color) ?? stop.color,
       position: stop.position,
     })),
   };
@@ -256,13 +322,43 @@ const paddingSchema = z.tuple([
   z.number().nonnegative(),
 ]);
 
+/**
+ * Zod preprocessor that accepts either a `BroadsetColor` discriminated
+ * union or any legacy CSS color string (hex / rgb / hsl / named / Color
+ * Level 4) and normalizes it into a canonical `BroadsetColor` at the
+ * model boundary. Unparseable strings (`'none'`, `'currentColor'`, …)
+ * are collapsed to `undefined` so callers treat them as "unset" rather
+ * than failing validation; the downstream `.optional()` schema accepts
+ * that outcome.
+ */
+function coerceStringToColorInput(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  try {
+    return migrateLegacyColor(value);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Gradient stop color: required, preprocesses strings → BroadsetColor (unparseable strings fail). */
+const broadsetColorOrRequiredLegacyStringSchema = z.preprocess(coerceStringToColorInput, broadsetColorSchema);
+
+/** Optional style color: preprocesses strings, unparseable / absent values collapse to undefined. */
+const broadsetColorOrOptionalLegacyStringSchema = z.preprocess(
+  coerceStringToColorInput,
+  broadsetColorSchema.optional(),
+);
+
 const broadsetGradientSchema = z
   .object({
     type: z.enum(['linear', 'radial', 'conic']),
     stops: z
       .array(
         z.object({
-          color: z.string(),
+          color: broadsetColorOrRequiredLegacyStringSchema,
           position: z.number().min(0).max(100),
         }),
       )
@@ -289,7 +385,7 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
     opacity: z.number().min(0).max(1),
     fontFamily: z.string().optional(),
     fontSize: z.number().positive().optional(),
-    fontColor: z.string().optional(),
+    fontColor: broadsetColorOrOptionalLegacyStringSchema,
     fontWeight: z.number().int().optional(),
     fontStyle: z.enum(['normal', 'italic', 'oblique']).optional(),
     textAlignment: z.enum(['left', 'center', 'right', 'justify']).optional(),
@@ -303,10 +399,10 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
     wordSpacing: z.number().optional(),
     textStroke: z.string().optional(),
     textShadow: z.string().optional(),
-    backgroundColor: z.string().optional(),
+    backgroundColor: broadsetColorOrOptionalLegacyStringSchema,
     backgroundGradient: z.union([z.string(), broadsetGradientSchema]).optional(),
     borderWidth: z.number().nonnegative().optional(),
-    borderColor: z.string().optional(),
+    borderColor: broadsetColorOrOptionalLegacyStringSchema,
     borderRadius: borderRadiusSchema.optional(),
     borderStyle: z.enum(BORDER_STYLE_VALUES).optional(),
     boxShadow: z.string().optional(),
@@ -316,7 +412,7 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
     isolation: z.enum(['auto', 'isolate']).optional(),
     padding: paddingSchema.optional(),
     objectFit: z.enum(['fill', 'contain', 'cover', 'none', 'scale-down']).optional(),
-    stroke: z.string().optional(),
+    stroke: broadsetColorOrOptionalLegacyStringSchema,
     strokeWidth: z.number().nonnegative().optional(),
     strokeDasharray: z.string().optional(),
     strokeDashoffset: z.number().optional(),
@@ -326,7 +422,7 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
     strokeOpacity: z.number().min(0).max(1).optional(),
     strokeHeadEnd: arrowEndSchema.optional(),
     strokeTailEnd: arrowEndSchema.optional(),
-    fill: z.string().optional(),
+    fill: broadsetColorOrOptionalLegacyStringSchema,
     fillOpacity: z.number().min(0).max(1).optional(),
     fillRule: z.enum(['nonzero', 'evenodd']).optional(),
     maskType: z.enum(['none', 'alpha', 'luminance', 'custom']).optional(),
@@ -375,7 +471,7 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
       opacity: value.opacity,
       fontFamily: value.fontFamily,
       fontSize: value.fontSize,
-      fontColor: maybeNormalizeColor(value.fontColor),
+      fontColor: coerceBroadsetColor(value.fontColor),
       fontWeight: normalizeFontWeight(value.fontWeight),
       fontStyle: value.fontStyle,
       textAlignment: value.textAlignment,
@@ -389,10 +485,10 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
       wordSpacing: normalizeSpacing(value.wordSpacing),
       textStroke: value.textStroke,
       textShadow: value.textShadow,
-      backgroundColor: maybeNormalizeColor(value.backgroundColor),
+      backgroundColor: coerceBroadsetColor(value.backgroundColor),
       ...(normalizedBackgroundGradient === undefined ? {} : { backgroundGradient: normalizedBackgroundGradient }),
       borderWidth: value.borderWidth,
-      borderColor: maybeNormalizeColor(value.borderColor),
+      borderColor: coerceBroadsetColor(value.borderColor),
       borderRadius: value.borderRadius === undefined ? undefined : normalizeBorderRadius(value.borderRadius),
       borderStyle: value.borderStyle,
       boxShadow: value.boxShadow,
@@ -402,7 +498,7 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
       isolation: value.isolation,
       padding: normalizePadding(value.padding) ?? [0, 0, 0, 0],
       objectFit: value.objectFit,
-      stroke: maybeNormalizeColor(value.stroke),
+      stroke: coerceBroadsetColor(value.stroke),
       strokeWidth: value.strokeWidth,
       strokeDasharray: value.strokeDasharray,
       strokeDashoffset: value.strokeDashoffset,
@@ -412,7 +508,7 @@ export const styleSchema: z.ZodType<BroadsetElementStyle> = z
       strokeOpacity: value.strokeOpacity,
       strokeHeadEnd: value.strokeHeadEnd,
       strokeTailEnd: value.strokeTailEnd,
-      fill: maybeNormalizeColor(value.fill),
+      fill: coerceBroadsetColor(value.fill),
       fillOpacity: value.fillOpacity,
       fillRule: value.fillRule,
       maskType: value.maskType ?? 'none',

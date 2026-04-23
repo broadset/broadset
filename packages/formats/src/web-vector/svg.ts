@@ -1,4 +1,11 @@
-import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle, BroadsetGradient } from '@broadset/model';
+import {
+  type BroadsetDocument,
+  type BroadsetElement,
+  type BroadsetElementStyle,
+  type BroadsetGradient,
+  colorToCss,
+  resolveStyleColor,
+} from '@broadset/model';
 
 import { generateQrSvgFragment } from '../interchange';
 import { escapeXml } from './shared';
@@ -17,7 +24,7 @@ function renderGradientDef(elementId: string, gradient: string | BroadsetGradien
 
   const gradId = `grad-${elementId}`;
   const stops = gradient.stops
-    .map((s) => `<stop offset="${String(s.position * 100)}%" stop-color="${escapeXml(s.color)}"/>`)
+    .map((s) => `<stop offset="${String(s.position * 100)}%" stop-color="${escapeXml(colorToCss(s.color))}"/>`)
     .join('');
 
   if (gradient.type === 'linear') {
@@ -114,12 +121,16 @@ function buildTransform(el: BroadsetElement): string {
 function buildStyleAttrs(style: BroadsetElementStyle): string {
   const attrs: string[] = [];
 
-  if (style.fill !== undefined) {
-    attrs.push(`fill="${escapeXml(style.fill)}"`);
+  const fillCss = resolveStyleColor(style.fill, { resolveTheme: false });
+
+  if (fillCss !== undefined) {
+    attrs.push(`fill="${escapeXml(fillCss)}"`);
   }
 
-  if (style.stroke !== undefined) {
-    attrs.push(`stroke="${escapeXml(style.stroke)}"`);
+  const strokeCss = resolveStyleColor(style.stroke, { resolveTheme: false });
+
+  if (strokeCss !== undefined) {
+    attrs.push(`stroke="${escapeXml(strokeCss)}"`);
   }
 
   if (style.strokeWidth !== undefined) {
@@ -165,8 +176,10 @@ function buildTextAttrs(style: BroadsetElementStyle): string {
     attrs.push(`font-size="${String(style.fontSize)}"`);
   }
 
-  if (style.fontColor) {
-    attrs.push(`fill="${escapeXml(style.fontColor)}"`);
+  const fontColorCss = resolveStyleColor(style.fontColor, { resolveTheme: false });
+
+  if (fontColorCss !== undefined) {
+    attrs.push(`fill="${escapeXml(fontColorCss)}"`);
   }
 
   if (style.fontWeight && style.fontWeight !== 400) {

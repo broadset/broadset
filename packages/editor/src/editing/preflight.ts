@@ -1,4 +1,4 @@
-import type { BroadsetDocument, BroadsetElement, FontDefinition } from '@broadset/model';
+import { type BroadsetDocument, type BroadsetElement, type FontDefinition, resolveStyleColor } from '@broadset/model';
 
 export type PreflightSeverity = 'error' | 'warning' | 'info';
 
@@ -76,6 +76,10 @@ function parseHexRgb(hex: string): readonly [number, number, number] | undefined
 
 function isFluorescentColor(hex: string | undefined): boolean {
   if (hex === undefined || hex === '') {
+    return false;
+  }
+
+  if (!hex.startsWith('#')) {
     return false;
   }
 
@@ -215,7 +219,8 @@ function checkColorMode(element: BroadsetElement, ctx: PreflightContext): readon
   }
 
   const hasFluorescent =
-    isFluorescentColor(element.style.backgroundColor) || isFluorescentColor(element.style.borderColor);
+    isFluorescentColor(resolveStyleColor(element.style.backgroundColor, { resolveTheme: false })) ||
+    isFluorescentColor(resolveStyleColor(element.style.borderColor, { resolveTheme: false }));
 
   if (!hasFluorescent) {
     return [];

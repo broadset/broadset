@@ -1,4 +1,4 @@
-import type { BroadsetElement, Canvas } from '@broadset/model';
+import { type BroadsetElement, type Canvas, resolveStyleColor } from '@broadset/model';
 
 import { RELATIONSHIP_TYPES } from './constants';
 import { buildSvgForElement, needsSvgFallback } from './svg-fallback';
@@ -111,7 +111,8 @@ function addMediaRelationship(
 }
 
 function buildTextShapeXml(el: BroadsetElement, x: number, y: number, cx: number, cy: number, rot: number): string {
-  const color = el.style.fontColor ? hexToRgb(el.style.fontColor) : '000000';
+  const fontColorCss = resolveStyleColor(el.style.fontColor, { resolveTheme: false });
+  const color = fontColorCss ? hexToRgb(fontColorCss) : '000000';
   const fontSize = el.style.fontSize ? Math.round(el.style.fontSize * 100) : 1200;
 
   return [
@@ -137,7 +138,8 @@ function buildTextShapeXml(el: BroadsetElement, x: number, y: number, cx: number
 }
 
 function buildRectShapeXml(el: BroadsetElement, x: number, y: number, cx: number, cy: number, rot: number): string {
-  const bgColor = el.style.backgroundColor ? hexToRgb(el.style.backgroundColor) : undefined;
+  const bgColorCss = resolveStyleColor(el.style.backgroundColor, { resolveTheme: false });
+  const bgColor = bgColorCss ? hexToRgb(bgColorCss) : undefined;
 
   return [
     `<p:sp>`,
@@ -155,7 +157,8 @@ function buildRectShapeXml(el: BroadsetElement, x: number, y: number, cx: number
 }
 
 function buildEllipseShapeXml(el: BroadsetElement, x: number, y: number, cx: number, cy: number, rot: number): string {
-  const bgColor = el.style.backgroundColor ? hexToRgb(el.style.backgroundColor) : undefined;
+  const bgColorCss = resolveStyleColor(el.style.backgroundColor, { resolveTheme: false });
+  const bgColor = bgColorCss ? hexToRgb(bgColorCss) : undefined;
 
   return [
     `<p:sp>`,

@@ -1,4 +1,4 @@
-import type { BroadsetElement } from '@broadset/model';
+import { type BroadsetElement, rgbColor } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { runPreflightDiagnostics } from './editing';
@@ -102,7 +102,7 @@ describe('Preflight Diagnostics', () => {
     // Fluorescent / highly saturated green
     const elWithFluo: BroadsetElement = {
       ...el,
-      style: { ...el.style, backgroundColor: '#00ff00' },
+      style: { ...el.style, backgroundColor: rgbColor('#00ff00') },
     };
     const doc = makePrintDoc([elWithFluo]);
     const issues = runPreflightDiagnostics(doc, {});
@@ -301,7 +301,7 @@ describe('Preflight Diagnostics', () => {
     });
     const elWithColor: BroadsetElement = {
       ...el,
-      style: { ...el.style, backgroundColor: '#0f0' },
+      style: { ...el.style, backgroundColor: rgbColor('#0f0') },
     };
     const doc = makePrintDoc([elWithColor]);
     const issues = runPreflightDiagnostics(doc, {});

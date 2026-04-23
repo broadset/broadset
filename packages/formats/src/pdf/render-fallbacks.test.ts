@@ -1,4 +1,3 @@
-import type { BroadsetElementStyle } from '@broadset/model';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { exportPdfBytes } from './index';
@@ -68,7 +67,7 @@ describe('PDF Render Fallback Upgrades', () => {
       elements: [
         makeElement('image', {
           content: 'https://example.com/photo.png',
-          style: makeStyle() as BroadsetElementStyle,
+          style: makeStyle(),
         }),
       ],
     });
@@ -85,11 +84,11 @@ describe('PDF Render Fallback Upgrades', () => {
       elements: [
         makeElement('clock', {
           content: '12:34',
-          style: makeStyle({ backgroundColor: '#ffffff' }) as BroadsetElementStyle,
+          style: makeStyle({ backgroundColor: '#ffffff' }),
         }),
         makeElement('ticker', {
           content: 'Breaking News',
-          style: makeStyle({ backgroundColor: '#ffffff' }) as BroadsetElementStyle,
+          style: makeStyle({ backgroundColor: '#ffffff' }),
         }),
       ],
     });
