@@ -1,25 +1,25 @@
 import { resolveContentAsPlainString } from '@broadset/model';
 
-import { createQrCodeMarkup } from './_util/qr-markup';
+import { createQrCodeMarkupAsElement } from './_util/qr-markup';
 import { createSimpleRenderer } from './_util/simple-renderer';
 
 /**
- * QR-code renderer. Generates scalable SVG markup from the element content
- * and applies responsive sizing. Empty payloads render no content instead of
- * an empty QR frame.
+ * QR-code renderer. Generates scalable SVG output from the element content
+ * via the safe element-returning helper, then mounts it directly — no
+ * `innerHTML` path. Empty payloads render no content instead of an empty
+ * QR frame.
  */
 export const createQrCodeRenderer = createSimpleRenderer((host, element) => {
-  const svgMarkup = createQrCodeMarkup(resolveContentAsPlainString(element.content));
+  const svg = createQrCodeMarkupAsElement(resolveContentAsPlainString(element.content));
 
-  host.innerHTML = svgMarkup ?? '';
+  if (svg === null) {
+    host.replaceChildren();
 
-  const firstChild = host.firstElementChild;
-
-  if (!(firstChild instanceof SVGElement)) {
     return;
   }
 
-  firstChild.setAttribute('width', '100%');
-  firstChild.setAttribute('height', '100%');
-  firstChild.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', '100%');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  host.replaceChildren(svg);
 });

@@ -69,7 +69,7 @@ Source of truth: [plan.md](./plan.md), [renderer-refactor-plan.md](./renderer-re
 - [x] P3.0 Contract cleanup
 - [x] P3.1 Internal layer split
 - [x] P3.2 Keyed reconciliation
-- [ ] P3.3 Semantic renderers and safe builders
+- [x] P3.3 Semantic renderers and safe builders
 - [ ] P3.4 Runtime services
 - [ ] P3.5 Broadset adapter migration
 - [ ] P3.6 Spec closure and hardening
