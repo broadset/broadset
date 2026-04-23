@@ -52,7 +52,14 @@ export interface ElementRendererFactoryParams {
 }
 
 export interface ElementRendererInstance {
-  update(element: BroadsetElement): void;
+  /**
+   * Apply the next element state to the renderer's host. The second
+   * argument is the current document snapshot, so composite renderers
+   * (e.g. boolean groups) can resolve their child-data dependencies
+   * against fresh data rather than a stale mount-time closure.
+   * Simple renderers that only need the element payload may ignore it.
+   */
+  update(element: BroadsetElement, document: BroadsetDocument): void;
   destroy(): void;
 }
 

@@ -12,6 +12,7 @@ import {
   type ScreenRendererController,
   type ScreenRendererOptions,
 } from '../core/contracts';
+import { classifyElementChange, type ElementChangeKind } from '../core/dirty';
 import { buildSceneTree, type SceneTreeNode } from '../scene-tree';
 import { BUILT_IN_RENDERERS, createFallbackRenderer } from '../screen-renderer/element-renderers';
 import { applyElementLayout, toPixelValue } from './layout';
@@ -176,19 +177,74 @@ export class DOMScreenRenderer implements ScreenRendererController {
   }
 
   private renderDocument(documentData: BroadsetDocument): void {
-    const fragment = document.createDocumentFragment();
-    const activeIds = new Set<string>();
+    const activeIds = this.collectActiveIds(documentData);
+    const changeKinds = this.computeChangeKinds(documentData, activeIds);
+    const rootNodes = buildSceneTree(documentData.elements);
+    const rootHosts: HTMLElement[] = [];
 
-    for (const node of buildSceneTree(documentData.elements)) {
-      this.renderNode({ activeIds, documentData, node, parent: fragment });
+    for (const node of rootNodes) {
+      rootHosts.push(this.renderNode({ changeKinds, documentData, node }));
     }
 
-    this.elementLayer.replaceChildren(fragment);
+    reconcileChildren(this.elementLayer, rootHosts);
+    this.destroyRemovedRecords(activeIds);
+  }
 
-    for (const [elementId, record] of this.rendererRecords.entries()) {
-      if (activeIds.has(elementId)) {
-        continue;
+  private collectActiveIds(documentData: BroadsetDocument): ReadonlySet<string> {
+    const activeIds = new Set<string>();
+
+    for (const element of documentData.elements) {
+      activeIds.add(element.id);
+    }
+
+    return activeIds;
+  }
+
+  private computeChangeKinds(
+    documentData: BroadsetDocument,
+    activeIds: ReadonlySet<string>,
+  ): ReadonlyMap<string, ElementChangeKind> {
+    const changeKinds = new Map<string, ElementChangeKind>();
+
+    for (const element of documentData.elements) {
+      changeKinds.set(element.id, classifyElementChange(this.previousElementsById.get(element.id), element));
+    }
+
+    // Composite nodes (boolean groups) resolve child data at render time,
+    // so their own output depends on child changes even when the composite
+    // element itself did not change. Walk the element list once and mark
+    // any composite parent whose direct children changed as dirty too.
+    for (const element of documentData.elements) {
+      const parent = findCompositeParent(documentData, element.parentId);
+
+      if (parent === null) continue;
+
+      const childKind = changeKinds.get(element.id);
+
+      if (childKind === 'mount' || childKind === 'dirty' || childKind === 'remount') {
+        markCompositeDirty(changeKinds, parent.id);
       }
+    }
+
+    // A child removal is not visible from the loop above (removed elements
+    // are not in the next document). Re-scan the previous element set for
+    // removed children whose composite parents are still in scope.
+    for (const [previousId, previousElement] of this.previousElementsById.entries()) {
+      if (activeIds.has(previousId)) continue;
+
+      const parent = findCompositeParent(documentData, previousElement.parentId);
+
+      if (parent === null) continue;
+
+      markCompositeDirty(changeKinds, parent.id);
+    }
+
+    return changeKinds;
+  }
+
+  private destroyRemovedRecords(activeIds: ReadonlySet<string>): void {
+    for (const [elementId, record] of this.rendererRecords.entries()) {
+      if (activeIds.has(elementId)) continue;
 
       record.renderer.destroy();
       record.host.remove();
@@ -197,36 +253,37 @@ export class DOMScreenRenderer implements ScreenRendererController {
   }
 
   private renderNode(args: {
-    readonly activeIds: Set<string>;
+    readonly changeKinds: ReadonlyMap<string, ElementChangeKind>;
     readonly documentData: BroadsetDocument;
     readonly node: SceneTreeNode;
-    readonly parent: DocumentFragment | HTMLDivElement;
-  }): void {
-    const { activeIds, documentData, node, parent } = args;
+  }): HTMLElement {
+    const { changeKinds, documentData, node } = args;
     const record = this.getOrCreateRecord(documentData, node.element);
     const hasChildren = node.children.length > 0;
-    const previousElement = this.previousElementsById.get(node.element.id);
-    const shouldUpdate =
-      previousElement?.type !== node.element.type ||
-      !areElementsEquivalent(previousElement, node.element);
+    const kind = changeKinds.get(node.element.id) ?? 'dirty';
 
-    activeIds.add(node.element.id);
-
-    if (shouldUpdate) {
+    if (kind !== 'clean') {
       applyElementLayout(record, node.element, hasChildren);
-      record.renderer.update(node.element);
+      record.renderer.update(node.element, documentData);
     }
 
-    parent.appendChild(record.host);
+    const childHosts: HTMLElement[] = [];
 
     for (const child of node.children) {
-      this.renderNode({
-        activeIds,
+      const childHost = this.renderNode({
+        changeKinds,
         documentData,
         node: child,
-        parent: record.contentHost,
       });
+
+      childHosts.push(childHost);
     }
+
+    if (hasChildren) {
+      reconcileChildren(record.contentHost, childHosts);
+    }
+
+    return record.host;
   }
 
   private getOrCreateRecord(documentData: BroadsetDocument, element: BroadsetElement): RendererRecord {
@@ -307,6 +364,56 @@ export class DOMScreenRenderer implements ScreenRendererController {
   }
 }
 
-function areElementsEquivalent(previous: BroadsetElement, next: BroadsetElement): boolean {
-  return JSON.stringify(previous) === JSON.stringify(next);
+function findCompositeParent(documentData: BroadsetDocument, parentId: string | null): BroadsetElement | null {
+  if (parentId === null) return null;
+
+  const parent = documentData.elements.find((candidate) => candidate.id === parentId);
+
+  if (parent === undefined) return null;
+  if (parent.type !== 'group') return null;
+  if (parent.booleanOperation === null) return null;
+
+  return parent;
+}
+
+function markCompositeDirty(changeKinds: Map<string, ElementChangeKind>, parentId: string): void {
+  const current = changeKinds.get(parentId) ?? 'clean';
+
+  if (current === 'clean') {
+    changeKinds.set(parentId, 'dirty');
+  }
+}
+
+/**
+ * Keyed reconciliation. Ensures `parent`'s children match the order of
+ * `nextChildren` by keyed identity without unnecessary DOM churn. Nodes
+ * already at the correct position are left in place; out-of-order nodes
+ * move to the target slot via `insertBefore`; trailing stale nodes are
+ * removed.
+ *
+ * The reconciler is used on both the outer element layer (roots) and
+ * nested group content hosts so sibling reorders preserve each host's
+ * DOM identity — editor chrome and playback engines can hold direct
+ * node references across updates.
+ */
+function reconcileChildren(parent: Element, nextChildren: readonly Element[]): void {
+  for (let i = 0; i < nextChildren.length; i += 1) {
+    const expected = nextChildren[i];
+
+    if (expected === undefined) continue;
+
+    const current = parent.childNodes.item(i);
+
+    if (current === expected) continue;
+
+    parent.insertBefore(expected, current);
+  }
+
+  while (parent.childNodes.length > nextChildren.length) {
+    const last = parent.lastChild;
+
+    if (last === null) break;
+
+    parent.removeChild(last);
+  }
 }

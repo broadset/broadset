@@ -1,4 +1,4 @@
-import type { BroadsetElement } from '@broadset/model';
+import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 import { resolveStyleColor, resolveStyleFillToSvgPaint } from '@broadset/model';
 
 import type { ElementRendererFactory } from '../core/contracts';
@@ -25,15 +25,15 @@ const DEFAULT_STROKE_WIDTH = 2;
  * `booleanOperation` themselves.
  */
 export function createGroupRenderer(): ElementRendererFactory {
-  return ({ document: doc, element, host }) => {
-    function render(el: BroadsetElement): void {
+  return ({ document: initialDoc, element, host }) => {
+    function render(el: BroadsetElement, currentDoc: BroadsetDocument): void {
       if (el.booleanOperation === null) {
         host.textContent = '';
 
         return;
       }
 
-      const children = doc.elements.filter((child) => child.parentId === el.id);
+      const children = currentDoc.elements.filter((child) => child.parentId === el.id);
       const combinedPath = computeBooleanPath(children, el.booleanOperation);
 
       if (combinedPath === null) {
@@ -85,11 +85,11 @@ export function createGroupRenderer(): ElementRendererFactory {
       host.replaceChildren(svg);
     }
 
-    render(element);
+    render(element, initialDoc);
 
     return {
-      update(nextElement) {
-        render(nextElement);
+      update(nextElement, nextDocument) {
+        render(nextElement, nextDocument);
       },
       destroy() {
         host.replaceChildren();
