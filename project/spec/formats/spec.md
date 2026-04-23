@@ -189,3 +189,47 @@ Every change to an importer MUST go through the `security-reviewer` agent before
 #### Acceptance Criteria
 
 - [ ] PR touching any importer includes evidence of `security-reviewer` sign-off
+
+---
+
+## Shared utilities under `_shared/`
+
+Cross-format utilities live under `packages/formats/src/_shared/<module>/`. Format code imports only from the `_shared/index.ts` barrel; submodule internals stay unexported. Each module ships with its own Vitest unit tests and a narrow public API (four-to-six functions).
+
+### Requirement: Shape Classifier (`_shared/shape-classifier/`)
+
+The shape classifier MUST identify canonical SVG rectangle and ellipse paths so every importer (SVG, PDF, PPTX, PSD) maps them back to native Broadset `rectangle` / `ellipse` elements instead of generic `path` payloads.
+
+```ts
+type ClassifiedShape =
+  | { kind: 'rectangle'; x: number; y: number; width: number; height: number }
+  | { kind: 'ellipse'; cx: number; cy: number; rx: number; ry: number }
+  | { kind: 'path' };
+
+interface ShapeClassifierHints {
+  readonly strokeWidth?: number;
+}
+
+function classifyPath(d: string, hints?: ShapeClassifierHints): ClassifiedShape;
+```
+
+Contract:
+
+- **Rectangle** — an `M` followed by either three or four axis-aligned edges (`L`, `H`, `V` — absolute or relative) plus `Z` yields `kind: 'rectangle'`. Non-axis-aligned quadrilaterals, triangles, and rounded rectangles fall through to `path`.
+- **Ellipse** — the canonical four-cubic-Bézier ellipse layout (kappa ≈ 0.5522847498) yields `kind: 'ellipse'` with the center and axis radii extracted. Arbitrary four-cubic curves whose control points don't match the kappa layout fall through to `path`.
+- **Path** — malformed input (unknown commands, truncated arguments), empty / whitespace strings, and multi-subpath paths MUST return `{ kind: 'path' }` without throwing. Per IO-D-18 the caller preserves the original `d` string verbatim.
+
+#### Acceptance Criteria
+
+- [ ] Given a canonical absolute-coord rectangle (`M x y L x+w y L x+w y+h L x y+h Z`), the classifier returns `rectangle` with correct `x/y/width/height`
+- [ ] Given a relative-coord rectangle (`M x y l w 0 l 0 h l -w 0 Z`), the classifier returns `rectangle`
+- [ ] Given a rectangle expressed with `H`/`V` commands, the classifier returns `rectangle`
+- [ ] Given a non-axis-aligned quadrilateral (any edge not parallel to an axis), the classifier returns `path`
+- [ ] Given a triangle or other non-rectangle polygon, the classifier returns `path`
+- [ ] Given a canonical four-cubic-Bézier ellipse with kappa control points, the classifier returns `ellipse` with correct `cx/cy/rx/ry`
+- [ ] Given a circle (rx === ry) in the same canonical form, the classifier returns `ellipse` with equal radii
+- [ ] Given an arbitrary four-cubic path that does not match the kappa layout, the classifier returns `path`
+- [ ] Given an empty or whitespace-only `d`, the classifier returns `path` without throwing
+- [ ] Given malformed or unsupported commands, the classifier returns `path` without throwing
+- [ ] Given a rounded rectangle (line + arc commands), the classifier returns `path`
+- [ ] Given a multi-subpath path, the classifier returns `path`
