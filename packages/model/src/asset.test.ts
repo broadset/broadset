@@ -356,6 +356,68 @@ describe('Image asset fidelity fields', () => {
     expect(asset.width).toBe(100);
     expect(asset.height).toBe(50);
   });
+
+  /**
+   * @description Optional `iccProfileAssetId` references a shared
+   * `icc-profile` asset (PDF `/OutputIntent`, PSD CMYK ICC, JPEG/PNG
+   * pass-through). Uses the same field name as
+   * `document.outputIntent.iccProfileAssetId` so a single grep finds
+   * every ICC-profile reference.
+   */
+  it('accepts an image asset with iccProfileAssetId', () => {
+    const asset = imageAsset({
+      id: 'asset-image-1',
+      name: 'Logo',
+      mimeType: 'image/jpeg',
+      source: { type: 'embedded', dataUri: 'data:image/jpeg;base64,AAAA' },
+      width: 800,
+      height: 600,
+      iccProfileAssetId: 'asset-icc-swop',
+    });
+    const parsed = assetSchema.safeParse(asset);
+
+    expect(parsed.success).toBe(true);
+    expect(asset.iccProfileAssetId).toBe('asset-icc-swop');
+  });
+
+  /**
+   * @description `iccProfileAssetId` is optional — a plain sRGB raster
+   * without an explicit profile must still validate.
+   */
+  it('accepts an image asset without iccProfileAssetId', () => {
+    const asset = imageAsset({
+      id: 'asset-image-1',
+      name: 'Logo',
+      mimeType: 'image/png',
+      source: { type: 'embedded', dataUri: 'data:image/png;base64,AAAA' },
+      width: 10,
+      height: 10,
+    });
+    const parsed = assetSchema.safeParse(asset);
+
+    expect(parsed.success).toBe(true);
+    expect(asset.iccProfileAssetId).toBeUndefined();
+  });
+
+  /**
+   * @description An empty `iccProfileAssetId` is a buggy importer
+   * signal — references must either be present and point to a real
+   * asset ID or be absent entirely.
+   */
+  it('rejects an image asset with empty iccProfileAssetId', () => {
+    const parsed = assetSchema.safeParse({
+      id: 'asset-image-1',
+      kind: 'image',
+      name: 'Logo',
+      mimeType: 'image/png',
+      source: { type: 'embedded', dataUri: 'data:image/png;base64,AAAA' },
+      width: 10,
+      height: 10,
+      iccProfileAssetId: '',
+    });
+
+    expect(parsed.success).toBe(false);
+  });
 });
 
 describe('Asset discriminated union', () => {

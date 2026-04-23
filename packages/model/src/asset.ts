@@ -82,6 +82,14 @@ export interface ImageAsset extends AssetBase {
   readonly width: number;
   /** Intrinsic pixel height. See `width` for rationale. */
   readonly height: number;
+  /**
+   * Optional reference to an `icc-profile` asset (lands in P4.4).
+   * Consumed by PDF prepress (`/OutputIntent` per-image override),
+   * PSD CMYK / Lab channel pipelines, and JPEG / PNG pass-through.
+   * Named to match `document.outputIntent.iccProfileAssetId` so every
+   * ICC reference in the model shares a single grep handle.
+   */
+  readonly iccProfileAssetId?: string | undefined;
 }
 
 export interface VideoAsset extends AssetBase {
@@ -159,6 +167,7 @@ const imageAssetSchema = z.object({
   kind: z.literal('image'),
   width: pixelDimensionSchema,
   height: pixelDimensionSchema,
+  iccProfileAssetId: z.string().min(1).optional(),
 });
 
 const videoAssetSchema = z.object({
@@ -224,6 +233,7 @@ export interface ImageAssetInput {
   readonly source: AssetSource;
   readonly width: number;
   readonly height: number;
+  readonly iccProfileAssetId?: string | undefined;
   readonly fileSizeBytes?: number | undefined;
   readonly metadata?: Readonly<Record<string, unknown>> | undefined;
 }
@@ -237,6 +247,7 @@ export function imageAsset(input: ImageAssetInput): ImageAsset {
     source: input.source,
     width: input.width,
     height: input.height,
+    ...(input.iccProfileAssetId === undefined ? {} : { iccProfileAssetId: input.iccProfileAssetId }),
     ...(input.fileSizeBytes === undefined ? {} : { fileSizeBytes: input.fileSizeBytes }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
   };

@@ -178,6 +178,43 @@ Both fields MUST be positive integers. Zero, negative, and non-integer values ar
 
 ---
 
+### Requirement: Image Asset ICC Profile Preservation
+
+Image assets MAY declare an optional `iccProfileAssetId` referencing an `icc-profile` asset (see the `ICC Profile Asset Type` requirement below). Consumers use this to preserve per-image color management across:
+
+- **PDF prepress.** Per-image color-space overrides reference the document-level output intent profile OR a dedicated per-image profile asset.
+- **PSD CMYK / Lab.** The PSD exporter embeds the referenced ICC profile on CMYK and Lab channel documents.
+- **JPEG / PNG pass-through.** When the imported image already carries an ICC profile (JPEG APP2, PNG `iCCP` chunk), the importer registers the profile as an `icc-profile` asset and wires the image's `iccProfileAssetId` to it so re-export preserves the profile byte-for-byte.
+
+The field name matches `document.outputIntent.iccProfileAssetId` so a single grep finds every ICC-profile reference in the model. If present, the value MUST be a non-empty asset ID. Absence means no per-image profile override.
+
+#### Scenario: Image asset with ICC profile reference
+
+- GIVEN an image asset with `iccProfileAssetId: 'asset-icc-swop'`
+- AND the project has an asset with `id: 'asset-icc-swop'` and `kind: 'icc-profile'`
+- WHEN the image is exported to PDF / PSD / JPEG
+- THEN the referenced ICC profile is preserved in the output
+
+#### Scenario: Image asset without ICC profile
+
+- GIVEN an image asset with no `iccProfileAssetId` field
+- WHEN the asset is validated
+- THEN validation succeeds — the field is optional
+
+#### Scenario: Empty ICC profile reference
+
+- GIVEN an image asset with `iccProfileAssetId: ''`
+- WHEN the asset is validated
+- THEN validation fails — references must be absent or point to a real asset ID
+
+#### Acceptance Criteria
+
+- [ ] Given an image asset with a non-empty `iccProfileAssetId`, validation succeeds
+- [ ] Given an image asset with no `iccProfileAssetId` field, validation succeeds
+- [ ] Given an image asset with an empty `iccProfileAssetId`, validation fails
+
+---
+
 ### Requirement: Font Assets
 
 Font assets (`kind: 'font'`) carry the font file data used by text elements. When a document references a `fontFamily` that matches a font asset name, the font MUST be loaded from the asset before rendering. The project's `settings.fonts` array (see [project.md](project.md)) declares available font families; each font family SHOULD have corresponding font assets for used weights/styles.

@@ -655,8 +655,8 @@ All shared modules under `packages/formats/src/_shared/<name>/` with Vitest unit
 
 - [x] Font asset type (`woff2`/`ttf`/`otf` bytes + `postScriptName` + `familyName` + `subsetRanges?`) — discriminated-union `Asset`; `FontAsset` on `packages/model` (`d3f091e`)
 - [ ] Custom font upload UI (listed in Phase 5; asset type blocks it)
-- [ ] Image assets become `{ assetId, bytes, mime, width, height, iccProfile? }` — bytes, not URLs
-- [ ] ICC profile preservation on image assets
+- [x] Image assets become `{ assetId, bytes, mime, width, height, iccProfile? }` — bytes, not URLs (P4.2 lands required `width`/`height`; `source` stays as the bytes transport — `c5cd226`; `iccProfile?` deferred to P4.3)
+- [x] ICC profile preservation on image assets (`ImageAsset.iccProfileAssetId?` optional reference to an `icc-profile` asset, shared naming with `document.outputIntent.iccProfileAssetId`)
 - [ ] `icc-profile` asset type (referenced by `document.outputIntent`, image-asset `iccProfile`)
 - [ ] Subsetting pipeline (`_shared/fonts/subset.ts` — `subsetFont(asset, glyphsUsed)`)
 - [ ] Font embed-permission surface (`fontkit` `OS/2.fsType` → asset panel + preflight)
