@@ -1,25 +1,31 @@
-import { type BroadsetDocument, createEmptyBroadsetDocument } from '@broadset/model';
+import { createEmptyBroadsetDocument } from '@broadset/model';
 
 import type { DocumentImportResult } from '../import-document';
+import { hydrateDocumentFromFastPath, loadPdf, readDocumentXmp, readRoundTripMetadata } from './import/index';
+import { collectMarkedContentTags } from './import/parse';
 import type { PdfImportOptions, PdfRoundTripMetadata } from './types';
-
-/**
- * Warning surfaced when P6.1's staged import returns an empty document.
- *
- * The pdf-lib + pdfjs-dist infrastructure lands in this unit; XMP and
- * marked-content extraction (P6.4a) and operator-level extraction (P6.4b)
- * replace this with real content in the next Phase 6 units. Until then the
- * importer is registered and safe to call — it validates the byte stream as
- * a PDF and reports what is missing.
- */
-const STAGED_IMPORT_WARNING =
-  'PDF import extraction lands in Phase 6.4 (pdf-support-plan.md §Phase 3). The document was recognised as a PDF but no elements were extracted.';
 
 /**
  * Warning surfaced when the byte stream does not look like a PDF file.
  */
 const INVALID_PDF_WARNING =
   'PDF import failed: the input does not start with a %PDF- header and was not recognised as a PDF file.';
+
+/**
+ * Warning surfaced when the PDF carries no `broadset:` XMP packet — the
+ * fast path is unavailable and the P6.4b operator-extraction pipeline
+ * takes over.
+ */
+const NO_XMP_WARNING =
+  'PDF import: no broadset: XMP packet found; arbitrary third-party PDF extraction lands in Phase 6.4b (pdf-support-plan.md §Phase 3b). The document is empty.';
+
+/**
+ * Warning surfaced alongside a successful XMP + marked-content
+ * hydration. Element geometry lands with the P6.4b operator-extraction
+ * pass; until then elements carry placeholder position / size.
+ */
+const FAST_PATH_PLACEHOLDER_WARNING =
+  'PDF import fast-path: hydrated document id + element ids + types from XMP and marked-content tags. Element geometry (position, width, height, rotation) will be recovered from the operator stream in Phase 6.4b.';
 
 /**
  * PDF file-header signature (ASCII "%PDF-").
@@ -37,50 +43,63 @@ function looksLikePdf(bytes: Uint8Array): boolean {
 }
 
 /**
- * Import a PDF byte stream as a `BroadsetDocument`.
- *
- * P6.1 registers the entry point and validates the byte stream as a PDF.
- * Operator-level extraction, XMP hydration, and marked-content tag
- * collection land in P6.4. The `Promise` return type is the stable P6.4
- * contract; the P6.1 body resolves synchronously via `Promise.resolve` to
- * avoid misleading eager callers that no async work is pending.
+ * Import a PDF byte stream as a `BroadsetDocument`. Runs the XMP +
+ * marked-content fast path (P6.4a) for Broadset-authored PDFs; arbitrary
+ * third-party PDFs surface an explanatory warning and return an empty
+ * document until the operator-extraction fallback (P6.4b) lands.
  */
-export function importPdfDocument(
+export async function importPdfDocument(
   data: Uint8Array,
   _options?: PdfImportOptions,
 ): Promise<DocumentImportResult> {
   if (!looksLikePdf(data)) {
-    const empty = createEmptyBroadsetDocument();
-
-    return Promise.resolve({ document: empty, warnings: [INVALID_PDF_WARNING] });
+    return { document: createEmptyBroadsetDocument(), warnings: [INVALID_PDF_WARNING] };
   }
 
-  const document: BroadsetDocument = createEmptyBroadsetDocument();
+  const pdf = await loadPdf(data);
 
-  return Promise.resolve({ document, warnings: [STAGED_IMPORT_WARNING] });
+  if (pdf === null) {
+    return { document: createEmptyBroadsetDocument(), warnings: [INVALID_PDF_WARNING] };
+  }
+
+  const xmp = readDocumentXmp(pdf);
+
+  if (xmp === null) {
+    return { document: createEmptyBroadsetDocument(), warnings: [NO_XMP_WARNING] };
+  }
+
+  const tags = collectMarkedContentTags(pdf);
+  const document = hydrateDocumentFromFastPath(xmp.documentId, tags);
+
+  return { document, warnings: [FAST_PATH_PLACEHOLDER_WARNING] };
 }
 
 /**
- * Inspect a PDF byte stream and report whether Broadset can round-trip its
- * contents without data loss.
- *
- * A round-trippable PDF carries a `broadset:` XMP packet on the document
- * catalog (IO-D-08) and `/BSET` marked-content tags around every element's
- * painting sequence. P6.1 has no pdfjs-dist parsing yet — the real XMP
- * probe lands in P6.4a. Until then this function returns `false` so callers
- * never assume a lossy best-effort import is a lossless round-trip.
+ * Inspect a PDF byte stream and report whether Broadset can round-trip
+ * its contents without data loss — true iff the document catalog carries
+ * a valid `broadset:` XMP packet. Third-party PDFs always return `false`
+ * so callers never mistake best-effort import for lossless round-trip.
  */
-export function canRoundTrip(_data: Uint8Array): Promise<boolean> {
-  return Promise.resolve(false);
+export async function canRoundTrip(data: Uint8Array): Promise<boolean> {
+  if (!looksLikePdf(data)) return false;
+
+  const pdf = await loadPdf(data);
+
+  if (pdf === null) return false;
+
+  return readDocumentXmp(pdf) !== null;
 }
 
 /**
- * Extract the preserved round-trip metadata from a PDF byte stream.
- *
- * The real XMP packet and marked-content tag collection lands in P6.4; the
- * staged return here keeps the type surface callable without misleading
- * downstream reconciliation code into treating missing data as present.
+ * Extract preserved round-trip metadata (XMP packet + marked-content
+ * tags) from a PDF byte stream. Used by the reconciliation pipeline
+ * (P6.5) to diff current operator-level visual state against the
+ * preserved XMP defaults.
  */
-export function readPdfRoundTripMetadata(_data: Uint8Array): Promise<PdfRoundTripMetadata> {
-  return Promise.resolve({ xmp: null, markedContentTags: [] });
+export async function readPdfRoundTripMetadata(data: Uint8Array): Promise<PdfRoundTripMetadata> {
+  if (!looksLikePdf(data)) {
+    return { xmp: null, markedContentTags: [] };
+  }
+
+  return await readRoundTripMetadata(data);
 }
