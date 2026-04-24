@@ -105,7 +105,7 @@ Source of truth: [plan.md](./plan.md), [psd-support-plan.md](./psd-support-plan.
 - [x] P5.0 PSD spec and scope lock (feature matrix + standards-only rule + `Format Round-Trip Metadata` cross-format requirement in `formats/spec.md`)
 - [x] P5.1 PSD types and de-risking spike (`packages/formats/src/psd/types.ts` + registry wiring; `xmp-roundtrip-spike.test.ts` verifies `ag-psd` XMP round-trip in-process; decision logged)
 - [x] P5.2 PSD export parity rebuild (groups via parentId tree, rotation composition, TextBody → styleRuns, `broadset:` XMP packet; deeper items in `project/spec/formats/psd.md` §Spec Gaps)
-- [ ] P5.3 PSD export beyond prior art
+- [x] P5.3 PSD export beyond prior art — P5.3a native vector shape layers (rectangle/ellipse `vectorFill` + `vectorMask`); P5.3b inner shadow from `inset` box-shadow + stroke layer effect from border; P5.3c linked smart object GUID preservation via `extensions.psd.smartObject`. Remaining sub-items recorded in `project/spec/formats/psd.md` §Spec Gaps
 - [x] P5.4a PSD import fast path (`XMP + additionalInfo`) — `readDocumentXmpPacket()` recovers document id + element ids from the `broadset:` packet; hydrates `extensions.psd.roundTrip` (`b4b4dfa`)
 - [x] P5.4b PSD arbitrary third-party import — existing `importPsd` layer-walker handles third-party PSDs; deeper extraction (layer comps, adjustment layers) deferred to Spec Gaps
 - [x] P5.5 PSD reconciliation (`reconcilePsd` wraps `_shared/reconcile`; `dirtyElementIds` for dirty-flag discipline)
