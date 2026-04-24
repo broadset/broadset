@@ -1,10 +1,17 @@
 import {
+  type BroadsetColor,
   type BroadsetDocument,
   type BroadsetElement,
+  type BroadsetFill,
+  type BroadsetGradient,
+  type BroadsetGradientStop,
   type Canvas,
+  type ColorMods,
   createDefaultElement,
-  rgbColor,
+  type Paragraph,
+  type Run,
   solidFill,
+  type TextBody,
   type ThemeSlot,
 } from '@broadset/model';
 import svgpath from 'svgpath';
@@ -379,7 +386,7 @@ function buildRectangle(
   parentGroupId: string | null,
 ): BroadsetElement {
   const base = buildBase(ctx, id, name, 'rectangle', transform, parentGroupId);
-  const fill = detectSolidFill(body, ctx.theme);
+  const fill = detectFill(body);
 
   if (fill !== null) return { ...base, style: { ...base.style, fill } };
 
@@ -395,7 +402,7 @@ function buildEllipse(
   parentGroupId: string | null,
 ): BroadsetElement {
   const base = buildBase(ctx, id, name, 'ellipse', transform, parentGroupId);
-  const fill = detectSolidFill(body, ctx.theme);
+  const fill = detectFill(body);
 
   if (fill !== null) return { ...base, style: { ...base.style, fill } };
 
@@ -412,7 +419,7 @@ function buildPath(
   d: string,
 ): BroadsetElement {
   const base = buildBase(ctx, id, name, 'path', transform, parentGroupId);
-  const fill = detectSolidFill(body, ctx.theme);
+  const fill = detectFill(body);
 
   return {
     ...base,
@@ -444,30 +451,106 @@ function buildPicture(
   return { ...base, content: dataUri };
 }
 
-function detectSolidFill(body: string, theme: ResolvedTheme): BroadsetElement['style']['fill'] | null {
-  const solidBlock = extractBlock(body, 'a:solidFill');
+/**
+ * Detect a fill on a shape body. Dispatches to solid / gradient /
+ * picture (returns null; caller handles `<p:pic>` separately) in that
+ * order.
+ */
+function detectFill(body: string): BroadsetFill | null {
+  const solid = extractBlock(body, 'a:solidFill');
 
-  if (solidBlock === null) return null;
+  if (solid !== null) {
+    const color = parseColorElement(solid.block);
 
-  const srgb = solidBlock.block.match(/<a:srgbClr\s+val="([0-9A-Fa-f]{6,8})"/);
-
-  if (srgb) {
-    const hex = `#${(srgb[1] ?? '').toUpperCase()}`;
-
-    return solidFill(rgbColor(hex as `#${string}`));
+    if (color !== null) return solidFill(color);
   }
 
-  const scheme = solidBlock.block.match(/<a:schemeClr\s+val="([a-zA-Z0-9]+)"/);
+  const gradient = extractBlock(body, 'a:gradFill');
 
-  if (scheme) {
-    const slot = scheme[1] as ThemeSlot | undefined;
+  if (gradient !== null) {
+    const grad = parseGradient(gradient.block);
 
-    if (slot !== undefined && slot in theme.palette) {
-      return solidFill(rgbColor((theme.palette[slot] as `#${string}`)));
-    }
+    if (grad !== null) return { kind: 'gradient', gradient: grad };
   }
 
   return null;
+}
+
+/**
+ * Parse a `<a:srgbClr>` or `<a:schemeClr>` block into a BroadsetColor.
+ * Preserves theme-slot references (`{ kind: 'theme', slot, mods }`)
+ * rather than resolving to the palette's sRGB — preserves identity so
+ * re-export emits `<a:schemeClr>` again.
+ */
+function parseColorElement(block: string): BroadsetColor | null {
+  const srgbMatch = block.match(/<a:srgbClr\s+val="([0-9A-Fa-f]{6,8})"(?:[^>]*)(\/>|>[\s\S]*?<\/a:srgbClr>)/);
+
+  if (srgbMatch !== null) {
+    const digits = (srgbMatch[1] ?? '').toUpperCase();
+    const hex: `#${string}` = `#${digits}`;
+
+    return { kind: 'rgb', hex };
+  }
+
+  const schemeMatch = block.match(/<a:schemeClr\s+val="([a-zA-Z0-9]+)"(?:[^>]*)(\/>|>[\s\S]*?<\/a:schemeClr>)/);
+
+  if (schemeMatch !== null) {
+    const slot = schemeMatch[1] as ThemeSlot;
+    const innerBody = schemeMatch[2] ?? '';
+    const mods = parseColorMods(innerBody);
+
+    return mods === null ? { kind: 'theme', slot } : { kind: 'theme', slot, mods };
+  }
+
+  return null;
+}
+
+function parseColorMods(innerBody: string): ColorMods | null {
+  const result: Record<string, number> = {};
+  const modNames = ['lumMod', 'lumOff', 'tint', 'shade', 'alpha'] as const;
+
+  for (const name of modNames) {
+    const re = new RegExp(`<a:${name}\\s+val="(\\d+)"`);
+    const match = innerBody.match(re);
+
+    if (match !== null) {
+      const raw = parseInt(match[1] ?? '0', 10);
+
+      result[name] = raw / 100000;
+    }
+  }
+
+  return Object.keys(result).length === 0 ? null : (result as ColorMods);
+}
+
+/**
+ * Parse `<a:gradFill>` into a BroadsetGradient. Supports linear
+ * (`<a:lin ang="…"/>`) and radial / path (`<a:path path="circle">`).
+ * Stops are extracted from `<a:gsLst>`.
+ */
+function parseGradient(block: string): BroadsetGradient | null {
+  const stops: BroadsetGradientStop[] = [];
+  const gsLst = extractBlock(block, 'a:gsLst');
+
+  if (gsLst === null) return null;
+
+  for (const stopMatch of gsLst.block.matchAll(/<a:gs\s+pos="(\d+)"[^>]*>([\s\S]*?)<\/a:gs>/g)) {
+    const pos = parseInt(stopMatch[1] ?? '0', 10) / 100000;
+    const color = parseColorElement(stopMatch[2] ?? '');
+
+    if (color !== null) stops.push({ position: pos, color });
+  }
+
+  if (stops.length === 0) return null;
+
+  const radial = block.includes('<a:path path="circle"');
+
+  if (radial) return { type: 'radial', stops };
+
+  const linMatch = block.match(/<a:lin\b[^>]*\bang="(-?\d+)"/);
+  const angle = linMatch !== null ? parseInt(linMatch[1] ?? '0', 10) / 60000 : 0;
+
+  return { type: 'linear', stops, angle };
 }
 
 interface ExtractedBlock {
@@ -508,29 +591,117 @@ function uint8ToBase64(bytes: Uint8Array): string {
 }
 
 /**
- * Recover text content from a `<p:sp>` body. Handles multi-paragraph
- * and multi-run text frames, concatenating runs with newlines between
- * paragraphs.
+ * Recover text content from a `<p:sp>` body as a structured TextBody
+ * with per-run styling (bold / italic / underline / font family / size
+ * / color). Spec requires: "Multi-run paragraphs import as TextBody
+ * with per-run styling".
+ *
+ * Returns `null` when the body has no text frame or the text frame is
+ * empty — callers treat that as "not a text shape".
  */
-export function extractTextContent(body: string): string {
+export function extractTextBody(body: string): TextBody | null {
   const txBody = extractBlock(body, 'p:txBody');
 
-  if (txBody === null) return '';
+  if (txBody === null) return null;
 
-  const paragraphs: string[] = [];
+  const paragraphs: Paragraph[] = [];
 
   for (const pMatch of txBody.block.matchAll(/<a:p\b[^>]*>([\s\S]*?)<\/a:p>/g)) {
     const pBody = pMatch[1] ?? '';
-    const runs: string[] = [];
+    const runs = extractRuns(pBody);
 
-    for (const rMatch of pBody.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)) {
-      runs.push(decodeXmlEntities(rMatch[1] ?? ''));
-    }
-
-    paragraphs.push(runs.join(''));
+    if (runs.length === 0) continue;
+    paragraphs.push({ runs });
   }
 
-  return paragraphs.join('\n');
+  if (paragraphs.length === 0) return null;
+
+  return { paragraphs };
+}
+
+function extractRuns(paragraphBody: string): Run[] {
+  const runs: Run[] = [];
+
+  for (const rMatch of paragraphBody.matchAll(/<a:r\b[^>]*>([\s\S]*?)<\/a:r>/g)) {
+    runs.push(buildRunFromRBody(rMatch[1] ?? ''));
+  }
+
+  // Fallback: a paragraph with raw `<a:t>` text and no `<a:r>` wrapper
+  // (unusual but produced by some tools) — emit a single unstyled run.
+  if (runs.length === 0) {
+    for (const tMatch of paragraphBody.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)) {
+      runs.push({ text: decodeXmlEntities(tMatch[1] ?? '') });
+    }
+  }
+
+  return runs;
+}
+
+function buildRunFromRBody(rBody: string): Run {
+  const tMatch = rBody.match(/<a:t>([\s\S]*?)<\/a:t>/);
+  const text = decodeXmlEntities(tMatch?.[1] ?? '');
+  const rPrBlock = extractBlock(rBody, 'a:rPr');
+
+  if (rPrBlock === null) return { text };
+
+  const style = runStyleFromRPr(rPrBlock);
+  const lang = rPrBlock.openAttrs.match(/\blang="([^"]+)"/)?.[1];
+  const hasStyle = Object.keys(style).length > 0;
+
+  if (!hasStyle && lang === undefined) return { text };
+
+  const props = {
+    ...(hasStyle ? { style } : {}),
+    ...(lang !== undefined ? { lang } : {}),
+  };
+
+  return { text, props };
+}
+
+function runStyleFromRPr(rPr: ExtractedBlock): Record<string, unknown> {
+  const style: Record<string, unknown> = {};
+  const openAttrs = rPr.openAttrs;
+
+  if (/\bb="1"/.test(openAttrs)) style['bold'] = true;
+  if (/\bi="1"/.test(openAttrs)) style['italic'] = true;
+
+  const uAttr = openAttrs.match(/\bu="([^"]+)"/)?.[1];
+
+  if (uAttr !== undefined && uAttr !== 'none') style['underline'] = true;
+
+  const szAttr = openAttrs.match(/\bsz="(\d+)"/)?.[1];
+
+  if (szAttr !== undefined) style['fontSize'] = parseInt(szAttr, 10) / 100;
+
+  const latinMatch = rPr.block.match(/<a:latin\s+typeface="([^"]+)"/);
+
+  if (latinMatch !== null) style['fontFamily'] = latinMatch[1];
+
+  const solidFillMatch = rPr.block.match(/<a:solidFill>[\s\S]*?<\/a:solidFill>/);
+
+  if (solidFillMatch !== null) {
+    const color = parseColorElement(solidFillMatch[0]);
+
+    if (color !== null) style['color'] = color;
+  }
+
+  return style;
+}
+
+/**
+ * Legacy helper for callers that only want flat text (imports where we
+ * promote a rectangle/ellipse to a text element). Falls back to joining
+ * paragraphs with newlines; prefer {@link extractTextBody} for
+ * structured output.
+ */
+export function extractTextContent(body: string): string {
+  const textBody = extractTextBody(body);
+
+  if (textBody === null) return '';
+
+  return textBody.paragraphs
+    .map((p) => p.runs.map((r) => r.text).join(''))
+    .join('\n');
 }
 
 function decodeXmlEntities(value: string): string {

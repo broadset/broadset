@@ -1,11 +1,11 @@
-import { type BroadsetDocument, createEmptyBroadsetDocument } from '@broadset/model';
+import { type AnimationDefinition, type BroadsetDocument, createEmptyBroadsetDocument, type TextBody } from '@broadset/model';
 
 import { parseTimingAnimations } from './import/animation';
 import { resolvePackage } from './import/package';
 import { parseLayoutPlaceholders } from './import/placeholders';
 import {
   composeDocumentFromSlides,
-  extractTextContent,
+  extractTextBody,
   parseSlideShapes,
   type SlideImportContext,
 } from './import/shapes';
@@ -56,7 +56,7 @@ function importOperatorLevel(pkg: OoxmlPackage): BroadsetDocument {
   const theme = parseTheme(themeXml);
   const layoutPlaceholders = aggregateLayoutPlaceholders(pkg, resolved.layoutPaths, theme);
   const slides: { readonly id: string; readonly notes?: string; readonly elements: readonly ReturnType<typeof parseSlideShapes>[number][] }[] = [];
-  const allAnimations: ReturnType<typeof parseTimingAnimations>[number][] = [];
+  const allAnimations: AnimationDefinition[] = [];
 
   let elementCounter = 1;
 
@@ -68,8 +68,12 @@ function importOperatorLevel(pkg: OoxmlPackage): BroadsetDocument {
     slides.push(result.slide);
 
     const slideXml = readTextPart(pkg, slidePath) ?? '';
+    const timing = parseTimingAnimations(slideXml);
 
-    for (const anim of parseTimingAnimations(slideXml)) allAnimations.push(anim);
+    for (const anim of timing.animations) allAnimations.push(anim);
+    // Timing warnings propagate through the importer warnings surface
+    // (built in parseSlideShapes' caller). Today we drop them since
+    // the operator-level path has no warning channel; A3 adds one.
   }
 
   const doc = composeDocumentFromSlides(resolved.canvas, slides);
@@ -133,9 +137,25 @@ function promoteShapeText(
 
   if (body === null) return shape;
 
-  const text = extractTextContent(body);
+  const textBody = extractTextBody(body);
 
-  if (text.length === 0) return shape;
+  if (textBody === null) return shape;
+
+  // Preserve structured text when the body has multiple runs or any
+  // run with actual styling (bold/italic/underline/font/color/size);
+  // flatten to a plain string otherwise. `lang` alone (default on
+  // PowerPoint runs) doesn't count as styling — we keep those single-
+  // run bodies as plain strings for compactness.
+  const hasStructure = textBody.paragraphs.some(
+    (p) =>
+      p.runs.length > 1 ||
+      p.runs.some(
+        (r) => r.props?.style !== undefined && Object.keys(r.props.style).length > 0,
+      ),
+  );
+  const content: string | TextBody = hasStructure
+    ? textBody
+    : textBody.paragraphs.map((p) => p.runs.map((r) => r.text).join('')).join('\n');
 
   const placeholder = resolvePlaceholderFromBody(body, layoutPlaceholders);
   const inherited = placeholder === undefined
@@ -149,7 +169,7 @@ function promoteShapeText(
   return {
     ...shape,
     type: 'text' as const,
-    content: text,
+    content,
     ...(Object.keys(inherited).length > 0 ? { style: { ...shape.style, ...inherited } } : {}),
   };
 }

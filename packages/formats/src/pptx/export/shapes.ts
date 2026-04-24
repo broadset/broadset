@@ -30,6 +30,9 @@ function emitNonVisualProps(
   options?: { readonly isPicture?: boolean; readonly isGroup?: boolean },
 ): string {
   const id = allocateShapeId(ctx);
+
+  ctx.shapeIdByElementId.set(element.id, id);
+
   const dataFieldName = readDataFieldName(element);
   const visibleWhen = readStringOrNull(element.visibleWhen);
   const repeaterField = readRepeaterField(element);

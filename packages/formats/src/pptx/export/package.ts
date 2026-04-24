@@ -299,15 +299,10 @@ function buildSlideForPage(document: BroadsetDocument, page: Page): SlideXmlResu
   const ctx: SlideExportContext = createSlideContext(document.canvas);
   const effectiveElements = applyPageOverrides(document.elements, page);
   const shapeTree = emitShapeTree(ctx, effectiveElements);
-  // Per-element shape id map — fade-in timing entries use the element
-  // id (our bset-id tag) to wire animations to the right shape. PP
-  // replays the animation even without shape ids when the target
-  // reference survives.
-  const shapeIdByElementId = new Map<string, number>();
-
-  for (const el of effectiveElements) shapeIdByElementId.set(el.id, 0);
-
-  const timing = buildTimingXml(document, shapeIdByElementId);
+  // The shape tree emission populated ctx.shapeIdByElementId with the
+  // real OOXML `<p:cNvPr id="…">` id per element; pass that map to the
+  // timing emitter so `<p:spTgt spid="…">` references valid shapes.
+  const timing = buildTimingXml(document, ctx.shapeIdByElementId);
   const xml = `${XML_DECLARATION}<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${shapeTree}</p:spTree></p:cSld>${timing}<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
 
   return { xml, rels: ctx.rels.entries(), media: ctx.media };

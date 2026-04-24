@@ -14,6 +14,7 @@ import type { AnimationDefinition, BroadsetDocument } from '@broadset/model';
 
 interface MappableFadeEntry {
   readonly elementId: string;
+  readonly shapeId: number;
   readonly durationMs: number;
 }
 
@@ -41,7 +42,7 @@ function collectFadeEntries(
     const duration = detectFadeInDuration(anim);
 
     if (duration === null) continue;
-    result.push({ elementId: anim.elementId, durationMs: duration });
+    result.push({ elementId: anim.elementId, shapeId, durationMs: duration });
   }
 
   return result;
@@ -92,9 +93,12 @@ function readOpacityFromProperties(properties: Readonly<Record<string, unknown>>
 
 function emitFadeEffect(fade: MappableFadeEntry): string {
   const duration = String(fade.durationMs);
+  const spid = String(fade.shapeId);
 
   // PowerPoint preset entrance: Fade (presetID=10, presetClass="entr",
   // presetSubtype=0). The timing tree below is the minimum that opens
   // in PowerPoint's Animation Pane as "Fade" on the target shape.
-  return `<p:par><p:cTn id="3" fill="hold"><p:stCondLst><p:cond delay="indefinite"/></p:stCondLst><p:childTnLst><p:par><p:cTn id="4" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst><p:par><p:cTn id="5" presetID="10" presetClass="entr" presetSubtype="0" fill="hold" grpId="0" nodeType="clickEffect"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst><p:set><p:cBhvr><p:cTn id="6" dur="1" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst></p:cTn><p:tgtEl><p:spTgt bset-id="${fade.elementId}"/></p:tgtEl><p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst></p:cBhvr><p:to><p:strVal val="visible"/></p:to></p:set><p:anim calcmode="lin" valueType="num"><p:cBhvr additive="base"><p:cTn id="7" dur="${duration}" fill="hold"/><p:tgtEl><p:spTgt bset-id="${fade.elementId}"/></p:tgtEl><p:attrNameLst><p:attrName>style.opacity</p:attrName></p:attrNameLst></p:cBhvr><p:tavLst><p:tav tm="0"><p:val><p:fltVal val="0"/></p:val></p:tav><p:tav tm="100000"><p:val><p:fltVal val="1"/></p:val></p:tav></p:tavLst></p:anim></p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par>`;
+  // `<p:spTgt spid="…"/>` is the canonical OOXML element-target form —
+  // referring to the shape by its slide-local `<p:cNvPr id="…"/>`.
+  return `<p:par><p:cTn id="3" fill="hold"><p:stCondLst><p:cond delay="indefinite"/></p:stCondLst><p:childTnLst><p:par><p:cTn id="4" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst><p:par><p:cTn id="5" presetID="10" presetClass="entr" presetSubtype="0" fill="hold" grpId="0" nodeType="clickEffect"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst><p:set><p:cBhvr><p:cTn id="6" dur="1" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst></p:cTn><p:tgtEl><p:spTgt spid="${spid}"/></p:tgtEl><p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst></p:cBhvr><p:to><p:strVal val="visible"/></p:to></p:set><p:anim calcmode="lin" valueType="num"><p:cBhvr additive="base"><p:cTn id="7" dur="${duration}" fill="hold"/><p:tgtEl><p:spTgt spid="${spid}"/></p:tgtEl><p:attrNameLst><p:attrName>style.opacity</p:attrName></p:attrNameLst></p:cBhvr><p:tavLst><p:tav tm="0"><p:val><p:fltVal val="0"/></p:val></p:tav><p:tav tm="100000"><p:val><p:fltVal val="1"/></p:val></p:tav></p:tavLst></p:anim></p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par>`;
 }

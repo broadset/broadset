@@ -12,6 +12,13 @@ export interface SlideExportContext {
   readonly rels: RelationshipAllocator;
   /** Per-slide media entries keyed by path inside the ZIP. */
   readonly media: Map<string, Uint8Array>;
+  /**
+   * Map from Broadset element id → the OOXML shape id allocated to that
+   * shape within this slide. `<p:timing>` targets shapes by id via
+   * `<p:spTgt spid="…"/>`; we populate the map during shape emission
+   * and read it back when emitting timing.
+   */
+  readonly shapeIdByElementId: Map<string, number>;
   /** Monotonic shape-id allocator for `<p:cNvPr id="…"/>`. Starts at 2 (OOXML reserves 1). */
   nextShapeId: number;
   /** Monotonic media counter so filenames stay unique within the slide. */
@@ -23,6 +30,7 @@ export function createSlideContext(canvas: Canvas): SlideExportContext {
     canvas,
     rels: new RelationshipAllocator(),
     media: new Map<string, Uint8Array>(),
+    shapeIdByElementId: new Map<string, number>(),
     nextShapeId: 2,
     nextMediaIndex: 1,
   };
