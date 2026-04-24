@@ -76,6 +76,59 @@ describe('FormatImportWarningsModal', () => {
   });
 });
 
+describe('Cross-format reuse (I6.1 / I7.1 / I8.1)', () => {
+  /**
+   * @description The shared modal is format-agnostic — it renders
+   * correctly with PDF, SVG, and PPTX labels so PDF / SVG / PPTX
+   * tracks reuse it unchanged under interleaves I6.1 / I7.1 / I8.1.
+   */
+  it.each(['PDF', 'SVG', 'PPTX'])('renders the shared import-warnings modal for %s', (label) => {
+    render(
+      <FormatImportWarningsModal
+        isOpen={true}
+        formatLabel={label}
+        warnings={['one', 'two']}
+        onClose={vi.fn()}
+        onAcknowledge={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByLabelText(`${label} import warnings`).length).toBeGreaterThan(0);
+    expect(screen.getByText(/2 warnings/i)).toBeTruthy();
+  });
+
+  /**
+   * @description Each format track declares its own `supportedFields`
+   * set so PDF (which cares about `colorSpace`/`embedIccProfile`),
+   * SVG (no color-mode choice), and PPTX (picture / theme-driven)
+   * all get a narrowed UI without a one-off modal per format.
+   */
+  it('renders the shared export-options modal with PDF-specific fields', () => {
+    render(
+      <FormatExportOptionsModal
+        isOpen={true}
+        formatLabel="PDF"
+        supportedFields={new Set(['colorSpace', 'embedIccProfile'])}
+        defaults={{
+          colorSpace: 'cmyk',
+          bitDepth: 8,
+          embedIccProfile: true,
+          linkSmartObjects: true,
+          preserveVisibility: true,
+        }}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+      />,
+    );
+
+    // Selects render as <select> with <option value="..."> children — use role to find them.
+    expect(screen.getAllByRole('option').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText(/embed icc profile/i).length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText(/keep smart objects linked/i)).toBeNull();
+    expect(screen.queryByLabelText(/preserve hidden elements/i)).toBeNull();
+  });
+});
+
 describe('FormatExportOptionsModal', () => {
   const defaults: FormatExportOptionsValue = {
     colorSpace: 'rgb',

@@ -90,7 +90,7 @@ Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md
 
 Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md), [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md)
 
-- [ ] I5.1 Land the PSD-required io-prereqs Phase 5 UI slice
+- [x] I5.1 Land the PSD-required io-prereqs Phase 5 UI slice (`FormatExportOptionsModal` + `FormatImportWarningsModal` in `packages/ui/src/modals/`; shared across PDF/SVG/PPTX tracks)
 - [ ] I6.1 Land the PDF-required io-prereqs Phase 5 UI slice
 - [ ] I7.1 Land the SVG-required io-prereqs Phase 5 UI slice
 - [ ] I8.1 Land the PPTX-required io-prereqs Phase 5 UI slice
@@ -109,7 +109,7 @@ Source of truth: [plan.md](./plan.md), [psd-support-plan.md](./psd-support-plan.
 - [x] P5.4a PSD import fast path (`XMP + additionalInfo`) — `readDocumentXmpPacket()` recovers document id + element ids from the `broadset:` packet; hydrates `extensions.psd.roundTrip` (`b4b4dfa`)
 - [x] P5.4b PSD arbitrary third-party import — existing `importPsd` layer-walker handles third-party PSDs; deeper extraction (layer comps, adjustment layers) deferred to Spec Gaps
 - [x] P5.5 PSD reconciliation (`reconcilePsd` wraps `_shared/reconcile`; `dirtyElementIds` for dirty-flag discipline)
-- [ ] P5.6 PSD tests and UI wiring
+- [x] P5.6 PSD tests and UI wiring (chain round-trip test via shared `runChainRoundTrip` + `assertReImportableBy`; UI modals landed via I5.1)
 
 ### Phase 6 — PDF track
 
