@@ -12,7 +12,13 @@ import { parseHexColor } from './color-utils';
 import { BLEND_MODE_MAP } from './constants';
 import { decodeDataUri } from './data-uri';
 import { parseBoxShadow, parseFilterGlow } from './effects';
-import { buildRoundedRectMask, polygonToVectorMask, svgPathToPsdVectorMask } from './vector-mask';
+import {
+  buildEllipseMask,
+  buildRectangleMask,
+  buildRoundedRectMask,
+  polygonToVectorMask,
+  svgPathToPsdVectorMask,
+} from './vector-mask';
 
 interface LinkedFileEntry {
   readonly id: string;
@@ -374,19 +380,24 @@ function applyShapeFill(layer: Layer, el: BroadsetElement): void {
 
   if (!color) return;
 
-  const w = Math.max(1, Math.round(el.width));
-  const h = Math.max(1, Math.round(el.height));
+  // Native vector shape layer: `vectorFill` carries the solid color,
+  // `vectorMask` carries the shape geometry. Photoshop reads both as
+  // a first-class editable shape. Per P5.3a (PSD plan) do NOT emit
+  // `imageData` — a rasterized shape is not round-trip-editable.
+  layer.vectorFill = { type: 'color', color };
 
-  layer.imageData = {
-    width: w,
-    height: h,
-    data: createSolidPixels(w, h, {
-      r: color.r,
-      g: color.g,
-      b: color.b,
-      a: Math.round(color.a * 255),
-    }),
-  };
+  // Stroke styling survives the fill — applyStroke may add vectorStroke
+  // separately below.
+  if (el.type === 'rectangle' && el.style.borderRadius === undefined) {
+    layer.vectorMask = { paths: [buildRectangleMask(el.width, el.height)] };
+  } else if (el.type === 'ellipse') {
+    layer.vectorMask = { paths: [buildEllipseMask(el.width, el.height)] };
+  }
+  // Rounded rectangles flow through `applyVectorMasks` above, which
+  // already emits the rounded-rect path via `buildRoundedRectMask`.
+
+  // Avoid emitting a stale `imageData` — ensure shape layers stay vector.
+  delete layer.imageData;
 }
 
 function applyTypeContent(layer: Layer, el: BroadsetElement): void {
