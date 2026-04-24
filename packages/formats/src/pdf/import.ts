@@ -1,7 +1,13 @@
 import { createEmptyBroadsetDocument } from '@broadset/model';
 
 import type { DocumentImportResult } from '../import-document';
-import { hydrateDocumentFromFastPath, loadPdf, readDocumentXmp, readRoundTripMetadata } from './import/index';
+import {
+  extractThirdPartyElements,
+  hydrateDocumentFromFastPath,
+  loadPdf,
+  readDocumentXmp,
+  readRoundTripMetadata,
+} from './import/index';
 import { collectMarkedContentTags } from './import/parse';
 import type { PdfImportOptions, PdfRoundTripMetadata } from './types';
 
@@ -12,12 +18,19 @@ const INVALID_PDF_WARNING =
   'PDF import failed: the input does not start with a %PDF- header and was not recognised as a PDF file.';
 
 /**
- * Warning surfaced when the PDF carries no `broadset:` XMP packet — the
- * fast path is unavailable and the P6.4b operator-extraction pipeline
- * takes over.
+ * Warning surfaced when the third-party extraction pass finds no
+ * operator-level content worth mapping.
  */
-const NO_XMP_WARNING =
-  'PDF import: no broadset: XMP packet found; arbitrary third-party PDF extraction lands in Phase 6.4b (pdf-support-plan.md §Phase 3b). The document is empty.';
+const EMPTY_THIRD_PARTY_WARNING =
+  'PDF import: no broadset: XMP packet found and the operator extraction pass recovered no elements. The imported document is empty.';
+
+/**
+ * Warning surfaced alongside a third-party operator extraction. Coverage
+ * is text-only today; shapes, images, and rich-text runs ride a future
+ * iteration of the operator engine (Spec Gap in `project/spec/formats/pdf.md`).
+ */
+const THIRD_PARTY_PARTIAL_WARNING =
+  'PDF import: no broadset: XMP packet — used operator-level text extraction (P6.4b). Raster images, vector paths / shapes, and rich-text runs are not yet mapped; Spec Gap in `project/spec/formats/pdf.md`.';
 
 /**
  * Warning surfaced alongside a successful XMP + marked-content
@@ -65,7 +78,17 @@ export async function importPdfDocument(
   const xmp = readDocumentXmp(pdf);
 
   if (xmp === null) {
-    return { document: createEmptyBroadsetDocument(), warnings: [NO_XMP_WARNING] };
+    const emptyDocument = createEmptyBroadsetDocument();
+    const thirdPartyElements = extractThirdPartyElements(pdf, emptyDocument.canvas);
+
+    if (thirdPartyElements.length === 0) {
+      return { document: emptyDocument, warnings: [EMPTY_THIRD_PARTY_WARNING] };
+    }
+
+    return {
+      document: { ...emptyDocument, elements: [...emptyDocument.elements, ...thirdPartyElements] },
+      warnings: [THIRD_PARTY_PARTIAL_WARNING],
+    };
   }
 
   const tags = collectMarkedContentTags(pdf);
