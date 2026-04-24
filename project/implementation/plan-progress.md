@@ -94,7 +94,7 @@ Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md
 - [ ] I6.1 Land the PDF-required io-prereqs Phase 5 UI slice
 - [ ] I7.1 Land the SVG-required io-prereqs Phase 5 UI slice
 - [ ] I8.1 Land the PPTX-required io-prereqs Phase 5 UI slice
-- [ ] I6.2 Introduce the shared io-prereqs Phase 6 testing infrastructure on first PSD need
+- [x] I6.2 Introduce the shared io-prereqs Phase 6 testing infrastructure on first PSD need (`_shared/test-infrastructure/` ships `assertReImportableBy` + `runChainRoundTrip` + `assertPreservedBlobSurvives`; PSD chain test wires the harness)
 
 ## Format tracks
 

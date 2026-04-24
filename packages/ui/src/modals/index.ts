@@ -20,4 +20,14 @@ export {
   TemplateBrowserModal,
   type TemplateBrowserModalProps,
 } from './extra-modals';
+export {
+  type FormatExportColorSpace,
+  FormatExportOptionsModal,
+  type FormatExportOptionsModalProps,
+  type FormatExportOptionsValue,
+} from './format-export-options';
+export {
+  FormatImportWarningsModal,
+  type FormatImportWarningsModalProps,
+} from './format-import-warnings';
 export type { DocumentPreset, MediaAsset, TemplateEntry } from './types';
