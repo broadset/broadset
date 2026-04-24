@@ -36,6 +36,12 @@ const mockImportSvgDocument = vi.fn(() => ({
   document: { ...createEmptyBroadsetDocument(), name: 'Imported SVG' } satisfies BroadsetDocument,
   warnings: [] as string[],
 }));
+const mockImportPdfDocument = vi.fn(() =>
+  Promise.resolve({
+    document: { ...createEmptyBroadsetDocument(), name: 'Imported PDF' } satisfies BroadsetDocument,
+    warnings: [] as string[],
+  }),
+);
 const mockExportProjectJson = vi.fn(() => '{}');
 const mockDiscoverCanvasElement = vi.fn(() => null);
 
@@ -54,6 +60,7 @@ const mockFormats = {
   exportVideoBlob: mockExportVideoBlob,
   exportWebMBlob: mockExportWebMBlob,
   generateOGrafPackages: mockGenerateOGrafPackages,
+  importPdfDocument: mockImportPdfDocument,
   importPptxDocument: mockImportPptxDocument,
   importPsdDocument: mockImportPsdDocument,
   importSvgDocument: mockImportSvgDocument,
@@ -448,6 +455,15 @@ describe('import orchestration', () => {
 
     expect(mockImportSvgDocument).toHaveBeenCalledTimes(1);
     expect(result.document).toBeDefined();
+  });
+
+  /** @description PDF import MUST call importPdfDocument (async) and return a BroadsetDocument. */
+  it('imports a PDF file', async () => {
+    const file = createTestFile(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), 'design.pdf', 'application/pdf');
+    const result = await importDocument(file);
+
+    expect(mockImportPdfDocument).toHaveBeenCalledTimes(1);
+    expect(result.document.name).toBe('Imported PDF');
   });
 
   /** @description Import orchestration MUST preserve importer warnings so the demo shell can surface them to the user. */

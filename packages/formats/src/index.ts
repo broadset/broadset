@@ -1,4 +1,10 @@
-export { type DocumentImportResult, importPptxDocument, importPsdDocument, importSvgDocument } from './import-document';
+export {
+  type DocumentImportResult,
+  importPdfDocument,
+  importPptxDocument,
+  importPsdDocument,
+  importSvgDocument,
+} from './import-document';
 export {
   exportProjectJson,
   exportVideoBlob,

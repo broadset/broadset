@@ -678,7 +678,7 @@ As of 2026-04-23:
 - **io-prereqs:** draft — pre-Phase 0
 - **renderer refactor:** draft — extracted from io-prereqs Phase 3 into its own detailed plan
 - **PSD support:** draft — pre-Phase 0
-- **PDF support:** draft — pre-Phase 0
+- **PDF support:** complete — all 8 units of the PDF track shipped (`pdf-lib` exporter with rebuilt parity, XMP + `/BSET` marked-content round-trip, page boxes, OCGs, XMP fast-path + third-party operator extraction import, reconciliation wrapper, chain round-trip test + demo dispatcher wiring)
 - **SVG support:** draft — pre-Phase 0
 - **PPTX support:** draft — pre-Phase 0
 - **PDF/A-2b compliance:** draft followup — blocked on main PDF track completion
@@ -701,8 +701,7 @@ Current master-plan state:
 - **Phase 5 (PSD track):** complete — P5.0 spec + cross-format round-trip metadata requirement; P5.1 PSD types + XMP round-trip spike; P5.2 export parity (groups via parentId tree, rotation, TextBody → styleRuns, `broadset:` XMP packet); P5.4a fast-path XMP import; P5.5 reconciliation wrapper + dirty-flag discipline; P5.6 chain round-trip test via shared harness. Deeper P5.2b/P5.3 surface (native shape layers, all 10 effects, bitmap masks, CMYK/Lab, linked smart objects) recorded as Spec Gaps in `project/spec/formats/psd.md`.
 - **I5.1 PSD UI slice:** complete — `FormatExportOptionsModal` + `FormatImportWarningsModal` in `packages/ui/src/modals/`, format-agnostic so PDF/SVG/PPTX interleaves I6.1/I7.1/I8.1 reuse them unchanged.
 - **I6.2 Phase 6 testing infrastructure:** complete — `_shared/test-infrastructure/` ships `assertReImportableBy`, `runChainRoundTrip`, `assertPreservedBlobSurvives`. PSD chain test wires the harness.
-- **Phase 6 (PDF track):** not started — **next active phase**
-- PDF track: not started
+- **Phase 6 (PDF track):** complete — all 8 units shipped (P6.0 spec + feature matrix; P6.1 `@libpdf/core` → `pdf-lib` swap + `pdfjs-dist` + `@pdf-lib/fontkit` deps; P6.2 parent-child translation + rotation CTM brackets + per-corner radii via kappa cubic Béziers + clip-path via native PDF clipping operators for `inset`/`circle`/`ellipse`/`polygon`; P6.3 `/BSET` marked-content property dicts registered in page `/Resources /Properties` + `broadset:` XMP packet on catalog `/Metadata` + page boxes from `canvas.bleed`/`canvas.safeArea` + one OCG per Broadset page in `/OCProperties`; P6.4a XMP fast-path hydrates document id + element ids + types; P6.4b third-party operator-level text extraction via FlateDecode + Tj / hex-Tj scanner; P6.5 reconciliation wrapper over `_shared/reconcile/` with `dirtyElementIds` for re-export discipline; P6.6 chain round-trip test + demo dispatcher wires `.pdf`). Real PDF shading-pattern gradients, CMYK/Lab/Gray/spot + ICC emission, font subsetting via `@pdf-lib/fontkit`, per-element `/OC` OCG membership, and the external-tool fixture corpus recorded as Spec Gaps in `project/spec/formats/pdf.md`.
 - SVG track: not started
 - PPTX track: not started
 - PDF/A-2b followup: not started
