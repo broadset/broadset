@@ -110,11 +110,32 @@ const psdBitmapMaskSchema: z.ZodType<PsdBitmapMask> = z.object({
 // Extensions payload
 // ────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Linked smart object metadata — preserves the external file path and
+ * stable GUID identity across round-trips so Photoshop's
+ * "Update linked file" continues to resolve the referenced asset.
+ */
+export interface PsdSmartObjectLink {
+  /** PSD linked-file GUID (UUID). Stable across re-exports. */
+  readonly guid: string;
+  /** MIME type of the linked asset. */
+  readonly mime: string;
+  /** Optional display name (falls back to element.name). */
+  readonly name?: string | undefined;
+}
+
+export const psdSmartObjectLinkSchema: z.ZodType<PsdSmartObjectLink> = z.object({
+  guid: z.string().min(1),
+  mime: z.string().min(1),
+  name: z.string().min(1).optional(),
+});
+
 export interface PsdExtensions extends BroadsetFormatExtensions {
   readonly roundTrip?: PsdRoundTripMetadata | undefined;
   readonly unmappedEffects?: PsdUnmappedEffect | undefined;
   readonly bitmapMask?: PsdBitmapMask | undefined;
   readonly preserved?: PsdPreservedData | undefined;
+  readonly smartObject?: PsdSmartObjectLink | undefined;
 }
 
 export const psdExtensionsSchema: z.ZodType<PsdExtensions> = broadsetFormatExtensionsBaseSchema.extend({
@@ -122,6 +143,7 @@ export const psdExtensionsSchema: z.ZodType<PsdExtensions> = broadsetFormatExten
   unmappedEffects: psdUnmappedEffectSchema.optional(),
   bitmapMask: psdBitmapMaskSchema.optional(),
   preserved: psdPreservedDataSchema.optional(),
+  smartObject: psdSmartObjectLinkSchema.optional(),
 });
 
 // ────────────────────────────────────────────────────────────────────────────

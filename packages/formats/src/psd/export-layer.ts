@@ -342,6 +342,13 @@ function applyTextContent(layer: Layer, el: BroadsetElement): void {
   };
 }
 
+function resolvePreservedSmartObjectGuid(el: BroadsetElement): string | undefined {
+  const psdExt = (el.extensions as { readonly psd?: { readonly smartObject?: { readonly guid?: unknown } } } | undefined)?.psd;
+  const guid = psdExt?.smartObject?.guid;
+
+  return typeof guid === 'string' && guid.length > 0 ? guid : undefined;
+}
+
 function applyImageContent(layer: Layer, el: BroadsetElement): void {
   const contentText = resolveContentAsPlainString(el.content);
 
@@ -355,7 +362,10 @@ function applyImageContent(layer: Layer, el: BroadsetElement): void {
 
   const w = Math.max(1, Math.round(el.width));
   const h = Math.max(1, Math.round(el.height));
-  const guid = elementIdToGuid(el.id);
+  // Preserve the round-trip GUID when the element carries a prior
+  // linked-smart-object identity (P5.3c). A stable GUID keeps
+  // Photoshop's "Update linked file" resolving after re-export.
+  const guid = resolvePreservedSmartObjectGuid(el) ?? elementIdToGuid(el.id);
 
   layer.imageData = {
     width: w,

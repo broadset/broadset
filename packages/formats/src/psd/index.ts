@@ -15,6 +15,8 @@ export {
   psdPreservedDataSchema,
   type PsdRoundTripMetadata,
   psdRoundTripMetadataSchema,
+  type PsdSmartObjectLink,
+  psdSmartObjectLinkSchema,
   type PsdUnmappedEffect,
 } from './types';
 export { svgPathToPsdVectorMask } from './vector-mask';
