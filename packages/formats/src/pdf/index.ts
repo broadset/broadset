@@ -6,6 +6,7 @@ export { canvasToPoints } from './geometry';
 export { canRoundTrip, importPdfDocument, readPdfRoundTripMetadata } from './import';
 export { buildMaskedSvgSource } from './masked-svg';
 export { drawQrOnPage } from './qr';
+export { dirtyElementIds, type PdfReconcileInput, reconcilePdf } from './roundtrip';
 export { wrapText } from './text';
 export type {
   BroadsetXmpPacket,
