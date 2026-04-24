@@ -36,6 +36,27 @@ describe('PPTX importer — fast-path round-trip', () => {
     expect(imported.elements.find((el) => el.id === 'ellipse-1')?.type).toBe('ellipse');
   });
 
+  /**
+   * @description Speaker notes (`Page.notes`) round-trip via the
+   * per-slide `ppt/notesSlides/notesSlideN.xml` part and the
+   * slide → notesSlide relationship.
+   */
+  it('round-trips Page.notes through notesSlides', () => {
+    const base = createEmptyBroadsetDocument();
+    const firstPage = base.pages[0];
+
+    if (firstPage === undefined) throw new Error('createEmptyBroadsetDocument produced no pages');
+
+    const doc = {
+      ...base,
+      pages: [{ ...firstPage, notes: 'Presenter reminder: pause here' }],
+    };
+    const bytes = exportPptxBytes(doc);
+    const imported = importPptx(bytes);
+
+    expect(imported.pages[0]?.notes).toBe('Presenter reminder: pause here');
+  });
+
   it('preserves text content across round-trip', () => {
     const doc = {
       ...createEmptyBroadsetDocument(),
@@ -106,6 +127,40 @@ describe('PPTX importer — operator-level extraction', () => {
     expect(group).toBeDefined();
     expect(rect).toBeDefined();
     expect(rect?.groupId).toBe(group?.id);
+  });
+
+  /**
+   * @description Placeholder inheritance — a slide shape with
+   * `<p:ph idx="0"/>` should pick up the layout's placeholder font
+   * family / size / colour when its own run properties omit them.
+   */
+  it('applies layout-placeholder inheritance to text-bearing shapes', () => {
+    const layoutXml = `<?xml version="1.0"?><p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" type="title"><p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr><p:ph type="title" idx="0"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US" sz="4400"><a:solidFill><a:srgbClr val="FF8800"/></a:solidFill><a:latin typeface="Inter"/></a:rPr><a:t>Layout Placeholder Default</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sldLayout>`;
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title 1"/><p:cNvSpPr/><p:nvPr><p:ph type="title" idx="0"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="914400" y="914400"/><a:ext cx="6858000" cy="1143000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US"/><a:t>Slide Title</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/></Relationships>`;
+    const masterRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/></Relationships>`;
+    const bytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')],
+        ['ppt/slideMasters/slideMaster1.xml', encodeText('<?xml version="1.0"?><p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>')],
+        ['ppt/slideMasters/_rels/slideMaster1.xml.rels', encodeText(masterRels)],
+        ['ppt/slideLayouts/slideLayout1.xml', encodeText(layoutXml)],
+      ]),
+    );
+
+    const imported = importPptx(bytes);
+    const textEl = imported.elements.find((el) => el.type === 'text');
+
+    expect(textEl).toBeDefined();
+    expect(textEl?.content).toBe('Slide Title');
+    expect(textEl?.style.fontFamily).toBe('Inter');
+    expect(textEl?.style.fontSize).toBe(44);
+    expect(textEl?.style.fontColor).toEqual({ kind: 'rgb', hex: '#FF8800' });
   });
 
   it('recovers a multi-slide deck as a multi-page document', () => {

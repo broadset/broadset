@@ -14,6 +14,7 @@ import {
   type PptxExportOptions,
 } from '../types';
 import { createSlideContext, type SlideExportContext } from './context';
+import { buildNotesMasterXml, buildNotesSlideXml } from './notes';
 import { emitShapeTree } from './shapes';
 
 /**
@@ -73,7 +74,18 @@ export async function buildPptxPackage(
     parts.set(slidePath, encodeText(slideXml.xml));
     contentTypes.addOverride(`/ppt/slides/${slideFile}`, OOXML_CONTENT_TYPES.slide);
     presRels.add(OOXML_REL_TYPES.slide, `slides/${slideFile}`);
+
+    attachNotesForSlide({
+      parts,
+      contentTypes,
+      slideIndex,
+      slideFile,
+      slideRelsEntries: [...slideXml.rels],
+      notes: page.notes,
+    });
   }
+
+  attachNotesMasterIfNeeded({ parts, contentTypes, presRels, pages });
 
   // Theme / master / layout parts.
   parts.set('ppt/slideMasters/slideMaster1.xml', encodeText(buildSlideMasterXml()));
@@ -166,7 +178,18 @@ export function buildPptxPackageSync(document: BroadsetDocument, options: PptxEx
     parts.set(slidePath, encodeText(slideXml.xml));
     contentTypes.addOverride(`/ppt/slides/${slideFile}`, OOXML_CONTENT_TYPES.slide);
     presRels.add(OOXML_REL_TYPES.slide, `slides/${slideFile}`);
+
+    attachNotesForSlide({
+      parts,
+      contentTypes,
+      slideIndex,
+      slideFile,
+      slideRelsEntries: [...slideXml.rels],
+      notes: page.notes,
+    });
   }
+
+  attachNotesMasterIfNeeded({ parts, contentTypes, presRels, pages });
 
   parts.set('ppt/slideMasters/slideMaster1.xml', encodeText(buildSlideMasterXml()));
   parts.set('ppt/slideMasters/_rels/slideMaster1.xml.rels', encodeText(buildRelationshipsXml(masterRels.entries())));
@@ -205,6 +228,64 @@ function extensionOf(path: string): string {
 
 function createFallbackPage(): Page {
   return { id: 'page-1', name: 'Page 1', elements: [], locale: null, extensions: {} };
+}
+
+/**
+ * Attach the one-per-package notes master when any page carries notes.
+ */
+function attachNotesMasterIfNeeded(options: {
+  readonly parts: Map<string, Uint8Array>;
+  readonly contentTypes: ContentTypesBuilder;
+  readonly presRels: RelationshipAllocator;
+  readonly pages: readonly Page[];
+}): void {
+  const { parts, contentTypes, presRels, pages } = options;
+  const hasAnyNotes = pages.some((p) => typeof p.notes === 'string' && p.notes.length > 0);
+
+  if (!hasAnyNotes) return;
+  parts.set('ppt/notesMasters/notesMaster1.xml', encodeText(buildNotesMasterXml()));
+
+  const notesMasterRels = new RelationshipAllocator();
+
+  notesMasterRels.add(OOXML_REL_TYPES.theme, '../theme/theme1.xml');
+  parts.set('ppt/notesMasters/_rels/notesMaster1.xml.rels', encodeText(buildRelationshipsXml(notesMasterRels.entries())));
+  contentTypes.addOverride('/ppt/notesMasters/notesMaster1.xml', OOXML_CONTENT_TYPES.notesMaster);
+  presRels.add(OOXML_REL_TYPES.notesMaster, 'notesMasters/notesMaster1.xml');
+}
+
+/**
+ * Attach the per-slide notes-slide part, its rels, and the
+ * slide → notesSlide relationship. A no-op when the page has no notes.
+ */
+function attachNotesForSlide(options: {
+  readonly parts: Map<string, Uint8Array>;
+  readonly contentTypes: ContentTypesBuilder;
+  readonly slideIndex: number;
+  readonly slideFile: string;
+  readonly slideRelsEntries: readonly ReturnType<RelationshipAllocator['entries']>[number][];
+  readonly notes: string | undefined;
+}): void {
+  const { parts, contentTypes, slideIndex, slideFile, slideRelsEntries, notes } = options;
+
+  if (notes === undefined || notes.length === 0) return;
+
+  const notesFile = `notesSlide${String(slideIndex)}.xml`;
+  const notesPath = `ppt/notesSlides/${notesFile}`;
+
+  parts.set(notesPath, encodeText(buildNotesSlideXml(notes)));
+  contentTypes.addOverride(`/${notesPath}`, OOXML_CONTENT_TYPES.notesSlide);
+
+  const notesRels = new RelationshipAllocator();
+
+  notesRels.add(OOXML_REL_TYPES.slide, `../slides/${slideFile}`);
+  notesRels.add(OOXML_REL_TYPES.notesMaster, '../notesMasters/notesMaster1.xml');
+  parts.set(`ppt/notesSlides/_rels/${notesFile}.rels`, encodeText(buildRelationshipsXml(notesRels.entries())));
+
+  // Slide → notesSlide. The slide's rels were already serialised; append
+  // the notes rel and rewrite.
+  const slideNotesRels = [...slideRelsEntries, { id: `rId${String(slideRelsEntries.length + 1)}` as `rId${number}`, type: OOXML_REL_TYPES.notesSlide, target: `../notesSlides/${notesFile}` }];
+
+  parts.set(`ppt/slides/_rels/${slideFile}.rels`, encodeText(buildRelationshipsXml(slideNotesRels)));
 }
 
 interface SlideXmlResult {

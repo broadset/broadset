@@ -11,7 +11,7 @@ import svgpath from 'svgpath';
 
 import { emuToMm, rotationUnitsToDegrees } from '../ooxml/units';
 import { decodeShapeName } from '../semantic/shape-name';
-import type { ResolvedTheme } from '../types';
+import type { LayoutPlaceholder, ResolvedTheme } from '../types';
 
 /**
  * Operator-level shape recovery. Walks a slide's XML and emits
@@ -31,6 +31,8 @@ import type { ResolvedTheme } from '../types';
 export interface SlideImportContext {
   readonly canvas: Canvas;
   readonly theme: ResolvedTheme;
+  /** Layout placeholder defaults — `idx` → font / size / colour. */
+  readonly layoutPlaceholders: ReadonlyMap<number, LayoutPlaceholder>;
   /** `rId` → media-file path (inside the ZIP) for picture resolution. */
   readonly mediaByRelId: ReadonlyMap<string, { readonly path: string; readonly mime: string; readonly bytes: Uint8Array }>;
   /** Monotonic element-id allocator when names are missing or rewritten. */
@@ -516,7 +518,11 @@ function decodeXmlEntities(value: string): string {
  */
 export function composeDocumentFromSlides(
   canvas: Canvas,
-  slides: readonly { readonly id: string; readonly elements: readonly BroadsetElement[] }[],
+  slides: readonly {
+    readonly id: string;
+    readonly notes?: string;
+    readonly elements: readonly BroadsetElement[];
+  }[],
 ): BroadsetDocument {
   const allElements: BroadsetElement[] = [];
   const pages = slides.map((slide) => {
@@ -528,6 +534,7 @@ export function composeDocumentFromSlides(
       elements: [],
       locale: null,
       extensions: {},
+      ...(slide.notes !== undefined && slide.notes.length > 0 ? { notes: slide.notes } : {}),
     };
   });
 
