@@ -1,6 +1,9 @@
 import {
+  type BroadsetColor,
   type BroadsetDocument,
+  type BroadsetElement,
   type BroadsetElementStyleInput,
+  type BroadsetFill,
   type BroadsetGradient,
   type BroadsetGradientStop,
   createDefaultElement,
@@ -8,6 +11,7 @@ import {
   rgbColor,
 } from '@broadset/model';
 
+import { type ParsedElementMetadata, parseMetadataPacket } from './metadata';
 import type { SvgImportOptions } from './types';
 
 export interface SvgImportResult {
@@ -30,6 +34,16 @@ interface ImportedElement {
   readonly height: number;
   readonly rotation: number;
   readonly style: Partial<BroadsetElementStyleInput>;
+  /**
+   * Captured `data-bs-id` from the source DOM node when present.
+   * Populated for every element produced in the fast-path walk so
+   * nested group children keep their OWN id (not the parent group's).
+   */
+  readonly dataBsId?: string | undefined;
+  /** Captured `data-bs-kind` from the source DOM node when present. */
+  readonly dataBsKind?: string | undefined;
+  /** `data-bs-id` of the nearest ancestor element, or `null` at root. */
+  readonly parentDataBsId?: string | null | undefined;
 }
 
 interface TransformState {
@@ -292,12 +306,91 @@ function importUnsupportedElement(el: Element, transform: TransformState, warnin
   };
 }
 
+interface GroupImportContext {
+  readonly transformStr: string;
+  readonly transform: TransformState;
+  readonly baseStyle: Partial<BroadsetElementStyleInput>;
+  readonly ownDataBsId: string | undefined;
+  readonly ownDataBsKind: string | undefined;
+  readonly tagMeta: Readonly<{
+    readonly dataBsId?: string;
+    readonly dataBsKind?: string;
+    readonly parentDataBsId: string | null;
+  }>;
+  readonly parentDataBsId: string | null;
+  readonly defsMap: ReadonlyMap<string, string>;
+  readonly gradients: ReadonlyMap<string, BroadsetGradient>;
+  readonly warnings: string[];
+}
+
+/**
+ * Handle the `<g>` element case during the visual walk. Extracted
+ * from `importElement` to keep that function's cognitive complexity
+ * below the sonarjs threshold. The group either becomes an opaque
+ * payload (matrix transform on the group — non-decomposable) or
+ * flattens into its children with proper `parentDataBsId` linkage.
+ */
+function importGroupElement(el: Element, ctx: GroupImportContext): ImportedElement[] {
+  if (ctx.transformStr.includes('matrix')) {
+    ctx.warnings.push(`Preserved transformed group as SVG payload (id: ${getAttr(el, 'id') ?? 'unknown'})`);
+
+    return [
+      {
+        type: 'svg',
+        content: el.outerHTML,
+        position: { x: 0, y: 0 },
+        width: 0,
+        height: 0,
+        rotation: 0,
+        style: {},
+        ...ctx.tagMeta,
+      },
+    ];
+  }
+
+  // A tagged group becomes a Broadset `'group'` element in the
+  // output; its children then carry `parentDataBsId = ownId` so
+  // the fast path reconstructs the parent tree. An untagged
+  // group is a pure visual wrapper — children inherit
+  // `parentDataBsId` unchanged.
+  const importedChildren: ImportedElement[] = [];
+
+  if (ctx.ownDataBsId !== undefined) {
+    importedChildren.push({
+      type: ctx.ownDataBsKind ?? 'group',
+      content: '',
+      position: { x: ctx.transform.x, y: ctx.transform.y },
+      width: 0,
+      height: 0,
+      rotation: ctx.transform.rotation,
+      style: ctx.baseStyle,
+      ...ctx.tagMeta,
+    });
+  }
+
+  const children = el.children;
+  const childParentId = ctx.ownDataBsId ?? ctx.parentDataBsId;
+
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+
+    if (!child || child.tagName.toLowerCase() === 'defs') {
+      continue;
+    }
+
+    importedChildren.push(...importElement(child, ctx.defsMap, ctx.gradients, ctx.warnings, ctx.transform, childParentId));
+  }
+
+  return importedChildren;
+}
+
 function importElement(
   el: Element,
   defsMap: ReadonlyMap<string, string>,
   gradients: ReadonlyMap<string, BroadsetGradient>,
   warnings: string[],
   inheritedTransform: TransformState,
+  parentDataBsId: string | null = null,
 ): ImportedElement[] {
   const tagName = el.tagName.toLowerCase();
   const transformStr = getAttr(el, 'transform') ?? '';
@@ -312,6 +405,13 @@ function importElement(
     ...(stroke ? { stroke } : undefined),
     ...(gradient !== undefined ? { backgroundGradient: gradient } : undefined),
   };
+  const ownDataBsId = el.getAttribute('data-bs-id') ?? undefined;
+  const ownDataBsKind = el.getAttribute('data-bs-kind') ?? undefined;
+  const tagMeta = {
+    ...(ownDataBsId !== undefined ? { dataBsId: ownDataBsId } : {}),
+    ...(ownDataBsKind !== undefined ? { dataBsKind: ownDataBsKind } : {}),
+    parentDataBsId,
+  } as const;
 
   switch (tagName) {
     case 'rect':
@@ -324,6 +424,7 @@ function importElement(
           height: getNumAttr(el, 'height', 0),
           rotation: transform.rotation,
           style: baseStyle,
+          ...tagMeta,
         },
       ];
 
@@ -337,6 +438,7 @@ function importElement(
           height: 0,
           rotation: transform.rotation,
           style: baseStyle,
+          ...tagMeta,
         },
       ];
 
@@ -350,6 +452,7 @@ function importElement(
           height: getNumAttr(el, 'ry', 0) * 2,
           rotation: transform.rotation,
           style: baseStyle,
+          ...tagMeta,
         },
       ];
 
@@ -365,6 +468,7 @@ function importElement(
           height: r * 2,
           rotation: transform.rotation,
           style: baseStyle,
+          ...tagMeta,
         },
       ];
     }
@@ -379,6 +483,7 @@ function importElement(
           height: 0,
           rotation: transform.rotation,
           style: baseStyle,
+          ...tagMeta,
         },
       ];
 
@@ -392,41 +497,23 @@ function importElement(
           height: getNumAttr(el, 'height', 0),
           rotation: transform.rotation,
           style: baseStyle,
+          ...tagMeta,
         },
       ];
 
-    case 'g': {
-      if (transformStr.includes('matrix')) {
-        warnings.push(`Preserved transformed group as SVG payload (id: ${getAttr(el, 'id') ?? 'unknown'})`);
-
-        return [
-          {
-            type: 'svg',
-            content: el.outerHTML,
-            position: { x: 0, y: 0 },
-            width: 0,
-            height: 0,
-            rotation: 0,
-            style: {},
-          },
-        ];
-      }
-
-      const importedChildren: ImportedElement[] = [];
-      const children = el.children;
-
-      for (let i = 0; i < children.length; i++) {
-        const child = children[i];
-
-        if (!child || child.tagName.toLowerCase() === 'defs') {
-          continue;
-        }
-
-        importedChildren.push(...importElement(child, defsMap, gradients, warnings, transform));
-      }
-
-      return importedChildren;
-    }
+    case 'g':
+      return importGroupElement(el, {
+        transformStr,
+        transform,
+        baseStyle,
+        ownDataBsId,
+        ownDataBsKind,
+        tagMeta,
+        parentDataBsId,
+        defsMap,
+        gradients,
+        warnings,
+      });
 
     case 'foreignobject':
       return [
@@ -438,11 +525,12 @@ function importElement(
           height: getNumAttr(el, 'height', 0),
           rotation: transform.rotation,
           style: {},
+          ...tagMeta,
         },
       ];
 
     default:
-      return [importUnsupportedElement(el, transform, warnings)];
+      return [{ ...importUnsupportedElement(el, transform, warnings), ...tagMeta }];
   }
 }
 
@@ -512,11 +600,123 @@ export function importSvgDocument(
   fileName = 'Imported SVG',
   _options?: SvgImportOptions,
 ): SvgDocumentImportResult {
-  // Phase 7.1 keeps the existing behaviour; options are consumed in
-  // Phase 7.4 when the fast-path importer lands.
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(input, 'image/svg+xml');
+  const parseError = xmlDoc.querySelector('parsererror');
+
+  if (parseError) {
+    throw new Error(`SVG import failed: invalid XML — ${parseError.textContent}`);
+  }
+
+  const metadata = parseMetadataPacket(xmlDoc);
+  const warnings: string[] = [];
+
+  if (metadata !== null) {
+    return hydrateFastPath(xmlDoc, metadata, fileName, warnings);
+  }
+
+  return hydrateThirdPartyFallback(input, fileName, warnings);
+}
+
+/**
+ * Hydrate a Broadset-exported SVG via the fast path per
+ * `project/spec/formats/svg.md` §"Standards-Only Round-Trip" —
+ * preserve document id, canvas unit/dpi, element ids, structured
+ * colour/gradient metadata, and initialise `extensions.svg.dirty`
+ * to `false` per IO-D-11.
+ */
+function hydrateFastPath(
+  xmlDoc: Document,
+  metadata: ReturnType<typeof parseMetadataPacket> & object,
+  fileName: string,
+  warnings: string[],
+): SvgDocumentImportResult {
+  const visualExtract = importSvgFromXmlDoc(xmlDoc);
+  const metadataById = new Map<string, ParsedElementMetadata>(metadata.elements.map((entry) => [entry.elementId, entry]));
+  const canvasWidth = visualExtract.canvasWidth;
+  const canvasHeight = visualExtract.canvasHeight;
+  const emptyDoc = createEmptyBroadsetDocument();
+
+  warnings.push(...visualExtract.warnings);
+
+  const hydrated: BroadsetElement[] = [];
+  let fallbackIndex = 0;
+
+  for (const visualEl of visualExtract.elements) {
+    const dataBsId = visualEl.dataBsId;
+    const parentId = visualEl.parentDataBsId ?? null;
+    const parentField = typeof parentId === 'string' && parentId !== '' ? { parentId } : {};
+
+    if (dataBsId !== undefined) {
+      const sourceKind = visualEl.dataBsKind ?? pickDefaultKindFromVisual(visualEl.type);
+      const meta = metadataById.get(dataBsId);
+      const style = applyMetadataOverrides(visualEl.style, meta);
+
+      hydrated.push(
+        createDefaultElement(sourceKind, {
+          id: dataBsId,
+          name: dataBsId,
+          position: { x: visualEl.position.x, y: visualEl.position.y },
+          width: visualEl.width,
+          height: visualEl.height,
+          rotation: visualEl.rotation,
+          content: visualEl.content,
+          style,
+          ...parentField,
+          extensions: { svg: { dirty: false } },
+        }),
+      );
+    } else {
+      hydrated.push(
+        createDefaultElement(pickDefaultKindFromVisual(visualEl.type), {
+          id: `imported-${String(fallbackIndex)}`,
+          name: `Element ${String(fallbackIndex + 1)}`,
+          position: { x: visualEl.position.x, y: visualEl.position.y },
+          width: visualEl.width,
+          height: visualEl.height,
+          rotation: visualEl.rotation,
+          content: visualEl.content,
+          style: visualEl.style,
+          ...parentField,
+          extensions: { svg: { dirty: false } },
+        }),
+      );
+      fallbackIndex += 1;
+    }
+  }
+
+  const document: BroadsetDocument = {
+    ...emptyDoc,
+    id: metadata.documentId,
+    name: fileName.replace(/\.svg$/i, ''),
+    canvas: {
+      ...emptyDoc.canvas,
+      width: canvasWidth,
+      height: canvasHeight,
+      unit: metadata.canvasUnit,
+      dpi: metadata.canvasDpi,
+    },
+    elements: hydrated,
+  };
+
+  if (document.elements.length === 0) {
+    warnings.push(
+      'SVG import produced no elements. Unsupported content may have been skipped; verify the source file and mapping coverage.',
+    );
+  }
+
+  return { document, warnings };
+}
+
+function hydrateThirdPartyFallback(
+  input: string,
+  fileName: string,
+  warnings: string[],
+): SvgDocumentImportResult {
   const result = importSvg(input);
   const emptyDoc = createEmptyBroadsetDocument();
-  const warnings = [...result.warnings];
+
+  warnings.push(...result.warnings);
 
   const document: BroadsetDocument = {
     ...emptyDoc,
@@ -532,6 +732,7 @@ export function importSvgDocument(
         rotation: element.rotation,
         content: element.content,
         style: element.style,
+        extensions: { svg: { dirty: false } },
       }),
     ),
   };
@@ -543,4 +744,173 @@ export function importSvgDocument(
   }
 
   return { document, warnings };
+}
+
+function pickDefaultKindFromVisual(source: string): string {
+  const allowed = new Set([
+    'text',
+    'image',
+    'svg',
+    'path',
+    'rectangle',
+    'ellipse',
+    'qrcode',
+    'group',
+    'video',
+    'clock',
+    'ticker',
+  ]);
+
+  return allowed.has(source) ? source : 'svg';
+}
+
+function applyMetadataOverrides(
+  style: Partial<BroadsetElementStyleInput>,
+  meta: ParsedElementMetadata | undefined,
+): Partial<BroadsetElementStyleInput> {
+  if (meta === undefined) {
+    return style;
+  }
+
+  const fillOverride =
+    meta.originalColor !== undefined ? applyOriginalColorToFill(style.fill, meta.originalColor) : undefined;
+  const parsedConic = meta.conicGradient !== undefined ? safeParseConicGradient(meta.conicGradient) : undefined;
+
+  return {
+    ...style,
+    ...(fillOverride !== undefined ? { fill: fillOverride } : {}),
+    ...(parsedConic !== undefined ? { backgroundGradient: parsedConic } : {}),
+  };
+}
+
+function applyOriginalColorToFill(
+  fill: BroadsetElementStyleInput['fill'] | undefined,
+  originalColor: string,
+): BroadsetFill {
+  const sourceColor = extractSolidColorOrDefault(fill);
+  const space = detectColorSpace(originalColor);
+  const color: BroadsetColor = {
+    kind: 'rgb',
+    hex: sourceColor,
+    originalColor,
+    ...(space !== undefined ? { space } : {}),
+  };
+
+  return { kind: 'solid', color };
+}
+
+function extractSolidColorOrDefault(fill: BroadsetElementStyleInput['fill'] | undefined): `#${string}` {
+  if (typeof fill === 'object' && 'kind' in fill && fill.kind === 'solid') {
+    const color = fill.color;
+
+    if (color.kind === 'rgb') {
+      return color.hex;
+    }
+  }
+
+  if (typeof fill === 'string') {
+    const parsed = parseHexFromString(fill);
+
+    if (parsed !== undefined) {
+      return parsed;
+    }
+  }
+
+  return '#000000';
+}
+
+function parseHexFromString(input: string): `#${string}` | undefined {
+  if (/^#[0-9a-fA-F]{6}$/.test(input) || /^#[0-9a-fA-F]{8}$/.test(input)) {
+    return input.toLowerCase() as `#${string}`;
+  }
+
+  return undefined;
+}
+
+function detectColorSpace(source: string): 'display-p3' | 'oklch' | 'oklab' | undefined {
+  if (source.includes('display-p3')) return 'display-p3';
+  if (source.includes('oklch')) return 'oklch';
+  if (source.includes('oklab')) return 'oklab';
+
+  return undefined;
+}
+
+function safeParseConicGradient(serialised: string): BroadsetGradient | undefined {
+  try {
+    const parsed: unknown = JSON.parse(serialised);
+
+    if (typeof parsed !== 'object' || parsed === null) {
+      return undefined;
+    }
+
+    if (!('type' in parsed) || (parsed as { type?: unknown }).type !== 'conic') {
+      return undefined;
+    }
+
+    return parsed as BroadsetGradient;
+  } catch {
+    return undefined;
+  }
+}
+
+interface VisualImportResult {
+  readonly elements: readonly ImportedElement[];
+  readonly canvasWidth: number;
+  readonly canvasHeight: number;
+  readonly warnings: readonly string[];
+}
+
+/**
+ * Alternate entry point used by the fast-path importer: walks an
+ * already-parsed DOM tree (so callers that did their own
+ * `parseMetadataPacket(xmlDoc)` don't re-parse). Each emitted
+ * `ImportedElement` carries its OWN `dataBsId` / `dataBsKind` /
+ * `parentDataBsId` so nested group children preserve their own
+ * identity and the fast path reconstructs the parent tree.
+ */
+function importSvgFromXmlDoc(xmlDoc: Document): VisualImportResult {
+  const svgRoot = xmlDoc.documentElement;
+  let canvasWidth = 800;
+  let canvasHeight = 600;
+  const widthAttr = svgRoot.getAttribute('width');
+  const heightAttr = svgRoot.getAttribute('height');
+
+  if (widthAttr && heightAttr) {
+    canvasWidth = parseFloat(widthAttr);
+    canvasHeight = parseFloat(heightAttr);
+  } else {
+    const viewBox = svgRoot.getAttribute('viewBox');
+
+    if (viewBox) {
+      const parts = viewBox.split(/[\s,]+/);
+
+      canvasWidth = parseFloat(parts[2] ?? '800');
+      canvasHeight = parseFloat(parts[3] ?? '600');
+    }
+  }
+
+  const defsMap = buildDefsMap(xmlDoc);
+  const gradients = buildGradientsMap(xmlDoc);
+  const warnings: string[] = [];
+  const elements: ImportedElement[] = [];
+  const children = svgRoot.children;
+  const rootTransform: TransformState = { x: 0, y: 0, rotation: 0 };
+
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+
+    if (!child) {
+      continue;
+    }
+
+    const tag = child.tagName.toLowerCase();
+
+    if (tag === 'defs' || tag === 'metadata') {
+      continue;
+    }
+
+    elements.push(...importElement(child, defsMap, gradients, warnings, rootTransform, null));
+  }
+
+  return { elements, canvasWidth, canvasHeight, warnings };
 }
