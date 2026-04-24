@@ -583,6 +583,13 @@ function buildMetadataPacket(doc: BroadsetDocument, fingerprints: ReadonlyMap<st
     const conicSpec = gradientFill?.type === 'conic' ? JSON.stringify(gradientFill) : undefined;
     const attrs: string[] = [` broadset:elementId="${escapeXml(el.id)}"`, ` broadset:fingerprint="${fingerprint}"`];
 
+    if (typeof el.name === 'string' && el.name !== '') {
+      attrs.push(` broadset:name="${escapeXml(el.name)}"`);
+    }
+
+    attrs.push(` broadset:width="${String(el.width)}"`);
+    attrs.push(` broadset:height="${String(el.height)}"`);
+
     if (originalColor !== undefined) {
       attrs.push(` broadset:originalColor="${escapeXml(originalColor)}"`);
     }

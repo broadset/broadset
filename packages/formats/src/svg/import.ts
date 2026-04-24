@@ -1117,10 +1117,10 @@ function hydrateFastPath(
       hydrated.push(
         createDefaultElement(sourceKind, {
           id: dataBsId,
-          name: dataBsId,
+          name: meta?.name ?? dataBsId,
           position: { x: visualEl.position.x, y: visualEl.position.y },
-          width: visualEl.width,
-          height: visualEl.height,
+          width: meta?.width ?? visualEl.width,
+          height: meta?.height ?? visualEl.height,
           rotation: visualEl.rotation,
           content: visualEl.content,
           style,
