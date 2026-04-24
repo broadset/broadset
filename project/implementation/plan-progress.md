@@ -116,8 +116,8 @@ Source of truth: [plan.md](./plan.md), [psd-support-plan.md](./psd-support-plan.
 Source of truth: [plan.md](./plan.md), [pdf-support-plan.md](./pdf-support-plan.md)
 
 - [x] P6.0 PDF spec and scope lock (feature matrix + standards-only round-trip + `broadset:` XMP + `/BSET` marked-content + CMYK/Lab/Gray + OCGs per page + page-boxes + dirty-flag + chain round-trip + reconciliation + security + preflight)
-- [ ] P6.1 PDF types and dependency swap
-- [ ] P6.2 PDF export parity rebuild
+- [x] P6.1 PDF types and dependency swap (`@libpdf/core@^0.3.4` → `pdf-lib@^1.17.1`; `pdfjs-dist@^5.6.205` + `@pdf-lib/fontkit@^1.1.1` added; `pdf/types.ts` with `PdfExportOptions`/`PdfImportOptions`/`PdfRoundTripMetadata`/`MarkedContentTag`/`ColorSpaceChoice`/`BroadsetXmpPacket`; `importPdfDocument` registered; 358 formats tests stay green)
+- [x] P6.2 PDF export parity rebuild (`pdf/export/geometry.ts` with `composeCanvasAbsolutePosition` + `elementRotationBrackets`; `pdf/export/rectangle.ts` with `buildRoundedRectPath` kappa-based per-corner rounded-rect; `pdf/export/clip.ts` with inset/circle/ellipse/polygon clip-path → native PDF clipping operators; 14 new P6.2 acceptance tests)
 - [ ] P6.3 PDF export beyond prior art
 - [ ] P6.4a PDF import fast path (`XMP + marked content`)
 - [ ] P6.4b PDF arbitrary third-party import

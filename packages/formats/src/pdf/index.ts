@@ -1,6 +1,6 @@
 export { parseCssColor } from './color';
+export { exportPdfBytes } from './core';
 export { decodeDataUri } from './data-uri';
-export { exportPdfBytes } from './export';
 export { normalizeFontFamily, resolveGoogleFontUrl } from './fonts';
 export { canvasToPoints } from './geometry';
 export { canRoundTrip, importPdfDocument, readPdfRoundTripMetadata } from './import';

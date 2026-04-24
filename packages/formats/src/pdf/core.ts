@@ -11,6 +11,17 @@ import { PDFDocument, type PDFFont, type PDFImage, type PDFPage, rgb, StandardFo
 
 import { parseCssColor } from './color';
 import { decodeDataUri } from './data-uri';
+import {
+  buildRoundedRectPath,
+  type CanvasAbsolutePosition,
+  clipPathBrackets,
+  composeCanvasAbsolutePosition,
+  type CornerRadii,
+  elementRotationBrackets,
+  hasAnyRoundedCorner,
+  indexElementsById,
+  type OperatorBrackets,
+} from './export';
 import { normalizeFontFamily, resolveGoogleFontUrl } from './fonts';
 import { canvasToPoints, elementToPoints } from './geometry';
 import { drawQrOnPage } from './qr';
@@ -361,12 +372,39 @@ function lookupFont(el: BroadsetElement, fontMap: ReadonlyMap<string, PDFFont>, 
 }
 
 /* ------------------------------------------------------------------ */
+/*  Geometry helpers                                                   */
+/* ------------------------------------------------------------------ */
+
+function elementTopLeftPt(
+  absolute: CanvasAbsolutePosition,
+  el: BroadsetElement,
+  canvas: Canvas,
+  heightPt: number,
+): { readonly xPt: number; readonly yPt: number; readonly wPt: number; readonly hPt: number } {
+  const xPt = elementToPoints(canvas, absolute.x);
+  const yPt = heightPt - elementToPoints(canvas, absolute.y) - elementToPoints(canvas, el.height);
+  const wPt = elementToPoints(canvas, el.width);
+  const hPt = elementToPoints(canvas, el.height);
+
+  return { xPt, yPt, wPt, hPt };
+}
+
+function applyBrackets(page: PDFPage, brackets: OperatorBrackets, phase: 'start' | 'end'): void {
+  const ops = phase === 'start' ? brackets.start : brackets.end;
+
+  if (ops.length === 0) return;
+
+  page.pushOperators(...ops);
+}
+
+/* ------------------------------------------------------------------ */
 /*  Element Rendering                                                  */
 /* ------------------------------------------------------------------ */
 
 function renderText(
   page: PDFPage,
   el: BroadsetElement,
+  absolute: CanvasAbsolutePosition,
   canvas: Canvas,
   heightPt: number,
   fontMap: ReadonlyMap<string, PDFFont>,
@@ -376,13 +414,11 @@ function renderText(
     return;
   }
 
-  const xPt = elementToPoints(canvas, el.position.x);
-  const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height);
+  const { xPt, yPt, wPt: maxWidthPt } = elementTopLeftPt(absolute, el, canvas, heightPt);
   const color = resolveStyleColor(el.style, 'fontColor') ?? rgb(0, 0, 0);
   const size = el.style.fontSize ? elementToPoints(canvas, el.style.fontSize) : 12;
   const opacity = resolveOpacity(el.style);
   const font = lookupFont(el, fontMap, fallbackFont);
-  const maxWidthPt = elementToPoints(canvas, el.width);
   const lineHeightPt = size * LINE_HEIGHT_MULTIPLIER;
 
   const measure = (text: string): number => font.widthOfTextAtSize(text, size);
@@ -418,16 +454,47 @@ function renderText(
   }
 }
 
-function renderRectangle(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
-  const xPt = elementToPoints(canvas, el.position.x);
-  const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height);
-  const wPt = elementToPoints(canvas, el.width);
-  const hPt = elementToPoints(canvas, el.height);
+function renderRectangle(
+  page: PDFPage,
+  el: BroadsetElement,
+  absolute: CanvasAbsolutePosition,
+  canvas: Canvas,
+  heightPt: number,
+): void {
+  const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, heightPt);
   const fillGradient = resolveFillGradient(el.style);
   const bg =
     resolveFillAsPdfRgb(el.style) ??
     (fillGradient !== undefined ? resolveGradientFallbackColor(fillGradient) : undefined);
   const border = resolveStyleColor(el.style, 'borderColor');
+  const opacity = resolveOpacity(el.style);
+  const borderWidthPt = el.style.borderWidth !== undefined ? elementToPoints(canvas, el.style.borderWidth) : undefined;
+
+  const radii = el.style.borderRadius;
+
+  if (hasAnyRoundedCorner(radii) && radii !== undefined) {
+    const cornerRadiiPt: CornerRadii = [
+      elementToPoints(canvas, radii[0]),
+      elementToPoints(canvas, radii[1]),
+      elementToPoints(canvas, radii[2]),
+      elementToPoints(canvas, radii[3]),
+    ];
+    const pathD = buildRoundedRectPath(wPt, hPt, cornerRadiiPt);
+
+    // `drawSvgPath` anchors at `(x, y)` treating it as the SVG origin — top
+    // of the SVG coordinate frame — and internally handles the PDF Y-flip.
+    // We anchor at the rectangle's top-left in PDF points (yPt + hPt).
+    page.drawSvgPath(pathD, {
+      x: xPt,
+      y: yPt + hPt,
+      ...(bg ? { color: bg } : undefined),
+      ...(border ? { borderColor: border } : undefined),
+      ...(borderWidthPt !== undefined ? { borderWidth: borderWidthPt } : undefined),
+      opacity,
+    });
+
+    return;
+  }
 
   page.drawRectangle({
     x: xPt,
@@ -436,14 +503,20 @@ function renderRectangle(page: PDFPage, el: BroadsetElement, canvas: Canvas, hei
     height: hPt,
     ...(bg ? { color: bg } : undefined),
     ...(border ? { borderColor: border } : undefined),
-    ...(el.style.borderWidth ? { borderWidth: elementToPoints(canvas, el.style.borderWidth) } : undefined),
-    opacity: resolveOpacity(el.style),
+    ...(borderWidthPt !== undefined ? { borderWidth: borderWidthPt } : undefined),
+    opacity,
   });
 }
 
-function renderEllipse(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
-  const cx = elementToPoints(canvas, el.position.x + el.width / 2);
-  const cy = heightPt - elementToPoints(canvas, el.position.y + el.height / 2);
+function renderEllipse(
+  page: PDFPage,
+  el: BroadsetElement,
+  absolute: CanvasAbsolutePosition,
+  canvas: Canvas,
+  heightPt: number,
+): void {
+  const cx = elementToPoints(canvas, absolute.x + el.width / 2);
+  const cy = heightPt - elementToPoints(canvas, absolute.y + el.height / 2);
   const ellipseGradient = resolveFillGradient(el.style);
   const bg =
     resolveFillAsPdfRgb(el.style) ??
@@ -459,13 +532,19 @@ function renderEllipse(page: PDFPage, el: BroadsetElement, canvas: Canvas, heigh
   });
 }
 
-function renderPath(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
+function renderPath(
+  page: PDFPage,
+  el: BroadsetElement,
+  absolute: CanvasAbsolutePosition,
+  canvas: Canvas,
+  heightPt: number,
+): void {
   if (!el.content) {
     return;
   }
 
-  const xPt = elementToPoints(canvas, el.position.x);
-  const yPt = heightPt - elementToPoints(canvas, el.position.y);
+  const xPt = elementToPoints(canvas, absolute.x);
+  const yPt = heightPt - elementToPoints(canvas, absolute.y);
   const fillColor = resolveFillAsPdfRgb(el.style) ?? rgb(0, 0, 0);
   const strokeColor = resolveStyleColor(el.style, 'stroke');
 
@@ -501,6 +580,7 @@ function drawImagePlaceholder(
 async function renderImage(
   page: PDFPage,
   el: BroadsetElement,
+  absolute: CanvasAbsolutePosition,
   canvas: Canvas,
   heightPt: number,
   pdf: PDFDocument,
@@ -510,10 +590,7 @@ async function renderImage(
     return;
   }
 
-  const xPt = elementToPoints(canvas, el.position.x);
-  const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height);
-  const wPt = elementToPoints(canvas, el.width);
-  const hPt = elementToPoints(canvas, el.height);
+  const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, heightPt);
   const opacity = resolveOpacity(el.style);
 
   const contentText = resolveContentAsPlainString(el.content);
@@ -569,16 +646,17 @@ function labelForNonStaticElement(el: BroadsetElement): string {
 function renderNonStaticElement(
   page: PDFPage,
   el: BroadsetElement,
+  absolute: CanvasAbsolutePosition,
   canvas: Canvas,
   heightPt: number,
   fallbackFont: PDFFont,
 ): void {
-  renderRectangle(page, el, canvas, heightPt);
+  renderRectangle(page, el, absolute, canvas, heightPt);
 
-  const xPt = elementToPoints(canvas, el.position.x) + PLACEHOLDER_LABEL_INSET;
+  const xPt = elementToPoints(canvas, absolute.x) + PLACEHOLDER_LABEL_INSET;
   const yPt =
     heightPt -
-    elementToPoints(canvas, el.position.y) -
+    elementToPoints(canvas, absolute.y) -
     elementToPoints(canvas, el.height) +
     PLACEHOLDER_LABEL_INSET;
   const label = labelForNonStaticElement(el);
@@ -593,11 +671,14 @@ function renderNonStaticElement(
   });
 }
 
-function renderQrCode(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
-  const xPt = elementToPoints(canvas, el.position.x);
-  const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height);
-  const wPt = elementToPoints(canvas, el.width);
-  const hPt = elementToPoints(canvas, el.height);
+function renderQrCode(
+  page: PDFPage,
+  el: BroadsetElement,
+  absolute: CanvasAbsolutePosition,
+  canvas: Canvas,
+  heightPt: number,
+): void {
+  const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, heightPt);
 
   drawQrOnPage(page, resolveContentAsPlainString(el.content), xPt, yPt, wPt, hPt);
 }
@@ -610,37 +691,50 @@ async function renderElement(
   pdf: PDFDocument,
   fontMap: ReadonlyMap<string, PDFFont>,
   fallbackFont: PDFFont,
+  elementsById: ReadonlyMap<string, BroadsetElement>,
   fetchFn?: typeof globalThis.fetch,
 ): Promise<void> {
+  const absolute = composeCanvasAbsolutePosition(el, elementsById);
+  const rotate = elementRotationBrackets(el, absolute, canvas, heightPt);
+  const clipBrackets = clipPathBrackets(el, absolute, canvas, heightPt);
+
+  applyBrackets(page, rotate, 'start');
+  applyBrackets(page, clipBrackets, 'start');
+
   switch (el.type) {
     case 'text':
-      renderText(page, el, canvas, heightPt, fontMap, fallbackFont);
+      renderText(page, el, absolute, canvas, heightPt, fontMap, fallbackFont);
       break;
     case 'rectangle':
-      renderRectangle(page, el, canvas, heightPt);
+      renderRectangle(page, el, absolute, canvas, heightPt);
       break;
     case 'ellipse':
-      renderEllipse(page, el, canvas, heightPt);
+      renderEllipse(page, el, absolute, canvas, heightPt);
       break;
     case 'path':
-      renderPath(page, el, canvas, heightPt);
+      renderPath(page, el, absolute, canvas, heightPt);
       break;
     case 'image':
     case 'svg':
-      await renderImage(page, el, canvas, heightPt, pdf, fetchFn);
+      await renderImage(page, el, absolute, canvas, heightPt, pdf, fetchFn);
       break;
     case 'qrcode':
-      renderQrCode(page, el, canvas, heightPt);
+      renderQrCode(page, el, absolute, canvas, heightPt);
       break;
     case 'group':
-      // Groups are rendered by iterating child elements (composed via parentId tree in P6.2).
+      // Groups are pure containers — children render independently via the
+      // flat `doc.elements` sweep; parent-child translation is composed
+      // via `composeCanvasAbsolutePosition`.
       break;
     case 'video':
     case 'clock':
     case 'ticker':
-      renderNonStaticElement(page, el, canvas, heightPt, fallbackFont);
+      renderNonStaticElement(page, el, absolute, canvas, heightPt, fallbackFont);
       break;
   }
+
+  applyBrackets(page, clipBrackets, 'end');
+  applyBrackets(page, rotate, 'end');
 }
 
 /* ------------------------------------------------------------------ */
@@ -669,6 +763,7 @@ export async function exportPdfBytes(doc: BroadsetDocument, fetchFn?: typeof glo
   // text elements without a declared family have a working PDFFont.
   const fallbackFont = await pdf.embedFont(StandardFonts.Helvetica);
   const fontMap = await resolveFonts(doc, pdf, effectiveFetch);
+  const elementsById = indexElementsById(doc.elements);
 
   // Draw background
   if (canvas.backgroundMode === 'solid' && canvas.backgroundColor) {
@@ -688,7 +783,7 @@ export async function exportPdfBytes(doc: BroadsetDocument, fetchFn?: typeof glo
 
   // Render elements at rest state (t=0) — animation data discarded per IO-D-16.
   for (const el of doc.elements) {
-    await renderElement(page, el, canvas, heightPt, pdf, fontMap, fallbackFont, effectiveFetch);
+    await renderElement(page, el, canvas, heightPt, pdf, fontMap, fallbackFont, elementsById, effectiveFetch);
   }
 
   return await pdf.save();

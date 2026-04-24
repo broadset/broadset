@@ -54,6 +54,7 @@ vi.mock('pdf-lib', () => {
       drawCalls.ellipses.push(opts);
     },
     drawSvgPath: (): void => {},
+    pushOperators: (): void => {},
   };
 
   const makeFont = (name: string | Uint8Array): MockFont => ({
@@ -90,6 +91,34 @@ vi.mock('pdf-lib', () => {
       ZapfDingbats: 'ZapfDingbats',
     },
     rgb: (r: number, g: number, b: number) => ({ r, g, b }),
+    pushGraphicsState: () => ({ kind: 'q' }),
+    popGraphicsState: () => ({ kind: 'Q' }),
+    translate: (x: number, y: number) => ({ kind: 'translate', x, y }),
+    rotateDegrees: (deg: number) => ({ kind: 'rotateDegrees', deg }),
+    concatTransformationMatrix: (a: number, b: number, c: number, d: number, e: number, f: number) => ({
+      kind: 'cm',
+      a,
+      b,
+      c,
+      d,
+      e,
+      f,
+    }),
+    moveTo: (x: number, y: number) => ({ kind: 'moveTo', x, y }),
+    lineTo: (x: number, y: number) => ({ kind: 'lineTo', x, y }),
+    appendBezierCurve: (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number) => ({
+      kind: 'appendBezierCurve',
+      x1,
+      y1,
+      x2,
+      y2,
+      x3,
+      y3,
+    }),
+    closePath: () => ({ kind: 'closePath' }),
+    clip: () => ({ kind: 'clip' }),
+    clipEvenOdd: () => ({ kind: 'clipEvenOdd' }),
+    endPath: () => ({ kind: 'endPath' }),
   };
 });
 
