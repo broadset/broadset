@@ -1,9 +1,21 @@
-import type { BroadsetElementStyleInput } from '@broadset/model';
+import {
+  type BroadsetDocument,
+  type BroadsetElementStyleInput,
+  createDefaultElement,
+  createEmptyBroadsetDocument,
+} from '@broadset/model';
+
+import type { SvgImportOptions } from './types';
 
 export interface SvgImportResult {
   readonly elements: readonly ImportedElement[];
   readonly canvasWidth: number;
   readonly canvasHeight: number;
+  readonly warnings: readonly string[];
+}
+
+export interface SvgDocumentImportResult {
+  readonly document: BroadsetDocument;
   readonly warnings: readonly string[];
 }
 
@@ -310,4 +322,51 @@ export function importSvg(input: string): SvgImportResult {
   }
 
   return { elements, canvasWidth, canvasHeight, warnings };
+}
+
+/**
+ * High-level SVG import entry point. Wraps the primitive element
+ * extractor `importSvg` and produces a full `BroadsetDocument` plus a
+ * warnings list that the demo surfaces through
+ * `FormatImportWarningsModal`. Phase 7.1 threads existing behaviour
+ * through this shape so `import-document.ts` can consume the svg
+ * module via its public API. Phase 7.4 replaces the body with the
+ * metadata-fast-path and arbitrary-source logic.
+ */
+export function importSvgDocument(
+  input: string,
+  fileName = 'Imported SVG',
+  _options?: SvgImportOptions,
+): SvgDocumentImportResult {
+  // Phase 7.1 keeps the existing behaviour; options are consumed in
+  // Phase 7.4 when the fast-path importer lands.
+  const result = importSvg(input);
+  const emptyDoc = createEmptyBroadsetDocument();
+  const warnings = [...result.warnings];
+
+  const document: BroadsetDocument = {
+    ...emptyDoc,
+    name: fileName.replace(/\.svg$/i, ''),
+    canvas: { ...emptyDoc.canvas, width: result.canvasWidth, height: result.canvasHeight },
+    elements: result.elements.map((element, index) =>
+      createDefaultElement(element.type === 'path' ? 'path' : 'svg', {
+        id: `imported-${String(index)}`,
+        name: `Element ${String(index + 1)}`,
+        position: { x: element.position.x, y: element.position.y },
+        width: element.width,
+        height: element.height,
+        rotation: element.rotation,
+        content: element.content,
+        style: element.style,
+      }),
+    ),
+  };
+
+  if (document.elements.length === 0) {
+    warnings.push(
+      'SVG import produced no elements. Unsupported content may have been skipped; verify the source file and mapping coverage.',
+    );
+  }
+
+  return { document, warnings };
 }

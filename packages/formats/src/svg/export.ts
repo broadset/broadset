@@ -12,6 +12,7 @@ import {
 
 import { generateQrSvgFragment } from '../interchange';
 import { escapeXml } from './shared';
+import type { SvgExportOptions } from './types';
 
 const SVG_XMLNS = 'http://www.w3.org/2000/svg';
 const XLINK_XMLNS = 'http://www.w3.org/1999/xlink';
@@ -304,7 +305,19 @@ function renderElement(el: BroadsetElement, defs: string[]): string {
   }
 }
 
-export function exportSvg(doc: BroadsetDocument): string {
+/**
+ * Serialises a `BroadsetDocument` into an SVG markup string. This is
+ * the Phase 7.1 baseline — the Phase 7.2 parity rebuild will replace
+ * this body with a richer renderer that fixes the recursive-group
+ * bug, covers every stroke property, handles full transform
+ * composition, and emits the `<metadata>` RDF packet plus
+ * `data-bs-*` tags. The current body preserves existing behaviour so
+ * the demo keeps rendering while Phase 7.1 is landing.
+ */
+export function exportSvgString(doc: BroadsetDocument, _options?: SvgExportOptions): string {
+  // Phase 7.1 intentionally does not consume `_options`; later phases
+  // will thread font-embedding choice and metadata toggles through
+  // this entry point.
   const defs: string[] = [];
   const elementNodes = doc.elements.map((el) => renderElement(el, defs));
 
@@ -316,4 +329,20 @@ export function exportSvg(doc: BroadsetDocument): string {
     ...elementNodes,
     '</svg>',
   ].join('\n');
+}
+
+export interface SvgExportResult {
+  readonly svg: string;
+  readonly warnings: readonly string[];
+}
+
+/**
+ * High-level export entry point: returns the SVG string plus any
+ * warnings raised during export. Phase 7.2 populates `warnings` with
+ * preflight output (missing fonts, restricted embed permissions,
+ * conic-gradient fallbacks, rasterisation fallbacks); the Phase 7.1
+ * baseline returns an empty list.
+ */
+export function exportSvgDocument(doc: BroadsetDocument, options?: SvgExportOptions): SvgExportResult {
+  return { svg: exportSvgString(doc, options), warnings: [] };
 }

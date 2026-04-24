@@ -12,7 +12,7 @@ import { type ExportContext, exportDocument, importDocument, loadFormats, resetF
 
 const mockTriggerDownload = vi.fn();
 const mockSanitizeFilename = vi.fn((name: string) => name.replace(/\s+/g, '-'));
-const mockExportSvg = vi.fn(() => '<svg></svg>');
+const mockExportSvgString = vi.fn(() => '<svg></svg>');
 const mockExportHtmlStandalone = vi.fn(() => '<html></html>');
 const mockExportPdfBytes = vi.fn(() => Promise.resolve(new Uint8Array([1, 2, 3])));
 const mockExportPptxBytes = vi.fn(() => new Uint8Array([4, 5, 6]));
@@ -50,7 +50,7 @@ const mockFormats = {
   exportProjectJson: mockExportProjectJson,
   exportPsdBytes: mockExportPsdBytes,
   exportPsdBytesAsync: mockExportPsdBytesAsync,
-  exportSvg: mockExportSvg,
+  exportSvgString: mockExportSvgString,
   exportVideoBlob: mockExportVideoBlob,
   exportWebMBlob: mockExportWebMBlob,
   generateOGrafPackages: mockGenerateOGrafPackages,
@@ -125,7 +125,7 @@ describe('lazy format loading', () => {
   it('loads the formats module on first call', async () => {
     const formats = await loadFormats();
 
-    expect(formats.exportSvg).toBe(mockExportSvg);
+    expect(formats.exportSvgString).toBe(mockExportSvgString);
     expect(formats.triggerDownload).toBe(mockTriggerDownload);
   });
 
@@ -152,7 +152,7 @@ describe('export orchestration', () => {
   it('exports SVG format and triggers download', async () => {
     await exportDocument('svg', makeContext());
 
-    expect(mockExportSvg).toHaveBeenCalledTimes(1);
+    expect(mockExportSvgString).toHaveBeenCalledTimes(1);
     expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
 
     const [blob, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];
@@ -387,7 +387,7 @@ describe('export orchestration', () => {
 
   /** @description A failed export MUST propagate the error so callers can display an error toast. */
   it('propagates errors from format functions', async () => {
-    mockExportSvg.mockImplementationOnce(() => {
+    mockExportSvgString.mockImplementationOnce(() => {
       throw new Error('SVG render failed');
     });
 
