@@ -128,7 +128,7 @@ Source of truth: [plan.md](./plan.md), [pdf-support-plan.md](./pdf-support-plan.
 
 Source of truth: [plan.md](./plan.md), [svg-support-plan.md](./svg-support-plan.md)
 
-- [ ] P7.0 SVG spec and scope lock
+- [x] P7.0 SVG spec and scope lock (new `project/spec/formats/svg.md` with feature matrix + standards-only metadata/tagging/sanitization requirements; `web-vector.md` trimmed to HTML-standalone only; `spec.md` sub-specs split)
 - [ ] P7.1 SVG types and architecture
 - [ ] P7.2 SVG export parity and critical bug fix
 - [ ] P7.3 SVG export beyond prior art

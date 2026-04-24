@@ -701,9 +701,9 @@ Current master-plan state:
 - **Phase 5 (PSD track):** complete — P5.0 spec + cross-format round-trip metadata requirement; P5.1 PSD types + XMP round-trip spike; P5.2 export parity (groups via parentId tree, rotation, TextBody → styleRuns, `broadset:` XMP packet); P5.4a fast-path XMP import; P5.5 reconciliation wrapper + dirty-flag discipline; P5.6 chain round-trip test via shared harness. Deeper P5.2b/P5.3 surface (native shape layers, all 10 effects, bitmap masks, CMYK/Lab, linked smart objects) recorded as Spec Gaps in `project/spec/formats/psd.md`.
 - **I5.1 PSD UI slice:** complete — `FormatExportOptionsModal` + `FormatImportWarningsModal` in `packages/ui/src/modals/`, format-agnostic so PDF/SVG/PPTX interleaves I6.1/I7.1/I8.1 reuse them unchanged.
 - **I6.2 Phase 6 testing infrastructure:** complete — `_shared/test-infrastructure/` ships `assertReImportableBy`, `runChainRoundTrip`, `assertPreservedBlobSurvives`. PSD chain test wires the harness.
-- **Phase 6 (PDF track):** not started — **next active phase**
+- **Phase 6 (PDF track):** not started — PDF track deferred; SVG track promoted per product priority reshuffle
+- **Phase 7 (SVG track):** in progress — P7.0 complete (new `project/spec/formats/svg.md`; `web-vector.md` trimmed to HTML-standalone; `spec.md` sub-specs split)
 - PDF track: not started
-- SVG track: not started
 - PPTX track: not started
 - PDF/A-2b followup: not started
 - Coverage reporting: not started
