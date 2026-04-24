@@ -136,8 +136,8 @@ describe('Cross-Format Conformance', () => {
    * @description SVG export must produce valid SVG markup containing visual
    * representations of all element types in the canonical document.
    */
-  it('SVG export produces valid output for canonical document', () => {
-    const svg = exportSvgString(doc);
+  it('SVG export produces valid output for canonical document', async () => {
+    const svg = await exportSvgString(doc);
 
     expect(svg.length).toBeGreaterThan(50);
     expect(svg).toContain('<svg');
@@ -293,7 +293,7 @@ describe('Cross-Format Stress Tests', () => {
     expect(html.length).toBeGreaterThan(500);
 
     // SVG
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg.length).toBeGreaterThan(500);
 
@@ -327,7 +327,7 @@ describe('Cross-Format Stress Tests', () => {
     const doc = makeDocument({ elements: [] });
 
     expect(() => exportHtmlStandalone(doc)).not.toThrow();
-    expect(() => exportSvgString(doc)).not.toThrow();
+    await expect(exportSvgString(doc)).resolves.toBeDefined();
     await expect(exportPdfBytes(doc)).resolves.toBeDefined();
     expect(() => exportPptxBytes(doc)).not.toThrow();
     expect(() => generateOGrafPackages(doc)).not.toThrow();
@@ -377,7 +377,7 @@ describe('Cross-Format Stress Tests', () => {
     });
 
     expect(() => exportHtmlStandalone(doc)).not.toThrow();
-    expect(() => exportSvgString(doc)).not.toThrow();
+    await expect(exportSvgString(doc)).resolves.toBeDefined();
     await expect(exportPdfBytes(doc)).resolves.toBeDefined();
     expect(() => exportPptxBytes(doc)).not.toThrow();
     expect(() => generateOGrafPackages(doc)).not.toThrow();

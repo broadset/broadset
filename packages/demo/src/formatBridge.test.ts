@@ -12,7 +12,7 @@ import { type ExportContext, exportDocument, importDocument, loadFormats, resetF
 
 const mockTriggerDownload = vi.fn();
 const mockSanitizeFilename = vi.fn((name: string) => name.replace(/\s+/g, '-'));
-const mockExportSvgString = vi.fn(() => '<svg></svg>');
+const mockExportSvgString = vi.fn(() => Promise.resolve('<svg></svg>'));
 const mockExportHtmlStandalone = vi.fn(() => '<html></html>');
 const mockExportPdfBytes = vi.fn(() => Promise.resolve(new Uint8Array([1, 2, 3])));
 const mockExportPptxBytes = vi.fn(() => new Uint8Array([4, 5, 6]));

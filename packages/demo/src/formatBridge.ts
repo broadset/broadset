@@ -81,7 +81,7 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
     }
 
     case 'svg': {
-      const svgStr = formats.exportSvgString(doc);
+      const svgStr = await formats.exportSvgString(doc);
       const blob = new Blob([svgStr], { type: 'image/svg+xml' });
 
       formats.triggerDownload(blob, `${name}.svg`);

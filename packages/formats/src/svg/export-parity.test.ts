@@ -106,7 +106,7 @@ describe('P7.2 — Recursive group rendering', () => {
    * in the order declared in the `parentId` tree. The previous
    * exporter emitted an empty `<g>` — that is a regression.
    */
-  it('serialises all children of a group inside <g> in tree order', () => {
+  it('serialises all children of a group inside <g> in tree order', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({ id: 'grp-1', type: 'group' }),
@@ -131,7 +131,7 @@ describe('P7.2 — Recursive group rendering', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
     const grpIdx = svg.indexOf('id="grp-1"');
     const endGrpIdx = svg.indexOf('</g>', grpIdx);
 
@@ -159,7 +159,7 @@ describe('P7.2 — Recursive group rendering', () => {
    * element at the root plus inside its group results in
    * double-rendering.
    */
-  it('does not render group children at the document root', () => {
+  it('does not render group children at the document root', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({ id: 'grp-1', type: 'group' }),
@@ -171,10 +171,12 @@ describe('P7.2 — Recursive group rendering', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
-    // Only one occurrence of the child id:
-    const matches = svg.match(/id="child-1"/g) ?? [];
+    // Only one occurrence of the child element open tag — the
+    // P7.3 `data-bs-id=` attribute appears on the same element, so
+    // we match the SVG-native `<rect id="…"` prefix specifically.
+    const matches = svg.match(/<rect id="child-1"/g) ?? [];
 
     expect(matches.length).toBe(1);
   });
@@ -184,7 +186,7 @@ describe('P7.2 — Recursive group rendering', () => {
    * children MUST emit two sibling `<g>` nodes at the root, each
    * containing its own children.
    */
-  it('emits sibling groups correctly', () => {
+  it('emits sibling groups correctly', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({ id: 'grp-a', type: 'group' }),
@@ -194,7 +196,7 @@ describe('P7.2 — Recursive group rendering', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
     const grpAIdx = svg.indexOf('id="grp-a"');
     const endGrpAIdx = svg.indexOf('</g>', grpAIdx);
     const grpBIdx = svg.indexOf('id="grp-b"');
@@ -218,7 +220,7 @@ describe('P7.2 — Full stroke property coverage', () => {
    * `stroke-linejoin`, `stroke-miterlimit`, `stroke-dasharray`,
    * `stroke-dashoffset`.
    */
-  it('emits all stroke attributes when set', () => {
+  it('emits all stroke attributes when set', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -236,7 +238,7 @@ describe('P7.2 — Full stroke property coverage', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).toContain('stroke="#00ff00"');
     expect(svg).toContain('stroke-width="4"');
@@ -251,7 +253,7 @@ describe('P7.2 — Full stroke property coverage', () => {
    * @description Arrow-head markers MUST emit as `<marker>` defs and
    * reference the marker via `marker-start` / `marker-end` on paths.
    */
-  it('emits marker definitions and marker-start / marker-end for paths with arrow ends', () => {
+  it('emits marker definitions and marker-start / marker-end for paths with arrow ends', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -268,7 +270,7 @@ describe('P7.2 — Full stroke property coverage', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).toContain('<marker');
     expect(svg).toContain('marker-start="url(#');
@@ -279,7 +281,7 @@ describe('P7.2 — Full stroke property coverage', () => {
    * @description When a stroke field is absent the exporter MUST NOT
    * emit a default — preserving the original SVG intent on round-trip.
    */
-  it('omits stroke attributes that are absent in the model', () => {
+  it('omits stroke attributes that are absent in the model', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -289,7 +291,7 @@ describe('P7.2 — Full stroke property coverage', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).not.toContain('stroke-width=');
     expect(svg).not.toContain('stroke-linecap=');
@@ -310,7 +312,7 @@ describe('P7.2 — Group transform composition', () => {
    * transforms on the `<g>` element, not individually on each child.
    * This matches SVG's native coordinate-system semantics.
    */
-  it('emits group transform on the <g> element', () => {
+  it('emits group transform on the <g> element', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -325,7 +327,7 @@ describe('P7.2 — Group transform composition', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
     const grpIdx = svg.indexOf('id="grp-1"');
     const endAttrIdx = svg.indexOf('>', grpIdx);
     const openTag = svg.slice(grpIdx, endAttrIdx);
@@ -342,7 +344,7 @@ describe('P7.2 — Group transform composition', () => {
    * child's position is already local; the group's `<g transform>`
    * adds the parent offset on render.
    */
-  it('child translations are local to the parent group', () => {
+  it('child translations are local to the parent group', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -361,7 +363,7 @@ describe('P7.2 — Group transform composition', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
     const childIdx = svg.indexOf('id="child-1"');
     const childEndAttrIdx = svg.indexOf('/>', childIdx);
     const childTag = svg.slice(childIdx, childEndAttrIdx);
@@ -468,7 +470,7 @@ describe('P7.2 — Opaque payload sanitization on export', () => {
    * is embedded in the output SVG. A later consumer opening the
    * Broadset-exported SVG MUST NOT find a `<script>` tag.
    */
-  it('strips <script> tags from opaque svg payloads on re-emission', () => {
+  it('strips <script> tags from opaque svg payloads on re-emission', async () => {
     const hostile =
       '<svg xmlns="http://www.w3.org/2000/svg"><script>alert("xss")</script><rect width="10" height="10"/></svg>';
     const doc = makeDocument({
@@ -481,7 +483,7 @@ describe('P7.2 — Opaque payload sanitization on export', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).not.toContain('<script');
     expect(svg).not.toContain('alert(');
@@ -491,7 +493,7 @@ describe('P7.2 — Opaque payload sanitization on export', () => {
    * @description `on*=` event-handler attributes on opaque payloads
    * MUST be stripped on re-emission.
    */
-  it('strips on*= event handlers from opaque svg payloads', () => {
+  it('strips on*= event handlers from opaque svg payloads', async () => {
     const hostile =
       '<svg xmlns="http://www.w3.org/2000/svg"><rect onclick="alert(1)" onmouseover="alert(2)" width="10" height="10"/></svg>';
     const doc = makeDocument({
@@ -504,7 +506,7 @@ describe('P7.2 — Opaque payload sanitization on export', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).not.toContain('onclick=');
     expect(svg).not.toContain('onmouseover=');
@@ -514,7 +516,7 @@ describe('P7.2 — Opaque payload sanitization on export', () => {
    * @description `javascript:` URLs on `href` / `xlink:href` MUST be
    * stripped from opaque payloads.
    */
-  it('strips javascript: URLs from opaque svg payloads', () => {
+  it('strips javascript: URLs from opaque svg payloads', async () => {
     const hostile =
       '<svg xmlns="http://www.w3.org/2000/svg"><a href="javascript:alert(1)"><text>click</text></a></svg>';
     const doc = makeDocument({
@@ -527,7 +529,7 @@ describe('P7.2 — Opaque payload sanitization on export', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).not.toContain('javascript:');
   });
@@ -537,7 +539,7 @@ describe('P7.2 — Opaque payload sanitization on export', () => {
    * handlers) MUST pass through unchanged — sanitization is a
    * no-regret on safe content.
    */
-  it('passes benign opaque payloads through unchanged', () => {
+  it('passes benign opaque payloads through unchanged', async () => {
     const benign =
       '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="25" fill="#336699"/></svg>';
     const doc = makeDocument({
@@ -550,7 +552,7 @@ describe('P7.2 — Opaque payload sanitization on export', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).toContain('<circle');
     expect(svg).toContain('cx="50"');
@@ -569,7 +571,7 @@ describe('P7.2 — Animation IN-state static export (IO-D-16)', () => {
    * `<animateMotion>`, `<set>` — and no CSS keyframe declarations.
    * Animation data is the `.bsp` authority and is discarded at export.
    */
-  it('emits no SMIL animation elements', () => {
+  it('emits no SMIL animation elements', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -614,7 +616,7 @@ describe('P7.2 — Animation IN-state static export (IO-D-16)', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).not.toContain('<animate');
     expect(svg).not.toContain('<animateTransform');
@@ -628,7 +630,7 @@ describe('P7.2 — Animation IN-state static export (IO-D-16)', () => {
    * embedded in its exported tag — animations live in the `.bsp`,
    * not in the SVG.
    */
-  it('emits no animation metadata references on animated elements', () => {
+  it('emits no animation metadata references on animated elements', async () => {
     const doc = makeDocument({
       elements: [makeElement({ id: 'el-2', type: 'rectangle' })],
       animations: [
@@ -659,7 +661,7 @@ describe('P7.2 — Animation IN-state static export (IO-D-16)', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     // Broadset-specific animation metadata fields MUST NOT appear on
     // the visual layer. They are explicitly not serialised per IO-D-16.

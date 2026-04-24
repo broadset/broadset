@@ -86,7 +86,7 @@ function makeDocument(overrides: Partial<BroadsetDocument> = {}): BroadsetDocume
 
 describe('SVG Path Export', () => {
   /** @description Validates that path elements produce <path> nodes with d, stroke, and fill. */
-  it('exports path with d attribute and stroke color', () => {
+  it('exports path with d attribute and stroke color', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -98,7 +98,7 @@ describe('SVG Path Export', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).toContain('<path');
     expect(svg).toContain('d="M0,0 L40,20 Z"');
@@ -108,7 +108,7 @@ describe('SVG Path Export', () => {
 
 describe('SVG Clip-Path Export', () => {
   /** @description Validates that custom clip-paths produce <clipPath> defs and are referenced. */
-  it('exports clipPath in defs and references via clip-path attribute', () => {
+  it('exports clipPath in defs and references via clip-path attribute', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -120,7 +120,7 @@ describe('SVG Clip-Path Export', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).toContain('<clipPath');
     expect(svg).toContain('<defs>');
@@ -130,7 +130,7 @@ describe('SVG Clip-Path Export', () => {
 
 describe('SVG Text, Image, and Rotation Export', () => {
   /** @description Validates text as <text> and rotated image with rotate() transform. */
-  it('exports text as <text> and image with rotate() transform', () => {
+  it('exports text as <text> and image with rotate() transform', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -148,7 +148,7 @@ describe('SVG Text, Image, and Rotation Export', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).toContain('<text');
     expect(svg).toContain('Hello World');
@@ -167,7 +167,7 @@ describe('SVG Inline Payload Embedding', () => {
    * also never wrap the payload in a `data:` URI reference; it emits
    * the sanitized markup inline.
    */
-  it('embeds benign inline shapes and strips foreignObject active-content carriers', () => {
+  it('embeds benign inline shapes and strips foreignObject active-content carriers', async () => {
     const svgPayload =
       '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="5"/><foreignObject width="100" height="50"><div>Hello</div></foreignObject></svg>';
     const doc = makeDocument({
@@ -180,7 +180,7 @@ describe('SVG Inline Payload Embedding', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).toContain('<circle');
     expect(svg).not.toContain('<foreignObject');
@@ -333,7 +333,7 @@ describe('SVG Import Error Recovery', () => {
 
 describe('SVG Export Style Enrichments', () => {
   /** @description Linear gradient must produce a linearGradient def and fill reference. */
-  it('exports linearGradient def for backgroundGradient', () => {
+  it('exports linearGradient def for backgroundGradient', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -353,7 +353,7 @@ describe('SVG Export Style Enrichments', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).toContain('<linearGradient id="grad-rect-grad"');
     expect(svg).toContain('stop-color="#ff0000"');
@@ -362,7 +362,7 @@ describe('SVG Export Style Enrichments', () => {
   });
 
   /** @description Radial gradient must produce a radialGradient def. */
-  it('exports radialGradient def for backgroundGradient', () => {
+  it('exports radialGradient def for backgroundGradient', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -381,14 +381,14 @@ describe('SVG Export Style Enrichments', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).toContain('<radialGradient id="grad-ellipse-grad"');
     expect(svg).toContain('fill="url(#grad-ellipse-grad)"');
   });
 
   /** @description boxShadow must produce an SVG filter def with feDropShadow. */
-  it('exports boxShadow as SVG filter', () => {
+  it('exports boxShadow as SVG filter', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -399,7 +399,7 @@ describe('SVG Export Style Enrichments', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).toContain('<filter id="shadow-shadow-el"');
     expect(svg).toContain('feDropShadow');
@@ -409,7 +409,7 @@ describe('SVG Export Style Enrichments', () => {
   });
 
   /** @description QR code elements must produce inline SVG content. */
-  it('exports qrcode elements as svg content', () => {
+  it('exports qrcode elements as svg content', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -420,14 +420,14 @@ describe('SVG Export Style Enrichments', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).toContain('id="qr-svg"');
     expect(svg).toContain('<rect');
   });
 
   /** @description Image elements must include preserveAspectRatio. */
-  it('exports image with preserveAspectRatio', () => {
+  it('exports image with preserveAspectRatio', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -438,13 +438,13 @@ describe('SVG Export Style Enrichments', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).toContain('preserveAspectRatio="xMidYMid meet"');
   });
 
   /** @description Text elements must include fontStyle and textDecoration attributes. */
-  it('exports text with fontStyle and textDecoration', () => {
+  it('exports text with fontStyle and textDecoration', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -459,7 +459,7 @@ describe('SVG Export Style Enrichments', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).toContain('font-style="italic"');
     expect(svg).toContain('text-decoration="underline"');
@@ -467,7 +467,7 @@ describe('SVG Export Style Enrichments', () => {
   });
 
   /** @description QR code with empty content must produce empty group. */
-  it('exports empty qrcode as empty group', () => {
+  it('exports empty qrcode as empty group', async () => {
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -478,7 +478,7 @@ describe('SVG Export Style Enrichments', () => {
       ],
     });
 
-    const svg = exportSvgString(doc);
+    const svg = await exportSvgString(doc);
 
     expect(svg).toContain('id="qr-empty"');
     expect(svg).toContain('<g id="qr-empty"');

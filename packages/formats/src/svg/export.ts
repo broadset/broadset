@@ -3,34 +3,42 @@ import {
   type BroadsetDocument,
   type BroadsetElement,
   type BroadsetElementStyle,
+  type BroadsetFill,
   type BroadsetGradient,
   colorToCss,
   getGradientFillGradient,
+  getSolidFillColor,
   resolveContentAsPlainString,
   resolveStyleColor,
   resolveStyleFillToSvgPaint,
 } from '@broadset/model';
 
+import { fingerprintElement } from '../_shared/fingerprint';
 import { sanitizeSvg } from '../_shared/sanitize';
 import { generateQrSvgFragment } from '../interchange';
 import { escapeXml } from './shared';
-import type { SvgExportOptions } from './types';
+import { SVG_BROADSET_NAMESPACE, type SvgExportOptions } from './types';
 
 const SVG_XMLNS = 'http://www.w3.org/2000/svg';
 const XLINK_XMLNS = 'http://www.w3.org/1999/xlink';
+const RDF_XMLNS = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 
 /* ------------------------------------------------------------------ */
 /*  Gradient Defs                                                     */
 /* ------------------------------------------------------------------ */
 
 function renderGradientDef(elementId: string, gradient: BroadsetGradient): { id: string; def: string } | null {
+  // Conic gradients fall back to a linear approximation on the
+  // visual layer; the metadata packet carries the original spec so
+  // re-import recovers the true type.
+  const effective = gradient.type === 'conic' ? conicFallbackGradient(gradient) : gradient;
   const gradId = `grad-${elementId}`;
-  const stops = gradient.stops
+  const stops = effective.stops
     .map((s) => `<stop offset="${String(s.position * 100)}%" stop-color="${escapeXml(colorToCss(s.color))}"/>`)
     .join('');
 
-  if (gradient.type === 'linear') {
-    const angle = gradient.angle ?? 0;
+  if (effective.type === 'linear') {
+    const angle = effective.angle ?? 0;
     const rad = (angle * Math.PI) / 180;
     const x2 = Math.round((Math.cos(rad) * 0.5 + 0.5) * 100) / 100;
     const y2 = Math.round((Math.sin(rad) * 0.5 + 0.5) * 100) / 100;
@@ -43,9 +51,9 @@ function renderGradientDef(elementId: string, gradient: BroadsetGradient): { id:
     };
   }
 
-  if (gradient.type === 'radial') {
-    const cx = (gradient.center?.[0] ?? 50) / 100;
-    const cy = (gradient.center?.[1] ?? 50) / 100;
+  if (effective.type === 'radial') {
+    const cx = (effective.center?.[0] ?? 50) / 100;
+    const cy = (effective.center?.[1] ?? 50) / 100;
 
     return {
       id: gradId,
@@ -53,7 +61,6 @@ function renderGradientDef(elementId: string, gradient: BroadsetGradient): { id:
     };
   }
 
-  // Conic gradients have no SVG equivalent — skip
   return null;
 }
 
@@ -385,6 +392,7 @@ function renderElement(
   el: BroadsetElement,
   defs: string[],
   childrenByParent: ReadonlyMap<string, readonly BroadsetElement[]>,
+  fingerprints: ReadonlyMap<string, string>,
 ): string {
   const transform = buildTransform(el);
   const styleAttrs = buildStyleAttrs(el.style);
@@ -392,53 +400,60 @@ function renderElement(
   const fillOverride = collectGradientFillOverride(el, defs);
   const filterAttr = collectShadowFilterAttr(el, defs);
   const markerAttrs = collectArrowMarkerAttrs(el, defs);
+  const tagAttrs = buildElementTagAttrs(el, resolveFingerprint(fingerprints, el.id));
+  // `extras` excludes `tagAttrs` so callers below append it exactly
+  // once on the element's opening tag. Mixing it in here would
+  // duplicate the attributes on elements whose open tag already
+  // emits `tagAttrs` explicitly (group / svg / qrcode).
   const extras = clipAttr + filterAttr + markerAttrs;
 
   switch (el.type) {
     case 'path':
-      return `<path id="${escapeXml(el.id)}" d="${escapeXml(resolveContentAsPlainString(el.content))}"${styleAttrs}${fillOverride}${transform}${extras}/>`;
+      return `<path id="${escapeXml(el.id)}" d="${escapeXml(resolveContentAsPlainString(el.content))}"${styleAttrs}${fillOverride}${transform}${extras}${tagAttrs}/>`;
 
     case 'rectangle':
-      return `<rect id="${escapeXml(el.id)}" width="${String(el.width)}" height="${String(el.height)}"${styleAttrs}${fillOverride}${transform}${extras}/>`;
+      return `<rect id="${escapeXml(el.id)}" width="${String(el.width)}" height="${String(el.height)}"${styleAttrs}${fillOverride}${transform}${extras}${tagAttrs}/>`;
 
     case 'ellipse':
-      return `<ellipse id="${escapeXml(el.id)}" cx="${String(el.width / 2)}" cy="${String(el.height / 2)}" rx="${String(el.width / 2)}" ry="${String(el.height / 2)}"${styleAttrs}${fillOverride}${transform}${extras}/>`;
+      return `<ellipse id="${escapeXml(el.id)}" cx="${String(el.width / 2)}" cy="${String(el.height / 2)}" rx="${String(el.width / 2)}" ry="${String(el.height / 2)}"${styleAttrs}${fillOverride}${transform}${extras}${tagAttrs}/>`;
 
     case 'text':
-      return `<text id="${escapeXml(el.id)}"${buildTextAttrs(el.style)}${transform}${extras}>${escapeXml(resolveContentAsPlainString(el.content))}</text>`;
+      return `<text id="${escapeXml(el.id)}"${buildTextAttrs(el.style)}${transform}${extras}${tagAttrs}>${escapeXml(resolveContentAsPlainString(el.content))}</text>`;
 
     case 'image': {
       const par = objectFitToPreserveAspectRatio(el.style.objectFit);
 
-      return `<image id="${escapeXml(el.id)}" href="${escapeXml(resolveContentAsPlainString(el.content))}" width="${String(el.width)}" height="${String(el.height)}" preserveAspectRatio="${par}"${transform}${extras}/>`;
+      return `<image id="${escapeXml(el.id)}" href="${escapeXml(resolveContentAsPlainString(el.content))}" width="${String(el.width)}" height="${String(el.height)}" preserveAspectRatio="${par}"${transform}${extras}${tagAttrs}/>`;
     }
 
     case 'svg':
-      return renderSvgPayload(el, transform + styleAttrs + extras);
+      return renderSvgPayload(el, transform + styleAttrs + extras + tagAttrs);
 
     case 'qrcode': {
       const qrSvg = generateQrSvgFragment(resolveContentAsPlainString(el.content));
 
       if (qrSvg === null) {
-        return `<g id="${escapeXml(el.id)}"${transform}/>`;
+        return `<g id="${escapeXml(el.id)}"${transform}${tagAttrs}/>`;
       }
 
       // Extract SVG inner content from the fragment
       const innerMatch = /<svg[^>]*>([\s\S]*)<\/svg>/i.exec(qrSvg);
       const inner = innerMatch?.[1] ?? qrSvg;
 
-      return `<g id="${escapeXml(el.id)}"${transform}>${inner}</g>`;
+      return `<g id="${escapeXml(el.id)}"${transform}${tagAttrs}>${inner}</g>`;
     }
 
     case 'group': {
       const children = childrenByParent.get(el.id) ?? [];
-      const childMarkup = children.map((child) => renderElement(child, defs, childrenByParent)).join('');
+      const childMarkup = children
+        .map((child) => renderElement(child, defs, childrenByParent, fingerprints))
+        .join('');
 
-      return `<g id="${escapeXml(el.id)}"${transform}${extras}>${childMarkup}</g>`;
+      return `<g id="${escapeXml(el.id)}"${transform}${extras}${tagAttrs}>${childMarkup}</g>`;
     }
 
     default:
-      return `<g id="${escapeXml(el.id)}"${transform}/>`;
+      return `<g id="${escapeXml(el.id)}"${transform}${tagAttrs}/>`;
   }
 }
 
@@ -451,6 +466,71 @@ function renderElement(
  */
 function hasNonEmptyParentId(el: BroadsetElement): el is BroadsetElement & { readonly parentId: string } {
   return typeof el.parentId === 'string' && el.parentId !== '';
+}
+
+/**
+ * Build the `data-bs-*` + `broadset:content-hash` attribute string
+ * every rendered element carries. The `data-bs-*` attributes are
+ * SVG 2 / HTML5 global so they survive Illustrator / Inkscape /
+ * Figma save-roundtrips; `broadset:content-hash` rides in the
+ * namespaced attribute so tag-strippers that drop `data-*` still
+ * leave a fingerprint for identity recovery.
+ */
+function buildElementTagAttrs(el: BroadsetElement, fingerprint: string): string {
+  const parts: string[] = [
+    ` data-bs-id="${escapeXml(el.id)}"`,
+    ` data-bs-kind="${el.type}"`,
+    ` broadset:content-hash="${fingerprint}"`,
+  ];
+
+  const dataField = el.dataField;
+
+  if (typeof dataField === 'object' && dataField !== null && typeof dataField.fieldName === 'string') {
+    parts.push(` data-bs-data-field="${escapeXml(dataField.fieldName)}"`);
+  }
+
+  const visibleWhen = el.visibleWhen;
+
+  if (typeof visibleWhen === 'string' && visibleWhen !== '') {
+    parts.push(` data-bs-visible-when="${escapeXml(visibleWhen)}"`);
+  }
+
+  const repeater = el.repeater;
+
+  if (typeof repeater === 'object' && repeater !== null && typeof repeater.dataArrayField === 'string') {
+    parts.push(` data-bs-repeater="${escapeXml(repeater.dataArrayField)}"`);
+  }
+
+  return parts.join('');
+}
+
+/**
+ * Extract `originalColor` strings from solid-fill colours so the
+ * document `<metadata>` packet can carry the source colour spec.
+ * sRGB-only colours return undefined so the caller skips them.
+ */
+function extractOriginalColor(fill: BroadsetFill): string | undefined {
+  const color = getSolidFillColor(fill);
+
+  if (color?.kind !== 'rgb') {
+    return undefined;
+  }
+
+  return color.originalColor;
+}
+
+/**
+ * The fill used by the visual layer when a conic gradient is
+ * requested. Conic has no SVG 2 primitive, so we emit a many-stop
+ * linear approximation — the true spec rides in `<metadata>` and is
+ * recovered on re-import.
+ */
+function conicFallbackGradient(conic: BroadsetGradient): BroadsetGradient {
+  return {
+    type: 'linear',
+    angle: conic.startAngle ?? 0,
+    stops: conic.stops,
+  };
 }
 
 function buildChildrenByParent(elements: readonly BroadsetElement[]): ReadonlyMap<string, readonly BroadsetElement[]> {
@@ -482,24 +562,102 @@ function buildChildrenByParent(elements: readonly BroadsetElement[]): ReadonlyMa
  * `data-bs-*` tags. The current body preserves existing behaviour so
  * the demo keeps rendering while Phase 7.1 is landing.
  */
-export function exportSvgString(doc: BroadsetDocument, _options?: SvgExportOptions): string {
-  // Phase 7.2 landed the recursive group renderer + full stroke
-  // coverage + opaque-payload sanitization. Phase 7.3 layers font
-  // embedding, conic-gradient fallback metadata, OKLCH preservation,
-  // and the <metadata> RDF packet on top.
-  const defs: string[] = [];
-  const childrenByParent = buildChildrenByParent(doc.elements);
-  const rootElements = doc.elements.filter((el) => !hasNonEmptyParentId(el));
-  const elementNodes = rootElements.map((el) => renderElement(el, defs, childrenByParent));
+/**
+ * Build the document-level `<metadata>` RDF/XML packet. Carries
+ * Broadset-native state that SVG primitives cannot express visually:
+ * document id, canvas unit + dpi, per-element identity list with
+ * fingerprints and optional `originalColor` / conic-gradient specs.
+ *
+ * The namespace URI is the shared Broadset XMP URI from IO-D-08 so
+ * reconciliation treats a single namespace across PSD / PDF / PPTX /
+ * SVG. The RDF/XML encoding is the W3C-recommended metadata form
+ * that Illustrator and Inkscape preserve across save.
+ */
+function buildMetadataPacket(doc: BroadsetDocument, fingerprints: ReadonlyMap<string, string>): string {
+  const elementEntries: string[] = [];
 
-  const defsBlock = defs.length > 0 ? `<defs>${defs.join('')}</defs>` : '';
+  for (const el of doc.elements) {
+    const fingerprint = resolveFingerprint(fingerprints, el.id);
+    const originalColor = extractOriginalColor(el.style.fill);
+    const gradientFill = getGradientFillGradient(el.style.fill);
+    const conicSpec = gradientFill?.type === 'conic' ? JSON.stringify(gradientFill) : undefined;
+    const attrs: string[] = [` broadset:elementId="${escapeXml(el.id)}"`, ` broadset:fingerprint="${fingerprint}"`];
+
+    if (originalColor !== undefined) {
+      attrs.push(` broadset:originalColor="${escapeXml(originalColor)}"`);
+    }
+
+    if (conicSpec !== undefined) {
+      attrs.push(` broadset:conicGradient="${escapeXml(conicSpec)}"`);
+    }
+
+    elementEntries.push(`<rdf:li${attrs.join('')}/>`);
+  }
 
   return [
-    `<svg xmlns="${SVG_XMLNS}" xmlns:xlink="${XLINK_XMLNS}" width="${String(doc.canvas.width)}" height="${String(doc.canvas.height)}" viewBox="0 0 ${String(doc.canvas.width)} ${String(doc.canvas.height)}">`,
-    defsBlock,
-    ...elementNodes,
-    '</svg>',
-  ].join('\n');
+    '<metadata>',
+    `<rdf:RDF xmlns:rdf="${RDF_XMLNS}" xmlns:broadset="${SVG_BROADSET_NAMESPACE}">`,
+    `<rdf:Description rdf:about="" broadset:canvasUnit="${doc.canvas.unit}" broadset:canvasDpi="${String(doc.canvas.dpi)}">`,
+    `<broadset:documentId>${escapeXml(doc.id)}</broadset:documentId>`,
+    '<broadset:elements>',
+    '<rdf:Seq>',
+    ...elementEntries,
+    '</rdf:Seq>',
+    '</broadset:elements>',
+    '</rdf:Description>',
+    '</rdf:RDF>',
+    '</metadata>',
+  ].join('');
+}
+
+async function computeFingerprints(elements: readonly BroadsetElement[]): Promise<ReadonlyMap<string, string>> {
+  const map = new Map<string, string>();
+
+  for (const el of elements) {
+    const fp = await fingerprintElement(el);
+
+    if (fp.length !== 16) {
+      throw new Error(`fingerprintElement produced an invalid digest for element "${el.id}": ${fp}`);
+    }
+
+    map.set(el.id, fp);
+  }
+
+  return map;
+}
+
+function resolveFingerprint(fingerprints: ReadonlyMap<string, string>, elementId: string): string {
+  const fp = fingerprints.get(elementId);
+
+  if (fp === undefined) {
+    throw new Error(`Fingerprint missing for element "${elementId}" during SVG export`);
+  }
+
+  return fp;
+}
+
+/**
+ * Serialises a `BroadsetDocument` into an SVG markup string. Async
+ * because per-element fingerprinting runs through xxhash-wasm
+ * (the WASM runtime initialises lazily on first call).
+ *
+ * Phase 7.3 adds: `data-bs-*` tagging on every rendered element,
+ * namespaced `broadset:content-hash` for identity recovery,
+ * document `<metadata>` RDF packet, conic-gradient fallback with
+ * metadata preservation, and `BroadsetColor.originalColor`
+ * preservation for non-sRGB fills.
+ */
+export async function exportSvgString(doc: BroadsetDocument, _options?: SvgExportOptions): Promise<string> {
+  const defs: string[] = [];
+  const fingerprints = await computeFingerprints(doc.elements);
+  const childrenByParent = buildChildrenByParent(doc.elements);
+  const rootElements = doc.elements.filter((el) => !hasNonEmptyParentId(el));
+  const elementNodes = rootElements.map((el) => renderElement(el, defs, childrenByParent, fingerprints));
+  const defsBlock = defs.length > 0 ? `<defs>${defs.join('')}</defs>` : '';
+  const metadataBlock = buildMetadataPacket(doc, fingerprints);
+  const rootOpen = `<svg xmlns="${SVG_XMLNS}" xmlns:xlink="${XLINK_XMLNS}" xmlns:broadset="${SVG_BROADSET_NAMESPACE}" xmlns:rdf="${RDF_XMLNS}" width="${String(doc.canvas.width)}" height="${String(doc.canvas.height)}" viewBox="0 0 ${String(doc.canvas.width)} ${String(doc.canvas.height)}">`;
+
+  return [rootOpen, metadataBlock, defsBlock, ...elementNodes, '</svg>'].join('\n');
 }
 
 export interface SvgExportResult {
@@ -509,11 +667,16 @@ export interface SvgExportResult {
 
 /**
  * High-level export entry point: returns the SVG string plus any
- * warnings raised during export. Phase 7.2 populates `warnings` with
- * preflight output (missing fonts, restricted embed permissions,
- * conic-gradient fallbacks, rasterisation fallbacks); the Phase 7.1
- * baseline returns an empty list.
+ * warnings raised during export. Phase 7.3 emits Broadset-native
+ * state in a document-level `<metadata>` packet and tags every
+ * rendered element with `data-bs-*` attributes. Future phases
+ * populate `warnings` with preflight output (missing fonts,
+ * restricted embed permissions, rasterisation fallbacks).
  */
-export function exportSvgDocument(doc: BroadsetDocument, options?: SvgExportOptions): SvgExportResult {
-  return { svg: exportSvgString(doc, options), warnings: [] };
+export async function exportSvgDocument(
+  doc: BroadsetDocument,
+  options?: SvgExportOptions,
+): Promise<SvgExportResult> {
+  return { svg: await exportSvgString(doc, options), warnings: [] };
 }
+

@@ -53,9 +53,9 @@ describe('SVG public API', () => {
    * later parity work — nothing about the Phase 7.1 barrel should
    * break callers that expect a string back.
    */
-  it('exportSvgString produces a string starting with <svg', () => {
+  it('exportSvgString produces a string starting with <svg', async () => {
     const doc = createEmptyBroadsetDocument();
-    const svg = svgBarrel.exportSvgString(doc);
+    const svg = await svgBarrel.exportSvgString(doc);
 
     expect(typeof svg).toBe('string');
     expect(svg.startsWith('<svg')).toBe(true);
@@ -66,11 +66,12 @@ describe('SVG public API', () => {
    * where `svg` matches the output of `exportSvgString` and
    * `warnings` is a readable-empty array in the Phase 7.1 baseline.
    */
-  it('exportSvgDocument returns the string plus a warnings array', () => {
+  it('exportSvgDocument returns the string plus a warnings array', async () => {
     const doc = createEmptyBroadsetDocument();
-    const result = svgBarrel.exportSvgDocument(doc);
+    const result = await svgBarrel.exportSvgDocument(doc);
+    const svgOnly = await svgBarrel.exportSvgString(doc);
 
-    expect(result.svg).toBe(svgBarrel.exportSvgString(doc));
+    expect(result.svg).toBe(svgOnly);
     expect(Array.isArray(result.warnings)).toBe(true);
     expect(result.warnings.length).toBe(0);
   });
