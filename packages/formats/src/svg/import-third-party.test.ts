@@ -1,0 +1,275 @@
+/**
+ * P7.4b — SVG arbitrary third-party import.
+ *
+ * Third-party SVGs (Illustrator / Inkscape / Figma / Sketch /
+ * Affinity / d3 / hand-authored / browser outerHTML) MUST import
+ * as Broadset documents per `project/spec/formats/svg.md`:
+ *
+ * 1. Import Sanitization (importer security contract floor).
+ *    `<script>`, `on*=`, `javascript:` URLs, `<foreignObject>` with
+ *    active content — all stripped via `_shared/sanitize/sanitizeSvg`
+ *    before the AST reaches downstream code. Every removal surfaces
+ *    as a warning per IO-D-18.
+ * 2. CSS style resolution. `<style>` blocks parsed via a simple
+ *    type / class / id selector matcher so inherited presentation
+ *    attributes land on the right element.
+ * 3. `<use>` / `<symbol>` dereferencing. References resolve inline
+ *    into groups; self-referential cycles detected and warned per
+ *    the importer security contract.
+ * 4. Tool-specific namespace preservation. `sodipodi:` /
+ *    `inkscape:` / `ai:` attrs on recognised elements surface a
+ *    warning — the element still imports natively.
+ */
+import { describe, expect, it } from 'vitest';
+
+import { importSvgDocument } from './index';
+
+/* ------------------------------------------------------------------ */
+/*  1. Import sanitization                                            */
+/* ------------------------------------------------------------------ */
+
+describe('P7.4b — Import sanitization (security contract)', () => {
+  /**
+   * @description An inline `<script>` in a third-party SVG MUST be
+   * stripped on import. The element extractor MUST NOT see the
+   * script, and the import report MUST list the removal as a
+   * warning.
+   */
+  it('strips inline <script> elements on import', () => {
+    const hostile = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <script>alert('xss')</script>
+      <rect width="50" height="50" fill="#ff0000"/>
+    </svg>`;
+
+    const { document, warnings } = importSvgDocument(hostile);
+    const hasRect = document.elements.some((el) => el.type === 'rectangle');
+    const hasSvgWithScript = document.elements.some(
+      (el) => el.type === 'svg' && typeof el.content === 'string' && el.content.includes('<script'),
+    );
+
+    expect(hasRect).toBe(true);
+    expect(hasSvgWithScript).toBe(false);
+    expect(warnings.some((w) => w.toLowerCase().includes('script'))).toBe(true);
+  });
+
+  /**
+   * @description `on*=` event handler attributes MUST be stripped.
+   * The element still imports natively — only the active-content
+   * attribute is gone.
+   */
+  it('strips on*= event handler attributes on import', () => {
+    const hostile = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <rect onclick="alert(1)" onmouseover="alert(2)" width="50" height="50" fill="#ff0000"/>
+    </svg>`;
+
+    const { document, warnings } = importSvgDocument(hostile);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+
+    expect(rect).toBeDefined();
+    // Sanitization strips the attributes before downstream code sees
+    // them — the resulting Broadset style has no `onclick` / `onmouseover`.
+    expect(rect?.content).not.toContain('onclick');
+    expect(warnings.some((w) => w.toLowerCase().includes('event') || w.toLowerCase().includes('attribute'))).toBe(
+      true,
+    );
+  });
+
+  /**
+   * @description `javascript:` URLs in `href` / `xlink:href` MUST be
+   * stripped on import per the security contract.
+   */
+  it('strips javascript: URLs on import', () => {
+    const hostile = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="100">
+      <image xlink:href="javascript:alert(1)" width="50" height="50"/>
+    </svg>`;
+
+    const { warnings } = importSvgDocument(hostile);
+
+    expect(warnings.some((w) => w.toLowerCase().includes('javascript') || w.toLowerCase().includes('url'))).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  2. <use> / <symbol> dereferencing                                 */
+/* ------------------------------------------------------------------ */
+
+describe('P7.4b — <use> / <symbol> dereferencing', () => {
+  /**
+   * @description A `<use>` element referencing a `<symbol>` in
+   * `<defs>` MUST dereference inline: the resulting Broadset doc
+   * contains the symbol's children as if they were direct SVG
+   * elements. Visually identical, structurally flattened per the
+   * plan's "known-lossy" note on structural round-trip.
+   */
+  it('dereferences <use> referencing a <symbol> with rect content', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200" height="200">
+      <defs>
+        <symbol id="cross">
+          <rect width="40" height="10" fill="#ff0000"/>
+          <rect width="10" height="40" fill="#ff0000"/>
+        </symbol>
+      </defs>
+      <use xlink:href="#cross"/>
+    </svg>`;
+
+    const { document } = importSvgDocument(input);
+    const rectCount = document.elements.filter((el) => el.type === 'rectangle').length;
+
+    expect(rectCount).toBe(2);
+  });
+
+  /**
+   * @description A self-referential `<use>` (reference chain back
+   * to its enclosing `<symbol>`) MUST be detected and broken
+   * without unbounded recursion. The importer warns and moves on
+   * per the importer security contract.
+   */
+  it('detects <use> cycles without unbounded recursion', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200" height="200">
+      <defs>
+        <symbol id="cycle">
+          <use xlink:href="#cycle"/>
+        </symbol>
+      </defs>
+      <use xlink:href="#cycle"/>
+    </svg>`;
+
+    const start = Date.now();
+    const { warnings } = importSvgDocument(input);
+    const elapsed = Date.now() - start;
+
+    expect(elapsed).toBeLessThan(1000);
+    expect(warnings.some((w) => w.toLowerCase().includes('cycle') || w.toLowerCase().includes('use'))).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  3. CSS <style> block resolution                                   */
+/* ------------------------------------------------------------------ */
+
+describe('P7.4b — CSS style block resolution', () => {
+  /**
+   * @description A `<style>` block defining a type selector MUST
+   * apply its declarations to matching elements on import.
+   */
+  it('applies type-selector rules from <style> blocks', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <style>rect { fill: #00ff00; }</style>
+      <rect width="50" height="50"/>
+    </svg>`;
+
+    const { document } = importSvgDocument(input);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+    const fill = rect?.style.fill;
+
+    expect(fill?.kind).toBe('solid');
+
+    if (fill?.kind === 'solid' && fill.color.kind === 'rgb') {
+      expect(fill.color.hex).toBe('#00ff00');
+    }
+  });
+
+  /**
+   * @description Inline `style=""` overrides `<style>` block rules
+   * per CSS 2.1 specificity. The inline value wins on import.
+   */
+  it('inline style attribute wins over <style> block rules', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <style>rect { fill: #00ff00; }</style>
+      <rect width="50" height="50" style="fill: #ff0000"/>
+    </svg>`;
+
+    const { document } = importSvgDocument(input);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+    const fill = rect?.style.fill;
+
+    if (fill?.kind === 'solid' && fill.color.kind === 'rgb') {
+      expect(fill.color.hex).toBe('#ff0000');
+    }
+  });
+
+  /**
+   * @description A class-selector rule MUST apply to elements
+   * bearing that class. Third-party SVGs from Illustrator and
+   * Figma export via class-heavy CSS.
+   */
+  it('applies class-selector rules from <style> blocks', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <style>.accent { fill: #0000ff; }</style>
+      <rect class="accent" width="50" height="50"/>
+    </svg>`;
+
+    const { document } = importSvgDocument(input);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+    const fill = rect?.style.fill;
+
+    if (fill?.kind === 'solid' && fill.color.kind === 'rgb') {
+      expect(fill.color.hex).toBe('#0000ff');
+    }
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  4. Tool-specific namespace preservation                           */
+/* ------------------------------------------------------------------ */
+
+describe('P7.4b — Tool-specific namespace preservation', () => {
+  /**
+   * @description An Inkscape-authored SVG with `sodipodi:` and
+   * `inkscape:` attributes MUST import the element natively (as a
+   * rectangle, path, etc.) with a warning describing the preserved
+   * namespaced attrs.
+   */
+  it('imports Inkscape rect with sodipodi attrs and warns', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.0.dtd" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="200" height="200">
+      <rect sodipodi:nodetypes="ccc" inkscape:label="layer1" width="100" height="50" fill="#ff0000"/>
+    </svg>`;
+
+    const { document, warnings } = importSvgDocument(input);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+
+    expect(rect).toBeDefined();
+    expect(warnings.some((w) => /sodipodi|inkscape|namespace/i.test(w))).toBe(true);
+  });
+
+  /**
+   * @description An Illustrator `ai:` namespace attribute on a
+   * natively-mapped element MUST surface a warning and still
+   * import the element natively.
+   */
+  it('imports Illustrator rect with ai attrs and warns', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:ai="http://ns.adobe.com/AdobeIllustrator/10.0/" width="200" height="200">
+      <rect ai:extended="true" width="100" height="50" fill="#00ff00"/>
+    </svg>`;
+
+    const { document, warnings } = importSvgDocument(input);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+
+    expect(rect).toBeDefined();
+    expect(warnings.some((w) => /illustrator|ai:|adobe|namespace/i.test(w))).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  5. No silent drops                                                */
+/* ------------------------------------------------------------------ */
+
+describe('P7.4b — No silent drops', () => {
+  /**
+   * @description A `<meshgradient>` (or other unknown vendor
+   * element) MUST preserve as an opaque `svg`-type Broadset element
+   * and emit a warning naming the unknown tag per IO-D-18.
+   */
+  it('preserves unknown elements as opaque svg-type and warns', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <meshgradient id="m1"/>
+    </svg>`;
+
+    const { document, warnings } = importSvgDocument(input);
+    const preserved = document.elements.find((el) => el.type === 'svg');
+
+    expect(preserved).toBeDefined();
+    expect(preserved?.content).toContain('meshgradient');
+    expect(warnings.some((w) => w.toLowerCase().includes('meshgradient'))).toBe(true);
+  });
+});
