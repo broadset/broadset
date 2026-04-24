@@ -1,5 +1,6 @@
-export { exportPptxBytes } from './export';
+export { exportPptxBytes, exportPptxBytesAsync } from './export';
 export { importPptx } from './import';
+export { readPreservedPptxDocument,reconcilePptx } from './reconcile';
 
 // P8.1 — typed infrastructure and shared OOXML helpers.
 export type {

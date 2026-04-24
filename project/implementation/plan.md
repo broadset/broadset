@@ -703,15 +703,16 @@ Current master-plan state:
 - **I6.2 Phase 6 testing infrastructure:** complete — `_shared/test-infrastructure/` ships `assertReImportableBy`, `runChainRoundTrip`, `assertPreservedBlobSurvives`. PSD chain test wires the harness.
 - **Phase 6 (PDF track):** not started
 - **Phase 7 (SVG track):** not started
-- **Phase 8 (PPTX track):** **in progress — active phase**
+- **Phase 8 (PPTX track):** **complete**
   - P8.0 spec lockdown: complete (rewrote `project/spec/formats/pptx.md` around OOXML-native primitives, shape-name tags, extension lists, custom XML parts)
   - P8.1 types + architecture + dependency swap: complete (`types.ts`, `ooxml/{namespaces,units,zip,xml,relationships,content-types}.ts`, `semantic/{shape-name,element-ext,custom-xml,ledger}.ts`; added `fflate` + `svgpath` deps)
-  - P8.2a export parity rebuild: not started
-  - P8.2b export beyond prior art: not started
-  - P8.3 import (fast-path + operator-level): not started
-  - P8.4 reconciliation: not started
-  - P8.5 tests: not started
-  - P8.6 UI wiring: not started
+  - P8.2a export parity rebuild: complete (namespace-safe emit, groups via `<p:grpSp>`, text runs, rotation, relationships, multi-slide, generated theme/master/layout, custom XML parts, shape-name tags + `<p:extLst>` entries, native `<a:custGeom>` paths)
+  - P8.2b export beyond prior art: covered by P8.2a (multi-slide, theme/master/layout, custGeom, gradients, QR fallback, custom XML parts, per-shape tags)
+  - P8.3a import fast-path: covered by P8.2a (reads `customXml/broadset-project.xml`)
+  - P8.3b operator-level import: complete (`import/{package,theme,shapes}.ts`; rectangles, ellipses, paths via `<a:custGeom>`, pictures, groups, theme colour resolution, multi-slide, text extraction)
+  - P8.4 reconciliation: complete (`reconcile.ts` wraps `_shared/reconcile/` with PPTX-specific fast-path + fingerprint fallback)
+  - P8.5 tests: complete baseline (per-module unit tests + round-trip + operator-level fixtures in `import.test.ts` + `reconcile.test.ts`; formats suite 421 tests green). External-tool fixture suite deferred as spec gap in `project/spec/formats/pptx.md` (requires real-world `.pptx` golden files).
+  - P8.6 UI wiring: complete — PPTX dispatch wired through `packages/demo/src/formatBridge.ts` (`exportPptxBytes` + `importPptxDocument`); shared HeroUI `FormatImportWarningsModal` + `FormatExportOptionsModal` (landed in I5.1) already support PPTX labels (covered by `packages/ui/src/modals/format-modals.test.tsx`).
 - PDF track: not started
 - SVG track: not started
 - PDF/A-2b followup: not started
