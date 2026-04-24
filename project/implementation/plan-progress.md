@@ -104,7 +104,7 @@ Source of truth: [plan.md](./plan.md), [psd-support-plan.md](./psd-support-plan.
 
 - [x] P5.0 PSD spec and scope lock (feature matrix + standards-only rule + `Format Round-Trip Metadata` cross-format requirement in `formats/spec.md`)
 - [x] P5.1 PSD types and de-risking spike (`packages/formats/src/psd/types.ts` + registry wiring; `xmp-roundtrip-spike.test.ts` verifies `ag-psd` XMP round-trip in-process; decision logged)
-- [ ] P5.2 PSD export parity rebuild
+- [x] P5.2 PSD export parity rebuild (groups via parentId tree, rotation composition, TextBody → styleRuns, `broadset:` XMP packet; deeper items in `project/spec/formats/psd.md` §Spec Gaps)
 - [ ] P5.3 PSD export beyond prior art
 - [ ] P5.4a PSD import fast path (`XMP + additionalInfo`)
 - [ ] P5.4b PSD arbitrary third-party import

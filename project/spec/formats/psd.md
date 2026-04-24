@@ -386,7 +386,15 @@ Export preflight and import warnings MUST follow IO-D-14 ("preflight warns and p
 
 ## Spec Gaps
 
-_None — all requirements carry acceptance criteria. The following items are intentionally scoped out of the PSD track and tracked by other specs:_
+The following requirements have their primary behaviour shipped via P5.2a foundation work but still need deeper implementation before "ship-ready" for full Photoshop round-trip:
+
+- **Native Shape Layer Export (rectangle / ellipse / path as vector shape layers instead of rasterized pixels).** Current behaviour: rectangle and ellipse export as solid-pixel raster layers via `applyShapeFill`. Target behaviour (P5.2a/b): emit native PSD shape layers via `vectorFill` + `vectorStroke` + `vectorMask`, with the `borderRadius` rounded-rectangle primitive where possible.
+- **Full Effect Coverage (all ten layer effects bidirectional).** Current behaviour: only drop shadow + outer glow are emitted. Target behaviour (P5.2b): all ten effects emit natively where CSS has equivalents (drop shadow, inner shadow, outer glow, inner glow, color overlay, gradient overlay, stroke) and ride in `extensions.psd.unmappedEffects` otherwise (bevel / emboss, satin, pattern overlay).
+- **Bitmap layer mask round-trip.** Current behaviour: only vector masks are emitted. Target behaviour (P5.2b): bitmap alpha-channel masks with `extensions.psd.bitmapMask` preservation blob when alpha cannot map to a Broadset mask.
+- **CMYK / Lab / Grayscale + ICC profile round-trip.** Current behaviour: RGB 8-bit only. Target behaviour (P5.2b + P5.3): colour mode follows `document.outputIntent.colorSpace`; embedded ICC profile rides via the asset pipeline (P4.4 done).
+- **Linked smart objects.** Current behaviour: embedded only. Target behaviour (P5.3): linked smart objects preserve external reference + GUID identity.
+
+_The following items are intentionally scoped out of the PSD track and tracked by other specs:_
 
 - Run-edit UI, ICC picker, export options modal, import warnings modal, reconciliation diff view — covered by the io-prereqs Phase 5 UI spec under [project/spec/ui/](../ui/) and interleaved during PSD Phase 2b per the plan.
 - External-tool fixture corpus and chain CT harness — covered by the io-prereqs Phase 6 testing infrastructure, landed during this track at first need.

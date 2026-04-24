@@ -12,6 +12,7 @@ import { readPsd } from 'ag-psd';
 import { isRgbaColor, rgbaToHex } from './color-utils';
 import { PSD_COORD_MAX, REVERSE_BLEND_MAP } from './constants';
 import { bytesToDataUri } from './data-uri';
+import { readDocumentXmpPacket } from './import-xmp';
 import { ensureCanvasInitialized } from './runtime-canvas';
 import { bezierPathToSvgD } from './vector-mask';
 
@@ -389,13 +390,27 @@ export function importPsd(data: Uint8Array): BroadsetDocument {
     backgroundMode: 'solid',
   };
   const { pages, elements } = buildPagesAndElements(psd);
+  const xmpPacket = readDocumentXmpPacket(psd);
+  const reconciledElements = xmpPacket
+    ? elements.map((el, index) => {
+        const packetEntry = xmpPacket.elements[index];
+
+        if (packetEntry === undefined) return el;
+
+        return {
+          ...el,
+          id: packetEntry.id,
+          extensions: { ...el.extensions, psd: { dirty: false, roundTrip: { signature: 'BsPs', elementId: packetEntry.id } } },
+        } satisfies BroadsetElement;
+      })
+    : elements;
 
   return {
-    id: 'imported-psd',
+    id: xmpPacket?.documentId ?? 'imported-psd',
     name: 'Imported PSD',
     documentMode: 'screen',
     canvas,
-    elements,
+    elements: reconciledElements,
     pages,
     animations: [],
     dataSchema: { fields: [] },
