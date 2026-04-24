@@ -1,5 +1,6 @@
 import { type BroadsetDocument, createEmptyBroadsetDocument } from '@broadset/model';
 
+import { parseTimingAnimations } from './import/animation';
 import { resolvePackage } from './import/package';
 import { parseLayoutPlaceholders } from './import/placeholders';
 import {
@@ -55,6 +56,7 @@ function importOperatorLevel(pkg: OoxmlPackage): BroadsetDocument {
   const theme = parseTheme(themeXml);
   const layoutPlaceholders = aggregateLayoutPlaceholders(pkg, resolved.layoutPaths, theme);
   const slides: { readonly id: string; readonly notes?: string; readonly elements: readonly ReturnType<typeof parseSlideShapes>[number][] }[] = [];
+  const allAnimations: ReturnType<typeof parseTimingAnimations>[number][] = [];
 
   let elementCounter = 1;
 
@@ -64,9 +66,15 @@ function importOperatorLevel(pkg: OoxmlPackage): BroadsetDocument {
     if (result === null) continue;
     elementCounter = result.nextElementCounter;
     slides.push(result.slide);
+
+    const slideXml = readTextPart(pkg, slidePath) ?? '';
+
+    for (const anim of parseTimingAnimations(slideXml)) allAnimations.push(anim);
   }
 
-  return composeDocumentFromSlides(resolved.canvas, slides);
+  const doc = composeDocumentFromSlides(resolved.canvas, slides);
+
+  return allAnimations.length > 0 ? { ...doc, animations: allAnimations } : doc;
 }
 
 function importSingleSlide(
