@@ -41,7 +41,7 @@ const TOOL_NAMESPACE_WARNINGS: readonly { readonly prefix: string; readonly labe
  * `on*=` event handlers are removed. `javascript:` URLs are
  * stripped by DOMPurify's built-in URL sanitizer.
  */
-const THIRD_PARTY_FORBID_TAGS: readonly string[] = ['script', 'foreignObject'];
+const THIRD_PARTY_FORBID_TAGS: readonly string[] = ['script', 'foreignobject'];
 const THIRD_PARTY_FORBID_ATTR: readonly string[] = ['onload', 'onerror', 'onclick', 'onmouseover', 'onfocus', 'onblur'];
 
 const THIRD_PARTY_IMPORT_CONFIG = {

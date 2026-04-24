@@ -702,7 +702,7 @@ Current master-plan state:
 - **I5.1 PSD UI slice:** complete — `FormatExportOptionsModal` + `FormatImportWarningsModal` in `packages/ui/src/modals/`, format-agnostic so PDF/SVG/PPTX interleaves I6.1/I7.1/I8.1 reuse them unchanged.
 - **I6.2 Phase 6 testing infrastructure:** complete — `_shared/test-infrastructure/` ships `assertReImportableBy`, `runChainRoundTrip`, `assertPreservedBlobSurvives`. PSD chain test wires the harness.
 - **Phase 6 (PDF track):** not started — PDF track deferred; SVG track promoted per product priority reshuffle
-- **Phase 7 (SVG track):** in progress — P7.0 complete (new `project/spec/formats/svg.md`; `web-vector.md` trimmed to HTML-standalone; `spec.md` sub-specs split)
+- **Phase 7 (SVG track):** complete — all 8 units shipped (P7.0 spec + scope lock with feature matrix; P7.1 types + architecture with Zod registration and import-tuned DOMPurify sanitizer; P7.2 parity + critical bug fix — recursive `<g>`, full stroke coverage, gradient import, opaque-payload sanitization; P7.3 beyond prior art — `data-bs-*` tagging, `broadset:content-hash`, `<metadata>` RDF packet, conic-fallback with metadata, OKLCH/display-p3 preservation; P7.4a fast-path hydration with nested group identity, `extensions.svg.dirty` init; P7.4b third-party import with `<use>` / `<symbol>` dereferencing + cycle detection, CSS `<style>` block resolution, namespace warnings, no silent drops; P7.5 reconciliation via `_shared/reconcile` with `dirtyElementIds` helper; P7.6 chain round-trip + synthetic external-tool fixtures + hostile-SVG security suite + `FormatExportOptionsModal` SVG fields)
 - PDF track: not started
 - PPTX track: not started
 - PDF/A-2b followup: not started
