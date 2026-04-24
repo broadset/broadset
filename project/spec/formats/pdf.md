@@ -2,201 +2,512 @@
 
 ## Purpose
 
-Defines PDF generation from a `BroadsetDocument`, including page sizing, element rendering, color parsing, font embedding with deduplication, text wrapping, and QR code drawing.
+Defines PDF export, import, and round-trip for Broadset. Covers round-trip within Broadset, external-source import (Illustrator, InDesign, Acrobat, Figma export, macOS Preview, Word, LaTeX), and external-target export with editable fidelity in Illustrator / Acrobat / InDesign. Implementation roadmap lives at [project/implementation/pdf-support-plan.md](../../implementation/pdf-support-plan.md).
+
+This spec supersedes all prior PDF fidelity requirements. It organizes the contract as a **Feature Matrix** scoring Export / Import / Round-trip fidelity per feature, followed by acceptance-criteria requirements for the headline behaviours. It inherits the cross-format contracts in [spec.md](spec.md) — importer contract, importer security contract, and the Format Round-Trip Metadata pattern (XMP + per-element tag + content-hash fallback).
+
+PDF/A-2b conformance is tracked separately in [project/implementation/pdf-pdfa-compliance-plan.md](../../implementation/pdf-pdfa-compliance-plan.md) and is a deliberate follow-up to the work described here.
+
+---
+
+## Sources of truth at export time
+
+Every PDF Broadset writes carries two collaborating layers. This is the concrete instantiation of the cross-format Format Round-Trip Metadata requirement in [spec.md](spec.md) for PDF.
+
+### Visual layer — what any PDF reader draws and edits
+
+Native PDF primitives map every Broadset feature that has a PDF counterpart:
+
+- **Text runs** — real `Tj` / `TJ` text showing operators with embedded / subsetted fonts; tracking, kerning, alignment, leading honour the font's true glyph metrics.
+- **Vector paths** — Broadset `path`, `rectangle`, `ellipse`, and rounded-rectangle elements emit native PDF path operators (`m`, `l`, `c`, `h`, `B`, `f`, `re`) so they stay editable in Illustrator and Acrobat.
+- **Images** — raster image XObjects with JPEG pass-through (no re-encode), PNG via SMask for alpha; embedded ICC profile when `ImageAsset.iccProfileAssetId` is present.
+- **Groups** — Broadset `'group'` elements emit as PDF Form XObjects so transforms compose and selection survives in Illustrator.
+- **Masks** — CSS / SVG clip-paths emit as PDF clipping paths; transparency groups carry group opacity and blend mode.
+- **Gradients** — linear and radial gradients emit as PDF type 2 and type 3 shading patterns (real gradient fills, not first-stop fallback). Conic gradients emit an SVG-raster fallback and preserve the structured definition in marked-content for round-trip.
+- **Color spaces** — the exporter emits the colour space declared by `document.outputIntent.colorSpace` (DeviceRGB, DeviceCMYK, CalRGB / Lab, DeviceN for spot). ICC profile embedded when declared.
+- **Blend modes** — CSS `mix-blend-mode` maps to PDF blend modes via `ExtGState` where an equivalent exists; otherwise the element renders flattened with a warning.
+- **Optional Content Groups** — each Broadset page maps to one OCG (IO-D-13) so PDF readers expose per-page visibility controls.
+- **Page boxes** — canvas `bleed` / `trim` / `safeArea` map to PDF `MediaBox` / `CropBox` / `BleedBox` / `TrimBox` / `ArtBox`.
+
+### Metadata layer — Broadset semantics PDF cannot express visually
+
+- **Document XMP under the shared `broadset:` namespace** (IO-D-08) — project settings, canvas unit/dpi/bleed/trim/safeArea, asset registry, data schema, page definitions with their override maps, Dublin Core metadata from `document.metadata`, `document.outputIntent` referencing an `icc-profile` asset. Animation data is NOT serialized (see "Animated elements" below — PDF is a static carrier per IO-D-16). Attached to the document catalog's `/Metadata` stream.
+- **Per-element marked-content tags** — every element's painting sequence is wrapped in a marked-content operator carrying a property dictionary keyed `/BSET`:
+
+  ```
+  /BSET << /ID (uuid) /Kind /Text /Dirty false /DataField (headline) >> BDC
+    ... painting operators for this element ...
+  EMC
+  ```
+
+  The `/BSET` property dictionary is registered in the page's `/Resources /Properties` dictionary and survives cleanly through Acrobat and typically through Illustrator unless the user flattens or restructures the content stream.
+
+### Tag-stripping fallback
+
+When both the XMP packet and the `/BSET` marked-content tags are stripped (aggressive flatten, "Save As", rasterize, Word / LaTeX / Preview regeneration), content-hash re-matching via `_shared/fingerprint/fingerprintElement()` recovers element identity against the preserved metadata. Elements that cannot be matched either way become new elements on re-import; see the `Reconciliation Reporting` requirement below for the user-facing report.
+
+---
+
+## Feature matrix
+
+Scoring legend for each of the three columns (Export, Import, Round-trip):
+
+- **native** — emitted via a native PDF primitive and re-read via the same primitive.
+- **metadata-preserved** — round-tripped via XMP or marked-content properties; not visible in the PDF content stream but the user sees it in Broadset after re-import.
+- **dropped** — the feature is not representable; deliberately omitted on export, flagged on import.
+
+| Domain | Feature | Export | Import | Round-trip |
+| --- | --- | --- | --- | --- |
+| Text | Single-run plain text | native | native | native |
+| Text | Multi-run styled text (`TextBody` + `Paragraph` + `Run`) | native | native | native |
+| Text | Paragraph style (alignment, leading, tracking) | native | native | native |
+| Text | Font resolution + fallback | native | native | native |
+| Text | Font embedding + subsetting | native | native | native |
+| Text | Text decoration (underline, strike) | native | native | native |
+| Text | Text-on-path | metadata-preserved | metadata-preserved | metadata-preserved |
+| Text | Bullets + numbered lists | native | native | native |
+| Vector | Rectangle / ellipse / path (as PDF path operators) | native | native | native |
+| Vector | Rounded rectangle with per-corner radii | native | native | native |
+| Vector | Stroke (cap / join / dasharray / miterlimit) | native | native | native |
+| Vector | Stroke arrowheads | metadata-preserved | metadata-preserved | metadata-preserved |
+| Vector | Fill — solid colour | native | native | native |
+| Vector | Fill — linear / radial gradient (PDF shading patterns) | native | native | native |
+| Vector | Fill — conic gradient | metadata-preserved + raster fallback | metadata-preserved | metadata-preserved |
+| Vector | Fill — pattern | native | native | native |
+| Vector | Fill — picture | native | native | native |
+| Raster | Plain raster image | native | native | native |
+| Raster | JPEG pass-through (no re-encode) | native | native | native |
+| Raster | ICC profile on image asset | native | native | native |
+| Raster | Last-resort rasterisation fallback | native | n/a | metadata-preserved |
+| Groups | `'group'` element ↔ PDF Form XObject | native | native | native |
+| Groups | Nested groups + composed transforms | native | native | native |
+| Groups | Group-level opacity (transparency group) | native | native | native |
+| Masks | Vector clip-path | native | native | native |
+| Masks | Bitmap mask via SMask | native | native | native |
+| Masks | Transparency groups for group opacity | native | native | native |
+| Effects | CSS filter primitives with a PDF equivalent (blur, drop shadow) | native (blend / ExtGState / raster fallback) | metadata-preserved | metadata-preserved |
+| Effects | Filter primitives without a PDF equivalent | metadata-preserved + raster fallback | metadata-preserved | metadata-preserved |
+| Pages | Canvas → `MediaBox` | native | native | native |
+| Pages | Bleed / trim / safe area → `BleedBox` / `TrimBox` / `ArtBox` / `CropBox` | native | native | native |
+| Pages | Per-page `OCG` | native | native | native |
+| Colour | sRGB 8-bit | native | native | native |
+| Colour | CMYK with embedded ICC | native | native | native |
+| Colour | Lab with embedded ICC | native | native | native |
+| Colour | Gray with embedded ICC | native | native | native |
+| Colour | Spot colours (DeviceN / Separation) | native | native | native |
+| Colour | `BroadsetColor.originalColor` preservation | n/a | native | native |
+| Blend | CSS-equivalent blend modes via ExtGState | native | native | native |
+| Blend | Blend modes without a PDF equivalent | metadata-preserved | metadata-preserved | metadata-preserved |
+| Metadata | Document XMP `broadset:` namespace | native | native | native |
+| Metadata | Per-element `/BSET` marked-content tag | native | native | native |
+| Metadata | Content-hash fallback when tags stripped | n/a | native | native |
+| Metadata | `document.metadata` (Dublin Core) | native (XMP) | native (XMP) | native |
+| Metadata | `document.outputIntent` ICC reference | native | native | native |
+| Animation | Animations (`animations` array, keyframes) | dropped (exported IN state) | dropped | dropped — animations are not serialized to XMP per IO-D-16 |
+| Data binding | `dataField`, `visibleWhen`, `repeater` | metadata-preserved | metadata-preserved | metadata-preserved |
+| Interactive | AcroForm / XFA forms | dropped | metadata-preserved | n/a |
+| Interactive | Embedded JavaScript | dropped on export | stripped on import | n/a |
+| Interactive | File attachments / embedded-file streams | dropped on export | metadata-preserved | metadata-preserved |
+| Security | Encrypted input (password-protected PDF) | n/a | rejected unless password provided | n/a |
 
 ---
 
 ## Requirements
 
-### Requirement: PDF Page Dimensions
+### Requirement: Standards-Only Round-Trip
 
-The system MUST convert canvas dimensions from millimeters to PDF points (1mm = 72/25.4pt). The generated PDF page dimensions MUST match the document canvas.
+Every PDF Broadset writes MUST be a single `.pdf` file with no sidecar files and no app-private streams outside PDF's documented extension mechanisms. Round-trip metadata rides exclusively in (1) document XMP under the shared `broadset:` namespace and (2) per-element marked-content properties under the `/BSET` key. Content-hash matching provides the fallback when tags are stripped.
 
-#### Scenario: Canvas mm to PDF points
+#### Scenario: Single-file output
 
-- GIVEN a canvas of 210×118 mm
-- WHEN a PDF is generated
-- THEN the page width is approximately `(210 × 72) / 25.4` points
+- GIVEN a Broadset project exported to PDF
+- WHEN the exporter writes output
+- THEN the output is a single `.pdf` file with no companion files
+
+#### Scenario: XMP + marked content both present
+
+- GIVEN a Broadset-exported PDF opened by a PDF parser
+- WHEN inspecting the file
+- THEN a `broadset:` XMP packet is attached to the document catalog
+- AND every element-carrying painting sequence is wrapped in a `/BSET` marked-content pair (`BDC` … `EMC`)
 
 #### Acceptance Criteria
 
-- [ ] Given a canvas of 210×118 mm, the page width is approximately `(210 × 72) / 25.4` points
+- [ ] Exported PDF is a single file; no sidecars emitted
+- [ ] Document-level XMP carries the `broadset:` namespace and validates against `_shared/xmp/`'s Zod schema
+- [ ] Every element-carrying painting sequence emits a `/BSET` marked-content pair with `/ID`, `/Kind`, and `/Dirty` properties
+- [ ] Importer hydrates from XMP when present, falling back to operator-level extraction when absent
+- [ ] Importer falls back to `fingerprintElement()` when both XMP and marked-content tags are stripped
+- [ ] Exporter MUST NOT emit embedded-file streams, app-private dictionaries, or any other data carrier for round-trip metadata
 
 ---
 
-### Requirement: Multi-Type Element Rendering
+### Requirement: Group-Preserving Import and Export
 
-The system MUST generate non-empty PDF output for documents containing text, image, path, and qrcode elements.
+The `'group'` element type and `parentId` tree (see [model/element.md](../model/element.md)) MUST round-trip through PDF Form XObjects. Flattening groups on import or export is a regression.
 
-#### Scenario: Mixed element types
+#### Scenario: Nested group export
 
-- GIVEN a document with text, image, path, and qrcode elements
-- WHEN a PDF is generated
-- THEN the output is a non-empty `Uint8Array` of reasonable size
+- GIVEN a Broadset document with a group containing three children, one of which is itself a group
+- WHEN exported to PDF
+- THEN the PDF content stream contains a Form XObject reference for the outer group whose XObject stream contains three painting sequences, the middle one a nested Form XObject
+
+#### Scenario: Nested group import
+
+- GIVEN a PDF with nested Form XObjects (three levels deep) or equivalent nested marked-content groups
+- WHEN imported
+- THEN the resulting Broadset elements form a `parentId` tree of three levels, with no flattening
 
 #### Acceptance Criteria
 
-- [ ] Given a document with text, image, path, and qrcode elements, the output is a non-empty `Uint8Array` of reasonable size
+- [ ] A nested group structure round-trips without flattening
+- [ ] Parent-child transforms flatten into PDF's current transformation matrix so each child renders at the correct absolute position while the group boundary survives in marked-content
+- [ ] Rotation composes into the exported geometry (previously broken in the `@libpdf/core` path)
+- [ ] Group-level opacity round-trips via a transparency group
 
 ---
 
-### Requirement: Data URI Decoding
+### Requirement: Text Run Fidelity
 
-The system MUST decode UTF-8 SVG data URIs with non-base64 parameters (e.g. `data:image/svg+xml;utf8,...`).
+Text content MUST round-trip as structured `TextBody` / `Paragraph` / `Run` data (IO-D-01). Mixed-run styling (different families, weights, italics, colours, tracking within one element) MUST NOT flatten to single-run.
 
-#### Scenario: UTF-8 SVG data URI
+#### Scenario: Multi-run text export
 
-- GIVEN a `data:image/svg+xml;utf8,...` encoded SVG
-- WHEN decoded
-- THEN the MIME type is `image/svg+xml` and bytes contain `<svg`
+- GIVEN a text element with two runs — one bold red and one italic blue
+- WHEN exported to PDF
+- THEN the PDF painting sequence contains two `Tj` / `TJ` runs with the font / colour operators (`Tf`, `rg`, `k`) reflecting each run's style
+
+#### Scenario: Multi-run text import
+
+- GIVEN a PDF with a text element whose painting sequence contains three `Tj` runs at different sizes
+- WHEN imported
+- THEN the resulting text element's `content` is a `TextBody` with three `Run` entries, each matching the source size
 
 #### Acceptance Criteria
 
-- [ ] Given a `data:image/svg+xml;utf8,...` encoded SVG, the MIME type is `image/svg+xml` and bytes contain `<svg`
+- [ ] Broadset `Run` entries map one-to-one to PDF text-showing runs on export
+- [ ] PDF text-showing runs map one-to-one to Broadset `Run` entries on import
+- [ ] Paragraph-level style (alignment, leading, tracking) round-trips via PDF text-state operators (`Tc`, `Tw`, `TL`)
+- [ ] Text decoration (underline, strike) round-trips via additional stroke operators
+- [ ] A single-run plain string flattens back to `string` content on re-import (greenfield model allows both `string` and `TextBody` per [model/element.md](../model/element.md))
 
 ---
 
-### Requirement: Masked SVG Fallback
+### Requirement: Native Vector Export
 
-The system MUST build a masked SVG fallback source for clipped image/svg elements, wrapping content in a `<clipPath>` definition with `preserveAspectRatio`.
+Rectangle, ellipse, and path elements MUST export as native PDF path operators — not rasterised pixels. Vectors stay editable in Illustrator and Acrobat Pro.
 
-#### Scenario: Clip-path mask generation
+#### Scenario: Path stays vector
 
-- GIVEN an SVG element with a custom clip-path
-- WHEN the masked source is built
-- THEN it contains `<clipPath>`, `clip-path="url(#clip0)"`, and `preserveAspectRatio`
+- GIVEN a Broadset `path` element with SVG path data `M 0 0 L 100 0 L 100 100 Z`
+- WHEN exported to PDF and re-opened in Illustrator
+- THEN the element appears as an editable vector path — not a rasterised image
 
 #### Acceptance Criteria
 
-- [ ] Given an SVG element with a custom clip-path, it contains `<clipPath>`, `clip-path="url(#clip0)"`, and `preserveAspectRatio`
+- [ ] Rectangle / ellipse / path elements emit native PDF path operators (`m`, `l`, `c`, `h`, `re`, `B`, `f`)
+- [ ] Per-corner `borderRadius` (tuple `[tl, tr, br, bl]`) round-trips via knot-composed cubic Bézier segments per corner
+- [ ] Stroke styling (cap, join, dasharray, miterlimit) round-trips via PDF graphics-state operators (`w`, `J`, `j`, `M`, `d`)
+- [ ] Rotation composes into the exported geometry
 
 ---
 
-### Requirement: CSS Color Parsing
+### Requirement: Real Gradients via Shading Patterns
 
-The system MUST parse hex colors (3, 4, 6, 8 digit) and `rgb()`/`rgba()` strings into normalized RGBA objects. Channel values MUST be clamped to `[0, 1]`. Unsupported formats (HSL, named colors) MUST return undefined.
+Linear and radial gradients MUST export as native PDF shading patterns (type 2 for linear, type 3 for radial). The prior "first-stop colour fallback" behaviour is a bug, not the intended behaviour. Conic gradients emit a raster fallback plus metadata preservation.
 
-#### Scenario: Hex with alpha
+#### Scenario: Linear gradient export
 
-- GIVEN `#11223380`
-- WHEN parsed
-- THEN channels are normalized and alpha is `128/255`
+- GIVEN a rectangle with a 45° linear-gradient fill from red to blue
+- WHEN exported to PDF
+- THEN the rectangle's fill is a type-2 shading pattern with a 2-stop function spanning the correct bounding box
 
-#### Scenario: Unsupported format
+#### Scenario: Radial gradient export
 
-- GIVEN `hsl(0, 100%, 50%)`
-- WHEN parsed
-- THEN the result is undefined
+- GIVEN a circle with a radial-gradient fill
+- WHEN exported to PDF
+- THEN the circle's fill is a type-3 shading pattern with the correct centre, radius, and colour stops
 
 #### Acceptance Criteria
 
-- [ ] Given `#11223380`, channels are normalized and alpha is `128/255`
-- [ ] Given `hsl(0, 100%, 50%)`, the result is undefined
-
-> **Note:** As of the color normalization requirement (model/config.md), all color values in the document are guaranteed to be hex format. The undefined return for unsupported formats is a defense-in-depth fallback that should not be reached in normal operation.
+- [ ] Linear gradients emit as PDF type-2 shading patterns
+- [ ] Radial gradients emit as PDF type-3 shading patterns
+- [ ] Gradient colour stops preserve alpha via a paired SMask shading when any stop has alpha < 1
+- [ ] Conic gradients emit a raster fallback AND preserve the structured gradient definition in marked-content so re-import round-trips
 
 ---
 
-### Requirement: Font Embedding
+### Requirement: Clip-Path and Mask Fidelity
 
-The system MUST normalize font family names for deduplication (strip quotes, hyphens, lowercased). Font resolution MUST return an exact match, fall back to the first embedded font, or return null. Embedding MUST deduplicate by family name and support Google Fonts URL resolution when no direct URL is provided.
-
-#### Scenario: Deduplication
-
-- GIVEN two fonts with family `Inter`
-- WHEN embedded
-- THEN only one fetch and one embed call occur
-
-#### Scenario: Google Fonts fallback
-
-- GIVEN a font with empty URL
-- WHEN embedded
-- THEN a Google Fonts CSS is fetched to resolve the font URL
+CSS / SVG clip-paths MUST emit as native PDF clipping paths. Group-level opacity MUST emit as a transparency group. Alpha masks MUST emit via the PDF SMask mechanism. Rasterising clipped content is a regression.
 
 #### Acceptance Criteria
 
-- [ ] Given two fonts with family `Inter`, only one fetch and one embed call occur
-- [ ] Given a font with empty URL, a Google Fonts CSS is fetched to resolve the font URL
+- [ ] SVG / CSS clip-path emits as native PDF clipping path operators (`W`, `W*`)
+- [ ] Group-level opacity emits as a transparency group on a Form XObject
+- [ ] Alpha masks on images emit via SMask
+- [ ] Clipped paths and nested clipped groups round-trip without rasterisation
 
 ---
 
-### Requirement: Text Wrapping
+### Requirement: Colour Space and ICC Profile Round-Trip
 
-The system MUST wrap text at word boundaries respecting maximum width. Explicit newlines MUST be preserved, including empty lines. When full-string measurement throws, the system MUST fall back to per-character measurement.
+sRGB, CMYK, Lab, and Grayscale documents MUST round-trip. The exporter emits the colour space declared by `document.outputIntent.colorSpace` (IO-D-13). The importer hydrates `BroadsetColor.originalColor` (IO-D-05) so re-export never silently downgrades a CMYK or Lab colour to sRGB.
 
-#### Scenario: Word boundary wrapping
+#### Scenario: CMYK round-trip
 
-- GIVEN text wider than the container
-- WHEN wrapped
-- THEN output has multiple lines with non-empty content
-
-#### Scenario: Explicit newlines preserved
-
-- GIVEN `"line one\n\nline three"`
-- WHEN wrapped
-- THEN output has 3 lines with an empty second line
+- GIVEN a CMYK PDF with an embedded U.S. Web Coated SWOP ICC profile
+- WHEN imported and re-exported without edits
+- THEN the re-exported PDF is CMYK with the same embedded ICC profile
+- AND the Broadset document has an `icc-profile` asset referenced by `document.outputIntent.iccProfileAssetId`
 
 #### Acceptance Criteria
 
-- [ ] Given text wider than the container, output has multiple lines with non-empty content
-- [ ] Given `"line one\n\nline three"`, output has 3 lines with an empty second line
+- [ ] sRGB / CMYK / Lab / Gray round-trip with the declared colour space preserved end-to-end
+- [ ] Embedded ICC profile survives as an `icc-profile` asset on import and re-embeds on export
+- [ ] `BroadsetColor.originalColor` preserves the original colour spec so re-export is lossless
+- [ ] Spot colours emit as DeviceN / Separation and round-trip via the swatches registry
+- [ ] Out-of-gamut colours gamut-map into the destination space via `_shared/color/gamutMap()` and surface a preflight warning
 
 ---
 
-### Requirement: PDF QR Code Drawing
+### Requirement: Font Embedding and Subsetting
 
-The system MUST draw QR code modules as rectangles on a PDF page. Empty content MUST draw only the white background rectangle.
-
-#### Scenario: Empty content draws background only
-
-- GIVEN empty QR content
-- WHEN drawn
-- THEN exactly 1 rectangle is drawn (background)
-
-#### Scenario: Non-empty content draws modules
-
-- GIVEN QR content `https://example.com`
-- WHEN drawn
-- THEN multiple rectangles are drawn (background + modules)
+Every PDF Broadset writes MUST embed every non-Standard-14 font used by the document, subsetted to the glyphs referenced in the content (IO-D-09). Broadset-owned exports default to subsetting-on; the export options modal MAY surface an opt-out. Fonts with `restricted` embed permission MUST NOT be embedded; fonts with `preview-print` permission MUST emit a preflight warning.
 
 #### Acceptance Criteria
 
-- [ ] Given empty QR content, exactly 1 rectangle is drawn (background)
-- [ ] Given QR content `https://example.com`, multiple rectangles are drawn (background + modules)
+- [ ] Non-Standard-14 fonts embed with a subset containing only the referenced glyphs, via `_shared/fonts/subsetFont()`
+- [ ] Every embedded font carries a ToUnicode CMap so copy-paste and accessibility work downstream
+- [ ] Fonts with `fsType` `restricted` are refused via `_shared/fonts/resolveEmbedDecision()`; affected elements emit a preflight warning
+- [ ] Fonts with `fsType` `preview-print` emit a preflight warning; export proceeds with embedding per user opt-in
+- [ ] Missing fonts surface a preflight warning and a Standard-14 fallback is used per the current Helvetica fallback
+
+---
+
+### Requirement: Optional Content Groups Per Page
+
+Each Broadset page MUST emit as one PDF Optional Content Group (OCG) so PDF readers expose per-page visibility toggles. The OCG name mirrors the page name; OCG visibility mirrors the page's current `visible` state.
+
+#### Acceptance Criteria
+
+- [ ] Each page emits one OCG registered in the document's `/OCProperties` dictionary
+- [ ] OCG visibility defaults match the page's `visible` flag
+- [ ] Importer maps OCGs back to pages when XMP metadata is present, and to a single synthesised page when absent
+
+---
+
+### Requirement: Page Boxes for Bleed / Trim / Safe Area
+
+Canvas `bleed` / `trim` / `safeArea` from the document model MUST emit as PDF page boxes: `MediaBox` for full extent including bleed, `BleedBox` = `MediaBox`, `TrimBox` = canvas minus bleed, `ArtBox` = trim minus safe-area margin, `CropBox` defaults to `BleedBox`. Importer hydrates all four page boxes back into the canvas model.
+
+#### Acceptance Criteria
+
+- [ ] `MediaBox` equals canvas width × height including bleed
+- [ ] `TrimBox` equals canvas width × height without bleed
+- [ ] `ArtBox` equals trim minus safe-area margin (when `canvas.safeArea` is defined)
+- [ ] `BleedBox` equals `MediaBox`
+- [ ] Importer hydrates each page box back into the canvas fields, preserving millimetre values via the unit-utilities pipeline
+
+---
+
+### Requirement: Marked-Content Element Tags
+
+Every painted Broadset element MUST be wrapped in a `/BSET` marked-content pair (`BDC` ... `EMC`). The property dictionary registered on the page's `/Resources /Properties` MUST include:
+
+- `/ID` — the element's stable `id` as a PDF string
+- `/Kind` — the element `type` as a PDF name (`/Text`, `/Image`, `/Path`, `/Rectangle`, `/Ellipse`, `/Svg`, `/Group`, `/Qrcode`, `/Video`, `/Clock`, `/Ticker`)
+- `/Dirty` — the `extensions.pdf.dirty` flag as a PDF boolean
+- `/DataField` — the element's `dataField` when present
+- `/Blob` — base-64 preservation blob when the importer recognised a feature it cannot emit natively (e.g. unmapped annotation types)
+
+#### Scenario: Tags round-trip
+
+- GIVEN a Broadset document with three elements exported to PDF
+- WHEN the PDF is re-opened and parsed
+- THEN each element's painting sequence sits between a matching `BDC` with `/BSET` tag and the `EMC` operator
+- AND the tag's `/ID` recovers the Broadset element `id`
+
+#### Acceptance Criteria
+
+- [ ] Every painted element emits one `BDC` / `EMC` pair
+- [ ] The `/BSET` property dictionary carries `/ID` and `/Kind` minimally, and `/Dirty` by default
+- [ ] The property dictionary is registered in the page `/Resources /Properties`
+- [ ] The importer reads the property dictionary and maps each `/BSET` pair to a Broadset element
+- [ ] Nested marked-content pairs (for groups) round-trip as `parentId` relationships
 
 ---
 
 ### Requirement: Animated Element Static Export
 
-When exporting to PDF, animated elements MUST be exported at their default/rest state (t=0, no active states, no modifiers applied). The exporter MUST NOT attempt to capture mid-animation state. Animation data (timelines, keyframes, states) is discarded in PDF output.
+Broadset animations (`animations` array, keyframes) MUST be discarded on PDF export per IO-D-16. Animated elements are exported at their fully-entered "IN" state (all `in` keyframes resolved to their end positions). Animation data is not serialized to XMP — PDF is a static carrier.
 
-#### Scenario: Animated element rendered at rest state
+If the same PDF is re-imported into Broadset, animations are NOT recovered; the user must re-author them. This is a documented known-lossy behaviour.
 
-- GIVEN an element with an active animation at t=0.5
+#### Scenario: Animation discarded at export
+
+- GIVEN an element with an animation timeline that translates it from left to right
 - WHEN PDF export runs
-- THEN the element is rendered at its default state (t=0)
-
-#### Scenario: Active state modifiers not applied
-
-- GIVEN an element with an active state modifier
-- WHEN PDF export runs
-- THEN the modifier is not applied in the export
+- THEN the element is rendered at the end of the `in` keyframe sequence (the "IN" state)
+- AND no animation data appears in the exported PDF
 
 #### Acceptance Criteria
 
-- [ ] Given an animated element, PDF export renders it at default/rest state (t=0)
-- [ ] Given an element with active state modifiers, modifiers are not applied in PDF export
+- [ ] Animations are discarded on export (not serialized to XMP or marked content)
+- [ ] Animated elements render at the fully-entered IN state
+- [ ] Active state modifiers are not applied on export (rest state)
+- [ ] Re-importing a Broadset-exported PDF surfaces an import warning that animations were lost
+
+---
+
+### Requirement: Dirty-Flag Discipline
+
+Every imported PDF element MUST land with `extensions.pdf.dirty === false`. On re-export:
+
+- Untouched elements (`dirty === false`) re-emit the preserved original operator sequence byte-for-byte.
+- Edited elements (`dirty === true`) re-emit from current Broadset state; the preservation blob is discarded.
+
+The dirty flag flips to `true` automatically when the user edits the element in Broadset via the editor middleware (IO-D-11).
+
+#### Acceptance Criteria
+
+- [ ] Every imported element carries `extensions.pdf.dirty === false`
+- [ ] Editing an element in the editor flips the flag to `true` via the dirty-flag middleware
+- [ ] Re-exporting an untouched document produces byte-identical painting-sequence output for every preserved element
+- [ ] Editing one element and re-exporting rewrites that element only; every other element is byte-identical
+
+---
+
+### Requirement: Chain-Round-Trip Tolerance
+
+Broadset → PDF → edit in Illustrator / Acrobat → save → re-import MUST preserve:
+
+- **External-tool edits** — text changes, position moves, colour changes, path edits made in Illustrator appear in Broadset after re-import.
+- **Broadset semantics not touched by the external tool** — data bindings, page override maps, repeater configs, `visibleWhen` expressions (via XMP).
+- **Untouched elements** — byte-identical painting sequences via the `dirty: false` preservation blob.
+
+#### Acceptance Criteria
+
+- [ ] A Broadset-edited-then-Illustrator-saved PDF re-imports cleanly
+- [ ] Fields Illustrator edited appear in Broadset with the new values and `dirty: true`
+- [ ] Fields Illustrator did not touch keep their Broadset-native state (bindings, overrides)
+- [ ] Elements with stripped `/BSET` tags recover identity via `fingerprintElement()` matching
+
+---
+
+### Requirement: Reconciliation Reporting
+
+When a re-imported PDF has added, removed, or ambiguously-edited elements relative to the preserved metadata, the importer MUST produce a reconciliation report per the `_shared/reconcile/` contract in [spec.md](spec.md):
+
+- **Additions** — elements in the PDF content stream with no matching tag or fingerprint.
+- **Deletions** — elements in the preserved metadata missing from the PDF content stream.
+- **Hash-recovered** — pairs where the `/BSET` tag was stripped but the fingerprint matched.
+
+Deletions require user confirmation before being dropped from the Broadset document.
+
+#### Acceptance Criteria
+
+- [ ] Re-import produces a reconciliation report listing additions, deletions, and hash-recovered matches
+- [ ] Additions land on an "Imported from PDF" staging page
+- [ ] Deletions surface as an import warning requiring user confirmation
+
+---
+
+### Requirement: External-Source Import
+
+The importer MUST handle PDFs produced by any tool that writes the format — not just Broadset-exported files. Best-effort mapping applies per the cross-format `Import scope: arbitrary external files` principle in [spec.md](spec.md). Tool-specific deviations are documented, not silently accepted.
+
+Covered sources (see Phase 5 of [pdf-support-plan.md](../../implementation/pdf-support-plan.md) for the fixture list):
+
+- Illustrator (Save As, Export as PDF)
+- Acrobat (Print to PDF, Optimize PDF)
+- InDesign (Export)
+- Figma export
+- macOS Preview (Export)
+- Microsoft Word
+- LaTeX (pdflatex, xelatex)
+
+#### Acceptance Criteria
+
+- [ ] Import never throws on valid PDFs from any supported source tool
+- [ ] Unknown operators, annotations, and form fields are preserved in `extensions.pdf.*` with an import warning describing what was not natively mapped
+- [ ] Illustrator's private `AIPrivateData` stream is ignored without error; nothing Broadset reads or writes depends on it
+- [ ] Non-RGB documents from any source import without silent colour conversion
+
+---
+
+### Requirement: Security — Encrypted Input and Active Content
+
+Encrypted PDFs MUST be rejected unless the user explicitly supplies the password via the import-options dialog. Embedded JavaScript actions (document-open JS, annotation actions, named actions) MUST be stripped before the content reaches the renderer. Embedded-file streams MUST be preserved as opaque preservation blobs and MUST NOT be executed, resolved, or followed.
+
+These rules are additive to the cross-format importer security contract in [spec.md](spec.md); nothing here weakens that floor.
+
+#### Acceptance Criteria
+
+- [ ] Encrypted PDFs without a supplied password surface an import warning and abort parsing before allocation
+- [ ] Embedded JavaScript actions are stripped and surfaced as an import warning
+- [ ] Embedded-file streams are preserved as base-64 blobs under `extensions.pdf.embeddedFiles[]` with an import warning; they are not fetched, executed, or resolved
+- [ ] The `pdfjs-dist` parser runs in a dedicated worker per the cross-format security contract
+
+---
+
+### Requirement: Preflight and Warnings
+
+Export preflight and import warnings MUST follow IO-D-14 ("preflight warns and proceeds — never blocks export") and IO-D-18 ("no silent drops"):
+
+- **Export preflight** surfaces: missing fonts (when `_shared/fonts/resolveFont` returns no match), missing ICC profile when the document is CMYK / Lab / Grayscale, fonts with `preview-print` or `restricted` embed permission, elements whose fallback is last-resort rasterisation, out-of-gamut colours.
+- **Import warnings** surface: dropped feature types (annotations mapped to preservation blobs, JavaScript stripped, encrypted content rejected, oversize files clipped to the importer security caps), non-`BroadsetColor.originalColor`-preserving colour conversions.
+
+#### Acceptance Criteria
+
+- [ ] Export preflight warnings surface missing fonts, missing ICC profile on non-RGB documents, restricted-font embeds, rasterisation fallbacks, and out-of-gamut colours
+- [ ] Export preflight never blocks — every warning carries a "proceed" path per IO-D-14
+- [ ] Import warnings surface unknown feature preservation, resource-limit clipping, encryption rejection, and colour-space downgrades
+- [ ] Every surfaced warning names the element or page it applies to
+
+---
+
+### Requirement: PDF Page Dimensions (retained from prior spec)
+
+The system MUST convert canvas dimensions to PDF points (1mm = 72/25.4pt, 1in = 72pt). Generated PDF page dimensions MUST match the document canvas declared via `canvas.width` / `canvas.height` in their declared `canvas.unit`.
+
+#### Acceptance Criteria
+
+- [ ] Given a canvas of 210×118 mm, the page width is approximately `(210 × 72) / 25.4` points
+- [ ] Given a canvas of 8.5×11 in, the page width is 612 points
+- [ ] Given a canvas of 800×600 px, the page dimensions honour the document's `canvas.dpi` to convert to points
 
 ---
 
 ## Spec Gaps
 
-- [x] **Animated Element Static Export:** Automated tests verify export at t=0 rest state and confirm active state modifiers are not applied (`packages/formats/src/pdf/fonts-wrap-qr-animation.test.ts`).
+The P6.0 foundation lands the standards-only round-trip contract, feature matrix, and acceptance criteria. The following items ship in subsequent P6 subphases and are tracked here:
+
+- **P6.1** — `@libpdf/core` → `pdf-lib` dependency swap, `pdfjs-dist` + `@pdf-lib/fontkit` added, `importPdfDocument` registered with `import-document.ts`, `types.ts` additions.
+- **P6.2** — Parent-child flattening, rotation composition, per-corner radii, clip-path / mask fidelity, native vector path operators.
+- **P6.3** — Real shading-pattern gradients, CMYK / spot colours, OCGs per page, `/BSET` marked-content tagging, `broadset:` XMP packet via `_shared/xmp/`.
+- **P6.4a** — Fast-path import from XMP + marked content.
+- **P6.4b** — Operator-level extraction of arbitrary third-party PDFs.
+- **P6.5** — Reconciliation wrapper via `_shared/reconcile/` and `_shared/fingerprint/`.
+- **P6.6** — External-tool fixture corpus, chain-round-trip tests via shared test infrastructure, UI wiring for import / export / preflight surfaces.
+
+_The following items are intentionally scoped out of the PDF track and tracked by other specs:_
+
+- PDF/A-2b conformance — covered by [pdf-pdfa-compliance-plan.md](../../implementation/pdf-pdfa-compliance-plan.md) as a deliberate follow-up.
+- Run-edit UI, ICC picker, gradient editor, preflight panel, export options modal, import warnings modal, reconciliation diff view — covered by the io-prereqs Phase 5 UI spec under [project/spec/ui/](../ui/) and interleaved during PDF Phase 6.6 per the plan.
+- External-tool fixture corpus and chain CT harness — covered by the io-prereqs Phase 6 testing infrastructure (`_shared/test-infrastructure/`), reused unchanged across the PDF track.
 
 ---
 
 ## Non-Goals
 
-- PPTX format → see [pptx.md](pptx.md)
-- PSD format → see [psd.md](psd.md)
-- SVG/HTML export → see [web-vector.md](web-vector.md)
+- **AcroForm / XFA forms** — interactive form fields are not exported and are preserved as opaque blobs on import.
+- **Embedded JavaScript** — stripped on import, never emitted on export.
+- **Encryption / password protection** — not applied on export; encrypted input is rejected unless the user supplies the password.
+- **3D annotations, multimedia annotations, embedded Flash** — not supported.
+- **File attachments (embedded-file streams)** — not emitted on export; preserved as opaque metadata on import so the user sees they exist.
+- **PDF/A-2b conformance** — deferred to [pdf-pdfa-compliance-plan.md](../../implementation/pdf-pdfa-compliance-plan.md).
+- **Digital signatures / certificate-based security** — not supported.
+- **PSD format** — see [psd.md](psd.md).
+- **PPTX format** — see [pptx.md](pptx.md).
+- **SVG / HTML export** — see [web-vector.md](web-vector.md).
