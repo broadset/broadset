@@ -91,9 +91,9 @@ Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md
 Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md), [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md)
 
 - [x] I5.1 Land the PSD-required io-prereqs Phase 5 UI slice (`FormatExportOptionsModal` + `FormatImportWarningsModal` in `packages/ui/src/modals/`; shared across PDF/SVG/PPTX tracks)
-- [ ] I6.1 Land the PDF-required io-prereqs Phase 5 UI slice
-- [ ] I7.1 Land the SVG-required io-prereqs Phase 5 UI slice
-- [ ] I8.1 Land the PPTX-required io-prereqs Phase 5 UI slice
+- [x] I6.1 Land the PDF-required io-prereqs Phase 5 UI slice (shared `FormatExportOptionsModal` / `FormatImportWarningsModal` from I5.1; PDF-specific `supportedFields` covered in format-modals test)
+- [x] I7.1 Land the SVG-required io-prereqs Phase 5 UI slice (shared modals; SVG label coverage in test)
+- [x] I8.1 Land the PPTX-required io-prereqs Phase 5 UI slice (shared modals; PPTX label coverage in test)
 - [x] I6.2 Introduce the shared io-prereqs Phase 6 testing infrastructure on first PSD need (`_shared/test-infrastructure/` ships `assertReImportableBy` + `runChainRoundTrip` + `assertPreservedBlobSurvives`; PSD chain test wires the harness)
 
 ## Format tracks

@@ -698,7 +698,10 @@ Current master-plan state:
 - **Phase 2 (shared libraries + `_shared` modules):** complete — 9 units shipped (shape-classifier, fingerprint, reconcile, sanitize, xmp, color, fonts, text-layout, bundle-size guard). `lcms-wasm` / ICC / CMYK / `harfbuzzjs` / font-resolve / subsetting are spec-gapped and light up when Phase 4 asset pipeline or a concrete caller arrives.
 - **Phase 3 (renderer refactor):** complete — all 7 subphases shipped (P3.0 contract cleanup, P3.1 internal layer split into core/dom/elements/adapters, P3.2 keyed reconciliation with composite child invalidation, P3.3 semantic renderers + safe builders removing innerHTML paths, P3.4 runtime service seams for time/data/state/fonts/assets, P3.5 generic `createHtmlMotionRenderer` entry + Broadset adapter, P3.6 performance tests + spec closure)
 - **Phase 4 (shared asset pipeline):** complete — all 7 units shipped (P4.1 font asset type with `format`/`postScriptName`/`familyName`/`subsetRanges?`; P4.2 image asset `width`/`height` required; P4.3 image `iccProfileAssetId?`; P4.4 `IccProfileAsset` variant; P4.5 `_shared/fonts/subset.ts` + codicon fixture; P4.6 `_shared/fonts/embed-policy.ts`; P4.7 `_shared/asset-dedup/` with `AssetDeduplicator`)
-- **Phase 5 (PSD track):** not started — **next active phase**
+- **Phase 5 (PSD track):** complete — P5.0 spec + cross-format round-trip metadata requirement; P5.1 PSD types + XMP round-trip spike; P5.2 export parity (groups via parentId tree, rotation, TextBody → styleRuns, `broadset:` XMP packet); P5.4a fast-path XMP import; P5.5 reconciliation wrapper + dirty-flag discipline; P5.6 chain round-trip test via shared harness. Deeper P5.2b/P5.3 surface (native shape layers, all 10 effects, bitmap masks, CMYK/Lab, linked smart objects) recorded as Spec Gaps in `project/spec/formats/psd.md`.
+- **I5.1 PSD UI slice:** complete — `FormatExportOptionsModal` + `FormatImportWarningsModal` in `packages/ui/src/modals/`, format-agnostic so PDF/SVG/PPTX interleaves I6.1/I7.1/I8.1 reuse them unchanged.
+- **I6.2 Phase 6 testing infrastructure:** complete — `_shared/test-infrastructure/` ships `assertReImportableBy`, `runChainRoundTrip`, `assertPreservedBlobSurvives`. PSD chain test wires the harness.
+- **Phase 6 (PDF track):** not started — **next active phase**
 - PDF track: not started
 - SVG track: not started
 - PPTX track: not started
