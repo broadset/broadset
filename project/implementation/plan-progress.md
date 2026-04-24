@@ -108,7 +108,7 @@ Source of truth: [plan.md](./plan.md), [psd-support-plan.md](./psd-support-plan.
 - [ ] P5.3 PSD export beyond prior art
 - [x] P5.4a PSD import fast path (`XMP + additionalInfo`) — `readDocumentXmpPacket()` recovers document id + element ids from the `broadset:` packet; hydrates `extensions.psd.roundTrip` (`b4b4dfa`)
 - [x] P5.4b PSD arbitrary third-party import — existing `importPsd` layer-walker handles third-party PSDs; deeper extraction (layer comps, adjustment layers) deferred to Spec Gaps
-- [ ] P5.5 PSD reconciliation
+- [x] P5.5 PSD reconciliation (`reconcilePsd` wraps `_shared/reconcile`; `dirtyElementIds` for dirty-flag discipline)
 - [ ] P5.6 PSD tests and UI wiring
 
 ### Phase 6 — PDF track

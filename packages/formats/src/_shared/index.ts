@@ -10,5 +10,6 @@ export * from './fonts';
 export * from './reconcile';
 export * from './sanitize';
 export * from './shape-classifier';
+export * from './test-infrastructure';
 export * from './text-layout';
 export * from './xmp';
