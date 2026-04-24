@@ -9,7 +9,7 @@ const drawCalls = {
   text: [] as string[],
 };
 
-vi.mock('@libpdf/core', () => {
+vi.mock('pdf-lib', () => {
   const page = {
     drawRectangle: (): void => {
       drawCalls.rectangles += 1;
@@ -26,19 +26,35 @@ vi.mock('@libpdf/core', () => {
 
   const pdfInstance = {
     addPage: () => page,
-    save: () => new Uint8Array([1, 2, 3]),
-    embedImage: () => ({ id: 'img-1' }),
-    embedFont: () => ({ widthOfTextAtSize: (text: string, size: number) => text.length * size * 0.5 }),
+    save: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+    embedPng: () => Promise.resolve({ id: 'img-png' }),
+    embedJpg: () => Promise.resolve({ id: 'img-jpg' }),
+    embedFont: (name: string | Uint8Array) =>
+      Promise.resolve({
+        name: typeof name === 'string' ? name : 'embedded-bytes',
+        widthOfTextAtSize: (text: string, size: number) => text.length * size * 0.5,
+      }),
   };
 
   return {
-    PDF: {
-      create: () => pdfInstance,
+    PDFDocument: {
+      create: () => Promise.resolve(pdfInstance),
     },
     StandardFonts: {
       Helvetica: 'Helvetica',
-      TimesRoman: 'TimesRoman',
+      HelveticaBold: 'Helvetica-Bold',
+      HelveticaOblique: 'Helvetica-Oblique',
+      HelveticaBoldOblique: 'Helvetica-BoldOblique',
+      TimesRoman: 'Times-Roman',
+      TimesRomanBold: 'Times-Bold',
+      TimesRomanItalic: 'Times-Italic',
+      TimesRomanBoldItalic: 'Times-BoldItalic',
       Courier: 'Courier',
+      CourierBold: 'Courier-Bold',
+      CourierOblique: 'Courier-Oblique',
+      CourierBoldOblique: 'Courier-BoldOblique',
+      Symbol: 'Symbol',
+      ZapfDingbats: 'ZapfDingbats',
     },
     rgb: (r: number, g: number, b: number) => ({ r, g, b }),
   };

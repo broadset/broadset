@@ -115,7 +115,7 @@ Source of truth: [plan.md](./plan.md), [psd-support-plan.md](./psd-support-plan.
 
 Source of truth: [plan.md](./plan.md), [pdf-support-plan.md](./pdf-support-plan.md)
 
-- [ ] P6.0 PDF spec and scope lock
+- [x] P6.0 PDF spec and scope lock (feature matrix + standards-only round-trip + `broadset:` XMP + `/BSET` marked-content + CMYK/Lab/Gray + OCGs per page + page-boxes + dirty-flag + chain round-trip + reconciliation + security + preflight)
 - [ ] P6.1 PDF types and dependency swap
 - [ ] P6.2 PDF export parity rebuild
 - [ ] P6.3 PDF export beyond prior art

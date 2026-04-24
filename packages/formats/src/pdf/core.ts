@@ -7,7 +7,7 @@ import type {
   Canvas,
 } from '@broadset/model';
 import { colorToCss, getGradientFillGradient, getSolidFillColor, resolveContentAsPlainString } from '@broadset/model';
-import { type EmbeddedFont, PDF, type PDFPage, rgb, type Standard14FontName, StandardFonts } from '@libpdf/core';
+import { PDFDocument, type PDFFont, type PDFImage, type PDFPage, rgb, StandardFonts } from 'pdf-lib';
 
 import { parseCssColor } from './color';
 import { decodeDataUri } from './data-uri';
@@ -29,20 +29,26 @@ const SVG_PLACEHOLDER_BORDER_WIDTH = 0.5;
 /** Default line-height multiplier (typical PDF/CSS default). */
 const LINE_HEIGHT_MULTIPLIER = 1.2;
 
-/** Approximate width ratio for standard 14 PDF fonts (avg char width / fontSize). */
-const STANDARD_FONT_WIDTH_RATIO = 0.5;
+/** Weight threshold above which a font is considered bold. */
+const BOLD_WEIGHT_THRESHOLD = 700;
+
+/** Label size for non-static placeholder elements (video/clock/ticker). */
+const PLACEHOLDER_LABEL_SIZE = 10;
+
+/** Inset applied to the non-static placeholder label relative to the element's box. */
+const PLACEHOLDER_LABEL_INSET = 4;
 
 function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
 }
 
 /**
- * Approximate a gradient as the first stop color (PDF has no native gradient support
- * without shading patterns, so we provide a best-effort solid fallback).
+ * Approximate a gradient as the first stop color (PDF has no native gradient
+ * support on this pipeline yet — shading patterns land in P6.3). Preserves
+ * the prior `@libpdf/core` behaviour through the pdf-lib swap.
  */
 function resolveGradientFallbackColor(gradient: string | BroadsetGradient): ReturnType<typeof rgb> | undefined {
   if (typeof gradient === 'string') {
-    // CSS gradient string — try to extract first color token
     const colorMatch = /#[0-9a-fA-F]{3,8}\b|rgba?\([^)]+\)/.exec(gradient);
 
     if (colorMatch) {
@@ -56,7 +62,6 @@ function resolveGradientFallbackColor(gradient: string | BroadsetGradient): Retu
     return undefined;
   }
 
-  // Structured gradient — use first stop color
   const firstStop = gradient.stops[0];
 
   if (firstStop === undefined) {
@@ -73,15 +78,9 @@ function resolveGradientFallbackColor(gradient: string | BroadsetGradient): Retu
 }
 
 /* ------------------------------------------------------------------ */
-/*  Element Rendering                                                  */
+/*  Colour resolution                                                  */
 /* ------------------------------------------------------------------ */
 
-/**
- * Resolves any `BroadsetColor` on an element style to a `pdf-lib` rgb
- * color. Accepts an optional `BroadsetColor` directly so callers can
- * funnel in the old `backgroundColor` / `fill` paths via
- * `getSolidFillColor(style.fill)` after the unit #8 BroadsetFill flip.
- */
 function colorToPdfRgb(color: BroadsetColor | undefined): ReturnType<typeof rgb> | undefined {
   if (color === undefined) return undefined;
 
@@ -118,6 +117,10 @@ function resolveFillGradient(style: Partial<BroadsetElementStyle>): BroadsetGrad
 function resolveOpacity(style: Partial<BroadsetElementStyle>): number {
   return typeof style.opacity === 'number' ? clamp01(style.opacity) : 1;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Image loading                                                      */
+/* ------------------------------------------------------------------ */
 
 async function fetchImageBytes(
   url: string,
@@ -194,14 +197,22 @@ async function rasterizeSvgToPngBytes(svgBytes: Uint8Array): Promise<Uint8Array 
   });
 }
 
+async function embedImageFromBytes(pdf: PDFDocument, mime: string, bytes: Uint8Array): Promise<PDFImage> {
+  const normalized = mime.toLowerCase();
+
+  if (normalized === 'image/jpeg' || normalized === 'image/jpg') {
+    return pdf.embedJpg(bytes);
+  }
+
+  return pdf.embedPng(bytes);
+}
+
 /* ------------------------------------------------------------------ */
-/*  Font Resolution                                                    */
+/*  Font resolution                                                    */
 /* ------------------------------------------------------------------ */
 
-type FontInput = Standard14FontName | EmbeddedFont;
-
-/** Map of normalized family name → Standard14 font name. */
-const STANDARD_FONT_MAP: ReadonlyMap<string, Standard14FontName> = new Map([
+/** Map of normalized family name → pdf-lib Standard14 font name. */
+const STANDARD_FONT_MAP: ReadonlyMap<string, StandardFonts> = new Map([
   ['helvetica', StandardFonts.Helvetica],
   ['arial', StandardFonts.Helvetica],
   ['timesroman', StandardFonts.TimesRoman],
@@ -211,38 +222,25 @@ const STANDARD_FONT_MAP: ReadonlyMap<string, Standard14FontName> = new Map([
   ['courier new', StandardFonts.Courier],
 ]);
 
-/** Standard 14 bold variants. */
-const STANDARD_BOLD_MAP: ReadonlyMap<Standard14FontName, Standard14FontName> = new Map([
+const STANDARD_BOLD_MAP: ReadonlyMap<StandardFonts, StandardFonts> = new Map([
   [StandardFonts.Helvetica, StandardFonts.HelveticaBold],
-  [StandardFonts.TimesRoman, StandardFonts.TimesBold],
+  [StandardFonts.TimesRoman, StandardFonts.TimesRomanBold],
   [StandardFonts.Courier, StandardFonts.CourierBold],
 ]);
 
-/** Standard 14 italic/oblique variants. */
-const STANDARD_ITALIC_MAP: ReadonlyMap<Standard14FontName, Standard14FontName> = new Map([
+const STANDARD_ITALIC_MAP: ReadonlyMap<StandardFonts, StandardFonts> = new Map([
   [StandardFonts.Helvetica, StandardFonts.HelveticaOblique],
-  [StandardFonts.TimesRoman, StandardFonts.TimesItalic],
+  [StandardFonts.TimesRoman, StandardFonts.TimesRomanItalic],
   [StandardFonts.Courier, StandardFonts.CourierOblique],
 ]);
 
-/** Standard 14 bold-italic variants. */
-const STANDARD_BOLD_ITALIC_MAP: ReadonlyMap<Standard14FontName, Standard14FontName> = new Map([
+const STANDARD_BOLD_ITALIC_MAP: ReadonlyMap<StandardFonts, StandardFonts> = new Map([
   [StandardFonts.Helvetica, StandardFonts.HelveticaBoldOblique],
-  [StandardFonts.TimesRoman, StandardFonts.TimesBoldItalic],
+  [StandardFonts.TimesRoman, StandardFonts.TimesRomanBoldItalic],
   [StandardFonts.Courier, StandardFonts.CourierBoldOblique],
 ]);
 
-/**
- * Select the standard font variant based on weight and style.
- */
-function selectStandardFontVariant(
-  base: Standard14FontName,
-  weight: number | undefined,
-  style: string | undefined,
-): Standard14FontName {
-  const isBold = weight !== undefined && weight >= 700;
-  const isItalic = style === 'italic' || style === 'oblique';
-
+function selectStandardFontVariant(base: StandardFonts, isBold: boolean, isItalic: boolean): StandardFonts {
   if (isBold && isItalic) {
     return STANDARD_BOLD_ITALIC_MAP.get(base) ?? base;
   }
@@ -258,16 +256,33 @@ function selectStandardFontVariant(
   return base;
 }
 
-/**
- * Resolve fonts for all text elements, deduplicating by normalized family name.
- * Attempts standard font match first, then Google Fonts fetch+embed, then falls back
- * to Helvetica.
- */
+interface FontIdentity {
+  readonly familyKey: string;
+  readonly isBold: boolean;
+  readonly isItalic: boolean;
+}
+
+function identityKey(id: FontIdentity): string {
+  return `${id.familyKey}|${id.isBold ? 'b' : 'r'}|${id.isItalic ? 'i' : 'u'}`;
+}
+
+function elementFontIdentity(el: BroadsetElement): FontIdentity {
+  const family = el.style.fontFamily ?? '';
+  const weight = el.style.fontWeight;
+  const style = el.style.fontStyle;
+
+  return {
+    familyKey: normalizeFontFamily(family),
+    isBold: weight !== undefined && weight >= BOLD_WEIGHT_THRESHOLD,
+    isItalic: style === 'italic' || style === 'oblique',
+  };
+}
+
 async function tryEmbedGoogleFont(
   family: string,
-  pdf: PDF,
+  pdf: PDFDocument,
   fetchFn: typeof globalThis.fetch,
-): Promise<FontInput | null> {
+): Promise<PDFFont | null> {
   try {
     const cssUrl = resolveGoogleFontUrl(family);
     const cssResponse = await fetchFn(cssUrl);
@@ -280,21 +295,25 @@ async function tryEmbedGoogleFont(
     const fontResponse = await fetchFn(fontUrl);
     const fontBytes = new Uint8Array(await fontResponse.arrayBuffer());
 
-    return pdf.embedFont(fontBytes);
+    return await pdf.embedFont(fontBytes);
   } catch {
     return null;
   }
 }
 
-async function resolveSingleFont(
+async function resolveIdentity(
   family: string,
-  pdf: PDF,
-  fetchFn?: typeof globalThis.fetch,
-): Promise<FontInput> {
+  isBold: boolean,
+  isItalic: boolean,
+  pdf: PDFDocument,
+  fetchFn: typeof globalThis.fetch | undefined,
+): Promise<PDFFont> {
   const normalized = normalizeFontFamily(family);
   const standard = STANDARD_FONT_MAP.get(normalized);
 
-  if (standard) return standard;
+  if (standard !== undefined) {
+    return await pdf.embedFont(selectStandardFontVariant(standard, isBold, isItalic));
+  }
 
   if (fetchFn) {
     const embedded = await tryEmbedGoogleFont(family, pdf, fetchFn);
@@ -302,57 +321,43 @@ async function resolveSingleFont(
     if (embedded !== null) return embedded;
   }
 
-  return StandardFonts.Helvetica;
+  // Fallback: Helvetica with variant applied
+  return await pdf.embedFont(selectStandardFontVariant(StandardFonts.Helvetica, isBold, isItalic));
 }
 
 async function resolveFonts(
   doc: BroadsetDocument,
-  pdf: PDF,
-  fetchFn?: typeof globalThis.fetch,
-): Promise<ReadonlyMap<string, FontInput>> {
-  const fontMap = new Map<string, FontInput>();
+  pdf: PDFDocument,
+  fetchFn: typeof globalThis.fetch | undefined,
+): Promise<ReadonlyMap<string, PDFFont>> {
+  const fontMap = new Map<string, PDFFont>();
   const seen = new Set<string>();
 
   for (const el of doc.elements) {
     if (el.type !== 'text') continue;
 
-    const family = el.style.fontFamily;
+    const id = elementFontIdentity(el);
+    const key = identityKey(id);
 
-    if (!family) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
 
-    const normalized = normalizeFontFamily(family);
+    // Empty family falls through resolveIdentity to the Helvetica variant
+    // fallback, matching the prior `@libpdf/core` behaviour where bold /
+    // italic text without a declared family still rendered in the matching
+    // Helvetica variant.
+    const family = el.style.fontFamily ?? '';
 
-    if (seen.has(normalized)) continue;
-    seen.add(normalized);
-
-    fontMap.set(normalized, await resolveSingleFont(family, pdf, fetchFn));
+    fontMap.set(key, await resolveIdentity(family, id.isBold, id.isItalic, pdf, fetchFn));
   }
 
   return fontMap;
 }
 
-/**
- * Look up the resolved font for an element, falling back to Helvetica.
- * Applies bold/italic standard font variants when available.
- */
-function lookupFont(el: BroadsetElement, fontMap: ReadonlyMap<string, FontInput>): FontInput {
-  let font: FontInput = StandardFonts.Helvetica;
+function lookupFont(el: BroadsetElement, fontMap: ReadonlyMap<string, PDFFont>, fallback: PDFFont): PDFFont {
+  const key = identityKey(elementFontIdentity(el));
 
-  if (el.style.fontFamily) {
-    const normalized = normalizeFontFamily(el.style.fontFamily);
-    const resolved = fontMap.get(normalized);
-
-    if (resolved) {
-      font = resolved;
-    }
-  }
-
-  // Apply bold/italic variants for standard fonts only
-  if (typeof font === 'string') {
-    return selectStandardFontVariant(font, el.style.fontWeight, el.style.fontStyle);
-  }
-
-  return font;
+  return fontMap.get(key) ?? fallback;
 }
 
 /* ------------------------------------------------------------------ */
@@ -364,7 +369,8 @@ function renderText(
   el: BroadsetElement,
   canvas: Canvas,
   heightPt: number,
-  fontMap: ReadonlyMap<string, FontInput>,
+  fontMap: ReadonlyMap<string, PDFFont>,
+  fallbackFont: PDFFont,
 ): void {
   if (!el.content) {
     return;
@@ -375,20 +381,11 @@ function renderText(
   const color = resolveStyleColor(el.style, 'fontColor') ?? rgb(0, 0, 0);
   const size = el.style.fontSize ? elementToPoints(canvas, el.style.fontSize) : 12;
   const opacity = resolveOpacity(el.style);
-  const font = lookupFont(el, fontMap);
+  const font = lookupFont(el, fontMap, fallbackFont);
   const maxWidthPt = elementToPoints(canvas, el.width);
   const lineHeightPt = size * LINE_HEIGHT_MULTIPLIER;
 
-  // Wrap text using our own wrapping (handles explicit newlines + per-char fallback)
-  const measure = (text: string): number => {
-    // Standard fonts have widthOfTextAtSize; for standard font names, approximate
-    if (typeof font === 'string') {
-      // Approximate: standard 14 fonts average ~0.5 × fontSize per character
-      return text.length * size * STANDARD_FONT_WIDTH_RATIO;
-    }
-
-    return font.widthOfTextAtSize(text, size);
-  };
+  const measure = (text: string): number => font.widthOfTextAtSize(text, size);
 
   const lines = wrapText(resolveContentAsPlainString(el.content), maxWidthPt, measure);
   const alignment = el.style.textAlignment ?? 'left';
@@ -398,7 +395,6 @@ function renderText(
 
     if (!line) continue;
 
-    // Calculate x offset for text alignment
     let lineX = xPt;
 
     if (alignment === 'center' || alignment === 'right') {
@@ -428,7 +424,9 @@ function renderRectangle(page: PDFPage, el: BroadsetElement, canvas: Canvas, hei
   const wPt = elementToPoints(canvas, el.width);
   const hPt = elementToPoints(canvas, el.height);
   const fillGradient = resolveFillGradient(el.style);
-  const bg = resolveFillAsPdfRgb(el.style) ?? (fillGradient !== undefined ? resolveGradientFallbackColor(fillGradient) : undefined);
+  const bg =
+    resolveFillAsPdfRgb(el.style) ??
+    (fillGradient !== undefined ? resolveGradientFallbackColor(fillGradient) : undefined);
   const border = resolveStyleColor(el.style, 'borderColor');
 
   page.drawRectangle({
@@ -447,13 +445,15 @@ function renderEllipse(page: PDFPage, el: BroadsetElement, canvas: Canvas, heigh
   const cx = elementToPoints(canvas, el.position.x + el.width / 2);
   const cy = heightPt - elementToPoints(canvas, el.position.y + el.height / 2);
   const ellipseGradient = resolveFillGradient(el.style);
-  const bg = resolveFillAsPdfRgb(el.style) ?? (ellipseGradient !== undefined ? resolveGradientFallbackColor(ellipseGradient) : undefined);
+  const bg =
+    resolveFillAsPdfRgb(el.style) ??
+    (ellipseGradient !== undefined ? resolveGradientFallbackColor(ellipseGradient) : undefined);
 
   page.drawEllipse({
     x: cx,
     y: cy,
-    xRadius: elementToPoints(canvas, el.width / 2),
-    yRadius: elementToPoints(canvas, el.height / 2),
+    xScale: elementToPoints(canvas, el.width / 2),
+    yScale: elementToPoints(canvas, el.height / 2),
     ...(bg ? { color: bg } : undefined),
     opacity: resolveOpacity(el.style),
   });
@@ -503,7 +503,7 @@ async function renderImage(
   el: BroadsetElement,
   canvas: Canvas,
   heightPt: number,
-  pdf: PDF,
+  pdf: PDFDocument,
   fetchFn?: typeof globalThis.fetch,
 ): Promise<void> {
   if (!el.content) {
@@ -543,7 +543,7 @@ async function renderImage(
   }
 
   try {
-    const image = pdf.embedImage(imageBytes.bytes);
+    const image = await embedImageFromBytes(pdf, imageBytes.mime, imageBytes.bytes);
 
     page.drawImage(image, {
       x: xPt,
@@ -566,19 +566,29 @@ function labelForNonStaticElement(el: BroadsetElement): string {
   return 'Video';
 }
 
-function renderNonStaticElement(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
+function renderNonStaticElement(
+  page: PDFPage,
+  el: BroadsetElement,
+  canvas: Canvas,
+  heightPt: number,
+  fallbackFont: PDFFont,
+): void {
   renderRectangle(page, el, canvas, heightPt);
 
-  const xPt = elementToPoints(canvas, el.position.x) + 4;
-  const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height) + 4;
+  const xPt = elementToPoints(canvas, el.position.x) + PLACEHOLDER_LABEL_INSET;
+  const yPt =
+    heightPt -
+    elementToPoints(canvas, el.position.y) -
+    elementToPoints(canvas, el.height) +
+    PLACEHOLDER_LABEL_INSET;
   const label = labelForNonStaticElement(el);
 
   page.drawText(label, {
     x: xPt,
     y: yPt,
-    size: 10,
+    size: PLACEHOLDER_LABEL_SIZE,
     color: rgb(0.2, 0.2, 0.2),
-    font: StandardFonts.Helvetica,
+    font: fallbackFont,
     opacity: resolveOpacity(el.style),
   });
 }
@@ -597,13 +607,14 @@ async function renderElement(
   el: BroadsetElement,
   canvas: Canvas,
   heightPt: number,
-  pdf: PDF,
-  fontMap: ReadonlyMap<string, FontInput>,
+  pdf: PDFDocument,
+  fontMap: ReadonlyMap<string, PDFFont>,
+  fallbackFont: PDFFont,
   fetchFn?: typeof globalThis.fetch,
 ): Promise<void> {
   switch (el.type) {
     case 'text':
-      renderText(page, el, canvas, heightPt, fontMap);
+      renderText(page, el, canvas, heightPt, fontMap, fallbackFont);
       break;
     case 'rectangle':
       renderRectangle(page, el, canvas, heightPt);
@@ -622,12 +633,12 @@ async function renderElement(
       renderQrCode(page, el, canvas, heightPt);
       break;
     case 'group':
-      // Groups are rendered by iterating child elements
+      // Groups are rendered by iterating child elements (composed via parentId tree in P6.2).
       break;
     case 'video':
     case 'clock':
     case 'ticker':
-      renderNonStaticElement(page, el, canvas, heightPt);
+      renderNonStaticElement(page, el, canvas, heightPt, fallbackFont);
       break;
   }
 }
@@ -637,23 +648,26 @@ async function renderElement(
 /* ------------------------------------------------------------------ */
 
 /**
- * Export a BroadsetDocument to PDF bytes.
+ * Export a BroadsetDocument to PDF bytes via `pdf-lib`.
  * Animated elements are exported at their default/rest state (t=0).
- * Animation data (timelines, keyframes, states) is discarded.
+ * Animation data (timelines, keyframes, states) is discarded per IO-D-16.
  *
  * @param doc - The document to export.
- * @param fetchFn - Optional fetch implementation for Google Fonts resolution.
- *                  Defaults to `globalThis.fetch` if available.
+ * @param fetchFn - Optional fetch implementation for Google Fonts / URL image resolution.
+ *                  Defaults to `globalThis.fetch` when available.
  */
 export async function exportPdfBytes(doc: BroadsetDocument, fetchFn?: typeof globalThis.fetch): Promise<Uint8Array> {
   const { canvas } = doc;
   const { widthPt, heightPt } = canvasToPoints(canvas);
 
-  const pdf = PDF.create();
-  const page = pdf.addPage({ width: widthPt, height: heightPt });
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([widthPt, heightPt]);
 
-  // Resolve and deduplicate fonts before rendering
   const effectiveFetch = fetchFn ?? (typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined);
+
+  // Always embed a Helvetica fallback up-front so placeholder labels and
+  // text elements without a declared family have a working PDFFont.
+  const fallbackFont = await pdf.embedFont(StandardFonts.Helvetica);
   const fontMap = await resolveFonts(doc, pdf, effectiveFetch);
 
   // Draw background
@@ -672,10 +686,10 @@ export async function exportPdfBytes(doc: BroadsetDocument, fetchFn?: typeof glo
     }
   }
 
-  // Render elements at rest state (t=0) — ignore all animation data
+  // Render elements at rest state (t=0) — animation data discarded per IO-D-16.
   for (const el of doc.elements) {
-    await renderElement(page, el, canvas, heightPt, pdf, fontMap, effectiveFetch);
+    await renderElement(page, el, canvas, heightPt, pdf, fontMap, fallbackFont, effectiveFetch);
   }
 
-  return pdf.save();
+  return await pdf.save();
 }

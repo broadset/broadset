@@ -136,7 +136,9 @@ Dependencies below are part of the current implemented architecture and package 
 | Model                | `zod`                                                   | Runtime validation at model boundaries             |
 | Editor state/history | `zustand`, `zundo`                                      | State store and undo/redo middleware               |
 | Renderer/Formats QR  | `qrcode-generator`                                      | QR generation parity across renderer/export        |
-| Formats PDF          | `@libpdf/core`                                          | PDF generation                                     |
+| Formats PDF emitter  | `pdf-lib`                                               | PDF emitter — operator-level control, shading patterns, OCGs, custom XMP |
+| Formats PDF parser   | `pdfjs-dist`                                            | PDF parser — operator extraction, XMP metadata, annotations (lazy-loaded from importer entry) |
+| Formats PDF fonts    | `@pdf-lib/fontkit`                                      | pdf-lib adapter for fontkit font subsetting        |
 | Formats PSD          | `ag-psd`                                                | PSD import/export                                  |
 | Formats PPTX         | `pizzip`                                                | OOXML ZIP processing for PPTX                      |
 | Formats raster       | `modern-screenshot`                                     | DOM-to-canvas/SVG capture utilities                |
@@ -181,7 +183,6 @@ Each package keeps `quality` and `quality:strict` scripts with gate order:
 The following are not part of the active baseline today and must not be treated as default stack decisions:
 
 - `subjx`
-- `pdfjs-dist`
 - `@uiw/react-color`
 
 They are allowed when a concrete, spec-driven implementation unit benefits from them.

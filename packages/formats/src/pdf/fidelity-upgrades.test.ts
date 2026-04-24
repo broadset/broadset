@@ -8,12 +8,17 @@ import { makeDocument, makeElement, makeStyle } from './test-helpers';
 /*  Draw Call Capture                                                 */
 /* ------------------------------------------------------------------ */
 
+interface MockFont {
+  readonly name: string;
+  readonly widthOfTextAtSize: (text: string, size: number) => number;
+}
+
 interface TextCall {
   readonly text: string;
   readonly x: number;
   readonly y: number;
   readonly size: number;
-  readonly font: string;
+  readonly font: MockFont;
 }
 
 interface RectCall {
@@ -36,7 +41,7 @@ const drawCalls = {
   ellipses: [] as EllipseCall[],
 };
 
-vi.mock('@libpdf/core', () => {
+vi.mock('pdf-lib', () => {
   const page = {
     drawRectangle: (opts: RectCall): void => {
       drawCalls.rectangles.push(opts);
@@ -51,18 +56,22 @@ vi.mock('@libpdf/core', () => {
     drawSvgPath: (): void => {},
   };
 
+  const makeFont = (name: string | Uint8Array): MockFont => ({
+    name: typeof name === 'string' ? name : 'embedded-bytes',
+    widthOfTextAtSize: (text: string, size: number) => text.length * size * 0.5,
+  });
+
   const pdfInstance = {
     addPage: () => page,
-    save: () => new Uint8Array([1, 2, 3]),
-    embedImage: () => ({ id: 'img-1' }),
-    embedFont: () => ({
-      widthOfTextAtSize: (text: string, size: number) => text.length * size * 0.5,
-    }),
+    save: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+    embedPng: () => Promise.resolve({ id: 'img-png' }),
+    embedJpg: () => Promise.resolve({ id: 'img-jpg' }),
+    embedFont: (name: string | Uint8Array) => Promise.resolve(makeFont(name)),
   };
 
   return {
-    PDF: {
-      create: () => pdfInstance,
+    PDFDocument: {
+      create: () => Promise.resolve(pdfInstance),
     },
     StandardFonts: {
       Helvetica: 'Helvetica',
@@ -70,13 +79,15 @@ vi.mock('@libpdf/core', () => {
       HelveticaOblique: 'Helvetica-Oblique',
       HelveticaBoldOblique: 'Helvetica-BoldOblique',
       TimesRoman: 'Times-Roman',
-      TimesBold: 'Times-Bold',
-      TimesItalic: 'Times-Italic',
-      TimesBoldItalic: 'Times-BoldItalic',
+      TimesRomanBold: 'Times-Bold',
+      TimesRomanItalic: 'Times-Italic',
+      TimesRomanBoldItalic: 'Times-BoldItalic',
       Courier: 'Courier',
       CourierBold: 'Courier-Bold',
       CourierOblique: 'Courier-Oblique',
       CourierBoldOblique: 'Courier-BoldOblique',
+      Symbol: 'Symbol',
+      ZapfDingbats: 'ZapfDingbats',
     },
     rgb: (r: number, g: number, b: number) => ({ r, g, b }),
   };
@@ -107,7 +118,7 @@ describe('PDF Fidelity Upgrades (C10)', () => {
     await exportPdfBytes(doc);
 
     expect(drawCalls.text.length).toBeGreaterThan(0);
-    expect(drawCalls.text[0]?.font).toBe('Helvetica-Bold');
+    expect(drawCalls.text[0]?.font.name).toBe('Helvetica-Bold');
   });
 
   /** @description Italic text must use an oblique/italic standard font variant. */
@@ -124,7 +135,7 @@ describe('PDF Fidelity Upgrades (C10)', () => {
     await exportPdfBytes(doc);
 
     expect(drawCalls.text.length).toBeGreaterThan(0);
-    expect(drawCalls.text[0]?.font).toBe('Helvetica-Oblique');
+    expect(drawCalls.text[0]?.font.name).toBe('Helvetica-Oblique');
   });
 
   /** @description Bold+italic must select the bold-oblique variant. */
@@ -145,7 +156,7 @@ describe('PDF Fidelity Upgrades (C10)', () => {
     await exportPdfBytes(doc);
 
     expect(drawCalls.text.length).toBeGreaterThan(0);
-    expect(drawCalls.text[0]?.font).toBe('Helvetica-BoldOblique');
+    expect(drawCalls.text[0]?.font.name).toBe('Helvetica-BoldOblique');
   });
 
   /** @description Center-aligned text must be offset to the center of the element width. */

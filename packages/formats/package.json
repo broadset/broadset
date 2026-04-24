@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@broadset/model": "^0.1.0",
-    "@libpdf/core": "^0.3.4",
+    "@pdf-lib/fontkit": "^1.1.1",
     "ag-psd": "^30.1.0",
     "bidi-js": "^1.0.3",
     "culori": "^4.0.2",
@@ -34,6 +34,8 @@
     "mediabunny": "^1.40.1",
     "microdiff": "^1.5.0",
     "modern-screenshot": "^4.6.8",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^5.4.296",
     "pizzip": "^3.2.0",
     "qrcode-generator": "^2.0.4",
     "xxhash-wasm": "^1.1.0"
