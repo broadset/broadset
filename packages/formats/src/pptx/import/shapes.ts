@@ -283,25 +283,34 @@ function custGeomToSvgD(body: string): string {
 
   const ops: string[] = [];
 
-  for (const m of pathBlock.block.matchAll(/<a:(moveTo|lnTo|cubicBezTo|quadBezTo|close)\b(.*?)(\/>|<\/a:\1>)/gs)) {
-    const op = m[1] ?? '';
-    const inner = m[2] ?? '';
-    const pts = [...inner.matchAll(/<a:pt\s+x="(-?\d+)"\s+y="(-?\d+)"\s*\/>/g)].map((pm) => ({
-      x: parseInt(pm[1] ?? '0', 10),
-      y: parseInt(pm[2] ?? '0', 10),
-    }));
+  // Match path operations explicitly — avoid greedy `.*?` matching that
+  // stops at child `<a:pt/>` self-closes. Two patterns: container ops
+  // (moveTo/lnTo/cubicBezTo/quadBezTo) with their full `<a:pt/>` list,
+  // and the empty-body `<a:close/>`. We interleave the matches in
+  // source order.
+  const allMatches: { readonly index: number; readonly op: string; readonly inner: string }[] = [];
 
-    if (op === 'moveTo' && pts.length >= 1 && pts[0] !== undefined) {
-      ops.push(`M ${String(pts[0].x)} ${String(pts[0].y)}`);
-    } else if (op === 'lnTo' && pts.length >= 1 && pts[0] !== undefined) {
-      ops.push(`L ${String(pts[0].x)} ${String(pts[0].y)}`);
-    } else if (op === 'cubicBezTo' && pts.length >= 3 && pts[0] && pts[1] && pts[2]) {
-      ops.push(
-        `C ${String(pts[0].x)} ${String(pts[0].y)} ${String(pts[1].x)} ${String(pts[1].y)} ${String(pts[2].x)} ${String(pts[2].y)}`,
-      );
-    } else if (op === 'quadBezTo' && pts.length >= 2 && pts[0] && pts[1]) {
-      ops.push(`Q ${String(pts[0].x)} ${String(pts[0].y)} ${String(pts[1].x)} ${String(pts[1].y)}`);
-    } else if (op === 'close') {
+  for (const m of pathBlock.block.matchAll(
+    /<a:(moveTo|lnTo|cubicBezTo|quadBezTo)\b[^>]*>([\s\S]*?)<\/a:\1>/g,
+  )) {
+    allMatches.push({ index: m.index, op: m[1] ?? '', inner: m[2] ?? '' });
+  }
+
+  for (const m of pathBlock.block.matchAll(/<a:close\s*\/\s*>/g)) {
+    allMatches.push({ index: m.index, op: 'close', inner: '' });
+  }
+
+  allMatches.sort((a, b) => a.index - b.index);
+
+  for (const { op, inner } of allMatches) {
+    const svg = opToSvgSegment(op, inner);
+
+    if (svg !== null) {
+      ops.push(svg);
+      continue;
+    }
+
+    if (op === 'close') {
       ops.push('Z');
     }
   }
@@ -316,6 +325,29 @@ function custGeomToSvgD(body: string): string {
   } catch {
     return d;
   }
+}
+
+function opToSvgSegment(op: string, inner: string): string | null {
+  const pts = [...inner.matchAll(/<a:pt\s+x="(-?\d+)"\s+y="(-?\d+)"\s*\/>/g)].map((pm) => ({
+    x: parseInt(pm[1] ?? '0', 10),
+    y: parseInt(pm[2] ?? '0', 10),
+  }));
+  const p0 = pts[0];
+  const p1 = pts[1];
+  const p2 = pts[2];
+
+  if (op === 'moveTo' && p0 !== undefined) return `M ${String(p0.x)} ${String(p0.y)}`;
+  if (op === 'lnTo' && p0 !== undefined) return `L ${String(p0.x)} ${String(p0.y)}`;
+
+  if (op === 'cubicBezTo' && p0 !== undefined && p1 !== undefined && p2 !== undefined) {
+    return `C ${String(p0.x)} ${String(p0.y)} ${String(p1.x)} ${String(p1.y)} ${String(p2.x)} ${String(p2.y)}`;
+  }
+
+  if (op === 'quadBezTo' && p0 !== undefined && p1 !== undefined) {
+    return `Q ${String(p0.x)} ${String(p0.y)} ${String(p1.x)} ${String(p1.y)}`;
+  }
+
+  return null;
 }
 
 function buildBase(
