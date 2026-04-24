@@ -12,6 +12,10 @@ import { PDFDocument, type PDFFont, type PDFImage, type PDFPage, rgb, StandardFo
 import { parseCssColor } from './color';
 import { decodeDataUri } from './data-uri';
 import {
+  applyPageBoxes,
+  attachBroadsetXmp,
+  buildBroadsetXmpPacket,
+  buildMarkedContentTag,
   buildRoundedRectPath,
   type CanvasAbsolutePosition,
   clipPathBrackets,
@@ -20,7 +24,9 @@ import {
   elementRotationBrackets,
   hasAnyRoundedCorner,
   indexElementsById,
+  markedContentBrackets,
   type OperatorBrackets,
+  registerPageOcgs,
 } from './export';
 import { normalizeFontFamily, resolveGoogleFontUrl } from './fonts';
 import { canvasToPoints, elementToPoints } from './geometry';
@@ -379,12 +385,22 @@ function elementTopLeftPt(
   absolute: CanvasAbsolutePosition,
   el: BroadsetElement,
   canvas: Canvas,
-  heightPt: number,
+  trimHeightPt: number,
 ): { readonly xPt: number; readonly yPt: number; readonly wPt: number; readonly hPt: number } {
-  const xPt = elementToPoints(canvas, absolute.x);
-  const yPt = heightPt - elementToPoints(canvas, absolute.y) - elementToPoints(canvas, el.height);
+  const bleed = canvas.bleed ?? [0, 0, 0, 0];
+  const bleedLeftPt = elementToPoints(canvas, bleed[3]);
+  const bleedBottomPt = elementToPoints(canvas, bleed[2]);
+
   const wPt = elementToPoints(canvas, el.width);
   const hPt = elementToPoints(canvas, el.height);
+
+  // Element positions are canvas-relative (Broadset canvas == PDF trim).
+  // Shift by the bleed offset so elements anchor at the trim box inside
+  // the bleed-extended media box. Y-flip from canvas Y-down to PDF Y-up
+  // happens inside the trim frame: top of trim is at
+  // `bleedBottomPt + trimHeightPt`.
+  const xPt = bleedLeftPt + elementToPoints(canvas, absolute.x);
+  const yPt = bleedBottomPt + trimHeightPt - elementToPoints(canvas, absolute.y) - hPt;
 
   return { xPt, yPt, wPt, hPt };
 }
@@ -406,7 +422,7 @@ function renderText(
   el: BroadsetElement,
   absolute: CanvasAbsolutePosition,
   canvas: Canvas,
-  heightPt: number,
+  trimHeightPt: number,
   fontMap: ReadonlyMap<string, PDFFont>,
   fallbackFont: PDFFont,
 ): void {
@@ -414,7 +430,7 @@ function renderText(
     return;
   }
 
-  const { xPt, yPt, wPt: maxWidthPt } = elementTopLeftPt(absolute, el, canvas, heightPt);
+  const { xPt, yPt, wPt: maxWidthPt } = elementTopLeftPt(absolute, el, canvas, trimHeightPt);
   const color = resolveStyleColor(el.style, 'fontColor') ?? rgb(0, 0, 0);
   const size = el.style.fontSize ? elementToPoints(canvas, el.style.fontSize) : 12;
   const opacity = resolveOpacity(el.style);
@@ -459,9 +475,9 @@ function renderRectangle(
   el: BroadsetElement,
   absolute: CanvasAbsolutePosition,
   canvas: Canvas,
-  heightPt: number,
+  trimHeightPt: number,
 ): void {
-  const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, heightPt);
+  const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, trimHeightPt);
   const fillGradient = resolveFillGradient(el.style);
   const bg =
     resolveFillAsPdfRgb(el.style) ??
@@ -513,10 +529,14 @@ function renderEllipse(
   el: BroadsetElement,
   absolute: CanvasAbsolutePosition,
   canvas: Canvas,
-  heightPt: number,
+  trimHeightPt: number,
 ): void {
-  const cx = elementToPoints(canvas, absolute.x + el.width / 2);
-  const cy = heightPt - elementToPoints(canvas, absolute.y + el.height / 2);
+  const bleed = canvas.bleed ?? [0, 0, 0, 0];
+  const bleedLeftPt = elementToPoints(canvas, bleed[3]);
+  const bleedBottomPt = elementToPoints(canvas, bleed[2]);
+
+  const cx = bleedLeftPt + elementToPoints(canvas, absolute.x + el.width / 2);
+  const cy = bleedBottomPt + trimHeightPt - elementToPoints(canvas, absolute.y + el.height / 2);
   const ellipseGradient = resolveFillGradient(el.style);
   const bg =
     resolveFillAsPdfRgb(el.style) ??
@@ -537,14 +557,18 @@ function renderPath(
   el: BroadsetElement,
   absolute: CanvasAbsolutePosition,
   canvas: Canvas,
-  heightPt: number,
+  trimHeightPt: number,
 ): void {
   if (!el.content) {
     return;
   }
 
-  const xPt = elementToPoints(canvas, absolute.x);
-  const yPt = heightPt - elementToPoints(canvas, absolute.y);
+  const bleed = canvas.bleed ?? [0, 0, 0, 0];
+  const bleedLeftPt = elementToPoints(canvas, bleed[3]);
+  const bleedBottomPt = elementToPoints(canvas, bleed[2]);
+
+  const xPt = bleedLeftPt + elementToPoints(canvas, absolute.x);
+  const yPt = bleedBottomPt + trimHeightPt - elementToPoints(canvas, absolute.y);
   const fillColor = resolveFillAsPdfRgb(el.style) ?? rgb(0, 0, 0);
   const strokeColor = resolveStyleColor(el.style, 'stroke');
 
@@ -582,7 +606,7 @@ async function renderImage(
   el: BroadsetElement,
   absolute: CanvasAbsolutePosition,
   canvas: Canvas,
-  heightPt: number,
+  trimHeightPt: number,
   pdf: PDFDocument,
   fetchFn?: typeof globalThis.fetch,
 ): Promise<void> {
@@ -590,7 +614,7 @@ async function renderImage(
     return;
   }
 
-  const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, heightPt);
+  const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, trimHeightPt);
   const opacity = resolveOpacity(el.style);
 
   const contentText = resolveContentAsPlainString(el.content);
@@ -648,17 +672,14 @@ function renderNonStaticElement(
   el: BroadsetElement,
   absolute: CanvasAbsolutePosition,
   canvas: Canvas,
-  heightPt: number,
+  trimHeightPt: number,
   fallbackFont: PDFFont,
 ): void {
-  renderRectangle(page, el, absolute, canvas, heightPt);
+  renderRectangle(page, el, absolute, canvas, trimHeightPt);
 
-  const xPt = elementToPoints(canvas, absolute.x) + PLACEHOLDER_LABEL_INSET;
-  const yPt =
-    heightPt -
-    elementToPoints(canvas, absolute.y) -
-    elementToPoints(canvas, el.height) +
-    PLACEHOLDER_LABEL_INSET;
+  const { xPt: topLeftXPt, yPt: topLeftYPt } = elementTopLeftPt(absolute, el, canvas, trimHeightPt);
+  const xPt = topLeftXPt + PLACEHOLDER_LABEL_INSET;
+  const yPt = topLeftYPt + PLACEHOLDER_LABEL_INSET;
   const label = labelForNonStaticElement(el);
 
   page.drawText(label, {
@@ -676,9 +697,9 @@ function renderQrCode(
   el: BroadsetElement,
   absolute: CanvasAbsolutePosition,
   canvas: Canvas,
-  heightPt: number,
+  trimHeightPt: number,
 ): void {
-  const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, heightPt);
+  const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, trimHeightPt);
 
   drawQrOnPage(page, resolveContentAsPlainString(el.content), xPt, yPt, wPt, hPt);
 }
@@ -687,7 +708,7 @@ async function renderElement(
   page: PDFPage,
   el: BroadsetElement,
   canvas: Canvas,
-  heightPt: number,
+  trimHeightPt: number,
   pdf: PDFDocument,
   fontMap: ReadonlyMap<string, PDFFont>,
   fallbackFont: PDFFont,
@@ -695,31 +716,37 @@ async function renderElement(
   fetchFn?: typeof globalThis.fetch,
 ): Promise<void> {
   const absolute = composeCanvasAbsolutePosition(el, elementsById);
-  const rotate = elementRotationBrackets(el, absolute, canvas, heightPt);
-  const clipBrackets = clipPathBrackets(el, absolute, canvas, heightPt);
+  const rotate = elementRotationBrackets(el, absolute, canvas, trimHeightPt);
+  const clipBrackets = clipPathBrackets(el, absolute, canvas, trimHeightPt);
+  const markedContent = markedContentBrackets(pdf, page, buildMarkedContentTag(el));
+
+  // /BSET BDC opens the element's painting sequence; rotation and clip
+  // CTM operators nest inside so the marked-content pair survives across
+  // any graphics-state resets Illustrator / Acrobat apply on save.
+  page.pushOperators(markedContent.start);
 
   applyBrackets(page, rotate, 'start');
   applyBrackets(page, clipBrackets, 'start');
 
   switch (el.type) {
     case 'text':
-      renderText(page, el, absolute, canvas, heightPt, fontMap, fallbackFont);
+      renderText(page, el, absolute, canvas, trimHeightPt, fontMap, fallbackFont);
       break;
     case 'rectangle':
-      renderRectangle(page, el, absolute, canvas, heightPt);
+      renderRectangle(page, el, absolute, canvas, trimHeightPt);
       break;
     case 'ellipse':
-      renderEllipse(page, el, absolute, canvas, heightPt);
+      renderEllipse(page, el, absolute, canvas, trimHeightPt);
       break;
     case 'path':
-      renderPath(page, el, absolute, canvas, heightPt);
+      renderPath(page, el, absolute, canvas, trimHeightPt);
       break;
     case 'image':
     case 'svg':
-      await renderImage(page, el, absolute, canvas, heightPt, pdf, fetchFn);
+      await renderImage(page, el, absolute, canvas, trimHeightPt, pdf, fetchFn);
       break;
     case 'qrcode':
-      renderQrCode(page, el, absolute, canvas, heightPt);
+      renderQrCode(page, el, absolute, canvas, trimHeightPt);
       break;
     case 'group':
       // Groups are pure containers — children render independently via the
@@ -729,12 +756,14 @@ async function renderElement(
     case 'video':
     case 'clock':
     case 'ticker':
-      renderNonStaticElement(page, el, absolute, canvas, heightPt, fallbackFont);
+      renderNonStaticElement(page, el, absolute, canvas, trimHeightPt, fallbackFont);
       break;
   }
 
   applyBrackets(page, clipBrackets, 'end');
   applyBrackets(page, rotate, 'end');
+
+  page.pushOperators(markedContent.end);
 }
 
 /* ------------------------------------------------------------------ */
@@ -752,10 +781,13 @@ async function renderElement(
  */
 export async function exportPdfBytes(doc: BroadsetDocument, fetchFn?: typeof globalThis.fetch): Promise<Uint8Array> {
   const { canvas } = doc;
-  const { widthPt, heightPt } = canvasToPoints(canvas);
 
   const pdf = await PDFDocument.create();
-  const page = pdf.addPage([widthPt, heightPt]);
+  const { widthPt: trimWidthPt, heightPt: trimHeightPt } = canvasToPoints(canvas);
+  const page = pdf.addPage([trimWidthPt, trimHeightPt]);
+
+  // MediaBox/BleedBox/TrimBox/ArtBox follow canvas.bleed/safeArea declarations.
+  applyPageBoxes(pdf, page, canvas);
 
   const effectiveFetch = fetchFn ?? (typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined);
 
@@ -765,16 +797,25 @@ export async function exportPdfBytes(doc: BroadsetDocument, fetchFn?: typeof glo
   const fontMap = await resolveFonts(doc, pdf, effectiveFetch);
   const elementsById = indexElementsById(doc.elements);
 
-  // Draw background
+  // Register one OCG per Broadset page so PDF readers surface per-page
+  // visibility toggles in the layers panel.
+  registerPageOcgs(pdf, doc);
+
+  // Draw background inside the trim box (PDF origin is bottom-left;
+  // applyPageBoxes already anchored the trim there via bleed offsets).
   if (canvas.backgroundMode === 'solid' && canvas.backgroundColor) {
     const bg = parseCssColor(canvas.backgroundColor);
 
     if (bg) {
+      const bleed = canvas.bleed ?? [0, 0, 0, 0];
+      const bleedLeftPt = elementToPoints(canvas, bleed[3]);
+      const bleedBottomPt = elementToPoints(canvas, bleed[2]);
+
       page.drawRectangle({
-        x: 0,
-        y: 0,
-        width: widthPt,
-        height: heightPt,
+        x: bleedLeftPt,
+        y: bleedBottomPt,
+        width: trimWidthPt,
+        height: trimHeightPt,
         color: rgb(bg.r, bg.g, bg.b),
         opacity: bg.a,
       });
@@ -782,9 +823,24 @@ export async function exportPdfBytes(doc: BroadsetDocument, fetchFn?: typeof glo
   }
 
   // Render elements at rest state (t=0) — animation data discarded per IO-D-16.
+  // Element rendering takes the trim-box height as reference; each helper
+  // adds the bleed offset when shifting from canvas-absolute coords into
+  // PDF media-box coords, so elements anchor correctly at the trim box
+  // regardless of whether bleed is declared.
   for (const el of doc.elements) {
-    await renderElement(page, el, canvas, heightPt, pdf, fontMap, fallbackFont, elementsById, effectiveFetch);
+    await renderElement(page, el, canvas, trimHeightPt, pdf, fontMap, fallbackFont, elementsById, effectiveFetch);
   }
 
-  return await pdf.save();
+  // Attach the shared `broadset:` XMP packet to the document catalog so
+  // the round-trip importer (P6.4a) has a trusted metadata fast-path.
+  attachBroadsetXmp(pdf, await buildBroadsetXmpPacket(doc));
+
+  // `useObjectStreams: false` keeps object dicts (catalog, page nodes,
+  // OCProperties, Metadata, MediaBox) visible as plain text in the PDF
+  // trailer rather than packed into compressed object streams. Content-
+  // stream compression is unchanged. The file opens identically in every
+  // PDF reader; the only difference is readability of metadata by tools
+  // (and test assertions that grep the bytes for `/BSET`, `/OCProperties`,
+  // etc.). Round-trip import tools don't care either way.
+  return await pdf.save({ useObjectStreams: false });
 }

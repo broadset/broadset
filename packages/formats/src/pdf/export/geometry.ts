@@ -77,14 +77,18 @@ export function elementRotationBrackets(
   element: BroadsetElement,
   absolute: CanvasAbsolutePosition,
   canvas: Canvas,
-  heightPt: number,
+  trimHeightPt: number,
 ): OperatorBrackets {
   if (element.rotation === 0) {
     return EMPTY_BRACKETS;
   }
 
-  const cxPt = elementToPoints(canvas, absolute.x + element.width / 2);
-  const cyPt = heightPt - elementToPoints(canvas, absolute.y + element.height / 2);
+  const bleed = canvas.bleed ?? [0, 0, 0, 0];
+  const bleedLeftPt = elementToPoints(canvas, bleed[3]);
+  const bleedBottomPt = elementToPoints(canvas, bleed[2]);
+
+  const cxPt = bleedLeftPt + elementToPoints(canvas, absolute.x + element.width / 2);
+  const cyPt = bleedBottomPt + trimHeightPt - elementToPoints(canvas, absolute.y + element.height / 2);
 
   return {
     start: [

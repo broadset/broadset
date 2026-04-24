@@ -36,6 +36,7 @@ export function makeElement(type: BroadsetElement['type'], overrides: Partial<Br
     rotation: 0,
     style: makeStyle(),
     content: '',
+    extensions: {},
     ...overrides,
   } as BroadsetElement;
 }

@@ -55,6 +55,14 @@ vi.mock('pdf-lib', () => {
     },
     drawSvgPath: (): void => {},
     pushOperators: (): void => {},
+    setSize: (): void => {},
+    node: {
+      set: (): void => {},
+      Resources: () => ({
+        lookupMaybe: () => ({ set: (): void => {} }),
+        set: (): void => {},
+      }),
+    },
   };
 
   const makeFont = (name: string | Uint8Array): MockFont => ({
@@ -62,12 +70,21 @@ vi.mock('pdf-lib', () => {
     widthOfTextAtSize: (text: string, size: number) => text.length * size * 0.5,
   });
 
+  const mockContext = {
+    obj: (literal: unknown): unknown => literal,
+    register: (): unknown => ({ kind: 'ref' }),
+  };
+  const mockCatalog = {
+    set: (): void => {},
+  };
   const pdfInstance = {
     addPage: () => page,
     save: () => Promise.resolve(new Uint8Array([1, 2, 3])),
     embedPng: () => Promise.resolve({ id: 'img-png' }),
     embedJpg: () => Promise.resolve({ id: 'img-jpg' }),
     embedFont: (name: string | Uint8Array) => Promise.resolve(makeFont(name)),
+    context: mockContext,
+    catalog: mockCatalog,
   };
 
   return {
@@ -119,6 +136,25 @@ vi.mock('pdf-lib', () => {
     clip: () => ({ kind: 'clip' }),
     clipEvenOdd: () => ({ kind: 'clipEvenOdd' }),
     endPath: () => ({ kind: 'endPath' }),
+    PDFOperator: {
+      of: (op: string, args?: unknown[]) => ({ op, args: args ?? [] }),
+    },
+    PDFOperatorNames: {
+      BeginMarkedContentSequence: 'BDC',
+      EndMarkedContent: 'EMC',
+    },
+    PDFName: {
+      of: (name: string) => ({ name }),
+    },
+    PDFString: {
+      of: (value: string) => ({ string: value }),
+    },
+    PDFDict: {
+      withContext: (): { readonly set: (key: unknown, value: unknown) => void } => ({ set: (): void => {} }),
+    },
+    PDFRawStream: {
+      of: (dict: unknown, bytes: Uint8Array) => ({ dict, bytes }),
+    },
   };
 });
 

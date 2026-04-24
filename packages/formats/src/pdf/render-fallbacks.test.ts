@@ -23,8 +23,23 @@ vi.mock('pdf-lib', () => {
     drawEllipse: (): void => {},
     drawSvgPath: (): void => {},
     pushOperators: (): void => {},
+    setSize: (): void => {},
+    node: {
+      set: (): void => {},
+      Resources: () => ({
+        lookupMaybe: () => ({ set: (): void => {} }),
+        set: (): void => {},
+      }),
+    },
   };
 
+  const mockContext = {
+    obj: (literal: unknown): unknown => literal,
+    register: (): unknown => ({ kind: 'ref' }),
+  };
+  const mockCatalog = {
+    set: (): void => {},
+  };
   const pdfInstance = {
     addPage: () => page,
     save: () => Promise.resolve(new Uint8Array([1, 2, 3])),
@@ -35,6 +50,8 @@ vi.mock('pdf-lib', () => {
         name: typeof name === 'string' ? name : 'embedded-bytes',
         widthOfTextAtSize: (text: string, size: number) => text.length * size * 0.5,
       }),
+    context: mockContext,
+    catalog: mockCatalog,
   };
 
   return {
@@ -86,6 +103,25 @@ vi.mock('pdf-lib', () => {
     clip: () => ({ kind: 'clip' }),
     clipEvenOdd: () => ({ kind: 'clipEvenOdd' }),
     endPath: () => ({ kind: 'endPath' }),
+    PDFOperator: {
+      of: (op: string, args?: unknown[]) => ({ op, args: args ?? [] }),
+    },
+    PDFOperatorNames: {
+      BeginMarkedContentSequence: 'BDC',
+      EndMarkedContent: 'EMC',
+    },
+    PDFName: {
+      of: (name: string) => ({ name }),
+    },
+    PDFString: {
+      of: (value: string) => ({ string: value }),
+    },
+    PDFDict: {
+      withContext: (): { readonly set: (key: unknown, value: unknown) => void } => ({ set: (): void => {} }),
+    },
+    PDFRawStream: {
+      of: (dict: unknown, bytes: Uint8Array) => ({ dict, bytes }),
+    },
   };
 });
 

@@ -41,7 +41,7 @@ export function clipPathBrackets(
   element: BroadsetElement,
   absolute: CanvasAbsolutePosition,
   canvas: Canvas,
-  heightPt: number,
+  trimHeightPt: number,
 ): OperatorBrackets {
   const raw = element.style.customClipPath;
 
@@ -53,8 +53,12 @@ export function clipPathBrackets(
     return EMPTY_BRACKETS;
   }
 
-  const xPt = elementToPoints(canvas, absolute.x);
-  const yPt = heightPt - elementToPoints(canvas, absolute.y) - elementToPoints(canvas, element.height);
+  const bleed = canvas.bleed ?? [0, 0, 0, 0];
+  const bleedLeftPt = elementToPoints(canvas, bleed[3]);
+  const bleedBottomPt = elementToPoints(canvas, bleed[2]);
+
+  const xPt = bleedLeftPt + elementToPoints(canvas, absolute.x);
+  const yPt = bleedBottomPt + trimHeightPt - elementToPoints(canvas, absolute.y) - elementToPoints(canvas, element.height);
   const wPt = elementToPoints(canvas, element.width);
   const hPt = elementToPoints(canvas, element.height);
 

@@ -481,11 +481,14 @@ The system MUST convert canvas dimensions to PDF points (1mm = 72/25.4pt, 1in = 
 
 ## Spec Gaps
 
-The P6.0 foundation lands the standards-only round-trip contract, feature matrix, and acceptance criteria. The following items ship in subsequent P6 subphases and are tracked here:
+The P6.0 foundation lands the standards-only round-trip contract, feature matrix, and acceptance criteria. The P6.2 parity rebuild adds parent-child translation flattening, rotation composition, per-corner radii, and clip-path fidelity. The P6.3 export-beyond-prior-art pass adds `/BSET` marked-content tagging, `broadset:` XMP packet, page boxes (MediaBox / BleedBox / TrimBox / ArtBox), and one OCG per Broadset page.
 
-- **P6.1** — `@libpdf/core` → `pdf-lib` dependency swap, `pdfjs-dist` + `@pdf-lib/fontkit` added, `importPdfDocument` registered with `import-document.ts`, `types.ts` additions.
-- **P6.2** — Parent-child flattening, rotation composition, per-corner radii, clip-path / mask fidelity, native vector path operators.
-- **P6.3** — Real shading-pattern gradients, CMYK / spot colours, OCGs per page, `/BSET` marked-content tagging, `broadset:` XMP packet via `_shared/xmp/`.
+The following items ship in subsequent P6 subphases and are tracked here:
+
+- **P6.3 — real shading-pattern gradients (type 2 linear, type 3 radial).** Current behaviour: linear / radial gradients use the first-stop colour as a solid fill. Target behaviour: native PDF shading patterns via `pdf.context` low-level API. The Feature Matrix shows these as `native` ≡ "target behaviour for P6.3b"; until the shading-pattern emitter lands, gradients fall back to the first-stop colour and a preflight warning surfaces.
+- **P6.3 — CMYK / Lab / Gray / spot colour emission + ICC output intent.** Current behaviour: export is sRGB / DeviceRGB only. Target behaviour: the exporter emits the colour space declared by `document.outputIntent.colorSpace` (IO-D-13); embedded ICC profile rides via the asset pipeline. The Feature Matrix shows these as `native` ≡ "target behaviour"; colour-mode-specific emission lands with the `_shared/color/lcms-wasm` CMYK path (Phase 2 Spec Gap).
+- **P6.3 — font subsetting via `@pdf-lib/fontkit`.** Current behaviour: fonts embed without subsetting via pdf-lib's default path. Target behaviour: `_shared/fonts/subsetFont` drives `@pdf-lib/fontkit` to emit subset fonts with a ToUnicode CMap. Dependencies are installed; wiring lands with the next export pass.
+- **P6.3 — per-element OCG membership via `/OC` marked-content wrappers.** Current behaviour: one OCG is registered per Broadset page in `/OCProperties`, but elements are not associated with specific OCGs in the content stream (every element is visible in every OCG). Target behaviour: elements on a given page are wrapped in `/OC` marked-content tags pointing at that page's OCG.
 - **P6.4a** — Fast-path import from XMP + marked content.
 - **P6.4b** — Operator-level extraction of arbitrary third-party PDFs.
 - **P6.5** — Reconciliation wrapper via `_shared/reconcile/` and `_shared/fingerprint/`.
