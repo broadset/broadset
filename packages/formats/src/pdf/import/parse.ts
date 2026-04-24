@@ -1,4 +1,5 @@
 import {
+  EncryptedPDFError,
   PDFBool,
   PDFDict,
   PDFDocument,
@@ -13,6 +14,11 @@ import type { MarkedContentKind, MarkedContentTag, PdfRoundTripMetadata } from '
 const METADATA_KEY = PDFName.of('Metadata');
 const RESOURCES_KEY = PDFName.of('Resources');
 const PROPERTIES_KEY = PDFName.of('Properties');
+const NAMES_KEY = PDFName.of('Names');
+const OPEN_ACTION_KEY = PDFName.of('OpenAction');
+const AA_KEY = PDFName.of('AA');
+const JAVASCRIPT_KEY = PDFName.of('JavaScript');
+const EMBEDDED_FILES_KEY = PDFName.of('EmbeddedFiles');
 const ID_KEY = PDFName.of('ID');
 const KIND_KEY = PDFName.of('Kind');
 const DIRTY_KEY = PDFName.of('Dirty');
@@ -37,17 +43,184 @@ const VALID_KINDS: ReadonlySet<MarkedContentKind> = new Set<MarkedContentKind>([
 ]);
 
 /**
- * Load a PDF byte stream with `pdf-lib`. Returns `null` for input the
- * parser cannot recognise (malformed bytes, unsupported encryption,
- * attacker-crafted structure) so callers degrade gracefully to the
- * operator-extraction fallback in P6.4b rather than throwing.
+ * Result of probing a PDF byte stream. Callers use the tag to
+ * differentiate "could not parse bytes" from "encrypted — need
+ * password" from "parsed successfully" so UI messaging can be precise.
+ */
+export type PdfLoadResult =
+  | { readonly kind: 'ok'; readonly pdf: PDFDocument }
+  | { readonly kind: 'encrypted' }
+  | { readonly kind: 'malformed' };
+
+/**
+ * Load a PDF byte stream with `pdf-lib`, differentiating encryption
+ * rejection from generic parse failure. Encrypted PDFs are NEVER
+ * silently accepted per `project/spec/formats/pdf.md` §"Security —
+ * Encrypted Input and Active Content": the spec mandates "abort
+ * parsing before allocation" unless an explicit password is supplied.
+ *
+ * When `password` is provided but pdf-lib still throws (the library
+ * does not expose a public password-decryption API), the result is
+ * still `'encrypted'` so the caller surfaces the "pdf-lib cannot
+ * decrypt" outcome honestly rather than silently dropping.
+ */
+export async function probeLoadPdf(
+  bytes: Uint8Array,
+  options: { readonly password?: string } = {},
+): Promise<PdfLoadResult> {
+  try {
+    const pdf = await PDFDocument.load(bytes, {
+      ignoreEncryption: false,
+      updateMetadata: false,
+    });
+
+    return { kind: 'ok', pdf };
+  } catch (err) {
+    if (isEncryptionError(err)) {
+      return { kind: 'encrypted' };
+    }
+
+    // `options.password` cannot be passed to pdf-lib at load time —
+    // the library does not expose a public password-decryption API.
+    // Callers still receive 'encrypted' so UI messaging is honest
+    // rather than silently dropping the password attempt.
+    if (options.password !== undefined) {
+      return { kind: 'encrypted' };
+    }
+
+    return { kind: 'malformed' };
+  }
+}
+
+/**
+ * pdf-lib's public `EncryptedPDFError` class is the intended signal
+ * for encrypted-input rejection, but the `Error` thrown by
+ * `PDFDocument.load` can arrive as a plain `Error` instance in some
+ * bundled builds (the `__extends`-patched class loses its constructor
+ * name after minification). Checking the message body is a stable
+ * fallback — pdf-lib's message consistently includes the literal
+ * substring "is encrypted" regardless of subclass plumbing.
+ */
+function isEncryptionError(err: unknown): boolean {
+  if (err instanceof EncryptedPDFError) return true;
+
+  if (err instanceof Error) {
+    return err.message.toLowerCase().includes('is encrypted');
+  }
+
+  return false;
+}
+
+/**
+ * Convenience wrapper that returns the PDFDocument when load succeeds
+ * or `null` when the PDF is encrypted or malformed. Callers that need
+ * to distinguish the two outcomes should use `probeLoadPdf` directly.
  */
 export async function loadPdf(bytes: Uint8Array): Promise<PDFDocument | null> {
-  try {
-    return await PDFDocument.load(bytes, { ignoreEncryption: true });
-  } catch {
-    return null;
+  const result = await probeLoadPdf(bytes);
+
+  return result.kind === 'ok' ? result.pdf : null;
+}
+
+/**
+ * Detect presence of embedded JavaScript actions on the document
+ * catalog. PDF 1.7 § 12.6.4 lists four JS carriers: `/Names
+ * /JavaScript`, `/OpenAction`, page-level `/AA`, and annotation `/A`.
+ * This probe catches the first two — the most common carriers emitted
+ * by Acrobat — and is sufficient to satisfy the spec's "strip +
+ * warn" floor. Per-annotation JS detection lands with the full
+ * annotation walker in a later iteration.
+ */
+export function hasEmbeddedJavaScript(pdf: PDFDocument): boolean {
+  const names = pdf.catalog.lookupMaybe(NAMES_KEY, PDFDict);
+
+  if (names !== undefined) {
+    const js = names.lookupMaybe(JAVASCRIPT_KEY, PDFDict);
+
+    if (js !== undefined) return true;
   }
+
+  // `/OpenAction` can be either an action dict (typed `S /JavaScript`)
+  // or a destination array. We detect only the action-dict form.
+  const openAction = pdf.catalog.lookupMaybe(OPEN_ACTION_KEY, PDFDict);
+
+  if (openAction !== undefined) {
+    const subtype = openAction.lookupMaybe(PDFName.of('S'), PDFName);
+
+    if (subtype?.decodeText() === 'JavaScript') {
+      return true;
+    }
+  }
+
+  return hasDocumentAdditionalActionJs(pdf);
+}
+
+function hasDocumentAdditionalActionJs(pdf: PDFDocument): boolean {
+  const aa = pdf.catalog.lookupMaybe(AA_KEY, PDFDict);
+
+  if (aa === undefined) return false;
+
+  for (const [, value] of aa.entries()) {
+    if (!(value instanceof PDFDict)) continue;
+
+    const subtype = value.lookupMaybe(PDFName.of('S'), PDFName);
+
+    if (subtype?.decodeText() === 'JavaScript') {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Collect embedded-file names from the document's `/Names
+ * /EmbeddedFiles` name tree. The spec requires these survive import
+ * as opaque preservation entries under `extensions.pdf.embeddedFiles`;
+ * the collector returns the file names so the caller can surface a
+ * warning listing what was preserved (and therefore what MUST NOT be
+ * assumed "gone").
+ *
+ * Name-tree traversal is simplified — we read the direct entries at
+ * the root plus one level of `/Kids` so common Acrobat-produced
+ * name trees are covered. Deeply-nested name trees produce a partial
+ * list, but that is a "count is at least N" signal, never a silent
+ * drop: the caller always receives at least one entry when any
+ * embedded file is present.
+ */
+export function collectEmbeddedFileNames(pdf: PDFDocument): readonly string[] {
+  const names = pdf.catalog.lookupMaybe(NAMES_KEY, PDFDict);
+
+  if (names === undefined) return [];
+
+  const embeddedFilesNode = names.lookupMaybe(EMBEDDED_FILES_KEY, PDFDict);
+
+  if (embeddedFilesNode === undefined) return [];
+
+  return collectNameTreeLabels(embeddedFilesNode);
+}
+
+function collectNameTreeLabels(node: PDFDict): readonly string[] {
+  const labels: string[] = [];
+  const namesArray = node.lookupMaybe(PDFName.of('Names'), PDFDict);
+
+  if (namesArray !== undefined) {
+    for (const [key] of namesArray.entries()) {
+      labels.push(key.decodeText());
+    }
+  }
+
+  const kids = node.lookupMaybe(PDFName.of('Kids'), PDFDict);
+
+  if (kids !== undefined) {
+    for (const [, kid] of kids.entries()) {
+      if (kid instanceof PDFDict) {
+        labels.push(...collectNameTreeLabels(kid));
+      }
+    }
+  }
+
+  return labels;
 }
 
 /**
@@ -151,7 +324,8 @@ function isMarkedContentKind(value: string): value is MarkedContentKind {
 /**
  * Read XMP packet + marked-content tag list from a PDF byte stream in
  * one pass. Returns `{ xmp: null, markedContentTags: [] }` when the PDF
- * cannot be loaded or carries no Broadset metadata.
+ * cannot be loaded (malformed or encrypted) or carries no Broadset
+ * metadata.
  */
 export async function readRoundTripMetadata(bytes: Uint8Array): Promise<PdfRoundTripMetadata> {
   const pdf = await loadPdf(bytes);

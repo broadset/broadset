@@ -39,6 +39,11 @@ export function hydrateDocumentFromFastPath(
         pdf: {
           dirty: tag.dirty,
           ...(tag.preservationBlob !== undefined ? { preservationBlob: tag.preservationBlob } : {}),
+          // P6.4a marker — lets the editor's dirty-flag middleware
+          // distinguish Broadset-native creations from imports so
+          // subsequent edits flip the flag to `true` and the exporter
+          // re-synthesises them instead of re-emitting a stale blob.
+          source: 'pdf-import-fast-path',
         },
       },
     }),

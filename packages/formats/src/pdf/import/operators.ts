@@ -159,6 +159,13 @@ const TJ_LITERAL_RE = /\(((?:\\.|[^\\()])*)\)\s+Tj/g;
 // Latin-1 → text.
 const TJ_HEX_RE = /<([0-9A-Fa-f\s]*)>\s+Tj/g;
 
+// `[...] TJ` — array form with inline kerning numbers.
+// Array contains strings (either `(…)` literal or `<…>` hex) interleaved
+// with numeric kerning offsets we discard. We match the whole array
+// lazily and reparse its contents via `TJ_ARRAY_ITEM_RE`.
+const TJ_ARRAY_RE = /\[([^\]]*)\]\s+TJ/g;
+const TJ_ARRAY_ITEM_RE = /\(((?:\\.|[^\\()])*)\)|<([0-9A-Fa-f\s]*)>/g;
+
 function scanContentStreamForText(content: string): readonly ExtractedTextItem[] {
   const items: ExtractedTextItem[] = [];
 
@@ -232,6 +239,21 @@ type ContentEvent =
   | { readonly kind: 'tj'; readonly index: number; readonly text: string };
 
 function collectEvents(block: string): readonly ContentEvent[] {
+  const events: ContentEvent[] = [
+    ...collectTmEvents(block),
+    ...collectTdEvents(block),
+    ...collectTfEvents(block),
+    ...collectTjLiteralEvents(block),
+    ...collectTjHexEvents(block),
+    ...collectTjArrayEvents(block),
+  ];
+
+  events.sort((a, b) => a.index - b.index);
+
+  return events;
+}
+
+function collectTmEvents(block: string): readonly ContentEvent[] {
   const events: ContentEvent[] = [];
 
   for (const match of block.matchAll(TM_RE)) {
@@ -243,6 +265,12 @@ function collectEvents(block: string): readonly ContentEvent[] {
     events.push({ kind: 'tm', index: match.index, x: e, y: f });
   }
 
+  return events;
+}
+
+function collectTdEvents(block: string): readonly ContentEvent[] {
+  const events: ContentEvent[] = [];
+
   for (const match of block.matchAll(TD_RE)) {
     const x = parseFloatSafe(match[1]);
     const y = parseFloatSafe(match[2]);
@@ -252,6 +280,12 @@ function collectEvents(block: string): readonly ContentEvent[] {
     events.push({ kind: 'td', index: match.index, x, y });
   }
 
+  return events;
+}
+
+function collectTfEvents(block: string): readonly ContentEvent[] {
+  const events: ContentEvent[] = [];
+
   for (const match of block.matchAll(TF_RE)) {
     const size = parseFloatSafe(match[1]);
 
@@ -260,11 +294,23 @@ function collectEvents(block: string): readonly ContentEvent[] {
     events.push({ kind: 'tf', index: match.index, size });
   }
 
+  return events;
+}
+
+function collectTjLiteralEvents(block: string): readonly ContentEvent[] {
+  const events: ContentEvent[] = [];
+
   for (const match of block.matchAll(TJ_LITERAL_RE)) {
     const literal = match[1] ?? '';
 
     events.push({ kind: 'tj', index: match.index, text: decodePdfStringLiteral(literal) });
   }
+
+  return events;
+}
+
+function collectTjHexEvents(block: string): readonly ContentEvent[] {
+  const events: ContentEvent[] = [];
 
   for (const match of block.matchAll(TJ_HEX_RE)) {
     const hex = match[1] ?? '';
@@ -275,9 +321,46 @@ function collectEvents(block: string): readonly ContentEvent[] {
     events.push({ kind: 'tj', index: match.index, text: decoded });
   }
 
-  events.sort((a, b) => a.index - b.index);
+  return events;
+}
+
+/**
+ * `[(chunk1) -100 (chunk2) <hex3>] TJ` — array form with inline
+ * kerning numbers. We concatenate every string chunk (literal + hex),
+ * ignoring the kerning deltas. The result is a single event per TJ
+ * array at the array's position in the block.
+ */
+function collectTjArrayEvents(block: string): readonly ContentEvent[] {
+  const events: ContentEvent[] = [];
+
+  for (const match of block.matchAll(TJ_ARRAY_RE)) {
+    const text = decodeTjArrayBody(match[1] ?? '');
+
+    if (text.length === 0) continue;
+
+    events.push({ kind: 'tj', index: match.index, text });
+  }
 
   return events;
+}
+
+function decodeTjArrayBody(body: string): string {
+  const chunks: string[] = [];
+
+  for (const item of body.matchAll(TJ_ARRAY_ITEM_RE)) {
+    if (item[1] !== undefined) {
+      chunks.push(decodePdfStringLiteral(item[1]));
+      continue;
+    }
+
+    if (item[2] !== undefined) {
+      const decoded = decodePdfHexLiteral(item[2]);
+
+      if (decoded.length > 0) chunks.push(decoded);
+    }
+  }
+
+  return chunks.join('');
 }
 
 function parseFloatSafe(raw: string | undefined): number | null {

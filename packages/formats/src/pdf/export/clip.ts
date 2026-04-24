@@ -99,6 +99,22 @@ function tryBuildClipOperators(
     return buildPolygonClip(source, xPt, yPt, wPt, hPt);
   }
 
+  if (lowered.startsWith('path(')) {
+    // The SVG path d-attribute uses the element's local CSS coord
+    // frame (origin top-left, Y down). `buildSvgPathClip` Y-flips
+    // against `yBaselinePt` = the PDF-space Y coordinate of the
+    // element's top edge, which is `yPt + hPt` in our current
+    // bottom-anchored `yPt` variable.
+    return buildSvgPathClip(source, xPt, yPt + hPt);
+  }
+
+  // `url(#id)` clip-paths reference an external SVG <clipPath> that lives
+  // outside the element's own style. Resolving the referenced SVG is an
+  // SVG-import concern (P7) rather than a PDF-export concern — recorded
+  // as a Spec Gap in `project/spec/formats/pdf.md` §Spec Gaps. Until
+  // that lands, `url(#id)` clip-paths fall through to no-clip rather
+  // than silently dropping; the element renders unclipped but the rest
+  // of its painting sequence is intact.
   return null;
 }
 
@@ -281,6 +297,182 @@ function buildPolygonClip(
   ops.push(closePath());
 
   return ops;
+}
+
+/* ------------------------------------------------------------------ */
+/*  path('d') — minimal SVG-command clip                               */
+/* ------------------------------------------------------------------ */
+
+interface SvgPathState {
+  cursorX: number;
+  cursorY: number;
+  subpathStartX: number;
+  subpathStartY: number;
+}
+
+function buildSvgPathClip(source: string, xPt: number, yBaselinePt: number): readonly PDFOperator[] | null {
+  const body = extractFunctionBody(source, 'path');
+
+  if (body === null) return null;
+
+  const stripped = body.trim().replace(/^["']|["']$/g, '').trim();
+  const ops: PDFOperator[] = [];
+  const state: SvgPathState = { cursorX: 0, cursorY: 0, subpathStartX: 0, subpathStartY: 0 };
+
+  const commandRe = /([MmLlHhVvCcZz])\s*([^MmLlHhVvCcZz]*)/g;
+
+  for (const match of stripped.matchAll(commandRe)) {
+    const cmd = match[1] ?? '';
+    const args = parseNumberSequence(match[2] ?? '');
+    const emitted = dispatchSvgCommand(cmd, args, state, xPt, yBaselinePt);
+
+    if (emitted === null) return null;
+
+    ops.push(...emitted);
+  }
+
+  return ops.length > 0 ? ops : null;
+}
+
+function dispatchSvgCommand(
+  cmd: string,
+  args: readonly number[],
+  state: SvgPathState,
+  xPt: number,
+  yBaselinePt: number,
+): readonly PDFOperator[] | null {
+  const isRelative = cmd >= 'a' && cmd <= 'z';
+
+  switch (cmd.toUpperCase()) {
+    case 'M':
+      return handleMoveOrLine(args, state, xPt, yBaselinePt, isRelative, true);
+    case 'L':
+      return handleMoveOrLine(args, state, xPt, yBaselinePt, isRelative, false);
+    case 'H':
+      return handleHorizontal(args, state, xPt, yBaselinePt, isRelative);
+    case 'V':
+      return handleVertical(args, state, xPt, yBaselinePt, isRelative);
+    case 'C':
+      return handleCubic(args, state, xPt, yBaselinePt, isRelative);
+    case 'Z':
+      return handleClose(state);
+    default:
+      // Q / T / A / S paths are not yet supported; rather than
+      // silently dropping the clip we signal failure and the caller
+      // falls through to no-clip. Documented as a Spec Gap.
+      return null;
+  }
+}
+
+function handleMoveOrLine(
+  args: readonly number[],
+  state: SvgPathState,
+  xPt: number,
+  yBaselinePt: number,
+  isRelative: boolean,
+  isMove: boolean,
+): readonly PDFOperator[] | null {
+  if (args.length < 2) return null;
+
+  const targetX = isRelative ? state.cursorX + (args[0] ?? 0) : (args[0] ?? 0);
+  const targetY = isRelative ? state.cursorY + (args[1] ?? 0) : (args[1] ?? 0);
+
+  state.cursorX = targetX;
+  state.cursorY = targetY;
+
+  if (isMove) {
+    state.subpathStartX = targetX;
+    state.subpathStartY = targetY;
+
+    return [moveTo(xPt + targetX, yBaselinePt - targetY)];
+  }
+
+  return [lineTo(xPt + targetX, yBaselinePt - targetY)];
+}
+
+function handleHorizontal(
+  args: readonly number[],
+  state: SvgPathState,
+  xPt: number,
+  yBaselinePt: number,
+  isRelative: boolean,
+): readonly PDFOperator[] | null {
+  if (args.length < 1) return null;
+
+  const targetX = isRelative ? state.cursorX + (args[0] ?? 0) : (args[0] ?? 0);
+
+  state.cursorX = targetX;
+
+  return [lineTo(xPt + targetX, yBaselinePt - state.cursorY)];
+}
+
+function handleVertical(
+  args: readonly number[],
+  state: SvgPathState,
+  xPt: number,
+  yBaselinePt: number,
+  isRelative: boolean,
+): readonly PDFOperator[] | null {
+  if (args.length < 1) return null;
+
+  const targetY = isRelative ? state.cursorY + (args[0] ?? 0) : (args[0] ?? 0);
+
+  state.cursorY = targetY;
+
+  return [lineTo(xPt + state.cursorX, yBaselinePt - targetY)];
+}
+
+function handleCubic(
+  args: readonly number[],
+  state: SvgPathState,
+  xPt: number,
+  yBaselinePt: number,
+  isRelative: boolean,
+): readonly PDFOperator[] | null {
+  if (args.length < 6) return null;
+
+  const ox = isRelative ? state.cursorX : 0;
+  const oy = isRelative ? state.cursorY : 0;
+  const c1x = ox + (args[0] ?? 0);
+  const c1y = oy + (args[1] ?? 0);
+  const c2x = ox + (args[2] ?? 0);
+  const c2y = oy + (args[3] ?? 0);
+  const endX = ox + (args[4] ?? 0);
+  const endY = oy + (args[5] ?? 0);
+
+  state.cursorX = endX;
+  state.cursorY = endY;
+
+  return [
+    appendBezierCurve(
+      xPt + c1x,
+      yBaselinePt - c1y,
+      xPt + c2x,
+      yBaselinePt - c2y,
+      xPt + endX,
+      yBaselinePt - endY,
+    ),
+  ];
+}
+
+function handleClose(state: SvgPathState): readonly PDFOperator[] {
+  state.cursorX = state.subpathStartX;
+  state.cursorY = state.subpathStartY;
+
+  return [closePath()];
+}
+
+function parseNumberSequence(source: string): readonly number[] {
+  const result: number[] = [];
+  const numberRe = /-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
+
+  for (const match of source.matchAll(numberRe)) {
+    const n = Number.parseFloat(match[0]);
+
+    if (Number.isFinite(n)) result.push(n);
+  }
+
+  return result;
 }
 
 /* ------------------------------------------------------------------ */

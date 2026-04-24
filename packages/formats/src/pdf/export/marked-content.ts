@@ -36,13 +36,39 @@ const MARKED_CONTENT_KIND_FALLBACK: MarkedContentKind = 'path';
  */
 export function buildMarkedContentTag(element: BroadsetElement): MarkedContentTag {
   const dataField = element.dataField?.fieldName;
+  const preservationBlob = readPdfPreservationBlob(element);
 
   return {
     id: element.id,
     kind: normalizeKind(element.type),
     dirty: readPdfDirtyFlag(element),
     ...(dataField !== undefined ? { dataField } : {}),
+    ...(preservationBlob !== undefined ? { preservationBlob } : {}),
   };
+}
+
+/**
+ * Read `extensions.pdf.preservationBlob` off an element. The importer
+ * stores the marked-content `/Blob` property on import so untouched
+ * (`dirty === false`) elements can re-emit byte-identical operators on
+ * re-export. The operator-level byte-identical re-emission pathway is
+ * Spec Gapped in `project/spec/formats/pdf.md` pending the per-element
+ * operator-capture work in P6.4b; until then `buildMarkedContentTag`
+ * round-trips the blob through the `/Blob` property so the data is
+ * preserved across import / edit / re-export.
+ */
+function readPdfPreservationBlob(element: BroadsetElement): string | undefined {
+  const extensions = element.extensions as Readonly<Record<string, unknown>> | undefined;
+
+  if (extensions === undefined) return undefined;
+
+  const pdfExt = extensions['pdf'];
+
+  if (pdfExt === undefined || pdfExt === null || typeof pdfExt !== 'object') return undefined;
+
+  const blob = (pdfExt as Record<string, unknown>)['preservationBlob'];
+
+  return typeof blob === 'string' ? blob : undefined;
 }
 
 /**
