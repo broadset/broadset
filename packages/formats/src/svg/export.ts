@@ -1,4 +1,5 @@
 import {
+  type ArrowEnd,
   type BroadsetDocument,
   type BroadsetElement,
   type BroadsetElementStyle,
@@ -10,6 +11,7 @@ import {
   resolveStyleFillToSvgPaint,
 } from '@broadset/model';
 
+import { sanitizeSvg } from '../_shared/sanitize';
 import { generateQrSvgFragment } from '../interchange';
 import { escapeXml } from './shared';
 import type { SvgExportOptions } from './types';
@@ -142,6 +144,26 @@ function buildStyleAttrs(style: BroadsetElementStyle): string {
     attrs.push(`stroke-width="${String(style.strokeWidth)}"`);
   }
 
+  if (style.strokeLinecap !== undefined) {
+    attrs.push(`stroke-linecap="${style.strokeLinecap}"`);
+  }
+
+  if (style.strokeLinejoin !== undefined) {
+    attrs.push(`stroke-linejoin="${style.strokeLinejoin}"`);
+  }
+
+  if (style.strokeMiterlimit !== undefined) {
+    attrs.push(`stroke-miterlimit="${String(style.strokeMiterlimit)}"`);
+  }
+
+  if (style.strokeDasharray !== undefined) {
+    attrs.push(`stroke-dasharray="${escapeXml(style.strokeDasharray)}"`);
+  }
+
+  if (style.strokeDashoffset !== undefined) {
+    attrs.push(`stroke-dashoffset="${String(style.strokeDashoffset)}"`);
+  }
+
   if (style.fillOpacity !== undefined) {
     attrs.push(`fill-opacity="${String(style.fillOpacity)}"`);
   }
@@ -155,6 +177,57 @@ function buildStyleAttrs(style: BroadsetElementStyle): string {
   }
 
   return attrs.length > 0 ? ' ' + attrs.join(' ') : '';
+}
+
+/**
+ * Renders a `<marker>` def for a stroke arrow end. The marker uses
+ * `stroke-width`-relative sizing (`markerUnits="strokeWidth"`) so the
+ * arrow grows with the line. Canonical triangle / stealth / diamond /
+ * oval shapes match the ArrowEndShape union in the model.
+ */
+function arrowEndScale(size: 'sm' | 'md' | 'lg' | undefined): number {
+  if (size === 'sm') return 2;
+  if (size === 'lg') return 6;
+
+  return 4;
+}
+
+function renderMarkerDef(id: string, end: ArrowEnd, stroke: string): string {
+  const widthScale = arrowEndScale(end.width);
+  const lengthScale = arrowEndScale(end.length);
+  let path: string;
+
+  switch (end.shape) {
+    case 'stealth':
+      // Narrow swept-back arrow
+      path = `<path d="M0,0 L${String(lengthScale)},${String(widthScale / 2)} L${String(
+        lengthScale * 0.6,
+      )},${String(widthScale / 2)} L0,${String(widthScale)} Z" fill="${stroke}"/>`;
+      break;
+    case 'diamond':
+      path = `<path d="M0,${String(widthScale / 2)} L${String(lengthScale / 2)},0 L${String(
+        lengthScale,
+      )},${String(widthScale / 2)} L${String(lengthScale / 2)},${String(widthScale)} Z" fill="${stroke}"/>`;
+      break;
+    case 'oval':
+      path = `<ellipse cx="${String(lengthScale / 2)}" cy="${String(widthScale / 2)}" rx="${String(
+        lengthScale / 2,
+      )}" ry="${String(widthScale / 2)}" fill="${stroke}"/>`;
+      break;
+    case 'none':
+      return '';
+    case 'triangle':
+    default:
+      path = `<path d="M0,0 L${String(lengthScale)},${String(widthScale / 2)} L0,${String(
+        widthScale,
+      )} Z" fill="${stroke}"/>`;
+  }
+
+  return `<marker id="${id}" viewBox="0 0 ${String(lengthScale)} ${String(
+    widthScale,
+  )}" markerUnits="strokeWidth" markerWidth="${String(lengthScale)}" markerHeight="${String(
+    widthScale,
+  )}" refX="${String(lengthScale)}" refY="${String(widthScale / 2)}" orient="auto">${path}</marker>`;
 }
 
 function renderClipPathDef(elementId: string, clipPath: string): string {
@@ -210,6 +283,14 @@ function buildTextAttrs(style: BroadsetElementStyle): string {
   return attrs.length > 0 ? ' ' + attrs.join(' ') : '';
 }
 
+/**
+ * Re-emits an opaque `svg`-type element's content, stripping any
+ * active surface (`<script>`, `on*=`, `javascript:` URLs,
+ * `<foreignObject>`) via the shared `_shared/sanitize` path before
+ * embedding the markup. Even a hostile payload that survived a
+ * previous importer cannot reach a downstream consumer as executable
+ * markup.
+ */
 function renderSvgPayload(el: BroadsetElement, transform: string): string {
   const content = resolveContentAsPlainString(el.content);
 
@@ -217,49 +298,101 @@ function renderSvgPayload(el: BroadsetElement, transform: string): string {
     return `<g id="${escapeXml(el.id)}"${transform}/>`;
   }
 
-  const innerMatch = /<svg[^>]*>([\s\S]*)<\/svg>/i.exec(content);
-  const inner = innerMatch?.[1] ?? content;
+  const { ast } = sanitizeSvg(content);
+  const sanitized = ast.markup;
+  const innerMatch = /<svg[^>]*>([\s\S]*)<\/svg>/i.exec(sanitized);
+  const inner = innerMatch?.[1] ?? sanitized;
 
   return `<g id="${escapeXml(el.id)}"${transform}>${inner}</g>`;
 }
 
-function renderElement(el: BroadsetElement, defs: string[]): string {
-  const transform = buildTransform(el);
-  const styleAttrs = buildStyleAttrs(el.style);
-  let clipAttr = '';
-  let fillOverride = '';
-  let filterAttr = '';
-
-  if (el.style.customClipPath) {
-    const clipId = `clip-${el.id}`;
-
-    defs.push(renderClipPathDef(el.id, el.style.customClipPath));
-    clipAttr = ` clip-path="url(#${clipId})"`;
+function collectClipAttr(el: BroadsetElement, defs: string[]): string {
+  if (!el.style.customClipPath) {
+    return '';
   }
 
-  // Gradient fill
+  const clipId = `clip-${el.id}`;
+
+  defs.push(renderClipPathDef(el.id, el.style.customClipPath));
+
+  return ` clip-path="url(#${clipId})"`;
+}
+
+function collectGradientFillOverride(el: BroadsetElement, defs: string[]): string {
   const gradientFill = getGradientFillGradient(el.style.fill);
 
-  if (gradientFill !== undefined) {
-    const grad = renderGradientDef(el.id, gradientFill);
+  if (gradientFill === undefined) {
+    return '';
+  }
 
-    if (grad !== null) {
-      defs.push(grad.def);
-      fillOverride = ` fill="url(#${grad.id})"`;
+  const grad = renderGradientDef(el.id, gradientFill);
+
+  if (grad === null) {
+    return '';
+  }
+
+  defs.push(grad.def);
+
+  return ` fill="url(#${grad.id})"`;
+}
+
+function collectShadowFilterAttr(el: BroadsetElement, defs: string[]): string {
+  if (!el.style.boxShadow) {
+    return '';
+  }
+
+  const shadow = renderShadowFilter(el.id, el.style.boxShadow);
+
+  if (shadow === null) {
+    return '';
+  }
+
+  defs.push(shadow.def);
+
+  return ` filter="url(#${shadow.id})"`;
+}
+
+function collectArrowMarkerAttrs(el: BroadsetElement, defs: string[]): string {
+  const strokeCss = resolveStyleColor(el.style.stroke, { resolveTheme: false }) ?? '#000000';
+  const parts: string[] = [];
+  const head = el.style.strokeHeadEnd;
+  const tail = el.style.strokeTailEnd;
+
+  if (head !== undefined && head.shape !== 'none') {
+    const markerId = `marker-start-${el.id}`;
+    const markerDef = renderMarkerDef(markerId, head, strokeCss);
+
+    if (markerDef !== '') {
+      defs.push(markerDef);
+      parts.push(` marker-start="url(#${markerId})"`);
     }
   }
 
-  // Box-shadow filter
-  if (el.style.boxShadow) {
-    const shadow = renderShadowFilter(el.id, el.style.boxShadow);
+  if (tail !== undefined && tail.shape !== 'none') {
+    const markerId = `marker-end-${el.id}`;
+    const markerDef = renderMarkerDef(markerId, tail, strokeCss);
 
-    if (shadow !== null) {
-      defs.push(shadow.def);
-      filterAttr = ` filter="url(#${shadow.id})"`;
+    if (markerDef !== '') {
+      defs.push(markerDef);
+      parts.push(` marker-end="url(#${markerId})"`);
     }
   }
 
-  const extras = clipAttr + filterAttr;
+  return parts.join('');
+}
+
+function renderElement(
+  el: BroadsetElement,
+  defs: string[],
+  childrenByParent: ReadonlyMap<string, readonly BroadsetElement[]>,
+): string {
+  const transform = buildTransform(el);
+  const styleAttrs = buildStyleAttrs(el.style);
+  const clipAttr = collectClipAttr(el, defs);
+  const fillOverride = collectGradientFillOverride(el, defs);
+  const filterAttr = collectShadowFilterAttr(el, defs);
+  const markerAttrs = collectArrowMarkerAttrs(el, defs);
+  const extras = clipAttr + filterAttr + markerAttrs;
 
   switch (el.type) {
     case 'path':
@@ -297,12 +430,47 @@ function renderElement(el: BroadsetElement, defs: string[]): string {
       return `<g id="${escapeXml(el.id)}"${transform}>${inner}</g>`;
     }
 
-    case 'group':
-      return `<g id="${escapeXml(el.id)}"${transform}${extras}/>`;
+    case 'group': {
+      const children = childrenByParent.get(el.id) ?? [];
+      const childMarkup = children.map((child) => renderElement(child, defs, childrenByParent)).join('');
+
+      return `<g id="${escapeXml(el.id)}"${transform}${extras}>${childMarkup}</g>`;
+    }
 
     default:
       return `<g id="${escapeXml(el.id)}"${transform}/>`;
   }
+}
+
+/**
+ * Build a parent→children map from a flat element list. The renderer
+ * iterates the top-level roots (`parentId === null`) only; every
+ * group recursively pulls its children from this map. Nesting is
+ * arbitrary-depth per the cross-format importer contract in
+ * `project/spec/formats/spec.md`.
+ */
+function hasNonEmptyParentId(el: BroadsetElement): el is BroadsetElement & { readonly parentId: string } {
+  return typeof el.parentId === 'string' && el.parentId !== '';
+}
+
+function buildChildrenByParent(elements: readonly BroadsetElement[]): ReadonlyMap<string, readonly BroadsetElement[]> {
+  const byParent = new Map<string, BroadsetElement[]>();
+
+  for (const el of elements) {
+    if (!hasNonEmptyParentId(el)) {
+      continue;
+    }
+
+    const bucket = byParent.get(el.parentId);
+
+    if (bucket !== undefined) {
+      bucket.push(el);
+    } else {
+      byParent.set(el.parentId, [el]);
+    }
+  }
+
+  return byParent;
 }
 
 /**
@@ -315,11 +483,14 @@ function renderElement(el: BroadsetElement, defs: string[]): string {
  * the demo keeps rendering while Phase 7.1 is landing.
  */
 export function exportSvgString(doc: BroadsetDocument, _options?: SvgExportOptions): string {
-  // Phase 7.1 intentionally does not consume `_options`; later phases
-  // will thread font-embedding choice and metadata toggles through
-  // this entry point.
+  // Phase 7.2 landed the recursive group renderer + full stroke
+  // coverage + opaque-payload sanitization. Phase 7.3 layers font
+  // embedding, conic-gradient fallback metadata, OKLCH preservation,
+  // and the <metadata> RDF packet on top.
   const defs: string[] = [];
-  const elementNodes = doc.elements.map((el) => renderElement(el, defs));
+  const childrenByParent = buildChildrenByParent(doc.elements);
+  const rootElements = doc.elements.filter((el) => !hasNonEmptyParentId(el));
+  const elementNodes = rootElements.map((el) => renderElement(el, defs, childrenByParent));
 
   const defsBlock = defs.length > 0 ? `<defs>${defs.join('')}</defs>` : '';
 

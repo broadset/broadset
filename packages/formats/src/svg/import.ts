@@ -1,8 +1,11 @@
 import {
   type BroadsetDocument,
   type BroadsetElementStyleInput,
+  type BroadsetGradient,
+  type BroadsetGradientStop,
   createDefaultElement,
   createEmptyBroadsetDocument,
+  rgbColor,
 } from '@broadset/model';
 
 import type { SvgImportOptions } from './types';
@@ -106,6 +109,173 @@ function buildDefsMap(doc: Document): ReadonlyMap<string, string> {
   return map;
 }
 
+/**
+ * Parse an SVG `offset` attribute (`0`, `1`, `50%`, `0.5`) into the
+ * Broadset 0-100 position range. SVG 2 accepts both fractional
+ * (0-1) and percentage (`0%`-`100%`) forms — we normalise both to
+ * 0-100 so the model schema accepts them.
+ */
+function parseGradientOffset(raw: string | null): number {
+  if (raw === null || raw === '') {
+    return 0;
+  }
+
+  const trimmed = raw.trim();
+  const hasPercent = trimmed.endsWith('%');
+  const numeric = parseFloat(hasPercent ? trimmed.slice(0, -1) : trimmed);
+
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+
+  if (hasPercent) {
+    return Math.max(0, Math.min(100, numeric));
+  }
+
+  // Fractional 0-1 form — convert to 0-100 percentage.
+  if (numeric <= 1) {
+    return Math.max(0, Math.min(100, numeric * 100));
+  }
+
+  return Math.max(0, Math.min(100, numeric));
+}
+
+/**
+ * Parse the `<stop>` children of a gradient element into the
+ * Broadset structured stop array. `stop-color` accepts any CSS
+ * colour; unparsable values default to opaque black so the stop is
+ * never silently dropped per IO-D-18.
+ */
+function parseGradientStops(gradientEl: Element): readonly BroadsetGradientStop[] {
+  const stops: BroadsetGradientStop[] = [];
+  const children = gradientEl.getElementsByTagName('stop');
+
+  for (let i = 0; i < children.length; i++) {
+    const stop = children[i];
+
+    if (!stop) {
+      continue;
+    }
+
+    const offset = parseGradientOffset(stop.getAttribute('offset'));
+    const colorRaw = stop.getAttribute('stop-color') ?? '#000000';
+
+    stops.push({ color: rgbColor(colorRaw), position: offset });
+  }
+
+  return stops;
+}
+
+/**
+ * Derive a linear-gradient angle from the SVG `x1/y1/x2/y2`
+ * direction. Returns degrees clockwise from the 12-o'clock
+ * (0° = top), matching CSS `linear-gradient(<angle>, ...)`.
+ */
+function deriveLinearAngle(gradientEl: Element): number {
+  const x1 = parseFloat(gradientEl.getAttribute('x1') ?? '0');
+  const y1 = parseFloat(gradientEl.getAttribute('y1') ?? '0');
+  const x2 = parseFloat(gradientEl.getAttribute('x2') ?? '1');
+  const y2 = parseFloat(gradientEl.getAttribute('y2') ?? '0');
+
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+
+  // atan2 returns radians counter-clockwise from the positive x-axis.
+  // Convert to CSS-style clockwise-from-north: 90 - atan2-degrees.
+  const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+  const cssAngle = (90 - angleDeg + 360) % 360;
+
+  return Math.round(cssAngle * 100) / 100;
+}
+
+/**
+ * Build a map of gradient id → `BroadsetGradient` from every
+ * `<linearGradient>` and `<radialGradient>` in the source. Both
+ * top-level and `<defs>`-nested gradients are collected so inherited
+ * `xlink:href` chains resolve correctly.
+ */
+function buildGradientsMap(doc: Document): ReadonlyMap<string, BroadsetGradient> {
+  const gradients = new Map<string, BroadsetGradient>();
+  const linears = doc.getElementsByTagName('linearGradient');
+  const radials = doc.getElementsByTagName('radialGradient');
+
+  for (let i = 0; i < linears.length; i++) {
+    const el = linears[i];
+
+    if (!el) {
+      continue;
+    }
+
+    const id = el.getAttribute('id');
+
+    if (id === null || id === '') {
+      continue;
+    }
+
+    const stops = parseGradientStops(el);
+
+    if (stops.length < 2) {
+      continue;
+    }
+
+    gradients.set(id, { type: 'linear', angle: deriveLinearAngle(el), stops });
+  }
+
+  for (let i = 0; i < radials.length; i++) {
+    const el = radials[i];
+
+    if (!el) {
+      continue;
+    }
+
+    const id = el.getAttribute('id');
+
+    if (id === null || id === '') {
+      continue;
+    }
+
+    const stops = parseGradientStops(el);
+
+    if (stops.length < 2) {
+      continue;
+    }
+
+    const cx = parseFloat(el.getAttribute('cx') ?? '0.5');
+    const cy = parseFloat(el.getAttribute('cy') ?? '0.5');
+
+    gradients.set(id, {
+      type: 'radial',
+      center: [cx * 100, cy * 100],
+      stops,
+    });
+  }
+
+  return gradients;
+}
+
+/**
+ * Resolve a CSS `url(#foo)` fill reference to a structured gradient
+ * if the id matches a gradient in the defs map; otherwise return
+ * undefined so the caller falls back to the raw paint server string.
+ */
+function resolveGradientFill(
+  fillAttr: string | null,
+  gradients: ReadonlyMap<string, BroadsetGradient>,
+): BroadsetGradient | undefined {
+  if (fillAttr === null) {
+    return undefined;
+  }
+
+  const match = /url\(\s*#([^)\s]+)\s*\)/.exec(fillAttr);
+  const id = match?.[1];
+
+  if (id === undefined) {
+    return undefined;
+  }
+
+  return gradients.get(id);
+}
+
 function importUnsupportedElement(el: Element, transform: TransformState, warnings: string[]): ImportedElement {
   const tagName = el.tagName.toLowerCase();
 
@@ -125,6 +295,7 @@ function importUnsupportedElement(el: Element, transform: TransformState, warnin
 function importElement(
   el: Element,
   defsMap: ReadonlyMap<string, string>,
+  gradients: ReadonlyMap<string, BroadsetGradient>,
   warnings: string[],
   inheritedTransform: TransformState,
 ): ImportedElement[] {
@@ -134,10 +305,12 @@ function importElement(
   const clipPath = resolveClipPath(el, defsMap);
   const fill = getAttr(el, 'fill');
   const stroke = getAttr(el, 'stroke');
+  const gradient = resolveGradientFill(fill, gradients);
   const baseStyle: Partial<BroadsetElementStyleInput> = {
     ...(clipPath ? { customClipPath: clipPath } : undefined),
-    ...(fill ? { fill } : undefined),
+    ...(fill && gradient === undefined ? { fill } : undefined),
     ...(stroke ? { stroke } : undefined),
+    ...(gradient !== undefined ? { backgroundGradient: gradient } : undefined),
   };
 
   switch (tagName) {
@@ -249,7 +422,7 @@ function importElement(
           continue;
         }
 
-        importedChildren.push(...importElement(child, defsMap, warnings, transform));
+        importedChildren.push(...importElement(child, defsMap, gradients, warnings, transform));
       }
 
       return importedChildren;
@@ -306,6 +479,7 @@ export function importSvg(input: string): SvgImportResult {
   }
 
   const defsMap = buildDefsMap(xmlDoc);
+  const gradients = buildGradientsMap(xmlDoc);
   const warnings: string[] = [];
   const elements: ImportedElement[] = [];
   const children = svgRoot.children;
@@ -318,7 +492,7 @@ export function importSvg(input: string): SvgImportResult {
       continue;
     }
 
-    elements.push(...importElement(child, defsMap, warnings, rootTransform));
+    elements.push(...importElement(child, defsMap, gradients, warnings, rootTransform));
   }
 
   return { elements, canvasWidth, canvasHeight, warnings };

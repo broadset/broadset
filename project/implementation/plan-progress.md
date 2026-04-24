@@ -130,7 +130,7 @@ Source of truth: [plan.md](./plan.md), [svg-support-plan.md](./svg-support-plan.
 
 - [x] P7.0 SVG spec and scope lock (new `project/spec/formats/svg.md` with feature matrix + standards-only metadata/tagging/sanitization requirements; `web-vector.md` trimmed to HTML-standalone only; `spec.md` sub-specs split)
 - [x] P7.1 SVG types and architecture (new `packages/formats/src/svg/` module with `types.ts` + Zod registration per IO-D-11; public API `exportSvgString` / `exportSvgDocument` / `importSvgDocument` / `canRoundTrip`; `svgpath` + `css-tree` + `transformation-matrix` deps added; architecture.md updated; metadata-roundtrip spike proves DOMParser preserves `<metadata>` RDF + namespaced attrs)
-- [ ] P7.2 SVG export parity and critical bug fix
+- [x] P7.2 SVG export parity and critical bug fix (recursive `<g>` with parentId-tree children; full stroke coverage — cap/join/miterlimit/dasharray/dashoffset + arrow markers; group transforms compose on `<g>`; opaque `svg`-type payloads routed through `_shared/sanitize` on re-emission; `<linearGradient>` / `<radialGradient>` parse from `<defs>` on import with stops + derived angle; animations remain discarded per IO-D-16)
 - [ ] P7.3 SVG export beyond prior art
 - [ ] P7.4a SVG import fast path (`metadata + data-bs-*`)
 - [ ] P7.4b SVG arbitrary third-party import

@@ -158,10 +158,18 @@ describe('SVG Text, Image, and Rotation Export', () => {
 });
 
 describe('SVG Inline Payload Embedding', () => {
-  /** @description Validates that SVG elements embed inline content including foreignObject. */
-  it('embeds foreignObject directly without data URI', () => {
+  /**
+   * @description SVG-type payloads embed their sanitized content
+   * inline — `<foreignObject>` is stripped per the Phase 7 importer
+   * security contract (see `project/spec/formats/svg.md` →
+   * "Requirement: Import Sanitization"), so benign inline shapes
+   * survive but active-content carriers do not. The exporter MUST
+   * also never wrap the payload in a `data:` URI reference; it emits
+   * the sanitized markup inline.
+   */
+  it('embeds benign inline shapes and strips foreignObject active-content carriers', () => {
     const svgPayload =
-      '<svg xmlns="http://www.w3.org/2000/svg"><foreignObject width="100" height="50"><div>Hello</div></foreignObject></svg>';
+      '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="5"/><foreignObject width="100" height="50"><div>Hello</div></foreignObject></svg>';
     const doc = makeDocument({
       elements: [
         makeElement({
@@ -174,7 +182,8 @@ describe('SVG Inline Payload Embedding', () => {
 
     const svg = exportSvgString(doc);
 
-    expect(svg).toContain('<foreignObject');
+    expect(svg).toContain('<circle');
+    expect(svg).not.toContain('<foreignObject');
     expect(svg).not.toContain('href="data:image/svg+xml;utf8,');
   });
 });
