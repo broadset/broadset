@@ -1,12 +1,13 @@
 import type { RgbaColor } from './color-utils';
 import { parseHexColor } from './color-utils';
 
-interface ParsedShadow {
+export interface ParsedShadow {
   readonly offsetX: number;
   readonly offsetY: number;
   readonly blur: number;
   readonly spread: number;
   readonly color: RgbaColor;
+  readonly inset: boolean;
 }
 
 interface ParsedGlow {
@@ -25,7 +26,11 @@ const SHADOW_HEX_RE = new RegExp(`${SHADOW_OFFSETS}\\s+(#[\\da-fA-F]{3,8})`);
 const FILTER_GLOW_RE = new RegExp(String.raw`drop-shadow\(\s*0\s+0\s+(\d+(?:\.\d+)?)px\s+${RGBA_BODY}\s*\)`);
 
 export function parseBoxShadow(shadow: string): ParsedShadow | undefined {
-  const rgbaMatch = SHADOW_RGBA_RE.exec(shadow);
+  const trimmed = shadow.trim();
+  const inset = trimmed.startsWith('inset');
+  const body = inset ? trimmed.replace(/^inset\s+/, '') : trimmed;
+
+  const rgbaMatch = SHADOW_RGBA_RE.exec(body);
 
   if (rgbaMatch) {
     return {
@@ -39,10 +44,11 @@ export function parseBoxShadow(shadow: string): ParsedShadow | undefined {
         b: parseInt(rgbaMatch[7] ?? '0', 10),
         a: parseFloat(rgbaMatch[8] ?? '1'),
       },
+      inset,
     };
   }
 
-  const hexMatch = SHADOW_HEX_RE.exec(shadow);
+  const hexMatch = SHADOW_HEX_RE.exec(body);
 
   if (hexMatch) {
     const color = parseHexColor(hexMatch[5] ?? '#000000');
@@ -53,6 +59,7 @@ export function parseBoxShadow(shadow: string): ParsedShadow | undefined {
       blur: parseFloat(hexMatch[3] ?? '0'),
       spread: parseFloat(hexMatch[4] ?? '0'),
       color: color ?? { r: 0, g: 0, b: 0, a: 1 },
+      inset,
     };
   }
 

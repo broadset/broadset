@@ -165,18 +165,52 @@ function applyBoxShadow(layer: Layer, el: BroadsetElement): void {
 
   if (!shadow) return;
 
+  const shadowEffect = {
+    present: true,
+    enabled: true,
+    color: { r: shadow.color.r, g: shadow.color.g, b: shadow.color.b },
+    opacity: shadow.color.a,
+    angle: Math.round(Math.atan2(shadow.offsetY, shadow.offsetX) * (180 / Math.PI)),
+    distance: { units: 'Pixels' as const, value: Math.sqrt(shadow.offsetX ** 2 + shadow.offsetY ** 2) },
+    size: { units: 'Pixels' as const, value: shadow.blur },
+    ...(shadow.spread ? { choke: { units: 'Pixels' as const, value: shadow.spread } } : undefined),
+  };
+
+  if (shadow.inset) {
+    // CSS `box-shadow: inset …` → PSD innerShadow layer effect
+    // (IO-D-18: every effect round-trips natively where possible).
+    layer.effects = { ...layer.effects, innerShadow: [shadowEffect] };
+
+    return;
+  }
+
+  layer.effects = { ...layer.effects, dropShadow: [shadowEffect] };
+}
+
+function applyStrokeLayerEffect(layer: Layer, el: BroadsetElement): void {
+  const borderWidth = el.style.borderWidth;
+
+  if (borderWidth === undefined || borderWidth <= 0) return;
+
+  const borderColorCss = resolveStyleColor(el.style.borderColor, { resolveTheme: false });
+
+  if (borderColorCss === undefined) return;
+
+  const color = parseHexColor(borderColorCss);
+
+  if (color === undefined) return;
+
   layer.effects = {
     ...layer.effects,
-    dropShadow: [
+    stroke: [
       {
         present: true,
         enabled: true,
-        color: { r: shadow.color.r, g: shadow.color.g, b: shadow.color.b },
-        opacity: shadow.color.a,
-        angle: Math.round(Math.atan2(shadow.offsetY, shadow.offsetX) * (180 / Math.PI)),
-        distance: { units: 'Pixels', value: Math.sqrt(shadow.offsetX ** 2 + shadow.offsetY ** 2) },
-        size: { units: 'Pixels', value: shadow.blur },
-        ...(shadow.spread ? { choke: { units: 'Pixels', value: shadow.spread } } : undefined),
+        size: { units: 'Pixels', value: borderWidth },
+        fillType: 'color',
+        color: { r: color.r, g: color.g, b: color.b },
+        opacity: color.a,
+        position: 'outside',
       },
     ],
   };
@@ -439,6 +473,7 @@ export function elementToLayer(el: BroadsetElement): Layer {
   applyVectorMasks(layer, el);
   applyBoxShadow(layer, el);
   applyFilterGlow(layer, el);
+  applyStrokeLayerEffect(layer, el);
   applyTypeContent(layer, el);
 
   return layer;
