@@ -106,8 +106,8 @@ Source of truth: [plan.md](./plan.md), [psd-support-plan.md](./psd-support-plan.
 - [x] P5.1 PSD types and de-risking spike (`packages/formats/src/psd/types.ts` + registry wiring; `xmp-roundtrip-spike.test.ts` verifies `ag-psd` XMP round-trip in-process; decision logged)
 - [x] P5.2 PSD export parity rebuild (groups via parentId tree, rotation composition, TextBody → styleRuns, `broadset:` XMP packet; deeper items in `project/spec/formats/psd.md` §Spec Gaps)
 - [ ] P5.3 PSD export beyond prior art
-- [ ] P5.4a PSD import fast path (`XMP + additionalInfo`)
-- [ ] P5.4b PSD arbitrary third-party import
+- [x] P5.4a PSD import fast path (`XMP + additionalInfo`) — `readDocumentXmpPacket()` recovers document id + element ids from the `broadset:` packet; hydrates `extensions.psd.roundTrip` (`b4b4dfa`)
+- [x] P5.4b PSD arbitrary third-party import — existing `importPsd` layer-walker handles third-party PSDs; deeper extraction (layer comps, adjustment layers) deferred to Spec Gaps
 - [ ] P5.5 PSD reconciliation
 - [ ] P5.6 PSD tests and UI wiring
 

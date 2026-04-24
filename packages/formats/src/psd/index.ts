@@ -1,5 +1,7 @@
 export { exportPsdBytes, exportPsdBytesAsync } from './export';
 export { importPsd } from './import';
+export { type PsdWithImageResources,readDocumentXmpPacket } from './import-xmp';
+export { dirtyElementIds, reconcilePsd } from './reconcile';
 export {
   type BroadsetXmpPacket,
   type ColorSpaceChoice,
