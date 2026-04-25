@@ -286,7 +286,10 @@ describe('PPTX importer — operator-level extraction', () => {
    * `dirty: false` so re-export emits the original blob.
    */
   it('preserves unknown OOXML presets under extensions.pptx.raw with dirty=false', () => {
-    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Star"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="2000000"/></a:xfrm><a:prstGeom prst="star5"><a:avLst/></a:prstGeom></p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    // `cloud` isn't in the OOXML_PRESET_TO_SVG_D table — falls through
+    // to the unknown-shape preservation path so we can assert the
+    // raw blob and the unsupported-shape warning.
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Cloud"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="2000000"/></a:xfrm><a:prstGeom prst="cloud"><a:avLst/></a:prstGeom></p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
     const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
     const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
     const bytes = writeOoxmlPackage(
@@ -303,7 +306,7 @@ describe('PPTX importer — operator-level extraction', () => {
     const ext = star?.extensions['pptx'] as { readonly dirty?: boolean; readonly raw?: string } | undefined;
 
     expect(ext?.dirty).toBe(false);
-    expect(ext?.raw).toContain('star5');
+    expect(ext?.raw).toContain('cloud');
     expect(report.warnings.some((w) => w.code === 'unsupported-shape')).toBe(true);
   });
 
@@ -335,6 +338,44 @@ describe('PPTX importer — operator-level extraction', () => {
    * @description vbaProject.bin is rejected at import time with a
    * structured warning per the Importer Security Contract.
    */
+  /**
+   * @description Common OOXML presets (triangle, star5, rightArrow,
+   * pentagon, hexagon) map to native Broadset `path` elements with
+   * SVG `d` strings rather than falling through to the unknown-preset
+   * preservation path. Spec acceptance: "<a:prstGeom> presets map to
+   * Broadset native kinds where possible (rect, roundRect, ellipse,
+   * triangle, star, arrow, callout, …)".
+   */
+  it('expands common OOXML presets to native Broadset path elements', () => {
+    const presets = ['triangle', 'star5', 'rightArrow', 'pentagon', 'hexagon', 'plus'];
+    const shapes = presets
+      .map(
+        (preset, idx) =>
+          `<p:sp><p:nvSpPr><p:cNvPr id="${String(idx + 2)}" name="${preset}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="2000000"/></a:xfrm><a:prstGeom prst="${preset}"><a:avLst/></a:prstGeom></p:spPr></p:sp>`,
+      )
+      .join('');
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>${shapes}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
+    const bytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')],
+      ]),
+    );
+    const imported = importPptx(bytes);
+    const paths = imported.elements.filter((el) => el.type === 'path');
+
+    expect(paths).toHaveLength(presets.length);
+
+    for (const path of paths) {
+      expect(path.content).toMatch(/^M /);
+    }
+  });
+
   /**
    * @description Placeholder inheritance cascades slide → layout →
    * master per ECMA-376. When a slide shape's placeholder idx is not
