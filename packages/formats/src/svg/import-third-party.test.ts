@@ -189,6 +189,77 @@ describe('P7.4b — CSS style block resolution', () => {
   });
 
   /**
+   * @description CSS specificity MUST match CSS 2.1 §6.4.3:
+   * `#id` > `.class` > type selector. When three rules match the
+   * same element, the id rule wins — not the last-declared rule.
+   * Regression test for the pre-css-tree hand-rolled parser that
+   * resolved in document order only.
+   */
+  it('resolves #id specificity over .class and type selectors', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <style>
+        rect { fill: #111111; }
+        .accent { fill: #222222; }
+        #winner { fill: #ff00ff; }
+      </style>
+      <rect id="winner" class="accent" width="50" height="50"/>
+    </svg>`;
+
+    const { document } = importSvgDocument(input);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+    const fill = rect?.style.fill;
+
+    if (fill?.kind === 'solid' && fill.color.kind === 'rgb') {
+      expect(fill.color.hex).toBe('#ff00ff');
+    } else {
+      throw new Error('Expected solid rgb fill');
+    }
+  });
+
+  /**
+   * @description `.class` specificity MUST beat a bare type
+   * selector even when the type rule is declared later in source
+   * order — the hand-rolled parser failed this because it matched
+   * in document order only.
+   */
+  it('resolves .class specificity over bare type selector regardless of source order', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <style>
+        .accent { fill: #00ff00; }
+        rect { fill: #ff0000; }
+      </style>
+      <rect class="accent" width="50" height="50"/>
+    </svg>`;
+
+    const { document } = importSvgDocument(input);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+    const fill = rect?.style.fill;
+
+    if (fill?.kind === 'solid' && fill.color.kind === 'rgb') {
+      expect(fill.color.hex).toBe('#00ff00');
+    }
+  });
+
+  /**
+   * @description Pseudo-class selectors (`:hover`, `:nth-child`)
+   * cannot be resolved against a static tree. The importer surfaces
+   * a warning so the user knows their stylesheet's dynamic rules
+   * were skipped. This is the documented "Spec Gap" behaviour.
+   */
+  it('warns about pseudo-class selectors it cannot resolve', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <style>
+        rect:hover { fill: #ff0000; }
+      </style>
+      <rect width="50" height="50"/>
+    </svg>`;
+
+    const { warnings } = importSvgDocument(input);
+
+    expect(warnings.some((w) => w.toLowerCase().includes('pseudo-class'))).toBe(true);
+  });
+
+  /**
    * @description A class-selector rule MUST apply to elements
    * bearing that class. Third-party SVGs from Illustrator and
    * Figma export via class-heavy CSS.

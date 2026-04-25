@@ -334,6 +334,66 @@ describe('P7.3 — Conic gradient fallback + metadata preservation', () => {
 /*  4. OKLCH / display-p3 colour preservation                         */
 /* ------------------------------------------------------------------ */
 
+describe('P7.3 / P7.6 — SvgExportOptions gate metadata + tagging emission', () => {
+  /**
+   * @description `includeMetadata: false` MUST suppress the
+   * `<metadata>` RDF packet AND the `xmlns:rdf` / `xmlns:broadset`
+   * namespace declarations on root when the caller also disables
+   * tagging. A minimal SVG output is useful for consumers that
+   * don't care about round-trip identity (pure visual distribution).
+   */
+  it('suppresses <metadata> and namespace decl when both options are off', async () => {
+    const doc = makeDocument({
+      elements: [makeElement({ id: 'no-meta', type: 'rectangle' })],
+    });
+
+    const svg = await exportSvgString(doc, { includeMetadata: false, includeElementTagging: false });
+
+    expect(svg).not.toContain('<metadata');
+    expect(svg).not.toContain('<rdf:RDF');
+    expect(svg).not.toContain('data-bs-id');
+    expect(svg).not.toContain('broadset:content-hash');
+    expect(svg).not.toContain('xmlns:broadset');
+    expect(svg).not.toContain('xmlns:rdf');
+  });
+
+  /**
+   * @description `includeElementTagging: false` with metadata on
+   * suppresses per-element `data-bs-*` + `broadset:content-hash`
+   * but keeps the `<metadata>` packet so reconciliation still
+   * has a document-level hook.
+   */
+  it('suppresses per-element tagging without dropping the <metadata> packet', async () => {
+    const doc = makeDocument({
+      elements: [makeElement({ id: 'tag-off', type: 'rectangle' })],
+    });
+
+    const svg = await exportSvgString(doc, { includeMetadata: true, includeElementTagging: false });
+
+    expect(svg).toContain('<metadata');
+    expect(svg).toContain('<rdf:RDF');
+    expect(svg).not.toContain('data-bs-id="tag-off"');
+    expect(svg).not.toContain('broadset:content-hash');
+  });
+
+  /**
+   * @description The default call (no options) MUST emit the full
+   * metadata + tagging surface — defaults are `true` for both, so
+   * every callsite gets round-trip-ready output unless it opts
+   * out explicitly.
+   */
+  it('emits metadata + tagging by default when no options are passed', async () => {
+    const doc = makeDocument({
+      elements: [makeElement({ id: 'default', type: 'rectangle' })],
+    });
+
+    const svg = await exportSvgString(doc);
+
+    expect(svg).toContain('<metadata');
+    expect(svg).toContain('data-bs-id="default"');
+  });
+});
+
 describe('P7.3 — OKLCH / display-p3 colour preservation', () => {
   /**
    * @description Non-sRGB colours from `BroadsetColor.originalColor`

@@ -10,7 +10,7 @@ import {
   createEmptyBroadsetDocument,
   rgbColor,
 } from '@broadset/model';
-import DOMPurify from 'dompurify';
+import * as CssTree from 'css-tree';
 
 import { type ParsedElementMetadata, parseMetadataPacket } from './metadata';
 import type { SvgImportOptions } from './types';
@@ -41,83 +41,97 @@ const TOOL_NAMESPACE_WARNINGS: readonly { readonly prefix: string; readonly labe
  * `on*=` event handlers are removed. `javascript:` URLs are
  * stripped by DOMPurify's built-in URL sanitizer.
  */
-const THIRD_PARTY_FORBID_TAGS: readonly string[] = ['script', 'foreignobject'];
-const THIRD_PARTY_FORBID_ATTR: readonly string[] = ['onload', 'onerror', 'onclick', 'onmouseover', 'onfocus', 'onblur'];
-
-const THIRD_PARTY_IMPORT_CONFIG = {
-  USE_PROFILES: { svg: true, svgFilters: true },
-  ADD_TAGS: [
-    'use',
-    'symbol',
-    'meshgradient',
-    'meshrow',
-    'meshpatch',
-    'meshcolor',
-    'solidcolor',
-    'hatch',
-    'hatchpath',
-  ],
-  FORBID_TAGS: [...THIRD_PARTY_FORBID_TAGS],
-  FORBID_ATTR: [...THIRD_PARTY_FORBID_ATTR],
-  ALLOW_DATA_ATTR: true,
-  KEEP_CONTENT: false,
-  WHOLE_DOCUMENT: false,
-  RETURN_DOM_FRAGMENT: false as const,
-};
+const FORBIDDEN_ELEMENT_NAMES = new Set(['script', 'foreignobject']);
+const URL_ATTRS_TO_CHECK = ['href', 'xlink:href', 'src'];
 
 /**
- * Sanitize the incoming third-party SVG string via DOMPurify (the
- * sole sanitization entry point per the cross-format decision) with
- * an import-tuned config. Structural elements `<use>` / `<symbol>`
- * and vendor-specific tags survive so the downstream
- * dereferencing / opaque-preservation passes can act on them;
- * `<script>` / `<foreignObject>` / `on*=` / `javascript:` URLs are
- * removed and surface as warnings per IO-D-18.
+ * DOM-walk sanitizer used on the parsed XML tree. Enforces the
+ * importer security contract floor — strips `<script>`,
+ * `<foreignObject>`, `on*=` event handlers, and `javascript:` URLs
+ * — while preserving structural elements that would be destroyed
+ * by DOMPurify's aggressive SVG profile: `<use>` / `<symbol>`,
+ * `<metadata>` with its `broadset:` / `rdf:` namespaced children
+ * (needed by the fast-path packet parse), and arbitrary vendor
+ * elements which become opaque `svg`-type preservations per
+ * IO-D-18.
+ *
+ * DOMPurify is still the sole *re-emission* sanitization entry
+ * point: `svg/export.ts` → `renderSvgPayload` calls
+ * `_shared/sanitize/sanitizeSvg` on opaque `svg`-type content at
+ * write-time. The DOM-walk enforcement here is narrower in scope
+ * (four attack vectors only) and purpose-built for parse-time,
+ * where full DOMPurify would clobber the round-trip metadata.
+ *
+ * Running on both the fast-path and third-party paths (post-parse,
+ * pre-extract) closes the security-audit C1 fast-path bypass.
  */
-function sanitizeInput(input: string, warnings: string[]): string {
-  // Capture callbacks so we can attribute removals to warnings.
-  const removedTags: string[] = [];
-  const removedAttrs: string[] = [];
+interface SanitizeTally {
+  readonly tags: Set<string>;
+  readonly attrs: Set<string>;
+  jsUrls: number;
+}
 
-  DOMPurify.addHook('uponSanitizeElement', (_node, data) => {
-    if (data.allowedTags[data.tagName] === false || THIRD_PARTY_FORBID_TAGS.includes(data.tagName)) {
-      removedTags.push(data.tagName);
+function stripEventHandlerAttrsFromEl(el: Element, tally: SanitizeTally): void {
+  const toRemove: string[] = [];
+
+  for (let i = 0; i < el.attributes.length; i++) {
+    const attr = el.attributes[i];
+
+    if (!attr) {
+      continue;
     }
-  });
-  DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
-    if (
-      data.attrName.startsWith('on') &&
-      /^on[a-z]+$/i.test(data.attrName) &&
-      data.forceKeepAttr !== true &&
-      data.allowedAttributes[data.attrName] !== true
-    ) {
-      removedAttrs.push(data.attrName);
+
+    const name = attr.name.toLowerCase();
+
+    if (/^on[a-z]+$/i.test(name)) {
+      toRemove.push(attr.name);
+      tally.attrs.add(name);
     }
-  });
-
-  let sanitized: string;
-
-  try {
-    sanitized = DOMPurify.sanitize(input, THIRD_PARTY_IMPORT_CONFIG);
-  } finally {
-    DOMPurify.removeAllHooks();
   }
 
-  // DOMPurify also strips `javascript:` URLs from `href` /
-  // `xlink:href`; detect the removal by comparing pre/post.
-  if (/javascript:/i.test(input) && !/javascript:/i.test(sanitized)) {
-    warnings.push('Stripped javascript: URL during sanitization (importer security contract).');
+  for (const name of toRemove) {
+    el.removeAttribute(name);
+  }
+}
+
+function stripJavascriptUrlsFromEl(el: Element, tally: SanitizeTally): void {
+  for (const urlAttr of URL_ATTRS_TO_CHECK) {
+    const val = el.getAttribute(urlAttr);
+
+    if (val !== null && /^\s*javascript:/i.test(val)) {
+      el.removeAttribute(urlAttr);
+      tally.jsUrls += 1;
+    }
+  }
+}
+
+function sanitizeDomInPlace(xmlDoc: Document, warnings: string[]): void {
+  const tally: SanitizeTally = { tags: new Set(), attrs: new Set(), jsUrls: 0 };
+
+  for (const el of Array.from(xmlDoc.getElementsByTagName('*'))) {
+    const tag = el.tagName.toLowerCase();
+
+    if (FORBIDDEN_ELEMENT_NAMES.has(tag)) {
+      el.remove();
+      tally.tags.add(tag);
+      continue;
+    }
+
+    stripEventHandlerAttrsFromEl(el, tally);
+    stripJavascriptUrlsFromEl(el, tally);
   }
 
-  for (const tag of new Set(removedTags)) {
+  for (const tag of tally.tags) {
     warnings.push(`Stripped <${tag}> during sanitization (importer security contract).`);
   }
 
-  for (const attr of new Set(removedAttrs)) {
+  for (const attr of tally.attrs) {
     warnings.push(`Stripped event-handler attribute ${attr} during sanitization (importer security contract).`);
   }
 
-  return sanitized;
+  if (tally.jsUrls > 0) {
+    warnings.push('Stripped javascript: URL during sanitization (importer security contract).');
+  }
 }
 
 /**
@@ -234,11 +248,16 @@ function dereferenceUseElements(xmlDoc: Document, warnings: string[]): void {
 interface CssRule {
   readonly selector: string;
   readonly body: string;
+  /** Specificity triple: [id-count, class/attr/pseudo-count, type-count] per CSS 2.1 §6.4.3. */
+  readonly specificity: readonly [number, number, number];
+  /** Source order within the document — ties break by order (later wins). */
+  readonly order: number;
 }
 
-function collectStylesheetRules(xmlDoc: Document): readonly CssRule[] {
+function collectStylesheetRules(xmlDoc: Document, warnings: string[]): readonly CssRule[] {
   const rules: CssRule[] = [];
   const styleEls = xmlDoc.getElementsByTagName('style');
+  let order = 0;
 
   for (let i = 0; i < styleEls.length; i++) {
     const styleEl = styleEls[i];
@@ -247,8 +266,9 @@ function collectStylesheetRules(xmlDoc: Document): readonly CssRule[] {
       continue;
     }
 
-    for (const rule of parseRules(styleEl.textContent)) {
-      rules.push(rule);
+    for (const rule of parseRulesViaCssTree(styleEl.textContent, warnings)) {
+      rules.push({ ...rule, order });
+      order += 1;
     }
   }
 
@@ -261,32 +281,43 @@ function applyRulesToElement(el: Element, rules: readonly CssRule[]): void {
   const classes = new Set(classAttr.split(/\s+/).filter((c) => c !== ''));
   const idAttr = el.getAttribute('id') ?? '';
   const inlineStyle = el.getAttribute('style') ?? '';
-  const applied: string[] = [];
+  const matching: CssRule[] = [];
 
   for (const rule of rules) {
-    if (ruleMatchesElement(rule.selector, tagName, classes, idAttr)) {
-      applied.push(rule.body);
+    if (ruleMatchesElement(rule, tagName, classes, idAttr)) {
+      matching.push(rule);
     }
   }
 
-  if (applied.length === 0) {
+  if (matching.length === 0) {
     return;
   }
 
-  // Combine in CSS precedence order: stylesheet rules first,
-  // inline `style=""` last (inline wins per CSS 2.1).
+  // Sort by specificity ascending, then by source order ascending.
+  // Combined string concatenation puts higher-specificity rules
+  // LATER so their declarations win in `applyStylePresentation`'s
+  // last-wins resolver.
+  matching.sort((a, b) => compareSpecificity(a.specificity, b.specificity) || a.order - b.order);
+
+  const applied = matching.map((r) => r.body);
+  // Combine in CSS precedence order: stylesheet rules first (by
+  // ascending specificity + source order), inline `style=""` last
+  // (inline wins per CSS 2.1).
   const combined = [...applied, inlineStyle].filter((s) => s.trim() !== '').join(';');
 
   el.setAttribute('style', combined);
   applyStylePresentation(el, combined);
 }
 
-function applyStyleBlocks(xmlDoc: Document, _warnings: string[]): void {
-  // `_warnings` is intentionally unused in the happy path. Future
-  // unresolved-selector warnings (pseudo-classes, attribute
-  // selectors) will push here without changing the public
-  // signature.
-  const rules = collectStylesheetRules(xmlDoc);
+function compareSpecificity(a: readonly [number, number, number], b: readonly [number, number, number]): number {
+  if (a[0] !== b[0]) return a[0] - b[0];
+  if (a[1] !== b[1]) return a[1] - b[1];
+
+  return a[2] - b[2];
+}
+
+function applyStyleBlocks(xmlDoc: Document, warnings: string[]): void {
+  const rules = collectStylesheetRules(xmlDoc, warnings);
 
   if (rules.length === 0) {
     return;
@@ -303,51 +334,241 @@ function applyStyleBlocks(xmlDoc: Document, _warnings: string[]): void {
   }
 }
 
-function parseRules(css: string | null): readonly CssRule[] {
-  const rules: CssRule[] = [];
-
-  if (css === null || css === '') {
-    return rules;
-  }
-
-  // Match `<selector> { <body> }` blocks. Greedy body is bounded by
-  // a terminating `}` so it is linear-time per IO-D's regex safety
-  // rule.
-  const blockRegex = /([^{}]+)\{([^{}]*)\}/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = blockRegex.exec(css)) !== null) {
-    const selector = match[1]?.trim() ?? '';
-    const body = match[2]?.trim() ?? '';
-
-    if (selector !== '' && body !== '') {
-      rules.push({ selector, body });
-    }
-  }
-
-  return rules;
+interface ParsedRuleWithoutOrder {
+  readonly selector: string;
+  readonly body: string;
+  readonly specificity: readonly [number, number, number];
 }
 
-function ruleMatchesElement(selector: string, tagName: string, classes: ReadonlySet<string>, id: string): boolean {
-  for (const part of selector.split(',').map((s) => s.trim())) {
-    if (part === '') {
-      continue;
-    }
+interface SelectorAnalysis {
+  readonly ids: readonly string[];
+  readonly classes: readonly string[];
+  readonly types: readonly string[];
+  readonly pseudoClasses: readonly string[];
+  readonly attributes: readonly string[];
+  readonly hasCombinator: boolean;
+  readonly specificity: readonly [number, number, number];
+}
 
-    if (part.startsWith('#') && part.slice(1) === id) {
-      return true;
-    }
-
-    if (part.startsWith('.') && classes.has(part.slice(1))) {
-      return true;
-    }
-
-    if (/^[a-zA-Z][a-zA-Z0-9-]*$/.test(part) && part.toLowerCase() === tagName) {
-      return true;
-    }
+/**
+ * Parse a `<style>` block with `css-tree` and return one
+ * `ParsedRuleWithoutOrder` per `selector { body }` pair. Selector
+ * lists (`a, b`) split into separate rules so each carries its own
+ * specificity. Unsupported selectors (pseudo-classes other than
+ * a narrow allow-list, combinators) surface as warnings and the
+ * caller falls back to matching on the base id/class/type triple;
+ * this is the "best-effort" posture svg.md § Pseudo-class and
+ * attribute-selector resolution documents.
+ */
+function parseRulesViaCssTree(css: string | null, warnings: string[]): readonly ParsedRuleWithoutOrder[] {
+  if (css === null || css === '') {
+    return [];
   }
 
-  return false;
+  const out: ParsedRuleWithoutOrder[] = [];
+  let ast: CssTree.CssNode;
+
+  try {
+    ast = CssTree.parse(css, { positions: false, onParseError: () => undefined });
+  } catch {
+    warnings.push('CSS <style> block could not be parsed; rules were skipped.');
+
+    return out;
+  }
+
+  CssTree.walk(ast, {
+    visit: 'Rule',
+    enter(node: CssTree.CssNode) {
+      processRuleNode(node as CssTree.Rule, out, warnings);
+    },
+  });
+
+  return out;
+}
+
+function processRuleNode(
+  rule: CssTree.Rule,
+  out: ParsedRuleWithoutOrder[],
+  warnings: string[],
+): void {
+  const body = CssTree.generate(rule.block).replace(/^\{|\}$/g, '').trim();
+
+  if (body === '') {
+    return;
+  }
+
+  // Selector lists: emit one rule per comma-separated selector.
+  CssTree.walk(rule.prelude, {
+    visit: 'Selector',
+    enter(selectorNode: CssTree.CssNode) {
+      pushSelectorRule(selectorNode as CssTree.Selector, body, out, warnings);
+    },
+  });
+}
+
+function pushSelectorRule(
+  selectorNode: CssTree.Selector,
+  body: string,
+  out: ParsedRuleWithoutOrder[],
+  warnings: string[],
+): void {
+  const selector = CssTree.generate(selectorNode).trim();
+  const analysis = analyseSelector(selectorNode);
+
+  if (analysis.hasCombinator) {
+    warnings.push(
+      `CSS combinator selector "${selector}" is not resolved; falling back to base matching (see svg.md Spec Gaps).`,
+    );
+  }
+
+  if (analysis.pseudoClasses.length > 0) {
+    warnings.push(
+      `CSS pseudo-class selector "${selector}" is not resolved; falling back to base matching (see svg.md Spec Gaps).`,
+    );
+  }
+
+  out.push({ selector, body, specificity: analysis.specificity });
+}
+
+function analyseSelector(selector: CssTree.Selector): SelectorAnalysis {
+  const ids: string[] = [];
+  const classes: string[] = [];
+  const types: string[] = [];
+  const pseudoClasses: string[] = [];
+  const attributes: string[] = [];
+  let hasCombinator = false;
+
+  CssTree.walk(selector, {
+    enter(node: CssTree.CssNode) {
+      if (node.type === 'IdSelector') {
+        ids.push(node.name);
+      } else if (node.type === 'ClassSelector') {
+        classes.push(node.name);
+      } else if (node.type === 'TypeSelector') {
+        types.push(node.name.toLowerCase());
+      } else if (node.type === 'AttributeSelector') {
+        attributes.push(node.name.name);
+      } else if (node.type === 'PseudoClassSelector' || node.type === 'PseudoElementSelector') {
+        pseudoClasses.push(node.name);
+      } else if (node.type === 'Combinator') {
+        hasCombinator = true;
+      }
+    },
+  });
+
+  // CSS 2.1 specificity: (a, b, c)
+  //   a = count of ID selectors
+  //   b = count of class / attribute / pseudo-class selectors
+  //   c = count of element / pseudo-element selectors
+  const specificity: [number, number, number] = [
+    ids.length,
+    classes.length + attributes.length + pseudoClasses.length,
+    types.length,
+  ];
+
+  return { ids, classes, types, pseudoClasses, attributes, hasCombinator, specificity };
+}
+
+function ruleMatchesElement(
+  rule: CssRule,
+  tagName: string,
+  classes: ReadonlySet<string>,
+  id: string,
+): boolean {
+  const selector = rule.selector;
+
+  // The parsed rule was split per selector list, so this string is
+  // a single selector like `rect`, `.foo`, `#bar`, or combinations
+  // like `#bar.foo`. Match by walking the atoms inline.
+  return matchSingleSelector(selector, tagName, classes, id);
+}
+
+interface AtomStep {
+  readonly matched: boolean;
+  readonly remainder: string;
+}
+
+function consumeClassAtom(remainder: string, classes: ReadonlySet<string>): AtomStep {
+  const nameMatch = /^\.([a-zA-Z_][a-zA-Z0-9_-]*)/.exec(remainder);
+
+  if (nameMatch === null) {
+    return { matched: false, remainder };
+  }
+
+  const name = nameMatch[1] ?? '';
+
+  return { matched: classes.has(name), remainder: remainder.slice(nameMatch[0].length) };
+}
+
+function consumeNextAtom(remainder: string, classes: ReadonlySet<string>, id: string): AtomStep {
+  if (remainder.startsWith('.')) {
+    return consumeClassAtom(remainder, classes);
+  }
+
+  if (remainder.startsWith('#')) {
+    return consumeIdAtom(remainder, id);
+  }
+
+  return { matched: false, remainder };
+}
+
+function consumeIdAtom(remainder: string, id: string): AtomStep {
+  const nameMatch = /^#([a-zA-Z_][a-zA-Z0-9_-]*)/.exec(remainder);
+
+  if (nameMatch === null) {
+    return { matched: false, remainder };
+  }
+
+  const name = nameMatch[1] ?? '';
+
+  return { matched: name === id, remainder: remainder.slice(nameMatch[0].length) };
+}
+
+function matchSingleSelector(
+  selector: string,
+  tagName: string,
+  classes: ReadonlySet<string>,
+  id: string,
+): boolean {
+  // Strip pseudo-classes / pseudo-elements — we can't resolve them
+  // against a static tree; base matching falls through with a
+  // warning emitted at parse time.
+  const base = selector.replace(/::?[a-zA-Z][a-zA-Z0-9-]*(\([^)]*\))?/g, '');
+
+  // Combinators bail out — the parser already emitted a warning.
+  if (/[>+~]/.test(base) || /\s/.test(base.trim())) {
+    return false;
+  }
+
+  let remainder = base.trim();
+
+  if (remainder === '' || remainder === '*') {
+    return true;
+  }
+
+  // Extract a leading type selector (if any) — must match tag.
+  const typeMatch = /^[a-zA-Z][a-zA-Z0-9-]*/.exec(remainder);
+
+  if (typeMatch !== null) {
+    if (typeMatch[0].toLowerCase() !== tagName) {
+      return false;
+    }
+
+    remainder = remainder.slice(typeMatch[0].length);
+  }
+
+  // Iterate remaining .class / #id atoms.
+  while (remainder !== '') {
+    const step = consumeNextAtom(remainder, classes, id);
+
+    if (!step.matched || step.remainder === remainder) {
+      return false;
+    }
+
+    remainder = step.remainder;
+  }
+
+  return true;
 }
 
 function applyStylePresentation(el: Element, body: string): void {
@@ -475,6 +696,12 @@ interface ImportedElement {
   readonly dataBsKind?: string | undefined;
   /** `data-bs-id` of the nearest ancestor element, or `null` at root. */
   readonly parentDataBsId?: string | null | undefined;
+  /**
+   * For text elements wrapping a `<textPath href="#id">`, carries
+   * the referenced path element id so the Broadset model's
+   * `textPathElementId` field round-trips through SVG (P7.6 gap fix).
+   */
+  readonly textPathElementId?: string | undefined;
 }
 
 interface TransformState {
@@ -904,19 +1131,27 @@ function importElement(
       ];
     }
 
-    case 'text':
+    case 'text': {
+      const textPathEl = el.getElementsByTagName('textPath')[0];
+      const hrefRaw = textPathEl?.getAttribute('href') ?? textPathEl?.getAttribute('xlink:href') ?? '';
+      const textPathElementId =
+        typeof hrefRaw === 'string' && hrefRaw.startsWith('#') && hrefRaw.length > 1 ? hrefRaw.slice(1) : undefined;
+      const content = textPathEl !== undefined ? textPathEl.textContent : el.textContent;
+
       return [
         {
           type: 'text',
-          content: el.textContent,
+          content,
           position: { x: transform.x, y: transform.y },
           width: 0,
           height: 0,
           rotation: transform.rotation,
           style: baseStyle,
           ...tagMeta,
+          ...(textPathElementId !== undefined ? { textPathElementId } : {}),
         },
       ];
+    }
 
     case 'image':
       return [
@@ -946,19 +1181,13 @@ function importElement(
         warnings,
       });
 
-    case 'foreignobject':
-      return [
-        {
-          type: 'svg',
-          content: el.outerHTML,
-          position: { x: transform.x, y: transform.y },
-          width: getNumAttr(el, 'width', 0),
-          height: getNumAttr(el, 'height', 0),
-          rotation: transform.rotation,
-          style: {},
-          ...tagMeta,
-        },
-      ];
+    // `<foreignObject>` is always stripped by `sanitizeDomInPlace`
+    // before `importElement` runs. The branch that previously
+    // preserved `el.outerHTML` as an opaque `svg`-type payload is
+    // removed; if a future regression lets `<foreignObject>` reach
+    // this switch, the `default` branch emits a safer
+    // `importUnsupportedElement` fallback that does not carry the
+    // unsanitized outerHTML into the Broadset document.
 
     default:
       return [{ ...importUnsupportedElement(el, transform, warnings), ...tagMeta }];
@@ -1022,33 +1251,6 @@ function walkSvgDocument(xmlDoc: Document): SvgImportResult {
 }
 
 /**
- * Third-party import pipeline. Runs the arbitrary-source passes on
- * top of the primitive extractor: CSS `<style>` block resolution,
- * `<use>` / `<symbol>` dereferencing, tool-specific namespace
- * warnings. Invoked by `hydrateThirdPartyFallback` per the Phase
- * 7.4b plan.
- */
-function importSvgWithThirdPartyPipeline(input: string, sharedWarnings: string[]): SvgImportResult {
-  const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(input, 'image/svg+xml');
-  const parseError = xmlDoc.querySelector('parsererror');
-
-  if (parseError) {
-    throw new Error(`SVG import failed: invalid XML — ${parseError.textContent}`);
-  }
-
-  // Order matters: `hydrateThirdPartyFallback` already ran
-  // DOMPurify on the markup, so the input is pre-sanitized. Styles
-  // resolve first so <use> dereferencing inherits already-applied
-  // presentation attrs. Namespace warnings run last.
-  applyStyleBlocks(xmlDoc, sharedWarnings);
-  dereferenceUseElements(xmlDoc, sharedWarnings);
-  warnToolNamespaces(xmlDoc, sharedWarnings);
-
-  return walkSvgDocument(xmlDoc);
-}
-
-/**
  * High-level SVG import entry point. Wraps the primitive element
  * extractor `importSvg` and produces a full `BroadsetDocument` plus a
  * warnings list that the demo surfaces through
@@ -1062,6 +1264,14 @@ export function importSvgDocument(
   fileName = 'Imported SVG',
   _options?: SvgImportOptions,
 ): SvgDocumentImportResult {
+  const warnings: string[] = [];
+
+  // Detect tool-specific namespaces on the raw input before the
+  // in-place sanitiser rewrites the DOM (namespace declarations on
+  // the root element are preserved by the sanitiser, but a pre-parse
+  // regex scan is more robust across DOMParser quirks).
+  warnRawToolNamespaces(input, warnings);
+
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(input, 'image/svg+xml');
   const parseError = xmlDoc.querySelector('parsererror');
@@ -1070,14 +1280,23 @@ export function importSvgDocument(
     throw new Error(`SVG import failed: invalid XML — ${parseError.textContent}`);
   }
 
+  // Security-contract sanitisation runs on EVERY path — fast-path
+  // and third-party fallback both consume the sanitised DOM.
+  // Closes the fast-path bypass (security audit C1) where a
+  // malicious SVG could declare the Broadset XMP namespace to route
+  // hostile `<script>` / `on*=` / `javascript:` / `<foreignObject>`
+  // content unsanitised. The walk preserves `<metadata>` /
+  // `broadset:` / `rdf:` children so the round-trip packet parser
+  // still sees the Broadset packet on the fast path.
+  sanitizeDomInPlace(xmlDoc, warnings);
+
   const metadata = parseMetadataPacket(xmlDoc);
-  const warnings: string[] = [];
 
   if (metadata !== null) {
     return hydrateFastPath(xmlDoc, metadata, fileName, warnings);
   }
 
-  return hydrateThirdPartyFallback(input, fileName, warnings);
+  return hydrateThirdPartyFallbackFromDoc(xmlDoc, fileName, warnings);
 }
 
 /**
@@ -1125,6 +1344,7 @@ function hydrateFastPath(
           content: visualEl.content,
           style,
           ...parentField,
+          ...(visualEl.textPathElementId !== undefined ? { textPathElementId: visualEl.textPathElementId } : {}),
           extensions: { svg: { dirty: false } },
         }),
       );
@@ -1140,6 +1360,7 @@ function hydrateFastPath(
           content: visualEl.content,
           style: visualEl.style,
           ...parentField,
+          ...(visualEl.textPathElementId !== undefined ? { textPathElementId: visualEl.textPathElementId } : {}),
           extensions: { svg: { dirty: false } },
         }),
       );
@@ -1170,23 +1391,21 @@ function hydrateFastPath(
   return { document, warnings };
 }
 
-function hydrateThirdPartyFallback(
-  input: string,
+/**
+ * Third-party fallback path. Caller has already sanitized the input
+ * and parsed it via DOMParser — we run CSS-style + `<use>` deref +
+ * namespace warnings on the sanitized DOM and walk elements.
+ */
+function hydrateThirdPartyFallbackFromDoc(
+  xmlDoc: Document,
   fileName: string,
   warnings: string[],
 ): SvgDocumentImportResult {
-  // Detect tool-specific namespaces on the RAW input before
-  // sanitization — DOMPurify's SVG profile drops namespaced
-  // attributes whose namespace isn't declared on an allowed list,
-  // so we warn first and proceed with the cleaner sanitized markup.
-  warnRawToolNamespaces(input, warnings);
+  applyStyleBlocks(xmlDoc, warnings);
+  dereferenceUseElements(xmlDoc, warnings);
+  warnToolNamespaces(xmlDoc, warnings);
 
-  // Security-contract sanitisation via DOMPurify — strips
-  // `<script>`, `<foreignObject>`, `on*=`, `javascript:` URLs.
-  // Import-tuned config preserves `<use>` / `<symbol>` / vendor
-  // elements so downstream passes can process them.
-  const sanitized = sanitizeInput(input, warnings);
-  const result = importSvgWithThirdPartyPipeline(sanitized, warnings);
+  const result = walkSvgDocument(xmlDoc);
   const emptyDoc = createEmptyBroadsetDocument();
 
   warnings.push(...result.warnings);
@@ -1205,6 +1424,7 @@ function hydrateThirdPartyFallback(
         rotation: element.rotation,
         content: element.content,
         style: element.style,
+        ...(element.textPathElementId !== undefined ? { textPathElementId: element.textPathElementId } : {}),
         extensions: { svg: { dirty: false } },
       }),
     ),

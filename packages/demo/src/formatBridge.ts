@@ -22,6 +22,13 @@ export type ExportFormat =
   | 'svg-embedded'
   | 'webm';
 
+export interface SvgExportOptionsInput {
+  readonly fontEmbedding?: 'embed' | 'reference' | 'flatten';
+  readonly includeMetadata?: boolean;
+  readonly includeElementTagging?: boolean;
+  readonly flattenGroups?: boolean;
+}
+
 export interface ExportContext {
   readonly document: BroadsetDocument;
   readonly snapshotCanvas?: HTMLCanvasElement;
@@ -32,6 +39,8 @@ export interface ExportContext {
   readonly videoFrameRate?: number;
   readonly videoQuality?: number;
   readonly onProgress?: (progress: number, stage?: string) => void;
+  /** SVG-specific options from the `FormatExportOptionsModal`. */
+  readonly svgOptions?: SvgExportOptionsInput;
 }
 
 export interface ImportDocumentResult {
@@ -81,7 +90,7 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
     }
 
     case 'svg': {
-      const svgStr = await formats.exportSvgString(doc);
+      const svgStr = await formats.exportSvgString(doc, context.svgOptions);
       const blob = new Blob([svgStr], { type: 'image/svg+xml' });
 
       formats.triggerDownload(blob, `${name}.svg`);

@@ -388,11 +388,16 @@ function collectArrowMarkerAttrs(el: BroadsetElement, defs: string[]): string {
   return parts.join('');
 }
 
+interface RenderElementOptions {
+  readonly includeElementTagging: boolean;
+}
+
 function renderElement(
   el: BroadsetElement,
   defs: string[],
   childrenByParent: ReadonlyMap<string, readonly BroadsetElement[]>,
   fingerprints: ReadonlyMap<string, string>,
+  options: RenderElementOptions,
 ): string {
   const transform = buildTransform(el);
   const styleAttrs = buildStyleAttrs(el.style);
@@ -400,7 +405,9 @@ function renderElement(
   const fillOverride = collectGradientFillOverride(el, defs);
   const filterAttr = collectShadowFilterAttr(el, defs);
   const markerAttrs = collectArrowMarkerAttrs(el, defs);
-  const tagAttrs = buildElementTagAttrs(el, resolveFingerprint(fingerprints, el.id));
+  const tagAttrs = options.includeElementTagging
+    ? buildElementTagAttrs(el, resolveFingerprint(fingerprints, el.id))
+    : '';
   // `extras` excludes `tagAttrs` so callers below append it exactly
   // once on the element's opening tag. Mixing it in here would
   // duplicate the attributes on elements whose open tag already
@@ -417,8 +424,16 @@ function renderElement(
     case 'ellipse':
       return `<ellipse id="${escapeXml(el.id)}" cx="${String(el.width / 2)}" cy="${String(el.height / 2)}" rx="${String(el.width / 2)}" ry="${String(el.height / 2)}"${styleAttrs}${fillOverride}${transform}${extras}${tagAttrs}/>`;
 
-    case 'text':
-      return `<text id="${escapeXml(el.id)}"${buildTextAttrs(el.style)}${transform}${extras}${tagAttrs}>${escapeXml(resolveContentAsPlainString(el.content))}</text>`;
+    case 'text': {
+      const textPathRef = el.textPathElementId;
+      const plainText = escapeXml(resolveContentAsPlainString(el.content));
+      const inner =
+        typeof textPathRef === 'string' && textPathRef !== ''
+          ? `<textPath href="#${escapeXml(textPathRef)}" xlink:href="#${escapeXml(textPathRef)}">${plainText}</textPath>`
+          : plainText;
+
+      return `<text id="${escapeXml(el.id)}"${buildTextAttrs(el.style)}${transform}${extras}${tagAttrs}>${inner}</text>`;
+    }
 
     case 'image': {
       const par = objectFitToPreserveAspectRatio(el.style.objectFit);
@@ -446,7 +461,7 @@ function renderElement(
     case 'group': {
       const children = childrenByParent.get(el.id) ?? [];
       const childMarkup = children
-        .map((child) => renderElement(child, defs, childrenByParent, fingerprints))
+        .map((child) => renderElement(child, defs, childrenByParent, fingerprints, options))
         .join('');
 
       return `<g id="${escapeXml(el.id)}"${transform}${extras}${tagAttrs}>${childMarkup}</g>`;
@@ -617,6 +632,18 @@ function buildMetadataPacket(doc: BroadsetDocument, fingerprints: ReadonlyMap<st
   ].join('');
 }
 
+function buildRootNamespaceDeclarations(opts: { includeMetadata: boolean; includeElementTagging: boolean }): string {
+  if (opts.includeMetadata) {
+    return ` xmlns:broadset="${SVG_BROADSET_NAMESPACE}" xmlns:rdf="${RDF_XMLNS}"`;
+  }
+
+  if (opts.includeElementTagging) {
+    return ` xmlns:broadset="${SVG_BROADSET_NAMESPACE}"`;
+  }
+
+  return '';
+}
+
 async function computeFingerprints(elements: readonly BroadsetElement[]): Promise<ReadonlyMap<string, string>> {
   const map = new Map<string, string>();
 
@@ -654,15 +681,20 @@ function resolveFingerprint(fingerprints: ReadonlyMap<string, string>, elementId
  * metadata preservation, and `BroadsetColor.originalColor`
  * preservation for non-sRGB fills.
  */
-export async function exportSvgString(doc: BroadsetDocument, _options?: SvgExportOptions): Promise<string> {
+export async function exportSvgString(doc: BroadsetDocument, options?: SvgExportOptions): Promise<string> {
+  const includeMetadata = options?.includeMetadata ?? true;
+  const includeElementTagging = options?.includeElementTagging ?? true;
   const defs: string[] = [];
   const fingerprints = await computeFingerprints(doc.elements);
   const childrenByParent = buildChildrenByParent(doc.elements);
   const rootElements = doc.elements.filter((el) => !hasNonEmptyParentId(el));
-  const elementNodes = rootElements.map((el) => renderElement(el, defs, childrenByParent, fingerprints));
+  const elementNodes = rootElements.map((el) =>
+    renderElement(el, defs, childrenByParent, fingerprints, { includeElementTagging }),
+  );
   const defsBlock = defs.length > 0 ? `<defs>${defs.join('')}</defs>` : '';
-  const metadataBlock = buildMetadataPacket(doc, fingerprints);
-  const rootOpen = `<svg xmlns="${SVG_XMLNS}" xmlns:xlink="${XLINK_XMLNS}" xmlns:broadset="${SVG_BROADSET_NAMESPACE}" xmlns:rdf="${RDF_XMLNS}" width="${String(doc.canvas.width)}" height="${String(doc.canvas.height)}" viewBox="0 0 ${String(doc.canvas.width)} ${String(doc.canvas.height)}">`;
+  const metadataBlock = includeMetadata ? buildMetadataPacket(doc, fingerprints) : '';
+  const nsDeclarations = buildRootNamespaceDeclarations({ includeMetadata, includeElementTagging });
+  const rootOpen = `<svg xmlns="${SVG_XMLNS}" xmlns:xlink="${XLINK_XMLNS}"${nsDeclarations} width="${String(doc.canvas.width)}" height="${String(doc.canvas.height)}" viewBox="0 0 ${String(doc.canvas.width)} ${String(doc.canvas.height)}">`;
 
   return [rootOpen, metadataBlock, defsBlock, ...elementNodes, '</svg>'].join('\n');
 }

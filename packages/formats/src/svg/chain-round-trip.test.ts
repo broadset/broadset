@@ -141,6 +141,48 @@ describe('P7.6 — Chain round-trip (source → export → import → reconcile)
 });
 
 /* ------------------------------------------------------------------ */
+/*  1b. text-on-path round-trip                                       */
+/* ------------------------------------------------------------------ */
+
+describe('P7.6 — Text-on-path round-trip', () => {
+  /**
+   * @description A text element referencing a path via
+   * `textPathElementId` MUST emit `<textPath href="#…">` on export
+   * and re-hydrate `textPathElementId` on import. Spec feature
+   * matrix marks this as "native" round-trip; regression test
+   * covers both directions.
+   */
+  it('round-trips text elements via <textPath href="#id">', async () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          id: 'guide-path',
+          type: 'path',
+          content: 'M10,50 Q100,0 190,50',
+        }),
+        makeElement({
+          id: 'on-path',
+          type: 'text',
+          content: 'Curved',
+          textPathElementId: 'guide-path',
+        }),
+      ],
+    });
+
+    const svg = await exportSvgString(doc);
+
+    expect(svg).toContain('<textPath');
+    expect(svg).toContain('href="#guide-path"');
+
+    const { document: imported } = importSvgDocument(svg);
+    const text = imported.elements.find((el) => el.id === 'on-path');
+
+    expect(text?.textPathElementId).toBe('guide-path');
+    expect(text?.content).toBe('Curved');
+  });
+});
+
+/* ------------------------------------------------------------------ */
 /*  2. assertReImportableBy — DOMParser validates the output          */
 /* ------------------------------------------------------------------ */
 
@@ -321,6 +363,61 @@ describe('P7.6 — Hostile-SVG security suite', () => {
 
     expect(Date.now() - start).toBeLessThan(1000);
     expect(warnings.some((w) => w.toLowerCase().includes('use') || w.toLowerCase().includes('cycle'))).toBe(true);
+  });
+
+  /**
+   * @description Regression for the fast-path sanitization bypass
+   * (security audit C1). A malicious SVG can declare the shared
+   * Broadset XMP namespace + a plausible `<metadata>` packet to
+   * route through `hydrateFastPath` — prior to the fix the fast
+   * path never called DOMPurify, letting `<script>` / `<foreignObject>`
+   * reach the importer unsanitised. Post-fix both paths sanitise
+   * BEFORE `parseMetadataPacket` runs.
+   */
+  it('sanitises hostile content even when the broadset namespace is declared', () => {
+    const hostile = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:broadset="https://broadset.io/ns/xmp/1.0/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" width="100" height="100">
+      <metadata>
+        <rdf:RDF>
+          <rdf:Description rdf:about="">
+            <broadset:documentId>spoof-doc</broadset:documentId>
+          </rdf:Description>
+        </rdf:RDF>
+      </metadata>
+      <script>alert('xss')</script>
+      <rect width="10" height="10" onclick="alert(1)"/>
+    </svg>`;
+    const { document, warnings } = importSvgDocument(hostile);
+    const serialised = JSON.stringify(document.elements);
+
+    expect(serialised).not.toContain('alert(');
+    expect(serialised).not.toContain('<script');
+    expect(serialised).not.toContain('onclick');
+    expect(warnings.some((w) => w.toLowerCase().includes('script'))).toBe(true);
+  });
+
+  /**
+   * @description Deeply-nested `<g>` recursion MUST not stack-
+   * overflow the importer. A thousand nested groups import in
+   * bounded time; even if the current implementation doesn't cap
+   * group depth explicitly, this smoke test catches a future
+   * regression that swaps the recursive walker for an unbounded
+   * one.
+   */
+  it('bounds deeply nested <g> recursion without crashing', () => {
+    const depth = 1000;
+    const opens = '<g>'.repeat(depth);
+    const closes = '</g>'.repeat(depth);
+    const hostile = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">${opens}<rect width="5" height="5"/>${closes}</svg>`;
+    const start = Date.now();
+
+    try {
+      importSvgDocument(hostile);
+    } catch {
+      // Recursion-depth-bail is acceptable; the importer must NOT
+      // hang or crash the process.
+    }
+
+    expect(Date.now() - start).toBeLessThan(2000);
   });
 
   /**
