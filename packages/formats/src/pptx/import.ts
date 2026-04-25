@@ -311,8 +311,9 @@ function decodeXmlEntities(value: string): string {
 }
 
 /**
- * Aggregate placeholder maps from every layout. If two layouts define
- * the same placeholder index, the first one wins.
+ * Aggregate placeholder maps cascading slide → layout → master per
+ * the ECMA-376 inheritance chain. Layouts populate first; the master
+ * fills in any idx the layout didn't define.
  */
 function aggregateLayoutPlaceholders(
   pkg: OoxmlPackage,
@@ -330,7 +331,30 @@ function aggregateLayoutPlaceholders(
     }
   }
 
+  // Master cascade: any idx not seen on the layouts inherits from the
+  // master placeholder definitions.
+  for (const masterPath of findMasterPaths(pkg)) {
+    const xml = readTextPart(pkg, masterPath);
+    const placeholders = parseLayoutPlaceholders(xml, theme);
+
+    for (const [idx, placeholder] of placeholders) {
+      if (!aggregated.has(idx)) aggregated.set(idx, placeholder);
+    }
+  }
+
   return aggregated;
+}
+
+function findMasterPaths(pkg: OoxmlPackage): readonly string[] {
+  const result: string[] = [];
+
+  for (const [path] of pkg) {
+    if (path.startsWith('ppt/slideMasters/') && path.endsWith('.xml') && !path.includes('/_rels/')) {
+      result.push(path);
+    }
+  }
+
+  return result;
 }
 
 function collectSlideMedia(

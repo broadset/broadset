@@ -1,5 +1,6 @@
 import type { BroadsetDocument, BroadsetElement, Page } from '@broadset/model';
 
+import { writeBroadsetXmp } from '../../_shared';
 import { ContentTypesBuilder } from '../ooxml/content-types';
 import { OOXML_CONTENT_TYPES, OOXML_REL_TYPES } from '../ooxml/namespaces';
 import { buildRelationshipsXml, RelationshipAllocator } from '../ooxml/relationships';
@@ -100,29 +101,27 @@ export async function buildPptxPackage(
   contentTypes.addOverride('/ppt/theme/theme1.xml', OOXML_CONTENT_TYPES.theme);
 
   // Custom XML parts (fast-path round-trip).
-  if (includeMetadata) {
-    parts.set(BROADSET_CUSTOM_XML_PROJECT, encodeText(buildProjectCustomXml(document)));
-    contentTypes.addOverride(`/${BROADSET_CUSTOM_XML_PROJECT}`, OOXML_CONTENT_TYPES.customXml);
-    presRels.add(OOXML_REL_TYPES.customXml, `../${BROADSET_CUSTOM_XML_PROJECT}`);
-
-    if (includeLedger) {
-      const ledger = await buildLedger({
-        documentId: document.id,
-        version: '1.0.0',
-        exportedAt: new Date(options.exportedAt ?? 0).toISOString(),
-        elements: document.elements,
-      });
-
-      parts.set(BROADSET_CUSTOM_XML_INTEROP, encodeText(buildLedgerXml(ledger)));
-      contentTypes.addOverride(`/${BROADSET_CUSTOM_XML_INTEROP}`, OOXML_CONTENT_TYPES.customXml);
-      presRels.add(OOXML_REL_TYPES.customXml, `../${BROADSET_CUSTOM_XML_INTEROP}`);
-    }
-  }
+  const ledgerFingerprints = await attachAsyncMetadata({
+    parts,
+    contentTypes,
+    presRels,
+    document,
+    options,
+    includeMetadata,
+    includeLedger,
+  });
 
   // Presentation-level parts.
   parts.set('ppt/presentation.xml', encodeText(buildPresentationXml(document, pages.length)));
   parts.set('ppt/_rels/presentation.xml.rels', encodeText(buildRelationshipsXml(presRels.entries())));
   contentTypes.addOverride('/ppt/presentation.xml', OOXML_CONTENT_TYPES.presentation);
+
+  // docProps/custom.xml carries the broadset: XMP packet (cross-format
+  // metadata requirement, IO-D-08). Async path populates per-element
+  // fingerprints from the ledger; sync path leaves them empty.
+  if (includeMetadata) {
+    attachXmpPacket({ parts, contentTypes, document, exportedAt: options.exportedAt, fingerprints: ledgerFingerprints });
+  }
 
   // Root rels + content types.
   const rootRels = new RelationshipAllocator();
@@ -206,6 +205,7 @@ export function buildPptxPackageSync(document: BroadsetDocument, options: PptxEx
     parts.set(BROADSET_CUSTOM_XML_PROJECT, encodeText(buildProjectCustomXml(document)));
     contentTypes.addOverride(`/${BROADSET_CUSTOM_XML_PROJECT}`, OOXML_CONTENT_TYPES.customXml);
     presRels.add(OOXML_REL_TYPES.customXml, `../${BROADSET_CUSTOM_XML_PROJECT}`);
+    attachXmpPacket({ parts, contentTypes, document, exportedAt: options.exportedAt, fingerprints: null });
   }
 
   parts.set('ppt/presentation.xml', encodeText(buildPresentationXml(document, pages.length)));
@@ -229,6 +229,89 @@ function extensionOf(path: string): string {
 
 function createFallbackPage(): Page {
   return { id: 'page-1', name: 'Page 1', elements: [], locale: null, extensions: {} };
+}
+
+/**
+ * Attach the project + ledger custom-XML parts (async path because
+ * the ledger requires xxhash-wasm). Returns the per-element
+ * fingerprint map so the XMP packet can include them.
+ */
+async function attachAsyncMetadata(args: {
+  readonly parts: Map<string, Uint8Array>;
+  readonly contentTypes: ContentTypesBuilder;
+  readonly presRels: RelationshipAllocator;
+  readonly document: BroadsetDocument;
+  readonly options: PptxExportOptions;
+  readonly includeMetadata: boolean;
+  readonly includeLedger: boolean;
+}): Promise<ReadonlyMap<string, string> | null> {
+  const { parts, contentTypes, presRels, document, options, includeMetadata, includeLedger } = args;
+
+  if (!includeMetadata) return null;
+
+  parts.set(BROADSET_CUSTOM_XML_PROJECT, encodeText(buildProjectCustomXml(document)));
+  contentTypes.addOverride(`/${BROADSET_CUSTOM_XML_PROJECT}`, OOXML_CONTENT_TYPES.customXml);
+  presRels.add(OOXML_REL_TYPES.customXml, `../${BROADSET_CUSTOM_XML_PROJECT}`);
+
+  if (!includeLedger) return null;
+
+  const ledger = await buildLedger({
+    documentId: document.id,
+    version: '1.0.0',
+    exportedAt: new Date(options.exportedAt ?? 0).toISOString(),
+    elements: document.elements,
+  });
+
+  parts.set(BROADSET_CUSTOM_XML_INTEROP, encodeText(buildLedgerXml(ledger)));
+  contentTypes.addOverride(`/${BROADSET_CUSTOM_XML_INTEROP}`, OOXML_CONTENT_TYPES.customXml);
+  presRels.add(OOXML_REL_TYPES.customXml, `../${BROADSET_CUSTOM_XML_INTEROP}`);
+
+  return new Map(ledger.entries.map((e) => [e.elementId, e.fingerprint]));
+}
+
+/**
+ * Attach the document-level `broadset:` XMP packet at
+ * `docProps/custom.xml`. Cross-format metadata requirement (IO-D-08):
+ * every round-trippable format exporter writes a packet under the
+ * shared namespace URI so reconciliation recovers document identity
+ * regardless of source format.
+ *
+ * Per-element fingerprints are populated from the interop ledger when
+ * available; sync exports without the ledger emit an empty element
+ * list (still satisfies the "packet exists" half of the contract).
+ */
+function attachXmpPacket(options: {
+  readonly parts: Map<string, Uint8Array>;
+  readonly contentTypes: ContentTypesBuilder;
+  readonly document: BroadsetDocument;
+  readonly exportedAt: number | undefined;
+  readonly fingerprints: ReadonlyMap<string, string> | null;
+}): void {
+  const { parts, contentTypes, document, exportedAt, fingerprints } = options;
+
+  // Only emit per-element entries when we have real fingerprints from
+  // the ledger — the XMP schema requires non-empty fingerprint strings.
+  // Sync export still emits the packet (document-level identity) with
+  // an empty elements list.
+  const elementsList =
+    fingerprints !== null
+      ? document.elements
+          .map((el) => {
+            const fp = fingerprints.get(el.id);
+
+            return fp !== undefined && fp.length > 0 ? { id: el.id, fingerprint: fp } : null;
+          })
+          .filter((entry): entry is { readonly id: string; readonly fingerprint: string } => entry !== null)
+      : [];
+  const packet = writeBroadsetXmp({
+    documentId: document.id,
+    version: '1.0.0',
+    exportedAt: new Date(exportedAt ?? 0).toISOString(),
+    elements: elementsList,
+  });
+
+  parts.set('docProps/custom.xml', encodeText(packet));
+  contentTypes.addOverride('/docProps/custom.xml', OOXML_CONTENT_TYPES.customProperties);
 }
 
 /**

@@ -335,6 +335,54 @@ describe('PPTX importer — operator-level extraction', () => {
    * @description vbaProject.bin is rejected at import time with a
    * structured warning per the Importer Security Contract.
    */
+  /**
+   * @description Placeholder inheritance cascades slide → layout →
+   * master per ECMA-376. When a slide shape's placeholder idx is not
+   * defined on any layout, it falls through to the master.
+   */
+  it('cascades placeholder inheritance through the master', () => {
+    const masterXml = `<?xml version="1.0"?><p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr id="2" name="MasterTitle"/><p:cNvSpPr/><p:nvPr><p:ph type="title" idx="0"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US" sz="3600"><a:solidFill><a:srgbClr val="ABCDEF"/></a:solidFill><a:latin typeface="Master Font"/></a:rPr><a:t>Master Title</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/></p:sldMaster>`;
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title 1"/><p:cNvSpPr/><p:nvPr><p:ph type="title" idx="0"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="6000000" cy="1000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US"/><a:t>Hi</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/></Relationships>`;
+    const bytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')],
+        ['ppt/slideMasters/slideMaster1.xml', encodeText(masterXml)],
+        // No layouts — cascade should fall through directly to master.
+      ]),
+    );
+    const imported = importPptx(bytes);
+    const textEl = imported.elements.find((el) => el.type === 'text');
+
+    expect(textEl?.style.fontFamily).toBe('Master Font');
+    expect(textEl?.style.fontSize).toBe(36);
+  });
+
+  /**
+   * @description Every Broadset-exported PPTX includes a `broadset:`
+   * XMP packet at `docProps/custom.xml` per the cross-format
+   * Round-Trip Metadata requirement (IO-D-08).
+   */
+  it('emits a broadset XMP packet at docProps/custom.xml on export', async () => {
+    const { exportPptxBytesAsync } = await import('./export');
+    const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
+    const doc = {
+      ...createEmptyBroadsetDocument(),
+      elements: [createDefaultElement('rectangle', { id: 'rect-1' })],
+    };
+    const bytes = await exportPptxBytesAsync(doc);
+    const pkg = readOoxmlPackage(bytes);
+    const xmp = readTextPart(pkg, 'docProps/custom.xml');
+
+    expect(xmp).not.toBeNull();
+    expect(xmp).toContain('https://broadset.io/ns/xmp/1.0/');
+  });
+
   it('rejects vbaProject.bin with a macro-rejected warning at import', () => {
     const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst/><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
     const bytes = writeOoxmlPackage(
