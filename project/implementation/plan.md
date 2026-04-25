@@ -703,16 +703,15 @@ Current master-plan state:
 - **I6.2 Phase 6 testing infrastructure:** complete — `_shared/test-infrastructure/` ships `assertReImportableBy`, `runChainRoundTrip`, `assertPreservedBlobSurvives`. PSD chain test wires the harness.
 - **Phase 6 (PDF track):** not started
 - **Phase 7 (SVG track):** not started
-- **Phase 8 (PPTX track):** **complete**
-  - P8.0 spec lockdown: complete (rewrote `project/spec/formats/pptx.md` around OOXML-native primitives, shape-name tags, extension lists, custom XML parts)
-  - P8.1 types + architecture + dependency swap: complete (`types.ts`, `ooxml/{namespaces,units,zip,xml,relationships,content-types}.ts`, `semantic/{shape-name,element-ext,custom-xml,ledger}.ts`; added `fflate` + `svgpath` deps)
-  - P8.2a export parity rebuild: complete (namespace-safe emit, groups via `<p:grpSp>`, text runs, rotation, relationships, multi-slide, generated theme/master/layout, custom XML parts, shape-name tags + `<p:extLst>` entries, native `<a:custGeom>` paths)
-  - P8.2b export beyond prior art: covered by P8.2a (multi-slide, theme/master/layout, custGeom, gradients, QR fallback, custom XML parts, per-shape tags)
-  - P8.3a import fast-path: covered by P8.2a (reads `customXml/broadset-project.xml`)
-  - P8.3b operator-level import: complete (`import/{package,theme,shapes}.ts`; rectangles, ellipses, paths via `<a:custGeom>`, pictures, groups, theme colour resolution, multi-slide, text extraction)
-  - P8.4 reconciliation: complete (`reconcile.ts` wraps `_shared/reconcile/` with PPTX-specific fast-path + fingerprint fallback)
-  - P8.5 tests: complete baseline (per-module unit tests + round-trip + operator-level fixtures in `import.test.ts` + `reconcile.test.ts`; formats suite 421 tests green). External-tool fixture suite deferred as spec gap in `project/spec/formats/pptx.md` (requires real-world `.pptx` golden files).
-  - P8.6 UI wiring: complete — PPTX dispatch wired through `packages/demo/src/formatBridge.ts` (`exportPptxBytes` + `importPptxDocument`); shared HeroUI `FormatImportWarningsModal` + `FormatExportOptionsModal` (landed in I5.1) already support PPTX labels (covered by `packages/ui/src/modals/format-modals.test.tsx`).
+- **Phase 8 (PPTX track):** substantially complete (audit-closed) — see `project/spec/formats/pptx.md → Spec Gaps` for the honest list of deferred features and known acceptance-criteria deviations
+  - P8.0 spec lockdown: complete
+  - P8.1 types + architecture + dependency swap: complete
+  - P8.2a/2b export: complete (groups via `<p:grpSp>`, text runs, rotation, multi-slide, generated theme/master/layout, custom XML parts, `broadset:` XMP packet at `docProps/custom.xml`, shape-name tags + `<p:extLst>`, native `<a:custGeom>` paths, gradient + theme colours + arrow ends)
+  - P8.3a/3b import: complete (fast-path via `customXml/broadset-project.xml`; operator-level: theme + master cascade, placeholder inheritance, shapes, text as `TextBody` with per-run styling, theme-slot colour preservation with mods, gradients, arrow ends, picture, groups, common-preset expansion to native paths, unsupported shapes preserved under `extensions.pptx.raw` with `dirty: false`, structured import warnings, security-contract size/depth/entry caps + `vbaProject.bin` rejection)
+  - P8.4 reconciliation: complete via `reconcile.ts` wrapping `_shared/reconcile/`
+  - P8.5 tests: 447 tests across 53 files, including per-tool synthesized fixtures (PowerPoint / Keynote / Google Slides / LibreOffice / Canva) and round-trip coverage for fade-entry animations
+  - P8.6 UI wiring: PPTX dispatch wired through `formatBridge.ts`; shared `FormatImportWarningsModal` + `FormatExportOptionsModal` from I5.1 cover the format
+  - **Audit gaps (closed during audit pass):** invalid `<p:spTgt bset-id>` attribute → canonical `spid`; theme-colour preservation; multi-run TextBody; gradient + arrow-end + raw preservation; XMP packet emission; placeholder cascade through master; preset shape expansion. **Known deviations remaining:** importer regex parsing (rebuild to fast-xml-parser AST tracked); page-override content/style/assetId (model-level work); `<a:blipFill>` srcRect crop baking; non-`entr` `<p:timing>` presets.
 - PDF track: not started
 - SVG track: not started
 - PDF/A-2b followup: not started

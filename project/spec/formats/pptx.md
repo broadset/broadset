@@ -504,14 +504,25 @@ When re-importing a Broadset-exported PPTX that has been edited externally, the 
 
 ## Spec Gaps
 
-- **First-class Broadset table element.** `<a:tbl>` currently imports as `extensions.pptx.table` preservation blob plus a grouped-text-box visual representation. Upgrading to a native Broadset table element is tracked as a future spec change, not a Phase 8 deliverable.
-- **First-class Broadset chart element.** `<c:chart>` currently imports as `extensions.pptx.chart` preservation blob plus a static picture. Native chart authoring is out of scope.
-- **Ink / 3D / SmartArt / connectors / comments.** Preserved under `extensions.pptx.*` but not first-class; upgrade path deferred.
+### Genuine deferred features
+
+- **First-class Broadset table element.** `<a:tbl>` currently imports as `extensions.pptx.raw` preservation blob plus a rectangle visual fallback. Upgrading to a native Broadset table element is tracked as a future spec change, not a Phase 8 deliverable.
+- **First-class Broadset chart element.** `<c:chart>` currently imports as `extensions.pptx.raw` preservation blob plus a rectangle visual fallback. Native chart authoring is out of scope.
+- **Ink / 3D / SmartArt / connectors / comments.** Preserved under `extensions.pptx.raw` via the unsupported-shape preservation path but not first-class; upgrade path deferred.
 - **Font embedding under `ppt/fonts/`.** Subsetted embedded fonts use the `_shared/fonts/` subsetter landed in Phase 4. Full font-embedding acceptance tests (byte-level OS/2 / name-table assertions) land when a license-clear font fixture is available.
 - **`<p:timing>` animations beyond fade-entry.** Fade-entry animations round-trip natively via `<p:timing>` (see `pptx/export/animation.ts`, `pptx/import/animation.ts`). Wipe, fly-in, zoom, rotate, and path-motion entrance effects plus any exit / emphasis effects drop on export per IO-D-16 and emit an import warning when encountered. Broadening the mappable preset set is tracked as a future unit.
-- **Full OOXML XSD validation.** `validatePptxPackage` performs structural ECMA-376 conformance checks (root rels, slide rel targets, content-type overrides, XML parsability, macro rejection). Full schema validation against the ISO/IEC 29500 XSDs is deferred to a future external-tool CI gate that runs `libreoffice --headless --convert-to pptx` or PowerPoint on Windows.
+- **Page-override content / style / assetId materialization.** The PPTX exporter applies `Page.elements[].visible` and `Page.elements[].transform` (position + rotation) when emitting each slide. The spec lists "content, style, assetId" overrides too, but the model's `PageElementInstance` only carries `elementId`, `transform`, `visible` — content / style / assetId page overrides require a model-level addition outside Phase 8 scope.
 - **Real-world external-tool golden files.** Synthesized fixtures in `pptx/fixtures/external-tools.ts` cover each tool's characteristic quirks. Licensed corporate `.pptx` files from PowerPoint / Keynote / Google Slides / LibreOffice / Canva would add fidelity confidence but require legal review before landing in the repo.
+- **Full OOXML XSD validation.** `validatePptxPackage` performs structural ECMA-376 conformance checks (root rels, slide rel targets, content-type overrides, XML parsability, macro rejection). Full schema validation against the ISO/IEC 29500 XSDs is deferred to a future external-tool CI gate that runs `libreoffice --headless --convert-to pptx` or PowerPoint on Windows.
 - **Keynote-specific round-trip.** Keynote-authored PPTX sometimes strips `<p:extLst>` extensions on re-save. Treated as a lossy endpoint in the chain; documented in the plan risk register. Content-hash fallback still recovers identity for visually-unchanged elements.
+
+### Known acceptance-criteria deviations (technical debt)
+
+These items are listed here so the spec reflects ground truth — they are NOT closed:
+
+- **Importer regex parsing (acceptance: "The importer does NOT use regex to extract XML attributes or element content").** The `pptx/import/*` and `pptx/semantic/*` modules use regex extensively for attribute and element-block extraction. fast-xml-parser is used for XXE / billion-laughs hardening (every XML part is sanity-parsed in `validate.ts`) but the operator-level shape walker, transform extractor, run/paragraph parser, and ledger / element-ext readers all use regex. **Risk:** non-default namespace prefixes (e.g. Keynote occasionally), CDATA sections, and entity-encoded attribute values can mis-parse. Tracked as a follow-up that will rebuild the import pipeline on a fast-xml-parser AST walker.
+- **`<a:blipFill>` `srcRect` crop baking.** Source images import as data URIs without applying the `srcRect` crop the OOXML carrier specifies. Future work: bake the crop into the source image bytes per the io-prereqs picture-fill rule.
+- **CMYK / display-p3 colour preservation on import.** Today's import resolves colours to sRGB hex; OOXML supports `<a:scrgbClr>`, `<a:hslClr>`, `<a:prstClr>` variants that are not yet parsed.
 
 ---
 
