@@ -93,3 +93,15 @@ export interface PdfRoundTripMetadata {
   /** All `/BSET` marked-content tags collected from every page. */
   readonly markedContentTags: readonly MarkedContentTag[];
 }
+
+/**
+ * Result of an export pass that carries preflight warnings alongside
+ * the produced bytes. Surfaces the gaps the spec's "Preflight and
+ * Warnings" requirement enumerates: missing fonts, restricted
+ * embed-permission fonts, rasterisation fallbacks, animation IN-state
+ * drops, image fetch failures.
+ */
+export interface PdfExportResult {
+  readonly bytes: Uint8Array;
+  readonly warnings: readonly string[];
+}

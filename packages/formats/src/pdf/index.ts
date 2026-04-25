@@ -1,5 +1,5 @@
 export { parseCssColor } from './color';
-export { exportPdfBytes } from './core';
+export { exportPdfBytes, exportPdfWithPreflight } from './core';
 export { decodeDataUri } from './data-uri';
 export { normalizeFontFamily, resolveGoogleFontUrl } from './fonts';
 export { canvasToPoints } from './geometry';
@@ -14,6 +14,7 @@ export type {
   MarkedContentKind,
   MarkedContentTag,
   PdfExportOptions,
+  PdfExportResult,
   PdfImportOptions,
   PdfRoundTripMetadata,
 } from './types';

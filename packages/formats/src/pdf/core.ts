@@ -13,6 +13,7 @@ import {
   buildRoundedRectPath,
   type CanvasAbsolutePosition,
   clipPathBrackets,
+  collectPreflightWarnings,
   colorToPdfRgb,
   composeCanvasAbsolutePosition,
   type CornerRadii,
@@ -38,6 +39,7 @@ import {
 } from './export';
 import { canvasToPoints, elementToPoints } from './geometry';
 import { drawQrOnPage } from './qr';
+import type { PdfExportResult } from './types';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -302,6 +304,32 @@ async function renderElement(
 /* ------------------------------------------------------------------ */
 /*  Main Export                                                        */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Export a BroadsetDocument to PDF bytes plus preflight warnings.
+ *
+ * Returns the byte stream and the warning list collected during the
+ * pre-render preflight pass per `project/spec/formats/pdf.md` →
+ * "Preflight and Warnings". Per IO-D-14 the export ALWAYS proceeds —
+ * warnings are surface-level, never blocking. Callers that don't care
+ * about warnings can use `exportPdfBytes` directly; this entry exists
+ * so the demo's preflight panel can render the warning list to the
+ * user before / after the export completes.
+ *
+ * @param doc - The document to export.
+ * @param fetchFn - Optional fetch implementation for Google Fonts /
+ *                  URL image resolution. Defaults to `globalThis.fetch`
+ *                  when available.
+ */
+export async function exportPdfWithPreflight(
+  doc: BroadsetDocument,
+  fetchFn?: typeof globalThis.fetch,
+): Promise<PdfExportResult> {
+  const warnings = collectPreflightWarnings(doc);
+  const bytes = await exportPdfBytes(doc, fetchFn);
+
+  return { bytes, warnings };
+}
 
 /**
  * Export a BroadsetDocument to PDF bytes via `pdf-lib`.
