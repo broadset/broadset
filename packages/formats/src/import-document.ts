@@ -1,6 +1,6 @@
 import { type BroadsetDocument, createDefaultElement, createEmptyBroadsetDocument } from '@broadset/model';
 
-import { importPptx } from './pptx';
+import { importPptxWithReport } from './pptx';
 import { importPsd } from './psd';
 import { importSvg } from './web-vector';
 
@@ -27,9 +27,13 @@ function buildFallbackImportWarnings(document: BroadsetDocument, formatLabel: st
 }
 
 export function importPptxDocument(data: Uint8Array): DocumentImportResult {
-  const document = importPptx(data);
+  const report = importPptxWithReport(data);
+  const structuralWarnings = report.warnings.map(
+    (w) => `${w.code}: ${w.message}${w.detail !== undefined ? ` (${w.detail})` : ''}`,
+  );
+  const fallback = buildFallbackImportWarnings(report.document, 'PPTX');
 
-  return createDocumentImportResult(document, buildFallbackImportWarnings(document, 'PPTX'));
+  return createDocumentImportResult(report.document, [...structuralWarnings, ...fallback]);
 }
 
 export function importPsdDocument(data: Uint8Array): DocumentImportResult {

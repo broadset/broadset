@@ -14,8 +14,16 @@ import { OOXML_REL_TYPES } from './ooxml/namespaces';
 import { parseRelationshipsXml } from './ooxml/relationships';
 import { type OoxmlPackage, readOoxmlPackage, readTextPart } from './ooxml/zip';
 import { parseProjectCustomXml } from './semantic/custom-xml';
-import type { LayoutPlaceholder } from './types';
+import type { LayoutPlaceholder, PptxImportWarning } from './types';
 import { BROADSET_CUSTOM_XML_PROJECT } from './types';
+
+/**
+ * Default caps per the Importer Security Contract in
+ * `project/spec/formats/spec.md`.
+ */
+const DEFAULT_MAX_INPUT_BYTES = 200 * 1024 * 1024; // 200 MiB
+const DEFAULT_MAX_PART_BYTES = 50 * 1024 * 1024; // 50 MiB
+const DEFAULT_MAX_ENTRIES = 4096;
 
 /**
  * PPTX importer.
@@ -32,12 +40,87 @@ import { BROADSET_CUSTOM_XML_PROJECT } from './types';
  *   `ppt/notesSlides/` populate `Page.notes`.
  */
 export function importPptx(data: Uint8Array): BroadsetDocument {
+  return importPptxWithReport(data).document;
+}
+
+/**
+ * Extended importer that returns the document alongside structured
+ * import warnings (unsupported shapes / animations, rejected macros,
+ * enforcement caps).
+ */
+export interface PptxImportReport {
+  readonly document: BroadsetDocument;
+  readonly warnings: readonly PptxImportWarning[];
+}
+
+export function importPptxWithReport(data: Uint8Array): PptxImportReport {
+  const warnings: PptxImportWarning[] = [];
+
+  if (data.byteLength > DEFAULT_MAX_INPUT_BYTES) {
+    warnings.push({
+      code: 'size-cap',
+      message: `Input size ${String(data.byteLength)} exceeds cap ${String(DEFAULT_MAX_INPUT_BYTES)} bytes`,
+    });
+
+    return { document: createEmptyBroadsetDocument(), warnings };
+  }
+
   const pkg = readOoxmlPackage(data);
+
+  enforcePackageCaps(pkg, warnings);
+  rejectExecutionSurface(pkg, warnings);
+
   const fastPathResult = tryFastPath(pkg);
 
-  if (fastPathResult !== null) return fastPathResult;
+  if (fastPathResult !== null) return { document: fastPathResult, warnings };
 
-  return importOperatorLevel(pkg);
+  const operatorLevel = importOperatorLevel(pkg);
+
+  return { document: operatorLevel.document, warnings: [...warnings, ...operatorLevel.warnings] };
+}
+
+function enforcePackageCaps(pkg: OoxmlPackage, warnings: PptxImportWarning[]): void {
+  if (pkg.size > DEFAULT_MAX_ENTRIES) {
+    warnings.push({
+      code: 'entry-cap',
+      message: `Package contains ${String(pkg.size)} entries; cap is ${String(DEFAULT_MAX_ENTRIES)}`,
+    });
+  }
+
+  for (const [path, bytes] of pkg) {
+    if (bytes.byteLength > DEFAULT_MAX_PART_BYTES) {
+      warnings.push({
+        code: 'size-cap',
+        message: `Part ${path} (${String(bytes.byteLength)} bytes) exceeds per-part cap`,
+        detail: path,
+      });
+    }
+  }
+}
+
+/**
+ * Reject PPTX macros (`vbaProject.bin`) and OLE embeddings at import
+ * time per the Importer Security Contract. The parts stay in the
+ * package bytes but are never surfaced to downstream consumers.
+ */
+function rejectExecutionSurface(pkg: OoxmlPackage, warnings: PptxImportWarning[]): void {
+  for (const [path] of pkg) {
+    if (path === 'ppt/vbaProject.bin') {
+      warnings.push({
+        code: 'macro-rejected',
+        message: 'PPTX contains vbaProject.bin — macros have been stripped from the import',
+        detail: path,
+      });
+    }
+
+    if (path.startsWith('ppt/embeddings/') && path.endsWith('.bin')) {
+      warnings.push({
+        code: 'ole-rejected',
+        message: `OLE embedding ${path} has been stripped from the import`,
+        detail: path,
+      });
+    }
+  }
 }
 
 function tryFastPath(pkg: OoxmlPackage): BroadsetDocument | null {
@@ -47,10 +130,16 @@ function tryFastPath(pkg: OoxmlPackage): BroadsetDocument | null {
   return isDocumentShape(fastPath) ? fastPath : null;
 }
 
-function importOperatorLevel(pkg: OoxmlPackage): BroadsetDocument {
-  const resolved = resolvePackage(pkg);
+interface OperatorLevelResult {
+  readonly document: BroadsetDocument;
+  readonly warnings: readonly PptxImportWarning[];
+}
 
-  if (resolved.slidePaths.length === 0) return createEmptyBroadsetDocument();
+function importOperatorLevel(pkg: OoxmlPackage): OperatorLevelResult {
+  const resolved = resolvePackage(pkg);
+  const warnings: PptxImportWarning[] = [];
+
+  if (resolved.slidePaths.length === 0) return { document: createEmptyBroadsetDocument(), warnings };
 
   const themeXml = resolved.themePath !== null ? readTextPart(pkg, resolved.themePath) : null;
   const theme = parseTheme(themeXml);
@@ -67,18 +156,24 @@ function importOperatorLevel(pkg: OoxmlPackage): BroadsetDocument {
     elementCounter = result.nextElementCounter;
     slides.push(result.slide);
 
+    for (const warning of result.warnings) warnings.push(warning);
+
     const slideXml = readTextPart(pkg, slidePath) ?? '';
     const timing = parseTimingAnimations(slideXml);
 
     for (const anim of timing.animations) allAnimations.push(anim);
-    // Timing warnings propagate through the importer warnings surface
-    // (built in parseSlideShapes' caller). Today we drop them since
-    // the operator-level path has no warning channel; A3 adds one.
+
+    for (const warning of timing.warnings) {
+      warnings.push({ code: warning.code, message: warning.message });
+    }
   }
 
   const doc = composeDocumentFromSlides(resolved.canvas, slides);
 
-  return allAnimations.length > 0 ? { ...doc, animations: allAnimations } : doc;
+  return {
+    document: allAnimations.length > 0 ? { ...doc, animations: allAnimations } : doc,
+    warnings,
+  };
 }
 
 function importSingleSlide(
@@ -92,6 +187,7 @@ function importSingleSlide(
 ): {
   readonly slide: { readonly id: string; readonly notes?: string; readonly elements: readonly ReturnType<typeof parseSlideShapes>[number][] };
   readonly nextElementCounter: number;
+  readonly warnings: readonly PptxImportWarning[];
 } | null {
   const slideXml = readTextPart(pkg, slidePath);
 
@@ -101,11 +197,13 @@ function importSingleSlide(
   const slideRels = slideRelsPath !== undefined ? parseRelationshipsXml(readTextPart(pkg, slideRelsPath) ?? '') : [];
   const mediaByRelId = collectSlideMedia(pkg, slidePath, slideRels);
   const notes = extractSlideNotes(pkg, slidePath, slideRels);
+  const ctxWarnings: SlideImportContext['warnings'] = [];
   const ctx: SlideImportContext = {
     canvas: resolved.canvas,
     theme,
     layoutPlaceholders,
     mediaByRelId,
+    warnings: ctxWarnings,
     nextElementIndex: elementCounter,
   };
   const shapes = parseSlideShapes(ctx, slideXml);
@@ -118,6 +216,7 @@ function importSingleSlide(
       ...(notes !== null ? { notes } : {}),
     },
     nextElementCounter: ctx.nextElementIndex,
+    warnings: ctxWarnings.map((w) => ({ code: w.code, message: w.message, ...(w.detail !== undefined ? { detail: w.detail } : {}) })),
   };
 }
 

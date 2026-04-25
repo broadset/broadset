@@ -1,4 +1,5 @@
 import {
+  type ArrowEnd,
   type BroadsetColor,
   type BroadsetDocument,
   type BroadsetElement,
@@ -42,6 +43,16 @@ export interface SlideImportContext {
   readonly layoutPlaceholders: ReadonlyMap<number, LayoutPlaceholder>;
   /** `rId` → media-file path (inside the ZIP) for picture resolution. */
   readonly mediaByRelId: ReadonlyMap<string, { readonly path: string; readonly mime: string; readonly bytes: Uint8Array }>;
+  /**
+   * Importer warning sink. Populated as the shape walker encounters
+   * content it drops or preserves as a raw blob. Returned to callers
+   * via the importPptx result shape.
+   */
+  readonly warnings: {
+    readonly code: 'unsupported-shape' | 'unsupported-content';
+    readonly message: string;
+    readonly detail?: string;
+  }[];
   /** Monotonic element-id allocator when names are missing or rewritten. */
   nextElementIndex: number;
 }
@@ -198,8 +209,43 @@ function emitElementFromShape(
     return buildPath(ctx, elementIdBase, elementName, transform, body, parentGroupId, geom.d ?? '');
   }
 
-  // Unknown preset → rectangle with the preset name in `name`.
-  return buildRectangle(ctx, elementIdBase, elementName, transform, body, parentGroupId);
+  // Unknown preset (triangle, star, arrow, callout, etc.) — preserve
+  // the source XML under `extensions.pptx.raw` per IO-D-18 and map to
+  // a rectangle as the visual fallback. A future expansion of the
+  // preset table (Audit A5) will map common presets natively.
+  ctx.warnings.push({
+    code: 'unsupported-shape',
+    message: `Unknown OOXML preset for shape id ${elementIdBase} — preserved as extensions.pptx.raw`,
+    detail: extractPresetName(body) ?? 'custom',
+  });
+
+  return preserveRawShape(ctx, elementIdBase, elementName, transform, body, parentGroupId);
+}
+
+function extractPresetName(body: string): string | undefined {
+  const match = body.match(/<a:prstGeom\s+prst="([^"]+)"/);
+
+  return match?.[1];
+}
+
+function preserveRawShape(
+  ctx: SlideImportContext,
+  id: string,
+  name: string,
+  transform: ParsedTransform,
+  body: string,
+  parentGroupId: string | null,
+): BroadsetElement {
+  const base = buildBase(ctx, id, name, 'rectangle', transform, parentGroupId);
+  const styled = applyShapeStyle(base, body);
+
+  return {
+    ...styled,
+    extensions: {
+      ...(styled.extensions),
+      pptx: { dirty: false, raw: body },
+    },
+  };
 }
 
 interface ParsedTransform {
@@ -365,6 +411,10 @@ function buildBase(
   transform: ParsedTransform,
   parentGroupId: string | null,
 ): BroadsetElement {
+  // Initialise extensions.pptx.dirty = false so subsequent edits in
+  // Broadset can distinguish untouched imports from edited elements
+  // per IO-D-18 and the cross-format Format Round-Trip Metadata
+  // requirement.
   const base = createDefaultElement(kind, {
     id,
     name,
@@ -372,9 +422,91 @@ function buildBase(
     width: transform.width,
     height: transform.height,
     rotation: transform.rotation,
+    extensions: { pptx: { dirty: false } },
   });
 
   return parentGroupId === null ? base : { ...base, groupId: parentGroupId };
+}
+
+/**
+ * Parse an `<a:ln>` stroke block from a shape body. Extracts width,
+ * stroke colour, dash, and head/tail arrow endings per the spec's
+ * `strokeHeadEnd` / `strokeTailEnd` fields (io-prereqs Phase 1).
+ */
+function parseStrokeFromBody(body: string): {
+  readonly borderWidth?: number;
+  readonly borderColor?: BroadsetColor;
+  readonly strokeDasharray?: string;
+  readonly strokeHeadEnd?: ArrowEnd;
+  readonly strokeTailEnd?: ArrowEnd;
+} | null {
+  const lnBlock = extractBlock(body, 'a:ln');
+
+  if (lnBlock === null) return null;
+
+  const result: {
+    borderWidth?: number;
+    borderColor?: BroadsetColor;
+    strokeDasharray?: string;
+    strokeHeadEnd?: ArrowEnd;
+    strokeTailEnd?: ArrowEnd;
+  } = {};
+
+  const widthAttr = lnBlock.openAttrs.match(/\bw="(\d+)"/)?.[1];
+
+  if (widthAttr !== undefined) result.borderWidth = emuToMm(parseInt(widthAttr, 10));
+
+  const colour = parseColorElement(lnBlock.block);
+
+  if (colour !== null) result.borderColor = colour;
+
+  const dashMatch = lnBlock.block.match(/<a:prstDash\s+val="([^"]+)"/);
+
+  const dashStyle = dashMatch?.[1];
+
+  if (dashStyle !== undefined && dashStyle !== 'solid') result.strokeDasharray = dashStyle;
+
+  const headEnd = parseArrowEnd(lnBlock.block, 'headEnd');
+  const tailEnd = parseArrowEnd(lnBlock.block, 'tailEnd');
+
+  if (headEnd !== null) result.strokeHeadEnd = headEnd;
+  if (tailEnd !== null) result.strokeTailEnd = tailEnd;
+
+  return Object.keys(result).length === 0 ? null : result;
+}
+
+function parseArrowEnd(lnBody: string, tag: 'headEnd' | 'tailEnd'): ArrowEnd | null {
+  const re = new RegExp(`<a:${tag}\\b([^/>]*)\\/?\\s*>`);
+  const match = lnBody.match(re);
+
+  if (!match) return null;
+
+  const attrs = match[1] ?? '';
+  const ooxmlType = attrs.match(/\btype="([^"]+)"/)?.[1] ?? 'none';
+  const widthAttr = attrs.match(/\bw="([^"]+)"/)?.[1];
+  const lengthAttr = attrs.match(/\blen="([^"]+)"/)?.[1];
+
+  return {
+    shape: ooxmlArrowShapeToBroadset(ooxmlType),
+    ...(widthAttr !== undefined ? { width: ooxmlArrowSizeToBroadset(widthAttr) } : {}),
+    ...(lengthAttr !== undefined ? { length: ooxmlArrowSizeToBroadset(lengthAttr) } : {}),
+  };
+}
+
+function ooxmlArrowShapeToBroadset(type: string): ArrowEnd['shape'] {
+  if (type === 'triangle' || type === 'arrow') return 'triangle';
+  if (type === 'stealth') return 'stealth';
+  if (type === 'diamond') return 'diamond';
+  if (type === 'oval') return 'oval';
+
+  return 'none';
+}
+
+function ooxmlArrowSizeToBroadset(size: string): 'sm' | 'md' | 'lg' {
+  if (size === 'sm') return 'sm';
+  if (size === 'lg') return 'lg';
+
+  return 'md';
 }
 
 function buildRectangle(
@@ -385,12 +517,7 @@ function buildRectangle(
   body: string,
   parentGroupId: string | null,
 ): BroadsetElement {
-  const base = buildBase(ctx, id, name, 'rectangle', transform, parentGroupId);
-  const fill = detectFill(body);
-
-  if (fill !== null) return { ...base, style: { ...base.style, fill } };
-
-  return base;
+  return applyShapeStyle(buildBase(ctx, id, name, 'rectangle', transform, parentGroupId), body);
 }
 
 function buildEllipse(
@@ -401,12 +528,7 @@ function buildEllipse(
   body: string,
   parentGroupId: string | null,
 ): BroadsetElement {
-  const base = buildBase(ctx, id, name, 'ellipse', transform, parentGroupId);
-  const fill = detectFill(body);
-
-  if (fill !== null) return { ...base, style: { ...base.style, fill } };
-
-  return base;
+  return applyShapeStyle(buildBase(ctx, id, name, 'ellipse', transform, parentGroupId), body);
 }
 
 function buildPath(
@@ -418,13 +540,32 @@ function buildPath(
   parentGroupId: string | null,
   d: string,
 ): BroadsetElement {
-  const base = buildBase(ctx, id, name, 'path', transform, parentGroupId);
+  const base = applyShapeStyle(buildBase(ctx, id, name, 'path', transform, parentGroupId), body);
+
+  return { ...base, content: d };
+}
+
+/**
+ * Merge fill + stroke (width, colour, dash, head/tail arrow ends)
+ * extracted from the shape body onto the element's style.
+ */
+function applyShapeStyle(element: BroadsetElement, body: string): BroadsetElement {
   const fill = detectFill(body);
+  const stroke = parseStrokeFromBody(body);
+
+  if (fill === null && stroke === null) return element;
 
   return {
-    ...base,
-    content: d,
-    ...(fill !== null ? { style: { ...base.style, fill } } : {}),
+    ...element,
+    style: {
+      ...element.style,
+      ...(fill !== null ? { fill } : {}),
+      ...(stroke?.borderWidth !== undefined ? { borderWidth: stroke.borderWidth } : {}),
+      ...(stroke?.borderColor !== undefined ? { borderColor: stroke.borderColor } : {}),
+      ...(stroke?.strokeDasharray !== undefined ? { strokeDasharray: stroke.strokeDasharray } : {}),
+      ...(stroke?.strokeHeadEnd !== undefined ? { strokeHeadEnd: stroke.strokeHeadEnd } : {}),
+      ...(stroke?.strokeTailEnd !== undefined ? { strokeTailEnd: stroke.strokeTailEnd } : {}),
+    },
   };
 }
 
