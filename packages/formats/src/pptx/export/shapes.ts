@@ -120,6 +120,45 @@ function readRawBlob(element: BroadsetElement): string | null {
   return typeof raw === 'string' && raw.length > 0 ? raw : null;
 }
 
+/**
+ * Element-aware wrapper around {@link emitTransform} that includes
+ * `flipH` / `flipV` flags read from `extensions.pptx`. Most shape
+ * emitters call this; group emit uses emitTransform directly to
+ * include the child offset.
+ */
+function emitElementXfrm(ctx: SlideExportContext, element: BroadsetElement): string {
+  const flip = readFlipFlags(element);
+
+  return emitTransform(ctx, {
+    x: element.position.x,
+    y: element.position.y,
+    width: element.width,
+    height: element.height,
+    rotationDegrees: element.rotation,
+    flipH: flip.flipH,
+    flipV: flip.flipV,
+  });
+}
+
+/**
+ * Extract OOXML flip flags from `extensions.pptx.flipH` / `flipV`.
+ * Broadset has no native flip field on elements; the PPTX importer
+ * stashes the flag on extensions to round-trip mirrored shapes.
+ */
+function readFlipFlags(element: BroadsetElement): { readonly flipH: boolean; readonly flipV: boolean } {
+  const extensions = element.extensions as unknown;
+
+  if (typeof extensions !== 'object' || extensions === null) return { flipH: false, flipV: false };
+
+  const pptx = (extensions as Record<string, unknown>)['pptx'];
+
+  if (typeof pptx !== 'object' || pptx === null) return { flipH: false, flipV: false };
+
+  const record = pptx as Record<string, unknown>;
+
+  return { flipH: record['flipH'] === true, flipV: record['flipV'] === true };
+}
+
 function readRepeaterField(element: BroadsetElement): string | null {
   const value = element.repeater as unknown;
 
@@ -135,13 +174,7 @@ function readRepeaterField(element: BroadsetElement): string | null {
  */
 export function emitTextShape(ctx: SlideExportContext, element: BroadsetElement): string {
   const nv = emitNonVisualProps(ctx, element, 'text');
-  const xfrm = emitTransform(ctx, {
-    x: element.position.x,
-    y: element.position.y,
-    width: element.width,
-    height: element.height,
-    rotationDegrees: element.rotation,
-  });
+  const xfrm = emitElementXfrm(ctx, element);
   const body = emitTextBody(element);
   const stroke = emitStroke(element.style, ctx);
 
@@ -277,13 +310,7 @@ function emitRun(
 /** Build a `<p:sp>` for a rectangle. Uniform radius → roundRect preset; per-corner → custGeom. */
 export function emitRectangleShape(ctx: SlideExportContext, element: BroadsetElement): string {
   const nv = emitNonVisualProps(ctx, element, 'rectangle');
-  const xfrm = emitTransform(ctx, {
-    x: element.position.x,
-    y: element.position.y,
-    width: element.width,
-    height: element.height,
-    rotationDegrees: element.rotation,
-  });
+  const xfrm = emitElementXfrm(ctx, element);
   const fill = emitElementFill(element);
   const stroke = emitStroke(element.style, ctx);
   const geom = emitRectangleGeometry(element);
@@ -347,13 +374,7 @@ function emitPerCornerCustGeom(width: number, height: number, radii: readonly nu
 
 export function emitEllipseShape(ctx: SlideExportContext, element: BroadsetElement): string {
   const nv = emitNonVisualProps(ctx, element, 'ellipse');
-  const xfrm = emitTransform(ctx, {
-    x: element.position.x,
-    y: element.position.y,
-    width: element.width,
-    height: element.height,
-    rotationDegrees: element.rotation,
-  });
+  const xfrm = emitElementXfrm(ctx, element);
   const fill = emitElementFill(element);
   const stroke = emitStroke(element.style, ctx);
 
@@ -365,13 +386,7 @@ export function emitEllipseShape(ctx: SlideExportContext, element: BroadsetEleme
  */
 export function emitPathShape(ctx: SlideExportContext, element: BroadsetElement): string {
   const nv = emitNonVisualProps(ctx, element, 'path');
-  const xfrm = emitTransform(ctx, {
-    x: element.position.x,
-    y: element.position.y,
-    width: element.width,
-    height: element.height,
-    rotationDegrees: element.rotation,
-  });
+  const xfrm = emitElementXfrm(ctx, element);
   const d = resolveContentAsPlainString(element.content);
   const geom = emitCustGeomFromD(d, element.width, element.height);
   const fill = emitElementFill(element);
@@ -447,13 +462,7 @@ function emitCustGeomFromD(d: string, width: number, height: number): string {
 /** Build a `<p:pic>` picture shape for image / svg elements. */
 export function emitPictureShape(ctx: SlideExportContext, element: BroadsetElement, relId: string, kind: string): string {
   const nv = emitNonVisualProps(ctx, element, kind, { isPicture: true });
-  const xfrm = emitTransform(ctx, {
-    x: element.position.x,
-    y: element.position.y,
-    width: element.width,
-    height: element.height,
-    rotationDegrees: element.rotation,
-  });
+  const xfrm = emitElementXfrm(ctx, element);
   const stroke = emitStroke(element.style, ctx);
 
   return `<p:pic>${nv}<p:blipFill><a:blip r:embed="${relId}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${stroke}</p:spPr></p:pic>`;
@@ -519,12 +528,15 @@ export function registerMedia(ctx: SlideExportContext, ext: string, bytes: Uint8
 /** Build a `<p:grpSp>` group shape wrapping the given rendered-child XML. */
 export function emitGroupShape(ctx: SlideExportContext, element: BroadsetElement, childrenXml: string): string {
   const nv = emitNonVisualProps(ctx, element, 'group', { isGroup: true });
+  const flip = readFlipFlags(element);
   const xfrm = emitTransform(ctx, {
     x: element.position.x,
     y: element.position.y,
     width: element.width,
     height: element.height,
     rotationDegrees: element.rotation,
+    flipH: flip.flipH,
+    flipV: flip.flipV,
     includeChildOffset: true,
   });
 
@@ -534,13 +546,7 @@ export function emitGroupShape(ctx: SlideExportContext, element: BroadsetElement
 /** Fallback shape for elements Broadset doesn't map to OOXML natively (clock, ticker, video, qrcode when no renderer). */
 export function emitFallbackShape(ctx: SlideExportContext, element: BroadsetElement, originalKind: string): string {
   const nv = emitNonVisualProps(ctx, element, originalKind);
-  const xfrm = emitTransform(ctx, {
-    x: element.position.x,
-    y: element.position.y,
-    width: element.width,
-    height: element.height,
-    rotationDegrees: element.rotation,
-  });
+  const xfrm = emitElementXfrm(ctx, element);
   const fill = emitElementFill(element);
   const stroke = emitStroke(element.style, ctx);
 

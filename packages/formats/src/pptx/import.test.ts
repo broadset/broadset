@@ -481,6 +481,39 @@ describe('PPTX importer — operator-level extraction', () => {
     expect(untouched?.position.x).toBe(0);
   });
 
+  /**
+   * @description B3 — flipH / flipV round-trip via extensions.pptx.
+   * Broadset has no native flip field on elements; mirror state is
+   * stashed on the extensions slot during import and re-emitted on
+   * `<a:xfrm flipH="1">` during export.
+   */
+  it('round-trips flipH / flipV via extensions.pptx', async () => {
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Mirror"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm flipH="1" flipV="1"><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
+    const inputBytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')],
+      ]),
+    );
+    const imported = importPptx(inputBytes);
+    const ext = imported.elements[0]?.extensions['pptx'] as { readonly flipH?: boolean; readonly flipV?: boolean } | undefined;
+
+    expect(ext?.flipH).toBe(true);
+    expect(ext?.flipV).toBe(true);
+
+    // Re-export and verify the flips emit on <a:xfrm>.
+    const reExported = exportPptxBytes(imported);
+    const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
+    const reExportedSlide = readTextPart(readOoxmlPackage(reExported), 'ppt/slides/slide1.xml') ?? '';
+
+    expect(reExportedSlide).toMatch(/<a:xfrm[^>]*flipH="1"[^>]*flipV="1"/);
+  });
+
   it('rejects vbaProject.bin with a macro-rejected warning at import', () => {
     const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst/><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
     const bytes = writeOoxmlPackage(

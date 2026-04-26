@@ -254,12 +254,14 @@ interface ParsedTransform {
   readonly width: number;
   readonly height: number;
   readonly rotation: number;
+  readonly flipH: boolean;
+  readonly flipV: boolean;
 }
 
 function extractTransform(body: string): ParsedTransform | null {
   const xfrmBlock = extractBlock(body, 'a:xfrm');
 
-  if (xfrmBlock === null) return { x: 0, y: 0, width: 1, height: 1, rotation: 0 };
+  if (xfrmBlock === null) return { x: 0, y: 0, width: 1, height: 1, rotation: 0, flipH: false, flipV: false };
 
   const off = xfrmBlock.block.match(/<a:off\s+x="(-?\d+)"\s+y="(-?\d+)"\s*\/>/);
   const ext = xfrmBlock.block.match(/<a:ext\s+cx="(\d+)"\s+cy="(\d+)"\s*\/>/);
@@ -270,8 +272,10 @@ function extractTransform(body: string): ParsedTransform | null {
   const height = ext ? emuToMm(parseInt(ext[2] ?? '0', 10)) : 1;
   const rotAttr = xfrmBlock.openAttrs.match(/\brot="(-?\d+)"/);
   const rotation = rotAttr ? rotationUnitsToDegrees(parseInt(rotAttr[1] ?? '0', 10)) : 0;
+  const flipH = /\bflipH="1"/.test(xfrmBlock.openAttrs);
+  const flipV = /\bflipV="1"/.test(xfrmBlock.openAttrs);
 
-  return { x, y, width, height, rotation };
+  return { x, y, width, height, rotation, flipH, flipV };
 }
 
 interface CNvPrAttrs {
@@ -461,6 +465,11 @@ function buildBase(
   // Broadset can distinguish untouched imports from edited elements
   // per IO-D-18 and the cross-format Format Round-Trip Metadata
   // requirement.
+  const pptxExt: Record<string, unknown> = { dirty: false };
+
+  if (transform.flipH) pptxExt['flipH'] = true;
+  if (transform.flipV) pptxExt['flipV'] = true;
+
   const base = createDefaultElement(kind, {
     id,
     name,
@@ -468,7 +477,7 @@ function buildBase(
     width: transform.width,
     height: transform.height,
     rotation: transform.rotation,
-    extensions: { pptx: { dirty: false } },
+    extensions: { pptx: pptxExt },
   });
 
   return parentGroupId === null ? base : { ...base, groupId: parentGroupId };

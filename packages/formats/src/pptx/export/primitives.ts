@@ -28,6 +28,8 @@ export function emitTransform(
     readonly width: number;
     readonly height: number;
     readonly rotationDegrees: number;
+    readonly flipH?: boolean;
+    readonly flipV?: boolean;
     readonly includeChildOffset?: boolean;
   },
 ): string {
@@ -37,12 +39,14 @@ export function emitTransform(
   const cy = canvasLengthToEmu(ctx.canvas, options.height);
   const rot = degreesToRotationUnits(options.rotationDegrees);
   const rotAttr = rot !== 0 ? ` rot="${String(rot)}"` : '';
+  const flipHAttr = options.flipH === true ? ` flipH="1"` : '';
+  const flipVAttr = options.flipV === true ? ` flipV="1"` : '';
   const childOffset =
     options.includeChildOffset === true
       ? `<a:chOff x="${String(x)}" y="${String(y)}"/><a:chExt cx="${String(cx)}" cy="${String(cy)}"/>`
       : '';
 
-  return `<a:xfrm${rotAttr}><a:off x="${String(x)}" y="${String(y)}"/><a:ext cx="${String(cx)}" cy="${String(cy)}"/>${childOffset}</a:xfrm>`;
+  return `<a:xfrm${rotAttr}${flipHAttr}${flipVAttr}><a:off x="${String(x)}" y="${String(y)}"/><a:ext cx="${String(cx)}" cy="${String(cy)}"/>${childOffset}</a:xfrm>`;
 }
 
 /**
