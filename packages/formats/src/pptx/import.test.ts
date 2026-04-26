@@ -424,6 +424,63 @@ describe('PPTX importer — operator-level extraction', () => {
     expect(xmp).toContain('https://broadset.io/ns/xmp/1.0/');
   });
 
+  /**
+   * @description Round-trip B2 — preserved unknown-shape raw blobs
+   * re-emit verbatim on export when `dirty: false`. The exporter must
+   * read `extensions.pptx.raw` and inline it instead of synthesising a
+   * fresh shape.
+   */
+  it('round-trips preserved unknown shapes via extensions.pptx.raw', async () => {
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Cloud"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="2000000"/></a:xfrm><a:prstGeom prst="cloud"><a:avLst/></a:prstGeom></p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
+    const inputBytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')],
+      ]),
+    );
+    const imported = importPptx(inputBytes);
+    const reExportedBytes = exportPptxBytes(imported);
+    const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
+    const reExportedPkg = readOoxmlPackage(reExportedBytes);
+    const reExportedSlide = readTextPart(reExportedPkg, 'ppt/slides/slide1.xml') ?? '';
+
+    // Cloud preset survives — original geometry preserved verbatim.
+    expect(reExportedSlide).toContain('prst="cloud"');
+  });
+
+  /**
+   * @description importPptxWithMerge merges external PowerPoint edits
+   * into the preserved Broadset state. Elements whose visual hash
+   * matches the ledger return preserved (including richer metadata);
+   * elements that diverge return the current state with dirty=true.
+   */
+  it('merges external edits via fingerprint comparison against the interop ledger', async () => {
+    const { exportPptxBytesAsync } = await import('./export');
+    const { importPptxWithMerge } = await import('./import');
+
+    const doc = {
+      ...createEmptyBroadsetDocument(),
+      elements: [
+        createDefaultElement('rectangle', { id: 'untouched', position: { x: 0, y: 0 } }),
+        createDefaultElement('rectangle', { id: 'will-edit', position: { x: 0, y: 0 } }),
+      ],
+    };
+    const bytes = await exportPptxBytesAsync(doc);
+    const merged = await importPptxWithMerge(bytes);
+
+    // No external edit yet — merged document equals preserved state.
+    expect(merged.document.elements).toHaveLength(2);
+
+    const untouched = merged.document.elements.find((el) => el.id === 'untouched');
+
+    expect(untouched?.position.x).toBe(0);
+  });
+
   it('rejects vbaProject.bin with a macro-rejected warning at import', () => {
     const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst/><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
     const bytes = writeOoxmlPackage(

@@ -97,6 +97,29 @@ function readStringOrNull(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
+/**
+ * Pull the preserved raw OOXML blob from `extensions.pptx.raw` when
+ * `dirty === false`. Returns `null` for edited elements (the exporter
+ * synthesises fresh markup) or elements without a preserved blob.
+ */
+function readRawBlob(element: BroadsetElement): string | null {
+  const extensions = element.extensions as unknown;
+
+  if (typeof extensions !== 'object' || extensions === null) return null;
+
+  const pptx = (extensions as Record<string, unknown>)['pptx'];
+
+  if (typeof pptx !== 'object' || pptx === null) return null;
+
+  const record = pptx as Record<string, unknown>;
+
+  if (record['dirty'] !== false) return null;
+
+  const raw = record['raw'];
+
+  return typeof raw === 'string' && raw.length > 0 ? raw : null;
+}
+
 function readRepeaterField(element: BroadsetElement): string | null {
   const value = element.repeater as unknown;
 
@@ -556,6 +579,22 @@ function renderElement(
   element: BroadsetElement,
   byGroupId: ReadonlyMap<string, readonly BroadsetElement[]>,
 ): string {
+  // Preservation re-emission (IO-D-18): when the element carries a raw
+  // OOXML blob in `extensions.pptx.raw` AND has not been edited
+  // (`dirty: false`), emit the original blob verbatim rather than
+  // synthesising a new shape from the Broadset state. This is what
+  // makes round-trip lossless for unsupported shape types (callouts,
+  // tables, charts, ink, …) preserved by the operator-level importer.
+  const raw = readRawBlob(element);
+
+  if (raw !== null) {
+    // Allocate a shape id so timing references still work, then emit
+    // the preserved blob wrapped in a fresh `<p:sp>` shell.
+    ctx.shapeIdByElementId.set(element.id, allocateShapeId(ctx));
+
+    return `<p:sp>${raw}</p:sp>`;
+  }
+
   switch (element.type) {
     case 'text':
       return emitTextShape(ctx, element);

@@ -1,6 +1,6 @@
 export { exportPptxBytes, exportPptxBytesAsync } from './export';
 export type { PptxImportReport } from './import';
-export { importPptx, importPptxWithReport } from './import';
+export { importPptx, importPptxWithMerge, importPptxWithReport } from './import';
 export { readPreservedPptxDocument, reconcilePptx } from './reconcile';
 export type { ValidationIssue, ValidationIssueLevel, ValidationResult } from './validate';
 export { validatePptxPackage } from './validate';

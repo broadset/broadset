@@ -1,5 +1,6 @@
 import { type AnimationDefinition, type BroadsetDocument, createEmptyBroadsetDocument, type TextBody } from '@broadset/model';
 
+import { fingerprintElement } from '../_shared';
 import { parseTimingAnimations } from './import/animation';
 import { resolvePackage } from './import/package';
 import { parseLayoutPlaceholders } from './import/placeholders';
@@ -14,8 +15,9 @@ import { OOXML_REL_TYPES } from './ooxml/namespaces';
 import { parseRelationshipsXml } from './ooxml/relationships';
 import { type OoxmlPackage, readOoxmlPackage, readTextPart } from './ooxml/zip';
 import { parseProjectCustomXml } from './semantic/custom-xml';
+import { parseLedgerXml } from './semantic/ledger';
 import type { LayoutPlaceholder, PptxImportWarning } from './types';
-import { BROADSET_CUSTOM_XML_PROJECT } from './types';
+import { BROADSET_CUSTOM_XML_INTEROP, BROADSET_CUSTOM_XML_PROJECT } from './types';
 
 /**
  * Default caps per the Importer Security Contract in
@@ -77,6 +79,128 @@ export function importPptxWithReport(data: Uint8Array): PptxImportReport {
   const operatorLevel = importOperatorLevel(pkg);
 
   return { document: operatorLevel.document, warnings: [...warnings, ...operatorLevel.warnings] };
+}
+
+/**
+ * Async importer that **merges external edits** into the fast-path
+ * output. When the source PPTX was previously exported by Broadset and
+ * has since been edited in PowerPoint / Keynote / Google Slides, the
+ * preserved `customXml/broadset-project.xml` represents the
+ * pre-export state and the slide tree represents the current state.
+ *
+ * For each element this function compares the cross-format fingerprint
+ * (xxhash via `_shared/fingerprint/`) against the interop ledger. When
+ * the fingerprint matches the ledger value the preserved state wins
+ * (it carries richer metadata: data bindings, animations, ext data).
+ * When the fingerprint diverges, the current visual state wins and
+ * `extensions.pptx.dirty` flips to `true`.
+ *
+ * Spec acceptance: "When element hash diverges from the ledger, dirty
+ * flips to true and current slide state wins field-by-field."
+ *
+ * The synchronous {@link importPptx} preserves backward compatibility
+ * — it returns the fast-path output as-is. Callers that need
+ * external-edit detection should migrate to this async variant.
+ */
+export async function importPptxWithMerge(data: Uint8Array): Promise<PptxImportReport> {
+  const baseReport = importPptxWithReport(data);
+  const pkg = readOoxmlPackage(data);
+  const preservedXml = readTextPart(pkg, BROADSET_CUSTOM_XML_PROJECT);
+
+  if (preservedXml === null) return baseReport;
+
+  const preserved = parseProjectCustomXml(preservedXml);
+
+  if (!isDocumentShape(preserved)) return baseReport;
+
+  // Re-run operator-level extraction so we have both representations.
+  const operatorLevel = importOperatorLevel(pkg);
+  const ledger = readLedgerEntries(pkg);
+  const merged = await mergeFromLedger(preserved, operatorLevel.document, ledger);
+
+  return { document: merged, warnings: baseReport.warnings };
+}
+
+function readLedgerEntries(pkg: OoxmlPackage): ReadonlyMap<string, string> {
+  const ledgerXml = readTextPart(pkg, BROADSET_CUSTOM_XML_INTEROP);
+  const map = new Map<string, string>();
+
+  if (ledgerXml === null) return map;
+
+  const ledger = parseLedgerXml(ledgerXml);
+
+  if (ledger === null) return map;
+  for (const entry of ledger.entries) map.set(entry.elementId, entry.fingerprint);
+
+  return map;
+}
+
+async function mergeFromLedger(
+  preserved: BroadsetDocument,
+  current: BroadsetDocument,
+  ledger: ReadonlyMap<string, string>,
+): Promise<BroadsetDocument> {
+  const currentById = new Map<string, BroadsetDocument['elements'][number]>();
+
+  for (const el of current.elements) currentById.set(el.id, el);
+
+  const merged: BroadsetDocument['elements'][number][] = [];
+
+  for (const preservedEl of preserved.elements) {
+    merged.push(await pickPreservedOrEdited(preservedEl, currentById.get(preservedEl.id), ledger));
+  }
+
+  for (const currentEl of current.elements) {
+    if (!preserved.elements.some((p) => p.id === currentEl.id)) {
+      merged.push(markDirty(currentEl));
+    }
+  }
+
+  return { ...preserved, elements: merged };
+}
+
+async function pickPreservedOrEdited(
+  preservedEl: BroadsetDocument['elements'][number],
+  currentEl: BroadsetDocument['elements'][number] | undefined,
+  ledger: ReadonlyMap<string, string>,
+): Promise<BroadsetDocument['elements'][number]> {
+  if (currentEl === undefined) return preservedEl;
+
+  const ledgerHash = ledger.get(preservedEl.id);
+  const currentHash = await fingerprintElement(currentEl);
+
+  if (ledgerHash !== undefined && ledgerHash === currentHash) return preservedEl;
+
+  return mergeEdited(preservedEl, currentEl);
+}
+
+function mergeEdited(
+  preservedEl: BroadsetDocument['elements'][number],
+  currentEl: BroadsetDocument['elements'][number],
+): BroadsetDocument['elements'][number] {
+  return {
+    ...currentEl,
+    ...(preservedEl.dataField !== null ? { dataField: preservedEl.dataField } : {}),
+    ...(preservedEl.visibleWhen !== null ? { visibleWhen: preservedEl.visibleWhen } : {}),
+    ...(preservedEl.repeater !== null ? { repeater: preservedEl.repeater } : {}),
+    extensions: {
+      ...preservedEl.extensions,
+      pptx: {
+        ...((preservedEl.extensions['pptx'] as Record<string, unknown> | undefined) ?? {}),
+        dirty: true,
+      },
+    },
+  };
+}
+
+function markDirty(el: BroadsetDocument['elements'][number]): BroadsetDocument['elements'][number] {
+  return {
+    ...el,
+    extensions: {
+      ...el.extensions,
+      pptx: { ...((el.extensions['pptx'] as Record<string, unknown> | undefined) ?? {}), dirty: true },
+    },
+  };
 }
 
 function enforcePackageCaps(pkg: OoxmlPackage, warnings: PptxImportWarning[]): void {
