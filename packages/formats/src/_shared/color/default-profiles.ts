@@ -23,10 +23,14 @@ const ICC_HEADER_SIZE = 128;
 const TAG_TABLE_HEADER_SIZE = 4;
 const TAG_TABLE_ENTRY_SIZE = 12;
 
-// ICC v4.3 — parametricCurveType (`para`) requires v4. PDF/A allows
-// both v2 and v4 ICC profiles; v4 + `para` is the correct way to
-// encode the sRGB transfer function without sample-table padding.
-const PROFILE_VERSION_4_3_0 = 0x04300000;
+// ICC v2.4. The `para` parametric-curve type is also defined in
+// ICC.1:2010-12 as a v2 type (it was added by erratum and is widely
+// supported by v2 parsers including lcms / littlecms / ColorSync).
+// We use a v2 header here because the `desc` tag body is encoded in
+// the v2 `textDescriptionType` shape — bumping to v4 would require
+// rewriting `desc` as `multiLocalizedUnicodeType` (`mluc`) for strict
+// v4 parsers (e.g. lcms in strict mode) to accept the profile.
+const PROFILE_VERSION_2_4_0 = 0x02400000;
 const D50_X_S15_FIXED = 0x0000_f6d6; // ≈ 0.9642
 const D50_Y_S15_FIXED = 0x0001_0000; // 1.0000
 const D50_Z_S15_FIXED = 0x0000_d32d; // ≈ 0.8249
@@ -121,7 +125,7 @@ function buildMinimalSrgbV2Profile(): Uint8Array {
   // ── 128-byte header ────────────────────────────────────────────────
   view.setUint32(0, totalSize); // profile size
   writeAscii(out, 4, '    '); // preferred CMM type — none
-  view.setUint32(8, PROFILE_VERSION_4_3_0);
+  view.setUint32(8, PROFILE_VERSION_2_4_0);
   writeAscii(out, 12, 'mntr'); // device class — display
   writeAscii(out, 16, 'RGB '); // colour space
   writeAscii(out, 20, 'XYZ '); // PCS

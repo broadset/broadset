@@ -79,10 +79,35 @@ function capturePageBlobs(pdf: PDFDocument, page: PDFPage, blobs: Map<string, st
 
     if (elementId === undefined) continue;
 
-    const sliceBytes = streamBytes.subarray(slice.start, slice.end);
+    // Trim PDF inter-operator whitespace at the slice boundaries so
+    // the captured blob contains only the operator bytes themselves.
+    // The BDC operator emits trailing whitespace and the EMC operator
+    // is preceded by whitespace; including those in the blob would
+    // make subsequent re-emission round-trips diverge byte-for-byte.
+    const trimmedStart = skipPdfWhitespaceForward(streamBytes, slice.start, slice.end);
+    const trimmedEnd = skipPdfWhitespaceBackward(streamBytes, trimmedStart, slice.end);
+    const sliceBytes = streamBytes.subarray(trimmedStart, trimmedEnd);
 
     blobs.set(elementId, bytesToBase64(sliceBytes));
   }
+}
+
+const PDF_WHITESPACE_BYTES: ReadonlySet<number> = new Set([0x00, 0x09, 0x0a, 0x0c, 0x0d, 0x20]);
+
+function skipPdfWhitespaceForward(bytes: Uint8Array, start: number, end: number): number {
+  let i = start;
+
+  while (i < end && PDF_WHITESPACE_BYTES.has(bytes[i] ?? 0)) i += 1;
+
+  return i;
+}
+
+function skipPdfWhitespaceBackward(bytes: Uint8Array, start: number, end: number): number {
+  let i = end;
+
+  while (i > start && PDF_WHITESPACE_BYTES.has(bytes[i - 1] ?? 0)) i -= 1;
+
+  return i;
 }
 
 /**

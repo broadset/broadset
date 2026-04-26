@@ -466,9 +466,6 @@ async function renderElement(
   fetchFn?: typeof globalThis.fetch,
 ): Promise<void> {
   const el = resolveAnimatedElementInState(rawElement);
-  const absolute = composeCanvasAbsolutePosition(el, elementsById);
-  const rotate = elementRotationBrackets(el, absolute, canvas, trimHeightPt);
-  const clipBrackets = clipPathBrackets(el, absolute, canvas, trimHeightPt);
   const markedContent = markedContentBrackets(pdf, page, buildMarkedContentTag(el));
   const ocgBinding = ocgRegistration.bindingByElementId.get(el.id);
 
@@ -489,6 +486,42 @@ async function renderElement(
   // CTM operators nest inside so the marked-content pair survives across
   // any graphics-state resets Illustrator / Acrobat apply on save.
   page.pushOperators(markedContent.start);
+
+  // Byte-stable re-emission: when the importer captured the element's
+  // operator slice into `extensions.pdf.preservationBlob` AND the
+  // element has not been edited since (`dirty: false`), re-emit the
+  // captured bytes verbatim instead of running the synthesizer. This
+  // preserves the source PDF's exact `cm` matrices, number formatting,
+  // and graphics-state push order — what reproducible-build / diff
+  // tools rely on.
+  const reEmittedFromBlob = tryEmitPreservationBlob(page, el);
+
+  if (!reEmittedFromBlob) {
+    await synthesizeElement(page, el, canvas, trimHeightPt, pdf, fontMap, fallbackFont, elementsById, colorSpace, fetchFn);
+  }
+
+  page.pushOperators(markedContent.end);
+
+  if (ocgBinding !== undefined) {
+    page.pushOperators(PDFOperator.of(PDFOperatorNames.EndMarkedContent));
+  }
+}
+
+async function synthesizeElement(
+  page: PDFPage,
+  el: BroadsetElement,
+  canvas: Canvas,
+  trimHeightPt: number,
+  pdf: PDFDocument,
+  fontMap: ReadonlyMap<string, PDFFont>,
+  fallbackFont: PDFFont,
+  elementsById: ReadonlyMap<string, BroadsetElement>,
+  colorSpace: DocumentColorSpace,
+  fetchFn?: typeof globalThis.fetch,
+): Promise<void> {
+  const absolute = composeCanvasAbsolutePosition(el, elementsById);
+  const rotate = elementRotationBrackets(el, absolute, canvas, trimHeightPt);
+  const clipBrackets = clipPathBrackets(el, absolute, canvas, trimHeightPt);
 
   applyBrackets(page, rotate, 'start');
   applyBrackets(page, clipBrackets, 'start');
@@ -527,11 +560,66 @@ async function renderElement(
 
   applyBrackets(page, clipBrackets, 'end');
   applyBrackets(page, rotate, 'end');
+}
 
-  page.pushOperators(markedContent.end);
+/**
+ * Re-emit the element's captured operator slice from
+ * `extensions.pdf.preservationBlob` verbatim, bypassing the
+ * synthesizer. Returns `true` when the blob was emitted (caller MUST
+ * skip synthesis), `false` when there is no blob or the element is
+ * dirty / corrupted (caller falls back to synthesis).
+ */
+function tryEmitPreservationBlob(page: PDFPage, el: BroadsetElement): boolean {
+  const preserved = readPreservationState(el);
 
-  if (ocgBinding !== undefined) {
-    page.pushOperators(PDFOperator.of(PDFOperatorNames.EndMarkedContent));
+  if (preserved === null) return false;
+
+  const decoded = decodeBase64(preserved);
+
+  if (decoded === null || decoded.length === 0) return false;
+
+  // pdf-lib's `PDFOperator` writes its `name` field verbatim into the
+  // page's content stream. By constructing an operator whose `name`
+  // is the decoded slice and whose args are empty, the bytes appear
+  // in the content stream exactly between `/BSET ... BDC` and `EMC`.
+  // The cast to `PDFOperatorNames` is necessary because the public
+  // type narrows to the operator-name enum, but the runtime accepts
+  // any string and serializes it byte-for-byte.
+  const rawOperator = PDFOperator.of(decoded as unknown as PDFOperatorNames, []);
+
+  page.pushOperators(rawOperator);
+
+  return true;
+}
+
+/**
+ * Read `extensions.pdf.preservationBlob` from an element when its
+ * `dirty` flag is false. Returns `null` when the element is dirty,
+ * has no blob, or carries no `extensions.pdf` block at all.
+ */
+function readPreservationState(el: BroadsetElement): string | null {
+  const extensions = el.extensions as Readonly<Record<string, unknown>> | undefined;
+
+  if (extensions === undefined) return null;
+
+  const pdfExt = extensions['pdf'];
+
+  if (pdfExt === undefined || pdfExt === null || typeof pdfExt !== 'object') return null;
+
+  const cast = pdfExt as Record<string, unknown>;
+
+  if (cast['dirty'] === true) return null;
+
+  const blob = cast['preservationBlob'];
+
+  return typeof blob === 'string' && blob.length > 0 ? blob : null;
+}
+
+function decodeBase64(value: string): string | null {
+  try {
+    return globalThis.atob(value);
+  } catch {
+    return null;
   }
 }
 
@@ -559,10 +647,10 @@ export async function exportPdfWithPreflight(
   doc: BroadsetDocument,
   fetchOrOptions?: typeof globalThis.fetch | PdfExportOptions,
 ): Promise<PdfExportResult> {
-  const warnings = collectPreflightWarnings(doc);
-  const bytes = await exportPdfBytes(doc, fetchOrOptions);
+  const preflightWarnings = collectPreflightWarnings(doc);
+  const { bytes, runtimeWarnings } = await runExport(doc, fetchOrOptions);
 
-  return { bytes, warnings };
+  return { bytes, warnings: [...preflightWarnings, ...runtimeWarnings] };
 }
 
 /**
@@ -578,6 +666,27 @@ export async function exportPdfBytes(
   doc: BroadsetDocument,
   fetchOrOptions?: typeof globalThis.fetch | PdfExportOptions,
 ): Promise<Uint8Array> {
+  const result = await runExport(doc, fetchOrOptions);
+
+  return result.bytes;
+}
+
+interface InternalExportResult {
+  readonly bytes: Uint8Array;
+  readonly runtimeWarnings: readonly string[];
+}
+
+/**
+ * Internal export driver shared by `exportPdfBytes` and
+ * `exportPdfWithPreflight`. Returns the produced bytes plus any
+ * warnings collected during the render pass (font fallbacks,
+ * unsupported features, etc.) so callers can choose whether to
+ * surface them.
+ */
+async function runExport(
+  doc: BroadsetDocument,
+  fetchOrOptions?: typeof globalThis.fetch | PdfExportOptions,
+): Promise<InternalExportResult> {
   const options = resolveOptions(fetchOrOptions);
   const fetchFn = options.fetch;
   const pdfaConformance = options.pdfaConformance;
@@ -594,7 +703,7 @@ export async function exportPdfBytes(
   // Always embed a Helvetica fallback up-front so placeholder labels and
   // text elements without a declared family have a working PDFFont.
   const fallbackFont = await pdf.embedFont(StandardFonts.Helvetica);
-  const fontMap = await resolveFonts(doc, pdf, fetchFn);
+  const { fontMap, failures: fontFailures } = await resolveFonts(doc, pdf, fetchFn);
   const elementsById = indexElementsById(doc.elements);
 
   // Register one OCG per Broadset page so PDF readers surface per-page
@@ -652,7 +761,9 @@ export async function exportPdfBytes(
   // PDF reader; the only difference is readability of metadata by tools
   // (and test assertions that grep the bytes for `/BSET`, `/OCProperties`,
   // etc.). Round-trip import tools don't care either way.
-  return await pdf.save({ useObjectStreams: false });
+  const bytes = await pdf.save({ useObjectStreams: false });
+
+  return { bytes, runtimeWarnings: fontFailures };
 }
 
 function resolveOptions(fetchOrOptions: typeof globalThis.fetch | PdfExportOptions | undefined): PdfExportOptions {

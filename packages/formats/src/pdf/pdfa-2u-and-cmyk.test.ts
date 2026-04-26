@@ -1,4 +1,5 @@
 import { rgbColor } from '@broadset/model';
+import { decodePDFRawStream, PDFArray, PDFDocument, PDFRawStream, PDFRef, PDFStream } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 
 import { exportPdfBytes, importPdfDocument, validatePdfA2b } from './index';
@@ -6,6 +7,65 @@ import { makeCanvas, makeDocument, makeElement, makeStyle } from './test-helpers
 
 function bytesToString(bytes: Uint8Array): string {
   return new TextDecoder('latin1').decode(bytes);
+}
+
+function tryDecodeStream(stream: PDFStream): Uint8Array | undefined {
+  if (!(stream instanceof PDFRawStream)) return undefined;
+
+  try {
+    return decodePDFRawStream(stream).decode();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Decode every page's content stream from a PDF byte buffer and
+ * return the concatenated operator text. Used by the CMYK / RGB
+ * operator-presence tests to look at the actual painted operators
+ * after FlateDecode decompression.
+ */
+function resolveContentStream(pdf: PDFDocument, entry: unknown): PDFStream | undefined {
+  if (entry instanceof PDFRef) {
+    const resolved = pdf.context.lookup(entry);
+
+    return resolved instanceof PDFStream ? resolved : undefined;
+  }
+
+  if (entry instanceof PDFStream) return entry;
+
+  return undefined;
+}
+
+function contentEntries(contents: unknown): readonly unknown[] {
+  if (contents instanceof PDFArray) {
+    return Array.from({ length: contents.size() }, (_, i) => contents.get(i));
+  }
+
+  return [contents];
+}
+
+async function decodePageContentText(bytes: Uint8Array): Promise<string> {
+  const pdf = await PDFDocument.load(bytes, { updateMetadata: false });
+  const chunks: string[] = [];
+
+  for (const page of pdf.getPages()) {
+    const contents = page.node.Contents();
+
+    if (contents === undefined) continue;
+
+    for (const entry of contentEntries(contents)) {
+      const stream = resolveContentStream(pdf, entry);
+
+      if (stream === undefined) continue;
+
+      const decoded = tryDecodeStream(stream);
+
+      if (decoded !== undefined) chunks.push(bytesToString(decoded));
+    }
+  }
+
+  return chunks.join('\n');
 }
 
 describe('PDF/A-2u — Unicode mapping conformance variant', () => {
@@ -64,7 +124,7 @@ describe('PDF CMYK colour emission', () => {
    * instead of `rg` (RGB) operators. Verifies the colour-space
    * routing wires through end-to-end.
    */
-  it('emits CMYK colour operators when outputIntent.colorSpace is cmyk', async () => {
+  it('emits CMYK k operators in the decompressed content stream when colorSpace is cmyk', async () => {
     const canvas = makeCanvas({ width: 210, height: 118, unit: 'mm' });
     const doc = makeDocument({
       id: 'cmyk-doc',
@@ -86,14 +146,16 @@ describe('PDF CMYK colour emission', () => {
     const bytes = await exportPdfBytes(doc, { pdfaConformance: '2b' });
     const text = bytesToString(bytes);
 
-    // pdf-lib's drawRectangle with `cmyk(...)` color emits a `k`
-    // operator. The presence of the `k` operator in the FlateDecode
-    // -compressed content stream is hard to grep directly; we
-    // instead confirm the `/N 4` (4-component CMYK ICC) declaration
-    // makes it onto the OutputIntent profile stream.
     expect(text).toContain('/OutputIntents');
 
-    // The PDF still validates as PDF/A.
+    // Decompress every page's content stream and confirm the actual
+    // PDF operators include `k` (non-stroking CMYK) — NOT just `rg`
+    // (RGB). This proves srgbToDeviceCmyk is wired through the render
+    // path, not just declared on the output intent.
+    const decoded = await decodePageContentText(bytes);
+
+    expect(decoded).toMatch(/\b\d+(?:\.\d+)?\s+\d+(?:\.\d+)?\s+\d+(?:\.\d+)?\s+\d+(?:\.\d+)?\s+k\b/);
+
     const validation = await validatePdfA2b(bytes);
 
     expect(validation.valid).toBe(true);
@@ -101,10 +163,11 @@ describe('PDF CMYK colour emission', () => {
 
   /**
    * @description The default sRGB document path does NOT route
-   * colours through CMYK conversion — confirms the colour-space
-   * branching is correctly gated on `outputIntent.colorSpace`.
+   * colours through CMYK conversion — the decompressed content stream
+   * MUST emit `rg` (non-stroking RGB) operators and contain no `k`
+   * operators for solid-colour fills.
    */
-  it('does not convert colours to CMYK for documents without a CMYK output intent', async () => {
+  it('emits rg operators (not k) when no CMYK output intent is declared', async () => {
     const doc = makeDocument({
       id: 'rgb-default',
       elements: [
@@ -118,9 +181,9 @@ describe('PDF CMYK colour emission', () => {
     });
 
     const bytes = await exportPdfBytes(doc);
+    const decoded = await decodePageContentText(bytes);
 
-    // Export succeeds without CMYK output intent — the colour-space
-    // branch is bypassed and bytes still produce a valid PDF.
-    expect(bytes.length).toBeGreaterThan(100);
+    expect(decoded).toMatch(/\b\d+(?:\.\d+)?\s+\d+(?:\.\d+)?\s+\d+(?:\.\d+)?\s+rg\b/);
+    expect(decoded).not.toMatch(/\b\d+(?:\.\d+)?\s+\d+(?:\.\d+)?\s+\d+(?:\.\d+)?\s+\d+(?:\.\d+)?\s+k\b/);
   });
 });

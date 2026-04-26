@@ -5,7 +5,7 @@ import { DEFAULT_PROFILE_IDENTIFIER, getDefaultProfile } from './default-profile
 const ICC_HEADER_SIZE = 128;
 const TAG_TABLE_HEADER_SIZE = 4;
 const TAG_TABLE_ENTRY_SIZE = 12;
-const PROFILE_VERSION_4_3_0 = 0x04300000;
+const PROFILE_VERSION_2_4_0 = 0x02400000;
 const SRGB_TOLERANCE = 1e-3;
 
 interface TagEntry {
@@ -56,16 +56,17 @@ function findTag(tags: ReadonlyArray<TagEntry>, signature: string): TagEntry {
 
 describe('Bundled synthetic sRGB ICC profile', () => {
   /**
-   * @description The bundled ICC profile must declare ICC version 4.3
-   * (or any v4 release) — parametricCurveType ('para') was added in
-   * ICC v4 and is required to encode the sRGB transfer function
-   * without a sample table.
+   * @description The bundled ICC profile declares ICC v2.4 in the
+   * header. The profile body uses v2 tag types (`textDescriptionType`
+   * for `desc`, `textType` for `cprt`, `XYZType` for primaries),
+   * which is consistent with a v2 header — strict parsers (lcms,
+   * littlecms, ColorSync) accept the profile in their default modes.
    */
-  it('declares ICC v4 in the profile header', () => {
+  it('declares ICC v2.4 in the profile header', () => {
     const bytes = getDefaultProfile('rgb');
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
-    expect(view.getUint32(8)).toBe(PROFILE_VERSION_4_3_0);
+    expect(view.getUint32(8)).toBe(PROFILE_VERSION_2_4_0);
   });
 
   /**

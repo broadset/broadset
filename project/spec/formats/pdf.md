@@ -541,11 +541,14 @@ The following items ship in subsequent P6 subphases and are tracked here:
 - **P6.5** — Reconciliation wrapper via `_shared/reconcile/` and `_shared/fingerprint/`.
 - **P6.6** — External-tool fixture corpus, chain-round-trip tests via shared test infrastructure, UI wiring for import / export / preflight surfaces.
 
-_The following items are intentionally scoped out of the PDF track and tracked by other specs:_
+_The following items are honest residual gaps after the Phase 6+9 closure pass — flagged so future work knows where the cliffs are and so the implementation never claims more than it delivers:_
 
-- PDF/A-2b conformance — covered by [pdf-pdfa-compliance-plan.md](../../implementation/pdf-pdfa-compliance-plan.md) as a deliberate follow-up.
-- Run-edit UI, ICC picker, gradient editor, preflight panel, export options modal, import warnings modal, reconciliation diff view — covered by the io-prereqs Phase 5 UI spec under [project/spec/ui/](../ui/) and interleaved during PDF Phase 6.6 per the plan.
-- External-tool fixture corpus and chain CT harness — covered by the io-prereqs Phase 6 testing infrastructure (`_shared/test-infrastructure/`), reused unchanged across the PDF track.
+- **External PDF/A validator (e.g. veraPDF) integration.** The bundled `validatePdfA2b` is a homegrown structural check (presence of `/OutputIntents`, `/GTS_PDFA1`, trailer `/ID`, `pdfaid:` XMP, no `/Encrypt`, no `/JavaScript`) — it does NOT exercise the hundreds of clauses in ISO 19005-2 that veraPDF audits (e.g. CIDFont CIDSystemInfo, transparency group blend mode restrictions, font ToUnicode coverage). PDF/A-2b conformance for arbitrary documents is therefore self-graded; veraPDF integration is a deliberate follow-up.
+- **PDF/A-2u ToUnicode enforcement.** The `2u` variant currently only emits `pdfaid:conformance="U"` in the XMP packet. ISO 19005-2 §6.2.11 also requires every text-showing operator to map to Unicode via the font's `/ToUnicode` CMap or a Standard-14 / WinAnsi encoding equivalent. The exporter does not yet verify that every embedded custom font carries a `/ToUnicode` CMap covering its used glyphs; documents that use non-Latin scripts in custom Google Fonts may emit a 2u packet whose actual content stream fails the ToUnicode check.
+- **Real-world third-party fixture corpus.** The importer is exercised against PDFs the test suite constructs via pdf-lib. There are no Illustrator / Acrobat / InDesign / Figma / macOS Preview / Microsoft Word / pdflatex fixtures committed under `packages/formats/src/pdf/__fixtures__/`. The "import = arbitrary external files" rule in `AGENTS.md` is therefore unenforced at test time. The reconciliation pipeline and fingerprint-based identity recovery are implemented but unproven against producer-quirk content streams.
+- **PDF/A-2a (tagged structure tree) conformance.** `2a` adds a logical structure tree (`/StructTreeRoot`, `/Marked true` in `/MarkInfo`, `Span` / `P` / `Figure` / `H1`–`H6` structure elements) for accessibility. Out of scope for the current work — the exporter writes `pdfaid:part 2 conformance B|U` only.
+- **WOFF2 font embedding.** Google Fonts increasingly serves WOFF2-only URLs. pdf-lib's bundled fontkit cannot decompress WOFF2; documents that reference such fonts now surface a preflight warning and fall back to Helvetica. Adding a WOFF2 decompressor (e.g. `wawoff2`) to the fontkit pipeline is a follow-up.
+- **Run-edit UI, ICC picker, gradient editor, preflight panel, export options modal, import warnings modal, reconciliation diff view** — covered by the io-prereqs Phase 5 UI spec under [project/spec/ui/](../ui/) and interleaved during PDF Phase 6.6 per the plan.
 
 ---
 

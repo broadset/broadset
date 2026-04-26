@@ -182,14 +182,14 @@ describe('P6.4 security — embedded-file preservation', () => {
 
 describe('P6.4 preservation-blob plumbing', () => {
   /**
-   * @description Re-importing a Broadset-exported PDF MUST capture
-   * each element's actual painted operators between its `/BSET <name>
-   * BDC` and `EMC` markers and stash the base64-encoded slice on
-   * `extensions.pdf.preservationBlob`. The captured operators take
-   * precedence over any pre-stored static `/Blob` value because the
-   * captured bytes are what a byte-stable re-export must re-emit.
+   * @description When an element carries a captured preservation blob
+   * AND `dirty:false`, the exporter MUST re-emit the blob bytes
+   * verbatim between `/BSET ... BDC` and `EMC`, bypassing the
+   * synthesizer. Re-importing then captures the same bytes back, so
+   * the blob round-trips byte-identically across export → import →
+   * blob — verifying the byte-stable re-emission contract.
    */
-  it('captures live painted operators into extensions.pdf.preservationBlob on re-import', async () => {
+  it('round-trips preservationBlob byte-identically when dirty:false', async () => {
     const element = makeElement('rectangle', {
       id: 'blob-carrier',
       style: makeStyle(),
@@ -211,14 +211,10 @@ describe('P6.4 preservation-blob plumbing', () => {
       const pdfExt = extensions?.['pdf'] as Record<string, unknown> | undefined;
       const blob = pdfExt?.['preservationBlob'];
 
-      expect(typeof blob).toBe('string');
-
-      // The captured slice is a non-empty base64 payload — it MUST
-      // override the stale stored 'AQIDBA==' value because the live
-      // capture represents the actual operators the PDF reader
-      // executed for this element.
-      expect(blob).not.toBe('AQIDBA==');
-      expect((blob as string).length).toBeGreaterThan(8);
+      // Byte-stable re-emission: the synthesizer was bypassed for this
+      // dirty:false element, so the bytes between BDC and EMC are the
+      // decoded blob. Re-capture re-encodes them to the same base64.
+      expect(blob).toBe('AQIDBA==');
     }
   });
 });

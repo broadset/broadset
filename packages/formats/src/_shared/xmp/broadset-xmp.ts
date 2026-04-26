@@ -28,10 +28,18 @@ const RDF_CLOSE = '</rdf:RDF>';
  * existed when the document was exported) plus a fingerprint so the
  * reconciliation pipeline can recover identity after an external tool
  * strips `data-bs-*` attributes or renames the shape.
+ *
+ * `payload` is an optional JSON-serialised snapshot of the entire
+ * `BroadsetElement`. When present, the importer can hydrate the
+ * element with full geometry + style instead of placeholder defaults.
+ * Carriers that have no room for the payload (e.g. a tight PSD
+ * resource) MAY omit it; the importer falls back to placeholder
+ * geometry in that case.
  */
 export interface BroadsetXmpElementEntry {
   readonly id: string;
   readonly fingerprint: string;
+  readonly payload?: string | undefined;
 }
 
 /**
@@ -55,6 +63,7 @@ export interface BroadsetXmpPacket {
 const elementEntrySchema: z.ZodType<BroadsetXmpElementEntry> = z.object({
   id: z.string().min(1),
   fingerprint: z.string().min(1),
+  payload: z.string().optional(),
 });
 
 const pdfaSchema: z.ZodType<BroadsetXmpPdfAIdentifier> = z.object({
@@ -91,12 +100,20 @@ function escapeXml(value: string): string {
 }
 
 function renderElementEntry(entry: BroadsetXmpElementEntry): string {
+  const payloadLine =
+    entry.payload === undefined
+      ? ''
+      : `          <broadset:payload>${escapeXml(entry.payload)}</broadset:payload>`;
+
   return [
     '        <rdf:li rdf:parseType="Resource">',
     `          <broadset:id>${escapeXml(entry.id)}</broadset:id>`,
     `          <broadset:fingerprint>${escapeXml(entry.fingerprint)}</broadset:fingerprint>`,
+    payloadLine,
     '        </rdf:li>',
-  ].join('\n');
+  ]
+    .filter((line) => line !== '')
+    .join('\n');
 }
 
 /**
@@ -207,7 +224,13 @@ function extractEntries(description: ParsedRdfDescription): readonly BroadsetXmp
 
     if (id === undefined || fingerprint === undefined) continue;
 
-    entries.push({ id, fingerprint });
+    const payload = toStringValue(cast['broadset:payload']);
+
+    entries.push({
+      id,
+      fingerprint,
+      ...(payload !== undefined ? { payload } : {}),
+    });
   }
 
   return entries;

@@ -199,7 +199,10 @@ export async function importPdfDocument(
   const tags = collectMarkedContentTags(pdf);
   const operatorBlobs = capturePreservationBlobs(pdf);
   const tagsWithLiveBlobs = mergeOperatorBlobsIntoTags(tags, operatorBlobs);
-  const document = hydrateDocumentFromFastPath(xmp.documentId, tagsWithLiveBlobs, { pdfa: xmp.pdfa });
+  const document = hydrateDocumentFromFastPath(xmp.documentId, tagsWithLiveBlobs, {
+    pdfa: xmp.pdfa,
+    xmpEntries: xmp.elements,
+  });
 
   warnings.push(FAST_PATH_PLACEHOLDER_WARNING);
 

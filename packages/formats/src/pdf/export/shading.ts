@@ -19,8 +19,22 @@ const SHADING_KEY = PDFName.of('Shading');
 const RESOURCES_KEY = PDFName.of('Resources');
 const PROPERTIES_KEY = PDFName.of('Properties');
 
-/** Stable counter for unique pattern names per document. */
-let patternCounter = 0;
+/**
+ * Per-document pattern counter. Module-global state would leak the
+ * counter across export passes in the same Node process, breaking
+ * deterministic byte output (`BSPat_1`, `BSPat_2`, ...) — so the
+ * counter is keyed on the `PDFDocument` and resets when a fresh
+ * document is created.
+ */
+const patternCountersByDoc = new WeakMap<PDFDocument, number>();
+
+function nextPatternIndex(pdf: PDFDocument): number {
+  const next = (patternCountersByDoc.get(pdf) ?? 0) + 1;
+
+  patternCountersByDoc.set(pdf, next);
+
+  return next;
+}
 
 /**
  * Result of registering a gradient as a PDF shading pattern.
@@ -90,9 +104,7 @@ export function registerLinearOrRadialShading(
   });
   const patternRef = pdf.context.register(patternDict);
 
-  patternCounter += 1;
-
-  const patternName = PDFName.of(`BSPat_${String(patternCounter)}`);
+  const patternName = PDFName.of(`BSPat_${String(nextPatternIndex(pdf))}`);
 
   registerPagePattern(pdf, page, patternName, patternRef);
 
@@ -239,8 +251,10 @@ function buildLinearShading(
  *
  * Centre defaults to the element's geometric centre; gradient.center
  * (a `[xPercent, yPercent]` tuple) overrides. Inner radius is 0 (CSS
- * radial-gradient always starts from a point); outer radius is half
- * the element's longer side, matching CSS's `farthest-corner` default.
+ * radial-gradient always starts from a point); outer radius is the
+ * Euclidean distance from the centre to the farthest of the four
+ * element corners — CSS `farthest-corner` semantics for an arbitrary
+ * (possibly off-centre) gradient origin.
  */
 function buildRadialShading(
   context: PDFContext,
@@ -251,7 +265,7 @@ function buildRadialShading(
   const center = gradient.center ?? [50, 50];
   const cxPt = geometry.xPt + (geometry.wPt * center[0]) / 100;
   const cyPt = geometry.yPt + geometry.hPt - (geometry.hPt * center[1]) / 100;
-  const radiusPt = Math.max(geometry.wPt, geometry.hPt) / 2;
+  const radiusPt = farthestCornerDistance(cxPt, cyPt, geometry);
 
   return context.obj({
     ShadingType: 3,
@@ -260,6 +274,17 @@ function buildRadialShading(
     Function: fn,
     Extend: [true, true],
   });
+}
+
+function farthestCornerDistance(cx: number, cy: number, geometry: ShadingGeometry): number {
+  const left = geometry.xPt;
+  const right = geometry.xPt + geometry.wPt;
+  const bottom = geometry.yPt;
+  const top = geometry.yPt + geometry.hPt;
+  const dx = Math.max(Math.abs(cx - left), Math.abs(cx - right));
+  const dy = Math.max(Math.abs(cy - bottom), Math.abs(cy - top));
+
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 /**

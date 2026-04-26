@@ -35,7 +35,15 @@ export async function buildBroadsetXmpPacket(
   options: BroadsetXmpPacketOptions = {},
 ): Promise<BroadsetXmpPacket> {
   const entries = await Promise.all(
-    doc.elements.map(async (el) => ({ id: el.id, fingerprint: await fingerprintElement(el) })),
+    doc.elements.map(async (el) => ({
+      id: el.id,
+      fingerprint: await fingerprintElement(el),
+      // Carry the element's full JSON snapshot so the importer can
+      // hydrate geometry, style, and content without re-deriving them
+      // from the operator stream. The XMP packet is the trusted
+      // round-trip surface for Broadset-authored PDFs (IO-D-08).
+      payload: JSON.stringify(el),
+    })),
   );
 
   return {
