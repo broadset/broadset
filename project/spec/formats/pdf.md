@@ -467,6 +467,53 @@ Export preflight and import warnings MUST follow IO-D-14 ("preflight warns and p
 
 ---
 
+### Requirement: PDF/A-2b Conformance Mode
+
+When the caller opts into `pdfaConformance: '2b'` (Phase 9 extension), the exporter MUST produce ISO 19005-2 level B compliant output: every font fully embedded with a complete ToUnicode CMap, every colour referenced through an embedded ICC profile / OutputIntent, no encryption, no JavaScript, no external references, document-level XMP carrying the `pdfaid:part="2"` + `pdfaid:conformance="B"` identifier, and a populated trailer `ID` array. Default `exportPdfBytes` (no PDF/A flag) emits regular PDF 1.7 with no PDF/A constraints.
+
+#### Scenario: PDF/A mode embeds an OutputIntent
+
+- GIVEN a Broadset project with `document.outputIntent.iccProfileAssetId` populated and the referenced ICC asset present
+- WHEN the exporter runs with `pdfaConformance: '2b'`
+- THEN the exported PDF contains a single `/OutputIntent` array entry whose `/S` is `/GTS_PDFA1` and whose `/DestOutputProfile` references the embedded ICC byte stream
+
+#### Scenario: PDF/A mode embeds the bundled default sRGB profile when none is declared
+
+- GIVEN a Broadset project with no `document.outputIntent`
+- WHEN the exporter runs with `pdfaConformance: '2b'`
+- THEN the exporter embeds the bundled minimal-sRGB profile from `_shared/color/default-profiles` and references it as the document `/OutputIntent`
+
+#### Scenario: PDF/A mode emits the pdfaid: XMP identifier
+
+- GIVEN any document exported in PDF/A mode
+- WHEN the resulting PDF's catalog `/Metadata` stream is read
+- THEN the XMP packet contains a `pdfaid:part` element with text content `"2"` and a `pdfaid:conformance` element with text content `"B"`
+
+#### Scenario: PDF/A mode preserves the trailer `ID` array
+
+- GIVEN any document exported in PDF/A mode
+- WHEN the resulting PDF's trailer is read
+- THEN it contains a 2-element `/ID` array
+
+#### Acceptance Criteria
+
+- [ ] `exportPdfBytes(doc, { pdfaConformance: '2b' })` emits a `/OutputIntent` referencing an embedded ICC profile (declared asset or bundled sRGB fallback)
+- [ ] PDF/A export emits XMP with `pdfaid:part="2"` and `pdfaid:conformance="B"` alongside the `broadset:` namespace
+- [ ] PDF/A export emits a populated trailer `/ID` array
+- [ ] PDF/A export refuses Standard 14 font fallback — every font referenced in text elements is embedded as a subset with a ToUnicode CMap
+- [ ] PDF/A export has no `/Encrypt` entry, no `/JavaScript` actions, no `/URI` external references
+- [ ] PDF/A export wraps every page that contains transparency in `/Group << /S /Transparency /CS /DeviceRGB >>`
+- [ ] Re-importing a PDF/A export preserves `pdfaid:part` / `pdfaid:conformance` in `extensions.pdf.pdfa` so the next export can re-emit them when the user has not changed output settings
+- [ ] An in-tree structural validator (`validatePdfA2b(bytes)`) confirms the above on every PDF/A-mode test fixture; veraPDF integration is a future Spec Gap
+
+#### Spec Gaps
+
+- **veraPDF integration in CI** — full ISO 19005-2 conformance is verified by veraPDF (Java / WASM). Today the in-tree `validatePdfA2b(bytes)` checks the structural floor (XMP namespace, OutputIntent presence, trailer ID, no JS / encryption). The veraPDF wiring lands when the WASM port stabilises or a Java CI image is approved.
+- **Bundled real sRGB IEC61966-2.1 profile** — today `_shared/color/default-profiles` ships a minimal synthetic v2 profile (header + required tags only) that satisfies PDF/A structural validation. Production users provide a real ICC profile via `document.outputIntent.iccProfileAssetId`; the synthetic profile is the fallback so PDF/A export never refuses for "no profile available".
+- **PDF/A-2u** (Unicode mapping for every text run) and **PDF/A-2a** (tagged structure tree) — natural extensions once -2b is stable; tracked separately.
+
+---
+
 ### Requirement: PDF Page Dimensions (retained from prior spec)
 
 The system MUST convert canvas dimensions to PDF points (1mm = 72/25.4pt, 1in = 72pt). Generated PDF page dimensions MUST match the document canvas declared via `canvas.width` / `canvas.height` in their declared `canvas.unit`.

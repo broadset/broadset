@@ -5,7 +5,17 @@ import {
   createEmptyBroadsetDocument,
 } from '@broadset/model';
 
+import type { BroadsetXmpPdfAIdentifier } from '../../_shared/xmp';
 import type { MarkedContentKind, MarkedContentTag } from '../types';
+
+/**
+ * Optional PDF/A round-trip surface. When present on the document
+ * `extensions.pdf.pdfa` block, the next export pass can re-emit the
+ * `pdfaid:` identifier without the user having to re-opt-in.
+ */
+export interface FastPathHydrationOptions {
+  readonly pdfa?: BroadsetXmpPdfAIdentifier | undefined;
+}
 
 /**
  * Hydrate a `BroadsetDocument` from a recovered XMP document id plus the
@@ -21,6 +31,7 @@ import type { MarkedContentKind, MarkedContentTag } from '../types';
 export function hydrateDocumentFromFastPath(
   documentId: string,
   tags: readonly MarkedContentTag[],
+  options: FastPathHydrationOptions = {},
 ): BroadsetDocument {
   const empty = createEmptyBroadsetDocument();
   const elements: BroadsetElement[] = tags.map((tag, index) =>
@@ -49,10 +60,20 @@ export function hydrateDocumentFromFastPath(
     }),
   );
 
+  const documentExtensions =
+    options.pdfa !== undefined
+      ? {
+          pdf: {
+            pdfa: { part: options.pdfa.part, conformance: options.pdfa.conformance },
+          },
+        }
+      : undefined;
+
   return {
     ...empty,
     id: documentId,
     elements,
+    ...(documentExtensions !== undefined ? { extensions: documentExtensions } : {}),
   };
 }
 

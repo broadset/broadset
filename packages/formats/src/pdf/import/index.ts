@@ -11,3 +11,4 @@ export {
   readRoundTripMetadata,
 } from './parse';
 export { extractThirdPartyElements } from './third-party';
+export { type PdfAValidationResult, validatePdfA2b, validatePdfAXmpPacket } from './validate-pdfa';

@@ -9,6 +9,15 @@ import {
 } from '../../_shared/xmp';
 
 /**
+ * Optional fields layered onto the base `broadset:` packet at build
+ * time. Today only the PDF/A identifier is carried via this options
+ * hatch; future PDF-specific identifiers can extend the shape.
+ */
+export interface BroadsetXmpPacketOptions {
+  readonly pdfa?: { readonly part: string; readonly conformance: string };
+}
+
+/**
  * Build a `broadset:` XMP packet (IO-D-08 shared namespace) from the
  * document. The packet carries the document id, packet version, export
  * timestamp, and per-element identity entries (id + content-hash
@@ -16,8 +25,15 @@ import {
  * walking the operator stream and the reconciliation pipeline (P6.5) can
  * recover identity via `_shared/fingerprint/` when an external tool has
  * stripped the `/BSET` marked-content tags.
+ *
+ * When PDF/A mode is requested, callers pass `{ pdfa: { part, conformance } }`
+ * and the packet emits the `pdfaid:part` + `pdfaid:conformance` block
+ * alongside the `broadset:` block (ISO 19005-1 Annex C).
  */
-export async function buildBroadsetXmpPacket(doc: BroadsetDocument): Promise<BroadsetXmpPacket> {
+export async function buildBroadsetXmpPacket(
+  doc: BroadsetDocument,
+  options: BroadsetXmpPacketOptions = {},
+): Promise<BroadsetXmpPacket> {
   const entries = await Promise.all(
     doc.elements.map(async (el) => ({ id: el.id, fingerprint: await fingerprintElement(el) })),
   );
@@ -27,6 +43,7 @@ export async function buildBroadsetXmpPacket(doc: BroadsetDocument): Promise<Bro
     version: BROADSET_XMP_VERSION,
     exportedAt: new Date().toISOString(),
     elements: entries,
+    ...(options.pdfa !== undefined ? { pdfa: options.pdfa } : {}),
   };
 }
 

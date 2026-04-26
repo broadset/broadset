@@ -1,3 +1,5 @@
+import type { Asset } from '@broadset/model';
+
 import type { BroadsetXmpPacket as SharedBroadsetXmpPacket } from '../_shared/xmp';
 
 /**
@@ -11,6 +13,14 @@ import type { BroadsetXmpPacket as SharedBroadsetXmpPacket } from '../_shared/xm
 export type ColorSpaceChoice = 'rgb' | 'cmyk' | 'spot';
 
 /**
+ * PDF/A conformance level the exporter currently supports. Only `2b`
+ * is wired today; `2u` (Unicode mapping for every text run) and `2a`
+ * (tagged structure tree) are explicit Spec Gaps in
+ * `project/spec/formats/pdf.md` § PDF/A-2b Conformance Mode.
+ */
+export type PdfAConformance = '2b';
+
+/**
  * Options controlling the PDF export pipeline.
  *
  * All fields are optional — the exporter reads defaults from the document
@@ -20,13 +30,28 @@ export type ColorSpaceChoice = 'rgb' | 'cmyk' | 'spot';
  */
 export interface PdfExportOptions {
   /** Fetch implementation for Google Fonts / image URL resolution. */
-  readonly fetch?: typeof globalThis.fetch;
+  readonly fetch?: typeof globalThis.fetch | undefined;
   /** Subset embedded fonts to the glyphs used in the document (default true per IO-D-09). */
-  readonly subsetFonts?: boolean;
+  readonly subsetFonts?: boolean | undefined;
   /** Emit OCGs (Optional Content Groups), one per page (default true). */
-  readonly emitOcgs?: boolean;
+  readonly emitOcgs?: boolean | undefined;
   /** Override the colour space declared on `document.outputIntent`. */
-  readonly colorSpace?: ColorSpaceChoice;
+  readonly colorSpace?: ColorSpaceChoice | undefined;
+  /**
+   * Opt into PDF/A-2b conformance mode. When set, the exporter
+   * embeds a `/OutputIntent` ICC profile, populates the trailer
+   * `/ID` array, emits the `pdfaid:part` + `pdfaid:conformance` XMP
+   * identifier, and refuses pdf-lib's Standard 14 font fallback (Spec
+   * Gap until font subsetting wires up).
+   */
+  readonly pdfaConformance?: PdfAConformance | undefined;
+  /**
+   * Project-level assets used to resolve `document.outputIntent.iccProfileAssetId`
+   * to a real ICC profile during PDF/A export. When the icc-profile
+   * asset is missing the exporter falls back to the bundled minimal
+   * sRGB profile from `_shared/color/default-profiles`.
+   */
+  readonly assets?: readonly Asset[] | undefined;
 }
 
 /**

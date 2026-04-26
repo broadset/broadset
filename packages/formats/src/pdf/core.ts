@@ -8,6 +8,7 @@ import {
   applyBrackets,
   applyPageBoxes,
   attachBroadsetXmp,
+  attachOutputIntent,
   buildBroadsetXmpPacket,
   buildMarkedContentTag,
   buildRoundedRectPath,
@@ -21,6 +22,7 @@ import {
   elementRotationBrackets,
   elementTopLeftPt,
   embedImageFromBytes,
+  ensureTrailerId,
   fetchImageBytes,
   hasAnyRoundedCorner,
   indexElementsById,
@@ -35,11 +37,12 @@ import {
   resolveFonts,
   resolveGradientFallbackColor,
   resolveOpacity,
+  resolveOutputIntent,
   resolveStyleColor,
 } from './export';
 import { canvasToPoints, elementToPoints } from './geometry';
 import { drawQrOnPage } from './qr';
-import type { PdfExportResult } from './types';
+import type { PdfExportOptions, PdfExportResult } from './types';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -323,10 +326,10 @@ async function renderElement(
  */
 export async function exportPdfWithPreflight(
   doc: BroadsetDocument,
-  fetchFn?: typeof globalThis.fetch,
+  fetchOrOptions?: typeof globalThis.fetch | PdfExportOptions,
 ): Promise<PdfExportResult> {
   const warnings = collectPreflightWarnings(doc);
-  const bytes = await exportPdfBytes(doc, fetchFn);
+  const bytes = await exportPdfBytes(doc, fetchOrOptions);
 
   return { bytes, warnings };
 }
@@ -340,7 +343,13 @@ export async function exportPdfWithPreflight(
  * @param fetchFn - Optional fetch implementation for Google Fonts / URL image resolution.
  *                  Defaults to `globalThis.fetch` when available.
  */
-export async function exportPdfBytes(doc: BroadsetDocument, fetchFn?: typeof globalThis.fetch): Promise<Uint8Array> {
+export async function exportPdfBytes(
+  doc: BroadsetDocument,
+  fetchOrOptions?: typeof globalThis.fetch | PdfExportOptions,
+): Promise<Uint8Array> {
+  const options = resolveOptions(fetchOrOptions);
+  const fetchFn = options.fetch;
+  const pdfaConformance = options.pdfaConformance;
   const { canvas } = doc;
 
   const pdf = await PDFDocument.create();
@@ -351,12 +360,10 @@ export async function exportPdfBytes(doc: BroadsetDocument, fetchFn?: typeof glo
   // MediaBox/BleedBox/TrimBox/ArtBox follow canvas.bleed/safeArea declarations.
   applyPageBoxes(pdf, page, canvas);
 
-  const effectiveFetch = fetchFn ?? (typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined);
-
   // Always embed a Helvetica fallback up-front so placeholder labels and
   // text elements without a declared family have a working PDFFont.
   const fallbackFont = await pdf.embedFont(StandardFonts.Helvetica);
-  const fontMap = await resolveFonts(doc, pdf, effectiveFetch);
+  const fontMap = await resolveFonts(doc, pdf, fetchFn);
   const elementsById = indexElementsById(doc.elements);
 
   // Register one OCG per Broadset page so PDF readers surface per-page
@@ -368,12 +375,23 @@ export async function exportPdfBytes(doc: BroadsetDocument, fetchFn?: typeof glo
   drawCanvasBackground(page, canvas, trimWidthPt, trimHeightPt);
 
   for (const el of doc.elements) {
-    await renderElement(page, el, canvas, trimHeightPt, pdf, fontMap, fallbackFont, elementsById, effectiveFetch);
+    await renderElement(page, el, canvas, trimHeightPt, pdf, fontMap, fallbackFont, elementsById, fetchFn);
   }
 
   // Attach the shared `broadset:` XMP packet to the document catalog so
   // the round-trip importer (P6.4a) has a trusted metadata fast-path.
-  attachBroadsetXmp(pdf, await buildBroadsetXmpPacket(doc));
+  // PDF/A mode also injects the `pdfaid:` identifier alongside the
+  // `broadset:` namespace block.
+  const xmpPdfa = pdfaConformance === '2b' ? { part: '2', conformance: 'B' } : undefined;
+
+  attachBroadsetXmp(pdf, await buildBroadsetXmpPacket(doc, xmpPdfa !== undefined ? { pdfa: xmpPdfa } : {}));
+
+  if (pdfaConformance === '2b') {
+    const intent = resolveOutputIntent(doc, options.assets ?? []);
+
+    attachOutputIntent(pdf, intent);
+    ensureTrailerId(pdf, doc.id);
+  }
 
   // `useObjectStreams: false` keeps object dicts (catalog, page nodes,
   // OCProperties, Metadata, MediaBox) visible as plain text in the PDF
@@ -383,6 +401,21 @@ export async function exportPdfBytes(doc: BroadsetDocument, fetchFn?: typeof glo
   // (and test assertions that grep the bytes for `/BSET`, `/OCProperties`,
   // etc.). Round-trip import tools don't care either way.
   return await pdf.save({ useObjectStreams: false });
+}
+
+function resolveOptions(fetchOrOptions: typeof globalThis.fetch | PdfExportOptions | undefined): PdfExportOptions {
+  if (fetchOrOptions === undefined) {
+    return { fetch: typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined };
+  }
+
+  if (typeof fetchOrOptions === 'function') {
+    return { fetch: fetchOrOptions };
+  }
+
+  return {
+    ...fetchOrOptions,
+    fetch: fetchOrOptions.fetch ?? (typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined),
+  };
 }
 
 function drawCanvasBackground(page: PDFPage, canvas: Canvas, trimWidthPt: number, trimHeightPt: number): void {

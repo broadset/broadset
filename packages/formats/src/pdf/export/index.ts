@@ -35,6 +35,13 @@ export { type OcgRegistration, registerPageOcgs } from './ocg';
 export { applyPageBoxes, type PageBoxesResult } from './page-boxes';
 export { applyBrackets, elementTopLeftPt } from './page-layout';
 export { renderPath } from './path';
+export {
+  attachOutputIntent,
+  ensureTrailerId,
+  type PdfAConformance,
+  type ResolvedOutputIntent,
+  resolveOutputIntent,
+} from './pdfa';
 export { collectPreflightWarnings } from './preflight';
 export { buildRoundedRectPath, type CornerRadii, hasAnyRoundedCorner, ROUNDED_RECT_KAPPA } from './rectangle';
 export { renderText } from './text';

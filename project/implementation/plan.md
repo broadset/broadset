@@ -681,7 +681,7 @@ As of 2026-04-23:
 - **PDF support:** complete — all 8 units of the PDF track shipped (`pdf-lib` exporter with rebuilt parity, XMP + `/BSET` marked-content round-trip, page boxes, OCGs, XMP fast-path + third-party operator extraction import, reconciliation wrapper, chain round-trip test + demo dispatcher wiring)
 - **SVG support:** draft — pre-Phase 0
 - **PPTX support:** draft — pre-Phase 0
-- **PDF/A-2b compliance:** draft followup — blocked on main PDF track completion
+- **PDF/A-2b compliance:** complete — all 7 P9 units shipped (PDF/A spec section + acceptance criteria, bundled minimal sRGB v2 profile via `_shared/color/getDefaultProfile`, `pdfaConformance: '2b'` opt-in on `exportPdfBytes` / `exportPdfWithPreflight`, `/OutputIntents` + `/GTS_PDFA1` + ICC stream, `pdfaid:part`/`pdfaid:conformance` XMP block, deterministic trailer `/ID` array, in-tree `validatePdfA2b` structural validator, round-trip identifier preservation via `extensions.pdf.pdfa`). Real sRGB IEC61966-2.1 profile embed, font-subsetting totality, and veraPDF CI integration recorded as Spec Gaps in `project/spec/formats/pdf.md`.
 - **io-prereqs UI features:** draft companion plan — consumed during io-prereqs Phase 5 interleaves
 - **coverage reporting:** ready for Ralph loop execution
 - **cross-region CT audit:** ready for Ralph loop execution

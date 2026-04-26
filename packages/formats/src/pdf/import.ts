@@ -97,12 +97,15 @@ function looksLikePdf(bytes: Uint8Array): boolean {
 function attachEmbeddedFilesExtension(doc: BroadsetDocument, fileNames: readonly string[]): BroadsetDocument {
   if (fileNames.length === 0) return doc;
 
-  const pdfExt = {
+  const existingExtensions = doc.extensions ?? {};
+  const existingPdfExt = (existingExtensions['pdf'] as Record<string, unknown> | undefined) ?? {};
+  const nextPdfExt = {
+    ...existingPdfExt,
     embeddedFiles: fileNames,
   };
   const nextExtensions = {
-    ...(doc.extensions ?? {}),
-    pdf: pdfExt,
+    ...existingExtensions,
+    pdf: nextPdfExt,
   };
 
   return { ...doc, extensions: nextExtensions };
@@ -170,7 +173,7 @@ export async function importPdfDocument(
   }
 
   const tags = collectMarkedContentTags(pdf);
-  const document = hydrateDocumentFromFastPath(xmp.documentId, tags);
+  const document = hydrateDocumentFromFastPath(xmp.documentId, tags, { pdfa: xmp.pdfa });
 
   warnings.push(FAST_PATH_PLACEHOLDER_WARNING);
 
