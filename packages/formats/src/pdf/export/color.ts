@@ -1,6 +1,6 @@
 import type { BroadsetColor, BroadsetElementStyle, BroadsetGradient } from '@broadset/model';
 import { colorToCss, getGradientFillGradient, getSolidFillColor } from '@broadset/model';
-import { rgb } from 'pdf-lib';
+import { type CMYK, cmyk, rgb } from 'pdf-lib';
 
 import { parseCssColor } from '../color';
 
@@ -119,4 +119,34 @@ export function resolveFillGradient(style: Partial<BroadsetElementStyle>): Broad
  */
 export function resolveOpacity(style: Partial<BroadsetElementStyle>): number {
   return typeof style.opacity === 'number' ? clamp01(style.opacity) : 1;
+}
+
+/**
+ * Convert an sRGB triple to CMYK using the canonical "subtractive
+ * inverse" mapping (`C = 1 - R`, `M = 1 - G`, `Y = 1 - B`, `K = min`)
+ * with black removal. This is the no-ICC fallback used when the
+ * document's `outputIntent.colorSpace === 'cmyk'` but no real ICC
+ * conversion path is wired (Spec Gap pending `_shared/color/lcms-wasm`).
+ *
+ * The result is a pdf-lib `CMYK` colour suitable for `drawRectangle({
+ * color })`. PDF emitters route `CMYK` colours through the `k` / `K`
+ * graphics-state operators rather than `rg` / `RG`, so the page's
+ * device-CMYK colour space is preserved end-to-end.
+ */
+export function srgbToDeviceCmyk(rgbColor: ReturnType<typeof rgb>): CMYK {
+  const r = clamp01(rgbColor.red);
+  const g = clamp01(rgbColor.green);
+  const b = clamp01(rgbColor.blue);
+
+  const k = 1 - Math.max(r, g, b);
+
+  if (k >= 1) {
+    return cmyk(0, 0, 0, 1);
+  }
+
+  const cyan = (1 - r - k) / (1 - k);
+  const magenta = (1 - g - k) / (1 - k);
+  const yellow = (1 - b - k) / (1 - k);
+
+  return cmyk(clamp01(cyan), clamp01(magenta), clamp01(yellow), clamp01(k));
 }

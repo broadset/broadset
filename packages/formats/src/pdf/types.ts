@@ -13,12 +13,13 @@ import type { BroadsetXmpPacket as SharedBroadsetXmpPacket } from '../_shared/xm
 export type ColorSpaceChoice = 'rgb' | 'cmyk' | 'spot';
 
 /**
- * PDF/A conformance level the exporter currently supports. Only `2b`
- * is wired today; `2u` (Unicode mapping for every text run) and `2a`
- * (tagged structure tree) are explicit Spec Gaps in
- * `project/spec/formats/pdf.md` § PDF/A-2b Conformance Mode.
+ * PDF/A conformance level the exporter supports. `2b` is the basic
+ * visual reproduction profile; `2u` is the Unicode-mapping profile
+ * (every text run must map to Unicode via a ToUnicode CMap). `2a`
+ * (tagged structure tree for accessibility) remains a Spec Gap until
+ * a dedicated tagged-PDF effort lands.
  */
-export type PdfAConformance = '2b';
+export type PdfAConformance = '2b' | '2u';
 
 /**
  * Options controlling the PDF export pipeline.

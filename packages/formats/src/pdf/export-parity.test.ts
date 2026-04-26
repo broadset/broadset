@@ -100,6 +100,7 @@ vi.mock('pdf-lib', () => {
     embedPng: () => Promise.resolve({ id: 'img-png' }),
     embedJpg: () => Promise.resolve({ id: 'img-jpg' }),
     embedFont: (name: string | Uint8Array) => Promise.resolve(makeFont(name)),
+    registerFontkit: (): void => {},
     context: mockContext,
     catalog: mockCatalog,
   };
@@ -159,6 +160,13 @@ vi.mock('pdf-lib', () => {
     PDFOperatorNames: {
       BeginMarkedContentSequence: 'BDC',
       EndMarkedContent: 'EMC',
+      AppendRectangle: 're',
+      FillNonZero: 'f',
+      NonStrokingColorspace: 'cs',
+      NonStrokingColorN: 'scn',
+    },
+    PDFNumber: {
+      of: (n: number) => ({ kind: 'number', value: n }),
     },
     PDFName: {
       of: (name: string) => ({ name }),

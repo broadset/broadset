@@ -50,6 +50,7 @@ vi.mock('pdf-lib', () => {
         name: typeof name === 'string' ? name : 'embedded-bytes',
         widthOfTextAtSize: (text: string, size: number) => text.length * size * 0.5,
       }),
+    registerFontkit: (): void => {},
     context: mockContext,
     catalog: mockCatalog,
   };
@@ -109,6 +110,13 @@ vi.mock('pdf-lib', () => {
     PDFOperatorNames: {
       BeginMarkedContentSequence: 'BDC',
       EndMarkedContent: 'EMC',
+      AppendRectangle: 're',
+      FillNonZero: 'f',
+      NonStrokingColorspace: 'cs',
+      NonStrokingColorN: 'scn',
+    },
+    PDFNumber: {
+      of: (n: number) => ({ kind: 'number', value: n }),
     },
     PDFName: {
       of: (name: string) => ({ name }),

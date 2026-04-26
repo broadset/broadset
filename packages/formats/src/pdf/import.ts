@@ -2,6 +2,7 @@ import { type BroadsetDocument, createEmptyBroadsetDocument } from '@broadset/mo
 
 import type { DocumentImportResult } from '../import-document';
 import {
+  capturePreservationBlobs,
   extractThirdPartyElements,
   hydrateDocumentFromFastPath,
   readDocumentXmp,
@@ -13,7 +14,7 @@ import {
   hasEmbeddedJavaScript,
   probeLoadPdf,
 } from './import/parse';
-import type { PdfImportOptions, PdfRoundTripMetadata } from './types';
+import type { MarkedContentTag, PdfImportOptions, PdfRoundTripMetadata } from './types';
 
 /**
  * Warning surfaced when the byte stream does not look like a PDF file.
@@ -92,6 +93,29 @@ function looksLikePdf(bytes: Uint8Array): boolean {
   }
 
   return true;
+}
+
+/**
+ * Layer the live operator-stream slices captured by
+ * `capturePreservationBlobs` over the marked-content tags' optional
+ * `/Blob` payloads. The captured operators take precedence — they
+ * represent the actual bytes the PDF reader executed, which is what
+ * a byte-stable re-export must re-emit. The static `/Blob` value (if
+ * any) is only retained when no live capture matched the element id
+ * so a third-party editor that scrubbed the content stream can still
+ * round-trip a previously-stored preservation payload.
+ */
+function mergeOperatorBlobsIntoTags(
+  tags: readonly MarkedContentTag[],
+  blobs: ReadonlyMap<string, string>,
+): readonly MarkedContentTag[] {
+  return tags.map((tag) => {
+    const captured = blobs.get(tag.id);
+
+    if (captured === undefined) return tag;
+
+    return { ...tag, preservationBlob: captured };
+  });
 }
 
 function attachEmbeddedFilesExtension(doc: BroadsetDocument, fileNames: readonly string[]): BroadsetDocument {
@@ -173,7 +197,9 @@ export async function importPdfDocument(
   }
 
   const tags = collectMarkedContentTags(pdf);
-  const document = hydrateDocumentFromFastPath(xmp.documentId, tags, { pdfa: xmp.pdfa });
+  const operatorBlobs = capturePreservationBlobs(pdf);
+  const tagsWithLiveBlobs = mergeOperatorBlobsIntoTags(tags, operatorBlobs);
+  const document = hydrateDocumentFromFastPath(xmp.documentId, tagsWithLiveBlobs, { pdfa: xmp.pdfa });
 
   warnings.push(FAST_PATH_PLACEHOLDER_WARNING);
 

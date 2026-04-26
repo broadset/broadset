@@ -1,4 +1,5 @@
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
+import fontkit from '@pdf-lib/fontkit';
 import { type PDFDocument, type PDFFont, StandardFonts } from 'pdf-lib';
 
 import { normalizeFontFamily, resolveGoogleFontUrl } from '../fonts';
@@ -123,6 +124,19 @@ export async function resolveIdentity(
 }
 
 /**
+ * Register the `@pdf-lib/fontkit` adapter on the document so any
+ * subsequent `pdf.embedFont(bytes, { subset: true })` call subsets the
+ * font to the glyphs actually referenced in the document. Idempotent —
+ * registering twice is a no-op for pdf-lib.
+ *
+ * Call this once at the start of every export pass; the cost is a
+ * single object allocation when no custom fonts are embedded.
+ */
+export function registerFontkit(pdf: PDFDocument): void {
+  pdf.registerFontkit(fontkit);
+}
+
+/**
  * Walk every text element in `doc`, dedupe identities, and embed one
  * PDFFont per identity. Identity-keyed map so `lookupFont` resolves
  * O(1) at draw time.
@@ -132,6 +146,8 @@ export async function resolveFonts(
   pdf: PDFDocument,
   fetchFn: typeof globalThis.fetch | undefined,
 ): Promise<ReadonlyMap<string, PDFFont>> {
+  registerFontkit(pdf);
+
   const fontMap = new Map<string, PDFFont>();
   const seen = new Set<string>();
 
@@ -188,7 +204,11 @@ async function tryEmbedGoogleFont(
     const fontResponse = await fetchFn(fontUrl);
     const fontBytes = new Uint8Array(await fontResponse.arrayBuffer());
 
-    return await pdf.embedFont(fontBytes);
+    // `subset: true` tells pdf-lib (via the registered `@pdf-lib/fontkit`
+    // adapter) to embed only the glyphs the document actually references.
+    // Cuts every Google-Font-backed embed from ~200 KB → ~10 KB on
+    // typical content.
+    return await pdf.embedFont(fontBytes, { subset: true });
   } catch {
     return null;
   }

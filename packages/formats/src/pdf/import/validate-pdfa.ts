@@ -78,8 +78,8 @@ export function validatePdfAXmpPacket(xmpString: string): PdfAValidationResult {
     violations.push(`pdfaid:part is "${xmp.pdfa.part}", expected "2"`);
   }
 
-  if (xmp.pdfa.conformance !== 'B') {
-    violations.push(`pdfaid:conformance is "${xmp.pdfa.conformance}", expected "B"`);
+  if (xmp.pdfa.conformance !== 'B' && xmp.pdfa.conformance !== 'U') {
+    violations.push(`pdfaid:conformance is "${xmp.pdfa.conformance}", expected "B" or "U"`);
   }
 
   return { valid: violations.length === 0, violations };
@@ -110,8 +110,8 @@ function validateXmpPdfaIdentifier(pdf: PDFDocument, violations: string[]): void
     violations.push(`pdfaid:part is "${xmp.pdfa.part}", expected "2"`);
   }
 
-  if (xmp.pdfa.conformance !== 'B') {
-    violations.push(`pdfaid:conformance is "${xmp.pdfa.conformance}", expected "B"`);
+  if (xmp.pdfa.conformance !== 'B' && xmp.pdfa.conformance !== 'U') {
+    violations.push(`pdfaid:conformance is "${xmp.pdfa.conformance}", expected "B" or "U"`);
   }
 }
 

@@ -1,6 +1,18 @@
-import type { BroadsetDocument, BroadsetElement, Canvas } from '@broadset/model';
+import type { BroadsetDocument, BroadsetElement, BroadsetGradient, Canvas } from '@broadset/model';
 import { resolveContentAsPlainString } from '@broadset/model';
-import { PDFDocument, type PDFFont, type PDFPage, rgb, StandardFonts } from 'pdf-lib';
+import {
+  PDFDocument,
+  type PDFFont,
+  PDFName,
+  PDFNumber,
+  PDFOperator,
+  PDFOperatorNames,
+  type PDFPage,
+  popGraphicsState,
+  pushGraphicsState,
+  rgb,
+  StandardFonts,
+} from 'pdf-lib';
 
 import { parseCssColor } from './color';
 import { decodeDataUri } from './data-uri';
@@ -8,6 +20,7 @@ import {
   applyBrackets,
   applyPageBoxes,
   attachBroadsetXmp,
+  attachOcgResourceBindings,
   attachOutputIntent,
   buildBroadsetXmpPacket,
   buildMarkedContentTag,
@@ -27,7 +40,10 @@ import {
   hasAnyRoundedCorner,
   indexElementsById,
   markedContentBrackets,
+  type OcgRegistration,
+  pdfaConformanceLetter,
   rasterizeSvgToPngBytes,
+  registerLinearOrRadialShading,
   registerPageOcgs,
   renderPath,
   renderText,
@@ -39,6 +55,8 @@ import {
   resolveOpacity,
   resolveOutputIntent,
   resolveStyleColor,
+  type ShadingGeometry,
+  srgbToDeviceCmyk,
 } from './export';
 import { canvasToPoints, elementToPoints } from './geometry';
 import { drawQrOnPage } from './qr';
@@ -58,25 +76,211 @@ const PLACEHOLDER_LABEL_INSET = 4;
 /*  Element rendering — wrappers over the focused export modules       */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Document-level output colour space, derived from
+ * `document.outputIntent.colorSpace` (or `'rgb'` when no output
+ * intent is declared). Passed into every render function that emits
+ * solid colours so CMYK / Lab / Gray documents route through the
+ * matching pdf-lib colour-emission path (`drawRectangle({ color:
+ * cmyk(...) })` writes `k` operators instead of `rg` operators).
+ */
+type DocumentColorSpace = 'rgb' | 'cmyk' | 'gray' | 'lab';
+
+function resolveDocumentColorSpace(doc: BroadsetDocument): DocumentColorSpace {
+  return doc.outputIntent?.colorSpace ?? 'rgb';
+}
+
+/**
+ * Convert a pdf-lib RGB colour into the document's output colour
+ * space. RGB documents pass through unchanged; CMYK documents go
+ * through the subtractive-inverse fallback per
+ * `srgbToDeviceCmyk` (real ICC conversion via `_shared/color/lcms-wasm`
+ * is a Spec Gap). Gray and Lab fall back to RGB until their dedicated
+ * colour-conversion paths land.
+ */
+function toDeviceColor(
+  color: ReturnType<typeof rgb> | undefined,
+  colorSpace: DocumentColorSpace,
+): ReturnType<typeof rgb> | ReturnType<typeof srgbToDeviceCmyk> | undefined {
+  if (color === undefined) return undefined;
+  if (colorSpace === 'cmyk') return srgbToDeviceCmyk(color);
+
+  return color;
+}
+
+interface RectangleStyleResolved {
+  readonly fillRgb: ReturnType<typeof resolveFillAsPdfRgb>;
+  readonly fillGradient: ReturnType<typeof resolveFillGradient>;
+  readonly border: ReturnType<typeof resolveStyleColor>;
+  readonly borderWidthPt: number | undefined;
+  readonly opacity: number;
+  readonly radii: BroadsetElement['style']['borderRadius'];
+}
+
+function resolveRectangleStyle(el: BroadsetElement, canvas: Canvas): RectangleStyleResolved {
+  return {
+    fillRgb: resolveFillAsPdfRgb(el.style),
+    fillGradient: resolveFillGradient(el.style),
+    border: resolveStyleColor(el.style, 'borderColor'),
+    borderWidthPt:
+      el.style.borderWidth !== undefined ? elementToPoints(canvas, el.style.borderWidth) : undefined,
+    opacity: resolveOpacity(el.style),
+    radii: el.style.borderRadius,
+  };
+}
+
 function renderRectangle(
   page: PDFPage,
   el: BroadsetElement,
   absolute: CanvasAbsolutePosition,
   canvas: Canvas,
   trimHeightPt: number,
+  pdf: PDFDocument,
+  colorSpace: DocumentColorSpace,
 ): void {
   const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, trimHeightPt);
-  const fillGradient = resolveFillGradient(el.style);
+  const styled = resolveRectangleStyle(el, canvas);
+
+  if (paintRectangleAsShading(pdf, page, styled, { xPt, yPt, wPt, hPt }, canvas, colorSpace)) {
+    return;
+  }
+
   const bg =
-    resolveFillAsPdfRgb(el.style) ??
-    (fillGradient !== undefined ? resolveGradientFallbackColor(fillGradient) : undefined);
-  const border = resolveStyleColor(el.style, 'borderColor');
-  const opacity = resolveOpacity(el.style);
-  const borderWidthPt =
-    el.style.borderWidth !== undefined ? elementToPoints(canvas, el.style.borderWidth) : undefined;
+    styled.fillRgb ??
+    (styled.fillGradient !== undefined ? resolveGradientFallbackColor(styled.fillGradient) : undefined);
 
-  const radii = el.style.borderRadius;
+  paintRectangleSolid(page, bg, styled, { xPt, yPt, wPt, hPt }, canvas, colorSpace);
+}
 
+/**
+ * Try to paint the rectangle as a PDF shading pattern when the fill is
+ * a linear / radial gradient. Returns `true` when the shading was
+ * applied; `false` when the caller should fall back to the solid /
+ * first-stop colour path.
+ */
+function paintRectangleAsShading(
+  pdf: PDFDocument,
+  page: PDFPage,
+  styled: RectangleStyleResolved,
+  geometry: ShadingGeometry,
+  canvas: Canvas,
+  colorSpace: DocumentColorSpace,
+): boolean {
+  if (styled.fillRgb !== undefined) return false;
+  if (styled.fillGradient === undefined) return false;
+
+  const shaded = paintGradientFill(pdf, page, styled.fillGradient, geometry, () => {
+    emitRectanglePath(page, geometry.xPt, geometry.yPt, geometry.wPt, geometry.hPt, styled.radii, canvas);
+  });
+
+  if (!shaded) return false;
+
+  const borderDeviceColor = toDeviceColor(styled.border, colorSpace);
+
+  if (borderDeviceColor !== undefined && styled.borderWidthPt !== undefined) {
+    page.drawRectangle({
+      x: geometry.xPt,
+      y: geometry.yPt,
+      width: geometry.wPt,
+      height: geometry.hPt,
+      borderColor: borderDeviceColor,
+      borderWidth: styled.borderWidthPt,
+      opacity: styled.opacity,
+    });
+  }
+
+  return true;
+}
+
+function paintRectangleSolid(
+  page: PDFPage,
+  bg: ReturnType<typeof resolveFillAsPdfRgb>,
+  styled: RectangleStyleResolved,
+  geometry: ShadingGeometry,
+  canvas: Canvas,
+  colorSpace: DocumentColorSpace,
+): void {
+  const deviceBg = toDeviceColor(bg, colorSpace);
+  const deviceBorder = toDeviceColor(styled.border, colorSpace);
+
+  if (hasAnyRoundedCorner(styled.radii) && styled.radii !== undefined) {
+    const cornerRadiiPt: CornerRadii = [
+      elementToPoints(canvas, styled.radii[0]),
+      elementToPoints(canvas, styled.radii[1]),
+      elementToPoints(canvas, styled.radii[2]),
+      elementToPoints(canvas, styled.radii[3]),
+    ];
+    const pathD = buildRoundedRectPath(geometry.wPt, geometry.hPt, cornerRadiiPt);
+
+    page.drawSvgPath(pathD, {
+      x: geometry.xPt,
+      y: geometry.yPt + geometry.hPt,
+      ...(deviceBg ? { color: deviceBg } : undefined),
+      ...(deviceBorder ? { borderColor: deviceBorder } : undefined),
+      ...(styled.borderWidthPt !== undefined ? { borderWidth: styled.borderWidthPt } : undefined),
+      opacity: styled.opacity,
+    });
+
+    return;
+  }
+
+  page.drawRectangle({
+    x: geometry.xPt,
+    y: geometry.yPt,
+    width: geometry.wPt,
+    height: geometry.hPt,
+    ...(deviceBg ? { color: deviceBg } : undefined),
+    ...(deviceBorder ? { borderColor: deviceBorder } : undefined),
+    ...(styled.borderWidthPt !== undefined ? { borderWidth: styled.borderWidthPt } : undefined),
+    opacity: styled.opacity,
+  });
+}
+
+/**
+ * Paint a Broadset gradient as a real PDF shading pattern. Returns
+ * `true` when the pattern was successfully registered + applied;
+ * `false` when the gradient kind isn't expressible as a PDF shading
+ * pattern (conic, malformed colour stops) and the caller should fall
+ * back to the first-stop solid fill.
+ *
+ * The `drawShape` callback emits the shape's path operators inside
+ * the graphics-state-saved + pattern-bound region so the pattern
+ * fills exactly that geometry.
+ */
+function paintGradientFill(
+  pdf: PDFDocument,
+  page: PDFPage,
+  gradient: BroadsetGradient,
+  geometry: ShadingGeometry,
+  drawShape: () => void,
+): boolean {
+  const pattern = registerLinearOrRadialShading(pdf, page, gradient, geometry);
+
+  if (pattern === null) return false;
+
+  page.pushOperators(pushGraphicsState(), ...pattern.setPatternFillOperators);
+
+  drawShape();
+
+  page.pushOperators(PDFOperator.of(PDFOperatorNames.FillNonZero), popGraphicsState());
+
+  return true;
+}
+
+/**
+ * Emit raw PDF rectangle / rounded-rect path operators (no fill / no
+ * stroke). Caller handles fill / stroke separately so the same path
+ * can be reused under a clipping or pattern-fill bracket.
+ */
+function emitRectanglePath(
+  page: PDFPage,
+  xPt: number,
+  yPt: number,
+  wPt: number,
+  hPt: number,
+  radii: BroadsetElement['style']['borderRadius'],
+  canvas: Canvas,
+): void {
   if (hasAnyRoundedCorner(radii) && radii !== undefined) {
     const cornerRadiiPt: CornerRadii = [
       elementToPoints(canvas, radii[0]),
@@ -86,28 +290,19 @@ function renderRectangle(
     ];
     const pathD = buildRoundedRectPath(wPt, hPt, cornerRadiiPt);
 
-    page.drawSvgPath(pathD, {
-      x: xPt,
-      y: yPt + hPt,
-      ...(bg ? { color: bg } : undefined),
-      ...(border ? { borderColor: border } : undefined),
-      ...(borderWidthPt !== undefined ? { borderWidth: borderWidthPt } : undefined),
-      opacity,
-    });
+    page.drawSvgPath(pathD, { x: xPt, y: yPt + hPt });
 
     return;
   }
 
-  page.drawRectangle({
-    x: xPt,
-    y: yPt,
-    width: wPt,
-    height: hPt,
-    ...(bg ? { color: bg } : undefined),
-    ...(border ? { borderColor: border } : undefined),
-    ...(borderWidthPt !== undefined ? { borderWidth: borderWidthPt } : undefined),
-    opacity,
-  });
+  page.pushOperators(
+    PDFOperator.of(PDFOperatorNames.AppendRectangle, [
+      PDFNumber.of(xPt),
+      PDFNumber.of(yPt),
+      PDFNumber.of(wPt),
+      PDFNumber.of(hPt),
+    ]),
+  );
 }
 
 function renderEllipse(
@@ -116,24 +311,38 @@ function renderEllipse(
   absolute: CanvasAbsolutePosition,
   canvas: Canvas,
   trimHeightPt: number,
+  pdf: PDFDocument,
+  colorSpace: DocumentColorSpace,
 ): void {
-  const bleed = canvas.bleed ?? [0, 0, 0, 0];
-  const bleedLeftPt = elementToPoints(canvas, bleed[3]);
-  const bleedBottomPt = elementToPoints(canvas, bleed[2]);
-
-  const cx = bleedLeftPt + elementToPoints(canvas, absolute.x + el.width / 2);
-  const cy = bleedBottomPt + trimHeightPt - elementToPoints(canvas, absolute.y + el.height / 2);
+  const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, trimHeightPt);
+  const cx = xPt + wPt / 2;
+  const cy = yPt + hPt / 2;
   const ellipseGradient = resolveFillGradient(el.style);
-  const bg =
-    resolveFillAsPdfRgb(el.style) ??
-    (ellipseGradient !== undefined ? resolveGradientFallbackColor(ellipseGradient) : undefined);
+  const fillRgb = resolveFillAsPdfRgb(el.style);
+
+  if (fillRgb === undefined && ellipseGradient !== undefined) {
+    const geometry: ShadingGeometry = { xPt, yPt, wPt, hPt };
+    const shaded = paintGradientFill(pdf, page, ellipseGradient, geometry, () => {
+      page.drawEllipse({
+        x: cx,
+        y: cy,
+        xScale: wPt / 2,
+        yScale: hPt / 2,
+      });
+    });
+
+    if (shaded) return;
+  }
+
+  const bg = fillRgb ?? (ellipseGradient !== undefined ? resolveGradientFallbackColor(ellipseGradient) : undefined);
+  const deviceBg = toDeviceColor(bg, colorSpace);
 
   page.drawEllipse({
     x: cx,
     y: cy,
-    xScale: elementToPoints(canvas, el.width / 2),
-    yScale: elementToPoints(canvas, el.height / 2),
-    ...(bg ? { color: bg } : undefined),
+    xScale: wPt / 2,
+    yScale: hPt / 2,
+    ...(deviceBg ? { color: deviceBg } : undefined),
     opacity: resolveOpacity(el.style),
   });
 }
@@ -211,8 +420,10 @@ function renderNonStaticElement(
   canvas: Canvas,
   trimHeightPt: number,
   fallbackFont: PDFFont,
+  pdf: PDFDocument,
+  colorSpace: DocumentColorSpace,
 ): void {
-  renderRectangle(page, el, absolute, canvas, trimHeightPt);
+  renderRectangle(page, el, absolute, canvas, trimHeightPt, pdf, colorSpace);
 
   const { xPt: topLeftXPt, yPt: topLeftYPt } = elementTopLeftPt(absolute, el, canvas, trimHeightPt);
   const xPt = topLeftXPt + PLACEHOLDER_LABEL_INSET;
@@ -250,6 +461,8 @@ async function renderElement(
   fontMap: ReadonlyMap<string, PDFFont>,
   fallbackFont: PDFFont,
   elementsById: ReadonlyMap<string, BroadsetElement>,
+  ocgRegistration: OcgRegistration,
+  colorSpace: DocumentColorSpace,
   fetchFn?: typeof globalThis.fetch,
 ): Promise<void> {
   const el = resolveAnimatedElementInState(rawElement);
@@ -257,6 +470,20 @@ async function renderElement(
   const rotate = elementRotationBrackets(el, absolute, canvas, trimHeightPt);
   const clipBrackets = clipPathBrackets(el, absolute, canvas, trimHeightPt);
   const markedContent = markedContentBrackets(pdf, page, buildMarkedContentTag(el));
+  const ocgBinding = ocgRegistration.bindingByElementId.get(el.id);
+
+  // /OC <ocg-name> BDC wraps the entire element so PDF readers can
+  // toggle per-page visibility from their layers panel. /BSET BDC
+  // nests inside it so reconciliation can still recover identity even
+  // when an OCG is hidden.
+  if (ocgBinding !== undefined) {
+    page.pushOperators(
+      PDFOperator.of(PDFOperatorNames.BeginMarkedContentSequence, [
+        PDFName.of('OC'),
+        ocgBinding.resourceName,
+      ]),
+    );
+  }
 
   // /BSET BDC opens the element's painting sequence; rotation and clip
   // CTM operators nest inside so the marked-content pair survives across
@@ -271,10 +498,10 @@ async function renderElement(
       renderText(page, el, absolute, canvas, trimHeightPt, fontMap, fallbackFont);
       break;
     case 'rectangle':
-      renderRectangle(page, el, absolute, canvas, trimHeightPt);
+      renderRectangle(page, el, absolute, canvas, trimHeightPt, pdf, colorSpace);
       break;
     case 'ellipse':
-      renderEllipse(page, el, absolute, canvas, trimHeightPt);
+      renderEllipse(page, el, absolute, canvas, trimHeightPt, pdf, colorSpace);
       break;
     case 'path':
       renderPath(page, el, absolute, canvas, trimHeightPt);
@@ -294,7 +521,7 @@ async function renderElement(
     case 'video':
     case 'clock':
     case 'ticker':
-      renderNonStaticElement(page, el, absolute, canvas, trimHeightPt, fallbackFont);
+      renderNonStaticElement(page, el, absolute, canvas, trimHeightPt, fallbackFont, pdf, colorSpace);
       break;
   }
 
@@ -302,6 +529,10 @@ async function renderElement(
   applyBrackets(page, rotate, 'end');
 
   page.pushOperators(markedContent.end);
+
+  if (ocgBinding !== undefined) {
+    page.pushOperators(PDFOperator.of(PDFOperatorNames.EndMarkedContent));
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -367,26 +598,47 @@ export async function exportPdfBytes(
   const elementsById = indexElementsById(doc.elements);
 
   // Register one OCG per Broadset page so PDF readers surface per-page
-  // visibility toggles in the layers panel.
-  registerPageOcgs(pdf, doc);
+  // visibility toggles in the layers panel. The registration also
+  // builds a per-element binding map so each element's painting can be
+  // wrapped in `/OC <name> BDC ... EMC` for per-page visibility.
+  const ocgRegistration = registerPageOcgs(pdf, doc);
+
+  attachOcgResourceBindings(pdf, page, ocgRegistration);
+
+  const documentColorSpace = resolveDocumentColorSpace(doc);
 
   // Draw background inside the trim box (PDF origin is bottom-left;
   // applyPageBoxes already anchored the trim there via bleed offsets).
   drawCanvasBackground(page, canvas, trimWidthPt, trimHeightPt);
 
   for (const el of doc.elements) {
-    await renderElement(page, el, canvas, trimHeightPt, pdf, fontMap, fallbackFont, elementsById, fetchFn);
+    await renderElement(
+      page,
+      el,
+      canvas,
+      trimHeightPt,
+      pdf,
+      fontMap,
+      fallbackFont,
+      elementsById,
+      ocgRegistration,
+      documentColorSpace,
+      fetchFn,
+    );
   }
 
   // Attach the shared `broadset:` XMP packet to the document catalog so
   // the round-trip importer (P6.4a) has a trusted metadata fast-path.
   // PDF/A mode also injects the `pdfaid:` identifier alongside the
   // `broadset:` namespace block.
-  const xmpPdfa = pdfaConformance === '2b' ? { part: '2', conformance: 'B' } : undefined;
+  const xmpPdfa =
+    pdfaConformance !== undefined
+      ? { part: '2', conformance: pdfaConformanceLetter(pdfaConformance) }
+      : undefined;
 
   attachBroadsetXmp(pdf, await buildBroadsetXmpPacket(doc, xmpPdfa !== undefined ? { pdfa: xmpPdfa } : {}));
 
-  if (pdfaConformance === '2b') {
+  if (pdfaConformance !== undefined) {
     const intent = resolveOutputIntent(doc, options.assets ?? []);
 
     attachOutputIntent(pdf, intent);

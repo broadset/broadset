@@ -182,14 +182,14 @@ describe('P6.4 security — embedded-file preservation', () => {
 
 describe('P6.4 preservation-blob plumbing', () => {
   /**
-   * @description A Broadset-exported PDF's marked-content `/Blob`
-   * property (populated from an element's
-   * `extensions.pdf.preservationBlob`) MUST round-trip on re-import
-   * so untouched elements can re-emit byte-identical operators on a
-   * later export. Byte-identical operator re-emission remains
-   * Spec-Gapped; this test just verifies the plumbing.
+   * @description Re-importing a Broadset-exported PDF MUST capture
+   * each element's actual painted operators between its `/BSET <name>
+   * BDC` and `EMC` markers and stash the base64-encoded slice on
+   * `extensions.pdf.preservationBlob`. The captured operators take
+   * precedence over any pre-stored static `/Blob` value because the
+   * captured bytes are what a byte-stable re-export must re-emit.
    */
-  it('round-trips extensions.pdf.preservationBlob through /Blob', async () => {
+  it('captures live painted operators into extensions.pdf.preservationBlob on re-import', async () => {
     const element = makeElement('rectangle', {
       id: 'blob-carrier',
       style: makeStyle(),
@@ -209,8 +209,16 @@ describe('P6.4 preservation-blob plumbing', () => {
     if (imported !== undefined) {
       const extensions = imported.extensions as Readonly<Record<string, unknown>> | undefined;
       const pdfExt = extensions?.['pdf'] as Record<string, unknown> | undefined;
+      const blob = pdfExt?.['preservationBlob'];
 
-      expect(pdfExt?.['preservationBlob']).toBe('AQIDBA==');
+      expect(typeof blob).toBe('string');
+
+      // The captured slice is a non-empty base64 payload — it MUST
+      // override the stale stored 'AQIDBA==' value because the live
+      // capture represents the actual operators the PDF reader
+      // executed for this element.
+      expect(blob).not.toBe('AQIDBA==');
+      expect((blob as string).length).toBeGreaterThan(8);
     }
   });
 });

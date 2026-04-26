@@ -6,13 +6,22 @@ import { DEFAULT_PROFILE_IDENTIFIER, getDefaultProfile } from '../../_shared/col
 import { decodeDataUri } from '../data-uri';
 
 /**
- * PDF/A conformance level the exporter currently supports.
- *
- * Only `2b` is wired today; `2u` (Unicode mapping for every text run)
- * and `2a` (tagged structure tree) are explicit Spec Gaps in
- * `project/spec/formats/pdf.md`.
+ * PDF/A conformance level the exporter supports. `2b` is the basic
+ * visual reproduction profile; `2u` adds the Unicode-mapping
+ * requirement (every text run must map to Unicode via its font's
+ * ToUnicode CMap). `2a` (tagged structure tree) remains a Spec Gap
+ * until a dedicated tagged-PDF effort lands.
  */
-export type PdfAConformance = '2b';
+export type PdfAConformance = '2b' | '2u';
+
+/**
+ * Translate a `PdfAConformance` level into the `pdfaid:conformance`
+ * letter PDF/A validators look for in the XMP packet — `B` for basic
+ * visual reproduction, `U` for Unicode mapping.
+ */
+export function pdfaConformanceLetter(conformance: PdfAConformance): 'B' | 'U' {
+  return conformance === '2u' ? 'U' : 'B';
+}
 
 /**
  * Resolved bytes + metadata for the OutputIntent ICC profile.
