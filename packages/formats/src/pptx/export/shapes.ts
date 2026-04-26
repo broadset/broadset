@@ -1,5 +1,6 @@
 import {
   type BroadsetElement,
+  type Bullet,
   type Paragraph,
   resolveContentAsPlainString,
   resolveStyleColor,
@@ -220,6 +221,7 @@ interface RunLike {
 interface ParagraphLike {
   readonly runs: readonly RunLike[];
   readonly align?: string | undefined;
+  readonly bullet?: Bullet | undefined;
 }
 
 function resolveParagraphs(element: BroadsetElement): readonly ParagraphLike[] {
@@ -244,6 +246,7 @@ function resolveParagraphs(element: BroadsetElement): readonly ParagraphLike[] {
         fontFamily: readRunStyleString(r.props?.style, 'fontFamily'),
       })),
       align: p.props?.align,
+      bullet: p.props?.bullet,
     }));
   }
 
@@ -282,9 +285,32 @@ function emitParagraph(
   defaults: { readonly defaultColor: string; readonly defaultSize: number; readonly defaultFamily: string | undefined },
 ): string {
   const align = textAlignAttr(paragraph.align);
+  const bullet = emitBulletXml(paragraph.bullet);
+  const pPr = `<a:pPr${align}>${bullet}</a:pPr>`;
   const runs = paragraph.runs.map((run) => emitRun(run, defaults)).join('');
 
-  return `<a:p><a:pPr${align}/>${runs}</a:p>`;
+  return `<a:p>${pPr}${runs}</a:p>`;
+}
+
+/**
+ * Emit OOXML bullet markup from a Broadset Bullet variant.
+ *
+ * - `kind: 'none'` → `<a:buNone/>` (suppress inherited bullets).
+ * - `kind: 'char'` → `<a:buChar char="•"/>`.
+ * - `kind: 'auto'` → `<a:buAutoNum type="…"/>` with format mapping.
+ */
+function emitBulletXml(bullet: Bullet | undefined): string {
+  if (bullet === undefined) return '';
+  if (bullet.kind === 'none') return '<a:buNone/>';
+
+  if (bullet.kind === 'char') {
+    return `<a:buChar char="${escapeXmlAttribute(bullet.char)}"/>`;
+  }
+
+  // 'auto' — map common Broadset format names to OOXML enum values.
+  const startAttr = bullet.startAt !== undefined ? ` startAt="${String(bullet.startAt)}"` : '';
+
+  return `<a:buAutoNum type="${escapeXmlAttribute(bullet.format)}"${startAttr}/>`;
 }
 
 function emitRun(

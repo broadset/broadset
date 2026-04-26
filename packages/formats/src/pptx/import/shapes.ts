@@ -6,10 +6,13 @@ import {
   type BroadsetFill,
   type BroadsetGradient,
   type BroadsetGradientStop,
+  type Bullet,
   type Canvas,
   type ColorMods,
   createDefaultElement,
   type Paragraph,
+  type ParagraphAlign,
+  type ParagraphProps,
   type Run,
   solidFill,
   type TextBody,
@@ -807,12 +810,94 @@ export function extractTextBody(body: string): TextBody | null {
     const runs = extractRuns(pBody);
 
     if (runs.length === 0) continue;
-    paragraphs.push({ runs });
+
+    const props = extractParagraphProps(pBody);
+
+    paragraphs.push(props === null ? { runs } : { runs, props });
   }
 
   if (paragraphs.length === 0) return null;
 
   return { paragraphs };
+}
+
+/**
+ * Parse paragraph properties from `<a:pPr>`: alignment, bullet markup,
+ * indent, line spacing, margin. Returns `null` when no `<a:pPr>` is
+ * present or all extracted props are defaults.
+ */
+function extractParagraphProps(paragraphBody: string): ParagraphProps | null {
+  const pPrBlock = extractBlock(paragraphBody, 'a:pPr');
+
+  if (pPrBlock === null) return null;
+
+  const props: { -readonly [K in keyof ParagraphProps]?: ParagraphProps[K] } = {};
+
+  const algn = pPrBlock.openAttrs.match(/\balgn="([^"]+)"/)?.[1];
+  const align = ooxmlAlignToBroadset(algn);
+
+  if (align !== undefined) props.align = align;
+
+  const indentAttr = pPrBlock.openAttrs.match(/\bindent="(-?\d+)"/)?.[1];
+
+  if (indentAttr !== undefined) props.indent = emuToMm(parseInt(indentAttr, 10));
+
+  const marLAttr = pPrBlock.openAttrs.match(/\bmarL="(-?\d+)"/)?.[1];
+
+  if (marLAttr !== undefined) {
+    // OOXML marL is the left bullet/text indent; Broadset's `indent`
+    // overlaps semantically. When both are present, indent wins.
+    props.indent ??= emuToMm(parseInt(marLAttr, 10));
+  }
+
+  const bullet = parseBulletFromPPr(pPrBlock.block);
+
+  if (bullet !== null) props.bullet = bullet;
+
+  // `<a:lnSpc>` line spacing — we read percent-of-line and store as a
+  // ratio. <a:spcPct val="150000"/> = 150% = 1.5.
+  const lnSpc = pPrBlock.block.match(/<a:lnSpc>[\s\S]*?<a:spcPct\s+val="(\d+)"/);
+
+  if (lnSpc !== null) {
+    props.lineSpacing = parseInt(lnSpc[1] ?? '100000', 10) / 100000;
+  }
+
+  return Object.keys(props).length === 0 ? null : (props as ParagraphProps);
+}
+
+function ooxmlAlignToBroadset(algn: string | undefined): ParagraphAlign | undefined {
+  if (algn === 'l') return 'start';
+  if (algn === 'r') return 'end';
+  if (algn === 'ctr') return 'center';
+  if (algn === 'just') return 'justify';
+
+  return undefined;
+}
+
+function parseBulletFromPPr(pPrBody: string): Bullet | null {
+  if (/<a:buNone\b/.test(pPrBody)) return { kind: 'none' };
+
+  const charMatch = pPrBody.match(/<a:buChar\s+char="([^"]+)"/);
+
+  if (charMatch !== null) {
+    const char = charMatch[1] ?? '•';
+
+    return { kind: 'char', char };
+  }
+
+  const autoMatch = pPrBody.match(/<a:buAutoNum\b([^/>]*)\/?>/);
+
+  if (autoMatch !== null) {
+    const attrs = autoMatch[1] ?? '';
+    const format = attrs.match(/\btype="([^"]+)"/)?.[1] ?? 'arabicPeriod';
+    const startAtAttr = attrs.match(/\bstartAt="(\d+)"/)?.[1];
+
+    return startAtAttr !== undefined
+      ? { kind: 'auto', format, startAt: parseInt(startAtAttr, 10) }
+      : { kind: 'auto', format };
+  }
+
+  return null;
 }
 
 function extractRuns(paragraphBody: string): Run[] {

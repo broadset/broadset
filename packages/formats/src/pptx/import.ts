@@ -292,12 +292,42 @@ function importOperatorLevel(pkg: OoxmlPackage): OperatorLevelResult {
     }
   }
 
-  const doc = composeDocumentFromSlides(resolved.canvas, slides);
+  // Slide-background read: the first slide's `<p:bg>` (if any) seeds
+  // the canvas-level backgroundColor. Per-slide variations get lost
+  // (the model has a single canvas-level background today).
+  const firstSlideXml = resolved.slidePaths[0] !== undefined ? readTextPart(pkg, resolved.slidePaths[0]) : null;
+  const canvasWithBg = applyFirstSlideBackground(resolved.canvas, firstSlideXml);
+  const doc = composeDocumentFromSlides(canvasWithBg, slides);
 
   return {
     document: allAnimations.length > 0 ? { ...doc, animations: allAnimations } : doc,
     warnings,
   };
+}
+
+/**
+ * Read the first slide's `<p:bg>` and seed the canvas background
+ * colour. Returns the canvas unchanged when the slide has no `<p:bg>`
+ * or the fill isn't a solid colour we can map.
+ */
+function applyFirstSlideBackground(
+  canvas: BroadsetDocument['canvas'],
+  slideXml: string | null,
+): BroadsetDocument['canvas'] {
+  if (slideXml === null) return canvas;
+
+  const bgMatch = slideXml.match(/<p:bg\b[^>]*>([\s\S]*?)<\/p:bg>/);
+
+  if (bgMatch === null) return canvas;
+
+  const bgBody = bgMatch[1] ?? '';
+  const srgb = bgBody.match(/<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/);
+
+  if (srgb === null) return canvas;
+
+  const hex = `#${(srgb[1] ?? '').toUpperCase()}`;
+
+  return { ...canvas, backgroundColor: hex, backgroundMode: 'solid' };
 }
 
 function importSingleSlide(
@@ -364,17 +394,19 @@ function promoteShapeText(
 
   if (textBody === null) return shape;
 
-  // Preserve structured text when the body has multiple runs or any
-  // run with actual styling (bold/italic/underline/font/color/size);
-  // flatten to a plain string otherwise. `lang` alone (default on
-  // PowerPoint runs) doesn't count as styling — we keep those single-
-  // run bodies as plain strings for compactness.
+  // Preserve structured text when the body has multiple runs, any run
+  // with actual styling (bold/italic/underline/font/color/size), or
+  // any paragraph-level property (alignment, bullet, indent, line
+  // spacing). `lang` alone (default on PowerPoint runs) doesn't count
+  // as styling — single-run bodies without paragraph props stay as
+  // plain strings for compactness.
   const hasStructure = textBody.paragraphs.some(
     (p) =>
       p.runs.length > 1 ||
       p.runs.some(
         (r) => r.props?.style !== undefined && Object.keys(r.props.style).length > 0,
-      ),
+      ) ||
+      p.props !== undefined,
   );
   const content: string | TextBody = hasStructure
     ? textBody

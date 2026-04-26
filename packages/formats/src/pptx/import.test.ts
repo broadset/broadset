@@ -514,6 +514,83 @@ describe('PPTX importer — operator-level extraction', () => {
     expect(reExportedSlide).toMatch(/<a:xfrm[^>]*flipH="1"[^>]*flipV="1"/);
   });
 
+  /**
+   * @description B4 — slide background round-trip. `<p:bg>` solid
+   * fill on the first slide seeds `canvas.backgroundColor`; export
+   * emits `<p:bg>` from the canvas state.
+   */
+  it('round-trips slide background colour via canvas.backgroundColor', async () => {
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="112233"/></a:solidFill></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
+    const inputBytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')],
+      ]),
+    );
+    const imported = importPptx(inputBytes);
+
+    expect(imported.canvas.backgroundColor).toBe('#112233');
+    expect(imported.canvas.backgroundMode).toBe('solid');
+
+    const reExported = exportPptxBytes(imported);
+    const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
+    const reExportedSlide = readTextPart(readOoxmlPackage(reExported), 'ppt/slides/slide1.xml') ?? '';
+
+    expect(reExportedSlide).toContain('<p:bg>');
+    expect(reExportedSlide).toContain('val="112233"');
+  });
+
+  /**
+   * @description B5+B7 — bullets / numbered lists / paragraph
+   * alignment / line spacing all live on `<a:pPr>`. Importer extracts
+   * them into Paragraph.props; exporter emits them back.
+   */
+  it('imports bullets, alignment, and line spacing from <a:pPr>', () => {
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="List"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="4000000" cy="3000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:pPr algn="ctr" indent="-360000" marL="360000"><a:lnSpc><a:spcPct val="150000"/></a:lnSpc><a:buChar char="•"/></a:pPr><a:r><a:rPr lang="en-US"/><a:t>First bullet</a:t></a:r></a:p><a:p><a:pPr algn="r"><a:buAutoNum type="arabicPeriod" startAt="3"/></a:pPr><a:r><a:rPr lang="en-US"/><a:t>Numbered item</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
+    const inputBytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')],
+      ]),
+    );
+    const imported = importPptx(inputBytes);
+    const textEl = imported.elements.find((el) => el.type === 'text');
+    const content = textEl?.content;
+
+    if (typeof content !== 'object' || !('paragraphs' in content)) throw new Error('expected TextBody');
+    expect(content.paragraphs).toHaveLength(2);
+
+    const first = content.paragraphs[0];
+
+    expect(first?.props?.align).toBe('center');
+    expect(first?.props?.lineSpacing).toBeCloseTo(1.5, 5);
+    expect(first?.props?.bullet?.kind).toBe('char');
+
+    if (first?.props?.bullet?.kind === 'char') {
+      expect(first.props.bullet.char).toBe('•');
+    }
+
+    const second = content.paragraphs[1];
+
+    expect(second?.props?.align).toBe('end');
+    expect(second?.props?.bullet?.kind).toBe('auto');
+
+    if (second?.props?.bullet?.kind === 'auto') {
+      expect(second.props.bullet.format).toBe('arabicPeriod');
+      expect(second.props.bullet.startAt).toBe(3);
+    }
+  });
+
   it('rejects vbaProject.bin with a macro-rejected warning at import', () => {
     const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst/><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
     const bytes = writeOoxmlPackage(
