@@ -350,6 +350,7 @@ export function DemoApp(): React.JSX.Element {
     playbackControllerRef,
     pushToast,
     setActiveDialog,
+    projectAssets: SAMPLE_PROJECT.assets,
   });
   const {
     handleAlignSelection,

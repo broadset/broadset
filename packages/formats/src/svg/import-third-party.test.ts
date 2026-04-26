@@ -363,6 +363,36 @@ describe('P7.4b — CSS style block resolution', () => {
     expect(rect?.style.fill).not.toBe('#ff0000');
   });
 
+  /**
+   * @description `:not(.foo)` is statically resolvable — the
+   * importer MUST match elements that don't carry the inner
+   * selector and MUST NOT emit a pseudo-class warning. Closes
+   * the P7.7 review nit that `:not()` was treated as opaque.
+   */
+  it('resolves :not(.class) by inverting the inner compound match', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+      <style>rect:not(.skip) { fill: #00ff00; }</style>
+      <rect width="50" height="50"/>
+      <rect class="skip" width="50" height="50"/>
+    </svg>`;
+    const { document, warnings } = importSvgDocument(input);
+    const rects = document.elements.filter((el) => el.type === 'rectangle');
+    const fill0 = rects[0]?.style.fill;
+    const fill1 = rects[1]?.style.fill;
+
+    if (fill0?.kind === 'solid' && fill0.color.kind === 'rgb') {
+      expect(fill0.color.hex).toBe('#00ff00');
+    } else {
+      throw new Error('expected first rect to have a solid green fill');
+    }
+
+    if (fill1?.kind === 'solid' && fill1.color.kind === 'rgb') {
+      expect(fill1.color.hex).not.toBe('#00ff00');
+    }
+
+    expect(warnings.some((w) => /pseudo-class.*not\b/i.test(w))).toBe(false);
+  });
+
   it('warns about pseudo-class selectors it cannot resolve', () => {
     const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
       <style>

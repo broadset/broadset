@@ -132,15 +132,52 @@ function skewIsZero(m: Matrix, tx: number, ty: number, angleRad: number, sx: num
 }
 
 /**
- * Build a `<rect>` outline as an SVG path d-string (no transform
- * applied yet). The caller bakes the transform via
- * `bakeTransformIntoPathD`.
+ * Build a `<rect>` outline as an SVG path d-string at the source
+ * `(x, y)` corner. The caller bakes the transform via
+ * `bakeTransformIntoPathD`. Honouring `x` / `y` is required because
+ * SVG `<rect x="50" y="30">` carries the offset on the element, NOT
+ * via a wrapping `transform=`.
  */
-export function rectAsPathD(width: number, height: number): string {
-  const w = String(width);
-  const h = String(height);
+export function rectAsPathD(x: number, y: number, width: number, height: number): string {
+  const x0 = String(x);
+  const y0 = String(y);
+  const x1 = String(x + width);
+  const y1 = String(y + height);
 
-  return `M0,0 L${w},0 L${w},${h} L0,${h} Z`;
+  return `M${x0},${y0} L${x1},${y0} L${x1},${y1} L${x0},${y1} Z`;
+}
+
+/**
+ * Build a `<polygon>` outline as an SVG path d-string. Points
+ * format follows SVG 2 (whitespace- or comma-separated `x,y`
+ * pairs). Empty / malformed point lists return `''`.
+ */
+export function polygonAsPathD(pointsAttr: string, closed: boolean): string {
+  const numbers: number[] = [];
+
+  for (const token of pointsAttr.split(/[\s,]+/)) {
+    if (token === '') continue;
+
+    const n = parseFloat(token);
+
+    if (Number.isFinite(n)) numbers.push(n);
+  }
+
+  if (numbers.length < 4 || numbers.length % 2 !== 0) {
+    return '';
+  }
+
+  const parts: string[] = [];
+
+  for (let i = 0; i < numbers.length; i += 2) {
+    const cmd = i === 0 ? 'M' : 'L';
+
+    parts.push(`${cmd}${String(numbers[i] ?? 0)},${String(numbers[i + 1] ?? 0)}`);
+  }
+
+  if (closed) parts.push('Z');
+
+  return parts.join(' ');
 }
 
 /**

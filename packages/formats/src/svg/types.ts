@@ -287,17 +287,20 @@ export const svgImportOptionsSchema: z.ZodType<SvgImportOptions> = z.object({
  * Per-family source declared by the caller for font embedding /
  * referencing / flattening. The exporter uses `bytes` for `'embed'`
  * (subsets and base64-encodes) and `'flatten'` (extracts glyph
- * outlines), and `url` for `'reference'`. `permissionOverride` lets
- * tests deterministically exercise the restricted-permission path
- * even when the supplied bytes carry no fsType bit; production
- * callers should leave it `undefined` and let the exporter read the
- * OS/2 table.
+ * outlines), and `url` for `'reference'`.
+ *
+ * `__testPermissionOverride` is a TEST-ONLY escape hatch (note the
+ * `__` prefix) — production callers MUST NOT pass it. It exists so
+ * permission-policy tests can deterministically exercise the
+ * `restricted` branch without committing a restricted-fsType font
+ * fixture. The Zod schema and the public `SvgExportOptions.fonts`
+ * surface ignore the field at the consumer's expense if set.
  */
 export interface SvgFontSource {
   readonly bytes?: Uint8Array | undefined;
   readonly url?: string | undefined;
   readonly format: 'woff2' | 'ttf' | 'otf';
-  readonly permissionOverride?: 'installable' | 'editable' | 'preview-print' | 'restricted' | undefined;
+  readonly __testPermissionOverride?: 'installable' | 'editable' | 'preview-print' | 'restricted' | undefined;
 }
 
 export interface SvgExportOptions {

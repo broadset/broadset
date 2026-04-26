@@ -258,18 +258,45 @@ describe('SVG Import Fallback Preservation', () => {
     expect(svgEl?.content).toContain('foreignObject');
   });
 
-  /** @description Validates that transformed matrix groups are preserved as svg element type. */
-  it('preserves transformed matrix groups as svg element type', () => {
+  /**
+   * @description A decomposable matrix on a `<g>` (here just a
+   * translate disguised as a matrix) MUST hydrate as a native
+   * rectangle, NOT an opaque svg payload. P7.7e replaced the
+   * blanket "anything containing 'matrix' gets preserved opaquely"
+   * branch with a proper decomposition + bake pipeline.
+   */
+  it('decomposes a translate-only matrix on <g> to a native child', () => {
     const input = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
       <g transform="matrix(1,0,0,1,10,20)"><rect width="50" height="25"/></g>
     </svg>`;
 
     const result = importSvg(input);
+    const rectEl = result.elements.find((e) => e.type === 'rectangle');
+    const opaqueEl = result.elements.find((e) => e.type === 'svg');
 
-    const svgEl = result.elements.find((e) => e.type === 'svg');
+    expect(rectEl?.position.x).toBeCloseTo(10, 1);
+    expect(rectEl?.position.y).toBeCloseTo(20, 1);
+    expect(opaqueEl).toBeUndefined();
+  });
 
-    expect(svgEl).toBeDefined();
-    expect(svgEl?.content).toContain('<g');
+  /**
+   * @description A non-decomposable matrix on a `<g>` (here scale)
+   * MUST bake the transform into each child shape's geometry as a
+   * `<path>`, NOT collapse to an opaque svg payload. P7.7e
+   * propagates the cumulative matrix through `TransformState` so
+   * leaf shapes pre-multiply their geometry.
+   */
+  it('propagates a baking matrix from <g> into child geometry', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+      <g transform="scale(2, 1)"><rect width="50" height="25"/></g>
+    </svg>`;
+
+    const result = importSvg(input);
+    const pathEl = result.elements.find((e) => e.type === 'path');
+    const opaqueEl = result.elements.find((e) => e.type === 'svg');
+
+    expect(pathEl).toBeDefined();
+    expect(opaqueEl).toBeUndefined();
   });
 
   /** @description Validates that simple groups are flattened so supported children import natively. */

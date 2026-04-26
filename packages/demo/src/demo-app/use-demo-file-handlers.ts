@@ -1,5 +1,5 @@
 import type { EditorStore } from '@broadset/editor';
-import type { BroadsetDocument } from '@broadset/model';
+import type { Asset, BroadsetDocument } from '@broadset/model';
 import { createEmptyBroadsetDocument } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { computeTimelineLoopDuration, createPlaybackController } from '@broadset/playback';
@@ -25,6 +25,15 @@ interface UseDemoFileHandlersOptions {
   readonly pushToast: (severity: 'error' | 'info' | 'success', message: string) => void;
   readonly setActiveDialog: Dispatch<SetStateAction<ActiveDialog>>;
   readonly fileInputRef: RefObject<HTMLInputElement | null>;
+  /**
+   * Project-level assets (font, image, video, etc.). The SVG
+   * exporter walks `FontAsset` entries here to populate
+   * `SvgExportOptions.fonts` so embed / reference / flatten modes
+   * find byte sources for any text element using a non-system
+   * `font-family`. Optional — when absent SVG export still works
+   * but emits "no font bytes supplied" warnings.
+   */
+  readonly projectAssets?: readonly Asset[];
 }
 
 function formatImportWarningMessage(warnings: readonly string[]): string {
@@ -372,6 +381,7 @@ export function useDemoFileHandlers({
   pushToast,
   setActiveDialog,
   fileInputRef,
+  projectAssets,
 }: UseDemoFileHandlersOptions): DemoFileHandlers {
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
 
@@ -545,6 +555,11 @@ export function useDemoFileHandlers({
 
         if (videoSession !== null) snapshotCanvas = videoSession.session.encoderCanvas;
 
+        // SVG export pulls byte-level font sources from the
+        // project's `FontAsset`s so embed / reference / flatten
+        // modes have something to embed beyond the family name.
+        const svgOptions = exporter === 'svg' && projectAssets !== undefined ? { projectAssets } : undefined;
+
         try {
           await bridge.exportDocument(exporter as ExportFormat, {
             document: renderDocument,
@@ -554,6 +569,7 @@ export function useDemoFileHandlers({
             ...(videoSession?.playbackDurationMs !== undefined ?
               { playbackDurationMs: videoSession.playbackDurationMs }
             : {}),
+            ...(svgOptions !== undefined ? { svgOptions } : {}),
             onProgress: makeFinalizeProgressHandler(setExportProgress),
           });
 

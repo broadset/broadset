@@ -55,6 +55,25 @@ describe('P7.7a — Element-count cap', () => {
   });
 });
 
+describe('P7.7e — CSS rule-count cap', () => {
+  /**
+   * @description An SVG with more than `SVG_CSS_RULE_CAP` rules in
+   * `<style>` blocks MUST emit a warning and stop collecting
+   * additional rules. Closes the P7.7 review finding that
+   * applyStyleBlocks ran O(rules × elements) without bound.
+   */
+  it('caps the number of CSS rules collected from <style> blocks', () => {
+    const ruleCount = 6_000;
+    const ruleText = Array.from({ length: ruleCount }, (_unused, i) => `.cls${String(i)} { fill: #fff; }`).join('\n');
+    const fixture = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><style>${ruleText}</style><rect width="50" height="50"/></svg>`;
+    const start = Date.now();
+    const { warnings } = importSvgDocument(fixture);
+
+    expect(Date.now() - start).toBeLessThan(5_000);
+    expect(warnings.some((w) => /CSS rule cap|rule cap/i.test(w))).toBe(true);
+  });
+});
+
 describe('P7.7a — Group-depth cap', () => {
   /**
    * @description Nesting `<g>` elements 200 levels deep MUST hit the

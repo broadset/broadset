@@ -1,5 +1,5 @@
 import type * as FormatsNS from '@broadset/formats';
-import type { BroadsetDocument } from '@broadset/model';
+import type { Asset, BroadsetDocument } from '@broadset/model';
 import { broadsetDocumentSchema } from '@broadset/model';
 
 /* ------------------------------------------------------------------ */
@@ -27,6 +27,15 @@ export interface SvgExportOptionsInput {
   readonly includeMetadata?: boolean;
   readonly includeElementTagging?: boolean;
   readonly flattenGroups?: boolean;
+  /**
+   * Project assets the SVG exporter walks for `FontAsset` byte
+   * sources. Used to populate `SvgExportOptions.fonts` so embed /
+   * reference / flatten modes have something to embed beyond the
+   * font-family name. Optional: when absent, the exporter emits
+   * preflight warnings for every text element using a non-system
+   * family.
+   */
+  readonly projectAssets?: readonly Asset[];
 }
 
 export interface ExportContext {
@@ -75,6 +84,42 @@ const DEFAULT_JPEG_QUALITY = 0.92;
 const DEFAULT_VIDEO_FRAME_RATE = 30;
 const DEFAULT_VIDEO_QUALITY = 0.8;
 
+/**
+ * Build the SVG-specific export options + font source map from the
+ * caller's `svgOptions`, and route the result through
+ * `exportSvgDocument`. Extracted from the main `exportDocument`
+ * switch to keep that function's cognitive complexity below the
+ * sonarjs threshold.
+ */
+async function exportSvgVia(formats: FormatsModule, context: ExportContext, name: string): Promise<void> {
+  const projectAssets = context.svgOptions?.projectAssets ?? [];
+  const fonts = projectAssets.length > 0 ? formats.buildSvgFontSourcesFromAssets(projectAssets) : undefined;
+  const svgExportOptions = {
+    ...(context.svgOptions?.fontEmbedding !== undefined ? { fontEmbedding: context.svgOptions.fontEmbedding } : {}),
+    ...(context.svgOptions?.includeMetadata !== undefined ?
+      { includeMetadata: context.svgOptions.includeMetadata }
+    : {}),
+    ...(context.svgOptions?.includeElementTagging !== undefined ?
+      { includeElementTagging: context.svgOptions.includeElementTagging }
+    : {}),
+    ...(context.svgOptions?.flattenGroups !== undefined ? { flattenGroups: context.svgOptions.flattenGroups } : {}),
+    ...(fonts !== undefined ? { fonts } : {}),
+  };
+  const result = await formats.exportSvgDocument(context.document, svgExportOptions);
+  const blob = new Blob([result.svg], { type: 'image/svg+xml' });
+
+  // Surface preflight warnings (missing fonts, restricted-
+  // permission embeds) to the caller via the onProgress stage
+  // channel so the toast layer can announce them.
+  if (result.warnings.length > 0 && context.onProgress !== undefined) {
+    const summary = `Exported with ${String(result.warnings.length)} font warning(s): ${result.warnings[0] ?? ''}`;
+
+    context.onProgress(1, summary);
+  }
+
+  formats.triggerDownload(blob, `${name}.svg`);
+}
+
 export async function exportDocument(format: ExportFormat, context: ExportContext): Promise<void> {
   const formats = await loadFormats();
   const { document: doc } = context;
@@ -90,10 +135,7 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
     }
 
     case 'svg': {
-      const svgStr = await formats.exportSvgString(doc, context.svgOptions);
-      const blob = new Blob([svgStr], { type: 'image/svg+xml' });
-
-      formats.triggerDownload(blob, `${name}.svg`);
+      await exportSvgVia(formats, context, name);
       break;
     }
 

@@ -1,5 +1,5 @@
-import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
-import { resolveContentAsPlainString, resolveStyleColor } from '@broadset/model';
+import type { Asset, BroadsetDocument, BroadsetElement, FontAsset, FontFormat } from '@broadset/model';
+import { isFontAsset, resolveContentAsPlainString, resolveStyleColor } from '@broadset/model';
 import * as fontkit from 'fontkit';
 
 import { resolveEmbedDecision } from '../_shared/fonts/embed-policy';
@@ -145,7 +145,7 @@ function resolveSingleFamily(
   }
 
   // mode === 'embed'
-  const permission: EmbedPermission | null = source.permissionOverride ?? readEmbedPermission(source.bytes);
+  const permission: EmbedPermission | null = source.__testPermissionOverride ?? readEmbedPermission(source.bytes);
   const decision = resolveEmbedDecision(permission);
 
   if (decision.action === 'refuse') {
@@ -263,47 +263,64 @@ function planFlatten(
   return { defsStyleBlock: '', flattenedTextElements, warnings };
 }
 
+/**
+ * Render a Broadset text element as `<path>` glyph outlines via
+ * fontkit's `font.layout`. Honours:
+ *
+ * - **Paragraphs** — each paragraph (or `\n`-split substring of the
+ *   plain-text projection) advances the baseline by `lineHeight`
+ *   so multi-line text renders on separate lines, not overlapping.
+ * - **Alignment** — `style.textAlignment` shifts each line by
+ *   `width - measuredWidth` (right) or half (centre) within the
+ *   element's `width` box. Defaults to left.
+ * - **Letter-spacing** — `style.letterSpacing` adds extra advance
+ *   per glyph so tight / loose tracking survives the bake.
+ *
+ * Returns `null` when the font is unusable (no `layout`, every
+ * glyph is notdef, or every line is empty) so the caller leaves
+ * the original `<text>` markup intact rather than emitting an
+ * empty `<g>`.
+ */
+interface FlattenLayoutContext {
+  readonly font: FontkitFont;
+  readonly scale: number;
+  readonly letterSpacing: number;
+  readonly alignment: string | undefined;
+  readonly elementWidth: number;
+}
+
 function renderTextAsGlyphPaths(el: BroadsetElement, font: FontkitFont): string | null {
-  const text = resolveContentAsPlainString(el.content);
-
-  if (text === '') return null;
-
   if (!('layout' in font) || typeof font.layout !== 'function') return null;
+
+  const lines = resolveLinesForFlatten(el);
+
+  if (lines.length === 0) return null;
 
   const fontSize = el.style.fontSize ?? 16;
   const upem = font.unitsPerEm;
   const scale = fontSize / upem;
   const ascent = 'ascent' in font ? font.ascent * scale : fontSize * 0.8;
-  let cursorX = 0;
-  const baselineY = ascent;
+  const descent = 'descent' in font ? Math.abs(font.descent * scale) : fontSize * 0.2;
+  const lineGap = 'lineGap' in font ? font.lineGap * scale : 0;
+  const lineHeightFromMetrics = ascent + descent + lineGap;
+  const lineHeight = resolveLineHeight(el.style.lineHeight, fontSize, lineHeightFromMetrics);
+  const layoutCtx: FlattenLayoutContext = {
+    font,
+    scale,
+    letterSpacing: el.style.letterSpacing ?? 0,
+    alignment: el.style.textAlignment,
+    elementWidth: el.width,
+  };
   const paths: string[] = [];
 
-  let run;
+  let baselineY = ascent;
 
-  try {
-    run = font.layout(text);
-  } catch {
-    return null;
-  }
-
-  for (let i = 0; i < run.glyphs.length; i++) {
-    const glyph = run.glyphs[i];
-    const position = run.positions[i];
-
-    if (glyph === undefined || position === undefined) continue;
-
-    if (glyph.id === 0) {
-      cursorX += position.xAdvance * scale;
-      continue;
+  for (const line of lines) {
+    if (line !== '') {
+      paths.push(...renderFlattenedLine(line, baselineY, layoutCtx));
     }
 
-    const glyphSvg = glyph.path
-      .scale(scale, -scale)
-      .translate(cursorX + position.xOffset * scale, baselineY + position.yOffset * scale)
-      .toSVG();
-
-    paths.push(`<path d="${escapeXml(glyphSvg)}"/>`);
-    cursorX += position.xAdvance * scale;
+    baselineY += lineHeight;
   }
 
   if (paths.length === 0) return null;
@@ -313,6 +330,131 @@ function renderTextAsGlyphPaths(el: BroadsetElement, font: FontkitFont): string 
   const transform = `translate(${String(el.position.x)}, ${String(el.position.y)})`;
 
   return `<g id="${escapeXml(el.id)}" transform="${transform}"${fillCss}>${paths.join('')}</g>`;
+}
+
+function renderFlattenedLine(line: string, baselineY: number, ctx: FlattenLayoutContext): readonly string[] {
+  if (!('layout' in ctx.font) || typeof ctx.font.layout !== 'function') return [];
+
+  let run: fontkit.GlyphRun;
+
+  try {
+    run = ctx.font.layout(line);
+  } catch {
+    return [];
+  }
+
+  const measuredWidth = measureRun(run, ctx);
+
+  let cursorX = startCursorX(ctx.alignment, ctx.elementWidth, measuredWidth);
+  const paths: string[] = [];
+
+  for (let i = 0; i < run.glyphs.length; i++) {
+    const glyph = run.glyphs[i];
+    const position = run.positions[i];
+
+    if (glyph === undefined || position === undefined) continue;
+
+    const advance = position.xAdvance * ctx.scale + ctx.letterSpacing;
+
+    if (glyph.id !== 0) {
+      const glyphSvg = glyph.path
+        .scale(ctx.scale, -ctx.scale)
+        .translate(cursorX + position.xOffset * ctx.scale, baselineY + position.yOffset * ctx.scale)
+        .toSVG();
+
+      paths.push(`<path d="${escapeXml(glyphSvg)}"/>`);
+    }
+
+    cursorX += advance;
+  }
+
+  return paths;
+}
+
+function measureRun(run: fontkit.GlyphRun, ctx: FlattenLayoutContext): number {
+  let measured = 0;
+
+  for (let i = 0; i < run.glyphs.length; i++) {
+    const position = run.positions[i];
+
+    if (position === undefined) continue;
+
+    measured += position.xAdvance * ctx.scale + ctx.letterSpacing;
+  }
+
+  return measured;
+}
+
+/**
+ * Split a text element's content into per-line strings the
+ * flattener can lay out independently. Handles both:
+ *
+ * - Plain `string` content with embedded `\n` → split on newlines.
+ * - Structured `TextBody` content → one line per paragraph
+ *   (run text concatenated within paragraphs).
+ */
+function resolveLinesForFlatten(el: BroadsetElement): readonly string[] {
+  const content = el.content;
+
+  if (typeof content === 'string') {
+    return content === '' ? [] : content.split(/\r?\n/);
+  }
+
+  if (typeof content === 'object' && 'paragraphs' in content) {
+    const lines: string[] = [];
+
+    for (const paragraph of content.paragraphs) {
+      const text = paragraph.runs.map((r) => r.text).join('');
+
+      lines.push(text);
+    }
+
+    return lines.length > 0 ? lines : [];
+  }
+
+  const fallback = resolveContentAsPlainString(content);
+
+  return fallback === '' ? [] : fallback.split(/\r?\n/);
+}
+
+/**
+ * Resolve `style.lineHeight` (which the model types as
+ * `number | string | undefined`) to a concrete pixel line height.
+ * Numbers are treated as multipliers of `fontSize` (CSS unitless
+ * `line-height` semantics). Strings are best-effort parsed:
+ * `'<n>px'` and bare numerics resolve directly; anything else
+ * falls back to the metrics-derived line height so a malformed
+ * value never crashes the bake.
+ */
+function resolveLineHeight(value: number | string | undefined, fontSize: number, fallback: number): number {
+  if (typeof value === 'number') {
+    return value * fontSize;
+  }
+
+  if (typeof value === 'string') {
+    const px = /^([\d.]+)\s*px$/i.exec(value);
+
+    if (px?.[1] !== undefined) {
+      const n = parseFloat(px[1]);
+
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    const numeric = parseFloat(value);
+
+    if (Number.isFinite(numeric)) return numeric * fontSize;
+  }
+
+  return fallback;
+}
+
+function startCursorX(alignment: string | undefined, boxWidth: number, lineWidth: number): number {
+  if (boxWidth <= 0) return 0;
+
+  if (alignment === 'right') return Math.max(0, boxWidth - lineWidth);
+  if (alignment === 'center') return Math.max(0, (boxWidth - lineWidth) / 2);
+
+  return 0;
 }
 
 function collectFontFamiliesUsed(doc: BroadsetDocument): Map<string, Set<number>> {
@@ -417,4 +559,83 @@ function isAllowedFontUrlScheme(url: string): boolean {
   }
 
   return false;
+}
+
+/**
+ * Build the `Map<familyName, SvgFontSource>` the SVG exporter
+ * consumes from a `BroadsetProject.assets` array. `embedded` data
+ * URIs are decoded to `Uint8Array` bytes (so `embed` mode can
+ * subset); `url` sources are passed through unchanged. Other asset
+ * kinds (image / video / etc.) are skipped. Closes the demo
+ * wiring gap surfaced in the P7.7 review — callers can now
+ * populate `SvgExportOptions.fonts` from any project.
+ */
+export function buildSvgFontSourcesFromAssets(assets: readonly Asset[]): Map<string, SvgFontSource> {
+  const map = new Map<string, SvgFontSource>();
+
+  for (const asset of assets) {
+    if (!isFontAsset(asset)) continue;
+
+    const source = buildSourceFromFontAsset(asset);
+
+    if (source !== null) {
+      map.set(asset.familyName, source);
+    }
+  }
+
+  return map;
+}
+
+function buildSourceFromFontAsset(asset: FontAsset): SvgFontSource | null {
+  const format: FontFormat = asset.format;
+  const src = asset.source;
+
+  if (src.type === 'url') {
+    return { url: src.url, format };
+  }
+
+  if (src.type === 'embedded') {
+    const bytes = decodeFontDataUri(src.dataUri);
+
+    if (bytes === null) return null;
+
+    return { bytes, format };
+  }
+
+  // 'file' source — bytes aren't directly available without async
+  // file I/O. Skip so the caller's render path falls back to
+  // consumer-side font resolution.
+  return null;
+}
+
+function decodeFontDataUri(dataUri: string): Uint8Array | null {
+  const match = /^data:[^;,]+(?:;[^,]+)?,(.+)$/.exec(dataUri);
+
+  if (match === null) return null;
+
+  const payload = match[1] ?? '';
+  const isBase64 = /;base64,/i.test(dataUri.slice(0, dataUri.length - payload.length));
+
+  if (!isBase64) {
+    // URL-encoded — fonts are binary, so this is unsupported in
+    // practice. Skip.
+    return null;
+  }
+
+  try {
+    if (typeof Buffer !== 'undefined') {
+      return new Uint8Array(Buffer.from(payload, 'base64'));
+    }
+
+    const binary = atob(payload);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+
+    return bytes;
+  } catch {
+    return null;
+  }
 }

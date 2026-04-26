@@ -12,9 +12,16 @@ import {
 } from '@broadset/model';
 import * as CssTree from 'css-tree';
 import svgpath from 'svgpath';
+import { compose as composeMatrix, type Matrix } from 'transformation-matrix';
 
 import { type ParsedElementMetadata, parseMetadataPacket } from './metadata';
-import { type DecomposedTransform, ellipseAsPathD, parseAndDecomposeTransform, rectAsPathD } from './transform';
+import {
+  type DecomposedTransform,
+  ellipseAsPathD,
+  parseAndDecomposeTransform,
+  polygonAsPathD,
+  rectAsPathD,
+} from './transform';
 import type { SvgImportOptions } from './types';
 
 const USE_DEREFERENCE_DEPTH_CAP = 16;
@@ -300,12 +307,24 @@ interface CssRule {
   readonly order: number;
 }
 
+/**
+ * Hard cap on the number of CSS rules we collect from `<style>`
+ * blocks. The element-by-element resolver runs O(rules × elements)
+ * after this — even at the 10 000-element document cap, 100 000
+ * rules drives 10⁹ matcher invocations. Realistic third-party SVGs
+ * carry a few hundred rules at most; 5 000 leaves an order-of-
+ * magnitude headroom while bounding the worst case to manageable
+ * size. Closes the P7.7 review CSS-rule unboundedness finding.
+ */
+const SVG_CSS_RULE_CAP = 5_000;
+
 function collectStylesheetRules(xmlDoc: Document, warnings: string[]): readonly CssRule[] {
   const rules: CssRule[] = [];
   const styleEls = xmlDoc.getElementsByTagName('style');
   let order = 0;
+  let truncated = false;
 
-  for (let i = 0; i < styleEls.length; i++) {
+  outer: for (let i = 0; i < styleEls.length; i++) {
     const styleEl = styleEls[i];
 
     if (!styleEl) {
@@ -313,9 +332,20 @@ function collectStylesheetRules(xmlDoc: Document, warnings: string[]): readonly 
     }
 
     for (const rule of parseRulesViaCssTree(styleEl.textContent, warnings)) {
+      if (rules.length >= SVG_CSS_RULE_CAP) {
+        truncated = true;
+        break outer;
+      }
+
       rules.push({ ...rule, order });
       order += 1;
     }
+  }
+
+  if (truncated) {
+    warnings.push(
+      `CSS rule cap of ${String(SVG_CSS_RULE_CAP)} reached; later <style> rules were not applied (resource cap per importer security contract).`,
+    );
   }
 
   return rules;
@@ -439,13 +469,19 @@ function processRuleNode(
     return;
   }
 
-  // Selector lists: emit one rule per comma-separated selector.
-  CssTree.walk(rule.prelude, {
-    visit: 'Selector',
-    enter(selectorNode: CssTree.CssNode) {
-      pushSelectorRule(selectorNode as CssTree.Selector, body, out, warnings);
-    },
-  });
+  // Selector lists: emit one rule per top-level comma-separated
+  // selector. Iterate the SelectorList's direct children rather
+  // than `walk(visit: 'Selector')` so we don't recurse INTO
+  // `:not(...)`'s own inner Selector nodes — that recursion would
+  // surface the inner compound (e.g. `.skip`) as a standalone
+  // rule, doubling the match.
+  if (rule.prelude.type === 'SelectorList') {
+    rule.prelude.children.forEach((selectorNode) => {
+      if (selectorNode.type === 'Selector') {
+        pushSelectorRule(selectorNode, body, out, warnings);
+      }
+    });
+  }
 }
 
 function pushSelectorRule(
@@ -490,7 +526,13 @@ function analyseSelector(selector: CssTree.Selector): SelectorAnalysis {
       } else if (node.type === 'AttributeSelector') {
         attributes.push(node.name.name);
       } else if (node.type === 'PseudoClassSelector' || node.type === 'PseudoElementSelector') {
-        pseudoClasses.push(node.name);
+        // `:not()` is statically resolvable via recursive
+        // `matchCompound` — don't flag it for warning. Other
+        // pseudo-classes (`:hover`, `:nth-child`) remain
+        // unresolved.
+        if (node.name !== 'not') {
+          pseudoClasses.push(node.name);
+        }
       } else if (node.type === 'Combinator') {
         hasCombinator = true;
       }
@@ -887,12 +929,34 @@ function consumeNextAtom(
 /**
  * Match a single compound selector (no combinator, e.g. `g`,
  * `.foo`, `#bar`, `g[data-x="y"].foo`) against an element.
+ *
+ * Supports `:not(<simple>)` by recursively matching the inner
+ * compound and inverting the result. Other pseudo-classes / pseudo-
+ * elements are stripped (cannot be resolved against a static tree
+ * — a warning surfaced at parse time documents the gap).
  */
 function matchCompound(compound: string, el: Element): boolean {
-  // Strip pseudo-classes / pseudo-elements — we can't resolve them
-  // against a static tree; base matching falls through with a
-  // warning emitted at parse time.
-  const base = compound.replace(/::?[a-zA-Z][a-zA-Z0-9-]*(\([^)]*\))?/g, '');
+  // Extract `:not(...)` clauses first — they're statically
+  // resolvable by recursively matching their inner compound and
+  // inverting. Multiple `:not()` clauses on the same compound
+  // (e.g. `g:not(.foo):not(#bar)`) all gate the match.
+  const notClauses: string[] = [];
+  const withoutNot = compound.replace(/:not\(([^)]+)\)/g, (_match, inner: string) => {
+    notClauses.push(inner.trim());
+
+    return '';
+  });
+
+  for (const inner of notClauses) {
+    if (matchCompound(inner, el)) {
+      return false;
+    }
+  }
+
+  // Strip remaining pseudo-classes / pseudo-elements — they cannot
+  // be resolved against a static tree; base matching continues
+  // with a warning emitted at parse time.
+  const base = withoutNot.replace(/::?[a-zA-Z][a-zA-Z0-9-]*(\([^)]*\))?/g, '');
   let remainder = base.trim();
 
   if (remainder === '' || remainder === '*') {
@@ -1066,7 +1130,24 @@ interface TransformState {
   readonly x: number;
   readonly y: number;
   readonly rotation: number;
+  /**
+   * Cumulative matrix from root to this element. Always populated;
+   * defaults to identity. When `requiresBake` is `true` the leaf
+   * shape importer pre-multiplies its geometry by this matrix
+   * instead of using `x`/`y`/`rotation` (which are unreliable
+   * once a bake-requiring ancestor is in the chain).
+   */
+  readonly matrix: Matrix;
+  /**
+   * `true` when the cumulative matrix carries a non-trivial scale
+   * or skew that Broadset cannot represent natively (per IO-D-02).
+   * Drives leaf shapes to bake geometry into a `<path>` rather than
+   * keeping a native `rectangle` / `ellipse` / etc.
+   */
+  readonly requiresBake: boolean;
 }
+
+const IDENTITY_MATRIX: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 
 function parseTransform(transformStr: string): {
   readonly x: number;
@@ -1087,10 +1168,31 @@ function parseTransform(transformStr: string): {
 }
 
 function combineTransform(base: TransformState, next: TransformState): TransformState {
+  // Fast-path: if neither side carries a baking transform, simple
+  // additive composition keeps the plain `x`/`y`/`rotation` story
+  // (and zero-allocates the matrix slot — every group descent hits
+  // this branch in practice).
+  if (!base.requiresBake && !next.requiresBake) {
+    return {
+      x: base.x + next.x,
+      y: base.y + next.y,
+      rotation: base.rotation + next.rotation,
+      matrix: IDENTITY_MATRIX,
+      requiresBake: false,
+    };
+  }
+
+  // Either side bakes — promote to full matrix composition so the
+  // leaf shape that eventually bakes can use the cumulative
+  // transform without losing scale / skew from any ancestor.
+  const composed = composeMatrix(base.matrix, next.matrix);
+
   return {
-    x: base.x + next.x,
-    y: base.y + next.y,
-    rotation: base.rotation + next.rotation,
+    x: composed.e,
+    y: composed.f,
+    rotation: 0,
+    matrix: composed,
+    requiresBake: true,
   };
 }
 
@@ -1353,11 +1455,20 @@ interface GroupImportContext {
 }
 
 /**
- * Handle the `<g>` element case during the visual walk. Extracted
- * from `importElement` to keep that function's cognitive complexity
- * below the sonarjs threshold. The group either becomes an opaque
- * payload (matrix transform on the group — non-decomposable) or
- * flattens into its children with proper `parentDataBsId` linkage.
+ * Handle the `<g>` element case during the visual walk. The group
+ * descends into children and links them via `parentDataBsId`. When
+ * the group's transform requires bake (scale / skew / non-
+ * decomposable matrix), the cumulative matrix is threaded down
+ * through `ctx.transform.matrix` so each leaf shape pre-multiplies
+ * its geometry instead of trying to store an unrepresentable
+ * transform on the group itself (Broadset has no group-level scale
+ * / skew per IO-D-02).
+ *
+ * Tagged groups (`data-bs-id`) emit a `'group'` element so the
+ * round-trip fast path can rebuild the parent tree; the group's
+ * own position is taken from the cumulative translate so an
+ * inherited bake-transform still leaves the group anchor at the
+ * correct point.
  */
 function importGroupElement(el: Element, ctx: GroupImportContext): ImportedElement[] {
   if (ctx.depth >= SVG_GROUP_DEPTH_CAP) {
@@ -1366,23 +1477,6 @@ function importGroupElement(el: Element, ctx: GroupImportContext): ImportedEleme
     );
 
     return [];
-  }
-
-  if (ctx.transformStr.includes('matrix')) {
-    ctx.warnings.push(`Preserved transformed group as SVG payload (id: ${getAttr(el, 'id') ?? 'unknown'})`);
-
-    return [
-      {
-        type: 'svg',
-        content: el.outerHTML,
-        position: { x: 0, y: 0 },
-        width: 0,
-        height: 0,
-        rotation: 0,
-        style: {},
-        ...ctx.tagMeta,
-      },
-    ];
   }
 
   // A tagged group becomes a Broadset `'group'` element in the
@@ -1399,7 +1493,10 @@ function importGroupElement(el: Element, ctx: GroupImportContext): ImportedEleme
       position: { x: ctx.transform.x, y: ctx.transform.y },
       width: 0,
       height: 0,
-      rotation: ctx.transform.rotation,
+      // When the cumulative transform requires bake, rotation is
+      // baked into children's geometry — keep the group's stored
+      // rotation at zero to avoid double-applying it.
+      rotation: ctx.transform.requiresBake ? 0 : ctx.transform.rotation,
       style: ctx.baseStyle,
       ...ctx.tagMeta,
     });
@@ -1434,10 +1531,28 @@ interface ShapeBakeContext {
   }>;
 }
 
+/**
+ * `true` when geometry MUST be baked into a `<path>` because either
+ * the inherited cumulative transform (from ancestor `<g>` matrices)
+ * or the element's own transform carries a non-trivial scale /
+ * skew. Either source disqualifies a native rectangle / ellipse
+ * representation per IO-D-02.
+ */
+function requiresBake(ctx: ShapeBakeContext): boolean {
+  return ctx.transform.requiresBake || ctx.ownTransform.requiresBake;
+}
+
 function bakedPathElement(d: string, ctx: ShapeBakeContext): ImportedElement {
+  // Compose the inherited cumulative matrix with the element's own
+  // transform so a leaf inside `<g transform="scale(2)">` bakes via
+  // (ancestor scale) ⊗ (own translate), not the own matrix alone.
+  const matrix = ctx.transform.requiresBake
+    ? composeMatrix(ctx.transform.matrix, ctx.ownTransform.matrix)
+    : ctx.ownTransform.matrix;
+
   return {
     type: 'path',
-    content: bakePathWithMatrix(d, ctx.ownTransform.matrix),
+    content: bakePathWithMatrix(d, matrix),
     position: { x: 0, y: 0 },
     width: 0,
     height: 0,
@@ -1448,17 +1563,19 @@ function bakedPathElement(d: string, ctx: ShapeBakeContext): ImportedElement {
 }
 
 function importRectElement(el: Element, ctx: ShapeBakeContext): ImportedElement {
+  const x = getNumAttr(el, 'x', 0);
+  const y = getNumAttr(el, 'y', 0);
   const w = getNumAttr(el, 'width', 0);
   const h = getNumAttr(el, 'height', 0);
 
-  if (ctx.ownTransform.requiresBake) {
-    return bakedPathElement(rectAsPathD(w, h), ctx);
+  if (requiresBake(ctx)) {
+    return bakedPathElement(rectAsPathD(x, y, w, h), ctx);
   }
 
   return {
     type: 'rectangle',
     content: '',
-    position: { x: ctx.transform.x, y: ctx.transform.y },
+    position: { x: ctx.transform.x + x, y: ctx.transform.y + y },
     width: w,
     height: h,
     rotation: ctx.transform.rotation,
@@ -1470,7 +1587,7 @@ function importRectElement(el: Element, ctx: ShapeBakeContext): ImportedElement 
 function importPathElement(el: Element, ctx: ShapeBakeContext): ImportedElement {
   const dRaw = getAttr(el, 'd') ?? '';
 
-  if (ctx.ownTransform.requiresBake) {
+  if (requiresBake(ctx)) {
     return bakedPathElement(dRaw, ctx);
   }
 
@@ -1487,17 +1604,19 @@ function importPathElement(el: Element, ctx: ShapeBakeContext): ImportedElement 
 }
 
 function importEllipseElement(el: Element, ctx: ShapeBakeContext): ImportedElement {
+  const cx = getNumAttr(el, 'cx', 0);
+  const cy = getNumAttr(el, 'cy', 0);
   const rx = getNumAttr(el, 'rx', 0);
   const ry = getNumAttr(el, 'ry', 0);
 
-  if (ctx.ownTransform.requiresBake) {
-    return bakedPathElement(ellipseAsPathD(rx, ry, rx, ry), ctx);
+  if (requiresBake(ctx)) {
+    return bakedPathElement(ellipseAsPathD(cx, cy, rx, ry), ctx);
   }
 
   return {
     type: 'ellipse',
     content: '',
-    position: { x: ctx.transform.x, y: ctx.transform.y },
+    position: { x: ctx.transform.x + cx - rx, y: ctx.transform.y + cy - ry },
     width: rx * 2,
     height: ry * 2,
     rotation: ctx.transform.rotation,
@@ -1507,18 +1626,40 @@ function importEllipseElement(el: Element, ctx: ShapeBakeContext): ImportedEleme
 }
 
 function importCircleElement(el: Element, ctx: ShapeBakeContext): ImportedElement {
+  const cx = getNumAttr(el, 'cx', 0);
+  const cy = getNumAttr(el, 'cy', 0);
   const r = getNumAttr(el, 'r', 0);
 
-  if (ctx.ownTransform.requiresBake) {
-    return bakedPathElement(ellipseAsPathD(r, r, r, r), ctx);
+  if (requiresBake(ctx)) {
+    return bakedPathElement(ellipseAsPathD(cx, cy, r, r), ctx);
   }
 
   return {
     type: 'ellipse',
     content: '',
-    position: { x: ctx.transform.x, y: ctx.transform.y },
+    position: { x: ctx.transform.x + cx - r, y: ctx.transform.y + cy - r },
     width: r * 2,
     height: r * 2,
+    rotation: ctx.transform.rotation,
+    style: ctx.baseStyle,
+    ...ctx.tagMeta,
+  };
+}
+
+function importPolygonElement(el: Element, ctx: ShapeBakeContext, closed: boolean): ImportedElement {
+  const pointsAttr = getAttr(el, 'points') ?? '';
+  const dRaw = polygonAsPathD(pointsAttr, closed);
+
+  if (requiresBake(ctx)) {
+    return bakedPathElement(dRaw, ctx);
+  }
+
+  return {
+    type: 'path',
+    content: dRaw,
+    position: { x: ctx.transform.x, y: ctx.transform.y },
+    width: 0,
+    height: 0,
     rotation: ctx.transform.rotation,
     style: ctx.baseStyle,
     ...ctx.tagMeta,
@@ -1549,8 +1690,17 @@ function importElement(
   };
   const ownDataBsId = el.getAttribute('data-bs-id') ?? undefined;
   const ownDataBsKind = el.getAttribute('data-bs-kind') ?? undefined;
+  // When `data-bs-id` is absent (third-party SVGs from Illustrator
+  // / Inkscape / Figma), fall back to the source DOM `id` so
+  // group hierarchy survives the walk and the third-party hydrator
+  // can rebuild `parentId` chains. The fast-path metadata gate
+  // (`parseMetadataPacket` returns null for non-Broadset SVGs) is
+  // checked before this code path uses the value as a metadata key,
+  // so the two namespaces never collide.
+  const sourceId = el.getAttribute('id') ?? undefined;
+  const effectiveId = ownDataBsId ?? sourceId;
   const tagMeta = {
-    ...(ownDataBsId !== undefined ? { dataBsId: ownDataBsId } : {}),
+    ...(effectiveId !== undefined ? { dataBsId: effectiveId } : {}),
     ...(ownDataBsKind !== undefined ? { dataBsKind: ownDataBsKind } : {}),
     parentDataBsId,
   } as const;
@@ -1570,6 +1720,12 @@ function importElement(
 
     case 'circle':
       return [importCircleElement(el, shapeCtx)];
+
+    case 'polygon':
+      return [importPolygonElement(el, shapeCtx, true)];
+
+    case 'polyline':
+      return [importPolygonElement(el, shapeCtx, false)];
 
     case 'text': {
       const textPathEl = el.getElementsByTagName('textPath')[0];
@@ -1612,7 +1768,7 @@ function importElement(
         transformStr,
         transform,
         baseStyle,
-        ownDataBsId,
+        ownDataBsId: effectiveId,
         ownDataBsKind,
         tagMeta,
         parentDataBsId,
@@ -1676,7 +1832,7 @@ function walkSvgDocument(xmlDoc: Document): SvgImportResult {
   const warnings: string[] = [];
   const elements: ImportedElement[] = [];
   const children = svgRoot.children;
-  const rootTransform: TransformState = { x: 0, y: 0, rotation: 0 };
+  const rootTransform: TransformState = { x: 0, y: 0, rotation: 0, matrix: IDENTITY_MATRIX, requiresBake: false };
   // Bound the visual walk by the same element-count cap that gates
   // sanitisation. A hostile SVG with millions of root children would
   // otherwise still walk the whole tree once sanitisation truncates.
@@ -1861,13 +2017,37 @@ function hydrateThirdPartyFallbackFromDoc(
 
   warnings.push(...result.warnings);
 
+  // Build a stable source-id → Broadset-id map so child elements
+  // can reference their parent group via `parentId`. When the
+  // visual walker captured a `dataBsId` (either the Broadset
+  // `data-bs-id` or the source DOM `id`), we keep it as the new
+  // Broadset id; otherwise we synthesise `imported-${index}`.
+  // Closes the third-party group-hierarchy gap surfaced in the
+  // P7.7 review.
+  const sourceIdToBroadsetId = new Map<string, string>();
+
+  result.elements.forEach((element, index) => {
+    const newId = element.dataBsId ?? `imported-${String(index)}`;
+
+    if (element.dataBsId !== undefined) {
+      sourceIdToBroadsetId.set(element.dataBsId, newId);
+    }
+  });
+
   const document: BroadsetDocument = {
     ...emptyDoc,
     name: fileName.replace(/\.svg$/i, ''),
     canvas: { ...emptyDoc.canvas, width: result.canvasWidth, height: result.canvasHeight },
-    elements: result.elements.map((element, index) =>
-      createDefaultElement(pickDefaultKindFromVisual(element.type), {
-        id: `imported-${String(index)}`,
+    elements: result.elements.map((element, index) => {
+      const id = element.dataBsId ?? `imported-${String(index)}`;
+      const parentSourceId = element.parentDataBsId;
+      const resolvedParentId =
+        typeof parentSourceId === 'string' && parentSourceId !== ''
+          ? sourceIdToBroadsetId.get(parentSourceId) ?? null
+          : null;
+
+      return createDefaultElement(pickDefaultKindFromVisual(element.type), {
+        id,
         name: `Element ${String(index + 1)}`,
         position: { x: element.position.x, y: element.position.y },
         width: element.width,
@@ -1875,10 +2055,11 @@ function hydrateThirdPartyFallbackFromDoc(
         rotation: element.rotation,
         content: element.content,
         style: element.style,
+        ...(resolvedParentId !== null ? { parentId: resolvedParentId } : {}),
         ...(element.textPathElementId !== undefined ? { textPathElementId: element.textPathElementId } : {}),
         extensions: { svg: { dirty: false } },
-      }),
-    ),
+      });
+    }),
   };
 
   if (document.elements.length === 0) {
@@ -2038,7 +2219,7 @@ function importSvgFromXmlDoc(xmlDoc: Document): VisualImportResult {
   const warnings: string[] = [];
   const elements: ImportedElement[] = [];
   const children = svgRoot.children;
-  const rootTransform: TransformState = { x: 0, y: 0, rotation: 0 };
+  const rootTransform: TransformState = { x: 0, y: 0, rotation: 0, matrix: IDENTITY_MATRIX, requiresBake: false };
 
   for (let i = 0; i < children.length; i++) {
     const child = children[i];

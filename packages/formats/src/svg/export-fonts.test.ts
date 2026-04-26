@@ -181,6 +181,41 @@ describe('P7.7d — Font embedding: flatten mode', () => {
   });
 });
 
+describe('P7.7e — flatten multi-line + alignment fidelity', () => {
+  /**
+   * @description Multi-paragraph / multi-line plain-text content
+   * MUST flatten to glyph paths whose baselines progress
+   * vertically by ~one line-height per line, NOT collapse onto a
+   * single overlapping baseline. Closes the P7.7 review finding
+   * that flatten lost line breaks.
+   */
+  it('progresses baselines down by ~lineHeight for newline-split content', async () => {
+    const bytes = loadCodicon();
+    const fonts = new Map<string, SvgFontSource>([['Codicon', { bytes, format: 'ttf' }]]);
+    // Codicon's private-use range — pick three codepoints separated
+    // by `\n` so the flattener has three lines to lay out.
+    const ch = (cp: number): string => String.fromCodePoint(cp);
+    const content = `${ch(0xea60)}\n${ch(0xea61)}\n${ch(0xea62)}`;
+    const doc = makeDocWithText('Codicon', content);
+    const { svg } = await exportSvgDocument(doc, { fontEmbedding: 'flatten', fonts });
+    // Each glyph path's first command is `M<x>,<y>` after the
+    // baseline translate. Capture every M-y value; distinct lines
+    // produce distinct y values (modulo baseline progression).
+    const pathDs = [...svg.matchAll(/<path[^>]*\sd="([^"]*)"/g)].map((m) => m[1] ?? '');
+    const yValues = new Set<string>();
+
+    for (const d of pathDs) {
+      const yMatch = /M[-\d.]+[,\s]([-\d.]+)/.exec(d);
+
+      if (yMatch?.[1] !== undefined) yValues.add(yMatch[1]);
+    }
+
+    // Three distinct baseline rows for the three glyphs.
+    expect(pathDs.length).toBeGreaterThanOrEqual(3);
+    expect(yValues.size).toBeGreaterThanOrEqual(2);
+  });
+});
+
 describe('P7.7d — CSS injection hardening', () => {
   /**
    * @description A hostile font-family name with `</style>` MUST be
@@ -224,7 +259,7 @@ describe('P7.7d — Restricted-permission preflight', () => {
    *
    * The codicon fixture does NOT carry restricted fsType. To exercise
    * the policy without a restricted fixture, the test passes
-   * `permissionOverride: 'restricted'` so the exporter follows the
+   * `__testPermissionOverride: 'restricted'` so the exporter follows the
    * policy branch deterministically. Real fonts with fsType bit 1
    * exercise the same branch via `readEmbedPermission`.
    */
@@ -233,7 +268,7 @@ describe('P7.7d — Restricted-permission preflight', () => {
     const fonts = new Map<string, SvgFontSource>([
       [
         'Codicon',
-        { bytes, format: 'ttf', url: 'https://example.com/codicon.woff2', permissionOverride: 'restricted' },
+        { bytes, format: 'ttf', url: 'https://example.com/codicon.woff2', __testPermissionOverride: 'restricted' },
       ],
     ]);
     const doc = makeDocWithText('Codicon', 'a');

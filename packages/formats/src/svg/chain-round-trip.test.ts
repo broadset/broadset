@@ -141,6 +141,57 @@ describe('P7.6 — Chain round-trip (source → export → import → reconcile)
 });
 
 /* ------------------------------------------------------------------ */
+/*  1a-bis. bake-to-path round-trip                                   */
+/* ------------------------------------------------------------------ */
+
+describe('P7.7e — Bake-to-path round-trip', () => {
+  /**
+   * @description A third-party SVG with a `skewX` transform on a
+   * `<rect>` MUST import as a baked `<path>`, then re-export and
+   * re-import preserve the same baked geometry. No drift, no loss.
+   */
+  it('round-trips a baked-skew rect through SVG without geometry drift', async () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+      <rect transform="skewX(15)" width="40" height="40" fill="#336699"/>
+    </svg>`;
+    const { document: imported } = importSvgDocument(input);
+    const path = imported.elements.find((el) => el.type === 'path');
+
+    expect(path).toBeDefined();
+
+    const exportedAgain = await exportSvgString(imported);
+    const { document: reImported } = importSvgDocument(exportedAgain);
+    const pathAgain = reImported.elements.find((el) => el.type === 'path');
+
+    expect(pathAgain?.content).toBe(path?.content);
+  });
+
+  /**
+   * @description A `<g transform="scale(2,1)">` wrapping a `<rect>`
+   * MUST propagate the bake into the child geometry on import (no
+   * opaque payload). The re-exported SVG MUST re-import to a
+   * structurally equivalent path.
+   */
+  it('propagates a baking <g> matrix into the child path on import', async () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+      <g transform="scale(2, 1)"><rect width="50" height="25"/></g>
+    </svg>`;
+    const { document: imported } = importSvgDocument(input);
+    const path = imported.elements.find((el) => el.type === 'path');
+    const opaque = imported.elements.find((el) => el.type === 'svg');
+
+    expect(opaque).toBeUndefined();
+    expect(path).toBeDefined();
+
+    const exportedAgain = await exportSvgString(imported);
+    const { document: reImported } = importSvgDocument(exportedAgain);
+    const pathAgain = reImported.elements.find((el) => el.type === 'path');
+
+    expect(pathAgain?.content).toBe(path?.content);
+  });
+});
+
+/* ------------------------------------------------------------------ */
 /*  1b. text-on-path round-trip                                       */
 /* ------------------------------------------------------------------ */
 

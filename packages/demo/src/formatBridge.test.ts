@@ -13,6 +13,8 @@ import { type ExportContext, exportDocument, importDocument, loadFormats, resetF
 const mockTriggerDownload = vi.fn();
 const mockSanitizeFilename = vi.fn((name: string) => name.replace(/\s+/g, '-'));
 const mockExportSvgString = vi.fn(() => Promise.resolve('<svg></svg>'));
+const mockExportSvgDocument = vi.fn(() => Promise.resolve({ svg: '<svg></svg>', warnings: [] as readonly string[] }));
+const mockBuildSvgFontSourcesFromAssets = vi.fn(() => new Map<string, unknown>());
 const mockExportHtmlStandalone = vi.fn(() => '<html></html>');
 const mockExportPdfBytes = vi.fn(() => Promise.resolve(new Uint8Array([1, 2, 3])));
 const mockExportPptxBytes = vi.fn(() => new Uint8Array([4, 5, 6]));
@@ -40,6 +42,7 @@ const mockExportProjectJson = vi.fn(() => '{}');
 const mockDiscoverCanvasElement = vi.fn(() => null);
 
 const mockFormats = {
+  buildSvgFontSourcesFromAssets: mockBuildSvgFontSourcesFromAssets,
   discoverCanvasElement: mockDiscoverCanvasElement,
   exportEmbeddedSvgBlob: mockExportEmbeddedSvgBlob,
   exportHtmlStandalone: mockExportHtmlStandalone,
@@ -50,6 +53,7 @@ const mockFormats = {
   exportProjectJson: mockExportProjectJson,
   exportPsdBytes: mockExportPsdBytes,
   exportPsdBytesAsync: mockExportPsdBytesAsync,
+  exportSvgDocument: mockExportSvgDocument,
   exportSvgString: mockExportSvgString,
   exportVideoBlob: mockExportVideoBlob,
   exportWebMBlob: mockExportWebMBlob,
@@ -148,11 +152,11 @@ describe('export orchestration', () => {
     ...overrides,
   });
 
-  /** @description SVG export MUST call exportSvg and trigger a file download. */
+  /** @description SVG export MUST call exportSvgDocument and trigger a file download. */
   it('exports SVG format and triggers download', async () => {
     await exportDocument('svg', makeContext());
 
-    expect(mockExportSvgString).toHaveBeenCalledTimes(1);
+    expect(mockExportSvgDocument).toHaveBeenCalledTimes(1);
     expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
 
     const [blob, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];
@@ -387,7 +391,7 @@ describe('export orchestration', () => {
 
   /** @description A failed export MUST propagate the error so callers can display an error toast. */
   it('propagates errors from format functions', async () => {
-    mockExportSvgString.mockImplementationOnce(() => {
+    mockExportSvgDocument.mockImplementationOnce(() => {
       throw new Error('SVG render failed');
     });
 

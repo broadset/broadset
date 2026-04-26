@@ -64,6 +64,9 @@ Scoring legend for each of the three columns (Export, Import, Round-trip):
 | Domain | Feature | Export | Import | Round-trip |
 | --- | --- | --- | --- | --- |
 | Vectors | Rectangle / ellipse / path | native | native | native |
+| Vectors | Circle (`cx` / `cy` / `r`) | native (as `ellipse`) | native | native |
+| Vectors | Polygon / polyline (`points="..."`) | native (as `path` with `M`/`L`/`Z` commands) | native | native |
+| Vectors | Element-level positional attributes (`<rect x y>`, `<circle cx cy>`, `<ellipse cx cy>`) | n/a (Broadset uses `transform=`) | native (combined with parent transform) | n/a |
 | Vectors | Rounded rectangle (`borderRadius`) | native (`rx`/`ry`) | native | native |
 | Vectors | Stroke — width / dasharray / dashoffset | native | native | native |
 | Vectors | Stroke — linecap / linejoin | native | native | native |
@@ -635,7 +638,7 @@ This spec is authoritative for the SVG track (Phase 7). As units land, the follo
 - **SMIL `<animate>` emission on export.** SMIL is deprecated in modern browsers. Broadset animations ride in `.bsp` only; SVG exports render the IN state. Re-introducing SMIL emission would be a new feature behind an explicit opt-in, not a current requirement.
 - **Structural `<use>` / `<symbol>` round-trip.** Current target: dereference to inline groups on import (visually identical, structurally flattened). Reconstructing `<use>` relationships on export is not in scope for the initial track.
 - **Animated imports from third-party SMIL SVGs.** Currently SMIL is treated as static (IN state extracted via element geometry; animation commands dropped with a warning). Full SMIL parsing → Broadset `animations` mapping is a future feature.
-- **Pseudo-class resolution.** `css-tree` parses pseudo-classes but the importer cannot evaluate `:hover` / `:nth-child` etc. against a static tree — a warning surfaces and the selector is dropped from matching. Attribute selectors (`[attr]`, `[attr=value]`, `[attr~=word]`, `[attr|=prefix]`, `[attr^=prefix]`, `[attr$=suffix]`, `[attr*=substring]`) and CSS combinators (`>`, `+`, `~`, descendant space) DO resolve as of P7.7b — they no longer fall through. Pseudo-classes remain the only unresolved selector surface.
+- **Pseudo-class resolution.** `css-tree` parses pseudo-classes but the importer cannot evaluate `:hover` / `:nth-child` etc. against a static tree — a warning surfaces and the selector is dropped from matching. Attribute selectors (`[attr]`, `[attr=value]`, `[attr~=word]`, `[attr|=prefix]`, `[attr^=prefix]`, `[attr$=suffix]`, `[attr*=substring]`), CSS combinators (`>`, `+`, `~`, descendant space), and `:not(<simple>)` DO resolve as of P7.7e — they no longer fall through. State pseudo-classes remain the only unresolved selector surface.
 
 _The following items are intentionally scoped out of the SVG track and tracked by other specs:_
 
