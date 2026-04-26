@@ -47,6 +47,7 @@ export const OOXML_REL_TYPES = {
   coreProperties: 'http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties',
   extendedProperties: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties',
   customProperties: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties',
+  hyperlink: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink',
 } as const;
 
 /** Content-type strings for PPTX parts. */

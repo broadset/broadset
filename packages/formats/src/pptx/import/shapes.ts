@@ -10,6 +10,7 @@ import {
   type Canvas,
   type ColorMods,
   createDefaultElement,
+  type Hyperlink,
   type Paragraph,
   type ParagraphAlign,
   type ParagraphProps,
@@ -46,6 +47,8 @@ export interface SlideImportContext {
   readonly layoutPlaceholders: ReadonlyMap<number, LayoutPlaceholder>;
   /** `rId` → media-file path (inside the ZIP) for picture resolution. */
   readonly mediaByRelId: ReadonlyMap<string, { readonly path: string; readonly mime: string; readonly bytes: Uint8Array }>;
+  /** `rId` → hyperlink target for `<a:hlinkClick>` resolution on text runs. */
+  readonly hyperlinkByRelId: ReadonlyMap<string, Hyperlink>;
   /**
    * Importer warning sink. Populated as the shape walker encounters
    * content it drops or preserves as a raw blob. Returned to callers
@@ -845,7 +848,10 @@ function uint8ToBase64(bytes: Uint8Array): string {
  * Returns `null` when the body has no text frame or the text frame is
  * empty — callers treat that as "not a text shape".
  */
-export function extractTextBody(body: string): TextBody | null {
+export function extractTextBody(
+  body: string,
+  hyperlinks?: ReadonlyMap<string, Hyperlink>,
+): TextBody | null {
   const txBody = extractBlock(body, 'p:txBody');
 
   if (txBody === null) return null;
@@ -854,7 +860,7 @@ export function extractTextBody(body: string): TextBody | null {
 
   for (const pMatch of txBody.block.matchAll(/<a:p\b[^>]*>([\s\S]*?)<\/a:p>/g)) {
     const pBody = pMatch[1] ?? '';
-    const runs = extractRuns(pBody);
+    const runs = extractRuns(pBody, hyperlinks);
 
     if (runs.length === 0) continue;
 
@@ -947,11 +953,14 @@ function parseBulletFromPPr(pPrBody: string): Bullet | null {
   return null;
 }
 
-function extractRuns(paragraphBody: string): Run[] {
+function extractRuns(
+  paragraphBody: string,
+  hyperlinks: ReadonlyMap<string, Hyperlink> | undefined,
+): Run[] {
   const runs: Run[] = [];
 
   for (const rMatch of paragraphBody.matchAll(/<a:r\b[^>]*>([\s\S]*?)<\/a:r>/g)) {
-    runs.push(buildRunFromRBody(rMatch[1] ?? ''));
+    runs.push(buildRunFromRBody(rMatch[1] ?? '', hyperlinks));
   }
 
   // Fallback: a paragraph with raw `<a:t>` text and no `<a:r>` wrapper
@@ -965,7 +974,10 @@ function extractRuns(paragraphBody: string): Run[] {
   return runs;
 }
 
-function buildRunFromRBody(rBody: string): Run {
+function buildRunFromRBody(
+  rBody: string,
+  hyperlinks: ReadonlyMap<string, Hyperlink> | undefined,
+): Run {
   const tMatch = rBody.match(/<a:t>([\s\S]*?)<\/a:t>/);
   const text = decodeXmlEntities(tMatch?.[1] ?? '');
   const rPrBlock = extractBlock(rBody, 'a:rPr');
@@ -974,16 +986,52 @@ function buildRunFromRBody(rBody: string): Run {
 
   const style = runStyleFromRPr(rPrBlock);
   const lang = rPrBlock.openAttrs.match(/\blang="([^"]+)"/)?.[1];
+  const hyperlink = parseRunHyperlink(rPrBlock.block, hyperlinks);
   const hasStyle = Object.keys(style).length > 0;
 
-  if (!hasStyle && lang === undefined) return { text };
+  if (!hasStyle && lang === undefined && hyperlink === undefined) return { text };
 
   const props = {
     ...(hasStyle ? { style } : {}),
     ...(lang !== undefined ? { lang } : {}),
+    ...(hyperlink !== undefined ? { hyperlink } : {}),
   };
 
   return { text, props };
+}
+
+/**
+ * Resolve `<a:hlinkClick r:id="rIdN"/>` against the slide's relationship
+ * table. Returns `undefined` if the run has no hyperlink, the rel is
+ * missing, or the rel target is empty (defensive — we never want to
+ * persist a broken hyperlink that the renderer would fail on).
+ */
+function parseRunHyperlink(
+  rPrBody: string,
+  hyperlinks: ReadonlyMap<string, Hyperlink> | undefined,
+): Hyperlink | undefined {
+  if (hyperlinks === undefined) return undefined;
+
+  const match = rPrBody.match(/<a:hlinkClick\b([^>]*)\/?>/);
+
+  if (match === null) return undefined;
+
+  const attrs = match[1] ?? '';
+  const relId = attrs.match(/\br:id="([^"]*)"/)?.[1];
+
+  if (relId === undefined || relId.length === 0) return undefined;
+
+  const target = hyperlinks.get(relId);
+
+  if (target === undefined) return undefined;
+
+  const tooltip = attrs.match(/\btooltip="([^"]*)"/)?.[1];
+
+  if (tooltip !== undefined && tooltip.length > 0 && target.tooltip !== tooltip) {
+    return { ...target, tooltip };
+  }
+
+  return target;
 }
 
 function runStyleFromRPr(rPr: ExtractedBlock): Record<string, unknown> {

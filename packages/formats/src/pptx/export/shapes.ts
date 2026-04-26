@@ -1,12 +1,14 @@
 import {
   type BroadsetElement,
   type Bullet,
+  type Hyperlink,
   type Paragraph,
   resolveContentAsPlainString,
   resolveStyleColor,
 } from '@broadset/model';
 import svgpath from 'svgpath';
 
+import { OOXML_REL_TYPES } from '../ooxml/namespaces';
 import { hexToOoxmlColor } from '../ooxml/units';
 import { escapeXmlAttribute, escapeXmlText } from '../ooxml/xml';
 import { buildElementExt } from '../semantic/element-ext';
@@ -176,7 +178,7 @@ function readRepeaterField(element: BroadsetElement): string | null {
 export function emitTextShape(ctx: SlideExportContext, element: BroadsetElement): string {
   const nv = emitNonVisualProps(ctx, element, 'text');
   const xfrm = emitElementXfrm(ctx, element);
-  const body = emitTextBody(element);
+  const body = emitTextBody(ctx, element);
   const stroke = emitStroke(element.style, ctx);
 
   const effects = emitEffects(element.style, ctx);
@@ -184,7 +186,7 @@ export function emitTextShape(ctx: SlideExportContext, element: BroadsetElement)
   return `<p:sp>${nv}<p:spPr>${xfrm}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/>${stroke}${effects}</p:spPr>${body}</p:sp>`;
 }
 
-function emitTextBody(element: BroadsetElement): string {
+function emitTextBody(ctx: SlideExportContext, element: BroadsetElement): string {
   const paragraphs = resolveParagraphs(element);
   const fontColorCss = resolveStyleColor(element.style.fontColor, { resolveTheme: false });
   const defaultColor = fontColorCss === undefined ? '000000' : hexToOoxmlColor(fontColorCss);
@@ -192,7 +194,7 @@ function emitTextBody(element: BroadsetElement): string {
   const family = element.style.fontFamily;
 
   const paragraphXml = paragraphs
-    .map((paragraph) => emitParagraph(paragraph, { defaultColor, defaultSize, defaultFamily: family }))
+    .map((paragraph) => emitParagraph(ctx, paragraph, { defaultColor, defaultSize, defaultFamily: family }))
     .join('');
 
   const align = textAlignAttr(element.style.textAlignment);
@@ -218,6 +220,7 @@ interface RunLike {
   readonly fontSize?: number | undefined;
   readonly fontFamily?: string | undefined;
   readonly color?: string | undefined;
+  readonly hyperlink?: Hyperlink | undefined;
 }
 
 interface ParagraphLike {
@@ -246,6 +249,7 @@ function resolveParagraphs(element: BroadsetElement): readonly ParagraphLike[] {
         underline: readRunStyleUnderline(r.props?.style),
         fontSize: readRunStyleNumber(r.props?.style, 'fontSize'),
         fontFamily: readRunStyleString(r.props?.style, 'fontFamily'),
+        hyperlink: r.props?.hyperlink,
       })),
       align: p.props?.align,
       bullet: p.props?.bullet,
@@ -283,13 +287,14 @@ function readRunStyleUnderline(style: Readonly<Record<string, unknown>> | undefi
 }
 
 function emitParagraph(
+  ctx: SlideExportContext,
   paragraph: ParagraphLike,
   defaults: { readonly defaultColor: string; readonly defaultSize: number; readonly defaultFamily: string | undefined },
 ): string {
   const align = textAlignAttr(paragraph.align);
   const bullet = emitBulletXml(paragraph.bullet);
   const pPr = `<a:pPr${align}>${bullet}</a:pPr>`;
-  const runs = paragraph.runs.map((run) => emitRun(run, defaults)).join('');
+  const runs = paragraph.runs.map((run) => emitRun(ctx, run, defaults)).join('');
 
   return `<a:p>${pPr}${runs}</a:p>`;
 }
@@ -316,6 +321,7 @@ function emitBulletXml(bullet: Bullet | undefined): string {
 }
 
 function emitRun(
+  ctx: SlideExportContext,
   run: RunLike,
   defaults: { readonly defaultColor: string; readonly defaultSize: number; readonly defaultFamily: string | undefined },
 ): string {
@@ -331,8 +337,32 @@ function emitRun(
   const fill = `<a:solidFill><a:srgbClr val="${fillHex}"/></a:solidFill>`;
   const latin = family !== undefined ? `<a:latin typeface="${escapeXmlAttribute(family)}"/>` : '';
   const text = escapeXmlText(run.text);
+  const hlink = emitHyperlinkRel(ctx, run.hyperlink);
 
-  return `<a:r><a:rPr ${attrs.join(' ')}>${fill}${latin}</a:rPr><a:t>${text}</a:t></a:r>`;
+  return `<a:r><a:rPr ${attrs.join(' ')}>${fill}${latin}${hlink}</a:rPr><a:t>${text}</a:t></a:r>`;
+}
+
+/**
+ * Allocate an external-target relationship for a run-level hyperlink and
+ * return the matching `<a:hlinkClick>` XML. OOXML stores the URL on the
+ * slide's `_rels` and references it from the run via `r:id`, so the
+ * relationship must be allocated on the same slide context the run is
+ * being emitted into.
+ */
+function emitHyperlinkRel(ctx: SlideExportContext, hyperlink: Hyperlink | undefined): string {
+  if (hyperlink === undefined) return '';
+
+  const url = hyperlink.url.trim();
+
+  if (url.length === 0) return '';
+
+  const relId = ctx.rels.add(OOXML_REL_TYPES.hyperlink, url, true);
+  const tooltip =
+    hyperlink.tooltip !== undefined && hyperlink.tooltip.length > 0
+      ? ` tooltip="${escapeXmlAttribute(hyperlink.tooltip)}"`
+      : '';
+
+  return `<a:hlinkClick r:id="${relId}"${tooltip}/>`;
 }
 
 /** Build a `<p:sp>` for a rectangle. Uniform radius → roundRect preset; per-corner → custGeom. */

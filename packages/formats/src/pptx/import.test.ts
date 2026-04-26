@@ -625,6 +625,50 @@ describe('PPTX importer — operator-level extraction', () => {
     expect(reExportedSlide).toMatch(/<a:alpha val="50\d{3}"/);
   });
 
+  /**
+   * @description B8 — hyperlink round-trip. `<a:hlinkClick r:id="…"/>`
+   * inside `<a:rPr>` resolves against the slide's relationships table to
+   * a `Hyperlink.url` on the run; re-export reallocates the rel and
+   * re-emits the markup.
+   */
+  it('round-trips run hyperlinks via the slide relationship table', async () => {
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="LinkText"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US"><a:hlinkClick r:id="rId7" tooltip="Anthropic"/></a:rPr><a:t>Click me</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
+    const slideRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://anthropic.com/" TargetMode="External"/></Relationships>`;
+    const inputBytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText(slideRels)],
+      ]),
+    );
+    const imported = importPptx(inputBytes);
+    const textEl = imported.elements.find((el) => el.type === 'text');
+    const content = textEl?.content;
+
+    if (typeof content !== 'object' || !('paragraphs' in content)) throw new Error('expected TextBody');
+
+    const run = content.paragraphs[0]?.runs[0];
+
+    expect(run?.props?.hyperlink?.url).toBe('https://anthropic.com/');
+    expect(run?.props?.hyperlink?.tooltip).toBe('Anthropic');
+
+    // Re-export and verify the hyperlink survives via a fresh rel.
+    const reExported = exportPptxBytes(imported);
+    const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
+    const pkg = readOoxmlPackage(reExported);
+    const reExportedSlide = readTextPart(pkg, 'ppt/slides/slide1.xml') ?? '';
+    const reExportedRels = readTextPart(pkg, 'ppt/slides/_rels/slide1.xml.rels') ?? '';
+
+    expect(reExportedSlide).toMatch(/<a:hlinkClick[^>]*r:id="rId\d+"/);
+    expect(reExportedRels).toContain('Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"');
+    expect(reExportedRels).toContain('Target="https://anthropic.com/"');
+    expect(reExportedRels).toContain('TargetMode="External"');
+  });
+
   it('rejects vbaProject.bin with a macro-rejected warning at import', () => {
     const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst/><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
     const bytes = writeOoxmlPackage(

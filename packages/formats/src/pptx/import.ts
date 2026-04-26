@@ -1,4 +1,4 @@
-import { type AnimationDefinition, type BroadsetDocument, createEmptyBroadsetDocument, type TextBody } from '@broadset/model';
+import { type AnimationDefinition, type BroadsetDocument, createEmptyBroadsetDocument, type Hyperlink, type TextBody } from '@broadset/model';
 
 import { fingerprintElement } from '../_shared';
 import { parseTimingAnimations } from './import/animation';
@@ -350,6 +350,7 @@ function importSingleSlide(
   const slideRelsPath = resolved.slideRelsByPath.get(slidePath);
   const slideRels = slideRelsPath !== undefined ? parseRelationshipsXml(readTextPart(pkg, slideRelsPath) ?? '') : [];
   const mediaByRelId = collectSlideMedia(pkg, slidePath, slideRels);
+  const hyperlinkByRelId = collectHyperlinkRels(slideRels);
   const notes = extractSlideNotes(pkg, slidePath, slideRels);
   const ctxWarnings: SlideImportContext['warnings'] = [];
   const ctx: SlideImportContext = {
@@ -357,11 +358,12 @@ function importSingleSlide(
     theme,
     layoutPlaceholders,
     mediaByRelId,
+    hyperlinkByRelId,
     warnings: ctxWarnings,
     nextElementIndex: elementCounter,
   };
   const shapes = parseSlideShapes(ctx, slideXml);
-  const withText = shapes.map((shape, shapeIdx) => promoteShapeText(shape, slideXml, shapeIdx, layoutPlaceholders));
+  const withText = shapes.map((shape, shapeIdx) => promoteShapeText(shape, slideXml, shapeIdx, layoutPlaceholders, hyperlinkByRelId));
 
   return {
     slide: {
@@ -383,6 +385,7 @@ function promoteShapeText(
   slideXml: string,
   shapeIdx: number,
   layoutPlaceholders: ReadonlyMap<number, LayoutPlaceholder>,
+  hyperlinks: ReadonlyMap<string, Hyperlink>,
 ): ReturnType<typeof parseSlideShapes>[number] {
   if (shape.type !== 'rectangle' && shape.type !== 'ellipse') return shape;
 
@@ -390,7 +393,7 @@ function promoteShapeText(
 
   if (body === null) return shape;
 
-  const textBody = extractTextBody(body);
+  const textBody = extractTextBody(body, hyperlinks);
 
   if (textBody === null) return shape;
 
@@ -404,7 +407,9 @@ function promoteShapeText(
     (p) =>
       p.runs.length > 1 ||
       p.runs.some(
-        (r) => r.props?.style !== undefined && Object.keys(r.props.style).length > 0,
+        (r) =>
+          (r.props?.style !== undefined && Object.keys(r.props.style).length > 0) ||
+          r.props?.hyperlink !== undefined,
       ) ||
       p.props !== undefined,
   );
@@ -511,6 +516,21 @@ function findMasterPaths(pkg: OoxmlPackage): readonly string[] {
   }
 
   return result;
+}
+
+function collectHyperlinkRels(
+  slideRels: ReturnType<typeof parseRelationshipsXml>,
+): ReadonlyMap<string, Hyperlink> {
+  const map = new Map<string, Hyperlink>();
+
+  for (const rel of slideRels) {
+    if (rel.type !== OOXML_REL_TYPES.hyperlink) continue;
+    if (rel.target.length === 0) continue;
+
+    map.set(rel.id, { url: rel.target });
+  }
+
+  return map;
 }
 
 function collectSlideMedia(
