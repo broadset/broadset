@@ -16,6 +16,7 @@ import {
 import { fingerprintElement } from '../_shared/fingerprint';
 import { sanitizeSvg } from '../_shared/sanitize';
 import { generateQrSvgFragment } from '../interchange';
+import { type FontEmbedPlan, planFontEmbedding } from './export-fonts';
 import { escapeXml } from './shared';
 import { SVG_BROADSET_NAMESPACE, type SvgExportOptions } from './types';
 
@@ -390,6 +391,7 @@ function collectArrowMarkerAttrs(el: BroadsetElement, defs: string[]): string {
 
 interface RenderElementOptions {
   readonly includeElementTagging: boolean;
+  readonly flattenedTextElements: ReadonlyMap<string, string>;
 }
 
 function renderElement(
@@ -399,6 +401,12 @@ function renderElement(
   fingerprints: ReadonlyMap<string, string>,
   options: RenderElementOptions,
 ): string {
+  const flatSubstitute = options.flattenedTextElements.get(el.id);
+
+  if (flatSubstitute !== undefined) {
+    return flatSubstitute;
+  }
+
   const transform = buildTransform(el);
   const styleAttrs = buildStyleAttrs(el.style);
   const clipAttr = collectClipAttr(el, defs);
@@ -682,21 +690,9 @@ function resolveFingerprint(fingerprints: ReadonlyMap<string, string>, elementId
  * preservation for non-sRGB fills.
  */
 export async function exportSvgString(doc: BroadsetDocument, options?: SvgExportOptions): Promise<string> {
-  const includeMetadata = options?.includeMetadata ?? true;
-  const includeElementTagging = options?.includeElementTagging ?? true;
-  const defs: string[] = [];
-  const fingerprints = await computeFingerprints(doc.elements);
-  const childrenByParent = buildChildrenByParent(doc.elements);
-  const rootElements = doc.elements.filter((el) => !hasNonEmptyParentId(el));
-  const elementNodes = rootElements.map((el) =>
-    renderElement(el, defs, childrenByParent, fingerprints, { includeElementTagging }),
-  );
-  const defsBlock = defs.length > 0 ? `<defs>${defs.join('')}</defs>` : '';
-  const metadataBlock = includeMetadata ? buildMetadataPacket(doc, fingerprints) : '';
-  const nsDeclarations = buildRootNamespaceDeclarations({ includeMetadata, includeElementTagging });
-  const rootOpen = `<svg xmlns="${SVG_XMLNS}" xmlns:xlink="${XLINK_XMLNS}"${nsDeclarations} width="${String(doc.canvas.width)}" height="${String(doc.canvas.height)}" viewBox="0 0 ${String(doc.canvas.width)} ${String(doc.canvas.height)}">`;
+  const result = await exportSvgInternal(doc, options);
 
-  return [rootOpen, metadataBlock, defsBlock, ...elementNodes, '</svg>'].join('\n');
+  return result.svg;
 }
 
 export interface SvgExportResult {
@@ -706,16 +702,48 @@ export interface SvgExportResult {
 
 /**
  * High-level export entry point: returns the SVG string plus any
- * warnings raised during export. Phase 7.3 emits Broadset-native
- * state in a document-level `<metadata>` packet and tags every
- * rendered element with `data-bs-*` attributes. Future phases
- * populate `warnings` with preflight output (missing fonts,
- * restricted embed permissions, rasterisation fallbacks).
+ * warnings raised during export. Phase 7.7d threads font-embedding
+ * preflight warnings through `warnings` (missing bytes, restricted
+ * permissions, fallback to `'reference'`).
  */
 export async function exportSvgDocument(
   doc: BroadsetDocument,
   options?: SvgExportOptions,
 ): Promise<SvgExportResult> {
-  return { svg: await exportSvgString(doc, options), warnings: [] };
+  return exportSvgInternal(doc, options);
+}
+
+async function exportSvgInternal(doc: BroadsetDocument, options?: SvgExportOptions): Promise<SvgExportResult> {
+  const includeMetadata = options?.includeMetadata ?? true;
+  const includeElementTagging = options?.includeElementTagging ?? true;
+  const fontEmbedding = options?.fontEmbedding ?? 'embed';
+  const defs: string[] = [];
+  const fontPlan: FontEmbedPlan = planFontEmbedding(doc, fontEmbedding, options?.fonts);
+  const fingerprints = await computeFingerprints(doc.elements);
+  const childrenByParent = buildChildrenByParent(doc.elements);
+  const rootElements = doc.elements.filter((el) => !hasNonEmptyParentId(el));
+  const elementNodes = rootElements.map((el) =>
+    renderElement(el, defs, childrenByParent, fingerprints, {
+      includeElementTagging,
+      flattenedTextElements: fontPlan.flattenedTextElements,
+    }),
+  );
+  const defsParts: string[] = [];
+
+  if (fontPlan.defsStyleBlock !== '') {
+    defsParts.push(fontPlan.defsStyleBlock);
+  }
+
+  if (defs.length > 0) {
+    defsParts.push(defs.join(''));
+  }
+
+  const defsBlock = defsParts.length > 0 ? `<defs>${defsParts.join('')}</defs>` : '';
+  const metadataBlock = includeMetadata ? buildMetadataPacket(doc, fingerprints) : '';
+  const nsDeclarations = buildRootNamespaceDeclarations({ includeMetadata, includeElementTagging });
+  const rootOpen = `<svg xmlns="${SVG_XMLNS}" xmlns:xlink="${XLINK_XMLNS}"${nsDeclarations} width="${String(doc.canvas.width)}" height="${String(doc.canvas.height)}" viewBox="0 0 ${String(doc.canvas.width)} ${String(doc.canvas.height)}">`;
+  const svg = [rootOpen, metadataBlock, defsBlock, ...elementNodes, '</svg>'].join('\n');
+
+  return { svg, warnings: fontPlan.warnings };
 }
 

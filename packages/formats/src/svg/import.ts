@@ -11,11 +11,31 @@ import {
   rgbColor,
 } from '@broadset/model';
 import * as CssTree from 'css-tree';
+import svgpath from 'svgpath';
 
 import { type ParsedElementMetadata, parseMetadataPacket } from './metadata';
+import { type DecomposedTransform, ellipseAsPathD, parseAndDecomposeTransform, rectAsPathD } from './transform';
 import type { SvgImportOptions } from './types';
 
 const USE_DEREFERENCE_DEPTH_CAP = 16;
+/**
+ * Element-count cap per the importer security contract
+ * (`project/spec/formats/spec.md` → "Input Size, Depth, and Entry
+ * Caps"). Realistic Broadset / Illustrator / Inkscape / Figma SVGs
+ * never exceed a few thousand elements; 10 000 is generous for a
+ * complex icon-heavy document. Above this the importer surfaces a
+ * warning per IO-D-18 and stops iterating instead of allowing an
+ * O(n) sanitiser × O(n) style-resolver × O(n) walker O(n³)
+ * pathological run on a hostile input.
+ */
+const SVG_ELEMENT_COUNT_CAP = 10_000;
+/**
+ * Group-depth cap per the importer security contract. Bounds the
+ * recursion in `importGroupElement` so a deeply nested `<g>` chain
+ * cannot overflow the V8 stack. 100 levels covers any realistic
+ * design-tool layer hierarchy.
+ */
+const SVG_GROUP_DEPTH_CAP = 100;
 const TOOL_NAMESPACE_WARNINGS: readonly { readonly prefix: string; readonly label: string }[] = [
   { prefix: 'sodipodi', label: 'sodipodi' },
   { prefix: 'inkscape', label: 'inkscape' },
@@ -105,10 +125,26 @@ function stripJavascriptUrlsFromEl(el: Element, tally: SanitizeTally): void {
   }
 }
 
-function sanitizeDomInPlace(xmlDoc: Document, warnings: string[]): void {
+/**
+ * Sanitises the parsed XML in-place and enforces the element-count
+ * cap. Returns `true` when the document is within the cap (the
+ * caller continues with the visual walk); returns `false` when the
+ * cap was hit (a warning has been emitted and the caller should
+ * still hydrate what was parsed but skip subsequent O(n) passes).
+ */
+function sanitizeDomInPlace(xmlDoc: Document, warnings: string[]): boolean {
   const tally: SanitizeTally = { tags: new Set(), attrs: new Set(), jsUrls: 0 };
+  const all = Array.from(xmlDoc.getElementsByTagName('*'));
+  const overCap = all.length > SVG_ELEMENT_COUNT_CAP;
+  const limit = overCap ? SVG_ELEMENT_COUNT_CAP : all.length;
 
-  for (const el of Array.from(xmlDoc.getElementsByTagName('*'))) {
+  for (let i = 0; i < limit; i++) {
+    const el = all[i];
+
+    if (!el) {
+      continue;
+    }
+
     const tag = el.tagName.toLowerCase();
 
     if (FORBIDDEN_ELEMENT_NAMES.has(tag)) {
@@ -132,6 +168,16 @@ function sanitizeDomInPlace(xmlDoc: Document, warnings: string[]): void {
   if (tally.jsUrls > 0) {
     warnings.push('Stripped javascript: URL during sanitization (importer security contract).');
   }
+
+  if (overCap) {
+    warnings.push(
+      `Element-count cap of ${String(SVG_ELEMENT_COUNT_CAP)} reached (input had ${String(all.length)} elements). Sanitisation truncated; remaining elements were not validated.`,
+    );
+
+    return false;
+  }
+
+  return true;
 }
 
 /**
@@ -276,15 +322,11 @@ function collectStylesheetRules(xmlDoc: Document, warnings: string[]): readonly 
 }
 
 function applyRulesToElement(el: Element, rules: readonly CssRule[]): void {
-  const tagName = el.tagName.toLowerCase();
-  const classAttr = el.getAttribute('class') ?? '';
-  const classes = new Set(classAttr.split(/\s+/).filter((c) => c !== ''));
-  const idAttr = el.getAttribute('id') ?? '';
   const inlineStyle = el.getAttribute('style') ?? '';
   const matching: CssRule[] = [];
 
   for (const rule of rules) {
-    if (ruleMatchesElement(rule, tagName, classes, idAttr)) {
+    if (ruleMatchesElement(rule, el)) {
       matching.push(rule);
     }
   }
@@ -415,12 +457,11 @@ function pushSelectorRule(
   const selector = CssTree.generate(selectorNode).trim();
   const analysis = analyseSelector(selectorNode);
 
-  if (analysis.hasCombinator) {
-    warnings.push(
-      `CSS combinator selector "${selector}" is not resolved; falling back to base matching (see svg.md Spec Gaps).`,
-    );
-  }
-
+  // Combinators (`>` / `+` / `~` / descendant) are resolved against
+  // the live DOM in `ruleMatchesElement`; no warning needed.
+  // Pseudo-classes / pseudo-elements remain unresolvable against a
+  // static tree — surface a warning so the user knows their dynamic
+  // rules were skipped.
   if (analysis.pseudoClasses.length > 0) {
     warnings.push(
       `CSS pseudo-class selector "${selector}" is not resolved; falling back to base matching (see svg.md Spec Gaps).`,
@@ -469,18 +510,231 @@ function analyseSelector(selector: CssTree.Selector): SelectorAnalysis {
   return { ids, classes, types, pseudoClasses, attributes, hasCombinator, specificity };
 }
 
-function ruleMatchesElement(
-  rule: CssRule,
-  tagName: string,
-  classes: ReadonlySet<string>,
-  id: string,
-): boolean {
-  const selector = rule.selector;
+/**
+ * Hard cap on the number of compound tokens in a single CSS
+ * selector. Right-to-left matching with descendant / sibling
+ * combinators is super-linear in token count × tree depth — without
+ * a cap a hostile stylesheet like `a a a a a … {}` can drive
+ * exponential walking. Real-world selectors rarely exceed 6 tokens;
+ * 16 leaves generous headroom. Closes the security audit C2 finding.
+ */
+const SELECTOR_TOKEN_CAP = 16;
 
-  // The parsed rule was split per selector list, so this string is
-  // a single selector like `rect`, `.foo`, `#bar`, or combinations
-  // like `#bar.foo`. Match by walking the atoms inline.
-  return matchSingleSelector(selector, tagName, classes, id);
+function ruleMatchesElement(rule: CssRule, el: Element): boolean {
+  // Tokenise the selector into a sequence of compound selectors
+  // separated by combinators (`>` / `+` / `~` / descendant space).
+  // Match right-to-left: rightmost compound on `el`, then walk up
+  // via the combinator to find a matching ancestor / sibling.
+  const tokens = tokeniseSelector(rule.selector);
+
+  if (tokens.length === 0 || tokens.length > SELECTOR_TOKEN_CAP) {
+    return false;
+  }
+
+  return matchTokensFromRight(tokens, el);
+}
+
+type SelectorCombinator = ' ' | '>' | '+' | '~';
+
+interface SelectorToken {
+  readonly compound: string;
+  readonly combinator: SelectorCombinator | null;
+}
+
+/**
+ * Split a selector string into compounds + combinators. Whitespace
+ * around `>` / `+` / `~` is a combinator, not a descendant. Bare
+ * whitespace inside the selector is the descendant combinator.
+ *
+ * Example: `g > div .foo` → [
+ *   { compound: 'g', combinator: '>' },
+ *   { compound: 'div', combinator: ' ' },
+ *   { compound: '.foo', combinator: null },
+ * ]
+ */
+interface TokeniserState {
+  buf: string;
+  pendingCombinator: SelectorCombinator | null;
+  inBracket: number;
+}
+
+function isStructuralCombinator(ch: string): ch is '>' | '+' | '~' {
+  return ch === '>' || ch === '+' || ch === '~';
+}
+
+function isWhitespace(ch: string): boolean {
+  return ch === ' ' || ch === '\t' || ch === '\n';
+}
+
+function consumeChar(
+  ch: string,
+  state: TokeniserState,
+  flush: (combinator: SelectorCombinator | null) => void,
+): void {
+  if (ch === '[') {
+    state.inBracket += 1;
+    state.buf += ch;
+
+    return;
+  }
+
+  if (ch === ']') {
+    state.inBracket = Math.max(0, state.inBracket - 1);
+    state.buf += ch;
+
+    return;
+  }
+
+  if (state.inBracket > 0) {
+    state.buf += ch;
+
+    return;
+  }
+
+  if (isStructuralCombinator(ch)) {
+    flush(state.pendingCombinator);
+    state.pendingCombinator = ch;
+
+    return;
+  }
+
+  if (isWhitespace(ch)) {
+    if (state.buf.trim() !== '') {
+      flush(state.pendingCombinator);
+      state.pendingCombinator = ' ';
+    }
+
+    return;
+  }
+
+  state.buf += ch;
+}
+
+function tokeniseSelector(selector: string): readonly SelectorToken[] {
+  const trimmed = selector.trim();
+
+  if (trimmed === '') {
+    return [];
+  }
+
+  const tokens: SelectorToken[] = [];
+  const state: TokeniserState = { buf: '', pendingCombinator: ' ', inBracket: 0 };
+  const flushCompound = (combinator: SelectorCombinator | null): void => {
+    const compound = state.buf.trim();
+
+    if (compound !== '') {
+      tokens.push({ compound, combinator });
+      state.buf = '';
+    }
+  };
+
+  for (let i = 0; i < trimmed.length; i++) {
+    consumeChar(trimmed.charAt(i), state, flushCompound);
+  }
+
+  flushCompound(state.pendingCombinator);
+
+  // Re-thread combinators so each token describes its relationship
+  // to the NEXT token in document order (not the previous one).
+  const out: SelectorToken[] = [];
+
+  for (let i = 0; i < tokens.length; i++) {
+    const cur = tokens[i];
+    const next = tokens[i + 1];
+
+    if (!cur) {
+      continue;
+    }
+
+    out.push({ compound: cur.compound, combinator: next?.combinator ?? null });
+  }
+
+  return out;
+}
+
+function matchTokensFromRight(tokens: readonly SelectorToken[], el: Element): boolean {
+  const last = tokens[tokens.length - 1];
+
+  if (!last || !matchCompound(last.compound, el)) {
+    return false;
+  }
+
+  let cursor: Element | null = el;
+
+  for (let i = tokens.length - 2; i >= 0; i--) {
+    const token = tokens[i];
+
+    if (!token) {
+      continue;
+    }
+
+    const cameVia = token.combinator;
+    const result = walkForCompound(token.compound, cursor, cameVia);
+
+    if (result === null) {
+      return false;
+    }
+
+    cursor = result;
+  }
+
+  return true;
+}
+
+function walkForCompound(
+  compound: string,
+  fromEl: Element | null,
+  combinator: SelectorCombinator | null,
+): Element | null {
+  if (fromEl === null) {
+    return null;
+  }
+
+  if (combinator === '>') return walkChildCombinator(compound, fromEl);
+  if (combinator === '+') return walkAdjacentSiblingCombinator(compound, fromEl);
+  if (combinator === '~') return walkGeneralSiblingCombinator(compound, fromEl);
+
+  return walkDescendantCombinator(compound, fromEl);
+}
+
+function walkChildCombinator(compound: string, fromEl: Element): Element | null {
+  const parent = fromEl.parentElement;
+
+  return parent !== null && matchCompound(compound, parent) ? parent : null;
+}
+
+function walkAdjacentSiblingCombinator(compound: string, fromEl: Element): Element | null {
+  const prev = fromEl.previousElementSibling;
+
+  return prev !== null && matchCompound(compound, prev) ? prev : null;
+}
+
+function walkGeneralSiblingCombinator(compound: string, fromEl: Element): Element | null {
+  let prev = fromEl.previousElementSibling;
+
+  while (prev !== null) {
+    if (matchCompound(compound, prev)) {
+      return prev;
+    }
+
+    prev = prev.previousElementSibling;
+  }
+
+  return null;
+}
+
+function walkDescendantCombinator(compound: string, fromEl: Element): Element | null {
+  let ancestor = fromEl.parentElement;
+
+  while (ancestor !== null) {
+    if (matchCompound(compound, ancestor)) {
+      return ancestor;
+    }
+
+    ancestor = ancestor.parentElement;
+  }
+
+  return null;
 }
 
 interface AtomStep {
@@ -500,18 +754,6 @@ function consumeClassAtom(remainder: string, classes: ReadonlySet<string>): Atom
   return { matched: classes.has(name), remainder: remainder.slice(nameMatch[0].length) };
 }
 
-function consumeNextAtom(remainder: string, classes: ReadonlySet<string>, id: string): AtomStep {
-  if (remainder.startsWith('.')) {
-    return consumeClassAtom(remainder, classes);
-  }
-
-  if (remainder.startsWith('#')) {
-    return consumeIdAtom(remainder, id);
-  }
-
-  return { matched: false, remainder };
-}
-
 function consumeIdAtom(remainder: string, id: string): AtomStep {
   const nameMatch = /^#([a-zA-Z_][a-zA-Z0-9_-]*)/.exec(remainder);
 
@@ -524,27 +766,143 @@ function consumeIdAtom(remainder: string, id: string): AtomStep {
   return { matched: name === id, remainder: remainder.slice(nameMatch[0].length) };
 }
 
-function matchSingleSelector(
-  selector: string,
-  tagName: string,
-  classes: ReadonlySet<string>,
-  id: string,
-): boolean {
-  // Strip pseudo-classes / pseudo-elements — we can't resolve them
-  // against a static tree; base matching falls through with a
-  // warning emitted at parse time.
-  const base = selector.replace(/::?[a-zA-Z][a-zA-Z0-9-]*(\([^)]*\))?/g, '');
+interface AttributeMatcher {
+  readonly name: string;
+  readonly op: '=' | '~=' | '|=' | '^=' | '$=' | '*=' | null;
+  readonly value: string;
+}
 
-  // Combinators bail out — the parser already emitted a warning.
-  if (/[>+~]/.test(base) || /\s/.test(base.trim())) {
+function consumeAttributeAtom(remainder: string, el: Element): AtomStep {
+  // [attr] | [attr=value] | [attr="value"] | [attr~=word] | [attr|=prefix]
+  // [attr^=prefix] | [attr$=suffix] | [attr*=substring]
+  if (!remainder.startsWith('[')) {
+    return { matched: false, remainder };
+  }
+
+  const closeIdx = remainder.indexOf(']');
+
+  if (closeIdx === -1) {
+    return { matched: false, remainder };
+  }
+
+  const inner = remainder.slice(1, closeIdx).trim();
+  const parsed = parseAttributeMatcher(inner);
+
+  if (parsed === null) {
+    return { matched: false, remainder };
+  }
+
+  const actual = el.getAttribute(parsed.name);
+
+  return {
+    matched: matchAttribute(parsed, actual),
+    remainder: remainder.slice(closeIdx + 1),
+  };
+}
+
+function parseAttributeMatcher(inner: string): AttributeMatcher | null {
+  const nameMatch = /^([a-zA-Z_][a-zA-Z0-9_-]*)\s*/.exec(inner);
+
+  if (nameMatch === null) {
+    return null;
+  }
+
+  const name = nameMatch[1] ?? '';
+  const rest = inner.slice(nameMatch[0].length);
+
+  if (rest === '') {
+    return { name, op: null, value: '' };
+  }
+
+  const opMatch = /^([~|^$*]?=)\s*/.exec(rest);
+
+  if (opMatch === null) {
+    return null;
+  }
+
+  const op = (opMatch[1] ?? null) as AttributeMatcher['op'];
+  const valueRaw = rest.slice(opMatch[0].length).trim();
+  const value = unquoteAttributeValue(valueRaw);
+
+  return { name, op, value };
+}
+
+function unquoteAttributeValue(raw: string): string {
+  if (raw.length >= 2) {
+    const first = raw.charAt(0);
+    const last = raw.charAt(raw.length - 1);
+
+    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+      return raw.slice(1, -1);
+    }
+  }
+
+  return raw;
+}
+
+function matchAttribute(matcher: AttributeMatcher, actual: string | null): boolean {
+  if (actual === null) {
     return false;
   }
 
+  switch (matcher.op) {
+    case null:
+      return true;
+    case '=':
+      return actual === matcher.value;
+    case '~=':
+      return actual.split(/\s+/).includes(matcher.value);
+    case '|=':
+      return actual === matcher.value || actual.startsWith(`${matcher.value}-`);
+    case '^=':
+      return actual.startsWith(matcher.value);
+    case '$=':
+      return actual.endsWith(matcher.value);
+    case '*=':
+      return actual.includes(matcher.value);
+  }
+}
+
+function consumeNextAtom(
+  remainder: string,
+  classes: ReadonlySet<string>,
+  id: string,
+  el: Element,
+): AtomStep {
+  if (remainder.startsWith('.')) {
+    return consumeClassAtom(remainder, classes);
+  }
+
+  if (remainder.startsWith('#')) {
+    return consumeIdAtom(remainder, id);
+  }
+
+  if (remainder.startsWith('[')) {
+    return consumeAttributeAtom(remainder, el);
+  }
+
+  return { matched: false, remainder };
+}
+
+/**
+ * Match a single compound selector (no combinator, e.g. `g`,
+ * `.foo`, `#bar`, `g[data-x="y"].foo`) against an element.
+ */
+function matchCompound(compound: string, el: Element): boolean {
+  // Strip pseudo-classes / pseudo-elements — we can't resolve them
+  // against a static tree; base matching falls through with a
+  // warning emitted at parse time.
+  const base = compound.replace(/::?[a-zA-Z][a-zA-Z0-9-]*(\([^)]*\))?/g, '');
   let remainder = base.trim();
 
   if (remainder === '' || remainder === '*') {
     return true;
   }
+
+  const tagName = el.tagName.toLowerCase();
+  const classAttr = el.getAttribute('class') ?? '';
+  const classes = new Set(classAttr.split(/\s+/).filter((c) => c !== ''));
+  const id = el.getAttribute('id') ?? '';
 
   // Extract a leading type selector (if any) — must match tag.
   const typeMatch = /^[a-zA-Z][a-zA-Z0-9-]*/.exec(remainder);
@@ -557,9 +915,9 @@ function matchSingleSelector(
     remainder = remainder.slice(typeMatch[0].length);
   }
 
-  // Iterate remaining .class / #id atoms.
+  // Iterate remaining .class / #id / [attr] atoms.
   while (remainder !== '') {
-    const step = consumeNextAtom(remainder, classes, id);
+    const step = consumeNextAtom(remainder, classes, id, el);
 
     if (!step.matched || step.remainder === remainder) {
       return false;
@@ -710,25 +1068,22 @@ interface TransformState {
   readonly rotation: number;
 }
 
-function parseTransform(transformStr: string): { readonly x: number; readonly y: number; readonly rotation: number } {
-  let x = 0;
-  let y = 0;
-  let rotation = 0;
+function parseTransform(transformStr: string): {
+  readonly x: number;
+  readonly y: number;
+  readonly rotation: number;
+  readonly requiresBake: boolean;
+  readonly matrix: DecomposedTransform['matrix'];
+} {
+  const decomposed = parseAndDecomposeTransform(transformStr);
 
-  const translateMatch = /translate\(\s*([\d.e+-]+)\s*[,\s]\s*([\d.e+-]+)\s*\)/i.exec(transformStr);
-
-  if (translateMatch) {
-    x = parseFloat(translateMatch[1] ?? '0');
-    y = parseFloat(translateMatch[2] ?? '0');
-  }
-
-  const rotateMatch = /rotate\(\s*([\d.e+-]+)/i.exec(transformStr);
-
-  if (rotateMatch) {
-    rotation = parseFloat(rotateMatch[1] ?? '0');
-  }
-
-  return { x, y, rotation };
+  return {
+    x: decomposed.tx,
+    y: decomposed.ty,
+    rotation: decomposed.rotation,
+    requiresBake: decomposed.requiresBake,
+    matrix: decomposed.matrix,
+  };
 }
 
 function combineTransform(base: TransformState, next: TransformState): TransformState {
@@ -737,6 +1092,21 @@ function combineTransform(base: TransformState, next: TransformState): Transform
     y: base.y + next.y,
     rotation: base.rotation + next.rotation,
   };
+}
+
+/**
+ * Bake an affine matrix into an SVG path d-string via `svgpath`.
+ * Used when a non-decomposable transform (scale / skew / matrix
+ * with non-identity 2x2) is applied to a shape — Broadset has no
+ * native scale/skew element fields per IO-D-02, so the geometry is
+ * pre-multiplied and stored as a `path`.
+ */
+function bakePathWithMatrix(d: string, matrix: DecomposedTransform['matrix']): string {
+  if (d === '') {
+    return '';
+  }
+
+  return svgpath(d).matrix([matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f]).abs().round(3).toString();
 }
 
 function getAttr(el: Element, name: string): string | null {
@@ -979,6 +1349,7 @@ interface GroupImportContext {
   readonly defsMap: ReadonlyMap<string, string>;
   readonly gradients: ReadonlyMap<string, BroadsetGradient>;
   readonly warnings: string[];
+  readonly depth: number;
 }
 
 /**
@@ -989,6 +1360,14 @@ interface GroupImportContext {
  * flattens into its children with proper `parentDataBsId` linkage.
  */
 function importGroupElement(el: Element, ctx: GroupImportContext): ImportedElement[] {
+  if (ctx.depth >= SVG_GROUP_DEPTH_CAP) {
+    ctx.warnings.push(
+      `Group depth cap of ${String(SVG_GROUP_DEPTH_CAP)} reached; deeper nesting was not imported (recursion bounded for safety).`,
+    );
+
+    return [];
+  }
+
   if (ctx.transformStr.includes('matrix')) {
     ctx.warnings.push(`Preserved transformed group as SVG payload (id: ${getAttr(el, 'id') ?? 'unknown'})`);
 
@@ -1036,10 +1415,114 @@ function importGroupElement(el: Element, ctx: GroupImportContext): ImportedEleme
       continue;
     }
 
-    importedChildren.push(...importElement(child, ctx.defsMap, ctx.gradients, ctx.warnings, ctx.transform, childParentId));
+    importedChildren.push(
+      ...importElement(child, ctx.defsMap, ctx.gradients, ctx.warnings, ctx.transform, childParentId, ctx.depth + 1),
+    );
   }
 
   return importedChildren;
+}
+
+interface ShapeBakeContext {
+  readonly transform: TransformState;
+  readonly ownTransform: ReturnType<typeof parseTransform>;
+  readonly baseStyle: Partial<BroadsetElementStyleInput>;
+  readonly tagMeta: Readonly<{
+    readonly dataBsId?: string;
+    readonly dataBsKind?: string;
+    readonly parentDataBsId: string | null;
+  }>;
+}
+
+function bakedPathElement(d: string, ctx: ShapeBakeContext): ImportedElement {
+  return {
+    type: 'path',
+    content: bakePathWithMatrix(d, ctx.ownTransform.matrix),
+    position: { x: 0, y: 0 },
+    width: 0,
+    height: 0,
+    rotation: 0,
+    style: ctx.baseStyle,
+    ...ctx.tagMeta,
+  };
+}
+
+function importRectElement(el: Element, ctx: ShapeBakeContext): ImportedElement {
+  const w = getNumAttr(el, 'width', 0);
+  const h = getNumAttr(el, 'height', 0);
+
+  if (ctx.ownTransform.requiresBake) {
+    return bakedPathElement(rectAsPathD(w, h), ctx);
+  }
+
+  return {
+    type: 'rectangle',
+    content: '',
+    position: { x: ctx.transform.x, y: ctx.transform.y },
+    width: w,
+    height: h,
+    rotation: ctx.transform.rotation,
+    style: ctx.baseStyle,
+    ...ctx.tagMeta,
+  };
+}
+
+function importPathElement(el: Element, ctx: ShapeBakeContext): ImportedElement {
+  const dRaw = getAttr(el, 'd') ?? '';
+
+  if (ctx.ownTransform.requiresBake) {
+    return bakedPathElement(dRaw, ctx);
+  }
+
+  return {
+    type: 'path',
+    content: dRaw,
+    position: { x: ctx.transform.x, y: ctx.transform.y },
+    width: 0,
+    height: 0,
+    rotation: ctx.transform.rotation,
+    style: ctx.baseStyle,
+    ...ctx.tagMeta,
+  };
+}
+
+function importEllipseElement(el: Element, ctx: ShapeBakeContext): ImportedElement {
+  const rx = getNumAttr(el, 'rx', 0);
+  const ry = getNumAttr(el, 'ry', 0);
+
+  if (ctx.ownTransform.requiresBake) {
+    return bakedPathElement(ellipseAsPathD(rx, ry, rx, ry), ctx);
+  }
+
+  return {
+    type: 'ellipse',
+    content: '',
+    position: { x: ctx.transform.x, y: ctx.transform.y },
+    width: rx * 2,
+    height: ry * 2,
+    rotation: ctx.transform.rotation,
+    style: ctx.baseStyle,
+    ...ctx.tagMeta,
+  };
+}
+
+function importCircleElement(el: Element, ctx: ShapeBakeContext): ImportedElement {
+  const r = getNumAttr(el, 'r', 0);
+
+  if (ctx.ownTransform.requiresBake) {
+    return bakedPathElement(ellipseAsPathD(r, r, r, r), ctx);
+  }
+
+  return {
+    type: 'ellipse',
+    content: '',
+    position: { x: ctx.transform.x, y: ctx.transform.y },
+    width: r * 2,
+    height: r * 2,
+    rotation: ctx.transform.rotation,
+    style: ctx.baseStyle,
+    ...ctx.tagMeta,
+  };
 }
 
 function importElement(
@@ -1049,6 +1532,7 @@ function importElement(
   warnings: string[],
   inheritedTransform: TransformState,
   parentDataBsId: string | null = null,
+  depth = 0,
 ): ImportedElement[] {
   const tagName = el.tagName.toLowerCase();
   const transformStr = getAttr(el, 'transform') ?? '';
@@ -1071,65 +1555,21 @@ function importElement(
     parentDataBsId,
   } as const;
 
+  const ownTransform = parseTransform(transformStr);
+  const shapeCtx: ShapeBakeContext = { transform, ownTransform, baseStyle, tagMeta };
+
   switch (tagName) {
     case 'rect':
-      return [
-        {
-          type: 'rectangle',
-          content: '',
-          position: { x: transform.x, y: transform.y },
-          width: getNumAttr(el, 'width', 0),
-          height: getNumAttr(el, 'height', 0),
-          rotation: transform.rotation,
-          style: baseStyle,
-          ...tagMeta,
-        },
-      ];
+      return [importRectElement(el, shapeCtx)];
 
     case 'path':
-      return [
-        {
-          type: 'path',
-          content: getAttr(el, 'd') ?? '',
-          position: { x: transform.x, y: transform.y },
-          width: 0,
-          height: 0,
-          rotation: transform.rotation,
-          style: baseStyle,
-          ...tagMeta,
-        },
-      ];
+      return [importPathElement(el, shapeCtx)];
 
     case 'ellipse':
-      return [
-        {
-          type: 'ellipse',
-          content: '',
-          position: { x: transform.x, y: transform.y },
-          width: getNumAttr(el, 'rx', 0) * 2,
-          height: getNumAttr(el, 'ry', 0) * 2,
-          rotation: transform.rotation,
-          style: baseStyle,
-          ...tagMeta,
-        },
-      ];
+      return [importEllipseElement(el, shapeCtx)];
 
-    case 'circle': {
-      const r = getNumAttr(el, 'r', 0);
-
-      return [
-        {
-          type: 'ellipse',
-          content: '',
-          position: { x: transform.x, y: transform.y },
-          width: r * 2,
-          height: r * 2,
-          rotation: transform.rotation,
-          style: baseStyle,
-          ...tagMeta,
-        },
-      ];
-    }
+    case 'circle':
+      return [importCircleElement(el, shapeCtx)];
 
     case 'text': {
       const textPathEl = el.getElementsByTagName('textPath')[0];
@@ -1179,6 +1619,7 @@ function importElement(
         defsMap,
         gradients,
         warnings,
+        depth,
       });
 
     // `<foreignObject>` is always stripped by `sanitizeDomInPlace`
@@ -1236,8 +1677,12 @@ function walkSvgDocument(xmlDoc: Document): SvgImportResult {
   const elements: ImportedElement[] = [];
   const children = svgRoot.children;
   const rootTransform: TransformState = { x: 0, y: 0, rotation: 0 };
+  // Bound the visual walk by the same element-count cap that gates
+  // sanitisation. A hostile SVG with millions of root children would
+  // otherwise still walk the whole tree once sanitisation truncates.
+  const limit = Math.min(children.length, SVG_ELEMENT_COUNT_CAP);
 
-  for (let i = 0; i < children.length; i++) {
+  for (let i = 0; i < limit; i++) {
     const child = children[i];
 
     if (!child || child.tagName.toLowerCase() === 'defs') {
@@ -1288,7 +1733,7 @@ export function importSvgDocument(
   // content unsanitised. The walk preserves `<metadata>` /
   // `broadset:` / `rdf:` children so the round-trip packet parser
   // still sees the Broadset packet on the fast path.
-  sanitizeDomInPlace(xmlDoc, warnings);
+  const withinCap = sanitizeDomInPlace(xmlDoc, warnings);
 
   const metadata = parseMetadataPacket(xmlDoc);
 
@@ -1296,7 +1741,7 @@ export function importSvgDocument(
     return hydrateFastPath(xmlDoc, metadata, fileName, warnings);
   }
 
-  return hydrateThirdPartyFallbackFromDoc(xmlDoc, fileName, warnings);
+  return hydrateThirdPartyFallbackFromDoc(xmlDoc, fileName, warnings, withinCap);
 }
 
 /**
@@ -1400,10 +1845,16 @@ function hydrateThirdPartyFallbackFromDoc(
   xmlDoc: Document,
   fileName: string,
   warnings: string[],
+  withinCap: boolean,
 ): SvgDocumentImportResult {
-  applyStyleBlocks(xmlDoc, warnings);
-  dereferenceUseElements(xmlDoc, warnings);
-  warnToolNamespaces(xmlDoc, warnings);
+  // Skip the O(n) third-party passes when we already hit the
+  // element-count cap during sanitisation — the warning already
+  // documents the truncation.
+  if (withinCap) {
+    applyStyleBlocks(xmlDoc, warnings);
+    dereferenceUseElements(xmlDoc, warnings);
+    warnToolNamespaces(xmlDoc, warnings);
+  }
 
   const result = walkSvgDocument(xmlDoc);
   const emptyDoc = createEmptyBroadsetDocument();

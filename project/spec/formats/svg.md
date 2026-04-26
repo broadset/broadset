@@ -80,9 +80,9 @@ Scoring legend for each of the three columns (Export, Import, Round-trip):
 | Text | Paragraph style (alignment, leading, tracking, first-line indent) | native | native | native |
 | Text | Text decoration (underline, strike) | native | native | native |
 | Text | Text-on-path | native (`<textPath>`) | native | native |
-| Text | Font — embedded WOFF2 (`embed` option) | **deferred (see §Spec Gaps — font embedding / subsetting on export)** | n/a | n/a |
-| Text | Font — external reference (`reference` option) | **deferred (see §Spec Gaps)** | n/a | n/a |
-| Text | Font — flattened to paths (`flatten` option) | **deferred (see §Spec Gaps)** | n/a (paths re-read as paths, text identity lost) | lossy |
+| Text | Font — embedded WOFF2 / TTF / OTF (`embed` option) | native (`<defs><style>@font-face { src: url(data:font/...;base64,...) }`, subset to used codepoints via `_shared/fonts/subsetFont`) | n/a (consumer reads `@font-face`) | n/a |
+| Text | Font — external reference (`reference` option) | native (`@font-face { src: url(<external>) }`) | n/a | n/a |
+| Text | Font — flattened to paths (`flatten` option) | native (`<g>` of `<path>` glyph outlines via fontkit `font.layout`) | n/a (paths re-read as paths, text identity lost) | lossy |
 | Groups | `'group'` element ↔ `<g>` | native | native | native |
 | Groups | Nested groups + composed transforms | native | native | native |
 | Groups | Group-level opacity / blend mode / effects | native | native | native |
@@ -232,12 +232,12 @@ The importer MUST parse every SVG transform variant: `translate`, `rotate`, `sca
 
 #### Acceptance Criteria
 
-- [ ] `translate`, `rotate`, `scale`, `skewX`, `skewY`, `matrix` all parse without throwing
-- [ ] Nested group transforms compose down the element tree
-- [ ] Translate-only and rotate-only matrices decompose to Broadset `position` + `rotation`
-- [ ] Translate + rotate combinations decompose without information loss
-- [ ] Matrices with non-trivial `scale` or `skew` bake to path geometry via `svgpath`
-- [ ] Baked geometry is numerically close to the source within the rounding tolerance of `svgpath` (3 decimal places)
+- [x] `translate`, `rotate`, `scale`, `skewX`, `skewY`, `matrix` all parse without throwing
+- [x] Nested group transforms compose down the element tree
+- [x] Translate-only and rotate-only matrices decompose to Broadset `position` + `rotation`
+- [x] Translate + rotate combinations decompose without information loss
+- [x] Matrices with non-trivial `scale` or `skew` bake to path geometry via `svgpath`
+- [x] Baked geometry is numerically close to the source within the rounding tolerance of `svgpath` (3 decimal places)
 
 ---
 
@@ -279,11 +279,11 @@ Linear, radial, and conic gradients MUST round-trip. `<linearGradient>` and `<ra
 
 ---
 
-### Requirement: Font Embedding (Embed / Reference / Flatten) — **deferred, see §Spec Gaps**
+### Requirement: Font Embedding (Embed / Reference / Flatten)
 
 The exporter MUST offer a `FontEmbedChoice` option: `'embed'` (default), `'reference'`, or `'flatten'`. `'embed'` emits `@font-face { src: url('data:font/woff2;base64,…'); }` inside `<defs><style>` for every non-system font referenced. `'reference'` emits an external `url()` reference. `'flatten'` converts text to paths (useful for consumers that forbid font embedding).
 
-**Implementation status as of Phase 7 landing:** The option exists on the exporter API and the UI modal, and the default value is `'embed'`. The exporter does NOT yet emit `@font-face` / external URL / path-flattened output — font-family names travel as plain `<text>` attributes so consumers render with their local font stack. Acceptance criteria below remain unchecked until the font-embedding pipeline wires into `_shared/fonts/subsetFont` (landed in P4.5). Tracked under §Spec Gaps → "Font embedding / subsetting on export".
+**Implementation status as of P7.7d:** Implemented. Callers pass per-family bytes / URLs through `SvgExportOptions.fonts` (a `ReadonlyMap<string, SvgFontSource>` keyed by `font-family`). The exporter walks every text element, collects the codepoints used, and runs the subset / reference / flatten pipeline through `_shared/fonts/subsetFont` (P4.5) and `_shared/fonts/embed-policy` (P4.6). Permission gating per IO-D-14: a restricted-permission font (`OS/2.fsType` bit 1) emits a warning and falls back to `'reference'` for that family.
 
 #### Scenario: Embed option (default) produces self-contained output
 
@@ -309,13 +309,13 @@ The exporter MUST offer a `FontEmbedChoice` option: `'embed'` (default), `'refer
 
 #### Acceptance Criteria
 
-- [ ] Default `FontEmbedChoice` is `'embed'`
-- [ ] `'embed'` emits WOFF2 as base64 inside `@font-face { src: url(...) }` in `<defs><style>`
-- [ ] `'embed'` shares a single `@font-face` entry across multiple elements that use the same font
-- [ ] `'reference'` emits an external `url()` reference
-- [ ] `'flatten'` converts text elements to paths via the shared `_shared/fonts/` glyph outline path
-- [ ] Restricted-permission fonts surface a preflight warning and fall back to `'reference'`
-- [ ] Font subsetting runs through `_shared/fonts/subsetFont` (P4.5) so embedded fonts contain only used glyphs
+- [x] Default `FontEmbedChoice` is `'embed'`
+- [x] `'embed'` emits font bytes as base64 inside `@font-face { src: url(...) }` in `<defs><style>` (WOFF2 / TTF / OTF per the supplied source format)
+- [x] `'embed'` shares a single `@font-face` entry across multiple elements that use the same font
+- [x] `'reference'` emits an external `url()` reference
+- [x] `'flatten'` converts text elements to `<path>` glyph outlines via fontkit `font.layout` + `glyph.path.toSVG()`
+- [x] Restricted-permission fonts surface a preflight warning and fall back to `'reference'`
+- [x] Font subsetting runs through `_shared/fonts/subsetFont` (P4.5) so embedded fonts contain only used glyphs
 
 ---
 
@@ -481,11 +481,13 @@ The importer MUST resolve styles in CSS precedence order: inherited presentation
 
 #### Acceptance Criteria
 
-- [ ] `<style>` blocks parse via `css-tree`
-- [ ] Selector specificity is calculated correctly (id > class > type)
-- [ ] Inline `style=""` overrides `<style>` block rules
-- [ ] `<style>` block rules override presentation attributes (per CSS 2.1)
-- [ ] Pseudo-classes and attribute selectors that cannot be resolved against a static tree surface a warning and fall back to the last-declared rule
+- [x] `<style>` blocks parse via `css-tree`
+- [x] Selector specificity is calculated correctly (id > class > type)
+- [x] Inline `style=""` overrides `<style>` block rules
+- [x] `<style>` block rules override presentation attributes (per CSS 2.1)
+- [x] Attribute selectors (`[attr]`, `[attr=value]`, `[attr~=word]`, `[attr|=prefix]`, `[attr^=prefix]`, `[attr$=suffix]`, `[attr*=substring]`) resolve against the static tree
+- [x] Combinators (`>`, `+`, `~`, descendant space) resolve right-to-left against the ancestor / sibling chain
+- [x] Pseudo-classes that cannot be resolved against a static tree surface a warning and fall back to the last-declared rule
 
 ---
 
@@ -630,14 +632,10 @@ The import and export UI MUST:
 
 This spec is authoritative for the SVG track (Phase 7). As units land, the following deeper surface will remain tracked here and will shift to the main requirements when implementation arrives:
 
-- **Font embedding / subsetting on export (deferred — the `fontEmbedding` option exists on the exporter API and in the UI modal but the exporter currently ignores the choice).** The Phase 7 plan listed this under P7.3 beyond-prior-art, but the shipped exporter does not emit `@font-face` declarations, does not reference external font URLs, and does not convert text to paths — regardless of the `FontEmbedChoice` value the caller passes. The `_shared/fonts/subsetFont` pipeline (landed in P4.5) is available and should drive the eventual implementation. Until that lands, exported SVGs use the consumer's local font resolution (font-family name only); Illustrator / Inkscape / browser rendering diverges from Broadset's canvas whenever the machine doesn't have the exact font installed. Reopening this item is recommended when a concrete caller (demo export flow or a customer-requested integration) surfaces the gap.
 - **SMIL `<animate>` emission on export.** SMIL is deprecated in modern browsers. Broadset animations ride in `.bsp` only; SVG exports render the IN state. Re-introducing SMIL emission would be a new feature behind an explicit opt-in, not a current requirement.
 - **Structural `<use>` / `<symbol>` round-trip.** Current target: dereference to inline groups on import (visually identical, structurally flattened). Reconstructing `<use>` relationships on export is not in scope for the initial track.
 - **Animated imports from third-party SMIL SVGs.** Currently SMIL is treated as static (IN state extracted via element geometry; animation commands dropped with a warning). Full SMIL parsing → Broadset `animations` mapping is a future feature.
-- **Pseudo-class and attribute-selector resolution.** `css-tree` parses these but the importer cannot evaluate pseudo-classes (`:hover`, `:nth-child`) against a static tree — a warning is emitted and the selector is dropped from matching. Attribute selectors (`[data-x]`) also surface a warning and fall through without a match. Combinators (`>`, `+`, `~`, descendant space) are not resolved — a warning surfaces and the selector is skipped.
-- **Full matrix / scale / skew transform decomposition on import.** `parseTransform` currently parses `translate` and `rotate` only. Matrix / scale / skew transforms on groups are preserved as opaque `svg`-type payloads (existing behaviour, tested). Non-decomposable affines on leaf shapes fall through to opaque preservation rather than the spec's documented bake-to-path via `svgpath`. The `svgpath` + `transformation-matrix` deps are installed and ready for the future implementation.
-- **Import-time element-count cap.** The shared importer security contract mandates "size / depth / entry caps". The SVG importer enforces the `<use>` follow-depth cap (`USE_DEREFERENCE_DEPTH_CAP = 16`) but does NOT yet enforce an element-count cap on the flat document walk — a hostile SVG with millions of elements drives `sanitizeDomInPlace` / `applyStyleBlocks` / `walkSvgDocument` in O(n). Recommended cap: 100 000 elements; emit a warning at the cap and stop iterating rather than throwing (per "Resource-Limit Failures Emit Warnings"). Tracked here for a future P7.7 hardening unit.
-- **Parser recursion depth cap on `<g>`.** `importElement` → `importGroupElement` recurses without an explicit depth budget. A smoke test (`bounds deeply nested <g> recursion without crashing`) asserts that 1000-level nesting completes in bounded time, but the cap should be explicit (100 per the shared contract) with a warning rather than relying on V8's stack size.
+- **Pseudo-class resolution.** `css-tree` parses pseudo-classes but the importer cannot evaluate `:hover` / `:nth-child` etc. against a static tree — a warning surfaces and the selector is dropped from matching. Attribute selectors (`[attr]`, `[attr=value]`, `[attr~=word]`, `[attr|=prefix]`, `[attr^=prefix]`, `[attr$=suffix]`, `[attr*=substring]`) and CSS combinators (`>`, `+`, `~`, descendant space) DO resolve as of P7.7b — they no longer fall through. Pseudo-classes remain the only unresolved selector surface.
 
 _The following items are intentionally scoped out of the SVG track and tracked by other specs:_
 

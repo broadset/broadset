@@ -24,6 +24,7 @@ export {
   svgExportOptionsSchema,
   type SvgExtensions,
   svgExtensionsSchema,
+  type SvgFontSource,
   type SvgImportOptions,
   svgImportOptionsSchema,
   type SvgPreservedData,

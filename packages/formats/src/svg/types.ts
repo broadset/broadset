@@ -283,9 +283,34 @@ export const svgImportOptionsSchema: z.ZodType<SvgImportOptions> = z.object({
   allowForeignObject: z.boolean().optional(),
 });
 
+/**
+ * Per-family source declared by the caller for font embedding /
+ * referencing / flattening. The exporter uses `bytes` for `'embed'`
+ * (subsets and base64-encodes) and `'flatten'` (extracts glyph
+ * outlines), and `url` for `'reference'`. `permissionOverride` lets
+ * tests deterministically exercise the restricted-permission path
+ * even when the supplied bytes carry no fsType bit; production
+ * callers should leave it `undefined` and let the exporter read the
+ * OS/2 table.
+ */
+export interface SvgFontSource {
+  readonly bytes?: Uint8Array | undefined;
+  readonly url?: string | undefined;
+  readonly format: 'woff2' | 'ttf' | 'otf';
+  readonly permissionOverride?: 'installable' | 'editable' | 'preview-print' | 'restricted' | undefined;
+}
+
 export interface SvgExportOptions {
   /** Font-embedding strategy. Default: `'embed'`. */
   readonly fontEmbedding?: FontEmbedChoice | undefined;
+  /**
+   * Per-family font sources keyed by `font-family`. The exporter
+   * walks every text element, collects the codepoints used, and
+   * subsets / references / flattens via this map. Families absent
+   * from the map fall back to consumer-side font resolution and
+   * surface a warning under `'embed'` mode.
+   */
+  readonly fonts?: ReadonlyMap<string, SvgFontSource> | undefined;
   /** When false, the document `<metadata>` packet is omitted. Default: `true`. */
   readonly includeMetadata?: boolean | undefined;
   /** When false, `data-bs-*` + `broadset:content-hash` tagging is omitted. Default: `true`. */
@@ -301,6 +326,7 @@ export interface SvgExportOptions {
 
 export const svgExportOptionsSchema: z.ZodType<SvgExportOptions> = z.object({
   fontEmbedding: fontEmbedChoiceSchema.optional(),
+  fonts: z.custom<ReadonlyMap<string, SvgFontSource>>((v) => v instanceof Map).optional(),
   includeMetadata: z.boolean().optional(),
   includeElementTagging: z.boolean().optional(),
   flattenGroups: z.boolean().optional(),

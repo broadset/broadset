@@ -241,11 +241,128 @@ describe('P7.4b — CSS style block resolution', () => {
   });
 
   /**
+   * @description Attribute selectors (`[attr]`, `[attr="value"]`,
+   * `[attr~="word"]`) MUST match elements bearing the attribute
+   * with the right value. Many third-party SVGs (Figma, web
+   * frameworks) emit class-and-attribute hybrids.
+   */
+  it('matches attribute-presence selectors [attr]', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <style>[data-flag] { fill: #ff0000; }</style>
+      <rect data-flag="x" width="50" height="50"/>
+    </svg>`;
+
+    const { document } = importSvgDocument(input);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+    const fill = rect?.style.fill;
+
+    if (fill?.kind === 'solid' && fill.color.kind === 'rgb') {
+      expect(fill.color.hex).toBe('#ff0000');
+    } else {
+      throw new Error('Expected solid rgb fill');
+    }
+  });
+
+  /**
+   * @description Equality attribute selectors (`[attr="value"]`)
+   * match only when the attribute equals the value verbatim.
+   */
+  it('matches attribute-equality selectors [attr="value"]', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <style>[data-kind="primary"] { fill: #00ff00; } [data-kind="secondary"] { fill: #0000ff; }</style>
+      <rect data-kind="primary" width="50" height="50"/>
+    </svg>`;
+
+    const { document } = importSvgDocument(input);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+    const fill = rect?.style.fill;
+
+    if (fill?.kind === 'solid' && fill.color.kind === 'rgb') {
+      expect(fill.color.hex).toBe('#00ff00');
+    }
+  });
+
+  /**
+   * @description Descendant combinator (`a b`) MUST match `b`
+   * elements anywhere inside an ancestor `a`. The most common
+   * combinator in third-party stylesheets.
+   */
+  it('matches descendant combinator selectors', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <style>g rect { fill: #abcdef; }</style>
+      <g><rect width="20" height="20"/></g>
+    </svg>`;
+
+    const { document } = importSvgDocument(input);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+    const fill = rect?.style.fill;
+
+    if (fill?.kind === 'solid' && fill.color.kind === 'rgb') {
+      expect(fill.color.hex).toBe('#abcdef');
+    } else {
+      throw new Error('Expected solid rgb fill');
+    }
+  });
+
+  /**
+   * @description Child combinator (`a > b`) MUST match only
+   * direct children, not arbitrary descendants. A `<rect>`
+   * grandchild MUST NOT match `g > rect`.
+   */
+  it('respects child combinator > vs descendant space', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <style>svg > rect { fill: #112233; }</style>
+      <g><rect width="20" height="20"/></g>
+      <rect width="30" height="30"/>
+    </svg>`;
+
+    const { document } = importSvgDocument(input);
+    const directRect = document.elements.find((el) => el.width === 30);
+    const nestedRect = document.elements.find((el) => el.width === 20);
+    const directFill = directRect?.style.fill;
+    const nestedFill = nestedRect?.style.fill;
+
+    if (directFill?.kind === 'solid' && directFill.color.kind === 'rgb') {
+      expect(directFill.color.hex).toBe('#112233');
+    }
+
+    // Nested rect MUST NOT pick up the `svg > rect` rule (it's a
+    // grandchild of svg, not a direct child).
+    if (nestedFill?.kind === 'solid' && nestedFill.color.kind === 'rgb') {
+      expect(nestedFill.color.hex).not.toBe('#112233');
+    }
+  });
+
+  /**
    * @description Pseudo-class selectors (`:hover`, `:nth-child`)
    * cannot be resolved against a static tree. The importer surfaces
    * a warning so the user knows their stylesheet's dynamic rules
    * were skipped. This is the documented "Spec Gap" behaviour.
    */
+  /**
+   * @description A selector with more than the SELECTOR_TOKEN_CAP
+   * compound tokens MUST NOT match — silently dropping is preferable
+   * to driving exponential right-to-left walks against a deep tree.
+   * This pins the security audit C2 hardening.
+   */
+  it('drops selectors with more than the token cap (security hardening)', () => {
+    // 20 nested `g` tokens — exceeds the cap of 16.
+    const longSelector = Array.from({ length: 20 }, () => 'g').join(' ');
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <style>${longSelector} { fill: #ff0000; }</style>
+      <g><rect width="50" height="50"/></g>
+    </svg>`;
+    const start = Date.now();
+    const { document } = importSvgDocument(input);
+    const elapsed = Date.now() - start;
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+
+    // The hostile selector did NOT match (cap dropped it before
+    // walking) and the import returned in well under a second.
+    expect(elapsed).toBeLessThan(1_000);
+    expect(rect?.style.fill).not.toBe('#ff0000');
+  });
+
   it('warns about pseudo-class selectors it cannot resolve', () => {
     const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
       <style>
