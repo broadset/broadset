@@ -604,14 +604,16 @@ function buildPath(
 }
 
 /**
- * Merge fill + stroke (width, colour, dash, head/tail arrow ends)
- * extracted from the shape body onto the element's style.
+ * Merge fill + stroke (width, colour, dash, head/tail arrow ends) +
+ * effects (outer shadow) extracted from the shape body onto the
+ * element's style.
  */
 function applyShapeStyle(element: BroadsetElement, body: string): BroadsetElement {
   const fill = detectFill(body);
   const stroke = parseStrokeFromBody(body);
+  const boxShadow = parseOuterShadow(body);
 
-  if (fill === null && stroke === null) return element;
+  if (fill === null && stroke === null && boxShadow === null) return element;
 
   return {
     ...element,
@@ -623,8 +625,53 @@ function applyShapeStyle(element: BroadsetElement, body: string): BroadsetElemen
       ...(stroke?.strokeDasharray !== undefined ? { strokeDasharray: stroke.strokeDasharray } : {}),
       ...(stroke?.strokeHeadEnd !== undefined ? { strokeHeadEnd: stroke.strokeHeadEnd } : {}),
       ...(stroke?.strokeTailEnd !== undefined ? { strokeTailEnd: stroke.strokeTailEnd } : {}),
+      ...(boxShadow !== null ? { boxShadow } : {}),
     },
   };
+}
+
+/**
+ * Parse `<a:outerShdw>` into a CSS `box-shadow` string. Inner shadows
+ * (`<a:innerShdw>`) are not yet mapped — they would require CSS
+ * `box-shadow` with `inset`, which doesn't render the same way.
+ */
+function parseOuterShadow(body: string): string | null {
+  const effectLst = extractBlock(body, 'a:effectLst');
+
+  if (effectLst === null) return null;
+
+  // Try paired form first; fall back to self-close. Two simpler regex
+  // calls instead of one alternation that the linter flags as too
+  // complex.
+  const paired = effectLst.block.match(/<a:outerShdw\b([^>]*)>([\s\S]*?)<\/a:outerShdw>/);
+  const selfClose = paired === null ? effectLst.block.match(/<a:outerShdw\b([^>]*)\/>/) : null;
+
+  if (paired === null && selfClose === null) return null;
+
+  const attrs = paired?.[1] ?? selfClose?.[1] ?? '';
+  const innerBody = paired?.[2] ?? '';
+  const blurEmu = parseInt(attrs.match(/\bblurRad="(\d+)"/)?.[1] ?? '0', 10);
+  const distEmu = parseInt(attrs.match(/\bdist="(\d+)"/)?.[1] ?? '0', 10);
+  const dirUnits = parseInt(attrs.match(/\bdir="(\d+)"/)?.[1] ?? '0', 10);
+  const dirRadians = (rotationUnitsToDegrees(dirUnits) * Math.PI) / 180;
+  const offsetXmm = emuToMm(distEmu) * Math.cos(dirRadians);
+  const offsetYmm = emuToMm(distEmu) * Math.sin(dirRadians);
+  const blurMm = emuToMm(blurEmu);
+  const colour = parseColorElement(innerBody);
+
+  if (colour?.kind !== 'rgb') return null;
+
+  const alphaMatch = innerBody.match(/<a:alpha\s+val="(\d+)"/);
+  const alpha = alphaMatch !== null ? parseInt(alphaMatch[1] ?? '100000', 10) / 100000 : 1;
+  const r = parseInt(colour.hex.slice(1, 3), 16);
+  const g = parseInt(colour.hex.slice(3, 5), 16);
+  const b = parseInt(colour.hex.slice(5, 7), 16);
+
+  return `${formatMm(offsetXmm)} ${formatMm(offsetYmm)} ${formatMm(blurMm)} rgba(${String(r)}, ${String(g)}, ${String(b)}, ${alpha.toFixed(3)})`;
+}
+
+function formatMm(value: number): string {
+  return `${value.toFixed(2)}mm`;
 }
 
 function buildPicture(

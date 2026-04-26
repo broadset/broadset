@@ -591,6 +591,40 @@ describe('PPTX importer — operator-level extraction', () => {
     }
   });
 
+  /**
+   * @description B6 — shadow effects round-trip. `<a:outerShdw>` on a
+   * shape's `<p:spPr><a:effectLst>` block becomes a CSS `box-shadow`
+   * rgba() string on `style.boxShadow`; re-export emits `<a:outerShdw>`
+   * again.
+   */
+  it('round-trips <a:outerShdw> through style.boxShadow', async () => {
+    const shadow = `<a:effectLst><a:outerShdw blurRad="180000" dist="360000" dir="2700000" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="50000"/></a:srgbClr></a:outerShdw></a:effectLst>`;
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Shadowed"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill>${shadow}</p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
+    const inputBytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')],
+      ]),
+    );
+    const imported = importPptx(inputBytes);
+    const boxShadow = imported.elements[0]?.style.boxShadow;
+
+    expect(boxShadow).toMatch(/^[-\d.]+mm [-\d.]+mm [\d.]+mm rgba\(0, 0, 0, 0\.50\d\)$/);
+
+    const reExported = exportPptxBytes(imported);
+    const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
+    const reExportedSlide = readTextPart(readOoxmlPackage(reExported), 'ppt/slides/slide1.xml') ?? '';
+
+    expect(reExportedSlide).toContain('<a:effectLst>');
+    expect(reExportedSlide).toContain('<a:outerShdw');
+    expect(reExportedSlide).toMatch(/<a:alpha val="50\d{3}"/);
+  });
+
   it('rejects vbaProject.bin with a macro-rejected warning at import', () => {
     const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst/><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
     const bytes = writeOoxmlPackage(

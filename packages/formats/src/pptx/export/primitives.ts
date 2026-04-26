@@ -3,13 +3,15 @@ import {
   type BroadsetElement,
   type BroadsetElementStyle,
   type BroadsetFill,
+  type Canvas,
   type ColorMods,
   getSolidFillColor,
   isRgbBroadsetColor,
+  pxToMm,
   resolveStyleColor,
 } from '@broadset/model';
 
-import { alphaToOoxml, canvasLengthToEmu, degreesToRotationUnits, hexToOoxmlColor } from '../ooxml/units';
+import { alphaToOoxml, canvasLengthToEmu, degreesToRotationUnits, hexToOoxmlColor, mmToEmu } from '../ooxml/units';
 import type { SlideExportContext } from './context';
 
 /**
@@ -167,6 +169,168 @@ export function emitStroke(style: BroadsetElementStyle, ctx: SlideExportContext)
       : '<a:miter lim="800000"/>';
 
   return `<a:ln w="${String(widthEmu)}"><a:solidFill><a:srgbClr val="${hex}"/></a:solidFill>${dashFragment}${join}</a:ln>`;
+}
+
+/**
+ * Emit an `<a:effectLst>` from the element's CSS-style `boxShadow`.
+ * Maps the most common form (offsetX offsetY blurRadius color) to
+ * OOXML `<a:outerShdw>`. Returns an empty string when no shadow is
+ * declared.
+ */
+export function emitEffects(style: BroadsetElementStyle, ctx: SlideExportContext): string {
+  const shadow = style.boxShadow;
+
+  if (shadow === undefined || shadow.trim().length === 0) return '';
+
+  const parsed = parseBoxShadow(shadow, ctx.canvas);
+
+  if (parsed === null) return '';
+
+  // offsets/blur are already in mm — go straight to EMU.
+  const distEmu = mmToEmu(Math.hypot(parsed.offsetXmm, parsed.offsetYmm));
+  const blurEmu = mmToEmu(parsed.blurMm);
+  const directionDegrees =
+    parsed.offsetXmm === 0 && parsed.offsetYmm === 0
+      ? 0
+      : (Math.atan2(parsed.offsetYmm, parsed.offsetXmm) * 180) / Math.PI;
+  const dirUnits = degreesToRotationUnits(((directionDegrees % 360) + 360) % 360);
+  const ooxmlHex = hexToOoxmlColor(parsed.color);
+  const alphaChild = parsed.alpha < 1 ? `<a:alpha val="${String(alphaToOoxml(parsed.alpha))}"/>` : '';
+
+  return `<a:effectLst><a:outerShdw blurRad="${String(blurEmu)}" dist="${String(distEmu)}" dir="${String(dirUnits)}" rotWithShape="0"><a:srgbClr val="${ooxmlHex}">${alphaChild}</a:srgbClr></a:outerShdw></a:effectLst>`;
+}
+
+/**
+ * Parse a CSS `box-shadow` value into offsetX/offsetY/blur (all in mm)
+ * and colour. Supports the canonical form
+ * `offsetX offsetY blurRadius color` with px/mm/in/cm/pt units and
+ * rgba(...) / hex colours. `inset` and multi-value shadow lists return
+ * `null`.
+ */
+function parseBoxShadow(value: string, canvas: Canvas): {
+  readonly offsetXmm: number;
+  readonly offsetYmm: number;
+  readonly blurMm: number;
+  readonly color: string;
+  readonly alpha: number;
+} | null {
+  // Inset shadows are not representable as <a:outerShdw>.
+  if (/\binset\b/.test(value)) return null;
+
+  // Strip rgba(...) so the multi-shadow comma check doesn't trip on
+  // colour-internal commas.
+  const withoutColours = value.replace(/rgba?\([^)]*\)/gi, '');
+
+  if (withoutColours.includes(',')) return null;
+
+  // Split on whitespace, but keep rgba(...) intact as a single token.
+  const tokens = tokeniseShadow(value);
+
+  if (tokens.length < 3) return null;
+
+  const offsetXmm = parseLengthMm(tokens[0] ?? '0', canvas);
+  const offsetYmm = parseLengthMm(tokens[1] ?? '0', canvas);
+  const blurMm = parseLengthMm(tokens[2] ?? '0', canvas);
+  const colourToken = tokens[tokens.length - 1] ?? '#000000';
+  const colourParse = parseCssColor(colourToken);
+
+  if (colourParse === null) return null;
+
+  return { offsetXmm, offsetYmm, blurMm, color: colourParse.hex, alpha: colourParse.alpha };
+}
+
+/**
+ * Tokenise a `box-shadow` value on whitespace, treating any `rgba(...)`
+ * or `rgb(...)` group as an atomic token even though it contains
+ * spaces and commas internally.
+ */
+function tokeniseShadow(value: string): readonly string[] {
+  const out: string[] = [];
+  let buffer = '';
+  let depth = 0;
+
+  for (const ch of value) {
+    if (ch === '(') depth += 1;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+
+    if (depth === 0 && /\s/.test(ch)) {
+      if (buffer.length > 0) {
+        out.push(buffer);
+        buffer = '';
+      }
+    } else {
+      buffer += ch;
+    }
+  }
+
+  if (buffer.length > 0) out.push(buffer);
+
+  return out;
+}
+
+const MM_PER_INCH = 25.4;
+const MM_PER_CM = 10;
+const PT_PER_INCH = 72;
+
+function parseLengthMm(token: string, canvas: Canvas): number {
+  const match = token.trim().match(/^(-?\d*\.?\d+)(px|mm|cm|in|pt)?$/i);
+
+  if (match === null) return 0;
+
+  const num = parseFloat(match[1] ?? '0');
+  const unit = (match[2] ?? 'px').toLowerCase();
+
+  if (unit === 'mm') return num;
+  if (unit === 'cm') return num * MM_PER_CM;
+  if (unit === 'in') return num * MM_PER_INCH;
+  if (unit === 'pt') return (num * MM_PER_INCH) / PT_PER_INCH;
+
+  // px (default): use canvas DPI.
+  return pxToMm(num, canvas.dpi);
+}
+
+function parseCssColor(input: string): { readonly hex: string; readonly alpha: number } | null {
+  const trimmed = input.trim();
+  const hexMatch = trimmed.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
+
+  if (hexMatch !== null) {
+    const digits = hexMatch[1] ?? '';
+
+    if (digits.length === 3) {
+      const expanded = digits.split('').map((c) => `${c}${c}`).join('');
+
+      return { hex: `#${expanded}`, alpha: 1 };
+    }
+
+    if (digits.length === 8) {
+      return { hex: `#${digits.slice(0, 6)}`, alpha: parseInt(digits.slice(6), 16) / 255 };
+    }
+
+    return { hex: `#${digits}`, alpha: 1 };
+  }
+
+  // Split rgb() / rgba() parsing into shape-detect + numeric-extract
+  // so neither regex is too complex for the lint threshold.
+  if (/^rgba?\s*\(/i.test(trimmed)) {
+    const inner = trimmed.replace(/^rgba?\s*\(/i, '').replace(/\)$/, '');
+    const parts = inner.split(',').map((s) => s.trim());
+
+    if (parts.length >= 3) {
+      const r = clamp255(parseFloat(parts[0] ?? '0'));
+      const g = clamp255(parseFloat(parts[1] ?? '0'));
+      const b = clamp255(parseFloat(parts[2] ?? '0'));
+      const a = parts.length >= 4 ? Math.max(0, Math.min(1, parseFloat(parts[3] ?? '1'))) : 1;
+      const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+
+      return { hex, alpha: a };
+    }
+  }
+
+  return null;
+}
+
+function clamp255(value: number): number {
+  return Math.max(0, Math.min(255, Math.round(value)));
 }
 
 /** Convenience wrapper: derive a solid fill string from an element's style. */
