@@ -1,15 +1,18 @@
 import {
+  type BroadsetColor,
   type BroadsetElement,
   type Bullet,
   type Hyperlink,
+  isBroadsetColor,
   type Paragraph,
   resolveContentAsPlainString,
   resolveStyleColor,
+  rgbColor,
 } from '@broadset/model';
 import svgpath from 'svgpath';
 
 import { OOXML_REL_TYPES } from '../ooxml/namespaces';
-import { hexToOoxmlColor } from '../ooxml/units';
+import { canvasLengthToEmu, hexToOoxmlColor } from '../ooxml/units';
 import { escapeXmlAttribute, escapeXmlText } from '../ooxml/xml';
 import { buildElementExt } from '../semantic/element-ext';
 import { encodeShapeName } from '../semantic/shape-name';
@@ -219,7 +222,7 @@ interface RunLike {
   readonly underline?: boolean | undefined;
   readonly fontSize?: number | undefined;
   readonly fontFamily?: string | undefined;
-  readonly color?: string | undefined;
+  readonly color?: BroadsetColor | undefined;
   readonly hyperlink?: Hyperlink | undefined;
 }
 
@@ -227,6 +230,10 @@ interface ParagraphLike {
   readonly runs: readonly RunLike[];
   readonly align?: string | undefined;
   readonly bullet?: Bullet | undefined;
+  /** Indent in canvas units (mm by default); negative values valid (hanging). */
+  readonly indent?: number | undefined;
+  /** Line spacing as a ratio: 1.0 = single, 1.5 = 150%. */
+  readonly lineSpacing?: number | undefined;
 }
 
 function resolveParagraphs(element: BroadsetElement): readonly ParagraphLike[] {
@@ -249,10 +256,13 @@ function resolveParagraphs(element: BroadsetElement): readonly ParagraphLike[] {
         underline: readRunStyleUnderline(r.props?.style),
         fontSize: readRunStyleNumber(r.props?.style, 'fontSize'),
         fontFamily: readRunStyleString(r.props?.style, 'fontFamily'),
+        color: readRunStyleColor(r.props?.style),
         hyperlink: r.props?.hyperlink,
       })),
       align: p.props?.align,
       bullet: p.props?.bullet,
+      indent: p.props?.indent,
+      lineSpacing: p.props?.lineSpacing,
     }));
   }
 
@@ -286,17 +296,63 @@ function readRunStyleUnderline(style: Readonly<Record<string, unknown>> | undefi
   return undefined;
 }
 
+/**
+ * Run-level colour can land in `r.props.style.color` two ways: as a
+ * structured `BroadsetColor` (importer's preferred shape, preserves
+ * theme slots + mods) or as a plain hex string (older edits / hand-
+ * authored content). Accept both so we never silently drop the value.
+ */
+function readRunStyleColor(style: Readonly<Record<string, unknown>> | undefined): BroadsetColor | undefined {
+  const value = style?.['color'];
+
+  if (value === undefined) return undefined;
+  if (isBroadsetColor(value)) return value;
+  if (typeof value === 'string' && value.length > 0) return rgbColor(value);
+
+  return undefined;
+}
+
 function emitParagraph(
   ctx: SlideExportContext,
   paragraph: ParagraphLike,
   defaults: { readonly defaultColor: string; readonly defaultSize: number; readonly defaultFamily: string | undefined },
 ): string {
-  const align = textAlignAttr(paragraph.align);
+  const pPrAttrs = buildPPrAttrs(ctx, paragraph);
   const bullet = emitBulletXml(paragraph.bullet);
-  const pPr = `<a:pPr${align}>${bullet}</a:pPr>`;
+  const lnSpc = emitLineSpacing(paragraph.lineSpacing);
+  const pPr = `<a:pPr${pPrAttrs}>${lnSpc}${bullet}</a:pPr>`;
   const runs = paragraph.runs.map((run) => emitRun(ctx, run, defaults)).join('');
 
   return `<a:p>${pPr}${runs}</a:p>`;
+}
+
+function buildPPrAttrs(ctx: SlideExportContext, paragraph: ParagraphLike): string {
+  const parts: string[] = [];
+  const align = textAlignAttr(paragraph.align);
+
+  if (align.length > 0) parts.push(align.trim());
+
+  if (paragraph.indent !== undefined) {
+    const indentEmu = canvasLengthToEmu(ctx.canvas, paragraph.indent);
+
+    parts.push(`indent="${String(indentEmu)}"`);
+
+    // Pair indent with a non-negative `marL` so PowerPoint reserves
+    // space for hanging indents (-indent → +marL of equal magnitude).
+    if (paragraph.indent < 0) parts.push(`marL="${String(Math.abs(indentEmu))}"`);
+  }
+
+  return parts.length === 0 ? '' : ` ${parts.join(' ')}`;
+}
+
+const SPC_PCT_SCALE = 100000;
+
+function emitLineSpacing(lineSpacing: number | undefined): string {
+  if (lineSpacing === undefined) return '';
+
+  const pct = Math.round(lineSpacing * SPC_PCT_SCALE);
+
+  return `<a:lnSpc><a:spcPct val="${String(pct)}"/></a:lnSpc>`;
 }
 
 /**
@@ -333,8 +389,10 @@ function emitRun(
   if (run.italic === true) attrs.push('i="1"');
   if (run.underline === true) attrs.push('u="sng"');
 
-  const fillHex = run.color !== undefined ? hexToOoxmlColor(run.color) : defaults.defaultColor;
-  const fill = `<a:solidFill><a:srgbClr val="${fillHex}"/></a:solidFill>`;
+  const fill =
+    run.color !== undefined
+      ? emitColorFill(run.color)
+      : `<a:solidFill><a:srgbClr val="${defaults.defaultColor}"/></a:solidFill>`;
   const latin = family !== undefined ? `<a:latin typeface="${escapeXmlAttribute(family)}"/>` : '';
   const text = escapeXmlText(run.text);
   const hlink = emitHyperlinkRel(ctx, run.hyperlink);

@@ -7,6 +7,7 @@ import {
   type ColorMods,
   getSolidFillColor,
   isRgbBroadsetColor,
+  normalizeColor,
   pxToMm,
   resolveStyleColor,
 } from '@broadset/model';
@@ -202,10 +203,13 @@ export function emitEffects(style: BroadsetElementStyle, ctx: SlideExportContext
 
 /**
  * Parse a CSS `box-shadow` value into offsetX/offsetY/blur (all in mm)
- * and colour. Supports the canonical form
- * `offsetX offsetY blurRadius color` with px/mm/in/cm/pt units and
- * rgba(...) / hex colours. `inset` and multi-value shadow lists return
- * `null`.
+ * and colour. Accepts the canonical form
+ * `offsetX offsetY blurRadius color` with px/mm/cm/in/pt length units
+ * and any colour `normalizeColor` understands (named CSS colours,
+ * hex 3/6/8, rgb/rgba, hsl/hsla). When the input is a multi-value list
+ * (`shadow1, shadow2, …`) we use the first non-`inset` entry —
+ * `<a:outerShdw>` only carries one. `inset` shadows are skipped because
+ * OOXML's outer shadow has no inset semantics.
  */
 function parseBoxShadow(value: string, canvas: Canvas): {
   readonly offsetXmm: number;
@@ -214,16 +218,29 @@ function parseBoxShadow(value: string, canvas: Canvas): {
   readonly color: string;
   readonly alpha: number;
 } | null {
-  // Inset shadows are not representable as <a:outerShdw>.
-  if (/\binset\b/.test(value)) return null;
+  for (const shadow of splitShadowList(value)) {
+    const trimmed = shadow.trim();
 
-  // Strip rgba(...) so the multi-shadow comma check doesn't trip on
-  // colour-internal commas.
-  const withoutColours = value.replace(/rgba?\([^)]*\)/gi, '');
+    if (trimmed.length === 0) continue;
+    // Inset shadows are not representable as <a:outerShdw>; skip and
+    // try the next entry in the list.
+    if (/\binset\b/.test(trimmed)) continue;
 
-  if (withoutColours.includes(',')) return null;
+    const parsed = parseSingleShadow(trimmed, canvas);
 
-  // Split on whitespace, but keep rgba(...) intact as a single token.
+    if (parsed !== null) return parsed;
+  }
+
+  return null;
+}
+
+function parseSingleShadow(value: string, canvas: Canvas): {
+  readonly offsetXmm: number;
+  readonly offsetYmm: number;
+  readonly blurMm: number;
+  readonly color: string;
+  readonly alpha: number;
+} | null {
   const tokens = tokeniseShadow(value);
 
   if (tokens.length < 3) return null;
@@ -237,6 +254,33 @@ function parseBoxShadow(value: string, canvas: Canvas): {
   if (colourParse === null) return null;
 
   return { offsetXmm, offsetYmm, blurMm, color: colourParse.hex, alpha: colourParse.alpha };
+}
+
+/**
+ * Split a CSS shadow list on top-level commas, preserving commas that
+ * appear inside `rgba(...)` / `hsl(...)` colour groups. Returns a single
+ * entry when no commas appear (unbracketed single-shadow case).
+ */
+function splitShadowList(value: string): readonly string[] {
+  const out: string[] = [];
+  let buffer = '';
+  let depth = 0;
+
+  for (const ch of value) {
+    if (ch === '(') depth += 1;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+
+    if (depth === 0 && ch === ',') {
+      out.push(buffer);
+      buffer = '';
+    } else {
+      buffer += ch;
+    }
+  }
+
+  if (buffer.length > 0) out.push(buffer);
+
+  return out;
 }
 
 /**
@@ -289,48 +333,34 @@ function parseLengthMm(token: string, canvas: Canvas): number {
   return pxToMm(num, canvas.dpi);
 }
 
+/**
+ * Resolve any CSS colour literal to `{ hex: '#RRGGBB', alpha }`.
+ *
+ * Delegates to `normalizeColor` (model package) so we get parity with
+ * the rest of Broadset for named colours, rgb/rgba, hsl/hsla, and 3/6/8
+ * digit hex. The 8-digit form encodes alpha in the trailing two hex
+ * digits — we split it out so `<a:alpha>` carries the channel
+ * separately, since OOXML keeps colour and alpha distinct.
+ */
 function parseCssColor(input: string): { readonly hex: string; readonly alpha: number } | null {
-  const trimmed = input.trim();
-  const hexMatch = trimmed.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
+  let normalized: string;
 
-  if (hexMatch !== null) {
-    const digits = hexMatch[1] ?? '';
-
-    if (digits.length === 3) {
-      const expanded = digits.split('').map((c) => `${c}${c}`).join('');
-
-      return { hex: `#${expanded}`, alpha: 1 };
-    }
-
-    if (digits.length === 8) {
-      return { hex: `#${digits.slice(0, 6)}`, alpha: parseInt(digits.slice(6), 16) / 255 };
-    }
-
-    return { hex: `#${digits}`, alpha: 1 };
+  try {
+    normalized = normalizeColor(input);
+  } catch {
+    return null;
   }
 
-  // Split rgb() / rgba() parsing into shape-detect + numeric-extract
-  // so neither regex is too complex for the lint threshold.
-  if (/^rgba?\s*\(/i.test(trimmed)) {
-    const inner = trimmed.replace(/^rgba?\s*\(/i, '').replace(/\)$/, '');
-    const parts = inner.split(',').map((s) => s.trim());
+  const stripped = normalized.startsWith('#') ? normalized.slice(1) : normalized;
 
-    if (parts.length >= 3) {
-      const r = clamp255(parseFloat(parts[0] ?? '0'));
-      const g = clamp255(parseFloat(parts[1] ?? '0'));
-      const b = clamp255(parseFloat(parts[2] ?? '0'));
-      const a = parts.length >= 4 ? Math.max(0, Math.min(1, parseFloat(parts[3] ?? '1'))) : 1;
-      const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-
-      return { hex, alpha: a };
-    }
+  if (stripped.length === 8) {
+    return {
+      hex: `#${stripped.slice(0, 6)}`,
+      alpha: parseInt(stripped.slice(6), 16) / 255,
+    };
   }
 
-  return null;
-}
-
-function clamp255(value: number): number {
-  return Math.max(0, Math.min(255, Math.round(value)));
+  return { hex: normalized, alpha: 1 };
 }
 
 /** Convenience wrapper: derive a solid fill string from an element's style. */

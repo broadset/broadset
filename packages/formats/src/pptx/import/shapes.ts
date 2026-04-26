@@ -21,7 +21,7 @@ import {
 } from '@broadset/model';
 import svgpath from 'svgpath';
 
-import { emuToMm, rotationUnitsToDegrees } from '../ooxml/units';
+import { emuToCanvasLength, emuToMm, rotationUnitsToDegrees } from '../ooxml/units';
 import { decodeShapeName } from '../semantic/shape-name';
 import type { LayoutPlaceholder, ResolvedTheme } from '../types';
 
@@ -180,7 +180,7 @@ function emitElementFromShape(
   body: string,
   parentGroupId: string | null,
 ): BroadsetElement | null {
-  const transform = extractTransform(body);
+  const transform = extractTransform(ctx.canvas, body);
 
   if (transform === null) return null;
 
@@ -243,7 +243,7 @@ function preserveRawShape(
   parentGroupId: string | null,
 ): BroadsetElement {
   const base = buildBase(ctx, id, name, 'rectangle', transform, parentGroupId);
-  const styled = applyShapeStyle(base, body);
+  const styled = applyShapeStyle(ctx.canvas, base, body);
 
   return {
     ...styled,
@@ -264,7 +264,7 @@ interface ParsedTransform {
   readonly flipV: boolean;
 }
 
-function extractTransform(body: string): ParsedTransform | null {
+function extractTransform(canvas: Canvas, body: string): ParsedTransform | null {
   const xfrmBlock = extractBlock(body, 'a:xfrm');
 
   if (xfrmBlock === null) return { x: 0, y: 0, width: 1, height: 1, rotation: 0, flipH: false, flipV: false };
@@ -272,10 +272,10 @@ function extractTransform(body: string): ParsedTransform | null {
   const off = xfrmBlock.block.match(/<a:off\s+x="(-?\d+)"\s+y="(-?\d+)"\s*\/>/);
   const ext = xfrmBlock.block.match(/<a:ext\s+cx="(\d+)"\s+cy="(\d+)"\s*\/>/);
 
-  const x = off ? emuToMm(parseInt(off[1] ?? '0', 10)) : 0;
-  const y = off ? emuToMm(parseInt(off[2] ?? '0', 10)) : 0;
-  const width = ext ? emuToMm(parseInt(ext[1] ?? '0', 10)) : 1;
-  const height = ext ? emuToMm(parseInt(ext[2] ?? '0', 10)) : 1;
+  const x = off ? emuToCanvasLength(canvas, parseInt(off[1] ?? '0', 10)) : 0;
+  const y = off ? emuToCanvasLength(canvas, parseInt(off[2] ?? '0', 10)) : 0;
+  const width = ext ? emuToCanvasLength(canvas, parseInt(ext[1] ?? '0', 10)) : 1;
+  const height = ext ? emuToCanvasLength(canvas, parseInt(ext[2] ?? '0', 10)) : 1;
   const rotAttr = xfrmBlock.openAttrs.match(/\brot="(-?\d+)"/);
   const rotation = rotAttr ? rotationUnitsToDegrees(parseInt(rotAttr[1] ?? '0', 10)) : 0;
   const flipH = /\bflipH="1"/.test(xfrmBlock.openAttrs);
@@ -494,7 +494,7 @@ function buildBase(
  * stroke colour, dash, and head/tail arrow endings per the spec's
  * `strokeHeadEnd` / `strokeTailEnd` fields (io-prereqs Phase 1).
  */
-function parseStrokeFromBody(body: string): {
+function parseStrokeFromBody(canvas: Canvas, body: string): {
   readonly borderWidth?: number;
   readonly borderColor?: BroadsetColor;
   readonly strokeDasharray?: string;
@@ -515,7 +515,7 @@ function parseStrokeFromBody(body: string): {
 
   const widthAttr = lnBlock.openAttrs.match(/\bw="(\d+)"/)?.[1];
 
-  if (widthAttr !== undefined) result.borderWidth = emuToMm(parseInt(widthAttr, 10));
+  if (widthAttr !== undefined) result.borderWidth = emuToCanvasLength(canvas, parseInt(widthAttr, 10));
 
   const colour = parseColorElement(lnBlock.block);
 
@@ -578,7 +578,7 @@ function buildRectangle(
   body: string,
   parentGroupId: string | null,
 ): BroadsetElement {
-  return applyShapeStyle(buildBase(ctx, id, name, 'rectangle', transform, parentGroupId), body);
+  return applyShapeStyle(ctx.canvas, buildBase(ctx, id, name, 'rectangle', transform, parentGroupId), body);
 }
 
 function buildEllipse(
@@ -589,7 +589,7 @@ function buildEllipse(
   body: string,
   parentGroupId: string | null,
 ): BroadsetElement {
-  return applyShapeStyle(buildBase(ctx, id, name, 'ellipse', transform, parentGroupId), body);
+  return applyShapeStyle(ctx.canvas, buildBase(ctx, id, name, 'ellipse', transform, parentGroupId), body);
 }
 
 function buildPath(
@@ -601,7 +601,7 @@ function buildPath(
   parentGroupId: string | null,
   d: string,
 ): BroadsetElement {
-  const base = applyShapeStyle(buildBase(ctx, id, name, 'path', transform, parentGroupId), body);
+  const base = applyShapeStyle(ctx.canvas, buildBase(ctx, id, name, 'path', transform, parentGroupId), body);
 
   return { ...base, content: d };
 }
@@ -611,9 +611,9 @@ function buildPath(
  * effects (outer shadow) extracted from the shape body onto the
  * element's style.
  */
-function applyShapeStyle(element: BroadsetElement, body: string): BroadsetElement {
+function applyShapeStyle(canvas: Canvas, element: BroadsetElement, body: string): BroadsetElement {
   const fill = detectFill(body);
-  const stroke = parseStrokeFromBody(body);
+  const stroke = parseStrokeFromBody(canvas, body);
   const boxShadow = parseOuterShadow(body);
 
   if (fill === null && stroke === null && boxShadow === null) return element;
@@ -819,12 +819,57 @@ function extractBlock(body: string, tagName: string): ExtractedBlock | null {
   if (selfClose) return { block: '', openAttrs: attrs };
 
   const startIdx = (open.index ?? 0) + open[0].length;
-  const close = `</${tagName}>`;
-  const endIdx = body.indexOf(close, startIdx);
+  const endIdx = findMatchingCloseIdx(body, tagName, startIdx);
 
   if (endIdx < 0) return { block: body.slice(startIdx), openAttrs: attrs };
 
   return { block: body.slice(startIdx, endIdx), openAttrs: attrs };
+}
+
+/**
+ * Scan forward from `startIdx` looking for the close tag that matches
+ * the open tag at the start of `extractBlock`'s span — same name, same
+ * depth. Naive `body.indexOf(close)` mis-binds when the same tag is
+ * nested (e.g. `<a:effectLst>` at shape level containing another
+ * `<a:effectLst>` inside a child run); this walker tracks depth so the
+ * returned span is always the matching close.
+ */
+function findMatchingCloseIdx(body: string, tagName: string, startIdx: number): number {
+  const open = `<${tagName}`;
+  const close = `</${tagName}>`;
+  let depth = 1;
+  let cursor = startIdx;
+
+  while (cursor < body.length) {
+    const nextOpen = body.indexOf(open, cursor);
+    const nextClose = body.indexOf(close, cursor);
+
+    if (nextClose < 0) return -1;
+
+    if (nextOpen >= 0 && nextOpen < nextClose) {
+      // Confirm the open is a tag boundary (e.g. `<a:p>`) rather than
+      // a longer-named tag that starts with the same prefix
+      // (`<a:pPr>`). The next char after `<tagName` must be a space,
+      // `>`, or `/`.
+      const after = body.charCodeAt(nextOpen + open.length);
+      const isBoundary = after === 0x20 || after === 0x3e || after === 0x2f || after === 0x09 || after === 0x0a || after === 0x0d;
+
+      if (isBoundary) {
+        depth += 1;
+        cursor = nextOpen + open.length;
+        continue;
+      }
+
+      cursor = nextOpen + open.length;
+      continue;
+    }
+
+    depth -= 1;
+    if (depth === 0) return nextClose;
+    cursor = nextClose + close.length;
+  }
+
+  return -1;
 }
 
 function uint8ToBase64(bytes: Uint8Array): string {
@@ -849,6 +894,7 @@ function uint8ToBase64(bytes: Uint8Array): string {
  * empty — callers treat that as "not a text shape".
  */
 export function extractTextBody(
+  canvas: Canvas,
   body: string,
   hyperlinks?: ReadonlyMap<string, Hyperlink>,
 ): TextBody | null {
@@ -861,12 +907,13 @@ export function extractTextBody(
   for (const pMatch of txBody.block.matchAll(/<a:p\b[^>]*>([\s\S]*?)<\/a:p>/g)) {
     const pBody = pMatch[1] ?? '';
     const runs = extractRuns(pBody, hyperlinks);
+    const props = extractParagraphProps(canvas, pBody);
+    // PowerPoint authors empty paragraphs (just `<a:endParaRPr/>`) for
+    // vertical spacing — preserve them as `runs: [{ text: '' }]` so the
+    // structural intent survives round-trip.
+    const finalRuns: readonly Run[] = runs.length === 0 ? [{ text: '' }] : runs;
 
-    if (runs.length === 0) continue;
-
-    const props = extractParagraphProps(pBody);
-
-    paragraphs.push(props === null ? { runs } : { runs, props });
+    paragraphs.push(props === null ? { runs: finalRuns } : { runs: finalRuns, props });
   }
 
   if (paragraphs.length === 0) return null;
@@ -879,7 +926,7 @@ export function extractTextBody(
  * indent, line spacing, margin. Returns `null` when no `<a:pPr>` is
  * present or all extracted props are defaults.
  */
-function extractParagraphProps(paragraphBody: string): ParagraphProps | null {
+function extractParagraphProps(canvas: Canvas, paragraphBody: string): ParagraphProps | null {
   const pPrBlock = extractBlock(paragraphBody, 'a:pPr');
 
   if (pPrBlock === null) return null;
@@ -893,14 +940,14 @@ function extractParagraphProps(paragraphBody: string): ParagraphProps | null {
 
   const indentAttr = pPrBlock.openAttrs.match(/\bindent="(-?\d+)"/)?.[1];
 
-  if (indentAttr !== undefined) props.indent = emuToMm(parseInt(indentAttr, 10));
+  if (indentAttr !== undefined) props.indent = emuToCanvasLength(canvas, parseInt(indentAttr, 10));
 
   const marLAttr = pPrBlock.openAttrs.match(/\bmarL="(-?\d+)"/)?.[1];
 
   if (marLAttr !== undefined) {
     // OOXML marL is the left bullet/text indent; Broadset's `indent`
     // overlaps semantically. When both are present, indent wins.
-    props.indent ??= emuToMm(parseInt(marLAttr, 10));
+    props.indent ??= emuToCanvasLength(canvas, parseInt(marLAttr, 10));
   }
 
   const bullet = parseBulletFromPPr(pPrBlock.block);
@@ -1062,22 +1109,6 @@ function runStyleFromRPr(rPr: ExtractedBlock): Record<string, unknown> {
   }
 
   return style;
-}
-
-/**
- * Legacy helper for callers that only want flat text (imports where we
- * promote a rectangle/ellipse to a text element). Falls back to joining
- * paragraphs with newlines; prefer {@link extractTextBody} for
- * structured output.
- */
-export function extractTextContent(body: string): string {
-  const textBody = extractTextBody(body);
-
-  if (textBody === null) return '';
-
-  return textBody.paragraphs
-    .map((p) => p.runs.map((r) => r.text).join(''))
-    .join('\n');
 }
 
 function decodeXmlEntities(value: string): string {

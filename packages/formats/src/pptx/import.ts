@@ -114,7 +114,11 @@ export async function importPptxWithMerge(data: Uint8Array): Promise<PptxImportR
   if (!isDocumentShape(preserved)) return baseReport;
 
   // Re-run operator-level extraction so we have both representations.
-  const operatorLevel = importOperatorLevel(pkg);
+  // We honour the preserved canvas unit so EMU values come back in the
+  // same unit space the preserved doc was authored in — otherwise every
+  // element's fingerprint diverges spuriously when the canvas declares
+  // anything other than 'mm'.
+  const operatorLevel = importOperatorLevel(pkg, preserved.canvas);
   const ledger = readLedgerEntries(pkg);
   const merged = await mergeFromLedger(preserved, operatorLevel.document, ledger);
 
@@ -259,8 +263,9 @@ interface OperatorLevelResult {
   readonly warnings: readonly PptxImportWarning[];
 }
 
-function importOperatorLevel(pkg: OoxmlPackage): OperatorLevelResult {
-  const resolved = resolvePackage(pkg);
+function importOperatorLevel(pkg: OoxmlPackage, canvasOverride?: BroadsetDocument['canvas']): OperatorLevelResult {
+  const baseResolved = resolvePackage(pkg);
+  const resolved = canvasOverride !== undefined ? { ...baseResolved, canvas: canvasOverride } : baseResolved;
   const warnings: PptxImportWarning[] = [];
 
   if (resolved.slidePaths.length === 0) return { document: createEmptyBroadsetDocument(), warnings };
@@ -363,7 +368,7 @@ function importSingleSlide(
     nextElementIndex: elementCounter,
   };
   const shapes = parseSlideShapes(ctx, slideXml);
-  const withText = shapes.map((shape, shapeIdx) => promoteShapeText(shape, slideXml, shapeIdx, layoutPlaceholders, hyperlinkByRelId));
+  const withText = shapes.map((shape, shapeIdx) => promoteShapeText(resolved.canvas, shape, slideXml, shapeIdx, layoutPlaceholders, hyperlinkByRelId));
 
   return {
     slide: {
@@ -381,6 +386,7 @@ function importSingleSlide(
  * and apply layout-placeholder inheritance for font / size / colour.
  */
 function promoteShapeText(
+  canvas: BroadsetDocument['canvas'],
   shape: ReturnType<typeof parseSlideShapes>[number],
   slideXml: string,
   shapeIdx: number,
@@ -393,7 +399,7 @@ function promoteShapeText(
 
   if (body === null) return shape;
 
-  const textBody = extractTextBody(body, hyperlinks);
+  const textBody = extractTextBody(canvas, body, hyperlinks);
 
   if (textBody === null) return shape;
 
