@@ -2,10 +2,12 @@ import {
   type AnimationDefinition,
   type BroadsetDocument,
   createEmptyBroadsetDocument,
+  type FontAsset,
 } from '@broadset/model';
 
 import { fingerprintElement } from '../_shared';
 import { parseTimingAnimations } from './import/animation';
+import { extractEmbeddedFonts } from './import/fonts';
 import { aggregateLayoutPlaceholders } from './import/layout';
 import { resolvePackage } from './import/package';
 import {
@@ -36,11 +38,13 @@ export function importPptx(data: Uint8Array): BroadsetDocument {
 /**
  * Extended importer that returns the document alongside structured
  * import warnings (unsupported shapes / animations, rejected macros,
- * enforcement caps).
+ * enforcement caps) and any embedded `ppt/fonts/` assets recovered
+ * from the package.
  */
 export interface PptxImportReport {
   readonly document: BroadsetDocument;
   readonly warnings: readonly PptxImportWarning[];
+  readonly fontAssets: readonly FontAsset[];
 }
 
 export function importPptxWithReport(data: Uint8Array): PptxImportReport {
@@ -52,7 +56,7 @@ export function importPptxWithReport(data: Uint8Array): PptxImportReport {
       message: `Input size ${String(data.byteLength)} exceeds cap ${String(DEFAULT_MAX_INPUT_BYTES)} bytes`,
     });
 
-    return { document: createEmptyBroadsetDocument(), warnings };
+    return { document: createEmptyBroadsetDocument(), warnings, fontAssets: [] };
   }
 
   let pkg: OoxmlPackage;
@@ -66,7 +70,7 @@ export function importPptxWithReport(data: Uint8Array): PptxImportReport {
       detail: err instanceof Error ? err.message : 'unknown ZIP error',
     });
 
-    return { document: createEmptyBroadsetDocument(), warnings };
+    return { document: createEmptyBroadsetDocument(), warnings, fontAssets: [] };
   }
 
   enforcePackageCaps(pkg, warnings);
@@ -78,16 +82,21 @@ export function importPptxWithReport(data: Uint8Array): PptxImportReport {
   if (xmlIssue !== null) {
     warnings.push(xmlIssue);
 
-    return { document: createEmptyBroadsetDocument(), warnings };
+    return { document: createEmptyBroadsetDocument(), warnings, fontAssets: [] };
   }
 
+  const fontAssets = extractEmbeddedFonts(pkg);
   const fastPathResult = tryFastPath(pkg);
 
-  if (fastPathResult !== null) return { document: fastPathResult, warnings };
+  if (fastPathResult !== null) return { document: fastPathResult, warnings, fontAssets };
 
   const operatorLevel = importOperatorLevel(pkg);
 
-  return { document: operatorLevel.document, warnings: [...warnings, ...operatorLevel.warnings] };
+  return {
+    document: operatorLevel.document,
+    warnings: [...warnings, ...operatorLevel.warnings],
+    fontAssets,
+  };
 }
 
 /**
@@ -155,7 +164,7 @@ export async function importPptxWithMerge(data: Uint8Array): Promise<PptxImportR
   const ledger = readLedgerEntries(pkg);
   const merged = await mergeFromLedger(preserved, operatorLevel.document, ledger);
 
-  return { document: merged, warnings: baseReport.warnings };
+  return { document: merged, warnings: baseReport.warnings, fontAssets: baseReport.fontAssets };
 }
 
 function readLedgerEntries(pkg: OoxmlPackage): ReadonlyMap<string, string> {

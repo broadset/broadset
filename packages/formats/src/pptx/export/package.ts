@@ -18,7 +18,7 @@ import {
 import { buildTimingXml } from './animation';
 import { emitSlideBackground } from './background';
 import { createSlideContext, type SlideExportContext } from './context';
-import { attachEmbeddedFonts } from './fonts';
+import { attachEmbeddedFonts, attachEmbeddedFontsAsync } from './fonts';
 import { buildNotesMasterXml, buildNotesSlideXml } from './notes';
 import { emitShapeTree } from './shapes';
 
@@ -84,16 +84,7 @@ export async function buildPptxPackageWithReport(
     // Register media files.
     for (const [mediaPath, mediaBytes] of slideXml.media) {
       parts.set(mediaPath, mediaBytes);
-
-      const lowerPath = mediaPath.toLowerCase();
-      const ext = extensionOf(lowerPath);
-
-      if (ext === 'png') contentTypes.addDefault('png', 'image/png');
-      else if (ext === 'jpeg' || ext === 'jpg') contentTypes.addDefault(ext, 'image/jpeg');
-      else if (ext === 'gif') contentTypes.addDefault('gif', 'image/gif');
-      else if (ext === 'svg') contentTypes.addDefault('svg', 'image/svg+xml');
-      else if (ext === 'webp') contentTypes.addDefault('webp', 'image/webp');
-      else if (ext === 'bmp') contentTypes.addDefault('bmp', 'image/bmp');
+      registerMediaContentType(contentTypes, mediaPath);
     }
 
     parts.set(slidePath, encodeText(slideXml.xml));
@@ -138,13 +129,18 @@ export async function buildPptxPackageWithReport(
   // codepoints), subsets each matched FontAsset, writes
   // ppt/fonts/font{N}.fntdata, and returns the
   // <p:embeddedFontLst> XML fragment to splice into presentation.xml.
-  const embeddedFontLst = attachEmbeddedFonts({
+  // Async path supports url / file sources via the caller-supplied
+  // resolveFontBytes; sync path stays embedded-only.
+  const embeddedFontLst = await attachEmbeddedFontsAsync({
     document,
     fontAssets: options.fontAssets ?? [],
     parts,
     contentTypes,
     presRels,
     warnings,
+    ...(options.resolveFontBytes !== undefined ? { resolveFontBytes: options.resolveFontBytes } : {}),
+    ...(options.fontFetchTimeoutMs !== undefined ? { fontFetchTimeoutMs: options.fontFetchTimeoutMs } : {}),
+    ...(options.fontMaxBytes !== undefined ? { fontMaxBytes: options.fontMaxBytes } : {}),
   });
 
   // Presentation-level parts.
@@ -286,6 +282,25 @@ function extensionOf(path: string): string {
   const dot = path.lastIndexOf('.');
 
   return dot >= 0 ? path.slice(dot + 1) : '';
+}
+
+const MEDIA_CONTENT_TYPES_BY_EXTENSION: ReadonlyMap<string, { readonly extension: string; readonly contentType: string }> = new Map([
+  ['png', { extension: 'png', contentType: 'image/png' }],
+  ['jpeg', { extension: 'jpeg', contentType: 'image/jpeg' }],
+  ['jpg', { extension: 'jpg', contentType: 'image/jpeg' }],
+  ['gif', { extension: 'gif', contentType: 'image/gif' }],
+  ['svg', { extension: 'svg', contentType: 'image/svg+xml' }],
+  ['webp', { extension: 'webp', contentType: 'image/webp' }],
+  ['bmp', { extension: 'bmp', contentType: 'image/bmp' }],
+]);
+
+function registerMediaContentType(contentTypes: ContentTypesBuilder, mediaPath: string): void {
+  const ext = extensionOf(mediaPath.toLowerCase());
+  const entry = MEDIA_CONTENT_TYPES_BY_EXTENSION.get(ext);
+
+  if (entry === undefined) return;
+
+  contentTypes.addDefault(entry.extension, entry.contentType);
 }
 
 function createFallbackPage(): Page {

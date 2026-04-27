@@ -42,16 +42,55 @@ export interface PptxExportOptions {
    * walks text elements collecting codepoints per `style.fontFamily`,
    * matches families against the supplied assets by `familyName`, and
    * emits a `<p:embeddedFontLst>` entry plus a `ppt/fonts/font{N}.fntdata`
-   * part per match. Assets without an `embedded` source are skipped
-   * with an `unsupported-content` warning — async URL / file resolution
-   * is the caller's responsibility (see {@link FontResolver}).
+   * part per match.
+   *
+   * Sync exporter: only `embedded` (data-URI) sources are honoured;
+   * `url` / `file` sources surface a `font-embed-skipped` warning.
+   *
+   * Async exporter ({@link exportPptxWithReportAsync}): non-embedded
+   * sources are routed through {@link resolveFontBytes} when supplied.
+   * Without a resolver, async behaves like sync (embedded-only).
    *
    * Fonts not used by any text element in the document are skipped
    * silently — embedding only the fonts the slides actually reference
    * keeps `.pptx` size proportional to content.
    */
   readonly fontAssets?: readonly FontAsset[];
+  /**
+   * Async resolver for `url` / `file` font sources. Called once per
+   * non-embedded {@link FontAsset} that has actual codepoint usage in
+   * the document. Returning `null` (or throwing — caught and turned
+   * into a `font-embed-skipped` warning) opts the asset out of
+   * embedding. The resolver receives an {@link AbortSignal} that
+   * trips after {@link fontFetchTimeoutMs} milliseconds.
+   *
+   * Production callers should validate the source's authority,
+   * cache results across exports, and reject suspicious content
+   * types — the exporter assumes returned bytes are a real
+   * font and only checks the OpenType signature on subset.
+   */
+  readonly resolveFontBytes?: AsyncFontResolver;
+  /**
+   * Per-font fetch budget in milliseconds. Default 10000.
+   */
+  readonly fontFetchTimeoutMs?: number;
+  /**
+   * Maximum bytes per fetched font. Default 5 MiB. Prevents a hostile
+   * URL from streaming an unbounded payload into the export pipeline.
+   * Resolvers that exceed the cap should reject with a
+   * RangeError-style throw.
+   */
+  readonly fontMaxBytes?: number;
 }
+
+/**
+ * Caller-supplied resolver for non-embedded font sources during async
+ * export. The signal aborts when the per-font fetch budget elapses;
+ * resolvers SHOULD honour it (e.g. pass it to `fetch`). Returning
+ * `null` skips the asset with a `font-embed-skipped` warning;
+ * throwing surfaces the error in the warning's `detail` field.
+ */
+export type AsyncFontResolver = (asset: FontAsset, signal: AbortSignal) => Promise<Uint8Array | null>;
 
 /** Options accepted by the PPTX importer. */
 export interface PptxImportOptions {

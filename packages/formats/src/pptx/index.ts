@@ -4,6 +4,7 @@ export {
   exportPptxWithReport,
   exportPptxWithReportAsync,
 } from './export';
+export { defaultUrlFontResolver } from './export/fonts';
 export type { PptxImportReport } from './import';
 export { importPptx, importPptxWithMerge, importPptxWithReport } from './import';
 export { readPreservedPptxDocument, reconcilePptx } from './reconcile';
@@ -12,6 +13,7 @@ export { validatePptxPackage } from './validate';
 
 // P8.1 — typed infrastructure and shared OOXML helpers.
 export type {
+  AsyncFontResolver,
   ElementMetaExtension,
   OoxmlRelationship,
   OoxmlRelId,

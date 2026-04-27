@@ -1,4 +1,4 @@
-import { type BroadsetDocument, createDefaultElement, createEmptyBroadsetDocument } from '@broadset/model';
+import { type BroadsetDocument, createDefaultElement, createEmptyBroadsetDocument, type FontAsset } from '@broadset/model';
 
 import { importPptxWithMerge, reconcilePptx } from './pptx';
 import { importPsd } from './psd';
@@ -34,14 +34,30 @@ export interface DocumentImportResult {
    * UX than the flat-string warnings list.
    */
   readonly reconciliation?: DocumentReconciliation | null;
+  /**
+   * Embedded fonts recovered from `ppt/fonts/` (PPTX) or any future
+   * format's font-embedding pipeline. Empty for arbitrary third-party
+   * files without embedded fonts and for formats that don't carry
+   * fonts. Hosts (the demo, the editor) can splice these into the
+   * project's `assets` so subsequent edits / re-exports keep the
+   * fonts available without forcing the user to re-upload.
+   */
+  readonly fontAssets?: readonly FontAsset[];
 }
 
 function createDocumentImportResult(
   document: BroadsetDocument,
   warnings: readonly string[] = [],
   reconciliation: DocumentReconciliation | null = null,
+  fontAssets: readonly FontAsset[] = [],
 ): DocumentImportResult {
-  return reconciliation === null ? { document, warnings } : { document, warnings, reconciliation };
+  const base: DocumentImportResult = { document, warnings };
+
+  return {
+    ...base,
+    ...(reconciliation === null ? {} : { reconciliation }),
+    ...(fontAssets.length > 0 ? { fontAssets } : {}),
+  };
 }
 
 function buildFallbackImportWarnings(document: BroadsetDocument, formatLabel: string): readonly string[] {
@@ -125,6 +141,7 @@ export async function importPptxDocument(data: Uint8Array): Promise<DocumentImpo
     report.document,
     [...reconciliationSummaries, ...structuralWarnings, ...fallback],
     reconciliationData,
+    report.fontAssets,
   );
 }
 

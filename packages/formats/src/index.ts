@@ -26,8 +26,9 @@ export {
   resolveGoogleFontUrl,
   wrapText,
 } from './pdf';
-export type { PptxExportReport, PptxExportWarning, PptxExportWarningCode } from './pptx';
+export type { AsyncFontResolver, PptxExportReport, PptxExportWarning, PptxExportWarningCode } from './pptx';
 export {
+  defaultUrlFontResolver,
   exportPptxBytes,
   exportPptxBytesAsync,
   exportPptxWithReport,
