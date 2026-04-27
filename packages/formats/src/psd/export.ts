@@ -5,6 +5,7 @@ import { writePsdUint8Array } from 'ag-psd';
 
 import { elementToLayer, getPendingLinkedFiles, resetExportState, setPrefetchedUrlImages } from './export-layer';
 import { writeBroadsetXmpForDocument } from './export-xmp';
+import { collectPreflightWarnings } from './preflight';
 import { ensureCanvasInitialized } from './runtime-canvas';
 
 interface PsdImageBytes {
@@ -223,4 +224,60 @@ export async function exportPsdBytesAsync(
   setPrefetchedUrlImages(prefetched);
 
   return exportPsdBytesCore(doc);
+}
+
+/**
+ * Result of a preflight-aware export: the bytes plus the structured
+ * warning list. Mirrors `PdfExportResult`.
+ */
+export interface PsdExportResult {
+  readonly bytes: Uint8Array;
+  readonly warnings: readonly string[];
+}
+
+/**
+ * Preflight-aware export — runs `collectPreflightWarnings` to surface
+ * the static-document concerns (animations dropped, rotated non-image
+ * elements, colour-mode downgrades, stale unmapped-effects, URL
+ * images) and appends fetch-failure messages from the async
+ * resolution. Always returns bytes — preflight warnings never block
+ * the export per IO-D-14.
+ */
+export async function exportPsdBytesAsyncWithPreflight(
+  doc: BroadsetDocument,
+  fetchFn: typeof globalThis.fetch = globalThis.fetch,
+): Promise<PsdExportResult> {
+  const baseWarnings = collectPreflightWarnings(doc);
+  const fetchWarnings: string[] = [];
+  const prefetched = new Map<string, { readonly mime: string; readonly bytes: Uint8Array }>();
+
+  const urlElements = doc.elements.filter((el) => {
+    const text = resolveContentAsPlainString(el.content);
+
+    return el.type === 'image' && text !== '' && isUrl(text);
+  });
+
+  const fetchResults = await Promise.all(
+    urlElements.map(async (el) => {
+      const url = resolveContentAsPlainString(el.content);
+      const result = await fetchImageAsBytes(url, fetchFn);
+
+      return { id: el.id, name: el.name || el.id, url, result };
+    }),
+  );
+
+  for (const { id, name, url, result } of fetchResults) {
+    if (result) {
+      prefetched.set(id, result);
+      continue;
+    }
+
+    fetchWarnings.push(`PSD preflight: failed to fetch image "${name}" from ${url}; the layer will export with placeholder pixels.`);
+  }
+
+  setPrefetchedUrlImages(prefetched);
+
+  const bytes = exportPsdBytesCore(doc);
+
+  return { bytes, warnings: [...baseWarnings, ...fetchWarnings] };
 }

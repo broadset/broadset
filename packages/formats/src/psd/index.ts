@@ -1,4 +1,4 @@
-export { exportPsdBytes, exportPsdBytesAsync } from './export';
+export { exportPsdBytes, exportPsdBytesAsync, exportPsdBytesAsyncWithPreflight, type PsdExportResult } from './export';
 export { importPsd } from './import';
 export { importPsdDocument } from './import-document';
 export { type PsdWithImageResources,readDocumentXmpPacket } from './import-xmp';
