@@ -1,5 +1,6 @@
 export { exportPsdBytes, exportPsdBytesAsync } from './export';
 export { importPsd } from './import';
+export { importPsdDocument } from './import-document';
 export { type PsdWithImageResources,readDocumentXmpPacket } from './import-xmp';
 export { dirtyElementIds, reconcilePsd } from './reconcile';
 export {

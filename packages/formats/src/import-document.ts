@@ -1,14 +1,12 @@
 import { type BroadsetDocument, createDefaultElement, createEmptyBroadsetDocument } from '@broadset/model';
 
+import type { DocumentImportResult } from './import-document-types';
 import { importPdfDocument as runPdfImport } from './pdf';
 import { importPptx } from './pptx';
-import { importPsd } from './psd';
+import { importPsdDocument as runPsdImport } from './psd';
 import { importSvg } from './web-vector';
 
-export interface DocumentImportResult {
-  readonly document: BroadsetDocument;
-  readonly warnings: readonly string[];
-}
+export type { DocumentImportResult } from './import-document-types';
 
 function createDocumentImportResult(
   document: BroadsetDocument,
@@ -34,9 +32,7 @@ export function importPptxDocument(data: Uint8Array): DocumentImportResult {
 }
 
 export function importPsdDocument(data: Uint8Array): DocumentImportResult {
-  const document = importPsd(data);
-
-  return createDocumentImportResult(document, buildFallbackImportWarnings(document, 'PSD'));
+  return runPsdImport(data);
 }
 
 export async function importPdfDocument(data: Uint8Array): Promise<DocumentImportResult> {
