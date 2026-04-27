@@ -195,6 +195,86 @@ describe('P7.7e — Bake-to-path round-trip', () => {
 /*  1b. text-on-path round-trip                                       */
 /* ------------------------------------------------------------------ */
 
+describe('P7.7g — <defs> content-hash deduplication', () => {
+  /**
+   * @description Two elements that share an identical gradient
+   * MUST produce a SINGLE `<linearGradient>` in `<defs>` and BOTH
+   * reference the same `url(#…)` id. Spec acceptance: "Shared
+   * `<defs>` entries are deduplicated by content-hash so multiple
+   * elements referencing the same gradient share one `<defs>`
+   * node". Closes the P7 review #4 finding.
+   */
+  it('emits a single <linearGradient> for two elements that share the gradient', async () => {
+    const sharedGradient = {
+      type: 'linear' as const,
+      angle: 90,
+      stops: [
+        { color: rgbColor('#ff0000'), position: 0 },
+        { color: rgbColor('#0000ff'), position: 1 },
+      ],
+    };
+    const doc = makeDocument({
+      elements: [
+        makeElement({ id: 'a', type: 'rectangle', style: makeStyle({ backgroundGradient: sharedGradient }) }),
+        makeElement({ id: 'b', type: 'rectangle', style: makeStyle({ backgroundGradient: sharedGradient }) }),
+      ],
+    });
+    const svg = await exportSvgString(doc);
+    const linearGradients = svg.match(/<linearGradient /g) ?? [];
+    const fillRefs = svg.match(/fill="url\(#grad-[^)]+\)"/g) ?? [];
+
+    expect(linearGradients).toHaveLength(1);
+    expect(fillRefs).toHaveLength(2);
+    // Both elements reference the SAME gradient id.
+    expect(new Set(fillRefs).size).toBe(1);
+  });
+});
+
+describe('P7.7g — Data-binding round-trip', () => {
+  /**
+   * @description `dataField` (with overflow / prefix / suffix /
+   * formatPattern), `visibleWhen`, and `repeater` (with direction
+   * / gap / maxItems) MUST survive a Broadset → SVG → Broadset
+   * chain. Earlier loops only emitted `data-bs-data-field` /
+   * `data-bs-visible-when` / `data-bs-repeater` with the primary
+   * identifier and dropped the structured fields on re-import.
+   * Closes the P7 review #4 finding that violated the
+   * `Chain-Round-Trip Tolerance` requirement.
+   */
+  it('preserves dataField / visibleWhen / repeater across SVG round-trip', async () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({
+          id: 'el-1',
+          type: 'text',
+          content: 'Bound',
+          dataField: { fieldName: 'title', overflow: 'ellipsis', prefix: '> ', suffix: '!', formatPattern: 'upper' },
+          visibleWhen: 'data.show === true',
+        }),
+        makeElement({
+          id: 'el-2',
+          type: 'rectangle',
+          repeater: { dataArrayField: 'items', direction: 'horizontal', gap: 8, maxItems: 12 },
+        }),
+      ],
+    });
+    const svg = await exportSvgString(doc);
+    const { document: imported } = importSvgDocument(svg);
+    const text = imported.elements.find((el) => el.id === 'el-1');
+    const rect = imported.elements.find((el) => el.id === 'el-2');
+
+    expect(text?.dataField).toEqual({
+      fieldName: 'title',
+      overflow: 'ellipsis',
+      prefix: '> ',
+      suffix: '!',
+      formatPattern: 'upper',
+    });
+    expect(text?.visibleWhen).toBe('data.show === true');
+    expect(rect?.repeater).toEqual({ dataArrayField: 'items', direction: 'horizontal', gap: 8, maxItems: 12 });
+  });
+});
+
 describe('P7.6 — Text-on-path round-trip', () => {
   /**
    * @description A text element referencing a path via

@@ -11,6 +11,16 @@ export interface ParsedElementMetadata {
   readonly height?: number | undefined;
   readonly originalColor?: string | undefined;
   readonly conicGradient?: string | undefined;
+  /**
+   * JSON-serialised data-binding metadata so the structured shapes
+   * (`dataField`'s `overflow` / `prefix` / `suffix` / `formatPattern`
+   * and `repeater`'s `direction` / `gap` / `maxItems`) survive a
+   * Broadset → SVG → Broadset chain. Closes the P7 review #4
+   * round-trip finding.
+   */
+  readonly dataField?: string | undefined;
+  readonly visibleWhen?: string | undefined;
+  readonly repeater?: string | undefined;
 }
 
 export interface ParsedDocumentMetadata {
@@ -44,6 +54,9 @@ function parseElementItem(item: Element): ParsedElementMetadata | null {
   const heightRaw = item.getAttributeNS(SVG_BROADSET_NAMESPACE, 'height');
   const originalColor = item.getAttributeNS(SVG_BROADSET_NAMESPACE, 'originalColor');
   const conicGradient = item.getAttributeNS(SVG_BROADSET_NAMESPACE, 'conicGradient');
+  const dataField = item.getAttributeNS(SVG_BROADSET_NAMESPACE, 'dataField');
+  const visibleWhen = item.getAttributeNS(SVG_BROADSET_NAMESPACE, 'visibleWhen');
+  const repeater = item.getAttributeNS(SVG_BROADSET_NAMESPACE, 'repeater');
   const width = widthRaw !== null ? Number.parseFloat(widthRaw) : NaN;
   const height = heightRaw !== null ? Number.parseFloat(heightRaw) : NaN;
 
@@ -55,6 +68,9 @@ function parseElementItem(item: Element): ParsedElementMetadata | null {
     ...(Number.isFinite(height) ? { height } : {}),
     ...(originalColor !== null ? { originalColor } : {}),
     ...(conicGradient !== null ? { conicGradient } : {}),
+    ...(dataField !== null ? { dataField } : {}),
+    ...(visibleWhen !== null ? { visibleWhen } : {}),
+    ...(repeater !== null ? { repeater } : {}),
   };
 }
 

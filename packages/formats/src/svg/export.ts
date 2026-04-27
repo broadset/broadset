@@ -28,12 +28,18 @@ const RDF_XMLNS = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 /*  Gradient Defs                                                     */
 /* ------------------------------------------------------------------ */
 
-function renderGradientDef(elementId: string, gradient: BroadsetGradient): { id: string; def: string } | null {
+/**
+ * Render a gradient `<defs>` entry with the supplied `id`. The
+ * caller (`DefsCollector`) owns id assignment so multiple elements
+ * sharing the same gradient content reuse a single `<defs>` node.
+ * Returns `''` when the gradient kind has no native SVG primitive
+ * — the caller treats empty defs as a no-op fill.
+ */
+function renderGradientDef(id: string, gradient: BroadsetGradient): string {
   // Conic gradients fall back to a linear approximation on the
   // visual layer; the metadata packet carries the original spec so
   // re-import recovers the true type.
   const effective = gradient.type === 'conic' ? conicFallbackGradient(gradient) : gradient;
-  const gradId = `grad-${elementId}`;
   const stops = effective.stops
     .map((s) => `<stop offset="${String(s.position * 100)}%" stop-color="${escapeXml(colorToCss(s.color))}"/>`)
     .join('');
@@ -46,51 +52,41 @@ function renderGradientDef(elementId: string, gradient: BroadsetGradient): { id:
     const x1 = 1 - x2;
     const y1 = 1 - y2;
 
-    return {
-      id: gradId,
-      def: `<linearGradient id="${gradId}" x1="${String(x1)}" y1="${String(y1)}" x2="${String(x2)}" y2="${String(y2)}">${stops}</linearGradient>`,
-    };
+    return `<linearGradient id="${id}" x1="${String(x1)}" y1="${String(y1)}" x2="${String(x2)}" y2="${String(y2)}">${stops}</linearGradient>`;
   }
 
   if (effective.type === 'radial') {
     const cx = (effective.center?.[0] ?? 50) / 100;
     const cy = (effective.center?.[1] ?? 50) / 100;
 
-    return {
-      id: gradId,
-      def: `<radialGradient id="${gradId}" cx="${String(cx)}" cy="${String(cy)}" r="0.5">${stops}</radialGradient>`,
-    };
+    return `<radialGradient id="${id}" cx="${String(cx)}" cy="${String(cy)}" r="0.5">${stops}</radialGradient>`;
   }
 
-  return null;
+  return '';
 }
 
 /* ------------------------------------------------------------------ */
 /*  Box-Shadow → SVG Filter Approximation                            */
 /* ------------------------------------------------------------------ */
 
-function renderShadowFilter(elementId: string, shadow: string): { id: string; def: string } | null {
+function renderShadowFilter(id: string, shadow: string): string {
   // Parse simple box-shadow: <x>px <y>px <blur>px <color>
   const match = /^(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px\s+(\d+(?:\.\d+)?)px\s+(.+)$/.exec(shadow.trim());
 
   if (match === null) {
-    return null;
+    return '';
   }
 
-  const filterId = `shadow-${elementId}`;
   const dx = match[1];
   const dy = match[2];
   const blur = match[3];
   const color = match[4];
 
   if (dx === undefined || dy === undefined || blur === undefined || color === undefined) {
-    return null;
+    return '';
   }
 
-  return {
-    id: filterId,
-    def: `<filter id="${filterId}"><feDropShadow dx="${dx}" dy="${dy}" stdDeviation="${String(Number(blur) / 2)}" flood-color="${escapeXml(color.trim())}"/></filter>`,
-  };
+  return `<filter id="${id}"><feDropShadow dx="${dx}" dy="${dy}" stdDeviation="${String(Number(blur) / 2)}" flood-color="${escapeXml(color.trim())}"/></filter>`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -238,10 +234,57 @@ function renderMarkerDef(id: string, end: ArrowEnd, stroke: string): string {
   )}" refX="${String(lengthScale)}" refY="${String(widthScale / 2)}" orient="auto">${path}</marker>`;
 }
 
-function renderClipPathDef(elementId: string, clipPath: string): string {
-  const clipId = `clip-${elementId}`;
+/**
+ * Content-addressed collector for `<defs>` entries (gradients,
+ * clip-paths, filters, markers). Each `register` call hashes the
+ * supplied key into a short stable id; multiple elements using the
+ * same gradient / clip-path / shadow share a single `<defs>` node
+ * rather than emitting one per element. Closes the P7 review #4
+ * finding that the matrix claim "Shared <defs> entries are
+ * deduplicated by content-hash" wasn't actually delivered.
+ */
+class DefsCollector {
+  private readonly defs: string[] = [];
+  private readonly idsByKey = new Map<string, string>();
 
-  return `<clipPath id="${clipId}"><path d="${escapeXml(clipPath)}"/></clipPath>`;
+  /**
+   * Register a def under a content-derived `key`. The factory only
+   * runs the first time `key` is registered; subsequent calls
+   * return the same id without emitting a duplicate def.
+   */
+  register(prefix: string, key: string, factory: (id: string) => string): string {
+    const cached = this.idsByKey.get(key);
+
+    if (cached !== undefined) return cached;
+
+    const id = `${prefix}-${shortHash(key)}`;
+
+    this.idsByKey.set(key, id);
+    this.defs.push(factory(id));
+
+    return id;
+  }
+
+  toArray(): readonly string[] {
+    return this.defs;
+  }
+}
+
+/**
+ * Short, stable hash used as a `<defs>` entry id. djb2-style — fast,
+ * no crypto needed (collisions in this domain just mean two
+ * different gradients share an id, which would be visually wrong;
+ * the input space is the gradient / clip / filter content string,
+ * not attacker-influenced).
+ */
+function shortHash(input: string): string {
+  let hash = 5381;
+
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) + hash + input.charCodeAt(i)) | 0;
+  }
+
+  return (hash >>> 0).toString(36);
 }
 
 function textAnchorForAlignment(alignment: string): string {
@@ -314,76 +357,62 @@ function renderSvgPayload(el: BroadsetElement, transform: string): string {
   return `<g id="${escapeXml(el.id)}"${transform}>${inner}</g>`;
 }
 
-function collectClipAttr(el: BroadsetElement, defs: string[]): string {
+function collectClipAttr(el: BroadsetElement, defs: DefsCollector): string {
   if (!el.style.customClipPath) {
     return '';
   }
 
-  const clipId = `clip-${el.id}`;
+  const customClipPath = el.style.customClipPath;
+  const id = defs.register('clip', `clip:${customClipPath}`, (clipId) => `<clipPath id="${clipId}"><path d="${escapeXml(customClipPath)}"/></clipPath>`);
 
-  defs.push(renderClipPathDef(el.id, el.style.customClipPath));
-
-  return ` clip-path="url(#${clipId})"`;
+  return ` clip-path="url(#${id})"`;
 }
 
-function collectGradientFillOverride(el: BroadsetElement, defs: string[]): string {
+function collectGradientFillOverride(el: BroadsetElement, defs: DefsCollector): string {
   const gradientFill = getGradientFillGradient(el.style.fill);
 
   if (gradientFill === undefined) {
     return '';
   }
 
-  const grad = renderGradientDef(el.id, gradientFill);
+  const id = defs.register('grad', `grad:${JSON.stringify(gradientFill)}`, (gradId) =>
+    renderGradientDef(gradId, gradientFill),
+  );
 
-  if (grad === null) {
-    return '';
-  }
-
-  defs.push(grad.def);
-
-  return ` fill="url(#${grad.id})"`;
+  return ` fill="url(#${id})"`;
 }
 
-function collectShadowFilterAttr(el: BroadsetElement, defs: string[]): string {
+function collectShadowFilterAttr(el: BroadsetElement, defs: DefsCollector): string {
   if (!el.style.boxShadow) {
     return '';
   }
 
-  const shadow = renderShadowFilter(el.id, el.style.boxShadow);
+  const shadowSpec = el.style.boxShadow;
+  const id = defs.register('shadow', `shadow:${shadowSpec}`, (filterId) => renderShadowFilter(filterId, shadowSpec));
 
-  if (shadow === null) {
-    return '';
-  }
-
-  defs.push(shadow.def);
-
-  return ` filter="url(#${shadow.id})"`;
+  return ` filter="url(#${id})"`;
 }
 
-function collectArrowMarkerAttrs(el: BroadsetElement, defs: string[]): string {
+function collectArrowMarkerAttrs(el: BroadsetElement, defs: DefsCollector): string {
   const strokeCss = resolveStyleColor(el.style.stroke, { resolveTheme: false }) ?? '#000000';
   const parts: string[] = [];
   const head = el.style.strokeHeadEnd;
   const tail = el.style.strokeTailEnd;
 
   if (head !== undefined && head.shape !== 'none') {
-    const markerId = `marker-start-${el.id}`;
-    const markerDef = renderMarkerDef(markerId, head, strokeCss);
+    const id = defs.register('marker-start', `marker:${JSON.stringify(head)}:${strokeCss}`, (markerId) =>
+      renderMarkerDef(markerId, head, strokeCss),
+    );
 
-    if (markerDef !== '') {
-      defs.push(markerDef);
-      parts.push(` marker-start="url(#${markerId})"`);
-    }
+    parts.push(` marker-start="url(#${id})"`);
   }
 
   if (tail !== undefined && tail.shape !== 'none') {
-    const markerId = `marker-end-${el.id}`;
-    const markerDef = renderMarkerDef(markerId, tail, strokeCss);
+    const id = defs.register('marker-end', `marker:${JSON.stringify(tail)}:${strokeCss}`, (markerId) =>
+      renderMarkerDef(markerId, tail, strokeCss),
+    );
 
-    if (markerDef !== '') {
-      defs.push(markerDef);
-      parts.push(` marker-end="url(#${markerId})"`);
-    }
+    parts.push(` marker-end="url(#${id})"`);
   }
 
   return parts.join('');
@@ -396,7 +425,7 @@ interface RenderElementOptions {
 
 function renderElement(
   el: BroadsetElement,
-  defs: string[],
+  defs: DefsCollector,
   childrenByParent: ReadonlyMap<string, readonly BroadsetElement[]>,
   fingerprints: ReadonlyMap<string, string>,
   options: RenderElementOptions,
@@ -597,32 +626,7 @@ function buildChildrenByParent(elements: readonly BroadsetElement[]): ReadonlyMa
  * that Illustrator and Inkscape preserve across save.
  */
 function buildMetadataPacket(doc: BroadsetDocument, fingerprints: ReadonlyMap<string, string>): string {
-  const elementEntries: string[] = [];
-
-  for (const el of doc.elements) {
-    const fingerprint = resolveFingerprint(fingerprints, el.id);
-    const originalColor = extractOriginalColor(el.style.fill);
-    const gradientFill = getGradientFillGradient(el.style.fill);
-    const conicSpec = gradientFill?.type === 'conic' ? JSON.stringify(gradientFill) : undefined;
-    const attrs: string[] = [` broadset:elementId="${escapeXml(el.id)}"`, ` broadset:fingerprint="${fingerprint}"`];
-
-    if (typeof el.name === 'string' && el.name !== '') {
-      attrs.push(` broadset:name="${escapeXml(el.name)}"`);
-    }
-
-    attrs.push(` broadset:width="${String(el.width)}"`);
-    attrs.push(` broadset:height="${String(el.height)}"`);
-
-    if (originalColor !== undefined) {
-      attrs.push(` broadset:originalColor="${escapeXml(originalColor)}"`);
-    }
-
-    if (conicSpec !== undefined) {
-      attrs.push(` broadset:conicGradient="${escapeXml(conicSpec)}"`);
-    }
-
-    elementEntries.push(`<rdf:li${attrs.join('')}/>`);
-  }
+  const elementEntries = doc.elements.map((el) => buildElementMetadataEntry(el, fingerprints));
 
   return [
     '<metadata>',
@@ -638,6 +642,64 @@ function buildMetadataPacket(doc: BroadsetDocument, fingerprints: ReadonlyMap<st
     '</rdf:RDF>',
     '</metadata>',
   ].join('');
+}
+
+function buildElementMetadataEntry(el: BroadsetElement, fingerprints: ReadonlyMap<string, string>): string {
+  const fingerprint = resolveFingerprint(fingerprints, el.id);
+  const attrs: string[] = [` broadset:elementId="${escapeXml(el.id)}"`, ` broadset:fingerprint="${fingerprint}"`];
+
+  if (typeof el.name === 'string' && el.name !== '') {
+    attrs.push(` broadset:name="${escapeXml(el.name)}"`);
+  }
+
+  attrs.push(` broadset:width="${String(el.width)}"`);
+  attrs.push(` broadset:height="${String(el.height)}"`);
+  attrs.push(...buildColorAttrs(el));
+  attrs.push(...buildDataBindingAttrs(el));
+
+  return `<rdf:li${attrs.join('')}/>`;
+}
+
+function buildColorAttrs(el: BroadsetElement): readonly string[] {
+  const attrs: string[] = [];
+  const originalColor = extractOriginalColor(el.style.fill);
+  const gradientFill = getGradientFillGradient(el.style.fill);
+  const conicSpec = gradientFill?.type === 'conic' ? JSON.stringify(gradientFill) : undefined;
+
+  if (originalColor !== undefined) {
+    attrs.push(` broadset:originalColor="${escapeXml(originalColor)}"`);
+  }
+
+  if (conicSpec !== undefined) {
+    attrs.push(` broadset:conicGradient="${escapeXml(conicSpec)}"`);
+  }
+
+  return attrs;
+}
+
+/**
+ * Carry data-binding shapes as JSON in the metadata packet so a
+ * Broadset → SVG → Broadset chain preserves the full structured
+ * values (overflow / prefix / suffix / formatPattern / direction /
+ * gap / maxItems). The `data-bs-*` element-level attrs only carry
+ * the primary identifier and would lose the rest on re-import.
+ */
+function buildDataBindingAttrs(el: BroadsetElement): readonly string[] {
+  const attrs: string[] = [];
+
+  if (typeof el.dataField === 'object' && el.dataField !== null) {
+    attrs.push(` broadset:dataField="${escapeXml(JSON.stringify(el.dataField))}"`);
+  }
+
+  if (typeof el.visibleWhen === 'string' && el.visibleWhen !== '') {
+    attrs.push(` broadset:visibleWhen="${escapeXml(el.visibleWhen)}"`);
+  }
+
+  if (typeof el.repeater === 'object' && el.repeater !== null) {
+    attrs.push(` broadset:repeater="${escapeXml(JSON.stringify(el.repeater))}"`);
+  }
+
+  return attrs;
 }
 
 function buildRootNamespaceDeclarations(opts: { includeMetadata: boolean; includeElementTagging: boolean }): string {
@@ -717,7 +779,7 @@ async function exportSvgInternal(doc: BroadsetDocument, options?: SvgExportOptio
   const includeMetadata = options?.includeMetadata ?? true;
   const includeElementTagging = options?.includeElementTagging ?? true;
   const fontEmbedding = options?.fontEmbedding ?? 'embed';
-  const defs: string[] = [];
+  const defs = new DefsCollector();
   const fontPlan: FontEmbedPlan = planFontEmbedding(doc, fontEmbedding, options?.fonts);
   const fingerprints = await computeFingerprints(doc.elements);
   const childrenByParent = buildChildrenByParent(doc.elements);
@@ -734,8 +796,10 @@ async function exportSvgInternal(doc: BroadsetDocument, options?: SvgExportOptio
     defsParts.push(fontPlan.defsStyleBlock);
   }
 
-  if (defs.length > 0) {
-    defsParts.push(defs.join(''));
+  const collectedDefs = defs.toArray();
+
+  if (collectedDefs.length > 0) {
+    defsParts.push(collectedDefs.join(''));
   }
 
   const defsBlock = defsParts.length > 0 ? `<defs>${defsParts.join('')}</defs>` : '';

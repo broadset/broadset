@@ -175,6 +175,67 @@ describe('P7.7c — Full transform parsing', () => {
   });
 
   /**
+   * @description A `<g scale(2)>` wrapping a `<g scale(0.5)>` cancels
+   * to identity at the leaf, so the rect MUST hydrate as a NATIVE
+   * rectangle — not bake to a path. Closes the P7.7 review #4
+   * finding that `requiresBake` was sticky and over-baked once an
+   * ancestor scale appeared, even when a descendant cancelled it.
+   */
+  it('does not bake when ancestor and descendant scales cancel to identity', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+      <g transform="scale(2)">
+        <g transform="scale(0.5)">
+          <rect width="40" height="40"/>
+        </g>
+      </g>
+    </svg>`;
+    const { document } = importSvgDocument(input);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+    const baked = document.elements.find((el) => el.type === 'path');
+
+    expect(rect).toBeDefined();
+    expect(baked).toBeUndefined();
+    expect(rect?.width).toBeCloseTo(40, 1);
+    expect(rect?.height).toBeCloseTo(40, 1);
+  });
+
+  /**
+   * @description A `<g transform="scale(2,3)">` wrapping an
+   * `<image>` MUST fold the scale into the image's width/height
+   * (since Broadset has no native image scale field). Closes the
+   * P7 review #4 finding that text and image silently dropped
+   * inherited scale.
+   */
+  it('folds an inherited uniform scale into <image> width/height', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+      <g transform="scale(2, 3)">
+        <image href="https://example.com/x.png" width="40" height="20"/>
+      </g>
+    </svg>`;
+    const { document } = importSvgDocument(input);
+    const image = document.elements.find((el) => el.type === 'image');
+
+    expect(image?.width).toBeCloseTo(80, 1);
+    expect(image?.height).toBeCloseTo(60, 1);
+  });
+
+  /**
+   * @description Inherited scale on a `<text>` element has no
+   * native Broadset representation. The importer MUST surface a
+   * warning rather than silently dropping the scale.
+   */
+  it('warns when inherited scale on <text> cannot be honoured', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+      <g transform="scale(2)">
+        <text>Hello</text>
+      </g>
+    </svg>`;
+    const { warnings } = importSvgDocument(input);
+
+    expect(warnings.some((w) => /scale\/skew on a <text>|text/i.test(w))).toBe(true);
+  });
+
+  /**
    * @description A non-decomposable affine on a `<path>` MUST
    * have its transform baked into the existing `d` via `svgpath`,
    * NOT preserved as opaque markup.

@@ -390,11 +390,12 @@ describe('SVG Export Style Enrichments', () => {
     });
 
     const svg = await exportSvgString(doc);
+    const linearMatch = /<linearGradient id="(grad-[^"]+)"/.exec(svg);
 
-    expect(svg).toContain('<linearGradient id="grad-rect-grad"');
+    expect(linearMatch).not.toBeNull();
     expect(svg).toContain('stop-color="#ff0000"');
     expect(svg).toContain('stop-color="#0000ff"');
-    expect(svg).toContain('fill="url(#grad-rect-grad)"');
+    expect(svg).toContain(`fill="url(#${linearMatch?.[1] ?? ''})"`);
   });
 
   /** @description Radial gradient must produce a radialGradient def. */
@@ -418,9 +419,10 @@ describe('SVG Export Style Enrichments', () => {
     });
 
     const svg = await exportSvgString(doc);
+    const radialMatch = /<radialGradient id="(grad-[^"]+)"/.exec(svg);
 
-    expect(svg).toContain('<radialGradient id="grad-ellipse-grad"');
-    expect(svg).toContain('fill="url(#grad-ellipse-grad)"');
+    expect(radialMatch).not.toBeNull();
+    expect(svg).toContain(`fill="url(#${radialMatch?.[1] ?? ''})"`);
   });
 
   /** @description boxShadow must produce an SVG filter def with feDropShadow. */
@@ -436,12 +438,13 @@ describe('SVG Export Style Enrichments', () => {
     });
 
     const svg = await exportSvgString(doc);
+    const filterMatch = /<filter id="(shadow-[^"]+)"/.exec(svg);
 
-    expect(svg).toContain('<filter id="shadow-shadow-el"');
+    expect(filterMatch).not.toBeNull();
     expect(svg).toContain('feDropShadow');
     expect(svg).toContain('dx="2"');
     expect(svg).toContain('dy="4"');
-    expect(svg).toContain('filter="url(#shadow-shadow-el)"');
+    expect(svg).toContain(`filter="url(#${filterMatch?.[1] ?? ''})"`);
   });
 
   /** @description QR code elements must produce inline SVG content. */

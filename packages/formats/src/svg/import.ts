@@ -8,6 +8,8 @@ import {
   type BroadsetGradientStop,
   createDefaultElement,
   createEmptyBroadsetDocument,
+  type DataFieldBinding,
+  type RepeaterConfig,
   rgbColor,
 } from '@broadset/model';
 import * as CssTree from 'css-tree';
@@ -1234,12 +1236,13 @@ function combineTransform(base: TransformState, next: TransformState): Transform
     y: decomposed.ty,
     rotation: decomposed.rotation,
     matrix: decomposed.matrix,
-    // `requiresBake` is sticky — once any ancestor or descendant in
-    // the chain needs a bake, every leaf below MUST bake too. The
-    // decomposed flag handles fresh skew / scale; the OR with the
-    // base flag handles a baking ancestor whose effect would
-    // otherwise be cancelled out by an inverse descendant.
-    requiresBake: base.requiresBake || next.requiresBake || decomposed.requiresBake,
+    // The CUMULATIVE matrix is the source of truth — its
+    // `requiresBake` flag captures whether the composed scale /
+    // skew survives. ORing in `base.requiresBake` was wrong: a
+    // `<g scale(2)><g scale(0.5)>` chain composes to identity, no
+    // bake needed, but the sticky OR baked the leaf to a path
+    // anyway (P7 review finding). Trust the decomposition.
+    requiresBake: decomposed.requiresBake,
   };
 }
 
@@ -1605,7 +1608,6 @@ function synthesiseGroupId(el: Element): string {
 
 interface ShapeBakeContext {
   readonly transform: TransformState;
-  readonly ownTransform: ReturnType<typeof parseTransform>;
   readonly baseStyle: Partial<BroadsetElementStyleInput>;
   readonly tagMeta: Readonly<{
     readonly dataBsId?: string;
@@ -1615,14 +1617,55 @@ interface ShapeBakeContext {
 }
 
 /**
- * `true` when geometry MUST be baked into a `<path>` because either
- * the inherited cumulative transform (from ancestor `<g>` matrices)
- * or the element's own transform carries a non-trivial scale /
- * skew. Either source disqualifies a native rectangle / ellipse
- * representation per IO-D-02.
+ * `true` when geometry MUST be baked into a `<path>` because the
+ * cumulative transform (root → leaf, including own) carries a
+ * non-trivial scale or skew. `ctx.transform` is the composed
+ * matrix from `combineTransform`, so checking its `requiresBake`
+ * flag covers both ancestor and own contributions.
  */
 function requiresBake(ctx: ShapeBakeContext): boolean {
-  return ctx.transform.requiresBake || ctx.ownTransform.requiresBake;
+  return ctx.transform.requiresBake;
+}
+
+/**
+ * `<image>` cannot bake to a `<path>`, but a pure scale+translate
+ * cumulative transform CAN fold its scale factors into the
+ * declared `width` / `height` so the visual result matches what
+ * the source SVG showed. Skew / rotation embedded in the matrix
+ * survives via `transform.rotation` (decomposed) — anything left
+ * over (true skew) emits a warning so the gap is visible.
+ */
+function bakeImageDimensions(
+  transform: TransformState,
+  rawWidth: number,
+  rawHeight: number,
+  warnings: string[],
+): { readonly width: number; readonly height: number } {
+  if (!transform.requiresBake) {
+    return { width: rawWidth, height: rawHeight };
+  }
+
+  // The cumulative matrix has shape { a, b, c, d, e, f }. After
+  // decomposeTSR factors out rotation, a pure scale+translate would
+  // satisfy b ≈ 0 and c ≈ 0; the magnitudes |a| and |d| are then
+  // the X / Y scale factors. Mixed skew leaves residual b / c that
+  // we can't represent on a native `<image>`.
+  const m = transform.matrix;
+  const cosTheta = Math.cos((transform.rotation * Math.PI) / 180);
+  const sinTheta = Math.sin((transform.rotation * Math.PI) / 180);
+  const sx = m.a * cosTheta + m.b * sinTheta;
+  const sy = -m.c * sinTheta + m.d * cosTheta;
+  const skewX = m.a * -sinTheta + m.b * cosTheta;
+  const skewY = m.c * cosTheta + m.d * sinTheta;
+  const skewMagnitude = Math.max(Math.abs(skewX), Math.abs(skewY));
+
+  if (skewMagnitude > 1e-3) {
+    warnings.push(
+      `Skew on an <image> element was dropped on import (Broadset has no element-level image skew per IO-D-02).`,
+    );
+  }
+
+  return { width: rawWidth * Math.abs(sx), height: rawHeight * Math.abs(sy) };
 }
 
 function bakedPathElement(d: string, ctx: ShapeBakeContext): ImportedElement {
@@ -1748,6 +1791,60 @@ function importPolygonElement(el: Element, ctx: ShapeBakeContext, closed: boolea
   };
 }
 
+/**
+ * Import a `<text>` element. Text has no Broadset-native scale or
+ * skew (IO-D-02) and no import-side path-bake equivalent — when
+ * the cumulative transform requires bake, surface a warning and
+ * keep the translate-only position.
+ */
+function importTextElement(el: Element, ctx: ShapeBakeContext, warnings: string[]): ImportedElement {
+  const textPathEl = el.getElementsByTagName('textPath')[0];
+  const hrefRaw = textPathEl?.getAttribute('href') ?? textPathEl?.getAttribute('xlink:href') ?? '';
+  const textPathElementId =
+    typeof hrefRaw === 'string' && hrefRaw.startsWith('#') && hrefRaw.length > 1 ? hrefRaw.slice(1) : undefined;
+  const content = textPathEl !== undefined ? textPathEl.textContent : el.textContent;
+
+  if (ctx.transform.requiresBake) {
+    warnings.push(
+      `Cumulative non-trivial scale/skew on a <text> element was dropped to translate-only on import (Broadset has no element-level text scale per IO-D-02).`,
+    );
+  }
+
+  return {
+    type: 'text',
+    content,
+    position: { x: ctx.transform.x, y: ctx.transform.y },
+    width: 0,
+    height: 0,
+    rotation: ctx.transform.rotation,
+    style: ctx.baseStyle,
+    ...ctx.tagMeta,
+    ...(textPathElementId !== undefined ? { textPathElementId } : {}),
+  };
+}
+
+/**
+ * Import an `<image>` element. Cumulative scale folds into width /
+ * height via `bakeImageDimensions`; cumulative skew emits a
+ * warning (no native representation per IO-D-02).
+ */
+function importImageElement(el: Element, ctx: ShapeBakeContext, warnings: string[]): ImportedElement {
+  const rawWidth = getNumAttr(el, 'width', 0);
+  const rawHeight = getNumAttr(el, 'height', 0);
+  const baked = bakeImageDimensions(ctx.transform, rawWidth, rawHeight, warnings);
+
+  return {
+    type: 'image',
+    content: getAttr(el, 'href') ?? getAttr(el, 'xlink:href') ?? '',
+    position: { x: ctx.transform.x, y: ctx.transform.y },
+    width: baked.width,
+    height: baked.height,
+    rotation: ctx.transform.rotation,
+    style: ctx.baseStyle,
+    ...ctx.tagMeta,
+  };
+}
+
 function importElement(
   el: Element,
   defsMap: ReadonlyMap<string, string>,
@@ -1787,8 +1884,7 @@ function importElement(
     parentDataBsId,
   } as const;
 
-  const ownTransform = parseTransform(transformStr);
-  const shapeCtx: ShapeBakeContext = { transform, ownTransform, baseStyle, tagMeta };
+  const shapeCtx: ShapeBakeContext = { transform, baseStyle, tagMeta };
 
   switch (tagName) {
     case 'rect':
@@ -1809,41 +1905,11 @@ function importElement(
     case 'polyline':
       return [importPolygonElement(el, shapeCtx, false)];
 
-    case 'text': {
-      const textPathEl = el.getElementsByTagName('textPath')[0];
-      const hrefRaw = textPathEl?.getAttribute('href') ?? textPathEl?.getAttribute('xlink:href') ?? '';
-      const textPathElementId =
-        typeof hrefRaw === 'string' && hrefRaw.startsWith('#') && hrefRaw.length > 1 ? hrefRaw.slice(1) : undefined;
-      const content = textPathEl !== undefined ? textPathEl.textContent : el.textContent;
-
-      return [
-        {
-          type: 'text',
-          content,
-          position: { x: transform.x, y: transform.y },
-          width: 0,
-          height: 0,
-          rotation: transform.rotation,
-          style: baseStyle,
-          ...tagMeta,
-          ...(textPathElementId !== undefined ? { textPathElementId } : {}),
-        },
-      ];
-    }
+    case 'text':
+      return [importTextElement(el, shapeCtx, warnings)];
 
     case 'image':
-      return [
-        {
-          type: 'image',
-          content: getAttr(el, 'href') ?? getAttr(el, 'xlink:href') ?? '',
-          position: { x: transform.x, y: transform.y },
-          width: getNumAttr(el, 'width', 0),
-          height: getNumAttr(el, 'height', 0),
-          rotation: transform.rotation,
-          style: baseStyle,
-          ...tagMeta,
-        },
-      ];
+      return [importImageElement(el, shapeCtx, warnings)];
 
     case 'g':
       return importGroupElement(el, {
@@ -1983,6 +2049,72 @@ export function importSvgDocument(
 }
 
 /**
+ * Hydrate a single tagged element (one with `data-bs-id`) using
+ * the metadata packet's overrides and the visually-extracted
+ * shape. Extracted from `hydrateFastPath` to keep that function's
+ * cognitive complexity below the sonarjs threshold.
+ */
+function hydrateTaggedElement(
+  visualEl: ImportedElement,
+  metadataById: ReadonlyMap<string, ParsedElementMetadata>,
+): BroadsetElement {
+  const dataBsId = visualEl.dataBsId;
+
+  if (dataBsId === undefined) {
+    throw new Error('hydrateTaggedElement called with untagged visual element');
+  }
+
+  const sourceKind = visualEl.dataBsKind ?? pickDefaultKindFromVisual(visualEl.type);
+  const meta = metadataById.get(dataBsId);
+  const style = applyMetadataOverrides(visualEl.style, meta);
+  const bindings = parseDataBindingMetadata(meta);
+  const parentId = visualEl.parentDataBsId ?? null;
+  const parentField = typeof parentId === 'string' && parentId !== '' ? { parentId } : {};
+
+  return createDefaultElement(sourceKind, {
+    id: dataBsId,
+    name: meta?.name ?? dataBsId,
+    position: { x: visualEl.position.x, y: visualEl.position.y },
+    width: meta?.width ?? visualEl.width,
+    height: meta?.height ?? visualEl.height,
+    rotation: visualEl.rotation,
+    content: visualEl.content,
+    style,
+    ...parentField,
+    ...(visualEl.textPathElementId !== undefined ? { textPathElementId: visualEl.textPathElementId } : {}),
+    ...(bindings.dataField !== undefined ? { dataField: bindings.dataField } : {}),
+    ...(bindings.visibleWhen !== undefined ? { visibleWhen: bindings.visibleWhen } : {}),
+    ...(bindings.repeater !== undefined ? { repeater: bindings.repeater } : {}),
+    extensions: { svg: { dirty: false } },
+  });
+}
+
+/**
+ * Hydrate an untagged visual element using a synthesised id. Used
+ * when the fast-path metadata packet is present but the element
+ * itself has no `data-bs-id` (e.g., a shape inside a Broadset
+ * group whose own tag survived but the child's tag was stripped).
+ */
+function hydrateUntaggedElement(visualEl: ImportedElement, fallbackIndex: number): BroadsetElement {
+  const parentId = visualEl.parentDataBsId ?? null;
+  const parentField = typeof parentId === 'string' && parentId !== '' ? { parentId } : {};
+
+  return createDefaultElement(pickDefaultKindFromVisual(visualEl.type), {
+    id: `imported-${String(fallbackIndex)}`,
+    name: `Element ${String(fallbackIndex + 1)}`,
+    position: { x: visualEl.position.x, y: visualEl.position.y },
+    width: visualEl.width,
+    height: visualEl.height,
+    rotation: visualEl.rotation,
+    content: visualEl.content,
+    style: visualEl.style,
+    ...parentField,
+    ...(visualEl.textPathElementId !== undefined ? { textPathElementId: visualEl.textPathElementId } : {}),
+    extensions: { svg: { dirty: false } },
+  });
+}
+
+/**
  * Hydrate a Broadset-exported SVG via the fast path per
  * `project/spec/formats/svg.md` §"Standards-Only Round-Trip" —
  * preserve document id, canvas unit/dpi, element ids, structured
@@ -2007,46 +2139,10 @@ function hydrateFastPath(
   let fallbackIndex = 0;
 
   for (const visualEl of visualExtract.elements) {
-    const dataBsId = visualEl.dataBsId;
-    const parentId = visualEl.parentDataBsId ?? null;
-    const parentField = typeof parentId === 'string' && parentId !== '' ? { parentId } : {};
-
-    if (dataBsId !== undefined) {
-      const sourceKind = visualEl.dataBsKind ?? pickDefaultKindFromVisual(visualEl.type);
-      const meta = metadataById.get(dataBsId);
-      const style = applyMetadataOverrides(visualEl.style, meta);
-
-      hydrated.push(
-        createDefaultElement(sourceKind, {
-          id: dataBsId,
-          name: meta?.name ?? dataBsId,
-          position: { x: visualEl.position.x, y: visualEl.position.y },
-          width: meta?.width ?? visualEl.width,
-          height: meta?.height ?? visualEl.height,
-          rotation: visualEl.rotation,
-          content: visualEl.content,
-          style,
-          ...parentField,
-          ...(visualEl.textPathElementId !== undefined ? { textPathElementId: visualEl.textPathElementId } : {}),
-          extensions: { svg: { dirty: false } },
-        }),
-      );
+    if (visualEl.dataBsId !== undefined) {
+      hydrated.push(hydrateTaggedElement(visualEl, metadataById));
     } else {
-      hydrated.push(
-        createDefaultElement(pickDefaultKindFromVisual(visualEl.type), {
-          id: `imported-${String(fallbackIndex)}`,
-          name: `Element ${String(fallbackIndex + 1)}`,
-          position: { x: visualEl.position.x, y: visualEl.position.y },
-          width: visualEl.width,
-          height: visualEl.height,
-          rotation: visualEl.rotation,
-          content: visualEl.content,
-          style: visualEl.style,
-          ...parentField,
-          ...(visualEl.textPathElementId !== undefined ? { textPathElementId: visualEl.textPathElementId } : {}),
-          extensions: { svg: { dirty: false } },
-        }),
-      );
+      hydrated.push(hydrateUntaggedElement(visualEl, fallbackIndex));
       fallbackIndex += 1;
     }
   }
@@ -2188,6 +2284,62 @@ function applyMetadataOverrides(
     ...(fillOverride !== undefined ? { fill: fillOverride } : {}),
     ...(parsedConic !== undefined ? { backgroundGradient: parsedConic } : {}),
   };
+}
+
+interface ParsedDataBindings {
+  readonly dataField?: DataFieldBinding | undefined;
+  readonly visibleWhen?: string | undefined;
+  readonly repeater?: RepeaterConfig | undefined;
+}
+
+/**
+ * Decode the JSON-stringified `broadset:dataField` /
+ * `broadset:repeater` metadata attrs the exporter writes, plus the
+ * plain `broadset:visibleWhen` expression. Malformed payloads
+ * silently degrade to `undefined` so a partly-corrupted packet
+ * still imports per IO-D-18.
+ */
+function parseDataBindingMetadata(meta: ParsedElementMetadata | undefined): ParsedDataBindings {
+  if (meta === undefined) {
+    return {};
+  }
+
+  const dataField = parseJsonOrNull(meta.dataField);
+  const repeater = parseJsonOrNull(meta.repeater);
+
+  return {
+    ...(isDataFieldBinding(dataField) ? { dataField } : {}),
+    ...(typeof meta.visibleWhen === 'string' && meta.visibleWhen !== '' ? { visibleWhen: meta.visibleWhen } : {}),
+    ...(isRepeaterConfig(repeater) ? { repeater } : {}),
+  };
+}
+
+function parseJsonOrNull(raw: string | undefined): unknown {
+  if (raw === undefined) return null;
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function isDataFieldBinding(value: unknown): value is DataFieldBinding {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'fieldName' in value &&
+    typeof (value as { fieldName: unknown }).fieldName === 'string'
+  );
+}
+
+function isRepeaterConfig(value: unknown): value is RepeaterConfig {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'dataArrayField' in value &&
+    typeof (value as { dataArrayField: unknown }).dataArrayField === 'string'
+  );
 }
 
 function applyOriginalColorToFill(
