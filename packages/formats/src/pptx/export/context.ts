@@ -1,6 +1,7 @@
 import type { Canvas } from '@broadset/model';
 
 import { RelationshipAllocator } from '../ooxml/relationships';
+import type { PptxExportWarning } from '../types';
 
 /**
  * Per-slide export context. Tracks relationship allocation, media
@@ -23,6 +24,13 @@ export interface SlideExportContext {
   nextShapeId: number;
   /** Monotonic media counter so filenames stay unique within the slide. */
   nextMediaIndex: number;
+  /**
+   * Sink for fidelity-loss warnings emitted during slide emission
+   * (silent drops in {@link emitEffects}, unsupported animation
+   * presets, etc.). The package builder aggregates these per slide and
+   * surfaces them through {@link exportPptxWithReport}.
+   */
+  readonly warnings: PptxExportWarning[];
 }
 
 export function createSlideContext(canvas: Canvas): SlideExportContext {
@@ -33,7 +41,13 @@ export function createSlideContext(canvas: Canvas): SlideExportContext {
     shapeIdByElementId: new Map<string, number>(),
     nextShapeId: 2,
     nextMediaIndex: 1,
+    warnings: [],
   };
+}
+
+/** Append a warning to the slide context's sink. */
+export function pushExportWarning(ctx: SlideExportContext, warning: PptxExportWarning): void {
+  ctx.warnings.push(warning);
 }
 
 export function allocateShapeId(ctx: SlideExportContext): number {

@@ -1,4 +1,9 @@
-export { exportPptxBytes, exportPptxBytesAsync } from './export';
+export {
+  exportPptxBytes,
+  exportPptxBytesAsync,
+  exportPptxWithReport,
+  exportPptxWithReportAsync,
+} from './export';
 export type { PptxImportReport } from './import';
 export { importPptx, importPptxWithMerge, importPptxWithReport } from './import';
 export { readPreservedPptxDocument, reconcilePptx } from './reconcile';
@@ -11,6 +16,9 @@ export type {
   OoxmlRelationship,
   OoxmlRelId,
   PptxExportOptions,
+  PptxExportReport,
+  PptxExportWarning,
+  PptxExportWarningCode,
   PptxImportOptions,
   PptxImportWarning,
   PptxImportWarningCode,

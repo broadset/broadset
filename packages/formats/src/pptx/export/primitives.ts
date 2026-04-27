@@ -13,7 +13,7 @@ import {
 } from '@broadset/model';
 
 import { alphaToOoxml, canvasLengthToEmu, degreesToRotationUnits, hexToOoxmlColor, mmToEmu } from '../ooxml/units';
-import type { SlideExportContext } from './context';
+import { pushExportWarning, type SlideExportContext } from './context';
 
 /**
  * Emit a `<a:xfrm>` transform element.
@@ -177,16 +177,41 @@ export function emitStroke(style: BroadsetElementStyle, ctx: SlideExportContext)
  * Maps the most common form (offsetX offsetY blurRadius color) to
  * OOXML `<a:outerShdw>`. Returns an empty string when no shadow is
  * declared.
+ *
+ * Pushes export warnings on `ctx.warnings` for fidelity-loss cases:
+ * inset entries skipped (`shadow-inset-skipped`), multi-shadow lists
+ * truncated to the first emit-eligible entry (`shadow-truncated`),
+ * and unparseable strings dropped entirely (`shadow-dropped`).
  */
-export function emitEffects(style: BroadsetElementStyle, ctx: SlideExportContext): string {
+export function emitEffects(
+  style: BroadsetElementStyle,
+  ctx: SlideExportContext,
+  elementId?: string,
+): string {
   const shadow = style.boxShadow;
 
   if (shadow === undefined || shadow.trim().length === 0) return '';
 
-  const parsed = parseBoxShadow(shadow, ctx.canvas);
+  const parseResult = parseBoxShadow(shadow, ctx.canvas);
 
-  if (parsed === null) return '';
+  for (const note of parseResult.notes) {
+    pushShadowNoteAsWarning(ctx, note, elementId, shadow);
+  }
 
+  if (parseResult.shadow === null) {
+    if (parseResult.notes.length === 0) {
+      // No structural reason — colour parse failed or token count short.
+      pushExportWarning(ctx, {
+        code: 'shadow-dropped',
+        message: `box-shadow could not be parsed and was dropped on export (${shadow})`,
+        ...(elementId !== undefined ? { elementId } : {}),
+      });
+    }
+
+    return '';
+  }
+
+  const parsed = parseResult.shadow;
   // offsets/blur are already in mm — go straight to EMU.
   const distEmu = mmToEmu(Math.hypot(parsed.offsetXmm, parsed.offsetYmm));
   const blurEmu = mmToEmu(parsed.blurMm);
@@ -201,6 +226,29 @@ export function emitEffects(style: BroadsetElementStyle, ctx: SlideExportContext
   return `<a:effectLst><a:outerShdw blurRad="${String(blurEmu)}" dist="${String(distEmu)}" dir="${String(dirUnits)}" rotWithShape="0"><a:srgbClr val="${ooxmlHex}">${alphaChild}</a:srgbClr></a:outerShdw></a:effectLst>`;
 }
 
+type BoxShadowParseNote = 'inset-skipped' | 'truncated';
+
+function pushShadowNoteAsWarning(
+  ctx: SlideExportContext,
+  note: BoxShadowParseNote,
+  elementId: string | undefined,
+  shadow: string,
+): void {
+  if (note === 'inset-skipped') {
+    pushExportWarning(ctx, {
+      code: 'shadow-inset-skipped',
+      message: `inset box-shadow entry skipped on export — OOXML outer-shadow cannot represent inset semantics (${shadow})`,
+      ...(elementId !== undefined ? { elementId } : {}),
+    });
+  } else {
+    pushExportWarning(ctx, {
+      code: 'shadow-truncated',
+      message: `multi-value box-shadow truncated to the first emit-eligible entry — OOXML outer-shadow only carries one (${shadow})`,
+      ...(elementId !== undefined ? { elementId } : {}),
+    });
+  }
+}
+
 /**
  * Parse a CSS `box-shadow` value into offsetX/offsetY/blur (all in mm)
  * and colour. Accepts the canonical form
@@ -211,27 +259,46 @@ export function emitEffects(style: BroadsetElementStyle, ctx: SlideExportContext
  * `<a:outerShdw>` only carries one. `inset` shadows are skipped because
  * OOXML's outer shadow has no inset semantics.
  */
-function parseBoxShadow(value: string, canvas: Canvas): {
+interface ParsedShadow {
   readonly offsetXmm: number;
   readonly offsetYmm: number;
   readonly blurMm: number;
   readonly color: string;
   readonly alpha: number;
-} | null {
-  for (const shadow of splitShadowList(value)) {
-    const trimmed = shadow.trim();
+}
 
-    if (trimmed.length === 0) continue;
+interface BoxShadowParseResult {
+  readonly shadow: ParsedShadow | null;
+  readonly notes: readonly BoxShadowParseNote[];
+}
+
+function parseBoxShadow(value: string, canvas: Canvas): BoxShadowParseResult {
+  const entries = splitShadowList(value).map((s) => s.trim()).filter((s) => s.length > 0);
+  const notes: BoxShadowParseNote[] = [];
+  let chosen: ParsedShadow | null = null;
+
+  for (const entry of entries) {
     // Inset shadows are not representable as <a:outerShdw>; skip and
     // try the next entry in the list.
-    if (/\binset\b/.test(trimmed)) continue;
+    if (/\binset\b/.test(entry)) {
+      notes.push('inset-skipped');
+      continue;
+    }
 
-    const parsed = parseSingleShadow(trimmed, canvas);
+    const parsed = parseSingleShadow(entry, canvas);
 
-    if (parsed !== null) return parsed;
+    if (parsed !== null && chosen === null) {
+      chosen = parsed;
+      continue;
+    }
+
+    if (parsed !== null && chosen !== null) {
+      // Additional entries beyond the first emit-eligible one.
+      notes.push('truncated');
+    }
   }
 
-  return null;
+  return { shadow: chosen, notes };
 }
 
 function parseSingleShadow(value: string, canvas: Canvas): {

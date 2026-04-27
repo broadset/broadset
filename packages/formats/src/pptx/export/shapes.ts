@@ -184,7 +184,7 @@ export function emitTextShape(ctx: SlideExportContext, element: BroadsetElement)
   const body = emitTextBody(ctx, element);
   const stroke = emitStroke(element.style, ctx);
 
-  const effects = emitEffects(element.style, ctx);
+  const effects = emitEffects(element.style, ctx, element.id);
 
   return `<p:sp>${nv}<p:spPr>${xfrm}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/>${stroke}${effects}</p:spPr>${body}</p:sp>`;
 }
@@ -431,7 +431,7 @@ export function emitRectangleShape(ctx: SlideExportContext, element: BroadsetEle
   const stroke = emitStroke(element.style, ctx);
   const geom = emitRectangleGeometry(element);
 
-  return `<p:sp>${nv}<p:spPr>${xfrm}${geom}${fill}${stroke}${emitEffects(element.style, ctx)}</p:spPr></p:sp>`;
+  return `<p:sp>${nv}<p:spPr>${xfrm}${geom}${fill}${stroke}${emitEffects(element.style, ctx, element.id)}</p:spPr></p:sp>`;
 }
 
 function emitRectangleGeometry(element: BroadsetElement): string {
@@ -494,7 +494,7 @@ export function emitEllipseShape(ctx: SlideExportContext, element: BroadsetEleme
   const fill = emitElementFill(element);
   const stroke = emitStroke(element.style, ctx);
 
-  return `<p:sp>${nv}<p:spPr>${xfrm}<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>${fill}${stroke}${emitEffects(element.style, ctx)}</p:spPr></p:sp>`;
+  return `<p:sp>${nv}<p:spPr>${xfrm}<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>${fill}${stroke}${emitEffects(element.style, ctx, element.id)}</p:spPr></p:sp>`;
 }
 
 /**
@@ -508,7 +508,7 @@ export function emitPathShape(ctx: SlideExportContext, element: BroadsetElement)
   const fill = emitElementFill(element);
   const stroke = emitStroke(element.style, ctx);
 
-  return `<p:sp>${nv}<p:spPr>${xfrm}${geom}${fill}${stroke}${emitEffects(element.style, ctx)}</p:spPr></p:sp>`;
+  return `<p:sp>${nv}<p:spPr>${xfrm}${geom}${fill}${stroke}${emitEffects(element.style, ctx, element.id)}</p:spPr></p:sp>`;
 }
 
 function emitCustGeomFromD(d: string, width: number, height: number): string {
@@ -581,7 +581,7 @@ export function emitPictureShape(ctx: SlideExportContext, element: BroadsetEleme
   const xfrm = emitElementXfrm(ctx, element);
   const stroke = emitStroke(element.style, ctx);
 
-  return `<p:pic>${nv}<p:blipFill><a:blip r:embed="${relId}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${stroke}${emitEffects(element.style, ctx)}</p:spPr></p:pic>`;
+  return `<p:pic>${nv}<p:blipFill><a:blip r:embed="${relId}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${stroke}${emitEffects(element.style, ctx, element.id)}</p:spPr></p:pic>`;
 }
 
 interface DecodedMedia {

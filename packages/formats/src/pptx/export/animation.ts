@@ -1,11 +1,14 @@
 import type { AnimationDefinition, BroadsetDocument } from '@broadset/model';
 
+import { pushExportWarning, type SlideExportContext } from './context';
+
 /**
  * `<p:timing>` export. Emits a native OOXML timing tree for the subset
  * of Broadset animations that map cleanly to PowerPoint's preset
  * entrance effects — today: **fade-in**. Unmappable animations drop
  * per IO-D-16 (no custom-XML preservation of animation data; the
- * `.bsp` is the source of truth).
+ * `.bsp` is the source of truth) and record an
+ * `animation-preset-unsupported` warning on the slide context.
  *
  * The emitted tree matches PowerPoint's canonical "Fade" entrance
  * effect so the imported animation plays in PowerPoint's Animation
@@ -18,8 +21,8 @@ interface MappableFadeEntry {
   readonly durationMs: number;
 }
 
-export function buildTimingXml(document: BroadsetDocument, shapeIdByElementId: ReadonlyMap<string, number>): string {
-  const fades = collectFadeEntries(document.animations, shapeIdByElementId);
+export function buildTimingXml(document: BroadsetDocument, ctx: SlideExportContext): string {
+  const fades = collectFadeEntries(document.animations, ctx);
 
   if (fades.length === 0) return '';
 
@@ -30,18 +33,30 @@ export function buildTimingXml(document: BroadsetDocument, shapeIdByElementId: R
 
 function collectFadeEntries(
   animations: readonly AnimationDefinition[],
-  shapeIdByElementId: ReadonlyMap<string, number>,
+  ctx: SlideExportContext,
 ): readonly MappableFadeEntry[] {
   const result: MappableFadeEntry[] = [];
 
   for (const anim of animations) {
-    const shapeId = shapeIdByElementId.get(anim.elementId);
+    const shapeId = ctx.shapeIdByElementId.get(anim.elementId);
 
+    // Animations whose target element isn't in this slide aren't a
+    // fidelity loss — they belong to a different page and will (or
+    // won't) emit there. Only animations targeting elements present
+    // here that fail the fade-in heuristic are real drops.
     if (shapeId === undefined) continue;
 
     const duration = detectFadeInDuration(anim);
 
-    if (duration === null) continue;
+    if (duration === null) {
+      pushExportWarning(ctx, {
+        code: 'animation-preset-unsupported',
+        message: `animation on element "${anim.elementId}" cannot be mapped to a PowerPoint preset entrance effect; dropped per IO-D-16`,
+        elementId: anim.elementId,
+      });
+      continue;
+    }
+
     result.push({ elementId: anim.elementId, shapeId, durationMs: duration });
   }
 

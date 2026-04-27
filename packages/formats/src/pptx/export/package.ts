@@ -13,6 +13,7 @@ import {
   BROADSET_CUSTOM_XML_INTEROP,
   BROADSET_CUSTOM_XML_PROJECT,
   type PptxExportOptions,
+  type PptxExportWarning,
 } from '../types';
 import { buildTimingXml } from './animation';
 import { createSlideContext, type SlideExportContext } from './context';
@@ -22,6 +23,9 @@ import { emitShapeTree } from './shapes';
 /**
  * Full async PPTX package builder (includes the interop ledger whose
  * per-element fingerprints require xxhash-wasm init on the first call).
+ * Convenience wrapper that discards the warnings sink — callers that
+ * want fidelity-loss visibility should use
+ * {@link buildPptxPackageWithReport}.
  *
  * @see buildPptxPackageSync for the sync fast-path used by
  * {@link exportPptxBytes}.
@@ -30,10 +34,25 @@ export async function buildPptxPackage(
   document: BroadsetDocument,
   options: PptxExportOptions = {},
 ): Promise<Uint8Array> {
+  const report = await buildPptxPackageWithReport(document, options);
+
+  return report.bytes;
+}
+
+/**
+ * Full async PPTX package builder that surfaces an aggregated warnings
+ * sink (silent drops in {@link emitEffects}, unmappable animations,
+ * etc.). Used by {@link exportPptxWithReportAsync}.
+ */
+export async function buildPptxPackageWithReport(
+  document: BroadsetDocument,
+  options: PptxExportOptions = {},
+): Promise<{ readonly bytes: Uint8Array; readonly warnings: readonly PptxExportWarning[] }> {
   const includeMetadata = options.preserveBroadsetMetadata !== false;
   const includeLedger = options.includeInteropLedger !== false;
   const parts = new Map<string, Uint8Array>();
   const contentTypes = new ContentTypesBuilder();
+  const warnings: PptxExportWarning[] = [];
 
   // Presentation-level relationships.
   const presRels = new RelationshipAllocator();
@@ -55,6 +74,8 @@ export async function buildPptxPackage(
     const slideFile = `slide${String(slideIndex)}.xml`;
     const slidePath = `ppt/slides/${slideFile}`;
     const slideXml = buildSlideForPage(document, page);
+
+    for (const w of slideXml.warnings) warnings.push(w);
 
     parts.set(`ppt/slides/_rels/${slideFile}.rels`, encodeText(buildRelationshipsXml(slideXml.rels)));
 
@@ -130,17 +151,31 @@ export async function buildPptxPackage(
   parts.set('_rels/.rels', encodeText(buildRelationshipsXml(rootRels.entries())));
   parts.set('[Content_Types].xml', encodeText(contentTypes.build()));
 
-  return writeOoxmlPackage(parts);
+  return { bytes: writeOoxmlPackage(parts), warnings };
 }
 
 /**
  * Synchronous package builder. Omits the interop ledger (which requires
- * async xxhash-wasm init). Callers that need the ledger should use
- * {@link buildPptxPackage}.
+ * async xxhash-wasm init). Convenience wrapper that discards the
+ * warnings sink — callers that need fidelity-loss visibility should use
+ * {@link buildPptxPackageSyncWithReport} (or
+ * {@link buildPptxPackageWithReport} for the async path with ledger).
  */
 export function buildPptxPackageSync(document: BroadsetDocument, options: PptxExportOptions = {}): Uint8Array {
+  return buildPptxPackageSyncWithReport(document, options).bytes;
+}
+
+/**
+ * Synchronous package builder that surfaces an aggregated warnings
+ * sink. Mirrors {@link buildPptxPackageWithReport} for the sync path.
+ */
+export function buildPptxPackageSyncWithReport(
+  document: BroadsetDocument,
+  options: PptxExportOptions = {},
+): { readonly bytes: Uint8Array; readonly warnings: readonly PptxExportWarning[] } {
   const includeMetadata = options.preserveBroadsetMetadata !== false;
   const parts = new Map<string, Uint8Array>();
+  const warnings: PptxExportWarning[] = [];
   const contentTypes = new ContentTypesBuilder();
   const presRels = new RelationshipAllocator();
   const masterRels = new RelationshipAllocator();
@@ -159,6 +194,8 @@ export function buildPptxPackageSync(document: BroadsetDocument, options: PptxEx
     const slideFile = `slide${String(slideIndex)}.xml`;
     const slidePath = `ppt/slides/${slideFile}`;
     const slideXml = buildSlideForPage(document, page);
+
+    for (const w of slideXml.warnings) warnings.push(w);
 
     parts.set(`ppt/slides/_rels/${slideFile}.rels`, encodeText(buildRelationshipsXml(slideXml.rels)));
 
@@ -218,7 +255,7 @@ export function buildPptxPackageSync(document: BroadsetDocument, options: PptxEx
   parts.set('_rels/.rels', encodeText(buildRelationshipsXml(rootRels.entries())));
   parts.set('[Content_Types].xml', encodeText(contentTypes.build()));
 
-  return writeOoxmlPackage(parts);
+  return { bytes: writeOoxmlPackage(parts), warnings };
 }
 
 function extensionOf(path: string): string {
@@ -376,6 +413,7 @@ interface SlideXmlResult {
   readonly xml: string;
   readonly rels: ReturnType<RelationshipAllocator['entries']>;
   readonly media: ReadonlyMap<string, Uint8Array>;
+  readonly warnings: readonly PptxExportWarning[];
 }
 
 function buildSlideForPage(document: BroadsetDocument, page: Page): SlideXmlResult {
@@ -385,11 +423,11 @@ function buildSlideForPage(document: BroadsetDocument, page: Page): SlideXmlResu
   // The shape tree emission populated ctx.shapeIdByElementId with the
   // real OOXML `<p:cNvPr id="…">` id per element; pass that map to the
   // timing emitter so `<p:spTgt spid="…">` references valid shapes.
-  const timing = buildTimingXml(document, ctx.shapeIdByElementId);
+  const timing = buildTimingXml(document, ctx);
   const bg = emitSlideBackground(document.canvas);
   const xml = `${XML_DECLARATION}<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld>${bg}<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${shapeTree}</p:spTree></p:cSld>${timing}<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
 
-  return { xml, rels: ctx.rels.entries(), media: ctx.media };
+  return { xml, rels: ctx.rels.entries(), media: ctx.media, warnings: ctx.warnings };
 }
 
 /**

@@ -73,6 +73,36 @@ export interface PptxImportWarning {
   readonly detail?: string;
 }
 
+/**
+ * Reason an exporter dropped or truncated content. Phase 8 spec gap
+ * called this out: silent drops are invisible, so callers can show a
+ * fidelity-loss toast based on these codes.
+ */
+export type PptxExportWarningCode =
+  /** `style.boxShadow` couldn't be parsed into `<a:outerShdw>` (e.g. unrecognised colour, multi-shadow input where every entry is inset, malformed length unit). */
+  | 'shadow-dropped'
+  /** Multi-shadow list truncated to the first non-inset entry — OOXML's `<a:outerShdw>` carries one shadow only. */
+  | 'shadow-truncated'
+  /** `inset` shadow skipped — OOXML's outer-shadow primitive cannot represent inset semantics. */
+  | 'shadow-inset-skipped'
+  /** Animation isn't representable as a PowerPoint preset entrance effect; dropped per IO-D-16 (the `.bsp` is the source of truth for animation data). */
+  | 'animation-preset-unsupported';
+
+export interface PptxExportWarning {
+  readonly code: PptxExportWarningCode;
+  readonly message: string;
+  /** Element id that triggered the warning, when applicable. */
+  readonly elementId?: string;
+  /** Optional free-form pointer to the source field / shape kind. */
+  readonly detail?: string;
+}
+
+/** Result shape for {@link exportPptxWithReport} / {@link exportPptxWithReportAsync}. */
+export interface PptxExportReport {
+  readonly bytes: Uint8Array;
+  readonly warnings: readonly PptxExportWarning[];
+}
+
 /** Shape-name tag encoded into `<p:cNvPr name="BSET:…"/>`. */
 export interface ShapeNameTag {
   readonly id: string;
