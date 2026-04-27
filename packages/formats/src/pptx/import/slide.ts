@@ -67,8 +67,15 @@ export function importSingleSlide(
     nextElementIndex: elementCounter,
   };
   const shapes = parseSlideShapes(ctx, slideXml);
+
+  // Parse the slide XML once — `promoteShapeText` previously re-
+  // parsed the full slide string per shape via `extractShapeBody`,
+  // which made the importer O(n²) in element count and pushed a
+  // 1000-element deck into multi-second import territory. We hand
+  // the pre-walked p:sp body list down to promoteShapeText instead.
+  const slideShapeBodies = collectShapeBodies(slideXml);
   const withText = shapes.map((shape, shapeIdx) =>
-    promoteShapeText(resolved.canvas, shape, slideXml, shapeIdx, layoutPlaceholders, hyperlinkByRelId),
+    promoteShapeText(resolved.canvas, shape, slideShapeBodies[shapeIdx] ?? null, layoutPlaceholders, hyperlinkByRelId),
   );
 
   return {
@@ -93,14 +100,11 @@ export function importSingleSlide(
 function promoteShapeText(
   canvas: BroadsetDocument['canvas'],
   shape: ReturnType<typeof parseSlideShapes>[number],
-  slideXml: string,
-  shapeIdx: number,
+  body: string | null,
   layoutPlaceholders: ReadonlyMap<number, LayoutPlaceholder>,
   hyperlinks: ReadonlyMap<string, Hyperlink>,
 ): ReturnType<typeof parseSlideShapes>[number] {
   if (shape.type !== 'rectangle' && shape.type !== 'ellipse') return shape;
-
-  const body = extractShapeBody(slideXml, shapeIdx);
 
   if (body === null) return shape;
 
@@ -297,21 +301,24 @@ function resolvePlaceholderIdx(idxText: string | undefined, type: string | undef
   return null;
 }
 
-function extractShapeBody(slideXml: string, index: number): string | null {
+/**
+ * Pre-walk every `<p:sp>` shape body in the slide XML once and
+ * return the serialized child-node strings indexed by shape order.
+ * Replaces the previous per-shape `extractShapeBody` re-parse that
+ * blew importer time up quadratically with element count.
+ */
+function collectShapeBodies(slideXml: string): readonly (string | null)[] {
   const root = rootElement(parseOoxml(slideXml));
 
-  if (root === null) return null;
+  if (root === null) return [];
 
   const spTree = findDescendant(root, 'p:spTree');
 
-  if (spTree === null) return null;
+  if (spTree === null) return [];
 
   const shapes = findChildren(spTree, 'p:sp');
-  const target = shapes[index];
 
-  if (target === undefined) return null;
-
-  return target.children.map((c) => serializeNode(c)).join('');
+  return shapes.map((shape) => shape.children.map((c) => serializeNode(c)).join(''));
 }
 
 /**
