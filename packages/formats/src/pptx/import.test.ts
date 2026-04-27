@@ -421,6 +421,8 @@ describe('PPTX importer — operator-level extraction', () => {
     const xmp = readTextPart(pkg, 'docProps/custom.xml');
 
     expect(xmp).not.toBeNull();
+    expect(xmp).toContain('http://schemas.openxmlformats.org/officeDocument/2006/custom-properties');
+    expect(xmp).toContain('BroadsetXmp');
     expect(xmp).toContain('https://broadset.io/ns/xmp/1.0/');
   });
 

@@ -5,7 +5,7 @@ import { ContentTypesBuilder } from '../ooxml/content-types';
 import { OOXML_CONTENT_TYPES, OOXML_REL_TYPES } from '../ooxml/namespaces';
 import { buildRelationshipsXml, RelationshipAllocator } from '../ooxml/relationships';
 import { canvasLengthToEmu } from '../ooxml/units';
-import { XML_DECLARATION } from '../ooxml/xml';
+import { escapeXmlText, XML_DECLARATION } from '../ooxml/xml';
 import { encodeText, writeOoxmlPackage } from '../ooxml/zip';
 import { buildProjectCustomXml } from '../semantic/custom-xml';
 import { buildLedger, buildLedgerXml } from '../semantic/ledger';
@@ -138,9 +138,9 @@ export async function buildPptxPackageWithReport(
   parts.set('ppt/_rels/presentation.xml.rels', encodeText(buildRelationshipsXml(presRels.entries())));
   contentTypes.addOverride('/ppt/presentation.xml', OOXML_CONTENT_TYPES.presentation);
 
-  // docProps/custom.xml carries the broadset: XMP packet (cross-format
-  // metadata requirement, IO-D-08). Async path populates per-element
-  // fingerprints from the ledger; sync path leaves them empty.
+  // docProps/custom.xml carries the broadset: XMP packet as a schema-valid
+  // custom property (cross-format metadata requirement, IO-D-08). Async path
+  // populates per-element fingerprints from the ledger; sync path leaves them empty.
   if (includeMetadata) {
     attachXmpPacket({ parts, contentTypes, document, exportedAt: options.exportedAt, fingerprints: ledgerFingerprints });
   }
@@ -309,10 +309,10 @@ async function attachAsyncMetadata(args: {
 
 /**
  * Attach the document-level `broadset:` XMP packet at
- * `docProps/custom.xml`. Cross-format metadata requirement (IO-D-08):
- * every round-trippable format exporter writes a packet under the
- * shared namespace URI so reconciliation recovers document identity
- * regardless of source format.
+ * `docProps/custom.xml` as a standard custom property. Cross-format
+ * metadata requirement (IO-D-08): every round-trippable format exporter
+ * writes a packet under the shared namespace URI so reconciliation
+ * recovers document identity regardless of source format.
  *
  * Per-element fingerprints are populated from the interop ledger when
  * available; sync exports without the ledger emit an empty element
@@ -348,8 +348,12 @@ function attachXmpPacket(options: {
     elements: elementsList,
   });
 
-  parts.set('docProps/custom.xml', encodeText(packet));
+  parts.set('docProps/custom.xml', encodeText(encodeCustomPropertiesXml(packet)));
   contentTypes.addOverride('/docProps/custom.xml', OOXML_CONTENT_TYPES.customProperties);
+}
+
+function encodeCustomPropertiesXml(xmpPacket: string): string {
+  return `${XML_DECLARATION}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" name="BroadsetXmp"><vt:lpwstr>${escapeXmlText(xmpPacket)}</vt:lpwstr></property></Properties>`;
 }
 
 /**

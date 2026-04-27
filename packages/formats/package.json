@@ -18,6 +18,7 @@
     "pptx:corpus:fetch": "node scripts/fetch-pptx-corpus.mjs",
     "pptx:oracle:generate": "python3 scripts/generate-python-pptx-oracle.py",
     "pptx:oracle:test": "BROADSET_REQUIRE_PYTHON_PPTX=1 vitest run --passWithNoTests pptx/python-pptx-oracle",
+    "pptx:xsd:validate": "BROADSET_REQUIRE_OPENXML_VALIDATOR=1 vitest run --passWithNoTests pptx/openxml-xsd-validate",
     "pptx:libreoffice:verify": "BROADSET_REQUIRE_LIBREOFFICE=1 vitest run --passWithNoTests pptx/libreoffice-verify"
   },
   "devDependencies": {
