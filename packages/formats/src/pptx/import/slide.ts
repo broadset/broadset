@@ -1,0 +1,370 @@
+import {
+  type BroadsetDocument,
+  type BroadsetElement,
+  type Hyperlink,
+  type TextBody,
+} from '@broadset/model';
+
+import {
+  findChildren,
+  findDescendant,
+  getAttr,
+  parseOoxml,
+  rootElement,
+  serializeNode,
+  type XmlElement,
+} from '../ooxml/ast';
+import { OOXML_REL_TYPES } from '../ooxml/namespaces';
+import { parseRelationshipsXml } from '../ooxml/relationships';
+import { type OoxmlPackage,readTextPart } from '../ooxml/zip';
+import type { LayoutPlaceholder, PptxImportWarning } from '../types';
+import { extractSlideNotes } from './notes';
+import { parseSlideShapes, type SlideImportContext } from './shape';
+import { extractTextBody } from './text';
+
+interface SlidePage {
+  readonly id: string;
+  readonly notes?: string;
+  readonly elements: readonly ReturnType<typeof parseSlideShapes>[number][];
+}
+
+interface ResolvedPackageInfo {
+  readonly canvas: BroadsetDocument['canvas'];
+  readonly slideRelsByPath: ReadonlyMap<string, string>;
+}
+
+export function importSingleSlide(
+  pkg: OoxmlPackage,
+  resolved: ResolvedPackageInfo,
+  slidePath: string,
+  index: number,
+  theme: SlideImportContext['theme'],
+  layoutPlaceholders: ReadonlyMap<number, LayoutPlaceholder>,
+  elementCounter: number,
+): {
+  readonly slide: SlidePage;
+  readonly nextElementCounter: number;
+  readonly warnings: readonly PptxImportWarning[];
+} | null {
+  const slideXml = readTextPart(pkg, slidePath);
+
+  if (slideXml === null) return null;
+
+  const slideRelsPath = resolved.slideRelsByPath.get(slidePath);
+  const slideRels = slideRelsPath !== undefined ? parseRelationshipsXml(readTextPart(pkg, slideRelsPath) ?? '') : [];
+  const mediaByRelId = collectSlideMedia(pkg, slidePath, slideRels);
+  const hyperlinkByRelId = collectHyperlinkRels(slideRels);
+  const notes = extractSlideNotes(pkg, slidePath, slideRels);
+  const ctxWarnings: SlideImportContext['warnings'] = [];
+  const ctx: SlideImportContext = {
+    canvas: resolved.canvas,
+    theme,
+    layoutPlaceholders,
+    mediaByRelId,
+    hyperlinkByRelId,
+    warnings: ctxWarnings,
+    nextElementIndex: elementCounter,
+  };
+  const shapes = parseSlideShapes(ctx, slideXml);
+  const withText = shapes.map((shape, shapeIdx) =>
+    promoteShapeText(resolved.canvas, shape, slideXml, shapeIdx, layoutPlaceholders, hyperlinkByRelId),
+  );
+
+  return {
+    slide: {
+      id: `page-${String(index + 1)}`,
+      elements: withText,
+      ...(notes !== null ? { notes } : {}),
+    },
+    nextElementCounter: ctx.nextElementIndex,
+    warnings: ctxWarnings.map((w) => ({
+      code: w.code,
+      message: w.message,
+      ...(w.detail !== undefined ? { detail: w.detail } : {}),
+    })),
+  };
+}
+
+/**
+ * Promote a rectangle / ellipse with embedded text to a text element,
+ * and apply layout-placeholder inheritance for font / size / colour.
+ */
+function promoteShapeText(
+  canvas: BroadsetDocument['canvas'],
+  shape: ReturnType<typeof parseSlideShapes>[number],
+  slideXml: string,
+  shapeIdx: number,
+  layoutPlaceholders: ReadonlyMap<number, LayoutPlaceholder>,
+  hyperlinks: ReadonlyMap<string, Hyperlink>,
+): ReturnType<typeof parseSlideShapes>[number] {
+  if (shape.type !== 'rectangle' && shape.type !== 'ellipse') return shape;
+
+  const body = extractShapeBody(slideXml, shapeIdx);
+
+  if (body === null) return shape;
+
+  const textBody = extractTextBody(canvas, body, hyperlinks);
+
+  if (textBody === null) return shape;
+
+  // Preserve structured text when the body has multiple runs, any run
+  // with actual styling, or any paragraph-level property.
+  const hasStructure = textBody.paragraphs.some(
+    (p) =>
+      p.runs.length > 1 ||
+      p.runs.some(
+        (r) =>
+          (r.props?.style !== undefined && Object.keys(r.props.style).length > 0) ||
+          r.props?.hyperlink !== undefined,
+      ) ||
+      p.props !== undefined,
+  );
+  const content: string | TextBody = hasStructure
+    ? textBody
+    : textBody.paragraphs.map((p) => p.runs.map((r) => r.text).join('')).join('\n');
+
+  const placeholder = resolvePlaceholderFromBody(body, layoutPlaceholders);
+  const inherited =
+    placeholder === undefined
+      ? {}
+      : {
+          ...(placeholder.fontFamily !== undefined ? { fontFamily: placeholder.fontFamily } : {}),
+          ...(placeholder.fontSize !== undefined ? { fontSize: placeholder.fontSize } : {}),
+          ...(placeholder.color !== undefined ? { fontColor: placeholder.color } : {}),
+        };
+
+  return {
+    ...shape,
+    type: 'text' as const,
+    content,
+    ...(Object.keys(inherited).length > 0 ? { style: { ...shape.style, ...inherited } } : {}),
+  };
+}
+
+export function applyFirstSlideBackground(
+  canvas: BroadsetDocument['canvas'],
+  slideXml: string | null,
+  warnings: PptxImportWarning[],
+): BroadsetDocument['canvas'] {
+  if (slideXml === null) return canvas;
+
+  const root = rootElement(parseOoxml(slideXml));
+
+  if (root === null) return canvas;
+
+  const bg = findDescendant(root, 'p:bg');
+
+  if (bg === null) return canvas;
+
+  const solidColour = readSrgbHex(findDescendant(bg, 'a:solidFill'));
+
+  if (solidColour !== null) {
+    return { ...canvas, backgroundColor: solidColour, backgroundMode: 'solid' };
+  }
+
+  const gradFill = findDescendant(bg, 'a:gradFill');
+
+  if (gradFill !== null) {
+    const firstStop = findDescendant(gradFill, 'a:gs');
+    const stopColour = firstStop !== null ? readSrgbHex(firstStop) : null;
+
+    if (stopColour !== null) {
+      warnings.push({
+        code: 'unsupported-content',
+        message: 'Slide gradient background downgraded to the first gradient stop colour — canvas model is solid-only',
+      });
+
+      return { ...canvas, backgroundColor: stopColour, backgroundMode: 'solid' };
+    }
+  }
+
+  return canvas;
+}
+
+function readSrgbHex(node: XmlElement | null): string | null {
+  if (node === null) return null;
+
+  const srgb = findDescendant(node, 'a:srgbClr');
+
+  if (srgb === null) return null;
+
+  const val = getAttr(srgb, 'val');
+
+  if (val === undefined || !/^[0-9A-Fa-f]{6}$/.test(val)) return null;
+
+  return `#${val.toUpperCase()}`;
+}
+
+function collectHyperlinkRels(
+  slideRels: ReturnType<typeof parseRelationshipsXml>,
+): ReadonlyMap<string, Hyperlink> {
+  const map = new Map<string, Hyperlink>();
+
+  for (const rel of slideRels) {
+    if (rel.type !== OOXML_REL_TYPES.hyperlink) continue;
+    if (rel.target.length === 0) continue;
+
+    map.set(rel.id, { url: rel.target });
+  }
+
+  return map;
+}
+
+function collectSlideMedia(
+  pkg: OoxmlPackage,
+  slidePath: string,
+  slideRels: ReturnType<typeof parseRelationshipsXml>,
+): ReadonlyMap<string, { readonly path: string; readonly mime: string; readonly bytes: Uint8Array }> {
+  const map = new Map<string, { readonly path: string; readonly mime: string; readonly bytes: Uint8Array }>();
+  const slideDir = slidePath.substring(0, slidePath.lastIndexOf('/'));
+
+  for (const rel of slideRels) {
+    if (rel.type !== OOXML_REL_TYPES.image) continue;
+
+    const mediaPath = resolvePath(slideDir, rel.target);
+    const bytes = pkg.get(mediaPath);
+
+    if (bytes === undefined) continue;
+
+    const mime = guessImageMime(mediaPath);
+
+    map.set(rel.id, { path: mediaPath, mime, bytes });
+  }
+
+  return map;
+}
+
+function resolvePath(baseDir: string, target: string): string {
+  const baseParts = baseDir.split('/').filter((p) => p.length > 0);
+  const targetParts = target.split('/');
+  const stack = [...baseParts];
+
+  for (const part of targetParts) {
+    if (part === '..') {
+      stack.pop();
+    } else if (part !== '.' && part.length > 0) {
+      stack.push(part);
+    }
+  }
+
+  return stack.join('/');
+}
+
+function guessImageMime(path: string): string {
+  const lower = path.toLowerCase();
+
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.bmp')) return 'image/bmp';
+  if (lower.endsWith('.svg')) return 'image/svg+xml';
+
+  return 'application/octet-stream';
+}
+
+function resolvePlaceholderFromBody(
+  body: string,
+  placeholders: ReadonlyMap<number, LayoutPlaceholder>,
+): LayoutPlaceholder | undefined {
+  const parsed = parseOoxml(`<sp xmlns:p="${PRESENTATIONML_NS}">${body}</sp>`);
+  const root = rootElement(parsed);
+
+  if (root === null) return undefined;
+
+  const ph = findDescendant(root, 'p:ph');
+
+  if (ph === null) return undefined;
+
+  const idxAttr = getAttr(ph, 'idx');
+  const type = getAttr(ph, 'type');
+  const idx = resolvePlaceholderIdx(idxAttr, type);
+
+  if (idx === null) return undefined;
+
+  return placeholders.get(idx);
+}
+
+const PRESENTATIONML_NS = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+
+function resolvePlaceholderIdx(idxText: string | undefined, type: string | undefined): number | null {
+  if (idxText !== undefined) return parseInt(idxText, 10);
+  if (type === 'title' || type === 'ctrTitle') return 0;
+  if (type === 'body') return 1;
+
+  return null;
+}
+
+function extractShapeBody(slideXml: string, index: number): string | null {
+  const root = rootElement(parseOoxml(slideXml));
+
+  if (root === null) return null;
+
+  const spTree = findDescendant(root, 'p:spTree');
+
+  if (spTree === null) return null;
+
+  const shapes = findChildren(spTree, 'p:sp');
+  const target = shapes[index];
+
+  if (target === undefined) return null;
+
+  return target.children.map((c) => serializeNode(c)).join('');
+}
+
+/**
+ * Compose a BroadsetDocument from per-slide element lists. Used by
+ * the operator-level importer once parseSlideShapes has populated
+ * each page.
+ */
+export function composeDocumentFromSlides(
+  canvas: BroadsetDocument['canvas'],
+  slides: readonly {
+    readonly id: string;
+    readonly notes?: string;
+    readonly elements: readonly BroadsetElement[];
+  }[],
+): BroadsetDocument {
+  const allElements: BroadsetElement[] = [];
+  const seenIds = new Map<string, number>();
+
+  for (const slide of slides) {
+    for (const el of slide.elements) {
+      const seenCount = seenIds.get(el.id) ?? 0;
+
+      seenIds.set(el.id, seenCount + 1);
+
+      if (seenCount === 0) {
+        allElements.push(el);
+        continue;
+      }
+
+      const disambiguated: BroadsetElement = {
+        ...el,
+        id: `${el.id}__dup-${slide.id}`,
+      };
+
+      allElements.push(disambiguated);
+    }
+  }
+
+  const pages = slides.map((slide) => ({
+    id: slide.id,
+    name: slide.id,
+    elements: [],
+    locale: null,
+    extensions: {},
+    ...(slide.notes !== undefined && slide.notes.length > 0 ? { notes: slide.notes } : {}),
+  }));
+
+  return {
+    id: 'pptx-import',
+    name: 'Imported from PPTX',
+    documentMode: 'screen',
+    canvas,
+    elements: allElements,
+    pages: pages.length > 0 ? pages : [{ id: 'page-1', name: 'Page 1', elements: [], locale: null, extensions: {} }],
+    animations: [],
+    dataSchema: { fields: [] },
+  };
+}
