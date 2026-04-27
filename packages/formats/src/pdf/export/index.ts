@@ -52,5 +52,6 @@ export {
   registerLinearOrRadialShading,
   type ShadingGeometry,
 } from './shading';
+export { attachPdfaStructureTree } from './struct-tree';
 export { renderText } from './text';
 export { attachBroadsetXmp, buildBroadsetXmpPacket } from './xmp';

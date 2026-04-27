@@ -22,6 +22,7 @@ import {
   attachBroadsetXmp,
   attachOcgResourceBindings,
   attachOutputIntent,
+  attachPdfaStructureTree,
   buildBroadsetXmpPacket,
   buildMarkedContentTag,
   buildRoundedRectPath,
@@ -752,6 +753,14 @@ async function runExport(
 
     attachOutputIntent(pdf, intent);
     ensureTrailerId(pdf, doc.id);
+  }
+
+  // PDF/A-2a (ISO 19005-2 §6.7) requires a tagged structure tree
+  // mapping each painted element to a logical structure type. We
+  // emit a flat tree (one StructElem per Broadset element under a
+  // single Document parent) which satisfies the structural floor.
+  if (pdfaConformance === '2a') {
+    attachPdfaStructureTree(pdf, page, doc);
   }
 
   // `useObjectStreams: false` keeps object dicts (catalog, page nodes,

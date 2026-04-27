@@ -38,6 +38,7 @@
     "pdfjs-dist": "^5.4.296",
     "pizzip": "^3.2.0",
     "qrcode-generator": "^2.0.4",
+    "wawoff2": "^2.0.1",
     "xxhash-wasm": "^1.1.0"
   }
 }

@@ -3,6 +3,7 @@ import fontkit from '@pdf-lib/fontkit';
 import { type PDFDocument, type PDFFont, StandardFonts } from 'pdf-lib';
 
 import { normalizeFontFamily, resolveGoogleFontUrl } from '../fonts';
+import { decompressWoff2Bytes } from './woff2-decompress';
 
 /** Weight threshold above which a font is considered bold. */
 const BOLD_WEIGHT_THRESHOLD = 700;
@@ -250,18 +251,14 @@ async function tryEmbedGoogleFont(
       };
     }
 
-    if (fontUrl.endsWith('.woff2')) {
-      // pdf-lib's fontkit cannot decompress WOFF2; trying to embed
-      // the bytes throws. Surface this as a preflight warning rather
-      // than silently degrading to Helvetica.
-      return {
-        font: null,
-        failure: `PDF preflight: font "${family}" is only available in WOFF2 format from Google Fonts; pdf-lib's fontkit cannot decompress WOFF2. Falling back to Helvetica.`,
-      };
-    }
-
     const fontResponse = await fetchFn(fontUrl);
-    const fontBytes = new Uint8Array(await fontResponse.arrayBuffer());
+    const compressedOrPlain = new Uint8Array(await fontResponse.arrayBuffer());
+    // Google Fonts increasingly only serves WOFF2; decompress to the
+    // underlying SFNT (TTF/OTF) bytes via wawoff2 before handing to
+    // pdf-lib's fontkit, which only understands uncompressed SFNT.
+    const fontBytes = fontUrl.endsWith('.woff2')
+      ? await decompressWoff2(compressedOrPlain)
+      : compressedOrPlain;
 
     // `subset: true` tells pdf-lib (via the registered `@pdf-lib/fontkit`
     // adapter) to embed only the glyphs the document actually references.
@@ -276,4 +273,8 @@ async function tryEmbedGoogleFont(
       failure: `PDF preflight: font "${family}" failed to embed (${reason}). Falling back to Helvetica.`,
     };
   }
+}
+
+async function decompressWoff2(woff2: Uint8Array): Promise<Uint8Array> {
+  return await decompressWoff2Bytes(woff2);
 }

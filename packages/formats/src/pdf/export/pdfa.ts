@@ -6,21 +6,27 @@ import { DEFAULT_PROFILE_IDENTIFIER, getDefaultProfile } from '../../_shared/col
 import { decodeDataUri } from '../data-uri';
 
 /**
- * PDF/A conformance level the exporter supports. `2b` is the basic
- * visual reproduction profile; `2u` adds the Unicode-mapping
- * requirement (every text run must map to Unicode via its font's
- * ToUnicode CMap). `2a` (tagged structure tree) remains a Spec Gap
- * until a dedicated tagged-PDF effort lands.
+ * PDF/A conformance level the exporter supports.
+ *
+ * - `2b` — basic visual reproduction.
+ * - `2u` — Unicode mapping (ToUnicode CMaps on every embedded font).
+ * - `2a` — accessible / tagged structure tree.
  */
-export type PdfAConformance = '2b' | '2u';
+export type PdfAConformance = '2b' | '2u' | '2a';
 
 /**
  * Translate a `PdfAConformance` level into the `pdfaid:conformance`
- * letter PDF/A validators look for in the XMP packet — `B` for basic
- * visual reproduction, `U` for Unicode mapping.
+ * letter PDF/A validators look for in the XMP packet.
  */
-export function pdfaConformanceLetter(conformance: PdfAConformance): 'B' | 'U' {
-  return conformance === '2u' ? 'U' : 'B';
+export function pdfaConformanceLetter(conformance: PdfAConformance): 'B' | 'U' | 'A' {
+  switch (conformance) {
+    case '2a':
+      return 'A';
+    case '2u':
+      return 'U';
+    case '2b':
+      return 'B';
+  }
 }
 
 /**

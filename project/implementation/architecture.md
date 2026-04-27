@@ -138,7 +138,7 @@ Dependencies below are part of the current implemented architecture and package 
 | Renderer/Formats QR  | `qrcode-generator`                                      | QR generation parity across renderer/export        |
 | Formats PDF emitter  | `pdf-lib`                                               | PDF emitter — operator-level control, shading patterns, OCGs, custom XMP |
 | Formats PDF parser   | `pdfjs-dist`                                            | PDF parser — operator extraction, XMP metadata, annotations (lazy-loaded from importer entry) |
-| Formats PDF fonts    | `@pdf-lib/fontkit`                                      | pdf-lib adapter for fontkit font subsetting        |
+| Formats PDF fonts    | `@pdf-lib/fontkit`, `wawoff2`                           | Fontkit adapter for subsetting + pure-JS WOFF2 decompression so Google Fonts WOFF2-only URLs embed natively |
 | Formats PSD          | `ag-psd`                                                | PSD import/export                                  |
 | Formats PPTX         | `pizzip`                                                | OOXML ZIP processing for PPTX                      |
 | Formats raster       | `modern-screenshot`                                     | DOM-to-canvas/SVG capture utilities                |
