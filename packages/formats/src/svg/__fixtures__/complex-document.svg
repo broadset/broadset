@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  Locally authored fixture exercising the surface synthetic
+  fixtures don't reach in a single document:
+
+  - `<text>` with `<tspan>` children carrying per-run
+    `font-family`, `font-weight`, `fill` overrides
+  - paragraph break via second `<tspan dy="1em">`
+  - `<g transform="translate(...)">` wrapping multiple children
+  - `<rect x y>` positional attribute (third-party convention)
+  - `<polygon points="...">` shape primitive
+  - `<use xlink:href="#…">` referencing a `<symbol>` in `<defs>`
+
+  Catches the integration of multi-run text + group hierarchy +
+  positional attrs + polygon import + `<use>` deref in one
+  walk, which surfaces interactions a single-feature fixture
+  misses.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="400" height="200" viewBox="0 0 400 200">
+  <defs>
+    <symbol id="bullet">
+      <circle cx="0" cy="0" r="3" fill="#aa3322"/>
+    </symbol>
+  </defs>
+
+  <g transform="translate(20, 20)" id="header">
+    <text x="0" y="20" font-family="serif" font-size="18">
+      <tspan font-family="Arial" fill="#333333">Hello </tspan>
+      <tspan font-weight="700" fill="#ff0000">World</tspan>
+      <tspan x="0" dy="1em" font-style="italic">Multi-line</tspan>
+    </text>
+  </g>
+
+  <g transform="translate(20, 100)" id="content">
+    <rect x="0" y="0" width="120" height="40" fill="#3366aa"/>
+    <polygon points="140,0 180,20 140,40" fill="#22aa55"/>
+    <use xlink:href="#bullet" x="200" y="20"/>
+  </g>
+</svg>

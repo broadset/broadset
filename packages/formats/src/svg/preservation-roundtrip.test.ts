@@ -84,6 +84,11 @@ describe('P7.7h — Dirty-flag byte preservation', () => {
    * to actually serialise user edits.
    */
   it('ignores the preserved cache when dirty===true (regenerates from state)', async () => {
+    // Use an unusual stroke-dashoffset value the importer
+    // captures (so the regenerated output has it from state)
+    // PLUS an unusual `xml:space` attr the importer doesn't
+    // capture (so the regenerated output drops it). The latter
+    // proves the cache was bypassed.
     const sourceSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:broadset="https://broadset.io/ns/xmp/1.0/" width="200" height="100">
       <metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:broadset="https://broadset.io/ns/xmp/1.0/">
         <rdf:Description rdf:about="" broadset:canvasUnit="px" broadset:canvasDpi="72">
@@ -93,7 +98,7 @@ describe('P7.7h — Dirty-flag byte preservation', () => {
           </rdf:Seq></broadset:elements>
         </rdf:Description>
       </rdf:RDF></metadata>
-      <rect id="rect-a" data-bs-id="rect-a" data-bs-kind="rectangle" width="50" height="50" stroke-dasharray="4 2"/>
+      <rect id="rect-a" data-bs-id="rect-a" data-bs-kind="rectangle" width="50" height="50" xml:space="preserve" pointer-events="none"/>
     </svg>`;
     const { document } = importSvgDocument(sourceSvg);
     // Simulate a user edit: width changed AND dirty flipped to true.
@@ -105,9 +110,14 @@ describe('P7.7h — Dirty-flag byte preservation', () => {
     };
     const reExported = await exportSvgString(edited);
 
-    // The new width comes from regenerated state; the preserved
-    // dasharray is discarded.
+    // The new width comes from regenerated state, NOT the
+    // cached markup which still says width="50".
     expect(reExported).toContain('width="999"');
-    expect(reExported).not.toContain('stroke-dasharray="4 2"');
+    expect(reExported).not.toContain('width="50"');
+    // Source-only attrs the model doesn't capture (`xml:space`,
+    // `pointer-events`) are dropped on the regenerate path —
+    // proves the cache was bypassed and we re-rendered from state.
+    expect(reExported).not.toContain('xml:space="preserve"');
+    expect(reExported).not.toContain('pointer-events="none"');
   });
 });

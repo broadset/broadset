@@ -1,0 +1,20 @@
+<!--
+  Source: W3C SVG 1.1 reference snippet (linear gradient on a rect)
+  https://www.w3.org/TR/SVG11/pservers.html#LinearGradients
+  License: W3C document license — redistributable for testing.
+
+  Standards-canonical `<linearGradient>` with explicit `<defs>` +
+  per-stop `stop-color` / `offset`. Pins the third-party gradient
+  import path: the importer MUST hydrate this as a Broadset
+  `gradient` fill, not lose the gradient and fall back to a
+  flat solid colour.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100">
+  <defs>
+    <linearGradient id="grad-w3c" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="rgb(255,255,0)" stop-opacity="1"/>
+      <stop offset="100%" stop-color="rgb(255,0,0)" stop-opacity="1"/>
+    </linearGradient>
+  </defs>
+  <rect x="10" y="10" width="180" height="80" fill="url(#grad-w3c)"/>
+</svg>

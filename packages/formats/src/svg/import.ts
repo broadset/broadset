@@ -1283,6 +1283,80 @@ function getAttr(el: Element, name: string): string | null {
   return el.getAttribute(name);
 }
 
+/**
+ * Look up `name` on `el`; if absent, walk `parentElement` up
+ * until a value is found or the root is hit. Implements SVG 1.1
+ * presentation-attribute inheritance (§6.4 / §11.4) — without
+ * this, real-world icon fixtures (Heroicons, Material Icons,
+ * etc.) lose root-level `stroke` / `fill` / `stroke-width`
+ * declared on the wrapping `<svg>`.
+ */
+function getInheritedAttr(el: Element, name: string): string | null {
+  let cursor: Element | null = el;
+
+  while (cursor !== null) {
+    const value = cursor.getAttribute(name);
+
+    if (value !== null && value !== '') {
+      return value;
+    }
+
+    cursor = cursor.parentElement;
+  }
+
+  return null;
+}
+
+/**
+ * Read inherited stroke style overrides (`stroke-width`,
+ * `stroke-linecap`, `stroke-linejoin`, `stroke-miterlimit`,
+ * `stroke-dasharray`, `stroke-dashoffset`) from the element or
+ * any ancestor. Each maps to the camelCase Broadset style key.
+ * Returns an object that's spread into the importer's
+ * `baseStyle`; absent attrs are omitted entirely.
+ */
+function readInheritedStrokeStyle(el: Element): Partial<BroadsetElementStyleInput> {
+  const out: Record<string, string | number> = {};
+  const widthRaw = getInheritedAttr(el, 'stroke-width');
+  const linecap = getInheritedAttr(el, 'stroke-linecap');
+  const linejoin = getInheritedAttr(el, 'stroke-linejoin');
+  const miterRaw = getInheritedAttr(el, 'stroke-miterlimit');
+  const dasharray = getInheritedAttr(el, 'stroke-dasharray');
+  const dashoffsetRaw = getInheritedAttr(el, 'stroke-dashoffset');
+
+  if (widthRaw !== null) {
+    const width = parseFloat(widthRaw);
+
+    if (Number.isFinite(width)) out['strokeWidth'] = width;
+  }
+
+  if (linecap === 'butt' || linecap === 'round' || linecap === 'square') {
+    out['strokeLinecap'] = linecap;
+  }
+
+  if (linejoin === 'miter' || linejoin === 'round' || linejoin === 'bevel') {
+    out['strokeLinejoin'] = linejoin;
+  }
+
+  if (miterRaw !== null) {
+    const miter = parseFloat(miterRaw);
+
+    if (Number.isFinite(miter)) out['strokeMiterlimit'] = miter;
+  }
+
+  if (dasharray !== null && dasharray !== '') {
+    out['strokeDasharray'] = dasharray;
+  }
+
+  if (dashoffsetRaw !== null) {
+    const dashoffset = parseFloat(dashoffsetRaw);
+
+    if (Number.isFinite(dashoffset)) out['strokeDashoffset'] = dashoffset;
+  }
+
+  return out as Partial<BroadsetElementStyleInput>;
+}
+
 function getNumAttr(el: Element, name: string, defaultVal: number): number {
   const val = el.getAttribute(name);
 
@@ -2093,14 +2167,23 @@ function importElement(
   const transformStr = getAttr(el, 'transform') ?? '';
   const transform = combineTransform(inheritedTransform, parseTransform(transformStr));
   const clipPath = resolveClipPath(el, defsMap);
-  const fill = getAttr(el, 'fill');
-  const stroke = getAttr(el, 'stroke');
+  // Presentation attributes inherit from ancestor elements per
+  // SVG 1.1 §6.4 / §11.4 (e.g., `<svg stroke="currentColor"
+  // stroke-width="1.5">` cascades to every `<path>` descendant).
+  // `getInheritedAttr` walks `parentElement` up until it finds
+  // a value or hits the root — without this, real-world icon
+  // fixtures (Heroicons, Material Icons, etc.) lose their root-
+  // level stroke / fill.
+  const fill = getInheritedAttr(el, 'fill');
+  const stroke = getInheritedAttr(el, 'stroke');
   const gradient = resolveGradientFill(fill, gradients);
+  const strokeStyle = readInheritedStrokeStyle(el);
   const baseStyle: Partial<BroadsetElementStyleInput> = {
     ...(clipPath ? { customClipPath: clipPath } : undefined),
-    ...(fill && gradient === undefined ? { fill } : undefined),
-    ...(stroke ? { stroke } : undefined),
+    ...(fill !== null && gradient === undefined ? { fill } : undefined),
+    ...(stroke !== null ? { stroke } : undefined),
     ...(gradient !== undefined ? { backgroundGradient: gradient } : undefined),
+    ...strokeStyle,
   };
   const ownDataBsId = el.getAttribute('data-bs-id') ?? undefined;
   const ownDataBsKind = el.getAttribute('data-bs-kind') ?? undefined;
