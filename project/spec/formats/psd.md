@@ -196,7 +196,7 @@ Rectangle, ellipse, and path elements MUST export as native PSD vector shape lay
 - [ ] Rectangle / ellipse / path elements emit native PSD shape layers, not rasterised pixels
 - [ ] `borderRadius` round-trips via the native rounded-rectangle primitive when all four corners match; otherwise via knot-composed cubic segments
 - [ ] Stroke styling (cap, join, dasharray, miterlimit) round-trips
-- [ ] Rotation composes into the exported layer geometry (currently a known bug — see [io-prereqs-plan.md](../../implementation/io-prereqs-plan.md))
+- [x] Rotation composes into the exported layer geometry — image rotation flows through `placedLayer.transform`; non-image (rectangle / ellipse / path) rotation expands the layer AABB and re-normalises vector-mask path knots so Photoshop reads back a rotated shape
 
 ---
 
@@ -386,12 +386,14 @@ Export preflight and import warnings MUST follow IO-D-14 ("preflight warns and p
 
 ## Spec Gaps
 
-The core P5.2a foundation and P5.3a/b/c coverage shipped: native vector shape layers, `broadset:` XMP round-trip, groups via `parentId` tree, rotation, TextBody → styleRuns, inner shadow / stroke layer effects, linked-smart-object GUID preservation. The following deeper round-trip surface is tracked here and will land under later PSD-track iterations:
+The core P5.2a foundation and P5.3a/b/c coverage shipped, plus the parity-with-PDF infrastructure pass: robust importer surface (`importPsdDocument` with `{ document, warnings }`), import fuzz harness, export preflight (`exportPsdBytesAsyncWithPreflight`), cross-reader structural validator (`validatePsdBytes`), producer-quirks fixture corpus, visual regression pixel sampling, UAX #9 / UAX #14 detection on text content, modular `psd/export/` layout. The following deeper round-trip surface is tracked here and will land under later PSD-track iterations:
 
 - **Inner glow / color overlay / gradient overlay / bevel / satin / pattern overlay.** Current behaviour: drop shadow, outer glow, inner shadow, stroke-effect emit natively. Target behaviour: CSS-mappable effects (inner glow, solid color overlay from explicit Broadset intent, gradient overlay) emit natively; PSD-only effects (bevel / emboss, satin, pattern overlay) ride in `extensions.psd.unmappedEffects` with `dirty: false` so untouched re-export is byte-identical.
 - **Bitmap layer mask round-trip.** Current behaviour: only vector masks are emitted. Target behaviour: bitmap alpha-channel masks with `extensions.psd.bitmapMask` preservation blob when alpha cannot map to a Broadset mask element.
-- **CMYK / Lab / Grayscale + ICC profile round-trip.** Current behaviour: RGB 8-bit only on the current exporter path. Target behaviour: colour mode follows `document.outputIntent.colorSpace`; embedded ICC profile rides via the asset pipeline (`IccProfileAsset` from P4.4 is ready).
+- **CMYK / Lab / Grayscale + ICC profile round-trip.** Current behaviour: RGB 8-bit only on the current exporter path; preflight surfaces a warning when `document.outputIntent.colorSpace` is non-RGB. Target behaviour: colour mode follows `document.outputIntent.colorSpace`; embedded ICC profile rides via the asset pipeline (`IccProfileAsset` from P4.4 is ready).
 - **16-bit / 32-bit-per-channel import preservation.** Current behaviour: bit depth is always 8. Target behaviour: import preserves original depth for re-export (downsampled for rendering).
+- **Text rotation through ag-psd's text engine.** Current behaviour: image and shape rotation compose natively; text rotation exports at axis-aligned bounds and surfaces a preflight warning. Target behaviour: rotated text rides through the ag-psd text-transform field and reads back as visually rotated in Photoshop.
+- **Real third-party fixture corpus.** Current behaviour: programmatically-generated `producer-quirks.fixture.ts` exercises the importer + validator on seven synthetic shapes; the `__fixtures__/external/` directory is the local-extension contract for users who drop in real Photoshop / Affinity / GIMP / Krita / Figma exports. Target behaviour: a vendored corpus comparable to veraPDF's once an analogous open-source PSD test corpus exists.
 
 _The following items are intentionally scoped out of the PSD track and tracked by other specs:_
 
