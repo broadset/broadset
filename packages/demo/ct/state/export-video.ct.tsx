@@ -32,6 +32,18 @@ test('MP4 video export completes successfully with DOM renderer', async ({ mount
   // Wait for the renderer to be ready — the canvas root must exist
   await expect(page.locator('[data-broadset-canvas-root]')).toBeVisible({ timeout: 5000 });
 
+  // Export dialog is experimental-gated; opt in so the menu item
+  // resolves to a visible dialog.
+  await page.evaluate(() => {
+    interface ExperimentalStore {
+      readonly getState: () => { readonly updateCanvasSettings: (s: { showExperimentalFeatures: boolean }) => void };
+    }
+
+    const store = (window as unknown as { __broadsetEditorStore?: ExperimentalStore }).__broadsetEditorStore;
+
+    store?.getState().updateCanvasSettings({ showExperimentalFeatures: true });
+  });
+
   // Collect console messages for debugging
   const consoleAll: string[] = [];
   const pageErrors: string[] = [];

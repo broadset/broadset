@@ -392,6 +392,18 @@ test('surfaces import and export failure workflows with descriptive toasts', asy
   });
   await expect(page.getByText(/Import failed:/)).toBeVisible({ timeout: 4000 });
 
+  // Export dialog is experimental-gated; opt in for the failure-toast
+  // exercise.
+  await page.evaluate(() => {
+    interface ExperimentalStore {
+      readonly getState: () => { readonly updateCanvasSettings: (s: { showExperimentalFeatures: boolean }) => void };
+    }
+
+    const store = (window as unknown as { __broadsetEditorStore?: ExperimentalStore }).__broadsetEditorStore;
+
+    store?.getState().updateCanvasSettings({ showExperimentalFeatures: true });
+  });
+
   await openToolbarMenu(page, 'File');
   await page.getByText('Export').first().click();
   await expect(page.getByRole('dialog', { name: 'Export' })).toBeVisible();

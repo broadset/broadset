@@ -24,8 +24,11 @@ test('clicking empty canvas space clears selection and disables dependent sideba
   await preview.dispatchEvent('click');
 
   await expect(page.getByTestId('demo-transform-widget')).toHaveCount(0);
+  // Properties tab is always visible and selection-dependent. The
+  // Animation tab is experimental-gated and not visible by default,
+  // so we don't assert it here — the experimental harnesses cover
+  // that flow.
   await expect(page.locator('button[aria-label="Properties"]').first()).toBeDisabled();
-  await expect(page.locator('button[aria-label="Animation"]').first()).toBeDisabled();
 });
 
 /**

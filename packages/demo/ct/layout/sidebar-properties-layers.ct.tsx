@@ -29,8 +29,11 @@ test('sidebar falls back to layers mode and disables selection tabs when selecti
 
   await preview.dispatchEvent('click');
 
+  // Properties tab is always visible and selection-dependent. The
+  // Animation tab is experimental-gated and not visible by default,
+  // so we don't assert it here — the experimental harnesses cover
+  // that flow.
   await expect(page.locator('button[aria-label="Properties"]').first()).toBeDisabled();
-  await expect(page.locator('button[aria-label="Animation"]').first()).toBeDisabled();
   await expect(page.getByRole('region', { name: 'Layers' })).toBeVisible();
 });
 
