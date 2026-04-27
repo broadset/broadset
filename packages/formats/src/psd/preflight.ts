@@ -1,6 +1,9 @@
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 import { resolveContentAsPlainString } from '@broadset/model';
 
+import { isTextBody } from './export/text';
+import { analyseTextUnicodeProfile, type TextUnicodeProfile } from './text-unicode';
+
 /**
  * PSD preflight warning collector — mirrors `pdf/export/preflight.ts`.
  * Centralises the warning messages the PSD export pipeline raises so
@@ -30,8 +33,63 @@ export function collectPreflightWarnings(doc: BroadsetDocument): readonly string
   warnings.push(...collectColorModeWarnings(doc));
   warnings.push(...collectUrlImageWarnings(doc));
   warnings.push(...collectUnmappedEffectWarnings(doc));
+  warnings.push(...collectTextUnicodeWarnings(doc));
 
   return warnings;
+}
+
+/**
+ * Photoshop's text engine handles UAX #9 (bidi) and UAX #14 (line-
+ * break / CJK wrapping) at render time. Broadset writes text in
+ * logical order; we surface a warning so users with RTL or CJK
+ * content know that visual rendering depends on the receiving
+ * application's Unicode implementation, not on byte fidelity.
+ */
+function collectTextUnicodeWarnings(doc: BroadsetDocument): readonly string[] {
+  const warnings: string[] = [];
+  const profile = aggregateTextProfile(doc);
+
+  if (profile.hasRtl) {
+    warnings.push(
+      'PSD preflight: document contains right-to-left text (Hebrew / Arabic / Syriac / NKo / etc.). The bytes are written in logical order; visual reordering relies on Photoshop’s UAX #9 implementation at render time.',
+    );
+  }
+
+  if (profile.hasCjk) {
+    warnings.push(
+      'PSD preflight: document contains CJK ideographs or Japanese / Korean syllables. Line wrapping and inter-glyph spacing rely on Photoshop’s UAX #14 line-break / ICU rules; round-trip wrap points are best-effort.',
+    );
+  }
+
+  return warnings;
+}
+
+function aggregateTextProfile(doc: BroadsetDocument): TextUnicodeProfile {
+  let hasRtl = false;
+  let hasCjk = false;
+
+  for (const el of doc.elements) {
+    if (el.type !== 'text') continue;
+
+    const text = extractElementText(el);
+    const profile = analyseTextUnicodeProfile(text);
+
+    if (profile.hasRtl) hasRtl = true;
+    if (profile.hasCjk) hasCjk = true;
+    if (hasRtl && hasCjk) break;
+  }
+
+  return { hasRtl, hasCjk };
+}
+
+function extractElementText(el: BroadsetElement): string {
+  if (isTextBody(el.content)) {
+    return el.content.paragraphs
+      .flatMap((para) => para.runs.map((run) => run.text))
+      .join('');
+  }
+
+  return resolveContentAsPlainString(el.content);
 }
 
 function collectAnimationWarnings(doc: BroadsetDocument): readonly string[] {

@@ -75,6 +75,31 @@ describe('collectPreflightWarnings', () => {
   });
 
   /**
+   * @description RTL text (Hebrew / Arabic) triggers a Unicode-
+   * fidelity warning so users know rendering depends on Photoshop's
+   * UAX #9 implementation rather than byte-level bidi reordering.
+   */
+  it('warns when the document contains RTL text', () => {
+    const el = makeElement('text', { id: 't1', content: 'مرحبا' });
+    const doc = makeDocument({ elements: [el] });
+    const warnings = collectPreflightWarnings(doc);
+
+    expect(warnings.some((w) => w.toLowerCase().includes('right-to-left'))).toBe(true);
+  });
+
+  /**
+   * @description CJK text triggers a separate UAX #14 line-break
+   * warning so users know Photoshop's text engine handles wrapping.
+   */
+  it('warns when the document contains CJK text', () => {
+    const el = makeElement('text', { id: 't1', content: '你好世界' });
+    const doc = makeDocument({ elements: [el] });
+    const warnings = collectPreflightWarnings(doc);
+
+    expect(warnings.some((w) => w.toLowerCase().includes('cjk'))).toBe(true);
+  });
+
+  /**
    * @description URL-bearing images need either prefetch or async
    * fetch — preflight warns so callers know to choose the right path.
    */
