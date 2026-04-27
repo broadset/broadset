@@ -199,9 +199,7 @@ describe('PSD Artboard and Text Export', () => {
         { id: 'page-1', name: 'Page 1', elements: [], locale: null, extensions: {} },
         { id: 'page-2', name: 'Page 2', elements: [], locale: null, extensions: {} },
       ],
-      elements: [
-        makeElement('rectangle', { style: makeStyle({ backgroundColor: '#ff0000' }) }),
-      ],
+      elements: [makeElement('rectangle', { style: makeStyle({ backgroundColor: '#ff0000' }) })],
     });
 
     const bytes = exportPsdBytes(doc);

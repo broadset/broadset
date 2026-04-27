@@ -27,11 +27,16 @@ describe('PSD chain round-trip', () => {
     const doc = makeDocument({ id: 'doc-chain', elements: [el] });
     const bytes = exportPsdBytes(doc);
 
-    const psd = assertReImportableBy(bytes, (b) => readPsd(b, {
-      skipLayerImageData: true,
-      skipCompositeImageData: true,
-      skipThumbnail: true,
-    }), { formatLabel: 'psd' });
+    const psd = assertReImportableBy(
+      bytes,
+      (b) =>
+        readPsd(b, {
+          skipLayerImageData: true,
+          skipCompositeImageData: true,
+          skipThumbnail: true,
+        }),
+      { formatLabel: 'psd' },
+    );
 
     expect(psd.width).toBe(doc.canvas.width);
   });

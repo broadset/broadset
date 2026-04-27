@@ -1,129 +1,14 @@
-# Formats — Web & Vector Specification
+# Formats — Web & Vector (HTML Standalone) Specification
 
 ## Purpose
 
-Defines SVG export/import and standalone HTML export with embedded animation runtime. SVG export produces valid SVG markup from a document. SVG import parses SVG markup back into document elements. HTML export produces a self-contained HTML file with embedded playback runtime for browser playback.
+Defines HTML standalone export with embedded playback runtime. HTML export produces a self-contained HTML file that embeds the playback runtime, serialized animations, and element markup, so the exported document plays back in any modern browser without Broadset runtime on the page.
+
+SVG export and import — including external-source import, external-target export, round-trip, sanitization, metadata, and element tagging — are defined in [svg.md](svg.md). HTML standalone exports consume the SVG exporter internally for any embedded vector surfaces, but the contract below concerns the HTML shell and runtime only.
 
 ---
 
 ## Requirements
-
-### Requirement: SVG Path Export
-
-The system MUST export path elements as SVG `<path>` nodes with `d` attribute, stroke, and fill attributes.
-
-#### Scenario: Path with stroke
-
-- GIVEN a path element with `d="M0,0 L40,20 Z"` and stroke `#ff0000`
-- WHEN exported to SVG
-- THEN the output contains `<path id="..." d="M0,0 L40,20 Z"` with `stroke="#ff0000"`
-
-#### Acceptance Criteria
-
-- [ ] Given a path element with `d="M0,0 L40,20 Z"` and stroke `#ff0000`, the output contains `<path id="..." d="M0,0 L40,20 Z"` with `stroke="#ff0000"`
-
----
-
-### Requirement: SVG Clip-Path Export
-
-The system MUST export custom clip-path masks as SVG `<clipPath>` definitions in `<defs>` and reference them via `clip-path="url(#...)"`.
-
-#### Scenario: Image with custom clip
-
-- GIVEN an image with a custom clip-path
-- WHEN exported to SVG
-- THEN `<clipPath>` is in defs and the image references it
-
-#### Acceptance Criteria
-
-- [ ] Given an image with a custom clip-path, `<clipPath>` is in defs and the image references it
-
----
-
-### Requirement: SVG Text, Image, and Rotation Export
-
-The system MUST export text as `<text>` elements, images with `href`, and rotation as `rotate()` transforms.
-
-#### Scenario: Mixed text and rotated image
-
-- GIVEN text and a rotated image element
-- WHEN exported to SVG
-- THEN output contains `<text>` with content and `<image>` with `rotate(...)` transform
-
-#### Acceptance Criteria
-
-- [ ] Given text and a rotated image element, output contains `<text>` with content and `<image>` with `rotate(...)` transform
-
----
-
-### Requirement: SVG Inline Payload Embedding
-
-The system MUST embed inline SVG payload content directly (including foreignObject) rather than converting to data URIs.
-
-#### Scenario: foreignObject preserved
-
-- GIVEN an SVG element with inline SVG content containing foreignObject
-- WHEN exported
-- THEN the output contains `<foreignObject>` and does NOT contain `href="data:image/svg+xml;utf8,"`
-
-#### Acceptance Criteria
-
-- [ ] Given an SVG element with inline SVG content containing foreignObject, the output contains `<foreignObject>` and does NOT contain `href="data:image/svg+xml;utf8,"`
-
----
-
-### Requirement: SVG Import
-
-The system MUST parse SVG markup into document elements. Rectangles MUST recover dimensions and transform translation/rotation. Paths MUST recover `d` data, stroke, and fill. Clip-path references MUST be resolved from `<defs>`. ViewBox dimensions MUST be used when width/height attributes are absent.
-
-#### Scenario: Rectangle with transform
-
-- GIVEN SVG with `<rect>` and `translate(10,20) rotate(45)`
-- WHEN imported
-- THEN element has type `rectangle`, translated position, and rotation 45
-
-#### Scenario: Path with clip-path from defs
-
-- GIVEN SVG with `<path>` referencing a `<clipPath>` in defs
-- WHEN imported
-- THEN element has type `path` with correct content and custom clip-path
-
-#### Scenario: ViewBox fallback dimensions
-
-- GIVEN SVG with only `viewBox` (no width/height)
-- WHEN imported
-- THEN document dimensions come from viewBox
-
-#### Acceptance Criteria
-
-- [ ] Given SVG with `<rect>` and `translate(10,20) rotate(45)`, element has type `rectangle`, translated position, and rotation 45
-- [ ] Given SVG with `<path>` referencing a `<clipPath>` in defs, element has type `path` with correct content and custom clip-path
-- [ ] Given SVG with only `viewBox` (no width/height), document dimensions come from viewBox
-
----
-
-### Requirement: SVG Import Fallback Preservation
-
-The system MUST convert native SVG primitives (rect, path) to native element types. Unsupported fragments (foreignObject, complex groups with transforms) MUST be preserved as SVG payload elements.
-
-#### Scenario: Mixed native and unsupported
-
-- GIVEN SVG with `<rect>` and `<foreignObject>`
-- WHEN imported
-- THEN rect becomes `rectangle` type and foreignObject becomes `svg` type with preserved markup
-
-#### Scenario: Transformed groups preserved
-
-- GIVEN SVG with `<g transform="matrix(...)">` containing children
-- WHEN imported
-- THEN the group becomes an `svg` type element with full markup preserved
-
-#### Acceptance Criteria
-
-- [ ] Given SVG with `<rect>` and `<foreignObject>`, rect becomes `rectangle` type and foreignObject becomes `svg` type with preserved markup
-- [ ] Given SVG with `<g transform="matrix(...)">` containing children, the group becomes an `svg` type element with full markup preserved
-
----
 
 ### Requirement: HTML Standalone Export
 
@@ -195,44 +80,9 @@ The embedded HTML runtime MUST include OKLab color interpolation, SVG path morph
 
 ---
 
-### Requirement: SVG Import Error Recovery
-
-When importing SVG content that contains malformed or unsupported elements, the importer MUST skip invalid elements and continue processing the remainder of the document. The importer MUST return a list of warnings describing skipped elements. A completely unparseable SVG input (not valid XML) MUST result in an import failure with a descriptive error message.
-
-#### Scenario: Partially invalid SVG skips bad elements
-
-- GIVEN an SVG with 10 valid elements and 2 with unsupported attributes
-- WHEN import runs
-- THEN 10 elements are imported and 2 warnings are returned
-
-#### Scenario: Completely invalid XML fails with error
-
-- GIVEN an SVG string that is not valid XML
-- WHEN import runs
-- THEN the import fails with a descriptive error
-
-#### Scenario: Unsupported element type skipped with warning
-
-- GIVEN an SVG with an unsupported element type (e.g., `<foreignObject>` in a non-payload context)
-- WHEN import runs
-- THEN the element is skipped and a warning is returned
-
-#### Acceptance Criteria
-
-- [ ] Given partially invalid SVG input, valid elements are imported and invalid ones are skipped
-- [ ] Given partially invalid SVG input, warnings are returned for skipped elements
-- [ ] Given completely invalid XML input, import fails with a descriptive error
-
----
-
-## Spec Gaps
-
-- [ ] **SVG Import Error Recovery:** No automated tests verify that the importer returns a warnings list for skipped elements, or that completely invalid XML produces a descriptive import failure.
-
----
-
 ## Non-Goals
 
+- SVG export and import (including metadata, sanitization, `data-bs-*` tagging, external-source import, chain round-trip) → see [svg.md](svg.md)
 - PDF generation → see [pdf.md](pdf.md)
 - PPTX format → see [pptx.md](pptx.md)
 - PSD format → see [psd.md](psd.md)

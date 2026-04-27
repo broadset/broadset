@@ -63,10 +63,7 @@ vi.mock('mediabunny', () => ({
       return Promise.resolve();
     });
   }),
-  Mp4OutputFormat: vi.fn(function MockMp4OutputFormat(
-    this: { type: string; options: unknown },
-    options: unknown,
-  ) {
+  Mp4OutputFormat: vi.fn(function MockMp4OutputFormat(this: { type: string; options: unknown }, options: unknown) {
     mockState.mp4FormatCreated = true;
     mockState.mp4FormatOptions = options;
     this.type = 'mp4';

@@ -25,9 +25,7 @@ describe('assertReImportableBy', () => {
    * failure — a reader can't prove anything about zero bytes.
    */
   it('throws for zero-length output', () => {
-    expect(() => assertReImportableBy(new Uint8Array(0), (b) => b, { formatLabel: 'test' })).toThrow(
-      /zero-length/,
-    );
+    expect(() => assertReImportableBy(new Uint8Array(0), (b) => b, { formatLabel: 'test' })).toThrow(/zero-length/);
   });
 
   /**
@@ -37,9 +35,13 @@ describe('assertReImportableBy', () => {
    */
   it('wraps reader exceptions with the format label', () => {
     expect(() =>
-      assertReImportableBy(new Uint8Array([1]), () => {
-        throw new Error('bad signature');
-      }, { formatLabel: 'psd' }),
+      assertReImportableBy(
+        new Uint8Array([1]),
+        () => {
+          throw new Error('bad signature');
+        },
+        { formatLabel: 'psd' },
+      ),
     ).toThrow(/psd.*bad signature/);
   });
 
@@ -50,9 +52,7 @@ describe('assertReImportableBy', () => {
   it('throws when the reader returns null', () => {
     const nullReader = (): unknown => null;
 
-    expect(() => assertReImportableBy(new Uint8Array([1]), nullReader, { formatLabel: 'fmt' })).toThrow(
-      /null/,
-    );
+    expect(() => assertReImportableBy(new Uint8Array([1]), nullReader, { formatLabel: 'fmt' })).toThrow(/null/);
   });
 });
 

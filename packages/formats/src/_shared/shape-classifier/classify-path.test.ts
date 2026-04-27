@@ -190,9 +190,7 @@ describe('classifyPath — path fallback', () => {
    * importer preserves the rounded geometry.
    */
   it('returns path for a rounded rectangle', () => {
-    const result = classifyPath(
-      'M 5 0 L 45 0 Q 50 0 50 5 L 50 45 Q 50 50 45 50 L 5 50 Q 0 50 0 45 L 0 5 Q 0 0 5 0 Z',
-    );
+    const result = classifyPath('M 5 0 L 45 0 Q 50 0 50 5 L 50 45 Q 50 50 45 50 L 5 50 Q 0 50 0 45 L 0 5 Q 0 0 5 0 Z');
 
     expect(result.kind).toBe('path');
   });

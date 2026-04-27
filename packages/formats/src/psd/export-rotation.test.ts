@@ -4,7 +4,7 @@ import { readPsd } from 'ag-psd';
 import { describe, expect, it } from 'vitest';
 
 import { exportPsdBytes } from './export';
-import { makeDocument,makeElement } from './test-helpers';
+import { makeDocument, makeElement } from './test-helpers';
 
 /**
  * Phase 5 unit P5.2a — element rotation MUST compose into exported
@@ -30,7 +30,8 @@ describe('PSD export — rotation', () => {
       width: 100,
       height: 50,
       rotation: 90,
-      content: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
+      content:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
     });
 
     const doc = makeDocument({ elements: [el] });
@@ -53,21 +54,10 @@ describe('PSD export — rotation', () => {
     // rotation is applied to the original corners. The four corners
     // after 90° CW rotation will all be distinct from the
     // un-rotated quad.
-    const originalCorners = [
-      10,
-      10,
-      110,
-      10,
-      110,
-      60,
-      10,
-      60,
-    ];
+    const originalCorners = [10, 10, 110, 10, 110, 60, 10, 60];
 
     const transformArray = transform ?? [];
-    const differs = originalCorners.some(
-      (value, idx) => Math.abs((transformArray[idx] ?? 0) - value) > 0.5,
-    );
+    const differs = originalCorners.some((value, idx) => Math.abs((transformArray[idx] ?? 0) - value) > 0.5);
 
     expect(differs).toBe(true);
   });
@@ -84,7 +74,8 @@ describe('PSD export — rotation', () => {
       width: 100,
       height: 50,
       rotation: 0,
-      content: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
+      content:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
     });
 
     const doc = makeDocument({ elements: [el] });

@@ -12,6 +12,7 @@ import { ModalShell } from './modal-shell';
  */
 
 export type FormatExportColorSpace = 'rgb' | 'cmyk' | 'lab' | 'grayscale';
+export type FormatExportFontEmbedding = 'embed' | 'reference' | 'flatten';
 
 export interface FormatExportOptionsValue {
   readonly colorSpace: FormatExportColorSpace;
@@ -19,6 +20,12 @@ export interface FormatExportOptionsValue {
   readonly embedIccProfile: boolean;
   readonly linkSmartObjects: boolean;
   readonly preserveVisibility: boolean;
+  /** SVG-only: font-embedding strategy. Default `'embed'`. */
+  readonly fontEmbedding: FormatExportFontEmbedding;
+  /** SVG-only: emit `<metadata>` RDF packet with document-level state. */
+  readonly includeMetadata: boolean;
+  /** SVG-only: emit `data-bs-*` / `broadset:content-hash` on every rendered element. */
+  readonly includeElementTagging: boolean;
 }
 
 export interface FormatExportOptionsModalProps {
@@ -36,6 +43,12 @@ const COLOR_SPACE_LABELS: Record<FormatExportColorSpace, string> = {
   cmyk: 'CMYK',
   lab: 'Lab',
   grayscale: 'Grayscale',
+};
+
+const FONT_EMBEDDING_LABELS: Record<FormatExportFontEmbedding, string> = {
+  embed: 'Embed (recommended)',
+  reference: 'External reference',
+  flatten: 'Flatten text to paths',
 };
 
 export function FormatExportOptionsModal({
@@ -121,6 +134,48 @@ export function FormatExportOptionsModal({
             aria-label="Preserve visibility"
           >
             Preserve hidden elements
+          </Switch>
+        ) : null}
+
+        {supportedFields.has('fontEmbedding') ? (
+          <Select
+            aria-label="Font embedding"
+            value={value.fontEmbedding}
+            onChange={(key) => {
+              const next = String(key) as FormatExportFontEmbedding;
+
+              setValue((prev) => ({ ...prev, fontEmbedding: next }));
+            }}
+          >
+            {(Object.keys(FONT_EMBEDDING_LABELS) as readonly FormatExportFontEmbedding[]).map((choice) => (
+              <option key={choice} value={choice}>
+                {FONT_EMBEDDING_LABELS[choice]}
+              </option>
+            ))}
+          </Select>
+        ) : null}
+
+        {supportedFields.has('includeMetadata') ? (
+          <Switch
+            isSelected={value.includeMetadata}
+            onChange={(isSelected) => {
+              setValue((prev) => ({ ...prev, includeMetadata: isSelected }));
+            }}
+            aria-label="Include document metadata packet"
+          >
+            Include document metadata (for round-trip)
+          </Switch>
+        ) : null}
+
+        {supportedFields.has('includeElementTagging') ? (
+          <Switch
+            isSelected={value.includeElementTagging}
+            onChange={(isSelected) => {
+              setValue((prev) => ({ ...prev, includeElementTagging: isSelected }));
+            }}
+            aria-label="Include per-element tagging"
+          >
+            Tag elements for reconciliation
           </Switch>
         ) : null}
 

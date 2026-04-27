@@ -1,4 +1,48 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m ' *)",
+      "Bash(npm run quality)",
+      "Bash(npm run quality -w *)",
+      "Bash(npm run quality:all)",
+      "Bash(npm run quality:strict)",
+      "Bash(npm run lint)",
+      "Bash(npm run lint -w *)",
+      "Bash(npm run lint:strict)",
+      "Bash(npm run lint:dead)",
+      "Bash(npm run lint:check)",
+      "Bash(npm run test)",
+      "Bash(npm run test -w *)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run typecheck -w *)",
+      "Bash(npm run gate:full)",
+      "Bash(npm run prettier:check)",
+      "Bash(npm run ct)",
+      "Bash(npm run ct -w *)",
+      "Bash(npm ls)",
+      "Bash(npm ls *)",
+      "Bash(npm view *)",
+      "Bash(npm info *)",
+      "Bash(npm test)",
+      "Bash(npm test *)",
+      "Bash(npx vitest run *)",
+      "Bash(npx tsc --noEmit *)",
+      "Bash(npx tsc -b *)",
+      "Bash(npx prettier --check *)",
+      "Bash(npx knip)",
+      "Bash(npx knip *)",
+      "Bash(bash agents/hooks/quality-gate.sh)",
+      "Bash(agents/hooks/quality-gate.sh)",
+      "Bash(agents/hooks/quality-gate.sh *)",
+      "mcp__chrome-devtools__take_snapshot",
+      "Skill(ralph-loop:ralph-loop)",
+      "Skill(ralph-loop:ralph-loop:*)"
+    ],
+    "additionalDirectories": [
+      "/tmp",
+      "/private/tmp"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -47,44 +91,6 @@
           }
         ]
       }
-    ]
-  },
-  "permissions": {
-    "allow": [
-      "Bash(git commit -m ' *)",
-      "Bash(npm run quality)",
-      "Bash(npm run quality -w *)",
-      "Bash(npm run quality:all)",
-      "Bash(npm run quality:strict)",
-      "Bash(npm run lint)",
-      "Bash(npm run lint -w *)",
-      "Bash(npm run lint:strict)",
-      "Bash(npm run lint:dead)",
-      "Bash(npm run test)",
-      "Bash(npm run test -w *)",
-      "Bash(npm run typecheck)",
-      "Bash(npm run typecheck -w *)",
-      "Bash(npm run gate:full)",
-      "Bash(npm run prettier:check)",
-      "Bash(npm run ct)",
-      "Bash(npm run ct -w *)",
-      "Bash(npm run lint:check)",
-      "Bash(npm ls)",
-      "Bash(npm ls *)",
-      "Bash(npm view *)",
-      "Bash(npm info *)",
-      "Bash(npx vitest run *)",
-      "Bash(npx tsc --noEmit *)",
-      "Bash(npx tsc -b *)",
-      "Bash(npx prettier --check *)",
-      "Bash(bash agents/hooks/quality-gate.sh)",
-      "Bash(agents/hooks/quality-gate.sh)",
-      "Bash(agents/hooks/quality-gate.sh *)",
-      "Bash(npx knip)",
-      "Bash(npx knip *)",
-      "Bash(npm test)",
-      "Bash(npm test *)",
-      "mcp__chrome-devtools__take_snapshot"
     ]
   }
 }

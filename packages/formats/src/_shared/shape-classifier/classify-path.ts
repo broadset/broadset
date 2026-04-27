@@ -180,11 +180,7 @@ function absolutePoint(isRelative: boolean, current: Point, dx: number, dy: numb
   return isRelative ? [current[0] + dx, current[1] + dy] : [dx, dy];
 }
 
-function applyCommand(
-  command: string,
-  args: readonly number[],
-  state: ParserState,
-): ParsedSegment | null {
+function applyCommand(command: string, args: readonly number[], state: ParserState): ParsedSegment | null {
   const isRelative = command === command.toLowerCase();
 
   switch (command.toUpperCase()) {
@@ -244,11 +240,7 @@ function applyHorizontalCommand(
   return { command: 'H', points: [absolute] };
 }
 
-function applyVerticalCommand(
-  args: readonly number[],
-  isRelative: boolean,
-  state: ParserState,
-): ParsedSegment | null {
+function applyVerticalCommand(args: readonly number[], isRelative: boolean, state: ParserState): ParsedSegment | null {
   const [y] = args;
 
   if (y === undefined) return null;
@@ -414,11 +406,9 @@ function deriveEllipseAxes(endpoints: readonly Point[]): EllipseAxes | null {
   const cyA = (p0[1] + p2[1]) / 2;
   const cxB = (p1[0] + p3[0]) / 2;
   const cyB = (p1[1] + p3[1]) / 2;
-  const axisTolerance = Math.max(
-    Math.abs(p0[0] - p2[0]) + Math.abs(p0[1] - p2[1]),
-    Math.abs(p1[0] - p3[0]) + Math.abs(p1[1] - p3[1]),
-    1,
-  ) * ELLIPSE_RADIUS_TOLERANCE_FRACTION;
+  const axisTolerance =
+    Math.max(Math.abs(p0[0] - p2[0]) + Math.abs(p0[1] - p2[1]), Math.abs(p1[0] - p3[0]) + Math.abs(p1[1] - p3[1]), 1) *
+    ELLIPSE_RADIUS_TOLERANCE_FRACTION;
 
   if (!approximatelyEqual(cxA, cxB, axisTolerance)) return null;
   if (!approximatelyEqual(cyA, cyB, axisTolerance)) return null;

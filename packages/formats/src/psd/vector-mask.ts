@@ -215,14 +215,7 @@ export function buildEllipseMask(width: number, height: number): BezierPath {
   const kx = rx * ELLIPSE_KAPPA;
   const ky = ry * ELLIPSE_KAPPA;
 
-  const knot = (
-    py: number,
-    px: number,
-    inY: number,
-    inX: number,
-    outY: number,
-    outX: number,
-  ): BezierKnot => ({
+  const knot = (py: number, px: number, inY: number, inX: number, outY: number, outX: number): BezierKnot => ({
     linked: false,
     points: [inY * scaleY, inX * scaleX, py * scaleY, px * scaleX, outY * scaleY, outX * scaleX],
   });

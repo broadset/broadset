@@ -255,7 +255,11 @@ function importOpenVectorPath(
   );
 }
 
-function importImageDataRectangle(layer: Layer, geometry: LayerGeometry, style: Record<string, unknown>): BroadsetElement {
+function importImageDataRectangle(
+  layer: Layer,
+  geometry: LayerGeometry,
+  style: Record<string, unknown>,
+): BroadsetElement {
   const hasColor = detectLayerColor(layer);
   const bgColor = hasColor ? rgbaToHex(hasColor.r, hasColor.g, hasColor.b, hasColor.a) : undefined;
 
@@ -420,8 +424,9 @@ export function importPsd(data: Uint8Array): BroadsetDocument {
   };
   const { pages, elements } = buildPagesAndElements(psd);
   const xmpPacket = readDocumentXmpPacket(psd);
-  const reconciledElements = xmpPacket
-    ? elements.map((el, index) => {
+  const reconciledElements =
+    xmpPacket ?
+      elements.map((el, index) => {
         const packetEntry = xmpPacket.elements[index];
 
         if (packetEntry === undefined) return el;
@@ -429,7 +434,10 @@ export function importPsd(data: Uint8Array): BroadsetDocument {
         return {
           ...el,
           id: packetEntry.id,
-          extensions: { ...el.extensions, psd: { dirty: false, roundTrip: { signature: 'BsPs', elementId: packetEntry.id } } },
+          extensions: {
+            ...el.extensions,
+            psd: { dirty: false, roundTrip: { signature: 'BsPs', elementId: packetEntry.id } },
+          },
         } satisfies BroadsetElement;
       })
     : elements;

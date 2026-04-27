@@ -122,9 +122,7 @@ describe('subsetFont happy path', () => {
       [0x4f, 0x54, 0x54, 0x4f],
     ];
 
-    const matches = acceptedSignatures.some((accepted) =>
-      accepted.every((byte, idx) => byte === signature[idx]),
-    );
+    const matches = acceptedSignatures.some((accepted) => accepted.every((byte, idx) => byte === signature[idx]));
 
     expect(matches).toBe(true);
   });

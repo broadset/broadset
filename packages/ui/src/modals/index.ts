@@ -22,6 +22,7 @@ export {
 } from './extra-modals';
 export {
   type FormatExportColorSpace,
+  type FormatExportFontEmbedding,
   FormatExportOptionsModal,
   type FormatExportOptionsModalProps,
   type FormatExportOptionsValue,

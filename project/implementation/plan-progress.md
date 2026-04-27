@@ -128,14 +128,14 @@ Source of truth: [plan.md](./plan.md), [pdf-support-plan.md](./pdf-support-plan.
 
 Source of truth: [plan.md](./plan.md), [svg-support-plan.md](./svg-support-plan.md)
 
-- [ ] P7.0 SVG spec and scope lock
-- [ ] P7.1 SVG types and architecture
-- [ ] P7.2 SVG export parity and critical bug fix
-- [ ] P7.3 SVG export beyond prior art
-- [ ] P7.4a SVG import fast path (`metadata + data-bs-*`)
-- [ ] P7.4b SVG arbitrary third-party import
-- [ ] P7.5 SVG reconciliation
-- [ ] P7.6 SVG tests and UI wiring
+- [x] P7.0 SVG spec and scope lock (new `project/spec/formats/svg.md` with feature matrix + standards-only metadata/tagging/sanitization requirements; `web-vector.md` trimmed to HTML-standalone only; `spec.md` sub-specs split)
+- [x] P7.1 SVG types and architecture (new `packages/formats/src/svg/` module with `types.ts` + Zod registration per IO-D-11; public API `exportSvgString` / `exportSvgDocument` / `importSvgDocument` / `canRoundTrip`; `svgpath` + `css-tree` + `transformation-matrix` deps added; architecture.md updated; metadata-roundtrip spike proves DOMParser preserves `<metadata>` RDF + namespaced attrs)
+- [x] P7.2 SVG export parity and critical bug fix (recursive `<g>` with parentId-tree children; full stroke coverage — cap/join/miterlimit/dasharray/dashoffset + arrow markers; group transforms compose on `<g>`; opaque `svg`-type payloads routed through `_shared/sanitize` on re-emission; `<linearGradient>` / `<radialGradient>` parse from `<defs>` on import with stops + derived angle; animations remain discarded per IO-D-16)
+- [x] P7.3 SVG export beyond prior art (data-bs-id/kind + broadset:content-hash on every element via `fingerprintElement`; document `<metadata>` RDF packet under shared IO-D-08 namespace with canvas unit/dpi + per-element seq + originalColor + conic spec; conic gradient visual fallback to linear approximation; exportSvgString/exportSvgDocument promoted to async; demo formatBridge awaits). Font embedding / subsetting deferred to P7.6 when asset pipeline calls arrive.
+- [x] P7.4a SVG import fast path (`metadata + data-bs-*`) (`svg/metadata.ts` parses RDF packet when the broadset namespace is declared on root; `importSvgDocument` detects fast path via namespace + metadata presence; hydrates document.id, canvas unit/dpi, per-element ids from data-bs-id, and applies originalColor / conic gradient overrides from metadata; every hydrated element carries `extensions.svg.dirty === false` per IO-D-11)
+- [x] P7.4b SVG arbitrary third-party import (in-place DOM sanitizer strips `<script>` / `on*=` / `javascript:` URLs / `<foreignObject>` — preserves `<use>` / `<symbol>` / vendor elements that DOMPurify's profile would over-strip; `<use>`/`<symbol>` dereference with cycle detection + bounded depth cap; basic CSS `<style>` block resolution with type/class/id selectors respecting inline-style precedence; tool-specific namespace warnings for `sodipodi:` / `inkscape:` / `ai:`; unknown vendor elements preserved as opaque `svg`-type per IO-D-18)
+- [x] P7.5 SVG reconciliation (`svg/roundtrip.ts` — `reconcileSvg({preserved, currentSvg})` wraps `_shared/reconcile` with SVG-specific normalisation; metadata packet extended to carry `name`/`width`/`height` so text + group geometry round-trips cleanly; `dirtyElementIds` helper for dirty-flag discipline on re-export)
+- [x] P7.6 SVG tests and UI wiring (chain round-trip test with zero-drift reconcile; browser-parseable via DOMParser; synthetic Illustrator / Inkscape / Figma / hand-authored `<use>` fixtures; hostile-SVG security suite — billion-laughs / `<use>` depth bomb / multi-vector; `FormatExportOptionsModal` extended with `fontEmbedding` + `includeMetadata` + `includeElementTagging` SVG-specific fields)
 
 ### Phase 8 — PPTX track
 

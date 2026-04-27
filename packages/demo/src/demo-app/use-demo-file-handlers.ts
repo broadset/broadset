@@ -1,5 +1,5 @@
 import type { EditorStore } from '@broadset/editor';
-import type { BroadsetDocument } from '@broadset/model';
+import type { BroadsetDocument, BroadsetProject } from '@broadset/model';
 import { createEmptyBroadsetDocument } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { computeTimelineLoopDuration, createPlaybackController } from '@broadset/playback';
@@ -25,6 +25,54 @@ interface UseDemoFileHandlersOptions {
   readonly pushToast: (severity: 'error' | 'info' | 'success', message: string) => void;
   readonly setActiveDialog: Dispatch<SetStateAction<ActiveDialog>>;
   readonly fileInputRef: RefObject<HTMLInputElement | null>;
+  /**
+   * Project-level assets (font, image, video, etc.). The SVG
+   * exporter walks `FontAsset` entries here to populate
+   * `SvgExportOptions.fonts` so embed / reference / flatten modes
+   * find byte sources for any text element using a non-system
+   * `font-family`. Optional — when absent SVG export still works
+   * but emits "no font bytes supplied" warnings.
+   */
+  readonly projectAssets?: BroadsetProject['assets'];
+  /**
+   * Setter the import handler invokes when the imported file is a
+   * `BroadsetProject` wrapper carrying its own `assets`. Lets the
+   * demo replace its in-memory project assets so subsequent SVG
+   * exports embed fonts the imported project actually declares
+   * rather than the bundled sample's. Optional — when absent, the
+   * file handler just leaves the existing `projectAssets` in place.
+   */
+  readonly setProjectAssets?: Dispatch<SetStateAction<BroadsetProject['assets']>>;
+  /**
+   * Setter for the pending import-warnings list. When the importer
+   * returns a non-empty `warnings` array, the file handler stows
+   * the list here so `LayoutDialogs` can surface it via
+   * `FormatImportWarningsModal` (per IO-D-18 — no silent drops).
+   */
+  readonly setPendingImportWarnings?: Dispatch<SetStateAction<readonly string[]>>;
+  /**
+   * Setter for the format label that accompanies the pending
+   * warnings (e.g., 'SVG', 'PSD'). Drives the modal title.
+   */
+  readonly setPendingImportFormatLabel?: Dispatch<SetStateAction<string>>;
+}
+
+/**
+ * Map a filename's extension to the human-readable format label
+ * the warnings modal displays in its title. Falls back to "File"
+ * for unknown extensions so the modal still has a meaningful
+ * heading.
+ */
+function deriveFormatLabel(fileName: string): string {
+  const lower = fileName.toLowerCase();
+
+  if (lower.endsWith('.svg')) return 'SVG';
+  if (lower.endsWith('.psd')) return 'PSD';
+  if (lower.endsWith('.pdf')) return 'PDF';
+  if (lower.endsWith('.pptx')) return 'PPTX';
+  if (lower.endsWith('.bsp') || lower.endsWith('.json')) return 'Project';
+
+  return 'File';
 }
 
 function formatImportWarningMessage(warnings: readonly string[]): string {
@@ -372,6 +420,10 @@ export function useDemoFileHandlers({
   pushToast,
   setActiveDialog,
   fileInputRef,
+  projectAssets,
+  setProjectAssets,
+  setPendingImportWarnings,
+  setPendingImportFormatLabel,
 }: UseDemoFileHandlersOptions): DemoFileHandlers {
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
 
@@ -410,13 +462,40 @@ export function useDemoFileHandlers({
 
       try {
         const { importDocument } = await import('../formatBridge');
-        const result = await importDocument(file);
+        // Pass the live project assets so SVG imports of third-
+        // party files that carry `<text>` under baking transforms
+        // can glyph-flatten via the project's fonts (P7.7i path).
+        // Other formats ignore this option.
+        const result = await importDocument(file, projectAssets !== undefined ? { projectAssets } : undefined);
 
         editorStore.getState().loadTemplate(result.document);
+
+        // Replace the in-memory project assets when the imported
+        // wrapper actually carried its own (a `BroadsetProject`
+        // JSON / .bsp). SVG exports done after the import will
+        // embed fonts the new project declares.
+        if (result.projectAssets !== undefined && setProjectAssets !== undefined) {
+          // ImportDocumentResult uses the raw `Asset` union; the
+          // demo's state uses the zod-parsed shape. Both are
+          // structurally identical at runtime — round-trip via
+          // `[...projectAssets]` so TS sees a fresh mutable array.
+          setProjectAssets([...result.projectAssets] as BroadsetProject['assets']);
+        }
+
         pushToast('success', 'Import complete.');
 
         if (result.warnings.length > 0) {
-          pushToast('info', formatImportWarningMessage(result.warnings));
+          // P7.7n: surface warnings via the dedicated review modal
+          // so users can see the full list (per IO-D-18 — no silent
+          // drops). Fall back to a toast when the modal isn't wired
+          // (some test harnesses don't supply the setters).
+          if (setPendingImportWarnings !== undefined && setPendingImportFormatLabel !== undefined) {
+            setPendingImportFormatLabel(deriveFormatLabel(file.name));
+            setPendingImportWarnings(result.warnings);
+            setActiveDialog('format-import-warnings');
+          } else {
+            pushToast('info', formatImportWarningMessage(result.warnings));
+          }
         }
       } catch (error: unknown) {
         pushToast('error', `Import failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -424,7 +503,15 @@ export function useDemoFileHandlers({
         event.currentTarget.value = '';
       }
     },
-    [editorStore, pushToast],
+    [
+      editorStore,
+      projectAssets,
+      pushToast,
+      setActiveDialog,
+      setPendingImportFormatLabel,
+      setPendingImportWarnings,
+      setProjectAssets,
+    ],
   );
 
   const handleSaveAsJson = useCallback((): void => {
@@ -545,6 +632,11 @@ export function useDemoFileHandlers({
 
         if (videoSession !== null) snapshotCanvas = videoSession.session.encoderCanvas;
 
+        // SVG export pulls byte-level font sources from the
+        // project's `FontAsset`s so embed / reference / flatten
+        // modes have something to embed beyond the family name.
+        const svgOptions = exporter === 'svg' && projectAssets !== undefined ? { projectAssets } : undefined;
+
         try {
           await bridge.exportDocument(exporter as ExportFormat, {
             document: renderDocument,
@@ -554,6 +646,7 @@ export function useDemoFileHandlers({
             ...(videoSession?.playbackDurationMs !== undefined ?
               { playbackDurationMs: videoSession.playbackDurationMs }
             : {}),
+            ...(svgOptions !== undefined ? { svgOptions } : {}),
             onProgress: makeFinalizeProgressHandler(setExportProgress),
           });
 
@@ -579,7 +672,7 @@ export function useDemoFileHandlers({
           setExportProgress(null);
         });
     },
-    [currentDocument, handleSaveAsJson, pushToast, renderDocument, setActiveDialog],
+    [currentDocument, handleSaveAsJson, projectAssets, pushToast, renderDocument, setActiveDialog],
   );
 
   const handleMediaSelect = useCallback(

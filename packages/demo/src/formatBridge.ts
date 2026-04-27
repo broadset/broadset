@@ -1,5 +1,5 @@
 import type * as FormatsNS from '@broadset/formats';
-import type { BroadsetDocument } from '@broadset/model';
+import type { Asset, BroadsetDocument } from '@broadset/model';
 import { broadsetDocumentSchema } from '@broadset/model';
 
 /* ------------------------------------------------------------------ */
@@ -22,6 +22,22 @@ export type ExportFormat =
   | 'svg-embedded'
   | 'webm';
 
+export interface SvgExportOptionsInput {
+  readonly fontEmbedding?: 'embed' | 'reference' | 'flatten';
+  readonly includeMetadata?: boolean;
+  readonly includeElementTagging?: boolean;
+  readonly flattenGroups?: boolean;
+  /**
+   * Project assets the SVG exporter walks for `FontAsset` byte
+   * sources. Used to populate `SvgExportOptions.fonts` so embed /
+   * reference / flatten modes have something to embed beyond the
+   * font-family name. Optional: when absent, the exporter emits
+   * preflight warnings for every text element using a non-system
+   * family.
+   */
+  readonly projectAssets?: readonly Asset[];
+}
+
 export interface ExportContext {
   readonly document: BroadsetDocument;
   readonly snapshotCanvas?: HTMLCanvasElement;
@@ -32,11 +48,21 @@ export interface ExportContext {
   readonly videoFrameRate?: number;
   readonly videoQuality?: number;
   readonly onProgress?: (progress: number, stage?: string) => void;
+  /** SVG-specific options from the `FormatExportOptionsModal`. */
+  readonly svgOptions?: SvgExportOptionsInput;
 }
 
 export interface ImportDocumentResult {
   readonly document: BroadsetDocument;
   readonly warnings: readonly string[];
+  /**
+   * Project-level asset list when the imported file was a
+   * `BroadsetProject` (JSON / `.bsp` with a `documents` array).
+   * Lets the demo replace its in-memory project assets so SVG
+   * exports can embed fonts the imported project actually
+   * declares — instead of defaulting to the bundled sample.
+   */
+  readonly projectAssets?: readonly Asset[] | undefined;
 }
 
 /* ------------------------------------------------------------------ */
@@ -66,6 +92,49 @@ const DEFAULT_JPEG_QUALITY = 0.92;
 const DEFAULT_VIDEO_FRAME_RATE = 30;
 const DEFAULT_VIDEO_QUALITY = 0.8;
 
+/**
+ * Build the SVG-specific export options + font source map from the
+ * caller's `svgOptions`, and route the result through
+ * `exportSvgDocument`. Extracted from the main `exportDocument`
+ * switch to keep that function's cognitive complexity below the
+ * sonarjs threshold.
+ */
+async function exportSvgVia(formats: FormatsModule, context: ExportContext, name: string): Promise<void> {
+  const projectAssets = context.svgOptions?.projectAssets ?? [];
+  const fonts = projectAssets.length > 0 ? formats.buildSvgFontSourcesFromAssets(projectAssets) : undefined;
+  // Resolve image / pattern asset ids to URLs (data: for embedded
+  // bytes, https: for hosted) so standalone SVG viewers render
+  // them. Without this the exporter emits the bare Broadset asset
+  // id as `<image href>`, which Illustrator / Inkscape / browsers
+  // cannot fetch. P7.7j adds the resolver hook.
+  const assetResolver = projectAssets.length > 0 ? formats.buildSvgAssetResolverFromAssets(projectAssets) : undefined;
+  const svgExportOptions = {
+    ...(context.svgOptions?.fontEmbedding !== undefined ? { fontEmbedding: context.svgOptions.fontEmbedding } : {}),
+    ...(context.svgOptions?.includeMetadata !== undefined ?
+      { includeMetadata: context.svgOptions.includeMetadata }
+    : {}),
+    ...(context.svgOptions?.includeElementTagging !== undefined ?
+      { includeElementTagging: context.svgOptions.includeElementTagging }
+    : {}),
+    ...(context.svgOptions?.flattenGroups !== undefined ? { flattenGroups: context.svgOptions.flattenGroups } : {}),
+    ...(fonts !== undefined ? { fonts } : {}),
+    ...(assetResolver !== undefined ? { assetResolver } : {}),
+  };
+  const result = await formats.exportSvgDocument(context.document, svgExportOptions);
+  const blob = new Blob([result.svg], { type: 'image/svg+xml' });
+
+  // Surface preflight warnings (missing fonts, restricted-
+  // permission embeds) to the caller via the onProgress stage
+  // channel so the toast layer can announce them.
+  if (result.warnings.length > 0 && context.onProgress !== undefined) {
+    const summary = `Exported with ${String(result.warnings.length)} font warning(s): ${result.warnings[0] ?? ''}`;
+
+    context.onProgress(1, summary);
+  }
+
+  formats.triggerDownload(blob, `${name}.svg`);
+}
+
 export async function exportDocument(format: ExportFormat, context: ExportContext): Promise<void> {
   const formats = await loadFormats();
   const { document: doc } = context;
@@ -81,10 +150,7 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
     }
 
     case 'svg': {
-      const svgStr = formats.exportSvg(doc);
-      const blob = new Blob([svgStr], { type: 'image/svg+xml' });
-
-      formats.triggerDownload(blob, `${name}.svg`);
+      await exportSvgVia(formats, context, name);
       break;
     }
 
@@ -241,7 +307,17 @@ function hasDocumentsArray(value: unknown): value is { readonly documents: reado
   );
 }
 
-export async function importDocument(file: File): Promise<ImportDocumentResult> {
+/** Detect a `BroadsetProject`-shaped wrapper carrying both `documents` AND `assets`. */
+function hasProjectShape(
+  value: unknown,
+): value is { readonly documents: readonly unknown[]; readonly assets: readonly Asset[] } {
+  return hasDocumentsArray(value) && 'assets' in value && Array.isArray((value as Record<string, unknown>)['assets']);
+}
+
+export async function importDocument(
+  file: File,
+  options?: { readonly projectAssets?: readonly Asset[] },
+): Promise<ImportDocumentResult> {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
 
   switch (ext) {
@@ -251,10 +327,12 @@ export async function importDocument(file: File): Promise<ImportDocumentResult> 
       const text = await file.text();
       const parsed: unknown = JSON.parse(text);
       const candidate = hasDocumentsArray(parsed) ? parsed['documents'][0] : parsed;
+      const projectAssets = hasProjectShape(parsed) ? parsed.assets : undefined;
 
       return {
         document: broadsetDocumentSchema.parse(candidate),
         warnings: [],
+        ...(projectAssets !== undefined ? { projectAssets } : {}),
       };
     }
 
@@ -275,8 +353,17 @@ export async function importDocument(file: File): Promise<ImportDocumentResult> 
     case 'svg': {
       const formats = await loadFormats();
       const text = await file.text();
+      // Thread project font assets into the importer so a third-
+      // party SVG with `<text>` under a baking ancestor (scale /
+      // skew) can glyph-flatten into a `<path>` using the project's
+      // own fonts. Without this, the importer silently drops the
+      // scale to translate-only with a warning. P7.7i shipped the
+      // import-side flatten; this wiring lets users actually
+      // trigger it.
+      const projectAssets = options?.projectAssets ?? [];
+      const fontSources = projectAssets.length > 0 ? formats.buildSvgFontSourcesFromAssets(projectAssets) : undefined;
 
-      return formats.importSvgDocument(text, file.name);
+      return formats.importSvgDocument(text, file.name, fontSources !== undefined ? { fontSources } : undefined);
     }
 
     case 'pdf': {

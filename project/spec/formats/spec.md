@@ -13,7 +13,8 @@ Defines all export and import format converters for broadset. Each format conver
 | [pdf.md](pdf.md)                 | PDF export, import, round-trip, XMP + marked-content metadata, colour space, font embedding        |
 | [pptx.md](pptx.md)               | PPTX export with SVG fallback, import with path recovery, round-trip fidelity                      |
 | [psd.md](psd.md)                 | PSD export (layers, masks, effects, artboards), import, path vector conversion                     |
-| [web-vector.md](web-vector.md)   | SVG export/import, HTML standalone export with embedded playback runtime                           |
+| [svg.md](svg.md)                 | SVG export, import, round-trip, sanitization, `<metadata>` RDF packet, `data-bs-*` element tagging |
+| [web-vector.md](web-vector.md)   | HTML standalone export with embedded playback runtime                                              |
 | [interchange.md](interchange.md) | JSON export, OGraf packages, video export, QR SVG, filename sanitization, cross-format conformance |
 | [raster.md](raster.md)           | PNG/JPEG raster export, pixel-ratio behavior, canvas discovery                                     |
 

@@ -115,6 +115,9 @@ describe('Cross-format reuse (I6.1 / I7.1 / I8.1)', () => {
           embedIccProfile: true,
           linkSmartObjects: true,
           preserveVisibility: true,
+          fontEmbedding: 'embed',
+          includeMetadata: true,
+          includeElementTagging: true,
         }}
         onCancel={vi.fn()}
         onConfirm={vi.fn()}
@@ -126,6 +129,53 @@ describe('Cross-format reuse (I6.1 / I7.1 / I8.1)', () => {
     expect(screen.getAllByLabelText(/embed icc profile/i).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText(/keep smart objects linked/i)).toBeNull();
     expect(screen.queryByLabelText(/preserve hidden elements/i)).toBeNull();
+    expect(screen.queryByLabelText(/font embedding/i)).toBeNull();
+    expect(screen.queryByLabelText(/include document metadata/i)).toBeNull();
+  });
+
+  /**
+   * @description P7.6 — the SVG track opts into `fontEmbedding`,
+   * `includeMetadata`, `includeElementTagging`, and skips the
+   * PSD/PDF-specific fields (colour space / bit depth / ICC /
+   * smart objects). Each SVG control renders with its labelled
+   * HeroUI component per the HeroUI mandate.
+   */
+  it('renders the SVG-specific supported fields when declared', () => {
+    render(
+      <FormatExportOptionsModal
+        isOpen={true}
+        formatLabel="SVG"
+        supportedFields={new Set(['fontEmbedding', 'includeMetadata', 'includeElementTagging'])}
+        defaults={{
+          colorSpace: 'rgb',
+          bitDepth: 8,
+          embedIccProfile: false,
+          linkSmartObjects: false,
+          preserveVisibility: true,
+          fontEmbedding: 'embed',
+          includeMetadata: true,
+          includeElementTagging: true,
+        }}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+      />,
+    );
+
+    // HeroUI's Select renders aria-label on the wrapping listbox,
+    // not the native <select>, so the font-embedding control is
+    // verified via its option values rather than label lookup.
+    const options = screen.getAllByRole('option');
+    const optionValues = options.map((el) => (el as HTMLOptionElement).value);
+
+    expect(optionValues).toContain('embed');
+    expect(optionValues).toContain('reference');
+    expect(optionValues).toContain('flatten');
+
+    expect(screen.getAllByLabelText(/include document metadata/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText(/include per-element tagging/i).length).toBeGreaterThan(0);
+    // SVG-specific supportedFields — PDF/PSD options MUST NOT appear.
+    expect(screen.queryByLabelText(/embed icc profile/i)).toBeNull();
+    expect(screen.queryByLabelText(/keep smart objects linked/i)).toBeNull();
   });
 });
 
@@ -136,6 +186,9 @@ describe('FormatExportOptionsModal', () => {
     embedIccProfile: true,
     linkSmartObjects: true,
     preserveVisibility: true,
+    fontEmbedding: 'embed',
+    includeMetadata: true,
+    includeElementTagging: true,
   };
 
   /**
