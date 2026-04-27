@@ -203,6 +203,8 @@ describe('P7.7h — Filter primitive export', () => {
     const svg = await exportSvgString(doc);
 
     expect(svg).toMatch(/<feComponentTransfer[\s\S]*<feFuncR/);
+    expect(svg).toContain('data-bs-filter-primitive="invert"');
+    expect(svg).toContain('data-bs-filter-primitive="brightness"');
   });
 
   /**

@@ -541,7 +541,55 @@ function readComponentTransferPrimitive(el: Element): FilterPrimitive | undefine
     return { kind: 'custom-svg', svg: el.outerHTML };
   }
 
+  // Broadset-exported `<feComponentTransfer>` carries
+  // `data-bs-filter-primitive` so mathematically equivalent
+  // invert/contrast forms preserve authored semantics on import.
+  const hinted = recoverHintedLinearTransfer(el, r.slope, r.intercept);
+
+  if (hinted !== undefined) {
+    return hinted;
+  }
+
   return classifyLinearTransfer(r.slope, r.intercept) ?? { kind: 'custom-svg', svg: el.outerHTML };
+}
+
+type ComponentTransferHint = 'invert' | 'brightness' | 'contrast';
+
+function readComponentTransferHint(el: Element): ComponentTransferHint | undefined {
+  const raw = (el.getAttribute('data-bs-filter-primitive') ?? '').trim().toLowerCase();
+
+  if (raw === 'invert' || raw === 'brightness' || raw === 'contrast') {
+    return raw;
+  }
+
+  return undefined;
+}
+
+function recoverHintedLinearTransfer(el: Element, slope: number, intercept: number): FilterPrimitive | undefined {
+  const hint = readComponentTransferHint(el);
+
+  if (hint === undefined) {
+    return undefined;
+  }
+
+  if (hint === 'brightness') {
+    if (Math.abs(intercept) < FILTER_RECOVERY_EPS) {
+      return { kind: 'brightness', amount: slope };
+    }
+
+    return undefined;
+  }
+
+  // Both invert(a) and contrast(a) satisfy slope + 2*intercept = 1.
+  if (Math.abs(slope + 2 * intercept - 1) >= FILTER_RECOVERY_EPS) {
+    return undefined;
+  }
+
+  if (hint === 'invert') {
+    return { kind: 'invert', amount: intercept };
+  }
+
+  return { kind: 'contrast', amount: slope };
 }
 
 interface LinearTransferParams {

@@ -210,20 +210,20 @@ function renderInvertComponentTransfer(amount: number): string {
   const slope = String(1 - 2 * amount);
   const intercept = String(amount);
 
-  return `<feComponentTransfer><feFuncR type="linear" slope="${slope}" intercept="${intercept}"/><feFuncG type="linear" slope="${slope}" intercept="${intercept}"/><feFuncB type="linear" slope="${slope}" intercept="${intercept}"/></feComponentTransfer>`;
+  return `<feComponentTransfer data-bs-filter-primitive="invert"><feFuncR type="linear" slope="${slope}" intercept="${intercept}"/><feFuncG type="linear" slope="${slope}" intercept="${intercept}"/><feFuncB type="linear" slope="${slope}" intercept="${intercept}"/></feComponentTransfer>`;
 }
 
 function renderBrightnessComponentTransfer(amount: number): string {
   const slope = String(amount);
 
-  return `<feComponentTransfer><feFuncR type="linear" slope="${slope}"/><feFuncG type="linear" slope="${slope}"/><feFuncB type="linear" slope="${slope}"/></feComponentTransfer>`;
+  return `<feComponentTransfer data-bs-filter-primitive="brightness"><feFuncR type="linear" slope="${slope}"/><feFuncG type="linear" slope="${slope}"/><feFuncB type="linear" slope="${slope}"/></feComponentTransfer>`;
 }
 
 function renderContrastComponentTransfer(amount: number): string {
   const slope = String(amount);
   const intercept = String((1 - amount) / 2);
 
-  return `<feComponentTransfer><feFuncR type="linear" slope="${slope}" intercept="${intercept}"/><feFuncG type="linear" slope="${slope}" intercept="${intercept}"/><feFuncB type="linear" slope="${slope}" intercept="${intercept}"/></feComponentTransfer>`;
+  return `<feComponentTransfer data-bs-filter-primitive="contrast"><feFuncR type="linear" slope="${slope}" intercept="${intercept}"/><feFuncG type="linear" slope="${slope}" intercept="${intercept}"/><feFuncB type="linear" slope="${slope}" intercept="${intercept}"/></feComponentTransfer>`;
 }
 
 /**

@@ -221,6 +221,53 @@ describe('P7.7l — <filter> import', () => {
   });
 
   /**
+   * @description `<feComponentTransfer>` functions that use
+   * non-linear transfer types (`gamma`, `table`, `discrete`) are
+   * not representable by Broadset's named primitives and MUST
+   * preserve as `custom-svg` so re-export keeps full visual/structural
+   * fidelity.
+   */
+  it('hydrates non-linear feComponentTransfer as custom-svg', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100">
+      <defs><filter id="x1"><feComponentTransfer><feFuncR type="gamma" amplitude="1" exponent="0.8" offset="0"/><feFuncG type="gamma" amplitude="1" exponent="0.8" offset="0"/><feFuncB type="gamma" amplitude="1" exponent="0.8" offset="0"/></feComponentTransfer></filter></defs>
+      <rect x="0" y="0" width="50" height="50" fill="#336699" filter="url(#x1)"/>
+    </svg>`;
+    const { document } = importSvgDocument(svg);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+    const stack = expectFilterStack(rect?.style.filter);
+    const first = stack[0];
+
+    if (first?.kind === 'custom-svg') {
+      expect(first.svg).toContain('feComponentTransfer');
+      expect(first.svg).toContain('type="gamma"');
+    } else {
+      throw new Error(`expected custom-svg primitive, got ${first?.kind ?? 'undefined'}`);
+    }
+  });
+
+  /**
+   * @description Per-channel-different linear transfers cannot map
+   * to a single named primitive and MUST preserve as `custom-svg`.
+   */
+  it('hydrates per-channel divergent feComponentTransfer as custom-svg', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100">
+      <defs><filter id="x2"><feComponentTransfer><feFuncR type="linear" slope="0.5" intercept="0.25"/><feFuncG type="linear" slope="0.4" intercept="0.3"/><feFuncB type="linear" slope="0.5" intercept="0.25"/></feComponentTransfer></filter></defs>
+      <rect x="0" y="0" width="50" height="50" fill="#336699" filter="url(#x2)"/>
+    </svg>`;
+    const { document } = importSvgDocument(svg);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+    const stack = expectFilterStack(rect?.style.filter);
+    const first = stack[0];
+
+    if (first?.kind === 'custom-svg') {
+      expect(first.svg).toContain('feComponentTransfer');
+      expect(first.svg).toContain('feFuncG');
+    } else {
+      throw new Error(`expected custom-svg primitive, got ${first?.kind ?? 'undefined'}`);
+    }
+  });
+
+  /**
    * @description Multiple primitives in one `<filter>` MUST hydrate
    * as multiple entries in the FilterStack array, in source order.
    */
@@ -352,6 +399,31 @@ describe('P7.7m — Filter structural fidelity (named-primitive recovery)', () =
       expect(first.amount).toBeCloseTo(0.5, 3);
     } else {
       throw new Error(`expected contrast, got ${first?.kind ?? 'undefined'}`);
+    }
+  });
+
+  /**
+   * @description In the ambiguous `slope >= 0` + non-zero-intercept
+   * region, `invert(a)` and `contrast(1 - 2a)` are mathematically
+   * equivalent. Broadset-exported component transfers carry
+   * `data-bs-filter-primitive` so importer recovery preserves the
+   * authored primitive kind across round-trip.
+   */
+  it('prefers exporter hint for ambiguous invert/contrast component-transfer forms', () => {
+    // invert(0.3) and contrast(0.4) both produce slope=0.4, intercept=0.3
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100">
+      <defs><filter id="amb"><feComponentTransfer data-bs-filter-primitive="invert"><feFuncR type="linear" slope="0.4" intercept="0.3"/><feFuncG type="linear" slope="0.4" intercept="0.3"/><feFuncB type="linear" slope="0.4" intercept="0.3"/></feComponentTransfer></filter></defs>
+      <rect x="0" y="0" width="50" height="50" fill="#336699" filter="url(#amb)"/>
+    </svg>`;
+    const { document } = importSvgDocument(svg);
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+    const stack = expectFilterStack(rect?.style.filter);
+    const first = stack[0];
+
+    if (first?.kind === 'invert') {
+      expect(first.amount).toBeCloseTo(0.3, 3);
+    } else {
+      throw new Error(`expected invert, got ${first?.kind ?? 'undefined'}`);
     }
   });
 });
