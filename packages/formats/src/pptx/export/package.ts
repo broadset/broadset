@@ -18,6 +18,7 @@ import {
 import { buildTimingXml } from './animation';
 import { emitSlideBackground } from './background';
 import { createSlideContext, type SlideExportContext } from './context';
+import { attachEmbeddedFonts } from './fonts';
 import { buildNotesMasterXml, buildNotesSlideXml } from './notes';
 import { emitShapeTree } from './shapes';
 
@@ -133,8 +134,21 @@ export async function buildPptxPackageWithReport(
     includeLedger,
   });
 
+  // Embedded fonts. Walks text elements collecting (familyName,
+  // codepoints), subsets each matched FontAsset, writes
+  // ppt/fonts/font{N}.fntdata, and returns the
+  // <p:embeddedFontLst> XML fragment to splice into presentation.xml.
+  const embeddedFontLst = attachEmbeddedFonts({
+    document,
+    fontAssets: options.fontAssets ?? [],
+    parts,
+    contentTypes,
+    presRels,
+    warnings,
+  });
+
   // Presentation-level parts.
-  parts.set('ppt/presentation.xml', encodeText(buildPresentationXml(document, pages.length)));
+  parts.set('ppt/presentation.xml', encodeText(buildPresentationXml(document, pages.length, embeddedFontLst)));
   parts.set('ppt/_rels/presentation.xml.rels', encodeText(buildRelationshipsXml(presRels.entries())));
   contentTypes.addOverride('/ppt/presentation.xml', OOXML_CONTENT_TYPES.presentation);
 
@@ -246,7 +260,16 @@ export function buildPptxPackageSyncWithReport(
     attachXmpPacket({ parts, contentTypes, document, exportedAt: options.exportedAt, fingerprints: null });
   }
 
-  parts.set('ppt/presentation.xml', encodeText(buildPresentationXml(document, pages.length)));
+  const embeddedFontLst = attachEmbeddedFonts({
+    document,
+    fontAssets: options.fontAssets ?? [],
+    parts,
+    contentTypes,
+    presRels,
+    warnings,
+  });
+
+  parts.set('ppt/presentation.xml', encodeText(buildPresentationXml(document, pages.length, embeddedFontLst)));
   parts.set('ppt/_rels/presentation.xml.rels', encodeText(buildRelationshipsXml(presRels.entries())));
   contentTypes.addOverride('/ppt/presentation.xml', OOXML_CONTENT_TYPES.presentation);
 
@@ -469,13 +492,13 @@ function applyPageOverrides(elements: readonly BroadsetElement[], page: Page): r
   return result;
 }
 
-function buildPresentationXml(document: BroadsetDocument, slideCount: number): string {
+function buildPresentationXml(document: BroadsetDocument, slideCount: number, embeddedFontLst = ''): string {
   const canvas = document.canvas;
   const cx = canvasLengthToEmu(canvas, canvas.width);
   const cy = canvasLengthToEmu(canvas, canvas.height);
   const slideIds = Array.from({ length: slideCount }, (_, i) => `<p:sldId id="${String(256 + i)}" r:id="rId${String(2 + i)}"/>`).join('');
 
-  return `${XML_DECLARATION}<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:sldIdLst>${slideIds}</p:sldIdLst><p:sldSz cx="${String(cx)}" cy="${String(cy)}" type="custom"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>`;
+  return `${XML_DECLARATION}<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:sldIdLst>${slideIds}</p:sldIdLst><p:sldSz cx="${String(cx)}" cy="${String(cy)}" type="custom"/><p:notesSz cx="6858000" cy="9144000"/>${embeddedFontLst}</p:presentation>`;
 }
 
 function buildThemeXml(): string {

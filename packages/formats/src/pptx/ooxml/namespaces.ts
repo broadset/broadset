@@ -48,6 +48,7 @@ export const OOXML_REL_TYPES = {
   extendedProperties: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties',
   customProperties: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties',
   hyperlink: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink',
+  font: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/font',
 } as const;
 
 /** Content-type strings for PPTX parts. */
@@ -64,4 +65,5 @@ export const OOXML_CONTENT_TYPES = {
   customProperties: 'application/vnd.openxmlformats-officedocument.custom-properties+xml',
   customXml: 'application/xml',
   rels: 'application/vnd.openxmlformats-package.relationships+xml',
+  font: 'application/vnd.openxmlformats-officedocument.obfuscatedFont',
 } as const;

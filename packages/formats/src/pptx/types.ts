@@ -4,7 +4,7 @@
  * placeholder inheritance). Cross-format types (BroadsetColor, TextBody,
  * Canvas, etc.) come from `@broadset/model`.
  */
-import type { BroadsetColor, ThemeSlot } from '@broadset/model';
+import type { BroadsetColor, FontAsset, ThemeSlot } from '@broadset/model';
 
 /** OOXML relationship ID — always of shape `rId{n}` where n ≥ 1. */
 export type OoxmlRelId = `rId${number}`;
@@ -37,6 +37,20 @@ export interface PptxExportOptions {
    * tests can round-trip without needing to re-stub `Date.now`.
    */
   readonly exportedAt?: number;
+  /**
+   * Font assets to subset and embed under `ppt/fonts/`. The exporter
+   * walks text elements collecting codepoints per `style.fontFamily`,
+   * matches families against the supplied assets by `familyName`, and
+   * emits a `<p:embeddedFontLst>` entry plus a `ppt/fonts/font{N}.fntdata`
+   * part per match. Assets without an `embedded` source are skipped
+   * with an `unsupported-content` warning — async URL / file resolution
+   * is the caller's responsibility (see {@link FontResolver}).
+   *
+   * Fonts not used by any text element in the document are skipped
+   * silently — embedding only the fonts the slides actually reference
+   * keeps `.pptx` size proportional to content.
+   */
+  readonly fontAssets?: readonly FontAsset[];
 }
 
 /** Options accepted by the PPTX importer. */
@@ -84,7 +98,9 @@ export type PptxExportWarningCode =
   /** Multi-shadow list truncated — OOXML carries at most one outer shadow + one inner shadow per shape. */
   | 'shadow-truncated'
   /** Animation isn't representable as a PowerPoint timing effect; dropped per IO-D-16 (the `.bsp` is the source of truth for animation data). */
-  | 'animation-preset-unsupported';
+  | 'animation-preset-unsupported'
+  /** Font asset couldn't be embedded — non-embedded source, subsetting failure, or unrecognised format. PowerPoint substitutes a fallback at render time. */
+  | 'font-embed-skipped';
 
 export interface PptxExportWarning {
   readonly code: PptxExportWarningCode;
