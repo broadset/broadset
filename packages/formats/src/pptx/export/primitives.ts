@@ -54,18 +54,37 @@ export function emitTransform(
 
 /**
  * Resolve a {@link BroadsetColor} to an OOXML `<a:solidFill>` /
- * `<a:srgbClr>` / `<a:schemeClr>` fragment. Theme slots produce
- * `<a:schemeClr val="…"/>`; RGB colours produce `<a:srgbClr val="…"/>`.
+ * `<a:srgbClr>` / `<a:scrgbClr>` / `<a:hslClr>` / `<a:prstClr>` /
+ * `<a:schemeClr>` fragment.
  *
- * Alpha is carried inside the `<a:srgbClr>` element as an `<a:alpha>`
- * child when the input hex is 8 digits (RRGGBBAA). Theme-slot alpha
- * travels in `mods.alpha`.
+ * When `color.originalColor` carries the source non-sRGB form
+ * (`scrgb(r, g, b)`, `hsl(h, s%, l%)`, or a bare CSS preset name) the
+ * exporter emits the matching OOXML primitive so a Keynote / foreign
+ * `<a:scrgbClr>` round-trips losslessly. Otherwise RGB colours emit
+ * `<a:srgbClr>` and theme slots emit `<a:schemeClr>`.
+ *
+ * Alpha is carried as an `<a:alpha>` child of the colour primitive
+ * when the input hex is 8 digits (RRGGBBAA); theme-slot alpha travels
+ * in `mods.alpha`.
  */
 export function emitColorFill(color: BroadsetColor): string {
   if (isRgbBroadsetColor(color)) {
-    const hex = color.hex;
-    const ooxmlHex = hexToOoxmlColor(hex);
-    const alphaChild = readHexAlpha(hex);
+    const alphaChild = readHexAlpha(color.hex);
+    const original = color.originalColor;
+
+    const scrgbInner = original !== undefined ? buildScrgbInner(original, alphaChild) : null;
+
+    if (scrgbInner !== null) return `<a:solidFill>${scrgbInner}</a:solidFill>`;
+
+    const hslInner = original !== undefined ? buildHslInner(original, alphaChild) : null;
+
+    if (hslInner !== null) return `<a:solidFill>${hslInner}</a:solidFill>`;
+
+    const prstInner = original !== undefined ? buildPrstInner(original, alphaChild) : null;
+
+    if (prstInner !== null) return `<a:solidFill>${prstInner}</a:solidFill>`;
+
+    const ooxmlHex = hexToOoxmlColor(color.hex);
 
     return `<a:solidFill><a:srgbClr val="${ooxmlHex}">${alphaChild}</a:srgbClr></a:solidFill>`;
   }
@@ -73,6 +92,58 @@ export function emitColorFill(color: BroadsetColor): string {
   const mods = emitColorMods(color.mods);
 
   return `<a:solidFill><a:schemeClr val="${color.slot}">${mods}</a:schemeClr></a:solidFill>`;
+}
+
+const SCRGB_RE = /^scrgb\(\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*\)$/i;
+const HSL_RE = /^hsl\(\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)%\s*,\s*(-?\d*\.?\d+)%\s*\)$/i;
+const PRST_RE = /^[a-z][a-zA-Z0-9]+$/;
+
+function buildScrgbInner(original: string, alphaChild: string): string | null {
+  const match = SCRGB_RE.exec(original);
+
+  if (match === null) return null;
+
+  // Source is recorded in 0–1 fractions; OOXML wants 0–100000 integers.
+  const r = clampScrgbVal(parseFloat(match[1] ?? '0') * SCRGB_SCALE);
+  const g = clampScrgbVal(parseFloat(match[2] ?? '0') * SCRGB_SCALE);
+  const b = clampScrgbVal(parseFloat(match[3] ?? '0') * SCRGB_SCALE);
+
+  return `<a:scrgbClr r="${String(r)}" g="${String(g)}" b="${String(b)}">${alphaChild}</a:scrgbClr>`;
+}
+
+function buildHslInner(original: string, alphaChild: string): string | null {
+  const match = HSL_RE.exec(original);
+
+  if (match === null) return null;
+
+  // OOXML hue is in 1/60000-degree units, sat/lum in 1/1000-percent.
+  const hue = Math.round(parseFloat(match[1] ?? '0') * HSL_HUE_SCALE);
+  const sat = clampHslPct(parseFloat(match[2] ?? '0') * HSL_PCT_SCALE);
+  const lum = clampHslPct(parseFloat(match[3] ?? '0') * HSL_PCT_SCALE);
+
+  return `<a:hslClr hue="${String(((hue % HSL_HUE_FULL) + HSL_HUE_FULL) % HSL_HUE_FULL)}" sat="${String(sat)}" lum="${String(lum)}">${alphaChild}</a:hslClr>`;
+}
+
+function buildPrstInner(original: string, alphaChild: string): string | null {
+  // A preset name is a bare CSS-colour identifier — must NOT contain
+  // parens, commas, hash, or whitespace. Keep the validation tight so
+  // garbage `originalColor` strings fall through to the sRGB path.
+  if (!PRST_RE.test(original)) return null;
+
+  return `<a:prstClr val="${original}">${alphaChild}</a:prstClr>`;
+}
+
+const SCRGB_SCALE = 100000;
+const HSL_HUE_SCALE = 60000;
+const HSL_HUE_FULL = HSL_HUE_SCALE * 360;
+const HSL_PCT_SCALE = 1000;
+
+function clampScrgbVal(value: number): number {
+  return Math.max(0, Math.min(SCRGB_SCALE, Math.round(value)));
+}
+
+function clampHslPct(value: number): number {
+  return Math.max(0, Math.min(SCRGB_SCALE, Math.round(value)));
 }
 
 function readHexAlpha(hex: string): string {

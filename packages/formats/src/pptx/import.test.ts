@@ -797,11 +797,11 @@ describe('PPTX importer — operator-level extraction', () => {
   /**
    * @description P2 — non-sRGB colour primitives (`<a:scrgbClr>`,
    * `<a:hslClr>`, `<a:prstClr>`) MUST resolve to a Broadset rgb colour
-   * with `originalColor` carrying the source form. This prevents
-   * silent colour mis-interpretation on import from foreign tools that
-   * use these variants.
+   * with `originalColor` carrying the source form, AND the source form
+   * MUST be re-emitted on export so the round-trip is lossless. Without
+   * the re-emission half the import is decorative.
    */
-  it('parses scrgbClr / hslClr / prstClr colour primitives', () => {
+  it('round-trips scrgbClr / hslClr / prstClr colour primitives', async () => {
     const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="ScRgb"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="100000" cy="100000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:scrgbClr r="100000" g="0" b="0"/></a:solidFill></p:spPr></p:sp><p:sp><p:nvSpPr><p:cNvPr id="3" name="Hsl"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="100000" y="0"/><a:ext cx="100000" cy="100000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:hslClr hue="7200000" sat="100000" lum="50000"/></a:solidFill></p:spPr></p:sp><p:sp><p:nvSpPr><p:cNvPr id="4" name="Prst"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="200000" y="0"/><a:ext cx="100000" cy="100000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:prstClr val="darkBlue"/></a:solidFill></p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
     const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
     const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
@@ -847,6 +847,28 @@ describe('PPTX importer — operator-level extraction', () => {
       expect(prstFill.color.originalColor).toBe('darkblue');
     } else {
       throw new Error('expected prst rectangle to have solid rgb fill');
+    }
+
+    // Circle-back: re-export and verify the source colour primitives
+    // come back as `<a:scrgbClr>`, `<a:hslClr>`, `<a:prstClr>` — NOT
+    // collapsed to lossy `<a:srgbClr>`.
+    const reExported = exportPptxBytes(imported);
+    const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
+    const reExportedSlide = readTextPart(readOoxmlPackage(reExported), 'ppt/slides/slide1.xml') ?? '';
+
+    expect(reExportedSlide).toContain('<a:scrgbClr');
+    expect(reExportedSlide).toContain('<a:hslClr');
+    expect(reExportedSlide).toContain('<a:prstClr val="darkblue"');
+
+    // Re-import and verify originalColor is still the same source form.
+    const reImported = importPptx(reExported);
+    const reRectangles = reImported.elements.filter((el) => el.type === 'rectangle');
+    const reScrgb = reRectangles[0]?.style.fill;
+
+    if (reScrgb?.kind === 'solid' && reScrgb.color.kind === 'rgb') {
+      expect(reScrgb.color.originalColor).toContain('scrgb');
+    } else {
+      throw new Error('re-imported scrgb rectangle missing rgb fill');
     }
   });
 
@@ -1123,6 +1145,32 @@ describe('PPTX importer — operator-level extraction', () => {
     } else {
       throw new Error('second run colour was lost on re-export');
     }
+  });
+
+  /**
+   * @description XXE / billion-laughs hardening — every XML part MUST
+   * route through fast-xml-parser before the regex hot path runs. A
+   * DOCTYPE declaration with entity references is the canonical
+   * billion-laughs vector; we don't expand entities, but the importer
+   * MUST surface a `malformed-xml` warning and bail rather than walking
+   * the raw text with regex.
+   */
+  it('rejects PPTX with an external-DTD / billion-laughs payload', () => {
+    const dtdPayload = `<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY lol "lol"><!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;"><!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">]><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst/><p:sldSz cx="9144000" cy="6858000"/><p:tag>&lol3;</p:tag></p:presentation>`;
+    const bytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['_rels/.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>')],
+        ['ppt/presentation.xml', encodeText(dtdPayload)],
+        ['ppt/_rels/presentation.xml.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')],
+      ]),
+    );
+    const report = importPptxWithReport(bytes);
+
+    // The import MUST short-circuit to the empty document — the
+    // regex parser never sees the malformed input.
+    expect(report.document.elements).toEqual([]);
+    expect(report.warnings.some((w) => w.code === 'malformed-xml')).toBe(true);
   });
 
   it('rejects vbaProject.bin with a macro-rejected warning at import', () => {

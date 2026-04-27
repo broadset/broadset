@@ -204,7 +204,7 @@ describe('external-tool fixtures', () => {
    * `<a:hslClr>`, `<a:prstClr>` all resolve to canonical sRGB hex
    * with the source form preserved on `originalColor`.
    */
-  it('parses Keynote non-sRGB colour primitives without silent translation', () => {
+  it('round-trips Keynote non-sRGB colour primitives losslessly', () => {
     const doc = importPptx(keynoteNonSrgbColoursFixture());
     const rectangles = doc.elements.filter((el) => el.type === 'rectangle' || el.type === 'ellipse');
 
@@ -220,6 +220,16 @@ describe('external-tool fixtures', () => {
       // originalColor MUST be set so the source form is recoverable.
       expect(fill.color.originalColor).toBeDefined();
     }
+
+    // Circle-back: re-export and verify the source colour primitives
+    // come back — collapsing to `<a:srgbClr>` would mean the
+    // `originalColor` round-trip claim is decorative.
+    const reExported = exportPptxBytes(doc);
+    const reSlide = readTextPart(readOoxmlPackage(reExported), 'ppt/slides/slide1.xml') ?? '';
+
+    expect(reSlide).toContain('<a:scrgbClr');
+    expect(reSlide).toContain('<a:hslClr');
+    expect(reSlide).toContain('<a:prstClr');
   });
 
   /**

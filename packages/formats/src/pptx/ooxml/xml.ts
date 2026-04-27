@@ -6,11 +6,16 @@ import { XMLParser } from 'fast-xml-parser';
  * master, layout, theme, rels, content-types) routes through this
  * module.
  *
- * Security posture: DTD processing and external-entity resolution are
- * NOT features of fast-xml-parser — the library does not follow entity
- * declarations, so billion-laughs / XXE attacks cannot reach the
- * importer. This satisfies the cross-format Entity Expansion Hardening
- * requirement in [spec.md].
+ * Security posture: fast-xml-parser does NOT follow external entities
+ * (so external-DTD XXE is not a vector), and it does NOT recursively
+ * expand DTD-declared entities (so billion-laughs depth-multiplication
+ * is bounded). However, with `processEntities: true` the library DOES
+ * expand DTD entities by one level on the matched text. Because of
+ * that, `pptx/import.ts` rejects any XML part whose raw text contains
+ * a `<!DOCTYPE>` declaration before this parser is reached — Office-
+ * authored OOXML never emits DTDs, so a DOCTYPE in the wild is a
+ * crafted payload. That pre-parse rejection is what satisfies the
+ * cross-format Entity Expansion Hardening requirement in `spec.md`.
  */
 
 /**

@@ -13,6 +13,7 @@ import {
 import { parseTheme } from './import/theme';
 import { OOXML_REL_TYPES } from './ooxml/namespaces';
 import { parseRelationshipsXml } from './ooxml/relationships';
+import { parseXml } from './ooxml/xml';
 import { type OoxmlPackage, readOoxmlPackage, readTextPart } from './ooxml/zip';
 import { parseProjectCustomXml } from './semantic/custom-xml';
 import { parseLedgerXml } from './semantic/ledger';
@@ -72,6 +73,21 @@ export function importPptxWithReport(data: Uint8Array): PptxImportReport {
   enforcePackageCaps(pkg, warnings);
   rejectExecutionSurface(pkg, warnings);
 
+  // Security floor: route every XML / rels part through fast-xml-parser
+  // (DTD / external-entity resolution disabled by the library). This
+  // guards against billion-laughs, XXE, and external-DTD attacks the
+  // regex hot path would otherwise pass through verbatim. Malformed
+  // parts surface a warning and we bail to the empty document — the
+  // regex parser cannot do anything useful with content fast-xml-parser
+  // refuses.
+  const xmlIssue = validateXmlSafety(pkg);
+
+  if (xmlIssue !== null) {
+    warnings.push(xmlIssue);
+
+    return { document: createEmptyBroadsetDocument(), warnings };
+  }
+
   const fastPathResult = tryFastPath(pkg);
 
   if (fastPathResult !== null) return { document: fastPathResult, warnings };
@@ -79,6 +95,53 @@ export function importPptxWithReport(data: Uint8Array): PptxImportReport {
   const operatorLevel = importOperatorLevel(pkg);
 
   return { document: operatorLevel.document, warnings: [...warnings, ...operatorLevel.warnings] };
+}
+
+/**
+ * Security floor for XML parts. Two checks per `.xml` / `.rels` part:
+ *
+ * 1. Any `<!DOCTYPE>` declaration → reject the whole import. Microsoft
+ *    Office never emits DTDs in OOXML; their presence indicates a
+ *    crafted billion-laughs / XXE / external-DTD payload. Refusing
+ *    pre-parse is the strongest defense — fast-xml-parser DOES expand
+ *    DTD-declared entities to one level when `processEntities: true`,
+ *    so trusting the library alone is insufficient.
+ * 2. `parseXml` succeeds (i.e. fast-xml-parser tolerates the structure).
+ *    Genuinely malformed XML is rejected here too.
+ *
+ * Returns the first issue as a `malformed-xml` warning, `null` when
+ * the whole package passes both checks.
+ */
+function validateXmlSafety(pkg: ReturnType<typeof readOoxmlPackage>): PptxImportWarning | null {
+  for (const [path] of pkg) {
+    if (!path.endsWith('.xml') && !path.endsWith('.rels')) continue;
+
+    const text = readTextPart(pkg, path);
+
+    if (text === null || text.trim().length === 0) continue;
+
+    if (/<!DOCTYPE\b/i.test(text)) {
+      return {
+        code: 'malformed-xml',
+        message: `XML part "${path}" contains a DOCTYPE declaration; suspected XXE / billion-laughs payload, import rejected`,
+        detail: 'DOCTYPE declarations are not used by Office-authored OOXML',
+      };
+    }
+
+    try {
+      parseXml(text);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'parse failure';
+
+      return {
+        code: 'malformed-xml',
+        message: `XML part "${path}" failed to parse and was rejected`,
+        detail,
+      };
+    }
+  }
+
+  return null;
 }
 
 /**

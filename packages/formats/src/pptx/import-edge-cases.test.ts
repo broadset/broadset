@@ -128,6 +128,54 @@ describe('PPTX importer — edge-case probes (regex parser limitations)', () => 
   });
 
   /**
+   * @description Known limitation: attribute-order swap on `<a:off>`
+   * (`y="…" x="…"` instead of `x="…" y="…"`). The regex `<a:off\s+x="
+   * (-?\d+)"\s+y="(-?\d+)"\s*\/>` requires the canonical order. ECMA-376
+   * doesn't pin attribute order — XML allows any. This test pins the
+   * limitation as `it.skip` so the AST rebuild has a measurable gate.
+   */
+  it.skip('handles attribute-order swap on <a:off> (y before x)', () => {
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="OffSwapped"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off y="500000" x="100000"/><a:ext cy="500000" cx="1000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const imported = importPptx(buildPackage(slideXml));
+    const rect = imported.elements.find((el) => el.type === 'rectangle');
+
+    // x and y are mm-converted from EMU; non-zero confirms extraction
+    // honoured the reordered attributes.
+    expect(rect?.position.x).toBeGreaterThan(0);
+    expect(rect?.position.y).toBeGreaterThan(0);
+    expect(rect?.width).toBeGreaterThan(0);
+    expect(rect?.height).toBeGreaterThan(0);
+  });
+
+  /**
+   * @description Known limitation: single-quoted attribute values
+   * (`name='Foo'`). XML allows either delimiter; the regex assumes
+   * double quotes throughout. Pinned as `it.skip` for the AST gate.
+   */
+  it.skip(`handles single-quoted attribute values`, () => {
+    const slideXml = `<?xml version='1.0'?><p:sld xmlns:a='http://schemas.openxmlformats.org/drawingml/2006/main' xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships' xmlns:p='http://schemas.openxmlformats.org/presentationml/2006/main'><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id='1' name=''/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id='2' name='SingleQuoted'/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x='0' y='0'/><a:ext cx='1000000' cy='500000'/></a:xfrm><a:prstGeom prst='rect'><a:avLst/></a:prstGeom></p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const imported = importPptx(buildPackage(slideXml));
+    const rect = imported.elements.find((el) => el.type === 'rectangle');
+
+    expect(rect).toBeDefined();
+  });
+
+  /**
+   * @description Known limitation: decimal-precision coordinates
+   * (`<a:pt x="0.5" y="0.5"/>` inside `<a:custGeom><a:pathLst>`).
+   * ECMA-376 §20.1.9.16 allows fixed-point decimal `pt` values in
+   * custom geometry — `(-?\d+)` rejects the decimal. Pinned for the
+   * AST gate.
+   */
+  it.skip('handles decimal coordinates in <a:custGeom><a:pt>', () => {
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="DecimalPath"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1000000" cy="500000"/></a:xfrm><a:custGeom><a:pathLst><a:path w="100000" h="50000"><a:moveTo><a:pt x="0.5" y="0.5"/></a:moveTo><a:lnTo><a:pt x="99999.5" y="49999.5"/></a:lnTo><a:close/></a:path></a:pathLst></a:custGeom></p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const imported = importPptx(buildPackage(slideXml));
+    const path = imported.elements.find((el) => el.type === 'path');
+
+    expect(path?.content).toMatch(/^M/);
+  });
+
+  /**
    * @description XML comments inside the slide tree (`<!-- … -->`)
    * MUST NOT confuse the walker. PowerPoint sometimes emits comments
    * for human readability; the importer should ignore them silently.
