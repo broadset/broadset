@@ -156,6 +156,20 @@ test('element library built-ins and plugin tools activate placement mode', async
 test('file and help menu actions open the expected dialogs', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
 
+  // The Export dialog is gated behind the experimental-features flag
+  // (it ships an MVP feature set the demo only surfaces to opt-in
+  // users). Enable the flag at the store level so the menu item is
+  // present for this end-to-end menu sweep.
+  await page.evaluate(() => {
+    interface ExperimentalStore {
+      readonly getState: () => { readonly updateCanvasSettings: (s: { showExperimentalFeatures: boolean }) => void };
+    }
+
+    const store = (window as unknown as { __broadsetEditorStore?: ExperimentalStore }).__broadsetEditorStore;
+
+    store?.getState().updateCanvasSettings({ showExperimentalFeatures: true });
+  });
+
   await openToolbarMenu(page, 'File');
   await page.getByText('New Document').first().click();
   await expect(page.getByRole('dialog', { name: 'New Document' })).toBeVisible();

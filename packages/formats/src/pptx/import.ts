@@ -1,134 +1,384 @@
-import type { BroadsetDocument, BroadsetElement, Canvas } from '@broadset/model';
-import PizZip from 'pizzip';
+import {
+  type AnimationDefinition,
+  type BroadsetDocument,
+  createEmptyBroadsetDocument,
+  type FontAsset,
+} from '@broadset/model';
 
-import { MM_TO_EMU } from './constants';
-import { extractAll, importShapeElement, parseSlideRelationships } from './import-utils';
+import { fingerprintElement } from '../_shared';
+import { parseTimingAnimations } from './import/animation';
+import { extractEmbeddedFonts } from './import/fonts';
+import { aggregateLayoutPlaceholders } from './import/layout';
+import { resolvePackage } from './import/package';
+import {
+  applyFirstSlideBackground,
+  composeDocumentFromSlides,
+  importSingleSlide,
+} from './import/slide';
+import { parseTheme } from './import/theme';
+import { parseXml } from './ooxml/xml';
+import { type OoxmlPackage, readOoxmlPackage, readTextPart } from './ooxml/zip';
+import { parseProjectCustomXml } from './semantic/custom-xml';
+import { parseLedgerXml } from './semantic/ledger';
+import type { PptxImportWarning } from './types';
+import { BROADSET_CUSTOM_XML_INTEROP, BROADSET_CUSTOM_XML_PROJECT } from './types';
 
-/** MIME type lookup for image extensions found in PPTX media. */
-const IMAGE_MIME: ReadonlyMap<string, string> = new Map([
-  ['.png', 'image/png'],
-  ['.jpg', 'image/jpeg'],
-  ['.jpeg', 'image/jpeg'],
-  ['.gif', 'image/gif'],
-  ['.bmp', 'image/bmp'],
-  ['.tiff', 'image/tiff'],
-  ['.tif', 'image/tiff'],
-  ['.webp', 'image/webp'],
-]);
+/**
+ * Default caps per the Importer Security Contract in
+ * `project/spec/formats/spec.md`.
+ */
+const DEFAULT_MAX_INPUT_BYTES = 200 * 1024 * 1024; // 200 MiB
+const DEFAULT_MAX_PART_BYTES = 50 * 1024 * 1024; // 50 MiB
+const DEFAULT_MAX_ENTRIES = 4096;
 
-function resolveMediaPath(target: string): string {
-  return target.startsWith('..') ? `ppt/${target.slice(3)}` : target;
+export function importPptx(data: Uint8Array): BroadsetDocument {
+  return importPptxWithReport(data).document;
 }
 
-function extOf(path: string): string {
-  const dot = path.lastIndexOf('.');
-
-  return dot >= 0 ? path.slice(dot).toLowerCase() : '';
+/**
+ * Extended importer that returns the document alongside structured
+ * import warnings (unsupported shapes / animations, rejected macros,
+ * enforcement caps) and any embedded `ppt/fonts/` assets recovered
+ * from the package.
+ */
+export interface PptxImportReport {
+  readonly document: BroadsetDocument;
+  readonly warnings: readonly PptxImportWarning[];
+  readonly fontAssets: readonly FontAsset[];
 }
 
-function uint8ToBase64(bytes: Uint8Array): string {
-  let binary = '';
+export function importPptxWithReport(data: Uint8Array): PptxImportReport {
+  const warnings: PptxImportWarning[] = [];
 
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i] ?? 0);
+  if (data.byteLength > DEFAULT_MAX_INPUT_BYTES) {
+    warnings.push({
+      code: 'size-cap',
+      message: `Input size ${String(data.byteLength)} exceeds cap ${String(DEFAULT_MAX_INPUT_BYTES)} bytes`,
+    });
+
+    return { document: createEmptyBroadsetDocument(), warnings, fontAssets: [] };
   }
 
-  return btoa(binary);
-}
+  let pkg: OoxmlPackage;
 
-function parseSlideCanvas(presXml: string): Canvas {
-  const sldSzMatch = presXml.match(/<p:sldSz\s+cx="(\d+)"\s+cy="(\d+)"\/>/);
-  const cxEmu = sldSzMatch ? parseInt(sldSzMatch[1] ?? '0', 10) : 0;
-  const cyEmu = sldSzMatch ? parseInt(sldSzMatch[2] ?? '0', 10) : 0;
+  try {
+    pkg = readOoxmlPackage(data);
+  } catch (err) {
+    warnings.push({
+      code: 'malformed-xml',
+      message: 'PPTX package is not a readable ZIP archive — import rejected.',
+      detail: err instanceof Error ? err.message : 'unknown ZIP error',
+    });
+
+    return { document: createEmptyBroadsetDocument(), warnings, fontAssets: [] };
+  }
+
+  enforcePackageCaps(pkg, warnings);
+  rejectExecutionSurface(pkg, warnings);
+
+  // Security floor: route every XML / rels part through fast-xml-parser.
+  const xmlIssue = validateXmlSafety(pkg);
+
+  if (xmlIssue !== null) {
+    warnings.push(xmlIssue);
+
+    return { document: createEmptyBroadsetDocument(), warnings, fontAssets: [] };
+  }
+
+  const fontAssets = extractEmbeddedFonts(pkg);
+  const fastPathResult = tryFastPath(pkg);
+
+  if (fastPathResult !== null) return { document: fastPathResult, warnings, fontAssets };
+
+  const operatorLevel = importOperatorLevel(pkg);
 
   return {
-    width: cxEmu / MM_TO_EMU,
-    height: cyEmu / MM_TO_EMU,
-    unit: 'mm',
-    dpi: 72,
-    padding: [0, 0, 0, 0],
-    backgroundMode: 'solid',
+    document: operatorLevel.document,
+    warnings: [...warnings, ...operatorLevel.warnings],
+    fontAssets,
   };
 }
 
-interface MediaMaps {
-  readonly svg: Map<string, string>;
-  readonly images: Map<string, string>;
-}
+/**
+ * Security floor for XML parts.
+ *
+ * 1. Any `<!DOCTYPE>` declaration rejects the import.
+ * 2. `parseXml` succeeds for each XML / rels part.
+ */
+function validateXmlSafety(pkg: ReturnType<typeof readOoxmlPackage>): PptxImportWarning | null {
+  for (const [path] of pkg) {
+    if (!path.endsWith('.xml') && !path.endsWith('.rels')) continue;
 
-function registerImageMedia(
-  zip: PizZip,
-  relId: string,
-  mediaPath: string,
-  mime: string,
-  images: Map<string, string>,
-): void {
-  const entry = zip.file(mediaPath);
+    const text = readTextPart(pkg, path);
 
-  if (!entry) return;
+    if (text === null || text.trim().length === 0) continue;
 
-  const raw: unknown = entry.asUint8Array();
-  const bytes = raw as Uint8Array;
-
-  images.set(relId, `data:${mime};base64,${uint8ToBase64(bytes)}`);
-}
-
-function buildMediaMaps(zip: PizZip, relMap: ReadonlyMap<string, string>): MediaMaps {
-  const svg = new Map<string, string>();
-  const images = new Map<string, string>();
-
-  for (const [relId, target] of relMap) {
-    const mediaPath = resolveMediaPath(target);
-    const ext = extOf(target);
-
-    if (ext === '.svg') {
-      const svgContent = zip.file(mediaPath)?.asText();
-
-      if (svgContent) svg.set(relId, svgContent);
-      continue;
+    if (/<!\s*DOCTYPE\b/i.test(text)) {
+      return {
+        code: 'malformed-xml',
+        message: `XML part "${path}" contains a DOCTYPE declaration; suspected XXE / billion-laughs payload, import rejected`,
+        detail: 'DOCTYPE declarations are not used by Office-authored OOXML',
+      };
     }
 
-    const mime = IMAGE_MIME.get(ext);
+    if (/<!\s*(?:ENTITY|ELEMENT|ATTLIST|NOTATION)\b/i.test(text)) {
+      return {
+        code: 'malformed-xml',
+        message: `XML part "${path}" contains a standalone DTD construct; rejected`,
+        detail: 'DTD-style declarations are not used by Office-authored OOXML',
+      };
+    }
 
-    if (mime) registerImageMedia(zip, relId, mediaPath, mime, images);
+    try {
+      parseXml(text);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'parse failure';
+
+      return {
+        code: 'malformed-xml',
+        message: `XML part "${path}" failed to parse and was rejected`,
+        detail,
+      };
+    }
   }
 
-  return { svg, images };
+  return null;
 }
 
-function importShapesFromSlide(slideXml: string, canvas: Canvas, media: MediaMaps): BroadsetElement[] {
-  const elements: BroadsetElement[] = [];
-  const shapeXmls = [
-    ...extractAll(slideXml, /<p:sp>[\s\S]*?<\/p:sp>/),
-    ...extractAll(slideXml, /<p:pic>[\s\S]*?<\/p:pic>/),
-  ];
+/**
+ * Async importer that merges external edits into the fast-path output.
+ */
+export async function importPptxWithMerge(data: Uint8Array): Promise<PptxImportReport> {
+  const baseReport = importPptxWithReport(data);
+  const pkg = readOoxmlPackage(data);
+  const preservedXml = readTextPart(pkg, BROADSET_CUSTOM_XML_PROJECT);
 
-  for (const shapeXml of shapeXmls) {
-    const el = importShapeElement(shapeXml, canvas, media.svg, media.images);
+  if (preservedXml === null) return baseReport;
 
-    if (el) elements.push(el);
+  const preserved = parseProjectCustomXml(preservedXml);
+
+  if (!isDocumentShape(preserved)) return baseReport;
+
+  // Re-run operator-level extraction so we have both representations.
+  const operatorLevel = importOperatorLevel(pkg, preserved.canvas);
+  const ledger = readLedgerEntries(pkg);
+  const merged = await mergeFromLedger(preserved, operatorLevel.document, ledger);
+
+  return { document: merged, warnings: baseReport.warnings, fontAssets: baseReport.fontAssets };
+}
+
+function readLedgerEntries(pkg: OoxmlPackage): ReadonlyMap<string, string> {
+  const ledgerXml = readTextPart(pkg, BROADSET_CUSTOM_XML_INTEROP);
+  const map = new Map<string, string>();
+
+  if (ledgerXml === null) return map;
+
+  const ledger = parseLedgerXml(ledgerXml);
+
+  if (ledger === null) return map;
+
+  for (const entry of ledger.entries) {
+    map.set(entry.elementId, entry.fingerprint);
   }
 
-  return elements;
+  return map;
 }
 
-export function importPptx(data: Uint8Array): BroadsetDocument {
-  const zip = new PizZip(data);
-  const presXml = zip.file('ppt/presentation.xml')?.asText() ?? '';
-  const canvas = parseSlideCanvas(presXml);
-  const slideRelsXml = zip.file('ppt/slides/_rels/slide1.xml.rels')?.asText() ?? '';
-  const media = buildMediaMaps(zip, parseSlideRelationships(slideRelsXml));
-  const slideXml = zip.file('ppt/slides/slide1.xml')?.asText() ?? '';
-  const elements = importShapesFromSlide(slideXml, canvas, media);
+async function mergeFromLedger(
+  preserved: BroadsetDocument,
+  current: BroadsetDocument,
+  ledger: ReadonlyMap<string, string>,
+): Promise<BroadsetDocument> {
+  const currentById = new Map<string, BroadsetDocument['elements'][number]>();
+
+  for (const el of current.elements) {
+    currentById.set(el.id, el);
+  }
+
+  const merged: BroadsetDocument['elements'][number][] = [];
+
+  for (const preservedEl of preserved.elements) {
+    merged.push(await pickPreservedOrEdited(preservedEl, currentById.get(preservedEl.id), ledger));
+  }
+
+  for (const currentEl of current.elements) {
+    if (!preserved.elements.some((p) => p.id === currentEl.id)) {
+      merged.push(markDirty(currentEl));
+    }
+  }
+
+  return { ...preserved, elements: merged };
+}
+
+async function pickPreservedOrEdited(
+  preservedEl: BroadsetDocument['elements'][number],
+  currentEl: BroadsetDocument['elements'][number] | undefined,
+  ledger: ReadonlyMap<string, string>,
+): Promise<BroadsetDocument['elements'][number]> {
+  if (currentEl === undefined) return preservedEl;
+
+  const ledgerHash = ledger.get(preservedEl.id);
+  const currentHash = await fingerprintElement(currentEl);
+
+  if (ledgerHash !== undefined && ledgerHash === currentHash) return preservedEl;
+
+  return mergeEdited(preservedEl, currentEl);
+}
+
+function mergeEdited(
+  preservedEl: BroadsetDocument['elements'][number],
+  currentEl: BroadsetDocument['elements'][number],
+): BroadsetDocument['elements'][number] {
+  return {
+    ...currentEl,
+    ...(preservedEl.dataField !== null ? { dataField: preservedEl.dataField } : {}),
+    ...(preservedEl.visibleWhen !== null ? { visibleWhen: preservedEl.visibleWhen } : {}),
+    ...(preservedEl.repeater !== null ? { repeater: preservedEl.repeater } : {}),
+    extensions: {
+      ...preservedEl.extensions,
+      pptx: {
+        ...((preservedEl.extensions['pptx'] as Record<string, unknown> | undefined) ?? {}),
+        dirty: true,
+      },
+    },
+  };
+}
+
+function markDirty(el: BroadsetDocument['elements'][number]): BroadsetDocument['elements'][number] {
+  return {
+    ...el,
+    extensions: {
+      ...el.extensions,
+      pptx: { ...((el.extensions['pptx'] as Record<string, unknown> | undefined) ?? {}), dirty: true },
+    },
+  };
+}
+
+function enforcePackageCaps(pkg: OoxmlPackage, warnings: PptxImportWarning[]): void {
+  if (pkg.size > DEFAULT_MAX_ENTRIES) {
+    warnings.push({
+      code: 'entry-cap',
+      message: `Package contains ${String(pkg.size)} entries; cap is ${String(DEFAULT_MAX_ENTRIES)}`,
+    });
+  }
+
+  for (const [path, bytes] of pkg) {
+    if (bytes.byteLength > DEFAULT_MAX_PART_BYTES) {
+      warnings.push({
+        code: 'size-cap',
+        message: `Part ${path} (${String(bytes.byteLength)} bytes) exceeds per-part cap`,
+        detail: path,
+      });
+    }
+  }
+}
+
+/**
+ * Reject PPTX macros (`vbaProject.bin`) and OLE embeddings at import
+ * time per the Importer Security Contract.
+ */
+function rejectExecutionSurface(pkg: OoxmlPackage, warnings: PptxImportWarning[]): void {
+  for (const [path] of pkg) {
+    if (path === 'ppt/vbaProject.bin') {
+      warnings.push({
+        code: 'macro-rejected',
+        message: 'PPTX contains vbaProject.bin — macros have been stripped from the import',
+        detail: path,
+      });
+    }
+
+    if (path.startsWith('ppt/embeddings/') && path.endsWith('.bin')) {
+      warnings.push({
+        code: 'ole-rejected',
+        message: `OLE embedding ${path} has been stripped from the import`,
+        detail: path,
+      });
+    }
+  }
+}
+
+function tryFastPath(pkg: OoxmlPackage): BroadsetDocument | null {
+  const projectXml = readTextPart(pkg, BROADSET_CUSTOM_XML_PROJECT);
+  const fastPath = projectXml !== null ? parseProjectCustomXml(projectXml) : null;
+
+  return isDocumentShape(fastPath) ? fastPath : null;
+}
+
+interface OperatorLevelResult {
+  readonly document: BroadsetDocument;
+  readonly warnings: readonly PptxImportWarning[];
+}
+
+function importOperatorLevel(pkg: OoxmlPackage, canvasOverride?: BroadsetDocument['canvas']): OperatorLevelResult {
+  const baseResolved = resolvePackage(pkg);
+  const resolved = canvasOverride !== undefined ? { ...baseResolved, canvas: canvasOverride } : baseResolved;
+  const warnings: PptxImportWarning[] = [];
+
+  if (resolved.slidePaths.length === 0) {
+    warnings.push({
+      code: 'unsupported-content',
+      message: 'PPTX package contains no slide parts — nothing to import.',
+    });
+
+    return { document: createEmptyBroadsetDocument(), warnings };
+  }
+
+  const themeXml = resolved.themePath !== null ? readTextPart(pkg, resolved.themePath) : null;
+  const theme = parseTheme(themeXml);
+  const layoutPlaceholders = aggregateLayoutPlaceholders(pkg, resolved.layoutPaths, theme);
+  const slides: {
+    readonly id: string;
+    readonly notes?: string;
+    readonly elements: readonly BroadsetDocument['elements'][number][];
+  }[] = [];
+  const allAnimations: AnimationDefinition[] = [];
+
+  let elementCounter = 1;
+
+  for (const [index, slidePath] of resolved.slidePaths.entries()) {
+    const result = importSingleSlide(pkg, resolved, slidePath, index, theme, layoutPlaceholders, elementCounter);
+
+    if (result === null) continue;
+
+    elementCounter = result.nextElementCounter;
+    slides.push(result.slide);
+
+    for (const warning of result.warnings) {
+      warnings.push(warning);
+    }
+
+    const slideXml = readTextPart(pkg, slidePath) ?? '';
+    const timing = parseTimingAnimations(slideXml);
+
+    for (const anim of timing.animations) {
+      allAnimations.push(anim);
+    }
+
+    for (const warning of timing.warnings) {
+      warnings.push({ code: warning.code, message: warning.message });
+    }
+  }
+
+  const firstSlideXml = resolved.slidePaths[0] !== undefined ? readTextPart(pkg, resolved.slidePaths[0]) : null;
+  const canvasWithBg = applyFirstSlideBackground(resolved.canvas, firstSlideXml);
+  const doc = composeDocumentFromSlides(canvasWithBg, slides);
 
   return {
-    id: 'imported-doc',
-    name: 'Imported PPTX',
-    documentMode: 'screen',
-    canvas,
-    elements,
-    pages: [{ id: 'page-1', name: 'Page 1', elements: [], locale: null, extensions: {} }],
-    animations: [],
-    dataSchema: { fields: [] },
-  } satisfies BroadsetDocument;
+    document: allAnimations.length > 0 ? { ...doc, animations: allAnimations } : doc,
+    warnings,
+  };
+}
+
+function isDocumentShape(value: unknown): value is BroadsetDocument {
+  if (value === null || typeof value !== 'object') return false;
+
+  const record = value as Record<string, unknown>;
+
+  return (
+    typeof record['id'] === 'string' &&
+    Array.isArray(record['elements']) &&
+    Array.isArray(record['pages']) &&
+    typeof record['canvas'] === 'object' &&
+    record['canvas'] !== null
+  );
 }

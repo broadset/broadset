@@ -5,6 +5,7 @@ import {
   type ExportAnimationInfo,
   ExportModal,
   FormatImportWarningsModal,
+  FormatReconciliationModal,
   MediaLibraryModal,
   NewDocumentModal,
   ShortcutHelpModal,
@@ -22,6 +23,8 @@ export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
     activeDialog,
     canvasSettings,
     currentDocument,
+    dismissImportReconciliationModal,
+    dismissImportWarningsModal,
     editorState,
     editorStore,
     exportProgress,
@@ -29,10 +32,9 @@ export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
     handleExportFormat,
     handleMediaSelect,
     handleTemplateSelect,
-    pendingImportFormatLabel,
-    pendingImportWarnings,
+    importReconciliationModal,
+    importWarningsModal,
     setActiveDialog,
-    setPendingImportWarnings,
   } = props;
 
   // Compute animation info for the ExportModal from the current document.
@@ -159,17 +161,27 @@ export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
       : null}
 
       <FormatImportWarningsModal
-        isOpen={activeDialog === 'format-import-warnings'}
-        formatLabel={pendingImportFormatLabel}
-        warnings={pendingImportWarnings}
-        onClose={() => {
-          setActiveDialog(null);
-          setPendingImportWarnings([]);
-        }}
-        onAcknowledge={() => {
-          setActiveDialog(null);
-          setPendingImportWarnings([]);
-        }}
+        isOpen={importWarningsModal !== null}
+        formatLabel={importWarningsModal?.formatLabel ?? ''}
+        warnings={importWarningsModal?.warnings ?? []}
+        onAcknowledge={dismissImportWarningsModal}
+        onClose={dismissImportWarningsModal}
+      />
+
+      <FormatReconciliationModal
+        isOpen={importReconciliationModal !== null}
+        formatLabel={importReconciliationModal?.formatLabel ?? ''}
+        data={
+          importReconciliationModal?.data ?? {
+            modifications: [],
+            additions: [],
+            deletions: [],
+            recoveredByHash: [],
+          }
+        }
+        warnings={importReconciliationModal?.warnings ?? []}
+        onAcknowledge={dismissImportReconciliationModal}
+        onClose={dismissImportReconciliationModal}
       />
 
       <Toast.Provider className="bottom-7 right-7 z-40" placement="bottom end" />

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { type AnimationDefinition, animationsSchema } from './animation';
+import { type BroadsetGradient, broadsetGradientSchema } from './broadset-gradient';
 import { type BroadsetElement, elementSchema } from './element';
 import { refineExtensionsAgainstRegistry } from './extensions-types';
 import { type OutputSpec, outputSpecSchema } from './output-spec';
@@ -33,7 +34,8 @@ export interface Canvas {
   readonly dpi: number;
   readonly padding: readonly [number, number, number, number];
   readonly backgroundColor?: string | undefined;
-  readonly backgroundMode: 'transparent' | 'solid';
+  readonly backgroundGradient?: BroadsetGradient | undefined;
+  readonly backgroundMode: 'transparent' | 'solid' | 'gradient';
   readonly safeAreas?: SafeAreas | undefined;
   readonly bleed?: PrepressInset | undefined;
   readonly trim?: PrepressInset | undefined;
@@ -142,24 +144,35 @@ const prepressInsetSchema = z.tuple([
   z.number().nonnegative(),
 ]);
 
-const canvasSchema = z.object({
-  width: z.number().positive(),
-  height: z.number().positive(),
-  unit: z.enum(['px', 'mm', 'in']).optional(),
-  dpi: z.number().positive().optional(),
-  padding: z.tuple([
-    z.number().nonnegative(),
-    z.number().nonnegative(),
-    z.number().nonnegative(),
-    z.number().nonnegative(),
-  ]),
-  backgroundColor: z.string().optional(),
-  backgroundMode: z.enum(['transparent', 'solid']).optional(),
-  safeAreas: safeAreasSchema.optional(),
-  bleed: prepressInsetSchema.optional(),
-  trim: prepressInsetSchema.optional(),
-  safeArea: prepressInsetSchema.optional(),
-});
+const canvasSchema = z
+  .object({
+    width: z.number().positive(),
+    height: z.number().positive(),
+    unit: z.enum(['px', 'mm', 'in']).optional(),
+    dpi: z.number().positive().optional(),
+    padding: z.tuple([
+      z.number().nonnegative(),
+      z.number().nonnegative(),
+      z.number().nonnegative(),
+      z.number().nonnegative(),
+    ]),
+    backgroundColor: z.string().optional(),
+    backgroundGradient: broadsetGradientSchema.optional(),
+    backgroundMode: z.enum(['transparent', 'solid', 'gradient']).optional(),
+    safeAreas: safeAreasSchema.optional(),
+    bleed: prepressInsetSchema.optional(),
+    trim: prepressInsetSchema.optional(),
+    safeArea: prepressInsetSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.backgroundMode === 'gradient' && value.backgroundGradient === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'backgroundGradient is required when backgroundMode is gradient',
+        path: ['backgroundGradient'],
+      });
+    }
+  });
 
 const vector3Schema: z.ZodType<Vector3> = z.object({
   x: z.number(),
@@ -241,6 +254,7 @@ function defaultCanvasForMode(mode: 'screen' | 'print', canvas: z.infer<typeof c
     dpi: canvas.dpi ?? (mode === 'screen' ? DEFAULT_SCREEN_CANVAS_DPI : DEFAULT_PRINT_CANVAS_DPI),
     padding: canvas.padding,
     backgroundColor: canvas.backgroundColor,
+    backgroundGradient: canvas.backgroundGradient,
     backgroundMode: canvas.backgroundMode ?? (mode === 'screen' ? 'transparent' : 'solid'),
     safeAreas: canvas.safeAreas,
     bleed: canvas.bleed,

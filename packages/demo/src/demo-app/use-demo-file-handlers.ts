@@ -43,57 +43,75 @@ interface UseDemoFileHandlersOptions {
    * file handler just leaves the existing `projectAssets` in place.
    */
   readonly setProjectAssets?: Dispatch<SetStateAction<BroadsetProject['assets']>>;
-  /**
-   * Setter for the pending import-warnings list. When the importer
-   * returns a non-empty `warnings` array, the file handler stows
-   * the list here so `LayoutDialogs` can surface it via
-   * `FormatImportWarningsModal` (per IO-D-18 — no silent drops).
-   */
-  readonly setPendingImportWarnings?: Dispatch<SetStateAction<readonly string[]>>;
-  /**
-   * Setter for the format label that accompanies the pending
-   * warnings (e.g., 'SVG', 'PSD'). Drives the modal title.
-   */
-  readonly setPendingImportFormatLabel?: Dispatch<SetStateAction<string>>;
 }
 
-/**
- * Map a filename's extension to the human-readable format label
- * the warnings modal displays in its title. Falls back to "File"
- * for unknown extensions so the modal still has a meaningful
- * heading.
- */
-function deriveFormatLabel(fileName: string): string {
-  const lower = fileName.toLowerCase();
-
-  if (lower.endsWith('.svg')) return 'SVG';
-  if (lower.endsWith('.psd')) return 'PSD';
-  if (lower.endsWith('.pdf')) return 'PDF';
-  if (lower.endsWith('.pptx')) return 'PPTX';
-  if (lower.endsWith('.bsp') || lower.endsWith('.json')) return 'Project';
-
-  return 'File';
+function formatExportWarningMessage(warnings: readonly string[]): string {
+  return formatWarningMessage('Export', warnings);
 }
 
-function formatImportWarningMessage(warnings: readonly string[]): string {
+function formatWarningMessage(action: 'Export' | 'Import', warnings: readonly string[]): string {
   const [firstWarning, secondWarning] = warnings;
 
   if (warnings.length === 1 && firstWarning !== undefined) {
-    return `Import completed with 1 warning: ${firstWarning}`;
+    return `${action} completed with 1 warning: ${firstWarning}`;
   }
 
   if (warnings.length > 1 && firstWarning !== undefined) {
     const moreCount = warnings.length - 1;
     const suffix = secondWarning === undefined ? '' : ` Next: ${secondWarning}`;
 
-    return `Import completed with ${String(warnings.length)} warnings. First: ${firstWarning}${suffix}${moreCount > 1 ? ' …' : ''}`;
+    return `${action} completed with ${String(warnings.length)} warnings. First: ${firstWarning}${suffix}${moreCount > 1 ? ' …' : ''}`;
   }
 
-  return 'Import completed with warnings.';
+  return `${action} completed with warnings.`;
+}
+
+/**
+ * Per-format import warnings surfaced via the shared
+ * `FormatImportWarningsModal` from `@broadset/ui`. The modal opens
+ * automatically when an import returns a non-empty warning list and
+ * closes via the user pressing acknowledge or close.
+ *
+ * Spec: `project/spec/formats/pptx.md` — Reconciliation Reporting
+ * acceptance criterion "report consumable by FormatImportWarningsModal"
+ * and the parallel PSD/SVG import paths use the same modal.
+ */
+export interface ImportWarningsModalState {
+  readonly formatLabel: string;
+  readonly warnings: readonly string[];
+}
+
+/**
+ * Per-element reconciliation diff surfaced when a Broadset-exported
+ * file is re-imported after external editing (PowerPoint / Keynote /
+ * Google Slides modified the file in between). The richer
+ * `FormatReconciliationModal` shows per-bucket counts plus expandable
+ * element lists; the flat `FormatImportWarningsModal` falls back to
+ * the warning summary lines when reconciliation is null.
+ */
+export interface ImportReconciliationModalState {
+  readonly formatLabel: string;
+  readonly data: {
+    readonly modifications: readonly ImportReconciliationModalElement[];
+    readonly additions: readonly ImportReconciliationModalElement[];
+    readonly deletions: readonly ImportReconciliationModalElement[];
+    readonly recoveredByHash: readonly ImportReconciliationModalElement[];
+  };
+  readonly warnings: readonly string[];
+}
+
+export interface ImportReconciliationModalElement {
+  readonly id: string;
+  readonly name?: string;
+  readonly description?: string;
 }
 
 interface DemoFileHandlers {
   readonly exportProgress: ExportProgress | null;
+  readonly importWarningsModal: ImportWarningsModalState | null;
+  readonly importReconciliationModal: ImportReconciliationModalState | null;
+  readonly dismissImportReconciliationModal: () => void;
+  readonly dismissImportWarningsModal: () => void;
   readonly handleCreateFromPreset: (preset: DocumentPreset) => void;
   readonly handleDebugSnapshotDownload: () => void;
   readonly handleDeleteSnapshot: (snapshotId: string) => void;
@@ -106,6 +124,20 @@ interface DemoFileHandlers {
   readonly handleSaveDocument: () => void;
   readonly handleSaveSnapshot: () => void;
   readonly handleTemplateSelect: (template: TemplateEntry) => void;
+}
+
+const FORMAT_LABEL_BY_EXTENSION: ReadonlyMap<string, string> = new Map([
+  ['bsp', 'Broadset Project'],
+  ['json', 'JSON'],
+  ['pptx', 'PowerPoint (PPTX)'],
+  ['psd', 'Photoshop (PSD)'],
+  ['svg', 'SVG'],
+]);
+
+function deriveFormatLabel(file: File): string {
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+
+  return FORMAT_LABEL_BY_EXTENSION.get(ext) ?? ext.toUpperCase();
 }
 
 function getOptionalNumber(data: Readonly<Record<string, unknown>>, key: string): number | undefined {
@@ -422,10 +454,18 @@ export function useDemoFileHandlers({
   fileInputRef,
   projectAssets,
   setProjectAssets,
-  setPendingImportWarnings,
-  setPendingImportFormatLabel,
 }: UseDemoFileHandlersOptions): DemoFileHandlers {
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
+  const [importWarningsModal, setImportWarningsModal] = useState<ImportWarningsModalState | null>(null);
+  const [importReconciliationModal, setImportReconciliationModal] = useState<ImportReconciliationModalState | null>(
+    null,
+  );
+  const dismissImportWarningsModal = useCallback((): void => {
+    setImportWarningsModal(null);
+  }, []);
+  const dismissImportReconciliationModal = useCallback((): void => {
+    setImportReconciliationModal(null);
+  }, []);
 
   useEffect(() => {
     // Warm the formats bundle in the background so export starts faster and
@@ -484,18 +524,16 @@ export function useDemoFileHandlers({
 
         pushToast('success', 'Import complete.');
 
-        if (result.warnings.length > 0) {
-          // P7.7n: surface warnings via the dedicated review modal
-          // so users can see the full list (per IO-D-18 — no silent
-          // drops). Fall back to a toast when the modal isn't wired
-          // (some test harnesses don't supply the setters).
-          if (setPendingImportWarnings !== undefined && setPendingImportFormatLabel !== undefined) {
-            setPendingImportFormatLabel(deriveFormatLabel(file.name));
-            setPendingImportWarnings(result.warnings);
-            setActiveDialog('format-import-warnings');
-          } else {
-            pushToast('info', formatImportWarningMessage(result.warnings));
-          }
+        const formatLabel = deriveFormatLabel(file);
+
+        if (result.reconciliation !== null && result.reconciliation !== undefined) {
+          setImportReconciliationModal({
+            formatLabel,
+            data: result.reconciliation,
+            warnings: result.warnings,
+          });
+        } else if (result.warnings.length > 0) {
+          setImportWarningsModal({ formatLabel, warnings: result.warnings });
         }
       } catch (error: unknown) {
         pushToast('error', `Import failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -503,15 +541,7 @@ export function useDemoFileHandlers({
         event.currentTarget.value = '';
       }
     },
-    [
-      editorStore,
-      projectAssets,
-      pushToast,
-      setActiveDialog,
-      setPendingImportFormatLabel,
-      setPendingImportWarnings,
-      setProjectAssets,
-    ],
+    [editorStore, projectAssets, pushToast, setProjectAssets],
   );
 
   const handleSaveAsJson = useCallback((): void => {
@@ -638,7 +668,7 @@ export function useDemoFileHandlers({
         const svgOptions = exporter === 'svg' && projectAssets !== undefined ? { projectAssets } : undefined;
 
         try {
-          await bridge.exportDocument(exporter as ExportFormat, {
+          const exportResult = await bridge.exportDocument(exporter as ExportFormat, {
             document: renderDocument,
             ...buildOptionalExportArgs(options),
             ...(snapshotCanvas !== undefined ? { snapshotCanvas } : {}),
@@ -651,7 +681,13 @@ export function useDemoFileHandlers({
           });
 
           setExportProgress({ progress: 1, stage: 'Done!' });
-          pushToast('success', `Exported as ${exporter.toUpperCase()}.`);
+
+          if (exportResult.warnings.length > 0) {
+            pushToast('info', formatExportWarningMessage(exportResult.warnings));
+          } else {
+            pushToast('success', `Exported as ${exporter.toUpperCase()}.`);
+          }
+
           document.body.setAttribute('data-export-status', 'done');
         } finally {
           videoSession?.session.dispose();
@@ -695,6 +731,8 @@ export function useDemoFileHandlers({
   );
 
   return {
+    dismissImportReconciliationModal,
+    dismissImportWarningsModal,
     exportProgress,
     handleCreateFromPreset,
     handleDebugSnapshotDownload,
@@ -708,5 +746,7 @@ export function useDemoFileHandlers({
     handleSaveDocument,
     handleSaveSnapshot,
     handleTemplateSelect,
+    importReconciliationModal,
+    importWarningsModal,
   };
 }

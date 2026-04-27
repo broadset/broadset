@@ -1,88 +1,65 @@
 import type { BroadsetDocument } from '@broadset/model';
-import PizZip from 'pizzip';
 
 import {
-  buildContentTypesXml,
-  buildPresentationRels,
-  buildPresentationXml,
-  buildRootRels,
-  buildSlideLayoutRels,
-  buildSlideLayoutXml,
-  buildSlideMasterRels,
-  buildSlideMasterXml,
-  buildSlideRels,
-  buildSlideXml,
-  buildThemeXml,
-} from './package-xml';
-import { buildGroupXml, buildShapeXml, type SlideContext } from './slide-shapes';
-import { valueToEmu } from './units';
+  buildPptxPackage,
+  buildPptxPackageSync,
+  buildPptxPackageSyncWithReport,
+  buildPptxPackageWithReport,
+} from './export/package';
+import type { PptxExportOptions, PptxExportReport } from './types';
 
-export function exportPptxBytes(doc: BroadsetDocument): Uint8Array {
-  const { canvas } = doc;
-  const cx = valueToEmu(canvas, canvas.width);
-  const cy = valueToEmu(canvas, canvas.height);
+/**
+ * Export a Broadset document to a PPTX byte stream (asynchronous).
+ *
+ * Produces a standards-only OOXML package with native shapes, groups,
+ * text runs, custom XML parts for round-trip, shape-name tags, and
+ * per-shape `<p:extLst>` entries plus the interop ledger
+ * (`customXml/broadset-interop.xml`). The ledger requires an xxhash-wasm
+ * init on first call which is why this variant is async.
+ *
+ * Convenience wrapper that discards fidelity-loss warnings; callers
+ * that want the warnings sink should use
+ * {@link exportPptxWithReportAsync}.
+ */
+export async function exportPptxBytesAsync(
+  document: BroadsetDocument,
+  options?: PptxExportOptions,
+): Promise<Uint8Array> {
+  return buildPptxPackage(document, options);
+}
 
-  const ctx: SlideContext = {
-    canvas,
-    relationships: [],
-    mediaFiles: [],
-    nextRelId: 1,
-    nextMediaId: 1,
-  };
+/**
+ * Async export that surfaces fidelity-loss warnings (e.g. silent
+ * `box-shadow` drops, animation effects outside the PPTX timing mapper per
+ * IO-D-16). Returns both the bytes and the structured warning list so
+ * callers can show a fidelity-loss toast to the user.
+ */
+export async function exportPptxWithReportAsync(
+  document: BroadsetDocument,
+  options?: PptxExportOptions,
+): Promise<PptxExportReport> {
+  return buildPptxPackageWithReport(document, options);
+}
 
-  const groupIds = new Set(doc.elements.filter((el) => el.type === 'group').map((el) => el.id));
+/**
+ * Synchronous export. Omits the per-element interop ledger (async-only
+ * xxhash-wasm dependency) but retains the document-level fast-path via
+ * `customXml/broadset-project.xml`. Callers that need the ledger for
+ * round-trip reconciliation should use {@link exportPptxBytesAsync};
+ * callers that want the warnings sink should use
+ * {@link exportPptxWithReport}.
+ */
+export function exportPptxBytes(document: BroadsetDocument, options?: PptxExportOptions): Uint8Array {
+  return buildPptxPackageSync(document, options);
+}
 
-  const shapeParts: string[] = [];
-
-  for (const el of doc.elements) {
-    if (el.groupId && groupIds.has(el.groupId)) {
-      continue;
-    }
-
-    if (el.type === 'group') {
-      const children = doc.elements.filter((child) => child.groupId === el.id);
-
-      shapeParts.push(buildGroupXml(el, children, ctx));
-    } else {
-      shapeParts.push(buildShapeXml(el, ctx));
-    }
-  }
-
-  const shapesXml = shapeParts.join('\n');
-
-  const hasSvg = ctx.mediaFiles.some((f) => f.path.endsWith('.svg'));
-  const imageExts = [
-    ...new Set(
-      ctx.mediaFiles
-        .map((f) => {
-          if (f.path.endsWith('.png')) return 'png';
-          if (f.path.endsWith('.jpg')) return 'jpg';
-
-          return '';
-        })
-        .filter(Boolean),
-    ),
-  ];
-
-  const zip = new PizZip();
-
-  zip.file('[Content_Types].xml', buildContentTypesXml(hasSvg, imageExts));
-  zip.file('_rels/.rels', buildRootRels());
-  zip.file('ppt/presentation.xml', buildPresentationXml(cx, cy));
-  zip.file('ppt/_rels/presentation.xml.rels', buildPresentationRels());
-  zip.file('ppt/slides/slide1.xml', buildSlideXml(shapesXml));
-  zip.file('ppt/slides/_rels/slide1.xml.rels', buildSlideRels(ctx.relationships));
-  zip.file('ppt/slideLayouts/slideLayout1.xml', buildSlideLayoutXml());
-  zip.file('ppt/slideLayouts/_rels/slideLayout1.xml.rels', buildSlideLayoutRels());
-  zip.file('ppt/slideMasters/slideMaster1.xml', buildSlideMasterXml());
-  zip.file('ppt/slideMasters/_rels/slideMaster1.xml.rels', buildSlideMasterRels());
-  zip.file('ppt/theme/theme1.xml', buildThemeXml());
-
-  for (const media of ctx.mediaFiles) {
-    zip.file(media.path, media.content);
-  }
-
-  const output: unknown = zip.generate({ type: 'uint8array' });
-
-  return output as Uint8Array;
+/**
+ * Synchronous export that surfaces fidelity-loss warnings. Mirrors
+ * {@link exportPptxWithReportAsync} but for the no-ledger sync path.
+ */
+export function exportPptxWithReport(
+  document: BroadsetDocument,
+  options?: PptxExportOptions,
+): PptxExportReport {
+  return buildPptxPackageSyncWithReport(document, options);
 }

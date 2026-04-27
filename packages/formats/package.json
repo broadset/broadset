@@ -15,7 +15,12 @@
     "test": "vitest run --passWithNoTests",
     "quality": "npm run lint && npm run typecheck && npm run test",
     "quality:strict": "npm run lint:strict && npm run typecheck && npm run test",
-    "validate:pdfa": "node scripts/validate-pdfa.mjs"
+    "validate:pdfa": "node scripts/validate-pdfa.mjs",
+    "pptx:corpus:fetch": "node scripts/fetch-pptx-corpus.mjs",
+    "pptx:oracle:generate": "python3 scripts/generate-python-pptx-oracle.py",
+    "pptx:oracle:test": "BROADSET_REQUIRE_PYTHON_PPTX=1 vitest run --passWithNoTests pptx/python-pptx-oracle",
+    "pptx:xsd:validate": "BROADSET_REQUIRE_OPENXML_VALIDATOR=1 vitest run --passWithNoTests pptx/openxml-xsd-validate",
+    "pptx:libreoffice:verify": "BROADSET_REQUIRE_LIBREOFFICE=1 vitest run --passWithNoTests pptx/libreoffice-verify"
   },
   "devDependencies": {
     "@napi-rs/canvas": "^0.1.100",
@@ -41,6 +46,7 @@
     "culori": "^4.0.2",
     "dompurify": "^3.4.1",
     "fast-xml-parser": "^5.7.1",
+    "fflate": "^0.8.2",
     "fontkit": "^2.0.4",
     "linebreak": "^1.1.0",
     "mediabunny": "^1.40.1",

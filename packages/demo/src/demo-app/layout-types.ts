@@ -4,6 +4,7 @@ import type { PlaybackController } from '@broadset/playback';
 import type { DocumentPreset, ExportProgress, MediaAsset, TemplateEntry } from '@broadset/ui';
 
 import type { ActiveDialog, ContextMenuState, SidebarTab } from '../demo-types';
+import type { ImportReconciliationModalState, ImportWarningsModalState } from './use-demo-file-handlers';
 
 export interface DemoAppLayoutProps {
   readonly activeDialog: ActiveDialog;
@@ -40,6 +41,10 @@ export interface DemoAppLayoutProps {
   readonly handleElementTransformPreview: (elementId: string, updates: ElementUpdate) => void;
   readonly handleExportFormat: (exporter: string, data: Readonly<Record<string, unknown>>) => void;
   readonly handleImportFileChange: (event: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  readonly importWarningsModal: ImportWarningsModalState | null;
+  readonly dismissImportWarningsModal: () => void;
+  readonly importReconciliationModal: ImportReconciliationModalState | null;
+  readonly dismissImportReconciliationModal: () => void;
   readonly handleAnimationAddKeyframe: () => void;
   readonly handleAnimationAddModifierBinding: () => void;
   readonly handleAnimationAddStateBinding: () => void;
@@ -80,8 +85,6 @@ export interface DemoAppLayoutProps {
   readonly isSidebarOpen: boolean;
   readonly isTimelinePreviewPlaying: boolean;
   readonly pasteClipboardElements: () => void;
-  readonly pendingImportFormatLabel: string;
-  readonly pendingImportWarnings: readonly string[];
   readonly placementLabel: string;
   readonly pushToast: (severity: 'error' | 'info' | 'success', message: string) => void;
   readonly renderDocument: BroadsetDocument;
@@ -90,8 +93,6 @@ export interface DemoAppLayoutProps {
   readonly selectedElement: BroadsetElement | null;
   readonly selectedElements: readonly BroadsetElement[];
   readonly selectedMovableElements: readonly BroadsetElement[];
-  readonly setPendingImportFormatLabel: React.Dispatch<React.SetStateAction<string>>;
-  readonly setPendingImportWarnings: React.Dispatch<React.SetStateAction<readonly string[]>>;
   readonly setPreviewPlaybackController: (controller: PlaybackController | null) => void;
   readonly setActiveDialog: React.Dispatch<React.SetStateAction<ActiveDialog>>;
   readonly setContextMenu: React.Dispatch<React.SetStateAction<ContextMenuState | null>>;

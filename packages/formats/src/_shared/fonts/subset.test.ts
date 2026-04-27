@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import * as fontkit from 'fontkit';
 import { describe, expect, it } from 'vitest';
 
 import { subsetFont } from './subset';
@@ -125,5 +126,113 @@ describe('subsetFont happy path', () => {
     const matches = acceptedSignatures.some((accepted) => accepted.every((byte, idx) => byte === signature[idx]));
 
     expect(matches).toBe(true);
+  });
+});
+
+/**
+ * @description Byte-level structural fidelity of the subset output.
+ *
+ * Closes the spec gap in `project/spec/formats/pptx.md` line 512
+ * ("Full font-embedding acceptance tests — byte-level OS/2 /
+ * name-table assertions land when a license-clear font fixture is
+ * available"). Codicon (MIT) is committed in `__fixtures__/` so
+ * these assertions run unconditionally.
+ *
+ * After subsetting, the OS/2 and name tables MUST survive — PPTX's
+ * `<p:embeddedFontLst>` and PDF's `/FontDescriptor` both require
+ * embed-permission flags (OS/2 fsType) and the family / style names
+ * (name records 1, 2, 6) for the embedded font to be usable in the
+ * consuming reader.
+ *
+ * fontkit's CFF / TTF subsetter strips these tables by default;
+ * `subsetFont` runs a post-process that copies OS/2 and name from
+ * the source font into the subset's table directory.
+ */
+describe('subsetFont preserves OS/2 + name tables', () => {
+  interface ParsedFont {
+    readonly familyName: string | null;
+    readonly subfamilyName: string | null;
+    readonly postscriptName: string | null;
+    readonly 'OS/2'?: {
+      readonly fsType?: unknown;
+      readonly usWeightClass?: number;
+      readonly usWidthClass?: number;
+    };
+  }
+
+  function parseSubset(codepoints: readonly number[]): ParsedFont {
+    const subset = subsetFont(codiconBytes, codepoints);
+
+    expect(subset).not.toBeNull();
+
+    if (subset === null) {
+      throw new Error('unreachable: subset is null after expect');
+    }
+
+    return fontkit.create(Buffer.from(subset)) as unknown as ParsedFont;
+  }
+
+  /**
+   * @description The OS/2 table (`fsType` field) controls the
+   * downstream embedder's permission to embed the font under
+   * `ppt/fonts/` or in PDF `/FontFile2`. A subsetted output that
+   * drops OS/2 leaves the embedder with no policy signal.
+   */
+  it('preserves the OS/2 table with a parseable fsType', () => {
+    const font = parseSubset([0xea60]);
+    const os2 = font['OS/2'];
+
+    expect(os2, 'subset must include the OS/2 table').toBeDefined();
+    expect(os2?.fsType, 'OS/2 fsType field must be parseable').toBeDefined();
+  });
+
+  /**
+   * @description Codicon is a regular-weight icon font. Subsetting
+   * MUST preserve the OS/2 weight + width class so the consuming
+   * reader can pair the subset with its sibling weights at compose
+   * time (PowerPoint, e.g., uses these to pick a fallback when the
+   * exact subset isn't installed).
+   */
+  it('preserves OS/2 weight and width classes', () => {
+    const font = parseSubset([0xea60]);
+    const os2 = font['OS/2'];
+    const expectedWeightClass = 400; // codicon Regular
+    const expectedWidthClassMin = 1; // 1..9 valid range
+    const expectedWidthClassMax = 9;
+
+    expect(os2?.usWeightClass).toBe(expectedWeightClass);
+    expect(os2?.usWidthClass ?? 0).toBeGreaterThanOrEqual(expectedWidthClassMin);
+    expect(os2?.usWidthClass ?? 10).toBeLessThanOrEqual(expectedWidthClassMax);
+  });
+
+  /**
+   * @description The name table family / subfamily / postscript
+   * names are how PowerPoint matches the embedded subset against
+   * the `<a:latin typeface="…"/>` reference in slide text. A
+   * subsetted output that loses the name records ends up rendering
+   * with the consumer's fallback font even though the embed went
+   * through.
+   */
+  it('preserves the name table family, subfamily, and postscript records', () => {
+    const font = parseSubset([0xea60]);
+
+    expect(font.familyName).toBe('codicon');
+    expect(font.subfamilyName).toBe('Regular');
+    expect(font.postscriptName).toBe('codicon');
+  });
+
+  /**
+   * @description Subsetting on a glyph the font does NOT cover is
+   * still expected to produce a valid font (the includeAny guard
+   * keeps any-glyph subsets out, but mixed input where SOME glyphs
+   * cover should preserve the metadata tables for the rest).
+   */
+  it('preserves the OS/2 and name tables for mixed-coverage codepoint sets', () => {
+    const codepoints = [0xea60, 0xfffd /* unassigned-but-valid */];
+    const font = parseSubset(codepoints);
+    const os2 = font['OS/2'];
+
+    expect(os2).toBeDefined();
+    expect(font.familyName).toBe('codicon');
   });
 });

@@ -1,0 +1,6 @@
+# Real-world `.pptx` corpus — drop licensed files here for local
+# round-trip validation. Each file is git-ignored so corporate /
+# proprietary content never lands in the repository.
+#
+# See README.md in this directory for the legal-review process.
+*.pptx

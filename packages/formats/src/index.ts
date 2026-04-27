@@ -1,5 +1,7 @@
 export {
   type DocumentImportResult,
+  type DocumentReconciliation,
+  type DocumentReconciliationElement,
   importPdfDocument,
   importPptxDocument,
   importPsdDocument,
@@ -24,7 +26,17 @@ export {
   parseCssColor,
   resolveGoogleFontUrl,
 } from './pdf';
-export { exportPptxBytes, importPptx } from './pptx';
+export type { AsyncFontResolver, PptxExportReport, PptxExportWarning, PptxExportWarningCode } from './pptx';
+export {
+  defaultUrlFontResolver,
+  exportPptxBytes,
+  exportPptxBytesAsync,
+  exportPptxWithReport,
+  exportPptxWithReportAsync,
+  importPptx,
+  readPreservedPptxDocument,
+  reconcilePptx,
+} from './pptx';
 export { exportPsdBytes, exportPsdBytesAsync, importPsd, svgPathToPsdVectorMask } from './psd';
 export {
   type BatchCaptureSession,

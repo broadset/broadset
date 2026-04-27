@@ -1,0 +1,80 @@
+import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
+
+import { fingerprintElement, reconcile, type ReconcileResult } from '../_shared';
+import { importPptx } from './import';
+import { readOoxmlPackage, readTextPart } from './ooxml/zip';
+import { parseProjectCustomXml } from './semantic/custom-xml';
+import { BROADSET_CUSTOM_XML_PROJECT } from './types';
+
+/**
+ * Reconcile a PPTX file against its preserved Broadset metadata. When
+ * the file was previously exported by Broadset, the
+ * `customXml/broadset-project.xml` part is the preserved state and the
+ * operator-level extraction of the slide tree is the current state.
+ *
+ * For files without preserved metadata, the result's `additions` bucket
+ * carries every shape as a "new element" — equivalent to a first-time
+ * import.
+ *
+ * Reuses the format-agnostic `_shared/reconcile/` engine so PSD / PDF /
+ * SVG / PPTX all produce the same result shape.
+ */
+export async function reconcilePptx(data: Uint8Array): Promise<ReconcileResult> {
+  const pkg = readOoxmlPackage(data);
+  const preservedXml = readTextPart(pkg, BROADSET_CUSTOM_XML_PROJECT);
+  const preservedDocument = preservedXml !== null ? parseProjectCustomXml(preservedXml) : null;
+  const currentDocument = importPptx(data);
+  const preservedElements = isDocumentShape(preservedDocument) ? preservedDocument.elements : [];
+  const fingerprintsByElementId = await computeFingerprints([
+    ...preservedElements,
+    ...currentDocument.elements,
+  ]);
+
+  return reconcile({
+    preservedMetadata: { elements: preservedElements },
+    currentVisual: { elements: currentDocument.elements },
+    fingerprintsByElementId,
+  });
+}
+
+async function computeFingerprints(
+  elements: readonly BroadsetElement[],
+): Promise<ReadonlyMap<string, string>> {
+  const map = new Map<string, string>();
+
+  for (const element of elements) {
+    if (map.has(element.id)) continue;
+
+    const fingerprint = await fingerprintElement(element);
+
+    map.set(element.id, fingerprint);
+  }
+
+  return map;
+}
+
+function isDocumentShape(value: unknown): value is BroadsetDocument {
+  if (value === null || typeof value !== 'object') return false;
+
+  const record = value as Record<string, unknown>;
+
+  return Array.isArray(record['elements']) && typeof record['id'] === 'string';
+}
+
+/**
+ * Diff the document-level metadata (settings, pages, data schema) that
+ * the custom XML preserves against the current visible state. Returns
+ * the preserved document itself when available so callers can present
+ * a "use preserved / use visual" choice for per-document values that
+ * don't reduce to per-element deltas.
+ */
+export function readPreservedPptxDocument(data: Uint8Array): BroadsetDocument | null {
+  const pkg = readOoxmlPackage(data);
+  const preservedXml = readTextPart(pkg, BROADSET_CUSTOM_XML_PROJECT);
+  const value = preservedXml !== null ? parseProjectCustomXml(preservedXml) : null;
+
+  return isDocumentShape(value) ? value : null;
+}
+
+/** Convenience re-export for ergonomic consumption. */
+export type { BroadsetElement, ReconcileResult };

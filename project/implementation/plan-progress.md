@@ -141,14 +141,14 @@ Source of truth: [plan.md](./plan.md), [svg-support-plan.md](./svg-support-plan.
 
 Source of truth: [plan.md](./plan.md), [pptx-support-plan.md](./pptx-support-plan.md)
 
-- [ ] P8.0 PPTX spec and scope lock
-- [ ] P8.1 PPTX types, package architecture, and parser swap
-- [ ] P8.2 PPTX export parity rebuild
-- [ ] P8.3 PPTX export beyond prior art
-- [ ] P8.4a PPTX import fast path (custom XML plus shape tags)
-- [ ] P8.4b PPTX arbitrary third-party import
-- [ ] P8.5 PPTX reconciliation
-- [ ] P8.6 PPTX tests and UI wiring
+- [x] P8.0 PPTX spec and scope lock
+- [x] P8.1 PPTX types, package architecture, and parser swap
+- [x] P8.2 PPTX export parity rebuild
+- [x] P8.3 PPTX export beyond prior art
+- [x] P8.4a PPTX import fast path (custom XML plus shape tags)
+- [x] P8.4b PPTX arbitrary third-party import
+- [x] P8.5 PPTX reconciliation
+- [x] P8.6 PPTX tests and UI wiring
 
 ### Phase 9 — PDF/A-2b followup
 

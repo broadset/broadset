@@ -1,4 +1,4 @@
-import type { BroadsetDocument } from '@broadset/model';
+import { type BroadsetDocument,gradientToCss } from '@broadset/model';
 
 import { toPixelValue } from '../../dom/layout';
 
@@ -43,6 +43,13 @@ export function applyCanvasFrame(args: {
   if (documentData.canvas.backgroundMode === 'solid') {
     canvasScaleShell.style.backgroundColor = documentData.canvas.backgroundColor ?? DEFAULT_CANVAS_BG;
     canvasScaleShell.style.backgroundImage = '';
+
+    return;
+  }
+
+  if (documentData.canvas.backgroundMode === 'gradient' && documentData.canvas.backgroundGradient !== undefined) {
+    canvasScaleShell.style.backgroundColor = documentData.canvas.backgroundColor ?? '';
+    canvasScaleShell.style.backgroundImage = gradientToCss(documentData.canvas.backgroundGradient);
 
     return;
   }

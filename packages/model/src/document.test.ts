@@ -10,6 +10,7 @@ import {
   createDefaultElement,
   createEmptyBroadsetDocument,
   registerExtensionsSchema,
+  rgbColor,
   unregisterExtensionsSchema,
 } from './index';
 
@@ -137,6 +138,52 @@ describe('Canvas validation', () => {
         }),
       ).success,
     ).toBe(false);
+  });
+
+  /** @description Canvas backgrounds may carry structured gradients for native importer/exporter round-trip. */
+  it('accepts structured gradient canvas backgrounds', () => {
+    const result = broadsetDocumentSchema.safeParse(
+      makeValidDoc({
+        canvas: {
+          width: 508,
+          height: 285.75,
+          unit: 'mm',
+          dpi: 96,
+          padding: [0, 0, 0, 0],
+          backgroundMode: 'gradient',
+          backgroundGradient: {
+            type: 'linear',
+            angle: 90,
+            stops: [
+              { color: rgbColor('#ff0000'), position: 0 },
+              { color: rgbColor('#0000ff'), position: 100 },
+            ],
+          },
+        },
+      }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.data?.canvas.backgroundMode).toBe('gradient');
+    expect(result.data?.canvas.backgroundGradient?.type).toBe('linear');
+  });
+
+  /** @description Gradient mode must carry a structured gradient so exporters do not silently drop the background. */
+  it('rejects gradient canvas mode without a gradient payload', () => {
+    const result = broadsetDocumentSchema.safeParse(
+      makeValidDoc({
+        canvas: {
+          width: 508,
+          height: 285.75,
+          unit: 'mm',
+          dpi: 96,
+          padding: [0, 0, 0, 0],
+          backgroundMode: 'gradient',
+        },
+      }),
+    );
+
+    expect(result.success).toBe(false);
   });
 });
 
@@ -527,9 +574,7 @@ describe('Document extensions validation (IO-D-11)', () => {
       broadsetFormatExtensionsBaseSchema as unknown as z.ZodType<BroadsetFormatExtensions>,
     );
 
-    const result = broadsetDocumentSchema.safeParse(
-      makeValidDoc({ extensions: { pdf: { dirty: 'not a boolean' } } }),
-    );
+    const result = broadsetDocumentSchema.safeParse(makeValidDoc({ extensions: { pdf: { dirty: 'not a boolean' } } }));
 
     expect(result.success).toBe(false);
 

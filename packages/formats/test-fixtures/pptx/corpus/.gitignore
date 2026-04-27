@@ -1,0 +1,5 @@
+# Cache directory for fetched corpus fixtures. Bytes are NEVER committed —
+# `manifest.json` pins each fixture by upstream commit SHA + SHA-256 hash,
+# and `npm run pptx:corpus:fetch -w @broadset/formats` populates this
+# directory on demand. See README.md for the licence story.
+.cache/

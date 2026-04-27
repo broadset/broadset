@@ -275,8 +275,6 @@ export function DemoApp(): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const playbackControllerRef = useRef<PlaybackController | null>(null);
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
-  const [pendingImportWarnings, setPendingImportWarnings] = useState<readonly string[]>([]);
-  const [pendingImportFormatLabel, setPendingImportFormatLabel] = useState('File');
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(
     () => typeof document !== 'undefined' && document.fullscreenElement !== null,
@@ -341,6 +339,8 @@ export function DemoApp(): React.JSX.Element {
   }, []);
 
   const {
+    dismissImportReconciliationModal,
+    dismissImportWarningsModal,
     exportProgress,
     handleCreateFromPreset,
     handleDebugSnapshotDownload,
@@ -354,6 +354,8 @@ export function DemoApp(): React.JSX.Element {
     handleSaveDocument,
     handleSaveSnapshot,
     handleTemplateSelect,
+    importReconciliationModal,
+    importWarningsModal,
   } = useDemoFileHandlers({
     currentDocument,
     renderDocument,
@@ -364,8 +366,6 @@ export function DemoApp(): React.JSX.Element {
     setActiveDialog,
     projectAssets,
     setProjectAssets,
-    setPendingImportWarnings,
-    setPendingImportFormatLabel,
   });
   const {
     handleAlignSelection,
@@ -701,6 +701,10 @@ export function DemoApp(): React.JSX.Element {
       handleExportFormat={handleExportFormat}
       exportProgress={exportProgress}
       handleImportFileChange={handleImportFileChange}
+      importWarningsModal={importWarningsModal}
+      dismissImportWarningsModal={dismissImportWarningsModal}
+      importReconciliationModal={importReconciliationModal}
+      dismissImportReconciliationModal={dismissImportReconciliationModal}
       handleMediaSelect={handleMediaSelect}
       handleOpenImportDialog={handleOpenImportDialog}
       handleResetPlayback={handleResetPlayback}
@@ -721,8 +725,6 @@ export function DemoApp(): React.JSX.Element {
       isSidebarOpen={isSidebarOpen}
       isTimelinePreviewPlaying={animationEditing.isTimelinePlaying}
       pasteClipboardElements={pasteClipboardElements}
-      pendingImportFormatLabel={pendingImportFormatLabel}
-      pendingImportWarnings={pendingImportWarnings}
       placementLabel={placementLabel}
       pushToast={pushToast}
       renderDocument={renderDocument}
@@ -731,8 +733,6 @@ export function DemoApp(): React.JSX.Element {
       selectedElement={selectedElement}
       selectedElements={selectedElements}
       selectedMovableElements={selectedMovableElements}
-      setPendingImportFormatLabel={setPendingImportFormatLabel}
-      setPendingImportWarnings={setPendingImportWarnings}
       setPreviewPlaybackController={animationEditing.registerPlaybackController}
       setActiveDialog={setActiveDialog}
       setContextMenu={setContextMenu}

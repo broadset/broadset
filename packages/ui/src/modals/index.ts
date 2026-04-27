@@ -31,4 +31,10 @@ export {
   FormatImportWarningsModal,
   type FormatImportWarningsModalProps,
 } from './format-import-warnings';
+export {
+  type FormatReconciliationData,
+  type FormatReconciliationElementSummary,
+  FormatReconciliationModal,
+  type FormatReconciliationModalProps,
+} from './format-reconciliation';
 export type { DocumentPreset, MediaAsset, TemplateEntry } from './types';

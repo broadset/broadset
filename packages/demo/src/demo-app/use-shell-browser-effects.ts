@@ -60,6 +60,19 @@ export function useShellBrowserEffects({
         event.preventDefault();
       }
     };
+    /**
+     * Browser zoom shortcuts (Ctrl/Cmd + + / - / 0) conflict with the
+     * editor's own zoom step bindings — let those keydowns through and
+     * the browser scales the whole UI rather than the canvas. Pre-empt
+     * the default before the browser applies the zoom.
+     */
+    const ZOOM_KEYS: ReadonlySet<string> = new Set(['+', '=', '-', '_', '0']);
+    const preventZoomOnKey = (event: KeyboardEvent): void => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      if (!ZOOM_KEYS.has(event.key)) return;
+
+      event.preventDefault();
+    };
     const preventMultiTouchZoom: EventListener = (event): void => {
       if (typeof TouchEvent !== 'undefined' && event instanceof TouchEvent && event.touches.length > 1) {
         event.preventDefault();
@@ -161,6 +174,7 @@ export function useShellBrowserEffects({
     }
 
     window.addEventListener('wheel', preventZoomOnWheel, { passive: false });
+    window.addEventListener('keydown', preventZoomOnKey);
     window.addEventListener('keydown', handleGlobalKeydown);
     window.addEventListener('pointerdown', handleWindowPointerDown);
     window.addEventListener('resize', handleWindowResize);
@@ -194,6 +208,7 @@ export function useShellBrowserEffects({
       }
 
       window.removeEventListener('wheel', preventZoomOnWheel);
+      window.removeEventListener('keydown', preventZoomOnKey);
       window.removeEventListener('keydown', handleGlobalKeydown);
       window.removeEventListener('pointerdown', handleWindowPointerDown);
       window.removeEventListener('resize', handleWindowResize);

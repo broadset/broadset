@@ -52,6 +52,19 @@ export interface ExportContext {
   readonly svgOptions?: SvgExportOptionsInput;
 }
 
+export interface ImportReconciliationElement {
+  readonly id: string;
+  readonly name?: string;
+  readonly description?: string;
+}
+
+export interface ImportReconciliationData {
+  readonly modifications: readonly ImportReconciliationElement[];
+  readonly additions: readonly ImportReconciliationElement[];
+  readonly deletions: readonly ImportReconciliationElement[];
+  readonly recoveredByHash: readonly ImportReconciliationElement[];
+}
+
 export interface ImportDocumentResult {
   readonly document: BroadsetDocument;
   readonly warnings: readonly string[];
@@ -63,6 +76,26 @@ export interface ImportDocumentResult {
    * declares — instead of defaulting to the bundled sample.
    */
   readonly projectAssets?: readonly Asset[] | undefined;
+  /**
+   * Populated for PPTX re-imports of Broadset-exported files —
+   * surfaces the four reconcile buckets so the demo opens
+   * `FormatReconciliationModal` instead of the flat-string
+   * `FormatImportWarningsModal`. `null` for arbitrary third-party
+   * files and for non-PPTX formats.
+   */
+  readonly reconciliation?: ImportReconciliationData | null;
+}
+
+/**
+ * Per-format export result. Carries any fidelity-loss warnings that
+ * surfaced during emission (today: PPTX `<a:outerShdw>` inset skips,
+ * multi-shadow truncation, animations beyond fade-entry per IO-D-16).
+ * Other formats currently return an empty array; the shape is
+ * uniform so the caller can show a fidelity-loss toast without
+ * branching on format.
+ */
+export interface ExportDocumentResult {
+  readonly warnings: readonly string[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -135,10 +168,11 @@ async function exportSvgVia(formats: FormatsModule, context: ExportContext, name
   formats.triggerDownload(blob, `${name}.svg`);
 }
 
-export async function exportDocument(format: ExportFormat, context: ExportContext): Promise<void> {
+export async function exportDocument(format: ExportFormat, context: ExportContext): Promise<ExportDocumentResult> {
   const formats = await loadFormats();
   const { document: doc } = context;
   const name = formats.sanitizeFilename(doc.name || 'broadset-document');
+  const warnings: string[] = [];
 
   switch (format) {
     case 'json': {
@@ -171,12 +205,17 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
     }
 
     case 'pptx': {
-      const pptxBytes = formats.exportPptxBytes(doc);
-      const blob = new Blob([pptxBytes.buffer as ArrayBuffer], {
+      const pptxReport = await formats.exportPptxWithReportAsync(doc);
+      const blob = new Blob([pptxReport.bytes.buffer as ArrayBuffer], {
         type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       });
 
       formats.triggerDownload(blob, `${name}.pptx`);
+
+      for (const w of pptxReport.warnings) {
+        warnings.push(`${w.code}: ${w.message}`);
+      }
+
       break;
     }
 
@@ -269,6 +308,8 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
       throw new Error(`Unsupported export format: ${_exhaustive as string}`);
     }
   }
+
+  return { warnings };
 }
 
 function requireSnapshotCanvas(context: ExportContext): asserts context is ExportContext & {
@@ -347,7 +388,7 @@ export async function importDocument(
       const formats = await loadFormats();
       const buffer = await file.arrayBuffer();
 
-      return formats.importPptxDocument(new Uint8Array(buffer));
+      return await formats.importPptxDocument(new Uint8Array(buffer));
     }
 
     case 'svg': {

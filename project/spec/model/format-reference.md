@@ -222,6 +222,14 @@ Spatial values are in the declared `unit`.
   "dpi": 96,
   "padding": [0, 0, 0, 0],
   "backgroundColor": "#000000",
+  "backgroundGradient": {
+    "type": "linear",
+    "angle": 90,
+    "stops": [
+      { "color": { "kind": "rgb", "hex": "#FF0000" }, "position": 0 },
+      { "color": { "kind": "rgb", "hex": "#0000FF" }, "position": 100 },
+    ],
+  },
   "backgroundMode": "transparent",
   "safeAreas": {
     "actionSafe": [3.5, 3.5, 3.5, 3.5],
@@ -231,16 +239,17 @@ Spatial values are in the declared `unit`.
 }
 ```
 
-| Field             | Type                       | Required | Default        | Description                                  |
-| ----------------- | -------------------------- | -------- | -------------- | -------------------------------------------- |
-| `width`           | `number`                   | Yes      | —              | Positive (> 0).                              |
-| `height`          | `number`                   | Yes      | —              | Positive (> 0).                              |
-| `unit`            | `"px" \| "mm" \| "in"`     | Yes      | —              | Unit for all spatial values.                 |
-| `dpi`             | `number`                   | Yes      | 96 / 300       | 96 for screen, 300 for print.                |
-| `padding`         | `[n, n, n, n]`             | Yes      | `[0,0,0,0]`    | Top, right, bottom, left.                    |
-| `backgroundColor` | `string`                   | No       | —              | CSS color string.                            |
-| `backgroundMode`  | `"transparent" \| "solid"` | No       | mode-dependent | `transparent` for screen, `solid` for print. |
-| `safeAreas`       | `SafeAreas`                | No       | —              | Safe area insets (percentage, 0–50).         |
+| Field                | Type                                     | Required | Default        | Description                                                                                 |
+| -------------------- | ---------------------------------------- | -------- | -------------- | ------------------------------------------------------------------------------------------- |
+| `width`              | `number`                                 | Yes      | —              | Positive (> 0).                                                                             |
+| `height`             | `number`                                 | Yes      | —              | Positive (> 0).                                                                             |
+| `unit`               | `"px" \| "mm" \| "in"`                   | Yes      | —              | Unit for all spatial values.                                                                |
+| `dpi`                | `number`                                 | Yes      | 96 / 300       | 96 for screen, 300 for print.                                                               |
+| `padding`            | `[n, n, n, n]`                           | Yes      | `[0,0,0,0]`    | Top, right, bottom, left.                                                                   |
+| `backgroundColor`    | `string`                                 | No       | —              | CSS color string for solid backgrounds and gradient fallback.                               |
+| `backgroundGradient` | `BroadsetGradient`                       | No       | —              | Structured gradient used when `backgroundMode` is `"gradient"`; required for gradient mode. |
+| `backgroundMode`     | `"transparent" \| "solid" \| "gradient"` | No       | mode-dependent | `transparent` for screen, `solid` for print.                                                |
+| `safeAreas`          | `SafeAreas`                              | No       | —              | Safe area insets (percentage, 0–50).                                                        |
 
 **Common canvas sizes:**
 

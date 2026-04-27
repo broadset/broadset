@@ -18,6 +18,17 @@ const mockBuildSvgFontSourcesFromAssets = vi.fn(() => new Map<string, unknown>()
 const mockExportHtmlStandalone = vi.fn(() => '<html></html>');
 const mockExportPdfBytes = vi.fn(() => Promise.resolve(new Uint8Array([1, 2, 3])));
 const mockExportPptxBytes = vi.fn(() => new Uint8Array([4, 5, 6]));
+
+interface MockPptxWarning {
+  readonly code: string;
+  readonly message: string;
+  readonly elementId?: string;
+}
+
+const mockExportPptxWithReportAsync = vi.fn(
+  async (): Promise<{ bytes: Uint8Array; warnings: readonly MockPptxWarning[] }> =>
+    Promise.resolve({ bytes: new Uint8Array([4, 5, 6]), warnings: [] }),
+);
 const mockExportPsdBytes = vi.fn(() => new Uint8Array([7, 8, 9]));
 const mockExportPsdBytesAsync = vi.fn(() => Promise.resolve(new Uint8Array([7, 8, 9])));
 const mockExportPngBlob = vi.fn(() => Promise.resolve(new Blob(['png'], { type: 'image/png' })));
@@ -30,10 +41,12 @@ const mockImportPsdDocument = vi.fn(() => ({
   document: { ...createEmptyBroadsetDocument(), name: 'Imported PSD' } satisfies BroadsetDocument,
   warnings: [] as string[],
 }));
-const mockImportPptxDocument = vi.fn(() => ({
-  document: { ...createEmptyBroadsetDocument(), name: 'Imported PPTX' } satisfies BroadsetDocument,
-  warnings: [] as string[],
-}));
+const mockImportPptxDocument = vi.fn(async () =>
+  Promise.resolve({
+    document: { ...createEmptyBroadsetDocument(), name: 'Imported PPTX' } satisfies BroadsetDocument,
+    warnings: [] as string[],
+  }),
+);
 const mockImportSvgDocument = vi.fn(() => ({
   document: { ...createEmptyBroadsetDocument(), name: 'Imported SVG' } satisfies BroadsetDocument,
   warnings: [] as string[],
@@ -56,6 +69,7 @@ const mockFormats = {
   exportPdfBytes: mockExportPdfBytes,
   exportPngBlob: mockExportPngBlob,
   exportPptxBytes: mockExportPptxBytes,
+  exportPptxWithReportAsync: mockExportPptxWithReportAsync,
   exportProjectJson: mockExportProjectJson,
   exportPsdBytes: mockExportPsdBytes,
   exportPsdBytesAsync: mockExportPsdBytesAsync,
@@ -196,16 +210,34 @@ describe('export orchestration', () => {
     expect(filename).toMatch(/\.pdf$/);
   });
 
-  /** @description PPTX export MUST call exportPptxBytes and trigger a file download. */
+  /** @description PPTX export MUST call exportPptxWithReportAsync and trigger a file download. */
   it('exports PPTX format and triggers download', async () => {
-    await exportDocument('pptx', makeContext());
+    const result = await exportDocument('pptx', makeContext());
 
-    expect(mockExportPptxBytes).toHaveBeenCalledTimes(1);
+    expect(mockExportPptxWithReportAsync).toHaveBeenCalledTimes(1);
     expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
+    expect(result.warnings).toEqual([]);
 
     const [, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];
 
     expect(filename).toMatch(/\.pptx$/);
+  });
+
+  /** @description PPTX export MUST surface export warnings in the result so the UI can toast them. */
+  it('propagates PPTX exporter warnings up to the caller', async () => {
+    mockExportPptxWithReportAsync.mockResolvedValueOnce({
+      bytes: new Uint8Array([4, 5, 6]),
+      warnings: [
+        { code: 'shadow-inset-skipped', message: 'inset shadow skipped', elementId: 'el-1' },
+        { code: 'animation-preset-unsupported', message: 'colour fade unsupported', elementId: 'el-2' },
+      ],
+    });
+
+    const result = await exportDocument('pptx', makeContext());
+
+    expect(result.warnings).toHaveLength(2);
+    expect(result.warnings[0]).toContain('shadow-inset-skipped');
+    expect(result.warnings[1]).toContain('animation-preset-unsupported');
   });
 
   /** @description PSD export MUST call exportPsdBytesAsync and trigger a file download. */

@@ -329,6 +329,12 @@ function MockTableRow(p: Record<string, unknown>) {
 }
 
 vi.mock('@heroui/react', () => ({
+  Accordion: Object.assign(mockWrap(), {
+    Item: mockWrap(),
+    Heading: mockWrap('header'),
+    Trigger: mockButton,
+    Panel: mockWrap(),
+  }),
   Button: mockButton,
   ButtonGroup: mockWrap(),
   Input: mockInput,
