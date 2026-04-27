@@ -27,10 +27,6 @@ interface UseDemoFileHandlersOptions {
   readonly fileInputRef: RefObject<HTMLInputElement | null>;
 }
 
-function formatImportWarningMessage(warnings: readonly string[]): string {
-  return formatWarningMessage('Import', warnings);
-}
-
 function formatExportWarningMessage(warnings: readonly string[]): string {
   return formatWarningMessage('Export', warnings);
 }
@@ -52,8 +48,25 @@ function formatWarningMessage(action: 'Export' | 'Import', warnings: readonly st
   return `${action} completed with warnings.`;
 }
 
+/**
+ * Per-format import warnings surfaced via the shared
+ * `FormatImportWarningsModal` from `@broadset/ui`. The modal opens
+ * automatically when an import returns a non-empty warning list and
+ * closes via the user pressing acknowledge or close.
+ *
+ * Spec: `project/spec/formats/pptx.md` — Reconciliation Reporting
+ * acceptance criterion "report consumable by FormatImportWarningsModal"
+ * and the parallel PSD/SVG import paths use the same modal.
+ */
+export interface ImportWarningsModalState {
+  readonly formatLabel: string;
+  readonly warnings: readonly string[];
+}
+
 interface DemoFileHandlers {
   readonly exportProgress: ExportProgress | null;
+  readonly importWarningsModal: ImportWarningsModalState | null;
+  readonly dismissImportWarningsModal: () => void;
   readonly handleCreateFromPreset: (preset: DocumentPreset) => void;
   readonly handleDebugSnapshotDownload: () => void;
   readonly handleDeleteSnapshot: (snapshotId: string) => void;
@@ -66,6 +79,20 @@ interface DemoFileHandlers {
   readonly handleSaveDocument: () => void;
   readonly handleSaveSnapshot: () => void;
   readonly handleTemplateSelect: (template: TemplateEntry) => void;
+}
+
+const FORMAT_LABEL_BY_EXTENSION: ReadonlyMap<string, string> = new Map([
+  ['bsp', 'Broadset Project'],
+  ['json', 'JSON'],
+  ['pptx', 'PowerPoint (PPTX)'],
+  ['psd', 'Photoshop (PSD)'],
+  ['svg', 'SVG'],
+]);
+
+function deriveFormatLabel(file: File): string {
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+
+  return FORMAT_LABEL_BY_EXTENSION.get(ext) ?? ext.toUpperCase();
 }
 
 function getOptionalNumber(data: Readonly<Record<string, unknown>>, key: string): number | undefined {
@@ -382,6 +409,10 @@ export function useDemoFileHandlers({
   fileInputRef,
 }: UseDemoFileHandlersOptions): DemoFileHandlers {
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
+  const [importWarningsModal, setImportWarningsModal] = useState<ImportWarningsModalState | null>(null);
+  const dismissImportWarningsModal = useCallback((): void => {
+    setImportWarningsModal(null);
+  }, []);
 
   useEffect(() => {
     // Warm the formats bundle in the background so export starts faster and
@@ -424,7 +455,10 @@ export function useDemoFileHandlers({
         pushToast('success', 'Import complete.');
 
         if (result.warnings.length > 0) {
-          pushToast('info', formatImportWarningMessage(result.warnings));
+          setImportWarningsModal({
+            formatLabel: deriveFormatLabel(file),
+            warnings: result.warnings,
+          });
         }
       } catch (error: unknown) {
         pushToast('error', `Import failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -616,6 +650,7 @@ export function useDemoFileHandlers({
   );
 
   return {
+    dismissImportWarningsModal,
     exportProgress,
     handleCreateFromPreset,
     handleDebugSnapshotDownload,
@@ -629,5 +664,6 @@ export function useDemoFileHandlers({
     handleSaveDocument,
     handleSaveSnapshot,
     handleTemplateSelect,
+    importWarningsModal,
   };
 }

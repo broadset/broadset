@@ -4,6 +4,7 @@ import type { PlaybackController } from '@broadset/playback';
 import type { DocumentPreset, ExportProgress, MediaAsset, TemplateEntry } from '@broadset/ui';
 
 import type { ActiveDialog, ContextMenuState, SidebarTab } from '../demo-types';
+import type { ImportWarningsModalState } from './use-demo-file-handlers';
 
 export interface DemoAppLayoutProps {
   readonly activeDialog: ActiveDialog;
@@ -40,6 +41,8 @@ export interface DemoAppLayoutProps {
   readonly handleElementTransformPreview: (elementId: string, updates: ElementUpdate) => void;
   readonly handleExportFormat: (exporter: string, data: Readonly<Record<string, unknown>>) => void;
   readonly handleImportFileChange: (event: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  readonly importWarningsModal: ImportWarningsModalState | null;
+  readonly dismissImportWarningsModal: () => void;
   readonly handleAnimationAddKeyframe: () => void;
   readonly handleAnimationAddModifierBinding: () => void;
   readonly handleAnimationAddStateBinding: () => void;
