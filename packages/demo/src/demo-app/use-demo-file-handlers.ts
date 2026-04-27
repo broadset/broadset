@@ -43,6 +43,36 @@ interface UseDemoFileHandlersOptions {
    * file handler just leaves the existing `projectAssets` in place.
    */
   readonly setProjectAssets?: Dispatch<SetStateAction<BroadsetProject['assets']>>;
+  /**
+   * Setter for the pending import-warnings list. When the importer
+   * returns a non-empty `warnings` array, the file handler stows
+   * the list here so `LayoutDialogs` can surface it via
+   * `FormatImportWarningsModal` (per IO-D-18 — no silent drops).
+   */
+  readonly setPendingImportWarnings?: Dispatch<SetStateAction<readonly string[]>>;
+  /**
+   * Setter for the format label that accompanies the pending
+   * warnings (e.g., 'SVG', 'PSD'). Drives the modal title.
+   */
+  readonly setPendingImportFormatLabel?: Dispatch<SetStateAction<string>>;
+}
+
+/**
+ * Map a filename's extension to the human-readable format label
+ * the warnings modal displays in its title. Falls back to "File"
+ * for unknown extensions so the modal still has a meaningful
+ * heading.
+ */
+function deriveFormatLabel(fileName: string): string {
+  const lower = fileName.toLowerCase();
+
+  if (lower.endsWith('.svg')) return 'SVG';
+  if (lower.endsWith('.psd')) return 'PSD';
+  if (lower.endsWith('.pdf')) return 'PDF';
+  if (lower.endsWith('.pptx')) return 'PPTX';
+  if (lower.endsWith('.bsp') || lower.endsWith('.json')) return 'Project';
+
+  return 'File';
 }
 
 function formatImportWarningMessage(warnings: readonly string[]): string {
@@ -392,6 +422,8 @@ export function useDemoFileHandlers({
   fileInputRef,
   projectAssets,
   setProjectAssets,
+  setPendingImportWarnings,
+  setPendingImportFormatLabel,
 }: UseDemoFileHandlersOptions): DemoFileHandlers {
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
 
@@ -453,7 +485,17 @@ export function useDemoFileHandlers({
         pushToast('success', 'Import complete.');
 
         if (result.warnings.length > 0) {
-          pushToast('info', formatImportWarningMessage(result.warnings));
+          // P7.7n: surface warnings via the dedicated review modal
+          // so users can see the full list (per IO-D-18 — no silent
+          // drops). Fall back to a toast when the modal isn't wired
+          // (some test harnesses don't supply the setters).
+          if (setPendingImportWarnings !== undefined && setPendingImportFormatLabel !== undefined) {
+            setPendingImportFormatLabel(deriveFormatLabel(file.name));
+            setPendingImportWarnings(result.warnings);
+            setActiveDialog('format-import-warnings');
+          } else {
+            pushToast('info', formatImportWarningMessage(result.warnings));
+          }
         }
       } catch (error: unknown) {
         pushToast('error', `Import failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -461,7 +503,15 @@ export function useDemoFileHandlers({
         event.currentTarget.value = '';
       }
     },
-    [editorStore, projectAssets, pushToast, setProjectAssets],
+    [
+      editorStore,
+      projectAssets,
+      pushToast,
+      setActiveDialog,
+      setPendingImportFormatLabel,
+      setPendingImportWarnings,
+      setProjectAssets,
+    ],
   );
 
   const handleSaveAsJson = useCallback((): void => {

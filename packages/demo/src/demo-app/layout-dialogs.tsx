@@ -4,6 +4,7 @@ import {
   CanvasSettingsModal,
   type ExportAnimationInfo,
   ExportModal,
+  FormatImportWarningsModal,
   MediaLibraryModal,
   NewDocumentModal,
   ShortcutHelpModal,
@@ -28,7 +29,10 @@ export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
     handleExportFormat,
     handleMediaSelect,
     handleTemplateSelect,
+    pendingImportFormatLabel,
+    pendingImportWarnings,
     setActiveDialog,
+    setPendingImportWarnings,
   } = props;
 
   // Compute animation info for the ExportModal from the current document.
@@ -153,6 +157,20 @@ export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
           }}
         />
       : null}
+
+      <FormatImportWarningsModal
+        isOpen={activeDialog === 'format-import-warnings'}
+        formatLabel={pendingImportFormatLabel}
+        warnings={pendingImportWarnings}
+        onClose={() => {
+          setActiveDialog(null);
+          setPendingImportWarnings([]);
+        }}
+        onAcknowledge={() => {
+          setActiveDialog(null);
+          setPendingImportWarnings([]);
+        }}
+      />
 
       <Toast.Provider className="bottom-7 right-7 z-40" placement="bottom end" />
     </>

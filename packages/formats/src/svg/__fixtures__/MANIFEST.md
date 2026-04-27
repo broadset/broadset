@@ -13,6 +13,12 @@ Each fixture pins a distinct surface — there's no overlap between them.
 | [`w3c-smil-animate.svg`](./w3c-smil-animate.svg) | W3C-style SMIL sample (locally assembled from SVG 1.1 animation patterns) | W3C-compatible test fixture | Import-time SMIL stripping (`<animate>`, `<animateTransform>`, `<set>`) while preserving static geometry |
 | [`inkscape-shapes.svg`](./inkscape-shapes.svg) | Locally authored — Inkscape-style structure | Broadset (this repo) | `sodipodi:` / `inkscape:` namespace surface, `<g inkscape:groupmode="layer">`, positional attrs |
 | [`complex-document.svg`](./complex-document.svg) | Locally authored | Broadset (this repo) | `<text>` with `<tspan>` overrides + paragraph break, `<g transform>` hierarchy, `<polygon>`, `<use>` / `<symbol>` |
+| [`d3-bars.svg`](./d3-bars.svg) | Locally authored — d3-v7 bar chart idiom | Broadset (this repo) | Programmatic `<g>` hierarchies with translate-only ticks, `currentColor` paint, `text-anchor` axis labels |
+| [`chrome-outerhtml.svg`](./chrome-outerhtml.svg) | Locally authored — Chrome `element.outerHTML` shape | Broadset (this repo) | Single-line markup, no XML prolog, explicit closing tags (`<circle></circle>`), no `xmlns:xlink` |
+| [`illustrator-cc-style.svg`](./illustrator-cc-style.svg) | Locally authored — Adobe Illustrator CC export shape | Broadset (this repo) | `xmlns:i` / `xmlns:graph` Adobe namespaces, `Generator` comment, `<switch>` / `<foreignObject>` Adobe wrapper, `i:extraneous` attrs |
+| [`figma-style.svg`](./figma-style.svg) | Locally authored — Figma export shape | Broadset (this repo) | `data-name` attrs (must NOT collide with `data-bs-id`), per-group `clip-path`, trailing `<defs>`, root `fill="none"` |
+| [`sketch-style.svg`](./sketch-style.svg) | Locally authored — Sketch export shape | Broadset (this repo) | `<title>` / `<desc>` per element, `Page-1` wrapper with cascading `stroke="none" fill="none" fill-rule="evenodd"`, decimal-translate transforms |
+| [`affinity-style.svg`](./affinity-style.svg) | Locally authored — Affinity Designer export shape | Broadset (this repo) | `<defs><style>` with `.cls-N` rules referenced via `class=""` (CSS resolution path) |
 
 ## Fixture additions require
 

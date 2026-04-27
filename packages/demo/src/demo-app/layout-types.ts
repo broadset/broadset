@@ -80,6 +80,8 @@ export interface DemoAppLayoutProps {
   readonly isSidebarOpen: boolean;
   readonly isTimelinePreviewPlaying: boolean;
   readonly pasteClipboardElements: () => void;
+  readonly pendingImportFormatLabel: string;
+  readonly pendingImportWarnings: readonly string[];
   readonly placementLabel: string;
   readonly pushToast: (severity: 'error' | 'info' | 'success', message: string) => void;
   readonly renderDocument: BroadsetDocument;
@@ -88,6 +90,8 @@ export interface DemoAppLayoutProps {
   readonly selectedElement: BroadsetElement | null;
   readonly selectedElements: readonly BroadsetElement[];
   readonly selectedMovableElements: readonly BroadsetElement[];
+  readonly setPendingImportFormatLabel: React.Dispatch<React.SetStateAction<string>>;
+  readonly setPendingImportWarnings: React.Dispatch<React.SetStateAction<readonly string[]>>;
   readonly setPreviewPlaybackController: (controller: PlaybackController | null) => void;
   readonly setActiveDialog: React.Dispatch<React.SetStateAction<ActiveDialog>>;
   readonly setContextMenu: React.Dispatch<React.SetStateAction<ContextMenuState | null>>;

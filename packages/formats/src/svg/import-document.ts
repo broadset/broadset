@@ -24,6 +24,18 @@ export interface SvgDocumentImportResult {
 }
 
 /**
+ * Default byte cap on SVG input. The browser `DOMParser` allocates
+ * the full DOM in memory before any element-count cap fires, so
+ * the byte budget MUST be enforced pre-parse to bound peak memory.
+ * 32 MB covers any realistic design-tool export (most are <5 MB)
+ * while making a 500 MB OOM bomb impossible. Callers can override
+ * via `SvgImportOptions.maxBytes` (`0` disables the cap entirely
+ * for trusted internal flows). Closes the P7.7n security audit C2
+ * finding (cap previously opt-in only — demo bridge passed nothing).
+ */
+const DEFAULT_SVG_MAX_BYTES = 32 * 1024 * 1024;
+
+/**
  * High-level SVG import entry point. Wraps the primitive element
  * extractor and produces a full `BroadsetDocument` plus a warnings
  * list that the demo surfaces through `FormatImportWarningsModal`.
@@ -35,8 +47,9 @@ export function importSvgDocument(
 ): SvgDocumentImportResult {
   const fontSources = options?.fontSources;
   const warnings: string[] = [];
+  const effectiveMaxBytes = options?.maxBytes ?? DEFAULT_SVG_MAX_BYTES;
 
-  if (exceedsMaxBytes(input, options?.maxBytes, warnings)) {
+  if (exceedsMaxBytes(input, effectiveMaxBytes, warnings)) {
     return hydrateEmptyDocument(fileName, warnings);
   }
 
@@ -50,6 +63,16 @@ export function importSvgDocument(
 
   if (parseError) {
     throw new Error(`SVG import failed: invalid XML - ${parseError.textContent}`);
+  }
+
+  // P7.7n security audit L2: defensively drop the `<!DOCTYPE>` node
+  // even though browser DOMParser does not expand DTD entities (a
+  // billion-laughs payload in a `<!ENTITY>` block is a no-op
+  // today). Removing the DocumentType node keeps the parsed tree
+  // clean and pins the no-expansion guarantee against future
+  // parser swaps (`fast-xml-parser`, etc.).
+  if (xmlDoc.doctype !== null) {
+    xmlDoc.removeChild(xmlDoc.doctype);
   }
 
   // Security-contract sanitization runs on every path.

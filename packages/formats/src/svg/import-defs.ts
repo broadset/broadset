@@ -16,6 +16,7 @@ import {
   type BroadsetGradientStop,
   type FilterPrimitive,
   type FilterStack,
+  isValidSvgPathData,
   type PatternFill,
   rgbColor,
 } from '@broadset/model';
@@ -135,15 +136,30 @@ function parseUrlRef(attr: string | null): string | undefined {
 
 function buildClipPathsMap(doc: Document): ReadonlyMap<string, string> {
   const map = new Map<string, string>();
-  const defs = doc.querySelectorAll('defs > clipPath');
+  // P7.7n: walk `<clipPath>` from anywhere in the document — Figma
+  // (and other modern tools) place `<defs>` after the geometry,
+  // and Illustrator nests `<clipPath>` inside `<defs>` deeper than
+  // direct-child. The model's `customClipPath` validator accepts
+  // path-data only, so we convert each clipPath body's shape
+  // children into a compound `d` string via the same compounder
+  // used for masks. Storing `innerHTML` (the previous behaviour)
+  // tripped the validator on tools that emit a `<rect>` or
+  // `<circle>` clipPath body instead of `<path>`.
+  const clipPaths = doc.getElementsByTagName('clipPath');
 
-  defs.forEach((clipPath) => {
+  for (let i = 0; i < clipPaths.length; i++) {
+    const clipPath = clipPaths[i];
+
+    if (clipPath === undefined) continue;
+
     const id = clipPath.getAttribute('id');
 
-    if (id !== null && id !== '') {
-      map.set(id, clipPath.innerHTML);
-    }
-  });
+    if (id === null || id === '') continue;
+
+    const compoundD = compoundPathFromShapeChildren(clipPath);
+
+    if (compoundD !== '') map.set(id, compoundD);
+  }
 
   return map;
 }
@@ -701,7 +717,16 @@ function compoundPathFromShapeChildren(parent: Element): string {
 
     const d = shapeElementToPathD(child);
 
-    if (d !== '') segments.push(d);
+    // P7.7n security audit M1: validate each segment as canonical
+    // SVG path data before concatenating. The compound `d` lands in
+    // `style.customClipPath`, which the consumer feeds to CSS
+    // `clip-path`. An attacker `<path d="not-actually-a-path"/>`
+    // inside a hostile `<clipPath>` body otherwise propagates raw
+    // bytes (newlines, CSS comments, etc.) into the persisted
+    // document. Invalid segments are dropped silently — the
+    // segment-level safe drop is preferable to a hard reject that
+    // would lose the rest of the compound shape.
+    if (d !== '' && isValidSvgPathData(d)) segments.push(d);
   }
 
   return segments.join(' ');

@@ -1,3 +1,5 @@
+import { isAllowedImageUrlScheme } from './shared';
+
 const USE_DEREFERENCE_DEPTH_CAP = 16;
 
 /**
@@ -57,8 +59,14 @@ function stripEventHandlerAttrsFromEl(el: Element, tally: SanitizeTally): void {
     }
 
     const name = attr.name.toLowerCase();
+    // P7.7n security audit L3: also strip namespaced event handlers
+    // (`xlink:onclick`, `ev:onload`, etc.). Modern browsers ignore
+    // them, but historic SVG viewers honoured the prefix and a
+    // re-export of an imported document could leak the bytes to a
+    // tool that does. Local-name match catches every prefixed form.
+    const localName = name.replace(/^[^:]+:/, '');
 
-    if (/^on[a-z]+$/i.test(name)) {
+    if (/^on[a-z]+$/i.test(localName)) {
       toRemove.push(attr.name);
       tally.attrs.add(name);
     }
@@ -70,10 +78,18 @@ function stripEventHandlerAttrsFromEl(el: Element, tally: SanitizeTally): void {
 }
 
 function stripJavascriptUrlsFromEl(el: Element, tally: SanitizeTally): void {
+  // P7.7n security audit H1: use the same scheme allowlist as the
+  // export side (`isAllowedImageUrlScheme`) so the importer rejects
+  // `vbscript:`, `data:text/html`, `data:application/*`, `file:`,
+  // `chrome-extension:`, etc. — not just `javascript:`. The previous
+  // `^javascript:` regex left the surface asymmetric: a malicious
+  // SVG carrying `<image href="vbscript:…">` survived import and
+  // was persisted into the document, and the demo's renderer does
+  // no scheme check before assigning to `<img>.src`.
   for (const urlAttr of URL_ATTRS_TO_CHECK) {
     const val = el.getAttribute(urlAttr);
 
-    if (val !== null && /^\s*javascript:/i.test(val)) {
+    if (val !== null && val !== '' && !isAllowedImageUrlScheme(val.trim())) {
       el.removeAttribute(urlAttr);
       tally.jsUrls += 1;
     }
@@ -205,10 +221,45 @@ function buildSymbolReplacement(xmlDoc: Document, symbol: Element): Element {
   return replacement;
 }
 
+/**
+ * Total invocation cap on `<use>` dereferencing across the whole
+ * document. The per-chain `seen` set + depth cap stop a
+ * single-chain cycle, but a fan-out tree (`s0 → 4× s1 → 4× s2 …`)
+ * grows as K^N invocations even when the chain re-entry guard
+ * holds (each child path has its own `seen` clone). The
+ * post-walk `SVG_ELEMENT_COUNT_CAP` checks the *input* tree, not
+ * the cloned output, so the expansion itself blows the CPU
+ * budget before any cap fires. 5 000 invocations covers any
+ * realistic design-tool icon (most stay under 100) while bounding
+ * the worst case to ~1 s wall time even in slow runtimes (jsdom).
+ * Closes the P7.7n security audit C1 finding.
+ */
+const USE_DEREFERENCE_INVOCATION_CAP = 5_000;
+
 export function dereferenceUseElements(xmlDoc: Document, warnings: string[]): void {
   const symbolById = collectSymbolsById(xmlDoc);
+  let invocationCount = 0;
+  let budgetExhausted = false;
 
   function replaceUse(useEl: Element, seen: ReadonlySet<string>, depth: number): void {
+    if (budgetExhausted) {
+      useEl.remove();
+
+      return;
+    }
+
+    invocationCount += 1;
+
+    if (invocationCount > USE_DEREFERENCE_INVOCATION_CAP) {
+      warnings.push(
+        `<use> expansion exceeded budget of ${String(USE_DEREFERENCE_INVOCATION_CAP)} invocations; remaining <use> elements were skipped (fan-out bomb defence).`,
+      );
+      budgetExhausted = true;
+      useEl.remove();
+
+      return;
+    }
+
     if (depth > USE_DEREFERENCE_DEPTH_CAP) {
       warnings.push(`<use> dereference depth cap of ${String(USE_DEREFERENCE_DEPTH_CAP)} reached; stopping recursion.`);
 

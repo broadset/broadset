@@ -14,6 +14,7 @@ import {
   importCircleElement,
   importEllipseElement,
   importImageElement,
+  importLineElement,
   importPathElement,
   importPolygonElement,
   importRectElement,
@@ -274,6 +275,9 @@ function importElement(
     case 'polyline':
       return withPreserved([importPolygonElement(el, shapeCtx, false)]);
 
+    case 'line':
+      return withPreserved([importLineElement(el, shapeCtx)]);
+
     case 'text':
       return withPreserved([importTextElement(el, shapeCtx, warnings, options.fontSources)]);
 
@@ -296,9 +300,71 @@ function importElement(
         fontSources: options.fontSources,
       });
 
+    case 'switch':
+      // SVG `<switch>` evaluates `requiredFeatures` /
+      // `requiredExtensions` / `systemLanguage` on each direct
+      // child and renders the FIRST one whose conditions are met.
+      // Adobe Illustrator wraps every export in a `<switch>` whose
+      // first child is a `<foreignObject requiredExtensions="…
+      // AdobeIllustrator">` (stripped by the sanitiser as unsafe)
+      // and whose second child is the actual `<g>` carrying the
+      // geometry. Treating `<switch>` as opaque-svg discarded all
+      // Illustrator content. Now: walk children, pick the first
+      // without an unsupported `requiredExtensions`, and recurse.
+      return importSwitchElement(el, defs, warnings, transform, parentDataBsId, depth, options);
+
+    case 'title':
+    case 'desc':
+    case 'metadata':
+      // Metadata-only elements — they carry no visual content and
+      // round-trip via the source-bytes preservation cache. Sketch
+      // and Inkscape emit `<title>` / `<desc>` per element; the
+      // importer must drop them silently rather than treating
+      // them as opaque payloads. (`<metadata>` already filtered at
+      // the root walk, but a nested one survives without this case.)
+      return [];
+
     default:
       return [{ ...importUnsupportedElement(el, transform, warnings), ...tagMeta }];
   }
+}
+
+/**
+ * Walk a `<switch>` element's children and recurse into the first
+ * one whose `requiredExtensions` / `requiredFeatures` /
+ * `systemLanguage` aren't constrained to extensions Broadset
+ * doesn't claim. In practice this always picks the bare `<g>`
+ * sibling next to Illustrator's stripped `<foreignObject>`.
+ */
+function importSwitchElement(
+  el: Element,
+  defs: DefsBundle,
+  warnings: string[],
+  inheritedTransform: TransformState,
+  parentDataBsId: string | null,
+  depth: number,
+  options: SvgWalkOptions,
+): ImportedElement[] {
+  const children = el.children;
+
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+
+    if (child === undefined) continue;
+
+    // Skip children with `requiredExtensions` / `requiredFeatures`
+    // — we don't claim any extension capabilities. SVG 1.1 §5.8
+    // says implementations render the first child without those
+    // constraints (or with constraints they can satisfy).
+    const requiredExt = child.getAttribute('requiredExtensions');
+    const requiredFeat = child.getAttribute('requiredFeatures');
+
+    if (requiredExt !== null || requiredFeat !== null) continue;
+
+    return importElement(child, defs, warnings, inheritedTransform, parentDataBsId, depth, options);
+  }
+
+  return [];
 }
 
 export function importSvg(input: string): SvgImportResult {

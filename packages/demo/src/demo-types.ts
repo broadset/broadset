@@ -29,6 +29,7 @@ export type ToastSeverity = keyof typeof TOAST_DISMISS_MS;
 export type ActiveDialog =
   | 'about'
   | 'export'
+  | 'format-import-warnings'
   | 'media-library'
   | 'new-document'
   | 'settings'

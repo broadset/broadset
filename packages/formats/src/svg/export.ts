@@ -1,28 +1,29 @@
 import {
-  type ArrowEnd,
   type BroadsetDocument,
   type BroadsetElement,
   type BroadsetElementStyle,
   type BroadsetFill,
-  type BroadsetGradient,
-  colorToCss,
-  type FilterPrimitive,
-  type FilterStack,
   getGradientFillGradient,
   getSolidFillColor,
-  type PatternFill,
-  type PictureFill,
   resolveContentAsPlainString,
   resolveStyleColor,
   resolveStyleFillToSvgPaint,
-  type Run,
-  type TextBody,
 } from '@broadset/model';
 
 import { fingerprintElement } from '../_shared/fingerprint';
 import { sanitizeSvg } from '../_shared/sanitize';
 import { generateQrSvgFragment } from '../interchange';
+import {
+  objectFitToPreserveAspectRatio,
+  renderFilterStackDef,
+  renderGradientDef,
+  renderMarkerDef,
+  renderMaskDef,
+  renderPatternDef,
+  renderShadowFilter,
+} from './export-defs';
 import { type FontEmbedPlan, planFontEmbedding } from './export-fonts';
+import { buildTextAttrs, renderTextInner } from './export-text';
 import { escapeXml, isAllowedImageUrlScheme } from './shared';
 import { SVG_BROADSET_NAMESPACE, type SvgExportOptions } from './types';
 
@@ -30,269 +31,6 @@ const SVG_XMLNS = 'http://www.w3.org/2000/svg';
 const XLINK_XMLNS = 'http://www.w3.org/1999/xlink';
 const RDF_XMLNS = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 
-/* ------------------------------------------------------------------ */
-/*  Gradient Defs                                                     */
-/* ------------------------------------------------------------------ */
-
-/**
- * Render a gradient `<defs>` entry with the supplied `id`. The
- * caller (`DefsCollector`) owns id assignment so multiple elements
- * sharing the same gradient content reuse a single `<defs>` node.
- * Returns `''` when the gradient kind has no native SVG primitive
- * — the caller treats empty defs as a no-op fill.
- */
-function renderGradientDef(id: string, gradient: BroadsetGradient): string {
-  // Conic gradients fall back to a linear approximation on the
-  // visual layer; the metadata packet carries the original spec so
-  // re-import recovers the true type.
-  const effective = gradient.type === 'conic' ? conicFallbackGradient(gradient) : gradient;
-  const stops = effective.stops
-    .map((s) => `<stop offset="${String(s.position * 100)}%" stop-color="${escapeXml(colorToCss(s.color))}"/>`)
-    .join('');
-
-  if (effective.type === 'linear') {
-    const angle = effective.angle ?? 0;
-    const rad = (angle * Math.PI) / 180;
-    const x2 = Math.round((Math.cos(rad) * 0.5 + 0.5) * 100) / 100;
-    const y2 = Math.round((Math.sin(rad) * 0.5 + 0.5) * 100) / 100;
-    const x1 = 1 - x2;
-    const y1 = 1 - y2;
-
-    return `<linearGradient id="${id}" x1="${String(x1)}" y1="${String(y1)}" x2="${String(x2)}" y2="${String(y2)}">${stops}</linearGradient>`;
-  }
-
-  if (effective.type === 'radial') {
-    const cx = (effective.center?.[0] ?? 50) / 100;
-    const cy = (effective.center?.[1] ?? 50) / 100;
-
-    return `<radialGradient id="${id}" cx="${String(cx)}" cy="${String(cy)}" r="0.5">${stops}</radialGradient>`;
-  }
-
-  return '';
-}
-
-/* ------------------------------------------------------------------ */
-/*  Box-Shadow → SVG Filter Approximation                            */
-/* ------------------------------------------------------------------ */
-
-function renderShadowFilter(id: string, shadow: string): string {
-  // Parse simple box-shadow: <x>px <y>px <blur>px <color>
-  const match = /^(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px\s+(\d+(?:\.\d+)?)px\s+(.+)$/.exec(shadow.trim());
-
-  if (match === null) {
-    return '';
-  }
-
-  const dx = match[1];
-  const dy = match[2];
-  const blur = match[3];
-  const color = match[4];
-
-  if (dx === undefined || dy === undefined || blur === undefined || color === undefined) {
-    return '';
-  }
-
-  return `<filter id="${id}"><feDropShadow dx="${dx}" dy="${dy}" stdDeviation="${String(Number(blur) / 2)}" flood-color="${escapeXml(color.trim())}"/></filter>`;
-}
-
-/**
- * Render a structured `FilterStack` as a single `<filter>` def.
- * Each primitive emits its corresponding SVG filter primitive
- * (`<feGaussianBlur>`, `<feColorMatrix>`, `<feDropShadow>`,
- * `<feComponentTransfer>`). Empty stacks return `''` so the
- * caller skips emission and the element gets no `filter=` attr.
- */
-function renderFilterStackDef(id: string, stack: FilterStack): string {
-  if (stack.length === 0) {
-    return '';
-  }
-
-  const primitives = stack.map(renderFilterPrimitive).filter((s) => s !== '');
-
-  if (primitives.length === 0) {
-    return '';
-  }
-
-  return `<filter id="${id}">${primitives.join('')}</filter>`;
-}
-
-function renderFilterPrimitive(primitive: FilterPrimitive): string {
-  switch (primitive.kind) {
-    case 'blur':
-      return `<feGaussianBlur stdDeviation="${String(primitive.stdDeviation)}"/>`;
-
-    case 'color-matrix':
-      return `<feColorMatrix type="matrix" values="${primitive.matrix.join(' ')}"/>`;
-
-    case 'drop-shadow': {
-      const colorCss = colorToCss(primitive.color);
-
-      return `<feDropShadow dx="${String(primitive.offsetX)}" dy="${String(primitive.offsetY)}" stdDeviation="${String(primitive.blur / 2)}" flood-color="${escapeXml(colorCss)}"/>`;
-    }
-
-    case 'hue-rotate':
-      return `<feColorMatrix type="hueRotate" values="${String(primitive.amount)}"/>`;
-
-    case 'saturate':
-      return `<feColorMatrix type="saturate" values="${String(primitive.amount)}"/>`;
-
-    case 'grayscale':
-      return renderGrayscaleMatrix(primitive.amount);
-
-    case 'sepia':
-      return renderSepiaMatrix(primitive.amount);
-
-    case 'invert':
-      return renderInvertComponentTransfer(primitive.amount);
-
-    case 'brightness':
-      return renderBrightnessComponentTransfer(primitive.amount);
-
-    case 'contrast':
-      return renderContrastComponentTransfer(primitive.amount);
-
-    case 'opacity':
-      return `<feColorMatrix type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ${String(primitive.amount)} 0"/>`;
-
-    case 'custom-svg':
-      // Custom SVG filter primitives are sanitised at the renderer
-      // boundary per FilterStack docs; emit verbatim through the
-      // shared SVG sanitizer to drop any active payload.
-      return sanitizeSvg(primitive.svg).ast.markup;
-  }
-}
-
-/**
- * Canonical CSS-equivalent matrices for the grayscale / sepia
- * amount-based filters. The values match the W3C CSS Filter Effects
- * 1 algorithm so consumer browsers reproduce the same output as
- * `filter: grayscale(0.5)`.
- */
-function renderGrayscaleMatrix(amount: number): string {
-  const a = Math.max(0, Math.min(1, amount));
-  const r = String(0.2126 + 0.7874 * (1 - a));
-  const g = String(0.7152 - 0.7152 * (1 - a));
-  const b = String(0.0722 - 0.0722 * (1 - a));
-  const r2 = String(0.2126 - 0.2126 * (1 - a));
-  const g2 = String(0.7152 + 0.2848 * (1 - a));
-  const b2 = String(0.0722 - 0.0722 * (1 - a));
-  const r3 = String(0.2126 - 0.2126 * (1 - a));
-  const g3 = String(0.7152 - 0.7152 * (1 - a));
-  const b3 = String(0.0722 + 0.9278 * (1 - a));
-  const matrix = `${r} ${g} ${b} 0 0 ${r2} ${g2} ${b2} 0 0 ${r3} ${g3} ${b3} 0 0 0 0 0 1 0`;
-
-  return `<feColorMatrix type="matrix" values="${matrix}"/>`;
-}
-
-function renderSepiaMatrix(amount: number): string {
-  const a = Math.max(0, Math.min(1, amount));
-  const r = String(0.393 + 0.607 * (1 - a));
-  const g = String(0.769 - 0.769 * (1 - a));
-  const b = String(0.189 - 0.189 * (1 - a));
-  const r2 = String(0.349 - 0.349 * (1 - a));
-  const g2 = String(0.686 + 0.314 * (1 - a));
-  const b2 = String(0.168 - 0.168 * (1 - a));
-  const r3 = String(0.272 - 0.272 * (1 - a));
-  const g3 = String(0.534 - 0.534 * (1 - a));
-  const b3 = String(0.131 + 0.869 * (1 - a));
-  const matrix = `${r} ${g} ${b} 0 0 ${r2} ${g2} ${b2} 0 0 ${r3} ${g3} ${b3} 0 0 0 0 0 1 0`;
-
-  return `<feColorMatrix type="matrix" values="${matrix}"/>`;
-}
-
-/**
- * `invert(a)` per CSS: out = 1 - 2a + 2a*in, clamped. Implemented
- * via `<feComponentTransfer>` with linear funcR/G/B. Same form
- * works for `brightness(a)` (slope=a, intercept=0) and
- * `contrast(a)` (slope=a, intercept=0.5*(1-a)).
- */
-function renderInvertComponentTransfer(amount: number): string {
-  const slope = String(1 - 2 * amount);
-  const intercept = String(amount);
-
-  return `<feComponentTransfer data-bs-filter-primitive="invert"><feFuncR type="linear" slope="${slope}" intercept="${intercept}"/><feFuncG type="linear" slope="${slope}" intercept="${intercept}"/><feFuncB type="linear" slope="${slope}" intercept="${intercept}"/></feComponentTransfer>`;
-}
-
-function renderBrightnessComponentTransfer(amount: number): string {
-  const slope = String(amount);
-
-  return `<feComponentTransfer data-bs-filter-primitive="brightness"><feFuncR type="linear" slope="${slope}"/><feFuncG type="linear" slope="${slope}"/><feFuncB type="linear" slope="${slope}"/></feComponentTransfer>`;
-}
-
-function renderContrastComponentTransfer(amount: number): string {
-  const slope = String(amount);
-  const intercept = String((1 - amount) / 2);
-
-  return `<feComponentTransfer data-bs-filter-primitive="contrast"><feFuncR type="linear" slope="${slope}" intercept="${intercept}"/><feFuncG type="linear" slope="${slope}" intercept="${intercept}"/><feFuncB type="linear" slope="${slope}" intercept="${intercept}"/></feComponentTransfer>`;
-}
-
-/**
- * Render a `<pattern>` def for `fill.kind === 'pattern'` /
- * `'picture'`. The pattern body references the asset id as the
- * `<image href>`; consumers resolve assets via their own registry.
- */
-function renderPatternDef(
-  id: string,
-  fill: PatternFill | PictureFill,
-  elementWidth: number,
-  elementHeight: number,
-  assetResolver?: (assetId: string) => string | undefined,
-): string {
-  const width = elementWidth > 0 ? elementWidth : 100;
-  const height = elementHeight > 0 ? elementHeight : 100;
-  // SVG pattern coords: `userSpaceOnUse` so width/height align with
-  // the element's user-space box. Repeat is implicit (pattern tiles)
-  // unless the caller is a `picture` fill with mode `'stretch'` —
-  // the pattern matches the element exactly so a single image fills
-  // the box without tiling.
-  const patternUnits = 'userSpaceOnUse';
-  // Resolve the asset id to a URL the consumer can fetch (data:
-  // URI for embedded bytes, https: for hosted, etc.). Without a
-  // resolver, fall back to the asset id verbatim — the resulting
-  // SVG is structurally correct but won't render in standalone
-  // viewers without an external asset registry. P7.7j adds the
-  // resolver hook to close the spec line-23 contract; P7.7l
-  // rejects unsafe schemes (javascript:, data:text/html) returned
-  // by a malicious or compromised resolver.
-  const resolved = assetResolver?.(fill.assetId) ?? fill.assetId;
-  const href = isAllowedImageUrlScheme(resolved) ? resolved : '';
-  const inner = `<image href="${escapeXml(href)}" xlink:href="${escapeXml(href)}" width="${String(width)}" height="${String(height)}" preserveAspectRatio="${fill.kind === 'picture' && fill.mode === 'stretch' ? 'none' : 'xMidYMid meet'}"/>`;
-
-  return `<pattern id="${id}" patternUnits="${patternUnits}" width="${String(width)}" height="${String(height)}">${inner}</pattern>`;
-}
-
-/**
- * Render a `<mask>` def for an element with a custom mask path.
- * The mask's `<path>` carries the supplied `customClipPath` `d` value;
- * the element references it via `mask="url(#…)"`.
- */
-function renderMaskDef(id: string, maskPath: string, fillCss: string): string {
-  // SVG mask convention: white = visible, black = hidden. The
-  // path fills with `fillCss` (white by default) so the masked
-  // shape shows through the path's geometry.
-  return `<mask id="${id}" maskUnits="userSpaceOnUse"><path d="${escapeXml(maskPath)}" fill="${escapeXml(fillCss)}"/></mask>`;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Object-Fit → preserveAspectRatio Mapping                         */
-/* ------------------------------------------------------------------ */
-
-function objectFitToPreserveAspectRatio(objectFit: string | undefined): string {
-  switch (objectFit) {
-    case 'contain':
-      return 'xMidYMid meet';
-    case 'cover':
-      return 'xMidYMid slice';
-    case 'fill':
-      return 'none';
-    case 'none':
-      return 'xMidYMid meet';
-    case 'scale-down':
-      return 'xMidYMid meet';
-    default:
-      return 'xMidYMid slice'; // default to cover
-  }
-}
 
 function buildTransformAttr(value: string): string {
   return value.length > 0 ? ` transform="${value}"` : '';
@@ -384,50 +122,6 @@ function buildStyleAttrs(style: BroadsetElementStyle): string {
  * arrow grows with the line. Canonical triangle / stealth / diamond /
  * oval shapes match the ArrowEndShape union in the model.
  */
-function arrowEndScale(size: 'sm' | 'md' | 'lg' | undefined): number {
-  if (size === 'sm') return 2;
-  if (size === 'lg') return 6;
-
-  return 4;
-}
-
-function renderMarkerDef(id: string, end: ArrowEnd, stroke: string): string {
-  const widthScale = arrowEndScale(end.width);
-  const lengthScale = arrowEndScale(end.length);
-  let path: string;
-
-  switch (end.shape) {
-    case 'stealth':
-      // Narrow swept-back arrow
-      path = `<path d="M0,0 L${String(lengthScale)},${String(widthScale / 2)} L${String(
-        lengthScale * 0.6,
-      )},${String(widthScale / 2)} L0,${String(widthScale)} Z" fill="${stroke}"/>`;
-      break;
-    case 'diamond':
-      path = `<path d="M0,${String(widthScale / 2)} L${String(lengthScale / 2)},0 L${String(
-        lengthScale,
-      )},${String(widthScale / 2)} L${String(lengthScale / 2)},${String(widthScale)} Z" fill="${stroke}"/>`;
-      break;
-    case 'oval':
-      path = `<ellipse cx="${String(lengthScale / 2)}" cy="${String(widthScale / 2)}" rx="${String(
-        lengthScale / 2,
-      )}" ry="${String(widthScale / 2)}" fill="${stroke}"/>`;
-      break;
-    case 'none':
-      return '';
-    case 'triangle':
-    default:
-      path = `<path d="M0,0 L${String(lengthScale)},${String(widthScale / 2)} L0,${String(
-        widthScale,
-      )} Z" fill="${stroke}"/>`;
-  }
-
-  return `<marker id="${id}" viewBox="0 0 ${String(lengthScale)} ${String(
-    widthScale,
-  )}" markerUnits="strokeWidth" markerWidth="${String(lengthScale)}" markerHeight="${String(
-    widthScale,
-  )}" refX="${String(lengthScale)}" refY="${String(widthScale / 2)}" orient="auto">${path}</marker>`;
-}
 
 /**
  * Content-addressed collector for `<defs>` entries (gradients,
@@ -482,176 +176,6 @@ function shortHash(input: string): string {
   return (hash >>> 0).toString(36);
 }
 
-function textAnchorForAlignment(alignment: string): string {
-  if (alignment === 'left') return 'start';
-  if (alignment === 'right') return 'end';
-
-  return 'middle';
-}
-
-function buildTextAttrs(style: BroadsetElementStyle): string {
-  const attrs: string[] = [];
-
-  if (style.fontFamily) {
-    attrs.push(`font-family="${escapeXml(style.fontFamily)}"`);
-  }
-
-  if (style.fontSize) {
-    attrs.push(`font-size="${String(style.fontSize)}"`);
-  }
-
-  const fontColorCss = resolveStyleColor(style.fontColor, { resolveTheme: false });
-
-  if (fontColorCss !== undefined) {
-    attrs.push(`fill="${escapeXml(fontColorCss)}"`);
-  }
-
-  if (style.fontWeight && style.fontWeight !== 400) {
-    attrs.push(`font-weight="${String(style.fontWeight)}"`);
-  }
-
-  if (style.fontStyle) {
-    attrs.push(`font-style="${escapeXml(style.fontStyle)}"`);
-  }
-
-  if (style.textAlignment) {
-    attrs.push(`text-anchor="${textAnchorForAlignment(style.textAlignment)}"`);
-  }
-
-  if (style.textDecoration) {
-    attrs.push(`text-decoration="${escapeXml(style.textDecoration)}"`);
-  }
-
-  if (style.letterSpacing !== undefined) {
-    attrs.push(`letter-spacing="${String(style.letterSpacing)}"`);
-  }
-
-  return attrs.length > 0 ? ' ' + attrs.join(' ') : '';
-}
-
-/**
- * Render the inner body of a `<text>` element. Plain `string`
- * content emits as escaped text; structured `TextBody` content
- * emits one `<tspan>` per `Run` per `Paragraph`, carrying any
- * run-level style overrides (`font-family`, `font-size`,
- * `font-weight`, `font-style`, `fill`) so per-run styling
- * survives the export. Closes the spec feature-matrix promise
- * "Multi-run styled text → native (`<tspan>` per run)".
- */
-function renderTextInner(content: string | TextBody): string {
-  if (typeof content === 'string') {
-    return escapeXml(content);
-  }
-
-  if (isSingleEmptyRunBody(content)) {
-    return '';
-  }
-
-  const segments: string[] = [];
-
-  for (let i = 0; i < content.paragraphs.length; i++) {
-    const paragraph = content.paragraphs[i];
-
-    if (paragraph === undefined) continue;
-
-    segments.push(...renderParagraphRuns(paragraph.runs, i === 0));
-  }
-
-  return segments.join('');
-}
-
-function isSingleEmptyRunBody(body: TextBody): boolean {
-  if (body.paragraphs.length === 0) return true;
-  if (body.paragraphs.length !== 1) return false;
-
-  const onlyPar = body.paragraphs[0];
-
-  return onlyPar?.runs.length === 1 && (onlyPar.runs[0]?.text ?? '') === '';
-}
-
-function renderParagraphRuns(runs: readonly Run[], isFirstParagraph: boolean): readonly string[] {
-  const segments: string[] = [];
-
-  for (let r = 0; r < runs.length; r++) {
-    const run = runs[r];
-
-    if (run === undefined) continue;
-
-    // Paragraph break: `dy="1em"` advances the baseline by one
-    // line-height. The first paragraph stays at the parent
-    // `<text>`'s baseline; subsequent paragraphs shift down.
-    const advance = r === 0 && !isFirstParagraph ? ' x="0" dy="1em"' : '';
-
-    segments.push(`<tspan${advance}${buildRunAttrs(run)}>${escapeXml(run.text)}</tspan>`);
-  }
-
-  return segments;
-}
-
-/**
- * Convert a `Run`'s optional style overrides (`font-family`,
- * `font-size`, `font-weight`, `font-style`, `fill` /
- * `fontColor`) into the `<tspan>`-attribute string the exporter
- * emits. Every other key on `props.style` is passed through as a
- * generic CSS `style=…` declaration so callers don't lose
- * authored overrides the schema doesn't yet narrow.
- */
-/**
- * Map of `RunProps.style` camelCase keys to the equivalent SVG
- * attribute name. Keys that aren't in this map fall through to a
- * generic `style="…"` declaration so callers don't lose authored
- * overrides the schema doesn't yet narrow.
- */
-const RUN_STYLE_TO_SVG_ATTR: ReadonlyMap<string, string> = new Map([
-  ['fontFamily', 'font-family'],
-  ['fontSize', 'font-size'],
-  ['fontWeight', 'font-weight'],
-  ['fontStyle', 'font-style'],
-  ['fontColor', 'fill'],
-  ['fill', 'fill'],
-  ['textDecoration', 'text-decoration'],
-]);
-
-function buildRunAttrs(run: Run): string {
-  const style = run.props?.style;
-
-  if (style === undefined) return '';
-
-  const attrs: string[] = [];
-  const cssDecls: string[] = [];
-
-  for (const [key, value] of Object.entries(style)) {
-    const stringValue = stringifyRunStyleValue(value);
-
-    if (stringValue === '') continue;
-
-    const attrName = RUN_STYLE_TO_SVG_ATTR.get(key);
-
-    if (attrName !== undefined) {
-      attrs.push(`${attrName}="${escapeXml(stringValue)}"`);
-    } else {
-      cssDecls.push(`${camelToKebab(key)}:${stringValue}`);
-    }
-  }
-
-  if (cssDecls.length > 0) {
-    attrs.push(`style="${escapeXml(cssDecls.join(';'))}"`);
-  }
-
-  return attrs.length > 0 ? ' ' + attrs.join(' ') : '';
-}
-
-function stringifyRunStyleValue(value: unknown): string {
-  if (value === undefined || value === null) return '';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number') return String(value);
-
-  return '';
-}
-
-function camelToKebab(name: string): string {
-  return name.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
-}
 
 /**
  * Re-emits an opaque `svg`-type element's content, stripping any
@@ -1097,19 +621,6 @@ function extractOriginalColor(fill: BroadsetFill): string | undefined {
   return color.originalColor;
 }
 
-/**
- * The fill used by the visual layer when a conic gradient is
- * requested. Conic has no SVG 2 primitive, so we emit a many-stop
- * linear approximation — the true spec rides in `<metadata>` and is
- * recovered on re-import.
- */
-function conicFallbackGradient(conic: BroadsetGradient): BroadsetGradient {
-  return {
-    type: 'linear',
-    angle: conic.startAngle ?? 0,
-    stops: conic.stops,
-  };
-}
 
 function buildChildrenByParent(elements: readonly BroadsetElement[]): ReadonlyMap<string, readonly BroadsetElement[]> {
   const byParent = new Map<string, BroadsetElement[]>();

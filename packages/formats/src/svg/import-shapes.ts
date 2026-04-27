@@ -141,6 +141,36 @@ export function importPathElement(el: Element, ctx: ShapeBakeContext): ImportedE
   };
 }
 
+/**
+ * `<line x1 y1 x2 y2>` imports as a Broadset `path` carrying the
+ * canonical `M x1 y1 L x2 y2` `d` string. Tools like d3 emit
+ * `<line>` heavily for axis ticks, connectors, and gridlines —
+ * without this case the importer fell back to opaque-svg payloads.
+ * Closes the d3 / chart-tool ecosystem coverage gap.
+ */
+export function importLineElement(el: Element, ctx: ShapeBakeContext): ImportedElement {
+  const x1 = getNumAttr(el, 'x1', 0);
+  const y1 = getNumAttr(el, 'y1', 0);
+  const x2 = getNumAttr(el, 'x2', 0);
+  const y2 = getNumAttr(el, 'y2', 0);
+  const dRaw = `M ${String(x1)} ${String(y1)} L ${String(x2)} ${String(y2)}`;
+
+  if (requiresBake(ctx)) {
+    return bakedPathElement(dRaw, ctx);
+  }
+
+  return {
+    type: 'path',
+    content: dRaw,
+    position: { x: ctx.transform.x, y: ctx.transform.y },
+    width: 0,
+    height: 0,
+    rotation: ctx.transform.rotation,
+    style: ctx.baseStyle,
+    ...ctx.tagMeta,
+  };
+}
+
 export function importEllipseElement(el: Element, ctx: ShapeBakeContext): ImportedElement {
   const cx = getNumAttr(el, 'cx', 0);
   const cy = getNumAttr(el, 'cy', 0);
