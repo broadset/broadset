@@ -743,6 +743,11 @@ describe('PPTX importer — operator-level extraction', () => {
 
     expect(ext?.srcRect).toEqual({ l: 10000, t: 20000, r: 30000, b: 40000 });
 
+    // Visual fidelity: the OOXML crop also lands on `style.customClipPath`
+    // as the canonical CSS `inset(top right bottom left)` form so the
+    // renderer shows the cropped region rather than the full image.
+    expect(image?.style.customClipPath).toBe('inset(20.00% 30.00% 40.00% 10.00%)');
+
     // Re-export and verify the srcRect re-emits with the same values.
     const reExported = exportPptxBytes(imported);
     const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
@@ -1238,15 +1243,15 @@ describe('PPTX importer — operator-level extraction', () => {
   });
 
   /**
-   * @description T7 — multi-page ledger merge respects per-slide
-   * identity. When the user duplicates a slide in PowerPoint, the
-   * duplicated shapes share the source BSET id; the ledger merge
-   * MUST NOT collapse them into one element. The current
-   * implementation keys only on `el.id` so this test pins the
-   * known limitation as `it.skip` until the merge logic is taught
-   * to disambiguate by (slideId, elementId).
+   * @description Multi-page ledger merge respects per-slide identity.
+   * When the user duplicates a slide in PowerPoint, the duplicated
+   * shapes share the source BSET id (PowerPoint copies the shape XML
+   * verbatim including the name). The merge logic disambiguates by
+   * appending `__dup-{slideId}` to subsequent occurrences so the
+   * preserved-doc match keys on the original id while the duplicate
+   * lands as a fresh dirty element.
    */
-  it.skip('preserves duplicated slides through the merge ledger', async () => {
+  it('preserves duplicated slides through the merge ledger', async () => {
     const { exportPptxBytesAsync } = await import('./export');
     const { importPptxWithMerge } = await import('./import');
     const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
@@ -1257,20 +1262,38 @@ describe('PPTX importer — operator-level extraction', () => {
     };
     const bytes = await exportPptxBytesAsync(doc);
 
-    // Simulate "Duplicate slide" in PowerPoint by adding a second slide
-    // that references the same shape.
+    // Simulate "Duplicate slide" in PowerPoint: copy slide1.xml to
+    // slide2.xml AND register the new slide in presentation.xml +
+    // its rels (PowerPoint does this atomically).
     const pkg = readOoxmlPackage(bytes);
     const slide1 = readTextPart(pkg, 'ppt/slides/slide1.xml') ?? '';
+    const presXml = readTextPart(pkg, 'ppt/presentation.xml') ?? '';
+    const presRels = readTextPart(pkg, 'ppt/_rels/presentation.xml.rels') ?? '';
     const editedParts = new Map<string, Uint8Array>(pkg);
 
     editedParts.set('ppt/slides/slide2.xml', encodeText(slide1));
+    editedParts.set(
+      'ppt/slides/_rels/slide2.xml.rels',
+      encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>'),
+    );
+    editedParts.set(
+      'ppt/presentation.xml',
+      encodeText(presXml.replace('</p:sldIdLst>', '<p:sldId id="257" r:id="rId99"/></p:sldIdLst>')),
+    );
+    editedParts.set(
+      'ppt/_rels/presentation.xml.rels',
+      encodeText(presRels.replace('</Relationships>', '<Relationship Id="rId99" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide2.xml"/></Relationships>')),
+    );
 
     const editedBytes = writeOoxmlPackage(editedParts);
     const merged = await importPptxWithMerge(editedBytes);
 
-    // Both slides should survive — but today the ledger merge collapses
-    // duplicate ids. This test pins the gap.
+    // Both slides survive — the original id matches the preserved doc,
+    // the duplicate is re-id'd with a slide suffix and lands as a
+    // dirty fresh element.
     expect(merged.document.elements.length).toBe(2);
+    expect(merged.document.elements.find((el) => el.id === 'shared-id')).toBeDefined();
+    expect(merged.document.elements.some((el) => el.id.startsWith('shared-id__dup-'))).toBe(true);
   });
 
   it('rejects PPTX with an external-DTD / billion-laughs payload', () => {

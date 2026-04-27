@@ -1,23 +1,41 @@
-import type { AnimationDefinition } from '@broadset/model';
+import type { AnimationDefinition, KeyframeValue, NumberKeyframeValue } from '@broadset/model';
 
 import { findChild, findDescendant, findDescendants, getAttr, parseOoxml, rootElement, type XmlElement } from '../ooxml/ast';
 import { decodeShapeName } from '../semantic/shape-name';
 
 /**
  * `<p:timing>` import. Walks a slide's timing tree looking for preset
- * entrance effects we can map back to Broadset animations — today:
- * PowerPoint's "Fade" (presetID="10", presetClass="entr"). Everything
- * else drops per IO-D-16; unmappable entries surface as import
- * warnings returned alongside the animation list.
+ * entrance effects we can map back to Broadset animations.
  *
- * `<p:spTgt spid="N"/>` is the canonical OOXML element-target form.
- * We resolve `spid` back to the Broadset element id via each slide
- * shape's `<p:cNvPr id="N" name="BSET:{id}:…">` tag (decoded via
- * `semantic/shape-name`). Third-party PPTX without a BSET tag still
- * imports if the shape-id matches an element whose id we assigned
- * during parseSlideShapes — in that case the shape-id map is the
- * allocated `pptx-el-…` synthetic id.
+ * Mappable presets (each pairs with the export side):
+ * - **Fade** (preset id 10) — opacity 0 → 1
+ * - **Fly-in** (preset id 2) — translateX/translateY non-zero → 0;
+ *   subtype encodes direction (1 right, 2 top, 4 bottom, 8 left)
+ * - **Zoom** (preset id 23) — scale 0 → 1
+ * - **Wipe** (preset id 14) — clipInsetLeft 1 → 0
+ *
+ * Anything outside this set drops with an `unsupported-animation`
+ * warning per IO-D-16; the `.bsp` is the source of truth.
+ *
+ * `<p:spTgt spid="N"/>` is the canonical OOXML element-target form;
+ * we resolve `spid` back to the Broadset element id via each slide
+ * shape's `<p:cNvPr id="N" name="BSET:{id}:…">` tag.
  */
+
+const PRESET_FADE = '10';
+const PRESET_FLY_IN = '2';
+const PRESET_ZOOM = '23';
+const PRESET_WIPE = '14';
+
+/** Preset subtype → fly-in source edge. */
+const FLY_SUBTYPE_TO_DIRECTION: Readonly<Record<string, 'top' | 'right' | 'bottom' | 'left'>> = {
+  '1': 'right',
+  '2': 'top',
+  '4': 'bottom',
+  '8': 'left',
+};
+
+const FLY_OFFSET_PIXELS = 100;
 
 export interface ParsedTimingResult {
   readonly animations: readonly AnimationDefinition[];
@@ -37,9 +55,6 @@ export function parseTimingAnimations(slideXml: string): ParsedTimingResult {
   const warnings: ParsedTimingResult['warnings'] extends readonly (infer U)[] ? U[] : never[] = [];
   const spidToElementId = buildSpidToElementIdMap(root);
 
-  // Walk every `<p:cTn>` with a `presetClass` attribute. Entrance
-  // effects map to Broadset animations; everything else drops with a
-  // warning per IO-D-16.
   for (const cTn of findDescendants(timing, 'p:cTn')) {
     const presetClass = getAttr(cTn, 'presetClass');
 
@@ -53,53 +68,75 @@ export function parseTimingAnimations(slideXml: string): ParsedTimingResult {
       continue;
     }
 
-    const fade = extractFadeFromEntrance(cTn);
+    const presetId = getAttr(cTn, 'presetID') ?? '';
+    const presetSubtype = getAttr(cTn, 'presetSubtype') ?? '0';
+    const tgt = extractTargetFromEntrance(cTn);
 
-    if (fade === null) continue;
+    if (tgt === null) continue;
 
-    const elementId = spidToElementId.get(fade.spid);
+    const elementId = spidToElementId.get(tgt.spid);
 
     if (elementId === undefined) {
       warnings.push({
         code: 'unsupported-animation',
-        message: `Preset entrance animation targets shape id ${fade.spid} which does not resolve to a Broadset element`,
+        message: `Preset entrance animation targets shape id ${tgt.spid} which does not resolve to a Broadset element`,
       });
       continue;
     }
 
-    animations.push(buildFadeAnimation(elementId, fade.durationMs));
+    const built = buildAnimationForPreset(elementId, presetId, presetSubtype, tgt.durationMs);
+
+    if (built === null) {
+      warnings.push({
+        code: 'unsupported-animation',
+        message: `Preset entrance id "${presetId}" is not yet mappable to Broadset animations`,
+      });
+      continue;
+    }
+
+    animations.push(built);
   }
 
   return { animations, warnings };
 }
 
 /**
- * Walk an entrance `<p:cTn presetClass="entr">` looking for the inner
- * `<p:anim>` whose `<p:cTn dur="…"/>` carries the duration and whose
- * `<p:cBhvr><p:tgtEl><p:spTgt spid="…"/></p:tgtEl></p:cBhvr>` carries
- * the target shape id. Returns `null` when either is missing.
+ * Walk an entrance `<p:cTn presetClass="entr">` to find the target
+ * shape id and animation duration. Different presets place the
+ * duration in different inner nodes — fade has an `<p:anim>` with a
+ * `<p:cTn dur="…"/>`, while fly-in / zoom / wipe lean on a `<p:set>`
+ * for visibility plus the parent's implicit duration. We probe both
+ * forms and fall back to the parent `<p:cTn dur>` when the inner is
+ * absent.
  */
-function extractFadeFromEntrance(entranceCTn: XmlElement): { readonly durationMs: number; readonly spid: string } | null {
-  const animNode = findDescendant(entranceCTn, 'p:anim');
-
-  if (animNode === null) return null;
-
-  const innerCTn = findDescendant(animNode, 'p:cTn');
-  const dur = innerCTn !== null ? getAttr(innerCTn, 'dur') : undefined;
-  const spTgt = findDescendant(animNode, 'p:spTgt');
+function extractTargetFromEntrance(entranceCTn: XmlElement): { readonly durationMs: number; readonly spid: string } | null {
+  const spTgt = findDescendant(entranceCTn, 'p:spTgt');
   const spid = spTgt !== null ? getAttr(spTgt, 'spid') : undefined;
 
-  if (dur === undefined || spid === undefined) return null;
+  if (spid === undefined) return null;
+
+  // Prefer the `<p:anim>` inner duration when present (matches
+  // PowerPoint's Fade tween); otherwise fall back to a containing
+  // `<p:cTn dur="…">`.
+  const animNode = findDescendant(entranceCTn, 'p:anim');
+  const animCTn = animNode !== null ? findDescendant(animNode, 'p:cTn') : null;
+  const innerDur = animCTn !== null ? getAttr(animCTn, 'dur') : undefined;
+  const fallbackDur = readDurationFromAncestors(entranceCTn);
+  const dur = innerDur ?? fallbackDur ?? '500';
 
   return { durationMs: parseInt(dur, 10), spid };
 }
 
-/**
- * Build a `spid → elementId` map by scanning slide shapes for their
- * `<p:cNvPr id="N" name="BSET:{id}:{kind}">` tags. Fallback uses the
- * display name as the element id (matches the parseSlideShapes naming
- * convention for untagged third-party shapes).
- */
+function readDurationFromAncestors(node: XmlElement): string | undefined {
+  for (const child of findDescendants(node, 'p:cTn')) {
+    const dur = getAttr(child, 'dur');
+
+    if (dur !== undefined && dur !== 'indefinite' && dur !== '1') return dur;
+  }
+
+  return undefined;
+}
+
 function buildSpidToElementIdMap(root: XmlElement): ReadonlyMap<string, string> {
   const map = new Map<string, string>();
 
@@ -117,32 +154,53 @@ function buildSpidToElementIdMap(root: XmlElement): ReadonlyMap<string, string> 
   return map;
 }
 
-function buildFadeAnimation(elementId: string, durationMs: number): AnimationDefinition {
+function buildAnimationForPreset(
+  elementId: string,
+  presetId: string,
+  presetSubtype: string,
+  durationMs: number,
+): AnimationDefinition | null {
+  if (presetId === PRESET_FADE) return buildSinglePropertyAnimation(elementId, 'opacity', 0, 1, durationMs, 'Fade');
+
+  if (presetId === PRESET_ZOOM) return buildSinglePropertyAnimation(elementId, 'scale', 0, 1, durationMs, 'Zoom');
+
+  if (presetId === PRESET_WIPE) return buildSinglePropertyAnimation(elementId, 'clipInsetLeft', 1, 0, durationMs, 'Wipe');
+
+  if (presetId === PRESET_FLY_IN) {
+    const direction = FLY_SUBTYPE_TO_DIRECTION[presetSubtype] ?? 'bottom';
+    const axis = direction === 'top' || direction === 'bottom' ? 'translateY' : 'translateX';
+    const sign = direction === 'right' || direction === 'bottom' ? 1 : -1;
+
+    return buildSinglePropertyAnimation(elementId, axis, FLY_OFFSET_PIXELS * sign, 0, durationMs, `Fly-in (${direction})`);
+  }
+
+  return null;
+}
+
+function buildSinglePropertyAnimation(
+  elementId: string,
+  propertyName: string,
+  startValue: number,
+  endValue: number,
+  durationMs: number,
+  label: string,
+): AnimationDefinition {
+  const startProp: NumberKeyframeValue = { type: 'number', value: startValue, easing: 'linear' };
+  const endProp: NumberKeyframeValue = { type: 'number', value: endValue, easing: 'linear' };
+  const startProperties: Readonly<Record<string, KeyframeValue>> = { [propertyName]: startProp };
+  const endProperties: Readonly<Record<string, KeyframeValue>> = { [propertyName]: endProp };
+
   return {
     elementId,
     config: {
       timelines: [
         {
-          id: `fade-${elementId}`,
-          name: 'Fade',
+          id: `${propertyName}-${elementId}`,
+          name: label,
           durationMs,
           keyframes: [
-            {
-              name: 'start',
-              action: 'none',
-              offsetMs: 0,
-              properties: {
-                opacity: { type: 'number', value: 0, easing: 'linear' },
-              },
-            },
-            {
-              name: 'end',
-              action: 'none',
-              offsetMs: durationMs,
-              properties: {
-                opacity: { type: 'number', value: 1, easing: 'linear' },
-              },
-            },
+            { name: 'start', action: 'none', offsetMs: 0, properties: startProperties },
+            { name: 'end', action: 'none', offsetMs: durationMs, properties: endProperties },
           ],
         },
       ],

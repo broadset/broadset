@@ -720,11 +720,23 @@ function buildPicture(
 
   if (srcRect === null) return { ...base, content: dataUri };
 
+  // Apply the OOXML crop visually via `style.customClipPath` (CSS
+  // `inset()` is the exact semantic match for `<a:srcRect>`) AND
+  // preserve the raw srcRect on `extensions.pptx.srcRect` so a clean
+  // round-trip re-emits the same crop. CSS `inset(top right bottom
+  // left)` accepts the four edge insets in clockwise-from-top order,
+  // each as a percentage. OOXML's units are 1/100000 (50000 = 50%);
+  // we divide by 1000 to land at CSS percent.
+  const clipPath = `inset(${formatPercent(srcRect.t)} ${formatPercent(srcRect.r)} ${formatPercent(srcRect.b)} ${formatPercent(srcRect.l)})`;
   const existingExt = (base.extensions['pptx'] as Record<string, unknown> | undefined) ?? {};
 
   return {
     ...base,
     content: dataUri,
+    style: {
+      ...base.style,
+      customClipPath: clipPath,
+    },
     extensions: {
       ...base.extensions,
       pptx: {
@@ -733,6 +745,12 @@ function buildPicture(
       },
     },
   };
+}
+
+function formatPercent(ooxmlValue: number): string {
+  // OOXML srcRect uses 1/100000 units; CSS inset() takes percentages.
+  // Round to two decimal places so the output stays compact.
+  return `${(ooxmlValue / 1000).toFixed(2)}%`;
 }
 
 function parseSrcRect(shape: XmlElement): { readonly l: number; readonly t: number; readonly r: number; readonly b: number } | null {
@@ -1205,18 +1223,43 @@ export function composeDocumentFromSlides(
   }[],
 ): BroadsetDocument {
   const allElements: BroadsetElement[] = [];
-  const pages = slides.map((slide) => {
-    for (const el of slide.elements) allElements.push(el);
+  // Element ids must be globally unique across the document. PowerPoint
+  // "Duplicate slide" copies the shape XML verbatim, BSET tags and all,
+  // so two slides can carry the same `BSET:{id}:…` name. Without
+  // disambiguation the merge ledger collapses both into one element.
+  // We give the second-and-later occurrences a synthetic suffix tagged
+  // with the slide id so the originals match the preserved JSON and
+  // the duplicates land as fresh elements (markDirty path).
+  const seenIds = new Map<string, number>();
 
-    return {
-      id: slide.id,
-      name: slide.id,
-      elements: [],
-      locale: null,
-      extensions: {},
-      ...(slide.notes !== undefined && slide.notes.length > 0 ? { notes: slide.notes } : {}),
-    };
-  });
+  for (const slide of slides) {
+    for (const el of slide.elements) {
+      const seenCount = seenIds.get(el.id) ?? 0;
+
+      seenIds.set(el.id, seenCount + 1);
+
+      if (seenCount === 0) {
+        allElements.push(el);
+        continue;
+      }
+
+      const disambiguated: BroadsetElement = {
+        ...el,
+        id: `${el.id}__dup-${slide.id}`,
+      };
+
+      allElements.push(disambiguated);
+    }
+  }
+
+  const pages = slides.map((slide) => ({
+    id: slide.id,
+    name: slide.id,
+    elements: [],
+    locale: null,
+    extensions: {},
+    ...(slide.notes !== undefined && slide.notes.length > 0 ? { notes: slide.notes } : {}),
+  }));
 
   return {
     id: 'pptx-import',
