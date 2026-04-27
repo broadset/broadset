@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
+import { exportPptxBytes } from '../export';
 import { importPptx } from '../import';
+import { readOoxmlPackage, readTextPart } from '../ooxml/zip';
 import {
+  canvaCroppedFixture,
   canvaFixture,
   googleSlidesFixture,
   keynoteFixture,
+  keynoteNonSrgbColoursFixture,
   libreofficeFixture,
+  powerpointComplexTextFixture,
   powerpointFixture,
 } from './external-tools';
 
@@ -151,5 +156,87 @@ describe('external-tool fixtures', () => {
     // level resolves to mm (no preserved canvas in the package).
     expect(image?.width).toBeCloseTo(83.33, 1);
     expect(image?.height).toBeCloseTo(41.67, 1);
+  });
+
+  /**
+   * @description PowerPoint complex-text fixture — multi-run paragraph
+   * with bold red, plain, and italic blue runs, plus a bulleted
+   * underlined hyperlink. Round-trips end-to-end (import → export →
+   * import) with all rich-text attributes preserved.
+   */
+  it('round-trips a complex-text PowerPoint fixture (rich runs + hyperlink + bullets)', () => {
+    const imported = importPptx(powerpointComplexTextFixture());
+    const text = imported.elements.find((el) => el.type === 'text');
+    const content = text?.content;
+
+    if (typeof content !== 'object' || !('paragraphs' in content)) throw new Error('expected TextBody');
+
+    expect(content.paragraphs).toHaveLength(2);
+
+    const firstRuns = content.paragraphs[0]?.runs ?? [];
+
+    expect(firstRuns).toHaveLength(3);
+
+    const linkRun = content.paragraphs[1]?.runs[0];
+
+    expect(linkRun?.props?.hyperlink?.url).toBe('https://broadset.dev/');
+
+    // Re-export → re-import; assert structure survives.
+    const reExported = exportPptxBytes(imported);
+    const reImported = importPptx(reExported);
+    const reText = reImported.elements.find((el) => el.type === 'text');
+    const reContent = reText?.content;
+
+    if (typeof reContent !== 'object' || !('paragraphs' in reContent)) throw new Error('expected re-imported TextBody');
+    expect(reContent.paragraphs).toHaveLength(2);
+
+    const reFirstRuns = reContent.paragraphs[0]?.runs ?? [];
+
+    expect(reFirstRuns).toHaveLength(3);
+
+    const reLinkRun = reContent.paragraphs[1]?.runs[0];
+
+    expect(reLinkRun?.props?.hyperlink?.url).toBe('https://broadset.dev/');
+  });
+
+  /**
+   * @description Keynote non-sRGB colour fixture — `<a:scrgbClr>`,
+   * `<a:hslClr>`, `<a:prstClr>` all resolve to canonical sRGB hex
+   * with the source form preserved on `originalColor`.
+   */
+  it('parses Keynote non-sRGB colour primitives without silent translation', () => {
+    const doc = importPptx(keynoteNonSrgbColoursFixture());
+    const rectangles = doc.elements.filter((el) => el.type === 'rectangle' || el.type === 'ellipse');
+
+    expect(rectangles).toHaveLength(3);
+
+    for (const el of rectangles) {
+      const fill = el.style.fill;
+
+      if (fill.kind !== 'solid' || fill.color.kind !== 'rgb') {
+        throw new Error(`expected rgb fill on element ${el.name}`);
+      }
+
+      // originalColor MUST be set so the source form is recoverable.
+      expect(fill.color.originalColor).toBeDefined();
+    }
+  });
+
+  /**
+   * @description Canva cropped fixture — `<a:srcRect>` crop preserves
+   * on import via `extensions.pptx.srcRect` and re-emits on export so
+   * the cropped view survives a round-trip.
+   */
+  it('round-trips a Canva fixture with <a:srcRect> via extensions.pptx.srcRect', () => {
+    const imported = importPptx(canvaCroppedFixture());
+    const image = imported.elements.find((el) => el.type === 'image');
+    const ext = image?.extensions['pptx'] as { readonly srcRect?: { l: number; t: number; r: number; b: number } } | undefined;
+
+    expect(ext?.srcRect).toEqual({ l: 10000, t: 20000, r: 30000, b: 40000 });
+
+    const reExported = exportPptxBytes(imported);
+    const reExportedSlide = readTextPart(readOoxmlPackage(reExported), 'ppt/slides/slide1.xml') ?? '';
+
+    expect(reExportedSlide).toContain('<a:srcRect');
   });
 });

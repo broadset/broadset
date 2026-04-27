@@ -39,6 +39,18 @@ export interface ImportDocumentResult {
   readonly warnings: readonly string[];
 }
 
+/**
+ * Per-format export result. Carries any fidelity-loss warnings that
+ * surfaced during emission (today: PPTX `<a:outerShdw>` inset skips,
+ * multi-shadow truncation, animations beyond fade-entry per IO-D-16).
+ * Other formats currently return an empty array; the shape is
+ * uniform so the caller can show a fidelity-loss toast without
+ * branching on format.
+ */
+export interface ExportDocumentResult {
+  readonly warnings: readonly string[];
+}
+
 /* ------------------------------------------------------------------ */
 /*  Lazy Loading                                                      */
 /* ------------------------------------------------------------------ */
@@ -66,10 +78,11 @@ const DEFAULT_JPEG_QUALITY = 0.92;
 const DEFAULT_VIDEO_FRAME_RATE = 30;
 const DEFAULT_VIDEO_QUALITY = 0.8;
 
-export async function exportDocument(format: ExportFormat, context: ExportContext): Promise<void> {
+export async function exportDocument(format: ExportFormat, context: ExportContext): Promise<ExportDocumentResult> {
   const formats = await loadFormats();
   const { document: doc } = context;
   const name = formats.sanitizeFilename(doc.name || 'broadset-document');
+  const warnings: string[] = [];
 
   switch (format) {
     case 'json': {
@@ -105,12 +118,17 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
     }
 
     case 'pptx': {
-      const pptxBytes = formats.exportPptxBytes(doc);
-      const blob = new Blob([pptxBytes.buffer as ArrayBuffer], {
+      const pptxReport = await formats.exportPptxWithReportAsync(doc);
+      const blob = new Blob([pptxReport.bytes.buffer as ArrayBuffer], {
         type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       });
 
       formats.triggerDownload(blob, `${name}.pptx`);
+
+      for (const w of pptxReport.warnings) {
+        warnings.push(`${w.code}: ${w.message}`);
+      }
+
       break;
     }
 
@@ -203,6 +221,8 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
       throw new Error(`Unsupported export format: ${_exhaustive as string}`);
     }
   }
+
+  return { warnings };
 }
 
 function requireSnapshotCanvas(context: ExportContext): asserts context is ExportContext & {

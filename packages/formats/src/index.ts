@@ -19,7 +19,14 @@ export {
   resolveGoogleFontUrl,
   wrapText,
 } from './pdf';
-export { exportPptxBytes, importPptx } from './pptx';
+export type { PptxExportReport, PptxExportWarning, PptxExportWarningCode } from './pptx';
+export {
+  exportPptxBytes,
+  exportPptxBytesAsync,
+  exportPptxWithReport,
+  exportPptxWithReportAsync,
+  importPptx,
+} from './pptx';
 export { exportPsdBytes, exportPsdBytesAsync, importPsd, svgPathToPsdVectorMask } from './psd';
 export {
   type BatchCaptureSession,

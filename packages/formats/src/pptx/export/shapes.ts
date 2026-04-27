@@ -580,8 +580,51 @@ export function emitPictureShape(ctx: SlideExportContext, element: BroadsetEleme
   const nv = emitNonVisualProps(ctx, element, kind, { isPicture: true });
   const xfrm = emitElementXfrm(ctx, element);
   const stroke = emitStroke(element.style, ctx);
+  const srcRect = readPreservedSrcRect(element);
 
-  return `<p:pic>${nv}<p:blipFill><a:blip r:embed="${relId}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${stroke}${emitEffects(element.style, ctx, element.id)}</p:spPr></p:pic>`;
+  return `<p:pic>${nv}<p:blipFill><a:blip r:embed="${relId}"/>${srcRect}<a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${stroke}${emitEffects(element.style, ctx, element.id)}</p:spPr></p:pic>`;
+}
+
+/**
+ * Read a preserved `srcRect` off `extensions.pptx.srcRect` and emit
+ * the matching `<a:srcRect>` element. Returns an empty string when no
+ * srcRect was preserved (or the user has marked the image dirty —
+ * a dirty picture's bytes are the new truth, the prior crop is
+ * meaningless).
+ */
+function readPreservedSrcRect(element: BroadsetElement): string {
+  // Defensive: some test fixtures cast elements to BroadsetElement
+  // without populating `extensions`, so the typed-required field can
+  // be `undefined` at runtime. Treat missing as no-srcRect.
+  const extensionsBag = element.extensions as Readonly<Record<string, unknown>> | undefined;
+  const ext = extensionsBag?.['pptx'];
+
+  if (typeof ext !== 'object' || ext === null) return '';
+
+  const record = ext as Record<string, unknown>;
+
+  if (record['dirty'] === true) return '';
+
+  const srcRect = record['srcRect'];
+
+  if (typeof srcRect !== 'object' || srcRect === null) return '';
+
+  const rect = srcRect as Record<string, unknown>;
+  const l = typeof rect['l'] === 'number' ? rect['l'] : 0;
+  const t = typeof rect['t'] === 'number' ? rect['t'] : 0;
+  const r = typeof rect['r'] === 'number' ? rect['r'] : 0;
+  const b = typeof rect['b'] === 'number' ? rect['b'] : 0;
+
+  if (l === 0 && t === 0 && r === 0 && b === 0) return '';
+
+  const attrs = [
+    l !== 0 ? `l="${String(l)}"` : '',
+    t !== 0 ? `t="${String(t)}"` : '',
+    r !== 0 ? `r="${String(r)}"` : '',
+    b !== 0 ? `b="${String(b)}"` : '',
+  ].filter((s) => s.length > 0).join(' ');
+
+  return `<a:srcRect ${attrs}/>`;
 }
 
 interface DecodedMedia {

@@ -79,12 +79,10 @@ export interface PptxImportWarning {
  * fidelity-loss toast based on these codes.
  */
 export type PptxExportWarningCode =
-  /** `style.boxShadow` couldn't be parsed into `<a:outerShdw>` (e.g. unrecognised colour, multi-shadow input where every entry is inset, malformed length unit). */
+  /** `style.boxShadow` couldn't be parsed into `<a:outerShdw>` / `<a:innerShdw>` (e.g. unrecognised colour, malformed length unit). */
   | 'shadow-dropped'
-  /** Multi-shadow list truncated to the first non-inset entry — OOXML's `<a:outerShdw>` carries one shadow only. */
+  /** Multi-shadow list truncated — OOXML carries at most one outer shadow + one inner shadow per shape. */
   | 'shadow-truncated'
-  /** `inset` shadow skipped — OOXML's outer-shadow primitive cannot represent inset semantics. */
-  | 'shadow-inset-skipped'
   /** Animation isn't representable as a PowerPoint preset entrance effect; dropped per IO-D-16 (the `.bsp` is the source of truth for animation data). */
   | 'animation-preset-unsupported';
 

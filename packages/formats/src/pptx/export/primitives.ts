@@ -175,13 +175,13 @@ export function emitStroke(style: BroadsetElementStyle, ctx: SlideExportContext)
 /**
  * Emit an `<a:effectLst>` from the element's CSS-style `boxShadow`.
  * Maps the most common form (offsetX offsetY blurRadius color) to
- * OOXML `<a:outerShdw>`. Returns an empty string when no shadow is
- * declared.
+ * OOXML `<a:outerShdw>`, plus `inset` entries to `<a:innerShdw>`.
+ * Returns an empty string when no shadow is declared.
  *
  * Pushes export warnings on `ctx.warnings` for fidelity-loss cases:
- * inset entries skipped (`shadow-inset-skipped`), multi-shadow lists
- * truncated to the first emit-eligible entry (`shadow-truncated`),
- * and unparseable strings dropped entirely (`shadow-dropped`).
+ * multi-shadow lists truncated to the first emit-eligible entry
+ * (`shadow-truncated`) and unparseable strings dropped entirely
+ * (`shadow-dropped`).
  */
 export function emitEffects(
   style: BroadsetElementStyle,
@@ -194,25 +194,31 @@ export function emitEffects(
 
   const parseResult = parseBoxShadow(shadow, ctx.canvas);
 
-  for (const note of parseResult.notes) {
-    pushShadowNoteAsWarning(ctx, note, elementId, shadow);
+  if (parseResult.truncatedCount > 0) {
+    pushExportWarning(ctx, {
+      code: 'shadow-truncated',
+      message: `multi-value box-shadow truncated to the first outer + first inner entry — OOXML carries one of each per shape (${shadow})`,
+      ...(elementId !== undefined ? { elementId } : {}),
+    });
   }
 
-  if (parseResult.shadow === null) {
-    if (parseResult.notes.length === 0) {
-      // No structural reason — colour parse failed or token count short.
-      pushExportWarning(ctx, {
-        code: 'shadow-dropped',
-        message: `box-shadow could not be parsed and was dropped on export (${shadow})`,
-        ...(elementId !== undefined ? { elementId } : {}),
-      });
-    }
+  if (parseResult.outer === null && parseResult.inner === null) {
+    pushExportWarning(ctx, {
+      code: 'shadow-dropped',
+      message: `box-shadow could not be parsed and was dropped on export (${shadow})`,
+      ...(elementId !== undefined ? { elementId } : {}),
+    });
 
     return '';
   }
 
-  const parsed = parseResult.shadow;
-  // offsets/blur are already in mm — go straight to EMU.
+  const outerXml = parseResult.outer !== null ? renderShadowXml('a:outerShdw', parseResult.outer) : '';
+  const innerXml = parseResult.inner !== null ? renderShadowXml('a:innerShdw', parseResult.inner) : '';
+
+  return `<a:effectLst>${outerXml}${innerXml}</a:effectLst>`;
+}
+
+function renderShadowXml(tagName: 'a:outerShdw' | 'a:innerShdw', parsed: ParsedShadow): string {
   const distEmu = mmToEmu(Math.hypot(parsed.offsetXmm, parsed.offsetYmm));
   const blurEmu = mmToEmu(parsed.blurMm);
   const directionDegrees =
@@ -222,31 +228,10 @@ export function emitEffects(
   const dirUnits = degreesToRotationUnits(((directionDegrees % 360) + 360) % 360);
   const ooxmlHex = hexToOoxmlColor(parsed.color);
   const alphaChild = parsed.alpha < 1 ? `<a:alpha val="${String(alphaToOoxml(parsed.alpha))}"/>` : '';
+  // outerShdw carries `rotWithShape`; innerShdw doesn't have that attribute.
+  const rotAttr = tagName === 'a:outerShdw' ? ' rotWithShape="0"' : '';
 
-  return `<a:effectLst><a:outerShdw blurRad="${String(blurEmu)}" dist="${String(distEmu)}" dir="${String(dirUnits)}" rotWithShape="0"><a:srgbClr val="${ooxmlHex}">${alphaChild}</a:srgbClr></a:outerShdw></a:effectLst>`;
-}
-
-type BoxShadowParseNote = 'inset-skipped' | 'truncated';
-
-function pushShadowNoteAsWarning(
-  ctx: SlideExportContext,
-  note: BoxShadowParseNote,
-  elementId: string | undefined,
-  shadow: string,
-): void {
-  if (note === 'inset-skipped') {
-    pushExportWarning(ctx, {
-      code: 'shadow-inset-skipped',
-      message: `inset box-shadow entry skipped on export — OOXML outer-shadow cannot represent inset semantics (${shadow})`,
-      ...(elementId !== undefined ? { elementId } : {}),
-    });
-  } else {
-    pushExportWarning(ctx, {
-      code: 'shadow-truncated',
-      message: `multi-value box-shadow truncated to the first emit-eligible entry — OOXML outer-shadow only carries one (${shadow})`,
-      ...(elementId !== undefined ? { elementId } : {}),
-    });
-  }
+  return `<${tagName} blurRad="${String(blurEmu)}" dist="${String(distEmu)}" dir="${String(dirUnits)}"${rotAttr}><a:srgbClr val="${ooxmlHex}">${alphaChild}</a:srgbClr></${tagName}>`;
 }
 
 /**
@@ -268,37 +253,33 @@ interface ParsedShadow {
 }
 
 interface BoxShadowParseResult {
-  readonly shadow: ParsedShadow | null;
-  readonly notes: readonly BoxShadowParseNote[];
+  readonly outer: ParsedShadow | null;
+  readonly inner: ParsedShadow | null;
+  /** Count of emit-eligible entries dropped because OOXML carries one of each. */
+  readonly truncatedCount: number;
 }
 
 function parseBoxShadow(value: string, canvas: Canvas): BoxShadowParseResult {
   const entries = splitShadowList(value).map((s) => s.trim()).filter((s) => s.length > 0);
-  const notes: BoxShadowParseNote[] = [];
-  let chosen: ParsedShadow | null = null;
+  let outer: ParsedShadow | null = null;
+  let inner: ParsedShadow | null = null;
+  let truncated = 0;
 
   for (const entry of entries) {
-    // Inset shadows are not representable as <a:outerShdw>; skip and
-    // try the next entry in the list.
-    if (/\binset\b/.test(entry)) {
-      notes.push('inset-skipped');
-      continue;
-    }
+    const isInset = /\binset\b/.test(entry);
+    const cleaned = isInset ? entry.replace(/\binset\b/g, '').trim() : entry;
+    const parsed = parseSingleShadow(cleaned, canvas);
 
-    const parsed = parseSingleShadow(entry, canvas);
+    if (parsed === null) continue;
 
-    if (parsed !== null && chosen === null) {
-      chosen = parsed;
-      continue;
-    }
-
-    if (parsed !== null && chosen !== null) {
-      // Additional entries beyond the first emit-eligible one.
-      notes.push('truncated');
-    }
+    if (isInset) {
+      if (inner === null) inner = parsed;
+      else truncated += 1;
+    } else if (outer === null) outer = parsed;
+    else truncated += 1;
   }
 
-  return { shadow: chosen, notes };
+  return { outer, inner, truncatedCount: truncated };
 }
 
 function parseSingleShadow(value: string, canvas: Canvas): {

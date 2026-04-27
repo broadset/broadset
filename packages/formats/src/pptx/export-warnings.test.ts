@@ -11,11 +11,12 @@ import { exportPptxWithReport, exportPptxWithReportAsync } from './export';
  */
 describe('PPTX exporter — warnings sink', () => {
   /**
-   * @description Inset shadows cannot be represented by `<a:outerShdw>`;
-   * the exporter MUST skip them and surface a `shadow-inset-skipped`
-   * warning carrying the source elementId.
+   * @description Inset shadows now round-trip through `<a:innerShdw>`,
+   * so an inset-only `boxShadow` MUST emit cleanly with NO warnings —
+   * P3 closed the previous fidelity gap. This test guards against a
+   * regression that would silently revert insets to opaque drops.
    */
-  it('emits shadow-inset-skipped when boxShadow is inset-only', () => {
+  it('emits inset boxShadow as <a:innerShdw> with no warning', async () => {
     const doc = {
       ...createEmptyBroadsetDocument(),
       elements: [
@@ -29,10 +30,12 @@ describe('PPTX exporter — warnings sink', () => {
     };
     const report = exportPptxWithReport(doc, { preserveBroadsetMetadata: false });
 
-    const warning = report.warnings.find((w) => w.code === 'shadow-inset-skipped');
+    expect(report.warnings).toEqual([]);
 
-    expect(warning).toBeDefined();
-    expect(warning?.elementId).toBe('inset-shadow');
+    const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
+    const slide = readTextPart(readOoxmlPackage(report.bytes), 'ppt/slides/slide1.xml') ?? '';
+
+    expect(slide).toContain('<a:innerShdw');
   });
 
   /**
@@ -160,16 +163,16 @@ describe('PPTX exporter — warnings sink', () => {
       ...createEmptyBroadsetDocument(),
       elements: [
         createDefaultElement('rectangle', {
-          id: 'inset-async',
+          id: 'multi-async',
           width: 100,
           height: 50,
-          style: { boxShadow: 'inset 4px 4px 8px black', opacity: 1 },
+          style: { boxShadow: '4px 4px 8px black, 8px 8px 12px red, 16px 16px 16px blue', opacity: 1 },
         }),
       ],
     };
     const report = await exportPptxWithReportAsync(doc, { preserveBroadsetMetadata: false });
 
-    expect(report.warnings.some((w) => w.code === 'shadow-inset-skipped')).toBe(true);
+    expect(report.warnings.some((w) => w.code === 'shadow-truncated')).toBe(true);
     expect(report.bytes.byteLength).toBeGreaterThan(0);
   });
 });

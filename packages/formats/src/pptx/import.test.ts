@@ -709,6 +709,148 @@ describe('PPTX importer — operator-level extraction', () => {
   });
 
   /**
+   * @description P4 — `<a:srcRect>` crops on `<a:blipFill>` MUST
+   * round-trip without data loss. Pixel-level baking is tracked as a
+   * follow-up; for now the values are preserved on
+   * `extensions.pptx.srcRect` and re-emitted on export so a
+   * round-tripped `.pptx` keeps PowerPoint's view of the image.
+   */
+  it('round-trips <a:srcRect> on <a:blipFill> via extensions.pptx.srcRect', async () => {
+    const onePxPng = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+      0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+      0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+      0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
+      0x42, 0x60, 0x82,
+    ]);
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:pic><p:nvPicPr><p:cNvPr id="2" name="CroppedImage"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId1"/><a:srcRect l="10000" t="20000" r="30000" b="40000"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1500000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
+    const slideRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>`;
+    const inputBytes = writeOoxmlPackage(
+      new Map<string, Uint8Array>([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText(slideRels)],
+        ['ppt/media/image1.png', onePxPng],
+      ]),
+    );
+    const imported = importPptx(inputBytes);
+    const image = imported.elements.find((el) => el.type === 'image');
+    const ext = image?.extensions['pptx'] as { readonly srcRect?: { l: number; t: number; r: number; b: number } } | undefined;
+
+    expect(ext?.srcRect).toEqual({ l: 10000, t: 20000, r: 30000, b: 40000 });
+
+    // Re-export and verify the srcRect re-emits with the same values.
+    const reExported = exportPptxBytes(imported);
+    const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
+    const reExportedSlide = readTextPart(readOoxmlPackage(reExported), 'ppt/slides/slide1.xml') ?? '';
+
+    expect(reExportedSlide).toContain('<a:srcRect');
+    expect(reExportedSlide).toContain('l="10000"');
+    expect(reExportedSlide).toContain('t="20000"');
+    expect(reExportedSlide).toContain('r="30000"');
+    expect(reExportedSlide).toContain('b="40000"');
+  });
+
+  /**
+   * @description P3 — inner shadows round-trip through CSS `inset`.
+   * `<a:innerShdw>` becomes `inset … rgba(...)` on import; a CSS
+   * `inset` shadow on `style.boxShadow` becomes `<a:innerShdw>` on
+   * export. Combined outer + inner shadows MUST also round-trip.
+   */
+  it('round-trips <a:innerShdw> through CSS inset', async () => {
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="InnerShadow"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:effectLst><a:innerShdw blurRad="180000" dist="360000" dir="2700000"><a:srgbClr val="000000"><a:alpha val="50000"/></a:srgbClr></a:innerShdw></a:effectLst></p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
+    const inputBytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')],
+      ]),
+    );
+    const imported = importPptx(inputBytes);
+    const boxShadow = imported.elements[0]?.style.boxShadow;
+
+    expect(boxShadow).toMatch(/^inset/);
+    expect(boxShadow).toMatch(/rgba\(0, 0, 0, 0\.50\d\)/);
+
+    // Re-export and verify <a:innerShdw> is emitted again.
+    const reExported = exportPptxBytes(imported);
+    const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
+    const reExportedSlide = readTextPart(readOoxmlPackage(reExported), 'ppt/slides/slide1.xml') ?? '';
+
+    expect(reExportedSlide).toContain('<a:innerShdw');
+
+    // Circle-back: re-import and confirm inset survives.
+    const reImported = importPptx(reExported);
+    const reBoxShadow = reImported.elements[0]?.style.boxShadow;
+
+    expect(reBoxShadow).toMatch(/^inset/);
+  });
+
+  /**
+   * @description P2 — non-sRGB colour primitives (`<a:scrgbClr>`,
+   * `<a:hslClr>`, `<a:prstClr>`) MUST resolve to a Broadset rgb colour
+   * with `originalColor` carrying the source form. This prevents
+   * silent colour mis-interpretation on import from foreign tools that
+   * use these variants.
+   */
+  it('parses scrgbClr / hslClr / prstClr colour primitives', () => {
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="ScRgb"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="100000" cy="100000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:scrgbClr r="100000" g="0" b="0"/></a:solidFill></p:spPr></p:sp><p:sp><p:nvSpPr><p:cNvPr id="3" name="Hsl"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="100000" y="0"/><a:ext cx="100000" cy="100000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:hslClr hue="7200000" sat="100000" lum="50000"/></a:solidFill></p:spPr></p:sp><p:sp><p:nvSpPr><p:cNvPr id="4" name="Prst"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="200000" y="0"/><a:ext cx="100000" cy="100000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:prstClr val="darkBlue"/></a:solidFill></p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
+    const inputBytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')],
+      ]),
+    );
+    const imported = importPptx(inputBytes);
+    const rectangles = imported.elements.filter((el) => el.type === 'rectangle');
+
+    expect(rectangles).toHaveLength(3);
+
+    // scrgb(100000, 0, 0) is pure-red linear → sRGB pure red.
+    const scrgbFill = rectangles[0]?.style.fill;
+
+    if (scrgbFill?.kind === 'solid' && scrgbFill.color.kind === 'rgb') {
+      expect(scrgbFill.color.hex.toUpperCase()).toBe('#FF0000');
+      expect(scrgbFill.color.originalColor).toContain('scrgb');
+    } else {
+      throw new Error('expected scrgb rectangle to have solid rgb fill');
+    }
+
+    // hue=7200000 (=120°), sat=100%, lum=50% → pure green.
+    const hslFill = rectangles[1]?.style.fill;
+
+    if (hslFill?.kind === 'solid' && hslFill.color.kind === 'rgb') {
+      expect(hslFill.color.hex.toUpperCase()).toBe('#00FF00');
+      expect(hslFill.color.originalColor).toContain('hsl');
+    } else {
+      throw new Error('expected hsl rectangle to have solid rgb fill');
+    }
+
+    // darkBlue is the canonical CSS named colour #00008B.
+    const prstFill = rectangles[2]?.style.fill;
+
+    if (prstFill?.kind === 'solid' && prstFill.color.kind === 'rgb') {
+      expect(prstFill.color.hex.toUpperCase()).toBe('#00008B');
+      expect(prstFill.color.originalColor).toBe('darkblue');
+    } else {
+      throw new Error('expected prst rectangle to have solid rgb fill');
+    }
+  });
+
+  /**
    * @description R6 — `extractBlock` MUST handle same-named tags
    * nested inside the block it's extracting. A run-level `<a:rPr>`
    * containing inner block markup must not throw the shape-level

@@ -11,6 +11,7 @@ import {
   type ColorMods,
   createDefaultElement,
   type Hyperlink,
+  normalizeColor,
   type Paragraph,
   type ParagraphAlign,
   type ParagraphProps,
@@ -296,7 +297,11 @@ function extractCNvPrAttrs(body: string): CNvPrAttrs | null {
 
   const attrs = match[1] ?? '';
   const nameAttr = attrs.match(/\bname="([^"]*)"/);
-  const displayName = nameAttr?.[1] ?? '';
+  const rawName = nameAttr?.[1] ?? '';
+  // OOXML attribute values escape `&`, `<`, `>`, `"`, `'`. Decode
+  // before BSET tag detection so a name like `Foo &amp; Bar` round-
+  // trips and BSET tags are matched character-for-character.
+  const displayName = decodeXmlEntities(rawName);
   const bsetTag = displayName.length > 0 ? decodeShapeName(displayName) : null;
 
   if (bsetTag !== null) return { bsetId: bsetTag.id, displayName: bsetTag.id };
@@ -634,20 +639,32 @@ function applyShapeStyle(canvas: Canvas, element: BroadsetElement, body: string)
 }
 
 /**
- * Parse `<a:outerShdw>` into a CSS `box-shadow` string. Inner shadows
- * (`<a:innerShdw>`) are not yet mapped — they would require CSS
- * `box-shadow` with `inset`, which doesn't render the same way.
+ * Parse `<a:outerShdw>` or `<a:innerShdw>` into a CSS `box-shadow`
+ * string. Inner shadows are emitted with the `inset` keyword. When
+ * both forms are present in the same `<a:effectLst>` we emit a
+ * comma-separated list (CSS box-shadow allows multiple shadows).
  */
 function parseOuterShadow(body: string): string | null {
   const effectLst = extractBlock(body, 'a:effectLst');
 
   if (effectLst === null) return null;
 
-  // Try paired form first; fall back to self-close. Two simpler regex
-  // calls instead of one alternation that the linter flags as too
-  // complex.
-  const paired = effectLst.block.match(/<a:outerShdw\b([^>]*)>([\s\S]*?)<\/a:outerShdw>/);
-  const selfClose = paired === null ? effectLst.block.match(/<a:outerShdw\b([^>]*)\/>/) : null;
+  const outer = parseShadowBlock(effectLst.block, 'a:outerShdw', false);
+  const inner = parseShadowBlock(effectLst.block, 'a:innerShdw', true);
+
+  if (outer === null && inner === null) return null;
+  if (outer !== null && inner !== null) return `${outer}, ${inner}`;
+
+  return outer ?? inner;
+}
+
+function parseShadowBlock(block: string, tagName: string, inset: boolean): string | null {
+  // Two simpler regex calls instead of one alternation — keeps complexity
+  // under the lint threshold and makes the matched-vs-self-close branch
+  // explicit.
+  const escapedTag = tagName.replace(':', '\\:');
+  const paired = block.match(new RegExp(`<${escapedTag}\\b([^>]*)>([\\s\\S]*?)<\\/${escapedTag}>`));
+  const selfClose = paired === null ? block.match(new RegExp(`<${escapedTag}\\b([^>]*)\\/>`)) : null;
 
   if (paired === null && selfClose === null) return null;
 
@@ -669,8 +686,9 @@ function parseOuterShadow(body: string): string | null {
   const r = parseInt(colour.hex.slice(1, 3), 16);
   const g = parseInt(colour.hex.slice(3, 5), 16);
   const b = parseInt(colour.hex.slice(5, 7), 16);
+  const prefix = inset ? 'inset ' : '';
 
-  return `${formatMm(offsetXmm)} ${formatMm(offsetYmm)} ${formatMm(blurMm)} rgba(${String(r)}, ${String(g)}, ${String(b)}, ${alpha.toFixed(3)})`;
+  return `${prefix}${formatMm(offsetXmm)} ${formatMm(offsetYmm)} ${formatMm(blurMm)} rgba(${String(r)}, ${String(g)}, ${String(b)}, ${alpha.toFixed(3)})`;
 }
 
 function formatMm(value: number): string {
@@ -696,8 +714,48 @@ function buildPicture(
 
   const base = buildBase(ctx, id, name, 'image', transform, parentGroupId);
   const dataUri = `data:${media.mime};base64,${uint8ToBase64(media.bytes)}`;
+  const srcRect = parseSrcRect(body);
 
-  return { ...base, content: dataUri };
+  if (srcRect === null) return { ...base, content: dataUri };
+
+  // Preserve the srcRect on extensions.pptx.srcRect so re-export emits
+  // it again. Pixel-level baking (cropping the image bytes) is tracked
+  // as a future enhancement — for now the data round-trips losslessly.
+  const existingExt = (base.extensions['pptx'] as Record<string, unknown> | undefined) ?? {};
+
+  return {
+    ...base,
+    content: dataUri,
+    extensions: {
+      ...base.extensions,
+      pptx: {
+        ...existingExt,
+        srcRect,
+      },
+    },
+  };
+}
+
+/**
+ * Parse `<a:srcRect>` percentages off `<a:blipFill>`. Each component
+ * is in OOXML's 1/100000 unit (50000 = 50%). All four sides may be
+ * absent (defaults to 0). Returns `null` when no `<a:srcRect>` is
+ * present so we don't litter `extensions.pptx` with empty crops.
+ */
+function parseSrcRect(body: string): { readonly l: number; readonly t: number; readonly r: number; readonly b: number } | null {
+  const match = body.match(/<a:srcRect\b([^>]*)\/?>/);
+
+  if (match === null) return null;
+
+  const attrs = match[1] ?? '';
+  const l = parseInt(attrs.match(/\bl="(-?\d+)"/)?.[1] ?? '0', 10);
+  const t = parseInt(attrs.match(/\bt="(-?\d+)"/)?.[1] ?? '0', 10);
+  const r = parseInt(attrs.match(/\br="(-?\d+)"/)?.[1] ?? '0', 10);
+  const b = parseInt(attrs.match(/\bb="(-?\d+)"/)?.[1] ?? '0', 10);
+
+  if (l === 0 && t === 0 && r === 0 && b === 0) return null;
+
+  return { l, t, r, b };
 }
 
 /**
@@ -726,10 +784,21 @@ function detectFill(body: string): BroadsetFill | null {
 }
 
 /**
- * Parse a `<a:srgbClr>` or `<a:schemeClr>` block into a BroadsetColor.
- * Preserves theme-slot references (`{ kind: 'theme', slot, mods }`)
- * rather than resolving to the palette's sRGB — preserves identity so
- * re-export emits `<a:schemeClr>` again.
+ * Parse an OOXML colour primitive into a BroadsetColor. Recognised
+ * variants:
+ *
+ * - `<a:srgbClr val="…"/>` — canonical sRGB hex.
+ * - `<a:schemeClr val="…"/>` — theme-slot reference; preserves
+ *   identity so re-export emits `<a:schemeClr>` again.
+ * - `<a:scrgbClr r="…" g="…" b="…"/>` — linear-light percentages
+ *   (0–100000). We convert to sRGB hex but keep the source string on
+ *   `originalColor` so a later round-trip can restore the linear form.
+ * - `<a:hslClr hue="…" sat="…" lum="…"/>` — HSL components per
+ *   ECMA-376 (hue 0–21600000 = 0–360°, sat/lum 0–100000 = 0–100%).
+ *   Converted to sRGB hex with `originalColor` carrying the source.
+ * - `<a:prstClr val="…"/>` — preset name (e.g. `darkBlue`).
+ *   Resolved through `normalizeColor` (which knows the CSS named
+ *   set), with the preset name preserved on `originalColor`.
  */
 function parseColorElement(block: string): BroadsetColor | null {
   const srgbMatch = block.match(/<a:srgbClr\s+val="([0-9A-Fa-f]{6,8})"(?:[^>]*)(\/>|>[\s\S]*?<\/a:srgbClr>)/);
@@ -751,8 +820,263 @@ function parseColorElement(block: string): BroadsetColor | null {
     return mods === null ? { kind: 'theme', slot } : { kind: 'theme', slot, mods };
   }
 
+  const scrgbMatch = block.match(/<a:scrgbClr\s+r="(\d+)"\s+g="(\d+)"\s+b="(\d+)"(?:[^>]*)(\/>|>[\s\S]*?<\/a:scrgbClr>)/);
+
+  if (scrgbMatch !== null) {
+    const r = clampScrgb(parseInt(scrgbMatch[1] ?? '0', 10));
+    const g = clampScrgb(parseInt(scrgbMatch[2] ?? '0', 10));
+    const b = clampScrgb(parseInt(scrgbMatch[3] ?? '0', 10));
+    const hex = scrgbToSrgbHex(r, g, b);
+
+    return {
+      kind: 'rgb',
+      hex,
+      originalColor: `scrgb(${String(r / 100000)}, ${String(g / 100000)}, ${String(b / 100000)})`,
+    };
+  }
+
+  const hslMatch = block.match(/<a:hslClr\s+hue="(\d+)"\s+sat="(\d+)"\s+lum="(\d+)"(?:[^>]*)(\/>|>[\s\S]*?<\/a:hslClr>)/);
+
+  if (hslMatch !== null) {
+    const hueDegrees = parseInt(hslMatch[1] ?? '0', 10) / 60000;
+    const saturationPct = parseInt(hslMatch[2] ?? '0', 10) / 1000;
+    const lightnessPct = parseInt(hslMatch[3] ?? '0', 10) / 1000;
+    const hex = hslToSrgbHex(hueDegrees, saturationPct, lightnessPct);
+
+    return {
+      kind: 'rgb',
+      hex,
+      originalColor: `hsl(${String(hueDegrees)}, ${String(saturationPct)}%, ${String(lightnessPct)}%)`,
+    };
+  }
+
+  const prstMatch = block.match(/<a:prstClr\s+val="([a-zA-Z0-9]+)"(?:[^>]*)(\/>|>[\s\S]*?<\/a:prstClr>)/);
+
+  if (prstMatch !== null) {
+    const name = (prstMatch[1] ?? '').toLowerCase();
+    const hex = prstNameToSrgbHex(name);
+
+    if (hex === null) return null;
+
+    return { kind: 'rgb', hex, originalColor: name };
+  }
+
   return null;
 }
+
+function clampScrgb(value: number): number {
+  return Math.max(0, Math.min(100000, value));
+}
+
+/**
+ * Convert OOXML `<a:scrgbClr>` linear-light components (0–100000) to
+ * an sRGB `#RRGGBB` string by applying the standard linear → gamma
+ * transfer (IEC 61966-2-1).
+ */
+function scrgbToSrgbHex(r: number, g: number, b: number): `#${string}` {
+  const toSrgb = (linearScaled: number): number => {
+    const linear = linearScaled / 100000;
+    const corrected = linear <= 0.0031308 ? 12.92 * linear : 1.055 * linear ** (1 / 2.4) - 0.055;
+
+    return Math.round(Math.max(0, Math.min(1, corrected)) * 255);
+  };
+
+  return rgbToHex(toSrgb(r), toSrgb(g), toSrgb(b));
+}
+
+/**
+ * HSL → sRGB hex per the canonical CSS Color formula. Hue in degrees,
+ * saturation/lightness as 0–100 percentages.
+ */
+function hslToSrgbHex(hueDegrees: number, saturationPct: number, lightnessPct: number): `#${string}` {
+  const s = Math.max(0, Math.min(100, saturationPct)) / 100;
+  const l = Math.max(0, Math.min(100, lightnessPct)) / 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const hp = (((hueDegrees % 360) + 360) % 360) / 60;
+  const x = c * (1 - Math.abs((hp % 2) - 1));
+
+  const [r1, g1, b1] = hslSegment(hp, c, x);
+  const m = l - c / 2;
+
+  return rgbToHex(
+    Math.round((r1 + m) * 255),
+    Math.round((g1 + m) * 255),
+    Math.round((b1 + m) * 255),
+  );
+}
+
+function hslSegment(hp: number, c: number, x: number): readonly [number, number, number] {
+  if (hp < 1) return [c, x, 0];
+  if (hp < 2) return [x, c, 0];
+  if (hp < 3) return [0, c, x];
+  if (hp < 4) return [0, x, c];
+  if (hp < 5) return [x, 0, c];
+
+  return [c, 0, x];
+}
+
+function rgbToHex(r: number, g: number, b: number): `#${string}` {
+  const hex = `${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase();
+
+  return `#${hex}`;
+}
+
+/**
+ * OOXML preset colour names per ECMA-376 §20.1.10.46. The full set
+ * mirrors CSS3/SVG named colours; we delegate to the model's
+ * `normalizeColor` first (which carries the basic 21 names) and fall
+ * back to the OOXML extended map. Names are matched case-insensitively.
+ * Returns `null` when the name isn't recognised.
+ */
+function prstNameToSrgbHex(name: string): `#${string}` | null {
+  try {
+    const normalized = normalizeColor(name);
+    const stripped = normalized.startsWith('#') ? normalized.slice(1) : normalized;
+
+    return `#${stripped.slice(0, 6).toUpperCase()}`;
+  } catch {
+    const fallback = OOXML_EXTENDED_PRESET_COLORS[name];
+
+    if (fallback === undefined) return null;
+
+    return `#${fallback.toUpperCase()}`;
+  }
+}
+
+/**
+ * OOXML preset colours that aren't in the model's basic CSS_NAMED_COLORS
+ * map. Hex values per ECMA-376 §20.1.10.46. Names are stored lowercase;
+ * caller lowercases the source val before lookup.
+ */
+const OOXML_EXTENDED_PRESET_COLORS: Readonly<Record<string, string>> = {
+  aliceblue: 'F0F8FF',
+  antiquewhite: 'FAEBD7',
+  aqua: '00FFFF',
+  aquamarine: '7FFFD4',
+  azure: 'F0FFFF',
+  beige: 'F5F5DC',
+  bisque: 'FFE4C4',
+  blanchedalmond: 'FFEBCD',
+  blueviolet: '8A2BE2',
+  burlywood: 'DEB887',
+  cadetblue: '5F9EA0',
+  chartreuse: '7FFF00',
+  chocolate: 'D2691E',
+  coral: 'FF7F50',
+  cornflowerblue: '6495ED',
+  cornsilk: 'FFF8DC',
+  crimson: 'DC143C',
+  darkblue: '00008B',
+  darkcyan: '008B8B',
+  darkgoldenrod: 'B8860B',
+  darkgray: 'A9A9A9',
+  darkgreen: '006400',
+  darkgrey: 'A9A9A9',
+  darkkhaki: 'BDB76B',
+  darkmagenta: '8B008B',
+  darkolivegreen: '556B2F',
+  darkorange: 'FF8C00',
+  darkorchid: '9932CC',
+  darkred: '8B0000',
+  darksalmon: 'E9967A',
+  darkseagreen: '8FBC8F',
+  darkslateblue: '483D8B',
+  darkslategray: '2F4F4F',
+  darkslategrey: '2F4F4F',
+  darkturquoise: '00CED1',
+  darkviolet: '9400D3',
+  deeppink: 'FF1493',
+  deepskyblue: '00BFFF',
+  dimgray: '696969',
+  dimgrey: '696969',
+  dodgerblue: '1E90FF',
+  firebrick: 'B22222',
+  floralwhite: 'FFFAF0',
+  forestgreen: '228B22',
+  gainsboro: 'DCDCDC',
+  ghostwhite: 'F8F8FF',
+  goldenrod: 'DAA520',
+  greenyellow: 'ADFF2F',
+  honeydew: 'F0FFF0',
+  hotpink: 'FF69B4',
+  indianred: 'CD5C5C',
+  indigo: '4B0082',
+  ivory: 'FFFFF0',
+  khaki: 'F0E68C',
+  lavender: 'E6E6FA',
+  lavenderblush: 'FFF0F5',
+  lawngreen: '7CFC00',
+  lemonchiffon: 'FFFACD',
+  lightblue: 'ADD8E6',
+  lightcoral: 'F08080',
+  lightcyan: 'E0FFFF',
+  lightgoldenrodyellow: 'FAFAD2',
+  lightgray: 'D3D3D3',
+  lightgreen: '90EE90',
+  lightgrey: 'D3D3D3',
+  lightpink: 'FFB6C1',
+  lightsalmon: 'FFA07A',
+  lightseagreen: '20B2AA',
+  lightskyblue: '87CEFA',
+  lightslategray: '778899',
+  lightslategrey: '778899',
+  lightsteelblue: 'B0C4DE',
+  lightyellow: 'FFFFE0',
+  limegreen: '32CD32',
+  linen: 'FAF0E6',
+  maroon: '800000',
+  mediumaquamarine: '66CDAA',
+  mediumblue: '0000CD',
+  mediumorchid: 'BA55D3',
+  mediumpurple: '9370DB',
+  mediumseagreen: '3CB371',
+  mediumslateblue: '7B68EE',
+  mediumspringgreen: '00FA9A',
+  mediumturquoise: '48D1CC',
+  mediumvioletred: 'C71585',
+  midnightblue: '191970',
+  mintcream: 'F5FFFA',
+  mistyrose: 'FFE4E1',
+  moccasin: 'FFE4B5',
+  navajowhite: 'FFDEAD',
+  oldlace: 'FDF5E6',
+  olive: '808000',
+  olivedrab: '6B8E23',
+  orangered: 'FF4500',
+  orchid: 'DA70D6',
+  palegoldenrod: 'EEE8AA',
+  palegreen: '98FB98',
+  paleturquoise: 'AFEEEE',
+  palevioletred: 'DB7093',
+  papayawhip: 'FFEFD5',
+  peachpuff: 'FFDAB9',
+  peru: 'CD853F',
+  plum: 'DDA0DD',
+  powderblue: 'B0E0E6',
+  rosybrown: 'BC8F8F',
+  royalblue: '4169E1',
+  saddlebrown: '8B4513',
+  salmon: 'FA8072',
+  sandybrown: 'F4A460',
+  seagreen: '2E8B57',
+  seashell: 'FFF5EE',
+  sienna: 'A0522D',
+  skyblue: '87CEEB',
+  slateblue: '6A5ACD',
+  slategray: '708090',
+  slategrey: '708090',
+  snow: 'FFFAFA',
+  springgreen: '00FF7F',
+  steelblue: '4682B4',
+  tan: 'D2B48C',
+  thistle: 'D8BFD8',
+  tomato: 'FF6347',
+  turquoise: '40E0D0',
+  violet: 'EE82EE',
+  wheat: 'F5DEB3',
+  whitesmoke: 'F5F5F5',
+  yellowgreen: '9ACD32',
+};
 
 function parseColorMods(innerBody: string): ColorMods | null {
   const result: Record<string, number> = {};

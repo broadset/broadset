@@ -28,20 +28,28 @@ interface UseDemoFileHandlersOptions {
 }
 
 function formatImportWarningMessage(warnings: readonly string[]): string {
+  return formatWarningMessage('Import', warnings);
+}
+
+function formatExportWarningMessage(warnings: readonly string[]): string {
+  return formatWarningMessage('Export', warnings);
+}
+
+function formatWarningMessage(action: 'Export' | 'Import', warnings: readonly string[]): string {
   const [firstWarning, secondWarning] = warnings;
 
   if (warnings.length === 1 && firstWarning !== undefined) {
-    return `Import completed with 1 warning: ${firstWarning}`;
+    return `${action} completed with 1 warning: ${firstWarning}`;
   }
 
   if (warnings.length > 1 && firstWarning !== undefined) {
     const moreCount = warnings.length - 1;
     const suffix = secondWarning === undefined ? '' : ` Next: ${secondWarning}`;
 
-    return `Import completed with ${String(warnings.length)} warnings. First: ${firstWarning}${suffix}${moreCount > 1 ? ' …' : ''}`;
+    return `${action} completed with ${String(warnings.length)} warnings. First: ${firstWarning}${suffix}${moreCount > 1 ? ' …' : ''}`;
   }
 
-  return 'Import completed with warnings.';
+  return `${action} completed with warnings.`;
 }
 
 interface DemoFileHandlers {
@@ -546,7 +554,7 @@ export function useDemoFileHandlers({
         if (videoSession !== null) snapshotCanvas = videoSession.session.encoderCanvas;
 
         try {
-          await bridge.exportDocument(exporter as ExportFormat, {
+          const exportResult = await bridge.exportDocument(exporter as ExportFormat, {
             document: renderDocument,
             ...buildOptionalExportArgs(options),
             ...(snapshotCanvas !== undefined ? { snapshotCanvas } : {}),
@@ -558,7 +566,13 @@ export function useDemoFileHandlers({
           });
 
           setExportProgress({ progress: 1, stage: 'Done!' });
-          pushToast('success', `Exported as ${exporter.toUpperCase()}.`);
+
+          if (exportResult.warnings.length > 0) {
+            pushToast('info', formatExportWarningMessage(exportResult.warnings));
+          } else {
+            pushToast('success', `Exported as ${exporter.toUpperCase()}.`);
+          }
+
           document.body.setAttribute('data-export-status', 'done');
         } finally {
           videoSession?.session.dispose();
