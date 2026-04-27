@@ -10,6 +10,7 @@ export {
   srgbToDeviceCmyk,
 } from './color';
 export {
+  clearFontBytesCache,
   elementFontIdentity,
   type FontIdentity,
   identityKey,
@@ -26,6 +27,7 @@ export {
   indexElementsById,
   type OperatorBrackets,
 } from './geometry';
+export { emitLinkAnnotation, readElementLink } from './hyperlinks';
 export {
   drawImagePlaceholder,
   embedImageFromBytes,

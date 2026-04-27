@@ -2,6 +2,7 @@ import type { BroadsetElement, BroadsetElementStyle, Canvas } from '@broadset/mo
 import { resolveContentAsPlainString } from '@broadset/model';
 import { type PDFFont, type PDFPage, rgb } from 'pdf-lib';
 
+import { reorderForBidi } from '../bidi-reorder';
 import { elementToPoints } from '../geometry';
 import { wrapText } from '../text';
 import { resolveOpacity, resolveStyleColor } from './color';
@@ -52,13 +53,18 @@ export function renderText(
   const alignment = el.style.textAlignment ?? 'left';
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const logicalLine = lines[i];
 
-    if (line === undefined || line === '') continue;
+    if (logicalLine === undefined || logicalLine === '') continue;
 
-    const lineX = computeLineX(xPt, line, alignment, maxWidthPt, measure);
+    // Reorder runs from logical to visual order so PDF readers paint
+    // RTL scripts (Arabic, Hebrew) in correct reading order. The
+    // function is an identity for pure-LTR strings, so the runtime
+    // cost on the common path is one regex test.
+    const visualLine = reorderForBidi(logicalLine);
+    const lineX = computeLineX(xPt, visualLine, alignment, maxWidthPt, measure);
 
-    page.drawText(line, {
+    page.drawText(visualLine, {
       x: lineX,
       y: yPt + (lines.length - 1 - i) * lineHeightPt,
       size,

@@ -39,8 +39,9 @@ export interface ExtractedTextItem {
  */
 export function extractTextItems(pdf: PDFDocument): readonly ExtractedTextItem[] {
   const items: ExtractedTextItem[] = [];
+  const pages = safeGetPages(pdf);
 
-  for (const page of pdf.getPages()) {
+  for (const page of pages) {
     const streamBytes = readPageContentBytes(pdf, page);
 
     if (streamBytes === undefined) continue;
@@ -51,6 +52,20 @@ export function extractTextItems(pdf: PDFDocument): readonly ExtractedTextItem[]
   }
 
   return items;
+}
+
+/**
+ * Walk the document's pages safely. pdf-lib's `getPages` throws when
+ * the catalog's `/Pages` tree is missing or malformed (which happens
+ * with truncated / fuzzed inputs). Wrap so the caller treats the
+ * "no pages" case as an empty extraction rather than crashing.
+ */
+function safeGetPages(pdf: PDFDocument): readonly PDFPage[] {
+  try {
+    return pdf.getPages();
+  } catch {
+    return [];
+  }
 }
 
 function readPageContentBytes(pdf: PDFDocument, page: PDFPage): Uint8Array | undefined {

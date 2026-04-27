@@ -55,12 +55,26 @@ export type PreservationBlobMap = ReadonlyMap<string, string>;
  */
 export function capturePreservationBlobs(pdf: PDFDocument): PreservationBlobMap {
   const blobs = new Map<string, string>();
+  const pages = safeGetPages(pdf);
 
-  for (const page of pdf.getPages()) {
+  for (const page of pages) {
     capturePageBlobs(pdf, page, blobs);
   }
 
   return blobs;
+}
+
+/**
+ * Safe variant of pdf-lib's `getPages` — wraps the throw on a
+ * malformed `/Pages` tree into an empty array so the capture pass
+ * never crashes the importer.
+ */
+function safeGetPages(pdf: PDFDocument): readonly PDFPage[] {
+  try {
+    return pdf.getPages();
+  } catch {
+    return [];
+  }
 }
 
 function capturePageBlobs(pdf: PDFDocument, page: PDFPage, blobs: Map<string, string>): void {

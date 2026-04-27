@@ -14,6 +14,7 @@ import {
   StandardFonts,
 } from 'pdf-lib';
 
+import { prepareBidiAnalysis } from './bidi-reorder';
 import { parseCssColor } from './color';
 import { decodeDataUri } from './data-uri';
 import {
@@ -36,6 +37,7 @@ import {
   elementRotationBrackets,
   elementTopLeftPt,
   embedImageFromBytes,
+  emitLinkAnnotation,
   ensureTrailerId,
   fetchImageBytes,
   hasAnyRoundedCorner,
@@ -44,6 +46,7 @@ import {
   type OcgRegistration,
   pdfaConformanceLetter,
   rasterizeSvgToPngBytes,
+  readElementLink,
   registerLinearOrRadialShading,
   registerPageOcgs,
   renderPath,
@@ -506,6 +509,20 @@ async function renderElement(
   if (ocgBinding !== undefined) {
     page.pushOperators(PDFOperator.of(PDFOperatorNames.EndMarkedContent));
   }
+
+  // Hyperlink overlay: opt-in via `extensions.pdf.link` on any
+  // element. Emits a `/Annot /Subtype /Link` covering the element's
+  // bounding box that opens the URL via the URI action when clicked.
+  // Annotation registration MUST happen after the marked-content
+  // brackets close — the annotation lives in the page's /Annots
+  // array, not inside the content stream.
+  const linkUrl = readElementLink(el);
+
+  if (linkUrl !== undefined) {
+    const linkAbsolute = composeCanvasAbsolutePosition(el, elementsById);
+
+    emitLinkAnnotation(pdf, page, el, linkAbsolute, canvas, trimHeightPt, linkUrl);
+  }
 }
 
 async function synthesizeElement(
@@ -700,6 +717,11 @@ async function runExport(
 
   // MediaBox/BleedBox/TrimBox/ArtBox follow canvas.bleed/safeArea declarations.
   applyPageBoxes(pdf, page, canvas);
+
+  // Warm the bidi analyser cache so subsequent sync `reorderForBidi`
+  // calls during text rendering can reorder RTL runs without
+  // turning the entire render path async.
+  await prepareBidiAnalysis();
 
   // Always embed a Helvetica fallback up-front so placeholder labels and
   // text elements without a declared family have a working PDFFont.

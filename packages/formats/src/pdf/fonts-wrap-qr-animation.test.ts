@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { drawQrOnPage, exportPdfBytes, normalizeFontFamily, resolveGoogleFontUrl, wrapText } from './index';
+import { drawQrOnPage, exportPdfBytes, normalizeFontFamily, resolveGoogleFontUrl } from './index';
 import { makeDocument, makeElement, makeStyle } from './test-helpers';
+import { wrapText } from './text';
 
 type FetchInput = string | Request | URL;
 

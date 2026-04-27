@@ -23,7 +23,6 @@ export {
   normalizeFontFamily,
   parseCssColor,
   resolveGoogleFontUrl,
-  wrapText,
 } from './pdf';
 export { exportPptxBytes, importPptx } from './pptx';
 export { exportPsdBytes, exportPsdBytesAsync, importPsd, svgPathToPsdVectorMask } from './psd';

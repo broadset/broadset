@@ -5,6 +5,15 @@ const FALLBACK_CHAR_WIDTH_PT = 8;
  * Wrap text at word boundaries respecting maximum width.
  * Explicit newlines are preserved including empty lines.
  * Falls back to per-character measurement when full-string measurement throws.
+ *
+ * NOTE — proper UAX #14 line-break opportunities (so CJK / Arabic /
+ * scripts without whitespace word separators wrap correctly) require
+ * pulling `_shared/text-layout/breakLines` (which depends on
+ * `linebreak`/`bidi-js`, neither of which ship TypeScript types). Per
+ * the architecture rules we can't leak ambient `declare module`
+ * declarations across package boundaries, so the integration with
+ * shaped line-breaking is deliberately Spec-Gapped pending an
+ * async-init refactor of the text emitter.
  */
 function safeMeasure(candidate: string, measure: (t: string) => number): number {
   try {

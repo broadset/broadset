@@ -232,12 +232,38 @@ interface GoogleFontEmbedAttempt {
   readonly failure?: string;
 }
 
+/**
+ * Cache of resolved SFNT bytes keyed by Google Fonts family name.
+ * The fetch + WOFF2 decompression is the expensive part of the Google
+ * Fonts pipeline — once we've resolved a family, reuse the bytes
+ * across every subsequent export pass instead of re-fetching and
+ * re-decompressing. The actual `pdf.embedFont(..., { subset: true })`
+ * call still happens per-document because pdf-lib's
+ * `CustomFontSubsetEmbedder` binds to a specific `PDFContext`.
+ */
+const fontBytesCache = new Map<string, Uint8Array>();
+
+/**
+ * Reset the cache. Test-only — production paths benefit from
+ * cross-export reuse, but tests that exercise WOFF2 decompression
+ * need a deterministic cache state.
+ */
+export function clearFontBytesCache(): void {
+  fontBytesCache.clear();
+}
+
 async function tryEmbedGoogleFont(
   family: string,
   pdf: PDFDocument,
   fetchFn: typeof globalThis.fetch,
 ): Promise<GoogleFontEmbedAttempt> {
   try {
+    const cached = fontBytesCache.get(family);
+
+    if (cached !== undefined) {
+      return { font: await pdf.embedFont(cached, { subset: true }) };
+    }
+
     const cssUrl = resolveGoogleFontUrl(family);
     const cssResponse = await fetchFn(cssUrl);
     const cssText = await cssResponse.text();
@@ -259,6 +285,8 @@ async function tryEmbedGoogleFont(
     const fontBytes = fontUrl.endsWith('.woff2')
       ? await decompressWoff2(compressedOrPlain)
       : compressedOrPlain;
+
+    fontBytesCache.set(family, fontBytes);
 
     // `subset: true` tells pdf-lib (via the registered `@pdf-lib/fontkit`
     // adapter) to embed only the glyphs the document actually references.

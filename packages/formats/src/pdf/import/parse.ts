@@ -5,6 +5,7 @@ import {
   PDFDocument,
   PDFName,
   PDFRawStream,
+  PDFRef,
   PDFString,
 } from 'pdf-lib';
 
@@ -132,10 +133,14 @@ export async function loadPdf(bytes: Uint8Array): Promise<PDFDocument | null> {
  * annotation walker in a later iteration.
  */
 export function hasEmbeddedJavaScript(pdf: PDFDocument): boolean {
-  const names = pdf.catalog.lookupMaybe(NAMES_KEY, PDFDict);
+  // pdf-lib's typings say `pdf.catalog` is always defined, but in
+  // practice partially-parsed garbage can leave it undefined.
+  // `lookupMaybeDict` wraps in try/catch so the entire detection
+  // pass falls through to `false` rather than throwing.
+  const names = lookupMaybeDict(pdf.catalog, NAMES_KEY);
 
   if (names !== undefined) {
-    const js = names.lookupMaybe(JAVASCRIPT_KEY, PDFDict);
+    const js = lookupMaybeDict(names, JAVASCRIPT_KEY);
 
     if (js !== undefined) return true;
   }
@@ -160,15 +165,46 @@ export function hasEmbeddedJavaScript(pdf: PDFDocument): boolean {
 }
 
 function lookupOpenActionDict(pdf: PDFDocument): PDFDict | undefined {
+  return lookupMaybeDict(pdf.catalog, OPEN_ACTION_KEY);
+}
+
+/**
+ * Safely call `dict.lookupMaybe(key, type)` — pdf-lib throws when the
+ * stored value's type does not match `type`, which on a malformed
+ * input crashes the importer. This helper turns the throw into
+ * `undefined` so the caller treats it the same as a missing key.
+ *
+ * `type` is the same constructor token pdf-lib expects (e.g.
+ * `PDFDict`, `PDFName`); we use a tiny generic-overload-aware shim
+ * to avoid the protected-constructor mismatch TypeScript surfaces
+ * when typing `typeof PDFDict` directly.
+ */
+function lookupMaybeDict(dict: PDFDict | undefined, key: PDFName): PDFDict | undefined {
+  if (dict === undefined) return undefined;
+
   try {
-    return pdf.catalog.lookupMaybe(OPEN_ACTION_KEY, PDFDict);
+    return dict.lookupMaybe(key, PDFDict);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Read a catalog entry by key, tolerating the runtime case where
+ * `pdf.catalog` is undefined (which pdf-lib's typings claim cannot
+ * happen but malformed inputs make true). Returns `undefined` when
+ * the catalog is missing OR the key is missing.
+ */
+function safeCatalogGet(pdf: PDFDocument, key: PDFName): unknown {
+  try {
+    return pdf.catalog.get(key);
   } catch {
     return undefined;
   }
 }
 
 function hasDocumentAdditionalActionJs(pdf: PDFDocument): boolean {
-  const aa = pdf.catalog.lookupMaybe(AA_KEY, PDFDict);
+  const aa = lookupMaybeDict(pdf.catalog, AA_KEY);
 
   if (aa === undefined) return false;
 
@@ -201,11 +237,11 @@ function hasDocumentAdditionalActionJs(pdf: PDFDocument): boolean {
  * embedded file is present.
  */
 export function collectEmbeddedFileNames(pdf: PDFDocument): readonly string[] {
-  const names = pdf.catalog.lookupMaybe(NAMES_KEY, PDFDict);
+  const names = lookupMaybeDict(pdf.catalog, NAMES_KEY);
 
   if (names === undefined) return [];
 
-  const embeddedFilesNode = names.lookupMaybe(EMBEDDED_FILES_KEY, PDFDict);
+  const embeddedFilesNode = lookupMaybeDict(names, EMBEDDED_FILES_KEY);
 
   if (embeddedFilesNode === undefined) return [];
 
@@ -242,9 +278,14 @@ function collectNameTreeLabels(node: PDFDict): readonly string[] {
  * schema validation (handled inside `readBroadsetXmp`).
  */
 export function readDocumentXmp(pdf: PDFDocument): BroadsetXmpPacket | null {
-  const metadataRef = pdf.catalog.get(METADATA_KEY);
+  const metadataRef = safeCatalogGet(pdf, METADATA_KEY);
 
   if (metadataRef === undefined) return null;
+
+  // pdf.context.lookup accepts a PDFRef and returns the dereferenced
+  // object. metadataRef arrives typed `unknown` from safeCatalogGet
+  // — narrow via instanceof before passing through.
+  if (!(metadataRef instanceof PDFRef)) return null;
 
   const stream = pdf.context.lookup(metadataRef);
 
