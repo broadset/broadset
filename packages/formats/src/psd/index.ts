@@ -20,4 +20,5 @@ export {
   psdSmartObjectLinkSchema,
   type PsdUnmappedEffect,
 } from './types';
+export { type PsdValidationResult, validatePsdBytes } from './validate-psd';
 export { svgPathToPsdVectorMask } from './vector-mask';

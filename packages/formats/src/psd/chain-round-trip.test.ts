@@ -7,6 +7,7 @@ import { assertReImportableBy, runChainRoundTrip } from '../_shared/test-infrast
 import { exportPsdBytes } from './export';
 import { importPsd } from './import';
 import { makeDocument, makeElement } from './test-helpers';
+import { validatePsdBytes } from './validate-psd';
 
 /**
  * Phase 5 + I6.2 — chain-round-trip test for PSD. Uses the shared
@@ -52,5 +53,19 @@ describe('PSD chain round-trip', () => {
 
     expect(result.imported.id).toBe('doc-chain');
     expect(result.imported.elements[0]?.id).toBe('el-chain');
+  });
+
+  /**
+   * @description Every exported PSD MUST also pass the cross-reader
+   * structural validator. Mirrors the PDF chain-test's veraPDF gate.
+   */
+  it('passes the cross-reader structural validator', () => {
+    const el = makeElement('rectangle', { id: 'el-validate', name: 'Validate' });
+    const doc = makeDocument({ id: 'doc-validate', elements: [el] });
+    const bytes = exportPsdBytes(doc);
+    const result = validatePsdBytes(bytes);
+
+    expect(result.errors).toHaveLength(0);
+    expect(result.valid).toBe(true);
   });
 });
