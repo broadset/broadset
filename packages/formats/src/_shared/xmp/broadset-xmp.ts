@@ -82,9 +82,15 @@ export function writeBroadsetXmp(packet: BroadsetXmpPacket): string {
   const validated = broadsetXmpPacketSchema.parse(packet);
   const elementsXml = validated.elements.map(renderElementEntry).join('\n');
   const elementsBlock =
-    validated.elements.length > 0
-      ? ['      <broadset:elements>', '        <rdf:Seq>', elementsXml, '        </rdf:Seq>', '      </broadset:elements>'].join('\n')
-      : '      <broadset:elements><rdf:Seq/></broadset:elements>';
+    validated.elements.length > 0 ?
+      [
+        '      <broadset:elements>',
+        '        <rdf:Seq>',
+        elementsXml,
+        '        </rdf:Seq>',
+        '      </broadset:elements>',
+      ].join('\n')
+    : '      <broadset:elements><rdf:Seq/></broadset:elements>';
 
   return [
     XMP_META_OPEN,

@@ -9,8 +9,16 @@ import {
   createDefaultElement,
   createEmptyBroadsetDocument,
   type DataFieldBinding,
+  type Paragraph,
+  paragraph as makeParagraph,
   type RepeaterConfig,
   rgbColor,
+  type Run,
+  run as makeRun,
+  type RunProps,
+  type TextBody,
+  textBody as makeTextBody,
+  textBodyToPlainString,
 } from '@broadset/model';
 import * as CssTree from 'css-tree';
 import svgpath from 'svgpath';
@@ -505,7 +513,9 @@ function processRuleNode(
   warnings: string[],
   budget: number,
 ): boolean {
-  const body = CssTree.generate(rule.block).replace(/^\{|\}$/g, '').trim();
+  const body = CssTree.generate(rule.block)
+    .replace(/^\{|\}$/g, '')
+    .trim();
 
   if (body === '') {
     return false;
@@ -662,11 +672,7 @@ function isWhitespace(ch: string): boolean {
   return ch === ' ' || ch === '\t' || ch === '\n';
 }
 
-function consumeChar(
-  ch: string,
-  state: TokeniserState,
-  flush: (combinator: SelectorCombinator | null) => void,
-): void {
+function consumeChar(ch: string, state: TokeniserState, flush: (combinator: SelectorCombinator | null) => void): void {
   if (ch === '[') {
     state.inBracket += 1;
     state.buf += ch;
@@ -959,12 +965,7 @@ function matchAttribute(matcher: AttributeMatcher, actual: string | null): boole
   }
 }
 
-function consumeNextAtom(
-  remainder: string,
-  classes: ReadonlySet<string>,
-  id: string,
-  el: Element,
-): AtomStep {
+function consumeNextAtom(remainder: string, classes: ReadonlySet<string>, id: string, el: Element): AtomStep {
   if (remainder.startsWith('.')) {
     return consumeClassAtom(remainder, classes);
   }
@@ -1156,7 +1157,14 @@ export interface SvgDocumentImportResult {
 
 interface ImportedElement {
   readonly type: string;
-  readonly content: string;
+  /**
+   * Text-element content can be either a plain `string` (single
+   * `<text>` body, no `<tspan>`s) or a structured `TextBody`
+   * carrying paragraphs / runs with per-run style overrides
+   * (built from `<tspan>` children). Other element kinds
+   * (`path`, `image`, etc.) always carry a string.
+   */
+  readonly content: string | TextBody;
   readonly position: { readonly x: number; readonly y: number };
   readonly width: number;
   readonly height: number;
@@ -1600,7 +1608,15 @@ function importGroupElement(el: Element, ctx: GroupImportContext): ImportedEleme
  * grep-friendly. Used by `isSyntheticGroupId` so the layer panel
  * can display a friendly name instead of the structural path.
  */
-const SYNTHETIC_GROUP_ID_PREFIX = 'g-';
+/**
+ * Stable synthetic-id prefix for `<g>` elements that lack a
+ * source DOM identity. Uses the `__bs-` Broadset-internal
+ * sentinel so the regex used by `isSyntheticGroupId` cannot
+ * collide with user-authored ids like `<g id="g-3">` (common in
+ * d3 / hand-authored / Inkscape outputs). Closes the P7.7i
+ * review #5 collision finding.
+ */
+const SYNTHETIC_GROUP_ID_PREFIX = '__bs-g-';
 
 /**
  * Produce a stable synthetic id for a `<g>` whose source DOM has
@@ -1642,10 +1658,11 @@ function synthesiseGroupId(el: Element): string {
  * panel shows readable names for unnamed third-party groups.
  */
 function isSyntheticGroupId(id: string): boolean {
-  // Match the exact `g-N(-N)*` shape `synthesiseGroupId` emits.
-  // Anchored so user-named groups like `g-foo` don't get mistaken
-  // for synthetic ones.
-  return /^g-\d+(-\d+)*$/.test(id);
+  // Match the exact `__bs-g-N(-N)*` shape `synthesiseGroupId`
+  // emits. The `__bs-` sentinel is not a legal Broadset element
+  // id pattern in user-authored SVGs, so this regex never fires
+  // a false positive on a third-party `<g id="g-3">`.
+  return /^__bs-g-\d+(-\d+)*$/.test(id);
 }
 
 interface ShapeBakeContext {
@@ -1834,6 +1851,91 @@ function importPolygonElement(el: Element, ctx: ShapeBakeContext, closed: boolea
 }
 
 /**
+ * Read the text content of a `<text>` (or wrapped `<textPath>`)
+ * element. When the source has `<tspan>` children, build a
+ * structured `TextBody` carrying each run's text plus any inline
+ * style overrides (`font-family` / `font-size` / `font-weight` /
+ * `font-style` / `fill` / `text-decoration`). Otherwise return
+ * the plain string body — preserves the existing single-line
+ * round-trip.
+ *
+ * The structured form lets a downstream re-export emit
+ * `<tspan>` markup that round-trips the run shape (closes the
+ * spec feature-matrix promise that multi-run text is native on
+ * import + export).
+ */
+function readTextContent(source: Element): string | TextBody {
+  const tspans = source.getElementsByTagName('tspan');
+
+  if (tspans.length === 0) {
+    return source.textContent;
+  }
+
+  const runs: Run[] = readTspanRuns(tspans);
+
+  if (runs.length === 0) {
+    return source.textContent;
+  }
+
+  // Single paragraph for now — SVG doesn't have explicit
+  // paragraph markers (unlike DOCX), so all `<tspan>`s collapse
+  // into one paragraph. Authors typically use `dy="1em"` on a
+  // tspan to encode a paragraph break; that visual cue is
+  // preserved in the round-trip via the metadata packet's
+  // structural fingerprint, not through the TextBody shape.
+  const paragraphs: Paragraph[] = [makeParagraph(runs)];
+
+  return makeTextBody(paragraphs);
+}
+
+function readTspanRuns(tspans: HTMLCollectionOf<Element>): Run[] {
+  const runs: Run[] = [];
+
+  for (let i = 0; i < tspans.length; i++) {
+    const tspan = tspans[i];
+
+    if (tspan === undefined) continue;
+
+    const text = tspan.textContent;
+
+    if (text === '') continue;
+
+    const props = readRunPropsFromTspan(tspan);
+
+    runs.push(props !== undefined ? makeRun(text, props) : makeRun(text));
+  }
+
+  return runs;
+}
+
+/**
+ * Extract per-run style overrides from a `<tspan>` element. The
+ * exporter emits canonical SVG attribute names (`font-family`,
+ * `font-size`, etc.); the importer maps them back to the
+ * camelCase keys the model's `RunProps.style` consumes.
+ */
+function readRunPropsFromTspan(tspan: Element): RunProps | undefined {
+  const style: Record<string, string> = {};
+  const fontFamily = tspan.getAttribute('font-family');
+  const fontSize = tspan.getAttribute('font-size');
+  const fontWeight = tspan.getAttribute('font-weight');
+  const fontStyle = tspan.getAttribute('font-style');
+  const fill = tspan.getAttribute('fill');
+  const textDecoration = tspan.getAttribute('text-decoration');
+
+  if (typeof fontFamily === 'string' && fontFamily !== '') style['fontFamily'] = fontFamily;
+  if (typeof fontSize === 'string' && fontSize !== '') style['fontSize'] = fontSize;
+  if (typeof fontWeight === 'string' && fontWeight !== '') style['fontWeight'] = fontWeight;
+  if (typeof fontStyle === 'string' && fontStyle !== '') style['fontStyle'] = fontStyle;
+  if (typeof fill === 'string' && fill !== '') style['fontColor'] = fill;
+  if (typeof textDecoration === 'string' && textDecoration !== '') style['textDecoration'] = textDecoration;
+
+  if (Object.keys(style).length === 0) return undefined;
+
+  return { style };
+}
+
+/**
  * Import a `<text>` element. When the cumulative transform
  * requires bake (scale / skew) AND `fontSources` carries bytes
  * for the referenced `font-family`, the text gets glyph-flattened
@@ -1852,10 +1954,16 @@ function importTextElement(
   const hrefRaw = textPathEl?.getAttribute('href') ?? textPathEl?.getAttribute('xlink:href') ?? '';
   const textPathElementId =
     typeof hrefRaw === 'string' && hrefRaw.startsWith('#') && hrefRaw.length > 1 ? hrefRaw.slice(1) : undefined;
-  const content = textPathEl !== undefined ? textPathEl.textContent : el.textContent;
+  const sourceForContent = textPathEl ?? el;
+  const content = readTextContent(sourceForContent);
 
   if (ctx.transform.requiresBake) {
-    const flattened = tryFlattenTextOnImport(el, ctx, content, fontSources, warnings);
+    // Flatten path needs a single string for fontkit layout —
+    // collapse a TextBody to its plain-string projection. Per-run
+    // styling is lost (the bake produces glyph paths regardless),
+    // which matches the export `flatten` mode's contract.
+    const plainText = typeof content === 'string' ? content : textBodyToPlainString(content);
+    const flattened = tryFlattenTextOnImport(el, ctx, plainText, fontSources, warnings);
 
     if (flattened !== null) {
       return flattened;
@@ -1916,9 +2024,7 @@ function tryFlattenTextOnImport(
   const font = safeOpenFont(source.bytes);
 
   if (font === null) {
-    warnings.push(
-      `Cannot glyph-flatten <text font-family="${family}"> — fontkit could not parse the supplied bytes.`,
-    );
+    warnings.push(`Cannot glyph-flatten <text font-family="${family}"> — fontkit could not parse the supplied bytes.`);
 
     return null;
   }
@@ -2019,8 +2125,7 @@ function importElement(
   // when `extensions.svg.dirty === false`. Groups are excluded —
   // their preservation would double-render children since the
   // children also carry their own preserved markup.
-  const preservedOuterHTML =
-    effectiveId !== undefined && tagName !== 'g' ? el.outerHTML : undefined;
+  const preservedOuterHTML = effectiveId !== undefined && tagName !== 'g' ? el.outerHTML : undefined;
   const withPreserved = (result: readonly ImportedElement[]): ImportedElement[] => {
     if (preservedOuterHTML === undefined) return [...result];
 
@@ -2251,13 +2356,34 @@ function resolveFriendlyName(metaName: string | undefined, dataBsId: string, sou
 }
 
 /**
+ * Display name for an element on the third-party hydration path
+ * (no metadata packet). Synthetic groups show "Group"; user-named
+ * groups (and other elements with a `dataBsId`) use that id as
+ * the name; everything else falls back to "Element N".
+ */
+function resolveImportedName(element: ImportedElement, id: string, sourceKind: string, index: number): string {
+  if (sourceKind === 'group' && isSyntheticGroupId(id)) {
+    return 'Group';
+  }
+
+  if (element.dataBsId !== undefined) {
+    return element.dataBsId;
+  }
+
+  return `Element ${String(index + 1)}`;
+}
+
+/**
  * Build the `extensions.svg` payload for an imported element.
  * Always sets `dirty: false`; populates `preserved` when the
  * importer captured the source `outerHTML` so the exporter can
  * re-emit byte-identical markup for unchanged elements
  * (`SvgPreservedData` per `svgPreservedDataSchema`).
  */
-function buildSvgExtensions(visualEl: ImportedElement): { readonly dirty: boolean; readonly preserved?: { readonly mime: string; readonly raw: string } } {
+function buildSvgExtensions(visualEl: ImportedElement): {
+  readonly dirty: boolean;
+  readonly preserved?: { readonly mime: string; readonly raw: string };
+} {
   if (visualEl.preservedOuterHTML === undefined) {
     return { dirty: false };
   }
@@ -2333,7 +2459,9 @@ function hydrateFastPath(
   fontSources?: ReadonlyMap<string, SvgFontSource>,
 ): SvgDocumentImportResult {
   const visualExtract = importSvgFromXmlDoc(xmlDoc, fontSources);
-  const metadataById = new Map<string, ParsedElementMetadata>(metadata.elements.map((entry) => [entry.elementId, entry]));
+  const metadataById = new Map<string, ParsedElementMetadata>(
+    metadata.elements.map((entry) => [entry.elementId, entry]),
+  );
   const canvasWidth = visualExtract.canvasWidth;
   const canvasHeight = visualExtract.canvasHeight;
   const emptyDoc = createEmptyBroadsetDocument();
@@ -2426,12 +2554,11 @@ function hydrateThirdPartyFallbackFromDoc(
       const id = element.dataBsId ?? `imported-${String(index)}`;
       const parentSourceId = element.parentDataBsId;
       const resolvedParentId =
-        typeof parentSourceId === 'string' && parentSourceId !== ''
-          ? sourceIdToBroadsetId.get(parentSourceId) ?? null
-          : null;
+        typeof parentSourceId === 'string' && parentSourceId !== '' ?
+          (sourceIdToBroadsetId.get(parentSourceId) ?? null)
+        : null;
       const sourceKind = pickDefaultKindFromVisual(element.type);
-      const friendlyName =
-        sourceKind === 'group' && isSyntheticGroupId(id) ? 'Group' : `Element ${String(index + 1)}`;
+      const friendlyName = resolveImportedName(element, id, sourceKind, index);
 
       return createDefaultElement(sourceKind, {
         id,
@@ -2636,10 +2763,7 @@ interface VisualImportResult {
  * `parentDataBsId` so nested group children preserve their own
  * identity and the fast path reconstructs the parent tree.
  */
-function importSvgFromXmlDoc(
-  xmlDoc: Document,
-  fontSources?: ReadonlyMap<string, SvgFontSource>,
-): VisualImportResult {
+function importSvgFromXmlDoc(xmlDoc: Document, fontSources?: ReadonlyMap<string, SvgFontSource>): VisualImportResult {
   const svgRoot = xmlDoc.documentElement;
   let canvasWidth = 800;
   let canvasHeight = 600;

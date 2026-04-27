@@ -286,11 +286,7 @@ async function tryEmbedGoogleFont(
   }
 }
 
-async function resolveSingleFont(
-  family: string,
-  pdf: PDF,
-  fetchFn?: typeof globalThis.fetch,
-): Promise<FontInput> {
+async function resolveSingleFont(family: string, pdf: PDF, fetchFn?: typeof globalThis.fetch): Promise<FontInput> {
   const normalized = normalizeFontFamily(family);
   const standard = STANDARD_FONT_MAP.get(normalized);
 
@@ -428,7 +424,9 @@ function renderRectangle(page: PDFPage, el: BroadsetElement, canvas: Canvas, hei
   const wPt = elementToPoints(canvas, el.width);
   const hPt = elementToPoints(canvas, el.height);
   const fillGradient = resolveFillGradient(el.style);
-  const bg = resolveFillAsPdfRgb(el.style) ?? (fillGradient !== undefined ? resolveGradientFallbackColor(fillGradient) : undefined);
+  const bg =
+    resolveFillAsPdfRgb(el.style) ??
+    (fillGradient !== undefined ? resolveGradientFallbackColor(fillGradient) : undefined);
   const border = resolveStyleColor(el.style, 'borderColor');
 
   page.drawRectangle({
@@ -447,7 +445,9 @@ function renderEllipse(page: PDFPage, el: BroadsetElement, canvas: Canvas, heigh
   const cx = elementToPoints(canvas, el.position.x + el.width / 2);
   const cy = heightPt - elementToPoints(canvas, el.position.y + el.height / 2);
   const ellipseGradient = resolveFillGradient(el.style);
-  const bg = resolveFillAsPdfRgb(el.style) ?? (ellipseGradient !== undefined ? resolveGradientFallbackColor(ellipseGradient) : undefined);
+  const bg =
+    resolveFillAsPdfRgb(el.style) ??
+    (ellipseGradient !== undefined ? resolveGradientFallbackColor(ellipseGradient) : undefined);
 
   page.drawEllipse({
     x: cx,

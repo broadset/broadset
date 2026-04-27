@@ -39,10 +39,7 @@ describe('composeTextFromBody', () => {
    */
   it('emits one styleRun per Run with per-run fontSize override', () => {
     const body = textBody([
-      paragraph([
-        run('Hello ', { style: { fontSize: 24 } }),
-        run('world', { style: { fontSize: 48 } }),
-      ]),
+      paragraph([run('Hello ', { style: { fontSize: 24 } }), run('world', { style: { fontSize: 48 } })]),
     ]);
     const composed = composeTextFromBody(body, { fontSize: 12 });
 
@@ -100,9 +97,7 @@ describe('composeTextFromBody', () => {
    * emitted as a PSD `fillColor`.
    */
   it('maps run-level fontColor to PSD fillColor', () => {
-    const body = textBody([
-      paragraph([run('red', { style: { fontColor: '#ff0000' } })]),
-    ]);
+    const body = textBody([paragraph([run('red', { style: { fontColor: '#ff0000' } })])]);
     const composed = composeTextFromBody(body, { fontSize: 12 });
 
     const fillColor = composed.styleRuns[0]?.style.fillColor;
@@ -122,9 +117,7 @@ describe('composeTextFromBody', () => {
    * lengths.
    */
   it('skips empty-text runs', () => {
-    const body = textBody([
-      paragraph([run('visible'), run('')]),
-    ]);
+    const body = textBody([paragraph([run('visible'), run('')])]);
     const composed = composeTextFromBody(body, { fontSize: 12 });
 
     expect(composed.styleRuns).toHaveLength(1);

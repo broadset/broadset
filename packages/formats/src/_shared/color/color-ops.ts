@@ -55,7 +55,9 @@ export interface ResolvedRgb {
 
 function ensureRgb(color: BroadsetColor): RgbBroadsetColor {
   if (color.kind === 'theme') {
-    throw new Error('toRgb requires an RGB BroadsetColor — resolve theme slots via resolveStyleColor / colorToCss first.');
+    throw new Error(
+      'toRgb requires an RGB BroadsetColor — resolve theme slots via resolveStyleColor / colorToCss first.',
+    );
   }
 
   return color;

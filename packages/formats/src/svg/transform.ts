@@ -1,10 +1,4 @@
-import {
-  compose,
-  decomposeTSR,
-  fromDefinition,
-  fromTransformAttribute,
-  type Matrix,
-} from 'transformation-matrix';
+import { compose, decomposeTSR, fromDefinition, fromTransformAttribute, type Matrix } from 'transformation-matrix';
 
 /**
  * P7.7c — Full SVG transform parser. Replaces the rotate+translate-

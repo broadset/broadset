@@ -343,7 +343,9 @@ function applyTextContent(layer: Layer, el: BroadsetElement): void {
 }
 
 function resolvePreservedSmartObjectGuid(el: BroadsetElement): string | undefined {
-  const psdExt = (el.extensions as { readonly psd?: { readonly smartObject?: { readonly guid?: unknown } } } | undefined)?.psd;
+  const psdExt = (
+    el.extensions as { readonly psd?: { readonly smartObject?: { readonly guid?: unknown } } } | undefined
+  )?.psd;
   const guid = psdExt?.smartObject?.guid;
 
   return typeof guid === 'string' && guid.length > 0 ? guid : undefined;

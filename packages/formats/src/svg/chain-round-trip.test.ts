@@ -566,9 +566,7 @@ describe('P7.6 — Hostile-SVG security suite', () => {
     const { warnings } = importSvgDocument(hostile);
 
     expect(warnings.some((w) => w.toLowerCase().includes('script'))).toBe(true);
-    expect(warnings.some((w) => w.toLowerCase().includes('event') || w.toLowerCase().includes('attribute'))).toBe(
-      true,
-    );
+    expect(warnings.some((w) => w.toLowerCase().includes('event') || w.toLowerCase().includes('attribute'))).toBe(true);
     expect(warnings.some((w) => w.toLowerCase().includes('javascript'))).toBe(true);
     expect(warnings.some((w) => w.toLowerCase().includes('foreignobject'))).toBe(true);
   });

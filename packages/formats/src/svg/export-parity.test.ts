@@ -540,8 +540,7 @@ describe('P7.2 — Opaque payload sanitization on export', () => {
    * no-regret on safe content.
    */
   it('passes benign opaque payloads through unchanged', async () => {
-    const benign =
-      '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="25" fill="#336699"/></svg>';
+    const benign = '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="25" fill="#336699"/></svg>';
     const doc = makeDocument({
       elements: [
         makeElement({

@@ -252,9 +252,7 @@ describe('HTML Standalone Style Enrichments', () => {
    * model boundary rather than at the exporter.
    */
   it('rejects legacy CSS-string gradients at parse time', () => {
-    expect(() =>
-      makeStyle({ backgroundGradient: 'linear-gradient(to right, red, blue)' }),
-    ).toThrow();
+    expect(() => makeStyle({ backgroundGradient: 'linear-gradient(to right, red, blue)' })).toThrow();
   });
 
   /** @description Structured BroadsetGradient objects must be converted to valid CSS gradient strings. */

@@ -69,9 +69,7 @@ describe('P7.4b — Import sanitization (security contract)', () => {
     // Sanitization strips the attributes before downstream code sees
     // them — the resulting Broadset style has no `onclick` / `onmouseover`.
     expect(rect?.content).not.toContain('onclick');
-    expect(warnings.some((w) => w.toLowerCase().includes('event') || w.toLowerCase().includes('attribute'))).toBe(
-      true,
-    );
+    expect(warnings.some((w) => w.toLowerCase().includes('event') || w.toLowerCase().includes('attribute'))).toBe(true);
   });
 
   /**

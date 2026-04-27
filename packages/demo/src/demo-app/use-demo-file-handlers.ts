@@ -430,7 +430,11 @@ export function useDemoFileHandlers({
 
       try {
         const { importDocument } = await import('../formatBridge');
-        const result = await importDocument(file);
+        // Pass the live project assets so SVG imports of third-
+        // party files that carry `<text>` under baking transforms
+        // can glyph-flatten via the project's fonts (P7.7i path).
+        // Other formats ignore this option.
+        const result = await importDocument(file, projectAssets !== undefined ? { projectAssets } : undefined);
 
         editorStore.getState().loadTemplate(result.document);
 
@@ -457,7 +461,7 @@ export function useDemoFileHandlers({
         event.currentTarget.value = '';
       }
     },
-    [editorStore, pushToast, setProjectAssets],
+    [editorStore, projectAssets, pushToast, setProjectAssets],
   );
 
   const handleSaveAsJson = useCallback((): void => {

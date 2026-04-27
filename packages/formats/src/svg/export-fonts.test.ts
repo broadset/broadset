@@ -95,9 +95,7 @@ describe('P7.7d — Font embedding: embed mode', () => {
    */
   it('emits a base64 data: @font-face inside <defs><style>', async () => {
     const bytes = loadCodicon();
-    const fonts = new Map<string, SvgFontSource>([
-      ['Codicon', { bytes, format: 'ttf' }],
-    ]);
+    const fonts = new Map<string, SvgFontSource>([['Codicon', { bytes, format: 'ttf' }]]);
     const doc = makeDocWithText('Codicon', '');
     const { svg, warnings } = await exportSvgDocument(doc, { fontEmbedding: 'embed', fonts });
 
@@ -117,10 +115,7 @@ describe('P7.7d — Font embedding: embed mode', () => {
     const doc = makeDocWithText('Codicon', 'ê');
     const docWithTwo: BroadsetDocument = {
       ...doc,
-      elements: [
-        ...doc.elements,
-        { ...doc.elements[0], id: 'text-2' } as BroadsetElement,
-      ],
+      elements: [...doc.elements, { ...doc.elements[0], id: 'text-2' } as BroadsetElement],
     };
     const { svg } = await exportSvgDocument(docWithTwo, { fontEmbedding: 'embed', fonts });
     const occurrences = (svg.match(/@font-face/g) ?? []).length;
@@ -226,9 +221,9 @@ describe('P7.7d — CSS injection hardening', () => {
   it('escapes </style> in font-family names so they cannot break out of <style>', async () => {
     const bytes = loadCodicon();
     const fonts = new Map<string, SvgFontSource>([
-      ["Hostile</style><script>alert(1)</script>", { bytes, format: 'ttf' }],
+      ['Hostile</style><script>alert(1)</script>', { bytes, format: 'ttf' }],
     ]);
-    const doc = makeDocWithText("Hostile</style><script>alert(1)</script>", '');
+    const doc = makeDocWithText('Hostile</style><script>alert(1)</script>', '');
     const { svg } = await exportSvgDocument(doc, { fontEmbedding: 'embed', fonts });
 
     expect(svg).not.toMatch(/<\/style><script>/);
@@ -240,9 +235,7 @@ describe('P7.7d — CSS injection hardening', () => {
    * warning and skip the `@font-face` for that family.
    */
   it('rejects javascript: URLs in reference mode and warns', async () => {
-    const fonts = new Map<string, SvgFontSource>([
-      ['Hostile', { url: 'javascript:alert(1)', format: 'woff2' }],
-    ]);
+    const fonts = new Map<string, SvgFontSource>([['Hostile', { url: 'javascript:alert(1)', format: 'woff2' }]]);
     const doc = makeDocWithText('Hostile', 'a');
     const { svg, warnings } = await exportSvgDocument(doc, { fontEmbedding: 'reference', fonts });
 

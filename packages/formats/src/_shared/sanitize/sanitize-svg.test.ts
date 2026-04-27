@@ -103,9 +103,7 @@ describe('sanitizeSvg', () => {
 
     expect(result.report.removed.length).toBeGreaterThan(0);
 
-    const hasScriptRemoval = result.report.removed.some(
-      (entry) => entry.kind === 'element' && entry.name === 'script',
-    );
+    const hasScriptRemoval = result.report.removed.some((entry) => entry.kind === 'element' && entry.name === 'script');
     const hasOnclickRemoval = result.report.removed.some(
       (entry) => entry.kind === 'attribute' && entry.name === 'onclick',
     );

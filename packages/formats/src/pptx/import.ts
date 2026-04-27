@@ -56,7 +56,13 @@ interface MediaMaps {
   readonly images: Map<string, string>;
 }
 
-function registerImageMedia(zip: PizZip, relId: string, mediaPath: string, mime: string, images: Map<string, string>): void {
+function registerImageMedia(
+  zip: PizZip,
+  relId: string,
+  mediaPath: string,
+  mime: string,
+  images: Map<string, string>,
+): void {
   const entry = zip.file(mediaPath);
 
   if (!entry) return;

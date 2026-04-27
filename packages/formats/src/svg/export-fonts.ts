@@ -1,4 +1,4 @@
-import type { Asset, BroadsetDocument, BroadsetElement, FontAsset, FontFormat } from '@broadset/model';
+import type { Asset, AssetSource, BroadsetDocument, BroadsetElement, FontAsset, FontFormat } from '@broadset/model';
 import { isFontAsset, resolveContentAsPlainString, resolveStyleColor } from '@broadset/model';
 import * as fontkit from 'fontkit';
 
@@ -141,7 +141,11 @@ function resolveSingleFamily(
   warnings: string[],
 ): ResolvedFontEmission {
   if (mode === 'reference') {
-    return { fontFaceRule: buildReferenceRule(family, source, warnings), mode: 'reference', emitted: source.url !== undefined };
+    return {
+      fontFaceRule: buildReferenceRule(family, source, warnings),
+      mode: 'reference',
+      emitted: source.url !== undefined,
+    };
   }
 
   // mode === 'embed'
@@ -153,7 +157,11 @@ function resolveSingleFamily(
       warnings.push(`Font "${family}": ${decision.reason}`);
     }
 
-    return { fontFaceRule: buildReferenceRule(family, source, warnings), mode: 'reference', emitted: source.url !== undefined };
+    return {
+      fontFaceRule: buildReferenceRule(family, source, warnings),
+      mode: 'reference',
+      emitted: source.url !== undefined,
+    };
   }
 
   if (decision.warning !== undefined) {
@@ -165,7 +173,11 @@ function resolveSingleFamily(
       `Font embedding fell back to reference for "${family}" (no bytes supplied; embed mode requires subsettable font bytes).`,
     );
 
-    return { fontFaceRule: buildReferenceRule(family, source, warnings), mode: 'reference', emitted: source.url !== undefined };
+    return {
+      fontFaceRule: buildReferenceRule(family, source, warnings),
+      mode: 'reference',
+      emitted: source.url !== undefined,
+    };
   }
 
   const subset = subsetFont(source.bytes, codepoints) ?? source.bytes;
@@ -175,7 +187,11 @@ function resolveSingleFamily(
       `Font "${family}" exceeds the ${String(FONT_EMBED_MAX_BYTES)}-byte embed cap (${String(subset.byteLength)} bytes after subset); falling back to reference.`,
     );
 
-    return { fontFaceRule: buildReferenceRule(family, source, warnings), mode: 'reference', emitted: source.url !== undefined };
+    return {
+      fontFaceRule: buildReferenceRule(family, source, warnings),
+      mode: 'reference',
+      emitted: source.url !== undefined,
+    };
   }
 
   const base64 = encodeBase64(subset);
@@ -238,7 +254,9 @@ function planFlatten(
     try {
       fontByFamily.set(family, fontkitCreate(source.bytes));
     } catch {
-      warnings.push(`Font flatten failed to parse bytes for "${family}"; text element falls back to consumer rendering.`);
+      warnings.push(
+        `Font flatten failed to parse bytes for "${family}"; text element falls back to consumer rendering.`,
+      );
     }
   }
 
@@ -592,6 +610,51 @@ export function buildSvgFontSourcesFromAssets(assets: readonly Asset[]): Map<str
   }
 
   return map;
+}
+
+/**
+ * Build an `assetResolver` callback for `SvgExportOptions` from
+ * a `BroadsetProject.assets` array. Image / video / picture
+ * assets carrying an `embedded` data URI source resolve to that
+ * URI; `url` sources resolve to the external URL. Font and ICC
+ * profile assets are excluded (they're consumed via
+ * `SvgExportOptions.fonts` and the renderer respectively).
+ *
+ * Closes the spec line-23 contract "embedded assets export with
+ * inline data URIs": before this helper, the SVG exporter
+ * emitted bare Broadset asset ids in `<image href>` / `<pattern>
+ * <image href>`, which standalone viewers (Illustrator /
+ * Inkscape / browsers) couldn't resolve.
+ */
+export function buildSvgAssetResolverFromAssets(assets: readonly Asset[]): (assetId: string) => string | undefined {
+  const urlById = new Map<string, string>();
+
+  for (const asset of assets) {
+    if (asset.kind === 'font' || asset.kind === 'icc-profile') continue;
+
+    const url = resolveAssetSourceUrl(asset.source);
+
+    if (url !== undefined) {
+      urlById.set(asset.id, url);
+    }
+  }
+
+  return (assetId) => urlById.get(assetId);
+}
+
+function resolveAssetSourceUrl(source: AssetSource): string | undefined {
+  if (source.type === 'url') {
+    return source.url;
+  }
+
+  if (source.type === 'embedded') {
+    return source.dataUri;
+  }
+
+  // 'file' source — bytes aren't directly available without async
+  // file I/O. Skip; the export emits the bare asset id as a
+  // best-effort fallback.
+  return undefined;
 }
 
 function buildSourceFromFontAsset(asset: FontAsset): SvgFontSource | null {

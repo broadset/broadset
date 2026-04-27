@@ -102,6 +102,12 @@ const DEFAULT_VIDEO_QUALITY = 0.8;
 async function exportSvgVia(formats: FormatsModule, context: ExportContext, name: string): Promise<void> {
   const projectAssets = context.svgOptions?.projectAssets ?? [];
   const fonts = projectAssets.length > 0 ? formats.buildSvgFontSourcesFromAssets(projectAssets) : undefined;
+  // Resolve image / pattern asset ids to URLs (data: for embedded
+  // bytes, https: for hosted) so standalone SVG viewers render
+  // them. Without this the exporter emits the bare Broadset asset
+  // id as `<image href>`, which Illustrator / Inkscape / browsers
+  // cannot fetch. P7.7j adds the resolver hook.
+  const assetResolver = projectAssets.length > 0 ? formats.buildSvgAssetResolverFromAssets(projectAssets) : undefined;
   const svgExportOptions = {
     ...(context.svgOptions?.fontEmbedding !== undefined ? { fontEmbedding: context.svgOptions.fontEmbedding } : {}),
     ...(context.svgOptions?.includeMetadata !== undefined ?
@@ -112,6 +118,7 @@ async function exportSvgVia(formats: FormatsModule, context: ExportContext, name
     : {}),
     ...(context.svgOptions?.flattenGroups !== undefined ? { flattenGroups: context.svgOptions.flattenGroups } : {}),
     ...(fonts !== undefined ? { fonts } : {}),
+    ...(assetResolver !== undefined ? { assetResolver } : {}),
   };
   const result = await formats.exportSvgDocument(context.document, svgExportOptions);
   const blob = new Blob([result.svg], { type: 'image/svg+xml' });
@@ -307,7 +314,10 @@ function hasProjectShape(
   return hasDocumentsArray(value) && 'assets' in value && Array.isArray((value as Record<string, unknown>)['assets']);
 }
 
-export async function importDocument(file: File): Promise<ImportDocumentResult> {
+export async function importDocument(
+  file: File,
+  options?: { readonly projectAssets?: readonly Asset[] },
+): Promise<ImportDocumentResult> {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
 
   switch (ext) {
@@ -343,8 +353,17 @@ export async function importDocument(file: File): Promise<ImportDocumentResult> 
     case 'svg': {
       const formats = await loadFormats();
       const text = await file.text();
+      // Thread project font assets into the importer so a third-
+      // party SVG with `<text>` under a baking ancestor (scale /
+      // skew) can glyph-flatten into a `<path>` using the project's
+      // own fonts. Without this, the importer silently drops the
+      // scale to translate-only with a warning. P7.7i shipped the
+      // import-side flatten; this wiring lets users actually
+      // trigger it.
+      const projectAssets = options?.projectAssets ?? [];
+      const fontSources = projectAssets.length > 0 ? formats.buildSvgFontSourcesFromAssets(projectAssets) : undefined;
 
-      return formats.importSvgDocument(text, file.name);
+      return formats.importSvgDocument(text, file.name, fontSources !== undefined ? { fontSources } : undefined);
     }
 
     default:

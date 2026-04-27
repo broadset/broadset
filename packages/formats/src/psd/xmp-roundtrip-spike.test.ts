@@ -1,6 +1,6 @@
 import './runtime-canvas';
 
-import { initializeCanvas, type Psd,readPsd, writePsdUint8Array } from 'ag-psd';
+import { initializeCanvas, type Psd, readPsd, writePsdUint8Array } from 'ag-psd';
 import { describe, expect, it } from 'vitest';
 
 import { BROADSET_XMP_NAMESPACE, readBroadsetXmp, writeBroadsetXmp } from '../_shared/xmp';

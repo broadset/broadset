@@ -9,7 +9,7 @@
  */
 export { canRoundTrip, type CanRoundTripResult } from './can-round-trip';
 export { exportSvgDocument, exportSvgString, type SvgExportResult } from './export';
-export { buildSvgFontSourcesFromAssets } from './export-fonts';
+export { buildSvgAssetResolverFromAssets, buildSvgFontSourcesFromAssets } from './export-fonts';
 export { importSvg, importSvgDocument, type SvgDocumentImportResult, type SvgImportResult } from './import';
 export { dirtyElementIds, reconcileSvg, type ReconcileSvgInput } from './roundtrip';
 export {

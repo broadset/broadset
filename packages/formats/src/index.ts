@@ -40,6 +40,7 @@ export {
   type BroadsetRdfPacket,
   broadsetRdfPacketSchema,
   type BroadsetXmpPacket,
+  buildSvgAssetResolverFromAssets,
   buildSvgFontSourcesFromAssets,
   canRoundTrip,
   type CanRoundTripResult,

@@ -275,10 +275,7 @@ describe('P7.4a — Extensions.svg.dirty = false on hydrate (IO-D-11)', () => {
    */
   it('initialises extensions.svg.dirty to false on every element', async () => {
     const doc = makeDocument({
-      elements: [
-        makeElement({ id: 'el-1', type: 'rectangle' }),
-        makeElement({ id: 'el-2', type: 'ellipse' }),
-      ],
+      elements: [makeElement({ id: 'el-1', type: 'rectangle' }), makeElement({ id: 'el-2', type: 'ellipse' })],
     });
 
     const svg = await exportSvgString(doc);

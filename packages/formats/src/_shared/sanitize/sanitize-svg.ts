@@ -60,8 +60,8 @@ const BROADSET_SVG_CONFIG = {
 };
 
 function wrapIfFragment(input: string): { readonly wrapped: string; readonly isFragment: boolean } {
-  return /<\s*svg\b/i.test(input)
-    ? { wrapped: input, isFragment: false }
+  return /<\s*svg\b/i.test(input) ?
+      { wrapped: input, isFragment: false }
     : { wrapped: `<svg xmlns="${SVG_XMLNS}">${input}</svg>`, isFragment: true };
 }
 

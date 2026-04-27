@@ -338,6 +338,23 @@ export interface SvgExportOptions {
    * Default: `false`.
    */
   readonly flattenGroups?: boolean | undefined;
+  /**
+   * Resolve a Broadset `assetId` to a URL the exported SVG can
+   * reference (a `data:image/...;base64,…` URI for embedded
+   * assets, or an external `https://…` URL). Consulted by:
+   *
+   * - `<image>` element exports when `el.content` is empty —
+   *   the resolver provides the `href` value.
+   * - Pattern / picture fills (`fill.kind === 'pattern' \|
+   *   'picture'`) — the resolver populates the inner
+   *   `<image href>` of the `<pattern>` def.
+   *
+   * When the resolver is absent or returns `undefined`, the
+   * exporter falls back to using the asset id verbatim — the
+   * resulting SVG is structurally correct but won't render in
+   * standalone viewers without an external asset registry.
+   */
+  readonly assetResolver?: ((assetId: string) => string | undefined) | undefined;
 }
 
 export const svgExportOptionsSchema: z.ZodType<SvgExportOptions> = z.object({
@@ -346,6 +363,7 @@ export const svgExportOptionsSchema: z.ZodType<SvgExportOptions> = z.object({
   includeMetadata: z.boolean().optional(),
   includeElementTagging: z.boolean().optional(),
   flattenGroups: z.boolean().optional(),
+  assetResolver: z.custom<(assetId: string) => string | undefined>((v) => typeof v === 'function').optional(),
 });
 
 // ────────────────────────────────────────────────────────────────────────────

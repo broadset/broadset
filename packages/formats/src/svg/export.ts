@@ -15,6 +15,8 @@ import {
   resolveContentAsPlainString,
   resolveStyleColor,
   resolveStyleFillToSvgPaint,
+  type Run,
+  type TextBody,
 } from '@broadset/model';
 
 import { fingerprintElement } from '../_shared/fingerprint';
@@ -229,7 +231,13 @@ function renderContrastComponentTransfer(amount: number): string {
  * `'picture'`. The pattern body references the asset id as the
  * `<image href>`; consumers resolve assets via their own registry.
  */
-function renderPatternDef(id: string, fill: PatternFill | PictureFill, elementWidth: number, elementHeight: number): string {
+function renderPatternDef(
+  id: string,
+  fill: PatternFill | PictureFill,
+  elementWidth: number,
+  elementHeight: number,
+  assetResolver?: (assetId: string) => string | undefined,
+): string {
   const width = elementWidth > 0 ? elementWidth : 100;
   const height = elementHeight > 0 ? elementHeight : 100;
   // SVG pattern coords: `userSpaceOnUse` so width/height align with
@@ -238,7 +246,13 @@ function renderPatternDef(id: string, fill: PatternFill | PictureFill, elementWi
   // the pattern matches the element exactly so a single image fills
   // the box without tiling.
   const patternUnits = 'userSpaceOnUse';
-  const href = fill.assetId;
+  // Resolve the asset id to a URL the consumer can fetch (data:
+  // URI for embedded bytes, https: for hosted, etc.). Without a
+  // resolver, fall back to the asset id verbatim — the resulting
+  // SVG is structurally correct but won't render in standalone
+  // viewers without an external asset registry. P7.7j adds the
+  // resolver hook to close the spec line-23 contract.
+  const href = assetResolver?.(fill.assetId) ?? fill.assetId;
   const inner = `<image href="${escapeXml(href)}" xlink:href="${escapeXml(href)}" width="${String(width)}" height="${String(height)}" preserveAspectRatio="${fill.kind === 'picture' && fill.mode === 'stretch' ? 'none' : 'xMidYMid meet'}"/>`;
 
   return `<pattern id="${id}" patternUnits="${patternUnits}" width="${String(width)}" height="${String(height)}">${inner}</pattern>`;
@@ -502,6 +516,130 @@ function buildTextAttrs(style: BroadsetElementStyle): string {
 }
 
 /**
+ * Render the inner body of a `<text>` element. Plain `string`
+ * content emits as escaped text; structured `TextBody` content
+ * emits one `<tspan>` per `Run` per `Paragraph`, carrying any
+ * run-level style overrides (`font-family`, `font-size`,
+ * `font-weight`, `font-style`, `fill`) so per-run styling
+ * survives the export. Closes the spec feature-matrix promise
+ * "Multi-run styled text → native (`<tspan>` per run)".
+ */
+function renderTextInner(content: string | TextBody): string {
+  if (typeof content === 'string') {
+    return escapeXml(content);
+  }
+
+  if (isSingleEmptyRunBody(content)) {
+    return '';
+  }
+
+  const segments: string[] = [];
+
+  for (let i = 0; i < content.paragraphs.length; i++) {
+    const paragraph = content.paragraphs[i];
+
+    if (paragraph === undefined) continue;
+
+    segments.push(...renderParagraphRuns(paragraph.runs, i === 0));
+  }
+
+  return segments.join('');
+}
+
+function isSingleEmptyRunBody(body: TextBody): boolean {
+  if (body.paragraphs.length === 0) return true;
+  if (body.paragraphs.length !== 1) return false;
+
+  const onlyPar = body.paragraphs[0];
+
+  return onlyPar?.runs.length === 1 && (onlyPar.runs[0]?.text ?? '') === '';
+}
+
+function renderParagraphRuns(runs: readonly Run[], isFirstParagraph: boolean): readonly string[] {
+  const segments: string[] = [];
+
+  for (let r = 0; r < runs.length; r++) {
+    const run = runs[r];
+
+    if (run === undefined) continue;
+
+    // Paragraph break: `dy="1em"` advances the baseline by one
+    // line-height. The first paragraph stays at the parent
+    // `<text>`'s baseline; subsequent paragraphs shift down.
+    const advance = r === 0 && !isFirstParagraph ? ' x="0" dy="1em"' : '';
+
+    segments.push(`<tspan${advance}${buildRunAttrs(run)}>${escapeXml(run.text)}</tspan>`);
+  }
+
+  return segments;
+}
+
+/**
+ * Convert a `Run`'s optional style overrides (`font-family`,
+ * `font-size`, `font-weight`, `font-style`, `fill` /
+ * `fontColor`) into the `<tspan>`-attribute string the exporter
+ * emits. Every other key on `props.style` is passed through as a
+ * generic CSS `style=…` declaration so callers don't lose
+ * authored overrides the schema doesn't yet narrow.
+ */
+/**
+ * Map of `RunProps.style` camelCase keys to the equivalent SVG
+ * attribute name. Keys that aren't in this map fall through to a
+ * generic `style="…"` declaration so callers don't lose authored
+ * overrides the schema doesn't yet narrow.
+ */
+const RUN_STYLE_TO_SVG_ATTR: ReadonlyMap<string, string> = new Map([
+  ['fontFamily', 'font-family'],
+  ['fontSize', 'font-size'],
+  ['fontWeight', 'font-weight'],
+  ['fontStyle', 'font-style'],
+  ['fontColor', 'fill'],
+  ['fill', 'fill'],
+  ['textDecoration', 'text-decoration'],
+]);
+
+function buildRunAttrs(run: Run): string {
+  const style = run.props?.style;
+
+  if (style === undefined) return '';
+
+  const attrs: string[] = [];
+  const cssDecls: string[] = [];
+
+  for (const [key, value] of Object.entries(style)) {
+    const stringValue = stringifyRunStyleValue(value);
+
+    if (stringValue === '') continue;
+
+    const attrName = RUN_STYLE_TO_SVG_ATTR.get(key);
+
+    if (attrName !== undefined) {
+      attrs.push(`${attrName}="${escapeXml(stringValue)}"`);
+    } else {
+      cssDecls.push(`${camelToKebab(key)}:${stringValue}`);
+    }
+  }
+
+  if (cssDecls.length > 0) {
+    attrs.push(`style="${escapeXml(cssDecls.join(';'))}"`);
+  }
+
+  return attrs.length > 0 ? ' ' + attrs.join(' ') : '';
+}
+
+function stringifyRunStyleValue(value: unknown): string {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+
+  return '';
+}
+
+function camelToKebab(name: string): string {
+  return name.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+}
+
+/**
  * Re-emits an opaque `svg`-type element's content, stripping any
  * active surface (`<script>`, `on*=`, `javascript:` URLs,
  * `<foreignObject>`) via the shared `_shared/sanitize` path before
@@ -530,7 +668,11 @@ function collectClipAttr(el: BroadsetElement, defs: DefsCollector): string {
   }
 
   const customClipPath = el.style.customClipPath;
-  const id = defs.register('clip', `clip:${customClipPath}`, (clipId) => `<clipPath id="${clipId}"><path d="${escapeXml(customClipPath)}"/></clipPath>`);
+  const id = defs.register(
+    'clip',
+    `clip:${customClipPath}`,
+    (clipId) => `<clipPath id="${clipId}"><path d="${escapeXml(customClipPath)}"/></clipPath>`,
+  );
 
   return ` clip-path="url(#${id})"`;
 }
@@ -555,15 +697,26 @@ function collectGradientFillOverride(el: BroadsetElement, defs: DefsCollector): 
  * `mode === 'stretch'` use `preserveAspectRatio="none"` so the
  * single image fills the box without tiling.
  */
-function collectPatternFillOverride(el: BroadsetElement, defs: DefsCollector): string {
+function collectPatternFillOverride(
+  el: BroadsetElement,
+  defs: DefsCollector,
+  assetResolver?: (assetId: string) => string | undefined,
+): string {
   const fill = el.style.fill;
 
   if (fill.kind !== 'pattern' && fill.kind !== 'picture') {
     return '';
   }
 
-  const key = `pattern:${JSON.stringify(fill)}:${String(el.width)}:${String(el.height)}`;
-  const id = defs.register('pattern', key, (patternId) => renderPatternDef(patternId, fill, el.width, el.height));
+  // Include the resolved href in the cache key so two patterns
+  // that share `assetId` but resolve to different URLs (e.g.,
+  // one with bytes prefetched, one without) still dedupe by
+  // their final emitted markup.
+  const resolvedHref = assetResolver?.(fill.assetId) ?? fill.assetId;
+  const key = `pattern:${JSON.stringify(fill)}:${resolvedHref}:${String(el.width)}:${String(el.height)}`;
+  const id = defs.register('pattern', key, (patternId) =>
+    renderPatternDef(patternId, fill, el.width, el.height, assetResolver),
+  );
 
   return ` fill="url(#${id})"`;
 }
@@ -588,7 +741,9 @@ function collectMaskAttr(el: BroadsetElement, defs: DefsCollector): string {
   // white so the masked shape shows through where the path
   // covers — luminance just samples brightness instead of alpha.
   const fillCss = '#ffffff';
-  const id = defs.register('mask', `mask:${maskType}:${maskPath}`, (maskId) => renderMaskDef(maskId, maskPath, fillCss));
+  const id = defs.register('mask', `mask:${maskType}:${maskPath}`, (maskId) =>
+    renderMaskDef(maskId, maskPath, fillCss),
+  );
 
   return ` mask="url(#${id})"`;
 }
@@ -600,7 +755,9 @@ function collectStructuredFilterAttr(el: BroadsetElement, defs: DefsCollector): 
     return '';
   }
 
-  const id = defs.register('filter', `filter:${JSON.stringify(stack)}`, (filterId) => renderFilterStackDef(filterId, stack));
+  const id = defs.register('filter', `filter:${JSON.stringify(stack)}`, (filterId) =>
+    renderFilterStackDef(filterId, stack),
+  );
 
   return ` filter="url(#${id})"`;
 }
@@ -644,6 +801,7 @@ function collectArrowMarkerAttrs(el: BroadsetElement, defs: DefsCollector): stri
 interface RenderElementOptions {
   readonly includeElementTagging: boolean;
   readonly flattenedTextElements: ReadonlyMap<string, string>;
+  readonly assetResolver?: ((assetId: string) => string | undefined) | undefined;
 }
 
 /**
@@ -652,8 +810,41 @@ interface RenderElementOptions {
  * (`extensions.svg.dirty === false`). Returns `null` when the
  * element should re-render from current state.
  */
+/**
+ * Resolve the `href` for an `<image>` element. Prefers the
+ * explicit `content` URL when set (legacy / direct-URL fixtures).
+ * Falls back to `assetResolver(assetId)` for assetId-only
+ * elements so standalone SVG viewers see a valid `<image href>`
+ * instead of a bare Broadset asset id. Returns `''` when neither
+ * is available — the SVG is structurally correct but the image
+ * won't render in standalone viewers.
+ */
+function resolveImageHref(
+  el: BroadsetElement,
+  assetResolver: ((assetId: string) => string | undefined) | undefined,
+): string {
+  const contentStr = resolveContentAsPlainString(el.content);
+
+  if (contentStr !== '') {
+    return contentStr;
+  }
+
+  if (el.assetId !== null) {
+    return assetResolver?.(el.assetId) ?? el.assetId;
+  }
+
+  return '';
+}
+
 function preservedMarkupFor(el: BroadsetElement): string | null {
-  const ext = el.extensions as { readonly svg?: { readonly dirty?: boolean; readonly preserved?: { readonly raw?: string; readonly mime?: string } } } | undefined;
+  const ext = el.extensions as
+    | {
+        readonly svg?: {
+          readonly dirty?: boolean;
+          readonly preserved?: { readonly raw?: string; readonly mime?: string };
+        };
+      }
+    | undefined;
   const svg = ext?.svg;
 
   if (svg === undefined) return null;
@@ -713,7 +904,7 @@ function renderElement(
   const clipAttr = collectClipAttr(el, defs);
   const maskAttr = collectMaskAttr(el, defs);
   const gradientFill = collectGradientFillOverride(el, defs);
-  const patternFill = collectPatternFillOverride(el, defs);
+  const patternFill = collectPatternFillOverride(el, defs, options.assetResolver);
   const fillOverride = gradientFill !== '' ? gradientFill : patternFill;
   // `style.filter` (structured FilterStack) is the modern path;
   // `style.boxShadow` is the legacy CSS shadow string. The
@@ -723,9 +914,8 @@ function renderElement(
   const shadowFilterAttr = collectShadowFilterAttr(el, defs);
   const filterAttr = structuredFilterAttr !== '' ? structuredFilterAttr : shadowFilterAttr;
   const markerAttrs = collectArrowMarkerAttrs(el, defs);
-  const tagAttrs = options.includeElementTagging
-    ? buildElementTagAttrs(el, resolveFingerprint(fingerprints, el.id))
-    : '';
+  const tagAttrs =
+    options.includeElementTagging ? buildElementTagAttrs(el, resolveFingerprint(fingerprints, el.id)) : '';
   // `extras` excludes `tagAttrs` so callers below append it exactly
   // once on the element's opening tag. Mixing it in here would
   // duplicate the attributes on elements whose open tag already
@@ -744,19 +934,20 @@ function renderElement(
 
     case 'text': {
       const textPathRef = el.textPathElementId;
-      const plainText = escapeXml(resolveContentAsPlainString(el.content));
+      const innerBody = renderTextInner(el.content);
       const inner =
-        typeof textPathRef === 'string' && textPathRef !== ''
-          ? `<textPath href="#${escapeXml(textPathRef)}" xlink:href="#${escapeXml(textPathRef)}">${plainText}</textPath>`
-          : plainText;
+        typeof textPathRef === 'string' && textPathRef !== '' ?
+          `<textPath href="#${escapeXml(textPathRef)}" xlink:href="#${escapeXml(textPathRef)}">${innerBody}</textPath>`
+        : innerBody;
 
       return `<text id="${escapeXml(el.id)}"${buildTextAttrs(el.style)}${transform}${extras}${tagAttrs}>${inner}</text>`;
     }
 
     case 'image': {
       const par = objectFitToPreserveAspectRatio(el.style.objectFit);
+      const resolvedHref = resolveImageHref(el, options.assetResolver);
 
-      return `<image id="${escapeXml(el.id)}" href="${escapeXml(resolveContentAsPlainString(el.content))}" width="${String(el.width)}" height="${String(el.height)}" preserveAspectRatio="${par}"${transform}${extras}${tagAttrs}/>`;
+      return `<image id="${escapeXml(el.id)}" href="${escapeXml(resolvedHref)}" width="${String(el.width)}" height="${String(el.height)}" preserveAspectRatio="${par}"${transform}${extras}${tagAttrs}/>`;
     }
 
     case 'svg':
@@ -1049,10 +1240,7 @@ export interface SvgExportResult {
  * preflight warnings through `warnings` (missing bytes, restricted
  * permissions, fallback to `'reference'`).
  */
-export async function exportSvgDocument(
-  doc: BroadsetDocument,
-  options?: SvgExportOptions,
-): Promise<SvgExportResult> {
+export async function exportSvgDocument(doc: BroadsetDocument, options?: SvgExportOptions): Promise<SvgExportResult> {
   return exportSvgInternal(doc, options);
 }
 
@@ -1069,6 +1257,7 @@ async function exportSvgInternal(doc: BroadsetDocument, options?: SvgExportOptio
     renderElement(el, defs, childrenByParent, fingerprints, {
       includeElementTagging,
       flattenedTextElements: fontPlan.flattenedTextElements,
+      ...(options?.assetResolver !== undefined ? { assetResolver: options.assetResolver } : {}),
     }),
   );
   const defsParts: string[] = [];
@@ -1091,4 +1280,3 @@ async function exportSvgInternal(doc: BroadsetDocument, options?: SvgExportOptio
 
   return { svg, warnings: fontPlan.warnings };
 }
-

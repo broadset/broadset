@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  BROADSET_XMP_NAMESPACE,
-  type BroadsetXmpPacket,
-  readBroadsetXmp,
-  writeBroadsetXmp,
-} from './broadset-xmp';
+import { BROADSET_XMP_NAMESPACE, type BroadsetXmpPacket, readBroadsetXmp, writeBroadsetXmp } from './broadset-xmp';
 
 /**
  * Phase 2 `_shared/xmp/` — tests pin the read / write contract for

@@ -129,7 +129,27 @@ describe('P7.7e — third-party group hierarchy', () => {
 
     expect(group).toBeDefined();
     expect(group?.name).toBe('Group');
-    expect(group?.id).toMatch(/^g-\d/); // structural id still preserved for round-trip
+    expect(group?.id).toMatch(/^__bs-g-\d/); // structural id still preserved for round-trip
+  });
+
+  /**
+   * @description A user-authored `<g id="g-3">` (a common d3 /
+   * hand-authored shape) MUST NOT be confused with a synthetic
+   * id by the friendly-name path. The synthetic-id regex now
+   * uses the `__bs-` sentinel prefix so the user's id passes
+   * through unchanged. Closes the P7.7i review #5 collision
+   * finding.
+   */
+  it('does not rewrite user-authored <g id="g-3"> as a synthetic group', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <g id="g-3"><rect width="50" height="50"/></g>
+    </svg>`;
+    const { document } = importSvgDocument(input);
+    const group = document.elements.find((el) => el.type === 'group');
+
+    expect(group).toBeDefined();
+    expect(group?.id).toBe('g-3');
+    expect(group?.name).toBe('g-3'); // user name preserved, NOT renamed to "Group"
   });
 
   /**
