@@ -16,6 +16,8 @@
     "quality": "npm run lint && npm run typecheck && npm run test",
     "quality:strict": "npm run lint:strict && npm run typecheck && npm run test",
     "pptx:corpus:fetch": "node scripts/fetch-pptx-corpus.mjs",
+    "pptx:oracle:generate": "python3 scripts/generate-python-pptx-oracle.py",
+    "pptx:oracle:test": "BROADSET_REQUIRE_PYTHON_PPTX=1 vitest run --passWithNoTests pptx/python-pptx-oracle",
     "pptx:libreoffice:verify": "BROADSET_REQUIRE_LIBREOFFICE=1 vitest run --passWithNoTests pptx/libreoffice-verify"
   },
   "devDependencies": {
