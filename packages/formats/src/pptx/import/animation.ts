@@ -1,5 +1,6 @@
 import type { AnimationDefinition } from '@broadset/model';
 
+import { findChild, findDescendant, findDescendants, getAttr, parseOoxml, rootElement, type XmlElement } from '../ooxml/ast';
 import { decodeShapeName } from '../semantic/shape-name';
 
 /**
@@ -24,53 +25,73 @@ export interface ParsedTimingResult {
 }
 
 export function parseTimingAnimations(slideXml: string): ParsedTimingResult {
-  const timingMatch = slideXml.match(/<p:timing\b[\s\S]*?<\/p:timing>/);
+  const root = rootElement(parseOoxml(slideXml));
 
-  if (!timingMatch) return { animations: [], warnings: [] };
+  if (root === null) return { animations: [], warnings: [] };
 
-  const timing = timingMatch[0];
+  const timing = findChild(root, 'p:timing');
+
+  if (timing === null) return { animations: [], warnings: [] };
+
   const animations: AnimationDefinition[] = [];
   const warnings: ParsedTimingResult['warnings'] extends readonly (infer U)[] ? U[] : never[] = [];
+  const spidToElementId = buildSpidToElementIdMap(root);
 
-  const spidToElementId = buildSpidToElementIdMap(slideXml);
+  // Walk every `<p:cTn>` with a `presetClass` attribute. Entrance
+  // effects map to Broadset animations; everything else drops with a
+  // warning per IO-D-16.
+  for (const cTn of findDescendants(timing, 'p:cTn')) {
+    const presetClass = getAttr(cTn, 'presetClass');
 
-  // Each `<p:par>` entrance block wraps a `<p:cTn presetClass="entr">`
-  // around one or more `<p:anim>` children. We walk preset blocks and
-  // extract the target spid + duration.
-  for (const match of timing.matchAll(
-    /<p:cTn\b[^>]*presetClass="entr"[^>]*>[\s\S]*?<p:anim\b[^>]*>[\s\S]*?<p:cTn\b[^>]*\bdur="(\d+)"[\s\S]*?<p:spTgt\b[^/>]*\bspid="(\d+)"/g,
-  )) {
-    const duration = parseInt(match[1] ?? '500', 10);
-    const spid = match[2] ?? '';
-    const elementId = spidToElementId.get(spid);
+    if (presetClass === undefined) continue;
 
-    if (elementId === undefined) {
-      warnings.push({
-        code: 'unsupported-animation',
-        message: `Preset entrance animation targets shape id ${spid} which does not resolve to a Broadset element`,
-      });
-      continue;
-    }
-
-    animations.push(buildFadeAnimation(elementId, duration));
-  }
-
-  // Any `<p:cTn presetClass="…">` whose class is NOT `entr` is dropped
-  // with a warning — exit / emphasis / mpath effects are not yet
-  // mappable. We scan for any preset class and skip the 'entr' ones
-  // (already handled above).
-  for (const match of timing.matchAll(/<p:cTn\b[^>]*\bpresetClass="([^"]+)"/g)) {
-    const presetClass = match[1];
-
-    if (presetClass !== 'entr' && presetClass !== undefined) {
+    if (presetClass !== 'entr') {
       warnings.push({
         code: 'unsupported-animation',
         message: `Preset class "${presetClass}" is not yet mappable to Broadset animations`,
       });
+      continue;
     }
+
+    const fade = extractFadeFromEntrance(cTn);
+
+    if (fade === null) continue;
+
+    const elementId = spidToElementId.get(fade.spid);
+
+    if (elementId === undefined) {
+      warnings.push({
+        code: 'unsupported-animation',
+        message: `Preset entrance animation targets shape id ${fade.spid} which does not resolve to a Broadset element`,
+      });
+      continue;
+    }
+
+    animations.push(buildFadeAnimation(elementId, fade.durationMs));
   }
 
   return { animations, warnings };
+}
+
+/**
+ * Walk an entrance `<p:cTn presetClass="entr">` looking for the inner
+ * `<p:anim>` whose `<p:cTn dur="…"/>` carries the duration and whose
+ * `<p:cBhvr><p:tgtEl><p:spTgt spid="…"/></p:tgtEl></p:cBhvr>` carries
+ * the target shape id. Returns `null` when either is missing.
+ */
+function extractFadeFromEntrance(entranceCTn: XmlElement): { readonly durationMs: number; readonly spid: string } | null {
+  const animNode = findDescendant(entranceCTn, 'p:anim');
+
+  if (animNode === null) return null;
+
+  const innerCTn = findDescendant(animNode, 'p:cTn');
+  const dur = innerCTn !== null ? getAttr(innerCTn, 'dur') : undefined;
+  const spTgt = findDescendant(animNode, 'p:spTgt');
+  const spid = spTgt !== null ? getAttr(spTgt, 'spid') : undefined;
+
+  if (dur === undefined || spid === undefined) return null;
+
+  return { durationMs: parseInt(dur, 10), spid };
 }
 
 /**
@@ -79,18 +100,18 @@ export function parseTimingAnimations(slideXml: string): ParsedTimingResult {
  * display name as the element id (matches the parseSlideShapes naming
  * convention for untagged third-party shapes).
  */
-function buildSpidToElementIdMap(slideXml: string): ReadonlyMap<string, string> {
+function buildSpidToElementIdMap(root: XmlElement): ReadonlyMap<string, string> {
   const map = new Map<string, string>();
 
-  for (const match of slideXml.matchAll(/<p:cNvPr\s+id="(\d+)"\s+name="([^"]*)"/g)) {
-    const id = match[1];
-    const rawName = match[2] ?? '';
+  for (const cNvPr of findDescendants(root, 'p:cNvPr')) {
+    const id = getAttr(cNvPr, 'id');
+    const name = getAttr(cNvPr, 'name') ?? '';
 
     if (id === undefined) continue;
 
-    const bsetTag = rawName.length > 0 ? decodeShapeName(rawName) : null;
+    const bsetTag = name.length > 0 ? decodeShapeName(name) : null;
 
-    map.set(id, bsetTag?.id ?? rawName);
+    map.set(id, bsetTag?.id ?? name);
   }
 
   return map;

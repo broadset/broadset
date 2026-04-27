@@ -1,5 +1,6 @@
 import type { BroadsetColor, ThemeSlot } from '@broadset/model';
 
+import { findChild, findDescendant, findDescendants, getAttr, parseOoxml, rootElement, type XmlElement } from '../ooxml/ast';
 import type { LayoutPlaceholder, ResolvedTheme } from '../types';
 
 /**
@@ -20,9 +21,12 @@ export function parseLayoutPlaceholders(xml: string | null, theme: ResolvedTheme
 
   if (xml === null || xml.length === 0) return map;
 
-  for (const match of xml.matchAll(/<p:sp\b([\s\S]*?)<\/p:sp>/g)) {
-    const body = match[1] ?? '';
-    const placeholder = extractPlaceholder(body, theme);
+  const root = rootElement(parseOoxml(xml));
+
+  if (root === null) return map;
+
+  for (const sp of findDescendants(root, 'p:sp')) {
+    const placeholder = extractPlaceholder(sp, theme);
 
     if (placeholder !== null) map.set(placeholder.index, placeholder);
   }
@@ -30,53 +34,50 @@ export function parseLayoutPlaceholders(xml: string | null, theme: ResolvedTheme
   return map;
 }
 
-function extractPlaceholder(body: string, theme: ResolvedTheme): LayoutPlaceholder | null {
-  const phMatch = body.match(/<p:ph\b([^/>]*)\/?\s*>/);
+function extractPlaceholder(spNode: XmlElement, theme: ResolvedTheme): LayoutPlaceholder | null {
+  const ph = findDescendant(spNode, 'p:ph');
 
-  if (!phMatch) return null;
+  if (ph === null) return null;
 
-  const phAttrs = phMatch[1] ?? '';
-  const typeAttr = phAttrs.match(/\btype="([^"]+)"/);
-  const index = resolvePlaceholderIndex(phAttrs, typeAttr?.[1]);
+  const type = getAttr(ph, 'type');
+  const index = resolvePlaceholderIndex(ph, type);
 
   if (index === null) return null;
 
-  const rPrProps = extractRunProps(body, theme);
+  const rPrProps = extractRunProps(spNode, theme);
 
   return {
     index,
-    ...(typeAttr?.[1] !== undefined ? { type: typeAttr[1] } : {}),
+    ...(type !== undefined ? { type } : {}),
     ...rPrProps,
   };
 }
 
-function resolvePlaceholderIndex(phAttrs: string, type: string | undefined): number | null {
-  const idxAttr = phAttrs.match(/\bidx="(\d+)"/);
+function resolvePlaceholderIndex(phNode: XmlElement, type: string | undefined): number | null {
+  const idx = getAttr(phNode, 'idx');
 
-  if (idxAttr !== null) return parseInt(idxAttr[1] ?? '0', 10);
+  if (idx !== undefined) return parseInt(idx, 10);
 
   return extractPlaceholderIndexFromType(type);
 }
 
 function extractRunProps(
-  body: string,
+  spNode: XmlElement,
   theme: ResolvedTheme,
 ): {
   readonly fontFamily?: string;
   readonly fontSize?: number;
   readonly color?: BroadsetColor;
 } {
-  const rPr = body.match(/<a:rPr\b([^/>]*)(\/>|>[\s\S]*?<\/a:rPr>)/);
+  const rPr = findDescendant(spNode, 'a:rPr');
 
-  if (!rPr) return {};
+  if (rPr === null) return {};
 
-  const rPrAttrs = rPr[1] ?? '';
-  const rPrBody = rPr[0];
-  const szAttr = rPrAttrs.match(/\bsz="(\d+)"/);
-  const fontSize = szAttr !== null ? parseInt(szAttr[1] ?? '0', 10) / 100 : undefined;
-  const latinMatch = rPrBody.match(/<a:latin\s+typeface="([^"]+)"/);
-  const fontFamily = latinMatch?.[1];
-  const color = extractColorFromRPr(rPrBody, theme);
+  const sz = getAttr(rPr, 'sz');
+  const fontSize = sz !== undefined ? parseInt(sz, 10) / 100 : undefined;
+  const latin = findChild(rPr, 'a:latin');
+  const fontFamily = latin !== null ? getAttr(latin, 'typeface') : undefined;
+  const color = extractColorFromRPr(rPr, theme);
 
   return {
     ...(fontFamily !== undefined ? { fontFamily } : {}),
@@ -85,25 +86,27 @@ function extractRunProps(
   };
 }
 
-function extractColorFromRPr(rPrBody: string, theme: ResolvedTheme): BroadsetColor | undefined {
-  const solid = rPrBody.match(/<a:solidFill>[\s\S]*?<\/a:solidFill>/);
+function extractColorFromRPr(rPrNode: XmlElement, theme: ResolvedTheme): BroadsetColor | undefined {
+  const solid = findChild(rPrNode, 'a:solidFill');
 
-  if (!solid) return undefined;
+  if (solid === null) return undefined;
 
-  const block = solid[0];
-  const srgb = block.match(/<a:srgbClr\s+val="([0-9A-Fa-f]{6,8})"/);
+  const srgb = findChild(solid, 'a:srgbClr');
 
   if (srgb !== null) {
-    const digits = (srgb[1] ?? '').toUpperCase();
-    const hex: `#${string}` = `#${digits}`;
+    const val = getAttr(srgb, 'val');
 
-    return { kind: 'rgb', hex };
+    if (val !== undefined && /^[0-9A-Fa-f]{6,8}$/.test(val)) {
+      const hex: `#${string}` = `#${val.toUpperCase()}`;
+
+      return { kind: 'rgb', hex };
+    }
   }
 
-  const scheme = block.match(/<a:schemeClr\s+val="([a-zA-Z0-9]+)"/);
+  const scheme = findChild(solid, 'a:schemeClr');
 
   if (scheme !== null) {
-    const slot = scheme[1] as ThemeSlot | undefined;
+    const slot = getAttr(scheme, 'val') as ThemeSlot | undefined;
 
     if (slot !== undefined && slot in theme.palette) {
       return { kind: 'rgb', hex: theme.palette[slot] as `#${string}` };

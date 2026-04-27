@@ -1,5 +1,6 @@
 import type { ThemeSlot } from '@broadset/model';
 
+import { findChild, findDescendant, findDescendants, getAttr, parseOoxml, rootElement, type XmlElement } from '../ooxml/ast';
 import type { ResolvedTheme } from '../types';
 
 /**
@@ -29,62 +30,60 @@ const DEFAULT_PALETTE: Readonly<Record<ThemeSlot, string>> = {
   folHlink: '#954F72',
 };
 
-const SLOT_TAGS: readonly (readonly [ThemeSlot, string])[] = [
-  ['dk1', 'dk1'],
-  ['lt1', 'lt1'],
-  ['dk2', 'dk2'],
-  ['lt2', 'lt2'],
-  ['accent1', 'accent1'],
-  ['accent2', 'accent2'],
-  ['accent3', 'accent3'],
-  ['accent4', 'accent4'],
-  ['accent5', 'accent5'],
-  ['accent6', 'accent6'],
-  ['hlink', 'hlink'],
-  ['folHlink', 'folHlink'],
+const THEME_SLOTS: readonly ThemeSlot[] = [
+  'dk1', 'lt1', 'dk2', 'lt2',
+  'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6',
+  'hlink', 'folHlink',
 ];
 
 export function parseTheme(xml: string | null): ResolvedTheme {
   const palette: Record<ThemeSlot, string> = { ...DEFAULT_PALETTE };
 
-  if (xml === null || xml.length === 0) {
-    return { palette };
-  }
+  if (xml === null || xml.length === 0) return { palette };
 
-  for (const [slot, tag] of SLOT_TAGS) {
-    const value = extractSlotColor(xml, tag);
+  const root = rootElement(parseOoxml(xml));
 
-    if (value !== null) palette[slot] = value;
+  if (root === null) return { palette };
+
+  // Theme structure: <a:theme><a:themeElements><a:clrScheme><a:dk1>…</a:clrScheme>…</a:theme>
+  const clrScheme = findDescendant(root, 'a:clrScheme');
+
+  if (clrScheme === null) return { palette };
+
+  for (const slot of THEME_SLOTS) {
+    const slotNode = findChild(clrScheme, `a:${slot}`);
+
+    if (slotNode === null) continue;
+
+    const colour = readSlotColour(slotNode);
+
+    if (colour !== null) palette[slot] = colour;
   }
 
   return { palette };
 }
 
-function extractSlotColor(xml: string, tag: string): string | null {
-  const open = new RegExp(`<a:${tag}\\b[^>]*>`, 'i');
-  const match = xml.match(open);
+/**
+ * Read the colour out of a single `<a:dk1>` / `<a:accent1>` etc. block.
+ * Children may be `<a:srgbClr val="HEX"/>` or `<a:sysClr lastClr="HEX"/>`;
+ * the importer prefers either over the unresolved system colour.
+ */
+function readSlotColour(slotNode: XmlElement): string | null {
+  for (const child of findDescendants(slotNode, 'a:srgbClr')) {
+    const val = getAttr(child, 'val');
 
-  if (!match) return null;
+    if (val !== undefined && /^[0-9A-Fa-f]{6}$/.test(val)) {
+      return `#${val.toUpperCase()}`;
+    }
+  }
 
-  const startIdx = match.index ?? 0;
-  const close = `</a:${tag}>`;
-  const endIdx = xml.indexOf(close, startIdx);
+  for (const child of findDescendants(slotNode, 'a:sysClr')) {
+    const lastClr = getAttr(child, 'lastClr');
 
-  if (endIdx < 0) return null;
-
-  const block = xml.slice(startIdx, endIdx);
-
-  return readColourFromBlock(block);
-}
-
-function readColourFromBlock(block: string): string | null {
-  const srgb = block.match(/<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/);
-
-  if (srgb) return `#${srgb[1]?.toUpperCase() ?? ''}`;
-
-  const sys = block.match(/<a:sysClr\b[^>]*\blastClr="([0-9A-Fa-f]{6})"/);
-
-  if (sys) return `#${sys[1]?.toUpperCase() ?? ''}`;
+    if (lastClr !== undefined && /^[0-9A-Fa-f]{6}$/.test(lastClr)) {
+      return `#${lastClr.toUpperCase()}`;
+    }
+  }
 
   return null;
 }

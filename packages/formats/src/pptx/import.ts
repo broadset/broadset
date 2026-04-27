@@ -11,6 +11,17 @@ import {
   type SlideImportContext,
 } from './import/shapes';
 import { parseTheme } from './import/theme';
+import {
+  findChildren,
+  findDescendant,
+  findDescendants,
+  getAttr,
+  getText,
+  parseOoxml,
+  rootElement,
+  serializeNode,
+  type XmlElement,
+} from './ooxml/ast';
 import { OOXML_REL_TYPES } from './ooxml/namespaces';
 import { parseRelationshipsXml } from './ooxml/relationships';
 import { parseXml } from './ooxml/xml';
@@ -406,39 +417,62 @@ function applyFirstSlideBackground(
 ): BroadsetDocument['canvas'] {
   if (slideXml === null) return canvas;
 
-  const bgMatch = slideXml.match(/<p:bg\b[^>]*>([\s\S]*?)<\/p:bg>/);
+  const root = rootElement(parseOoxml(slideXml));
 
-  if (bgMatch === null) return canvas;
+  if (root === null) return canvas;
 
-  const bgBody = bgMatch[1] ?? '';
+  const bg = findDescendant(root, 'p:bg');
 
-  // Solid fill: take the first colour.
-  const srgb = bgBody.match(/<a:solidFill>[\s\S]*?<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/);
+  if (bg === null) return canvas;
 
-  if (srgb !== null) {
-    const hex = `#${(srgb[1] ?? '').toUpperCase()}`;
+  // Solid fill takes precedence — `<p:bg><p:bgPr><a:solidFill><a:srgbClr/>`.
+  const solidColour = readSrgbHex(findDescendant(bg, 'a:solidFill'));
 
-    return { ...canvas, backgroundColor: hex, backgroundMode: 'solid' };
+  if (solidColour !== null) {
+    return { ...canvas, backgroundColor: solidColour, backgroundMode: 'solid' };
   }
 
   // Gradient fill: downgrade to the first stop and surface a warning.
   // The canvas model carries a single solid colour, so the gradient
   // can't survive intact — better to seed something visible than to
   // silently leave the canvas blank.
-  const gradStop = bgBody.match(/<a:gradFill\b[\s\S]*?<a:gs\b[^>]*>[\s\S]*?<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/);
+  const gradFill = findDescendant(bg, 'a:gradFill');
 
-  if (gradStop !== null) {
-    const hex = `#${(gradStop[1] ?? '').toUpperCase()}`;
+  if (gradFill !== null) {
+    const firstStop = findDescendant(gradFill, 'a:gs');
+    const stopColour = firstStop !== null ? readSrgbHex(firstStop) : null;
 
-    warnings.push({
-      code: 'unsupported-content',
-      message: 'Slide gradient background downgraded to the first gradient stop colour — canvas model is solid-only',
-    });
+    if (stopColour !== null) {
+      warnings.push({
+        code: 'unsupported-content',
+        message: 'Slide gradient background downgraded to the first gradient stop colour — canvas model is solid-only',
+      });
 
-    return { ...canvas, backgroundColor: hex, backgroundMode: 'solid' };
+      return { ...canvas, backgroundColor: stopColour, backgroundMode: 'solid' };
+    }
   }
 
   return canvas;
+}
+
+/**
+ * Pull the first `<a:srgbClr val="…"/>` descendant out of a node and
+ * return it as a `#RRGGBB` string. Returns `null` when no valid sRGB
+ * colour is present (e.g. only `<a:schemeClr>` references, or
+ * malformed hex).
+ */
+function readSrgbHex(node: XmlElement | null): string | null {
+  if (node === null) return null;
+
+  const srgb = findDescendant(node, 'a:srgbClr');
+
+  if (srgb === null) return null;
+
+  const val = getAttr(srgb, 'val');
+
+  if (val === undefined || !/^[0-9A-Fa-f]{6}$/.test(val)) return null;
+
+  return `#${val.toUpperCase()}`;
 }
 
 function importSingleSlide(
@@ -564,23 +598,37 @@ function extractSlideNotes(
 
   if (notesXml === null) return null;
 
-  // Extract all `<a:t>` text inside the body-type placeholder.
-  const body = notesXml.match(/<p:sp\b[\s\S]*?type="body"[\s\S]*?<p:txBody>([\s\S]*?)<\/p:txBody>/);
-  const textBlock = body?.[1] ?? notesXml;
-  const runs = [...textBlock.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)]
-    .map((m) => decodeXmlEntities(m[1] ?? ''))
-    .join('\n');
+  // Notes shapes carry their text in `<p:sp>` whose `<p:nvSpPr>` flags
+  // a body-type placeholder. Find that shape and walk every `<a:t>`
+  // descendant, joining text runs with newlines per ECMA-376
+  // §19.3.1.32 "notes" guidance.
+  const root = rootElement(parseOoxml(notesXml));
 
-  return runs.length > 0 ? runs : null;
+  if (root === null) return null;
+
+  const bodyShape = findBodyShape(root);
+  const scope = bodyShape ?? root;
+  const runs = findDescendants(scope, 'a:t')
+    .map((t) => getText(t))
+    .filter((s) => s.length > 0);
+
+  return runs.length > 0 ? runs.join('\n') : null;
 }
 
-function decodeXmlEntities(value: string): string {
-  return value
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, '&');
+/**
+ * Walk a notes-slide AST looking for the `<p:sp>` whose `<p:ph>`
+ * placeholder type is `body`. That's the canonical notes-text host.
+ * Returns `null` when no body-type placeholder is present, falling
+ * the caller back to a slide-wide text scan.
+ */
+function findBodyShape(root: XmlElement): XmlElement | null {
+  for (const sp of findDescendants(root, 'p:sp')) {
+    const ph = findDescendant(sp, 'p:ph');
+
+    if (ph !== null && getAttr(ph, 'type') === 'body') return sp;
+  }
+
+  return null;
 }
 
 /**
@@ -702,19 +750,27 @@ function resolvePlaceholderFromBody(
   body: string,
   placeholders: ReadonlyMap<number, LayoutPlaceholder>,
 ): LayoutPlaceholder | undefined {
-  const phMatch = body.match(/<p:ph\b([^/>]*)\/?\s*>/);
+  // The `body` argument is a serialised shape body (no surrounding
+  // <p:sp> element). Wrap and parse so the AST helpers can navigate.
+  const parsed = parseOoxml(`<sp xmlns:p="${PRESENTATIONML_NS}">${body}</sp>`);
+  const root = rootElement(parsed);
 
-  if (phMatch === null) return undefined;
+  if (root === null) return undefined;
 
-  const attrs = phMatch[1] ?? '';
-  const idxAttr = attrs.match(/\bidx="(\d+)"/);
-  const typeAttr = attrs.match(/\btype="([^"]+)"/);
-  const idx = resolvePlaceholderIdx(idxAttr?.[1], typeAttr?.[1]);
+  const ph = findDescendant(root, 'p:ph');
+
+  if (ph === null) return undefined;
+
+  const idxAttr = getAttr(ph, 'idx');
+  const type = getAttr(ph, 'type');
+  const idx = resolvePlaceholderIdx(idxAttr, type);
 
   if (idx === null) return undefined;
 
   return placeholders.get(idx);
 }
+
+const PRESENTATIONML_NS = 'http://schemas.openxmlformats.org/presentationml/2006/main';
 
 function resolvePlaceholderIdx(idxText: string | undefined, type: string | undefined): number | null {
   if (idxText !== undefined) return parseInt(idxText, 10);
@@ -724,10 +780,30 @@ function resolvePlaceholderIdx(idxText: string | undefined, type: string | undef
   return null;
 }
 
+/**
+ * Extract the Nth top-level `<p:sp>` body as a serialised XML string.
+ * The string-form return is a transitional artifact of the regex →
+ * AST migration: `shapes.ts` still consumes string bodies, so we
+ * navigate with the AST then serialize back. After A9 migrates
+ * `shapes.ts`, this can return the AST node directly.
+ */
 function extractShapeBody(slideXml: string, index: number): string | null {
-  const matches = [...slideXml.matchAll(/<p:sp\b[^>]*?>([\s\S]*?)<\/p:sp>/g)];
+  const root = rootElement(parseOoxml(slideXml));
 
-  return matches[index]?.[1] ?? null;
+  if (root === null) return null;
+
+  const spTree = findDescendant(root, 'p:spTree');
+
+  if (spTree === null) return null;
+
+  const shapes = findChildren(spTree, 'p:sp');
+  const target = shapes[index];
+
+  if (target === undefined) return null;
+
+  // Reconstruct the inner body so callers see the same content shape
+  // the regex parser used to return (children only, no <p:sp> wrapper).
+  return target.children.map((c) => serializeNode(c)).join('');
 }
 
 function isDocumentShape(value: unknown): value is BroadsetDocument {

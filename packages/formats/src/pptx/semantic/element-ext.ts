@@ -1,3 +1,4 @@
+import { findChildByNs, findChildrenByNs, findDescendant, getAttr, getText, parseOoxml, rootElement, type XmlElement } from '../ooxml/ast';
 import { escapeXmlAttribute, escapeXmlText } from '../ooxml/xml';
 import { BROADSET_ELEMENT_EXT_URI, type ElementMetaExtension } from '../types';
 
@@ -58,6 +59,8 @@ export function buildElementExt(meta: ElementMetaExtension): string {
   return `<p:ext uri="${BROADSET_ELEMENT_EXT_URI}"><bset:elementMeta xmlns:bset="${BROADSET_META_NS}" ${attrs.join(' ')}>${animationsXml}${preservedXml}</bset:elementMeta></p:ext>`;
 }
 
+const BROADSET_META_NS_URI = BROADSET_META_NS;
+
 /**
  * Parse an `<p:ext>` XML body back into an {@link ElementMetaExtension}.
  * Returns `null` for strings that don't contain a broadset-element-ext
@@ -70,63 +73,128 @@ export function buildElementExt(meta: ElementMetaExtension): string {
 export function parseElementExt(input: string): ElementMetaExtension | null {
   if (!input.includes(BROADSET_ELEMENT_EXT_URI)) return null;
 
-  const id = getAttr(input, 'id');
-  const kind = getAttr(input, 'kind');
+  const meta = locateElementMetaNode(input);
 
-  if (id === null || kind === null) return null;
+  if (meta === null) return null;
 
-  const dirtyValue = getAttr(input, 'dirty') ?? '0';
+  return buildExtensionFromMeta(meta);
+}
+
+/**
+ * Wrap the raw fragment so fast-xml-parser sees a single root, then
+ * walk down to the broadset `elementMeta` node. Returns `null` when
+ * the fragment doesn't carry a broadset metadata extension.
+ */
+function locateElementMetaNode(input: string): XmlElement | null {
+  const wrapped = `<root xmlns:p="${PRESENTATIONML_NS}">${input}</root>`;
+  const root = rootElement(parseOoxml(wrapped));
+
+  if (root === null) return null;
+
+  const ext = findFirstBroadsetExt(root);
+
+  if (ext === null) return null;
+
+  return findChildByNs(ext, BROADSET_META_NS_URI, 'elementMeta');
+}
+
+/**
+ * Translate an `<bset:elementMeta>` node into the typed extension
+ * shape. Required `id` + `kind` attributes are validated; optional
+ * fields are folded in only when non-empty so the round-trip
+ * idempotency test stays clean.
+ */
+function buildExtensionFromMeta(meta: XmlElement): ElementMetaExtension | null {
+  const id = getAttr(meta, 'id');
+  const kind = getAttr(meta, 'kind');
+
+  if (id === undefined || kind === undefined) return null;
+
+  const dirtyValue = getAttr(meta, 'dirty') ?? '0';
   const dirty = dirtyValue === '1' || dirtyValue === 'true';
-
-  const dataField = getAttr(input, 'dataField') ?? undefined;
-  const visibleWhen = getAttr(input, 'visibleWhen') ?? undefined;
-  const repeater = getAttr(input, 'repeater') ?? undefined;
-  const originalKind = getAttr(input, 'originalKind') ?? undefined;
-
-  const animations = [...input.matchAll(/<bset:ref\s+id="([^"]*)"\s*\/>/g)].map((m) => m[1] ?? '').filter(Boolean);
-  const preservedBlob = extractBetween(input, '<bset:preservedBlob>', '</bset:preservedBlob>') ?? undefined;
+  const animations = readAnimationRefs(meta);
+  const preservedBlobNode = findChildByNs(meta, BROADSET_META_NS_URI, 'preservedBlob');
+  const preservedBlob = preservedBlobNode !== null ? getText(preservedBlobNode) : undefined;
 
   const base: ElementMetaExtension = { id, kind, dirty };
+  const optional = readOptionalStringAttrs(meta);
 
   return {
     ...base,
-    ...(dataField ? { dataField } : {}),
-    ...(visibleWhen ? { visibleWhen } : {}),
-    ...(repeater ? { repeater } : {}),
-    ...(originalKind ? { originalKind } : {}),
+    ...optional,
     ...(animations.length > 0 ? { animations } : {}),
-    ...(preservedBlob ? { preservedBlob: decodeXmlEntities(preservedBlob) } : {}),
+    ...(preservedBlob !== undefined && preservedBlob.length > 0 ? { preservedBlob } : {}),
   };
 }
 
-function getAttr(input: string, name: string): string | null {
-  const re = new RegExp(`\\b${name}="([^"]*)"`);
-  const match = input.match(re);
+function readAnimationRefs(meta: XmlElement): readonly string[] {
+  const animationsNode = findChildByNs(meta, BROADSET_META_NS_URI, 'animations');
 
-  if (!match) return null;
+  if (animationsNode === null) return [];
 
-  const raw = match[1] ?? '';
-
-  return decodeXmlEntities(raw);
+  return findChildrenByNs(animationsNode, BROADSET_META_NS_URI, 'ref')
+    .map((r) => getAttr(r, 'id') ?? '')
+    .filter((s) => s.length > 0);
 }
 
-function extractBetween(input: string, open: string, close: string): string | null {
-  const start = input.indexOf(open);
+function readOptionalStringAttrs(meta: XmlElement): {
+  readonly dataField?: string;
+  readonly visibleWhen?: string;
+  readonly repeater?: string;
+  readonly originalKind?: string;
+} {
+  const out: { dataField?: string; visibleWhen?: string; repeater?: string; originalKind?: string } = {};
+  const fields: readonly (keyof typeof out)[] = ['dataField', 'visibleWhen', 'repeater', 'originalKind'];
 
-  if (start < 0) return null;
+  for (const field of fields) {
+    const v = getAttr(meta, field);
 
-  const end = input.indexOf(close, start + open.length);
+    if (v !== undefined && v.length > 0) out[field] = v;
+  }
 
-  if (end < 0) return null;
-
-  return input.slice(start + open.length, end);
+  return out;
 }
 
-function decodeXmlEntities(value: string): string {
-  return value
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, '&');
+const PRESENTATIONML_NS = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+
+/**
+ * Find the first `<p:ext>` (presentationML namespace) whose `uri`
+ * attribute matches the broadset-element-ext URI. The metadata is
+ * always nested under `<p:ext uri="…">` per OOXML extension
+ * conventions.
+ */
+function findFirstBroadsetExt(node: XmlElement): XmlElement | null {
+  for (const child of node.children) {
+    if (child.kind !== 'element') continue;
+
+    if (child.local === 'ext' && child.ns === PRESENTATIONML_NS) {
+      const uri = getAttr(child, 'uri');
+
+      if (uri === BROADSET_ELEMENT_EXT_URI) return child;
+    }
+
+    const inner = findFirstBroadsetExt(child);
+
+    if (inner !== null) return inner;
+  }
+
+  return findDescendant(node, 'p:ext') === null ? null : findDescendantBroadsetExt(node);
+}
+
+function findDescendantBroadsetExt(node: XmlElement): XmlElement | null {
+  for (const child of node.children) {
+    if (child.kind !== 'element') continue;
+
+    if (child.local === 'ext' && child.ns === PRESENTATIONML_NS) {
+      const uri = getAttr(child, 'uri');
+
+      if (uri === BROADSET_ELEMENT_EXT_URI) return child;
+    }
+
+    const inner = findDescendantBroadsetExt(child);
+
+    if (inner !== null) return inner;
+  }
+
+  return null;
 }

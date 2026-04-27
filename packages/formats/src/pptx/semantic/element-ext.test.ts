@@ -80,9 +80,10 @@ describe('buildElementExt / parseElementExt', () => {
   });
 
   it('parses dirty="1" as true and dirty="0" as false (also accepts legacy "true"/"false")', () => {
-    const xmlDirty = `<p:ext uri="{broadset-element-ext}"><bset:elementMeta id="x" kind="y" dirty="1"/></p:ext>`;
-    const xmlClean = `<p:ext uri="{broadset-element-ext}"><bset:elementMeta id="x" kind="y" dirty="0"/></p:ext>`;
-    const xmlLegacy = `<p:ext uri="{broadset-element-ext}"><bset:elementMeta id="x" kind="y" dirty="true"/></p:ext>`;
+    const ns = ' xmlns:bset="https://broadset.io/ns/pptx/1.0/"';
+    const xmlDirty = `<p:ext uri="{broadset-element-ext}"><bset:elementMeta${ns} id="x" kind="y" dirty="1"/></p:ext>`;
+    const xmlClean = `<p:ext uri="{broadset-element-ext}"><bset:elementMeta${ns} id="x" kind="y" dirty="0"/></p:ext>`;
+    const xmlLegacy = `<p:ext uri="{broadset-element-ext}"><bset:elementMeta${ns} id="x" kind="y" dirty="true"/></p:ext>`;
 
     expect(parseElementExt(xmlDirty)?.dirty).toBe(true);
     expect(parseElementExt(xmlClean)?.dirty).toBe(false);

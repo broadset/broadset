@@ -1,6 +1,7 @@
 import type { BroadsetElement } from '@broadset/model';
 
 import { fingerprintElement } from '../../_shared';
+import { findChildrenByNs, getAttr, parseOoxml, rootElement } from '../ooxml/ast';
 import { XML_DECLARATION } from '../ooxml/xml';
 import type { PptxLedgerEntry, PptxRoundTripLedger } from '../types';
 
@@ -52,27 +53,27 @@ export function buildLedgerXml(ledger: PptxRoundTripLedger): string {
 
 /**
  * Parse a ledger XML body. Returns `null` for empty / non-ledger input so
- * callers can branch on absence.
+ * callers can branch on absence. Resolves elements by explicit
+ * namespace URI so the ledger's `xmlns="…"` default-namespace entries
+ * are matched correctly.
  */
 export function parseLedgerXml(body: string): PptxRoundTripLedger | null {
-  if (!body.includes(LEDGER_NS)) return null;
+  const root = rootElement(parseOoxml(body));
 
-  // Scope attribute lookup to the `<ledger …>` open tag so the XML
-  // declaration's own `version="1.0"` does not shadow the ledger's
-  // semantic version.
-  const openTagMatch = body.match(/<ledger\b[^>]*>/);
-  const ledgerTag = openTagMatch?.[0] ?? '';
-  const documentId = matchAttr(ledgerTag, 'documentId') ?? '';
-  const version = matchAttr(ledgerTag, 'version') ?? '';
-  const exportedAt = matchAttr(ledgerTag, 'exportedAt') ?? '';
+  if (root?.local !== 'ledger' || root.ns !== LEDGER_NS) return null;
+
+  const documentId = getAttr(root, 'documentId') ?? '';
+  const version = getAttr(root, 'version') ?? '';
+  const exportedAt = getAttr(root, 'exportedAt') ?? '';
   const entries: PptxLedgerEntry[] = [];
 
-  for (const match of body.matchAll(/<entry\s+([^/>]+)\/?\s*>/g)) {
-    const attrs = match[1] ?? '';
-    const elementId = attrs.match(/\bid="([^"]*)"/)?.[1];
-    const fingerprint = attrs.match(/\bfingerprint="([^"]*)"/)?.[1];
+  for (const entry of findChildrenByNs(root, LEDGER_NS, 'entry')) {
+    const elementId = getAttr(entry, 'id');
+    const fingerprint = getAttr(entry, 'fingerprint');
 
-    if (!elementId || !fingerprint) continue;
+    if (elementId === undefined || fingerprint === undefined) continue;
+    if (elementId.length === 0 || fingerprint.length === 0) continue;
+
     entries.push({ elementId, fingerprint });
   }
 
@@ -95,11 +96,4 @@ export function indexLedger(ledger: PptxRoundTripLedger): ReadonlyMap<string, st
 
 function escapeAttr(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-}
-
-function matchAttr(body: string, name: string): string | null {
-  const re = new RegExp(`\\b${name}="([^"]*)"`);
-  const match = body.match(re);
-
-  return match?.[1] ?? null;
 }

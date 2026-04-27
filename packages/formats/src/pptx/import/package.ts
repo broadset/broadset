@@ -1,5 +1,6 @@
 import type { Canvas } from '@broadset/model';
 
+import { findChild, getAttr, parseOoxml, rootElement } from '../ooxml/ast';
 import { OOXML_REL_TYPES } from '../ooxml/namespaces';
 import { parseRelationshipsXml } from '../ooxml/relationships';
 import { emuToMm } from '../ooxml/units';
@@ -83,13 +84,16 @@ export function resolvePackage(pkg: OoxmlPackage): ResolvedPackage {
 }
 
 function parseCanvasFromPresentation(xml: string): Canvas {
-  const match = xml.match(/<p:sldSz\b([^/>]*)\/?\s*>/);
+  const root = rootElement(parseOoxml(xml));
 
-  if (!match) return DEFAULT_CANVAS;
+  if (root === null) return DEFAULT_CANVAS;
 
-  const attrs = match[1] ?? '';
-  const cx = parseInt(attrs.match(/\bcx="(\d+)"/)?.[1] ?? '0', 10);
-  const cy = parseInt(attrs.match(/\bcy="(\d+)"/)?.[1] ?? '0', 10);
+  const sldSz = findChild(root, 'p:sldSz');
+
+  if (sldSz === null) return DEFAULT_CANVAS;
+
+  const cx = parseInt(getAttr(sldSz, 'cx') ?? '0', 10);
+  const cy = parseInt(getAttr(sldSz, 'cy') ?? '0', 10);
 
   if (cx <= 0 || cy <= 0) return DEFAULT_CANVAS;
 
