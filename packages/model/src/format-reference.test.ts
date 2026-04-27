@@ -12,7 +12,7 @@ type MinimalDocument = {
     unit: 'px' | 'mm' | 'in';
     dpi: number;
     padding: [number, number, number, number];
-    backgroundMode: 'transparent' | 'solid';
+    backgroundMode: 'transparent' | 'solid' | 'gradient';
   };
   elements: Array<ReturnType<typeof createDefaultElement>>;
   animations: [];

@@ -339,7 +339,7 @@ function importOperatorLevel(pkg: OoxmlPackage, canvasOverride?: BroadsetDocumen
   }
 
   const firstSlideXml = resolved.slidePaths[0] !== undefined ? readTextPart(pkg, resolved.slidePaths[0]) : null;
-  const canvasWithBg = applyFirstSlideBackground(resolved.canvas, firstSlideXml, warnings);
+  const canvasWithBg = applyFirstSlideBackground(resolved.canvas, firstSlideXml);
   const doc = composeDocumentFromSlides(canvasWithBg, slides);
 
   return {

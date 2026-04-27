@@ -16,10 +16,11 @@ import {
 } from '../ooxml/ast';
 import { OOXML_REL_TYPES } from '../ooxml/namespaces';
 import { parseRelationshipsXml } from '../ooxml/relationships';
-import { type OoxmlPackage,readTextPart } from '../ooxml/zip';
+import { type OoxmlPackage, readTextPart } from '../ooxml/zip';
 import type { LayoutPlaceholder, PptxImportWarning } from '../types';
 import { extractSlideNotes } from './notes';
 import { parseSlideShapes, type SlideImportContext } from './shape';
+import { parseGradient } from './style';
 import { extractTextBody } from './text';
 
 interface SlidePage {
@@ -144,7 +145,6 @@ function promoteShapeText(
 export function applyFirstSlideBackground(
   canvas: BroadsetDocument['canvas'],
   slideXml: string | null,
-  warnings: PptxImportWarning[],
 ): BroadsetDocument['canvas'] {
   if (slideXml === null) return canvas;
 
@@ -165,16 +165,18 @@ export function applyFirstSlideBackground(
   const gradFill = findDescendant(bg, 'a:gradFill');
 
   if (gradFill !== null) {
-    const firstStop = findDescendant(gradFill, 'a:gs');
-    const stopColour = firstStop !== null ? readSrgbHex(firstStop) : null;
+    const gradient = parseGradient(gradFill);
 
-    if (stopColour !== null) {
-      warnings.push({
-        code: 'unsupported-content',
-        message: 'Slide gradient background downgraded to the first gradient stop colour — canvas model is solid-only',
-      });
+    if (gradient !== null) {
+      const firstStop = findDescendant(gradFill, 'a:gs');
+      const fallbackColour = firstStop !== null ? (readSrgbHex(firstStop) ?? undefined) : undefined;
 
-      return { ...canvas, backgroundColor: stopColour, backgroundMode: 'solid' };
+      return {
+        ...canvas,
+        ...(fallbackColour !== undefined ? { backgroundColor: fallbackColour } : {}),
+        backgroundGradient: gradient,
+        backgroundMode: 'gradient',
+      };
     }
   }
 

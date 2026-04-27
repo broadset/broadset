@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { exportPptxBytes } from './export';
 import { importPptx, importPptxWithReport } from './import';
-import { encodeText,writeOoxmlPackage } from './ooxml/zip';
+import { encodeText, writeOoxmlPackage } from './ooxml/zip';
 
 /**
  * @description Round-trip validates the fast-path — a Broadset document
@@ -1217,12 +1217,11 @@ describe('PPTX importer — operator-level extraction', () => {
   });
 
   /**
-   * @description T5 — gradient slide backgrounds downgrade to the
-   * first stop colour with a warning. Solid backgrounds remain
-   * lossless; this test asserts the gradient path doesn't silently
-   * leave the canvas blank.
+   * @description T2.10 — gradient slide backgrounds import to the
+   * canvas gradient model and export back as native `<a:gradFill>`
+   * without downgrade warnings.
    */
-  it('downgrades gradient slide backgrounds to first stop with warning', () => {
+  it('round-trips gradient slide backgrounds through the canvas model', async () => {
     const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:bg><p:bgPr><a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="FF0000"/></a:gs><a:gs pos="100000"><a:srgbClr val="0000FF"/></a:gs></a:gsLst><a:lin ang="5400000"/></a:gradFill></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
     const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
     const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
@@ -1238,8 +1237,21 @@ describe('PPTX importer — operator-level extraction', () => {
     const report = importPptxWithReport(inputBytes);
 
     expect(report.document.canvas.backgroundColor).toBe('#FF0000');
-    expect(report.document.canvas.backgroundMode).toBe('solid');
-    expect(report.warnings.some((w) => w.code === 'unsupported-content' && w.message.includes('gradient'))).toBe(true);
+    expect(report.document.canvas.backgroundMode).toBe('gradient');
+    expect(report.document.canvas.backgroundGradient?.type).toBe('linear');
+    expect(report.document.canvas.backgroundGradient?.angle).toBeCloseTo(90, 5);
+    expect(report.document.canvas.backgroundGradient?.stops).toHaveLength(2);
+    expect(report.warnings.some((w) => w.message.includes('gradient'))).toBe(false);
+
+    const reExported = exportPptxBytes(report.document);
+    const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
+    const reExportedSlide = readTextPart(readOoxmlPackage(reExported), 'ppt/slides/slide1.xml') ?? '';
+
+    expect(reExportedSlide).toContain('<p:bg>');
+    expect(reExportedSlide).toContain('<a:gradFill');
+    expect(reExportedSlide).toContain('<a:lin ang="5400000"');
+    expect(reExportedSlide).toContain('val="FF0000"');
+    expect(reExportedSlide).toContain('val="0000FF"');
   });
 
   /**

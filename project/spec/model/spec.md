@@ -59,8 +59,9 @@ Every document MUST have a `canvas` with:
 - `unit`: `'px'` | `'mm'` | `'in'` — declares the unit for all spatial values in the document
 - `dpi`: positive number — default `96` for screen mode, `300` for print mode
 - `padding`: 4-tuple `[top, right, bottom, left]` of non-negative numbers
-- `backgroundColor` (optional): CSS color string for canvas background
-- `backgroundMode`: `'transparent'` | `'solid'` — default `'transparent'` for screen, `'solid'` for print
+- `backgroundColor` (optional): CSS color string for solid canvas background and fallback colour for gradient backgrounds
+- `backgroundGradient` (optional): structured `BroadsetGradient` for gradient canvas backgrounds; required when `backgroundMode` is `'gradient'`
+- `backgroundMode`: `'transparent'` | `'solid'` | `'gradient'` — default `'transparent'` for screen, `'solid'` for print
 - `safeAreas` (optional): broadcast action-safe and title-safe insets as percentages (see Safe Areas below)
 - `bleed` (optional): print prepress bleed inset as `[top, right, bottom, left]` of non-negative numbers in the canvas-declared unit — maps to PDF `BleedBox`
 - `trim` (optional): print prepress trim inset with the same shape — maps to PDF `TrimBox`

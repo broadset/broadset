@@ -16,6 +16,7 @@ import {
   type PptxExportWarning,
 } from '../types';
 import { buildTimingXml } from './animation';
+import { emitSlideBackground } from './background';
 import { createSlideContext, type SlideExportContext } from './context';
 import { buildNotesMasterXml, buildNotesSlideXml } from './notes';
 import { emitShapeTree } from './shapes';
@@ -428,27 +429,6 @@ function buildSlideForPage(document: BroadsetDocument, page: Page): SlideXmlResu
   const xml = `${XML_DECLARATION}<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld>${bg}<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${shapeTree}</p:spTree></p:cSld>${timing}<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
 
   return { xml, rels: ctx.rels.entries(), media: ctx.media, warnings: ctx.warnings };
-}
-
-/**
- * Emit `<p:bg>` from the document's canvas background. Solid-fill
- * canvases produce `<a:solidFill>`; transparent canvases produce
- * nothing (the master / theme background shows through).
- */
-function emitSlideBackground(canvas: BroadsetDocument['canvas']): string {
-  if (canvas.backgroundMode !== 'solid') return '';
-
-  const colour = canvas.backgroundColor;
-
-  if (colour === undefined || colour.length === 0) return '';
-
-  const stripped = colour.startsWith('#') ? colour.slice(1) : colour;
-  const expanded = stripped.length === 3
-    ? `${stripped[0] ?? ''}${stripped[0] ?? ''}${stripped[1] ?? ''}${stripped[1] ?? ''}${stripped[2] ?? ''}${stripped[2] ?? ''}`
-    : stripped.slice(0, 6);
-  const hex = expanded.toUpperCase();
-
-  return `<p:bg><p:bgPr><a:solidFill><a:srgbClr val="${hex}"/></a:solidFill></p:bgPr></p:bg>`;
 }
 
 function applyPageOverrides(elements: readonly BroadsetElement[], page: Page): readonly BroadsetElement[] {

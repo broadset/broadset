@@ -10,6 +10,7 @@ import {
 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
+import { applyCanvasFrame } from '../adapters/broadset/preview-host';
 import {
   ALL_DISABLED_CAPABILITIES,
   applyBackgroundStyle,
@@ -258,6 +259,39 @@ describe('renderer core', () => {
 
     expect(node.style.backgroundColor).toBe('rgb(18, 52, 86)');
     expect(node.style.backgroundImage).toBe('');
+  });
+
+  /** @description Canvas-level gradient backgrounds render on the preview frame rather than falling back to transparency. */
+  it('applies gradient canvas backgrounds to the preview frame', () => {
+    const canvasTransformLayer = document.createElement('div');
+    const canvasScaleShell = document.createElement('div');
+    const canvasRoot = document.createElement('div');
+    const documentData = createDocument([]);
+
+    applyCanvasFrame({
+      documentData: {
+        ...documentData,
+        canvas: {
+          ...documentData.canvas,
+          backgroundColor: '#ff0000',
+          backgroundMode: 'gradient',
+          backgroundGradient: {
+            type: 'linear',
+            angle: 90,
+            stops: [
+              { color: rgbColor('#ff0000'), position: 0 },
+              { color: rgbColor('#0000ff'), position: 100 },
+            ],
+          },
+        },
+      },
+      canvasTransformLayer,
+      canvasScaleShell,
+      canvasRoot,
+    });
+
+    expect(canvasScaleShell.style.backgroundImage).toContain('linear-gradient');
+    expect(canvasScaleShell.style.backgroundColor).toBe('rgb(255, 0, 0)');
   });
 
   /** @description Structured gradients must store JSON on data-gradient for playback animation targeting. */

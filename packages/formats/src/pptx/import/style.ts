@@ -330,7 +330,7 @@ function parseColorMods(scheme: XmlElement): ColorMods | null {
   return Object.keys(result).length === 0 ? null : (result as ColorMods);
 }
 
-function parseGradient(gradFill: XmlElement): BroadsetGradient | null {
+export function parseGradient(gradFill: XmlElement): BroadsetGradient | null {
   const stops: BroadsetGradientStop[] = [];
   const gsLst = findChild(gradFill, 'a:gsLst');
 
