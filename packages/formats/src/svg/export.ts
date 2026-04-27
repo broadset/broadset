@@ -6,8 +6,12 @@ import {
   type BroadsetFill,
   type BroadsetGradient,
   colorToCss,
+  type FilterPrimitive,
+  type FilterStack,
   getGradientFillGradient,
   getSolidFillColor,
+  type PatternFill,
+  type PictureFill,
   resolveContentAsPlainString,
   resolveStyleColor,
   resolveStyleFillToSvgPaint,
@@ -87,6 +91,169 @@ function renderShadowFilter(id: string, shadow: string): string {
   }
 
   return `<filter id="${id}"><feDropShadow dx="${dx}" dy="${dy}" stdDeviation="${String(Number(blur) / 2)}" flood-color="${escapeXml(color.trim())}"/></filter>`;
+}
+
+/**
+ * Render a structured `FilterStack` as a single `<filter>` def.
+ * Each primitive emits its corresponding SVG filter primitive
+ * (`<feGaussianBlur>`, `<feColorMatrix>`, `<feDropShadow>`,
+ * `<feComponentTransfer>`). Empty stacks return `''` so the
+ * caller skips emission and the element gets no `filter=` attr.
+ */
+function renderFilterStackDef(id: string, stack: FilterStack): string {
+  if (stack.length === 0) {
+    return '';
+  }
+
+  const primitives = stack.map(renderFilterPrimitive).filter((s) => s !== '');
+
+  if (primitives.length === 0) {
+    return '';
+  }
+
+  return `<filter id="${id}">${primitives.join('')}</filter>`;
+}
+
+function renderFilterPrimitive(primitive: FilterPrimitive): string {
+  switch (primitive.kind) {
+    case 'blur':
+      return `<feGaussianBlur stdDeviation="${String(primitive.stdDeviation)}"/>`;
+
+    case 'color-matrix':
+      return `<feColorMatrix type="matrix" values="${primitive.matrix.join(' ')}"/>`;
+
+    case 'drop-shadow': {
+      const colorCss = colorToCss(primitive.color);
+
+      return `<feDropShadow dx="${String(primitive.offsetX)}" dy="${String(primitive.offsetY)}" stdDeviation="${String(primitive.blur / 2)}" flood-color="${escapeXml(colorCss)}"/>`;
+    }
+
+    case 'hue-rotate':
+      return `<feColorMatrix type="hueRotate" values="${String(primitive.amount)}"/>`;
+
+    case 'saturate':
+      return `<feColorMatrix type="saturate" values="${String(primitive.amount)}"/>`;
+
+    case 'grayscale':
+      return renderGrayscaleMatrix(primitive.amount);
+
+    case 'sepia':
+      return renderSepiaMatrix(primitive.amount);
+
+    case 'invert':
+      return renderInvertComponentTransfer(primitive.amount);
+
+    case 'brightness':
+      return renderBrightnessComponentTransfer(primitive.amount);
+
+    case 'contrast':
+      return renderContrastComponentTransfer(primitive.amount);
+
+    case 'opacity':
+      return `<feColorMatrix type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ${String(primitive.amount)} 0"/>`;
+
+    case 'custom-svg':
+      // Custom SVG filter primitives are sanitised at the renderer
+      // boundary per FilterStack docs; emit verbatim through the
+      // shared SVG sanitizer to drop any active payload.
+      return sanitizeSvg(primitive.svg).ast.markup;
+  }
+}
+
+/**
+ * Canonical CSS-equivalent matrices for the grayscale / sepia
+ * amount-based filters. The values match the W3C CSS Filter Effects
+ * 1 algorithm so consumer browsers reproduce the same output as
+ * `filter: grayscale(0.5)`.
+ */
+function renderGrayscaleMatrix(amount: number): string {
+  const a = Math.max(0, Math.min(1, amount));
+  const r = String(0.2126 + 0.7874 * (1 - a));
+  const g = String(0.7152 - 0.7152 * (1 - a));
+  const b = String(0.0722 - 0.0722 * (1 - a));
+  const r2 = String(0.2126 - 0.2126 * (1 - a));
+  const g2 = String(0.7152 + 0.2848 * (1 - a));
+  const b2 = String(0.0722 - 0.0722 * (1 - a));
+  const r3 = String(0.2126 - 0.2126 * (1 - a));
+  const g3 = String(0.7152 - 0.7152 * (1 - a));
+  const b3 = String(0.0722 + 0.9278 * (1 - a));
+  const matrix = `${r} ${g} ${b} 0 0 ${r2} ${g2} ${b2} 0 0 ${r3} ${g3} ${b3} 0 0 0 0 0 1 0`;
+
+  return `<feColorMatrix type="matrix" values="${matrix}"/>`;
+}
+
+function renderSepiaMatrix(amount: number): string {
+  const a = Math.max(0, Math.min(1, amount));
+  const r = String(0.393 + 0.607 * (1 - a));
+  const g = String(0.769 - 0.769 * (1 - a));
+  const b = String(0.189 - 0.189 * (1 - a));
+  const r2 = String(0.349 - 0.349 * (1 - a));
+  const g2 = String(0.686 + 0.314 * (1 - a));
+  const b2 = String(0.168 - 0.168 * (1 - a));
+  const r3 = String(0.272 - 0.272 * (1 - a));
+  const g3 = String(0.534 - 0.534 * (1 - a));
+  const b3 = String(0.131 + 0.869 * (1 - a));
+  const matrix = `${r} ${g} ${b} 0 0 ${r2} ${g2} ${b2} 0 0 ${r3} ${g3} ${b3} 0 0 0 0 0 1 0`;
+
+  return `<feColorMatrix type="matrix" values="${matrix}"/>`;
+}
+
+/**
+ * `invert(a)` per CSS: out = 1 - 2a + 2a*in, clamped. Implemented
+ * via `<feComponentTransfer>` with linear funcR/G/B. Same form
+ * works for `brightness(a)` (slope=a, intercept=0) and
+ * `contrast(a)` (slope=a, intercept=0.5*(1-a)).
+ */
+function renderInvertComponentTransfer(amount: number): string {
+  const slope = String(1 - 2 * amount);
+  const intercept = String(amount);
+
+  return `<feComponentTransfer><feFuncR type="linear" slope="${slope}" intercept="${intercept}"/><feFuncG type="linear" slope="${slope}" intercept="${intercept}"/><feFuncB type="linear" slope="${slope}" intercept="${intercept}"/></feComponentTransfer>`;
+}
+
+function renderBrightnessComponentTransfer(amount: number): string {
+  const slope = String(amount);
+
+  return `<feComponentTransfer><feFuncR type="linear" slope="${slope}"/><feFuncG type="linear" slope="${slope}"/><feFuncB type="linear" slope="${slope}"/></feComponentTransfer>`;
+}
+
+function renderContrastComponentTransfer(amount: number): string {
+  const slope = String(amount);
+  const intercept = String((1 - amount) / 2);
+
+  return `<feComponentTransfer><feFuncR type="linear" slope="${slope}" intercept="${intercept}"/><feFuncG type="linear" slope="${slope}" intercept="${intercept}"/><feFuncB type="linear" slope="${slope}" intercept="${intercept}"/></feComponentTransfer>`;
+}
+
+/**
+ * Render a `<pattern>` def for `fill.kind === 'pattern'` /
+ * `'picture'`. The pattern body references the asset id as the
+ * `<image href>`; consumers resolve assets via their own registry.
+ */
+function renderPatternDef(id: string, fill: PatternFill | PictureFill, elementWidth: number, elementHeight: number): string {
+  const width = elementWidth > 0 ? elementWidth : 100;
+  const height = elementHeight > 0 ? elementHeight : 100;
+  // SVG pattern coords: `userSpaceOnUse` so width/height align with
+  // the element's user-space box. Repeat is implicit (pattern tiles)
+  // unless the caller is a `picture` fill with mode `'stretch'` —
+  // the pattern matches the element exactly so a single image fills
+  // the box without tiling.
+  const patternUnits = 'userSpaceOnUse';
+  const href = fill.assetId;
+  const inner = `<image href="${escapeXml(href)}" xlink:href="${escapeXml(href)}" width="${String(width)}" height="${String(height)}" preserveAspectRatio="${fill.kind === 'picture' && fill.mode === 'stretch' ? 'none' : 'xMidYMid meet'}"/>`;
+
+  return `<pattern id="${id}" patternUnits="${patternUnits}" width="${String(width)}" height="${String(height)}">${inner}</pattern>`;
+}
+
+/**
+ * Render a `<mask>` def for an element with a custom mask path.
+ * The mask's `<path>` carries the supplied `customClipPath` `d` value;
+ * the element references it via `mask="url(#…)"`.
+ */
+function renderMaskDef(id: string, maskPath: string, fillCss: string): string {
+  // SVG mask convention: white = visible, black = hidden. The
+  // path fills with `fillCss` (white by default) so the masked
+  // shape shows through the path's geometry.
+  return `<mask id="${id}" maskUnits="userSpaceOnUse"><path d="${escapeXml(maskPath)}" fill="${escapeXml(fillCss)}"/></mask>`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -382,6 +549,62 @@ function collectGradientFillOverride(el: BroadsetElement, defs: DefsCollector): 
   return ` fill="url(#${id})"`;
 }
 
+/**
+ * Pattern / picture fill: emit a `<pattern>` def referencing the
+ * asset id; element gets `fill="url(#…)"`. Picture fills with
+ * `mode === 'stretch'` use `preserveAspectRatio="none"` so the
+ * single image fills the box without tiling.
+ */
+function collectPatternFillOverride(el: BroadsetElement, defs: DefsCollector): string {
+  const fill = el.style.fill;
+
+  if (fill.kind !== 'pattern' && fill.kind !== 'picture') {
+    return '';
+  }
+
+  const key = `pattern:${JSON.stringify(fill)}:${String(el.width)}:${String(el.height)}`;
+  const id = defs.register('pattern', key, (patternId) => renderPatternDef(patternId, fill, el.width, el.height));
+
+  return ` fill="url(#${id})"`;
+}
+
+/**
+ * `<mask>` for elements that declare both a `customClipPath` and
+ * a non-`none` `maskType`. The mask def carries the path with a
+ * white fill (visible) so the resulting alpha follows the path
+ * geometry. Plain `customClipPath` (no `maskType`) still uses the
+ * `<clipPath>` path via `collectClipAttr`.
+ */
+function collectMaskAttr(el: BroadsetElement, defs: DefsCollector): string {
+  const maskType = el.style.maskType;
+  const maskPath = el.style.customClipPath;
+
+  if (maskType === undefined || maskType === 'none' || typeof maskPath !== 'string' || maskPath === '') {
+    return '';
+  }
+
+  // SVG mask convention: white = visible, black = hidden. Both
+  // alpha and luminance mask types produce a path filled with
+  // white so the masked shape shows through where the path
+  // covers — luminance just samples brightness instead of alpha.
+  const fillCss = '#ffffff';
+  const id = defs.register('mask', `mask:${maskType}:${maskPath}`, (maskId) => renderMaskDef(maskId, maskPath, fillCss));
+
+  return ` mask="url(#${id})"`;
+}
+
+function collectStructuredFilterAttr(el: BroadsetElement, defs: DefsCollector): string {
+  const stack = el.style.filter;
+
+  if (stack === undefined || !Array.isArray(stack) || stack.length === 0) {
+    return '';
+  }
+
+  const id = defs.register('filter', `filter:${JSON.stringify(stack)}`, (filterId) => renderFilterStackDef(filterId, stack));
+
+  return ` filter="url(#${id})"`;
+}
+
 function collectShadowFilterAttr(el: BroadsetElement, defs: DefsCollector): string {
   if (!el.style.boxShadow) {
     return '';
@@ -423,6 +646,43 @@ interface RenderElementOptions {
   readonly flattenedTextElements: ReadonlyMap<string, string>;
 }
 
+/**
+ * Return the cached source markup for `el` when the importer
+ * captured one AND the user hasn't modified the element
+ * (`extensions.svg.dirty === false`). Returns `null` when the
+ * element should re-render from current state.
+ */
+function preservedMarkupFor(el: BroadsetElement): string | null {
+  const ext = el.extensions as { readonly svg?: { readonly dirty?: boolean; readonly preserved?: { readonly raw?: string; readonly mime?: string } } } | undefined;
+  const svg = ext?.svg;
+
+  if (svg === undefined) return null;
+  if (svg.dirty !== false) return null;
+
+  const raw = svg.preserved?.raw;
+
+  if (typeof raw !== 'string' || raw === '') return null;
+
+  return decodeBase64Utf8(raw);
+}
+
+function decodeBase64Utf8(raw: string): string {
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(raw, 'base64').toString('utf8');
+  }
+
+  // Browser path: decode base64 → bytes → UTF-8 string. Avoids
+  // the deprecated `escape` / `unescape` legacy helpers.
+  const binary = atob(raw);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
 function renderElement(
   el: BroadsetElement,
   defs: DefsCollector,
@@ -436,11 +696,32 @@ function renderElement(
     return flatSubstitute;
   }
 
+  // Byte preservation fast path: if the element's
+  // `extensions.svg.dirty` is false AND the importer captured a
+  // `preserved.raw` blob (base64 outerHTML), re-emit the cached
+  // markup verbatim. Closes the spec acceptance "Re-exporting an
+  // untouched document produces output with preserved elements
+  // identical to the source".
+  const preserved = preservedMarkupFor(el);
+
+  if (preserved !== null) {
+    return preserved;
+  }
+
   const transform = buildTransform(el);
   const styleAttrs = buildStyleAttrs(el.style);
   const clipAttr = collectClipAttr(el, defs);
-  const fillOverride = collectGradientFillOverride(el, defs);
-  const filterAttr = collectShadowFilterAttr(el, defs);
+  const maskAttr = collectMaskAttr(el, defs);
+  const gradientFill = collectGradientFillOverride(el, defs);
+  const patternFill = collectPatternFillOverride(el, defs);
+  const fillOverride = gradientFill !== '' ? gradientFill : patternFill;
+  // `style.filter` (structured FilterStack) is the modern path;
+  // `style.boxShadow` is the legacy CSS shadow string. The
+  // structured filter wins when both are present — `boxShadow`
+  // is folded into the same `<feDropShadow>` primitive on import.
+  const structuredFilterAttr = collectStructuredFilterAttr(el, defs);
+  const shadowFilterAttr = collectShadowFilterAttr(el, defs);
+  const filterAttr = structuredFilterAttr !== '' ? structuredFilterAttr : shadowFilterAttr;
   const markerAttrs = collectArrowMarkerAttrs(el, defs);
   const tagAttrs = options.includeElementTagging
     ? buildElementTagAttrs(el, resolveFingerprint(fingerprints, el.id))
@@ -449,7 +730,7 @@ function renderElement(
   // once on the element's opening tag. Mixing it in here would
   // duplicate the attributes on elements whose open tag already
   // emits `tagAttrs` explicitly (group / svg / qrcode).
-  const extras = clipAttr + filterAttr + markerAttrs;
+  const extras = clipAttr + maskAttr + filterAttr + markerAttrs;
 
   switch (el.type) {
     case 'path':

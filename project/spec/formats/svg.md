@@ -95,11 +95,11 @@ Scoring legend for each of the three columns (Export, Import, Round-trip):
 | Transforms | `skewX` / `skewY` | n/a (not in Broadset fields per IO-D-02) | native (baked to path) | baked |
 | Transforms | `matrix` | n/a (composed from above) | native (baked to path when non-decomposable) | baked |
 | Masks | `<clipPath>` | native (`customClipPath` style → `<clipPath>` def) | native | native |
-| Masks | `<mask>` | **deferred (see §Spec Gaps — filter / mask / pattern export coverage)** | n/a | n/a |
-| Masks | `<pattern>` | **deferred (see §Spec Gaps — filter / mask / pattern export coverage)** | n/a | n/a |
+| Masks | `<mask>` | native (`<mask>` def emitted when `style.maskType !== 'none'`, deduplicated by content hash) | n/a | n/a |
+| Masks | `<pattern>` (pattern fill) | native (`<pattern>` def with `<image>` body for `fill.kind === 'pattern' \| 'picture'`, deduplicated by content hash) | n/a | n/a |
 | Filters | `box-shadow` / drop-shadow | native (`<filter><feDropShadow>`, deduplicated by content hash) | native | native |
-| Filters | Blur | **deferred (see §Spec Gaps — filter / mask / pattern export coverage)** | n/a | n/a |
-| Filters | Structured `FilterPrimitive[]` (hue-rotate, saturate, grayscale, sepia, invert, brightness, contrast) | **deferred (see §Spec Gaps — filter / mask / pattern export coverage)** | n/a | n/a |
+| Filters | Blur | native (`<feGaussianBlur>` via `style.filter` `FilterStack`) | n/a | n/a |
+| Filters | Structured `FilterPrimitive[]` (hue-rotate, saturate, grayscale, sepia, invert, brightness, contrast) | native (`<feColorMatrix>` / `<feComponentTransfer>` per primitive, content-hash-deduped) | n/a | n/a |
 | Images | Embedded (data URI) | native | native | native |
 | Images | External reference (URL) | native | native | native |
 | Colour | sRGB hex / `rgb()` / `rgba()` | native | native | native |
@@ -639,8 +639,7 @@ This spec is authoritative for the SVG track (Phase 7). As units land, the follo
 - **Structural `<use>` / `<symbol>` round-trip.** Current target: dereference to inline groups on import (visually identical, structurally flattened). Reconstructing `<use>` relationships on export is not in scope for the initial track.
 - **Animated imports from third-party SMIL SVGs.** Currently SMIL is treated as static (IN state extracted via element geometry; animation commands dropped with a warning). Full SMIL parsing → Broadset `animations` mapping is a future feature.
 - **Pseudo-class resolution.** `css-tree` parses pseudo-classes but the importer cannot evaluate `:hover` / `:nth-child` etc. against a static tree — a warning surfaces and the selector is dropped from matching. Attribute selectors (`[attr]`, `[attr=value]`, `[attr~=word]`, `[attr|=prefix]`, `[attr^=prefix]`, `[attr$=suffix]`, `[attr*=substring]`), CSS combinators (`>`, `+`, `~`, descendant space), and `:not(<simple>)` DO resolve as of P7.7e — they no longer fall through. State pseudo-classes remain the only unresolved selector surface.
-- **Dirty-flag byte preservation on re-export.** The model carries `extensions.svg.dirty` per element, and the importer initialises it to `false` for every element on import (P7.4 / P7.7g). The exporter does NOT yet read this flag — every export currently re-renders from current state, so a third-party-edited SVG re-imported into Broadset and re-exported untouched will not produce identical bytes. The acceptance criterion "Re-exporting an untouched document produces output with preserved elements identical to the source" is therefore not yet met. Implementation requires `export.ts` to keep a per-element preservation cache (the original sanitised XML fragment) and emit it verbatim when `dirty === false`. Tracked here for a future P7.8 unit.
-- **Filter / mask / pattern export coverage.** The feature matrix above lists `<feGaussianBlur>`, structured `FilterPrimitive[]` (`<feColorMatrix>`), `<mask>`, and `<pattern>` as native exports. The current exporter only emits `<feDropShadow>` (for `boxShadow`) and gradient defs. Other filter primitives, masks, and patterns fall back to consumer-side rendering with no SVG primitive emitted. Tracked here so the matrix isn't read as a guarantee until the implementation lands.
+- **Glyph flatten on import** for third-party SVGs that author baked text via inherited scale. Currently the importer warns and drops the scale to translate-only when a text element sits under a baking ancestor (P7.7g). Implementing import-side glyph flatten would require fontkit on the import path and asset resolution for the source font — meaningful work that doesn't currently have a customer surface.
 - **Text scale / skew on import.** When a third-party SVG carries an inherited scale or skew transform on a `<text>` element, the importer drops the scale/skew to a translate-only position and emits a warning (P7.7g). Broadset's text element has no native scale field per IO-D-02, and the import-time "flatten-to-paths" path is an export-only feature. Future implementation could opt in to glyph-flattening on import for tools that author baked text.
 
 _The following items are intentionally scoped out of the SVG track and tracked by other specs:_

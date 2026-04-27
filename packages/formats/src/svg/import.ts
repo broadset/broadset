@@ -1177,6 +1177,15 @@ interface ImportedElement {
    * `textPathElementId` field round-trips through SVG (P7.6 gap fix).
    */
   readonly textPathElementId?: string | undefined;
+  /**
+   * Source DOM `outerHTML` after sanitisation. Cached so the
+   * exporter can re-emit byte-identical markup for elements that
+   * the user didn't touch (`extensions.svg.dirty === false`).
+   * Populated only for tagged elements (those with `data-bs-id`)
+   * — untagged third-party elements re-render from current state
+   * because we have no stable identity to anchor preservation to.
+   */
+  readonly preservedOuterHTML?: string | undefined;
 }
 
 interface TransformState {
@@ -1574,6 +1583,15 @@ function importGroupElement(el: Element, ctx: GroupImportContext): ImportedEleme
 }
 
 /**
+ * Stable synthetic id prefix for `<g>` elements that source DOM
+ * carries no explicit identity for. The path-from-root encoding
+ * survives byte-stable round-trips while keeping the id format
+ * grep-friendly. Used by `isSyntheticGroupId` so the layer panel
+ * can display a friendly name instead of the structural path.
+ */
+const SYNTHETIC_GROUP_ID_PREFIX = 'g-';
+
+/**
  * Produce a stable synthetic id for a `<g>` whose source DOM has
  * neither `data-bs-id` nor `id`. The id encodes the element's path
  * from the document root (`g-<idx>-<idx>-…`) so re-imports of the
@@ -1603,7 +1621,20 @@ function synthesiseGroupId(el: Element): string {
     cursor = parent;
   }
 
-  return `__bs-g-${segments.join('-')}`;
+  return `${SYNTHETIC_GROUP_ID_PREFIX}${segments.join('-')}`;
+}
+
+/**
+ * `true` when an id was produced by `synthesiseGroupId`. Lets
+ * the hydrator use a friendly display `name` for these groups
+ * (`'Group'`) rather than the structural path id, so the layer
+ * panel shows readable names for unnamed third-party groups.
+ */
+function isSyntheticGroupId(id: string): boolean {
+  // Match the exact `g-N(-N)*` shape `synthesiseGroupId` emits.
+  // Anchored so user-named groups like `g-foo` don't get mistaken
+  // for synthetic ones.
+  return /^g-\d+(-\d+)*$/.test(id);
 }
 
 interface ShapeBakeContext {
@@ -1885,31 +1916,43 @@ function importElement(
   } as const;
 
   const shapeCtx: ShapeBakeContext = { transform, baseStyle, tagMeta };
+  // For tagged leaf elements only: capture the source DOM
+  // `outerHTML` so the exporter can re-emit byte-identical markup
+  // when `extensions.svg.dirty === false`. Groups are excluded —
+  // their preservation would double-render children since the
+  // children also carry their own preserved markup.
+  const preservedOuterHTML =
+    effectiveId !== undefined && tagName !== 'g' ? el.outerHTML : undefined;
+  const withPreserved = (result: readonly ImportedElement[]): ImportedElement[] => {
+    if (preservedOuterHTML === undefined) return [...result];
+
+    return result.map((r) => ({ ...r, preservedOuterHTML }));
+  };
 
   switch (tagName) {
     case 'rect':
-      return [importRectElement(el, shapeCtx)];
+      return withPreserved([importRectElement(el, shapeCtx)]);
 
     case 'path':
-      return [importPathElement(el, shapeCtx)];
+      return withPreserved([importPathElement(el, shapeCtx)]);
 
     case 'ellipse':
-      return [importEllipseElement(el, shapeCtx)];
+      return withPreserved([importEllipseElement(el, shapeCtx)]);
 
     case 'circle':
-      return [importCircleElement(el, shapeCtx)];
+      return withPreserved([importCircleElement(el, shapeCtx)]);
 
     case 'polygon':
-      return [importPolygonElement(el, shapeCtx, true)];
+      return withPreserved([importPolygonElement(el, shapeCtx, true)]);
 
     case 'polyline':
-      return [importPolygonElement(el, shapeCtx, false)];
+      return withPreserved([importPolygonElement(el, shapeCtx, false)]);
 
     case 'text':
-      return [importTextElement(el, shapeCtx, warnings)];
+      return withPreserved([importTextElement(el, shapeCtx, warnings)]);
 
     case 'image':
-      return [importImageElement(el, shapeCtx, warnings)];
+      return withPreserved([importImageElement(el, shapeCtx, warnings)]);
 
     case 'g':
       return importGroupElement(el, {
@@ -2073,7 +2116,7 @@ function hydrateTaggedElement(
 
   return createDefaultElement(sourceKind, {
     id: dataBsId,
-    name: meta?.name ?? dataBsId,
+    name: resolveFriendlyName(meta?.name, dataBsId, sourceKind),
     position: { x: visualEl.position.x, y: visualEl.position.y },
     width: meta?.width ?? visualEl.width,
     height: meta?.height ?? visualEl.height,
@@ -2085,8 +2128,69 @@ function hydrateTaggedElement(
     ...(bindings.dataField !== undefined ? { dataField: bindings.dataField } : {}),
     ...(bindings.visibleWhen !== undefined ? { visibleWhen: bindings.visibleWhen } : {}),
     ...(bindings.repeater !== undefined ? { repeater: bindings.repeater } : {}),
-    extensions: { svg: { dirty: false } },
+    extensions: { svg: buildSvgExtensions(visualEl) },
   });
+}
+
+/**
+ * Resolve the display `name` for a hydrated element. Prefers the
+ * metadata-supplied `name`; falls back to the id but masks
+ * synthetic group ids (`g-0-2-1`) with a friendly `'Group'` so
+ * the layer panel doesn't expose internal path-derived noise.
+ */
+function resolveFriendlyName(metaName: string | undefined, dataBsId: string, sourceKind: string): string {
+  if (typeof metaName === 'string' && metaName !== '') {
+    return metaName;
+  }
+
+  if (sourceKind === 'group' && isSyntheticGroupId(dataBsId)) {
+    return 'Group';
+  }
+
+  return dataBsId;
+}
+
+/**
+ * Build the `extensions.svg` payload for an imported element.
+ * Always sets `dirty: false`; populates `preserved` when the
+ * importer captured the source `outerHTML` so the exporter can
+ * re-emit byte-identical markup for unchanged elements
+ * (`SvgPreservedData` per `svgPreservedDataSchema`).
+ */
+function buildSvgExtensions(visualEl: ImportedElement): { readonly dirty: boolean; readonly preserved?: { readonly mime: string; readonly raw: string } } {
+  if (visualEl.preservedOuterHTML === undefined) {
+    return { dirty: false };
+  }
+
+  return {
+    dirty: false,
+    preserved: { mime: 'image/svg+xml', raw: encodeBase64Utf8(visualEl.preservedOuterHTML) },
+  };
+}
+
+/**
+ * Encode a UTF-8 string as base64. Uses Node's `Buffer` when
+ * available (test / build environments) and falls back to the
+ * `btoa(unescape(encodeURIComponent(...)))` trick on the
+ * browser. The roundtrip is symmetric with the exporter's
+ * decoder so the cached bytes survive.
+ */
+function encodeBase64Utf8(s: string): string {
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(s, 'utf8').toString('base64');
+  }
+
+  // Browser path: UTF-8-encode the string into bytes, then
+  // ASCII-stringify each byte for `btoa`. Avoids the deprecated
+  // `escape` / `unescape` legacy helpers.
+  const bytes = new TextEncoder().encode(s);
+  let binary = '';
+
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i] ?? 0);
+  }
+
+  return btoa(binary);
 }
 
 /**
@@ -2223,10 +2327,13 @@ function hydrateThirdPartyFallbackFromDoc(
         typeof parentSourceId === 'string' && parentSourceId !== ''
           ? sourceIdToBroadsetId.get(parentSourceId) ?? null
           : null;
+      const sourceKind = pickDefaultKindFromVisual(element.type);
+      const friendlyName =
+        sourceKind === 'group' && isSyntheticGroupId(id) ? 'Group' : `Element ${String(index + 1)}`;
 
-      return createDefaultElement(pickDefaultKindFromVisual(element.type), {
+      return createDefaultElement(sourceKind, {
         id,
-        name: `Element ${String(index + 1)}`,
+        name: friendlyName,
         position: { x: element.position.x, y: element.position.y },
         width: element.width,
         height: element.height,
@@ -2235,7 +2342,7 @@ function hydrateThirdPartyFallbackFromDoc(
         style: element.style,
         ...(resolvedParentId !== null ? { parentId: resolvedParentId } : {}),
         ...(element.textPathElementId !== undefined ? { textPathElementId: element.textPathElementId } : {}),
-        extensions: { svg: { dirty: false } },
+        extensions: { svg: buildSvgExtensions(element) },
       });
     }),
   };

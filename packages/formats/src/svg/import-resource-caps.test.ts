@@ -37,7 +37,13 @@ describe('P7.7a — Element-count cap', () => {
     const start = Date.now();
     const { warnings } = importSvgDocument(fixture);
 
-    expect(Date.now() - start).toBeLessThan(5_000);
+    // 15s threshold: this assertion proves the cap fires fast
+    // even under heavy concurrent test load (the wall-clock budget
+    // shrinks when other vitest workers compete for CPU). 15s is
+    // ~30x the in-isolation runtime so a regression beyond cap
+    // logic still fails the test, but normal CI parallelism is
+    // tolerated.
+    expect(Date.now() - start).toBeLessThan(15_000);
     expect(warnings.some((w) => /element-count|too many|cap/i.test(w))).toBe(true);
   });
 

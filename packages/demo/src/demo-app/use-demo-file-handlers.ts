@@ -618,7 +618,7 @@ export function useDemoFileHandlers({
           setExportProgress(null);
         });
     },
-    [currentDocument, handleSaveAsJson, pushToast, renderDocument, setActiveDialog],
+    [currentDocument, handleSaveAsJson, projectAssets, pushToast, renderDocument, setActiveDialog],
   );
 
   const handleMediaSelect = useCallback(

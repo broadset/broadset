@@ -114,6 +114,25 @@ describe('P7.7e — third-party group hierarchy', () => {
   });
 
   /**
+   * @description An unnamed group's display `name` MUST be
+   * `'Group'` rather than the synthetic path-derived id
+   * (`g-0-2-1`). Closes the P7.7g review #4 cosmetic finding —
+   * synthetic ids stay for round-trip stability but never reach
+   * user-visible surfaces (layer panel, metadata).
+   */
+  it('uses a friendly Group name for unnamed third-party <g> elements', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <g><rect width="50" height="50"/></g>
+    </svg>`;
+    const { document } = importSvgDocument(input);
+    const group = document.elements.find((el) => el.type === 'group');
+
+    expect(group).toBeDefined();
+    expect(group?.name).toBe('Group');
+    expect(group?.id).toMatch(/^g-\d/); // structural id still preserved for round-trip
+  });
+
+  /**
    * @description An UNNAMED `<g>` (no `id` attribute, no
    * `data-bs-id`) — typical of Figma / Illustrator / Inkscape
    * exports — MUST still emit a Broadset `'group'` element with
