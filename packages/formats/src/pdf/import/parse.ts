@@ -1,5 +1,6 @@
 import {
   EncryptedPDFError,
+  PDFArray,
   PDFBool,
   PDFDict,
   PDFDocument,
@@ -248,27 +249,79 @@ export function collectEmbeddedFileNames(pdf: PDFDocument): readonly string[] {
   return collectNameTreeLabels(embeddedFilesNode);
 }
 
+/**
+ * Walk a PDF name-tree node collecting the leaf name strings. PDF
+ * spec §7.9.6 — name-tree nodes carry `/Names` as an alternating
+ * `[name, value, name, value, ...]` PDFArray of leaf entries OR
+ * `/Kids` as a PDFArray of refs to child name-tree dicts.
+ *
+ * Tolerates both spec-compliant PDFArray shape (Acrobat / Illustrator
+ * / InDesign output) AND the legacy PDFDict-of-name-to-value shape
+ * some tools emit. The previous implementation only accepted PDFDict
+ * — pdf-lib threw `UnexpectedObjectTypeError` on every Adobe-style
+ * embedded-files name tree.
+ */
 function collectNameTreeLabels(node: PDFDict): readonly string[] {
-  const labels: string[] = [];
-  const namesArray = node.lookupMaybe(PDFName.of('Names'), PDFDict);
+  return [
+    ...collectFromNamesEntry(node.get(PDFName.of('Names'))),
+    ...collectFromKidsEntry(node.context, node.get(PDFName.of('Kids'))),
+  ];
+}
 
-  if (namesArray !== undefined) {
-    for (const [key] of namesArray.entries()) {
-      labels.push(key.decodeText());
-    }
+function collectFromNamesEntry(value: unknown): readonly string[] {
+  if (value instanceof PDFArray) return collectNamesFromArray(value);
+  if (value instanceof PDFDict) return collectNamesFromDict(value);
+
+  return [];
+}
+
+function collectNamesFromArray(array: PDFArray): readonly string[] {
+  const labels: string[] = [];
+
+  // Spec-compliant: /Names is `[name1, ref1, name2, ref2, ...]`.
+  // Iterate even indices for the name strings; ignore value refs.
+  for (let i = 0; i < array.size(); i += 2) {
+    const entry = array.get(i);
+
+    if (entry instanceof PDFString) labels.push(entry.decodeText());
   }
 
-  const kids = node.lookupMaybe(PDFName.of('Kids'), PDFDict);
+  return labels;
+}
 
-  if (kids !== undefined) {
-    for (const [, kid] of kids.entries()) {
-      if (kid instanceof PDFDict) {
-        labels.push(...collectNameTreeLabels(kid));
-      }
+function collectNamesFromDict(dict: PDFDict): readonly string[] {
+  const labels: string[] = [];
+
+  for (const [key] of dict.entries()) {
+    labels.push(key.decodeText());
+  }
+
+  return labels;
+}
+
+function collectFromKidsEntry(context: PDFDict['context'], value: unknown): readonly string[] {
+  if (!(value instanceof PDFArray)) return [];
+
+  const labels: string[] = [];
+
+  for (let i = 0; i < value.size(); i++) {
+    const entry = value.get(i);
+    const resolved = entry instanceof PDFRef ? safeContextLookup(context, entry) : entry;
+
+    if (resolved instanceof PDFDict) {
+      labels.push(...collectNameTreeLabels(resolved));
     }
   }
 
   return labels;
+}
+
+function safeContextLookup(context: { lookup(ref: PDFRef): unknown }, ref: PDFRef): unknown {
+  try {
+    return context.lookup(ref);
+  } catch {
+    return undefined;
+  }
 }
 
 /**
