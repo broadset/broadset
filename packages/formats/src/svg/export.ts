@@ -294,7 +294,11 @@ function objectFitToPreserveAspectRatio(objectFit: string | undefined): string {
   }
 }
 
-function buildTransform(el: BroadsetElement): string {
+function buildTransformAttr(value: string): string {
+  return value.length > 0 ? ` transform="${value}"` : '';
+}
+
+function buildTransformValue(el: BroadsetElement): string {
   const parts: string[] = [];
 
   if (el.position.x !== 0 || el.position.y !== 0) {
@@ -305,7 +309,14 @@ function buildTransform(el: BroadsetElement): string {
     parts.push(`rotate(${String(el.rotation)},${String(el.width / 2)},${String(el.height / 2)})`);
   }
 
-  return parts.length > 0 ? ` transform="${parts.join(' ')}"` : '';
+  return parts.join(' ');
+}
+
+function mergeTransformValues(parent: string, child: string): string {
+  if (parent === '') return child;
+  if (child === '') return parent;
+
+  return `${parent} ${child}`;
 }
 
 function buildStyleAttrs(style: BroadsetElementStyle): string {
@@ -804,7 +815,16 @@ function collectArrowMarkerAttrs(el: BroadsetElement, defs: DefsCollector): stri
 interface RenderElementOptions {
   readonly includeElementTagging: boolean;
   readonly flattenedTextElements: ReadonlyMap<string, string>;
+  readonly flattenGroups: boolean;
   readonly assetResolver?: ((assetId: string) => string | undefined) | undefined;
+}
+
+interface RenderElementContext {
+  readonly defs: DefsCollector;
+  readonly childrenByParent: ReadonlyMap<string, readonly BroadsetElement[]>;
+  readonly fingerprints: ReadonlyMap<string, string>;
+  readonly options: RenderElementOptions;
+  readonly inheritedTransform: string;
 }
 
 /**
@@ -879,16 +899,49 @@ function decodeBase64Utf8(raw: string): string {
   return new TextDecoder('utf-8').decode(bytes);
 }
 
+function renderFlattenedTextSubstitute(el: BroadsetElement, context: RenderElementContext): string | null {
+  const flatSubstitute = context.options.flattenedTextElements.get(el.id);
+
+  if (flatSubstitute === undefined) {
+    return null;
+  }
+
+  if (context.options.flattenGroups && context.inheritedTransform !== '') {
+    return `<g transform="${context.inheritedTransform}">${flatSubstitute}</g>`;
+  }
+
+  return flatSubstitute;
+}
+
+function renderGroupElement(
+  el: BroadsetElement,
+  context: RenderElementContext,
+  effectiveTransform: string,
+  transform: string,
+  extras: string,
+  tagAttrs: string,
+): string {
+  const children = context.childrenByParent.get(el.id) ?? [];
+  const childInheritedTransform = context.options.flattenGroups ? effectiveTransform : '';
+  const childMarkup = children
+    .map((child) => renderElement(child, { ...context, inheritedTransform: childInheritedTransform }))
+    .join('');
+  const groupTransform = context.options.flattenGroups ? '' : transform;
+
+  return `<g id="${escapeXml(el.id)}"${groupTransform}${extras}${tagAttrs}>${childMarkup}</g>`;
+}
+
 function renderElement(
   el: BroadsetElement,
-  defs: DefsCollector,
-  childrenByParent: ReadonlyMap<string, readonly BroadsetElement[]>,
-  fingerprints: ReadonlyMap<string, string>,
-  options: RenderElementOptions,
+  context: RenderElementContext,
 ): string {
-  const flatSubstitute = options.flattenedTextElements.get(el.id);
+  const ownTransform = buildTransformValue(el);
+  const effectiveTransform =
+    context.options.flattenGroups ? mergeTransformValues(context.inheritedTransform, ownTransform) : ownTransform;
+  const transform = buildTransformAttr(effectiveTransform);
+  const flatSubstitute = renderFlattenedTextSubstitute(el, context);
 
-  if (flatSubstitute !== undefined) {
+  if (flatSubstitute !== null) {
     return flatSubstitute;
   }
 
@@ -904,23 +957,24 @@ function renderElement(
     return preserved;
   }
 
-  const transform = buildTransform(el);
   const styleAttrs = buildStyleAttrs(el.style);
-  const clipAttr = collectClipAttr(el, defs);
-  const maskAttr = collectMaskAttr(el, defs);
-  const gradientFill = collectGradientFillOverride(el, defs);
-  const patternFill = collectPatternFillOverride(el, defs, options.assetResolver);
+  const clipAttr = collectClipAttr(el, context.defs);
+  const maskAttr = collectMaskAttr(el, context.defs);
+  const gradientFill = collectGradientFillOverride(el, context.defs);
+  const patternFill = collectPatternFillOverride(el, context.defs, context.options.assetResolver);
   const fillOverride = gradientFill !== '' ? gradientFill : patternFill;
   // `style.filter` (structured FilterStack) is the modern path;
   // `style.boxShadow` is the legacy CSS shadow string. The
   // structured filter wins when both are present — `boxShadow`
   // is folded into the same `<feDropShadow>` primitive on import.
-  const structuredFilterAttr = collectStructuredFilterAttr(el, defs);
-  const shadowFilterAttr = collectShadowFilterAttr(el, defs);
+  const structuredFilterAttr = collectStructuredFilterAttr(el, context.defs);
+  const shadowFilterAttr = collectShadowFilterAttr(el, context.defs);
   const filterAttr = structuredFilterAttr !== '' ? structuredFilterAttr : shadowFilterAttr;
-  const markerAttrs = collectArrowMarkerAttrs(el, defs);
+  const markerAttrs = collectArrowMarkerAttrs(el, context.defs);
   const tagAttrs =
-    options.includeElementTagging ? buildElementTagAttrs(el, resolveFingerprint(fingerprints, el.id)) : '';
+    context.options.includeElementTagging ?
+      buildElementTagAttrs(el, resolveFingerprint(context.fingerprints, el.id))
+    : '';
   // `extras` excludes `tagAttrs` so callers below append it exactly
   // once on the element's opening tag. Mixing it in here would
   // duplicate the attributes on elements whose open tag already
@@ -950,7 +1004,7 @@ function renderElement(
 
     case 'image': {
       const par = objectFitToPreserveAspectRatio(el.style.objectFit);
-      const resolvedHref = resolveImageHref(el, options.assetResolver);
+      const resolvedHref = resolveImageHref(el, context.options.assetResolver);
 
       return `<image id="${escapeXml(el.id)}" href="${escapeXml(resolvedHref)}" width="${String(el.width)}" height="${String(el.height)}" preserveAspectRatio="${par}"${transform}${extras}${tagAttrs}/>`;
     }
@@ -973,12 +1027,7 @@ function renderElement(
     }
 
     case 'group': {
-      const children = childrenByParent.get(el.id) ?? [];
-      const childMarkup = children
-        .map((child) => renderElement(child, defs, childrenByParent, fingerprints, options))
-        .join('');
-
-      return `<g id="${escapeXml(el.id)}"${transform}${extras}${tagAttrs}>${childMarkup}</g>`;
+      return renderGroupElement(el, context, effectiveTransform, transform, extras, tagAttrs);
     }
 
     default:
@@ -1252,6 +1301,7 @@ export async function exportSvgDocument(doc: BroadsetDocument, options?: SvgExpo
 async function exportSvgInternal(doc: BroadsetDocument, options?: SvgExportOptions): Promise<SvgExportResult> {
   const includeMetadata = options?.includeMetadata ?? true;
   const includeElementTagging = options?.includeElementTagging ?? true;
+  const flattenGroups = options?.flattenGroups ?? false;
   const fontEmbedding = options?.fontEmbedding ?? 'embed';
   const defs = new DefsCollector();
   const fontPlan: FontEmbedPlan = planFontEmbedding(doc, fontEmbedding, options?.fonts);
@@ -1259,10 +1309,17 @@ async function exportSvgInternal(doc: BroadsetDocument, options?: SvgExportOptio
   const childrenByParent = buildChildrenByParent(doc.elements);
   const rootElements = doc.elements.filter((el) => !hasNonEmptyParentId(el));
   const elementNodes = rootElements.map((el) =>
-    renderElement(el, defs, childrenByParent, fingerprints, {
-      includeElementTagging,
-      flattenedTextElements: fontPlan.flattenedTextElements,
-      ...(options?.assetResolver !== undefined ? { assetResolver: options.assetResolver } : {}),
+    renderElement(el, {
+      defs,
+      childrenByParent,
+      fingerprints,
+      inheritedTransform: '',
+      options: {
+        includeElementTagging,
+        flattenGroups,
+        flattenedTextElements: fontPlan.flattenedTextElements,
+        ...(options?.assetResolver !== undefined ? { assetResolver: options.assetResolver } : {}),
+      },
     }),
   );
   const defsParts: string[] = [];

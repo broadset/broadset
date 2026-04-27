@@ -207,6 +207,28 @@ describe('P7.2 — Recursive group rendering', () => {
     expect(svg.slice(grpBIdx, endGrpBIdx)).toContain('id="ch-b"');
     expect(svg.slice(grpBIdx, endGrpBIdx)).not.toContain('id="ch-a"');
   });
+
+  /**
+   * @description `flattenGroups` is an export compatibility option:
+   * group structure remains in the SVG, but group-level transforms
+   * are composed into descendant transforms so strict consumers do
+   * not need to apply nested group transforms.
+   */
+  it('composes group transforms into children when flattenGroups is enabled', async () => {
+    const doc = makeDocument({
+      elements: [
+        makeElement({ id: 'grp-1', type: 'group', position: { x: 40, y: 20 }, rotation: 15 }),
+        makeElement({ id: 'child-1', type: 'rectangle', parentId: 'grp-1', position: { x: 10, y: 5 } }),
+      ],
+    });
+
+    const svg = await exportSvgString(doc, { flattenGroups: true });
+    const groupOpen = svg.match(/<g id="grp-1"[^>]*>/)?.[0] ?? '';
+    const childOpen = svg.match(/<rect id="child-1"[^>]*>/)?.[0] ?? '';
+
+    expect(groupOpen).not.toContain('transform=');
+    expect(childOpen).toContain('transform="translate(40,20) rotate(15,50,25) translate(10,5)"');
+  });
 });
 
 /* ------------------------------------------------------------------ */
