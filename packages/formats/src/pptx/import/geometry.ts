@@ -77,14 +77,17 @@ function custGeomToSvgD(custGeom: XmlElement): string {
   if (path === null) return '';
 
   const ops: string[] = [];
+  let cursor: PathPoint = { x: 0, y: 0 };
 
   for (const op of path.children) {
     if (op.kind !== 'element') continue;
 
-    const segment = opToSvgSegment(op);
+    const result = opToSvgSegment(op, cursor);
 
-    if (segment !== null) ops.push(segment);
-    else if (op.local === 'close') ops.push('Z');
+    if (result === null) continue;
+
+    ops.push(result.segment);
+    cursor = result.cursor;
   }
 
   const d = ops.join(' ');
@@ -98,7 +101,26 @@ function custGeomToSvgD(custGeom: XmlElement): string {
   }
 }
 
-function opToSvgSegment(op: XmlElement): string | null {
+/** OOXML angle unit: 60,000ths of a degree (`<a:arcTo>` stAng / swAng). */
+const OOXML_ANGLE_UNITS_PER_DEGREE = 60_000;
+const HALF_TURN_DEGREES = 180;
+
+interface PathPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * Convert one OOXML path operator into one SVG path segment. Tracks
+ * the current pen position via `cursor` so `<a:arcTo>` (which is
+ * relative to the current point in OOXML) can resolve to an absolute
+ * SVG arc command.
+ *
+ * Returns `{ segment, cursor }` so the caller threads the cursor
+ * forward across operators. Returns `null` when the operator is
+ * unrecognised so the caller can warn / drop.
+ */
+function opToSvgSegment(op: XmlElement, cursor: PathPoint): { readonly segment: string; readonly cursor: PathPoint } | null {
   const pts = findChildren(op, 'a:pt').map((pt) => ({
     x: parseFloat(getAttr(pt, 'x') ?? '0'),
     y: parseFloat(getAttr(pt, 'y') ?? '0'),
@@ -107,16 +129,60 @@ function opToSvgSegment(op: XmlElement): string | null {
   const p1 = pts[1];
   const p2 = pts[2];
 
-  if (op.local === 'moveTo' && p0 !== undefined) return `M ${String(p0.x)} ${String(p0.y)}`;
-  if (op.local === 'lnTo' && p0 !== undefined) return `L ${String(p0.x)} ${String(p0.y)}`;
+  if (op.local === 'moveTo' && p0 !== undefined) return { segment: `M ${String(p0.x)} ${String(p0.y)}`, cursor: p0 };
+  if (op.local === 'lnTo' && p0 !== undefined) return { segment: `L ${String(p0.x)} ${String(p0.y)}`, cursor: p0 };
 
   if (op.local === 'cubicBezTo' && p0 !== undefined && p1 !== undefined && p2 !== undefined) {
-    return `C ${String(p0.x)} ${String(p0.y)} ${String(p1.x)} ${String(p1.y)} ${String(p2.x)} ${String(p2.y)}`;
+    return { segment: `C ${String(p0.x)} ${String(p0.y)} ${String(p1.x)} ${String(p1.y)} ${String(p2.x)} ${String(p2.y)}`, cursor: p2 };
   }
 
   if (op.local === 'quadBezTo' && p0 !== undefined && p1 !== undefined) {
-    return `Q ${String(p0.x)} ${String(p0.y)} ${String(p1.x)} ${String(p1.y)}`;
+    return { segment: `Q ${String(p0.x)} ${String(p0.y)} ${String(p1.x)} ${String(p1.y)}`, cursor: p1 };
   }
 
+  if (op.local === 'arcTo') return arcToSvgSegment(op, cursor);
+  if (op.local === 'close') return { segment: 'Z', cursor };
+
   return null;
+}
+
+/**
+ * OOXML `<a:arcTo wR="…" hR="…" stAng="…" swAng="…"/>` semantics
+ * (ECMA-376 §20.1.9.6): draw an elliptical arc whose ellipse has
+ * x-radius `wR` and y-radius `hR`, starting at the current pen point
+ * (an angle of `stAng` from the ellipse centre) and sweeping by
+ * `swAng`. Both angles are in 60000ths of a degree, counter-clockwise
+ * positive in OOXML's coordinate system but clockwise in SVG (because
+ * SVG's Y axis points down). We compute the arc end point and emit a
+ * standard SVG `A` command — `svgpath.unarc()` later normalises arcs
+ * to cubics on export, so emitting an arc on import is the
+ * round-trip-safe representation.
+ */
+function arcToSvgSegment(op: XmlElement, cursor: PathPoint): { readonly segment: string; readonly cursor: PathPoint } | null {
+  const wR = parseFloat(getAttr(op, 'wR') ?? '0');
+  const hR = parseFloat(getAttr(op, 'hR') ?? '0');
+  const stAng = parseFloat(getAttr(op, 'stAng') ?? '0') / OOXML_ANGLE_UNITS_PER_DEGREE;
+  const swAng = parseFloat(getAttr(op, 'swAng') ?? '0') / OOXML_ANGLE_UNITS_PER_DEGREE;
+
+  if (wR === 0 || hR === 0) {
+    // Degenerate arc (zero-radius ellipse) — fall back to a line to
+    // the current position so the segment doesn't drop entirely.
+    return { segment: `L ${String(cursor.x)} ${String(cursor.y)}`, cursor };
+  }
+
+  const stRad = (stAng * Math.PI) / HALF_TURN_DEGREES;
+  const endRad = ((stAng + swAng) * Math.PI) / HALF_TURN_DEGREES;
+  const centerX = cursor.x - wR * Math.cos(stRad);
+  const centerY = cursor.y - hR * Math.sin(stRad);
+  const endX = centerX + wR * Math.cos(endRad);
+  const endY = centerY + hR * Math.sin(endRad);
+  const largeArc = Math.abs(swAng) > HALF_TURN_DEGREES ? 1 : 0;
+  // OOXML and SVG both treat positive sweep as the same orientation
+  // for a y-down coordinate system used by both formats here.
+  const sweep = swAng > 0 ? 1 : 0;
+
+  return {
+    segment: `A ${String(wR)} ${String(hR)} 0 ${String(largeArc)} ${String(sweep)} ${String(endX)} ${String(endY)}`,
+    cursor: { x: endX, y: endY },
+  };
 }
