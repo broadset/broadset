@@ -34,9 +34,30 @@ export interface ExportContext {
   readonly onProgress?: (progress: number, stage?: string) => void;
 }
 
+export interface ImportReconciliationElement {
+  readonly id: string;
+  readonly name?: string;
+  readonly description?: string;
+}
+
+export interface ImportReconciliationData {
+  readonly modifications: readonly ImportReconciliationElement[];
+  readonly additions: readonly ImportReconciliationElement[];
+  readonly deletions: readonly ImportReconciliationElement[];
+  readonly recoveredByHash: readonly ImportReconciliationElement[];
+}
+
 export interface ImportDocumentResult {
   readonly document: BroadsetDocument;
   readonly warnings: readonly string[];
+  /**
+   * Populated for PPTX re-imports of Broadset-exported files —
+   * surfaces the four reconcile buckets so the demo opens
+   * `FormatReconciliationModal` instead of the flat-string
+   * `FormatImportWarningsModal`. `null` for arbitrary third-party
+   * files and for non-PPTX formats.
+   */
+  readonly reconciliation?: ImportReconciliationData | null;
 }
 
 /**

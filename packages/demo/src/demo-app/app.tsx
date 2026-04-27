@@ -329,6 +329,7 @@ export function DemoApp(): React.JSX.Element {
   }, []);
 
   const {
+    dismissImportReconciliationModal,
     dismissImportWarningsModal,
     exportProgress,
     handleCreateFromPreset,
@@ -343,6 +344,7 @@ export function DemoApp(): React.JSX.Element {
     handleSaveDocument,
     handleSaveSnapshot,
     handleTemplateSelect,
+    importReconciliationModal,
     importWarningsModal,
   } = useDemoFileHandlers({
     currentDocument,
@@ -689,6 +691,8 @@ export function DemoApp(): React.JSX.Element {
       handleImportFileChange={handleImportFileChange}
       importWarningsModal={importWarningsModal}
       dismissImportWarningsModal={dismissImportWarningsModal}
+      importReconciliationModal={importReconciliationModal}
+      dismissImportReconciliationModal={dismissImportReconciliationModal}
       handleMediaSelect={handleMediaSelect}
       handleOpenImportDialog={handleOpenImportDialog}
       handleResetPlayback={handleResetPlayback}

@@ -63,9 +63,36 @@ export interface ImportWarningsModalState {
   readonly warnings: readonly string[];
 }
 
+/**
+ * Per-element reconciliation diff surfaced when a Broadset-exported
+ * file is re-imported after external editing (PowerPoint / Keynote /
+ * Google Slides modified the file in between). The richer
+ * `FormatReconciliationModal` shows per-bucket counts plus expandable
+ * element lists; the flat `FormatImportWarningsModal` falls back to
+ * the warning summary lines when reconciliation is null.
+ */
+export interface ImportReconciliationModalState {
+  readonly formatLabel: string;
+  readonly data: {
+    readonly modifications: readonly ImportReconciliationModalElement[];
+    readonly additions: readonly ImportReconciliationModalElement[];
+    readonly deletions: readonly ImportReconciliationModalElement[];
+    readonly recoveredByHash: readonly ImportReconciliationModalElement[];
+  };
+  readonly warnings: readonly string[];
+}
+
+export interface ImportReconciliationModalElement {
+  readonly id: string;
+  readonly name?: string;
+  readonly description?: string;
+}
+
 interface DemoFileHandlers {
   readonly exportProgress: ExportProgress | null;
   readonly importWarningsModal: ImportWarningsModalState | null;
+  readonly importReconciliationModal: ImportReconciliationModalState | null;
+  readonly dismissImportReconciliationModal: () => void;
   readonly dismissImportWarningsModal: () => void;
   readonly handleCreateFromPreset: (preset: DocumentPreset) => void;
   readonly handleDebugSnapshotDownload: () => void;
@@ -410,8 +437,14 @@ export function useDemoFileHandlers({
 }: UseDemoFileHandlersOptions): DemoFileHandlers {
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [importWarningsModal, setImportWarningsModal] = useState<ImportWarningsModalState | null>(null);
+  const [importReconciliationModal, setImportReconciliationModal] = useState<ImportReconciliationModalState | null>(
+    null,
+  );
   const dismissImportWarningsModal = useCallback((): void => {
     setImportWarningsModal(null);
+  }, []);
+  const dismissImportReconciliationModal = useCallback((): void => {
+    setImportReconciliationModal(null);
   }, []);
 
   useEffect(() => {
@@ -454,11 +487,16 @@ export function useDemoFileHandlers({
         editorStore.getState().loadTemplate(result.document);
         pushToast('success', 'Import complete.');
 
-        if (result.warnings.length > 0) {
-          setImportWarningsModal({
-            formatLabel: deriveFormatLabel(file),
+        const formatLabel = deriveFormatLabel(file);
+
+        if (result.reconciliation !== null && result.reconciliation !== undefined) {
+          setImportReconciliationModal({
+            formatLabel,
+            data: result.reconciliation,
             warnings: result.warnings,
           });
+        } else if (result.warnings.length > 0) {
+          setImportWarningsModal({ formatLabel, warnings: result.warnings });
         }
       } catch (error: unknown) {
         pushToast('error', `Import failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -650,6 +688,7 @@ export function useDemoFileHandlers({
   );
 
   return {
+    dismissImportReconciliationModal,
     dismissImportWarningsModal,
     exportProgress,
     handleCreateFromPreset,
@@ -664,6 +703,7 @@ export function useDemoFileHandlers({
     handleSaveDocument,
     handleSaveSnapshot,
     handleTemplateSelect,
+    importReconciliationModal,
     importWarningsModal,
   };
 }
