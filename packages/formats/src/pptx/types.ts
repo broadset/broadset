@@ -81,6 +81,45 @@ export interface PptxExportOptions {
    * RangeError-style throw.
    */
   readonly fontMaxBytes?: number;
+  /**
+   * Optional overrides for the generated theme — when supplied, the
+   * exporter uses these instead of deriving them from the document.
+   * Each value is a 6-digit hex (no leading `#`) per OOXML
+   * `<a:srgbClr val="…"/>` form. Any field left undefined falls
+   * through to the auto-derivation heuristic (most-frequent element
+   * fill colours become the accents; canvas background becomes lt1
+   * / bg1; otherwise hard-coded Office defaults).
+   */
+  readonly themeColors?: ThemeColorOverrides;
+  /**
+   * Optional overrides for the generated `<a:fontScheme>`. Auto-
+   * derivation picks the majority `style.fontFamily` across text
+   * elements as the minor (body) font; `themeFonts.major` defaults
+   * to the same family as a fallback.
+   */
+  readonly themeFonts?: ThemeFontOverrides;
+}
+
+/** OOXML `<a:clrScheme>` slots a theme can override. */
+export interface ThemeColorOverrides {
+  readonly dk1?: string;
+  readonly lt1?: string;
+  readonly dk2?: string;
+  readonly lt2?: string;
+  readonly accent1?: string;
+  readonly accent2?: string;
+  readonly accent3?: string;
+  readonly accent4?: string;
+  readonly accent5?: string;
+  readonly accent6?: string;
+  readonly hlink?: string;
+  readonly folHlink?: string;
+}
+
+/** OOXML `<a:fontScheme>` major / minor faces. */
+export interface ThemeFontOverrides {
+  readonly major?: string;
+  readonly minor?: string;
 }
 
 /**
