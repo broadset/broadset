@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 1,
+  "description": "Permissively-licensed real-world .pptx test corpus. Fixtures are fetched on demand from upstream open-source projects (Apache POI, Apache Tika, python-pptx) and pinned by commit + SHA-256. The bytes are NEVER committed to this repo — running `npm run pptx:corpus:fetch -w @broadset/formats` populates the .cache/ directory.",
+  "sources": {
+    "apache-poi": {
+      "repository": "https://github.com/apache/poi",
+      "commit": "e6a04b49211e23c704fcdbe524d99d2f4486b083",
+      "license": "Apache-2.0",
+      "licenseUrl": "https://github.com/apache/poi/blob/e6a04b49211e23c704fcdbe524d99d2f4486b083/legal/LICENSE",
+      "fixtureRoot": "test-data/slideshow"
+    },
+    "apache-tika": {
+      "repository": "https://github.com/apache/tika",
+      "commit": "0eac3d3ec6cfc36ceb4dfa41a01f3ac7cfdc8bb1",
+      "license": "Apache-2.0",
+      "licenseUrl": "https://github.com/apache/tika/blob/0eac3d3ec6cfc36ceb4dfa41a01f3ac7cfdc8bb1/LICENSE.txt",
+      "fixtureRoot": "tika-parsers/tika-parsers-standard/tika-parsers-standard-modules/tika-parser-microsoft-module/src/test/resources/test-documents"
+    },
+    "python-pptx": {
+      "repository": "https://github.com/scanny/python-pptx",
+      "commit": "278b47b1dedd5b46ee84c286e77cdfb0bf4594be",
+      "license": "MIT",
+      "licenseUrl": "https://github.com/scanny/python-pptx/blob/278b47b1dedd5b46ee84c286e77cdfb0bf4594be/LICENSE",
+      "fixtureRoot": "tests/test_files"
+    }
+  },
+  "fixtures": [
+    {
+      "name": "ppx-minimal.pptx",
+      "source": "python-pptx",
+      "upstreamName": "minimal.pptx",
+      "sha256": "f04f94947620332c06dd2ad3c1aa52cb614d3b8d608e8d6fcbe66f5a29c5e4ee",
+      "bytes": 15802,
+      "tags": ["minimal", "happy-path"]
+    },
+    {
+      "name": "ppx-missing-rels-item.pptx",
+      "source": "python-pptx",
+      "upstreamName": "missing_rels_item.pptx",
+      "sha256": "9a156f00b5faeaf15d12ea44bc49dc8f0c5dd7411352445b4908630bc6a2db28",
+      "bytes": 32944,
+      "tags": ["malformed-rels"]
+    },
+    {
+      "name": "ppx-no-core-props.pptx",
+      "source": "python-pptx",
+      "upstreamName": "no-core-props.pptx",
+      "sha256": "93289b5e951a7256ef783651e1245284472c77512fc3d8df17680dd693fc5c6c",
+      "bytes": 34436,
+      "tags": ["no-core-props"]
+    },
+    {
+      "name": "ppx-no-slides.pptx",
+      "source": "python-pptx",
+      "upstreamName": "no-slides.pptx",
+      "sha256": "76b8a109c450fedce7a44bf03b385a327ad0bf99d583e492fa49b760860a77db",
+      "bytes": 34036,
+      "tags": ["zero-slides", "edge-case"]
+    },
+    {
+      "name": "poi-smartart.pptx",
+      "source": "apache-poi",
+      "upstreamName": "SmartArt.pptx",
+      "sha256": "b97e4c6d2ee1dd4094f50f9043820610268dd452d7717c537f5456636adcc353",
+      "bytes": 41382,
+      "tags": ["smartart"]
+    },
+    {
+      "name": "poi-with-master.pptx",
+      "source": "apache-poi",
+      "upstreamName": "WithMaster.pptx",
+      "sha256": "54ae7677fd2813a815160cc72bd8960a4e482690dfc369b392868521c9b61549",
+      "bytes": 47505,
+      "tags": ["master-inheritance"]
+    },
+    {
+      "name": "poi-layouts.pptx",
+      "source": "apache-poi",
+      "upstreamName": "layouts.pptx",
+      "sha256": "9c3d53afa3115de2ba72ec77637a616aeed505a6ff3b30a46db871c4edd32be5",
+      "bytes": 62901,
+      "tags": ["layout-inheritance"]
+    },
+    {
+      "name": "poi-backgrounds.pptx",
+      "source": "apache-poi",
+      "upstreamName": "backgrounds.pptx",
+      "sha256": "6d1e661c87b072a701e02e28f9d2c9bb43c6bfe0ad5acd02811a0382bab769b7",
+      "bytes": 63442,
+      "tags": ["backgrounds", "fills"]
+    },
+    {
+      "name": "poi-table.pptx",
+      "source": "apache-poi",
+      "upstreamName": "table_test.pptx",
+      "sha256": "b9c3eb4b198ef3e53a4ff1a5ef4118a5ce6ba1760592c553abf665b37dcac5f8",
+      "bytes": 28935,
+      "tags": ["table"]
+    },
+    {
+      "name": "poi-table-with-theme.pptx",
+      "source": "apache-poi",
+      "upstreamName": "table-with-theme.pptx",
+      "sha256": "571d0cd2e1e9767249b3a02544c7771c883c48bb191264409729c7cec574ab48",
+      "bytes": 35189,
+      "tags": ["table", "theme"]
+    },
+    {
+      "name": "poi-bar-chart.pptx",
+      "source": "apache-poi",
+      "upstreamName": "bar-chart.pptx",
+      "sha256": "79e1d218bfb2903e8dc8425a6b1997d9c1976f5a5f025bada85b0c47b5777969",
+      "bytes": 44410,
+      "tags": ["chart"]
+    },
+    {
+      "name": "poi-pie-chart.pptx",
+      "source": "apache-poi",
+      "upstreamName": "pie-chart.pptx",
+      "sha256": "3b6404b59b24cb79fbb91fc2e92bd8b80cdc340aeed71a1ec1e267db0d8ad444",
+      "bytes": 55297,
+      "tags": ["chart"]
+    },
+    {
+      "name": "poi-pr-props.pptx",
+      "source": "apache-poi",
+      "upstreamName": "prProps.pptx",
+      "sha256": "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad",
+      "bytes": 30976,
+      "tags": ["paragraph-props", "run-props"]
+    },
+    {
+      "name": "poi-highlight-test-case.pptx",
+      "source": "apache-poi",
+      "upstreamName": "highlight-test-case.pptx",
+      "sha256": "b1c38080db134799830ee3e01ca2fcd292feb1c1ba0abd3187f3a3807aac34d6",
+      "bytes": 36284,
+      "tags": ["text-highlight", "runs"]
+    },
+    {
+      "name": "poi-minimal-gradient-fill-issue.pptx",
+      "source": "apache-poi",
+      "upstreamName": "minimal-gradient-fill-issue.pptx",
+      "sha256": "366cebcd2b63501069daa129cda91232781e4e3f492b6afa050cd11db8ac7e93",
+      "bytes": 36775,
+      "tags": ["gradient", "edge-case"]
+    },
+    {
+      "name": "poi-cropped-bitmap.pptx",
+      "source": "apache-poi",
+      "upstreamName": "54542_cropped_bitmap.pptx",
+      "sha256": "fa219615dae3cd01f62e8449f7b477bebadd53d3cfba3348ada6377098d8c65e",
+      "bytes": 100030,
+      "tags": ["src-rect", "image-crop"]
+    },
+    {
+      "name": "poi-overlapping-relations.pptx",
+      "source": "apache-poi",
+      "upstreamName": "OverlappingRelations.pptx",
+      "sha256": "1ea1c979983ddafa798da32f7fd12a72b6262478aae1c7e021354226e0a8790f",
+      "bytes": 38135,
+      "tags": ["malformed-rels"]
+    },
+    {
+      "name": "poi-missing-blip-fill.pptx",
+      "source": "apache-poi",
+      "upstreamName": "missing-blip-fill.pptx",
+      "sha256": "00b19b1ba0f3b399dd3c3c0de906b8cfeca5cda9425d481c2d75f5d74790c004",
+      "bytes": 40732,
+      "tags": ["missing-image", "edge-case"]
+    },
+    {
+      "name": "poi-with-japanese.pptx",
+      "source": "apache-poi",
+      "upstreamName": "with_japanese.pptx",
+      "sha256": "f0b1efbfbd70f7ee2395dc2505639f99449971ba404a6ec8cf1b97d82cf45c10",
+      "bytes": 48011,
+      "tags": ["i18n", "japanese"]
+    },
+    {
+      "name": "poi-null-dates.pptx",
+      "source": "apache-poi",
+      "upstreamName": "49386-null_dates.pptx",
+      "sha256": "64ef06e6d3869a8eea90ea28ddf35f20ff59578d09d04611343f32aa56ac196e",
+      "bytes": 17124,
+      "tags": ["edge-case", "null-fields"]
+    },
+    {
+      "name": "poi-picture-transparency.pptx",
+      "source": "apache-poi",
+      "upstreamName": "picture-transparency.pptx",
+      "sha256": "0ce76411a6e2fe3a5b8acf42722b973131a91b93cb5c3118a5a9c481b063e386",
+      "bytes": 11793,
+      "tags": ["picture", "transparency"]
+    },
+    {
+      "name": "poi-shapes.pptx",
+      "source": "apache-poi",
+      "upstreamName": "shapes.pptx",
+      "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571",
+      "bytes": 68822,
+      "tags": ["preset-shapes"]
+    },
+    {
+      "name": "tika-groups.pptx",
+      "source": "apache-tika",
+      "upstreamName": "testPPT_groups.pptx",
+      "sha256": "e8d4cd55569be22849a584bff949d07e8c16abbd00b59feedc43f17c33b4061f",
+      "bytes": 59888,
+      "tags": ["groups"]
+    },
+    {
+      "name": "tika-charts.pptx",
+      "source": "apache-tika",
+      "upstreamName": "testPPT_charts.pptx",
+      "sha256": "a6763b16b4bdc36751eacdd8f07547a1d9725905d1c977355e618adb3322b53a",
+      "bytes": 34766,
+      "tags": ["chart"]
+    },
+    {
+      "name": "tika-signed.pptx",
+      "source": "apache-tika",
+      "upstreamName": "testPPT_signed.pptx",
+      "sha256": "429eb4255ab47e6efec780c15d40cd8f887fefba9bdee34cbcb868b424ea4750",
+      "bytes": 39761,
+      "tags": ["xmldsig"]
+    },
+    {
+      "name": "tika-wordart.pptx",
+      "source": "apache-tika",
+      "upstreamName": "testWordArt.pptx",
+      "sha256": "8b0abc3e867ede7adbe3d879e475e60e3c66f9a1fb810ee2a35cced6c46ab73b",
+      "bytes": 37792,
+      "tags": ["wordart", "text-effects"]
+    },
+    {
+      "name": "tika-thumbnail.pptx",
+      "source": "apache-tika",
+      "upstreamName": "testPPTX_Thumbnail.pptx",
+      "sha256": "68b45f3d6150a630b8e3979dbd19a843fdedee75b2c3430c6f4ba75b8d24156d",
+      "bytes": 42580,
+      "tags": ["thumbnail"]
+    },
+    {
+      "name": "tika-diagram-data.pptx",
+      "source": "apache-tika",
+      "upstreamName": "testPPT_diagramData.pptx",
+      "sha256": "69a19e17398a1a5c8f3bd7c0d70a3afee9654a3e8e92aec61cc6054417c5c5ab",
+      "bytes": 48793,
+      "tags": ["smartart", "diagram-data"]
+    },
+    {
+      "name": "tika-2imgs.pptx",
+      "source": "apache-tika",
+      "upstreamName": "testPPT_2imgs.pptx",
+      "sha256": "a5ec2ad60eebe2d7b82ec6747618302df7b4fc99cde73b5fd03bbec9e2b37ebc",
+      "bytes": 59246,
+      "tags": ["images"]
+    }
+  ]
+}

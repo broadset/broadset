@@ -109,7 +109,10 @@ function walkShapeTree(
 
     const tagName = canonicalShapeTag(child);
 
-    if (tagName === null) continue;
+    if (tagName === null) {
+      pushUnsupportedShapeWarning(ctx, child);
+      continue;
+    }
 
     const element = emitElementFromShape(ctx, tagName, child, parentGroupId);
 
@@ -130,6 +133,49 @@ function canonicalShapeTag(node: XmlElement): 'p:sp' | 'p:pic' | 'p:grpSp' | nul
   if (node.local === 'sp') return 'p:sp';
   if (node.local === 'pic') return 'p:pic';
   if (node.local === 'grpSp') return 'p:grpSp';
+
+  return null;
+}
+
+interface UnsupportedShapeInfo {
+  readonly label: string;
+  readonly detail?: string;
+}
+
+/**
+ * Identify shape-tree children that aren't mapped to a Broadset
+ * element today so the importer surfaces a warning instead of
+ * dropping silently. Tables, charts, SmartArt diagrams, connectors,
+ * and ink all live here.
+ */
+function pushUnsupportedShapeWarning(ctx: SlideImportContext, node: XmlElement): void {
+  const info = unsupportedShapeKind(node);
+
+  if (info === null) return;
+
+  ctx.warnings.push({
+    code: 'unsupported-shape',
+    message: `${info.label} not yet mapped to a Broadset element — visual content dropped.`,
+    ...(info.detail !== undefined ? { detail: info.detail } : {}),
+  });
+}
+
+function classifyGraphicFrame(node: XmlElement): UnsupportedShapeInfo {
+  const data = findDescendant(node, 'a:graphicData');
+  const uri = data !== null ? getAttr(data, 'uri') ?? undefined : undefined;
+
+  if (uri?.endsWith('/table')) return { label: 'OOXML table (<a:tbl>)', detail: uri };
+  if (uri?.endsWith('/chart')) return { label: 'OOXML chart (<c:chart>)', detail: uri };
+  if (uri?.includes('/diagram')) return { label: 'OOXML SmartArt diagram', detail: uri };
+
+  return uri !== undefined ? { label: 'OOXML graphicFrame', detail: uri } : { label: 'OOXML graphicFrame' };
+}
+
+function unsupportedShapeKind(node: XmlElement): UnsupportedShapeInfo | null {
+  if (node.ns !== PML_NS) return null;
+  if (node.local === 'graphicFrame') return classifyGraphicFrame(node);
+  if (node.local === 'cxnSp') return { label: 'OOXML connector (<p:cxnSp>)' };
+  if (node.local === 'contentPart') return { label: 'OOXML ink / content part (<p:contentPart>)' };
 
   return null;
 }
@@ -707,12 +753,28 @@ function buildPicture(
 ): BroadsetElement | null {
   const blip = findDescendant(shape, 'a:blip');
 
-  if (blip === null) return null;
+  if (blip === null) {
+    ctx.warnings.push({
+      code: 'unsupported-content',
+      message: `Picture shape "${name}" has no <a:blip> fill — rendered as transparent rectangle.`,
+      detail: id,
+    });
+
+    return buildBase(ctx, id, name, 'rectangle', transform, parentGroupId);
+  }
 
   const relId = getAttr(blip, 'embed') ?? '';
   const media = ctx.mediaByRelId.get(relId);
 
-  if (!media) return null;
+  if (!media) {
+    ctx.warnings.push({
+      code: 'unsupported-content',
+      message: `Picture shape "${name}" references missing media (rel "${relId}") — rendered as transparent rectangle.`,
+      detail: id,
+    });
+
+    return buildBase(ctx, id, name, 'rectangle', transform, parentGroupId);
+  }
 
   const base = buildBase(ctx, id, name, 'image', transform, parentGroupId);
   const dataUri = `data:${media.mime};base64,${uint8ToBase64(media.bytes)}`;

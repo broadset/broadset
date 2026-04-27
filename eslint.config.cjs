@@ -122,6 +122,15 @@ module.exports = [
     },
   },
   {
+    files: ['**/scripts/**/*.mjs', '**/*.mjs'],
+    languageOptions: {
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 'latest',

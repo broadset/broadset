@@ -357,7 +357,14 @@ function importOperatorLevel(pkg: OoxmlPackage, canvasOverride?: BroadsetDocumen
   const resolved = canvasOverride !== undefined ? { ...baseResolved, canvas: canvasOverride } : baseResolved;
   const warnings: PptxImportWarning[] = [];
 
-  if (resolved.slidePaths.length === 0) return { document: createEmptyBroadsetDocument(), warnings };
+  if (resolved.slidePaths.length === 0) {
+    warnings.push({
+      code: 'unsupported-content',
+      message: 'PPTX package contains no slide parts — nothing to import.',
+    });
+
+    return { document: createEmptyBroadsetDocument(), warnings };
+  }
 
   const themeXml = resolved.themePath !== null ? readTextPart(pkg, resolved.themePath) : null;
   const theme = parseTheme(themeXml);
