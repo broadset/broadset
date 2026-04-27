@@ -18,7 +18,15 @@ import {
   importPolygonElement,
   importRectElement,
 } from './import-shapes';
-import { combineTransform,getAttr, getInheritedAttr, getNumAttr, IDENTITY_MATRIX, parseTransform, readInheritedStrokeStyle } from './import-style';
+import {
+  combineTransform,
+  getAttr,
+  getInheritedAttr,
+  getNumAttr,
+  IDENTITY_MATRIX,
+  parseTransform,
+  readInheritedStrokeStyle,
+} from './import-style';
 import { importTextElement } from './import-text';
 import { type ImportedElement, type ShapeBakeContext, type TransformState } from './import-types';
 import type { SvgFontSource } from './types';
@@ -29,7 +37,13 @@ import type { SvgFontSource } from './types';
  * cannot overflow the V8 stack. 100 levels covers any realistic
  * design-tool layer hierarchy.
  */
-const SVG_GROUP_DEPTH_CAP = 100;
+const DEFAULT_SVG_GROUP_DEPTH_CAP = 100;
+
+export interface SvgWalkOptions {
+  readonly fontSources?: ReadonlyMap<string, SvgFontSource> | undefined;
+  readonly maxDepth?: number | undefined;
+  readonly warnOnPreservation?: boolean | undefined;
+}
 
 export interface SvgImportResult {
   readonly elements: readonly ImportedElement[];
@@ -69,6 +83,7 @@ interface GroupImportContext {
   readonly defs: DefsBundle;
   readonly warnings: string[];
   readonly depth: number;
+  readonly maxDepth: number;
   readonly fontSources?: ReadonlyMap<string, SvgFontSource> | undefined;
 }
 
@@ -83,9 +98,9 @@ interface GroupImportContext {
  * / skew per IO-D-02).
  */
 function importGroupElement(el: Element, ctx: GroupImportContext): ImportedElement[] {
-  if (ctx.depth >= SVG_GROUP_DEPTH_CAP) {
+  if (ctx.depth >= ctx.maxDepth) {
     ctx.warnings.push(
-      `Group depth cap of ${String(SVG_GROUP_DEPTH_CAP)} reached; deeper nesting was not imported (recursion bounded for safety).`,
+      `Group depth cap of ${String(ctx.maxDepth)} reached; deeper nesting was not imported (recursion bounded for safety).`,
     );
 
     return [];
@@ -131,7 +146,7 @@ function importGroupElement(el: Element, ctx: GroupImportContext): ImportedEleme
         ctx.transform,
         childParentId,
         ctx.depth + 1,
-        ctx.fontSources,
+        { fontSources: ctx.fontSources, maxDepth: ctx.maxDepth },
       ),
     );
   }
@@ -191,7 +206,7 @@ function importElement(
   inheritedTransform: TransformState,
   parentDataBsId: string | null = null,
   depth = 0,
-  fontSources?: ReadonlyMap<string, SvgFontSource>,
+  options: SvgWalkOptions = {},
 ): ImportedElement[] {
   const tagName = el.tagName.toLowerCase();
   const transformStr = getAttr(el, 'transform') ?? '';
@@ -225,9 +240,15 @@ function importElement(
     ...(ownDataBsKind !== undefined ? { dataBsKind: ownDataBsKind } : {}),
     parentDataBsId,
   } as const;
+  const maxDepth = resolveMaxDepth(options.maxDepth);
 
   const shapeCtx: ShapeBakeContext = { transform, baseStyle, tagMeta };
   const preservedOuterHTML = effectiveId !== undefined && tagName !== 'g' ? el.outerHTML : undefined;
+
+  if (preservedOuterHTML !== undefined && effectiveId !== undefined && options.warnOnPreservation === true) {
+    warnings.push(`Preserved source SVG markup for <${tagName}> element "${effectiveId}" for dirty-flag re-export.`);
+  }
+
   const withPreserved = (result: readonly ImportedElement[]): ImportedElement[] => {
     if (preservedOuterHTML === undefined) return [...result];
 
@@ -254,7 +275,7 @@ function importElement(
       return withPreserved([importPolygonElement(el, shapeCtx, false)]);
 
     case 'text':
-      return withPreserved([importTextElement(el, shapeCtx, warnings, fontSources)]);
+      return withPreserved([importTextElement(el, shapeCtx, warnings, options.fontSources)]);
 
     case 'image':
       return withPreserved([importImageElement(el, shapeCtx, warnings)]);
@@ -271,7 +292,8 @@ function importElement(
         defs,
         warnings,
         depth,
-        fontSources,
+        maxDepth,
+        fontSources: options.fontSources,
       });
 
     default:
@@ -292,7 +314,7 @@ export function importSvg(input: string): SvgImportResult {
   return walkSvgDocument(xmlDoc);
 }
 
-export function walkSvgDocument(xmlDoc: Document, fontSources?: ReadonlyMap<string, SvgFontSource>): SvgImportResult {
+export function walkSvgDocument(xmlDoc: Document, options: SvgWalkOptions = {}): SvgImportResult {
   const svgRoot = xmlDoc.documentElement;
 
   let canvasWidth = 800;
@@ -329,7 +351,7 @@ export function walkSvgDocument(xmlDoc: Document, fontSources?: ReadonlyMap<stri
       continue;
     }
 
-    elements.push(...importElement(child, defs, warnings, rootTransform, null, 0, fontSources));
+    elements.push(...importElement(child, defs, warnings, rootTransform, null, 0, options));
   }
 
   return { elements, canvasWidth, canvasHeight, warnings };
@@ -349,7 +371,7 @@ export interface VisualImportResult {
  */
 export function importSvgFromXmlDoc(
   xmlDoc: Document,
-  fontSources?: ReadonlyMap<string, SvgFontSource>,
+  options: SvgWalkOptions = {},
 ): VisualImportResult {
   const svgRoot = xmlDoc.documentElement;
   let canvasWidth = 800;
@@ -390,8 +412,12 @@ export function importSvgFromXmlDoc(
       continue;
     }
 
-    elements.push(...importElement(child, defs, warnings, rootTransform, null, 0, fontSources));
+    elements.push(...importElement(child, defs, warnings, rootTransform, null, 0, options));
   }
 
   return { elements, canvasWidth, canvasHeight, warnings };
+}
+
+function resolveMaxDepth(maxDepth: number | undefined): number {
+  return maxDepth !== undefined && Number.isFinite(maxDepth) && maxDepth > 0 ? maxDepth : DEFAULT_SVG_GROUP_DEPTH_CAP;
 }

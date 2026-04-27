@@ -85,6 +85,41 @@ describe('P7.4b — Import sanitization (security contract)', () => {
 
     expect(warnings.some((w) => w.toLowerCase().includes('javascript') || w.toLowerCase().includes('url'))).toBe(true);
   });
+
+  /**
+   * @description `<foreignObject>` remains stripped by default, but
+   * callers may explicitly opt into sanitized opaque preservation.
+   * Active descendants and event attributes MUST still be removed.
+   */
+  it('preserves sanitized <foreignObject> only when explicitly allowed', () => {
+    const hostile = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80">
+      <foreignObject width="100" height="50"><div onclick="alert(1)"><script>alert(2)</script><p>Safe text</p></div></foreignObject>
+      <rect width="10" height="10"/>
+    </svg>`;
+    const defaultImport = importSvgDocument(hostile);
+    const optInImport = importSvgDocument(hostile, 'foreign-object.svg', { allowForeignObject: true });
+    const preserved = optInImport.document.elements.find((el) => el.type === 'svg');
+    const preservedContent = typeof preserved?.content === 'string' ? preserved.content : '';
+
+    expect(defaultImport.document.elements.some((el) => el.type === 'svg')).toBe(false);
+    expect(preservedContent).toContain('<foreignObject');
+    expect(preservedContent).toContain('Safe text');
+    expect(preservedContent).not.toContain('<script');
+    expect(preservedContent).not.toContain('onclick');
+    expect(optInImport.warnings.some((w) => /foreignobject|script|event|attribute/i.test(w))).toBe(true);
+  });
+
+  /**
+   * @description `warnOnPreservation` MUST surface an explicit
+   * warning when the importer stores source SVG markup for an
+   * otherwise native element so dirty-flag re-export can preserve it.
+   */
+  it('warns for native source markup preservation when requested', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect id="native-rect" width="50" height="50"/></svg>`;
+    const { warnings } = importSvgDocument(input, 'preserve.svg', { warnOnPreservation: true });
+
+    expect(warnings.some((w) => /preserved source svg markup.*native-rect/i.test(w))).toBe(true);
+  });
 });
 
 /* ------------------------------------------------------------------ */

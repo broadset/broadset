@@ -21,6 +21,10 @@ const FORBIDDEN_ELEMENT_NAMES = new Set(['script', 'foreignobject']);
 const SMIL_ANIMATION_ELEMENT_NAMES = new Set(['animate', 'animatetransform', 'animatemotion', 'set']);
 const URL_ATTRS_TO_CHECK = ['href', 'xlink:href', 'src'];
 
+export interface SvgSanitizeOptions {
+  readonly allowForeignObject?: boolean | undefined;
+}
+
 /**
  * DOM-walk sanitizer used on the parsed XML tree. Enforces the
  * importer security contract floor - strips `<script>`,
@@ -83,7 +87,11 @@ function stripJavascriptUrlsFromEl(el: Element, tally: SanitizeTally): void {
  * cap was hit (a warning has been emitted and the caller should
  * still hydrate what was parsed but skip subsequent O(n) passes).
  */
-export function sanitizeDomInPlace(xmlDoc: Document, warnings: string[]): boolean {
+export function sanitizeDomInPlace(
+  xmlDoc: Document,
+  warnings: string[],
+  options: SvgSanitizeOptions = {},
+): boolean {
   const tally: SanitizeTally = { tags: new Set(), smilTags: new Set(), attrs: new Set(), jsUrls: 0 };
   const all = Array.from(xmlDoc.getElementsByTagName('*'));
   const overCap = all.length > SVG_ELEMENT_COUNT_CAP;
@@ -98,7 +106,7 @@ export function sanitizeDomInPlace(xmlDoc: Document, warnings: string[]): boolea
 
     const tag = el.tagName.toLowerCase();
 
-    if (FORBIDDEN_ELEMENT_NAMES.has(tag)) {
+    if (FORBIDDEN_ELEMENT_NAMES.has(tag) && !(tag === 'foreignobject' && options.allowForeignObject === true)) {
       el.remove();
       tally.tags.add(tag);
       continue;

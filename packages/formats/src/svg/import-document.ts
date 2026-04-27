@@ -16,7 +16,7 @@ import { dereferenceUseElements, sanitizeDomInPlace, warnRawToolNamespaces, warn
 import { type ImportedElement } from './import-types';
 import { importSvgFromXmlDoc, isSyntheticGroupId, walkSvgDocument } from './import-walk';
 import { type ParsedElementMetadata, parseMetadataPacket } from './metadata';
-import type { SvgFontSource, SvgImportOptions } from './types';
+import type { SvgImportOptions } from './types';
 
 export interface SvgDocumentImportResult {
   readonly document: BroadsetDocument;
@@ -36,6 +36,10 @@ export function importSvgDocument(
   const fontSources = options?.fontSources;
   const warnings: string[] = [];
 
+  if (exceedsMaxBytes(input, options?.maxBytes, warnings)) {
+    return hydrateEmptyDocument(fileName, warnings);
+  }
+
   // Detect tool-specific namespaces on raw input before sanitization
   // rewrites the parsed DOM.
   warnRawToolNamespaces(input, warnings);
@@ -49,15 +53,58 @@ export function importSvgDocument(
   }
 
   // Security-contract sanitization runs on every path.
-  const withinCap = sanitizeDomInPlace(xmlDoc, warnings);
+  const withinCap = sanitizeDomInPlace(xmlDoc, warnings, { allowForeignObject: options?.allowForeignObject });
 
   const metadata = parseMetadataPacket(xmlDoc);
 
   if (metadata !== null) {
-    return hydrateFastPath(xmlDoc, metadata, fileName, warnings, fontSources);
+    return hydrateFastPath(xmlDoc, metadata, fileName, warnings, {
+      fontSources,
+      maxDepth: options?.maxDepth,
+      warnOnPreservation: options?.warnOnPreservation,
+    });
   }
 
-  return hydrateThirdPartyFallbackFromDoc(xmlDoc, fileName, warnings, withinCap, fontSources);
+  return hydrateThirdPartyFallbackFromDoc(xmlDoc, fileName, warnings, withinCap, {
+    fontSources,
+    maxDepth: options?.maxDepth,
+    warnOnPreservation: options?.warnOnPreservation,
+  });
+}
+
+function exceedsMaxBytes(input: string, maxBytes: number | undefined, warnings: string[]): boolean {
+  if (maxBytes === undefined || maxBytes <= 0) {
+    return false;
+  }
+
+  const byteLength = utf8ByteLength(input);
+
+  if (byteLength <= maxBytes) {
+    return false;
+  }
+
+  warnings.push(
+    `SVG input byte cap of ${String(maxBytes)} reached (input had ${String(byteLength)} bytes). Import was skipped before XML parsing to avoid unbounded allocation.`,
+  );
+
+  return true;
+}
+
+function utf8ByteLength(input: string): number {
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.byteLength(input, 'utf8');
+  }
+
+  return new TextEncoder().encode(input).byteLength;
+}
+
+function hydrateEmptyDocument(fileName: string, warnings: string[]): SvgDocumentImportResult {
+  const emptyDoc = createEmptyBroadsetDocument();
+
+  return {
+    document: { ...emptyDoc, name: fileName.replace(/\.svg$/i, '') },
+    warnings,
+  };
 }
 
 /**
@@ -194,9 +241,13 @@ function hydrateFastPath(
   metadata: ReturnType<typeof parseMetadataPacket> & object,
   fileName: string,
   warnings: string[],
-  fontSources?: ReadonlyMap<string, SvgFontSource>,
+  options: SvgImportOptions,
 ): SvgDocumentImportResult {
-  const visualExtract = importSvgFromXmlDoc(xmlDoc, fontSources);
+  const visualExtract = importSvgFromXmlDoc(xmlDoc, {
+    fontSources: options.fontSources,
+    maxDepth: options.maxDepth,
+    warnOnPreservation: options.warnOnPreservation,
+  });
   const metadataById = new Map<string, ParsedElementMetadata>(
     metadata.elements.map((entry) => [entry.elementId, entry]),
   );
@@ -249,7 +300,7 @@ function hydrateThirdPartyFallbackFromDoc(
   fileName: string,
   warnings: string[],
   withinCap: boolean,
-  fontSources?: ReadonlyMap<string, SvgFontSource>,
+  options: SvgImportOptions,
 ): SvgDocumentImportResult {
   if (withinCap) {
     applyStyleBlocks(xmlDoc, warnings);
@@ -257,7 +308,11 @@ function hydrateThirdPartyFallbackFromDoc(
     warnToolNamespaces(xmlDoc, warnings);
   }
 
-  const result = walkSvgDocument(xmlDoc, fontSources);
+  const result = walkSvgDocument(xmlDoc, {
+    fontSources: options.fontSources,
+    maxDepth: options.maxDepth,
+    warnOnPreservation: options.warnOnPreservation,
+  });
   const emptyDoc = createEmptyBroadsetDocument();
 
   warnings.push(...result.warnings);

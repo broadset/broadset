@@ -25,6 +25,20 @@ import { importSvgDocument } from './index';
 
 describe('P7.7a — Element-count cap', () => {
   /**
+   * @description A caller-supplied `maxBytes` cap MUST be enforced
+   * before XML parsing so oversized SVG strings do not drive parser
+   * allocation. The importer returns an empty document plus a
+   * warning instead of throwing.
+   */
+  it('honors caller-supplied maxBytes before XML parsing', () => {
+    const fixture = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="50" height="50"/></svg>`;
+    const { document, warnings } = importSvgDocument(fixture, 'oversize.svg', { maxBytes: 10 });
+
+    expect(document.elements).toEqual([]);
+    expect(warnings.some((w) => /byte cap|bytes|skipped/i.test(w))).toBe(true);
+  });
+
+  /**
    * @description An SVG with element count above the configured cap
    * MUST surface a warning naming the cap and the importer MUST stop
    * iterating rather than processing all elements (which is O(n) per
@@ -97,6 +111,18 @@ describe('P7.7e — CSS rule-count cap', () => {
 });
 
 describe('P7.7a — Group-depth cap', () => {
+  /**
+   * @description The `maxDepth` import option MUST override the
+   * default group-depth cap for callers that need a stricter
+   * sandbox. The warning names the configured cap.
+   */
+  it('honors caller-supplied maxDepth for nested groups', () => {
+    const fixture = `<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><g><g><rect width="5" height="5"/></g></g></svg>`;
+    const { warnings } = importSvgDocument(fixture, 'strict-depth.svg', { maxDepth: 1 });
+
+    expect(warnings.some((w) => /group depth cap of 1/i.test(w))).toBe(true);
+  });
+
   /**
    * @description Nesting `<g>` elements 200 levels deep MUST hit the
    * group-depth cap (100) and emit a warning. The importer MUST NOT
