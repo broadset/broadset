@@ -16,6 +16,7 @@ import * as CssTree from 'css-tree';
 import svgpath from 'svgpath';
 import { compose as composeMatrix, type Matrix } from 'transformation-matrix';
 
+import { layoutTextAsPathD, safeOpenFont } from './flatten-text';
 import { type ParsedElementMetadata, parseMetadataPacket } from './metadata';
 import {
   type DecomposedTransform,
@@ -25,7 +26,7 @@ import {
   polygonAsPathD,
   rectAsPathD,
 } from './transform';
-import type { SvgImportOptions } from './types';
+import type { SvgFontSource, SvgImportOptions } from './types';
 
 const USE_DEREFERENCE_DEPTH_CAP = 16;
 /**
@@ -1511,6 +1512,7 @@ interface GroupImportContext {
   readonly gradients: ReadonlyMap<string, BroadsetGradient>;
   readonly warnings: string[];
   readonly depth: number;
+  readonly fontSources?: ReadonlyMap<string, SvgFontSource> | undefined;
 }
 
 /**
@@ -1575,7 +1577,16 @@ function importGroupElement(el: Element, ctx: GroupImportContext): ImportedEleme
     }
 
     importedChildren.push(
-      ...importElement(child, ctx.defsMap, ctx.gradients, ctx.warnings, ctx.transform, childParentId, ctx.depth + 1),
+      ...importElement(
+        child,
+        ctx.defsMap,
+        ctx.gradients,
+        ctx.warnings,
+        ctx.transform,
+        childParentId,
+        ctx.depth + 1,
+        ctx.fontSources,
+      ),
     );
   }
 
@@ -1823,12 +1834,20 @@ function importPolygonElement(el: Element, ctx: ShapeBakeContext, closed: boolea
 }
 
 /**
- * Import a `<text>` element. Text has no Broadset-native scale or
- * skew (IO-D-02) and no import-side path-bake equivalent — when
- * the cumulative transform requires bake, surface a warning and
- * keep the translate-only position.
+ * Import a `<text>` element. When the cumulative transform
+ * requires bake (scale / skew) AND `fontSources` carries bytes
+ * for the referenced `font-family`, the text gets glyph-flattened
+ * into a `<path>` element pre-multiplied by the cumulative matrix
+ * — the visual result on re-render matches the source SVG. When
+ * the font isn't available, surface a warning and keep the
+ * translate-only position (lossy-but-graceful per IO-D-02).
  */
-function importTextElement(el: Element, ctx: ShapeBakeContext, warnings: string[]): ImportedElement {
+function importTextElement(
+  el: Element,
+  ctx: ShapeBakeContext,
+  warnings: string[],
+  fontSources?: ReadonlyMap<string, SvgFontSource>,
+): ImportedElement {
   const textPathEl = el.getElementsByTagName('textPath')[0];
   const hrefRaw = textPathEl?.getAttribute('href') ?? textPathEl?.getAttribute('xlink:href') ?? '';
   const textPathElementId =
@@ -1836,6 +1855,12 @@ function importTextElement(el: Element, ctx: ShapeBakeContext, warnings: string[
   const content = textPathEl !== undefined ? textPathEl.textContent : el.textContent;
 
   if (ctx.transform.requiresBake) {
+    const flattened = tryFlattenTextOnImport(el, ctx, content, fontSources, warnings);
+
+    if (flattened !== null) {
+      return flattened;
+    }
+
     warnings.push(
       `Cumulative non-trivial scale/skew on a <text> element was dropped to translate-only on import (Broadset has no element-level text scale per IO-D-02).`,
     );
@@ -1851,6 +1876,78 @@ function importTextElement(el: Element, ctx: ShapeBakeContext, warnings: string[
     style: ctx.baseStyle,
     ...ctx.tagMeta,
     ...(textPathElementId !== undefined ? { textPathElementId } : {}),
+  };
+}
+
+/**
+ * When a `<text>` element under a baking ancestor has a known
+ * font in `fontSources`, lay out its glyphs and bake them as a
+ * `<path>` element pre-multiplied by the cumulative matrix. The
+ * resulting Broadset `path` carries the visual fidelity of the
+ * source `<text>` at the cost of font / content identity (same
+ * lossy trade-off as the export `flatten` mode). Returns `null`
+ * when the bake can't run — caller falls back to translate-only.
+ */
+function tryFlattenTextOnImport(
+  el: Element,
+  ctx: ShapeBakeContext,
+  content: string,
+  fontSources: ReadonlyMap<string, SvgFontSource> | undefined,
+  warnings: string[],
+): ImportedElement | null {
+  if (content === '') return null;
+
+  const family = el.getAttribute('font-family') ?? '';
+
+  if (family === '') return null;
+
+  if (fontSources === undefined) return null;
+
+  const source = fontSources.get(family);
+
+  if (source?.bytes === undefined) {
+    warnings.push(
+      `Cannot glyph-flatten <text font-family="${family}"> under a baking transform — font bytes for "${family}" were not supplied via importSvgDocument(options.fontSources).`,
+    );
+
+    return null;
+  }
+
+  const font = safeOpenFont(source.bytes);
+
+  if (font === null) {
+    warnings.push(
+      `Cannot glyph-flatten <text font-family="${family}"> — fontkit could not parse the supplied bytes.`,
+    );
+
+    return null;
+  }
+
+  const fontSize = parseFloat(el.getAttribute('font-size') ?? '16');
+  const originX = parseFloat(el.getAttribute('x') ?? '0');
+  const originY = parseFloat(el.getAttribute('y') ?? '0');
+  const dRaw = layoutTextAsPathD(content, font, {
+    fontSize: Number.isFinite(fontSize) ? fontSize : 16,
+    originX: Number.isFinite(originX) ? originX : 0,
+    originY: Number.isFinite(originY) ? originY : 0,
+  });
+
+  if (dRaw === '') return null;
+
+  // Pre-multiply by the cumulative matrix (already includes the
+  // baking ancestor's scale / skew) the same way every other
+  // shape importer bakes geometry into the `d`.
+  const baked = bakePathWithMatrix(dRaw, ctx.transform.matrix);
+
+  return {
+    type: 'path',
+    content: baked,
+    position: { x: 0, y: 0 },
+    width: 0,
+    height: 0,
+    rotation: 0,
+    style: ctx.baseStyle,
+    ...ctx.tagMeta,
   };
 }
 
@@ -1884,6 +1981,7 @@ function importElement(
   inheritedTransform: TransformState,
   parentDataBsId: string | null = null,
   depth = 0,
+  fontSources?: ReadonlyMap<string, SvgFontSource>,
 ): ImportedElement[] {
   const tagName = el.tagName.toLowerCase();
   const transformStr = getAttr(el, 'transform') ?? '';
@@ -1949,7 +2047,7 @@ function importElement(
       return withPreserved([importPolygonElement(el, shapeCtx, false)]);
 
     case 'text':
-      return withPreserved([importTextElement(el, shapeCtx, warnings)]);
+      return withPreserved([importTextElement(el, shapeCtx, warnings, fontSources)]);
 
     case 'image':
       return withPreserved([importImageElement(el, shapeCtx, warnings)]);
@@ -1967,6 +2065,7 @@ function importElement(
         gradients,
         warnings,
         depth,
+        fontSources,
       });
 
     // `<foreignObject>` is always stripped by `sanitizeDomInPlace`
@@ -1995,7 +2094,7 @@ export function importSvg(input: string): SvgImportResult {
   return walkSvgDocument(xmlDoc);
 }
 
-function walkSvgDocument(xmlDoc: Document): SvgImportResult {
+function walkSvgDocument(xmlDoc: Document, fontSources?: ReadonlyMap<string, SvgFontSource>): SvgImportResult {
   const svgRoot = xmlDoc.documentElement;
 
   let canvasWidth = 800;
@@ -2036,7 +2135,7 @@ function walkSvgDocument(xmlDoc: Document): SvgImportResult {
       continue;
     }
 
-    elements.push(...importElement(child, defsMap, gradients, warnings, rootTransform));
+    elements.push(...importElement(child, defsMap, gradients, warnings, rootTransform, null, 0, fontSources));
   }
 
   return { elements, canvasWidth, canvasHeight, warnings };
@@ -2054,8 +2153,9 @@ function walkSvgDocument(xmlDoc: Document): SvgImportResult {
 export function importSvgDocument(
   input: string,
   fileName = 'Imported SVG',
-  _options?: SvgImportOptions,
+  options?: SvgImportOptions,
 ): SvgDocumentImportResult {
+  const fontSources = options?.fontSources;
   const warnings: string[] = [];
 
   // Detect tool-specific namespaces on the raw input before the
@@ -2085,10 +2185,10 @@ export function importSvgDocument(
   const metadata = parseMetadataPacket(xmlDoc);
 
   if (metadata !== null) {
-    return hydrateFastPath(xmlDoc, metadata, fileName, warnings);
+    return hydrateFastPath(xmlDoc, metadata, fileName, warnings, fontSources);
   }
 
-  return hydrateThirdPartyFallbackFromDoc(xmlDoc, fileName, warnings, withinCap);
+  return hydrateThirdPartyFallbackFromDoc(xmlDoc, fileName, warnings, withinCap, fontSources);
 }
 
 /**
@@ -2230,8 +2330,9 @@ function hydrateFastPath(
   metadata: ReturnType<typeof parseMetadataPacket> & object,
   fileName: string,
   warnings: string[],
+  fontSources?: ReadonlyMap<string, SvgFontSource>,
 ): SvgDocumentImportResult {
-  const visualExtract = importSvgFromXmlDoc(xmlDoc);
+  const visualExtract = importSvgFromXmlDoc(xmlDoc, fontSources);
   const metadataById = new Map<string, ParsedElementMetadata>(metadata.elements.map((entry) => [entry.elementId, entry]));
   const canvasWidth = visualExtract.canvasWidth;
   const canvasHeight = visualExtract.canvasHeight;
@@ -2284,6 +2385,7 @@ function hydrateThirdPartyFallbackFromDoc(
   fileName: string,
   warnings: string[],
   withinCap: boolean,
+  fontSources?: ReadonlyMap<string, SvgFontSource>,
 ): SvgDocumentImportResult {
   // Skip the O(n) third-party passes when we already hit the
   // element-count cap during sanitisation — the warning already
@@ -2294,7 +2396,7 @@ function hydrateThirdPartyFallbackFromDoc(
     warnToolNamespaces(xmlDoc, warnings);
   }
 
-  const result = walkSvgDocument(xmlDoc);
+  const result = walkSvgDocument(xmlDoc, fontSources);
   const emptyDoc = createEmptyBroadsetDocument();
 
   warnings.push(...result.warnings);
@@ -2534,7 +2636,10 @@ interface VisualImportResult {
  * `parentDataBsId` so nested group children preserve their own
  * identity and the fast path reconstructs the parent tree.
  */
-function importSvgFromXmlDoc(xmlDoc: Document): VisualImportResult {
+function importSvgFromXmlDoc(
+  xmlDoc: Document,
+  fontSources?: ReadonlyMap<string, SvgFontSource>,
+): VisualImportResult {
   const svgRoot = xmlDoc.documentElement;
   let canvasWidth = 800;
   let canvasHeight = 600;
@@ -2575,7 +2680,7 @@ function importSvgFromXmlDoc(xmlDoc: Document): VisualImportResult {
       continue;
     }
 
-    elements.push(...importElement(child, defsMap, gradients, warnings, rootTransform, null));
+    elements.push(...importElement(child, defsMap, gradients, warnings, rootTransform, null, 0, fontSources));
   }
 
   return { elements, canvasWidth, canvasHeight, warnings };

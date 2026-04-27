@@ -274,6 +274,18 @@ export interface SvgImportOptions {
    * importer security contract.
    */
   readonly allowForeignObject?: boolean | undefined;
+  /**
+   * Per-family font byte sources for import-side glyph flatten.
+   * When a `<text>` element sits under a baking ancestor (scale /
+   * skew / non-decomposable matrix) AND `fontSources` carries
+   * bytes for the referenced `font-family`, the importer
+   * pre-multiplies every glyph outline by the cumulative matrix
+   * and emits a `path` element instead of dropping the scale to
+   * translate-only. Same `SvgFontSource` shape the exporter uses
+   * — pass the same map to both directions for round-trip
+   * fidelity.
+   */
+  readonly fontSources?: ReadonlyMap<string, SvgFontSource> | undefined;
 }
 
 export const svgImportOptionsSchema: z.ZodType<SvgImportOptions> = z.object({
@@ -281,6 +293,7 @@ export const svgImportOptionsSchema: z.ZodType<SvgImportOptions> = z.object({
   maxBytes: z.number().positive().optional(),
   warnOnPreservation: z.boolean().optional(),
   allowForeignObject: z.boolean().optional(),
+  fontSources: z.custom<ReadonlyMap<string, SvgFontSource>>((v) => v instanceof Map).optional(),
 });
 
 /**
