@@ -197,3 +197,37 @@ Source of truth: [plan.md](./plan.md), [package-split.md](./package-split.md)
 - [ ] C.3 Editor split
 - [ ] C.4 Optional UI tokens split
 - [ ] C.5 Cleanup and hardening
+
+## Cross-format I/O improvement (added 2026-04-28)
+
+Source of truth: [cross-format-io-improvement-plan.md](./cross-format-io-improvement-plan.md)
+
+Outcome of the 2026-04-28 cross-format analysis (PDF / PSD / PPTX / SVG). Lights up already-built backend capability through wired UI, closes open SVG security findings, consolidates duplicated text-shaping / shadow-parsing / geometry helpers into `_shared/`, and brings each format's feature surface up to a defensible production-grade bar.
+
+- [ ] CFIO.1.1 Wire `FormatExportOptionsModal` into ExportModal (PDF/A, PSD color space, SVG font embed, PPTX animations + font embed)
+- [ ] CFIO.1.2 Generalize reconciliation modal beyond PPTX (populate `ImportDocumentResult.reconciliation` for PDF / PSD / SVG)
+- [ ] CFIO.1.3 Surface preflight + validation results in dedicated `FormatPreflightModal`
+- [ ] CFIO.2.1 SVG H2 — run full element-schema validation on import
+- [ ] CFIO.2.2 SVG M2 — strip dangerous CSS `url()` from preserved outerHTML
+- [ ] CFIO.3.1 Promote text shaping (UAX #9 + UAX #14 + unicode profile) to `_shared/text-layout`
+- [ ] CFIO.3.2 Extract CSS shadow / glow parsing to `_shared/effects`
+- [ ] CFIO.3.3 Extract canvas-unit conversion + matrix decomposition to `_shared/geometry`
+- [ ] CFIO.4.1 PSD CMYK / Lab / Grayscale + ICC profile round-trip *(needs sub-plan)*
+- [ ] CFIO.4.2 PDF P6.3 — real shading patterns + per-element OCG wrappers *(needs sub-plan)*
+- [ ] CFIO.4.3 PSD effects parity (bevel / satin / pattern overlay preserve, inner glow / overlays native) *(needs sub-plan)*
+- [ ] CFIO.4.4 PSD bitmap layer mask round-trip *(needs sub-plan)*
+- [ ] CFIO.4.5 PSD text rotation through ag-psd text-transform *(needs sub-plan)*
+- [ ] CFIO.4.6 PSD 16/32-bpc bit-depth preservation *(needs sub-plan)*
+- [ ] CFIO.4.7 PPTX font weight / style variants (closes pptx-known-gaps A4) *(needs sub-plan)*
+- [ ] CFIO.4.8 PPTX page-override extension to `PageElementInstance` (closes A2) *(needs sub-plan)*
+- [ ] CFIO.4.9 PPTX reconciliation conflict-resolution UI (closes A1) *(needs sub-plan)*
+- [ ] CFIO.4.10 `_shared/css` extraction *(deferred per YAGNI until PPTX needs it)*
+- [ ] CFIO.5.1 PPTX visual-fidelity CI gate (closes S3) *(needs sub-plan)*
+- [ ] CFIO.5.2 PowerPoint-on-Windows manual sanity protocol (closes S2) *(needs sub-plan)*
+- [ ] CFIO.5.3 Real licensed fixture mounts in CI for PPTX + PSD *(needs sub-plan)*
+- [ ] CFIO.5.4 Telemetry on warning codes (closes B1) *(needs sub-plan)*
+- [ ] CFIO.5.5 Accessibility audit on new modals (closes B3) *(needs sub-plan)*
+- [ ] CFIO.5.6 Sister-format audits — PSD / SVG / PDF (closes B4) *(needs sub-plan)*
+- [ ] CFIO.5.7 Real-world large-deck load tests (closes B2) *(needs sub-plan)*
+- [ ] CFIO.5.8 PDF font subsetting wiring *(needs sub-plan)*
+- [ ] CFIO.6 Gap-file rolling updates (SVG KNOWN-GAPS, pptx-known-gaps, PSD/PDF Spec Gaps)

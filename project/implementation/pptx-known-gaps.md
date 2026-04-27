@@ -10,6 +10,22 @@ close it. When closed, move the entry to the corresponding "Spec
 Gaps" section in [project/spec/formats/pptx.md](../spec/formats/pptx.md)
 (if user-visible) or remove it (if internal). Do not silently delete.
 
+> **Tracked closures:** the entries below are scheduled across the
+> [cross-format I/O improvement plan](cross-format-io-improvement-plan.md):
+>
+> - **A1** (reconciliation UI conflict resolution) — Phase 1.2
+>   generalizes reconciliation across formats; Phase 4.9 adds the
+>   conflict-resolution choice UI on top.
+> - **A2** (per-element page overrides) — Phase 4.8.
+> - **A4** (font weight / style variants) — Phase 4.7.
+> - **B1** (telemetry) — Phase 5.4.
+> - **B3** (accessibility audit on new modals) — Phase 5.5.
+> - **B4** (sister-format audits) — Phase 5.6.
+> - **S1** (CI jobs unverified end-to-end) — closes once branch lands.
+> - **S2** (PowerPoint-on-Windows sanity) — Phase 5.2.
+> - **S3** (visual fidelity coverage) — Phase 5.1.
+> - **B2** (real-world large-deck load testing) — Phase 5.7.
+
 ## Tier S — verify before general release
 
 ### S1. New CI jobs unverified end-to-end

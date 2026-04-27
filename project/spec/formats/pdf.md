@@ -532,6 +532,12 @@ The P6.0 foundation lands the standards-only round-trip contract, feature matrix
 
 The following items ship in subsequent P6 subphases and are tracked here:
 
+> **Tracked closures:** scheduled under the
+> [cross-format I/O improvement plan](../../implementation/cross-format-io-improvement-plan.md):
+> real shading patterns + per-element OCG = Phase 4.2;
+> CMYK / Lab / Gray / spot colour emission + ICC = Phase 4.1
+> (shares `_shared/color/lcms-wasm` with PSD); font subsetting = Phase 5.8.
+
 - **P6.3 — real shading-pattern gradients (type 2 linear, type 3 radial).** Current behaviour: linear / radial gradients use the first-stop colour as a solid fill. Target behaviour: native PDF shading patterns via `pdf.context` low-level API. The Feature Matrix shows these as `native` ≡ "target behaviour for P6.3b"; until the shading-pattern emitter lands, gradients fall back to the first-stop colour and a preflight warning surfaces.
 - **P6.3 — CMYK / Lab / Gray / spot colour emission + ICC output intent.** Current behaviour: export is sRGB / DeviceRGB only. Target behaviour: the exporter emits the colour space declared by `document.outputIntent.colorSpace` (IO-D-13); embedded ICC profile rides via the asset pipeline. The Feature Matrix shows these as `native` ≡ "target behaviour"; colour-mode-specific emission lands with the `_shared/color/lcms-wasm` CMYK path (Phase 2 Spec Gap).
 - **P6.3 — font subsetting via `@pdf-lib/fontkit`.** Current behaviour: fonts embed without subsetting via pdf-lib's default path. Target behaviour: `_shared/fonts/subsetFont` drives `@pdf-lib/fontkit` to emit subset fonts with a ToUnicode CMap. Dependencies are installed; wiring lands with the next export pass.

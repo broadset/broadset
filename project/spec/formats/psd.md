@@ -388,6 +388,13 @@ Export preflight and import warnings MUST follow IO-D-14 ("preflight warns and p
 
 The core P5.2a foundation and P5.3a/b/c coverage shipped, plus the parity-with-PDF infrastructure pass: robust importer surface (`importPsdDocument` with `{ document, warnings }`), import fuzz harness, export preflight (`exportPsdBytesAsyncWithPreflight`), cross-reader structural validator (`validatePsdBytes`), producer-quirks fixture corpus, visual regression pixel sampling, UAX #9 / UAX #14 detection on text content, modular `psd/export/` layout. The following deeper round-trip surface is tracked here and will land under later PSD-track iterations:
 
+> **Tracked closures:** scheduled under the
+> [cross-format I/O improvement plan](../../implementation/cross-format-io-improvement-plan.md) Phase 4:
+> CMYK/Lab/Grayscale + ICC = Phase 4.1; effects parity = Phase 4.3;
+> bitmap layer mask = Phase 4.4; text rotation = Phase 4.5;
+> 16/32-bpc preservation = Phase 4.6; real third-party fixture
+> corpus = Phase 5.3.
+
 - **Inner glow / color overlay / gradient overlay / bevel / satin / pattern overlay.** Current behaviour: drop shadow, outer glow, inner shadow, stroke-effect emit natively. Target behaviour: CSS-mappable effects (inner glow, solid color overlay from explicit Broadset intent, gradient overlay) emit natively; PSD-only effects (bevel / emboss, satin, pattern overlay) ride in `extensions.psd.unmappedEffects` with `dirty: false` so untouched re-export is byte-identical.
 - **Bitmap layer mask round-trip.** Current behaviour: only vector masks are emitted. Target behaviour: bitmap alpha-channel masks with `extensions.psd.bitmapMask` preservation blob when alpha cannot map to a Broadset mask element.
 - **CMYK / Lab / Grayscale + ICC profile round-trip.** Current behaviour: RGB 8-bit only on the current exporter path; preflight surfaces a warning when `document.outputIntent.colorSpace` is non-RGB. Target behaviour: colour mode follows `document.outputIntent.colorSpace`; embedded ICC profile rides via the asset pipeline (`IccProfileAsset` from P4.4 is ready).

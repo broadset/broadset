@@ -6,6 +6,12 @@ documented surfaces (5 real-tool fixtures pinning each ecosystem,
 274 tests, security-reviewer audit landed); the items below are
 issues we know about and have explicitly chosen not to close yet.
 
+> **Tracked closures:** the open security findings below (H2, M2)
+> are scheduled to close under Phase 2 of the
+> [cross-format I/O improvement plan](../../../../project/implementation/cross-format-io-improvement-plan.md).
+> When the plan's Phase 2 lands, delete the corresponding entries
+> per the "How to use this file" instructions below.
+
 Update this file when a gap closes (delete the entry) or when a
 new one surfaces (add an entry with severity, location, attack /
 fidelity description, and the deferred fix).
