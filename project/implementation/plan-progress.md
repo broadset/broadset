@@ -22,10 +22,10 @@ As of 2026-04-23:
 Source of truth: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md)
 
 - [x] P0.1 Ratify IO-D-01 through IO-D-18 in [decisions.md](./decisions.md)
-- [ ] P0.2 Finish pre-emptive model spec updates for every remaining Phase 1 field shape
+- [x] P0.2 Finish pre-emptive model spec updates for every remaining Phase 1 field shape — all 12 shapes covered inline with each Phase 1 commit per CONTRIBUTING.md §Backpropagate Into Specs. Shape → spec home: TextBody → `element.md` "Structured Text Model"; BroadsetColor → `style.md` "Color values use `BroadsetColor`"; BroadsetFill → `style.md` "Structured Fill"; FilterStack → `style.md` "Structured Filter Primitives"; stroke arrow ends → `style.md` "Stroke Arrow Endings"; strokeMiterlimit → `style.md` "SVG Stroke and Fill Properties"; extensions namespacing + dirty flag → `element.md` "Format Extensions Registry (IO-D-11)"; content hash → `element.md` "Content-Hash Identity"; bleed/trim/safeArea → `spec.md` "Prepress Insets"; document.metadata → `spec.md` "Document Metadata"; document.outputIntent → `spec.md` "Document Output Intent"
 - [x] P0.3 Land the importer security contract baseline in [../spec/formats/spec.md](../spec/formats/spec.md)
 - [x] P0.4 Land the importer contract baseline updates in [../spec/formats/spec.md](../spec/formats/spec.md)
-- [ ] P0.5 Close remaining plan-level formats-spec updates (`no-sidecar`, `no-silent-drops`)
+- [x] P0.5 Close remaining plan-level formats-spec updates (`no-sidecar`, `no-silent-drops`) — dedicated `### Requirement: No Sidecar Files (IO-D-17)` + `### Requirement: No Silent Drops (IO-D-18)` blocks landed in `project/spec/formats/spec.md` with scenarios + acceptance criteria cross-referencing the Importer Contract and Format Round-Trip Metadata requirements
 
 ### Phase 1 — Shared model additions
 

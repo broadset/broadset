@@ -47,6 +47,75 @@ All exporters MUST produce files that open correctly in the canonical external t
 
 ---
 
+### Requirement: No Sidecar Files (IO-D-17)
+
+Every round-trippable format exporter (PSD, PDF, PPTX, SVG) MUST produce a single file of the target format. Broadset-native state that cannot be represented in the format's visible payload rides inside the file via the format's own documented extension mechanism — never as a companion file, hidden filesystem artifact, or app-private stream outside the format spec. This invariant is what lets an exported file travel through arbitrary user workflows (email, cloud sync, DAM, external editors) without losing reconciliation identity.
+
+Carrier mechanisms per format (restated from the Format Round-Trip Metadata requirement below):
+
+- **PSD** — document `ImageResources.xmpMetadata` (ISO 16684-1 XMP packet) + per-layer `additionalInfo` under the `BsPs` 4-byte signature.
+- **PDF** — document `Metadata` dictionary (XMP) + marked-content custom properties.
+- **PPTX** — custom XML parts under `ppt/customXml/` + per-shape `<ext>` elements, plus the shape tag map.
+- **SVG** — `<metadata>` element under the shared `broadset:` namespace + `data-bs-*` attributes on individual elements.
+
+#### Scenario: Single-file export
+
+- GIVEN a Broadset project exported to PSD, PDF, PPTX, or SVG
+- WHEN the exporter writes output
+- THEN the exporter produces exactly one file of the target format
+- AND no companion JSON, ZIP wrapper around the format output, or hidden artifact is written alongside
+
+#### Scenario: App-private streams rejected
+
+- GIVEN any proposed exporter change that would persist Broadset state outside the format's documented extension mechanism
+- WHEN the change is reviewed
+- THEN the change MUST be rejected regardless of convenience — sidecar streams are not an acceptable fallback even when the carrier mechanism is lossy
+
+#### Acceptance Criteria
+
+- [ ] Every round-trippable format exporter (PSD/PDF/PPTX/SVG) writes exactly one file per invocation
+- [ ] No exporter emits a companion file, ZIP wrapper, or hidden filesystem artifact
+- [ ] Broadset-native state rides in the format's own XMP / marked-content / `additionalInfo` / `data-bs-*` mechanism
+- [ ] Every exporter's single-file invariant is covered by a CI test that fails if a companion file is produced
+
+---
+
+### Requirement: No Silent Drops (IO-D-18)
+
+Every format importer (PSD, PDF, PPTX, SVG) MUST account for every piece of source content it encounters via one of three paths: (a) map to a native Broadset element, (b) preserve the raw source fragment under `extensions.<format>.<key>` (or an opaque `svg`-type element for SVG) for lossless re-emission, or (c) emit a structured import warning describing what was dropped and why. A fourth path — silently discarding content — is forbidden. This invariant is what keeps users in control of their own files: anything the importer doesn't fully understand still surfaces somewhere the user can see.
+
+This cross-cutting rule derives from IO-D-18 and is enforced at every importer boundary by the Importer Contract bullets "Preservation by default" and "Warnings, not exceptions" below, plus the format-specific preservation schemas in `extensions.<format>`.
+
+#### Scenario: Unknown feature preserved under extensions
+
+- GIVEN a PSD with a Photoshop-specific effect Broadset does not natively model (e.g. bevel/emboss)
+- WHEN the importer processes the layer
+- THEN the effect parameters are preserved under `extensions.psd.unmappedEffects` with `dirty: false`
+- AND the element is otherwise imported normally
+
+#### Scenario: Unknown feature surfaces as warning
+
+- GIVEN an input file containing content that cannot be mapped AND cannot be preserved losslessly (e.g. an importer security cap was hit before the tail of the file was read)
+- WHEN the importer finalises
+- THEN an import warning describing the dropped content MUST appear in the import report
+- AND the warning names the element / region affected and the reason
+
+#### Scenario: Importer throws instead of warning — rejected
+
+- GIVEN any proposed importer path that throws an exception for content it doesn't recognise
+- WHEN the change is reviewed
+- THEN the change MUST be rejected — importers degrade gracefully per the Importer Contract "Warnings, not exceptions" bullet
+
+#### Acceptance Criteria
+
+- [ ] Every importer maps recognised content to a native Broadset element OR preserves it under `extensions.<format>` OR emits an import warning
+- [ ] No importer silently drops source content without the user seeing a warning OR a preservation blob
+- [ ] Every format sub-spec enumerates its preservation surface (`extensions.psd.*`, `extensions.pdf.*`, `extensions.pptx.*`, `extensions.svg.*` or opaque SVG elements)
+- [ ] Every importer under test reports warnings via the shared `{ document, warnings }` `DocumentImportResult` shape
+- [ ] Importer security-cap hits surface as warnings per the Importer Security Contract `Resource-Limit Failures Emit Warnings` requirement below
+
+---
+
 ### Importer Contract
 
 Every format importer MUST satisfy the following contract in addition to the format-specific behaviour in its sub-spec. These rules derive from [io-prereqs-plan.md](../../implementation/io-prereqs-plan.md) decisions IO-D-17 and IO-D-18, and exist so that multi-format round-trip, reconciliation, and preservation behave uniformly across PDF, PSD, PPTX, and SVG.
