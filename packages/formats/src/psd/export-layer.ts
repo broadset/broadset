@@ -12,6 +12,7 @@ import { parseHexColor } from './color-utils';
 import { BLEND_MODE_MAP } from './constants';
 import { decodeDataUri } from './data-uri';
 import { parseBoxShadow, parseFilterGlow } from './effects';
+import { applyRotationToVectorMask } from './rotate-vector-mask';
 import {
   buildEllipseMask,
   buildRectangleMask,
@@ -485,6 +486,14 @@ export function elementToLayer(el: BroadsetElement): Layer {
   applyFilterGlow(layer, el);
   applyStrokeLayerEffect(layer, el);
   applyTypeContent(layer, el);
+
+  // Image rotation is composed into placedLayer.transform inside
+  // applyImageContent. For non-image (text, rectangle, ellipse, path)
+  // layers we expand the AABB and rotate the vector-mask knots so
+  // Photoshop reads back a rotated shape.
+  if (el.type !== 'image') {
+    applyRotationToVectorMask(layer, el.rotation);
+  }
 
   return layer;
 }

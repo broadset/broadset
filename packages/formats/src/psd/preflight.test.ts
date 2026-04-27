@@ -48,11 +48,12 @@ describe('collectPreflightWarnings', () => {
   });
 
   /**
-   * @description Rotated non-image elements (text, shape) export at
-   * axis-aligned bounds — preflight names the count.
+   * @description Rotated text elements still export at axis-aligned
+   * bounds because ag-psd's text engine doesn't round-trip a
+   * transform — preflight names the count.
    */
-  it('warns when shapes or text are rotated', () => {
-    const el = makeElement('rectangle', { id: 'r1', rotation: 45 });
+  it('warns when text is rotated', () => {
+    const el = makeElement('text', { id: 't1', rotation: 45, content: 'Hello' });
     const doc = makeDocument({ elements: [el] });
     const warnings = collectPreflightWarnings(doc);
 
@@ -60,12 +61,14 @@ describe('collectPreflightWarnings', () => {
   });
 
   /**
-   * @description Rotated images compose via placedLayer.transform —
-   * no warning needed.
+   * @description Rotated images and shapes compose natively (via
+   * placedLayer.transform for images, via the vector-mask rotation
+   * pass for shapes) — no warning needed.
    */
-  it('does not warn when only images are rotated', () => {
-    const el = makeElement('image', { id: 'i1', rotation: 90, content: 'data:image/png;base64,xx' });
-    const doc = makeDocument({ elements: [el] });
+  it('does not warn when only images or shapes are rotated', () => {
+    const image = makeElement('image', { id: 'i1', rotation: 90, content: 'data:image/png;base64,xx' });
+    const rect = makeElement('rectangle', { id: 'r1', rotation: 30 });
+    const doc = makeDocument({ elements: [image, rect] });
     const warnings = collectPreflightWarnings(doc);
 
     expect(warnings.some((w) => w.toLowerCase().includes('rotat'))).toBe(false);
@@ -91,7 +94,7 @@ describe('exportPsdBytesAsyncWithPreflight', () => {
    * preflight + any fetch failures.
    */
   it('returns bytes alongside the static preflight warnings', async () => {
-    const el = makeElement('rectangle', { id: 'r1', rotation: 30 });
+    const el = makeElement('text', { id: 't1', rotation: 30, content: 'Hello' });
     const doc = makeDocument({ elements: [el] });
     const result = await exportPsdBytesAsyncWithPreflight(doc, () => Promise.resolve(new Response(null, { status: 500 })));
 

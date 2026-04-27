@@ -50,17 +50,18 @@ function collectAnimationWarnings(doc: BroadsetDocument): readonly string[] {
 
 /**
  * Rotation composes natively into image (`placedLayer`) transforms,
- * but text and shape elements export at their axis-aligned bounds.
- * This is a known gap; the warning sets user expectations until the
- * vector-mask rotation pass lands.
+ * and into the vector-mask AABB for native shape and path layers.
+ * Text rotation is the remaining gap: ag-psd's text engine doesn't
+ * round-trip an arbitrary transform, so rotated text exports at its
+ * axis-aligned bounds and reads back as un-rotated.
  */
 function collectRotationWarnings(doc: BroadsetDocument): readonly string[] {
-  const rotated = doc.elements.filter((el) => el.rotation !== 0 && el.type !== 'image');
+  const rotated = doc.elements.filter((el) => el.rotation !== 0 && el.type === 'text');
 
   if (rotated.length === 0) return [];
 
   return [
-    `PSD preflight: ${String(rotated.length)} rotated non-image element(s) will export at axis-aligned bounds. Image rotation composes natively via placedLayer.transform; text and shape rotation lands in a follow-up.`,
+    `PSD preflight: ${String(rotated.length)} rotated text element(s) will export at axis-aligned bounds. Image and shape rotation compose natively; text rotation through ag-psd's text engine lands in a follow-up.`,
   ];
 }
 
