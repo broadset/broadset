@@ -15,7 +15,8 @@
     "test": "vitest run --passWithNoTests",
     "quality": "npm run lint && npm run typecheck && npm run test",
     "quality:strict": "npm run lint:strict && npm run typecheck && npm run test",
-    "pptx:corpus:fetch": "node scripts/fetch-pptx-corpus.mjs"
+    "pptx:corpus:fetch": "node scripts/fetch-pptx-corpus.mjs",
+    "pptx:libreoffice:verify": "BROADSET_REQUIRE_LIBREOFFICE=1 vitest run --passWithNoTests pptx/libreoffice-verify"
   },
   "devDependencies": {
     "@types/culori": "^4.0.1",
