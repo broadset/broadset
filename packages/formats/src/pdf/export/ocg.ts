@@ -86,8 +86,14 @@ export function registerPageOcgs(pdf: PDFDocument, doc: BroadsetDocument): OcgRe
   // (`/D`) declaring which are visible on load. Every OCG is on by
   // default — Broadset's visibility system lives at the element level,
   // not the OCG level.
+  //
+  // ISO 19005-2 §6.9 requires the default configuration dictionary
+  // to carry `/Name` (configuration name) and `/Creator`. Without
+  // them veraPDF flags the document as non-conformant.
   const ocgsArray = context.obj(refs);
   const defaultConfig = context.obj({
+    Name: PDFString.of('Broadset Page Layers'),
+    Creator: PDFString.of('Broadset PDF Exporter'),
     Order: refs,
     ON: refs,
     OFF: [],

@@ -110,6 +110,9 @@ module.exports = [
       '**/playwright/.cache/**',
       'playwright-report/**',
       'test-results/**',
+      // CI/dev utility scripts (e.g. veraPDF runner) that aren't part
+      // of the package's source tree and don't need typechecking.
+      '**/scripts/**',
     ],
   },
   {

@@ -14,7 +14,8 @@
     "typecheck": "tsc -b",
     "test": "vitest run --passWithNoTests",
     "quality": "npm run lint && npm run typecheck && npm run test",
-    "quality:strict": "npm run lint:strict && npm run typecheck && npm run test"
+    "quality:strict": "npm run lint:strict && npm run typecheck && npm run test",
+    "validate:pdfa": "node scripts/validate-pdfa.mjs"
   },
   "devDependencies": {
     "@napi-rs/canvas": "^0.1.100",
@@ -27,6 +28,7 @@
     "pdfkit": "^0.18.0",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.2"
   },
   "dependencies": {

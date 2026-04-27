@@ -1,6 +1,6 @@
 import type { Asset, BroadsetDocument, IccProfileAsset } from '@broadset/model';
 import { isIccProfileAsset } from '@broadset/model';
-import { type PDFDocument, PDFHexString, PDFName, PDFRawStream } from 'pdf-lib';
+import { type PDFDocument, PDFHexString, PDFName, PDFRawStream, PDFString } from 'pdf-lib';
 
 import { DEFAULT_PROFILE_IDENTIFIER, getDefaultProfile } from '../../_shared/color';
 import { decodeDataUri } from '../data-uri';
@@ -131,11 +131,17 @@ export function attachOutputIntent(pdf: PDFDocument, intent: ResolvedOutputInten
   const profileStream = PDFRawStream.of(profileStreamDict, intent.profileBytes);
   const profileRef = pdf.context.register(profileStream);
 
+  // ISO 32000-1 §14.11.5 requires `OutputConditionIdentifier` and
+  // `Info` to be **text strings** (PDFString), not names. pdf-lib's
+  // `context.obj({ key: 'value' })` emits raw strings as PDFName
+  // (`/value`), which veraPDF flags as a conformance violation.
+  // Wrap explicitly with `PDFString.of(...)` so the values come out
+  // as `(value)` PDF literal strings.
   const outputIntentDict = pdf.context.obj({
     Type: 'OutputIntent',
     S: 'GTS_PDFA1',
-    OutputConditionIdentifier: intent.identifier,
-    Info: intent.identifier,
+    OutputConditionIdentifier: PDFString.of(intent.identifier),
+    Info: PDFString.of(intent.identifier),
     DestOutputProfile: profileRef,
   });
 
