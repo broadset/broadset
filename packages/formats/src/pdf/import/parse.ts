@@ -141,8 +141,12 @@ export function hasEmbeddedJavaScript(pdf: PDFDocument): boolean {
   }
 
   // `/OpenAction` can be either an action dict (typed `S /JavaScript`)
-  // or a destination array. We detect only the action-dict form.
-  const openAction = pdf.catalog.lookupMaybe(OPEN_ACTION_KEY, PDFDict);
+  // or a destination array (`[page /XYZ x y zoom]` from jsPDF, Acrobat,
+  // etc.). We detect only the action-dict form. pdf-lib's
+  // `lookupMaybe` throws when the value's type does not match the
+  // requested class — wrap in try/catch so a destination-array
+  // /OpenAction gracefully falls through rather than aborting import.
+  const openAction = lookupOpenActionDict(pdf);
 
   if (openAction !== undefined) {
     const subtype = openAction.lookupMaybe(PDFName.of('S'), PDFName);
@@ -153,6 +157,14 @@ export function hasEmbeddedJavaScript(pdf: PDFDocument): boolean {
   }
 
   return hasDocumentAdditionalActionJs(pdf);
+}
+
+function lookupOpenActionDict(pdf: PDFDocument): PDFDict | undefined {
+  try {
+    return pdf.catalog.lookupMaybe(OPEN_ACTION_KEY, PDFDict);
+  } catch {
+    return undefined;
+  }
 }
 
 function hasDocumentAdditionalActionJs(pdf: PDFDocument): boolean {

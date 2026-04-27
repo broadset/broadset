@@ -19,6 +19,9 @@
   "devDependencies": {
     "@types/culori": "^4.0.1",
     "@types/fontkit": "^2.0.9",
+    "@types/pdfkit": "^0.17.6",
+    "jspdf": "^4.2.1",
+    "pdfkit": "^0.18.0",
     "typescript": "^6.0.2"
   },
   "dependencies": {
