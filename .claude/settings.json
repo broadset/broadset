@@ -78,6 +78,12 @@
       "Bash(npx tsc -b *)",
       "Bash(npx prettier --check *)",
       "Bash(bash agents/hooks/quality-gate.sh)",
+      "Bash(agents/hooks/quality-gate.sh)",
+      "Bash(agents/hooks/quality-gate.sh *)",
+      "Bash(npx knip)",
+      "Bash(npx knip *)",
+      "Bash(npm test)",
+      "Bash(npm test *)",
       "mcp__chrome-devtools__take_snapshot"
     ]
   }
