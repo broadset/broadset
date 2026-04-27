@@ -55,7 +55,19 @@ export function importPptxWithReport(data: Uint8Array): PptxImportReport {
     return { document: createEmptyBroadsetDocument(), warnings };
   }
 
-  const pkg = readOoxmlPackage(data);
+  let pkg: OoxmlPackage;
+
+  try {
+    pkg = readOoxmlPackage(data);
+  } catch (err) {
+    warnings.push({
+      code: 'malformed-xml',
+      message: 'PPTX package is not a readable ZIP archive — import rejected.',
+      detail: err instanceof Error ? err.message : 'unknown ZIP error',
+    });
+
+    return { document: createEmptyBroadsetDocument(), warnings };
+  }
 
   enforcePackageCaps(pkg, warnings);
   rejectExecutionSurface(pkg, warnings);
