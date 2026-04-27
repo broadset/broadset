@@ -3,10 +3,10 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createDefaultElement, createEmptyBroadsetDocument } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { exportPptxBytes } from './export';
+import { buildCanonicalDocument } from './fixtures/canonical';
 
 /**
  * @description LibreOffice headless verification — proves a Broadset-
@@ -42,41 +42,7 @@ function findLibreOffice(): string | null {
 }
 
 function buildCanonicalFixture(): Uint8Array {
-  const baseDoc = createEmptyBroadsetDocument();
-  const elements = [
-    createDefaultElement('rectangle', {
-      id: 'rect-1',
-      name: 'Rectangle',
-      position: { x: 20, y: 20 },
-      width: 60,
-      height: 40,
-    }),
-    createDefaultElement('ellipse', {
-      id: 'ellipse-1',
-      name: 'Ellipse',
-      position: { x: 100, y: 30 },
-      width: 50,
-      height: 35,
-    }),
-    createDefaultElement('text', {
-      id: 'text-1',
-      name: 'Caption',
-      position: { x: 20, y: 80 },
-      width: 130,
-      height: 18,
-      content: 'Canonical caption.',
-    }),
-    createDefaultElement('path', {
-      id: 'path-1',
-      name: 'Path',
-      position: { x: 20, y: 120 },
-      width: 60,
-      height: 40,
-      content: 'M 0 0 L 100 0 L 100 100 Z',
-    }),
-  ];
-
-  return exportPptxBytes({ ...baseDoc, elements });
+  return exportPptxBytes(buildCanonicalDocument());
 }
 
 const lo = findLibreOffice();

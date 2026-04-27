@@ -3,10 +3,10 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createDefaultElement, createEmptyBroadsetDocument, rgbColor } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { exportPptxBytes } from './export';
+import { buildCanonicalDocument } from './fixtures/canonical';
 
 /**
  * @description ECMA-376 / ISO/IEC 29500 schema validation gate.
@@ -71,56 +71,7 @@ function findDotnet(): string | null {
 }
 
 function buildCanonicalFixture(): Uint8Array {
-  const baseDoc = createEmptyBroadsetDocument();
-
-  return exportPptxBytes({
-    ...baseDoc,
-    canvas: {
-      ...baseDoc.canvas,
-      backgroundColor: '#FF0000',
-      backgroundMode: 'gradient',
-      backgroundGradient: {
-        type: 'linear',
-        angle: 90,
-        stops: [
-          { color: rgbColor('#FF0000'), position: 0 },
-          { color: rgbColor('#0000FF'), position: 1 },
-        ],
-      },
-    },
-    elements: [
-      createDefaultElement('rectangle', {
-        id: 'rect-1',
-        name: 'Rectangle',
-        position: { x: 20, y: 20 },
-        width: 60,
-        height: 40,
-      }),
-      createDefaultElement('ellipse', {
-        id: 'ellipse-1',
-        name: 'Ellipse',
-        position: { x: 100, y: 30 },
-        width: 50,
-        height: 35,
-      }),
-      createDefaultElement('text', {
-        id: 'text-1',
-        name: 'Caption',
-        position: { x: 20, y: 80 },
-        width: 130,
-        height: 18,
-        content: 'Canonical caption.',
-      }),
-      createDefaultElement('path', {
-        id: 'path-1',
-        name: 'Path',
-        position: { x: 20, y: 120 },
-        width: 60,
-        height: 40,
-        content: 'M 0 0 L 100 0 L 100 100 Z',
-      }),
-    ],
-  });
+  return exportPptxBytes(buildCanonicalDocument());
 }
 
 function writeValidatorProject(rootDir: string): string {
