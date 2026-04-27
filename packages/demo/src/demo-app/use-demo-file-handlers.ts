@@ -146,6 +146,108 @@ function getOptionalNumber(data: Readonly<Record<string, unknown>>, key: string)
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
+/**
+ * Pull a `Record<string, unknown>`-shaped object from `data[key]`.
+ * The `ExportModal` writes the per-format options block at
+ * `svgOptions` / `psdOptions` / `pdfOptions` / `pptxOptions`; this
+ * helper narrows from `unknown` so the bridge call site stays
+ * strictly typed.
+ */
+function extractFormatOptionsObject(
+  data: Readonly<Record<string, unknown>>,
+  key: string,
+): Readonly<Record<string, unknown>> | undefined {
+  const value = data[key];
+
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+
+  // After the narrowing above we know `value` is a non-null,
+  // non-array object — `Object.fromEntries(Object.entries(...))`
+  // produces a fresh `Record<string, unknown>` without widening or
+  // a type-asserting cast.
+  const entries: ReadonlyArray<readonly [string, unknown]> = Object.entries(value);
+
+  return Object.fromEntries(entries);
+}
+
+/**
+ * Per-format options arriving from the FormatExportOptionsModal.
+ * Each entry is a partial of the matching `*ExportOptionsInput`
+ * shape on the bridge — keys missing from the dynamic data are
+ * omitted so the bridge falls back to its own defaults.
+ */
+interface FormatScopedExportArgs {
+  readonly svgOptions?: Readonly<Record<string, unknown>>;
+  readonly pdfOptions?: Readonly<Record<string, unknown>>;
+  readonly psdOptions?: Readonly<Record<string, unknown>>;
+  readonly pptxOptions?: Readonly<Record<string, unknown>>;
+}
+
+function buildSvgScopedArgs(
+  data: Readonly<Record<string, unknown>>,
+  projectAssets: BroadsetProject['assets'] | undefined,
+): FormatScopedExportArgs {
+  const svgFromUi = extractFormatOptionsObject(data, 'svgOptions');
+
+  if (projectAssets === undefined && svgFromUi === undefined) return {};
+
+  return {
+    svgOptions: { ...(svgFromUi ?? {}), ...(projectAssets !== undefined ? { projectAssets } : {}) },
+  };
+}
+
+function buildPptxScopedArgs(
+  data: Readonly<Record<string, unknown>>,
+  projectAssets: BroadsetProject['assets'] | undefined,
+): FormatScopedExportArgs {
+  const pptxFromUi = extractFormatOptionsObject(data, 'pptxOptions');
+
+  if (pptxFromUi === undefined) return {};
+
+  return {
+    pptxOptions: { ...pptxFromUi, ...(projectAssets !== undefined ? { projectAssets } : {}) },
+  };
+}
+
+/**
+ * Aggregate per-format option objects the bridge expects. The
+ * `ExportModal` writes each format's block onto the dynamic-data
+ * payload by key (`svgOptions`, `psdOptions`, `pdfOptions`,
+ * `pptxOptions`); this helper merges those values with project
+ * assets where the bridge needs them (SVG fonts, PPTX font embed).
+ *
+ * Extracted from `handleExportFormat` to keep that function under
+ * the sonarjs cognitive-complexity threshold.
+ */
+function buildFormatScopedExportArgs(
+  exporter: string,
+  data: Readonly<Record<string, unknown>>,
+  projectAssets: BroadsetProject['assets'] | undefined,
+): FormatScopedExportArgs {
+  switch (exporter) {
+    case 'svg':
+      return buildSvgScopedArgs(data, projectAssets);
+
+    case 'pdf': {
+      const pdfFromUi = extractFormatOptionsObject(data, 'pdfOptions');
+
+      return pdfFromUi !== undefined ? { pdfOptions: pdfFromUi } : {};
+    }
+
+    case 'psd': {
+      const psdFromUi = extractFormatOptionsObject(data, 'psdOptions');
+
+      return psdFromUi !== undefined ? { psdOptions: psdFromUi } : {};
+    }
+
+    case 'pptx':
+      return buildPptxScopedArgs(data, projectAssets);
+
+    default:
+      return {};
+  }
+}
+
 const FORMATS_LOAD_TIMEOUT_MS = 60_000;
 
 /** Round up to the nearest even number (H.264 requires even dimensions). */
@@ -662,10 +764,12 @@ export function useDemoFileHandlers({
 
         if (videoSession !== null) snapshotCanvas = videoSession.session.encoderCanvas;
 
-        // SVG export pulls byte-level font sources from the
-        // project's `FontAsset`s so embed / reference / flatten
-        // modes have something to embed beyond the family name.
-        const svgOptions = exporter === 'svg' && projectAssets !== undefined ? { projectAssets } : undefined;
+        // Per-format options (SVG font embed, PDF colour/PDF-A,
+        // PSD colour mode, PPTX font embed) arrive from the
+        // FormatExportOptionsModal via `data[<format>Options]`.
+        // Build the bridge-shaped block once, including project
+        // assets where applicable.
+        const formatScopedArgs = buildFormatScopedExportArgs(exporter, data, projectAssets);
 
         try {
           const exportResult = await bridge.exportDocument(exporter as ExportFormat, {
@@ -676,7 +780,7 @@ export function useDemoFileHandlers({
             ...(videoSession?.playbackDurationMs !== undefined ?
               { playbackDurationMs: videoSession.playbackDurationMs }
             : {}),
-            ...(svgOptions !== undefined ? { svgOptions } : {}),
+            ...formatScopedArgs,
             onProgress: makeFinalizeProgressHandler(setExportProgress),
           });
 

@@ -118,6 +118,8 @@ describe('Cross-format reuse (I6.1 / I7.1 / I8.1)', () => {
           fontEmbedding: 'embed',
           includeMetadata: true,
           includeElementTagging: true,
+          pdfaConformance: 'none',
+          embedFonts: false,
         }}
         onCancel={vi.fn()}
         onConfirm={vi.fn()}
@@ -155,6 +157,8 @@ describe('Cross-format reuse (I6.1 / I7.1 / I8.1)', () => {
           fontEmbedding: 'embed',
           includeMetadata: true,
           includeElementTagging: true,
+          pdfaConformance: 'none',
+          embedFonts: false,
         }}
         onCancel={vi.fn()}
         onConfirm={vi.fn()}
@@ -189,6 +193,8 @@ describe('FormatExportOptionsModal', () => {
     fontEmbedding: 'embed',
     includeMetadata: true,
     includeElementTagging: true,
+    pdfaConformance: 'none',
+    embedFonts: false,
   };
 
   /**
@@ -225,7 +231,9 @@ describe('FormatExportOptionsModal', () => {
       <FormatExportOptionsModal
         isOpen={true}
         formatLabel="PSD"
-        supportedFields={new Set(['colorSpace', 'bitDepth', 'embedIccProfile', 'linkSmartObjects', 'preserveVisibility'])}
+        supportedFields={
+          new Set(['colorSpace', 'bitDepth', 'embedIccProfile', 'linkSmartObjects', 'preserveVisibility'])
+        }
         defaults={defaults}
         onCancel={vi.fn()}
         onConfirm={onConfirm}

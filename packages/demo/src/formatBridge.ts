@@ -1,6 +1,6 @@
 import type * as FormatsNS from '@broadset/formats';
 import type { Asset, BroadsetDocument } from '@broadset/model';
-import { broadsetDocumentSchema } from '@broadset/model';
+import { broadsetDocumentSchema, isFontAsset } from '@broadset/model';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -38,6 +38,52 @@ export interface SvgExportOptionsInput {
   readonly projectAssets?: readonly Asset[];
 }
 
+/**
+ * PDF-specific options forwarded from the demo through
+ * {@link exportDocument} into `formats.exportPdfBytes`. Mirrors the
+ * subset of `PdfExportOptions` the UI surfaces today (colour space
+ * + PDF/A conformance level). The UI's `'none'` PDF/A choice maps to
+ * "do not opt into PDF/A" — the bridge omits the field in that case
+ * so pdf-lib falls back to standard PDF.
+ */
+export interface PdfExportOptionsInput {
+  readonly colorSpace?: 'rgb' | 'cmyk' | 'spot';
+  readonly pdfaConformance?: '2b' | '2u' | '2a' | 'none';
+}
+
+/**
+ * PSD-specific options forwarded through {@link exportDocument}.
+ * Mirrors `PsdExportOptions` from `@broadset/formats/psd` — the
+ * underlying PSD exporter does not yet consume these (Spec Gap), so
+ * the bridge currently records them onto the export call without
+ * propagating downstream. They are part of the wire contract so a
+ * later PR can connect them without changing the UI surface.
+ */
+export interface PsdExportOptionsInput {
+  readonly colorSpace?: 'rgb' | 'cmyk' | 'lab' | 'grayscale';
+  readonly bitDepth?: 8 | 16;
+  readonly embedIccProfile?: boolean;
+  readonly linkSmartObjects?: boolean;
+  readonly preserveVisibility?: boolean;
+}
+
+/**
+ * PPTX-specific options forwarded through {@link exportDocument}. The
+ * single UI-level field today is `embedFonts` — when true, the
+ * bridge collects every `FontAsset` from the project and passes
+ * them as `fontAssets` to the async PPTX exporter, which subsets +
+ * embeds them under `ppt/fonts/` for any text element that uses the
+ * matching `style.fontFamily`.
+ */
+export interface PptxExportOptionsInput {
+  readonly embedFonts?: boolean;
+  /**
+   * Project assets the bridge walks for `FontAsset` entries when
+   * `embedFonts` is true. Mirrors {@link SvgExportOptionsInput.projectAssets}.
+   */
+  readonly projectAssets?: readonly Asset[];
+}
+
 export interface ExportContext {
   readonly document: BroadsetDocument;
   readonly snapshotCanvas?: HTMLCanvasElement;
@@ -50,6 +96,12 @@ export interface ExportContext {
   readonly onProgress?: (progress: number, stage?: string) => void;
   /** SVG-specific options from the `FormatExportOptionsModal`. */
   readonly svgOptions?: SvgExportOptionsInput;
+  /** PDF-specific options from the `FormatExportOptionsModal`. */
+  readonly pdfOptions?: PdfExportOptionsInput;
+  /** PSD-specific options from the `FormatExportOptionsModal`. */
+  readonly psdOptions?: PsdExportOptionsInput;
+  /** PPTX-specific options from the `FormatExportOptionsModal`. */
+  readonly pptxOptions?: PptxExportOptionsInput;
 }
 
 export interface ImportReconciliationElement {
@@ -168,6 +220,49 @@ async function exportSvgVia(formats: FormatsModule, context: ExportContext, name
   formats.triggerDownload(blob, `${name}.svg`);
 }
 
+/**
+ * Build a `PdfExportOptions`-shaped object from the caller's
+ * `pdfOptions`. The UI's `'none'` PDF/A choice is collapsed by
+ * omitting the field so pdf-lib emits standard PDF; populated values
+ * map straight through.
+ */
+function buildPdfExportOptions(context: ExportContext): Record<string, unknown> {
+  const pdfOpts = context.pdfOptions ?? {};
+  const exportOpts: Record<string, unknown> = {};
+
+  if (pdfOpts.colorSpace !== undefined) {
+    exportOpts['colorSpace'] = pdfOpts.colorSpace;
+  }
+
+  if (pdfOpts.pdfaConformance !== undefined && pdfOpts.pdfaConformance !== 'none') {
+    exportOpts['pdfaConformance'] = pdfOpts.pdfaConformance;
+  }
+
+  return exportOpts;
+}
+
+/**
+ * Build a `PptxExportOptions`-shaped object from the caller's
+ * `pptxOptions`. When `embedFonts === true` and the project carries
+ * `FontAsset`s, they're forwarded into the PPTX exporter's
+ * `fontAssets` slot for subset-and-embed under `ppt/fonts/`.
+ */
+function buildPptxExportOptions(context: ExportContext): Record<string, unknown> {
+  const pptxOpts = context.pptxOptions ?? {};
+  const exportOpts: Record<string, unknown> = {};
+
+  if (pptxOpts.embedFonts === true) {
+    const projectAssets = pptxOpts.projectAssets ?? [];
+    const fontAssets = projectAssets.filter(isFontAsset);
+
+    if (fontAssets.length > 0) {
+      exportOpts['fontAssets'] = fontAssets;
+    }
+  }
+
+  return exportOpts;
+}
+
 export async function exportDocument(format: ExportFormat, context: ExportContext): Promise<ExportDocumentResult> {
   const formats = await loadFormats();
   const { document: doc } = context;
@@ -197,7 +292,7 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
     }
 
     case 'pdf': {
-      const pdfBytes = await formats.exportPdfBytes(doc);
+      const pdfBytes = await formats.exportPdfBytes(doc, buildPdfExportOptions(context));
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
 
       formats.triggerDownload(blob, `${name}.pdf`);
@@ -205,7 +300,7 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
     }
 
     case 'pptx': {
-      const pptxReport = await formats.exportPptxWithReportAsync(doc);
+      const pptxReport = await formats.exportPptxWithReportAsync(doc, buildPptxExportOptions(context));
       const blob = new Blob([pptxReport.bytes.buffer as ArrayBuffer], {
         type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       });
@@ -220,6 +315,12 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
     }
 
     case 'psd': {
+      // PsdExportOptions are accepted on the bridge surface but the
+      // underlying `exportPsdBytesAsync` does not consume them yet
+      // (Spec Gap — PSD export still reads colour mode from
+      // `document.outputIntent`). Recording the input here so a
+      // future PR can wire the options downstream without a UI
+      // change.
       const psdBytes = await formats.exportPsdBytesAsync(doc);
       const blob = new Blob([psdBytes.buffer as ArrayBuffer], { type: 'image/vnd.adobe.photoshop' });
 

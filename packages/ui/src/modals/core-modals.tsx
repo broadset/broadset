@@ -4,6 +4,7 @@ import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState }
 import { NumField, ToggleSwitch } from '../inputs';
 import { color, sp } from '../tokens';
 import { EXPORTER_CATEGORIES, VIEW_MODES } from './constants';
+import { FormatExportOptionsModal, type FormatExportOptionsValue } from './format-export-options';
 import { ModalShell } from './modal-shell';
 
 export interface AboutModalProps {
@@ -248,6 +249,89 @@ export interface ExportModalProps {
   readonly onClose: () => void;
 }
 
+/**
+ * Per-format projection of {@link FormatExportOptionsValue} fields the
+ * `FormatExportOptionsModal` exposes when that exporter is selected.
+ * Formats not listed here render no Options… button.
+ */
+const FORMAT_OPTION_SUPPORT: Readonly<Record<string, ReadonlySet<keyof FormatExportOptionsValue>>> = {
+  svg: new Set(['fontEmbedding', 'includeMetadata', 'includeElementTagging'] as const),
+  psd: new Set(['colorSpace', 'bitDepth', 'embedIccProfile', 'linkSmartObjects', 'preserveVisibility'] as const),
+  pdf: new Set(['colorSpace', 'pdfaConformance'] as const),
+  pptx: new Set(['embedFonts'] as const),
+};
+
+/** Sensible defaults seeded into the FormatExportOptionsModal on first open. */
+const DEFAULT_FORMAT_OPTIONS: FormatExportOptionsValue = {
+  colorSpace: 'rgb',
+  bitDepth: 8,
+  embedIccProfile: true,
+  linkSmartObjects: false,
+  preserveVisibility: true,
+  fontEmbedding: 'embed',
+  includeMetadata: true,
+  includeElementTagging: true,
+  pdfaConformance: 'none',
+  embedFonts: false,
+};
+
+/**
+ * Build the per-format options block that flows through `onExport`'s
+ * `data` payload. The bridge layer pulls these out by key
+ * (`svgOptions` / `psdOptions` / `pdfOptions` / `pptxOptions`) and
+ * forwards them to the underlying exporter; we only emit the keys for
+ * the chosen format so the payload stays narrow.
+ */
+function buildFormatScopedExportOptions(
+  exporter: string,
+  formatOptions: FormatExportOptionsValue,
+): Readonly<Record<string, unknown>> {
+  const supported = FORMAT_OPTION_SUPPORT[exporter];
+
+  if (supported === undefined || supported.size === 0) return {};
+
+  switch (exporter) {
+    case 'svg':
+      return {
+        svgOptions: {
+          fontEmbedding: formatOptions.fontEmbedding,
+          includeMetadata: formatOptions.includeMetadata,
+          includeElementTagging: formatOptions.includeElementTagging,
+        },
+      };
+    case 'psd':
+      return {
+        psdOptions: {
+          colorSpace: formatOptions.colorSpace,
+          bitDepth: formatOptions.bitDepth,
+          embedIccProfile: formatOptions.embedIccProfile,
+          linkSmartObjects: formatOptions.linkSmartObjects,
+          preserveVisibility: formatOptions.preserveVisibility,
+        },
+      };
+    case 'pdf':
+      return {
+        pdfOptions: {
+          colorSpace: formatOptions.colorSpace,
+          pdfaConformance: formatOptions.pdfaConformance,
+        },
+      };
+    case 'pptx':
+      return {
+        pptxOptions: {
+          embedFonts: formatOptions.embedFonts,
+        },
+      };
+    default:
+      return {};
+  }
+}
+
+/** Human-readable label used in the FormatExportOptionsModal title. */
+function formatExporterLabel(exporter: string): string {
+  return exporter.toUpperCase();
+}
+
 /** Format milliseconds as a human-readable duration string. */
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(ms / 1000);
@@ -277,6 +361,8 @@ export function ExportModal({
   const [videoFrameRate, setVideoFrameRate] = useState(30);
   const [videoQuality, setVideoQuality] = useState(0.8);
   const [selectedAnimationIds, setSelectedAnimationIds] = useState<ReadonlySet<string>>(new Set());
+  const [showFormatOptions, setShowFormatOptions] = useState(false);
+  const [formatOptions, setFormatOptions] = useState(DEFAULT_FORMAT_OPTIONS);
 
   const isVideoFormat = selectedExporter === 'mp4' || selectedExporter === 'webm';
   const isExporting = exportProgress !== null && exportProgress !== undefined;
@@ -330,10 +416,12 @@ export function ExportModal({
         videoFrameRate,
         videoQuality,
         selectedAnimationIds: [...selectedAnimationIds],
+        ...buildFormatScopedExportOptions(selectedExporter, formatOptions),
       });
     }
   }, [
     dynamicData,
+    formatOptions,
     jpegQuality,
     onExport,
     pixelRatio,
@@ -343,186 +431,230 @@ export function ExportModal({
     videoQuality,
   ]);
 
+  // Show "Options…" button only when the chosen exporter declares
+  // FormatExportOptionsModal support. Other formats (HTML, PNG,
+  // JPEG, video) use the existing advanced-options block instead.
+  const supportedFormatOptionFields = selectedExporter !== null ? FORMAT_OPTION_SUPPORT[selectedExporter] : undefined;
+  const hasFormatOptions = supportedFormatOptionFields !== undefined && supportedFormatOptionFields.size > 0;
+
   return (
-    <ModalShell isOpen={isOpen} size="lg" title="Export" onClose={onClose}>
-      <Modal.Header>
-        <span style={{ flex: 1, fontWeight: 700 }}>Export</span>
-      </Modal.Header>
-      <Modal.Body>
-        {isExporting ?
-          <section aria-label="Export progress">
-            <p style={{ fontWeight: 600, marginBottom: sp('sp-02') }}>{exportProgress.stage}</p>
-            <ProgressBar aria-label="Export progress" maxValue={1} minValue={0} value={exportProgress.progress}>
-              <ProgressBar.Track>
-                <ProgressBar.Fill />
-              </ProgressBar.Track>
-            </ProgressBar>
-            <p style={{ fontSize: '0.75rem', color: color('muted'), marginTop: sp('sp-01') }}>
-              {Math.round(exportProgress.progress * 100)}%
-            </p>
-          </section>
-        : <>
-            {EXPORTER_CATEGORIES.map(({ category, formats }) => {
-              const enabledFormats = formats.filter((f) => enabledExporters.includes(f));
+    <>
+      <ModalShell isOpen={isOpen} size="lg" title="Export" onClose={onClose}>
+        <Modal.Header>
+          <span style={{ flex: 1, fontWeight: 700 }}>Export</span>
+        </Modal.Header>
+        <Modal.Body>
+          {isExporting ?
+            <section aria-label="Export progress">
+              <p style={{ fontWeight: 600, marginBottom: sp('sp-02') }}>{exportProgress.stage}</p>
+              <ProgressBar aria-label="Export progress" maxValue={1} minValue={0} value={exportProgress.progress}>
+                <ProgressBar.Track>
+                  <ProgressBar.Fill />
+                </ProgressBar.Track>
+              </ProgressBar>
+              <p style={{ fontSize: '0.75rem', color: color('muted'), marginTop: sp('sp-01') }}>
+                {Math.round(exportProgress.progress * 100)}%
+              </p>
+            </section>
+          : <>
+              {EXPORTER_CATEGORIES.map(({ category, formats }) => {
+                const enabledFormats = formats.filter((f) => enabledExporters.includes(f));
 
-              if (enabledFormats.length === 0) return null;
+                if (enabledFormats.length === 0) return null;
 
-              return (
-                <div key={category} style={{ marginBottom: sp('sp-03') }}>
-                  <h4 style={{ fontSize: '0.75rem', color: color('muted'), marginBottom: sp('sp-01') }}>{category}</h4>
-                  <div style={{ display: 'flex', gap: sp('sp-02'), flexWrap: 'wrap' }}>
-                    {enabledFormats.map((format) => (
-                      <Button
-                        key={format}
-                        aria-label={format.toUpperCase()}
-                        variant={selectedExporter === format ? 'primary' : 'ghost'}
-                        onPress={() => {
-                          setSelectedExporter(format);
-                        }}
-                      >
-                        {format.toUpperCase()}
-                      </Button>
-                    ))}
+                return (
+                  <div key={category} style={{ marginBottom: sp('sp-03') }}>
+                    <h4 style={{ fontSize: '0.75rem', color: color('muted'), marginBottom: sp('sp-01') }}>
+                      {category}
+                    </h4>
+                    <div style={{ display: 'flex', gap: sp('sp-02'), flexWrap: 'wrap' }}>
+                      {enabledFormats.map((format) => (
+                        <Button
+                          key={format}
+                          aria-label={format.toUpperCase()}
+                          variant={selectedExporter === format ? 'primary' : 'ghost'}
+                          onPress={() => {
+                            setSelectedExporter(format);
+                          }}
+                        >
+                          {format.toUpperCase()}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
 
-            {isVideoFormat && animations !== undefined && animations.length > 0 && (
-              <section aria-label="Animation selection" style={{ marginTop: sp('sp-03') }}>
-                <h4 style={{ fontSize: '0.75rem', color: color('muted'), marginBottom: sp('sp-01') }}>
-                  Animations to export
-                </h4>
-                <div
-                  style={{
-                    display: 'grid',
-                    gap: sp('sp-01'),
-                    padding: sp('sp-02'),
-                    border: `1px solid ${color('border')}`,
-                    borderRadius: 10,
-                    maxHeight: '150px',
-                    overflowY: 'auto',
-                  }}
-                >
-                  {animations.map((anim) => (
-                    <Checkbox
-                      key={anim.elementId}
-                      id={`export-anim-${anim.elementId}`}
-                      isSelected={selectedAnimationIds.has(anim.elementId)}
-                      onChange={(isSelected: boolean) => {
-                        handleToggleAnimation(anim.elementId, isSelected);
-                      }}
-                    >
-                      <Checkbox.Control>
-                        <Checkbox.Indicator />
-                      </Checkbox.Control>
-                      <Checkbox.Content>
-                        <Label htmlFor={`export-anim-${anim.elementId}`} style={{ fontSize: '0.8125rem' }}>
-                          {anim.elementName || anim.elementId}
-                          <span style={{ color: color('muted'), marginLeft: sp('sp-01') }}>
-                            ({formatDuration(anim.durationMs)}, {String(anim.timelineCount)} timeline
-                            {anim.timelineCount !== 1 ? 's' : ''})
-                          </span>
-                        </Label>
-                      </Checkbox.Content>
-                    </Checkbox>
-                  ))}
-                </div>
-                <p style={{ fontSize: '0.75rem', color: color('muted'), marginTop: sp('sp-01') }}>
-                  Total duration: {formatDuration(computedDurationMs)}
-                </p>
-              </section>
-            )}
-
-            <section aria-label="Advanced export options" style={{ marginTop: sp('sp-02') }}>
-              <ToggleSwitch
-                ariaLabel="Show advanced export options"
-                isSelected={showAdvanced}
-                onChange={setShowAdvanced}
-              >
-                Advanced export options
-              </ToggleSwitch>
-
-              {showAdvanced && (
-                <div
-                  style={{
-                    marginTop: sp('sp-02'),
-                    padding: sp('sp-02'),
-                    border: `1px solid ${color('border')}`,
-                    borderRadius: 10,
-                    display: 'grid',
-                    gap: sp('sp-02'),
-                  }}
-                >
-                  <NumField
-                    label="Raster pixel ratio"
-                    max={8}
-                    min={1}
-                    step={1}
-                    value={pixelRatio}
-                    onChange={(value) => {
-                      setPixelRatio(Math.max(1, Math.min(8, Math.round(value))));
-                    }}
-                  />
-
-                  <Slider
-                    aria-label="JPEG quality"
-                    maxValue={1}
-                    minValue={0.1}
-                    step={0.01}
-                    value={jpegQuality}
-                    onChange={(value) => {
-                      setJpegQuality(typeof value === 'number' ? value : jpegQuality);
+              {hasFormatOptions && selectedExporter !== null && (
+                <div style={{ marginBottom: sp('sp-03') }}>
+                  <Button
+                    aria-label={`Open ${formatExporterLabel(selectedExporter)} export options`}
+                    variant="ghost"
+                    onPress={() => {
+                      setShowFormatOptions(true);
                     }}
                   >
-                    JPEG quality ({jpegQuality.toFixed(2)})
-                  </Slider>
-
-                  <NumField
-                    label="Video frame rate"
-                    max={120}
-                    min={1}
-                    step={1}
-                    value={videoFrameRate}
-                    onChange={(value) => {
-                      setVideoFrameRate(Math.max(1, Math.min(120, Math.round(value))));
-                    }}
-                  />
-
-                  <Slider
-                    aria-label="Video quality"
-                    maxValue={1}
-                    minValue={0.1}
-                    step={0.01}
-                    value={videoQuality}
-                    onChange={(value) => {
-                      setVideoQuality(typeof value === 'number' ? value : videoQuality);
-                    }}
-                  >
-                    Video quality ({videoQuality.toFixed(2)})
-                  </Slider>
+                    Options…
+                  </Button>
                 </div>
               )}
-            </section>
-          </>
-        }
-      </Modal.Body>
-      <Modal.Footer>
-        {isExporting ?
-          <Button isDisabled variant="ghost" onPress={onClose}>
-            Exporting…
-          </Button>
-        : <>
-            <Button variant="ghost" onPress={onClose}>
-              Cancel
+
+              {isVideoFormat && animations !== undefined && animations.length > 0 && (
+                <section aria-label="Animation selection" style={{ marginTop: sp('sp-03') }}>
+                  <h4 style={{ fontSize: '0.75rem', color: color('muted'), marginBottom: sp('sp-01') }}>
+                    Animations to export
+                  </h4>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gap: sp('sp-01'),
+                      padding: sp('sp-02'),
+                      border: `1px solid ${color('border')}`,
+                      borderRadius: 10,
+                      maxHeight: '150px',
+                      overflowY: 'auto',
+                    }}
+                  >
+                    {animations.map((anim) => (
+                      <Checkbox
+                        key={anim.elementId}
+                        id={`export-anim-${anim.elementId}`}
+                        isSelected={selectedAnimationIds.has(anim.elementId)}
+                        onChange={(isSelected: boolean) => {
+                          handleToggleAnimation(anim.elementId, isSelected);
+                        }}
+                      >
+                        <Checkbox.Control>
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
+                        <Checkbox.Content>
+                          <Label htmlFor={`export-anim-${anim.elementId}`} style={{ fontSize: '0.8125rem' }}>
+                            {anim.elementName || anim.elementId}
+                            <span style={{ color: color('muted'), marginLeft: sp('sp-01') }}>
+                              ({formatDuration(anim.durationMs)}, {String(anim.timelineCount)} timeline
+                              {anim.timelineCount !== 1 ? 's' : ''})
+                            </span>
+                          </Label>
+                        </Checkbox.Content>
+                      </Checkbox>
+                    ))}
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: color('muted'), marginTop: sp('sp-01') }}>
+                    Total duration: {formatDuration(computedDurationMs)}
+                  </p>
+                </section>
+              )}
+
+              <section aria-label="Advanced export options" style={{ marginTop: sp('sp-02') }}>
+                <ToggleSwitch
+                  ariaLabel="Show advanced export options"
+                  isSelected={showAdvanced}
+                  onChange={setShowAdvanced}
+                >
+                  Advanced export options
+                </ToggleSwitch>
+
+                {showAdvanced && (
+                  <div
+                    style={{
+                      marginTop: sp('sp-02'),
+                      padding: sp('sp-02'),
+                      border: `1px solid ${color('border')}`,
+                      borderRadius: 10,
+                      display: 'grid',
+                      gap: sp('sp-02'),
+                    }}
+                  >
+                    <NumField
+                      label="Raster pixel ratio"
+                      max={8}
+                      min={1}
+                      step={1}
+                      value={pixelRatio}
+                      onChange={(value) => {
+                        setPixelRatio(Math.max(1, Math.min(8, Math.round(value))));
+                      }}
+                    />
+
+                    <Slider
+                      aria-label="JPEG quality"
+                      maxValue={1}
+                      minValue={0.1}
+                      step={0.01}
+                      value={jpegQuality}
+                      onChange={(value) => {
+                        setJpegQuality(typeof value === 'number' ? value : jpegQuality);
+                      }}
+                    >
+                      JPEG quality ({jpegQuality.toFixed(2)})
+                    </Slider>
+
+                    <NumField
+                      label="Video frame rate"
+                      max={120}
+                      min={1}
+                      step={1}
+                      value={videoFrameRate}
+                      onChange={(value) => {
+                        setVideoFrameRate(Math.max(1, Math.min(120, Math.round(value))));
+                      }}
+                    />
+
+                    <Slider
+                      aria-label="Video quality"
+                      maxValue={1}
+                      minValue={0.1}
+                      step={0.01}
+                      value={videoQuality}
+                      onChange={(value) => {
+                        setVideoQuality(typeof value === 'number' ? value : videoQuality);
+                      }}
+                    >
+                      Video quality ({videoQuality.toFixed(2)})
+                    </Slider>
+                  </div>
+                )}
+              </section>
+            </>
+          }
+        </Modal.Body>
+        <Modal.Footer>
+          {isExporting ?
+            <Button isDisabled variant="ghost" onPress={onClose}>
+              Exporting…
             </Button>
-            <Button aria-label="Export" isDisabled={selectedExporter === null} variant="primary" onPress={handleExport}>
-              Export
-            </Button>
-          </>
-        }
-      </Modal.Footer>
-    </ModalShell>
+          : <>
+              <Button variant="ghost" onPress={onClose}>
+                Cancel
+              </Button>
+              <Button
+                aria-label="Export"
+                isDisabled={selectedExporter === null}
+                variant="primary"
+                onPress={handleExport}
+              >
+                Export
+              </Button>
+            </>
+          }
+        </Modal.Footer>
+      </ModalShell>
+      {hasFormatOptions && selectedExporter !== null && (
+        <FormatExportOptionsModal
+          isOpen={showFormatOptions}
+          formatLabel={formatExporterLabel(selectedExporter)}
+          supportedFields={supportedFormatOptionFields}
+          defaults={formatOptions}
+          onCancel={() => {
+            setShowFormatOptions(false);
+          }}
+          onConfirm={(next) => {
+            setFormatOptions(next);
+            setShowFormatOptions(false);
+          }}
+        />
+      )}
+    </>
   );
 }
 

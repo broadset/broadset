@@ -13,6 +13,7 @@ import { ModalShell } from './modal-shell';
 
 export type FormatExportColorSpace = 'rgb' | 'cmyk' | 'lab' | 'grayscale';
 export type FormatExportFontEmbedding = 'embed' | 'reference' | 'flatten';
+export type PdfAConformance = 'none' | '2b' | '2u' | '2a';
 
 export interface FormatExportOptionsValue {
   readonly colorSpace: FormatExportColorSpace;
@@ -26,6 +27,10 @@ export interface FormatExportOptionsValue {
   readonly includeMetadata: boolean;
   /** SVG-only: emit `data-bs-*` / `broadset:content-hash` on every rendered element. */
   readonly includeElementTagging: boolean;
+  /** PDF-only: PDF/A conformance level. Default `'none'` (no PDF/A). */
+  readonly pdfaConformance: PdfAConformance;
+  /** PPTX-only: when true, the demo passes its project FontAssets to the PPTX exporter for subset + embed under `ppt/fonts/`. */
+  readonly embedFonts: boolean;
 }
 
 export interface FormatExportOptionsModalProps {
@@ -51,6 +56,13 @@ const FONT_EMBEDDING_LABELS: Record<FormatExportFontEmbedding, string> = {
   flatten: 'Flatten text to paths',
 };
 
+const PDFA_CONFORMANCE_LABELS: Record<PdfAConformance, string> = {
+  none: 'None (standard PDF)',
+  '2b': 'PDF/A-2b (basic)',
+  '2u': 'PDF/A-2u (Unicode)',
+  '2a': 'PDF/A-2a (accessible)',
+};
+
 export function FormatExportOptionsModal({
   isOpen,
   formatLabel,
@@ -68,7 +80,7 @@ export function FormatExportOptionsModal({
         data-testid="format-export-options-body"
         style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
       >
-        {supportedFields.has('colorSpace') ? (
+        {supportedFields.has('colorSpace') ?
           <Select
             aria-label="Color space"
             value={value.colorSpace}
@@ -84,9 +96,9 @@ export function FormatExportOptionsModal({
               </option>
             ))}
           </Select>
-        ) : null}
+        : null}
 
-        {supportedFields.has('bitDepth') ? (
+        {supportedFields.has('bitDepth') ?
           <Select
             aria-label="Bit depth"
             value={String(value.bitDepth)}
@@ -99,9 +111,9 @@ export function FormatExportOptionsModal({
             <option value="8">8-bit</option>
             <option value="16">16-bit</option>
           </Select>
-        ) : null}
+        : null}
 
-        {supportedFields.has('embedIccProfile') ? (
+        {supportedFields.has('embedIccProfile') ?
           <Switch
             isSelected={value.embedIccProfile}
             onChange={(isSelected) => {
@@ -111,9 +123,9 @@ export function FormatExportOptionsModal({
           >
             Embed ICC profile
           </Switch>
-        ) : null}
+        : null}
 
-        {supportedFields.has('linkSmartObjects') ? (
+        {supportedFields.has('linkSmartObjects') ?
           <Switch
             isSelected={value.linkSmartObjects}
             onChange={(isSelected) => {
@@ -123,9 +135,9 @@ export function FormatExportOptionsModal({
           >
             Keep smart objects linked
           </Switch>
-        ) : null}
+        : null}
 
-        {supportedFields.has('preserveVisibility') ? (
+        {supportedFields.has('preserveVisibility') ?
           <Switch
             isSelected={value.preserveVisibility}
             onChange={(isSelected) => {
@@ -135,9 +147,9 @@ export function FormatExportOptionsModal({
           >
             Preserve hidden elements
           </Switch>
-        ) : null}
+        : null}
 
-        {supportedFields.has('fontEmbedding') ? (
+        {supportedFields.has('fontEmbedding') ?
           <Select
             aria-label="Font embedding"
             value={value.fontEmbedding}
@@ -153,9 +165,9 @@ export function FormatExportOptionsModal({
               </option>
             ))}
           </Select>
-        ) : null}
+        : null}
 
-        {supportedFields.has('includeMetadata') ? (
+        {supportedFields.has('includeMetadata') ?
           <Switch
             isSelected={value.includeMetadata}
             onChange={(isSelected) => {
@@ -165,9 +177,9 @@ export function FormatExportOptionsModal({
           >
             Include document metadata (for round-trip)
           </Switch>
-        ) : null}
+        : null}
 
-        {supportedFields.has('includeElementTagging') ? (
+        {supportedFields.has('includeElementTagging') ?
           <Switch
             isSelected={value.includeElementTagging}
             onChange={(isSelected) => {
@@ -177,7 +189,37 @@ export function FormatExportOptionsModal({
           >
             Tag elements for reconciliation
           </Switch>
-        ) : null}
+        : null}
+
+        {supportedFields.has('pdfaConformance') ?
+          <Select
+            aria-label="PDF/A conformance"
+            value={value.pdfaConformance}
+            onChange={(key) => {
+              const next = String(key) as PdfAConformance;
+
+              setValue((prev) => ({ ...prev, pdfaConformance: next }));
+            }}
+          >
+            {(Object.keys(PDFA_CONFORMANCE_LABELS) as readonly PdfAConformance[]).map((choice) => (
+              <option key={choice} value={choice}>
+                {PDFA_CONFORMANCE_LABELS[choice]}
+              </option>
+            ))}
+          </Select>
+        : null}
+
+        {supportedFields.has('embedFonts') ?
+          <Switch
+            isSelected={value.embedFonts}
+            onChange={(isSelected) => {
+              setValue((prev) => ({ ...prev, embedFonts: isSelected }));
+            }}
+            aria-label="Embed fonts"
+          >
+            Embed project fonts
+          </Switch>
+        : null}
 
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
           <Button variant="ghost" onPress={onCancel} aria-label="Cancel export options">
