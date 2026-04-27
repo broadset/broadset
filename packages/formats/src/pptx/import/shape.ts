@@ -76,7 +76,10 @@ function walkShapeTree(
     const tagName = canonicalShapeTag(child);
 
     if (tagName === null) {
-      pushUnsupportedShapeWarning(ctx, child);
+      const preserved = handleUnsupportedShape(ctx, child, parentGroupId);
+
+      if (preserved !== null) out.push(preserved);
+
       continue;
     }
 
@@ -92,6 +95,62 @@ function walkShapeTree(
   }
 }
 
+/**
+ * Round-trip path for shape-tree children we don't yet map to a
+ * native Broadset element kind (`<p:graphicFrame>` for tables /
+ * charts / SmartArt, `<p:cxnSp>` connectors, `<p:contentPart>`
+ * ink). Each emits a placeholder rectangle whose
+ * `extensions.pptx.raw` carries the source XML verbatim, so a clean
+ * round-trip re-emits the exact bytes per IO-D-18. Surfaces a
+ * warning either way so users see what didn't make it to a native
+ * Broadset element.
+ *
+ * Returns null when the node isn't a known unsupported shape kind
+ * (in which case it's a non-shape child like `<p:nvGrpSpPr>` and
+ * should be skipped silently).
+ */
+function handleUnsupportedShape(
+  ctx: SlideImportContext,
+  node: XmlElement,
+  parentGroupId: string | null,
+): BroadsetElement | null {
+  const info = unsupportedShapeKind(node);
+
+  if (info === null) return null;
+
+  ctx.warnings.push({
+    code: 'unsupported-shape',
+    message: `${info.label} preserved as extensions.pptx.raw — re-export round-trips byte-equivalent content; native Broadset mapping deferred.`,
+    ...(info.detail !== undefined ? { detail: info.detail } : {}),
+  });
+
+  const transform = extractTransform(ctx.canvas, node);
+
+  if (transform === null) return null;
+
+  const nameMatch = extractCNvPrAttrs(node);
+  const elementIdBase = nameMatch?.bsetId ?? `pptx-el-${String(ctx.nextElementIndex)}`;
+  const elementName = nameMatch?.displayName ?? info.label;
+
+  ctx.nextElementIndex += 1;
+
+  const base = buildBase(elementIdBase, elementName, 'rectangle', transform, parentGroupId);
+  const raw = node.children.map((c) => serializeNode(c)).join('');
+
+  return {
+    ...base,
+    extensions: {
+      ...base.extensions,
+      pptx: {
+        dirty: false,
+        raw,
+        unsupportedTag: info.label,
+        ...(info.detail !== undefined ? { unsupportedUri: info.detail } : {}),
+      },
+    },
+  };
+}
+
 const PML_NS = 'http://schemas.openxmlformats.org/presentationml/2006/main';
 
 function canonicalShapeTag(node: XmlElement): 'p:sp' | 'p:pic' | 'p:grpSp' | null {
@@ -101,24 +160,6 @@ function canonicalShapeTag(node: XmlElement): 'p:sp' | 'p:pic' | 'p:grpSp' | nul
   if (node.local === 'grpSp') return 'p:grpSp';
 
   return null;
-}
-
-/**
- * Identify shape-tree children that aren't mapped to a Broadset
- * element today so the importer surfaces a warning instead of
- * dropping silently. Tables, charts, SmartArt diagrams, connectors,
- * and ink all live here.
- */
-function pushUnsupportedShapeWarning(ctx: SlideImportContext, node: XmlElement): void {
-  const info = unsupportedShapeKind(node);
-
-  if (info === null) return;
-
-  ctx.warnings.push({
-    code: 'unsupported-shape',
-    message: `${info.label} not yet mapped to a Broadset element — visual content dropped.`,
-    ...(info.detail !== undefined ? { detail: info.detail } : {}),
-  });
 }
 
 function classifyGraphicFrame(node: XmlElement): UnsupportedShapeInfo {

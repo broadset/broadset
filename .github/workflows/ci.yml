@@ -35,6 +35,9 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Fetch PPTX corpus (29 real-world fixtures pinned by SHA)
+        run: npm run pptx:corpus:fetch -w @broadset/formats
+
       - name: Knip (dead code / unused deps)
         run: npm run lint:dead
 
