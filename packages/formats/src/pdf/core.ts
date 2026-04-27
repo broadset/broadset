@@ -65,6 +65,7 @@ import {
 import { canvasToPoints, elementToPoints } from './geometry';
 import { drawQrOnPage } from './qr';
 import type { PdfExportOptions, PdfExportResult } from './types';
+import { prepareLineBreaker } from './uax14-linebreak';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -718,10 +719,13 @@ async function runExport(
   // MediaBox/BleedBox/TrimBox/ArtBox follow canvas.bleed/safeArea declarations.
   applyPageBoxes(pdf, page, canvas);
 
-  // Warm the bidi analyser cache so subsequent sync `reorderForBidi`
-  // calls during text rendering can reorder RTL runs without
-  // turning the entire render path async.
-  await prepareBidiAnalysis();
+  // Warm the bidi analyser + UAX #14 line-breaker caches so
+  // subsequent sync `reorderForBidi` and `wrapText` calls during
+  // text rendering work without turning the entire render path
+  // async. Both modules use dynamic-import + cache so the static
+  // type chain doesn't leak `linebreak`/`bidi-js` ambient types
+  // across package boundaries.
+  await Promise.all([prepareBidiAnalysis(), prepareLineBreaker()]);
 
   // Always embed a Helvetica fallback up-front so placeholder labels and
   // text elements without a declared family have a working PDFFont.

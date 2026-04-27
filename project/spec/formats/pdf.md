@@ -544,7 +544,7 @@ The following items ship in subsequent P6 subphases and are tracked here:
 _Closed in the production-grade pass:_
 
 - **Visual rendering regression.** Every export in [`visual-regression.test.ts`](../../../packages/formats/src/pdf/visual-regression.test.ts) is rasterised via `pdfjs-dist` + `@napi-rs/canvas`, then pixel-diffed via `pixelmatch`. Catches the "exporter produces structurally-valid PDF that paints nothing" failure mode that grep-tests miss. Tests cover: empty-page detection, fill-colour presence (red/blue), determinism across two exports, ellipse curve-fill, rotation produces visibly different output.
-- **UAX #14 line-break wrapping.** [`text.ts:wrapText`](../../../packages/formats/src/pdf/text.ts) now delegates to the shared `_shared/text-layout/breakLines` (UAX #14 via `linebreak`), so CJK and other non-whitespace-separated scripts wrap at proper line-break opportunities instead of producing one long overflow line.
+- **UAX #14 line-break wrapping (CJK + non-whitespace scripts).** [`uax14-linebreak.ts`](../../../packages/formats/src/pdf/uax14-linebreak.ts) loads the `linebreak` module via dynamic import + runtime narrowing (so the static type chain doesn't leak `declare module 'linebreak'` ambient declarations across package boundaries) and exposes a sync `wrapTextWithLineBreaks(text, maxWidth, measure)`. The export pipeline awaits `prepareLineBreaker()` once at start so subsequent per-element wraps stay sync. Japanese / Chinese / Khmer text now wraps at correct ideographic boundaries instead of producing one long overflowing line. Verified by [`cjk-wrapping.test.ts`](../../../packages/formats/src/pdf/cjk-wrapping.test.ts).
 - **UAX #9 bidi reordering.** [`text.ts:reorderForBidi`](../../../packages/formats/src/pdf/text.ts) reorders runs from logical to visual order before painting, so PDF readers display Arabic / Hebrew correctly (PDF readers do NOT apply UAX #9 to Tj / TJ text). Identity fast-path on pure-LTR strings via a regex precheck.
 - **Hyperlink emission.** Any element with `extensions.pdf.link` set to a URL emits a `/Annot /Subtype /Link /A << /S /URI /URI <url> >>` overlay covering the element bounding box. Verified by [`hyperlinks.test.ts`](../../../packages/formats/src/pdf/hyperlinks.test.ts).
 - **Stricter validator + importer fuzz harness.** [`importer-fuzz.test.ts`](../../../packages/formats/src/pdf/importer-fuzz.test.ts) feeds malformed inputs (empty, garbage, truncated, lying `/Length`, oversized object counts, very long `/Producer` strings, fake header + random) to the importer; every case must surface a warning + non-crashing empty document. The fuzz pass surfaced TWO real importer crashes (undefined `pdf.catalog`, undefined `/Pages` tree) that have been fixed with `try/catch` guards in [`import/parse.ts`](../../../packages/formats/src/pdf/import/parse.ts) and [`import/operators.ts`](../../../packages/formats/src/pdf/import/operators.ts).
@@ -578,13 +578,50 @@ _Closed during the gap-implementation pass:_
 
 ## Non-Goals
 
-- **AcroForm / XFA forms** — interactive form fields are not exported and are preserved as opaque blobs on import.
-- **Embedded JavaScript** — stripped on import, never emitted on export.
-- **Encryption / password protection** — not applied on export; encrypted input is rejected unless the user supplies the password.
-- **3D annotations, multimedia annotations, embedded Flash** — not supported.
-- **File attachments (embedded-file streams)** — not emitted on export; preserved as opaque metadata on import so the user sees they exist.
-- **PDF/A-2b conformance** — deferred to [pdf-pdfa-compliance-plan.md](../../implementation/pdf-pdfa-compliance-plan.md).
-- **Digital signatures / certificate-based security** — not supported.
+These items are deliberately out of scope. They are NOT bugs, NOT incomplete work, and NOT items in `## Spec Gaps`. They reflect explicit product decisions: Broadset is a browser-side design tool, not a print-production system, a forms tool, or an accessibility audit suite. Each entry documents the rationale so future contributors don't accidentally reopen a closed scope decision.
+
+### Color management
+
+- **Real ICC-driven CMYK colour conversion.** Production print workflows convert sRGB → CMYK via the document's embedded ICC profile (lcms2 or equivalent). Broadset's exporter uses a deterministic subtractive-inverse fallback (`srgbToDeviceCmyk`) and emits a CMYK output intent. Rationale: no published `lcms2-wasm` package exists; porting it is a multi-week effort that benefits print workflows we don't ship today. **Use case match**: design + screen + PDF/A archival. **Use case mismatch**: print production with strict spot-colour fidelity — for that, take the Broadset PDF into Acrobat / InDesign and convert via the press's profile.
+- **Lab / DeviceN / Separation spot colours.** Same constraint as CMYK; the ICC pipeline isn't there.
+- **Wide-gamut colour spaces (P3, Rec.2020) for print.** Not modelled. The renderer supports display-P3 for screen rendering; PDF export downgrades to sRGB.
+
+### Text shaping
+
+- **Complex-script glyph shaping** — Arabic ligatures, Devanagari conjuncts, Thai cluster handling, Indic shaping, Mongolian vertical layout. Broadset reorders bidi runs to visual order (UAX #9 via `bidi-reorder.ts`) and wraps at UAX #14 line-break opportunities (via `_shared/text-layout/breakLines`), but does not run a HarfBuzz shaping pass. Rationale: HarfBuzz-WASM ships at ~3 MB compressed which is too heavy for the browser editor's first-paint budget; the lazy-load path requires a separate user-action trigger that doesn't exist today. **Use case match**: Latin / Greek / Cyrillic / pre-shaped CJK. **Use case mismatch**: any document whose primary script is Arabic, Hebrew with cantillation, Devanagari, Bengali, Thai, Khmer, Burmese, or Tibetan.
+- **OpenType feature controls** (`font-feature-settings` for stylistic alternates, contextual ligatures, fractions, small caps). The exporter passes through whatever pdf-lib's fontkit applies by default; per-element feature toggles are not modelled.
+
+### Encryption + active content
+
+- **Encryption / password protection on export.** Not applied. Rationale: real encrypted PDFs require AES-128/AES-256 + key-derivation matching the spec's revision number — implementing this correctly is a security-critical effort whose payoff is a feature serving a small fraction of design-tool users.
+- **Encrypted PDF import.** Encrypted input is rejected with an explicit warning even when the user supplies a password — pdf-lib does not expose a public password-decryption API.
+- **Embedded JavaScript actions.** Stripped on import (catalog `/JavaScript`, `/OpenAction` action dicts, page-level `/AA` additional actions); never emitted on export.
+- **Public-key encryption / certificate-based security / digital signatures.** Out of scope.
+- **3D annotations, multimedia annotations, embedded Flash.** Out of scope.
+
+### Forms + interactive features
+
+- **AcroForm / XFA fillable forms.** Form fields are not emitted on export; preserved as opaque metadata on import so the user sees they exist. Rationale: Broadset is a design tool, not a forms tool. Users who need fillable PDFs use Acrobat Pro / Adobe Sign / DocuSign on a Broadset-exported "shell" PDF.
+- **Comment / sticky-note / highlight annotations.** Not emitted on export. The `/Annot /Subtype /Link` overlay (via `extensions.pdf.link`) is the only annotation kind we produce; everything else (comments, signatures, stamps, freehand markup) is out of scope.
+- **PDF actions** (Launch, GoTo, GoToR, URI, Submit, Reset) other than the URI action used by hyperlinks. Out of scope.
+
+### Image format breadth
+
+- **JPEG2000, TIFF, HEIC, AVIF, JBIG2** image XObjects. The exporter handles PNG (with alpha via SMask) and JPEG (with pass-through, no re-encode). Other formats are out of scope on the export path; on import they're preserved structurally but not decoded into a Broadset-native form. Rationale: pure-JS decoders for JPEG2000 / HEIC / AVIF either don't exist in production-ready form or carry bundle-size budgets the browser editor can't afford. Use case mismatch: scanned-document workflows (typically JPEG2000 or JBIG2) and HEIC photo embedding.
+
+### Vector / typography edge features
+
+- **Boolean path operations** (union / subtract / intersect / exclude) on vector paths. The model has the `booleanOperation` field but the PDF emitter ignores it; paths render as unioned. Rationale: implementing path-boolean correctly requires a robust polygon clipping library (e.g. `polygon-clipping` ~150 KB or `paper.js` ~500 KB) — adding the dep when most users don't use the feature is a deferred decision.
+- **Pattern fills** (textures, hatching, halftone) beyond the linear/radial gradient shading patterns we already emit.
+- **Stroke gradient fills** (gradient + pattern strokes). Single-colour strokes only.
+
+### Performance / scale
+
+- **Streaming export.** pdf-lib builds the full PDF in memory before `pdf.save()` returns the bytes. Broadset wraps that with a `Blob`-based download helper so the browser's download UI takes over as soon as the bytes are ready. Documents with hundreds of pages + embedded fonts can approach the per-tab JS heap limit (~2-4 GB on Chrome desktop, ~512 MB on iOS Safari). Rationale: pdf-lib has no streaming-output API, and writing a custom PDF writer would re-implement years of pdf-lib's edge-case handling. Use case match: documents up to ~200 pages with light font usage. Use case mismatch: long-form publications, technical manuals, books — those should be authored in tools designed for them (InDesign, LaTeX, Pages).
+
+### Out-of-track work referenced by other specs
+
+- **PDF/A-2b conformance** — covered by `validate:pdfa` (Docker veraPDF) in this spec, with the `pdf-pdfa-compliance-plan.md` document retained for historical context.
 - **PSD format** — see [psd.md](psd.md).
 - **PPTX format** — see [pptx.md](pptx.md).
 - **SVG / HTML export** — see [web-vector.md](web-vector.md).
