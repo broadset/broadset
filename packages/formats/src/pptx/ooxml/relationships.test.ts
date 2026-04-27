@@ -88,7 +88,7 @@ describe('buildRelationshipsXml / parseRelationshipsXml', () => {
   });
 
   it('skips malformed entries (missing id / type / target)', () => {
-    const body = `<Relationships xmlns="..."><Relationship Type="x" Target="y"/><Relationship Id="rId5" Type="z" Target="w"/></Relationships>`;
+    const body = `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="x" Target="y"/><Relationship Id="rId5" Type="z" Target="w"/></Relationships>`;
     const parsed = parseRelationshipsXml(body);
 
     expect(parsed).toHaveLength(1);

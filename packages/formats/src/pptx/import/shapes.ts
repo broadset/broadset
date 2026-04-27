@@ -22,6 +22,17 @@ import {
 } from '@broadset/model';
 import svgpath from 'svgpath';
 
+import {
+  findChild,
+  findChildren,
+  findDescendant,
+  getAttr,
+  getText,
+  parseOoxml,
+  rootElement,
+  serializeNode,
+  type XmlElement,
+} from '../ooxml/ast';
 import { OOXML_PRESET_COLOR_HEX } from '../ooxml/preset-colors';
 import { emuToCanvasLength, emuToMm, rotationUnitsToDegrees } from '../ooxml/units';
 import { parseElementExt } from '../semantic/element-ext';
@@ -29,18 +40,18 @@ import { decodeShapeName } from '../semantic/shape-name';
 import type { ElementMetaExtension, LayoutPlaceholder, ResolvedTheme } from '../types';
 
 /**
- * Operator-level shape recovery. Walks a slide's XML and emits
- * Broadset elements for the primitives the importer recognizes.
+ * Operator-level shape recovery, AST-driven.
  *
- * Recognized today: `<p:sp>` with `<a:prstGeom prst="rect|roundRect">`
- * (→ rectangle), `<a:prstGeom prst="ellipse">` (→ ellipse), arbitrary
- * `<a:prstGeom>` presets (→ rectangle with name hint), `<a:custGeom>`
- * (→ path), `<p:pic>` (→ image), `<p:grpSp>` (→ group).
+ * Walks the parsed XML AST of a slide and emits Broadset elements for
+ * the primitives the importer recognises: `<p:sp>` with rectangular /
+ * round-rect / ellipse presets, `<a:custGeom>` paths, common preset
+ * shapes (triangle / star / arrow / callout), `<p:pic>` images, and
+ * `<p:grpSp>` groups. Anything else preserves under
+ * `extensions.pptx.raw` per IO-D-18.
  *
- * Each recognized shape inherits its rotation / geometry / fill from
- * the source XML. Text frames (`<p:txBody>`) recover their textual
- * content (without per-run styling; structured rich-text is deferred
- * to a later iteration).
+ * Namespace-aware: matches by namespace URI, so non-default prefixes
+ * (Keynote's `<dml:sp>`, etc.) resolve to the same canonical readers
+ * as Office-canonical `<p:sp>`.
  */
 
 export interface SlideImportContext {
@@ -72,129 +83,75 @@ export interface SlideImportContext {
  * into the document's `elements` array.
  */
 export function parseSlideShapes(ctx: SlideImportContext, slideXml: string): readonly BroadsetElement[] {
+  const root = rootElement(parseOoxml(slideXml));
+
+  if (root === null) return [];
+
+  const spTree = findDescendant(root, 'p:spTree');
+
+  if (spTree === null) return [];
+
   const elements: BroadsetElement[] = [];
 
-  // Extract the shape tree body. The root is `<p:spTree>`.
-  const treeBody = extractBlock(slideXml, 'p:spTree');
-
-  if (treeBody === null) return elements;
-
-  walkShapeTree(ctx, treeBody.block, null, elements);
+  walkShapeTree(ctx, spTree, null, elements);
 
   return elements;
 }
 
 function walkShapeTree(
   ctx: SlideImportContext,
-  body: string,
+  parent: XmlElement,
   parentGroupId: string | null,
   out: BroadsetElement[],
 ): void {
-  let cursor = 0;
+  for (const child of parent.children) {
+    if (child.kind !== 'element') continue;
 
-  while (cursor < body.length) {
-    const nextOpen = findNextShapeOpen(body, cursor);
+    const tagName = canonicalShapeTag(child);
 
-    if (nextOpen === null) break;
+    if (tagName === null) continue;
 
-    const { tagName, openEndIdx } = nextOpen;
-    const closeTag = `</${tagName}>`;
-    const contentStart = openEndIdx;
-    const contentEnd = findMatchingCloseIndex(body, contentStart, tagName);
+    const element = emitElementFromShape(ctx, tagName, child, parentGroupId);
 
-    if (contentEnd < 0) {
-      cursor = openEndIdx;
-      continue;
-    }
+    if (element === null) continue;
 
-    const shapeBody = body.slice(contentStart, contentEnd);
-    const element = emitElementFromShape(ctx, tagName, shapeBody, parentGroupId);
+    out.push(element);
 
-    if (element !== null) {
-      out.push(element);
-
-      if (tagName === 'p:grpSp') {
-        walkShapeTree(ctx, shapeBody, element.id, out);
-      }
-    }
-
-    cursor = contentEnd + closeTag.length;
-  }
-}
-
-interface ShapeOpen {
-  readonly tagName: string;
-  readonly startIdx: number;
-  readonly openEndIdx: number;
-}
-
-function findNextShapeOpen(body: string, from: number): ShapeOpen | null {
-  const re = /<(p:sp|p:pic|p:grpSp)\b[^>]*?>/g;
-
-  re.lastIndex = from;
-
-  const match = re.exec(body);
-
-  if (match === null) return null;
-
-  const tagName = match[1] ?? 'p:sp';
-  const startIdx = match.index;
-  const openEndIdx = startIdx + match[0].length;
-
-  return { tagName, startIdx, openEndIdx };
-}
-
-function findMatchingCloseIndex(body: string, fromIdx: number, tagName: string): number {
-  // Handle nested groups correctly: count depth.
-  const openRe = new RegExp(`<${tagName}\\b[^>]*?>`, 'g');
-  const closeRe = new RegExp(`</${tagName}>`, 'g');
-
-  openRe.lastIndex = fromIdx;
-  closeRe.lastIndex = fromIdx;
-
-  let depth = 1;
-  let search = fromIdx;
-
-  while (depth > 0 && search < body.length) {
-    openRe.lastIndex = search;
-    closeRe.lastIndex = search;
-
-    const nextOpen = openRe.exec(body);
-    const nextClose = closeRe.exec(body);
-
-    if (nextClose === null) return -1;
-
-    if (nextOpen !== null && nextOpen.index < nextClose.index) {
-      depth += 1;
-      search = nextOpen.index + nextOpen[0].length;
-    } else {
-      depth -= 1;
-      if (depth === 0) return nextClose.index;
-      search = nextClose.index + nextClose[0].length;
+    if (tagName === 'p:grpSp') {
+      walkShapeTree(ctx, child, element.id, out);
     }
   }
+}
 
-  return -1;
+const PML_NS = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+
+function canonicalShapeTag(node: XmlElement): 'p:sp' | 'p:pic' | 'p:grpSp' | null {
+  if (node.ns !== PML_NS) return null;
+  if (node.local === 'sp') return 'p:sp';
+  if (node.local === 'pic') return 'p:pic';
+  if (node.local === 'grpSp') return 'p:grpSp';
+
+  return null;
 }
 
 function emitElementFromShape(
   ctx: SlideImportContext,
-  tagName: string,
-  body: string,
+  tagName: 'p:sp' | 'p:pic' | 'p:grpSp',
+  shape: XmlElement,
   parentGroupId: string | null,
 ): BroadsetElement | null {
-  const transform = extractTransform(ctx.canvas, body);
+  const transform = extractTransform(ctx.canvas, shape);
 
   if (transform === null) return null;
 
-  const nameMatch = extractCNvPrAttrs(body);
+  const nameMatch = extractCNvPrAttrs(shape);
   const elementIdBase = nameMatch?.bsetId ?? `pptx-el-${String(ctx.nextElementIndex)}`;
   const elementName = nameMatch?.displayName ?? elementIdBase;
-  const meta = extractElementMeta(body);
+  const meta = extractElementMeta(shape);
 
   ctx.nextElementIndex += 1;
 
-  const built = buildElementByTag(ctx, tagName, elementIdBase, elementName, transform, body, parentGroupId);
+  const built = buildElementByTag(ctx, tagName, elementIdBase, elementName, transform, shape, parentGroupId);
 
   if (built === null) return null;
 
@@ -203,11 +160,11 @@ function emitElementFromShape(
 
 function buildElementByTag(
   ctx: SlideImportContext,
-  tagName: string,
+  tagName: 'p:sp' | 'p:pic' | 'p:grpSp',
   id: string,
   name: string,
   transform: ParsedTransform,
-  body: string,
+  shape: XmlElement,
   parentGroupId: string | null,
 ): BroadsetElement | null {
   if (tagName === 'p:grpSp') {
@@ -215,37 +172,34 @@ function buildElementByTag(
   }
 
   if (tagName === 'p:pic') {
-    return buildPicture(ctx, id, name, transform, body, parentGroupId);
+    return buildPicture(ctx, id, name, transform, shape, parentGroupId);
   }
 
   // p:sp — dispatch on geometry.
-  const geom = detectGeometry(body);
+  const geom = detectGeometry(shape);
 
-  if (geom === null) return buildRectangle(ctx, id, name, transform, body, parentGroupId);
+  if (geom === null) return buildRectangle(ctx, id, name, transform, shape, parentGroupId);
 
   if (geom.kind === 'rectangle' || geom.kind === 'roundRect') {
-    return buildRectangle(ctx, id, name, transform, body, parentGroupId);
+    return buildRectangle(ctx, id, name, transform, shape, parentGroupId);
   }
 
   if (geom.kind === 'ellipse') {
-    return buildEllipse(ctx, id, name, transform, body, parentGroupId);
+    return buildEllipse(ctx, id, name, transform, shape, parentGroupId);
   }
 
   if (geom.kind === 'path') {
-    return buildPath(ctx, id, name, transform, body, parentGroupId, geom.d ?? '');
+    return buildPath(ctx, id, name, transform, shape, parentGroupId, geom.d ?? '');
   }
 
-  // Unknown preset (triangle, star, arrow, callout, etc.) — preserve
-  // the source XML under `extensions.pptx.raw` per IO-D-18 and map to
-  // a rectangle as the visual fallback. A future expansion of the
-  // preset table (Audit A5) will map common presets natively.
+  // Unknown preset — preserve under extensions.pptx.raw per IO-D-18.
   ctx.warnings.push({
     code: 'unsupported-shape',
     message: `Unknown OOXML preset for shape id ${id} — preserved as extensions.pptx.raw`,
-    detail: extractPresetName(body) ?? 'custom',
+    detail: extractPresetName(shape) ?? 'custom',
   });
 
-  return preserveRawShape(ctx, id, name, transform, body, parentGroupId);
+  return preserveRawShape(ctx, id, name, transform, shape, parentGroupId);
 }
 
 const NATIVE_BROADSET_KINDS: ReadonlySet<string> = new Set([
@@ -264,18 +218,9 @@ const NATIVE_BROADSET_KINDS: ReadonlySet<string> = new Set([
 
 /**
  * Apply Broadset metadata pulled from `<p:extLst>` and the BSET shape
- * name onto a freshly-built element.
- *
- * Type override priority (most authoritative first):
- * 1. `extLst.kind` — the structured per-shape extension; survives any
- *    sane round-trip through PowerPoint / Keynote / LibreOffice.
- * 2. `bsetTag.kind` (from the shape name) — secondary fallback when
- *    the extLst was stripped (Google Slides, Keynote save).
- *
- * Without this override a Broadset-exported `qrcode` / `clock` /
- * `ticker` / `video` would re-import as a `rectangle` because the
- * geometry-derived kind is the OOXML primitive shape rather than the
- * Broadset element kind.
+ * name onto a freshly-built element. Type override priority:
+ * 1. `extLst.kind` — structured per-shape extension (most authoritative).
+ * 2. `bsetTag.kind` (from the shape name) — fallback when extLst was stripped.
  */
 function applyMetaOverrides(
   element: BroadsetElement,
@@ -295,10 +240,6 @@ function applyMetaOverrides(
     ...(dataFieldBinding !== null ? { dataField: dataFieldBinding } : {}),
   };
 
-  // `dirty` flag: extLst's `dirty` is the truth when present —
-  // PowerPoint never authors this attribute, so a `1` only appears
-  // when Broadset previously round-tripped through. Persist on
-  // extensions.pptx for downstream merge logic.
   if (meta !== null) {
     const existingExt = (result.extensions['pptx'] as Record<string, unknown> | undefined) ?? {};
 
@@ -337,10 +278,10 @@ function pickOverrideKind(
   return null;
 }
 
-function extractPresetName(body: string): string | undefined {
-  const match = body.match(/<a:prstGeom\s+prst="([^"]+)"/);
+function extractPresetName(shape: XmlElement): string | undefined {
+  const prst = findDescendant(shape, 'a:prstGeom');
 
-  return match?.[1];
+  return prst !== null ? getAttr(prst, 'prst') : undefined;
 }
 
 function preserveRawShape(
@@ -348,17 +289,20 @@ function preserveRawShape(
   id: string,
   name: string,
   transform: ParsedTransform,
-  body: string,
+  shape: XmlElement,
   parentGroupId: string | null,
 ): BroadsetElement {
   const base = buildBase(ctx, id, name, 'rectangle', transform, parentGroupId);
-  const styled = applyShapeStyle(ctx.canvas, base, body);
+  const styled = applyShapeStyle(ctx.canvas, base, shape);
+  // Serialise the shape's children back to a raw-XML string so the
+  // exporter can re-emit byte-equivalent content per IO-D-18.
+  const raw = shape.children.map((c) => serializeNode(c)).join('');
 
   return {
     ...styled,
     extensions: {
       ...(styled.extensions),
-      pptx: { dirty: false, raw: body },
+      pptx: { dirty: false, raw },
     },
   };
 }
@@ -373,22 +317,21 @@ interface ParsedTransform {
   readonly flipV: boolean;
 }
 
-function extractTransform(canvas: Canvas, body: string): ParsedTransform | null {
-  const xfrmBlock = extractBlock(body, 'a:xfrm');
+function extractTransform(canvas: Canvas, shape: XmlElement): ParsedTransform | null {
+  const xfrm = findDescendant(shape, 'a:xfrm');
 
-  if (xfrmBlock === null) return { x: 0, y: 0, width: 1, height: 1, rotation: 0, flipH: false, flipV: false };
+  if (xfrm === null) return { x: 0, y: 0, width: 1, height: 1, rotation: 0, flipH: false, flipV: false };
 
-  const off = xfrmBlock.block.match(/<a:off\s+x="(-?\d+)"\s+y="(-?\d+)"\s*\/>/);
-  const ext = xfrmBlock.block.match(/<a:ext\s+cx="(\d+)"\s+cy="(\d+)"\s*\/>/);
-
-  const x = off ? emuToCanvasLength(canvas, parseInt(off[1] ?? '0', 10)) : 0;
-  const y = off ? emuToCanvasLength(canvas, parseInt(off[2] ?? '0', 10)) : 0;
-  const width = ext ? emuToCanvasLength(canvas, parseInt(ext[1] ?? '0', 10)) : 1;
-  const height = ext ? emuToCanvasLength(canvas, parseInt(ext[2] ?? '0', 10)) : 1;
-  const rotAttr = xfrmBlock.openAttrs.match(/\brot="(-?\d+)"/);
-  const rotation = rotAttr ? rotationUnitsToDegrees(parseInt(rotAttr[1] ?? '0', 10)) : 0;
-  const flipH = /\bflipH="1"/.test(xfrmBlock.openAttrs);
-  const flipV = /\bflipV="1"/.test(xfrmBlock.openAttrs);
+  const off = findChild(xfrm, 'a:off');
+  const ext = findChild(xfrm, 'a:ext');
+  const x = off !== null ? emuToCanvasLength(canvas, parseInt(getAttr(off, 'x') ?? '0', 10)) : 0;
+  const y = off !== null ? emuToCanvasLength(canvas, parseInt(getAttr(off, 'y') ?? '0', 10)) : 0;
+  const width = ext !== null ? emuToCanvasLength(canvas, parseInt(getAttr(ext, 'cx') ?? '1', 10)) : 1;
+  const height = ext !== null ? emuToCanvasLength(canvas, parseInt(getAttr(ext, 'cy') ?? '1', 10)) : 1;
+  const rotAttr = getAttr(xfrm, 'rot');
+  const rotation = rotAttr !== undefined ? rotationUnitsToDegrees(parseInt(rotAttr, 10)) : 0;
+  const flipH = getAttr(xfrm, 'flipH') === '1';
+  const flipV = getAttr(xfrm, 'flipV') === '1';
 
   return { x, y, width, height, rotation, flipH, flipV };
 }
@@ -396,24 +339,19 @@ function extractTransform(canvas: Canvas, body: string): ParsedTransform | null 
 interface CNvPrAttrs {
   readonly bsetId?: string;
   readonly displayName: string;
-  /** Element kind decoded from the BSET shape name, when present. */
   readonly bsetKind?: string;
-  /** dataField encoded into the BSET shape name, when present. */
   readonly bsetDataField?: string;
 }
 
-function extractCNvPrAttrs(body: string): CNvPrAttrs | null {
-  const match = body.match(/<p:cNvPr\b([^>]*)(\/>|>)/);
+function extractCNvPrAttrs(shape: XmlElement): CNvPrAttrs | null {
+  const cNvPr = findDescendant(shape, 'p:cNvPr');
 
-  if (!match) return null;
+  if (cNvPr === null) return null;
 
-  const attrs = match[1] ?? '';
-  const nameAttr = attrs.match(/\bname="([^"]*)"/);
-  const rawName = nameAttr?.[1] ?? '';
-  // OOXML attribute values escape `&`, `<`, `>`, `"`, `'`. Decode
-  // before BSET tag detection so a name like `Foo &amp; Bar` round-
-  // trips and BSET tags are matched character-for-character.
-  const displayName = decodeXmlEntities(rawName);
+  const rawName = getAttr(cNvPr, 'name') ?? '';
+  // The AST already decodes XML entities on attribute values, so
+  // `Foo &amp; Bar` arrives as `Foo & Bar` here.
+  const displayName = rawName;
   const bsetTag = displayName.length > 0 ? decodeShapeName(displayName) : null;
 
   if (bsetTag !== null) {
@@ -430,21 +368,18 @@ function extractCNvPrAttrs(body: string): CNvPrAttrs | null {
 
 /**
  * Pull the per-shape Broadset metadata extension out of the shape's
- * `<p:extLst>` block. PowerPoint, Keynote, and LibreOffice preserve
- * unknown `<p:ext>` elements verbatim across save, so this is the
- * primary structured-metadata carrier for `dataField`, `visibleWhen`,
- * `repeater`, `originalKind`, and the `dirty` flag. Returns `null` when
- * no Broadset extension is present (foreign tools that strip the
- * extension list, or shapes that pre-date Broadset metadata).
+ * `<p:extLst>` block. Defers to the namespace-aware `parseElementExt`
+ * by serialising the cNvPr inner body — the function is shared with
+ * the customXml ledger reader so we don't re-implement the schema.
  */
-function extractElementMeta(body: string): ElementMetaExtension | null {
-  // The extLst block may live anywhere inside `<p:cNvPr>` — extract the
-  // first `<p:cNvPr>...</p:cNvPr>` paired form and search inside.
-  const cNvPr = body.match(/<p:cNvPr\b[^>]*>([\s\S]*?)<\/p:cNvPr>/);
+function extractElementMeta(shape: XmlElement): ElementMetaExtension | null {
+  const cNvPr = findDescendant(shape, 'p:cNvPr');
 
   if (cNvPr === null) return null;
 
-  return parseElementExt(cNvPr[1] ?? '');
+  const inner = cNvPr.children.map((c) => serializeNode(c)).join('');
+
+  return parseElementExt(inner);
 }
 
 interface DetectedGeometry {
@@ -452,20 +387,16 @@ interface DetectedGeometry {
   readonly d?: string;
 }
 
-function detectGeometry(body: string): DetectedGeometry | null {
-  const prst = body.match(/<a:prstGeom\s+prst="([^"]+)"/);
+function detectGeometry(shape: XmlElement): DetectedGeometry | null {
+  const prst = findDescendant(shape, 'a:prstGeom');
 
-  if (prst) {
-    const preset = prst[1] ?? '';
+  if (prst !== null) {
+    const preset = getAttr(prst, 'prst') ?? '';
 
     if (preset === 'rect') return { kind: 'rectangle' };
     if (preset === 'roundRect') return { kind: 'roundRect' };
     if (preset === 'ellipse' || preset === 'circle') return { kind: 'ellipse' };
 
-    // Common presets without a native Broadset type. Express the
-    // geometry as a `path` element with an SVG `d` string scaled to
-    // the OOXML 0..100000 unit cube. Future expansion: callouts,
-    // arrows with stem widths, multi-pointed stars.
     const presetD = OOXML_PRESET_TO_SVG_D[preset];
 
     if (presetD !== undefined) return { kind: 'path', d: presetD };
@@ -473,8 +404,10 @@ function detectGeometry(body: string): DetectedGeometry | null {
     return { kind: 'unknown' };
   }
 
-  if (body.includes('<a:custGeom>')) {
-    const d = custGeomToSvgD(body);
+  const custGeom = findDescendant(shape, 'a:custGeom');
+
+  if (custGeom !== null) {
+    const d = custGeomToSvgD(custGeom);
 
     return { kind: 'path', d };
   }
@@ -482,12 +415,6 @@ function detectGeometry(body: string): DetectedGeometry | null {
   return null;
 }
 
-/**
- * Common OOXML preset shapes mapped to SVG `d` strings on the canonical
- * 0..100000 × 0..100000 path-coordinate cube. Geometry is approximate
- * for presets that have parametric variants; future versions can pull
- * the OOXML preset adjustment values (`<a:gd>`) when present.
- */
 const OOXML_PRESET_TO_SVG_D: Readonly<Record<string, string>> = {
   triangle: 'M 50000 0 L 100000 100000 L 0 100000 Z',
   rtTriangle: 'M 0 0 L 100000 100000 L 0 100000 Z',
@@ -513,65 +440,31 @@ const OOXML_PRESET_TO_SVG_D: Readonly<Record<string, string>> = {
   leftRightArrow: 'M 0 50000 L 25000 0 L 25000 25000 L 75000 25000 L 75000 0 L 100000 50000 L 75000 100000 L 75000 75000 L 25000 75000 L 25000 100000 Z',
   upDownArrow: 'M 50000 0 L 100000 25000 L 75000 25000 L 75000 75000 L 100000 75000 L 50000 100000 L 0 75000 L 25000 75000 L 25000 25000 L 0 25000 Z',
   plus: 'M 35000 0 L 65000 0 L 65000 35000 L 100000 35000 L 100000 65000 L 65000 65000 L 65000 100000 L 35000 100000 L 35000 65000 L 0 65000 L 0 35000 L 35000 35000 Z',
-  // Callouts approximate to a rounded-rectangle body + tail; full
-  // geometry varies by adjustment values that we don't read yet.
   wedgeRectCallout: 'M 0 0 L 100000 0 L 100000 75000 L 60000 75000 L 50000 100000 L 40000 75000 L 0 75000 Z',
   wedgeRoundRectCallout: 'M 10000 0 L 90000 0 L 100000 10000 L 100000 65000 L 90000 75000 L 60000 75000 L 50000 100000 L 40000 75000 L 10000 75000 L 0 65000 L 0 10000 Z',
   wedgeEllipseCallout: 'M 50000 0 C 22386 0 0 16863 0 37500 C 0 58137 22386 75000 50000 75000 L 60000 75000 L 50000 100000 L 40000 75000 C 36000 75000 32000 74600 28000 73850 Z',
 };
 
-function custGeomToSvgD(body: string): string {
-  // Very tolerant parse: walk moveTo / lnTo / cubicBezTo / quadBezTo /
-  // close operators and emit an SVG `d` string. OOXML coords are in
-  // `<a:path w="…" h="…">` units; we normalize to the path's local
-  // bbox (width × height) by scaling to the output unit the caller
-  // passes as the element width × height. At import time the element
-  // geometry already carries absolute dimensions, so a relative `d`
-  // that references 0..100000 × 0..100000 is fine — the path renderer
-  // interprets via viewBox.
-  const pathBlock = extractBlock(body, 'a:path');
+function custGeomToSvgD(custGeom: XmlElement): string {
+  const path = findDescendant(custGeom, 'a:path');
 
-  if (pathBlock === null) return '';
+  if (path === null) return '';
 
   const ops: string[] = [];
 
-  // Match path operations explicitly — avoid greedy `.*?` matching that
-  // stops at child `<a:pt/>` self-closes. Two patterns: container ops
-  // (moveTo/lnTo/cubicBezTo/quadBezTo) with their full `<a:pt/>` list,
-  // and the empty-body `<a:close/>`. We interleave the matches in
-  // source order.
-  const allMatches: { readonly index: number; readonly op: string; readonly inner: string }[] = [];
+  for (const op of path.children) {
+    if (op.kind !== 'element') continue;
 
-  for (const m of pathBlock.block.matchAll(
-    /<a:(moveTo|lnTo|cubicBezTo|quadBezTo)\b[^>]*>([\s\S]*?)<\/a:\1>/g,
-  )) {
-    allMatches.push({ index: m.index, op: m[1] ?? '', inner: m[2] ?? '' });
-  }
+    const segment = opToSvgSegment(op);
 
-  for (const m of pathBlock.block.matchAll(/<a:close\s*\/\s*>/g)) {
-    allMatches.push({ index: m.index, op: 'close', inner: '' });
-  }
-
-  allMatches.sort((a, b) => a.index - b.index);
-
-  for (const { op, inner } of allMatches) {
-    const svg = opToSvgSegment(op, inner);
-
-    if (svg !== null) {
-      ops.push(svg);
-      continue;
-    }
-
-    if (op === 'close') {
-      ops.push('Z');
-    }
+    if (segment !== null) ops.push(segment);
+    else if (op.local === 'close') ops.push('Z');
   }
 
   const d = ops.join(' ');
 
   if (d.length === 0) return '';
 
-  // Normalize the `d` path; harmless when already canonical.
   try {
     return svgpath(d).abs().toString();
   } catch {
@@ -579,23 +472,23 @@ function custGeomToSvgD(body: string): string {
   }
 }
 
-function opToSvgSegment(op: string, inner: string): string | null {
-  const pts = [...inner.matchAll(/<a:pt\s+x="(-?\d+)"\s+y="(-?\d+)"\s*\/>/g)].map((pm) => ({
-    x: parseInt(pm[1] ?? '0', 10),
-    y: parseInt(pm[2] ?? '0', 10),
+function opToSvgSegment(op: XmlElement): string | null {
+  const pts = findChildren(op, 'a:pt').map((pt) => ({
+    x: parseFloat(getAttr(pt, 'x') ?? '0'),
+    y: parseFloat(getAttr(pt, 'y') ?? '0'),
   }));
   const p0 = pts[0];
   const p1 = pts[1];
   const p2 = pts[2];
 
-  if (op === 'moveTo' && p0 !== undefined) return `M ${String(p0.x)} ${String(p0.y)}`;
-  if (op === 'lnTo' && p0 !== undefined) return `L ${String(p0.x)} ${String(p0.y)}`;
+  if (op.local === 'moveTo' && p0 !== undefined) return `M ${String(p0.x)} ${String(p0.y)}`;
+  if (op.local === 'lnTo' && p0 !== undefined) return `L ${String(p0.x)} ${String(p0.y)}`;
 
-  if (op === 'cubicBezTo' && p0 !== undefined && p1 !== undefined && p2 !== undefined) {
+  if (op.local === 'cubicBezTo' && p0 !== undefined && p1 !== undefined && p2 !== undefined) {
     return `C ${String(p0.x)} ${String(p0.y)} ${String(p1.x)} ${String(p1.y)} ${String(p2.x)} ${String(p2.y)}`;
   }
 
-  if (op === 'quadBezTo' && p0 !== undefined && p1 !== undefined) {
+  if (op.local === 'quadBezTo' && p0 !== undefined && p1 !== undefined) {
     return `Q ${String(p0.x)} ${String(p0.y)} ${String(p1.x)} ${String(p1.y)}`;
   }
 
@@ -610,10 +503,6 @@ function buildBase(
   transform: ParsedTransform,
   parentGroupId: string | null,
 ): BroadsetElement {
-  // Initialise extensions.pptx.dirty = false so subsequent edits in
-  // Broadset can distinguish untouched imports from edited elements
-  // per IO-D-18 and the cross-format Format Round-Trip Metadata
-  // requirement.
   const pptxExt: Record<string, unknown> = { dirty: false };
 
   if (transform.flipH) pptxExt['flipH'] = true;
@@ -632,21 +521,16 @@ function buildBase(
   return parentGroupId === null ? base : { ...base, groupId: parentGroupId };
 }
 
-/**
- * Parse an `<a:ln>` stroke block from a shape body. Extracts width,
- * stroke colour, dash, and head/tail arrow endings per the spec's
- * `strokeHeadEnd` / `strokeTailEnd` fields (io-prereqs Phase 1).
- */
-function parseStrokeFromBody(canvas: Canvas, body: string): {
+function parseStrokeFromBody(canvas: Canvas, shape: XmlElement): {
   readonly borderWidth?: number;
   readonly borderColor?: BroadsetColor;
   readonly strokeDasharray?: string;
   readonly strokeHeadEnd?: ArrowEnd;
   readonly strokeTailEnd?: ArrowEnd;
 } | null {
-  const lnBlock = extractBlock(body, 'a:ln');
+  const ln = findDescendant(shape, 'a:ln');
 
-  if (lnBlock === null) return null;
+  if (ln === null) return null;
 
   const result: {
     borderWidth?: number;
@@ -656,22 +540,21 @@ function parseStrokeFromBody(canvas: Canvas, body: string): {
     strokeTailEnd?: ArrowEnd;
   } = {};
 
-  const widthAttr = lnBlock.openAttrs.match(/\bw="(\d+)"/)?.[1];
+  const widthAttr = getAttr(ln, 'w');
 
   if (widthAttr !== undefined) result.borderWidth = emuToCanvasLength(canvas, parseInt(widthAttr, 10));
 
-  const colour = parseColorElement(lnBlock.block);
+  const colour = parseColorElement(ln);
 
   if (colour !== null) result.borderColor = colour;
 
-  const dashMatch = lnBlock.block.match(/<a:prstDash\s+val="([^"]+)"/);
-
-  const dashStyle = dashMatch?.[1];
+  const dash = findChild(ln, 'a:prstDash');
+  const dashStyle = dash !== null ? getAttr(dash, 'val') : undefined;
 
   if (dashStyle !== undefined && dashStyle !== 'solid') result.strokeDasharray = dashStyle;
 
-  const headEnd = parseArrowEnd(lnBlock.block, 'headEnd');
-  const tailEnd = parseArrowEnd(lnBlock.block, 'tailEnd');
+  const headEnd = parseArrowEnd(ln, 'a:headEnd');
+  const tailEnd = parseArrowEnd(ln, 'a:tailEnd');
 
   if (headEnd !== null) result.strokeHeadEnd = headEnd;
   if (tailEnd !== null) result.strokeTailEnd = tailEnd;
@@ -679,16 +562,14 @@ function parseStrokeFromBody(canvas: Canvas, body: string): {
   return Object.keys(result).length === 0 ? null : result;
 }
 
-function parseArrowEnd(lnBody: string, tag: 'headEnd' | 'tailEnd'): ArrowEnd | null {
-  const re = new RegExp(`<a:${tag}\\b([^/>]*)\\/?\\s*>`);
-  const match = lnBody.match(re);
+function parseArrowEnd(ln: XmlElement, qname: 'a:headEnd' | 'a:tailEnd'): ArrowEnd | null {
+  const node = findChild(ln, qname);
 
-  if (!match) return null;
+  if (node === null) return null;
 
-  const attrs = match[1] ?? '';
-  const ooxmlType = attrs.match(/\btype="([^"]+)"/)?.[1] ?? 'none';
-  const widthAttr = attrs.match(/\bw="([^"]+)"/)?.[1];
-  const lengthAttr = attrs.match(/\blen="([^"]+)"/)?.[1];
+  const ooxmlType = getAttr(node, 'type') ?? 'none';
+  const widthAttr = getAttr(node, 'w');
+  const lengthAttr = getAttr(node, 'len');
 
   return {
     shape: ooxmlArrowShapeToBroadset(ooxmlType),
@@ -718,10 +599,10 @@ function buildRectangle(
   id: string,
   name: string,
   transform: ParsedTransform,
-  body: string,
+  shape: XmlElement,
   parentGroupId: string | null,
 ): BroadsetElement {
-  return applyShapeStyle(ctx.canvas, buildBase(ctx, id, name, 'rectangle', transform, parentGroupId), body);
+  return applyShapeStyle(ctx.canvas, buildBase(ctx, id, name, 'rectangle', transform, parentGroupId), shape);
 }
 
 function buildEllipse(
@@ -729,10 +610,10 @@ function buildEllipse(
   id: string,
   name: string,
   transform: ParsedTransform,
-  body: string,
+  shape: XmlElement,
   parentGroupId: string | null,
 ): BroadsetElement {
-  return applyShapeStyle(ctx.canvas, buildBase(ctx, id, name, 'ellipse', transform, parentGroupId), body);
+  return applyShapeStyle(ctx.canvas, buildBase(ctx, id, name, 'ellipse', transform, parentGroupId), shape);
 }
 
 function buildPath(
@@ -740,24 +621,19 @@ function buildPath(
   id: string,
   name: string,
   transform: ParsedTransform,
-  body: string,
+  shape: XmlElement,
   parentGroupId: string | null,
   d: string,
 ): BroadsetElement {
-  const base = applyShapeStyle(ctx.canvas, buildBase(ctx, id, name, 'path', transform, parentGroupId), body);
+  const base = applyShapeStyle(ctx.canvas, buildBase(ctx, id, name, 'path', transform, parentGroupId), shape);
 
   return { ...base, content: d };
 }
 
-/**
- * Merge fill + stroke (width, colour, dash, head/tail arrow ends) +
- * effects (outer shadow) extracted from the shape body onto the
- * element's style.
- */
-function applyShapeStyle(canvas: Canvas, element: BroadsetElement, body: string): BroadsetElement {
-  const fill = detectFill(body);
-  const stroke = parseStrokeFromBody(canvas, body);
-  const boxShadow = parseOuterShadow(body);
+function applyShapeStyle(canvas: Canvas, element: BroadsetElement, shape: XmlElement): BroadsetElement {
+  const fill = detectFill(shape);
+  const stroke = parseStrokeFromBody(canvas, shape);
+  const boxShadow = parseOuterShadow(shape);
 
   if (fill === null && stroke === null && boxShadow === null) return element;
 
@@ -776,19 +652,13 @@ function applyShapeStyle(canvas: Canvas, element: BroadsetElement, body: string)
   };
 }
 
-/**
- * Parse `<a:outerShdw>` or `<a:innerShdw>` into a CSS `box-shadow`
- * string. Inner shadows are emitted with the `inset` keyword. When
- * both forms are present in the same `<a:effectLst>` we emit a
- * comma-separated list (CSS box-shadow allows multiple shadows).
- */
-function parseOuterShadow(body: string): string | null {
-  const effectLst = extractBlock(body, 'a:effectLst');
+function parseOuterShadow(shape: XmlElement): string | null {
+  const effectLst = findDescendant(shape, 'a:effectLst');
 
   if (effectLst === null) return null;
 
-  const outer = parseShadowBlock(effectLst.block, 'a:outerShdw', false);
-  const inner = parseShadowBlock(effectLst.block, 'a:innerShdw', true);
+  const outer = parseShadowBlock(effectLst, 'a:outerShdw', false);
+  const inner = parseShadowBlock(effectLst, 'a:innerShdw', true);
 
   if (outer === null && inner === null) return null;
   if (outer !== null && inner !== null) return `${outer}, ${inner}`;
@@ -796,31 +666,25 @@ function parseOuterShadow(body: string): string | null {
   return outer ?? inner;
 }
 
-function parseShadowBlock(block: string, tagName: string, inset: boolean): string | null {
-  // Two simpler regex calls instead of one alternation — keeps complexity
-  // under the lint threshold and makes the matched-vs-self-close branch
-  // explicit.
-  const escapedTag = tagName.replace(':', '\\:');
-  const paired = block.match(new RegExp(`<${escapedTag}\\b([^>]*)>([\\s\\S]*?)<\\/${escapedTag}>`));
-  const selfClose = paired === null ? block.match(new RegExp(`<${escapedTag}\\b([^>]*)\\/>`)) : null;
+function parseShadowBlock(effectLst: XmlElement, qname: 'a:outerShdw' | 'a:innerShdw', inset: boolean): string | null {
+  const shdw = findChild(effectLst, qname);
 
-  if (paired === null && selfClose === null) return null;
+  if (shdw === null) return null;
 
-  const attrs = paired?.[1] ?? selfClose?.[1] ?? '';
-  const innerBody = paired?.[2] ?? '';
-  const blurEmu = parseInt(attrs.match(/\bblurRad="(\d+)"/)?.[1] ?? '0', 10);
-  const distEmu = parseInt(attrs.match(/\bdist="(\d+)"/)?.[1] ?? '0', 10);
-  const dirUnits = parseInt(attrs.match(/\bdir="(\d+)"/)?.[1] ?? '0', 10);
+  const blurEmu = parseInt(getAttr(shdw, 'blurRad') ?? '0', 10);
+  const distEmu = parseInt(getAttr(shdw, 'dist') ?? '0', 10);
+  const dirUnits = parseInt(getAttr(shdw, 'dir') ?? '0', 10);
   const dirRadians = (rotationUnitsToDegrees(dirUnits) * Math.PI) / 180;
   const offsetXmm = emuToMm(distEmu) * Math.cos(dirRadians);
   const offsetYmm = emuToMm(distEmu) * Math.sin(dirRadians);
   const blurMm = emuToMm(blurEmu);
-  const colour = parseColorElement(innerBody);
+  const colour = parseColorElement(shdw);
 
   if (colour?.kind !== 'rgb') return null;
 
-  const alphaMatch = innerBody.match(/<a:alpha\s+val="(\d+)"/);
-  const alpha = alphaMatch !== null ? parseInt(alphaMatch[1] ?? '100000', 10) / 100000 : 1;
+  const srgb = findDescendant(shdw, 'a:srgbClr');
+  const alphaNode = srgb !== null ? findChild(srgb, 'a:alpha') : null;
+  const alpha = alphaNode !== null ? parseInt(getAttr(alphaNode, 'val') ?? '100000', 10) / 100000 : 1;
   const r = parseInt(colour.hex.slice(1, 3), 16);
   const g = parseInt(colour.hex.slice(3, 5), 16);
   const b = parseInt(colour.hex.slice(5, 7), 16);
@@ -838,27 +702,24 @@ function buildPicture(
   id: string,
   name: string,
   transform: ParsedTransform,
-  body: string,
+  shape: XmlElement,
   parentGroupId: string | null,
 ): BroadsetElement | null {
-  const embed = body.match(/<a:blip\b[^>]*\br:embed="([^"]+)"/);
+  const blip = findDescendant(shape, 'a:blip');
 
-  if (!embed) return null;
+  if (blip === null) return null;
 
-  const relId = embed[1] ?? '';
+  const relId = getAttr(blip, 'embed') ?? '';
   const media = ctx.mediaByRelId.get(relId);
 
   if (!media) return null;
 
   const base = buildBase(ctx, id, name, 'image', transform, parentGroupId);
   const dataUri = `data:${media.mime};base64,${uint8ToBase64(media.bytes)}`;
-  const srcRect = parseSrcRect(body);
+  const srcRect = parseSrcRect(shape);
 
   if (srcRect === null) return { ...base, content: dataUri };
 
-  // Preserve the srcRect on extensions.pptx.srcRect so re-export emits
-  // it again. Pixel-level baking (cropping the image bytes) is tracked
-  // as a future enhancement — for now the data round-trips losslessly.
   const existingExt = (base.extensions['pptx'] as Record<string, unknown> | undefined) ?? {};
 
   return {
@@ -874,46 +735,38 @@ function buildPicture(
   };
 }
 
-/**
- * Parse `<a:srcRect>` percentages off `<a:blipFill>`. Each component
- * is in OOXML's 1/100000 unit (50000 = 50%). All four sides may be
- * absent (defaults to 0). Returns `null` when no `<a:srcRect>` is
- * present so we don't litter `extensions.pptx` with empty crops.
- */
-function parseSrcRect(body: string): { readonly l: number; readonly t: number; readonly r: number; readonly b: number } | null {
-  const match = body.match(/<a:srcRect\b([^>]*)\/?>/);
+function parseSrcRect(shape: XmlElement): { readonly l: number; readonly t: number; readonly r: number; readonly b: number } | null {
+  const node = findDescendant(shape, 'a:srcRect');
 
-  if (match === null) return null;
+  if (node === null) return null;
 
-  const attrs = match[1] ?? '';
-  const l = parseInt(attrs.match(/\bl="(-?\d+)"/)?.[1] ?? '0', 10);
-  const t = parseInt(attrs.match(/\bt="(-?\d+)"/)?.[1] ?? '0', 10);
-  const r = parseInt(attrs.match(/\br="(-?\d+)"/)?.[1] ?? '0', 10);
-  const b = parseInt(attrs.match(/\bb="(-?\d+)"/)?.[1] ?? '0', 10);
+  const l = parseInt(getAttr(node, 'l') ?? '0', 10);
+  const t = parseInt(getAttr(node, 't') ?? '0', 10);
+  const r = parseInt(getAttr(node, 'r') ?? '0', 10);
+  const b = parseInt(getAttr(node, 'b') ?? '0', 10);
 
   if (l === 0 && t === 0 && r === 0 && b === 0) return null;
 
   return { l, t, r, b };
 }
 
-/**
- * Detect a fill on a shape body. Dispatches to solid / gradient /
- * picture (returns null; caller handles `<p:pic>` separately) in that
- * order.
- */
-function detectFill(body: string): BroadsetFill | null {
-  const solid = extractBlock(body, 'a:solidFill');
+function detectFill(shape: XmlElement): BroadsetFill | null {
+  // Look for spPr fill children only — a paint inside `<a:ln>` is the
+  // border colour, not the fill, and per-run colours live in the text body.
+  const spPr = findDescendant(shape, 'p:spPr');
+  const scope = spPr ?? shape;
+  const solid = findChild(scope, 'a:solidFill');
 
   if (solid !== null) {
-    const color = parseColorElement(solid.block);
+    const color = parseColorElement(solid);
 
     if (color !== null) return solidFill(color);
   }
 
-  const gradient = extractBlock(body, 'a:gradFill');
+  const gradient = findChild(scope, 'a:gradFill');
 
   if (gradient !== null) {
-    const grad = parseGradient(gradient.block);
+    const grad = parseGradient(gradient);
 
     if (grad !== null) return { kind: 'gradient', gradient: grad };
   }
@@ -922,48 +775,39 @@ function detectFill(body: string): BroadsetFill | null {
 }
 
 /**
- * Parse an OOXML colour primitive into a BroadsetColor. Recognised
- * variants:
- *
- * - `<a:srgbClr val="…"/>` — canonical sRGB hex.
- * - `<a:schemeClr val="…"/>` — theme-slot reference; preserves
- *   identity so re-export emits `<a:schemeClr>` again.
- * - `<a:scrgbClr r="…" g="…" b="…"/>` — linear-light percentages
- *   (0–100000). We convert to sRGB hex but keep the source string on
- *   `originalColor` so a later round-trip can restore the linear form.
- * - `<a:hslClr hue="…" sat="…" lum="…"/>` — HSL components per
- *   ECMA-376 (hue 0–21600000 = 0–360°, sat/lum 0–100000 = 0–100%).
- *   Converted to sRGB hex with `originalColor` carrying the source.
- * - `<a:prstClr val="…"/>` — preset name (e.g. `darkBlue`).
- *   Resolved through `normalizeColor` (which knows the CSS named
- *   set), with the preset name preserved on `originalColor`.
+ * Parse an OOXML colour primitive into a BroadsetColor. The function
+ * accepts any node containing one of the colour primitives directly as
+ * a descendant (`<a:srgbClr>`, `<a:schemeClr>`, `<a:scrgbClr>`,
+ * `<a:hslClr>`, `<a:prstClr>`).
  */
-function parseColorElement(block: string): BroadsetColor | null {
-  const srgbMatch = block.match(/<a:srgbClr\s+val="([0-9A-Fa-f]{6,8})"(?:[^>]*)(\/>|>[\s\S]*?<\/a:srgbClr>)/);
+function parseColorElement(node: XmlElement): BroadsetColor | null {
+  const srgb = findDescendant(node, 'a:srgbClr');
 
-  if (srgbMatch !== null) {
-    const digits = (srgbMatch[1] ?? '').toUpperCase();
-    const hex: `#${string}` = `#${digits}`;
+  if (srgb !== null) {
+    const val = getAttr(srgb, 'val') ?? '';
 
-    return { kind: 'rgb', hex };
+    if (/^[0-9A-Fa-f]{6,8}$/.test(val)) {
+      const hex: `#${string}` = `#${val.toUpperCase()}`;
+
+      return { kind: 'rgb', hex };
+    }
   }
 
-  const schemeMatch = block.match(/<a:schemeClr\s+val="([a-zA-Z0-9]+)"(?:[^>]*)(\/>|>[\s\S]*?<\/a:schemeClr>)/);
+  const scheme = findDescendant(node, 'a:schemeClr');
 
-  if (schemeMatch !== null) {
-    const slot = schemeMatch[1] as ThemeSlot;
-    const innerBody = schemeMatch[2] ?? '';
-    const mods = parseColorMods(innerBody);
+  if (scheme !== null) {
+    const slot = (getAttr(scheme, 'val') ?? '') as ThemeSlot;
+    const mods = parseColorMods(scheme);
 
     return mods === null ? { kind: 'theme', slot } : { kind: 'theme', slot, mods };
   }
 
-  const scrgbMatch = block.match(/<a:scrgbClr\s+r="(\d+)"\s+g="(\d+)"\s+b="(\d+)"(?:[^>]*)(\/>|>[\s\S]*?<\/a:scrgbClr>)/);
+  const scrgb = findDescendant(node, 'a:scrgbClr');
 
-  if (scrgbMatch !== null) {
-    const r = clampScrgb(parseInt(scrgbMatch[1] ?? '0', 10));
-    const g = clampScrgb(parseInt(scrgbMatch[2] ?? '0', 10));
-    const b = clampScrgb(parseInt(scrgbMatch[3] ?? '0', 10));
+  if (scrgb !== null) {
+    const r = clampScrgb(parseInt(getAttr(scrgb, 'r') ?? '0', 10));
+    const g = clampScrgb(parseInt(getAttr(scrgb, 'g') ?? '0', 10));
+    const b = clampScrgb(parseInt(getAttr(scrgb, 'b') ?? '0', 10));
     const hex = scrgbToSrgbHex(r, g, b);
 
     return {
@@ -973,12 +817,12 @@ function parseColorElement(block: string): BroadsetColor | null {
     };
   }
 
-  const hslMatch = block.match(/<a:hslClr\s+hue="(\d+)"\s+sat="(\d+)"\s+lum="(\d+)"(?:[^>]*)(\/>|>[\s\S]*?<\/a:hslClr>)/);
+  const hsl = findDescendant(node, 'a:hslClr');
 
-  if (hslMatch !== null) {
-    const hueDegrees = parseInt(hslMatch[1] ?? '0', 10) / 60000;
-    const saturationPct = parseInt(hslMatch[2] ?? '0', 10) / 1000;
-    const lightnessPct = parseInt(hslMatch[3] ?? '0', 10) / 1000;
+  if (hsl !== null) {
+    const hueDegrees = parseInt(getAttr(hsl, 'hue') ?? '0', 10) / 60000;
+    const saturationPct = parseInt(getAttr(hsl, 'sat') ?? '0', 10) / 1000;
+    const lightnessPct = parseInt(getAttr(hsl, 'lum') ?? '0', 10) / 1000;
     const hex = hslToSrgbHex(hueDegrees, saturationPct, lightnessPct);
 
     return {
@@ -988,15 +832,13 @@ function parseColorElement(block: string): BroadsetColor | null {
     };
   }
 
-  const prstMatch = block.match(/<a:prstClr\s+val="([a-zA-Z0-9]+)"(?:[^>]*)(\/>|>[\s\S]*?<\/a:prstClr>)/);
+  const prst = findDescendant(node, 'a:prstClr');
 
-  if (prstMatch !== null) {
-    const name = (prstMatch[1] ?? '').toLowerCase();
+  if (prst !== null) {
+    const name = (getAttr(prst, 'val') ?? '').toLowerCase();
     const hex = prstNameToSrgbHex(name);
 
-    if (hex === null) return null;
-
-    return { kind: 'rgb', hex, originalColor: name };
+    if (hex !== null) return { kind: 'rgb', hex, originalColor: name };
   }
 
   return null;
@@ -1006,11 +848,6 @@ function clampScrgb(value: number): number {
   return Math.max(0, Math.min(100000, value));
 }
 
-/**
- * Convert OOXML `<a:scrgbClr>` linear-light components (0–100000) to
- * an sRGB `#RRGGBB` string by applying the standard linear → gamma
- * transfer (IEC 61966-2-1).
- */
 function scrgbToSrgbHex(r: number, g: number, b: number): `#${string}` {
   const toSrgb = (linearScaled: number): number => {
     const linear = linearScaled / 100000;
@@ -1022,10 +859,6 @@ function scrgbToSrgbHex(r: number, g: number, b: number): `#${string}` {
   return rgbToHex(toSrgb(r), toSrgb(g), toSrgb(b));
 }
 
-/**
- * HSL → sRGB hex per the canonical CSS Color formula. Hue in degrees,
- * saturation/lightness as 0–100 percentages.
- */
 function hslToSrgbHex(hueDegrees: number, saturationPct: number, lightnessPct: number): `#${string}` {
   const s = Math.max(0, Math.min(100, saturationPct)) / 100;
   const l = Math.max(0, Math.min(100, lightnessPct)) / 100;
@@ -1059,13 +892,6 @@ function rgbToHex(r: number, g: number, b: number): `#${string}` {
   return `#${hex}`;
 }
 
-/**
- * OOXML preset colour names per ECMA-376 §20.1.10.46. The full set
- * mirrors CSS3/SVG named colours; we delegate to the model's
- * `normalizeColor` first (which carries the basic 21 names) and fall
- * back to the OOXML extended map. Names are matched case-insensitively.
- * Returns `null` when the name isn't recognised.
- */
 function prstNameToSrgbHex(name: string): `#${string}` | null {
   try {
     const normalized = normalizeColor(name);
@@ -1081,123 +907,48 @@ function prstNameToSrgbHex(name: string): `#${string}` | null {
   }
 }
 
-
-function parseColorMods(innerBody: string): ColorMods | null {
+function parseColorMods(scheme: XmlElement): ColorMods | null {
   const result: Record<string, number> = {};
   const modNames = ['lumMod', 'lumOff', 'tint', 'shade', 'alpha'] as const;
 
   for (const name of modNames) {
-    const re = new RegExp(`<a:${name}\\s+val="(\\d+)"`);
-    const match = innerBody.match(re);
+    const mod = findChild(scheme, `a:${name}`);
 
-    if (match !== null) {
-      const raw = parseInt(match[1] ?? '0', 10);
+    if (mod === null) continue;
 
-      result[name] = raw / 100000;
-    }
+    const raw = parseInt(getAttr(mod, 'val') ?? '0', 10);
+
+    result[name] = raw / 100000;
   }
 
   return Object.keys(result).length === 0 ? null : (result as ColorMods);
 }
 
-/**
- * Parse `<a:gradFill>` into a BroadsetGradient. Supports linear
- * (`<a:lin ang="…"/>`) and radial / path (`<a:path path="circle">`).
- * Stops are extracted from `<a:gsLst>`.
- */
-function parseGradient(block: string): BroadsetGradient | null {
+function parseGradient(gradFill: XmlElement): BroadsetGradient | null {
   const stops: BroadsetGradientStop[] = [];
-  const gsLst = extractBlock(block, 'a:gsLst');
+  const gsLst = findChild(gradFill, 'a:gsLst');
 
   if (gsLst === null) return null;
 
-  for (const stopMatch of gsLst.block.matchAll(/<a:gs\s+pos="(\d+)"[^>]*>([\s\S]*?)<\/a:gs>/g)) {
-    const pos = parseInt(stopMatch[1] ?? '0', 10) / 100000;
-    const color = parseColorElement(stopMatch[2] ?? '');
+  for (const gs of findChildren(gsLst, 'a:gs')) {
+    const pos = parseInt(getAttr(gs, 'pos') ?? '0', 10) / 100000;
+    const color = parseColorElement(gs);
 
     if (color !== null) stops.push({ position: pos, color });
   }
 
   if (stops.length === 0) return null;
 
-  const radial = block.includes('<a:path path="circle"');
+  const path = findChild(gradFill, 'a:path');
 
-  if (radial) return { type: 'radial', stops };
-
-  const linMatch = block.match(/<a:lin\b[^>]*\bang="(-?\d+)"/);
-  const angle = linMatch !== null ? parseInt(linMatch[1] ?? '0', 10) / 60000 : 0;
-
-  return { type: 'linear', stops, angle };
-}
-
-interface ExtractedBlock {
-  readonly block: string;
-  readonly openAttrs: string;
-}
-
-function extractBlock(body: string, tagName: string): ExtractedBlock | null {
-  const openRe = new RegExp(`<${tagName}\\b([^>]*)(\\/?)>`);
-  const open = body.match(openRe);
-
-  if (!open) return null;
-
-  const attrs = open[1] ?? '';
-  const selfClose = open[2] === '/';
-
-  if (selfClose) return { block: '', openAttrs: attrs };
-
-  const startIdx = (open.index ?? 0) + open[0].length;
-  const endIdx = findMatchingCloseIdx(body, tagName, startIdx);
-
-  if (endIdx < 0) return { block: body.slice(startIdx), openAttrs: attrs };
-
-  return { block: body.slice(startIdx, endIdx), openAttrs: attrs };
-}
-
-/**
- * Scan forward from `startIdx` looking for the close tag that matches
- * the open tag at the start of `extractBlock`'s span — same name, same
- * depth. Naive `body.indexOf(close)` mis-binds when the same tag is
- * nested (e.g. `<a:effectLst>` at shape level containing another
- * `<a:effectLst>` inside a child run); this walker tracks depth so the
- * returned span is always the matching close.
- */
-function findMatchingCloseIdx(body: string, tagName: string, startIdx: number): number {
-  const open = `<${tagName}`;
-  const close = `</${tagName}>`;
-  let depth = 1;
-  let cursor = startIdx;
-
-  while (cursor < body.length) {
-    const nextOpen = body.indexOf(open, cursor);
-    const nextClose = body.indexOf(close, cursor);
-
-    if (nextClose < 0) return -1;
-
-    if (nextOpen >= 0 && nextOpen < nextClose) {
-      // Confirm the open is a tag boundary (e.g. `<a:p>`) rather than
-      // a longer-named tag that starts with the same prefix
-      // (`<a:pPr>`). The next char after `<tagName` must be a space,
-      // `>`, or `/`.
-      const after = body.charCodeAt(nextOpen + open.length);
-      const isBoundary = after === 0x20 || after === 0x3e || after === 0x2f || after === 0x09 || after === 0x0a || after === 0x0d;
-
-      if (isBoundary) {
-        depth += 1;
-        cursor = nextOpen + open.length;
-        continue;
-      }
-
-      cursor = nextOpen + open.length;
-      continue;
-    }
-
-    depth -= 1;
-    if (depth === 0) return nextClose;
-    cursor = nextClose + close.length;
+  if (path !== null && getAttr(path, 'path') === 'circle') {
+    return { type: 'radial', stops };
   }
 
-  return -1;
+  const lin = findChild(gradFill, 'a:lin');
+  const angle = lin !== null ? parseInt(getAttr(lin, 'ang') ?? '0', 10) / 60000 : 0;
+
+  return { type: 'linear', stops, angle };
 }
 
 function uint8ToBase64(bytes: Uint8Array): string {
@@ -1214,31 +965,42 @@ function uint8ToBase64(bytes: Uint8Array): string {
 
 /**
  * Recover text content from a `<p:sp>` body as a structured TextBody
- * with per-run styling (bold / italic / underline / font family / size
- * / color). Spec requires: "Multi-run paragraphs import as TextBody
- * with per-run styling".
- *
- * Returns `null` when the body has no text frame or the text frame is
- * empty — callers treat that as "not a text shape".
+ * with per-run styling. Public API takes a raw XML body string for
+ * backward compatibility — callers that already have an `XmlElement`
+ * should pass it through `extractTextBodyFromNode` directly.
  */
 export function extractTextBody(
   canvas: Canvas,
   body: string,
   hyperlinks?: ReadonlyMap<string, Hyperlink>,
 ): TextBody | null {
-  const txBody = extractBlock(body, 'p:txBody');
+  // Wrap the body fragment so fast-xml-parser sees a single root, then
+  // navigate down to the `<p:txBody>` via the AST.
+  const wrapped = `<sp xmlns:p="${PML_NS}" xmlns:a="${DML_NS}" xmlns:r="${REL_NS}">${body}</sp>`;
+  const root = rootElement(parseOoxml(wrapped));
+
+  if (root === null) return null;
+
+  return extractTextBodyFromNode(canvas, root, hyperlinks);
+}
+
+const DML_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+const REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+
+function extractTextBodyFromNode(
+  canvas: Canvas,
+  shape: XmlElement,
+  hyperlinks: ReadonlyMap<string, Hyperlink> | undefined,
+): TextBody | null {
+  const txBody = findDescendant(shape, 'p:txBody');
 
   if (txBody === null) return null;
 
   const paragraphs: Paragraph[] = [];
 
-  for (const pMatch of txBody.block.matchAll(/<a:p\b[^>]*>([\s\S]*?)<\/a:p>/g)) {
-    const pBody = pMatch[1] ?? '';
-    const runs = extractRuns(pBody, hyperlinks);
-    const props = extractParagraphProps(canvas, pBody);
-    // PowerPoint authors empty paragraphs (just `<a:endParaRPr/>`) for
-    // vertical spacing — preserve them as `runs: [{ text: '' }]` so the
-    // structural intent survives round-trip.
+  for (const p of findChildren(txBody, 'a:p')) {
+    const runs = extractRuns(p, hyperlinks);
+    const props = extractParagraphProps(canvas, p);
     const finalRuns: readonly Run[] = runs.length === 0 ? [{ text: '' }] : runs;
 
     paragraphs.push(props === null ? { runs: finalRuns } : { runs: finalRuns, props });
@@ -1249,45 +1011,40 @@ export function extractTextBody(
   return { paragraphs };
 }
 
-/**
- * Parse paragraph properties from `<a:pPr>`: alignment, bullet markup,
- * indent, line spacing, margin. Returns `null` when no `<a:pPr>` is
- * present or all extracted props are defaults.
- */
-function extractParagraphProps(canvas: Canvas, paragraphBody: string): ParagraphProps | null {
-  const pPrBlock = extractBlock(paragraphBody, 'a:pPr');
+function extractParagraphProps(canvas: Canvas, p: XmlElement): ParagraphProps | null {
+  const pPr = findChild(p, 'a:pPr');
 
-  if (pPrBlock === null) return null;
+  if (pPr === null) return null;
 
   const props: { -readonly [K in keyof ParagraphProps]?: ParagraphProps[K] } = {};
 
-  const algn = pPrBlock.openAttrs.match(/\balgn="([^"]+)"/)?.[1];
+  const algn = getAttr(pPr, 'algn');
   const align = ooxmlAlignToBroadset(algn);
 
   if (align !== undefined) props.align = align;
 
-  const indentAttr = pPrBlock.openAttrs.match(/\bindent="(-?\d+)"/)?.[1];
+  const indentAttr = getAttr(pPr, 'indent');
 
   if (indentAttr !== undefined) props.indent = emuToCanvasLength(canvas, parseInt(indentAttr, 10));
 
-  const marLAttr = pPrBlock.openAttrs.match(/\bmarL="(-?\d+)"/)?.[1];
+  const marLAttr = getAttr(pPr, 'marL');
 
   if (marLAttr !== undefined) {
-    // OOXML marL is the left bullet/text indent; Broadset's `indent`
-    // overlaps semantically. When both are present, indent wins.
     props.indent ??= emuToCanvasLength(canvas, parseInt(marLAttr, 10));
   }
 
-  const bullet = parseBulletFromPPr(pPrBlock.block);
+  const bullet = parseBulletFromPPr(pPr);
 
   if (bullet !== null) props.bullet = bullet;
 
-  // `<a:lnSpc>` line spacing — we read percent-of-line and store as a
-  // ratio. <a:spcPct val="150000"/> = 150% = 1.5.
-  const lnSpc = pPrBlock.block.match(/<a:lnSpc>[\s\S]*?<a:spcPct\s+val="(\d+)"/);
+  const lnSpc = findChild(pPr, 'a:lnSpc');
 
   if (lnSpc !== null) {
-    props.lineSpacing = parseInt(lnSpc[1] ?? '100000', 10) / 100000;
+    const spcPct = findChild(lnSpc, 'a:spcPct');
+
+    if (spcPct !== null) {
+      props.lineSpacing = parseInt(getAttr(spcPct, 'val') ?? '100000', 10) / 100000;
+    }
   }
 
   return Object.keys(props).length === 0 ? null : (props as ParagraphProps);
@@ -1302,23 +1059,22 @@ function ooxmlAlignToBroadset(algn: string | undefined): ParagraphAlign | undefi
   return undefined;
 }
 
-function parseBulletFromPPr(pPrBody: string): Bullet | null {
-  if (/<a:buNone\b/.test(pPrBody)) return { kind: 'none' };
+function parseBulletFromPPr(pPr: XmlElement): Bullet | null {
+  if (findChild(pPr, 'a:buNone') !== null) return { kind: 'none' };
 
-  const charMatch = pPrBody.match(/<a:buChar\s+char="([^"]+)"/);
+  const buChar = findChild(pPr, 'a:buChar');
 
-  if (charMatch !== null) {
-    const char = charMatch[1] ?? '•';
+  if (buChar !== null) {
+    const char = getAttr(buChar, 'char') ?? '•';
 
     return { kind: 'char', char };
   }
 
-  const autoMatch = pPrBody.match(/<a:buAutoNum\b([^/>]*)\/?>/);
+  const buAuto = findChild(pPr, 'a:buAutoNum');
 
-  if (autoMatch !== null) {
-    const attrs = autoMatch[1] ?? '';
-    const format = attrs.match(/\btype="([^"]+)"/)?.[1] ?? 'arabicPeriod';
-    const startAtAttr = attrs.match(/\bstartAt="(\d+)"/)?.[1];
+  if (buAuto !== null) {
+    const format = getAttr(buAuto, 'type') ?? 'arabicPeriod';
+    const startAtAttr = getAttr(buAuto, 'startAt');
 
     return startAtAttr !== undefined
       ? { kind: 'auto', format, startAt: parseInt(startAtAttr, 10) }
@@ -1329,39 +1085,39 @@ function parseBulletFromPPr(pPrBody: string): Bullet | null {
 }
 
 function extractRuns(
-  paragraphBody: string,
+  paragraph: XmlElement,
   hyperlinks: ReadonlyMap<string, Hyperlink> | undefined,
 ): Run[] {
   const runs: Run[] = [];
 
-  for (const rMatch of paragraphBody.matchAll(/<a:r\b[^>]*>([\s\S]*?)<\/a:r>/g)) {
-    runs.push(buildRunFromRBody(rMatch[1] ?? '', hyperlinks));
+  for (const r of findChildren(paragraph, 'a:r')) {
+    runs.push(buildRunFromElement(r, hyperlinks));
   }
 
-  // Fallback: a paragraph with raw `<a:t>` text and no `<a:r>` wrapper
-  // (unusual but produced by some tools) — emit a single unstyled run.
+  // Fallback: paragraphs without `<a:r>` wrapper but with raw `<a:t>`
+  // text — emit a single unstyled run.
   if (runs.length === 0) {
-    for (const tMatch of paragraphBody.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)) {
-      runs.push({ text: decodeXmlEntities(tMatch[1] ?? '') });
+    for (const t of findChildren(paragraph, 'a:t')) {
+      runs.push({ text: getText(t) });
     }
   }
 
   return runs;
 }
 
-function buildRunFromRBody(
-  rBody: string,
+function buildRunFromElement(
+  r: XmlElement,
   hyperlinks: ReadonlyMap<string, Hyperlink> | undefined,
 ): Run {
-  const tMatch = rBody.match(/<a:t>([\s\S]*?)<\/a:t>/);
-  const text = decodeXmlEntities(tMatch?.[1] ?? '');
-  const rPrBlock = extractBlock(rBody, 'a:rPr');
+  const t = findChild(r, 'a:t');
+  const text = t !== null ? getText(t) : '';
+  const rPr = findChild(r, 'a:rPr');
 
-  if (rPrBlock === null) return { text };
+  if (rPr === null) return { text };
 
-  const style = runStyleFromRPr(rPrBlock);
-  const lang = rPrBlock.openAttrs.match(/\blang="([^"]+)"/)?.[1];
-  const hyperlink = parseRunHyperlink(rPrBlock.block, hyperlinks);
+  const style = runStyleFromRPr(rPr);
+  const lang = getAttr(rPr, 'lang');
+  const hyperlink = parseRunHyperlink(rPr, hyperlinks);
   const hasStyle = Object.keys(style).length > 0;
 
   if (!hasStyle && lang === undefined && hyperlink === undefined) return { text };
@@ -1375,32 +1131,25 @@ function buildRunFromRBody(
   return { text, props };
 }
 
-/**
- * Resolve `<a:hlinkClick r:id="rIdN"/>` against the slide's relationship
- * table. Returns `undefined` if the run has no hyperlink, the rel is
- * missing, or the rel target is empty (defensive — we never want to
- * persist a broken hyperlink that the renderer would fail on).
- */
 function parseRunHyperlink(
-  rPrBody: string,
+  rPr: XmlElement,
   hyperlinks: ReadonlyMap<string, Hyperlink> | undefined,
 ): Hyperlink | undefined {
   if (hyperlinks === undefined) return undefined;
 
-  const match = rPrBody.match(/<a:hlinkClick\b([^>]*)\/?>/);
+  const hlink = findChild(rPr, 'a:hlinkClick');
 
-  if (match === null) return undefined;
+  if (hlink === null) return undefined;
 
-  const attrs = match[1] ?? '';
-  const relId = attrs.match(/\br:id="([^"]*)"/)?.[1];
+  const relId = getAttr(hlink, 'id') ?? '';
 
-  if (relId === undefined || relId.length === 0) return undefined;
+  if (relId.length === 0) return undefined;
 
   const target = hyperlinks.get(relId);
 
   if (target === undefined) return undefined;
 
-  const tooltip = attrs.match(/\btooltip="([^"]*)"/)?.[1];
+  const tooltip = getAttr(hlink, 'tooltip');
 
   if (tooltip !== undefined && tooltip.length > 0 && target.tooltip !== tooltip) {
     return { ...target, tooltip };
@@ -1409,29 +1158,32 @@ function parseRunHyperlink(
   return target;
 }
 
-function runStyleFromRPr(rPr: ExtractedBlock): Record<string, unknown> {
+function runStyleFromRPr(rPr: XmlElement): Record<string, unknown> {
   const style: Record<string, unknown> = {};
-  const openAttrs = rPr.openAttrs;
 
-  if (/\bb="1"/.test(openAttrs)) style['bold'] = true;
-  if (/\bi="1"/.test(openAttrs)) style['italic'] = true;
+  if (getAttr(rPr, 'b') === '1') style['bold'] = true;
+  if (getAttr(rPr, 'i') === '1') style['italic'] = true;
 
-  const uAttr = openAttrs.match(/\bu="([^"]+)"/)?.[1];
+  const uAttr = getAttr(rPr, 'u');
 
   if (uAttr !== undefined && uAttr !== 'none') style['underline'] = true;
 
-  const szAttr = openAttrs.match(/\bsz="(\d+)"/)?.[1];
+  const szAttr = getAttr(rPr, 'sz');
 
   if (szAttr !== undefined) style['fontSize'] = parseInt(szAttr, 10) / 100;
 
-  const latinMatch = rPr.block.match(/<a:latin\s+typeface="([^"]+)"/);
+  const latin = findChild(rPr, 'a:latin');
 
-  if (latinMatch !== null) style['fontFamily'] = latinMatch[1];
+  if (latin !== null) {
+    const typeface = getAttr(latin, 'typeface');
 
-  const solidFillMatch = rPr.block.match(/<a:solidFill>[\s\S]*?<\/a:solidFill>/);
+    if (typeface !== undefined) style['fontFamily'] = typeface;
+  }
 
-  if (solidFillMatch !== null) {
-    const color = parseColorElement(solidFillMatch[0]);
+  const solid = findChild(rPr, 'a:solidFill');
+
+  if (solid !== null) {
+    const color = parseColorElement(solid);
 
     if (color !== null) style['color'] = color;
   }
@@ -1439,20 +1191,10 @@ function runStyleFromRPr(rPr: ExtractedBlock): Record<string, unknown> {
   return style;
 }
 
-function decodeXmlEntities(value: string): string {
-  return value
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, '&');
-}
-
 /**
- * Turn the importer's flat element list into a full BroadsetDocument —
- * one Page per slide, with per-slide elements. If any slide contains
- * text frames with non-empty content, a text element is emitted in
- * addition to the shape.
+ * Compose a BroadsetDocument from per-slide element lists. Used by
+ * the operator-level importer once parseSlideShapes has populated
+ * each page.
  */
 export function composeDocumentFromSlides(
   canvas: Canvas,

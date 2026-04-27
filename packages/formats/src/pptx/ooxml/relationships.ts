@@ -1,5 +1,8 @@
 import type { OoxmlRelationship, OoxmlRelId } from '../types';
+import { findChildrenByNs, getAttr, parseOoxml, rootElement } from './ast';
 import { XML_DECLARATION } from './xml';
+
+const PACKAGE_RELS_NS = 'http://schemas.openxmlformats.org/package/2006/relationships';
 
 /**
  * OOXML relationship allocator. A single PPTX part may carry many
@@ -50,24 +53,24 @@ export function buildRelationshipsXml(rels: readonly OoxmlRelationship[]): strin
 /**
  * Parse a `_rels/*.xml.rels` part body into relationship records.
  * Tolerant of unknown attributes so future OOXML extensions don't break
- * the importer.
+ * the importer. Walks the XML AST so attribute order and quote style
+ * are immaterial.
  */
 export function parseRelationshipsXml(body: string): readonly OoxmlRelationship[] {
+  const root = rootElement(parseOoxml(body));
+
+  if (root === null) return [];
+  if (root.local !== 'Relationships' || root.ns !== PACKAGE_RELS_NS) return [];
+
   const rels: OoxmlRelationship[] = [];
-  // Match `<Relationship …/>` but NOT the wrapping `<Relationships …>`
-  // element. The attribute list may contain `/` (URLs in Type) and `>`
-  // never appears unescaped inside an attribute value, so we key off the
-  // self-closing `/>` terminator.
-  const re = /<Relationship(?![a-zA-Z])\s+([^>]+?)\s*\/>/g;
 
-  for (const match of body.matchAll(re)) {
-    const attrs = match[1] ?? '';
-    const id = attrs.match(/\bId="([^"]*)"/)?.[1];
-    const type = attrs.match(/\bType="([^"]*)"/)?.[1];
-    const target = attrs.match(/\bTarget="([^"]*)"/)?.[1];
-    const mode = attrs.match(/\bTargetMode="([^"]*)"/)?.[1];
+  for (const node of findChildrenByNs(root, PACKAGE_RELS_NS, 'Relationship')) {
+    const id = getAttr(node, 'Id');
+    const type = getAttr(node, 'Type');
+    const target = getAttr(node, 'Target');
+    const mode = getAttr(node, 'TargetMode');
 
-    if (!id || !type || !target) continue;
+    if (id === undefined || type === undefined || target === undefined) continue;
     if (!id.startsWith('rId')) continue;
 
     const rel: OoxmlRelationship =

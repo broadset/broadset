@@ -1,4 +1,4 @@
-import { findChildByNs, findChildrenByNs, findDescendant, getAttr, getText, parseOoxml, rootElement, type XmlElement } from '../ooxml/ast';
+import { findChildByNs, findChildrenByNs, getAttr, getText, parseOoxml, rootElement, type XmlElement } from '../ooxml/ast';
 import { escapeXmlAttribute, escapeXmlText } from '../ooxml/xml';
 import { BROADSET_ELEMENT_EXT_URI, type ElementMetaExtension } from '../types';
 
@@ -158,10 +158,10 @@ function readOptionalStringAttrs(meta: XmlElement): {
 const PRESENTATIONML_NS = 'http://schemas.openxmlformats.org/presentationml/2006/main';
 
 /**
- * Find the first `<p:ext>` (presentationML namespace) whose `uri`
- * attribute matches the broadset-element-ext URI. The metadata is
- * always nested under `<p:ext uri="…">` per OOXML extension
- * conventions.
+ * Recursively find the first `<p:ext>` (presentationML namespace)
+ * whose `uri` attribute matches the broadset-element-ext URI. The
+ * metadata is always nested under `<p:ext uri="…">` per OOXML
+ * extension conventions.
  */
 function findFirstBroadsetExt(node: XmlElement): XmlElement | null {
   for (const child of node.children) {
@@ -174,24 +174,6 @@ function findFirstBroadsetExt(node: XmlElement): XmlElement | null {
     }
 
     const inner = findFirstBroadsetExt(child);
-
-    if (inner !== null) return inner;
-  }
-
-  return findDescendant(node, 'p:ext') === null ? null : findDescendantBroadsetExt(node);
-}
-
-function findDescendantBroadsetExt(node: XmlElement): XmlElement | null {
-  for (const child of node.children) {
-    if (child.kind !== 'element') continue;
-
-    if (child.local === 'ext' && child.ns === PRESENTATIONML_NS) {
-      const uri = getAttr(child, 'uri');
-
-      if (uri === BROADSET_ELEMENT_EXT_URI) return child;
-    }
-
-    const inner = findDescendantBroadsetExt(child);
 
     if (inner !== null) return inner;
   }

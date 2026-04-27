@@ -318,5 +318,49 @@ module.exports = [
   // test/CT files are restricted from importing it (message says as much).
   sampleDocumentRestrictionConfig,
 
+  // Spec acceptance: "The importer does NOT use regex to extract XML
+  // attributes or element content. Regex parsing is prohibited."
+  // (project/spec/formats/pptx.md). Catch any future regression that
+  // re-introduces regex-based XML extraction in the importer hot path.
+  // The AST helper layer in `pptx/ooxml/ast.ts` is the only place
+  // where fast-xml-parser output gets shaped into typed nodes.
+  {
+    files: [
+      'packages/formats/src/pptx/import.ts',
+      'packages/formats/src/pptx/import/**/*.ts',
+      'packages/formats/src/pptx/semantic/**/*.ts',
+    ],
+    ignores: [
+      // The AST module is the legitimate consumer of fast-xml-parser
+      // and contains the only regex-flavoured logic the importer
+      // needs (entity decoding inside text nodes happens via the
+      // library, not regex here).
+      'packages/formats/src/pptx/ooxml/**',
+      // Tests author input fixtures with template literals; regexes
+      // there assert importer behaviour rather than parse OOXML.
+      '**/*.test.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.property.name='match']",
+          message:
+            'Regex parsing of OOXML is prohibited (project/spec/formats/pptx.md). Use the namespace-aware AST helpers in pptx/ooxml/ast.ts instead.',
+        },
+        {
+          selector: "CallExpression[callee.property.name='matchAll']",
+          message:
+            'Regex parsing of OOXML is prohibited (project/spec/formats/pptx.md). Use the namespace-aware AST helpers in pptx/ooxml/ast.ts instead.',
+        },
+        {
+          selector: 'NewExpression[callee.name="RegExp"]',
+          message:
+            'Regex parsing of OOXML is prohibited (project/spec/formats/pptx.md). Use the namespace-aware AST helpers in pptx/ooxml/ast.ts instead.',
+        },
+      ],
+    },
+  },
+
   eslintConfigPrettier,
 ];

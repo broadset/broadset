@@ -7,13 +7,14 @@ import { importPptx } from './import';
 import { encodeText, writeOoxmlPackage } from './ooxml/zip';
 
 /**
- * Number of `it.skip` probes in this file — this is the AST-rebuild
- * acceptance gate's measurable target. Each entry pins a known
- * limitation of the regex parser. Adding a new skip MUST also bump
- * this count so the regression gate below catches it; flipping a
- * skip to a passing test means the AST rebuild closed that gap.
+ * Number of `it.skip` probes in this file. As of the AST migration
+ * the count is `0` — every probe that previously documented a regex
+ * parser limitation now passes via the namespace-aware AST. The gate
+ * stays in place to catch any regression that re-introduces a skip;
+ * if a future change discovers a new edge case that genuinely cannot
+ * be handled, document the reason on the skip and bump this count.
  */
-const EXPECTED_SKIPPED_PROBES = 5;
+const EXPECTED_SKIPPED_PROBES = 0;
 
 /**
  * @description Edge-case probe for the regex-based importer. The spec
@@ -117,7 +118,7 @@ describe('PPTX importer — edge-case probes (regex parser limitations)', () => 
    * This test is `skipped` so the suite stays green; flipping it on
    * is the AST-rebuild acceptance gate.
    */
-  it.skip('handles non-default namespace prefixes (dml:sp instead of p:sp)', () => {
+  it('handles non-default namespace prefixes (dml:sp instead of p:sp)', () => {
     const slideXml = `<?xml version="1.0"?><dml:sld xmlns:dml="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:dr="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:rl="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dml:cSld><dml:spTree><dml:nvGrpSpPr><dml:cNvPr id="1" name=""/><dml:cNvGrpSpPr/><dml:nvPr/></dml:nvGrpSpPr><dml:grpSpPr/><dml:sp><dml:nvSpPr><dml:cNvPr id="2" name="Renamed"/><dml:cNvSpPr/><dml:nvPr/></dml:nvSpPr><dml:spPr><dr:xfrm><dr:off x="0" y="0"/><dr:ext cx="1000000" cy="500000"/></dr:xfrm><dr:prstGeom prst="rect"><dr:avLst/></dr:prstGeom></dml:spPr></dml:sp></dml:spTree></dml:cSld></dml:sld>`;
     const imported = importPptx(buildPackage(slideXml));
     const rect = imported.elements.find((el) => el.type === 'rectangle');
@@ -131,7 +132,7 @@ describe('PPTX importer — edge-case probes (regex parser limitations)', () => 
    * never emits CDATA but some non-Office tools do. Skipped for now;
    * tracked under the AST-rebuild gate.
    */
-  it.skip('decodes CDATA-wrapped text content', () => {
+  it('decodes CDATA-wrapped text content', () => {
     const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Cdata"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US"/><a:t><![CDATA[A & B]]></a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
     const imported = importPptx(buildPackage(slideXml));
     const text = imported.elements.find((el) => el.type === 'text');
@@ -146,7 +147,7 @@ describe('PPTX importer — edge-case probes (regex parser limitations)', () => 
    * doesn't pin attribute order — XML allows any. This test pins the
    * limitation as `it.skip` so the AST rebuild has a measurable gate.
    */
-  it.skip('handles attribute-order swap on <a:off> (y before x)', () => {
+  it('handles attribute-order swap on <a:off> (y before x)', () => {
     const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="OffSwapped"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off y="500000" x="100000"/><a:ext cy="500000" cx="1000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
     const imported = importPptx(buildPackage(slideXml));
     const rect = imported.elements.find((el) => el.type === 'rectangle');
@@ -164,7 +165,7 @@ describe('PPTX importer — edge-case probes (regex parser limitations)', () => 
    * (`name='Foo'`). XML allows either delimiter; the regex assumes
    * double quotes throughout. Pinned as `it.skip` for the AST gate.
    */
-  it.skip(`handles single-quoted attribute values`, () => {
+  it(`handles single-quoted attribute values`, () => {
     const slideXml = `<?xml version='1.0'?><p:sld xmlns:a='http://schemas.openxmlformats.org/drawingml/2006/main' xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships' xmlns:p='http://schemas.openxmlformats.org/presentationml/2006/main'><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id='1' name=''/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id='2' name='SingleQuoted'/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x='0' y='0'/><a:ext cx='1000000' cy='500000'/></a:xfrm><a:prstGeom prst='rect'><a:avLst/></a:prstGeom></p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
     const imported = importPptx(buildPackage(slideXml));
     const rect = imported.elements.find((el) => el.type === 'rectangle');
@@ -179,7 +180,7 @@ describe('PPTX importer — edge-case probes (regex parser limitations)', () => 
    * custom geometry — `(-?\d+)` rejects the decimal. Pinned for the
    * AST gate.
    */
-  it.skip('handles decimal coordinates in <a:custGeom><a:pt>', () => {
+  it('handles decimal coordinates in <a:custGeom><a:pt>', () => {
     const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="DecimalPath"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1000000" cy="500000"/></a:xfrm><a:custGeom><a:pathLst><a:path w="100000" h="50000"><a:moveTo><a:pt x="0.5" y="0.5"/></a:moveTo><a:lnTo><a:pt x="99999.5" y="49999.5"/></a:lnTo><a:close/></a:path></a:pathLst></a:custGeom></p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
     const imported = importPptx(buildPackage(slideXml));
     const path = imported.elements.find((el) => el.type === 'path');

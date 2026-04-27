@@ -164,12 +164,15 @@ function collectAttributes(rawAttrs: Record<string, unknown>): Readonly<Record<s
 
     const stripped = key.slice('@_'.length);
 
-    if (stripped === 'xmlns' || stripped.startsWith('xmlns:')) continue;
-
     // Preserve the prefixed form (e.g. `r:id`) so `serializeNode`
     // round-trips losslessly. Callers read attributes via `getAttr`
     // which normalises lookup by local name, so consumers don't have
     // to know whether the source had a prefix or not.
+    //
+    // `xmlns` / `xmlns:*` declarations stay in the attrs map too — they
+    // are real XML attributes that must survive serialisation, even
+    // though `mergeNamespaceBindings` (above) reads them separately
+    // for prefix-resolution.
     out[stripped] = value;
   }
 

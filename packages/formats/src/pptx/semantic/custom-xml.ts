@@ -1,5 +1,6 @@
 import type { BroadsetDocument } from '@broadset/model';
 
+import { findChildByNs, getText, parseOoxml, rootElement } from '../ooxml/ast';
 import { XML_DECLARATION } from '../ooxml/xml';
 
 /**
@@ -80,9 +81,18 @@ function stripAnimations(document: BroadsetDocument): BroadsetDocument {
 }
 
 function extractDocumentBody(xml: string): string | null {
-  const match = xml.match(/<document\b[^>]*>([\s\S]*?)<\/document>/);
+  const root = rootElement(parseOoxml(xml));
 
-  return match?.[1]?.trim() ?? null;
+  if (root === null) return null;
+  if (root.local !== 'broadsetProject' || root.ns !== PROJECT_NS) return null;
+
+  const document = findChildByNs(root, PROJECT_NS, 'document');
+
+  if (document === null) return null;
+
+  const text = getText(document).trim();
+
+  return text.length === 0 ? null : text;
 }
 
 function base64Encode(input: string): string {
