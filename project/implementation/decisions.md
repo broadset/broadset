@@ -101,3 +101,17 @@ Headline decisions (full rationale in the source table):
 3. Encode per-layer metadata as a hidden signature-named layer group (deferred — viable fallback but defers Photoshop-side testing; revisit if the XMP + element-id approach proves insufficient for the chain-round-trip scenarios in Phase 5 tests).
 
 **Rationale:** The XMP packet already carries an `elements[]` array keyed by `id` + `fingerprint` (see `_shared/xmp/BroadsetXmpPacket`). Combined with per-element `extensions.psd.roundTrip`, this is sufficient to reconcile Broadset-exported PSDs end-to-end: the layer `name` field links layers back to the XMP entry, and the `_shared/fingerprint/` module recovers identity when both are stripped. The Photoshop-macOS preservation verification of document XMP is well-established in the ISO spec; the custom-signature Photoshop preservation (the part not yet verified) is deferred until upstream support lands or we have a fallback ship decision. Tracked in the PSD risk register in `project/implementation/psd-support-plan.md` §Risk register.
+
+### P6.1 — PDF emitter swap: @libpdf/core → pdf-lib
+
+**Decision:** Replace `@libpdf/core@^0.3.4` with `pdf-lib@^1.17.1` across `packages/formats/src/pdf/*` as the first concrete Phase 6 task. Add `pdfjs-dist@^5.6.205` and `@pdf-lib/fontkit@^1.1.1` as active dependencies. Promote `pdfjs-dist` out of the "non-default optional dependencies" list in [architecture.md](./architecture.md).
+**Alternatives considered:**
+
+1. Keep `@libpdf/core` and extend it with marked-content, shading patterns, OCGs, and CMYK support (rejected — `@libpdf/core` is early, less battle-tested, and its capability ceiling around operator injection and custom XMP is unknown; the Phase 6 feature matrix demands real shading patterns, OCGs, `/BSET` marked-content properties, and `broadset:` XMP on the document catalog).
+2. Use `jsPDF` (rejected — generation-only, no operator-level control; cannot emit the marked-content and shading-pattern fidelity the spec requires).
+3. Use `pdfkit` (rejected — stream-based Node-first API is awkward for a browser-first app).
+4. Use `pdftron` / `Apryse` / `iText` (rejected — commercial licensing conflicts with the repo's OSS posture).
+
+**Rationale:** `pdf-lib` exposes `page.pushOperators(...)` for raw operator injection (required for `/BSET` marked-content BDC/EMC pairs and shading-pattern painting), native DeviceCMYK / DeviceN / Separation colour spaces (required for IO-D-13 per-document colour mode), OCG registration via `/OCProperties`, Form XObjects for group preservation, and `PDFHexString` / `PDFRawStream` for writing custom-namespace XMP on the catalog's `/Metadata`. `pdfjs-dist` is Mozilla's reference parser — the only browser-first choice for operator-level extraction in P6.4b. `@pdf-lib/fontkit` is the official adapter wiring `_shared/fonts/` (fontkit-backed subsetting) into pdf-lib's font embedding.
+
+The P6.1 swap is strictly mechanical: `PDF.create()` → `await PDFDocument.create()`, `addPage({width, height})` → `addPage([widthPt, heightPt])`, `embedImage(bytes)` → `embedPng(bytes)` / `embedJpg(bytes)` based on MIME, `drawEllipse({xRadius, yRadius, ...})` → `drawEllipse({xScale, yScale, ...})`, `Standard14FontName` union → pre-embedded `PDFFont` (every standard-font variant is embedded via `pdf.embedFont(StandardFonts.X)` before render time). Existing 358 formats tests stay green. Operator injection, shading patterns, OCGs, marked content, XMP, and CMYK all land in P6.2 / P6.3 on top of this foundation.

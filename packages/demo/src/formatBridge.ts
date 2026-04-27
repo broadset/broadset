@@ -279,6 +279,13 @@ export async function importDocument(file: File): Promise<ImportDocumentResult> 
       return formats.importSvgDocument(text, file.name);
     }
 
+    case 'pdf': {
+      const formats = await loadFormats();
+      const buffer = await file.arrayBuffer();
+
+      return await formats.importPdfDocument(new Uint8Array(buffer));
+    }
+
     default:
       throw new Error(`Unsupported file format: .${ext}`);
   }

@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+
 import type { ViteUserConfig } from 'vitest/config';
 
 type VitestEnvironment = 'node' | 'jsdom';

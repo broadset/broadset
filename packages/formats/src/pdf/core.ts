@@ -1,519 +1,371 @@
-import type {
-  BroadsetColor,
-  BroadsetDocument,
-  BroadsetElement,
-  BroadsetElementStyle,
-  BroadsetGradient,
-  Canvas,
-} from '@broadset/model';
-import { colorToCss, getGradientFillGradient, getSolidFillColor, resolveContentAsPlainString } from '@broadset/model';
-import { type EmbeddedFont, PDF, type PDFPage, rgb, type Standard14FontName, StandardFonts } from '@libpdf/core';
+import type { BroadsetDocument, BroadsetElement, BroadsetGradient, Canvas } from '@broadset/model';
+import { resolveContentAsPlainString } from '@broadset/model';
+import {
+  PDFDocument,
+  type PDFFont,
+  PDFName,
+  PDFNumber,
+  PDFOperator,
+  PDFOperatorNames,
+  type PDFPage,
+  popGraphicsState,
+  pushGraphicsState,
+  rgb,
+  StandardFonts,
+} from 'pdf-lib';
 
+import { prepareBidiAnalysis } from './bidi-reorder';
 import { parseCssColor } from './color';
 import { decodeDataUri } from './data-uri';
-import { normalizeFontFamily, resolveGoogleFontUrl } from './fonts';
+import {
+  applyBrackets,
+  applyPageBoxes,
+  attachBroadsetXmp,
+  attachOcgResourceBindings,
+  attachOutputIntent,
+  attachPdfaStructureTree,
+  buildBroadsetXmpPacket,
+  buildMarkedContentTag,
+  buildRoundedRectPath,
+  type CanvasAbsolutePosition,
+  clipPathBrackets,
+  collectPreflightWarnings,
+  colorToPdfRgb,
+  composeCanvasAbsolutePosition,
+  type CornerRadii,
+  drawImagePlaceholder,
+  elementRotationBrackets,
+  elementTopLeftPt,
+  embedImageFromBytes,
+  emitLinkAnnotation,
+  ensureTrailerId,
+  fetchImageBytes,
+  hasAnyRoundedCorner,
+  indexElementsById,
+  markedContentBrackets,
+  type OcgRegistration,
+  pdfaConformanceLetter,
+  rasterizeSvgToPngBytes,
+  readElementLink,
+  registerLinearOrRadialShading,
+  registerPageOcgs,
+  renderPath,
+  renderText,
+  resolveAnimatedElementInState,
+  resolveFillAsPdfRgb,
+  resolveFillGradient,
+  resolveFonts,
+  resolveGradientFallbackColor,
+  resolveOpacity,
+  resolveOutputIntent,
+  resolveStyleColor,
+  type ShadingGeometry,
+  srgbToDeviceCmyk,
+} from './export';
 import { canvasToPoints, elementToPoints } from './geometry';
 import { drawQrOnPage } from './qr';
-import { wrapText } from './text';
+import type { PdfExportOptions, PdfExportResult } from './types';
+import { prepareLineBreaker } from './uax14-linebreak';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-/** Placeholder border for elements that cannot be rendered natively in PDF (e.g. SVG). */
-const SVG_PLACEHOLDER_BORDER = rgb(0.8, 0.8, 0.8);
+/** Label size for non-static placeholder elements (video/clock/ticker). */
+const PLACEHOLDER_LABEL_SIZE = 10;
 
-/** Placeholder border width for non-renderable elements. */
-const SVG_PLACEHOLDER_BORDER_WIDTH = 0.5;
-
-/** Default line-height multiplier (typical PDF/CSS default). */
-const LINE_HEIGHT_MULTIPLIER = 1.2;
-
-/** Approximate width ratio for standard 14 PDF fonts (avg char width / fontSize). */
-const STANDARD_FONT_WIDTH_RATIO = 0.5;
-
-function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v));
-}
-
-/**
- * Approximate a gradient as the first stop color (PDF has no native gradient support
- * without shading patterns, so we provide a best-effort solid fallback).
- */
-function resolveGradientFallbackColor(gradient: string | BroadsetGradient): ReturnType<typeof rgb> | undefined {
-  if (typeof gradient === 'string') {
-    // CSS gradient string — try to extract first color token
-    const colorMatch = /#[0-9a-fA-F]{3,8}\b|rgba?\([^)]+\)/.exec(gradient);
-
-    if (colorMatch) {
-      const parsed = parseCssColor(colorMatch[0]);
-
-      if (parsed) {
-        return rgb(parsed.r, parsed.g, parsed.b);
-      }
-    }
-
-    return undefined;
-  }
-
-  // Structured gradient — use first stop color
-  const firstStop = gradient.stops[0];
-
-  if (firstStop === undefined) {
-    return undefined;
-  }
-
-  const parsed = parseCssColor(colorToCss(firstStop.color));
-
-  if (parsed) {
-    return rgb(parsed.r, parsed.g, parsed.b);
-  }
-
-  return undefined;
-}
+/** Inset applied to the non-static placeholder label relative to the element's box. */
+const PLACEHOLDER_LABEL_INSET = 4;
 
 /* ------------------------------------------------------------------ */
-/*  Element Rendering                                                  */
+/*  Element rendering — wrappers over the focused export modules       */
 /* ------------------------------------------------------------------ */
 
 /**
- * Resolves any `BroadsetColor` on an element style to a `pdf-lib` rgb
- * color. Accepts an optional `BroadsetColor` directly so callers can
- * funnel in the old `backgroundColor` / `fill` paths via
- * `getSolidFillColor(style.fill)` after the unit #8 BroadsetFill flip.
+ * Document-level output colour space, derived from
+ * `document.outputIntent.colorSpace` (or `'rgb'` when no output
+ * intent is declared). Passed into every render function that emits
+ * solid colours so CMYK / Lab / Gray documents route through the
+ * matching pdf-lib colour-emission path (`drawRectangle({ color:
+ * cmyk(...) })` writes `k` operators instead of `rg` operators).
  */
-function colorToPdfRgb(color: BroadsetColor | undefined): ReturnType<typeof rgb> | undefined {
+type DocumentColorSpace = 'rgb' | 'cmyk' | 'gray' | 'lab';
+
+function resolveDocumentColorSpace(doc: BroadsetDocument): DocumentColorSpace {
+  return doc.outputIntent?.colorSpace ?? 'rgb';
+}
+
+/**
+ * Convert a pdf-lib RGB colour into the document's output colour
+ * space. RGB documents pass through unchanged; CMYK documents go
+ * through the subtractive-inverse fallback per
+ * `srgbToDeviceCmyk` (real ICC conversion via `_shared/color/lcms-wasm`
+ * is a Spec Gap). Gray and Lab fall back to RGB until their dedicated
+ * colour-conversion paths land.
+ */
+function toDeviceColor(
+  color: ReturnType<typeof rgb> | undefined,
+  colorSpace: DocumentColorSpace,
+): ReturnType<typeof rgb> | ReturnType<typeof srgbToDeviceCmyk> | undefined {
   if (color === undefined) return undefined;
+  if (colorSpace === 'cmyk') return srgbToDeviceCmyk(color);
 
-  const parsed = parseCssColor(colorToCss(color));
-
-  if (!parsed) return undefined;
-
-  return rgb(parsed.r, parsed.g, parsed.b);
+  return color;
 }
 
-function resolveStyleColor(
-  style: Partial<BroadsetElementStyle>,
-  prop: 'fontColor' | 'borderColor' | 'stroke',
-): ReturnType<typeof rgb> | undefined {
-  return colorToPdfRgb(style[prop]);
+interface RectangleStyleResolved {
+  readonly fillRgb: ReturnType<typeof resolveFillAsPdfRgb>;
+  readonly fillGradient: ReturnType<typeof resolveFillGradient>;
+  readonly border: ReturnType<typeof resolveStyleColor>;
+  readonly borderWidthPt: number | undefined;
+  readonly opacity: number;
+  readonly radii: BroadsetElement['style']['borderRadius'];
 }
 
-function resolveFillAsPdfRgb(style: Partial<BroadsetElementStyle>): ReturnType<typeof rgb> | undefined {
-  const fill = style.fill;
-
-  if (fill === undefined) return undefined;
-
-  return colorToPdfRgb(getSolidFillColor(fill));
+function resolveRectangleStyle(el: BroadsetElement, canvas: Canvas): RectangleStyleResolved {
+  return {
+    fillRgb: resolveFillAsPdfRgb(el.style),
+    fillGradient: resolveFillGradient(el.style),
+    border: resolveStyleColor(el.style, 'borderColor'),
+    borderWidthPt:
+      el.style.borderWidth !== undefined ? elementToPoints(canvas, el.style.borderWidth) : undefined,
+    opacity: resolveOpacity(el.style),
+    radii: el.style.borderRadius,
+  };
 }
 
-function resolveFillGradient(style: Partial<BroadsetElementStyle>): BroadsetGradient | undefined {
-  const fill = style.fill;
-
-  if (fill === undefined) return undefined;
-
-  return getGradientFillGradient(fill);
-}
-
-function resolveOpacity(style: Partial<BroadsetElementStyle>): number {
-  return typeof style.opacity === 'number' ? clamp01(style.opacity) : 1;
-}
-
-async function fetchImageBytes(
-  url: string,
-  fetchFn?: typeof globalThis.fetch,
-): Promise<{ readonly mime: string; readonly bytes: Uint8Array } | undefined> {
-  if (fetchFn === undefined) {
-    return undefined;
-  }
-
-  try {
-    const response = await fetchFn(url);
-
-    if (!response.ok) {
-      return undefined;
-    }
-
-    const mime = response.headers.get('content-type') ?? 'image/png';
-    const bytes = new Uint8Array(await response.arrayBuffer());
-
-    return { mime, bytes };
-  } catch {
-    return undefined;
-  }
-}
-
-async function rasterizeSvgToPngBytes(svgBytes: Uint8Array): Promise<Uint8Array | undefined> {
-  if (typeof document === 'undefined') {
-    return undefined;
-  }
-
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d');
-
-  if (context === null) {
-    return undefined;
-  }
-
-  const svgText = new TextDecoder().decode(svgBytes);
-  const svgBlob = new Blob([svgText], { type: 'image/svg+xml' });
-
-  return await new Promise((resolve) => {
-    const image = new Image();
-    const objectUrl = URL.createObjectURL(svgBlob);
-
-    image.onload = () => {
-      const width = Math.max(1, image.naturalWidth || image.width || 1);
-      const height = Math.max(1, image.naturalHeight || image.height || 1);
-
-      canvas.width = width;
-      canvas.height = height;
-      context.drawImage(image, 0, 0);
-
-      canvas.toBlob((blob) => {
-        URL.revokeObjectURL(objectUrl);
-
-        if (!blob) {
-          resolve(undefined);
-
-          return;
-        }
-
-        void blob.arrayBuffer().then((buffer) => {
-          resolve(new Uint8Array(buffer));
-        });
-      }, 'image/png');
-    };
-
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve(undefined);
-    };
-
-    image.src = objectUrl;
-  });
-}
-
-/* ------------------------------------------------------------------ */
-/*  Font Resolution                                                    */
-/* ------------------------------------------------------------------ */
-
-type FontInput = Standard14FontName | EmbeddedFont;
-
-/** Map of normalized family name → Standard14 font name. */
-const STANDARD_FONT_MAP: ReadonlyMap<string, Standard14FontName> = new Map([
-  ['helvetica', StandardFonts.Helvetica],
-  ['arial', StandardFonts.Helvetica],
-  ['timesroman', StandardFonts.TimesRoman],
-  ['times', StandardFonts.TimesRoman],
-  ['times new roman', StandardFonts.TimesRoman],
-  ['courier', StandardFonts.Courier],
-  ['courier new', StandardFonts.Courier],
-]);
-
-/** Standard 14 bold variants. */
-const STANDARD_BOLD_MAP: ReadonlyMap<Standard14FontName, Standard14FontName> = new Map([
-  [StandardFonts.Helvetica, StandardFonts.HelveticaBold],
-  [StandardFonts.TimesRoman, StandardFonts.TimesBold],
-  [StandardFonts.Courier, StandardFonts.CourierBold],
-]);
-
-/** Standard 14 italic/oblique variants. */
-const STANDARD_ITALIC_MAP: ReadonlyMap<Standard14FontName, Standard14FontName> = new Map([
-  [StandardFonts.Helvetica, StandardFonts.HelveticaOblique],
-  [StandardFonts.TimesRoman, StandardFonts.TimesItalic],
-  [StandardFonts.Courier, StandardFonts.CourierOblique],
-]);
-
-/** Standard 14 bold-italic variants. */
-const STANDARD_BOLD_ITALIC_MAP: ReadonlyMap<Standard14FontName, Standard14FontName> = new Map([
-  [StandardFonts.Helvetica, StandardFonts.HelveticaBoldOblique],
-  [StandardFonts.TimesRoman, StandardFonts.TimesBoldItalic],
-  [StandardFonts.Courier, StandardFonts.CourierBoldOblique],
-]);
-
-/**
- * Select the standard font variant based on weight and style.
- */
-function selectStandardFontVariant(
-  base: Standard14FontName,
-  weight: number | undefined,
-  style: string | undefined,
-): Standard14FontName {
-  const isBold = weight !== undefined && weight >= 700;
-  const isItalic = style === 'italic' || style === 'oblique';
-
-  if (isBold && isItalic) {
-    return STANDARD_BOLD_ITALIC_MAP.get(base) ?? base;
-  }
-
-  if (isBold) {
-    return STANDARD_BOLD_MAP.get(base) ?? base;
-  }
-
-  if (isItalic) {
-    return STANDARD_ITALIC_MAP.get(base) ?? base;
-  }
-
-  return base;
-}
-
-/**
- * Resolve fonts for all text elements, deduplicating by normalized family name.
- * Attempts standard font match first, then Google Fonts fetch+embed, then falls back
- * to Helvetica.
- */
-async function tryEmbedGoogleFont(
-  family: string,
-  pdf: PDF,
-  fetchFn: typeof globalThis.fetch,
-): Promise<FontInput | null> {
-  try {
-    const cssUrl = resolveGoogleFontUrl(family);
-    const cssResponse = await fetchFn(cssUrl);
-    const cssText = await cssResponse.text();
-    const urlMatch = cssText.match(/url\(([^)]+\.(?:ttf|woff2?))\)/);
-    const fontUrl = urlMatch?.[1];
-
-    if (!fontUrl) return null;
-
-    const fontResponse = await fetchFn(fontUrl);
-    const fontBytes = new Uint8Array(await fontResponse.arrayBuffer());
-
-    return pdf.embedFont(fontBytes);
-  } catch {
-    return null;
-  }
-}
-
-async function resolveSingleFont(
-  family: string,
-  pdf: PDF,
-  fetchFn?: typeof globalThis.fetch,
-): Promise<FontInput> {
-  const normalized = normalizeFontFamily(family);
-  const standard = STANDARD_FONT_MAP.get(normalized);
-
-  if (standard) return standard;
-
-  if (fetchFn) {
-    const embedded = await tryEmbedGoogleFont(family, pdf, fetchFn);
-
-    if (embedded !== null) return embedded;
-  }
-
-  return StandardFonts.Helvetica;
-}
-
-async function resolveFonts(
-  doc: BroadsetDocument,
-  pdf: PDF,
-  fetchFn?: typeof globalThis.fetch,
-): Promise<ReadonlyMap<string, FontInput>> {
-  const fontMap = new Map<string, FontInput>();
-  const seen = new Set<string>();
-
-  for (const el of doc.elements) {
-    if (el.type !== 'text') continue;
-
-    const family = el.style.fontFamily;
-
-    if (!family) continue;
-
-    const normalized = normalizeFontFamily(family);
-
-    if (seen.has(normalized)) continue;
-    seen.add(normalized);
-
-    fontMap.set(normalized, await resolveSingleFont(family, pdf, fetchFn));
-  }
-
-  return fontMap;
-}
-
-/**
- * Look up the resolved font for an element, falling back to Helvetica.
- * Applies bold/italic standard font variants when available.
- */
-function lookupFont(el: BroadsetElement, fontMap: ReadonlyMap<string, FontInput>): FontInput {
-  let font: FontInput = StandardFonts.Helvetica;
-
-  if (el.style.fontFamily) {
-    const normalized = normalizeFontFamily(el.style.fontFamily);
-    const resolved = fontMap.get(normalized);
-
-    if (resolved) {
-      font = resolved;
-    }
-  }
-
-  // Apply bold/italic variants for standard fonts only
-  if (typeof font === 'string') {
-    return selectStandardFontVariant(font, el.style.fontWeight, el.style.fontStyle);
-  }
-
-  return font;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Element Rendering                                                  */
-/* ------------------------------------------------------------------ */
-
-function renderText(
+function renderRectangle(
   page: PDFPage,
   el: BroadsetElement,
+  absolute: CanvasAbsolutePosition,
   canvas: Canvas,
-  heightPt: number,
-  fontMap: ReadonlyMap<string, FontInput>,
+  trimHeightPt: number,
+  pdf: PDFDocument,
+  colorSpace: DocumentColorSpace,
 ): void {
-  if (!el.content) {
+  const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, trimHeightPt);
+  const styled = resolveRectangleStyle(el, canvas);
+
+  if (paintRectangleAsShading(pdf, page, styled, { xPt, yPt, wPt, hPt }, canvas, colorSpace)) {
     return;
   }
 
-  const xPt = elementToPoints(canvas, el.position.x);
-  const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height);
-  const color = resolveStyleColor(el.style, 'fontColor') ?? rgb(0, 0, 0);
-  const size = el.style.fontSize ? elementToPoints(canvas, el.style.fontSize) : 12;
-  const opacity = resolveOpacity(el.style);
-  const font = lookupFont(el, fontMap);
-  const maxWidthPt = elementToPoints(canvas, el.width);
-  const lineHeightPt = size * LINE_HEIGHT_MULTIPLIER;
+  const bg =
+    styled.fillRgb ??
+    (styled.fillGradient !== undefined ? resolveGradientFallbackColor(styled.fillGradient) : undefined);
 
-  // Wrap text using our own wrapping (handles explicit newlines + per-char fallback)
-  const measure = (text: string): number => {
-    // Standard fonts have widthOfTextAtSize; for standard font names, approximate
-    if (typeof font === 'string') {
-      // Approximate: standard 14 fonts average ~0.5 × fontSize per character
-      return text.length * size * STANDARD_FONT_WIDTH_RATIO;
-    }
+  paintRectangleSolid(page, bg, styled, { xPt, yPt, wPt, hPt }, canvas, colorSpace);
+}
 
-    return font.widthOfTextAtSize(text, size);
-  };
+/**
+ * Try to paint the rectangle as a PDF shading pattern when the fill is
+ * a linear / radial gradient. Returns `true` when the shading was
+ * applied; `false` when the caller should fall back to the solid /
+ * first-stop colour path.
+ */
+function paintRectangleAsShading(
+  pdf: PDFDocument,
+  page: PDFPage,
+  styled: RectangleStyleResolved,
+  geometry: ShadingGeometry,
+  canvas: Canvas,
+  colorSpace: DocumentColorSpace,
+): boolean {
+  if (styled.fillRgb !== undefined) return false;
+  if (styled.fillGradient === undefined) return false;
 
-  const lines = wrapText(resolveContentAsPlainString(el.content), maxWidthPt, measure);
-  const alignment = el.style.textAlignment ?? 'left';
+  const shaded = paintGradientFill(pdf, page, styled.fillGradient, geometry, () => {
+    emitRectanglePath(page, geometry.xPt, geometry.yPt, geometry.wPt, geometry.hPt, styled.radii, canvas);
+  });
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  if (!shaded) return false;
 
-    if (!line) continue;
+  const borderDeviceColor = toDeviceColor(styled.border, colorSpace);
 
-    // Calculate x offset for text alignment
-    let lineX = xPt;
-
-    if (alignment === 'center' || alignment === 'right') {
-      const lineWidth = measure(line);
-
-      if (alignment === 'center') {
-        lineX = xPt + (maxWidthPt - lineWidth) / 2;
-      } else {
-        lineX = xPt + maxWidthPt - lineWidth;
-      }
-    }
-
-    page.drawText(line, {
-      x: lineX,
-      y: yPt + (lines.length - 1 - i) * lineHeightPt,
-      size,
-      color,
-      opacity,
-      font,
+  if (borderDeviceColor !== undefined && styled.borderWidthPt !== undefined) {
+    page.drawRectangle({
+      x: geometry.xPt,
+      y: geometry.yPt,
+      width: geometry.wPt,
+      height: geometry.hPt,
+      borderColor: borderDeviceColor,
+      borderWidth: styled.borderWidthPt,
+      opacity: styled.opacity,
     });
   }
+
+  return true;
 }
 
-function renderRectangle(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
-  const xPt = elementToPoints(canvas, el.position.x);
-  const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height);
-  const wPt = elementToPoints(canvas, el.width);
-  const hPt = elementToPoints(canvas, el.height);
-  const fillGradient = resolveFillGradient(el.style);
-  const bg = resolveFillAsPdfRgb(el.style) ?? (fillGradient !== undefined ? resolveGradientFallbackColor(fillGradient) : undefined);
-  const border = resolveStyleColor(el.style, 'borderColor');
+function paintRectangleSolid(
+  page: PDFPage,
+  bg: ReturnType<typeof resolveFillAsPdfRgb>,
+  styled: RectangleStyleResolved,
+  geometry: ShadingGeometry,
+  canvas: Canvas,
+  colorSpace: DocumentColorSpace,
+): void {
+  const deviceBg = toDeviceColor(bg, colorSpace);
+  const deviceBorder = toDeviceColor(styled.border, colorSpace);
 
-  page.drawRectangle({
-    x: xPt,
-    y: yPt,
-    width: wPt,
-    height: hPt,
-    ...(bg ? { color: bg } : undefined),
-    ...(border ? { borderColor: border } : undefined),
-    ...(el.style.borderWidth ? { borderWidth: elementToPoints(canvas, el.style.borderWidth) } : undefined),
-    opacity: resolveOpacity(el.style),
-  });
-}
+  if (hasAnyRoundedCorner(styled.radii) && styled.radii !== undefined) {
+    const cornerRadiiPt: CornerRadii = [
+      elementToPoints(canvas, styled.radii[0]),
+      elementToPoints(canvas, styled.radii[1]),
+      elementToPoints(canvas, styled.radii[2]),
+      elementToPoints(canvas, styled.radii[3]),
+    ];
+    const pathD = buildRoundedRectPath(geometry.wPt, geometry.hPt, cornerRadiiPt);
 
-function renderEllipse(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
-  const cx = elementToPoints(canvas, el.position.x + el.width / 2);
-  const cy = heightPt - elementToPoints(canvas, el.position.y + el.height / 2);
-  const ellipseGradient = resolveFillGradient(el.style);
-  const bg = resolveFillAsPdfRgb(el.style) ?? (ellipseGradient !== undefined ? resolveGradientFallbackColor(ellipseGradient) : undefined);
+    page.drawSvgPath(pathD, {
+      x: geometry.xPt,
+      y: geometry.yPt + geometry.hPt,
+      ...(deviceBg ? { color: deviceBg } : undefined),
+      ...(deviceBorder ? { borderColor: deviceBorder } : undefined),
+      ...(styled.borderWidthPt !== undefined ? { borderWidth: styled.borderWidthPt } : undefined),
+      opacity: styled.opacity,
+    });
 
-  page.drawEllipse({
-    x: cx,
-    y: cy,
-    xRadius: elementToPoints(canvas, el.width / 2),
-    yRadius: elementToPoints(canvas, el.height / 2),
-    ...(bg ? { color: bg } : undefined),
-    opacity: resolveOpacity(el.style),
-  });
-}
-
-function renderPath(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
-  if (!el.content) {
     return;
   }
 
-  const xPt = elementToPoints(canvas, el.position.x);
-  const yPt = heightPt - elementToPoints(canvas, el.position.y);
-  const fillColor = resolveFillAsPdfRgb(el.style) ?? rgb(0, 0, 0);
-  const strokeColor = resolveStyleColor(el.style, 'stroke');
-
-  page.drawSvgPath(resolveContentAsPlainString(el.content), {
-    x: xPt,
-    y: yPt,
-    color: fillColor,
-    ...(strokeColor ? { borderColor: strokeColor } : undefined),
-    ...(el.style.strokeWidth ? { borderWidth: elementToPoints(canvas, el.style.strokeWidth) } : undefined),
-    opacity: resolveOpacity(el.style),
+  page.drawRectangle({
+    x: geometry.xPt,
+    y: geometry.yPt,
+    width: geometry.wPt,
+    height: geometry.hPt,
+    ...(deviceBg ? { color: deviceBg } : undefined),
+    ...(deviceBorder ? { borderColor: deviceBorder } : undefined),
+    ...(styled.borderWidthPt !== undefined ? { borderWidth: styled.borderWidthPt } : undefined),
+    opacity: styled.opacity,
   });
 }
 
-function drawImagePlaceholder(
+/**
+ * Paint a Broadset gradient as a real PDF shading pattern. Returns
+ * `true` when the pattern was successfully registered + applied;
+ * `false` when the gradient kind isn't expressible as a PDF shading
+ * pattern (conic, malformed colour stops) and the caller should fall
+ * back to the first-stop solid fill.
+ *
+ * The `drawShape` callback emits the shape's path operators inside
+ * the graphics-state-saved + pattern-bound region so the pattern
+ * fills exactly that geometry.
+ */
+function paintGradientFill(
+  pdf: PDFDocument,
+  page: PDFPage,
+  gradient: BroadsetGradient,
+  geometry: ShadingGeometry,
+  drawShape: () => void,
+): boolean {
+  const pattern = registerLinearOrRadialShading(pdf, page, gradient, geometry);
+
+  if (pattern === null) return false;
+
+  page.pushOperators(pushGraphicsState(), ...pattern.setPatternFillOperators);
+
+  drawShape();
+
+  page.pushOperators(PDFOperator.of(PDFOperatorNames.FillNonZero), popGraphicsState());
+
+  return true;
+}
+
+/**
+ * Emit raw PDF rectangle / rounded-rect path operators (no fill / no
+ * stroke). Caller handles fill / stroke separately so the same path
+ * can be reused under a clipping or pattern-fill bracket.
+ */
+function emitRectanglePath(
   page: PDFPage,
   xPt: number,
   yPt: number,
   wPt: number,
   hPt: number,
-  opacity: number,
+  radii: BroadsetElement['style']['borderRadius'],
+  canvas: Canvas,
 ): void {
-  page.drawRectangle({
-    x: xPt,
-    y: yPt,
-    width: wPt,
-    height: hPt,
-    borderColor: SVG_PLACEHOLDER_BORDER,
-    borderWidth: SVG_PLACEHOLDER_BORDER_WIDTH,
-    opacity,
+  if (hasAnyRoundedCorner(radii) && radii !== undefined) {
+    const cornerRadiiPt: CornerRadii = [
+      elementToPoints(canvas, radii[0]),
+      elementToPoints(canvas, radii[1]),
+      elementToPoints(canvas, radii[2]),
+      elementToPoints(canvas, radii[3]),
+    ];
+    const pathD = buildRoundedRectPath(wPt, hPt, cornerRadiiPt);
+
+    page.drawSvgPath(pathD, { x: xPt, y: yPt + hPt });
+
+    return;
+  }
+
+  page.pushOperators(
+    PDFOperator.of(PDFOperatorNames.AppendRectangle, [
+      PDFNumber.of(xPt),
+      PDFNumber.of(yPt),
+      PDFNumber.of(wPt),
+      PDFNumber.of(hPt),
+    ]),
+  );
+}
+
+function renderEllipse(
+  page: PDFPage,
+  el: BroadsetElement,
+  absolute: CanvasAbsolutePosition,
+  canvas: Canvas,
+  trimHeightPt: number,
+  pdf: PDFDocument,
+  colorSpace: DocumentColorSpace,
+): void {
+  const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, trimHeightPt);
+  const cx = xPt + wPt / 2;
+  const cy = yPt + hPt / 2;
+  const ellipseGradient = resolveFillGradient(el.style);
+  const fillRgb = resolveFillAsPdfRgb(el.style);
+
+  if (fillRgb === undefined && ellipseGradient !== undefined) {
+    const geometry: ShadingGeometry = { xPt, yPt, wPt, hPt };
+    const shaded = paintGradientFill(pdf, page, ellipseGradient, geometry, () => {
+      page.drawEllipse({
+        x: cx,
+        y: cy,
+        xScale: wPt / 2,
+        yScale: hPt / 2,
+      });
+    });
+
+    if (shaded) return;
+  }
+
+  const bg = fillRgb ?? (ellipseGradient !== undefined ? resolveGradientFallbackColor(ellipseGradient) : undefined);
+  const deviceBg = toDeviceColor(bg, colorSpace);
+
+  page.drawEllipse({
+    x: cx,
+    y: cy,
+    xScale: wPt / 2,
+    yScale: hPt / 2,
+    ...(deviceBg ? { color: deviceBg } : undefined),
+    opacity: resolveOpacity(el.style),
   });
 }
 
 async function renderImage(
   page: PDFPage,
   el: BroadsetElement,
+  absolute: CanvasAbsolutePosition,
   canvas: Canvas,
-  heightPt: number,
-  pdf: PDF,
+  trimHeightPt: number,
+  pdf: PDFDocument,
   fetchFn?: typeof globalThis.fetch,
 ): Promise<void> {
   if (!el.content) {
     return;
   }
 
-  const xPt = elementToPoints(canvas, el.position.x);
-  const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height);
-  const wPt = elementToPoints(canvas, el.width);
-  const hPt = elementToPoints(canvas, el.height);
+  const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, trimHeightPt);
   const opacity = resolveOpacity(el.style);
 
   const contentText = resolveContentAsPlainString(el.content);
@@ -543,7 +395,7 @@ async function renderImage(
   }
 
   try {
-    const image = pdf.embedImage(imageBytes.bytes);
+    const image = await embedImageFromBytes(pdf, imageBytes.mime, imageBytes.bytes);
 
     page.drawImage(image, {
       x: xPt,
@@ -566,69 +418,227 @@ function labelForNonStaticElement(el: BroadsetElement): string {
   return 'Video';
 }
 
-function renderNonStaticElement(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
-  renderRectangle(page, el, canvas, heightPt);
+function renderNonStaticElement(
+  page: PDFPage,
+  el: BroadsetElement,
+  absolute: CanvasAbsolutePosition,
+  canvas: Canvas,
+  trimHeightPt: number,
+  fallbackFont: PDFFont,
+  pdf: PDFDocument,
+  colorSpace: DocumentColorSpace,
+): void {
+  renderRectangle(page, el, absolute, canvas, trimHeightPt, pdf, colorSpace);
 
-  const xPt = elementToPoints(canvas, el.position.x) + 4;
-  const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height) + 4;
+  const { xPt: topLeftXPt, yPt: topLeftYPt } = elementTopLeftPt(absolute, el, canvas, trimHeightPt);
+  const xPt = topLeftXPt + PLACEHOLDER_LABEL_INSET;
+  const yPt = topLeftYPt + PLACEHOLDER_LABEL_INSET;
   const label = labelForNonStaticElement(el);
 
   page.drawText(label, {
     x: xPt,
     y: yPt,
-    size: 10,
+    size: PLACEHOLDER_LABEL_SIZE,
     color: rgb(0.2, 0.2, 0.2),
-    font: StandardFonts.Helvetica,
+    font: fallbackFont,
     opacity: resolveOpacity(el.style),
   });
 }
 
-function renderQrCode(page: PDFPage, el: BroadsetElement, canvas: Canvas, heightPt: number): void {
-  const xPt = elementToPoints(canvas, el.position.x);
-  const yPt = heightPt - elementToPoints(canvas, el.position.y) - elementToPoints(canvas, el.height);
-  const wPt = elementToPoints(canvas, el.width);
-  const hPt = elementToPoints(canvas, el.height);
+function renderQrCode(
+  page: PDFPage,
+  el: BroadsetElement,
+  absolute: CanvasAbsolutePosition,
+  canvas: Canvas,
+  trimHeightPt: number,
+): void {
+  const { xPt, yPt, wPt, hPt } = elementTopLeftPt(absolute, el, canvas, trimHeightPt);
 
   drawQrOnPage(page, resolveContentAsPlainString(el.content), xPt, yPt, wPt, hPt);
 }
 
 async function renderElement(
   page: PDFPage,
-  el: BroadsetElement,
+  rawElement: BroadsetElement,
   canvas: Canvas,
-  heightPt: number,
-  pdf: PDF,
-  fontMap: ReadonlyMap<string, FontInput>,
+  trimHeightPt: number,
+  pdf: PDFDocument,
+  fontMap: ReadonlyMap<string, PDFFont>,
+  fallbackFont: PDFFont,
+  elementsById: ReadonlyMap<string, BroadsetElement>,
+  ocgRegistration: OcgRegistration,
+  colorSpace: DocumentColorSpace,
   fetchFn?: typeof globalThis.fetch,
 ): Promise<void> {
+  const el = resolveAnimatedElementInState(rawElement);
+  const markedContent = markedContentBrackets(pdf, page, buildMarkedContentTag(el));
+  const ocgBinding = ocgRegistration.bindingByElementId.get(el.id);
+
+  // /OC <ocg-name> BDC wraps the entire element so PDF readers can
+  // toggle per-page visibility from their layers panel. /BSET BDC
+  // nests inside it so reconciliation can still recover identity even
+  // when an OCG is hidden.
+  if (ocgBinding !== undefined) {
+    page.pushOperators(
+      PDFOperator.of(PDFOperatorNames.BeginMarkedContentSequence, [
+        PDFName.of('OC'),
+        ocgBinding.resourceName,
+      ]),
+    );
+  }
+
+  // /BSET BDC opens the element's painting sequence; rotation and clip
+  // CTM operators nest inside so the marked-content pair survives across
+  // any graphics-state resets Illustrator / Acrobat apply on save.
+  page.pushOperators(markedContent.start);
+
+  // Byte-stable re-emission: when the importer captured the element's
+  // operator slice into `extensions.pdf.preservationBlob` AND the
+  // element has not been edited since (`dirty: false`), re-emit the
+  // captured bytes verbatim instead of running the synthesizer. This
+  // preserves the source PDF's exact `cm` matrices, number formatting,
+  // and graphics-state push order — what reproducible-build / diff
+  // tools rely on.
+  const reEmittedFromBlob = tryEmitPreservationBlob(page, el);
+
+  if (!reEmittedFromBlob) {
+    await synthesizeElement(page, el, canvas, trimHeightPt, pdf, fontMap, fallbackFont, elementsById, colorSpace, fetchFn);
+  }
+
+  page.pushOperators(markedContent.end);
+
+  if (ocgBinding !== undefined) {
+    page.pushOperators(PDFOperator.of(PDFOperatorNames.EndMarkedContent));
+  }
+
+  // Hyperlink overlay: opt-in via `extensions.pdf.link` on any
+  // element. Emits a `/Annot /Subtype /Link` covering the element's
+  // bounding box that opens the URL via the URI action when clicked.
+  // Annotation registration MUST happen after the marked-content
+  // brackets close — the annotation lives in the page's /Annots
+  // array, not inside the content stream.
+  const linkUrl = readElementLink(el);
+
+  if (linkUrl !== undefined) {
+    const linkAbsolute = composeCanvasAbsolutePosition(el, elementsById);
+
+    emitLinkAnnotation(pdf, page, el, linkAbsolute, canvas, trimHeightPt, linkUrl);
+  }
+}
+
+async function synthesizeElement(
+  page: PDFPage,
+  el: BroadsetElement,
+  canvas: Canvas,
+  trimHeightPt: number,
+  pdf: PDFDocument,
+  fontMap: ReadonlyMap<string, PDFFont>,
+  fallbackFont: PDFFont,
+  elementsById: ReadonlyMap<string, BroadsetElement>,
+  colorSpace: DocumentColorSpace,
+  fetchFn?: typeof globalThis.fetch,
+): Promise<void> {
+  const absolute = composeCanvasAbsolutePosition(el, elementsById);
+  const rotate = elementRotationBrackets(el, absolute, canvas, trimHeightPt);
+  const clipBrackets = clipPathBrackets(el, absolute, canvas, trimHeightPt);
+
+  applyBrackets(page, rotate, 'start');
+  applyBrackets(page, clipBrackets, 'start');
+
   switch (el.type) {
     case 'text':
-      renderText(page, el, canvas, heightPt, fontMap);
+      renderText(page, el, absolute, canvas, trimHeightPt, fontMap, fallbackFont);
       break;
     case 'rectangle':
-      renderRectangle(page, el, canvas, heightPt);
+      renderRectangle(page, el, absolute, canvas, trimHeightPt, pdf, colorSpace);
       break;
     case 'ellipse':
-      renderEllipse(page, el, canvas, heightPt);
+      renderEllipse(page, el, absolute, canvas, trimHeightPt, pdf, colorSpace);
       break;
     case 'path':
-      renderPath(page, el, canvas, heightPt);
+      renderPath(page, el, absolute, canvas, trimHeightPt);
       break;
     case 'image':
     case 'svg':
-      await renderImage(page, el, canvas, heightPt, pdf, fetchFn);
+      await renderImage(page, el, absolute, canvas, trimHeightPt, pdf, fetchFn);
       break;
     case 'qrcode':
-      renderQrCode(page, el, canvas, heightPt);
+      renderQrCode(page, el, absolute, canvas, trimHeightPt);
       break;
     case 'group':
-      // Groups are rendered by iterating child elements
+      // Groups are pure containers — children render independently via the
+      // flat `doc.elements` sweep; parent-child translation is composed
+      // via `composeCanvasAbsolutePosition`.
       break;
     case 'video':
     case 'clock':
     case 'ticker':
-      renderNonStaticElement(page, el, canvas, heightPt);
+      renderNonStaticElement(page, el, absolute, canvas, trimHeightPt, fallbackFont, pdf, colorSpace);
       break;
+  }
+
+  applyBrackets(page, clipBrackets, 'end');
+  applyBrackets(page, rotate, 'end');
+}
+
+/**
+ * Re-emit the element's captured operator slice from
+ * `extensions.pdf.preservationBlob` verbatim, bypassing the
+ * synthesizer. Returns `true` when the blob was emitted (caller MUST
+ * skip synthesis), `false` when there is no blob or the element is
+ * dirty / corrupted (caller falls back to synthesis).
+ */
+function tryEmitPreservationBlob(page: PDFPage, el: BroadsetElement): boolean {
+  const preserved = readPreservationState(el);
+
+  if (preserved === null) return false;
+
+  const decoded = decodeBase64(preserved);
+
+  if (decoded === null || decoded.length === 0) return false;
+
+  // pdf-lib's `PDFOperator` writes its `name` field verbatim into the
+  // page's content stream. By constructing an operator whose `name`
+  // is the decoded slice and whose args are empty, the bytes appear
+  // in the content stream exactly between `/BSET ... BDC` and `EMC`.
+  // The cast to `PDFOperatorNames` is necessary because the public
+  // type narrows to the operator-name enum, but the runtime accepts
+  // any string and serializes it byte-for-byte.
+  const rawOperator = PDFOperator.of(decoded as unknown as PDFOperatorNames, []);
+
+  page.pushOperators(rawOperator);
+
+  return true;
+}
+
+/**
+ * Read `extensions.pdf.preservationBlob` from an element when its
+ * `dirty` flag is false. Returns `null` when the element is dirty,
+ * has no blob, or carries no `extensions.pdf` block at all.
+ */
+function readPreservationState(el: BroadsetElement): string | null {
+  const extensions = el.extensions as Readonly<Record<string, unknown>> | undefined;
+
+  if (extensions === undefined) return null;
+
+  const pdfExt = extensions['pdf'];
+
+  if (pdfExt === undefined || pdfExt === null || typeof pdfExt !== 'object') return null;
+
+  const cast = pdfExt as Record<string, unknown>;
+
+  if (cast['dirty'] === true) return null;
+
+  const blob = cast['preservationBlob'];
+
+  return typeof blob === 'string' && blob.length > 0 ? blob : null;
+}
+
+function decodeBase64(value: string): string | null {
+  try {
+    return globalThis.atob(value);
+  } catch {
+    return null;
   }
 }
 
@@ -637,45 +647,194 @@ async function renderElement(
 /* ------------------------------------------------------------------ */
 
 /**
- * Export a BroadsetDocument to PDF bytes.
- * Animated elements are exported at their default/rest state (t=0).
- * Animation data (timelines, keyframes, states) is discarded.
+ * Export a BroadsetDocument to PDF bytes plus preflight warnings.
+ *
+ * Returns the byte stream and the warning list collected during the
+ * pre-render preflight pass per `project/spec/formats/pdf.md` →
+ * "Preflight and Warnings". Per IO-D-14 the export ALWAYS proceeds —
+ * warnings are surface-level, never blocking. Callers that don't care
+ * about warnings can use `exportPdfBytes` directly; this entry exists
+ * so the demo's preflight panel can render the warning list to the
+ * user before / after the export completes.
  *
  * @param doc - The document to export.
- * @param fetchFn - Optional fetch implementation for Google Fonts resolution.
- *                  Defaults to `globalThis.fetch` if available.
+ * @param fetchFn - Optional fetch implementation for Google Fonts /
+ *                  URL image resolution. Defaults to `globalThis.fetch`
+ *                  when available.
  */
-export async function exportPdfBytes(doc: BroadsetDocument, fetchFn?: typeof globalThis.fetch): Promise<Uint8Array> {
+export async function exportPdfWithPreflight(
+  doc: BroadsetDocument,
+  fetchOrOptions?: typeof globalThis.fetch | PdfExportOptions,
+): Promise<PdfExportResult> {
+  const preflightWarnings = collectPreflightWarnings(doc);
+  const { bytes, runtimeWarnings } = await runExport(doc, fetchOrOptions);
+
+  return { bytes, warnings: [...preflightWarnings, ...runtimeWarnings] };
+}
+
+/**
+ * Export a BroadsetDocument to PDF bytes via `pdf-lib`.
+ * Animated elements are exported at their default/rest state (t=0).
+ * Animation data (timelines, keyframes, states) is discarded per IO-D-16.
+ *
+ * @param doc - The document to export.
+ * @param fetchFn - Optional fetch implementation for Google Fonts / URL image resolution.
+ *                  Defaults to `globalThis.fetch` when available.
+ */
+export async function exportPdfBytes(
+  doc: BroadsetDocument,
+  fetchOrOptions?: typeof globalThis.fetch | PdfExportOptions,
+): Promise<Uint8Array> {
+  const result = await runExport(doc, fetchOrOptions);
+
+  return result.bytes;
+}
+
+interface InternalExportResult {
+  readonly bytes: Uint8Array;
+  readonly runtimeWarnings: readonly string[];
+}
+
+/**
+ * Internal export driver shared by `exportPdfBytes` and
+ * `exportPdfWithPreflight`. Returns the produced bytes plus any
+ * warnings collected during the render pass (font fallbacks,
+ * unsupported features, etc.) so callers can choose whether to
+ * surface them.
+ */
+async function runExport(
+  doc: BroadsetDocument,
+  fetchOrOptions?: typeof globalThis.fetch | PdfExportOptions,
+): Promise<InternalExportResult> {
+  const options = resolveOptions(fetchOrOptions);
+  const fetchFn = options.fetch;
+  const pdfaConformance = options.pdfaConformance;
   const { canvas } = doc;
-  const { widthPt, heightPt } = canvasToPoints(canvas);
 
-  const pdf = PDF.create();
-  const page = pdf.addPage({ width: widthPt, height: heightPt });
+  const pdf = await PDFDocument.create();
+  const { widthPt: trimWidthPt, heightPt: trimHeightPt } = canvasToPoints(canvas);
 
-  // Resolve and deduplicate fonts before rendering
-  const effectiveFetch = fetchFn ?? (typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined);
-  const fontMap = await resolveFonts(doc, pdf, effectiveFetch);
+  const page = pdf.addPage([trimWidthPt, trimHeightPt]);
 
-  // Draw background
-  if (canvas.backgroundMode === 'solid' && canvas.backgroundColor) {
-    const bg = parseCssColor(canvas.backgroundColor);
+  // MediaBox/BleedBox/TrimBox/ArtBox follow canvas.bleed/safeArea declarations.
+  applyPageBoxes(pdf, page, canvas);
 
-    if (bg) {
-      page.drawRectangle({
-        x: 0,
-        y: 0,
-        width: widthPt,
-        height: heightPt,
-        color: rgb(bg.r, bg.g, bg.b),
-        opacity: bg.a,
-      });
-    }
-  }
+  // Warm the bidi analyser + UAX #14 line-breaker caches so
+  // subsequent sync `reorderForBidi` and `wrapText` calls during
+  // text rendering work without turning the entire render path
+  // async. Both modules use dynamic-import + cache so the static
+  // type chain doesn't leak `linebreak`/`bidi-js` ambient types
+  // across package boundaries.
+  await Promise.all([prepareBidiAnalysis(), prepareLineBreaker()]);
 
-  // Render elements at rest state (t=0) — ignore all animation data
+  // Always embed a Helvetica fallback up-front so placeholder labels and
+  // text elements without a declared family have a working PDFFont.
+  const fallbackFont = await pdf.embedFont(StandardFonts.Helvetica);
+  const { fontMap, failures: fontFailures } = await resolveFonts(doc, pdf, fetchFn);
+  const elementsById = indexElementsById(doc.elements);
+
+  // Register one OCG per Broadset page so PDF readers surface per-page
+  // visibility toggles in the layers panel. The registration also
+  // builds a per-element binding map so each element's painting can be
+  // wrapped in `/OC <name> BDC ... EMC` for per-page visibility.
+  const ocgRegistration = registerPageOcgs(pdf, doc);
+
+  attachOcgResourceBindings(pdf, page, ocgRegistration);
+
+  const documentColorSpace = resolveDocumentColorSpace(doc);
+
+  // Draw background inside the trim box (PDF origin is bottom-left;
+  // applyPageBoxes already anchored the trim there via bleed offsets).
+  drawCanvasBackground(page, canvas, trimWidthPt, trimHeightPt);
+
   for (const el of doc.elements) {
-    await renderElement(page, el, canvas, heightPt, pdf, fontMap, effectiveFetch);
+    await renderElement(
+      page,
+      el,
+      canvas,
+      trimHeightPt,
+      pdf,
+      fontMap,
+      fallbackFont,
+      elementsById,
+      ocgRegistration,
+      documentColorSpace,
+      fetchFn,
+    );
   }
 
-  return pdf.save();
+  // Attach the shared `broadset:` XMP packet to the document catalog so
+  // the round-trip importer (P6.4a) has a trusted metadata fast-path.
+  // PDF/A mode also injects the `pdfaid:` identifier alongside the
+  // `broadset:` namespace block.
+  const xmpPdfa =
+    pdfaConformance !== undefined
+      ? { part: '2', conformance: pdfaConformanceLetter(pdfaConformance) }
+      : undefined;
+
+  attachBroadsetXmp(pdf, await buildBroadsetXmpPacket(doc, xmpPdfa !== undefined ? { pdfa: xmpPdfa } : {}));
+
+  if (pdfaConformance !== undefined) {
+    const intent = resolveOutputIntent(doc, options.assets ?? []);
+
+    attachOutputIntent(pdf, intent);
+    ensureTrailerId(pdf, doc.id);
+  }
+
+  // PDF/A-2a (ISO 19005-2 §6.7) requires a tagged structure tree
+  // mapping each painted element to a logical structure type. We
+  // emit a flat tree (one StructElem per Broadset element under a
+  // single Document parent) which satisfies the structural floor.
+  if (pdfaConformance === '2a') {
+    attachPdfaStructureTree(pdf, page, doc);
+  }
+
+  // `useObjectStreams: false` keeps object dicts (catalog, page nodes,
+  // OCProperties, Metadata, MediaBox) visible as plain text in the PDF
+  // trailer rather than packed into compressed object streams. Content-
+  // stream compression is unchanged. The file opens identically in every
+  // PDF reader; the only difference is readability of metadata by tools
+  // (and test assertions that grep the bytes for `/BSET`, `/OCProperties`,
+  // etc.). Round-trip import tools don't care either way.
+  const bytes = await pdf.save({ useObjectStreams: false });
+
+  return { bytes, runtimeWarnings: fontFailures };
+}
+
+function resolveOptions(fetchOrOptions: typeof globalThis.fetch | PdfExportOptions | undefined): PdfExportOptions {
+  if (fetchOrOptions === undefined) {
+    return { fetch: typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined };
+  }
+
+  if (typeof fetchOrOptions === 'function') {
+    return { fetch: fetchOrOptions };
+  }
+
+  return {
+    ...fetchOrOptions,
+    fetch: fetchOrOptions.fetch ?? (typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined),
+  };
+}
+
+function drawCanvasBackground(page: PDFPage, canvas: Canvas, trimWidthPt: number, trimHeightPt: number): void {
+  if (canvas.backgroundMode !== 'solid') return;
+  if (canvas.backgroundColor === undefined) return;
+
+  const bg = parseCssColor(canvas.backgroundColor);
+
+  if (bg === undefined) return;
+
+  const bleed = canvas.bleed ?? [0, 0, 0, 0];
+  const bleedLeftPt = elementToPoints(canvas, bleed[3]);
+  const bleedBottomPt = elementToPoints(canvas, bleed[2]);
+  const color = colorToPdfRgb(undefined) ?? rgb(bg.r, bg.g, bg.b);
+
+  page.drawRectangle({
+    x: bleedLeftPt,
+    y: bleedBottomPt,
+    width: trimWidthPt,
+    height: trimHeightPt,
+    color,
+    opacity: bg.a,
+  });
 }

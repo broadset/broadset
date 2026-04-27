@@ -1,4 +1,4 @@
-import { type PDFPage, rgb } from '@libpdf/core';
+import { type PDFPage, rgb } from 'pdf-lib';
 import qrcode from 'qrcode-generator';
 
 /**

@@ -1,4 +1,10 @@
-export { type DocumentImportResult, importPptxDocument, importPsdDocument, importSvgDocument } from './import-document';
+export {
+  type DocumentImportResult,
+  importPdfDocument,
+  importPptxDocument,
+  importPsdDocument,
+  importSvgDocument,
+} from './import-document';
 export {
   exportProjectJson,
   exportVideoBlob,
@@ -17,7 +23,6 @@ export {
   normalizeFontFamily,
   parseCssColor,
   resolveGoogleFontUrl,
-  wrapText,
 } from './pdf';
 export { exportPptxBytes, importPptx } from './pptx';
 export { exportPsdBytes, exportPsdBytesAsync, importPsd, svgPathToPsdVectorMask } from './psd';

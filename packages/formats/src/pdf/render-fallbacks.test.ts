@@ -9,7 +9,7 @@ const drawCalls = {
   text: [] as string[],
 };
 
-vi.mock('@libpdf/core', () => {
+vi.mock('pdf-lib', () => {
   const page = {
     drawRectangle: (): void => {
       drawCalls.rectangles += 1;
@@ -22,25 +22,114 @@ vi.mock('@libpdf/core', () => {
     },
     drawEllipse: (): void => {},
     drawSvgPath: (): void => {},
+    pushOperators: (): void => {},
+    setSize: (): void => {},
+    node: {
+      set: (): void => {},
+      Resources: () => ({
+        lookupMaybe: () => ({ set: (): void => {} }),
+        set: (): void => {},
+      }),
+    },
   };
 
+  const mockContext = {
+    obj: (literal: unknown): unknown => literal,
+    register: (): unknown => ({ kind: 'ref' }),
+  };
+  const mockCatalog = {
+    set: (): void => {},
+  };
   const pdfInstance = {
     addPage: () => page,
-    save: () => new Uint8Array([1, 2, 3]),
-    embedImage: () => ({ id: 'img-1' }),
-    embedFont: () => ({ widthOfTextAtSize: (text: string, size: number) => text.length * size * 0.5 }),
+    save: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+    embedPng: () => Promise.resolve({ id: 'img-png' }),
+    embedJpg: () => Promise.resolve({ id: 'img-jpg' }),
+    embedFont: (name: string | Uint8Array) =>
+      Promise.resolve({
+        name: typeof name === 'string' ? name : 'embedded-bytes',
+        widthOfTextAtSize: (text: string, size: number) => text.length * size * 0.5,
+      }),
+    registerFontkit: (): void => {},
+    context: mockContext,
+    catalog: mockCatalog,
   };
 
   return {
-    PDF: {
-      create: () => pdfInstance,
+    PDFDocument: {
+      create: () => Promise.resolve(pdfInstance),
     },
     StandardFonts: {
       Helvetica: 'Helvetica',
-      TimesRoman: 'TimesRoman',
+      HelveticaBold: 'Helvetica-Bold',
+      HelveticaOblique: 'Helvetica-Oblique',
+      HelveticaBoldOblique: 'Helvetica-BoldOblique',
+      TimesRoman: 'Times-Roman',
+      TimesRomanBold: 'Times-Bold',
+      TimesRomanItalic: 'Times-Italic',
+      TimesRomanBoldItalic: 'Times-BoldItalic',
       Courier: 'Courier',
+      CourierBold: 'Courier-Bold',
+      CourierOblique: 'Courier-Oblique',
+      CourierBoldOblique: 'Courier-BoldOblique',
+      Symbol: 'Symbol',
+      ZapfDingbats: 'ZapfDingbats',
     },
     rgb: (r: number, g: number, b: number) => ({ r, g, b }),
+    pushGraphicsState: () => ({ kind: 'q' }),
+    popGraphicsState: () => ({ kind: 'Q' }),
+    translate: (x: number, y: number) => ({ kind: 'translate', x, y }),
+    rotateDegrees: (deg: number) => ({ kind: 'rotateDegrees', deg }),
+    concatTransformationMatrix: (a: number, b: number, c: number, d: number, e: number, f: number) => ({
+      kind: 'cm',
+      a,
+      b,
+      c,
+      d,
+      e,
+      f,
+    }),
+    moveTo: (x: number, y: number) => ({ kind: 'moveTo', x, y }),
+    lineTo: (x: number, y: number) => ({ kind: 'lineTo', x, y }),
+    appendBezierCurve: (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number) => ({
+      kind: 'appendBezierCurve',
+      x1,
+      y1,
+      x2,
+      y2,
+      x3,
+      y3,
+    }),
+    closePath: () => ({ kind: 'closePath' }),
+    clip: () => ({ kind: 'clip' }),
+    clipEvenOdd: () => ({ kind: 'clipEvenOdd' }),
+    endPath: () => ({ kind: 'endPath' }),
+    PDFOperator: {
+      of: (op: string, args?: unknown[]) => ({ op, args: args ?? [] }),
+    },
+    PDFOperatorNames: {
+      BeginMarkedContentSequence: 'BDC',
+      EndMarkedContent: 'EMC',
+      AppendRectangle: 're',
+      FillNonZero: 'f',
+      NonStrokingColorspace: 'cs',
+      NonStrokingColorN: 'scn',
+    },
+    PDFNumber: {
+      of: (n: number) => ({ kind: 'number', value: n }),
+    },
+    PDFName: {
+      of: (name: string) => ({ name }),
+    },
+    PDFString: {
+      of: (value: string) => ({ string: value }),
+    },
+    PDFDict: {
+      withContext: (): { readonly set: (key: unknown, value: unknown) => void } => ({ set: (): void => {} }),
+    },
+    PDFRawStream: {
+      of: (dict: unknown, bytes: Uint8Array) => ({ dict, bytes }),
+    },
   };
 });
 

@@ -10,7 +10,7 @@ Defines all export and import format converters for broadset. Each format conver
 
 | Sub-Spec                         | Scope                                                                                              |
 | -------------------------------- | -------------------------------------------------------------------------------------------------- |
-| [pdf.md](pdf.md)                 | PDF generation, color parsing, font embedding, text wrapping, QR codes                             |
+| [pdf.md](pdf.md)                 | PDF export, import, round-trip, XMP + marked-content metadata, colour space, font embedding        |
 | [pptx.md](pptx.md)               | PPTX export with SVG fallback, import with path recovery, round-trip fidelity                      |
 | [psd.md](psd.md)                 | PSD export (layers, masks, effects, artboards), import, path vector conversion                     |
 | [web-vector.md](web-vector.md)   | SVG export/import, HTML standalone export with embedded playback runtime                           |

@@ -23,6 +23,12 @@ export interface LineSegment {
  */
 export type TextMeasure = (text: string) => number;
 
+/**
+ * One paragraph of bidi analysis. NOTE: `end` is the index of the
+ * LAST character in the paragraph (inclusive), matching the
+ * `bidi-js` API. Callers slicing the input string MUST use
+ * `text.slice(start, end + 1)` to include the final character.
+ */
 export interface BidiParagraph {
   readonly start: number;
   readonly end: number;

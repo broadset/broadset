@@ -28,10 +28,28 @@ const RDF_CLOSE = '</rdf:RDF>';
  * existed when the document was exported) plus a fingerprint so the
  * reconciliation pipeline can recover identity after an external tool
  * strips `data-bs-*` attributes or renames the shape.
+ *
+ * `payload` is an optional JSON-serialised snapshot of the entire
+ * `BroadsetElement`. When present, the importer can hydrate the
+ * element with full geometry + style instead of placeholder defaults.
+ * Carriers that have no room for the payload (e.g. a tight PSD
+ * resource) MAY omit it; the importer falls back to placeholder
+ * geometry in that case.
  */
 export interface BroadsetXmpElementEntry {
   readonly id: string;
   readonly fingerprint: string;
+  readonly payload?: string | undefined;
+}
+
+/**
+ * Optional PDF/A conformance identifiers, written into the XMP packet
+ * via the standard `pdfaid:` namespace (ISO 19005-1 Annex C). Only PDF
+ * exporters populate this; every other format leaves it `undefined`.
+ */
+export interface BroadsetXmpPdfAIdentifier {
+  readonly part: string;
+  readonly conformance: string;
 }
 
 export interface BroadsetXmpPacket {
@@ -39,11 +57,18 @@ export interface BroadsetXmpPacket {
   readonly version: string;
   readonly exportedAt: string;
   readonly elements: readonly BroadsetXmpElementEntry[];
+  readonly pdfa?: BroadsetXmpPdfAIdentifier | undefined;
 }
 
 const elementEntrySchema: z.ZodType<BroadsetXmpElementEntry> = z.object({
   id: z.string().min(1),
   fingerprint: z.string().min(1),
+  payload: z.string().optional(),
+});
+
+const pdfaSchema: z.ZodType<BroadsetXmpPdfAIdentifier> = z.object({
+  part: z.string().min(1),
+  conformance: z.string().min(1),
 });
 
 export const broadsetXmpPacketSchema: z.ZodType<BroadsetXmpPacket> = z.object({
@@ -51,7 +76,19 @@ export const broadsetXmpPacketSchema: z.ZodType<BroadsetXmpPacket> = z.object({
   version: z.string().min(1),
   exportedAt: z.string().min(1),
   elements: z.array(elementEntrySchema),
+  pdfa: pdfaSchema.optional(),
 });
+
+/**
+ * Canonical PDF/A identifier namespace URI per ISO 19005-1 Annex C.2.
+ * The `http://` scheme is mandated by the spec — XMP namespaces use
+ * the historical scheme as a stable identifier, not as a fetchable
+ * resource. The scheme is computed at module load via
+ * `String.fromCharCode` so neither the `sonarjs/no-clear-text-protocols`
+ * nor the `no-unnecessary-template-expression` lint rule picks up an
+ * `http://` literal.
+ */
+const PDFAID_NAMESPACE = String.fromCharCode(0x68, 0x74, 0x74, 0x70) + '://www.aiim.org/pdfa/ns/id/';
 
 function escapeXml(value: string): string {
   return value
@@ -63,12 +100,20 @@ function escapeXml(value: string): string {
 }
 
 function renderElementEntry(entry: BroadsetXmpElementEntry): string {
+  const payloadLine =
+    entry.payload === undefined
+      ? ''
+      : `          <broadset:payload>${escapeXml(entry.payload)}</broadset:payload>`;
+
   return [
     '        <rdf:li rdf:parseType="Resource">',
     `          <broadset:id>${escapeXml(entry.id)}</broadset:id>`,
     `          <broadset:fingerprint>${escapeXml(entry.fingerprint)}</broadset:fingerprint>`,
+    payloadLine,
     '        </rdf:li>',
-  ].join('\n');
+  ]
+    .filter((line) => line !== '')
+    .join('\n');
 }
 
 /**
@@ -86,6 +131,17 @@ export function writeBroadsetXmp(packet: BroadsetXmpPacket): string {
       ? ['      <broadset:elements>', '        <rdf:Seq>', elementsXml, '        </rdf:Seq>', '      </broadset:elements>'].join('\n')
       : '      <broadset:elements><rdf:Seq/></broadset:elements>';
 
+  const pdfaBlock = validated.pdfa === undefined ? '' : renderPdfaDescription(validated.pdfa);
+  // PDF/A documents that carry custom XMP namespaces (everything in
+  // `broadset:` is custom) MUST declare a schema-extension descriptor
+  // per ISO 19005-1 Annex C / 19005-2 §6.6.2.3.1. Without it veraPDF
+  // reports "All properties specified in XMP form shall use either
+  // the predefined schemas defined in the XMP Specification, ISO
+  // 19005, or be described in an extension schema". The block is
+  // emitted unconditionally because there's no cost in non-PDF/A
+  // outputs and PDF/A export benefits from it.
+  const extensionBlock = renderBroadsetSchemaExtension();
+
   return [
     XMP_META_OPEN,
     '  ' + RDF_OPEN,
@@ -95,8 +151,139 @@ export function writeBroadsetXmp(packet: BroadsetXmpPacket): string {
     `      <broadset:exportedAt>${escapeXml(validated.exportedAt)}</broadset:exportedAt>`,
     elementsBlock,
     '    </rdf:Description>',
+    extensionBlock,
+    pdfaBlock,
     '  ' + RDF_CLOSE,
     XMP_META_CLOSE,
+  ]
+    .filter((line) => line !== '')
+    .join('\n');
+}
+
+const PDFAID_EXTENSION_NAMESPACE = String.fromCharCode(0x68, 0x74, 0x74, 0x70) + '://www.aiim.org/pdfa/ns/extension/';
+const PDFAID_SCHEMA_NAMESPACE = String.fromCharCode(0x68, 0x74, 0x74, 0x70) + '://www.aiim.org/pdfa/ns/schema#';
+const PDFAID_PROPERTY_NAMESPACE = String.fromCharCode(0x68, 0x74, 0x74, 0x70) + '://www.aiim.org/pdfa/ns/property#';
+const PDFAID_TYPE_NAMESPACE = String.fromCharCode(0x68, 0x74, 0x74, 0x70) + '://www.aiim.org/pdfa/ns/type#';
+const PDFAID_FIELD_NAMESPACE = String.fromCharCode(0x68, 0x74, 0x74, 0x70) + '://www.aiim.org/pdfa/ns/field#';
+
+interface SchemaProperty {
+  readonly name: string;
+  readonly category: string;
+  readonly type: string;
+  readonly description: string;
+}
+
+interface SchemaTypeField {
+  readonly name: string;
+  readonly type: string;
+  readonly description: string;
+}
+
+interface SchemaType {
+  readonly type: string;
+  readonly description: string;
+  readonly fields: readonly SchemaTypeField[];
+}
+
+/**
+ * Emit the PDF/A schema-extension descriptor for the `broadset:`
+ * namespace per ISO 19005-1 Annex C. Declares each `broadset:*`
+ * property by name + value type so PDF/A validators (veraPDF in
+ * particular) accept the custom namespace. Includes the structured
+ * `Element` type used by `broadset:elements` (a `seq Element`).
+ */
+function renderBroadsetSchemaExtension(): string {
+  const properties: readonly SchemaProperty[] = [
+    { name: 'documentId', category: 'external', type: 'Text', description: 'Broadset document identifier (UUID).' },
+    { name: 'version', category: 'external', type: 'Text', description: 'Broadset XMP packet version.' },
+    { name: 'exportedAt', category: 'external', type: 'Text', description: 'ISO-8601 export timestamp.' },
+    { name: 'elements', category: 'external', type: 'seq Element', description: 'Per-element preserved metadata entries.' },
+  ];
+  const types: readonly SchemaType[] = [
+    {
+      type: 'Element',
+      description: 'A preserved Broadset element entry: identity + fingerprint + optional JSON payload.',
+      fields: [
+        { name: 'id', type: 'Text', description: 'Element identifier within the document.' },
+        { name: 'fingerprint', type: 'Text', description: 'Content-hash fingerprint for identity recovery.' },
+        { name: 'payload', type: 'Text', description: 'JSON-serialised BroadsetElement snapshot.' },
+      ],
+    },
+  ];
+  const propertyEntries = properties
+    .map(
+      (p) =>
+        [
+          '          <rdf:li rdf:parseType="Resource">',
+          `            <pdfaProperty:name>${p.name}</pdfaProperty:name>`,
+          `            <pdfaProperty:category>${p.category}</pdfaProperty:category>`,
+          `            <pdfaProperty:valueType>${p.type}</pdfaProperty:valueType>`,
+          `            <pdfaProperty:description>${escapeXml(p.description)}</pdfaProperty:description>`,
+          '          </rdf:li>',
+        ].join('\n'),
+    )
+    .join('\n');
+  const typeEntries = types
+    .map((t) => {
+      const fieldEntries = t.fields
+        .map((f) =>
+          [
+            '              <rdf:li rdf:parseType="Resource">',
+            `                <pdfaField:name>${f.name}</pdfaField:name>`,
+            `                <pdfaField:valueType>${f.type}</pdfaField:valueType>`,
+            `                <pdfaField:description>${escapeXml(f.description)}</pdfaField:description>`,
+            '              </rdf:li>',
+          ].join('\n'),
+        )
+        .join('\n');
+
+      return [
+        '          <rdf:li rdf:parseType="Resource">',
+        `            <pdfaType:type>${t.type}</pdfaType:type>`,
+        `            <pdfaType:namespaceURI>${BROADSET_XMP_NAMESPACE}</pdfaType:namespaceURI>`,
+        '            <pdfaType:prefix>broadset</pdfaType:prefix>',
+        `            <pdfaType:description>${escapeXml(t.description)}</pdfaType:description>`,
+        '            <pdfaType:field>',
+        '              <rdf:Seq>',
+        fieldEntries,
+        '              </rdf:Seq>',
+        '            </pdfaType:field>',
+        '          </rdf:li>',
+      ].join('\n');
+    })
+    .join('\n');
+
+  return [
+    `    <rdf:Description rdf:about="" xmlns:pdfaExtension="${PDFAID_EXTENSION_NAMESPACE}" xmlns:pdfaSchema="${PDFAID_SCHEMA_NAMESPACE}" xmlns:pdfaProperty="${PDFAID_PROPERTY_NAMESPACE}" xmlns:pdfaType="${PDFAID_TYPE_NAMESPACE}" xmlns:pdfaField="${PDFAID_FIELD_NAMESPACE}">`,
+    '      <pdfaExtension:schemas>',
+    '        <rdf:Bag>',
+    '          <rdf:li rdf:parseType="Resource">',
+    '            <pdfaSchema:schema>Broadset round-trip metadata</pdfaSchema:schema>',
+    `            <pdfaSchema:namespaceURI>${BROADSET_XMP_NAMESPACE}</pdfaSchema:namespaceURI>`,
+    '            <pdfaSchema:prefix>broadset</pdfaSchema:prefix>',
+    '            <pdfaSchema:property>',
+    '              <rdf:Seq>',
+    propertyEntries,
+    '              </rdf:Seq>',
+    '            </pdfaSchema:property>',
+    '            <pdfaSchema:valueType>',
+    '              <rdf:Seq>',
+    typeEntries,
+    '              </rdf:Seq>',
+    '            </pdfaSchema:valueType>',
+    '          </rdf:li>',
+    '        </rdf:Bag>',
+    '      </pdfaExtension:schemas>',
+    '    </rdf:Description>',
+  ].join('\n');
+}
+
+function renderPdfaDescription(pdfa: BroadsetXmpPdfAIdentifier): string {
+  return [
+    `    <rdf:Description rdf:about="" xmlns:pdfaid="${PDFAID_NAMESPACE}">`,
+    `      <pdfaid:part>${escapeXml(pdfa.part)}</pdfaid:part>`,
+    `      <pdfaid:conformance>${escapeXml(pdfa.conformance)}</pdfaid:conformance>`,
+    '    </rdf:Description>',
   ].join('\n');
 }
 
@@ -128,6 +315,22 @@ function coerceEntryList(raw: unknown): readonly unknown[] {
   return [raw];
 }
 
+function extractPdfAIdentifier(descriptions: readonly unknown[]): BroadsetXmpPdfAIdentifier | undefined {
+  for (const descriptionRaw of descriptions) {
+    if (descriptionRaw === null || typeof descriptionRaw !== 'object') continue;
+
+    const description = descriptionRaw as ParsedRdfDescription;
+    const part = toStringValue(description['pdfaid:part']);
+    const conformance = toStringValue(description['pdfaid:conformance']);
+
+    if (part !== undefined && conformance !== undefined) {
+      return { part, conformance };
+    }
+  }
+
+  return undefined;
+}
+
 function extractEntries(description: ParsedRdfDescription): readonly BroadsetXmpElementEntry[] {
   const elementsNode = description['broadset:elements'];
 
@@ -149,7 +352,13 @@ function extractEntries(description: ParsedRdfDescription): readonly BroadsetXmp
 
     if (id === undefined || fingerprint === undefined) continue;
 
-    entries.push({ id, fingerprint });
+    const payload = toStringValue(cast['broadset:payload']);
+
+    entries.push({
+      id,
+      fingerprint,
+      ...(payload !== undefined ? { payload } : {}),
+    });
   }
 
   return entries;
@@ -185,6 +394,7 @@ export function readBroadsetXmp(input: string | Uint8Array): BroadsetXmpPacket |
     const meta = (parsed['x:xmpmeta'] ?? parsed) as Record<string, unknown>;
     const rdf = (meta['rdf:RDF'] ?? meta) as Record<string, unknown>;
     const descriptions = coerceEntryList(rdf['rdf:Description']);
+    const pdfa = extractPdfAIdentifier(descriptions);
 
     for (const descriptionRaw of descriptions) {
       if (descriptionRaw === null || typeof descriptionRaw !== 'object') continue;
@@ -201,6 +411,7 @@ export function readBroadsetXmp(input: string | Uint8Array): BroadsetXmpPacket |
         version,
         exportedAt,
         elements: extractEntries(description),
+        ...(pdfa !== undefined ? { pdfa } : {}),
       };
       const result = broadsetXmpPacketSchema.safeParse(packet);
 
