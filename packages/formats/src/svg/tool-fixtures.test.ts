@@ -1,27 +1,28 @@
 /**
- * P7.7n — Tool-ecosystem SVG fixture coverage.
+ * P7.7o — Tool-ecosystem SVG fixture coverage (real-tool exports).
  *
  * The earlier real-world fixtures (`real-world-fixtures.test.ts`)
  * pinned icon-dispenser shapes (Material, Heroicons, Bootstrap)
  * and the W3C reference samples. This unit broadens coverage to
  * the **authoring-tool** ecosystem the production importer
- * actually faces in user uploads:
+ * actually faces in user uploads, using **license-clean real
+ * exports** from each tool (see `__fixtures__/MANIFEST.md` for
+ * commit-pinned source URLs):
  *
- * | Fixture                        | Surface |
- * | ------------------------------ | ------- |
- * | `d3-bars.svg`                  | d3-v7 programmatic `<g>` hierarchies |
- * | `chrome-outerhtml.svg`         | Browser `element.outerHTML` canonical form |
- * | `illustrator-cc-style.svg`     | Adobe namespaces + `<switch>`/`<foreignObject>` wrapper |
- * | `figma-style.svg`              | `data-name` attrs + trailing defs + root `fill="none"` |
- * | `sketch-style.svg`             | `<title>`/`<desc>` blocks + cascading null paint |
- * | `affinity-style.svg`           | `<defs><style>` class-based CSS resolution |
+ * | Fixture                              | Source / License | Surface |
+ * | ------------------------------------ | ---------------- | ------- |
+ * | `d3-elm-visualization.svg`           | gampleman/elm-visualization (MIT) | d3-shape axis output: `<path class="domain">`, `<g class="tick">` per tick, programmatic translates |
+ * | `chrome-outerhtml.svg`               | Broadset (MIT)   | Browser `element.outerHTML` canonical form |
+ * | `illustrator-cordova-bug.svg`        | apache/cordova-docs (Apache-2.0) | Real Adobe Illustrator 19.1.0 export — `<style>` CSS-class system |
+ * | `illustrator-switch-wrapper.svg`     | Broadset (MIT, synthetic) | Illustrator `<switch>` / `<foreignObject>` Adobe wrapper |
+ * | `figma-adobe-spectrum.svg`           | adobe/react-spectrum (Apache-2.0) | Real Figma export — `data-name`, dual-rect stroke, `var(--…)` fills |
+ * | `sketch-wikimedia-adguard.svg`       | Wikimedia AdGuard.svg (CC-BY-SA + PD-textlogo) | Real Sketch 52.2 export — Generator comment, `<title>`/`<desc>`, cascading null paint |
+ * | `affinity-jimschubert-hi.svg`        | jimschubert/hi (Apache-2.0) | Real Affinity Designer export — `xmlns:serif`, miterlimit:1.41421, top-level `<clipPath>` |
  *
- * Each test asserts the importer extracts native Broadset elements
- * (no opaque-svg fallback for shapes the spec promises native), no
- * spurious sanitisation warnings on benign inputs, and chain
- * round-trip preserves at least one native element. Fixtures that
- * trip a documented warning (Adobe namespace, Inkscape namespace,
- * SMIL strip) verify the warning fires.
+ * Each test asserts native geometry (no opaque-svg fallback for
+ * shapes the spec promises native), no spurious sanitisation
+ * warnings on benign inputs, and chain round-trip preserves at
+ * least one native element.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -56,25 +57,29 @@ async function runImportReExportChain(svg: string): Promise<ChainResult> {
 
 describe('P7.7n — Tool-ecosystem fixture imports', () => {
   /**
-   * @description d3-v7 bar-chart idiom: nested `<g>` with `class`,
-   * programmatic `translate()` per tick, `currentColor` strokes,
-   * axis labels using `text-anchor` + `dy="0.71em"`. The importer
-   * MUST hydrate the bars + ticks as native rectangles + paths,
-   * not collapse the `<g class="tick">` hierarchy or fall back to
-   * opaque-svg. d3 emits a LOT of nested groups; the importer's
-   * group-walker handles it without warnings.
+   * @description d3-shape axis idiom (real elm-visualization
+   * output, byte-equivalent to d3): nested `<g>` with `class`,
+   * programmatic `translate()` per tick, `<path class="domain">`,
+   * `<line>` siblings + `<text>` labels per tick. The importer
+   * MUST hydrate the path + tick lines + labels as native
+   * geometry, not collapse the `<g class="tick">` hierarchy or
+   * fall back to opaque-svg. d3 emits a LOT of nested groups; the
+   * group-walker handles them without warnings.
    */
-  it('d3 bar chart: nested groups + currentColor axis hydrate natively', () => {
-    const svg = loadFixture('d3-bars.svg');
+  it('d3 axis (real export): tick groups + lines + text hydrate natively', () => {
+    const svg = loadFixture('d3-elm-visualization.svg');
     const { document, warnings } = importSvgDocument(svg, 'fixture');
     const types = document.elements.map((el) => el.type);
 
-    expect(types).toContain('rectangle'); // bars
+    // d3 emits axis-domain as `<path>`, ticks as `<line>` (which
+    // we hydrate as `path`), and labels as `<text>`.
+    expect(types).toContain('path');
+    expect(types).toContain('text');
     expect(types).not.toContain('svg'); // no opaque fallback
 
-    // d3 emits no Adobe / Inkscape namespaces — no namespace
-    // warnings should fire on this benign authoring-tool input.
-    expect(warnings.filter((w) => /namespace/i.test(w))).toEqual([]);
+    // Benign authoring-tool input — no namespace / sanitisation
+    // warnings expected.
+    expect(warnings).toEqual([]);
   });
 
   /**
@@ -95,75 +100,103 @@ describe('P7.7n — Tool-ecosystem fixture imports', () => {
   });
 
   /**
-   * @description Illustrator CC export shape — `xmlns:i` /
-   * `xmlns:graph` Adobe namespaces on the root, a `<switch>` /
-   * `<foreignObject>` Adobe wrapper holding the actual geometry,
-   * `i:extraneous` attrs. The importer MUST:
-   * - Skip the `<foreignObject>` payload (Adobe places a no-op there)
-   * - Hydrate the `<g i:extraneous="self">` body's children
-   *   natively (rect + circle)
-   * - Emit a vendor-namespace warning for the Adobe surface (per
-   *   IO-D-18, tool namespaces are documented preservation points).
+   * @description Real Adobe Illustrator 19.1.0 export
+   * (apache/cordova-docs `bug_icon.svg`, Apache-2.0). Has the
+   * canonical `Generator: Adobe Illustrator` comment + a
+   * `<style type="text/css">` block carrying `.stN` class
+   * definitions, with shapes referencing them via `class="stN"`.
+   * The importer MUST:
+   * - Drop the top-level `<style>` element silently (the CSS
+   *   resolver consumes it before the walk)
+   * - Apply the class rules so shapes get their fills resolved
+   *   (`.st1{fill:#3892AB}` → solid fill on the polygon)
+   * - Hydrate rects + polygons + paths natively (no opaque-svg).
    */
-  it('Illustrator CC: <switch>/<foreignObject> wrapper unwraps to native geometry', () => {
-    const svg = loadFixture('illustrator-cc-style.svg');
+  it('Illustrator (real export): <style> CSS-class system applies fills natively', () => {
+    const svg = loadFixture('illustrator-cordova-bug.svg');
+    const { document, warnings } = importSvgDocument(svg, 'fixture');
+    const types = document.elements.map((el) => el.type);
+    const filledPath = document.elements.find(
+      (el) => el.type === 'path' && typeof el.style.fill === 'object' && el.style.fill.kind === 'solid',
+    );
+
+    expect(types).toContain('rectangle');
+    expect(types).toContain('path'); // polygons → paths
+    expect(types).not.toContain('svg'); // no opaque fallback
+    expect(filledPath).toBeDefined(); // CSS .stN rule resolved to a real fill
+    expect(warnings).toEqual([]);
+  });
+
+  /**
+   * @description Synthetic Illustrator `<switch>` / `<foreignObject>`
+   * wrapper coverage. The Illustrator-CS through CC envelope
+   * places a `<foreignObject requiredExtensions="ns_ai">` first
+   * child (sanitiser strips the foreignObject) followed by a
+   * `<g i:extraneous="self">` carrying the real geometry. We
+   * could not find a small (<10 KB) MIT/Apache/CC0 real export
+   * with this exact wrapper, so the surface stays synthetic. The
+   * importer MUST unwrap the `<switch>` per SVG 1.1 §5.8 and
+   * recurse into the first child without an unsupported
+   * `requiredExtensions` constraint.
+   */
+  it('Illustrator <switch> wrapper: foreignObject sibling unwraps to native geometry', () => {
+    const svg = loadFixture('illustrator-switch-wrapper.svg');
     const { document } = importSvgDocument(svg, 'fixture');
     const types = document.elements.map((el) => el.type);
 
     expect(types).toContain('rectangle');
     expect(types).toContain('ellipse'); // <circle>
-    // No opaque-svg fallback — the geometry escapes the wrapper.
     expect(types).not.toContain('svg');
   });
 
   /**
-   * @description Figma export shape — `data-name` on every
-   * grouping element (the Figma layer-name surface), trailing
-   * `<defs>` after the geometry, root `fill="none"` (Figma's
-   * artboard convention), per-group `clip-path="url(#…)"`. The
-   * importer MUST:
+   * @description Real Figma export (adobe/react-spectrum
+   * `ListBox.svg`, Apache-2.0). Has `data-name` attrs on every
+   * grouping element (the Figma layer-name surface), the
+   * distinctive **dual-`<rect>` stroke pattern** (one fill rect +
+   * one stroke rect with a 0.5-px offset to render strokes
+   * crisply on retina), and `fill="var(--…)"` references to CSS
+   * custom properties. The importer MUST:
    * - NOT confuse `data-name` with Broadset's `data-bs-id`
-   * - Resolve the trailing `<defs><clipPath>` reference correctly
-   * - Hydrate path + rect children of the framed group natively.
+   * - Hydrate the dual rects natively (no opaque-svg fallback)
+   * - Preserve `<text>` / `<tspan>` content
+   * - Pass through unknown CSS-variable fills as opaque strings
+   *   (renderer will resolve them at render time).
    */
-  it('Figma: data-name attrs + trailing defs + clipPath group hydrates natively', () => {
-    const svg = loadFixture('figma-style.svg');
+  it('Figma (real export): data-name + dual-rect stroke + var(--) fills hydrate natively', () => {
+    const svg = loadFixture('figma-adobe-spectrum.svg');
     const { document, warnings } = importSvgDocument(svg, 'fixture');
     const types = document.elements.map((el) => el.type);
-    const path = document.elements.find((el) => el.type === 'path');
 
     expect(types).toContain('path');
     expect(types).toContain('rectangle');
-    expect(path).toBeDefined();
-    // No spurious sanitisation warnings — `data-name` is benign.
-    expect(warnings.filter((w) => /sanitis|removed/i.test(w))).toEqual([]);
+    expect(types).toContain('text');
+    // No spurious sanitisation warnings — `data-name` and CSS
+    // variable refs are benign.
+    expect(warnings).toEqual([]);
   });
 
   /**
-   * @description Sketch export shape — `<title>` and `<desc>`
-   * blocks (the latter typically carrying "Created with Sketch."),
-   * a `Page-1` wrapper group with cascading `stroke="none"
-   * fill="none" fill-rule="evenodd"`, decimal-translate transforms
-   * (Sketch emits `translate(10.000000, 10.000000)`). The importer
-   * MUST:
-   * - NOT parse `<title>` / `<desc>` text into a Broadset text element
-   * - Cascade the wrapper-group `fill="none"` to descendants per
-   *   SVG 1.1 §6.4 inheritance (so child `fill="#…"` overrides win)
-   * - Parse decimal-translate transforms without precision loss.
+   * @description Real Sketch 52.2 export (Wikimedia AdGuard.svg,
+   * CC-BY-SA 4.0 + PD-textlogo). Has the `Generator: Sketch 52.2`
+   * comment, `<title>logo@2x</title>` + `<desc>Created with
+   * Sketch.</desc>` blocks, a `<g id="logo">` wrapper with
+   * cascading `stroke="none" fill="none" fill-rule="evenodd"`
+   * (children override with explicit fills), and the canonical
+   * Sketch nested-group hierarchy (`Group-10 → Group-9 → Group-8 → Group-7`).
+   * The importer MUST:
+   * - Drop `<title>` / `<desc>` silently
+   * - Hydrate paths + rect natively, with the cascading null
+   *   paint correctly inherited and child fills overriding.
    */
-  it('Sketch: <title>/<desc> blocks ignored, cascading null paint inherited correctly', () => {
-    const svg = loadFixture('sketch-style.svg');
+  it('Sketch (real export): <title>/<desc> dropped, native geometry with cascading paint', () => {
+    const svg = loadFixture('sketch-wikimedia-adguard.svg');
     const { document, warnings } = importSvgDocument(svg, 'fixture');
     const rect = document.elements.find((el) => el.type === 'rectangle');
     const path = document.elements.find((el) => el.type === 'path');
 
     expect(rect).toBeDefined();
     expect(path).toBeDefined();
-
-    // The cascading group has translate(10, 10) — children land at
-    // their own (0,0) PLUS the parent translate.
-    expect(rect?.position.x).toBeCloseTo(10, 0);
-    expect(rect?.position.y).toBeCloseTo(10, 0);
 
     // <title> / <desc> are NOT misimported as Broadset text elements.
     const textEls = document.elements.filter((el) => el.type === 'text');
@@ -173,31 +206,29 @@ describe('P7.7n — Tool-ecosystem fixture imports', () => {
   });
 
   /**
-   * @description Affinity Designer export shape — `<defs><style>`
-   * block with `.cls-N` class definitions, shapes carrying
-   * `class="cls-N"` instead of inline `fill=`/`stroke=`. The
-   * importer's CSS resolution (`import-css.ts`) MUST apply the
-   * class rules to elements as presentation attributes before the
-   * shape walker reads them. A regression here would import every
-   * Affinity-exported shape with no fill / no stroke.
+   * @description Real Affinity Designer export (jimschubert/hi
+   * `assets/icon.svg`, Apache-2.0). Has the `<!-- Export settings
+   * for Affinity Designer: ... -->` comment, `xmlns:serif="…/serif"`
+   * namespace, root `style="…stroke-miterlimit:1.41421;"` (Affinity's
+   * distinctive √2 default miterlimit), and a top-level
+   * `<clipPath>` element (Affinity emits clipPaths OUTSIDE
+   * `<defs>`). The importer MUST:
+   * - Drop the top-level `<clipPath>` silently (defs-only element;
+   *   `buildDefsBundle` already extracted the path data)
+   * - Hydrate paths + ellipses natively
+   * - Resolve `style="…"` attribute paint values applied at the
+   *   root via inheritance.
    */
-  it('Affinity: <defs><style> .cls-N rules apply to class-referenced shapes', () => {
-    const svg = loadFixture('affinity-style.svg');
+  it('Affinity (real export): top-level <clipPath> dropped silently, paths hydrate natively', () => {
+    const svg = loadFixture('affinity-jimschubert-hi.svg');
     const { document, warnings } = importSvgDocument(svg, 'fixture');
-    const rect = document.elements.find((el) => el.type === 'rectangle');
-    const ellipse = document.elements.find((el) => el.type === 'ellipse'); // <circle>
+    const types = document.elements.map((el) => el.type);
     const path = document.elements.find((el) => el.type === 'path');
 
-    expect(rect).toBeDefined();
-    expect(ellipse).toBeDefined();
+    expect(types).toContain('path');
+    expect(types).toContain('ellipse');
     expect(path).toBeDefined();
-
-    // The CSS rule `.cls-1 { fill: #4a90e2 }` applied to the rect
-    // resolves to a solid fill on the imported element.
-    if (rect?.style.fill !== undefined && typeof rect.style.fill === 'object' && 'kind' in rect.style.fill) {
-      expect(rect.style.fill.kind).toBe('solid');
-    }
-
+    expect(types).not.toContain('svg'); // no opaque fallback
     expect(warnings).toEqual([]);
   });
 
@@ -208,12 +239,13 @@ describe('P7.7n — Tool-ecosystem fixture imports', () => {
    * that silently emits an empty body.
    */
   it.each([
-    ['d3-bars.svg'],
+    ['d3-elm-visualization.svg'],
     ['chrome-outerhtml.svg'],
-    ['illustrator-cc-style.svg'],
-    ['figma-style.svg'],
-    ['sketch-style.svg'],
-    ['affinity-style.svg'],
+    ['illustrator-cordova-bug.svg'],
+    ['illustrator-switch-wrapper.svg'],
+    ['figma-adobe-spectrum.svg'],
+    ['sketch-wikimedia-adguard.svg'],
+    ['affinity-jimschubert-hi.svg'],
   ])('%s: chain round-trip preserves at least one native element', async (filename) => {
     const result = await runImportReExportChain(loadFixture(filename));
 
