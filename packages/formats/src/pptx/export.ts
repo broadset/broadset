@@ -30,7 +30,7 @@ export async function exportPptxBytesAsync(
 
 /**
  * Async export that surfaces fidelity-loss warnings (e.g. silent
- * `box-shadow` drops, animation presets beyond fade-entry per
+ * `box-shadow` drops, animation effects outside the PPTX timing mapper per
  * IO-D-16). Returns both the bytes and the structured warning list so
  * callers can show a fidelity-loss toast to the user.
  */

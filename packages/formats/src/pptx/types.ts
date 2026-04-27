@@ -83,7 +83,7 @@ export type PptxExportWarningCode =
   | 'shadow-dropped'
   /** Multi-shadow list truncated — OOXML carries at most one outer shadow + one inner shadow per shape. */
   | 'shadow-truncated'
-  /** Animation isn't representable as a PowerPoint preset entrance effect; dropped per IO-D-16 (the `.bsp` is the source of truth for animation data). */
+  /** Animation isn't representable as a PowerPoint timing effect; dropped per IO-D-16 (the `.bsp` is the source of truth for animation data). */
   | 'animation-preset-unsupported';
 
 export interface PptxExportWarning {

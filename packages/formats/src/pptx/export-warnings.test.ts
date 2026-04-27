@@ -89,8 +89,8 @@ describe('PPTX exporter — warnings sink', () => {
   });
 
   /**
-   * @description Animations that don't match the fade-entry preset
-   * heuristic drop per IO-D-16. The exporter MUST surface
+  * @description Animations that don't match the supported PPTX timing
+  * heuristics drop per IO-D-16. The exporter MUST surface
    * `animation-preset-unsupported` so callers can tell the user that
    * non-preset animations stay in the `.bsp` source-of-truth.
    */

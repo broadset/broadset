@@ -63,57 +63,57 @@ Scoring legend for each column (Export, Import, Round-trip):
 - **dropped** — the feature is not representable in PPTX; deliberately omitted on export, flagged on import.
 - **n/a** — direction does not apply.
 
-| Domain | Feature | Export | Import | Round-trip |
-| --- | --- | --- | --- | --- |
-| Text | Single-run plain text | native | native | native |
-| Text | Multi-run styled text (`TextBody` + `Paragraph` + `Run`) | native | native | native |
-| Text | Paragraph style (alignment, indent, margin, line spacing) | native | native | native |
-| Text | Run style (family, size, weight, italic, underline, colour, lang) | native | native | native |
-| Text | Hyperlink run | native | native | native |
-| Text | Bullets and numbered lists | native | native | native |
-| Text | Text-on-path | dropped | metadata-preserved | metadata-preserved |
-| Text | Autofit / shrink-to-fit | native | native | native |
-| Text | RTL / mixed direction | native | native | native |
-| Vector | Rectangle / ellipse | native (`prstGeom`) | native | native |
-| Vector | Rounded rectangle (uniform) | native (`prstGeom="roundRect"`) | native | native |
-| Vector | Rounded rectangle (per-corner) | native (`custGeom`) | native | native |
-| Vector | Arbitrary `path` element | native (`custGeom`) | native | native |
-| Vector | Preset shapes (triangle, star, arrow, callout, …) | native (`prstGeom`) | native | native |
-| Vector | Stroke (cap / join / dasharray / miterlimit / arrowheads) | native (`<a:ln>`) | native | native |
-| Vector | Fill — solid colour | native (`<a:solidFill>`) | native | native |
-| Vector | Fill — gradient (linear / radial / path) | native (`<a:gradFill>`) | native | native |
-| Vector | Fill — conic gradient | dropped (not in OOXML) | metadata-preserved | metadata-preserved |
-| Vector | Fill — pattern | native (`<a:pattFill>`) | native | native |
-| Vector | Fill — picture | native (`<a:blipFill>`) | native | native |
-| Vector | Theme-colour references (`schemeClr` + mods) | native | native | native |
-| Raster | Image element | native (`<p:pic>`) | native | native |
-| Raster | ICC profile on image asset | metadata-preserved | metadata-preserved | metadata-preserved |
-| Groups | `'group'` element ↔ `<p:grpSp>` | native | native | native |
-| Groups | Nested groups + composed child transforms | native | native | native |
-| Groups | Group-level opacity | native | native | native |
-| QR code | `qrcode` element | native (grouped rects when small; picture otherwise) | metadata-preserved | metadata-preserved |
-| Clock | `clock` element | native (rendered IN-state + `<p:extLst>` config) | metadata-preserved | metadata-preserved |
-| Ticker | `ticker` element | native (rendered IN-state + `<p:extLst>` config) | metadata-preserved | metadata-preserved |
-| Video | `video` element | native (first-frame picture + `<p:extLst>` source) | metadata-preserved | metadata-preserved |
-| Animations | Fade / wipe / fly / zoom / rotate / path-motion | native (`<p:timing>`) | native | native |
-| Animations | Unmappable animations | dropped | dropped | dropped |
-| Transitions | Slide transitions | native (`<p:transition>`) | native | native |
-| Notes | Speaker notes (`Page.notes`) | native | native | native |
-| Slides | Multi-slide (page → slide) | native | native | native |
-| Slides | Page overrides materialized per slide | native | n/a (round-trip via XMP page-override maps) | metadata-preserved |
-| Theme | Generated theme / master / layout | native | native | native |
-| Tables | Tables (`<a:tbl>`) | metadata-preserved (`extensions.pptx.table`) | metadata-preserved | metadata-preserved |
-| Charts | Charts (`<c:chart>`) | metadata-preserved (`extensions.pptx.chart`) | metadata-preserved | metadata-preserved |
-| Connectors | Connector shapes | metadata-preserved (`extensions.pptx.connector`) | metadata-preserved | metadata-preserved |
-| Comments | Slide comments | metadata-preserved (`extensions.pptx.comments`) | metadata-preserved | metadata-preserved |
-| Unknown | Unknown OOXML shape | metadata-preserved (`extensions.pptx.raw`) | metadata-preserved | metadata-preserved |
-| Security | VBA macros (`vbaProject.bin`) | dropped | dropped (with warning) | dropped |
-| Security | OLE embeddings | dropped | dropped (with warning) | dropped |
-| Security | Ink / 3D / SmartArt / active content | dropped | metadata-preserved | metadata-preserved |
-| Metadata | Document XMP (`broadset:` namespace) | native | native | native |
-| Metadata | Custom XML parts (`customXml/broadset-*.xml`) | native | native | native |
-| Metadata | Per-shape `<p:extLst>` + shape-name tag | native | native | native |
-| Metadata | Content-hash ledger (`broadset-interop.xml`) | native | native | native |
+| Domain      | Feature                                                           | Export                                               | Import                                      | Round-trip         |
+| ----------- | ----------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------- | ------------------ |
+| Text        | Single-run plain text                                             | native                                               | native                                      | native             |
+| Text        | Multi-run styled text (`TextBody` + `Paragraph` + `Run`)          | native                                               | native                                      | native             |
+| Text        | Paragraph style (alignment, indent, margin, line spacing)         | native                                               | native                                      | native             |
+| Text        | Run style (family, size, weight, italic, underline, colour, lang) | native                                               | native                                      | native             |
+| Text        | Hyperlink run                                                     | native                                               | native                                      | native             |
+| Text        | Bullets and numbered lists                                        | native                                               | native                                      | native             |
+| Text        | Text-on-path                                                      | dropped                                              | metadata-preserved                          | metadata-preserved |
+| Text        | Autofit / shrink-to-fit                                           | native                                               | native                                      | native             |
+| Text        | RTL / mixed direction                                             | native                                               | native                                      | native             |
+| Vector      | Rectangle / ellipse                                               | native (`prstGeom`)                                  | native                                      | native             |
+| Vector      | Rounded rectangle (uniform)                                       | native (`prstGeom="roundRect"`)                      | native                                      | native             |
+| Vector      | Rounded rectangle (per-corner)                                    | native (`custGeom`)                                  | native                                      | native             |
+| Vector      | Arbitrary `path` element                                          | native (`custGeom`)                                  | native                                      | native             |
+| Vector      | Preset shapes (triangle, star, arrow, callout, …)                 | native (`prstGeom`)                                  | native                                      | native             |
+| Vector      | Stroke (cap / join / dasharray / miterlimit / arrowheads)         | native (`<a:ln>`)                                    | native                                      | native             |
+| Vector      | Fill — solid colour                                               | native (`<a:solidFill>`)                             | native                                      | native             |
+| Vector      | Fill — gradient (linear / radial / path)                          | native (`<a:gradFill>`)                              | native                                      | native             |
+| Vector      | Fill — conic gradient                                             | dropped (not in OOXML)                               | metadata-preserved                          | metadata-preserved |
+| Vector      | Fill — pattern                                                    | native (`<a:pattFill>`)                              | native                                      | native             |
+| Vector      | Fill — picture                                                    | native (`<a:blipFill>`)                              | native                                      | native             |
+| Vector      | Theme-colour references (`schemeClr` + mods)                      | native                                               | native                                      | native             |
+| Raster      | Image element                                                     | native (`<p:pic>`)                                   | native                                      | native             |
+| Raster      | ICC profile on image asset                                        | metadata-preserved                                   | metadata-preserved                          | metadata-preserved |
+| Groups      | `'group'` element ↔ `<p:grpSp>`                                   | native                                               | native                                      | native             |
+| Groups      | Nested groups + composed child transforms                         | native                                               | native                                      | native             |
+| Groups      | Group-level opacity                                               | native                                               | native                                      | native             |
+| QR code     | `qrcode` element                                                  | native (grouped rects when small; picture otherwise) | metadata-preserved                          | metadata-preserved |
+| Clock       | `clock` element                                                   | native (rendered IN-state + `<p:extLst>` config)     | metadata-preserved                          | metadata-preserved |
+| Ticker      | `ticker` element                                                  | native (rendered IN-state + `<p:extLst>` config)     | metadata-preserved                          | metadata-preserved |
+| Video       | `video` element                                                   | native (first-frame picture + `<p:extLst>` source)   | metadata-preserved                          | metadata-preserved |
+| Animations  | Fade / wipe / fly / zoom / rotate / path-motion                   | native (`<p:timing>`)                                | native                                      | native             |
+| Animations  | Unmappable animations                                             | dropped                                              | dropped                                     | dropped            |
+| Transitions | Slide transitions                                                 | native (`<p:transition>`)                            | native                                      | native             |
+| Notes       | Speaker notes (`Page.notes`)                                      | native                                               | native                                      | native             |
+| Slides      | Multi-slide (page → slide)                                        | native                                               | native                                      | native             |
+| Slides      | Page overrides materialized per slide                             | native                                               | n/a (round-trip via XMP page-override maps) | metadata-preserved |
+| Theme       | Generated theme / master / layout                                 | native                                               | native                                      | native             |
+| Tables      | Tables (`<a:tbl>`)                                                | metadata-preserved (`extensions.pptx.table`)         | metadata-preserved                          | metadata-preserved |
+| Charts      | Charts (`<c:chart>`)                                              | metadata-preserved (`extensions.pptx.chart`)         | metadata-preserved                          | metadata-preserved |
+| Connectors  | Connector shapes                                                  | metadata-preserved (`extensions.pptx.connector`)     | metadata-preserved                          | metadata-preserved |
+| Comments    | Slide comments                                                    | metadata-preserved (`extensions.pptx.comments`)      | metadata-preserved                          | metadata-preserved |
+| Unknown     | Unknown OOXML shape                                               | metadata-preserved (`extensions.pptx.raw`)           | metadata-preserved                          | metadata-preserved |
+| Security    | VBA macros (`vbaProject.bin`)                                     | dropped                                              | dropped (with warning)                      | dropped            |
+| Security    | OLE embeddings                                                    | dropped                                              | dropped (with warning)                      | dropped            |
+| Security    | Ink / 3D / SmartArt / active content                              | dropped                                              | metadata-preserved                          | metadata-preserved |
+| Metadata    | Document XMP (`broadset:` namespace)                              | native                                               | native                                      | native             |
+| Metadata    | Custom XML parts (`customXml/broadset-*.xml`)                     | native                                               | native                                      | native             |
+| Metadata    | Per-shape `<p:extLst>` + shape-name tag                           | native                                               | native                                      | native             |
+| Metadata    | Content-hash ledger (`broadset-interop.xml`)                      | native                                               | native                                      | native             |
 
 ---
 
@@ -510,7 +510,7 @@ When re-importing a Broadset-exported PPTX that has been edited externally, the 
 - **First-class Broadset chart element.** `<c:chart>` currently imports as `extensions.pptx.raw` preservation blob plus a rectangle visual fallback. Native chart authoring is out of scope.
 - **Ink / 3D / SmartArt / connectors / comments.** Preserved under `extensions.pptx.raw` via the unsupported-shape preservation path but not first-class; upgrade path deferred.
 - **Font embedding under `ppt/fonts/`.** Subsetted embedded fonts use the `_shared/fonts/` subsetter landed in Phase 4. Full font-embedding acceptance tests (byte-level OS/2 / name-table assertions) land when a license-clear font fixture is available.
-- **`<p:timing>` animations beyond the supported preset set.** Fade-in, fly-in (from top / right / bottom / left), zoom-in, and wipe entrance effects round-trip natively via `<p:timing>` — see `pptx/export/animation.ts` for the heuristics that detect each preset from the Broadset keyframe shape and `pptx/import/animation.ts` for the inverse. Rotate and path-motion entrances, plus all exit / emphasis effects, still drop on export per IO-D-16 and surface as an `animation-preset-unsupported` warning. Broadening to those classes requires Broadset model additions (motion-path keyframes specifically) and stays tracked as a future unit.
+- **`<p:timing>` animations beyond the supported effect set.** Fade, fly, zoom, wipe, rotate, and motion-path effects round-trip natively via `<p:timing>` for the supported entrance / exit / emphasis / path classes — see `pptx/export/animation.ts` for the heuristics that detect each Broadset timeline shape and `pptx/import/animation.ts` for the inverse. The remaining PowerPoint preset long tail outside those mapped effects still drops per IO-D-16 and surfaces as an `animation-preset-unsupported` warning.
 - **Page-override content / style / assetId materialization.** The PPTX exporter applies `Page.elements[].visible` and `Page.elements[].transform` (position + rotation) when emitting each slide. The spec lists "content, style, assetId" overrides too, but the model's `PageElementInstance` only carries `elementId`, `transform`, `visible` — content / style / assetId page overrides require a model-level addition outside Phase 8 scope.
 - **Real-world external-tool golden files.** Synthesized fixtures in `pptx/fixtures/external-tools.ts` cover each tool's characteristic quirks. The `packages/formats/test-fixtures/pptx/real/` directory + harness in `pptx/real-fixtures.test.ts` accept locally-licensed `.pptx` files (drop them in, the harness picks them up; the directory is git-ignored so corporate content never lands in the repo). The harness skips cleanly when empty, so CI stays green for contributors who can't share licensed fixtures. Adding a corpus to CI requires a private mounting strategy (git submodule with restricted access, or a private S3 bucket fetched at the test step) plus legal sign-off — those steps live outside the formats package.
 - **Full OOXML XSD validation.** `validatePptxPackage` performs structural ECMA-376 conformance checks (root rels, slide rel targets, content-type overrides, XML parsability, macro rejection). Full schema validation against the ISO/IEC 29500 XSDs is deferred to a future external-tool CI gate that runs `libreoffice --headless --convert-to pptx` or PowerPoint on Windows.
