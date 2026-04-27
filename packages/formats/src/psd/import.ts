@@ -327,13 +327,42 @@ function populateLinkedFiles(psd: ReturnType<typeof readPsd>): void {
   }
 }
 
-function collectChildElements(children: readonly Layer[] | undefined): BroadsetElement[] {
+function isGroupLayer(layer: Layer): boolean {
+  return Array.isArray(layer.children) && layer.children.length > 0;
+}
+
+function importGroupLayer(layer: Layer, parentId: string | null): BroadsetElement {
+  const geometry = extractGeometry(layer);
+  const emptyStyle: Partial<BroadsetElementStyleInput> = {};
+  const base = createImportedElement(
+    'group',
+    '',
+    geometry.position,
+    geometry.width,
+    geometry.height,
+    emptyStyle,
+  );
+
+  return { ...base, name: layer.name ?? base.name, parentId };
+}
+
+function collectChildElements(children: readonly Layer[] | undefined, parentId: string | null = null): BroadsetElement[] {
   const elements: BroadsetElement[] = [];
 
   for (const child of children ?? []) {
+    if (isGroupLayer(child)) {
+      const groupEl = importGroupLayer(child, parentId);
+
+      elements.push(groupEl);
+      elements.push(...collectChildElements(child.children, groupEl.id));
+      continue;
+    }
+
     const el = layerToElement(child);
 
-    if (el) elements.push(el);
+    if (el === undefined) continue;
+
+    elements.push(parentId === null ? el : { ...el, parentId });
   }
 
   return elements;

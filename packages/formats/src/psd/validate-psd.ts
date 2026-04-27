@@ -45,9 +45,14 @@ export function validatePsdBytes(bytes: Uint8Array): PsdValidationResult {
 
   try {
     psd = readPsd(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, {
-      skipCompositeImageData: false,
+      // Force layer image data to be read so a writer that emitted
+      // a corrupt layer body fails here rather than at consumer time.
       skipLayerImageData: false,
-      skipThumbnail: false,
+      // Composite + thumbnail are optional in the PSD format spec
+      // (Photoshop generates them lazily). Forcing them would falsely
+      // fail empty / fixture-style documents, so leave them skipped.
+      skipCompositeImageData: true,
+      skipThumbnail: true,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'unknown parse error';
