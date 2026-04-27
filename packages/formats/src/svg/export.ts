@@ -23,7 +23,7 @@ import { fingerprintElement } from '../_shared/fingerprint';
 import { sanitizeSvg } from '../_shared/sanitize';
 import { generateQrSvgFragment } from '../interchange';
 import { type FontEmbedPlan, planFontEmbedding } from './export-fonts';
-import { escapeXml } from './shared';
+import { escapeXml, isAllowedImageUrlScheme } from './shared';
 import { SVG_BROADSET_NAMESPACE, type SvgExportOptions } from './types';
 
 const SVG_XMLNS = 'http://www.w3.org/2000/svg';
@@ -251,8 +251,11 @@ function renderPatternDef(
   // resolver, fall back to the asset id verbatim — the resulting
   // SVG is structurally correct but won't render in standalone
   // viewers without an external asset registry. P7.7j adds the
-  // resolver hook to close the spec line-23 contract.
-  const href = assetResolver?.(fill.assetId) ?? fill.assetId;
+  // resolver hook to close the spec line-23 contract; P7.7l
+  // rejects unsafe schemes (javascript:, data:text/html) returned
+  // by a malicious or compromised resolver.
+  const resolved = assetResolver?.(fill.assetId) ?? fill.assetId;
+  const href = isAllowedImageUrlScheme(resolved) ? resolved : '';
   const inner = `<image href="${escapeXml(href)}" xlink:href="${escapeXml(href)}" width="${String(width)}" height="${String(height)}" preserveAspectRatio="${fill.kind === 'picture' && fill.mode === 'stretch' ? 'none' : 'xMidYMid meet'}"/>`;
 
   return `<pattern id="${id}" patternUnits="${patternUnits}" width="${String(width)}" height="${String(height)}">${inner}</pattern>`;
@@ -826,11 +829,13 @@ function resolveImageHref(
   const contentStr = resolveContentAsPlainString(el.content);
 
   if (contentStr !== '') {
-    return contentStr;
+    return isAllowedImageUrlScheme(contentStr) ? contentStr : '';
   }
 
   if (el.assetId !== null) {
-    return assetResolver?.(el.assetId) ?? el.assetId;
+    const resolved = assetResolver?.(el.assetId) ?? el.assetId;
+
+    return isAllowedImageUrlScheme(resolved) ? resolved : '';
   }
 
   return '';

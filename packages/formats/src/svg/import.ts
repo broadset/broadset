@@ -9,8 +9,11 @@ import {
   createDefaultElement,
   createEmptyBroadsetDocument,
   type DataFieldBinding,
+  type FilterPrimitive,
+  type FilterStack,
   type Paragraph,
   paragraph as makeParagraph,
+  type PatternFill,
   type RepeaterConfig,
   rgbColor,
   type Run,
@@ -1548,18 +1551,251 @@ function resolveGradientFill(
   fillAttr: string | null,
   gradients: ReadonlyMap<string, BroadsetGradient>,
 ): BroadsetGradient | undefined {
-  if (fillAttr === null) {
-    return undefined;
-  }
+  const id = parseUrlRef(fillAttr);
 
-  const match = /url\(\s*#([^)\s]+)\s*\)/.exec(fillAttr);
-  const id = match?.[1];
-
-  if (id === undefined) {
-    return undefined;
-  }
+  if (id === undefined) return undefined;
 
   return gradients.get(id);
+}
+
+/**
+ * Extract the id from a `url(#foo)` paint-server / filter / mask
+ * reference. Returns `undefined` when the attribute is null or not
+ * a `url(#…)` reference. Shared by gradient / filter / mask /
+ * pattern resolvers — every SVG def reference uses this form.
+ */
+function parseUrlRef(attr: string | null): string | undefined {
+  if (attr === null) return undefined;
+
+  const match = /url\(\s*#([^)\s]+)\s*\)/.exec(attr);
+
+  return match?.[1];
+}
+
+/**
+ * Build a map of filter id → `FilterStack` from every `<filter>`
+ * def in the source. Each filter primitive (`<feGaussianBlur>`,
+ * `<feColorMatrix>`, `<feDropShadow>`, `<feComponentTransfer>`)
+ * hydrates to its corresponding `FilterPrimitive` shape. Unknown
+ * primitives fall back to `custom-svg` carrying the source markup
+ * verbatim so re-export round-trips the visual identity. Closes
+ * the P7.7l review #4 blocker.
+ */
+function buildFiltersMap(doc: Document): ReadonlyMap<string, FilterStack> {
+  const map = new Map<string, FilterStack>();
+  const filters = doc.getElementsByTagName('filter');
+
+  for (let i = 0; i < filters.length; i++) {
+    const filter = filters[i];
+
+    if (filter === undefined) continue;
+
+    const id = filter.getAttribute('id');
+
+    if (id === null || id === '') continue;
+
+    const stack = readFilterStack(filter);
+
+    if (stack.length === 0) continue;
+
+    map.set(id, stack);
+  }
+
+  return map;
+}
+
+function readFilterStack(filter: Element): FilterStack {
+  const stack: FilterPrimitive[] = [];
+  const children = filter.children;
+
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+
+    if (child === undefined) continue;
+
+    const primitive = readFilterPrimitive(child);
+
+    if (primitive !== undefined) stack.push(primitive);
+  }
+
+  return stack;
+}
+
+function readFilterPrimitive(el: Element): FilterPrimitive | undefined {
+  const tag = el.tagName.toLowerCase();
+
+  if (tag === 'fegaussianblur') return readBlurPrimitive(el);
+  if (tag === 'fedropshadow') return readDropShadowPrimitive(el);
+  if (tag === 'fecolormatrix') return readColorMatrixPrimitive(el);
+
+  // Every other primitive (`<feComponentTransfer>`, `<feTurbulence>`,
+  // `<feMorphology>`, `<feConvolveMatrix>`, etc.) preserves verbatim
+  // as `custom-svg`. The exporter sanitises before emission per the
+  // FilterStack docs, so the re-import → re-export pass stays safe.
+  return { kind: 'custom-svg', svg: el.outerHTML };
+}
+
+function readBlurPrimitive(el: Element): FilterPrimitive | undefined {
+  const sd = parseFloat(el.getAttribute('stdDeviation') ?? '0');
+
+  if (!Number.isFinite(sd) || sd < 0) return undefined;
+
+  return { kind: 'blur', stdDeviation: sd };
+}
+
+function readDropShadowPrimitive(el: Element): FilterPrimitive | undefined {
+  const dx = parseFloat(el.getAttribute('dx') ?? '0');
+  const dy = parseFloat(el.getAttribute('dy') ?? '0');
+  // Export halves the blur via `stdDeviation = blur / 2`; double
+  // it back so the round-trip recovers the original value.
+  const sd = parseFloat(el.getAttribute('stdDeviation') ?? '0');
+
+  if (!Number.isFinite(dx) || !Number.isFinite(dy) || !Number.isFinite(sd)) return undefined;
+
+  const flood = el.getAttribute('flood-color') ?? '#000000';
+  const color = parseHexColor(flood);
+
+  return { kind: 'drop-shadow', offsetX: dx, offsetY: dy, blur: sd * 2, color };
+}
+
+function readColorMatrixPrimitive(el: Element): FilterPrimitive | undefined {
+  const type = (el.getAttribute('type') ?? 'matrix').toLowerCase();
+  const valuesStr = el.getAttribute('values') ?? '';
+
+  if (type === 'huerotate' || type === 'saturate') {
+    const amount = parseFloat(valuesStr);
+
+    if (!Number.isFinite(amount)) return undefined;
+
+    return { kind: type === 'huerotate' ? 'hue-rotate' : 'saturate', amount };
+  }
+
+  // type="matrix" (default) or type="luminanceToAlpha" — preserve
+  // verbatim as a `color-matrix` primitive.
+  const matrix = valuesStr
+    .split(/[\s,]+/)
+    .filter((s) => s !== '')
+    .map(parseFloat)
+    .filter((n) => Number.isFinite(n));
+
+  if (matrix.length === 0) return undefined;
+
+  return { kind: 'color-matrix', matrix };
+}
+
+/**
+ * Parse a CSS color string into a `BroadsetColor`. Hands the raw
+ * input to `rgbColor`, which normalizes named colors, `rgb()`,
+ * `hsl()`, 3/4/6/8-digit hex through the model's `normalizeColor`.
+ * Falls back to opaque black for unparseable input so the importer
+ * never throws on an unusual flood-color.
+ */
+function parseHexColor(input: string): BroadsetColor {
+  try {
+    return rgbColor(input);
+  } catch {
+    return rgbColor('#000000');
+  }
+}
+
+/**
+ * Build a map of mask id → mask path `d` string from every
+ * `<mask>` def. The exporter emits masks as a single `<path d>`
+ * inside the `<mask>` body (see `renderMaskDef`); the importer
+ * pulls the same `d` back out so a re-export reproduces the
+ * original mask geometry. Closes the P7.7l review #4 blocker.
+ */
+function buildMasksMap(doc: Document): ReadonlyMap<string, string> {
+  const map = new Map<string, string>();
+  const masks = doc.getElementsByTagName('mask');
+
+  for (let i = 0; i < masks.length; i++) {
+    const mask = masks[i];
+
+    if (mask === undefined) continue;
+
+    const id = mask.getAttribute('id');
+
+    if (id === null || id === '') continue;
+
+    // Find the first descendant `<path d>` — `<mask>` may contain
+    // arbitrary geometry, but the canonical Broadset shape is a
+    // single path. Real-world tools (Figma, Illustrator) follow
+    // the same convention.
+    const path = mask.getElementsByTagName('path')[0];
+    const d = path?.getAttribute('d');
+
+    if (typeof d === 'string' && d !== '') map.set(id, d);
+  }
+
+  return map;
+}
+
+/**
+ * Build a map of pattern id → `PatternFill` from every `<pattern>`
+ * def. The pattern's inner `<image href>` becomes the assetId on
+ * the resulting `PatternFill`, so re-export round-trips the
+ * reference (data URI for embedded bytes, URL for external).
+ * Patterns lacking an `<image>` body are skipped — a `<pattern>`
+ * holding raw shapes has no Broadset equivalent and degrades to
+ * the raw paint-server string fallback. Closes the P7.7l review
+ * #4 blocker.
+ */
+function buildPatternsMap(doc: Document): ReadonlyMap<string, PatternFill> {
+  const map = new Map<string, PatternFill>();
+  const patterns = doc.getElementsByTagName('pattern');
+
+  for (let i = 0; i < patterns.length; i++) {
+    const pattern = patterns[i];
+
+    if (pattern === undefined) continue;
+
+    const id = pattern.getAttribute('id');
+
+    if (id === null || id === '') continue;
+
+    const image = pattern.getElementsByTagName('image')[0];
+
+    if (image === undefined) continue;
+
+    const href = image.getAttribute('href') ?? image.getAttribute('xlink:href') ?? '';
+
+    if (href === '') continue;
+
+    map.set(id, { kind: 'pattern', assetId: href, repeat: 'repeat' });
+  }
+
+  return map;
+}
+
+function resolveFilterStack(
+  filterAttr: string | null,
+  filters: ReadonlyMap<string, FilterStack>,
+): FilterStack | undefined {
+  const id = parseUrlRef(filterAttr);
+
+  if (id === undefined) return undefined;
+
+  return filters.get(id);
+}
+
+function resolveMaskPath(maskAttr: string | null, masks: ReadonlyMap<string, string>): string | undefined {
+  const id = parseUrlRef(maskAttr);
+
+  if (id === undefined) return undefined;
+
+  return masks.get(id);
+}
+
+function resolvePatternFill(
+  fillAttr: string | null,
+  patterns: ReadonlyMap<string, PatternFill>,
+): PatternFill | undefined {
+  const id = parseUrlRef(fillAttr);
+
+  if (id === undefined) return undefined;
+
+  return patterns.get(id);
 }
 
 function importUnsupportedElement(el: Element, transform: TransformState, warnings: string[]): ImportedElement {
@@ -1578,6 +1814,21 @@ function importUnsupportedElement(el: Element, transform: TransformState, warnin
   };
 }
 
+/**
+ * The collection of `<defs>` resolutions a single import pass
+ * shares across every element. Bundled into one struct so the
+ * recursive walk doesn't grow a parameter list every time we
+ * support a new defs surface (filters, masks, patterns added in
+ * P7.7l).
+ */
+interface DefsBundle {
+  readonly clipPaths: ReadonlyMap<string, string>;
+  readonly gradients: ReadonlyMap<string, BroadsetGradient>;
+  readonly filters: ReadonlyMap<string, FilterStack>;
+  readonly masks: ReadonlyMap<string, string>;
+  readonly patterns: ReadonlyMap<string, PatternFill>;
+}
+
 interface GroupImportContext {
   readonly transformStr: string;
   readonly transform: TransformState;
@@ -1590,8 +1841,7 @@ interface GroupImportContext {
     readonly parentDataBsId: string | null;
   }>;
   readonly parentDataBsId: string | null;
-  readonly defsMap: ReadonlyMap<string, string>;
-  readonly gradients: ReadonlyMap<string, BroadsetGradient>;
+  readonly defs: DefsBundle;
   readonly warnings: string[];
   readonly depth: number;
   readonly fontSources?: ReadonlyMap<string, SvgFontSource> | undefined;
@@ -1661,8 +1911,7 @@ function importGroupElement(el: Element, ctx: GroupImportContext): ImportedEleme
     importedChildren.push(
       ...importElement(
         child,
-        ctx.defsMap,
-        ctx.gradients,
+        ctx.defs,
         ctx.warnings,
         ctx.transform,
         childParentId,
@@ -1939,47 +2188,107 @@ function importPolygonElement(el: Element, ctx: ShapeBakeContext, closed: boolea
  * import + export).
  */
 function readTextContent(source: Element): string | TextBody {
-  const tspans = source.getElementsByTagName('tspan');
+  const directTspans = collectDirectTspanChildren(source);
 
-  if (tspans.length === 0) {
+  if (directTspans.length === 0) {
     return source.textContent;
   }
 
-  const runs: Run[] = readTspanRuns(tspans);
+  // Walk direct `<tspan>` children only — `getElementsByTagName`
+  // returns descendants and would double-count text inside nested
+  // tspans (the outer's `textContent` already includes the inner's
+  // bytes). The walker below recurses into nested children but
+  // emits one Run per leaf, so each text byte appears exactly once.
+  // P7.7l review #4 blocker.
+  const paragraphs: Paragraph[] = [];
+  let currentRuns: Run[] = [];
 
-  if (runs.length === 0) {
-    return source.textContent;
+  for (const tspan of directTspans) {
+    // `dy="1em"` is the canonical SVG paragraph-break convention
+    // (matches Broadset's own exporter — see text-tspan.test.ts
+    // P7.7j export tests). When a non-first tspan carries
+    // `dy="1em"`, flush the current paragraph and start a new one.
+    const isParagraphBreak = currentRuns.length > 0 && tspanIsParagraphBreak(tspan);
+
+    if (isParagraphBreak) {
+      paragraphs.push(makeParagraph(currentRuns));
+      currentRuns = [];
+    }
+
+    appendRunsFromTspan(tspan, currentRuns);
   }
 
-  // Single paragraph for now — SVG doesn't have explicit
-  // paragraph markers (unlike DOCX), so all `<tspan>`s collapse
-  // into one paragraph. Authors typically use `dy="1em"` on a
-  // tspan to encode a paragraph break; that visual cue is
-  // preserved in the round-trip via the metadata packet's
-  // structural fingerprint, not through the TextBody shape.
-  const paragraphs: Paragraph[] = [makeParagraph(runs)];
+  if (currentRuns.length > 0) {
+    paragraphs.push(makeParagraph(currentRuns));
+  }
+
+  if (paragraphs.length === 0 || paragraphs.every((p) => p.runs.length === 0)) {
+    return source.textContent;
+  }
 
   return makeTextBody(paragraphs);
 }
 
-function readTspanRuns(tspans: HTMLCollectionOf<Element>): Run[] {
-  const runs: Run[] = [];
+function collectDirectTspanChildren(source: Element): Element[] {
+  const out: Element[] = [];
+  const children = source.children;
 
-  for (let i = 0; i < tspans.length; i++) {
-    const tspan = tspans[i];
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
 
-    if (tspan === undefined) continue;
-
-    const text = tspan.textContent;
-
-    if (text === '') continue;
-
-    const props = readRunPropsFromTspan(tspan);
-
-    runs.push(props !== undefined ? makeRun(text, props) : makeRun(text));
+    if (child === undefined) continue;
+    if (child.tagName.toLowerCase() === 'tspan') out.push(child);
   }
 
-  return runs;
+  return out;
+}
+
+function tspanIsParagraphBreak(tspan: Element): boolean {
+  const dy = tspan.getAttribute('dy');
+
+  if (typeof dy !== 'string' || dy === '') return false;
+
+  // Match `1em`, `1.0em`, etc. — the canonical break marker.
+  // Other dy values (raw px shifts, super/subscript) are not
+  // paragraph breaks and stay in the current paragraph.
+  return /^1(\.0+)?em$/i.test(dy.trim());
+}
+
+/**
+ * Append one Run per leaf segment in a `<tspan>` subtree.
+ * Iterates direct children: text nodes become a Run carrying the
+ * tspan's own style overrides; nested `<tspan>` recurses with
+ * the child's overrides taking precedence. The result is exactly
+ * one Run per visible text segment — no duplication.
+ */
+function appendRunsFromTspan(tspan: Element, out: Run[]): void {
+  const ownProps = readRunPropsFromTspan(tspan);
+  const flushText = (text: string): void => {
+    if (text === '') return;
+
+    out.push(ownProps !== undefined ? makeRun(text, ownProps) : makeRun(text));
+  };
+  const childNodes = tspan.childNodes;
+  let directText = '';
+
+  for (let i = 0; i < childNodes.length; i++) {
+    const node = childNodes[i];
+
+    if (node === undefined) continue;
+
+    if (node.nodeType === 3 /* TEXT_NODE */) {
+      directText += node.textContent ?? '';
+      continue;
+    }
+
+    if (node.nodeType === 1 /* ELEMENT_NODE */ && (node as Element).tagName.toLowerCase() === 'tspan') {
+      flushText(directText);
+      directText = '';
+      appendRunsFromTspan(node as Element, out);
+    }
+  }
+
+  flushText(directText);
 }
 
 /**
@@ -2155,8 +2464,7 @@ function importImageElement(el: Element, ctx: ShapeBakeContext, warnings: string
 
 function importElement(
   el: Element,
-  defsMap: ReadonlyMap<string, string>,
-  gradients: ReadonlyMap<string, BroadsetGradient>,
+  defs: DefsBundle,
   warnings: string[],
   inheritedTransform: TransformState,
   parentDataBsId: string | null = null,
@@ -2166,7 +2474,7 @@ function importElement(
   const tagName = el.tagName.toLowerCase();
   const transformStr = getAttr(el, 'transform') ?? '';
   const transform = combineTransform(inheritedTransform, parseTransform(transformStr));
-  const clipPath = resolveClipPath(el, defsMap);
+  const clipPath = resolveClipPath(el, defs.clipPaths);
   // Presentation attributes inherit from ancestor elements per
   // SVG 1.1 §6.4 / §11.4 (e.g., `<svg stroke="currentColor"
   // stroke-width="1.5">` cascades to every `<path>` descendant).
@@ -2176,13 +2484,31 @@ function importElement(
   // level stroke / fill.
   const fill = getInheritedAttr(el, 'fill');
   const stroke = getInheritedAttr(el, 'stroke');
-  const gradient = resolveGradientFill(fill, gradients);
+  // P7.7l: resolve `<filter>`, `<mask>`, and `<pattern>` defs so
+  // re-importing a Broadset-exported SVG round-trips the filter
+  // stack, mask geometry, and pattern fills (export emits these,
+  // import had been ignoring them). Pattern fill resolution wins
+  // over gradient when both match — the importer mirrors the
+  // exporter's def-id discriminator (gradient vs pattern).
+  const gradient = resolveGradientFill(fill, defs.gradients);
+  const pattern = resolvePatternFill(fill, defs.patterns);
+  const filterStack = resolveFilterStack(getInheritedAttr(el, 'filter'), defs.filters);
+  const maskPath = resolveMaskPath(getAttr(el, 'mask'), defs.masks);
   const strokeStyle = readInheritedStrokeStyle(el);
+  // Mask path takes precedence over clip-path: an element carrying
+  // both is rare, and the export pipeline only emits one. The
+  // importer mirrors that — either is stored as `customClipPath`,
+  // and the `maskType` flag distinguishes the two on round-trip.
+  const effectiveClipPath = maskPath ?? clipPath;
+  const isFillFromGradientOrPattern = gradient !== undefined || pattern !== undefined;
   const baseStyle: Partial<BroadsetElementStyleInput> = {
-    ...(clipPath ? { customClipPath: clipPath } : undefined),
-    ...(fill !== null && gradient === undefined ? { fill } : undefined),
+    ...(effectiveClipPath !== undefined ? { customClipPath: effectiveClipPath } : undefined),
+    ...(maskPath !== undefined ? { maskType: 'alpha' } : undefined),
+    ...(pattern !== undefined ? { fill: pattern } : undefined),
+    ...(fill !== null && !isFillFromGradientOrPattern ? { fill } : undefined),
     ...(stroke !== null ? { stroke } : undefined),
     ...(gradient !== undefined ? { backgroundGradient: gradient } : undefined),
+    ...(filterStack !== undefined ? { filter: filterStack } : undefined),
     ...strokeStyle,
   };
   const ownDataBsId = el.getAttribute('data-bs-id') ?? undefined;
@@ -2249,8 +2575,7 @@ function importElement(
         ownDataBsKind,
         tagMeta,
         parentDataBsId,
-        defsMap,
-        gradients,
+        defs,
         warnings,
         depth,
         fontSources,
@@ -2305,8 +2630,13 @@ function walkSvgDocument(xmlDoc: Document, fontSources?: ReadonlyMap<string, Svg
     }
   }
 
-  const defsMap = buildDefsMap(xmlDoc);
-  const gradients = buildGradientsMap(xmlDoc);
+  const defs: DefsBundle = {
+    clipPaths: buildDefsMap(xmlDoc),
+    gradients: buildGradientsMap(xmlDoc),
+    filters: buildFiltersMap(xmlDoc),
+    masks: buildMasksMap(xmlDoc),
+    patterns: buildPatternsMap(xmlDoc),
+  };
   const warnings: string[] = [];
   const elements: ImportedElement[] = [];
   const children = svgRoot.children;
@@ -2323,7 +2653,7 @@ function walkSvgDocument(xmlDoc: Document, fontSources?: ReadonlyMap<string, Svg
       continue;
     }
 
-    elements.push(...importElement(child, defsMap, gradients, warnings, rootTransform, null, 0, fontSources));
+    elements.push(...importElement(child, defs, warnings, rootTransform, null, 0, fontSources));
   }
 
   return { elements, canvasWidth, canvasHeight, warnings };
@@ -2867,8 +3197,13 @@ function importSvgFromXmlDoc(xmlDoc: Document, fontSources?: ReadonlyMap<string,
     }
   }
 
-  const defsMap = buildDefsMap(xmlDoc);
-  const gradients = buildGradientsMap(xmlDoc);
+  const defs: DefsBundle = {
+    clipPaths: buildDefsMap(xmlDoc),
+    gradients: buildGradientsMap(xmlDoc),
+    filters: buildFiltersMap(xmlDoc),
+    masks: buildMasksMap(xmlDoc),
+    patterns: buildPatternsMap(xmlDoc),
+  };
   const warnings: string[] = [];
   const elements: ImportedElement[] = [];
   const children = svgRoot.children;
@@ -2887,7 +3222,7 @@ function importSvgFromXmlDoc(xmlDoc: Document, fontSources?: ReadonlyMap<string,
       continue;
     }
 
-    elements.push(...importElement(child, defsMap, gradients, warnings, rootTransform, null, 0, fontSources));
+    elements.push(...importElement(child, defs, warnings, rootTransform, null, 0, fontSources));
   }
 
   return { elements, canvasWidth, canvasHeight, warnings };

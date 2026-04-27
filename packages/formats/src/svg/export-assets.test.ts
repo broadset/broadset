@@ -141,6 +141,62 @@ describe('P7.7j — <image> asset resolution', () => {
   });
 });
 
+describe('P7.7l — assetResolver URL scheme allowlist', () => {
+  /**
+   * @description A `javascript:` URL returned by `assetResolver`
+   * MUST be rejected and surface a warning. The exporter
+   * preserves the spec's import-side `javascript:` stripping
+   * symmetrically on the export side: a malicious or
+   * compromised asset registry cannot produce a viewer-exploit
+   * SVG via the resolver hook.
+   */
+  it('rejects javascript: URLs from assetResolver and falls back', async () => {
+    const doc = makeDocument({
+      elements: [makeElement({ id: 'image-x', type: 'image', content: '', assetId: 'evil-asset' })],
+    });
+    const result = await exportSvgString(doc, {
+      assetResolver: () => 'javascript:alert(1)',
+    });
+
+    expect(result).not.toContain('javascript:');
+    expect(result).not.toContain('alert');
+  });
+
+  /**
+   * @description `data:text/html` and similar non-image data
+   * URIs MUST be rejected. Only `data:image/...`, `data:font/...`,
+   * `http(s):`, fragment refs, and relative paths are allowed.
+   */
+  it('rejects data:text/html URLs from assetResolver', async () => {
+    const doc = makeDocument({
+      elements: [makeElement({ id: 'image-y', type: 'image', content: '', assetId: 'sneaky' })],
+    });
+    const result = await exportSvgString(doc, {
+      assetResolver: () => 'data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==',
+    });
+
+    expect(result).not.toContain('data:text/html');
+    expect(result).not.toContain('PHNjcmlwdD');
+  });
+
+  /**
+   * @description A `data:image/png;base64,…` URL MUST pass
+   * through unchanged — that's the canonical embedded-image
+   * shape consumers expect.
+   */
+  it('accepts data:image/png;base64 URLs', async () => {
+    const dataUri = 'data:image/png;base64,iVBORw0KGgo';
+    const doc = makeDocument({
+      elements: [makeElement({ id: 'image-ok', type: 'image', content: '', assetId: 'photo' })],
+    });
+    const result = await exportSvgString(doc, {
+      assetResolver: () => dataUri,
+    });
+
+    expect(result).toContain(`href="${dataUri}"`);
+  });
+});
+
 describe('P7.7j — <pattern> asset resolution', () => {
   /**
    * @description A `pattern` fill MUST resolve its asset id via

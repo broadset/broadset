@@ -199,4 +199,53 @@ describe('P7.7j — Multi-run text import', () => {
     expect(typeof text?.content).toBe('string');
     expect(text?.content).toBe('Plain string');
   });
+
+  /**
+   * @description Nested `<tspan>` MUST NOT duplicate text.
+   * `getElementsByTagName('tspan')` walks descendants — the outer
+   * tspan's `textContent` already contains the inner tspan's text.
+   * The importer MUST iterate direct children, not descendants,
+   * so each text byte appears in exactly one Run. Closes the
+   * P7.7l review #4 blocker.
+   */
+  it('does not duplicate text from nested <tspan>', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100">
+      <text x="0" y="20"><tspan>outer <tspan font-weight="700">inner</tspan></tspan></text>
+    </svg>`;
+    const { document } = importSvgDocument(input);
+    const text = document.elements.find((el) => el.type === 'text');
+    const content = text?.content;
+
+    expect(typeof content).not.toBe('string');
+
+    if (content !== undefined && typeof content !== 'string') {
+      const allText = content.paragraphs[0]?.runs.map((r) => r.text).join('') ?? '';
+
+      expect(allText).toBe('outer inner');
+    }
+  });
+
+  /**
+   * @description A `<tspan>` with `dy="1em"` (the canonical SVG
+   * paragraph-break convention emitted by Broadset's own exporter
+   * and other authoring tools) MUST start a new `Paragraph`. The
+   * round-trip otherwise loses the multi-paragraph structure on
+   * import. Closes the P7.7l review #4 blocker.
+   */
+  it('detects dy="1em" as a paragraph break', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100">
+      <text x="0" y="20"><tspan>Line 1</tspan><tspan x="0" dy="1em">Line 2</tspan></text>
+    </svg>`;
+    const { document } = importSvgDocument(input);
+    const text = document.elements.find((el) => el.type === 'text');
+    const content = text?.content;
+
+    expect(typeof content).not.toBe('string');
+
+    if (content !== undefined && typeof content !== 'string') {
+      expect(content.paragraphs).toHaveLength(2);
+      expect(content.paragraphs[0]?.runs[0]?.text).toBe('Line 1');
+      expect(content.paragraphs[1]?.runs[0]?.text).toBe('Line 2');
+    }
+  });
 });
