@@ -324,6 +324,24 @@ function importElement(
       // the root walk, but a nested one survives without this case.)
       return [];
 
+    case 'style':
+    case 'clippath':
+    case 'mask':
+    case 'filter':
+    case 'lineargradient':
+    case 'radialgradient':
+    case 'pattern':
+    case 'symbol':
+      // Definition-only elements — content has already been read
+      // out by the defs builders (`buildDefsBundle`) or the CSS
+      // walker (`applyStyleBlocks`) BEFORE the element walk runs.
+      // Real-tool exports place these at the top level (Affinity
+      // emits `<clipPath>` as a direct `<svg>` child, Illustrator
+      // emits `<style>` outside `<defs>`); without this case the
+      // walker fell through to `importUnsupportedElement` and
+      // produced spurious opaque-svg payloads + warnings.
+      return [];
+
     default:
       return [{ ...importUnsupportedElement(el, transform, warnings), ...tagMeta }];
   }
