@@ -39,10 +39,12 @@ const mockImportPsdDocument = vi.fn(() => ({
   document: { ...createEmptyBroadsetDocument(), name: 'Imported PSD' } satisfies BroadsetDocument,
   warnings: [] as string[],
 }));
-const mockImportPptxDocument = vi.fn(() => ({
-  document: { ...createEmptyBroadsetDocument(), name: 'Imported PPTX' } satisfies BroadsetDocument,
-  warnings: [] as string[],
-}));
+const mockImportPptxDocument = vi.fn(async () =>
+  Promise.resolve({
+    document: { ...createEmptyBroadsetDocument(), name: 'Imported PPTX' } satisfies BroadsetDocument,
+    warnings: [] as string[],
+  }),
+);
 const mockImportSvgDocument = vi.fn(() => ({
   document: { ...createEmptyBroadsetDocument(), name: 'Imported SVG' } satisfies BroadsetDocument,
   warnings: [] as string[],

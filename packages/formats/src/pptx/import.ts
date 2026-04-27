@@ -120,11 +120,26 @@ function validateXmlSafety(pkg: ReturnType<typeof readOoxmlPackage>): PptxImport
 
     if (text === null || text.trim().length === 0) continue;
 
-    if (/<!DOCTYPE\b/i.test(text)) {
+    // DOCTYPE detection: tolerate optional BOM at the head, whitespace
+    // between `<!` and `DOCTYPE` (XML 1.0 §2.8 actually forbids it, but
+    // some malformed payloads include it precisely to dodge naive
+    // matchers), arbitrary case, and line breaks before / after.
+    if (/<!\s*DOCTYPE\b/i.test(text)) {
       return {
         code: 'malformed-xml',
         message: `XML part "${path}" contains a DOCTYPE declaration; suspected XXE / billion-laughs payload, import rejected`,
         detail: 'DOCTYPE declarations are not used by Office-authored OOXML',
+      };
+    }
+
+    // Standalone `<!ENTITY>` or `<!ELEMENT>` outside a DOCTYPE wrapper
+    // is also a DTD-style construct fast-xml-parser may handle in ways
+    // we can't fully audit; reject these too.
+    if (/<!\s*(?:ENTITY|ELEMENT|ATTLIST|NOTATION)\b/i.test(text)) {
+      return {
+        code: 'malformed-xml',
+        message: `XML part "${path}" contains a standalone DTD construct; rejected`,
+        detail: 'DTD-style declarations are not used by Office-authored OOXML',
       };
     }
 
@@ -364,7 +379,7 @@ function importOperatorLevel(pkg: OoxmlPackage, canvasOverride?: BroadsetDocumen
   // the canvas-level backgroundColor. Per-slide variations get lost
   // (the model has a single canvas-level background today).
   const firstSlideXml = resolved.slidePaths[0] !== undefined ? readTextPart(pkg, resolved.slidePaths[0]) : null;
-  const canvasWithBg = applyFirstSlideBackground(resolved.canvas, firstSlideXml);
+  const canvasWithBg = applyFirstSlideBackground(resolved.canvas, firstSlideXml, warnings);
   const doc = composeDocumentFromSlides(canvasWithBg, slides);
 
   return {
@@ -376,11 +391,18 @@ function importOperatorLevel(pkg: OoxmlPackage, canvasOverride?: BroadsetDocumen
 /**
  * Read the first slide's `<p:bg>` and seed the canvas background
  * colour. Returns the canvas unchanged when the slide has no `<p:bg>`
- * or the fill isn't a solid colour we can map.
+ * or the fill isn't a colour we can map.
+ *
+ * Solid fills (`<a:solidFill><a:srgbClr/>`) map directly. Gradient
+ * fills (`<a:gradFill>`) are downgraded to the first stop's colour as
+ * a best-effort visual proxy and surface an `unsupported-content`
+ * warning — Broadset's canvas model is solid-only today, so the
+ * gradient can't be preserved natively.
  */
 function applyFirstSlideBackground(
   canvas: BroadsetDocument['canvas'],
   slideXml: string | null,
+  warnings: PptxImportWarning[],
 ): BroadsetDocument['canvas'] {
   if (slideXml === null) return canvas;
 
@@ -389,13 +411,34 @@ function applyFirstSlideBackground(
   if (bgMatch === null) return canvas;
 
   const bgBody = bgMatch[1] ?? '';
-  const srgb = bgBody.match(/<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/);
 
-  if (srgb === null) return canvas;
+  // Solid fill: take the first colour.
+  const srgb = bgBody.match(/<a:solidFill>[\s\S]*?<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/);
 
-  const hex = `#${(srgb[1] ?? '').toUpperCase()}`;
+  if (srgb !== null) {
+    const hex = `#${(srgb[1] ?? '').toUpperCase()}`;
 
-  return { ...canvas, backgroundColor: hex, backgroundMode: 'solid' };
+    return { ...canvas, backgroundColor: hex, backgroundMode: 'solid' };
+  }
+
+  // Gradient fill: downgrade to the first stop and surface a warning.
+  // The canvas model carries a single solid colour, so the gradient
+  // can't survive intact — better to seed something visible than to
+  // silently leave the canvas blank.
+  const gradStop = bgBody.match(/<a:gradFill\b[\s\S]*?<a:gs\b[^>]*>[\s\S]*?<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/);
+
+  if (gradStop !== null) {
+    const hex = `#${(gradStop[1] ?? '').toUpperCase()}`;
+
+    warnings.push({
+      code: 'unsupported-content',
+      message: 'Slide gradient background downgraded to the first gradient stop colour — canvas model is solid-only',
+    });
+
+    return { ...canvas, backgroundColor: hex, backgroundMode: 'solid' };
+  }
+
+  return canvas;
 }
 
 function importSingleSlide(

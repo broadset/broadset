@@ -1155,6 +1155,124 @@ describe('PPTX importer — operator-level extraction', () => {
    * MUST surface a `malformed-xml` warning and bail rather than walking
    * the raw text with regex.
    */
+  /**
+   * @description T9 — non-geometric Broadset element kinds (qrcode,
+   * clock, ticker, video) round-trip through `<p:extLst>` even when
+   * the source slide-XML's geometry says "rectangle". The previous
+   * import dropped originalKind silently, returning rectangles. This
+   * test asserts that the operator-level walker now reads
+   * `<p:extLst>` and overrides the geometry-derived kind from the
+   * Broadset metadata.
+   */
+  it('preserves non-geometric kinds (qrcode/clock/ticker/video) via <p:extLst>', () => {
+    const extLstFor = (id: string, kind: string): string =>
+      `<p:extLst><p:ext uri="{broadset-element-ext}"><bset:elementMeta xmlns:bset="https://broadset.io/ns/pptx/1.0/" id="${id}" kind="${kind}" dirty="0"></bset:elementMeta></p:ext></p:extLst>`;
+    const sp = (id: string, kind: string, x: number): string =>
+      `<p:sp><p:nvSpPr><p:cNvPr id="${String(x + 2)}" name="${id}-stripped">${extLstFor(id, kind)}</p:cNvPr><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${String(x * 1000000)}" y="0"/><a:ext cx="500000" cy="500000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:sp>`;
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>${sp('qr-1', 'qrcode', 0)}${sp('cl-1', 'clock', 1)}${sp('ti-1', 'ticker', 2)}${sp('vi-1', 'video', 3)}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
+    const inputBytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')],
+      ]),
+    );
+    const imported = importPptx(inputBytes);
+    const types = imported.elements.map((el) => el.type).sort((a, b) => a.localeCompare(b));
+
+    expect(types).toEqual(['clock', 'qrcode', 'ticker', 'video']);
+  });
+
+  /**
+   * @description T9b — `bsetTag.kind` from the BSET shape name is the
+   * fallback when `<p:extLst>` was stripped (Google Slides save,
+   * Keynote save). A `BSET:qr-1:qrcode` shape-name without any extLst
+   * MUST still re-import as a qrcode element.
+   */
+  it('uses BSET shape-name kind when <p:extLst> is stripped', () => {
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="BSET:qr-1:qrcode"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="500000" cy="500000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
+    const inputBytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')],
+      ]),
+    );
+    const imported = importPptx(inputBytes);
+
+    expect(imported.elements[0]?.type).toBe('qrcode');
+  });
+
+  /**
+   * @description T5 — gradient slide backgrounds downgrade to the
+   * first stop colour with a warning. Solid backgrounds remain
+   * lossless; this test asserts the gradient path doesn't silently
+   * leave the canvas blank.
+   */
+  it('downgrades gradient slide backgrounds to first stop with warning', () => {
+    const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:bg><p:bgPr><a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="FF0000"/></a:gs><a:gs pos="100000"><a:srgbClr val="0000FF"/></a:gs></a:gsLst><a:lin ang="5400000"/></a:gradFill></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+    const presXml = `<?xml version="1.0"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`;
+    const presRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>`;
+    const inputBytes = writeOoxmlPackage(
+      new Map([
+        ['[Content_Types].xml', encodeText('<Types/>')],
+        ['ppt/presentation.xml', encodeText(presXml)],
+        ['ppt/_rels/presentation.xml.rels', encodeText(presRels)],
+        ['ppt/slides/slide1.xml', encodeText(slideXml)],
+        ['ppt/slides/_rels/slide1.xml.rels', encodeText('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')],
+      ]),
+    );
+    const report = importPptxWithReport(inputBytes);
+
+    expect(report.document.canvas.backgroundColor).toBe('#FF0000');
+    expect(report.document.canvas.backgroundMode).toBe('solid');
+    expect(report.warnings.some((w) => w.code === 'unsupported-content' && w.message.includes('gradient'))).toBe(true);
+  });
+
+  /**
+   * @description T7 — multi-page ledger merge respects per-slide
+   * identity. When the user duplicates a slide in PowerPoint, the
+   * duplicated shapes share the source BSET id; the ledger merge
+   * MUST NOT collapse them into one element. The current
+   * implementation keys only on `el.id` so this test pins the
+   * known limitation as `it.skip` until the merge logic is taught
+   * to disambiguate by (slideId, elementId).
+   */
+  it.skip('preserves duplicated slides through the merge ledger', async () => {
+    const { exportPptxBytesAsync } = await import('./export');
+    const { importPptxWithMerge } = await import('./import');
+    const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
+
+    const doc = {
+      ...createEmptyBroadsetDocument(),
+      elements: [createDefaultElement('rectangle', { id: 'shared-id', width: 80, height: 80 })],
+    };
+    const bytes = await exportPptxBytesAsync(doc);
+
+    // Simulate "Duplicate slide" in PowerPoint by adding a second slide
+    // that references the same shape.
+    const pkg = readOoxmlPackage(bytes);
+    const slide1 = readTextPart(pkg, 'ppt/slides/slide1.xml') ?? '';
+    const editedParts = new Map<string, Uint8Array>(pkg);
+
+    editedParts.set('ppt/slides/slide2.xml', encodeText(slide1));
+
+    const editedBytes = writeOoxmlPackage(editedParts);
+    const merged = await importPptxWithMerge(editedBytes);
+
+    // Both slides should survive — but today the ledger merge collapses
+    // duplicate ids. This test pins the gap.
+    expect(merged.document.elements.length).toBe(2);
+  });
+
   it('rejects PPTX with an external-DTD / billion-laughs payload', () => {
     const dtdPayload = `<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY lol "lol"><!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;"><!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">]><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst/><p:sldSz cx="9144000" cy="6858000"/><p:tag>&lol3;</p:tag></p:presentation>`;
     const bytes = writeOoxmlPackage(

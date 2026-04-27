@@ -158,6 +158,44 @@ describe('PPTX exporter — warnings sink', () => {
    * two entry points in lockstep so callers can pick whichever
    * matches their ledger needs without branching on warning shape.
    */
+  /**
+   * @description T10 — three shadows with mixed inset+outer ordering.
+   * The exporter MUST keep the first outer + first inner and surface
+   * exactly one `shadow-truncated` warning naming the source element.
+   * Without this guard the truncation logic could silently drop the
+   * inner half of a layered effect.
+   */
+  it('keeps first outer + first inner from a 3-entry mixed list', async () => {
+    const doc = {
+      ...createEmptyBroadsetDocument(),
+      elements: [
+        createDefaultElement('rectangle', {
+          id: 'three-mixed',
+          width: 100,
+          height: 50,
+          // outer red, inner black, then a second outer that MUST be
+          // truncated (OOXML carries one outer + one inner per shape).
+          style: {
+            boxShadow: '4px 4px 8px red, inset 2px 2px 4px black, 16px 16px 16px blue',
+            opacity: 1,
+          },
+        }),
+      ],
+    };
+    const report = exportPptxWithReport(doc, { preserveBroadsetMetadata: false });
+    const truncated = report.warnings.filter((w) => w.code === 'shadow-truncated');
+
+    expect(truncated).toHaveLength(1);
+    expect(truncated[0]?.elementId).toBe('three-mixed');
+
+    const { readOoxmlPackage, readTextPart } = await import('./ooxml/zip');
+    const slide = readTextPart(readOoxmlPackage(report.bytes), 'ppt/slides/slide1.xml') ?? '';
+
+    // Both outer and inner emit; the second outer is dropped.
+    expect((slide.match(/<a:outerShdw/g) ?? []).length).toBe(1);
+    expect((slide.match(/<a:innerShdw/g) ?? []).length).toBe(1);
+  });
+
   it('surfaces the same warnings through exportPptxWithReportAsync', async () => {
     const doc = {
       ...createEmptyBroadsetDocument(),

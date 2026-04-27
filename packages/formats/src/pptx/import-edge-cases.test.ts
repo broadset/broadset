@@ -1,7 +1,19 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { importPptx } from './import';
 import { encodeText, writeOoxmlPackage } from './ooxml/zip';
+
+/**
+ * Number of `it.skip` probes in this file — this is the AST-rebuild
+ * acceptance gate's measurable target. Each entry pins a known
+ * limitation of the regex parser. Adding a new skip MUST also bump
+ * this count so the regression gate below catches it; flipping a
+ * skip to a passing test means the AST rebuild closed that gap.
+ */
+const EXPECTED_SKIPPED_PROBES = 5;
 
 /**
  * @description Edge-case probe for the regex-based importer. The spec
@@ -186,5 +198,22 @@ describe('PPTX importer — edge-case probes (regex parser limitations)', () => 
     const rect = imported.elements.find((el) => el.type === 'rectangle');
 
     expect(rect).toBeDefined();
+  });
+
+  /**
+   * @description Skip-count regression gate. Adding a new `it.skip`
+   * here without bumping `EXPECTED_SKIPPED_PROBES` fails this test —
+   * which is the point. Skipped probes are the spec gap's measurable
+   * AST-rebuild acceptance criteria; silently growing the list would
+   * dilute the gate.
+   */
+  it('matches the documented skipped-probe count exactly', () => {
+    // vitest runs from the package root (packages/formats) — read the
+    // probe file via that anchor since ESM `import.meta.url` is not a
+    // file: URL in the bundled environment.
+    const source = readFileSync(resolve(process.cwd(), 'src/pptx/import-edge-cases.test.ts'), 'utf8');
+    const skipMatches = source.match(/\bit\.skip\(/g) ?? [];
+
+    expect(skipMatches.length).toBe(EXPECTED_SKIPPED_PROBES);
   });
 });

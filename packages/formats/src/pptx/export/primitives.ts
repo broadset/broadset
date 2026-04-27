@@ -12,6 +12,7 @@ import {
   resolveStyleColor,
 } from '@broadset/model';
 
+import { isOoxmlPresetColorName } from '../ooxml/preset-colors';
 import { alphaToOoxml, canvasLengthToEmu, degreesToRotationUnits, hexToOoxmlColor, mmToEmu } from '../ooxml/units';
 import { pushExportWarning, type SlideExportContext } from './context';
 
@@ -126,9 +127,13 @@ function buildHslInner(original: string, alphaChild: string): string | null {
 
 function buildPrstInner(original: string, alphaChild: string): string | null {
   // A preset name is a bare CSS-colour identifier — must NOT contain
-  // parens, commas, hash, or whitespace. Keep the validation tight so
-  // garbage `originalColor` strings fall through to the sRGB path.
+  // parens, commas, hash, or whitespace. The shape regex is the cheap
+  // filter; the ECMA-376 §20.1.10.46 allowlist is the authoritative
+  // gate. Without the allowlist, a stale or crafted `originalColor`
+  // string could emit a `<a:prstClr val="…"/>` PowerPoint rejects with
+  // a repair dialog.
   if (!PRST_RE.test(original)) return null;
+  if (!isOoxmlPresetColorName(original.toLowerCase())) return null;
 
   return `<a:prstClr val="${original}">${alphaChild}</a:prstClr>`;
 }

@@ -22,9 +22,11 @@ import {
 } from '@broadset/model';
 import svgpath from 'svgpath';
 
+import { OOXML_PRESET_COLOR_HEX } from '../ooxml/preset-colors';
 import { emuToCanvasLength, emuToMm, rotationUnitsToDegrees } from '../ooxml/units';
+import { parseElementExt } from '../semantic/element-ext';
 import { decodeShapeName } from '../semantic/shape-name';
-import type { LayoutPlaceholder, ResolvedTheme } from '../types';
+import type { ElementMetaExtension, LayoutPlaceholder, ResolvedTheme } from '../types';
 
 /**
  * Operator-level shape recovery. Walks a slide's XML and emits
@@ -188,32 +190,49 @@ function emitElementFromShape(
   const nameMatch = extractCNvPrAttrs(body);
   const elementIdBase = nameMatch?.bsetId ?? `pptx-el-${String(ctx.nextElementIndex)}`;
   const elementName = nameMatch?.displayName ?? elementIdBase;
+  const meta = extractElementMeta(body);
 
   ctx.nextElementIndex += 1;
 
+  const built = buildElementByTag(ctx, tagName, elementIdBase, elementName, transform, body, parentGroupId);
+
+  if (built === null) return null;
+
+  return applyMetaOverrides(built, meta, nameMatch);
+}
+
+function buildElementByTag(
+  ctx: SlideImportContext,
+  tagName: string,
+  id: string,
+  name: string,
+  transform: ParsedTransform,
+  body: string,
+  parentGroupId: string | null,
+): BroadsetElement | null {
   if (tagName === 'p:grpSp') {
-    return buildBase(ctx, elementIdBase, elementName, 'group', transform, parentGroupId);
+    return buildBase(ctx, id, name, 'group', transform, parentGroupId);
   }
 
   if (tagName === 'p:pic') {
-    return buildPicture(ctx, elementIdBase, elementName, transform, body, parentGroupId);
+    return buildPicture(ctx, id, name, transform, body, parentGroupId);
   }
 
   // p:sp — dispatch on geometry.
   const geom = detectGeometry(body);
 
-  if (geom === null) return buildRectangle(ctx, elementIdBase, elementName, transform, body, parentGroupId);
+  if (geom === null) return buildRectangle(ctx, id, name, transform, body, parentGroupId);
 
   if (geom.kind === 'rectangle' || geom.kind === 'roundRect') {
-    return buildRectangle(ctx, elementIdBase, elementName, transform, body, parentGroupId);
+    return buildRectangle(ctx, id, name, transform, body, parentGroupId);
   }
 
   if (geom.kind === 'ellipse') {
-    return buildEllipse(ctx, elementIdBase, elementName, transform, body, parentGroupId);
+    return buildEllipse(ctx, id, name, transform, body, parentGroupId);
   }
 
   if (geom.kind === 'path') {
-    return buildPath(ctx, elementIdBase, elementName, transform, body, parentGroupId, geom.d ?? '');
+    return buildPath(ctx, id, name, transform, body, parentGroupId, geom.d ?? '');
   }
 
   // Unknown preset (triangle, star, arrow, callout, etc.) — preserve
@@ -222,11 +241,100 @@ function emitElementFromShape(
   // preset table (Audit A5) will map common presets natively.
   ctx.warnings.push({
     code: 'unsupported-shape',
-    message: `Unknown OOXML preset for shape id ${elementIdBase} — preserved as extensions.pptx.raw`,
+    message: `Unknown OOXML preset for shape id ${id} — preserved as extensions.pptx.raw`,
     detail: extractPresetName(body) ?? 'custom',
   });
 
-  return preserveRawShape(ctx, elementIdBase, elementName, transform, body, parentGroupId);
+  return preserveRawShape(ctx, id, name, transform, body, parentGroupId);
+}
+
+const NATIVE_BROADSET_KINDS: ReadonlySet<string> = new Set([
+  'text',
+  'image',
+  'svg',
+  'path',
+  'rectangle',
+  'ellipse',
+  'qrcode',
+  'group',
+  'video',
+  'clock',
+  'ticker',
+]);
+
+/**
+ * Apply Broadset metadata pulled from `<p:extLst>` and the BSET shape
+ * name onto a freshly-built element.
+ *
+ * Type override priority (most authoritative first):
+ * 1. `extLst.kind` — the structured per-shape extension; survives any
+ *    sane round-trip through PowerPoint / Keynote / LibreOffice.
+ * 2. `bsetTag.kind` (from the shape name) — secondary fallback when
+ *    the extLst was stripped (Google Slides, Keynote save).
+ *
+ * Without this override a Broadset-exported `qrcode` / `clock` /
+ * `ticker` / `video` would re-import as a `rectangle` because the
+ * geometry-derived kind is the OOXML primitive shape rather than the
+ * Broadset element kind.
+ */
+function applyMetaOverrides(
+  element: BroadsetElement,
+  meta: ElementMetaExtension | null,
+  nameMatch: CNvPrAttrs | null,
+): BroadsetElement {
+  const overrideKind = pickOverrideKind(element.type, meta, nameMatch);
+  const dataFieldFromMeta = meta?.dataField ?? nameMatch?.bsetDataField;
+  const dataFieldBinding =
+    dataFieldFromMeta !== undefined && dataFieldFromMeta.length > 0
+      ? { fieldName: dataFieldFromMeta, overflow: 'clip' as const }
+      : null;
+
+  const result: BroadsetElement = {
+    ...element,
+    ...(overrideKind !== null ? { type: overrideKind } : {}),
+    ...(dataFieldBinding !== null ? { dataField: dataFieldBinding } : {}),
+  };
+
+  // `dirty` flag: extLst's `dirty` is the truth when present —
+  // PowerPoint never authors this attribute, so a `1` only appears
+  // when Broadset previously round-tripped through. Persist on
+  // extensions.pptx for downstream merge logic.
+  if (meta !== null) {
+    const existingExt = (result.extensions['pptx'] as Record<string, unknown> | undefined) ?? {};
+
+    return {
+      ...result,
+      extensions: {
+        ...result.extensions,
+        pptx: {
+          ...existingExt,
+          dirty: meta.dirty,
+        },
+      },
+    };
+  }
+
+  return result;
+}
+
+function pickOverrideKind(
+  geomType: string,
+  meta: ElementMetaExtension | null,
+  nameMatch: CNvPrAttrs | null,
+): string | null {
+  const metaKind = meta?.kind;
+
+  if (metaKind !== undefined && metaKind !== geomType && NATIVE_BROADSET_KINDS.has(metaKind)) {
+    return metaKind;
+  }
+
+  const tagKind = nameMatch?.bsetKind;
+
+  if (tagKind !== undefined && tagKind !== geomType && NATIVE_BROADSET_KINDS.has(tagKind)) {
+    return tagKind;
+  }
+
+  return null;
 }
 
 function extractPresetName(body: string): string | undefined {
@@ -288,6 +396,10 @@ function extractTransform(canvas: Canvas, body: string): ParsedTransform | null 
 interface CNvPrAttrs {
   readonly bsetId?: string;
   readonly displayName: string;
+  /** Element kind decoded from the BSET shape name, when present. */
+  readonly bsetKind?: string;
+  /** dataField encoded into the BSET shape name, when present. */
+  readonly bsetDataField?: string;
 }
 
 function extractCNvPrAttrs(body: string): CNvPrAttrs | null {
@@ -304,9 +416,35 @@ function extractCNvPrAttrs(body: string): CNvPrAttrs | null {
   const displayName = decodeXmlEntities(rawName);
   const bsetTag = displayName.length > 0 ? decodeShapeName(displayName) : null;
 
-  if (bsetTag !== null) return { bsetId: bsetTag.id, displayName: bsetTag.id };
+  if (bsetTag !== null) {
+    return {
+      bsetId: bsetTag.id,
+      displayName: bsetTag.id,
+      bsetKind: bsetTag.kind,
+      ...(bsetTag.dataField !== undefined ? { bsetDataField: bsetTag.dataField } : {}),
+    };
+  }
 
   return { displayName };
+}
+
+/**
+ * Pull the per-shape Broadset metadata extension out of the shape's
+ * `<p:extLst>` block. PowerPoint, Keynote, and LibreOffice preserve
+ * unknown `<p:ext>` elements verbatim across save, so this is the
+ * primary structured-metadata carrier for `dataField`, `visibleWhen`,
+ * `repeater`, `originalKind`, and the `dirty` flag. Returns `null` when
+ * no Broadset extension is present (foreign tools that strip the
+ * extension list, or shapes that pre-date Broadset metadata).
+ */
+function extractElementMeta(body: string): ElementMetaExtension | null {
+  // The extLst block may live anywhere inside `<p:cNvPr>` — extract the
+  // first `<p:cNvPr>...</p:cNvPr>` paired form and search inside.
+  const cNvPr = body.match(/<p:cNvPr\b[^>]*>([\s\S]*?)<\/p:cNvPr>/);
+
+  if (cNvPr === null) return null;
+
+  return parseElementExt(cNvPr[1] ?? '');
 }
 
 interface DetectedGeometry {
@@ -935,7 +1073,7 @@ function prstNameToSrgbHex(name: string): `#${string}` | null {
 
     return `#${stripped.slice(0, 6).toUpperCase()}`;
   } catch {
-    const fallback = OOXML_EXTENDED_PRESET_COLORS[name];
+    const fallback = OOXML_PRESET_COLOR_HEX[name];
 
     if (fallback === undefined) return null;
 
@@ -943,140 +1081,6 @@ function prstNameToSrgbHex(name: string): `#${string}` | null {
   }
 }
 
-/**
- * OOXML preset colours that aren't in the model's basic CSS_NAMED_COLORS
- * map. Hex values per ECMA-376 §20.1.10.46. Names are stored lowercase;
- * caller lowercases the source val before lookup.
- */
-const OOXML_EXTENDED_PRESET_COLORS: Readonly<Record<string, string>> = {
-  aliceblue: 'F0F8FF',
-  antiquewhite: 'FAEBD7',
-  aqua: '00FFFF',
-  aquamarine: '7FFFD4',
-  azure: 'F0FFFF',
-  beige: 'F5F5DC',
-  bisque: 'FFE4C4',
-  blanchedalmond: 'FFEBCD',
-  blueviolet: '8A2BE2',
-  burlywood: 'DEB887',
-  cadetblue: '5F9EA0',
-  chartreuse: '7FFF00',
-  chocolate: 'D2691E',
-  coral: 'FF7F50',
-  cornflowerblue: '6495ED',
-  cornsilk: 'FFF8DC',
-  crimson: 'DC143C',
-  darkblue: '00008B',
-  darkcyan: '008B8B',
-  darkgoldenrod: 'B8860B',
-  darkgray: 'A9A9A9',
-  darkgreen: '006400',
-  darkgrey: 'A9A9A9',
-  darkkhaki: 'BDB76B',
-  darkmagenta: '8B008B',
-  darkolivegreen: '556B2F',
-  darkorange: 'FF8C00',
-  darkorchid: '9932CC',
-  darkred: '8B0000',
-  darksalmon: 'E9967A',
-  darkseagreen: '8FBC8F',
-  darkslateblue: '483D8B',
-  darkslategray: '2F4F4F',
-  darkslategrey: '2F4F4F',
-  darkturquoise: '00CED1',
-  darkviolet: '9400D3',
-  deeppink: 'FF1493',
-  deepskyblue: '00BFFF',
-  dimgray: '696969',
-  dimgrey: '696969',
-  dodgerblue: '1E90FF',
-  firebrick: 'B22222',
-  floralwhite: 'FFFAF0',
-  forestgreen: '228B22',
-  gainsboro: 'DCDCDC',
-  ghostwhite: 'F8F8FF',
-  goldenrod: 'DAA520',
-  greenyellow: 'ADFF2F',
-  honeydew: 'F0FFF0',
-  hotpink: 'FF69B4',
-  indianred: 'CD5C5C',
-  indigo: '4B0082',
-  ivory: 'FFFFF0',
-  khaki: 'F0E68C',
-  lavender: 'E6E6FA',
-  lavenderblush: 'FFF0F5',
-  lawngreen: '7CFC00',
-  lemonchiffon: 'FFFACD',
-  lightblue: 'ADD8E6',
-  lightcoral: 'F08080',
-  lightcyan: 'E0FFFF',
-  lightgoldenrodyellow: 'FAFAD2',
-  lightgray: 'D3D3D3',
-  lightgreen: '90EE90',
-  lightgrey: 'D3D3D3',
-  lightpink: 'FFB6C1',
-  lightsalmon: 'FFA07A',
-  lightseagreen: '20B2AA',
-  lightskyblue: '87CEFA',
-  lightslategray: '778899',
-  lightslategrey: '778899',
-  lightsteelblue: 'B0C4DE',
-  lightyellow: 'FFFFE0',
-  limegreen: '32CD32',
-  linen: 'FAF0E6',
-  maroon: '800000',
-  mediumaquamarine: '66CDAA',
-  mediumblue: '0000CD',
-  mediumorchid: 'BA55D3',
-  mediumpurple: '9370DB',
-  mediumseagreen: '3CB371',
-  mediumslateblue: '7B68EE',
-  mediumspringgreen: '00FA9A',
-  mediumturquoise: '48D1CC',
-  mediumvioletred: 'C71585',
-  midnightblue: '191970',
-  mintcream: 'F5FFFA',
-  mistyrose: 'FFE4E1',
-  moccasin: 'FFE4B5',
-  navajowhite: 'FFDEAD',
-  oldlace: 'FDF5E6',
-  olive: '808000',
-  olivedrab: '6B8E23',
-  orangered: 'FF4500',
-  orchid: 'DA70D6',
-  palegoldenrod: 'EEE8AA',
-  palegreen: '98FB98',
-  paleturquoise: 'AFEEEE',
-  palevioletred: 'DB7093',
-  papayawhip: 'FFEFD5',
-  peachpuff: 'FFDAB9',
-  peru: 'CD853F',
-  plum: 'DDA0DD',
-  powderblue: 'B0E0E6',
-  rosybrown: 'BC8F8F',
-  royalblue: '4169E1',
-  saddlebrown: '8B4513',
-  salmon: 'FA8072',
-  sandybrown: 'F4A460',
-  seagreen: '2E8B57',
-  seashell: 'FFF5EE',
-  sienna: 'A0522D',
-  skyblue: '87CEEB',
-  slateblue: '6A5ACD',
-  slategray: '708090',
-  slategrey: '708090',
-  snow: 'FFFAFA',
-  springgreen: '00FF7F',
-  steelblue: '4682B4',
-  tan: 'D2B48C',
-  thistle: 'D8BFD8',
-  tomato: 'FF6347',
-  turquoise: '40E0D0',
-  violet: 'EE82EE',
-  wheat: 'F5DEB3',
-  whitesmoke: 'F5F5F5',
-  yellowgreen: '9ACD32',
-};
 
 function parseColorMods(innerBody: string): ColorMods | null {
   const result: Record<string, number> = {};

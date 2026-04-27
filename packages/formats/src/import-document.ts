@@ -1,6 +1,6 @@
 import { type BroadsetDocument, createDefaultElement, createEmptyBroadsetDocument } from '@broadset/model';
 
-import { importPptxWithReport } from './pptx';
+import { importPptxWithMerge } from './pptx';
 import { importPsd } from './psd';
 import { importSvg } from './web-vector';
 
@@ -26,8 +26,18 @@ function buildFallbackImportWarnings(document: BroadsetDocument, formatLabel: st
   ];
 }
 
-export function importPptxDocument(data: Uint8Array): DocumentImportResult {
-  const report = importPptxWithReport(data);
+/**
+ * Import a `.pptx` byte stream into a Broadset document.
+ *
+ * Async because we route through `importPptxWithMerge`, which uses
+ * xxhash-wasm for the per-element interop ledger fingerprint compare.
+ * The merge path is what flips `extensions.pptx.dirty=true` on shapes
+ * that an external tool (PowerPoint, Keynote, Google Slides, etc.) has
+ * edited since the last Broadset export — without it, the dirty
+ * detection guarantee in the spec is dead code at the user surface.
+ */
+export async function importPptxDocument(data: Uint8Array): Promise<DocumentImportResult> {
+  const report = await importPptxWithMerge(data);
   const structuralWarnings = report.warnings.map(
     (w) => `${w.code}: ${w.message}${w.detail !== undefined ? ` (${w.detail})` : ''}`,
   );

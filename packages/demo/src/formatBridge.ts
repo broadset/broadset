@@ -289,7 +289,7 @@ export async function importDocument(file: File): Promise<ImportDocumentResult> 
       const formats = await loadFormats();
       const buffer = await file.arrayBuffer();
 
-      return formats.importPptxDocument(new Uint8Array(buffer));
+      return await formats.importPptxDocument(new Uint8Array(buffer));
     }
 
     case 'svg': {
