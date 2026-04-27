@@ -26,6 +26,8 @@ export {
   exportPptxWithReport,
   exportPptxWithReportAsync,
   importPptx,
+  readPreservedPptxDocument,
+  reconcilePptx,
 } from './pptx';
 export { exportPsdBytes, exportPsdBytesAsync, importPsd, svgPathToPsdVectorMask } from './psd';
 export {

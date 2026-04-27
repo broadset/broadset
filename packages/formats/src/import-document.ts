@@ -1,6 +1,6 @@
 import { type BroadsetDocument, createDefaultElement, createEmptyBroadsetDocument } from '@broadset/model';
 
-import { importPptxWithMerge } from './pptx';
+import { importPptxWithMerge, reconcilePptx } from './pptx';
 import { importPsd } from './psd';
 import { importSvg } from './web-vector';
 
@@ -27,6 +27,48 @@ function buildFallbackImportWarnings(document: BroadsetDocument, formatLabel: st
 }
 
 /**
+ * Build a one-line summary of an external-edit reconciliation against
+ * a Broadset-exported PPTX. Surfaces in the import-warnings modal so
+ * the user can see what PowerPoint / Keynote / Google Slides / etc.
+ * changed since the last export. The summary is intentionally terse —
+ * a future "Reconciliation Diff" UI would render the per-element
+ * buckets directly, but a one-liner per bucket is the MVP that closes
+ * the spec acceptance criteria for "report consumable by the import-
+ * warnings modal".
+ */
+function buildReconciliationSummaries(
+  result: Awaited<ReturnType<typeof reconcilePptx>>,
+): readonly string[] {
+  const summaries: string[] = [];
+
+  if (result.modifications.length > 0) {
+    summaries.push(
+      `External edits detected: ${String(result.modifications.length)} element${result.modifications.length === 1 ? '' : 's'} modified outside Broadset since last export.`,
+    );
+  }
+
+  if (result.additions.length > 0) {
+    summaries.push(
+      `External additions detected: ${String(result.additions.length)} new element${result.additions.length === 1 ? '' : 's'} added outside Broadset since last export.`,
+    );
+  }
+
+  if (result.deletions.length > 0) {
+    summaries.push(
+      `External deletions detected: ${String(result.deletions.length)} element${result.deletions.length === 1 ? '' : 's'} removed outside Broadset since last export.`,
+    );
+  }
+
+  if (result.recoveredByHash.length > 0) {
+    summaries.push(
+      `Identity recovered by content hash for ${String(result.recoveredByHash.length)} element${result.recoveredByHash.length === 1 ? '' : 's'} (shape tags / extensions stripped externally).`,
+    );
+  }
+
+  return summaries;
+}
+
+/**
  * Import a `.pptx` byte stream into a Broadset document.
  *
  * Async because we route through `importPptxWithMerge`, which uses
@@ -35,6 +77,11 @@ function buildFallbackImportWarnings(document: BroadsetDocument, formatLabel: st
  * that an external tool (PowerPoint, Keynote, Google Slides, etc.) has
  * edited since the last Broadset export — without it, the dirty
  * detection guarantee in the spec is dead code at the user surface.
+ *
+ * When the file is a Broadset re-import (carries the
+ * `customXml/broadset-project.xml` part), additionally runs the
+ * shared `_shared/reconcile/` engine to surface a per-bucket summary
+ * of external edits in the import-warnings modal.
  */
 export async function importPptxDocument(data: Uint8Array): Promise<DocumentImportResult> {
   const report = await importPptxWithMerge(data);
@@ -42,8 +89,14 @@ export async function importPptxDocument(data: Uint8Array): Promise<DocumentImpo
     (w) => `${w.code}: ${w.message}${w.detail !== undefined ? ` (${w.detail})` : ''}`,
   );
   const fallback = buildFallbackImportWarnings(report.document, 'PPTX');
+  const reconciliation = await reconcilePptx(data);
+  const reconciliationSummaries = buildReconciliationSummaries(reconciliation);
 
-  return createDocumentImportResult(report.document, [...structuralWarnings, ...fallback]);
+  return createDocumentImportResult(report.document, [
+    ...reconciliationSummaries,
+    ...structuralWarnings,
+    ...fallback,
+  ]);
 }
 
 export function importPsdDocument(data: Uint8Array): DocumentImportResult {
