@@ -10,6 +10,7 @@ Each fixture pins a distinct surface — there's no overlap between them.
 | [`heroicons-pencil.svg`](./heroicons-pencil.svg) | Tailwind [Heroicons](https://github.com/tailwindlabs/heroicons) — `pencil` outline | MIT | Stroke-only icon (`stroke-width` / `stroke-linecap` / `stroke-linejoin`) |
 | [`bootstrap-gear.svg`](./bootstrap-gear.svg) | [Bootstrap Icons](https://github.com/twbs/icons) — `gear-fill` | MIT | Multi-subpath single `<path>` (outer ring + inner cutout via fill-rule) |
 | [`w3c-gradient.svg`](./w3c-gradient.svg) | [W3C SVG 1.1](https://www.w3.org/TR/SVG11/pservers.html#LinearGradients) reference snippet | W3C document license (redistributable for testing) | Standards-canonical `<linearGradient>` import |
+| [`w3c-smil-animate.svg`](./w3c-smil-animate.svg) | W3C-style SMIL sample (locally assembled from SVG 1.1 animation patterns) | W3C-compatible test fixture | Import-time SMIL stripping (`<animate>`, `<animateTransform>`, `<set>`) while preserving static geometry |
 | [`inkscape-shapes.svg`](./inkscape-shapes.svg) | Locally authored — Inkscape-style structure | Broadset (this repo) | `sodipodi:` / `inkscape:` namespace surface, `<g inkscape:groupmode="layer">`, positional attrs |
 | [`complex-document.svg`](./complex-document.svg) | Locally authored | Broadset (this repo) | `<text>` with `<tspan>` overrides + paragraph break, `<g transform>` hierarchy, `<polygon>`, `<use>` / `<symbol>` |
 
@@ -28,8 +29,9 @@ Each fixture pins a distinct surface — there's no overlap between them.
 - **Hostile / XSS samples.** The security suite in `import-third-party.test.ts`
   uses synthetic fixtures with explicit attacker payloads — those make the
   threat model legible. Real-world hostile SVG would be redundant.
-- **Animated SMIL samples.** Spec §Non-Goals — animations are dropped on
-  import per IO-D-16; no fidelity to test.
+- **SMIL animation fidelity.** Broadset intentionally drops animation
+  commands on import per IO-D-16; the SMIL fixture validates safe
+  stripping only (not animation preservation).
 - **Illustrator / Figma exports.** Proprietary tool output is user content
   even when authored for testing; license risk isn't worth the marginal
   coverage. Inkscape (free, open source) covers the tool-namespace surface.

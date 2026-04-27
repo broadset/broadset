@@ -118,6 +118,26 @@ describe('P7.7k — Real-world SVG fixture import', () => {
   });
 
   /**
+   * @description W3C-style SMIL sample - animation commands are
+   * intentionally out of scope (IO-D-16) and MUST be stripped on
+   * import, while static geometry still imports natively.
+   */
+  it('W3C SMIL sample: strips animation commands and preserves static geometry', async () => {
+    const svg = loadFixture('w3c-smil-animate.svg');
+    const { document, warnings } = importSvgDocument(svg, 'fixture');
+    const exported = await exportSvgString(document);
+
+    expect(document.elements.some((el) => el.type === 'rectangle')).toBe(true);
+    expect(document.elements.some((el) => el.type === 'ellipse')).toBe(true);
+    expect(warnings.some((w) => /smil|animate/i.test(w))).toBe(true);
+
+    expect(exported).not.toContain('<animate');
+    expect(exported).not.toContain('<animateTransform');
+    expect(exported).not.toContain('<animateMotion');
+    expect(exported).not.toMatch(/<set\b/);
+  });
+
+  /**
    * @description Inkscape-shape sample — the importer surfaces
    * a warning naming the `inkscape:` (or `sodipodi:`) namespace
    * but otherwise hydrates the rect + circle natively. The
@@ -186,6 +206,7 @@ describe('P7.7k — Real-world SVG fixture import', () => {
     ['heroicons-pencil.svg'],
     ['bootstrap-gear.svg'],
     ['w3c-gradient.svg'],
+    ['w3c-smil-animate.svg'],
     ['inkscape-shapes.svg'],
     ['complex-document.svg'],
   ])('%s: chain round-trip preserves at least one native element', async (filename) => {
