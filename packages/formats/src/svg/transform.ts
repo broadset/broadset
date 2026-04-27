@@ -64,6 +64,21 @@ export function parseAndDecomposeTransform(transformStr: string): DecomposedTran
 
   const matrices = descriptors.map((d) => fromDefinition(d));
   const composed = compose(...matrices);
+
+  return decomposeMatrix(composed);
+}
+
+/**
+ * Decompose an arbitrary affine matrix into the Broadset
+ * `DecomposedTransform` shape. Used both by
+ * `parseAndDecomposeTransform` (after parsing the source SVG
+ * transform attribute) and by `combineTransform` (after composing
+ * an inherited cumulative matrix with a new descriptor) so the
+ * NaN-guard + skew-detection logic stays in a single place. Closes
+ * the P7.7 review finding that the additive fast-path dropped the
+ * cumulative matrix when a later descendant baked.
+ */
+export function decomposeMatrix(composed: Matrix): DecomposedTransform {
   const tsr = decomposeTSR(composed);
   const tx = tsr.translate.tx;
   const ty = tsr.translate.ty;
@@ -76,8 +91,7 @@ export function parseAndDecomposeTransform(transformStr: string): DecomposedTran
   // operations; downstream consumers received `rotation = NaN` from
   // `(NaN + 360) % 360`. Falling back to identity preserves IO-D-18
   // (no silent drops — the document still imports, the transform
-  // just no-ops with a warning). Closes the security audit
-  // hardening finding.
+  // just no-ops with a warning).
   if (
     !Number.isFinite(tx) ||
     !Number.isFinite(ty) ||

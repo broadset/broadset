@@ -72,6 +72,24 @@ describe('P7.7e — CSS rule-count cap', () => {
     expect(Date.now() - start).toBeLessThan(5_000);
     expect(warnings.some((w) => /CSS rule cap|rule cap/i.test(w))).toBe(true);
   });
+
+  /**
+   * @description A SINGLE rule with a comma-separated selector
+   * list of N entries expands to N CssRule entries. The cap MUST
+   * fire mid-expansion so a hostile `.a, .a, .a, … × 50_000 { … }`
+   * cannot allocate 50_000 entries before the outer collector
+   * checks. Closes the second P7 review finding on this surface.
+   */
+  it('caps rule expansion mid-selector-list to prevent memory blow-up', () => {
+    const selectorCount = 50_000;
+    const selector = Array.from({ length: selectorCount }, (_unused, i) => `.cls${String(i)}`).join(', ');
+    const fixture = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><style>${selector} { fill: #f00; }</style><rect width="50" height="50"/></svg>`;
+    const start = Date.now();
+    const { warnings } = importSvgDocument(fixture);
+
+    expect(Date.now() - start).toBeLessThan(5_000);
+    expect(warnings.some((w) => /CSS rule cap|rule cap/i.test(w))).toBe(true);
+  });
 });
 
 describe('P7.7a — Group-depth cap', () => {

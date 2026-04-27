@@ -114,6 +114,30 @@ describe('P7.7e — third-party group hierarchy', () => {
   });
 
   /**
+   * @description An UNNAMED `<g>` (no `id` attribute, no
+   * `data-bs-id`) — typical of Figma / Illustrator / Inkscape
+   * exports — MUST still emit a Broadset `'group'` element with
+   * its children linked via `parentId`, NOT silently flatten.
+   * Closes the P7.7e review finding.
+   */
+  it('preserves <g> hierarchy even when neither data-bs-id nor id is present', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+      <g transform="translate(10, 20)">
+        <rect width="50" height="50"/>
+        <rect width="50" height="50" x="60"/>
+      </g>
+    </svg>`;
+    const { document } = importSvgDocument(input);
+    const group = document.elements.find((el) => el.type === 'group');
+    const rects = document.elements.filter((el) => el.type === 'rectangle');
+
+    expect(group).toBeDefined();
+    expect(rects).toHaveLength(2);
+    expect(rects[0]?.parentId).toBe(group?.id);
+    expect(rects[1]?.parentId).toBe(group?.id);
+  });
+
+  /**
    * @description Nested groups MUST nest in the resulting parentId
    * chain — the inner group's parentId references the outer group.
    */

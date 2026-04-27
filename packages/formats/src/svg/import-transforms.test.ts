@@ -113,6 +113,68 @@ describe('P7.7c — Full transform parsing', () => {
   });
 
   /**
+   * @description Ancestor `translate` + descendant `skew` MUST
+   * combine cleanly: the baked geometry sits at the ancestor
+   * translate offset. Closes the P7.7 review finding that the
+   * additive fast-path dropped the cumulative ancestor translate
+   * the moment a descendant baked.
+   */
+  it('preserves an ancestor translate when a descendant bakes', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+      <g transform="translate(100, 50)">
+        <rect transform="skewX(15)" width="40" height="40"/>
+      </g>
+    </svg>`;
+    const { document } = importSvgDocument(input);
+    const path = document.elements.find((el) => el.type === 'path');
+    const dStr = typeof path?.content === 'string' ? path.content : '';
+    const moveMatch = /^M([-\d.]+)\s+([-\d.]+)/.exec(dStr);
+
+    expect(moveMatch).not.toBeNull();
+
+    const startX = parseFloat(moveMatch?.[1] ?? '0');
+    const startY = parseFloat(moveMatch?.[2] ?? '0');
+
+    // Top-left corner after the cumulative translate(100,50) and
+    // skewX(15): the rect's (0,0) corner lands at (100, 50)
+    // (skewX shifts only x = old_x + tan(15°) * y; at y=0 → no
+    // shift). Tolerance: 1px for any rounding.
+    expect(startX).toBeCloseTo(100, 0);
+    expect(startY).toBeCloseTo(50, 0);
+  });
+
+  /**
+   * @description Ancestor `scale(2)` + descendant `translate(10,5)`
+   * must compose so the leaf bakes at scale(2) × translate(10,5)
+   * and NOT translate(10,5) × translate(10,5) (the prior double-
+   * apply bug from `bakedPathElement`).
+   */
+  it('does not double-apply the leaf own translate under a baking ancestor', () => {
+    const input = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+      <g transform="scale(2)">
+        <rect transform="translate(10, 5)" width="20" height="20"/>
+      </g>
+    </svg>`;
+    const { document } = importSvgDocument(input);
+    const path = document.elements.find((el) => el.type === 'path');
+    const dStr = typeof path?.content === 'string' ? path.content : '';
+    const moveMatch = /^M([-\d.]+)\s+([-\d.]+)/.exec(dStr);
+
+    expect(moveMatch).not.toBeNull();
+
+    const startX = parseFloat(moveMatch?.[1] ?? '0');
+    const startY = parseFloat(moveMatch?.[2] ?? '0');
+
+    // SVG composition: scale(2) is applied AFTER translate(10,5)
+    // (outer wraps inner). So the rect's (0,0) corner lands at
+    // 2 * (0+10) = 20 horizontally, 2 * (0+5) = 10 vertically.
+    // The previous bug double-applied the translate, producing
+    // 2 * 20 = 40 / 2 * 10 = 20.
+    expect(startX).toBeCloseTo(20, 0);
+    expect(startY).toBeCloseTo(10, 0);
+  });
+
+  /**
    * @description A non-decomposable affine on a `<path>` MUST
    * have its transform baked into the existing `d` via `svgpath`,
    * NOT preserved as opaque markup.

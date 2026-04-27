@@ -17,6 +17,7 @@ import { compose as composeMatrix, type Matrix } from 'transformation-matrix';
 import { type ParsedElementMetadata, parseMetadataPacket } from './metadata';
 import {
   type DecomposedTransform,
+  decomposeMatrix,
   ellipseAsPathD,
   parseAndDecomposeTransform,
   polygonAsPathD,
@@ -331,7 +332,20 @@ function collectStylesheetRules(xmlDoc: Document, warnings: string[]): readonly 
       continue;
     }
 
-    for (const rule of parseRulesViaCssTree(styleEl.textContent, warnings)) {
+    const remaining = SVG_CSS_RULE_CAP - rules.length;
+
+    if (remaining <= 0) {
+      truncated = true;
+      break;
+    }
+
+    const parsed = parseRulesViaCssTree(styleEl.textContent, warnings, remaining);
+
+    if (parsed.truncated) {
+      truncated = true;
+    }
+
+    for (const rule of parsed.rules) {
       if (rules.length >= SVG_CSS_RULE_CAP) {
         truncated = true;
         break outer;
@@ -432,9 +446,23 @@ interface SelectorAnalysis {
  * this is the "best-effort" posture svg.md § Pseudo-class and
  * attribute-selector resolution documents.
  */
-function parseRulesViaCssTree(css: string | null, warnings: string[]): readonly ParsedRuleWithoutOrder[] {
-  if (css === null || css === '') {
-    return [];
+interface ParsedRulesResult {
+  readonly rules: readonly ParsedRuleWithoutOrder[];
+  readonly truncated: boolean;
+}
+
+/**
+ * Parse a single `<style>` block's CSS via `css-tree`, expanding
+ * comma-separated selector lists into per-rule entries. The
+ * `budget` argument bounds total expanded rules (including those
+ * spawned by selector-list children) to prevent a single hostile
+ * rule like `.a, .a, .a, ... × 100_000 {}` from blowing the
+ * memory cap before the outer collector check fires. Closes the
+ * P7 review CSS-rule budget bypass.
+ */
+function parseRulesViaCssTree(css: string | null, warnings: string[], budget: number): ParsedRulesResult {
+  if (css === null || css === '' || budget <= 0) {
+    return { rules: [], truncated: budget <= 0 };
   }
 
   const out: ParsedRuleWithoutOrder[] = [];
@@ -445,28 +473,39 @@ function parseRulesViaCssTree(css: string | null, warnings: string[]): readonly 
   } catch {
     warnings.push('CSS <style> block could not be parsed; rules were skipped.');
 
-    return out;
+    return { rules: out, truncated: false };
   }
+
+  let truncated = false;
 
   CssTree.walk(ast, {
     visit: 'Rule',
     enter(node: CssTree.CssNode) {
-      processRuleNode(node as CssTree.Rule, out, warnings);
+      if (out.length >= budget) {
+        truncated = true;
+
+        return;
+      }
+
+      const reachedBudget = processRuleNode(node as CssTree.Rule, out, warnings, budget);
+
+      if (reachedBudget) truncated = true;
     },
   });
 
-  return out;
+  return { rules: out, truncated };
 }
 
 function processRuleNode(
   rule: CssTree.Rule,
   out: ParsedRuleWithoutOrder[],
   warnings: string[],
-): void {
+  budget: number,
+): boolean {
   const body = CssTree.generate(rule.block).replace(/^\{|\}$/g, '').trim();
 
   if (body === '') {
-    return;
+    return false;
   }
 
   // Selector lists: emit one rule per top-level comma-separated
@@ -474,14 +513,26 @@ function processRuleNode(
   // than `walk(visit: 'Selector')` so we don't recurse INTO
   // `:not(...)`'s own inner Selector nodes — that recursion would
   // surface the inner compound (e.g. `.skip`) as a standalone
-  // rule, doubling the match.
-  if (rule.prelude.type === 'SelectorList') {
-    rule.prelude.children.forEach((selectorNode) => {
-      if (selectorNode.type === 'Selector') {
-        pushSelectorRule(selectorNode, body, out, warnings);
-      }
-    });
+  // rule, doubling the match. Stop emitting once `budget` is hit
+  // so a single 100_000-comma rule cannot exhaust memory.
+  if (rule.prelude.type !== 'SelectorList') {
+    return false;
   }
+
+  let reachedBudget = false;
+
+  for (const selectorNode of rule.prelude.children) {
+    if (out.length >= budget) {
+      reachedBudget = true;
+      break;
+    }
+
+    if (selectorNode.type === 'Selector') {
+      pushSelectorRule(selectorNode, body, out, warnings);
+    }
+  }
+
+  return reachedBudget;
 }
 
 function pushSelectorRule(
@@ -1168,31 +1219,27 @@ function parseTransform(transformStr: string): {
 }
 
 function combineTransform(base: TransformState, next: TransformState): TransformState {
-  // Fast-path: if neither side carries a baking transform, simple
-  // additive composition keeps the plain `x`/`y`/`rotation` story
-  // (and zero-allocates the matrix slot — every group descent hits
-  // this branch in practice).
-  if (!base.requiresBake && !next.requiresBake) {
-    return {
-      x: base.x + next.x,
-      y: base.y + next.y,
-      rotation: base.rotation + next.rotation,
-      matrix: IDENTITY_MATRIX,
-      requiresBake: false,
-    };
-  }
-
-  // Either side bakes — promote to full matrix composition so the
-  // leaf shape that eventually bakes can use the cumulative
-  // transform without losing scale / skew from any ancestor.
+  // Always compose matrices and re-decompose. The previous
+  // additive fast-path (when neither side baked) silently dropped
+  // the cumulative matrix to identity, causing ancestor translates
+  // to vanish the moment a descendant baked (P7 review finding).
+  // Matrix composition is cheap and the decomposition pipeline is
+  // shared with `parseAndDecomposeTransform` so the skew / NaN
+  // logic lives in one place.
   const composed = composeMatrix(base.matrix, next.matrix);
+  const decomposed = decomposeMatrix(composed);
 
   return {
-    x: composed.e,
-    y: composed.f,
-    rotation: 0,
-    matrix: composed,
-    requiresBake: true,
+    x: decomposed.tx,
+    y: decomposed.ty,
+    rotation: decomposed.rotation,
+    matrix: decomposed.matrix,
+    // `requiresBake` is sticky — once any ancestor or descendant in
+    // the chain needs a bake, every leaf below MUST bake too. The
+    // decomposed flag handles fresh skew / scale; the OR with the
+    // base flag handles a baking ancestor whose effect would
+    // otherwise be cancelled out by an inverse descendant.
+    requiresBake: base.requiresBake || next.requiresBake || decomposed.requiresBake,
   };
 }
 
@@ -1479,31 +1526,34 @@ function importGroupElement(el: Element, ctx: GroupImportContext): ImportedEleme
     return [];
   }
 
-  // A tagged group becomes a Broadset `'group'` element in the
-  // output; its children then carry `parentDataBsId = ownId` so
-  // the fast path reconstructs the parent tree. An untagged
-  // group is a pure visual wrapper — children inherit
-  // `parentDataBsId` unchanged.
+  // Spec §"Group-Preserving Import": EVERY <g> produces a
+  // 'group' element with children linked via parentId. Earlier
+  // loops only emitted a group when the source DOM carried an
+  // identity attribute (data-bs-id or id), which silently flattened
+  // unnamed groups from Figma / Illustrator / Inkscape. We now
+  // synthesise a stable ID derived from the element's DOM path
+  // when neither is present so the parentId chain survives.
+  const groupId = ctx.ownDataBsId ?? synthesiseGroupId(el);
   const importedChildren: ImportedElement[] = [];
 
-  if (ctx.ownDataBsId !== undefined) {
-    importedChildren.push({
-      type: ctx.ownDataBsKind ?? 'group',
-      content: '',
-      position: { x: ctx.transform.x, y: ctx.transform.y },
-      width: 0,
-      height: 0,
-      // When the cumulative transform requires bake, rotation is
-      // baked into children's geometry — keep the group's stored
-      // rotation at zero to avoid double-applying it.
-      rotation: ctx.transform.requiresBake ? 0 : ctx.transform.rotation,
-      style: ctx.baseStyle,
-      ...ctx.tagMeta,
-    });
-  }
+  importedChildren.push({
+    type: ctx.ownDataBsKind ?? 'group',
+    content: '',
+    position: { x: ctx.transform.x, y: ctx.transform.y },
+    width: 0,
+    height: 0,
+    // When the cumulative transform requires bake, rotation is
+    // baked into children's geometry — keep the group's stored
+    // rotation at zero to avoid double-applying it.
+    rotation: ctx.transform.requiresBake ? 0 : ctx.transform.rotation,
+    style: ctx.baseStyle,
+    dataBsId: groupId,
+    ...(ctx.ownDataBsKind !== undefined ? { dataBsKind: ctx.ownDataBsKind } : {}),
+    parentDataBsId: ctx.parentDataBsId,
+  });
 
   const children = el.children;
-  const childParentId = ctx.ownDataBsId ?? ctx.parentDataBsId;
+  const childParentId = groupId;
 
   for (let i = 0; i < children.length; i++) {
     const child = children[i];
@@ -1518,6 +1568,39 @@ function importGroupElement(el: Element, ctx: GroupImportContext): ImportedEleme
   }
 
   return importedChildren;
+}
+
+/**
+ * Produce a stable synthetic id for a `<g>` whose source DOM has
+ * neither `data-bs-id` nor `id`. The id encodes the element's path
+ * from the document root (`g-<idx>-<idx>-…`) so re-imports of the
+ * same byte stream produce the same parentId chain — a property
+ * the chain-round-trip suite depends on.
+ */
+function synthesiseGroupId(el: Element): string {
+  const segments: string[] = [];
+  let cursor: Element = el;
+
+  for (;;) {
+    const parent: Element | null = cursor.parentElement;
+
+    if (parent === null) break;
+
+    const siblings = parent.children;
+    let index = 0;
+
+    for (let i = 0; i < siblings.length; i++) {
+      if (siblings[i] === cursor) {
+        index = i;
+        break;
+      }
+    }
+
+    segments.unshift(String(index));
+    cursor = parent;
+  }
+
+  return `__bs-g-${segments.join('-')}`;
 }
 
 interface ShapeBakeContext {
@@ -1543,16 +1626,15 @@ function requiresBake(ctx: ShapeBakeContext): boolean {
 }
 
 function bakedPathElement(d: string, ctx: ShapeBakeContext): ImportedElement {
-  // Compose the inherited cumulative matrix with the element's own
-  // transform so a leaf inside `<g transform="scale(2)">` bakes via
-  // (ancestor scale) ⊗ (own translate), not the own matrix alone.
-  const matrix = ctx.transform.requiresBake
-    ? composeMatrix(ctx.transform.matrix, ctx.ownTransform.matrix)
-    : ctx.ownTransform.matrix;
-
+  // `ctx.transform.matrix` is the FULL cumulative matrix from root
+  // through this element's own transform — `combineTransform`
+  // already composed it. The previous code re-composed
+  // `ctx.transform.matrix × ctx.ownTransform.matrix`, double-
+  // applying the leaf's own transform on every bake (P7 review
+  // finding). The bake just needs the cumulative matrix as-is.
   return {
     type: 'path',
-    content: bakePathWithMatrix(d, matrix),
+    content: bakePathWithMatrix(d, ctx.transform.matrix),
     position: { x: 0, y: 0 },
     width: 0,
     height: 0,

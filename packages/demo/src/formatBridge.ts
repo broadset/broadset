@@ -55,6 +55,14 @@ export interface ExportContext {
 export interface ImportDocumentResult {
   readonly document: BroadsetDocument;
   readonly warnings: readonly string[];
+  /**
+   * Project-level asset list when the imported file was a
+   * `BroadsetProject` (JSON / `.bsp` with a `documents` array).
+   * Lets the demo replace its in-memory project assets so SVG
+   * exports can embed fonts the imported project actually
+   * declares — instead of defaulting to the bundled sample.
+   */
+  readonly projectAssets?: readonly Asset[] | undefined;
 }
 
 /* ------------------------------------------------------------------ */
@@ -292,6 +300,13 @@ function hasDocumentsArray(value: unknown): value is { readonly documents: reado
   );
 }
 
+/** Detect a `BroadsetProject`-shaped wrapper carrying both `documents` AND `assets`. */
+function hasProjectShape(
+  value: unknown,
+): value is { readonly documents: readonly unknown[]; readonly assets: readonly Asset[] } {
+  return hasDocumentsArray(value) && 'assets' in value && Array.isArray((value as Record<string, unknown>)['assets']);
+}
+
 export async function importDocument(file: File): Promise<ImportDocumentResult> {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
 
@@ -302,10 +317,12 @@ export async function importDocument(file: File): Promise<ImportDocumentResult> 
       const text = await file.text();
       const parsed: unknown = JSON.parse(text);
       const candidate = hasDocumentsArray(parsed) ? parsed['documents'][0] : parsed;
+      const projectAssets = hasProjectShape(parsed) ? parsed.assets : undefined;
 
       return {
         document: broadsetDocumentSchema.parse(candidate),
         warnings: [],
+        ...(projectAssets !== undefined ? { projectAssets } : {}),
       };
     }
 

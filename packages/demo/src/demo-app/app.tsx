@@ -224,9 +224,19 @@ export function DemoApp(): React.JSX.Element {
         (inst) => inst.elementId === selectedElementId,
       ) ?? null)
     );
+  // Live project assets state. Defaults to the bundled sample,
+  // gets replaced when a `BroadsetProject` JSON / .bsp wrapper is
+  // imported (see `useDemoFileHandlers.handleImportFileChange`).
+  // Threaded through to SVG export so font embedding picks up
+  // the fonts the actual loaded project declares — not the
+  // sample's. Closes the P7.7 review wiring gap. Typed as
+  // `BroadsetProject['assets']` so it matches both the zod-parsed
+  // shape used by `buildRenderableDocumentForActivePage` and the
+  // public `Asset` union used by `formatBridge`.
+  const [projectAssets, setProjectAssets] = useState(SAMPLE_PROJECT.assets);
   const renderDocument = useMemo(
-    () => buildRenderableDocumentForActivePage(currentDocument, editorState.activePageIndex, SAMPLE_PROJECT.assets),
-    [currentDocument, editorState.activePageIndex],
+    () => buildRenderableDocumentForActivePage(currentDocument, editorState.activePageIndex, projectAssets),
+    [currentDocument, editorState.activePageIndex, projectAssets],
   );
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarPreferences.isOpen);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(initialSidebarPreferences.tab);
@@ -350,7 +360,8 @@ export function DemoApp(): React.JSX.Element {
     playbackControllerRef,
     pushToast,
     setActiveDialog,
-    projectAssets: SAMPLE_PROJECT.assets,
+    projectAssets,
+    setProjectAssets,
   });
   const {
     handleAlignSelection,

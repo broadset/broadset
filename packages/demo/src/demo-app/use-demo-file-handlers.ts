@@ -1,5 +1,5 @@
 import type { EditorStore } from '@broadset/editor';
-import type { Asset, BroadsetDocument } from '@broadset/model';
+import type { BroadsetDocument, BroadsetProject } from '@broadset/model';
 import { createEmptyBroadsetDocument } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { computeTimelineLoopDuration, createPlaybackController } from '@broadset/playback';
@@ -33,7 +33,16 @@ interface UseDemoFileHandlersOptions {
    * `font-family`. Optional — when absent SVG export still works
    * but emits "no font bytes supplied" warnings.
    */
-  readonly projectAssets?: readonly Asset[];
+  readonly projectAssets?: BroadsetProject['assets'];
+  /**
+   * Setter the import handler invokes when the imported file is a
+   * `BroadsetProject` wrapper carrying its own `assets`. Lets the
+   * demo replace its in-memory project assets so subsequent SVG
+   * exports embed fonts the imported project actually declares
+   * rather than the bundled sample's. Optional — when absent, the
+   * file handler just leaves the existing `projectAssets` in place.
+   */
+  readonly setProjectAssets?: Dispatch<SetStateAction<BroadsetProject['assets']>>;
 }
 
 function formatImportWarningMessage(warnings: readonly string[]): string {
@@ -382,6 +391,7 @@ export function useDemoFileHandlers({
   setActiveDialog,
   fileInputRef,
   projectAssets,
+  setProjectAssets,
 }: UseDemoFileHandlersOptions): DemoFileHandlers {
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
 
@@ -423,6 +433,19 @@ export function useDemoFileHandlers({
         const result = await importDocument(file);
 
         editorStore.getState().loadTemplate(result.document);
+
+        // Replace the in-memory project assets when the imported
+        // wrapper actually carried its own (a `BroadsetProject`
+        // JSON / .bsp). SVG exports done after the import will
+        // embed fonts the new project declares.
+        if (result.projectAssets !== undefined && setProjectAssets !== undefined) {
+          // ImportDocumentResult uses the raw `Asset` union; the
+          // demo's state uses the zod-parsed shape. Both are
+          // structurally identical at runtime — round-trip via
+          // `[...projectAssets]` so TS sees a fresh mutable array.
+          setProjectAssets([...result.projectAssets] as BroadsetProject['assets']);
+        }
+
         pushToast('success', 'Import complete.');
 
         if (result.warnings.length > 0) {
@@ -434,7 +457,7 @@ export function useDemoFileHandlers({
         event.currentTarget.value = '';
       }
     },
-    [editorStore, pushToast],
+    [editorStore, pushToast, setProjectAssets],
   );
 
   const handleSaveAsJson = useCallback((): void => {

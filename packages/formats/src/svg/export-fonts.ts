@@ -372,7 +372,14 @@ function renderFlattenedLine(line: string, baselineY: number, ctx: FlattenLayout
 }
 
 function measureRun(run: fontkit.GlyphRun, ctx: FlattenLayoutContext): number {
+  // CSS `letter-spacing` applies BETWEEN glyphs, not after the
+  // last one — adding it on every iteration inflated `measured`
+  // by one extra `letterSpacing`, shifting right-aligned and
+  // centre-aligned flattened text. Subtract it once at the end
+  // when at least one glyph contributed. Closes the P7.7 review
+  // off-by-one finding.
   let measured = 0;
+  let glyphCount = 0;
 
   for (let i = 0; i < run.glyphs.length; i++) {
     const position = run.positions[i];
@@ -380,9 +387,10 @@ function measureRun(run: fontkit.GlyphRun, ctx: FlattenLayoutContext): number {
     if (position === undefined) continue;
 
     measured += position.xAdvance * ctx.scale + ctx.letterSpacing;
+    glyphCount += 1;
   }
 
-  return measured;
+  return glyphCount > 0 ? measured - ctx.letterSpacing : 0;
 }
 
 /**

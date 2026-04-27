@@ -299,8 +299,15 @@ describe('SVG Import Fallback Preservation', () => {
     expect(opaqueEl).toBeUndefined();
   });
 
-  /** @description Validates that simple groups are flattened so supported children import natively. */
-  it('flattens simple groups and imports their supported children', () => {
+  /**
+   * @description Per svg.md §"Group-Preserving Import", every `<g>`
+   * MUST hydrate as a Broadset `'group'` element with its children
+   * linked via `parentDataBsId`. Earlier implementations flattened
+   * unnamed groups; P7.7e's review surfaced that this lost
+   * hierarchy on Figma / Illustrator / Inkscape exports where most
+   * `<g>`s carry no `id`.
+   */
+  it('imports a translated <g> as a group element with the rect linked via parent', () => {
     const input = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
       <g transform="translate(10,20)">
         <rect width="50" height="25" fill="#ff0000"/>
@@ -309,13 +316,15 @@ describe('SVG Import Fallback Preservation', () => {
 
     const result = importSvg(input);
 
-    expect(result.elements).toHaveLength(1);
+    expect(result.elements).toHaveLength(2);
 
-    const rectEl = result.elements[0];
+    const groupEl = result.elements.find((e) => e.type === 'group');
+    const rectEl = result.elements.find((e) => e.type === 'rectangle');
 
-    expect(rectEl?.type).toBe('rectangle');
+    expect(groupEl).toBeDefined();
     expect(rectEl?.position.x).toBe(10);
     expect(rectEl?.position.y).toBe(20);
+    expect(rectEl?.parentDataBsId).toBe(groupEl?.dataBsId);
   });
 
   /** @description Validates that unsupported elements are preserved as svg payload fallbacks with warnings. */
