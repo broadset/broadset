@@ -2,8 +2,8 @@ import type { BroadsetElement } from '@broadset/model';
 import { resolveStyleColor, resolveStyleFilter } from '@broadset/model';
 import type { Layer } from 'ag-psd';
 
+import { parseBoxShadow, parseFilterGlow } from '../../_shared/effects';
 import { parseHexColor } from '../color-utils';
-import { parseBoxShadow, parseFilterGlow } from '../effects';
 
 export function applyBoxShadow(layer: Layer, el: BroadsetElement): void {
   if (!el.style.boxShadow) return;

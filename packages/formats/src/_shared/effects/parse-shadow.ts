@@ -1,30 +1,25 @@
-import type { RgbaColor } from './color-utils';
-import { parseHexColor } from './color-utils';
+import { parseHexColor } from './parse-color';
+import type { ParsedShadow } from './types';
 
-export interface ParsedShadow {
-  readonly offsetX: number;
-  readonly offsetY: number;
-  readonly blur: number;
-  readonly spread: number;
-  readonly color: RgbaColor;
-  readonly inset: boolean;
-}
-
-interface ParsedGlow {
-  readonly blur: number;
-  readonly color: RgbaColor;
-}
-
-// Shared regex fragments. Composed via template strings so each individual
-// expression stays under sonarjs/regex-complexity (default 20).
+// Shared regex fragments. Composed via template strings so each
+// individual expression stays under sonarjs/regex-complexity (default 20).
 const SIGNED_PX = String.raw`(-?\d+(?:\.\d+)?)px`;
 const RGBA_BODY = String.raw`rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)`;
 const SHADOW_OFFSETS = `${SIGNED_PX}\\s+${SIGNED_PX}\\s+${SIGNED_PX}(?:\\s+${SIGNED_PX})?`;
 
 const SHADOW_RGBA_RE = new RegExp(`${SHADOW_OFFSETS}\\s+${RGBA_BODY}`);
 const SHADOW_HEX_RE = new RegExp(`${SHADOW_OFFSETS}\\s+(#[\\da-fA-F]{3,8})`);
-const FILTER_GLOW_RE = new RegExp(String.raw`drop-shadow\(\s*0\s+0\s+(\d+(?:\.\d+)?)px\s+${RGBA_BODY}\s*\)`);
 
+/**
+ * Parse a single CSS `box-shadow` value (one shadow, not a list) into
+ * a structured descriptor: `<offsetX>px <offsetY>px <blur>px [<spread>px] <color>`,
+ * with optional leading `inset`. The colour leg accepts hex
+ * (`#rgb` / `#rrggbb` / `#rrggbbaa`) or `rgb()` / `rgba()`.
+ *
+ * Returns `undefined` for unparseable input. Format-specific exporters
+ * map the descriptor onto their own primitive (PSD layer effect,
+ * SVG `<feDropShadow>`, PDF `/ExtGState`).
+ */
 export function parseBoxShadow(shadow: string): ParsedShadow | undefined {
   const trimmed = shadow.trim();
   const inset = trimmed.startsWith('inset');
@@ -64,22 +59,4 @@ export function parseBoxShadow(shadow: string): ParsedShadow | undefined {
   }
 
   return undefined;
-}
-
-export function parseFilterGlow(filter: string): ParsedGlow | undefined {
-  const match = FILTER_GLOW_RE.exec(filter);
-
-  if (!match) {
-    return undefined;
-  }
-
-  return {
-    blur: parseFloat(match[1] ?? '0'),
-    color: {
-      r: parseInt(match[2] ?? '0', 10),
-      g: parseInt(match[3] ?? '0', 10),
-      b: parseInt(match[4] ?? '0', 10),
-      a: parseFloat(match[5] ?? '1'),
-    },
-  };
 }
