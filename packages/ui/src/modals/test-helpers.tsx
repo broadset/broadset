@@ -333,6 +333,64 @@ function MockTableRow(p: Record<string, unknown>) {
   );
 }
 
+const mockRadioGroupCtx = React.createContext({
+  name: '',
+  value: '' as string,
+  onChange: undefined as ((value: string) => void) | undefined,
+});
+
+let mockRadioGroupCounter = 0;
+
+function nextMockRadioGroupId(): number {
+  mockRadioGroupCounter += 1;
+
+  return mockRadioGroupCounter;
+}
+
+function mockRadioGroup(p: Record<string, unknown>) {
+  const { children, value, onChange, name, ...rest } = p;
+  const groupName =
+    typeof name === 'string' && name.length > 0 ? name : `mock-radio-group-${String(nextMockRadioGroupId())}`;
+
+  return React.createElement(
+    'div',
+    { ...rest, role: 'radiogroup' },
+    React.createElement(
+      mockRadioGroupCtx.Provider,
+      {
+        value: {
+          name: groupName,
+          value: typeof value === 'string' ? value : '',
+          onChange: typeof onChange === 'function' ? (onChange as (value: string) => void) : undefined,
+        },
+      },
+      (children as React.ReactNode) ?? null,
+    ),
+  );
+}
+
+function MockRadio(p: Record<string, unknown>) {
+  const ctx = React.useContext(mockRadioGroupCtx);
+  const { children, value, ...rest } = p;
+  const stringValue = typeof value === 'string' ? value : '';
+
+  return React.createElement(
+    'label',
+    { 'aria-label': p['aria-label'] },
+    React.createElement('input', {
+      ...rest,
+      checked: ctx.value === stringValue,
+      name: ctx.name,
+      onChange: () => {
+        if (ctx.onChange !== undefined) ctx.onChange(stringValue);
+      },
+      type: 'radio',
+      value: stringValue,
+    }),
+    (children as React.ReactNode) ?? null,
+  );
+}
+
 vi.mock('@heroui/react', () => ({
   Accordion: Object.assign(mockWrap(), {
     Item: mockWrap(),
@@ -366,6 +424,13 @@ vi.mock('@heroui/react', () => ({
     Fill: mockWrap(),
     Output: mockWrap('output'),
   }),
+  Radio: Object.assign(MockRadio, {
+    Root: MockRadio,
+    Control: mockWrap('span'),
+    Indicator: mockWrap('span'),
+    Content: mockWrap('span'),
+  }),
+  RadioGroup: Object.assign(mockRadioGroup, { Root: mockRadioGroup }),
   Select: Object.assign(mockSelect, {
     Trigger: mockSelectFragment,
     Value: mockSelectFragment,

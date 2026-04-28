@@ -183,8 +183,13 @@ export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
           }
         }
         warnings={importReconciliationModal?.warnings ?? []}
-        onAcknowledge={dismissImportReconciliationModal}
-        onClose={dismissImportReconciliationModal}
+        onAcknowledge={() => {
+          dismissImportReconciliationModal();
+        }}
+        onAcknowledgeWithChoices={dismissImportReconciliationModal}
+        onClose={() => {
+          dismissImportReconciliationModal();
+        }}
       />
 
       <FormatPreflightModal

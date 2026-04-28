@@ -553,6 +553,64 @@ export function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
+/**
+ * Per-modification "Use preserved / Use visual" choice the user picks
+ * in the `FormatReconciliationModal`. Mirrors the modal's
+ * `ReconciliationChoice` so the demo doesn't have to depend on the
+ * formats package at module-eval time (the formats package stays
+ * lazy-loaded — see `bundle-boundary.test.ts`).
+ */
+export type DemoReconciliationChoice = 'preserved' | 'visual';
+
+/**
+ * Per-modification record carrying both element refs the demo needs to
+ * resolve a "Use preserved" choice without re-reaching into the formats
+ * package. Populated when the import flow stashes a reconciliation
+ * result; consumed by {@link applyReconciliationChoicesToDocument}.
+ */
+export interface DemoReconciliationModification {
+  readonly id: string;
+  readonly preservedElement: BroadsetElement;
+  readonly currentElement: BroadsetElement;
+}
+
+/**
+ * Apply per-modification "Use preserved / Use visual" choices to the
+ * re-imported document before `loadTemplate` runs (Phase 4.9 of
+ * cross-format-io-improvement-plan.md, closes pptx-known-gaps §A1).
+ *
+ * For each modification id, looks up the user's choice (defaulting to
+ * `'visual'` when unset) and either keeps the current element or swaps
+ * in the preserved one. Pure: returns a new document with a new
+ * `elements` array.
+ *
+ * Mirrors `applyReconciliationChoices` in `@broadset/formats` —
+ * inlined here so the demo's lazy-formats bundle boundary
+ * (`bundle-boundary.test.ts`) stays intact.
+ */
+export function applyReconciliationChoicesToDocument(
+  document: BroadsetDocument,
+  modifications: readonly DemoReconciliationModification[],
+  choices: ReadonlyMap<string, DemoReconciliationChoice>,
+): BroadsetDocument {
+  if (modifications.length === 0) return document;
+
+  const modById = new Map(modifications.map((mod) => [mod.id, mod]));
+
+  return {
+    ...document,
+    elements: document.elements.map((element) => {
+      const mod = modById.get(element.id);
+
+      if (mod === undefined) return element;
+
+      const choice = choices.get(element.id) ?? 'visual';
+
+      return choice === 'preserved' ? mod.preservedElement : element;
+    }),
+  };
+}
+
 export function downloadJsonFile(filename: string, payload: unknown): void {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const objectUrl = URL.createObjectURL(blob);

@@ -1,4 +1,4 @@
-import type { BroadsetDocument, FontAsset } from '@broadset/model';
+import type { BroadsetDocument, BroadsetElement, FontAsset } from '@broadset/model';
 
 /**
  * Per-bucket summary surfaced to the demo's reconciliation modal so
@@ -12,8 +12,27 @@ export interface DocumentReconciliationElement {
   readonly description?: string;
 }
 
+/**
+ * Richer per-modification entry for the conflict-resolution UX (Phase
+ * 4.9 of cross-format-io-improvement-plan.md, closes pptx-known-gaps
+ * §A1). Carries both the preserved (last Broadset export) element and
+ * the current (re-imported, externally edited) element so the demo can
+ * resolve "Use preserved" by swapping the element back in `loadTemplate`.
+ *
+ * The `FormatReconciliationModal` itself stays decoupled from
+ * `BroadsetElement` — the demo translates this richer shape into the
+ * UI's plain summaries (id + name + description) and keeps the element
+ * references for choice resolution after the user acknowledges.
+ */
+export interface DocumentReconciliationModification extends DocumentReconciliationElement {
+  /** The element as it was in the preserved (last Broadset-export) document. */
+  readonly preservedElement: BroadsetElement;
+  /** The element as it is in the visual (re-imported) document. */
+  readonly currentElement: BroadsetElement;
+}
+
 export interface DocumentReconciliation {
-  readonly modifications: readonly DocumentReconciliationElement[];
+  readonly modifications: readonly DocumentReconciliationModification[];
   readonly additions: readonly DocumentReconciliationElement[];
   readonly deletions: readonly DocumentReconciliationElement[];
   readonly recoveredByHash: readonly DocumentReconciliationElement[];

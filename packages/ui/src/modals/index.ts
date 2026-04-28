@@ -40,5 +40,6 @@ export {
   type FormatReconciliationElementSummary,
   FormatReconciliationModal,
   type FormatReconciliationModalProps,
+  type ReconciliationChoice,
 } from './format-reconciliation';
 export type { DocumentPreset, MediaAsset, TemplateEntry } from './types';

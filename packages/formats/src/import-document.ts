@@ -6,16 +6,23 @@ import type {
   DocumentImportResult,
   DocumentReconciliation,
   DocumentReconciliationElement,
+  DocumentReconciliationModification,
 } from './import-document-types';
 import { importPdfDocument as runPdfImport, readPreservedPdfDocument, reconcilePdf } from './pdf';
 import { importPptxWithMerge, reconcilePptx } from './pptx';
 import { importPsdDocument as runPsdImport, readPreservedPsdDocument, reconcilePsd } from './psd';
-import { importSvgDocument as importSvgDocumentRaw, reconcileSvg, SVG_BROADSET_NAMESPACE, type SvgImportOptions } from './svg';
+import {
+  importSvgDocument as importSvgDocumentRaw,
+  reconcileSvg,
+  SVG_BROADSET_NAMESPACE,
+  type SvgImportOptions,
+} from './svg';
 
 export type {
   DocumentImportResult,
   DocumentReconciliation,
   DocumentReconciliationElement,
+  DocumentReconciliationModification,
 } from './import-document-types';
 
 function createDocumentImportResult(
@@ -108,10 +115,21 @@ function buildReconciliationData(result: ReconcileResult): DocumentReconciliatio
     ...(description !== undefined ? { description } : {}),
   });
 
+  const modifications: readonly DocumentReconciliationModification[] = result.modifications.map((mod) => {
+    const summary = summarise(
+      mod.before,
+      `${String(mod.differences.length)} field${mod.differences.length === 1 ? '' : 's'} changed`,
+    );
+
+    return {
+      ...summary,
+      preservedElement: mod.before,
+      currentElement: mod.after,
+    };
+  });
+
   return {
-    modifications: result.modifications.map((mod) =>
-      summarise(mod.before, `${String(mod.differences.length)} field${mod.differences.length === 1 ? '' : 's'} changed`),
-    ),
+    modifications,
     additions: result.additions.map((el) => summarise(el)),
     deletions: result.deletions.map((el) => summarise(el)),
     recoveredByHash: result.recoveredByHash.map((entry) =>

@@ -1,5 +1,5 @@
 import type * as FormatsNS from '@broadset/formats';
-import type { Asset, BroadsetDocument } from '@broadset/model';
+import type { Asset, BroadsetDocument, BroadsetElement } from '@broadset/model';
 import { broadsetDocumentSchema, isFontAsset } from '@broadset/model';
 import type { PreflightFinding } from '@broadset/ui';
 
@@ -112,8 +112,21 @@ export interface ImportReconciliationElement {
   readonly description?: string;
 }
 
+/**
+ * Phase 4.9 — modifications carry the full preserved + current element
+ * references so the demo can apply per-element "Use preserved / Use
+ * visual" choices via `applyReconciliationChoices` from
+ * `@broadset/formats`. The summary fields (id / name / description) are
+ * what the modal itself displays; the element refs stay in the demo's
+ * state and are never threaded into the modal props.
+ */
+export interface ImportReconciliationModification extends ImportReconciliationElement {
+  readonly preservedElement: BroadsetElement;
+  readonly currentElement: BroadsetElement;
+}
+
 export interface ImportReconciliationData {
-  readonly modifications: readonly ImportReconciliationElement[];
+  readonly modifications: readonly ImportReconciliationModification[];
   readonly additions: readonly ImportReconciliationElement[];
   readonly deletions: readonly ImportReconciliationElement[];
   readonly recoveredByHash: readonly ImportReconciliationElement[];

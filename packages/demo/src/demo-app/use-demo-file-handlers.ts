@@ -1,16 +1,23 @@
 import type { EditorStore } from '@broadset/editor';
-import type { BroadsetDocument, BroadsetProject } from '@broadset/model';
+import type { BroadsetDocument, BroadsetElement, BroadsetProject } from '@broadset/model';
 import { createEmptyBroadsetDocument } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { computeTimelineLoopDuration, createPlaybackController } from '@broadset/playback';
 import { createScreenRenderer } from '@broadset/renderer';
-import type { DocumentPreset, ExportProgress, MediaAsset, PreflightFinding, TemplateEntry } from '@broadset/ui';
+import type {
+  DocumentPreset,
+  ExportProgress,
+  MediaAsset,
+  PreflightFinding,
+  ReconciliationChoice,
+  TemplateEntry,
+} from '@broadset/ui';
 import type { ChangeEvent, Dispatch, RefObject, SetStateAction } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { ActiveDialog } from '../demo-types';
 import { DOCUMENT_STORAGE_KEY } from '../demo-types';
-import { downloadJsonFile } from '../demo-utils';
+import { applyReconciliationChoicesToDocument, downloadJsonFile } from '../demo-utils';
 import type { exportDocument, ExportFormat, FormatsModule, loadFormats } from '../formatBridge';
 
 type LoadFormats = typeof loadFormats;
@@ -88,6 +95,12 @@ export interface ImportWarningsModalState {
  * `FormatReconciliationModal` shows per-bucket counts plus expandable
  * element lists; the flat `FormatImportWarningsModal` falls back to
  * the warning summary lines when reconciliation is null.
+ *
+ * Phase 4.9 — the state additionally stashes the re-imported document
+ * and the rich modifications (with preserved + current element refs)
+ * so the acknowledge handler can apply per-element "Use preserved /
+ * Use visual" choices via `applyReconciliationChoices` before
+ * `loadTemplate` runs.
  */
 export interface ImportReconciliationModalState {
   readonly formatLabel: string;
@@ -98,12 +111,29 @@ export interface ImportReconciliationModalState {
     readonly recoveredByHash: readonly ImportReconciliationModalElement[];
   };
   readonly warnings: readonly string[];
+  /**
+   * Pending re-imported document. `loadTemplate` is deferred until the
+   * user acknowledges the modal; the acknowledge handler swaps any
+   * "Use preserved" elements in via `applyReconciliationChoices` first.
+   */
+  readonly pendingDocument: BroadsetDocument;
+  /**
+   * Modifications keyed by id, carrying both the preserved and current
+   * `BroadsetElement` references. The acknowledge handler reads this
+   * to resolve "Use preserved" choices.
+   */
+  readonly modificationRefs: ReadonlyMap<string, ImportReconciliationModificationRefs>;
 }
 
 export interface ImportReconciliationModalElement {
   readonly id: string;
   readonly name?: string;
   readonly description?: string;
+}
+
+export interface ImportReconciliationModificationRefs {
+  readonly preservedElement: BroadsetElement;
+  readonly currentElement: BroadsetElement;
 }
 
 /**
@@ -124,7 +154,15 @@ interface DemoFileHandlers {
   readonly importReconciliationModal: ImportReconciliationModalState | null;
   readonly exportPreflightModal: ExportPreflightModalState | null;
   readonly dismissExportPreflightModal: () => void;
-  readonly dismissImportReconciliationModal: () => void;
+  /**
+   * Phase 4.9 — closes the reconciliation modal AND applies the user's
+   * per-modification "Use preserved / Use visual" choices to the
+   * pending re-imported document, then loads it into the editor. The
+   * choices map is keyed by element id and must include every entry
+   * for `data.modifications` (the modal resolves the default to
+   * `'visual'` for ones the user didn't touch).
+   */
+  readonly dismissImportReconciliationModal: (choices?: ReadonlyMap<string, ReconciliationChoice>) => void;
   readonly dismissImportWarningsModal: () => void;
   readonly handleCreateFromPreset: (preset: DocumentPreset) => void;
   readonly handleDebugSnapshotDownload: () => void;
@@ -580,9 +618,37 @@ export function useDemoFileHandlers({
   const dismissImportWarningsModal = useCallback((): void => {
     setImportWarningsModal(null);
   }, []);
-  const dismissImportReconciliationModal = useCallback((): void => {
-    setImportReconciliationModal(null);
-  }, []);
+  /**
+   * Phase 4.9 — closes the reconciliation modal AND finishes the
+   * deferred import: swaps any "Use preserved" elements into the
+   * pending document, then drives `loadTemplate`. When called with no
+   * choices map (e.g. the user hits Close instead of Continue), every
+   * modification falls back to `'visual'` — today's silent default.
+   */
+  const dismissImportReconciliationModal = useCallback(
+    (choices?: ReadonlyMap<string, ReconciliationChoice>): void => {
+      const current = importReconciliationModal;
+
+      setImportReconciliationModal(null);
+
+      if (current === null) return;
+
+      const resolvedChoices = choices ?? new Map<string, ReconciliationChoice>();
+      const modifications = Array.from(current.modificationRefs, ([id, refs]) => ({
+        id,
+        preservedElement: refs.preservedElement,
+        currentElement: refs.currentElement,
+      }));
+      const documentToLoad = applyReconciliationChoicesToDocument(
+        current.pendingDocument,
+        modifications,
+        resolvedChoices,
+      );
+
+      editorStore.getState().loadTemplate(documentToLoad);
+    },
+    [editorStore, importReconciliationModal],
+  );
   const dismissExportPreflightModal = useCallback((): void => {
     setExportPreflightModal(null);
   }, []);
@@ -627,8 +693,8 @@ export function useDemoFileHandlers({
         // can glyph-flatten via the project's fonts (P7.7i path).
         // Other formats ignore this option.
         const result = await importDocument(file, projectAssets !== undefined ? { projectAssets } : undefined);
-
-        editorStore.getState().loadTemplate(result.document);
+        const formatLabel = deriveFormatLabel(file);
+        const reconciliation = result.reconciliation ?? null;
 
         // Replace the in-memory project assets when the imported
         // wrapper actually carried its own (a `BroadsetProject`
@@ -642,18 +708,46 @@ export function useDemoFileHandlers({
           setProjectAssets([...result.projectAssets] as BroadsetProject['assets']);
         }
 
-        pushToast('success', 'Import complete.');
+        if (reconciliation !== null) {
+          // Phase 4.9 — defer loadTemplate. The acknowledge handler
+          // (dismissImportReconciliationModal) reads the user's
+          // per-modification choices and applies them via
+          // applyReconciliationChoicesToDocument before driving
+          // loadTemplate. Falls back to "all visual" if the user
+          // closes the modal without picking, matching today's
+          // silent default.
+          const modificationRefs = new Map<string, ImportReconciliationModificationRefs>(
+            reconciliation.modifications.map((mod) => [
+              mod.id,
+              { preservedElement: mod.preservedElement, currentElement: mod.currentElement },
+            ]),
+          );
 
-        const formatLabel = deriveFormatLabel(file);
-
-        if (result.reconciliation !== null && result.reconciliation !== undefined) {
           setImportReconciliationModal({
             formatLabel,
-            data: result.reconciliation,
+            data: {
+              modifications: reconciliation.modifications.map((mod) => ({
+                id: mod.id,
+                ...(mod.name !== undefined ? { name: mod.name } : {}),
+                ...(mod.description !== undefined ? { description: mod.description } : {}),
+              })),
+              additions: reconciliation.additions,
+              deletions: reconciliation.deletions,
+              recoveredByHash: reconciliation.recoveredByHash,
+            },
             warnings: result.warnings,
+            pendingDocument: result.document,
+            modificationRefs,
           });
-        } else if (result.warnings.length > 0) {
-          setImportWarningsModal({ formatLabel, warnings: result.warnings });
+
+          pushToast('success', 'Import complete — review external changes.');
+        } else {
+          editorStore.getState().loadTemplate(result.document);
+          pushToast('success', 'Import complete.');
+
+          if (result.warnings.length > 0) {
+            setImportWarningsModal({ formatLabel, warnings: result.warnings });
+          }
         }
       } catch (error: unknown) {
         pushToast('error', `Import failed: ${error instanceof Error ? error.message : String(error)}`);

@@ -1,7 +1,9 @@
+export { applyReconciliationChoices, type ReconciliationChoice } from './apply-reconciliation-choices';
 export {
   type DocumentImportResult,
   type DocumentReconciliation,
   type DocumentReconciliationElement,
+  type DocumentReconciliationModification,
   importPdfDocument,
   importPptxDocument,
   importPsdDocument,

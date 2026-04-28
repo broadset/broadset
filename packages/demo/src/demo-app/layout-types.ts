@@ -1,7 +1,7 @@
 import { type createDataStore, type EditorStore, type ElementUpdate } from '@broadset/editor';
 import type { BroadsetDocument, BroadsetElement, EasingMode, Timeline } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
-import type { DocumentPreset, ExportProgress, MediaAsset, TemplateEntry } from '@broadset/ui';
+import type { DocumentPreset, ExportProgress, MediaAsset, ReconciliationChoice, TemplateEntry } from '@broadset/ui';
 
 import type { ActiveDialog, ContextMenuState, SidebarTab } from '../demo-types';
 import type {
@@ -48,7 +48,7 @@ export interface DemoAppLayoutProps {
   readonly importWarningsModal: ImportWarningsModalState | null;
   readonly dismissImportWarningsModal: () => void;
   readonly importReconciliationModal: ImportReconciliationModalState | null;
-  readonly dismissImportReconciliationModal: () => void;
+  readonly dismissImportReconciliationModal: (choices?: ReadonlyMap<string, ReconciliationChoice>) => void;
   readonly exportPreflightModal: ExportPreflightModalState | null;
   readonly dismissExportPreflightModal: () => void;
   readonly handleAnimationAddKeyframe: () => void;

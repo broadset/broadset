@@ -13,9 +13,6 @@ Gaps" section in [project/spec/formats/pptx.md](../spec/formats/pptx.md)
 > **Tracked closures:** the entries below are scheduled across the
 > [cross-format I/O improvement plan](cross-format-io-improvement-plan.md):
 >
-> - **A1** (reconciliation UI conflict resolution) — Phase 1.2
->   generalizes reconciliation across formats; Phase 4.9 adds the
->   conflict-resolution choice UI on top.
 > - **B1** (telemetry) — Phase 5.4.
 > - **B3** (accessibility audit on new modals) — Phase 5.5.
 > - **B4** (sister-format audits) — Phase 5.6.
@@ -75,25 +72,6 @@ generation. Different LibreOffice versions render differently — pin
 the apt package version to keep the reference stable.
 
 ## Tier A — known scope cuts
-
-### A1. Reconciliation UI is read-only
-
-`FormatReconciliationModal` shows the four reconcile buckets
-(modifications / additions / deletions / recoveredByHash) with
-expandable per-element lists, but it does NOT let the user resolve
-conflicts. The modal is no longer PPTX-only — Phase 1.2 generalised
-the cross-format adaptor so PDF, PSD, and SVG re-imports also populate
-`DocumentImportResult.reconciliation` when the input carries Broadset
-round-trip metadata. The remaining gap is the conflict-resolution
-UX. Spec wording: "Use preserved / Use visual" choice for
-modifications. Today the import unconditionally takes the merged
-result from `mergeFromLedger` — the UI is informational.
-
-**To close:** extend `FormatReconciliationModalProps` with
-per-modification choice callbacks (`onUsePreserved`, `onUseVisual`,
-or per-field overrides). Demo wiring needs to defer the
-`loadTemplate` call until the user acknowledges, and apply the
-chosen branch per element.
 
 ### A3. Connectors / ink / SmartArt are preserve-only, not first-class
 
