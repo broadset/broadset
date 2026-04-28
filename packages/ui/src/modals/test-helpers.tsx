@@ -294,10 +294,15 @@ function mockSelect(p: Record<string, unknown>) {
   );
 }
 
-function mockListBoxItem(p: Record<string, unknown>) {
-  const { children, ...rest } = p;
+function mockSelectFragment(p: Record<string, unknown>) {
+  return React.createElement(React.Fragment, null, (p['children'] as React.ReactNode) ?? null);
+}
 
-  return React.createElement('option', rest, (children as React.ReactNode) ?? null);
+function mockListBoxItem(p: Record<string, unknown>) {
+  const { children, id, ...rest } = p;
+  const optionValue = typeof id === 'string' || typeof id === 'number' ? String(id) : (rest['value'] ?? '');
+
+  return React.createElement('option', { ...rest, value: optionValue }, (children as React.ReactNode) ?? null);
 }
 
 function MockTableRow(p: Record<string, unknown>) {
@@ -339,6 +344,11 @@ vi.mock('@heroui/react', () => ({
   ButtonGroup: mockWrap(),
   Input: mockInput,
   Kbd: mockKbd,
+  ListBox: Object.assign(mockSelectFragment, {
+    Item: mockListBoxItem,
+    Section: mockWrap(),
+    ItemIndicator: mockWrap('span'),
+  }),
   ListBoxItem: mockListBoxItem,
   Modal: Object.assign(mockModal, {
     Backdrop: mockWrap(),
@@ -357,9 +367,10 @@ vi.mock('@heroui/react', () => ({
     Output: mockWrap('output'),
   }),
   Select: Object.assign(mockSelect, {
-    Trigger: mockWrap(),
-    Value: mockWrap('span'),
-    Popover: mockWrap(),
+    Trigger: mockSelectFragment,
+    Value: mockSelectFragment,
+    Indicator: mockSelectFragment,
+    Popover: mockSelectFragment,
   }),
   Slider: Object.assign(mockSlider, { Track: mockWrap(), Fill: mockWrap(), Thumb: mockWrap() }),
   Spinner: mockSpinner,

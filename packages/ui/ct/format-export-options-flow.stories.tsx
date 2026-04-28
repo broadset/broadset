@@ -17,12 +17,11 @@ import { ExportModal } from '../src/modals/core-modals';
  *    options block (`svgOptions` / `psdOptions` / `pdfOptions` /
  *    `pptxOptions`) into the `onExport` payload.
  *
- * The harness does NOT attempt to drive the FormatExportOptionsModal's
- * Select widget — real-browser HeroUI Select with raw `<option>`
- * children does not surface dropdown items, so this CT verifies the
- * round-trip with the modal's seeded defaults. The default values
- * are themselves part of the wiring's contract (the bridge layer
- * relies on them being present).
+ * The harness mounts the real ExportModal so dropdown interactions
+ * exercise the canonical HeroUI `Select.Trigger` / `Select.Popover` /
+ * `ListBox` shape used by FormatExportOptionsModal. The default-value
+ * round trip plus at least one Select-driven value change are both
+ * covered by the CT spec.
  */
 
 interface ExportCallRecord {

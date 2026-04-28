@@ -43,6 +43,38 @@ test.describe('ExportModal × FormatExportOptionsModal wiring', () => {
   });
 
   /**
+   * @description SVG flow — opening the FormatExportOptionsModal,
+   * clicking the "Font embedding" Select, choosing the "Flatten text
+   * to paths" option, confirming, then exporting. Asserts the new
+   * value is forwarded as `data.svgOptions.fontEmbedding === 'flatten'`.
+   *
+   * This validates the migration from raw `<option>` children to the
+   * canonical `Select.Trigger` / `Select.Popover` / `ListBox` shape —
+   * raw `<option>` rendered nothing under react-aria-components in a
+   * real browser, so this drop-down click was previously impossible.
+   */
+  test('SVG font-embedding Select can change value end-to-end', async ({ mount, page }) => {
+    const component = await mount(<ExportModalFormatOptionsHarness format="svg" />);
+
+    await page.getByRole('button', { name: 'SVG', exact: true }).click();
+    await page.getByRole('button', { name: /open svg export options/i }).click();
+
+    await page.getByRole('button', { name: 'Font embedding' }).click();
+    await page.getByRole('option', { name: 'Flatten text to paths' }).click();
+
+    await page.getByRole('button', { name: 'Confirm export options' }).click();
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
+
+    await expect(component.getByLabel('export-call-count')).toHaveText('1');
+
+    const payloadText = await component.getByLabel('export-call-payload').textContent();
+    const payload = JSON.parse(payloadText ?? 'null') as { exporter: string; data: Record<string, unknown> } | null;
+    const svgOptions = payload?.data['svgOptions'] as { fontEmbedding: string } | undefined;
+
+    expect(svgOptions?.fontEmbedding).toBe('flatten');
+  });
+
+  /**
    * @description PSD flow — same round trip emits `psdOptions` with
    * the five PSD-supported fields (colorSpace, bitDepth, embedIccProfile,
    * linkSmartObjects, preserveVisibility).

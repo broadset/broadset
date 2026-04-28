@@ -1,4 +1,4 @@
-import { Button, Select, Switch } from '@heroui/react';
+import { Button, ListBox, Select, Switch } from '@heroui/react';
 import type { JSX } from 'react';
 import { useState } from 'react';
 
@@ -85,16 +85,26 @@ export function FormatExportOptionsModal({
             aria-label="Color space"
             value={value.colorSpace}
             onChange={(key) => {
+              if (key === null) return;
+
               const next = String(key) as FormatExportColorSpace;
 
               setValue((prev) => ({ ...prev, colorSpace: next }));
             }}
           >
-            {(Object.keys(COLOR_SPACE_LABELS) as readonly FormatExportColorSpace[]).map((cs) => (
-              <option key={cs} value={cs}>
-                {COLOR_SPACE_LABELS[cs]}
-              </option>
-            ))}
+            <Select.Trigger>
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                {(Object.keys(COLOR_SPACE_LABELS) as readonly FormatExportColorSpace[]).map((cs) => (
+                  <ListBox.Item id={cs} key={cs} textValue={COLOR_SPACE_LABELS[cs]}>
+                    {COLOR_SPACE_LABELS[cs]}
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Select.Popover>
           </Select>
         : null}
 
@@ -103,13 +113,27 @@ export function FormatExportOptionsModal({
             aria-label="Bit depth"
             value={String(value.bitDepth)}
             onChange={(key) => {
+              if (key === null) return;
+
               const next = Number(String(key));
 
               setValue((prev) => ({ ...prev, bitDepth: next === 16 ? 16 : 8 }));
             }}
           >
-            <option value="8">8-bit</option>
-            <option value="16">16-bit</option>
+            <Select.Trigger>
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                <ListBox.Item id="8" textValue="8-bit">
+                  8-bit
+                </ListBox.Item>
+                <ListBox.Item id="16" textValue="16-bit">
+                  16-bit
+                </ListBox.Item>
+              </ListBox>
+            </Select.Popover>
           </Select>
         : null}
 
@@ -154,16 +178,26 @@ export function FormatExportOptionsModal({
             aria-label="Font embedding"
             value={value.fontEmbedding}
             onChange={(key) => {
+              if (key === null) return;
+
               const next = String(key) as FormatExportFontEmbedding;
 
               setValue((prev) => ({ ...prev, fontEmbedding: next }));
             }}
           >
-            {(Object.keys(FONT_EMBEDDING_LABELS) as readonly FormatExportFontEmbedding[]).map((choice) => (
-              <option key={choice} value={choice}>
-                {FONT_EMBEDDING_LABELS[choice]}
-              </option>
-            ))}
+            <Select.Trigger>
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                {(Object.keys(FONT_EMBEDDING_LABELS) as readonly FormatExportFontEmbedding[]).map((choice) => (
+                  <ListBox.Item id={choice} key={choice} textValue={FONT_EMBEDDING_LABELS[choice]}>
+                    {FONT_EMBEDDING_LABELS[choice]}
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Select.Popover>
           </Select>
         : null}
 
@@ -196,16 +230,26 @@ export function FormatExportOptionsModal({
             aria-label="PDF/A conformance"
             value={value.pdfaConformance}
             onChange={(key) => {
+              if (key === null) return;
+
               const next = String(key) as PdfAConformance;
 
               setValue((prev) => ({ ...prev, pdfaConformance: next }));
             }}
           >
-            {(Object.keys(PDFA_CONFORMANCE_LABELS) as readonly PdfAConformance[]).map((choice) => (
-              <option key={choice} value={choice}>
-                {PDFA_CONFORMANCE_LABELS[choice]}
-              </option>
-            ))}
+            <Select.Trigger>
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                {(Object.keys(PDFA_CONFORMANCE_LABELS) as readonly PdfAConformance[]).map((choice) => (
+                  <ListBox.Item id={choice} key={choice} textValue={PDFA_CONFORMANCE_LABELS[choice]}>
+                    {PDFA_CONFORMANCE_LABELS[choice]}
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Select.Popover>
           </Select>
         : null}
 
