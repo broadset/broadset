@@ -9,7 +9,7 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src", "ct", "playwright", "vite.config.ts", "playwright-ct.config.ts"],
+  "include": ["src", "ct", "playwright", "vite.config.ts", "playwright-ct.config.ts", "playwright-ct-logger.ts"],
   "exclude": ["node_modules", "dist", "coverage"],
   "references": [{ "path": "../model" }, { "path": "../playback" }, { "path": "../renderer" }, { "path": "../formats" }]
 }

@@ -9,7 +9,7 @@
     "sourceMap": true,
     "jsx": "react-jsx"
   },
-  "include": ["src", "ct", "playwright", "playwright-ct.config.ts"],
+  "include": ["src", "ct", "playwright", "playwright-ct.config.ts", "playwright-ct-logger.ts"],
   "exclude": ["node_modules", "dist", "coverage", "test-results"],
   "references": [{ "path": "../model" }, { "path": "../playback" }, { "path": "../renderer" }, { "path": "../editor" }]
 }

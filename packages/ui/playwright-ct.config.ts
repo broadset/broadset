@@ -1,6 +1,8 @@
 /// <reference types="node" />
 import { defineConfig, devices } from '@playwright/experimental-ct-react';
 
+import { createCtLogger } from './playwright-ct-logger';
+
 export default defineConfig({
   testDir: './ct',
   testMatch: ['**/*.ct.tsx'],
@@ -18,6 +20,7 @@ export default defineConfig({
       resolve: {
         conditions: ['import', 'module', 'browser', 'default'],
       },
+      customLogger: createCtLogger(),
     },
   },
   projects: [
