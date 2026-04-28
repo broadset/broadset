@@ -1,5 +1,6 @@
 import { type BroadsetElementStyleInput } from '@broadset/model';
 
+import { sanitizeStyleAttribute } from '../_shared/sanitize';
 import {
   buildDefsBundle,
   type DefsBundle,
@@ -200,6 +201,44 @@ export function isSyntheticGroupId(id: string): boolean {
   return /^__bs-g-\d+(-\d+)*$/.test(id);
 }
 
+/**
+ * Snapshot `el.outerHTML` after sanitising every nested `style=""`
+ * declaration through the CSS URL allowlist (M2 closure). The
+ * preserved blob is opaque on re-export, so we cannot rely on the
+ * export-side cleaner to scrub it; instead we strip dangerous
+ * `url(javascript:…)` / `url(vbscript:…)` / `url(file:…)` /
+ * `url(data:application/javascript;…)` references at capture time.
+ *
+ * Mutates the source DOM nodes in place — the importer has already
+ * extracted the visual style into `baseStyle`, so the residual style
+ * text is only of interest to the dirty-flag round-trip cache.
+ */
+function capturePreservedOuterHtml(el: Element): string {
+  const styledNodes: Element[] = [];
+
+  if (el.hasAttribute('style')) {
+    styledNodes.push(el);
+  }
+
+  styledNodes.push(...Array.from(el.querySelectorAll('[style]')));
+
+  for (const node of styledNodes) {
+    const original = node.getAttribute('style');
+
+    if (original === null) {
+      continue;
+    }
+
+    const sanitised = sanitizeStyleAttribute(original);
+
+    if (sanitised !== original) {
+      node.setAttribute('style', sanitised);
+    }
+  }
+
+  return el.outerHTML;
+}
+
 function importElement(
   el: Element,
   defs: DefsBundle,
@@ -244,7 +283,7 @@ function importElement(
   const maxDepth = resolveMaxDepth(options.maxDepth);
 
   const shapeCtx: ShapeBakeContext = { transform, baseStyle, tagMeta };
-  const preservedOuterHTML = effectiveId !== undefined && tagName !== 'g' ? el.outerHTML : undefined;
+  const preservedOuterHTML = effectiveId !== undefined && tagName !== 'g' ? capturePreservedOuterHtml(el) : undefined;
 
   if (preservedOuterHTML !== undefined && effectiveId !== undefined && options.warnOnPreservation === true) {
     warnings.push(`Preserved source SVG markup for <${tagName}> element "${effectiveId}" for dirty-flag re-export.`);

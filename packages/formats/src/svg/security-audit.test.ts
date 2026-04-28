@@ -10,6 +10,7 @@
  * Companion to `import-third-party.test.ts` (synthetic baseline)
  * and `tool-fixtures.test.ts` (real-tool ecosystem coverage).
  */
+import { checkElementContentSecurity } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { importSvgDocument } from './index';
@@ -166,5 +167,148 @@ describe('P7.7n security audit — fixed findings', () => {
     expect(decoded).not.toContain('onclick=');
     expect(decoded).not.toContain('onload=');
     expect(decoded).not.toContain('alert(');
+  });
+
+  /**
+   * @description H2 closure — Importer hydrates every element through
+   * the full element schema (`elementSchema`, including its
+   * `superRefine` block). A `<image href="javascript:…">` payload that
+   * the existing scheme allowlist somehow let slip MUST be caught by
+   * `isLikelyUrlLikeContent` / `containsScriptMarkers` and either
+   * dropped (with a warning per IO-D-18) or surface as an empty href.
+   * The failure mode being closed: an element survives in the
+   * persisted document with `javascript:` content that a later
+   * re-export would carry verbatim.
+   */
+  it('H2 closure: <image href="javascript:…"> never reaches the persisted document with the dangerous bytes', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <image href="javascript:alert(1)" width="100" height="100"/>
+    </svg>`;
+    const { document, warnings } = importSvgDocument(svg, 'evil.svg');
+    const imageEls = document.elements.filter((e) => e.type === 'image');
+
+    // No surviving image element may carry a javascript: URL in content.
+    for (const el of imageEls) {
+      const content = el.content;
+      const href = typeof content === 'string' ? content : (content.paragraphs[0]?.runs[0]?.text ?? '');
+
+      expect(href).not.toMatch(/javascript:/i);
+    }
+
+    const hadSchemaOrSanitiseWarning = warnings.some((w) =>
+      /schema|validation|href|rejected|javascript/i.test(w),
+    );
+    const allImagesEmptyHref = imageEls.every((el) => {
+      const content = el.content;
+      const href = typeof content === 'string' ? content : (content.paragraphs[0]?.runs[0]?.text ?? '');
+
+      return href === '';
+    });
+
+    // Either the element was dropped entirely (with a warning), the
+    // existing sanitiser left it standing with an empty href, or the
+    // new schema-validation step caught it with a warning. The shape
+    // being prohibited is: element survives carrying `javascript:`.
+    expect(imageEls.length === 0 || hadSchemaOrSanitiseWarning || allImagesEmptyHref).toBe(true);
+  });
+
+  /**
+   * @description H2 closure (positive) — A clean element with a safe
+   * `data:image/png` href MUST round-trip through the schema-validation
+   * gate without being dropped or warning-flagged. Pins the gate
+   * against a regression that over-rejects benign content.
+   */
+  it('H2 closure: safe <image href="data:image/png;…"> survives the schema gate untouched', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><image href="data:image/png;base64,iVBORw0KGgo" width="50" height="50"/></svg>`;
+    const { document, warnings } = importSvgDocument(svg, 'safe-image');
+    const image = document.elements.find((el) => el.type === 'image');
+
+    expect(image).toBeDefined();
+    expect(typeof image?.content === 'string' ? image.content : '').toContain('data:image/png');
+    expect(warnings.some((w) => /schema|validation|rejected/i.test(w))).toBe(false);
+  });
+
+  /**
+   * @description H2 closure (gate exercise) — The existing scheme
+   * allowlist (`stripJavascriptUrlsFromEl`) only acts on attributes
+   * whose value starts with a forbidden URL scheme. A whitespace-
+   * containing value (no scheme prefix at all) survives sanitisation
+   * but is rejected by `isLikelyUrlLikeContent` from the element
+   * schema's `superRefine`. The new content-security gate MUST drop
+   * such an element with a warning that names the issue, proving the
+   * defence-in-depth layer fires and is not just shadowed by the
+   * sanitiser.
+   */
+  it('H2 closure: <image href="not a url"> is dropped by the content-security gate', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><image href="not a url has spaces" width="50" height="50"/></svg>`;
+    const { document, warnings } = importSvgDocument(svg, 'unsafe-shape');
+
+    // The element MUST NOT survive in the persisted document carrying
+    // the malformed-URL bytes — the gate drops it.
+    const imageEls = document.elements.filter((e) => e.type === 'image');
+
+    expect(imageEls.length).toBe(0);
+    // And the drop MUST surface a warning naming the schema issue
+    // per IO-D-18 (no silent drops).
+    expect(warnings.some((w) => /content-security|unsafe-url-shape/i.test(w))).toBe(true);
+  });
+
+  /**
+   * @description H2 closure (text/svg gate exercise) — The existing
+   * sanitiser strips `<script>` tags and `on*=` attributes at the DOM
+   * level, but text-element content (or an opaque `svg`-typed
+   * preservation that round-trips through a different importer
+   * branch) could plausibly carry `<script>` markers in a future
+   * regression. The content-security gate MUST also fire on the
+   * `containsScriptMarkers` half of the schema's `superRefine` —
+   * proven here by constructing a candidate element directly and
+   * round-tripping it through the exported helper.
+   */
+  it('H2 closure: checkElementContentSecurity flags <script> markers on text/svg content', () => {
+    // Use the helper that the importer's gate is built on, so the
+    // contract is pinned in a way the importer can't silently bypass
+    // even if a future hydration path forgets to call the gate.
+    const candidate = { type: 'text', content: 'hello <script>alert(1)</script>' };
+
+    expect(checkElementContentSecurity(candidate)).toEqual(['script-markers']);
+    expect(checkElementContentSecurity({ type: 'svg', content: '<g><script>x</script></g>' })).toEqual([
+      'script-markers',
+    ]);
+    expect(checkElementContentSecurity({ type: 'image', content: 'has whitespace not a url' })).toEqual([
+      'unsafe-url-shape',
+    ]);
+    expect(checkElementContentSecurity({ type: 'image', content: 'data:image/png;base64,iVBORw0KGgo' })).toEqual([]);
+  });
+
+  /**
+   * @description M2 closure — Preserved `outerHTML` cache used to
+   * capture raw `style=""` content verbatim, leaking dangerous CSS
+   * `url(javascript:…)` references into the persisted document and
+   * any downstream re-export. The capture site now sanitises every
+   * nested `style` attribute through the CSS URL allowlist, so the
+   * `javascript:` substring MUST NOT appear anywhere in the
+   * resulting `BroadsetDocument` JSON.
+   */
+  it('M2 closure: CSS url(javascript:…) does not survive in any preserved blob', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <rect id="evil" width="50" height="50" style="background:url(javascript:alert(1));filter:url(http://attacker/leak.svg)"/>
+    </svg>`;
+    const { document } = importSvgDocument(svg, 'evil.svg');
+    const serialised = JSON.stringify(document);
+
+    expect(serialised).not.toMatch(/url\(\s*['"]?javascript:/i);
+
+    // Also verify the base64-encoded preservation blob (if any) is
+    // free of the raw `javascript:` substring once decoded.
+    const rect = document.elements.find((el) => el.type === 'rectangle');
+    const ext = rect?.extensions as { readonly svg?: { readonly preserved?: { readonly raw?: string } } } | undefined;
+    const preserved = ext?.svg?.preserved?.raw ?? '';
+    const decoded = preserved !== '' ? Buffer.from(preserved, 'base64').toString('utf8') : '';
+
+    expect(decoded).not.toContain('javascript:');
+    // Allowlist allows http:// — the M2 closure is specifically about
+    // executable-script schemes. Filter URLs over plain http to attacker
+    // domains are also undesirable but the IO-D-15 contract limits the
+    // scope here to executable-script schemes.
   });
 });

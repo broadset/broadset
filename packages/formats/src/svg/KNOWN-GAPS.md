@@ -6,83 +6,9 @@ documented surfaces (5 real-tool fixtures pinning each ecosystem,
 274 tests, security-reviewer audit landed); the items below are
 issues we know about and have explicitly chosen not to close yet.
 
-> **Tracked closures:** the open security findings below (H2, M2)
-> are scheduled to close under Phase 2 of the
-> [cross-format I/O improvement plan](../../../../project/implementation/cross-format-io-improvement-plan.md).
-> When the plan's Phase 2 lands, delete the corresponding entries
-> per the "How to use this file" instructions below.
-
 Update this file when a gap closes (delete the entry) or when a
 new one surfaces (add an entry with severity, location, attack /
 fidelity description, and the deferred fix).
-
----
-
-## Security
-
-### H2 — Importer bypasses full element-schema validation
-
-**Severity:** High (defence-in-depth)
-**Location:** [`import-document.ts`](./import-document.ts) — every
-imported element is hydrated via `createDefaultElement`, which only
-runs `styleSchema.parse(...)` and skips the element schema's
-`superRefine` block.
-
-**Attack surface:** `<image href="…">` content reaches the
-persisted document without the element schema's `isLikelyUrlLikeContent`
-/ `containsScriptMarkers` checks running. The renderer's URL
-allowlist (`packages/renderer/src/elements/image.ts`) scrubs again
-at render time, and the importer's own scheme allowlist
-(`stripJavascriptUrlsFromEl`) blocks the worst attacks at sanitise
-time, so the *practical* attack surface is narrow. But the schema
-gives a false sense of safety and a re-export of the persisted
-document carries the unsanitized bytes.
-
-**Deferred fix:** in `import-document.ts`, run each `ImportedElement`
-through the full element schema (e.g.,
-`broadsetElementSchema.parse(...)` if exported, or call into
-`createDefaultElement` with the validated overrides) before pushing
-into the document. On validation failure, drop to the safe default
-and emit a warning per IO-D-18.
-
-**Trigger to close:** before exposing the importer to anonymous
-public uploads from arbitrary attackers.
-
----
-
-### M2 — Preserved `outerHTML` may carry CSS-borne URL injection
-
-**Severity:** Medium
-**Location:** [`import-walk.ts`](./import-walk.ts) — `preservedOuterHTML`
-captures `el.outerHTML` for the dirty-flag round-trip cache.
-
-**Attack surface:** the sanitiser strips `script`/`on*=`/`javascript:` href
-but does NOT scan `style="…"` content. A hostile element with
-`<rect style="background:url(javascript:alert(1));filter:url(http://attacker/leak.svg)">`
-survives:
-1. Sanitiser leaves `style` untouched.
-2. `applyStylePresentation` only matches `fill|stroke|stop-color|opacity|stroke-*`.
-3. `el.outerHTML` is base64-encoded into `extensions.svg.preserved.raw`.
-4. On re-export, the preserved blob re-emits; the export-side
-   cleaner does not run on preserved markup (preservation is by
-   design opaque).
-
-The renderer's `parseSanitizedSvg` does scrub URL attrs with a
-scheme allowlist for elements rendered as `svg` type, but
-preservation leaks bytes to other consumers (re-export to PSD/PPTX,
-copy/paste flows).
-
-**Deferred fix:** when capturing `preservedOuterHTML`, strip
-dangerous CSS via an allowlist on `style=""` content (or simply
-drop `style` from preserved markup since the importer has already
-extracted what it can use). Add a regression test asserting that
-an imported `<rect style="background:url(javascript:alert(1))">`
-does not retain the `url(javascript:` substring anywhere in the
-resulting `BroadsetDocument`.
-
-**Trigger to close:** before exposing the importer to anonymous
-public uploads, or before adding a re-export → re-import flow that
-crosses tenant boundaries.
 
 ---
 
