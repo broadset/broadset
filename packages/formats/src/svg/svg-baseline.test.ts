@@ -67,7 +67,7 @@ function makeElement(overrides: Partial<BroadsetElement> = {}): BroadsetElement 
     booleanOperation: null,
     extensions: {},
     ...overrides,
-  } as BroadsetElement;
+  };
 }
 
 function makeDocument(overrides: Partial<BroadsetDocument> = {}): BroadsetDocument {
@@ -81,7 +81,7 @@ function makeDocument(overrides: Partial<BroadsetDocument> = {}): BroadsetDocume
     pages: [],
     dataSchema: { fields: [] },
     ...overrides,
-  } as BroadsetDocument;
+  };
 }
 
 describe('SVG Path Export', () => {

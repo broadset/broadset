@@ -60,6 +60,39 @@ describe('P7.7a — Element-count cap', () => {
   }, 60_000);
 
   /**
+   * @description Closes the 2026-04-28 production-readiness audit
+   * finding: when the element-count cap fires, the importer MUST
+   * remove the unsanitised tail of the DOM before the visual walk so
+   * `outerHTML`-shaped preservation blobs cannot capture
+   * attacker-controlled markup. A hostile descendant past the cap is a
+   * reachable XSS surface today because `extensions.svg.preserved.raw`
+   * is re-emitted verbatim by the SVG exporter.
+   */
+  it('removes unsanitised descendants past the element-count cap', () => {
+    const headFiller = '<rect width="1" height="1"/>'.repeat(10_000);
+    const hostileTail = '<g id="bs-xss-tail"><script>alert(1)</script></g>';
+    const fixture = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">${headFiller}${hostileTail}</svg>`;
+    const { document, warnings } = importSvgDocument(fixture);
+
+    expect(warnings.some((w) => /element-count|cap/i.test(w))).toBe(true);
+
+    for (const element of document.elements) {
+      const ext = element.extensions['svg'] as { preserved?: { raw?: string } } | undefined;
+      const preservedRaw = ext?.preserved?.raw;
+
+      if (typeof preservedRaw !== 'string') continue;
+
+      const decoded =
+        typeof Buffer !== 'undefined' ?
+          Buffer.from(preservedRaw, 'base64').toString('utf8')
+        : preservedRaw;
+
+      expect(decoded.toLowerCase()).not.toContain('<script');
+      expect(decoded).not.toContain('bs-xss-tail');
+    }
+  }, 60_000);
+
+  /**
    * @description An SVG well below the cap MUST NOT emit the cap
    * warning. Pins the false-positive surface.
    */

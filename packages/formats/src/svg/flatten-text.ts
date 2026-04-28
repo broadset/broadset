@@ -37,7 +37,7 @@ export function safeOpenFont(bytes: Uint8Array | undefined): FontkitFont | null 
   }
 }
 
-export interface GlyphLayoutOptions {
+interface GlyphLayoutOptions {
   readonly fontSize: number;
   readonly letterSpacing?: number;
   readonly originX?: number;

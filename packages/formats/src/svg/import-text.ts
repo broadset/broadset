@@ -37,7 +37,7 @@ import type { SvgFontSource } from './types';
  * spec feature-matrix promise that multi-run text is native on
  * import + export).
  */
-export function readTextContent(source: Element): string | TextBody {
+function readTextContent(source: Element): string | TextBody {
   const directTspans = collectDirectTspanChildren(source);
 
   if (directTspans.length === 0) {

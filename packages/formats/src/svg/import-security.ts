@@ -23,7 +23,7 @@ const FORBIDDEN_ELEMENT_NAMES = new Set(['script', 'foreignobject']);
 const SMIL_ANIMATION_ELEMENT_NAMES = new Set(['animate', 'animatetransform', 'animatemotion', 'set']);
 const URL_ATTRS_TO_CHECK = ['href', 'xlink:href', 'src'];
 
-export interface SvgSanitizeOptions {
+interface SvgSanitizeOptions {
   readonly allowForeignObject?: boolean | undefined;
 }
 
@@ -103,22 +103,41 @@ function stripJavascriptUrlsFromEl(el: Element, tally: SanitizeTally): void {
  * cap was hit (a warning has been emitted and the caller should
  * still hydrate what was parsed but skip subsequent O(n) passes).
  */
-export function sanitizeDomInPlace(
-  xmlDoc: Document,
-  warnings: string[],
-  options: SvgSanitizeOptions = {},
-): boolean {
+export function sanitizeDomInPlace(xmlDoc: Document, warnings: string[], options: SvgSanitizeOptions = {}): boolean {
   const tally: SanitizeTally = { tags: new Set(), smilTags: new Set(), attrs: new Set(), jsUrls: 0 };
   const all = Array.from(xmlDoc.getElementsByTagName('*'));
   const overCap = all.length > SVG_ELEMENT_COUNT_CAP;
   const limit = overCap ? SVG_ELEMENT_COUNT_CAP : all.length;
 
+  sanitizeElementsUpToLimit(all, limit, options, tally);
+
+  if (overCap) {
+    removeUnsanitizedTail(all, limit);
+  }
+
+  emitSanitizeTallyWarnings(tally, warnings);
+
+  if (overCap) {
+    warnings.push(
+      `Element-count cap of ${String(SVG_ELEMENT_COUNT_CAP)} reached (input had ${String(all.length)} elements). Elements past the cap have been removed before further import.`,
+    );
+
+    return false;
+  }
+
+  return true;
+}
+
+function sanitizeElementsUpToLimit(
+  all: readonly Element[],
+  limit: number,
+  options: SvgSanitizeOptions,
+  tally: SanitizeTally,
+): void {
   for (let i = 0; i < limit; i++) {
     const el = all[i];
 
-    if (!el) {
-      continue;
-    }
+    if (!el) continue;
 
     const tag = el.tagName.toLowerCase();
 
@@ -137,7 +156,9 @@ export function sanitizeDomInPlace(
     stripEventHandlerAttrsFromEl(el, tally);
     stripJavascriptUrlsFromEl(el, tally);
   }
+}
 
+function emitSanitizeTallyWarnings(tally: SanitizeTally, warnings: string[]): void {
   for (const tag of tally.tags) {
     warnings.push(`Stripped <${tag}> during sanitization (importer security contract).`);
   }
@@ -153,16 +174,26 @@ export function sanitizeDomInPlace(
   if (tally.jsUrls > 0) {
     warnings.push('Stripped javascript: URL during sanitization (importer security contract).');
   }
+}
 
-  if (overCap) {
-    warnings.push(
-      `Element-count cap of ${String(SVG_ELEMENT_COUNT_CAP)} reached (input had ${String(all.length)} elements). Sanitisation truncated; remaining elements were not validated.`,
-    );
+/**
+ * P7.7n / 2026-04-28 audit fix: when the input exceeds the element
+ * cap, fail closed by removing every element past the cap so the
+ * downstream walk and preservation-blob capture cannot snapshot
+ * unsanitized markup. Without this, `outerHTML` capture in
+ * `import-walk.ts` would lift attacker-controlled descendants into
+ * `extensions.svg.preserved.raw`, which the SVG exporter re-emits
+ * verbatim — producing an active-content escape hatch despite the
+ * sanitiser pass having flagged the cap.
+ */
+function removeUnsanitizedTail(all: readonly Element[], limit: number): void {
+  for (let i = limit; i < all.length; i++) {
+    const el = all[i];
 
-    return false;
+    if (el !== undefined) {
+      el.remove();
+    }
   }
-
-  return true;
 }
 
 /**
@@ -331,7 +362,9 @@ function checkElementNamespaces(el: Element, emitted: Set<string>, warnings: str
     const label = detectNamespaceOnAttribute(attr.name, emitted);
 
     if (label !== null) {
-      warnings.push(`Preserved ${label} namespace attributes on native elements; vendor metadata is not natively mapped.`);
+      warnings.push(
+        `Preserved ${label} namespace attributes on native elements; vendor metadata is not natively mapped.`,
+      );
       emitted.add(label);
     }
   }
@@ -367,7 +400,9 @@ export function warnRawToolNamespaces(input: string, warnings: string[]): void {
     const pattern = new RegExp(`(?:<|\\s)${ns.prefix}:[a-zA-Z][a-zA-Z0-9-]*\\s*=`);
 
     if (pattern.test(input) && !emitted.has(ns.label)) {
-      warnings.push(`Preserved ${ns.label} namespace attributes on native elements; vendor metadata is not natively mapped.`);
+      warnings.push(
+        `Preserved ${ns.label} namespace attributes on native elements; vendor metadata is not natively mapped.`,
+      );
       emitted.add(ns.label);
     }
   }

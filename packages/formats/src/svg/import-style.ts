@@ -124,7 +124,7 @@ export function readInheritedStrokeStyle(el: Element): Partial<BroadsetElementSt
     if (Number.isFinite(dashoffset)) out['strokeDashoffset'] = dashoffset;
   }
 
-  return out as Partial<BroadsetElementStyleInput>;
+  return out;
 }
 
 export function getNumAttr(el: Element, name: string, defaultVal: number): number {

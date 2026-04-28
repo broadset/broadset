@@ -71,7 +71,7 @@ function makeElement(o: Partial<BroadsetElement> = {}): BroadsetElement {
     booleanOperation: null,
     extensions: {},
     ...o,
-  } as BroadsetElement;
+  };
 }
 
 function makeDocument(o: Partial<BroadsetDocument> = {}): BroadsetDocument {
@@ -85,7 +85,7 @@ function makeDocument(o: Partial<BroadsetDocument> = {}): BroadsetDocument {
     pages: [],
     dataSchema: { fields: [] },
     ...o,
-  } as BroadsetDocument;
+  };
 }
 
 function expectFilterStack(stack: FilterStack | undefined): FilterStack {

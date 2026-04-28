@@ -1,7 +1,6 @@
 import { SVG_BROADSET_NAMESPACE } from './types';
 
 const RDF_NS = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
-const SVG_NS = 'http://www.w3.org/2000/svg';
 
 export interface ParsedElementMetadata {
   readonly elementId: string;
@@ -23,7 +22,7 @@ export interface ParsedElementMetadata {
   readonly repeater?: string | undefined;
 }
 
-export interface ParsedDocumentMetadata {
+interface ParsedDocumentMetadata {
   readonly documentId: string;
   readonly canvasUnit: 'px' | 'mm' | 'in';
   readonly canvasDpi: number;
@@ -128,36 +127,6 @@ export function parseMetadataPacket(svgDoc: Document): ParsedDocumentMetadata | 
   };
 }
 
-/**
- * Find every element in the SVG tree that carries a `data-bs-id`
- * attribute. Returns a map keyed by the Broadset id — each tagged
- * element hydrates by id lookup in the fast path.
- */
-export function collectTaggedElements(svgDoc: Document): ReadonlyMap<string, Element> {
-  const map = new Map<string, Element>();
-  const all = svgDoc.getElementsByTagName('*');
-
-  for (let i = 0; i < all.length; i++) {
-    const el = all[i];
-
-    if (!el) {
-      continue;
-    }
-
-    const id = el.getAttribute('data-bs-id');
-
-    if (id === null || id === '') {
-      continue;
-    }
-
-    if (!map.has(id)) {
-      map.set(id, el);
-    }
-  }
-
-  return map;
-}
-
 function firstTextByNs(parent: Element, localName: string): string | null {
   const els = parent.getElementsByTagNameNS(SVG_BROADSET_NAMESPACE, localName);
   const el = els[0];
@@ -198,4 +167,3 @@ function normaliseCanvasDpi(raw: string | null): number {
 // already consume this module's parsing helpers. Not tree-shaken
 // away since DOMParser call-sites use it as the root element
 // namespace check.
-export { SVG_NS };

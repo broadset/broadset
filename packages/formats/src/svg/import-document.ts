@@ -9,6 +9,7 @@ import {
   createDefaultElement,
   createEmptyBroadsetDocument,
   type DataFieldBinding,
+  ensureRootElementsHavePageInstances,
   type RepeaterConfig,
 } from '@broadset/model';
 
@@ -352,7 +353,7 @@ function hydrateFastPath(
     );
   }
 
-  return { document, warnings };
+  return { document: ensureRootElementsHavePageInstances(document), warnings };
 }
 
 /**
@@ -436,7 +437,7 @@ function hydrateThirdPartyFallbackFromDoc(
     );
   }
 
-  return { document, warnings };
+  return { document: ensureRootElementsHavePageInstances(document), warnings };
 }
 
 const ALLOWED_IMPORTED_TYPES = new Set([
@@ -515,7 +516,7 @@ function isDataFieldBinding(value: unknown): value is DataFieldBinding {
     typeof value === 'object' &&
     value !== null &&
     'fieldName' in value &&
-    typeof (value as { fieldName: unknown }).fieldName === 'string'
+    typeof (value).fieldName === 'string'
   );
 }
 
@@ -524,7 +525,7 @@ function isRepeaterConfig(value: unknown): value is RepeaterConfig {
     typeof value === 'object' &&
     value !== null &&
     'dataArrayField' in value &&
-    typeof (value as { dataArrayField: unknown }).dataArrayField === 'string'
+    typeof (value).dataArrayField === 'string'
   );
 }
 

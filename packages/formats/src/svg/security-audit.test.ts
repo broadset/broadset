@@ -44,7 +44,10 @@ describe('P7.7n security audit — fixed findings', () => {
     // Wall-clock assertions on jsdom were flaky under full-suite
     // load — the cap firing alone is sufficient proof.
     expect(warnings.some((w) => /exceeded budget/i.test(w))).toBe(true);
-  }, 30_000);
+    // Bumped to 90 s so V8 coverage instrumentation (which slows hot
+    // loops measurably) doesn't false-fail this stress test. Normal
+    // `npm run test` finishes in ~5 s.
+  }, 90_000);
 
   /**
    * @description C2 — Default byte cap. An import without an

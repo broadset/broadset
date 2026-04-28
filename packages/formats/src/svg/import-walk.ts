@@ -41,7 +41,7 @@ import type { SvgFontSource } from './types';
  */
 const DEFAULT_SVG_GROUP_DEPTH_CAP = 100;
 
-export interface SvgWalkOptions {
+interface SvgWalkOptions {
   readonly fontSources?: ReadonlyMap<string, SvgFontSource> | undefined;
   readonly maxDepth?: number | undefined;
   readonly warnOnPreservation?: boolean | undefined;
@@ -141,15 +141,10 @@ function importGroupElement(el: Element, ctx: GroupImportContext): ImportedEleme
     }
 
     importedChildren.push(
-      ...importElement(
-        child,
-        ctx.defs,
-        ctx.warnings,
-        ctx.transform,
-        childParentId,
-        ctx.depth + 1,
-        { fontSources: ctx.fontSources, maxDepth: ctx.maxDepth },
-      ),
+      ...importElement(child, ctx.defs, ctx.warnings, ctx.transform, childParentId, ctx.depth + 1, {
+        fontSources: ctx.fontSources,
+        maxDepth: ctx.maxDepth,
+      }),
     );
   }
 
@@ -480,7 +475,7 @@ export function walkSvgDocument(xmlDoc: Document, options: SvgWalkOptions = {}):
   return { elements, canvasWidth, canvasHeight, warnings };
 }
 
-export interface VisualImportResult {
+interface VisualImportResult {
   readonly elements: readonly ImportedElement[];
   readonly canvasWidth: number;
   readonly canvasHeight: number;
@@ -492,10 +487,7 @@ export interface VisualImportResult {
  * already-parsed DOM tree (so callers that did their own
  * `parseMetadataPacket(xmlDoc)` don't re-parse).
  */
-export function importSvgFromXmlDoc(
-  xmlDoc: Document,
-  options: SvgWalkOptions = {},
-): VisualImportResult {
+export function importSvgFromXmlDoc(xmlDoc: Document, options: SvgWalkOptions = {}): VisualImportResult {
   const svgRoot = xmlDoc.documentElement;
   let canvasWidth = 800;
   let canvasHeight = 600;

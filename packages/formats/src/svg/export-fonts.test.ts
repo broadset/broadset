@@ -63,7 +63,7 @@ function makeDocWithText(fontFamily: string, content: string): BroadsetDocument 
     textPathElementId: null,
     booleanOperation: null,
     extensions: {},
-  } as BroadsetElement;
+  };
 
   return {
     id: 'doc-1',
@@ -82,7 +82,7 @@ function makeDocWithText(fontFamily: string, content: string): BroadsetDocument 
     animations: [],
     pages: [],
     dataSchema: { fields: [] },
-  } as BroadsetDocument;
+  };
 }
 
 describe('P7.7d — Font embedding: embed mode', () => {

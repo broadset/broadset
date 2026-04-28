@@ -71,7 +71,7 @@ export function renderGradientDef(id: string, gradient: BroadsetGradient): strin
  * linear approximation — the true spec rides in `<metadata>` and is
  * recovered on re-import.
  */
-export function conicFallbackGradient(conic: BroadsetGradient): BroadsetGradient {
+function conicFallbackGradient(conic: BroadsetGradient): BroadsetGradient {
   return {
     type: 'linear',
     angle: conic.startAngle ?? 0,
