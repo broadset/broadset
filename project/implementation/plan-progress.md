@@ -215,7 +215,7 @@ Outcome of the 2026-04-28 cross-format analysis (PDF / PSD / PPTX / SVG). Lights
 - [ ] CFIO.4.1 PSD CMYK / Lab / Grayscale + ICC profile round-trip *(needs sub-plan; blocks on `_shared/color/lcms-wasm`)*
 - [ ] CFIO.4.2 PDF P6.3 — real shading patterns + per-element OCG wrappers *(needs sub-plan)*
 - [ ] CFIO.4.3 PSD effects parity (bevel / satin / pattern overlay preserve, inner glow / overlays native) *(needs sub-plan)*
-- [ ] CFIO.4.4 PSD bitmap layer mask round-trip *(needs sub-plan)*
+- [x] CFIO.4.4 PSD bitmap layer mask round-trip (commit pending)
 - [x] CFIO.4.5 PSD text rotation through ag-psd text-transform (`1ab6354`)
 - [ ] CFIO.4.6 PSD 16/32-bpc bit-depth preservation *(needs sub-plan)*
 - [x] CFIO.4.7 PPTX font weight / style variants — closes pptx-known-gaps A4 (`24dcb7f`)
@@ -229,5 +229,5 @@ Outcome of the 2026-04-28 cross-format analysis (PDF / PSD / PPTX / SVG). Lights
 - [ ] CFIO.5.5 Accessibility audit on new modals (closes B3) *(needs hands-on screen-reader walkthrough)*
 - [x] CFIO.5.6 Sister-format audits — PSD / SVG / PDF (closes B4) — applied PPTX Phase 8 audit lens (silent drops, lazy-boundary checks, perf scaling, async resource resolvers) to PSD / SVG / PDF tracks. Findings landed in [`project/implementation/sister-format-audit.md`](sister-format-audit.md); High / Critical findings filed back into per-track gap files (PSD = 5 entries in `psd.md` §Spec Gaps, PDF = 6 entries in `pdf.md` §Spec Gaps; SVG had no High findings — track is the best-audited under all four lenses)
 - [ ] CFIO.5.7 Real-world large-deck load tests (closes B2) *(needs acquiring decks)*
-- [ ] CFIO.5.8 PDF font subsetting wiring *(needs sub-plan)*
+- [x] CFIO.5.8 PDF font subsetting wiring — pdf-lib's `CustomFontSubsetEmbedder` (registered `@pdf-lib/fontkit`) drives subset emission with `/ToUnicode` CMap by default; `PdfExportOptions.subsetFonts: false` plumbed end-to-end for archival full-face embed; closes [pdf.md spec gap §3](../spec/formats/pdf.md). Verified by `font-subset-shared-pipeline.test.ts` + existing `font-subset-effectiveness.test.ts` / `woff2-and-tounicode.test.ts`
 - [x] CFIO.6 Gap-file rolling updates — SVG KNOWN-GAPS (H2/M2 deleted), pptx-known-gaps (A1/A2/A4/B1 deleted), PSD spec (text rotation, smart-object link, page overrides removed), PDF spec (cross-references added)

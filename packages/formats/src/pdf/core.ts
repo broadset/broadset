@@ -730,7 +730,9 @@ async function runExport(
   // Always embed a Helvetica fallback up-front so placeholder labels and
   // text elements without a declared family have a working PDFFont.
   const fallbackFont = await pdf.embedFont(StandardFonts.Helvetica);
-  const { fontMap, failures: fontFailures } = await resolveFonts(doc, pdf, fetchFn);
+  const { fontMap, failures: fontFailures } = await resolveFonts(doc, pdf, fetchFn, {
+    subsetFonts: options.subsetFonts,
+  });
   const elementsById = indexElementsById(doc.elements);
 
   // Register one OCG per Broadset page so PDF readers surface per-page

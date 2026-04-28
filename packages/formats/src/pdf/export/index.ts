@@ -16,8 +16,11 @@ export {
   identityKey,
   lookupFont,
   registerFontkit,
+  type ResolvedFontMap,
   resolveFonts,
+  type ResolveFontsOptions,
   resolveIdentity,
+  type ResolveIdentityOptions,
   selectStandardFontVariant,
 } from './fonts';
 export {

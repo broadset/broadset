@@ -105,6 +105,16 @@ export interface ResolvedFontIdentity {
 }
 
 /**
+ * Optional per-call resolver settings. `subsetFonts: false` opts back
+ * into pdf-lib's full-font embed (used by archival workflows where the
+ * original face must round-trip byte-for-byte). `subsetFonts: true`
+ * (the default) routes through pdf-lib's fontkit-backed subsetter.
+ */
+export interface ResolveIdentityOptions {
+  readonly subsetFonts?: boolean | undefined;
+}
+
+/**
  * Embed a single `PDFFont` for a (family, isBold, isItalic) identity.
  * Tries Standard 14 lookup first; falls back to the Google Fonts CSS
  * resolution path when the family name is not a Standard 14; final
@@ -114,6 +124,13 @@ export interface ResolvedFontIdentity {
  * custom face that we could NOT embed (Google Fonts unreachable,
  * fontkit rejected the format, etc.). Standard 14 hits leave
  * `failure` undefined.
+ *
+ * Custom fonts route through pdf-lib's `CustomFontSubsetEmbedder` (the
+ * default `{ subset: true }` path) which uses the registered
+ * `@pdf-lib/fontkit` adapter to emit a glyph-only subset plus the
+ * `/ToUnicode` CMap so the text remains copy-pastable. Pass
+ * `options.subsetFonts: false` to opt back into pdf-lib's
+ * `CustomFontEmbedder` for an archival full-face embed.
  */
 export async function resolveIdentity(
   family: string,
@@ -121,6 +138,7 @@ export async function resolveIdentity(
   isItalic: boolean,
   pdf: PDFDocument,
   fetchFn: typeof globalThis.fetch | undefined,
+  options: ResolveIdentityOptions = {},
 ): Promise<ResolvedFontIdentity> {
   const normalized = normalizeFontFamily(family);
   const standard = STANDARD_FONT_MAP.get(normalized);
@@ -130,7 +148,7 @@ export async function resolveIdentity(
   }
 
   if (fetchFn && family.trim().length > 0) {
-    const result = await tryEmbedGoogleFont(family, pdf, fetchFn);
+    const result = await tryEmbedGoogleFont(family, pdf, fetchFn, options);
 
     if (result.font !== null) {
       return { font: result.font };
@@ -172,15 +190,35 @@ export interface ResolvedFontMap {
 }
 
 /**
+ * Per-call options for `resolveFonts`. `subsetFonts` defaults to true
+ * per `PdfExportOptions.subsetFonts` (IO-D-09); pass `false` to embed
+ * the full SFNT for every fetched custom font. `subsetFonts: false` is
+ * intended for archival workflows where the original face must be
+ * present byte-for-byte; the default path reduces a typical Inter
+ * embed from ~200 KB → ~10 KB by routing through pdf-lib's
+ * `CustomFontSubsetEmbedder`.
+ */
+export interface ResolveFontsOptions {
+  readonly subsetFonts?: boolean | undefined;
+}
+
+/**
  * Walk every text element in `doc`, dedupe identities, and embed one
  * PDFFont per identity. Identity-keyed map so `lookupFont` resolves
  * O(1) at draw time. Returns the failure list alongside so callers
  * can surface "font X could not be embedded" warnings to the user.
+ *
+ * Subsetting is on by default (per IO-D-09 / `PdfExportOptions.subsetFonts`).
+ * The fontkit-driven subsetter walks the document's referenced glyphs
+ * via pdf-lib's `CustomFontSubsetEmbedder` and emits a glyph-only
+ * embed plus a `/ToUnicode` CMap. Pass `options.subsetFonts: false`
+ * to embed the full SFNT for archival workflows.
  */
 export async function resolveFonts(
   doc: BroadsetDocument,
   pdf: PDFDocument,
   fetchFn: typeof globalThis.fetch | undefined,
+  options: ResolveFontsOptions = {},
 ): Promise<ResolvedFontMap> {
   registerFontkit(pdf);
 
@@ -202,7 +240,9 @@ export async function resolveFonts(
     // where bold / italic text without a declared family still rendered
     // in the matching Helvetica variant.
     const family = el.style.fontFamily ?? '';
-    const resolved = await resolveIdentity(family, id.isBold, id.isItalic, pdf, fetchFn);
+    const resolved = await resolveIdentity(family, id.isBold, id.isItalic, pdf, fetchFn, {
+      subsetFonts: options.subsetFonts,
+    });
 
     fontMap.set(key, resolved.font);
 
@@ -256,12 +296,13 @@ async function tryEmbedGoogleFont(
   family: string,
   pdf: PDFDocument,
   fetchFn: typeof globalThis.fetch,
+  options: ResolveIdentityOptions,
 ): Promise<GoogleFontEmbedAttempt> {
   try {
     const cached = fontBytesCache.get(family);
 
     if (cached !== undefined) {
-      return { font: await pdf.embedFont(cached, { subset: true }) };
+      return { font: await embedFontBytes(pdf, cached, options) };
     }
 
     const cssUrl = resolveGoogleFontUrl(family);
@@ -288,11 +329,7 @@ async function tryEmbedGoogleFont(
 
     fontBytesCache.set(family, fontBytes);
 
-    // `subset: true` tells pdf-lib (via the registered `@pdf-lib/fontkit`
-    // adapter) to embed only the glyphs the document actually references.
-    // Cuts every Google-Font-backed embed from ~200 KB → ~10 KB on
-    // typical content.
-    return { font: await pdf.embedFont(fontBytes, { subset: true }) };
+    return { font: await embedFontBytes(pdf, fontBytes, options) };
   } catch (err) {
     const reason = err instanceof Error ? err.message : 'unknown error';
 
@@ -301,6 +338,38 @@ async function tryEmbedGoogleFont(
       failure: `PDF preflight: font "${family}" failed to embed (${reason}). Falling back to Helvetica.`,
     };
   }
+}
+
+/**
+ * Embed `fontBytes` into the document. When `options.subsetFonts !== false`
+ * (the default per IO-D-09) the bytes are routed through pdf-lib's
+ * `CustomFontSubsetEmbedder`, which uses the registered `@pdf-lib/fontkit`
+ * adapter to walk the document's referenced glyphs and emit a subset
+ * containing only those glyphs plus the `/ToUnicode` CMap that maps
+ * each glyph back to its source codepoint(s). The `_shared/fonts/`
+ * subsetter ships the same fontkit-based glyph extraction for sibling
+ * formats (PPTX `<p:embeddedFont>`, SVG `@font-face`, raw font export);
+ * for PDF the subsetting is delegated to pdf-lib because pdf-lib needs
+ * the original `Font` object alive for text layout — re-parsing a
+ * post-subset SFNT byte stream loses the cmap fontkit needs to call
+ * `glyphForCodePoint` at draw time.
+ *
+ * Typical reduction: ~200 KB → ~10 KB on a Latin-only document.
+ *
+ * `subsetFonts: false` opts back into pdf-lib's `CustomFontEmbedder`,
+ * which embeds the entire SFNT (head, hhea, glyf, loca, cmap, OS/2,
+ * name, post — every table in the source font) and attaches the same
+ * `/ToUnicode` CMap derived from the font's cmap table. Intended for
+ * archival workflows where the original face must be present byte-for-byte.
+ */
+async function embedFontBytes(
+  pdf: PDFDocument,
+  fontBytes: Uint8Array,
+  options: ResolveIdentityOptions,
+): Promise<PDFFont> {
+  const shouldSubset = options.subsetFonts !== false;
+
+  return await pdf.embedFont(fontBytes, { subset: shouldSubset });
 }
 
 async function decompressWoff2(woff2: Uint8Array): Promise<Uint8Array> {
