@@ -37,20 +37,24 @@ const mockExportEmbeddedSvgBlob = vi.fn(() => Promise.resolve(new Blob(['svg'], 
 const mockExportVideoBlob = vi.fn(() => Promise.resolve(new Blob(['video'], { type: 'video/webm' })));
 const mockExportWebMBlob = vi.fn(() => Promise.resolve(new Blob(['webm'], { type: 'video/webm' })));
 const mockGenerateOGrafPackages = vi.fn(() => []);
-const mockImportPsdDocument = vi.fn(() => ({
-  document: { ...createEmptyBroadsetDocument(), name: 'Imported PSD' } satisfies BroadsetDocument,
-  warnings: [] as string[],
-}));
+const mockImportPsdDocument = vi.fn(() =>
+  Promise.resolve({
+    document: { ...createEmptyBroadsetDocument(), name: 'Imported PSD' } satisfies BroadsetDocument,
+    warnings: [] as string[],
+  }),
+);
 const mockImportPptxDocument = vi.fn(async () =>
   Promise.resolve({
     document: { ...createEmptyBroadsetDocument(), name: 'Imported PPTX' } satisfies BroadsetDocument,
     warnings: [] as string[],
   }),
 );
-const mockImportSvgDocument = vi.fn(() => ({
-  document: { ...createEmptyBroadsetDocument(), name: 'Imported SVG' } satisfies BroadsetDocument,
-  warnings: [] as string[],
-}));
+const mockImportSvgDocument = vi.fn(() =>
+  Promise.resolve({
+    document: { ...createEmptyBroadsetDocument(), name: 'Imported SVG' } satisfies BroadsetDocument,
+    warnings: [] as string[],
+  }),
+);
 const mockImportPdfDocument = vi.fn(() =>
   Promise.resolve({
     document: { ...createEmptyBroadsetDocument(), name: 'Imported PDF' } satisfies BroadsetDocument,
@@ -504,10 +508,12 @@ describe('import orchestration', () => {
 
   /** @description Import orchestration MUST preserve importer warnings so the demo shell can surface them to the user. */
   it('returns importer warnings for the caller to surface in the UI', async () => {
-    mockImportSvgDocument.mockReturnValueOnce({
-      document: { ...createEmptyBroadsetDocument(), name: 'Imported SVG' },
-      warnings: ['Unsupported blend mode converted to fallback'],
-    });
+    mockImportSvgDocument.mockReturnValueOnce(
+      Promise.resolve({
+        document: { ...createEmptyBroadsetDocument(), name: 'Imported SVG' },
+        warnings: ['Unsupported blend mode converted to fallback'],
+      }),
+    );
 
     const file = createTestFile('<svg></svg>', 'graphic.svg', 'image/svg+xml');
     const result = await importDocument(file);

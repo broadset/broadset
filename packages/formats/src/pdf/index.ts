@@ -7,7 +7,7 @@ export { canRoundTrip, importPdfDocument, readPdfRoundTripMetadata } from './imp
 export { type PdfAValidationResult, validatePdfA2b, validatePdfAXmpPacket } from './import/validate-pdfa';
 export { buildMaskedSvgSource } from './masked-svg';
 export { drawQrOnPage } from './qr';
-export { dirtyElementIds, type PdfReconcileInput, reconcilePdf } from './roundtrip';
+export { dirtyElementIds, type PdfReconcileInput, readPreservedPdfDocument, reconcilePdf } from './roundtrip';
 // `wrapText` and `reorderForBidi` are internal — see `./text.ts`.
 // They depend transitively on `bidi-js` / `linebreak` (no upstream
 // types), so exposing them through the public surface would leak

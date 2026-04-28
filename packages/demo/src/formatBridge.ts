@@ -130,11 +130,13 @@ export interface ImportDocumentResult {
    */
   readonly projectAssets?: readonly Asset[] | undefined;
   /**
-   * Populated for PPTX re-imports of Broadset-exported files —
-   * surfaces the four reconcile buckets so the demo opens
-   * `FormatReconciliationModal` instead of the flat-string
+   * Populated for any format re-import where the input carries
+   * Broadset round-trip metadata (PDF/A XMP, PSD XMP, PPTX customXml,
+   * SVG `<metadata>` RDF). Surfaces the four reconcile buckets so the
+   * demo opens `FormatReconciliationModal` instead of the flat-string
    * `FormatImportWarningsModal`. `null` for arbitrary third-party
-   * files and for non-PPTX formats.
+   * files and for round-trips where the buckets are all empty (no
+   * external edits).
    */
   readonly reconciliation?: ImportReconciliationData | null;
 }
@@ -477,7 +479,7 @@ export async function importDocument(
       const formats = await loadFormats();
       const buffer = await file.arrayBuffer();
 
-      return formats.importPsdDocument(new Uint8Array(buffer));
+      return await formats.importPsdDocument(new Uint8Array(buffer));
     }
 
     case 'pptx': {
@@ -500,7 +502,7 @@ export async function importDocument(
       const projectAssets = options?.projectAssets ?? [];
       const fontSources = projectAssets.length > 0 ? formats.buildSvgFontSourcesFromAssets(projectAssets) : undefined;
 
-      return formats.importSvgDocument(text, file.name, fontSources !== undefined ? { fontSources } : undefined);
+      return await formats.importSvgDocument(text, file.name, fontSources !== undefined ? { fontSources } : undefined);
     }
 
     case 'pdf': {

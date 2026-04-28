@@ -9,7 +9,7 @@ export {
 export { importPsd } from './import';
 export { importPsdDocument } from './import-document';
 export { type PsdWithImageResources, readDocumentXmpPacket } from './import-xmp';
-export { dirtyElementIds, reconcilePsd } from './reconcile';
+export { dirtyElementIds, readPreservedPsdDocument, reconcilePsd } from './reconcile';
 export {
   type BroadsetXmpPacket,
   type ColorSpaceChoice,

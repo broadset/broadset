@@ -83,7 +83,11 @@ the apt package version to keep the reference stable.
 `FormatReconciliationModal` shows the four reconcile buckets
 (modifications / additions / deletions / recoveredByHash) with
 expandable per-element lists, but it does NOT let the user resolve
-conflicts. Spec wording: "Use preserved / Use visual" choice for
+conflicts. The modal is no longer PPTX-only — Phase 1.2 generalised
+the cross-format adaptor so PDF, PSD, and SVG re-imports also populate
+`DocumentImportResult.reconciliation` when the input carries Broadset
+round-trip metadata. The remaining gap is the conflict-resolution
+UX. Spec wording: "Use preserved / Use visual" choice for
 modifications. Today the import unconditionally takes the merged
 result from `mergeFromLedger` — the UI is informational.
 

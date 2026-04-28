@@ -1,6 +1,8 @@
-import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
+import { type BroadsetDocument, type BroadsetElement, createEmptyBroadsetDocument } from '@broadset/model';
 
 import { reconcile,type ReconcileResult } from '../_shared/reconcile';
+import type { BroadsetXmpElementEntry } from '../_shared/xmp';
+import { readPdfRoundTripMetadata } from './import';
 
 /**
  * Phase 6 P6.5 — PDF reconciliation. Thin wrapper over
@@ -41,10 +43,30 @@ export interface PdfReconcileInput {
 
 export function reconcilePdf(input: PdfReconcileInput): ReconcileResult {
   return reconcile({
-    preservedMetadata: { elements: [...input.preserved.elements] },
-    currentVisual: { elements: [...input.current.elements] },
+    preservedMetadata: { elements: input.preserved.elements.map(normaliseForReconcile) },
+    currentVisual: { elements: input.current.elements.map(normaliseForReconcile) },
     fingerprintsByElementId: input.fingerprintsByElementId,
   });
+}
+
+/**
+ * Strip the `extensions.pdf` bookkeeping (`dirty`, `source`,
+ * `preservationBlob`) before reconciling. The flags are import-side
+ * state — present after `importPdfDocument` hydrates an element,
+ * absent on elements parsed from the preserved XMP payload — so
+ * diffing them surfaces false `modifications` that obscure the actual
+ * external edits the user made in Acrobat / etc. Mirrors the SVG
+ * `normaliseForReconcile` strategy in `svg/roundtrip.ts`.
+ */
+function normaliseForReconcile(el: BroadsetElement): BroadsetElement {
+  // The model declares `extensions` as non-nullable, but several
+  // older test fixtures cast through `as BroadsetElement` and omit
+  // the field — so we treat the value as possibly-undefined at the
+  // boundary to keep the destructure safe.
+  const source = el.extensions as ({ pdf?: unknown } & Record<string, unknown>) | undefined;
+  const { pdf: _pdf, ...restExtensions } = source ?? {};
+
+  return { ...el, extensions: restExtensions };
 }
 
 /**
@@ -75,4 +97,58 @@ function isDirty(element: BroadsetElement): boolean {
   if (pdf === undefined || pdf === null || typeof pdf !== 'object') return false;
 
   return (pdf as Record<string, unknown>)['dirty'] === true;
+}
+
+/**
+ * Hydrate the preserved Broadset document a Broadset-exported PDF
+ * carries in its XMP packet. Mirrors `readPreservedPptxDocument` and
+ * `readPreservedPsdDocument` so cross-format reconciliation wiring
+ * can ask each format the same question — "do you have a preserved
+ * snapshot to diff against?" — without reaching into format-specific
+ * internals.
+ *
+ * Returns `null` when the byte stream is not a recognisable PDF,
+ * carries no XMP packet, or carries a packet whose `elements[]` lack
+ * the JSON `payload` reconciliation depends on.
+ */
+export async function readPreservedPdfDocument(data: Uint8Array): Promise<BroadsetDocument | null> {
+  const metadata = await readPdfRoundTripMetadata(data);
+
+  if (metadata.xmp === null) return null;
+
+  const elements: BroadsetElement[] = [];
+
+  for (const entry of metadata.xmp.elements) {
+    const element = tryParseElementPayload(entry);
+
+    if (element !== null) elements.push(element);
+  }
+
+  if (elements.length === 0) return null;
+
+  const empty = createEmptyBroadsetDocument();
+
+  return { ...empty, id: metadata.xmp.documentId, elements };
+}
+
+/**
+ * Best-effort parse of an XMP element entry's JSON payload into a
+ * `BroadsetElement`. Returns `null` when the payload is absent,
+ * unparseable, or carries a mismatching `id` — corrupt payloads fall
+ * through so reconciliation never crashes on a tampered packet.
+ */
+function tryParseElementPayload(entry: BroadsetXmpElementEntry): BroadsetElement | null {
+  if (entry.payload === undefined) return null;
+
+  try {
+    const value = JSON.parse(entry.payload) as unknown;
+
+    if (value === null || typeof value !== 'object') return null;
+    if (!('id' in value) || !('type' in value) || !('style' in value)) return null;
+    if ((value as { id: unknown }).id !== entry.id) return null;
+
+    return value as BroadsetElement;
+  } catch {
+    return null;
+  }
 }
