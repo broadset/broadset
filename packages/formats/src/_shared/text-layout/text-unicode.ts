@@ -1,22 +1,17 @@
 /**
- * UAX #9 (bidi) and UAX #14 (line-break) detection helpers for PSD
- * text. Mirrors `pdf/bidi-reorder.ts` and `pdf/uax14-linebreak.ts` in
- * intent — but PSD differs from PDF in one critical way: Photoshop's
- * text engine DOES apply bidi reordering and ICU line-breaking at
- * render time, so the bytes Broadset writes must stay in *logical*
- * order. The exporter therefore does NOT visually reorder runs the
- * way the PDF exporter does.
+ * Cheap UAX #9 (bidi) and UAX #14 (line-break) detection helpers for
+ * any format whose preflight needs to flag RTL or CJK content. The
+ * detectors are regex-based codepoint-range checks — they tell you
+ * the script is *present*, not how to wrap or reorder it. Formats
+ * that need actual reordering (PDF — readers don't apply UAX #9 to
+ * `Tj` / `TJ`) or line-breaking (PDF emitter for non-whitespace
+ * scripts) still own format-specific implementations on top of the
+ * `_shared/text-layout` `breakLines` / `analyzeBidi` primitives.
  *
- * What we DO need:
- *   - detect RTL content so preflight can flag it (Photoshop's text
- *     engine is the rendering authority; round-trip fidelity depends
- *     on its UAX #9 implementation, not ours);
- *   - detect CJK / non-whitespace-script content so preflight can
- *     flag it (line wrapping inside Photoshop relies on ICU; round-
- *     tripping the wrap points is best-effort);
- *   - expose these checks as a single `analyseTextUnicodeProfile`
- *     helper so preflight + future text-shaping passes share one
- *     source of truth.
+ * Used by: PSD preflight (Photoshop is the rendering authority and
+ * does its own ICU pass — Broadset only needs to flag content that
+ * round-trips through that pipeline). Reusable by PPTX / SVG
+ * preflight when those tracks gain RTL / CJK awareness.
  */
 
 /**

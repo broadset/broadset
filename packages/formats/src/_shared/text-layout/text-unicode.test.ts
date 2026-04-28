@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { analyseTextUnicodeProfile, containsCjkCharacters, containsRtlCharacters } from './text-unicode';
 
-describe('PSD text Unicode profile', () => {
+describe('text Unicode profile (shared)', () => {
   /** @description Pure ASCII / Latin text has no RTL / CJK content. */
   it('returns false for pure Latin text', () => {
     const profile = analyseTextUnicodeProfile('Hello world');

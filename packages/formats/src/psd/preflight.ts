@@ -1,8 +1,8 @@
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 import { resolveContentAsPlainString } from '@broadset/model';
 
+import { analyseTextUnicodeProfile, type TextUnicodeProfile } from '../_shared/text-layout';
 import { isTextBody } from './export/text';
-import { analyseTextUnicodeProfile, type TextUnicodeProfile } from './text-unicode';
 import type { PsdExportOptions } from './types';
 
 /**
