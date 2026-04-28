@@ -17,6 +17,10 @@ const mockExportSvgDocument = vi.fn(() => Promise.resolve({ svg: '<svg></svg>', 
 const mockBuildSvgFontSourcesFromAssets = vi.fn(() => new Map<string, unknown>());
 const mockExportHtmlStandalone = vi.fn(() => '<html></html>');
 const mockExportPdfBytes = vi.fn(() => Promise.resolve(new Uint8Array([1, 2, 3])));
+const mockExportPdfWithPreflight = vi.fn(
+  async (): Promise<{ bytes: Uint8Array; warnings: readonly string[] }> =>
+    Promise.resolve({ bytes: new Uint8Array([1, 2, 3]), warnings: [] }),
+);
 const mockExportPptxBytes = vi.fn(() => new Uint8Array([4, 5, 6]));
 
 interface MockPptxWarning {
@@ -75,6 +79,7 @@ const mockFormats = {
   exportHtmlStandalone: mockExportHtmlStandalone,
   exportJpegBlob: mockExportJpegBlob,
   exportPdfBytes: mockExportPdfBytes,
+  exportPdfWithPreflight: mockExportPdfWithPreflight,
   exportPngBlob: mockExportPngBlob,
   exportPptxBytes: mockExportPptxBytes,
   exportPptxWithReportAsync: mockExportPptxWithReportAsync,
@@ -207,11 +212,11 @@ describe('export orchestration', () => {
     expect(filename).toMatch(/\.html$/);
   });
 
-  /** @description PDF export MUST call exportPdfBytes and trigger a file download. */
+  /** @description PDF export MUST call exportPdfWithPreflight and trigger a file download. */
   it('exports PDF format and triggers download', async () => {
     await exportDocument('pdf', makeContext());
 
-    expect(mockExportPdfBytes).toHaveBeenCalledTimes(1);
+    expect(mockExportPdfWithPreflight).toHaveBeenCalledTimes(1);
     expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
 
     const [, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];

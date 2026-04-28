@@ -22,8 +22,10 @@ export {
   decodeDataUri,
   drawQrOnPage,
   exportPdfBytes,
+  exportPdfWithPreflight,
   normalizeFontFamily,
   parseCssColor,
+  type PdfExportResult,
   resolveGoogleFontUrl,
 } from './pdf';
 export type { AsyncFontResolver, PptxExportReport, PptxExportWarning, PptxExportWarningCode } from './pptx';

@@ -343,6 +343,25 @@ function collectPsdFormatWarnings(psdWarnings: readonly string[]): FormatExportW
   };
 }
 
+/**
+ * PDF warnings are prose-only too — `exportPdfWithPreflight` produces
+ * a flat string list combining `collectPreflightWarnings` (font /
+ * permission / out-of-gamut) and runtime extras (Google Fonts fetch
+ * failures, embedded image decode warnings). Map each to the same
+ * `'preflight'` placeholder code as PSD until structured codes land
+ * with Phase 4.2 / 5.8.
+ */
+function collectPdfFormatWarnings(pdfWarnings: readonly string[]): FormatExportWarnings {
+  return {
+    warnings: pdfWarnings,
+    preflight: pdfWarnings.map((warning) => ({
+      code: 'preflight',
+      message: warning,
+      severity: 'warning',
+    })),
+  };
+}
+
 export async function exportDocument(format: ExportFormat, context: ExportContext): Promise<ExportDocumentResult> {
   const formats = await loadFormats();
   const { document: doc } = context;
@@ -374,16 +393,11 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
     }
 
     case 'pdf': {
-      const pdfBytes = await formats.exportPdfBytes(doc, buildPdfExportOptions(context));
-      const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      const pdfResult = await formats.exportPdfWithPreflight(doc, buildPdfExportOptions(context));
+      const blob = new Blob([pdfResult.bytes.buffer as ArrayBuffer], { type: 'application/pdf' });
 
       formats.triggerDownload(blob, `${name}.pdf`);
-      // PDF preflight stays empty: today the bridge calls the
-      // `Uint8Array`-only `exportPdfBytes`. Routing through
-      // `exportPdfWithPreflight` is tracked under
-      // `project/implementation/cross-format-io-improvement-plan.md`
-      // Phase 4.2 / 5.8 — once that lands the structured warnings can
-      // map straight onto `PreflightFinding` here.
+      collected = collectPdfFormatWarnings(pdfResult.warnings);
       break;
     }
 
