@@ -3,6 +3,7 @@ import { resolveContentAsPlainString } from '@broadset/model';
 import type { Layer, Psd } from 'ag-psd';
 import { writePsdUint8Array } from 'ag-psd';
 
+import { canvasUnitToMm, MM_PER_INCH } from '../_shared/geometry';
 import { elementToLayer, getPendingLinkedFiles, resetExportState, setPrefetchedUrlImages } from './export-layer';
 import { writeBroadsetXmpForDocument } from './export-xmp';
 import { collectExportOptionsWarnings, collectPreflightWarnings } from './preflight';
@@ -13,8 +14,6 @@ interface PsdImageBytes {
   readonly mime: string;
   readonly bytes: Uint8Array;
 }
-
-const MM_PER_INCH = 25.4;
 
 /**
  * Sync export options. Adds `prefetchedUrlImages` on top of the
@@ -78,14 +77,10 @@ function buildLayersForParent(elements: readonly BroadsetElement[], parentId: st
 }
 
 function canvasToPixels(canvas: Canvas, value: number): number {
-  switch (canvas.unit) {
-    case 'px':
-      return value;
-    case 'mm':
-      return (value / MM_PER_INCH) * canvas.dpi;
-    case 'in':
-      return value * canvas.dpi;
-  }
+  if (canvas.unit === 'px') return value;
+
+  // mm / in → mm via the shared helper, then mm → px via the canvas DPI.
+  return (canvasUnitToMm(canvas, value) / MM_PER_INCH) * canvas.dpi;
 }
 
 function isUrl(content: string): boolean {
