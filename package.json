@@ -17,6 +17,7 @@
     "format": "npm run format --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
+    "test:coverage": "VITEST_COVERAGE=1 vitest run",
     "ct": "npm run ct -w @broadset/demo",
     "ct:all": "npm run ct -w @broadset/ui && npm run ct -w @broadset/demo",
     "quality": "npm run quality --workspaces --if-present",
@@ -25,8 +26,16 @@
     "quality:all:strict": "npm run quality:strict --workspaces --if-present",
     "lint:dead": "knip",
     "lint:typecoverage": "type-coverage --at-least 99.95",
+    "audit:prod": "npm audit --omit=dev",
+    "audit:all": "npm audit",
     "gate:full": "npm run quality:strict && npm run lint:dead && npm run lint:typecoverage && npm run ct:all && npm run build",
     "prepare": "husky"
+  },
+  "overrides": {
+    "postcss": "^8.5.12",
+    "@playwright/experimental-ct-core": {
+      "vite": "^6.4.2"
+    }
   },
   "devDependencies": {
     "@commitlint/cli": "^20.5.0",
@@ -37,6 +46,7 @@
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@vitest/coverage-v8": "^4.1.4",
     "@typescript-eslint/parser": "^8.58.0",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",

@@ -31,7 +31,8 @@
     },
     "packages/formats": {
       "entry": ["src/**/*.test.{ts,tsx}"],
-      "project": ["src/**/*.{ts,tsx}"]
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignoreBinaries": ["python3"]
     }
   }
 }
