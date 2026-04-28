@@ -11,6 +11,8 @@ import {
   hasValidPageElementReferences,
   hasValidParentIds,
 } from './page-validation';
+import { type BroadsetElementStyleInput } from './style';
+import { type TextBody, textBodySchema } from './text-body';
 import { hasValidTextPathReferences } from './text-path-validation';
 
 export interface SafeAreas {
@@ -58,6 +60,29 @@ export interface PageElementInstance {
   readonly elementId: string;
   readonly transform: PageElementTransform;
   readonly visible: boolean;
+  /**
+   * Per-page override of the element's `content`. When present, supersedes
+   * the document-level element's content for this page only. Use case:
+   * the same template element rendered with different copy per page (e.g.
+   * "Page 1 of 5", localized text variants, repeating-data renders).
+   */
+  readonly content?: string | TextBody | undefined;
+  /**
+   * Partial per-page style override, merged on top of the document-level
+   * element's style. Only the keys present in the override are applied;
+   * absent keys fall through to the element-level style. Mirrors the
+   * input shape accepted by `styleSchema` so a page-author can provide
+   * convenience inputs (string fills, number border radius) the same
+   * way the element-level style accepts them.
+   */
+  readonly style?: Partial<BroadsetElementStyleInput> | undefined;
+  /**
+   * Per-page asset reference override. Lets a page swap an `image`
+   * element's bitmap (or any element's `assetId`-bearing asset) without
+   * forking the element. The override id resolves against the project's
+   * `assets` registry the same way the element-level `assetId` does.
+   */
+  readonly assetId?: string | undefined;
 }
 
 export interface Page {
@@ -186,10 +211,29 @@ const pageElementTransformSchema: z.ZodType<PageElementTransform> = z.object({
   scale: vector3Schema,
 });
 
+/**
+ * Per-page `content` override accepts the same plain-string / `TextBody`
+ * union the element-level `content` accepts, so a page can substitute
+ * either shape without forcing the document author to commit to one.
+ */
+const pageElementContentOverrideSchema = z.union([z.string(), textBodySchema]);
+
+/**
+ * Per-page `style` override is a partial subset of `BroadsetElementStyleInput`.
+ * We accept the same loose record shape `elementSchema` uses for `style`
+ * — the override is merged into the element's persisted style at the
+ * exporter / renderer boundary, where the full `styleSchema` runs to
+ * normalize the merged result.
+ */
+const pageElementStyleOverrideSchema = z.record(z.string(), z.unknown());
+
 const pageElementInstanceSchema: z.ZodType<PageElementInstance> = z.object({
   elementId: z.string().min(1),
   transform: pageElementTransformSchema,
   visible: z.boolean(),
+  content: pageElementContentOverrideSchema.optional(),
+  style: pageElementStyleOverrideSchema.optional(),
+  assetId: z.string().min(1).optional(),
 });
 
 const pageSchema: z.ZodType<Page> = z.object({

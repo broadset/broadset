@@ -413,6 +413,223 @@ describe('Page speaker notes', () => {
 });
 
 /**
+ * @description `PageElementInstance` may carry per-page overrides for
+ * `content`, `style`, and `assetId` in addition to `transform` + `visible`.
+ * Per-page overrides let a single document-level element render with
+ * page-specific copy / styling / asset references (PPTX page-override
+ * materialization, SVG / PDF page-variant export, repeating-data renders).
+ * All three fields are optional and absent values fall through to the
+ * element-level value.
+ */
+describe('Page element instance overrides', () => {
+  /** @description Building a Page with all three overrides round-trips through Zod parse with values preserved. */
+  it('round-trips content + style + assetId overrides through Zod parse', () => {
+    const element = createDefaultElement('text', { id: 'shared-element', content: 'base copy' });
+    const doc = makeValidDoc({
+      elements: [element],
+      pages: [
+        {
+          id: 'page-1',
+          name: 'Default',
+          elements: [
+            {
+              elementId: 'shared-element',
+              transform: {
+                position: { x: 12, y: 34, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: { x: 1, y: 1, z: 1 },
+              },
+              visible: true,
+              content: 'page-1 copy',
+              style: { fontSize: 24, opacity: 0.75 },
+              assetId: 'asset-page-1',
+            },
+          ],
+          locale: null,
+          extensions: {},
+        },
+      ],
+    });
+    const result = broadsetDocumentSchema.safeParse(doc);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      const instance = result.data.pages[0]?.elements[0];
+
+      expect(instance?.content).toBe('page-1 copy');
+      expect(instance?.style).toEqual({ fontSize: 24, opacity: 0.75 });
+      expect(instance?.assetId).toBe('asset-page-1');
+    }
+  });
+
+  /** @description A `content`-only override leaves `style` and `assetId` undefined on the parsed instance. */
+  it('accepts a content-only override and leaves the other override fields unset', () => {
+    const element = createDefaultElement('text', { id: 'shared-element' });
+    const doc = makeValidDoc({
+      elements: [element],
+      pages: [
+        {
+          id: 'page-1',
+          name: 'Default',
+          elements: [
+            {
+              ...makePageElementInstance('shared-element'),
+              content: 'overridden copy',
+            },
+          ],
+          locale: null,
+          extensions: {},
+        },
+      ],
+    });
+    const result = broadsetDocumentSchema.safeParse(doc);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      const instance = result.data.pages[0]?.elements[0];
+
+      expect(instance?.content).toBe('overridden copy');
+      expect(instance?.style).toBeUndefined();
+      expect(instance?.assetId).toBeUndefined();
+    }
+  });
+
+  /** @description A `style`-only override leaves `content` and `assetId` undefined on the parsed instance. */
+  it('accepts a style-only override and leaves the other override fields unset', () => {
+    const element = createDefaultElement('rectangle', { id: 'shared-element' });
+    const doc = makeValidDoc({
+      elements: [element],
+      pages: [
+        {
+          id: 'page-1',
+          name: 'Default',
+          elements: [
+            {
+              ...makePageElementInstance('shared-element'),
+              style: { opacity: 0.5 },
+            },
+          ],
+          locale: null,
+          extensions: {},
+        },
+      ],
+    });
+    const result = broadsetDocumentSchema.safeParse(doc);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      const instance = result.data.pages[0]?.elements[0];
+
+      expect(instance?.content).toBeUndefined();
+      expect(instance?.style).toEqual({ opacity: 0.5 });
+      expect(instance?.assetId).toBeUndefined();
+    }
+  });
+
+  /** @description An `assetId`-only override leaves `content` and `style` undefined on the parsed instance. */
+  it('accepts an assetId-only override and leaves the other override fields unset', () => {
+    const element = createDefaultElement('image', { id: 'shared-element', content: 'https://example/img.png' });
+    const doc = makeValidDoc({
+      elements: [element],
+      pages: [
+        {
+          id: 'page-1',
+          name: 'Default',
+          elements: [
+            {
+              ...makePageElementInstance('shared-element'),
+              assetId: 'asset-variant-a',
+            },
+          ],
+          locale: null,
+          extensions: {},
+        },
+      ],
+    });
+    const result = broadsetDocumentSchema.safeParse(doc);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      const instance = result.data.pages[0]?.elements[0];
+
+      expect(instance?.content).toBeUndefined();
+      expect(instance?.style).toBeUndefined();
+      expect(instance?.assetId).toBe('asset-variant-a');
+    }
+  });
+
+  /** @description Empty `style` override (`{}`) is permitted — it merges to a no-op at the boundary. */
+  it('accepts an empty style override object', () => {
+    const element = createDefaultElement('rectangle', { id: 'shared-element' });
+    const doc = makeValidDoc({
+      elements: [element],
+      pages: [
+        {
+          id: 'page-1',
+          name: 'Default',
+          elements: [{ ...makePageElementInstance('shared-element'), style: {} }],
+          locale: null,
+          extensions: {},
+        },
+      ],
+    });
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(true);
+  });
+
+  /** @description Omitting all override fields keeps the existing minimal `PageElementInstance` shape valid. */
+  it('keeps the override fields absent on a baseline instance', () => {
+    const element = createDefaultElement('rectangle', { id: 'shared-element' });
+    const doc = makeValidDoc({
+      elements: [element],
+      pages: [
+        {
+          id: 'page-1',
+          name: 'Default',
+          elements: [makePageElementInstance('shared-element')],
+          locale: null,
+          extensions: {},
+        },
+      ],
+    });
+    const result = broadsetDocumentSchema.safeParse(doc);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      const instance = result.data.pages[0]?.elements[0];
+
+      expect(instance?.content).toBeUndefined();
+      expect(instance?.style).toBeUndefined();
+      expect(instance?.assetId).toBeUndefined();
+    }
+  });
+
+  /** @description An empty `assetId` string is rejected — the asset registry contract requires a non-empty id. */
+  it('rejects an empty-string assetId override', () => {
+    const element = createDefaultElement('image', { id: 'shared-element', content: 'https://example/img.png' });
+    const doc = makeValidDoc({
+      elements: [element],
+      pages: [
+        {
+          id: 'page-1',
+          name: 'Default',
+          elements: [{ ...makePageElementInstance('shared-element'), assetId: '' }],
+          locale: null,
+          extensions: {},
+        },
+      ],
+    });
+
+    expect(broadsetDocumentSchema.safeParse(doc).success).toBe(false);
+  });
+});
+
+/**
  * @description Dublin Core metadata lets importers and exporters round-trip
  * title / author / subject / keywords / rights / producer across every
  * format — PDF XMP, PSD XMP, SVG `<metadata>`, PPTX `docProps/core.xml`.

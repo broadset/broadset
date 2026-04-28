@@ -16,7 +16,6 @@ Gaps" section in [project/spec/formats/pptx.md](../spec/formats/pptx.md)
 > - **A1** (reconciliation UI conflict resolution) — Phase 1.2
 >   generalizes reconciliation across formats; Phase 4.9 adds the
 >   conflict-resolution choice UI on top.
-> - **A2** (per-element page overrides) — Phase 4.8.
 > - **B1** (telemetry) — Phase 5.4.
 > - **B3** (accessibility audit on new modals) — Phase 5.5.
 > - **B4** (sister-format audits) — Phase 5.6.
@@ -95,18 +94,6 @@ per-modification choice callbacks (`onUsePreserved`, `onUseVisual`,
 or per-field overrides). Demo wiring needs to defer the
 `loadTemplate` call until the user acknowledges, and apply the
 chosen branch per element.
-
-### A2. Per-element page overrides are limited
-
-The model's `PageElementInstance` carries `elementId`, `transform`,
-and `visible`. The spec also mentions per-page overrides for
-`content`, `style`, and `assetId`, but those require a model-level
-addition. The PPTX exporter applies only the supported overrides
-and silently no-ops the others.
-
-**To close:** add the missing fields to `PageElementInstance` in the
-model package, propagate through `applyPageOverrides` in
-`pptx/export/package.ts`, and update fixtures.
 
 ### A3. Connectors / ink / SmartArt are preserve-only, not first-class
 

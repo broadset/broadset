@@ -1,4 +1,4 @@
-import type { BroadsetDocument, BroadsetElement, Page } from '@broadset/model';
+import { type BroadsetDocument, type BroadsetElement, type Page, styleSchema } from '@broadset/model';
 
 import { writeBroadsetXmp } from '../../_shared';
 import { ContentTypesBuilder } from '../ooxml/content-types';
@@ -501,15 +501,60 @@ function applyPageOverrides(elements: readonly BroadsetElement[], page: Page): r
 
     if (!override.visible) continue;
 
-    // Page overrides carry a per-element transform (position / rotation
-    // / scale). Apply the transform to produce the slide-time element.
-    const pos = override.transform.position;
-    const rot = override.transform.rotation;
-
-    result.push({ ...element, position: { x: pos.x, y: pos.y }, rotation: rot.x });
+    result.push(applyOverrideToElement(element, override));
   }
 
   return result;
+}
+
+/**
+ * Merges a single `PageElementInstance` override onto its target
+ * element. Content / style / assetId substitutions land first; the
+ * transform applies last so position + rotation stay winning over any
+ * conflicting style override (e.g. an override style that carried a
+ * stale `transform` field would still lose to the explicit transform).
+ */
+function applyOverrideToElement(
+  element: BroadsetElement,
+  override: Page['elements'][number],
+): BroadsetElement {
+  let merged: BroadsetElement = element;
+
+  // Per-page `content` override supersedes the element-level content
+  // for this slide only (e.g. "Page 1 of N", localized variants).
+  if (override.content !== undefined) {
+    merged = { ...merged, content: override.content };
+  }
+
+  // Per-page `style` override merges on top of the element style.
+  // Absent keys fall through to the document-level value. The merged
+  // record is fed through `styleSchema` to normalize input-side
+  // conveniences (string fills → `BroadsetFill`, number radii →
+  // tuples) the same way `elementSchema` normalizes element-level
+  // styles. A parse failure falls back to the unmerged element style
+  // so a malformed override never crashes export.
+  if (override.style !== undefined) {
+    const mergedStyleResult = styleSchema.safeParse({ ...merged.style, ...override.style });
+
+    if (mergedStyleResult.success) {
+      merged = { ...merged, style: mergedStyleResult.data };
+    }
+  }
+
+  // Per-page `assetId` override swaps the element's asset reference
+  // (typical case: image element pointing to a different asset on a
+  // sister page) without forking the document-level element.
+  if (override.assetId !== undefined) {
+    merged = { ...merged, assetId: override.assetId };
+  }
+
+  // Page overrides carry a per-element transform (position / rotation
+  // / scale). Apply the transform LAST so transform stays winning over
+  // any content / style / asset substitutions that landed first.
+  const pos = override.transform.position;
+  const rot = override.transform.rotation;
+
+  return { ...merged, position: { x: pos.x, y: pos.y }, rotation: rot.x };
 }
 
 function buildPresentationXml(document: BroadsetDocument, slideCount: number, embeddedFontLst = ''): string {
