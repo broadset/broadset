@@ -3,6 +3,10 @@ import { createRequire } from 'node:module';
 
 import { PDFDict, PDFDocument, PDFName, PDFRawStream, StandardFonts } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
+// Static import paired with the minimal `wawoff2` declaration in
+// `_shared/text-layout/text-layout.types.d.ts` so the dependency is
+// visible to `knip` without an `ignoreDependencies` suppression.
+import { compress as compressWoff2 } from 'wawoff2';
 
 import { registerFontkit } from './export/fonts';
 import { exportPdfBytes, validatePdfA2b } from './index';
@@ -24,31 +28,8 @@ function urlOf(input: string | URL | Request): string {
   return input.url;
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object';
-}
-
-type CompressFn = (sfnt: Uint8Array) => Promise<Uint8Array>;
-
-function isCompressFn(value: unknown): value is CompressFn {
-  return typeof value === 'function';
-}
-
 async function compressTtfToWoff2(ttf: Uint8Array): Promise<Uint8Array> {
-  // Build the specifier dynamically so TypeScript sees `unknown` —
-  // wawoff2 ships no .d.ts and we don't want to leak ambient types
-  // out of @broadset/formats.
-  const moduleSpecifier = 'wawoff2';
-  const wawoff2Module: unknown = await import(moduleSpecifier);
-
-  if (!isObject(wawoff2Module)) throw new TypeError('wawoff2: module did not resolve to an object');
-
-  const defaultExport = isObject(wawoff2Module['default']) ? wawoff2Module['default'] : wawoff2Module;
-  const compress = defaultExport['compress'];
-
-  if (!isCompressFn(compress)) throw new TypeError('wawoff2: compress export is not a function');
-
-  const compressed = await compress(ttf);
+  const compressed = await compressWoff2(ttf);
 
   return compressed instanceof Uint8Array ? compressed : new Uint8Array(compressed);
 }
@@ -73,7 +54,7 @@ describe('WOFF2 decompression in the font pipeline', () => {
 
       if (url.includes('fonts.googleapis.com')) {
         return Promise.resolve(
-          new Response('@font-face { src: url(https://example.com/font.woff2) format("woff2"); }'),
+          new Response('@font-face { src: url(https://fonts.gstatic.com/font.woff2) format("woff2"); }'),
         );
       }
 

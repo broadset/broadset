@@ -1,4 +1,13 @@
-import { decodePDFRawStream, PDFArray, PDFDict, type PDFDocument, PDFName, PDFRawStream, PDFRef, PDFStream } from 'pdf-lib';
+import {
+  decodePDFRawStream,
+  PDFArray,
+  PDFDict,
+  type PDFDocument,
+  PDFName,
+  PDFRawStream,
+  PDFRef,
+  PDFStream,
+} from 'pdf-lib';
 
 import { readBroadsetXmp } from '../../_shared/xmp';
 import { loadPdf, readDocumentXmp } from './parse';
@@ -12,7 +21,7 @@ import { loadPdf, readDocumentXmp } from './parse';
  * is the structural floor every PDF/A-mode export is regression-tested
  * against.
  */
-export interface PdfAValidationResult {
+interface PdfAValidationResult {
   readonly valid: boolean;
   readonly violations: readonly string[];
 }
@@ -129,9 +138,7 @@ function validateNoTransparencyWithoutGroup(grepText: string, violations: string
   // in the content stream, or as `/CA <value>` / `/ca <value>` entries
   // in /ExtGState dicts. /SMask appears either form.
   const usesTransparency =
-    /\/(?:CA|ca)\s+0?\.\d/.test(grepText) ||
-    /\b0?\.\d+\s+(?:ca|CA)\b/.test(grepText) ||
-    /\/SMask\b/.test(grepText);
+    /\/(?:CA|ca)\s+0?\.\d/.test(grepText) || /\b0?\.\d+\s+(?:ca|CA)\b/.test(grepText) || /\/SMask\b/.test(grepText);
 
   if (!usesTransparency) return;
 
@@ -202,9 +209,8 @@ function decompressedPageContents(pdf: PDFDocument): string {
 
     if (contents === undefined) continue;
 
-    const entries = contents instanceof PDFArray
-      ? Array.from({ length: contents.size() }, (_, i) => contents.get(i))
-      : [contents];
+    const entries =
+      contents instanceof PDFArray ? Array.from({ length: contents.size() }, (_, i) => contents.get(i)) : [contents];
 
     for (const entry of entries) {
       const stream = resolveContentStream(pdf, entry);

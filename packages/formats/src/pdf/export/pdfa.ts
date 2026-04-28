@@ -12,7 +12,7 @@ import { decodeDataUri } from '../data-uri';
  * - `2u` — Unicode mapping (ToUnicode CMaps on every embedded font).
  * - `2a` — accessible / tagged structure tree.
  */
-export type PdfAConformance = '2b' | '2u' | '2a';
+type PdfAConformance = '2b' | '2u' | '2a';
 
 /**
  * Translate a `PdfAConformance` level into the `pdfaid:conformance`
@@ -32,7 +32,7 @@ export function pdfaConformanceLetter(conformance: PdfAConformance): 'B' | 'U' |
 /**
  * Resolved bytes + metadata for the OutputIntent ICC profile.
  */
-export interface ResolvedOutputIntent {
+interface ResolvedOutputIntent {
   readonly profileBytes: Uint8Array;
   readonly identifier: string;
   readonly numberOfComponents: number;
@@ -47,10 +47,7 @@ export interface ResolvedOutputIntent {
  * "no profile available" per the spec's "fallback to bundled default"
  * scenario.
  */
-export function resolveOutputIntent(
-  doc: BroadsetDocument,
-  assets: readonly Asset[],
-): ResolvedOutputIntent {
+export function resolveOutputIntent(doc: BroadsetDocument, assets: readonly Asset[]): ResolvedOutputIntent {
   const declared = doc.outputIntent;
 
   if (declared !== undefined) {

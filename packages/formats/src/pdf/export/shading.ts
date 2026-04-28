@@ -15,9 +15,7 @@ import { parseCssColor } from '../color';
 
 const PATTERN_KEY = PDFName.of('Pattern');
 const PATTERN_COLORSPACE = PDFName.of('Pattern');
-const SHADING_KEY = PDFName.of('Shading');
 const RESOURCES_KEY = PDFName.of('Resources');
-const PROPERTIES_KEY = PDFName.of('Properties');
 
 /**
  * Per-document pattern counter. Module-global state would leak the
@@ -45,7 +43,7 @@ function nextPatternIndex(pdf: PDFDocument): number {
  * the caller — the shading pattern only sources the colour, not the
  * geometry.
  */
-export interface RegisteredShadingPattern {
+interface RegisteredShadingPattern {
   readonly patternName: PDFName;
   readonly setPatternFillOperators: readonly PDFOperator[];
 }
@@ -93,9 +91,9 @@ export function registerLinearOrRadialShading(
 
   const stitchedFunction = buildStitchedFunction(pdf.context, resolvedStops);
   const shadingDict =
-    gradient.type === 'linear'
-      ? buildLinearShading(pdf.context, gradient, geometry, stitchedFunction)
-      : buildRadialShading(pdf.context, gradient, geometry, stitchedFunction);
+    gradient.type === 'linear' ?
+      buildLinearShading(pdf.context, gradient, geometry, stitchedFunction)
+    : buildRadialShading(pdf.context, gradient, geometry, stitchedFunction);
 
   const patternDict = pdf.context.obj({
     Type: 'Pattern',
@@ -325,13 +323,3 @@ function readOrCreatePatternDict(pdf: PDFDocument, resources: PDFDict): PDFDict 
   return created;
 }
 
-/**
- * Re-export keys consumed by helpers in this module so call-sites can
- * extend the same `/Resources /Properties` registry without relying
- * on string literals.
- */
-export const __SHADING_RESOURCE_KEYS = {
-  PATTERN_KEY,
-  SHADING_KEY,
-  PROPERTIES_KEY,
-};

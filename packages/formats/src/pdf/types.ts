@@ -10,7 +10,7 @@ import type { BroadsetXmpPacket as SharedBroadsetXmpPacket } from '../_shared/xm
  * - `cmyk` — DeviceCMYK with an embedded ICC profile where declared.
  * - `spot` — DeviceN / Separation spot colours alongside a process base.
  */
-export type ColorSpaceChoice = 'rgb' | 'cmyk' | 'spot';
+type ColorSpaceChoice = 'rgb' | 'cmyk' | 'spot';
 
 /**
  * PDF/A conformance level the exporter supports.
@@ -24,7 +24,7 @@ export type ColorSpaceChoice = 'rgb' | 'cmyk' | 'spot';
  *   images, `Span` for text, `Form` for groups). Inherits all `2u`
  *   constraints.
  */
-export type PdfAConformance = '2b' | '2u' | '2a';
+type PdfAConformance = '2b' | '2u' | '2a';
 
 /**
  * Options controlling the PDF export pipeline.
@@ -68,6 +68,27 @@ export interface PdfImportOptions {
   readonly password?: string;
   /** Fetch implementation for resolving external resources referenced by the PDF. */
   readonly fetch?: typeof globalThis.fetch;
+  /**
+   * Total input size cap in bytes. The importer rejects inputs above
+   * this cap before invoking pdf-lib so a hostile or malformed PDF
+   * cannot exhaust memory during xref parsing. `0` disables the cap
+   * for trusted internal flows; default is 256 MiB.
+   */
+  readonly maxBytes?: number;
+  /**
+   * Maximum number of pages the importer will iterate. Caller-supplied
+   * value above the cap fires a warning and the importer truncates
+   * iteration. Default is 1,024 pages — covers every realistic
+   * design-tool export while bounding the operator-stream scan.
+   */
+  readonly maxPages?: number;
+  /**
+   * Maximum operator-stream byte budget the importer will decode for
+   * the third-party fallback path. Pages above this cap surface a
+   * warning and skip extraction. Default is 16 MiB total (sum across
+   * all pages).
+   */
+  readonly maxOperatorBytes?: number;
 }
 
 /**
@@ -111,7 +132,7 @@ export interface MarkedContentTag {
  * import the round-trip metadata shape without reaching into `_shared/`.
  * Per IO-D-08 the same packet is emitted by every round-trippable format.
  */
-export type BroadsetXmpPacket = SharedBroadsetXmpPacket;
+type BroadsetXmpPacket = SharedBroadsetXmpPacket;
 
 /**
  * Round-trip metadata produced by the import pipeline. Carried alongside the

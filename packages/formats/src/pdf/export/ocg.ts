@@ -17,7 +17,7 @@ const RESOURCES_KEY = PDFName.of('Resources');
  * `/Resources /Properties`. The `/OC <name> BDC` marked-content
  * operator references the ref via this name.
  */
-export interface OcgResourceBinding {
+interface OcgResourceBinding {
   readonly pageId: string;
   readonly resourceName: PDFName;
   readonly ref: PDFRef;

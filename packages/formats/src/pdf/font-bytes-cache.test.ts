@@ -37,8 +37,12 @@ async function exportWithObservedFetches(
     if (url.includes('fonts.googleapis.com')) {
       observation.cssFetches += 1;
 
+      // Use the canonical Google Fonts static-asset host so the
+      // hardened export-fetch path (allowlist on
+      // `fonts.gstatic.com`) lets the request through. Closes the
+      // 2026-04-28 audit's unbounded-fetch finding.
       return Promise.resolve(
-        new Response('@font-face { src: url(https://example.com/font.ttf) format("truetype"); }'),
+        new Response('@font-face { src: url(https://fonts.gstatic.com/font.ttf) format("truetype"); }'),
       );
     }
 

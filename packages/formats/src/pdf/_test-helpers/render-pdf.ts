@@ -24,7 +24,7 @@ interface RasteriseOptions {
   readonly scale?: number;
 }
 
-export interface RasterisedPage {
+interface RasterisedPage {
   readonly width: number;
   readonly height: number;
   /** RGBA pixel data, length = width × height × 4. */
@@ -86,10 +86,7 @@ async function loadPdfJs(): Promise<PdfJsModuleShape> {
  * deterministic output across runs on the same node version, which
  * is what makes the byte-level diff tractable.
  */
-export async function rasterisePdfPage(
-  bytes: Uint8Array,
-  options: RasteriseOptions = {},
-): Promise<RasterisedPage> {
+export async function rasterisePdfPage(bytes: Uint8Array, options: RasteriseOptions = {}): Promise<RasterisedPage> {
   const pageNumber = options.page ?? 1;
   const scale = options.scale ?? 1;
   const pdfJs = await loadPdfJs();

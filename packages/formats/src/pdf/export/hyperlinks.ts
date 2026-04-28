@@ -95,5 +95,5 @@ function readOrCreateAnnotsArray(pdf: PDFDocument, page: PDFPage): PageAnnotsLik
 }
 
 function hasPushMethod(value: unknown): value is PageAnnotsLike {
-  return value !== null && typeof value === 'object' && 'push' in value && typeof (value as { push: unknown }).push === 'function';
+  return value !== null && typeof value === 'object' && 'push' in value && typeof (value).push === 'function';
 }

@@ -8,7 +8,7 @@ import { elementToPoints } from '../geometry';
  * trim-plus-bleed box. When bleed is undeclared the trim and media box
  * are equal.
  */
-export interface PageBoxesResult {
+interface PageBoxesResult {
   readonly mediaWidthPt: number;
   readonly mediaHeightPt: number;
 }

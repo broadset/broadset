@@ -161,7 +161,7 @@ describe('PDF Render Fallback Upgrades', () => {
       ],
     });
 
-    const bytes = await exportPdfBytes(doc, mockFetch as never);
+    const bytes = await exportPdfBytes(doc, mockFetch);
 
     expect(bytes.length).toBeGreaterThan(0);
     expect(drawCalls.images).toBeGreaterThan(0);

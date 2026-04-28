@@ -3,6 +3,7 @@ import {
   type BroadsetElement,
   createDefaultElement,
   createEmptyBroadsetDocument,
+  createPageElementInstanceForElement,
 } from '@broadset/model';
 
 import type { BroadsetXmpElementEntry, BroadsetXmpPdfAIdentifier } from '../../_shared/xmp';
@@ -13,7 +14,7 @@ import type { MarkedContentKind, MarkedContentTag } from '../types';
  * `extensions.pdf.pdfa` block, the next export pass can re-emit the
  * `pdfaid:` identifier without the user having to re-opt-in.
  */
-export interface FastPathHydrationOptions {
+interface FastPathHydrationOptions {
   readonly pdfa?: BroadsetXmpPdfAIdentifier | undefined;
   /**
    * XMP `broadset:elements` payload entries keyed by element id.
@@ -51,23 +52,25 @@ export function hydrateDocumentFromFastPath(
     if (entry.payload !== undefined) payloadById.set(entry.id, entry.payload);
   }
 
-  const elements: BroadsetElement[] = tags.map((tag, index) =>
-    hydrateElement(tag, index, payloadById.get(tag.id)),
-  );
+  const elements: BroadsetElement[] = tags.map((tag, index) => hydrateElement(tag, index, payloadById.get(tag.id)));
 
   const documentExtensions =
-    options.pdfa !== undefined
-      ? {
-          pdf: {
-            pdfa: { part: options.pdfa.part, conformance: options.pdfa.conformance },
-          },
-        }
-      : undefined;
+    options.pdfa !== undefined ?
+      {
+        pdf: {
+          pdfa: { part: options.pdfa.part, conformance: options.pdfa.conformance },
+        },
+      }
+    : undefined;
+
+  const rootInstances = elements.filter((el) => el.parentId === null).map(createPageElementInstanceForElement);
+  const pages = empty.pages.map((page, index) => (index === 0 ? { ...page, elements: rootInstances } : page));
 
   return {
     ...empty,
     id: documentId,
     elements,
+    pages,
     ...(documentExtensions !== undefined ? { extensions: documentExtensions } : {}),
   };
 }
@@ -87,14 +90,14 @@ function hydrateElement(tag: MarkedContentTag, index: number, payload: string | 
   return createDefaultElement(elementTypeForKind(tag.kind), {
     id: tag.id,
     name: `Element ${String(index + 1)}`,
-    ...(tag.dataField !== undefined
-      ? {
-          dataField: {
-            fieldName: tag.dataField,
-            overflow: 'clip',
-          },
-        }
-      : {}),
+    ...(tag.dataField !== undefined ?
+      {
+        dataField: {
+          fieldName: tag.dataField,
+          overflow: 'clip',
+        },
+      }
+    : {}),
     extensions: pdfExtensions(tag),
   });
 }

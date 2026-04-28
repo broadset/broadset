@@ -39,7 +39,7 @@ function buildMockFetch(fontBytes: Uint8Array): typeof globalThis.fetch {
 
     if (url.includes('fonts.googleapis.com')) {
       return Promise.resolve(
-        new Response('@font-face { src: url(https://example.com/font.ttf) format("truetype"); }'),
+        new Response('@font-face { src: url(https://fonts.gstatic.com/font.ttf) format("truetype"); }'),
       );
     }
 

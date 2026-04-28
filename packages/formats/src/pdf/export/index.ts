@@ -9,54 +9,24 @@ export {
   resolveStyleColor,
   srgbToDeviceCmyk,
 } from './color';
-export {
-  clearFontBytesCache,
-  elementFontIdentity,
-  type FontIdentity,
-  identityKey,
-  lookupFont,
-  registerFontkit,
-  type ResolvedFontMap,
-  resolveFonts,
-  type ResolveFontsOptions,
-  resolveIdentity,
-  type ResolveIdentityOptions,
-  selectStandardFontVariant,
-} from './fonts';
+export { resolveFonts } from './fonts';
 export {
   type CanvasAbsolutePosition,
   composeCanvasAbsolutePosition,
   elementRotationBrackets,
   indexElementsById,
-  type OperatorBrackets,
 } from './geometry';
 export { emitLinkAnnotation, readElementLink } from './hyperlinks';
-export {
-  drawImagePlaceholder,
-  embedImageFromBytes,
-  fetchImageBytes,
-  rasterizeSvgToPngBytes,
-} from './image';
+export { drawImagePlaceholder, embedImageFromBytes, fetchImageBytes, rasterizeSvgToPngBytes } from './image';
 export { buildMarkedContentTag, markedContentBrackets } from './marked-content';
-export { attachOcgResourceBindings, type OcgRegistration, type OcgResourceBinding, registerPageOcgs } from './ocg';
-export { applyPageBoxes, type PageBoxesResult } from './page-boxes';
+export { attachOcgResourceBindings, type OcgRegistration, registerPageOcgs } from './ocg';
+export { applyPageBoxes } from './page-boxes';
 export { applyBrackets, elementTopLeftPt } from './page-layout';
 export { renderPath } from './path';
-export {
-  attachOutputIntent,
-  ensureTrailerId,
-  type PdfAConformance,
-  pdfaConformanceLetter,
-  type ResolvedOutputIntent,
-  resolveOutputIntent,
-} from './pdfa';
+export { attachOutputIntent, ensureTrailerId, pdfaConformanceLetter, resolveOutputIntent } from './pdfa';
 export { collectPreflightWarnings } from './preflight';
-export { buildRoundedRectPath, type CornerRadii, hasAnyRoundedCorner, ROUNDED_RECT_KAPPA } from './rectangle';
-export {
-  type RegisteredShadingPattern,
-  registerLinearOrRadialShading,
-  type ShadingGeometry,
-} from './shading';
+export { buildRoundedRectPath, type CornerRadii, hasAnyRoundedCorner } from './rectangle';
+export { registerLinearOrRadialShading, type ShadingGeometry } from './shading';
 export { attachPdfaStructureTree } from './struct-tree';
 export { renderText } from './text';
 export { attachBroadsetXmp, buildBroadsetXmpPacket } from './xmp';

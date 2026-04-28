@@ -1,6 +1,6 @@
 import { type BroadsetDocument, type BroadsetElement, createEmptyBroadsetDocument } from '@broadset/model';
 
-import { reconcile,type ReconcileResult } from '../_shared/reconcile';
+import { reconcile, type ReconcileResult } from '../_shared/reconcile';
 import type { BroadsetXmpElementEntry } from '../_shared/xmp';
 import { readPdfRoundTripMetadata } from './import';
 
@@ -29,7 +29,7 @@ import { readPdfRoundTripMetadata } from './import';
  *   whose `fingerprintElement()` hash still matched, preventing a
  *   spurious delete + add event.
  */
-export interface PdfReconcileInput {
+interface PdfReconcileInput {
   readonly preserved: BroadsetDocument;
   readonly current: BroadsetDocument;
   /**

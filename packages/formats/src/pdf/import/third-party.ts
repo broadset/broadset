@@ -1,7 +1,13 @@
 import { type BroadsetElement, type Canvas, createDefaultElement } from '@broadset/model';
 import type { PDFDocument } from 'pdf-lib';
 
-import { type ExtractedTextItem, extractTextItems } from './operators';
+import { type ExtractedTextItem, extractTextItemsWithBudget } from './operators';
+
+interface ThirdPartyExtractionResult {
+  readonly elements: readonly BroadsetElement[];
+  readonly capExceeded: boolean;
+  readonly capBytes: number;
+}
 
 /**
  * Default approximate character width in PDF points per `fontSize` unit.
@@ -45,14 +51,24 @@ const PT_PER_IN = 72;
  * dedicated operator engine in a later iteration and are recorded as
  * Spec Gaps in `project/spec/formats/pdf.md`.
  */
-export function extractThirdPartyElements(pdf: PDFDocument, canvas: Canvas): readonly BroadsetElement[] {
-  const items = extractTextItems(pdf);
+/**
+ * Cap-aware operator-stream → element extraction. Surfaces the
+ * cap-exceeded flag so the caller can emit a structured warning when
+ * the operator-stream byte budget fired and the result is partial.
+ */
+export function extractThirdPartyElementsWithBudget(
+  pdf: PDFDocument,
+  canvas: Canvas,
+  capBytes?: number,
+): ThirdPartyExtractionResult {
+  const extraction =
+    capBytes === undefined ? extractTextItemsWithBudget(pdf) : extractTextItemsWithBudget(pdf, capBytes);
   const { widthPt: _widthPt, heightPt } = canvasTrimSizePt(canvas);
   const elements: BroadsetElement[] = [];
 
   let index = 0;
 
-  for (const item of items) {
+  for (const item of extraction.items) {
     const text = item.text.trim();
 
     if (text === '') continue;
@@ -63,7 +79,7 @@ export function extractThirdPartyElements(pdf: PDFDocument, canvas: Canvas): rea
     index += 1;
   }
 
-  return elements;
+  return { elements, capExceeded: extraction.capExceeded, capBytes: extraction.capBytes };
 }
 
 /**

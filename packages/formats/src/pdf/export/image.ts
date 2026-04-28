@@ -1,5 +1,17 @@
 import { type PDFDocument, type PDFImage, type PDFPage, rgb } from 'pdf-lib';
 
+import { safeFetchBytes } from '../../_shared/network/safe-fetch';
+
+/**
+ * Default cap on raster image bytes the PDF exporter will pull. Real
+ * design-tool images max out at a few megabytes; 16 MiB leaves
+ * comfortable headroom while bounding peak buffer use under hostile
+ * inputs. Closes the 2026-04-28 audit follow-up "PDF image fetch
+ * remains unbounded".
+ */
+const PDF_IMAGE_FETCH_MAX_BYTES = 16 * 1024 * 1024;
+const PDF_IMAGE_FETCH_TIMEOUT_MS = 10_000;
+
 /** Placeholder border for image elements that fail to embed. */
 const PLACEHOLDER_BORDER = rgb(0.8, 0.8, 0.8);
 
@@ -29,9 +41,15 @@ export async function embedImageFromBytes(pdf: PDFDocument, mime: string, bytes:
 
 /**
  * Fetch image bytes from a URL via the caller-supplied `fetchFn`.
- * Returns `undefined` on any error (no fetch impl, network failure,
- * non-OK status, malformed body) so the caller can fall through to
- * the placeholder border.
+ * Returns `undefined` on any error (no fetch impl, scheme/host not
+ * allowed, timeout, byte-cap exceeded, network failure, non-OK
+ * status) so the caller can fall through to the placeholder border.
+ *
+ * Hardened — routes through `safeFetchBytes` so the export pipeline
+ * never hangs on a slow upstream and never buffers a multi-gigabyte
+ * response. The default scheme allowlist (`http:` / `https:`) blocks
+ * `data:` and `file:` URLs that could let a project file with a
+ * crafted asset reference read arbitrary local files.
  */
 export async function fetchImageBytes(
   url: string,
@@ -41,20 +59,23 @@ export async function fetchImageBytes(
     return undefined;
   }
 
-  try {
-    const response = await fetchFn(url);
+  const result = await safeFetchBytes(url, {
+    fetchFn,
+    maxBytes: PDF_IMAGE_FETCH_MAX_BYTES,
+    timeoutMs: PDF_IMAGE_FETCH_TIMEOUT_MS,
+  });
 
-    if (!response.ok) {
-      return undefined;
-    }
-
-    const mime = response.headers.get('content-type') ?? 'image/png';
-    const bytes = new Uint8Array(await response.arrayBuffer());
-
-    return { mime, bytes };
-  } catch {
+  if (!result.ok) {
     return undefined;
   }
+
+  // Default to image/png so the embedder still routes a typeable raster
+  // when the upstream omits a Content-Type. Both pdf-lib's `embedJpg`
+  // and `embedPng` validate the byte magic; mis-identified MIME falls
+  // through to a placeholder rather than a broken embed.
+  const mime = result.mime === 'application/octet-stream' ? 'image/png' : result.mime;
+
+  return { mime, bytes: result.bytes };
 }
 
 /**

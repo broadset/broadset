@@ -1,9 +1,14 @@
-import { type BroadsetDocument, createEmptyBroadsetDocument } from '@broadset/model';
+import {
+  type BroadsetDocument,
+  createEmptyBroadsetDocument,
+  createPageElementInstanceForElement,
+  ensureRootElementsHavePageInstances,
+} from '@broadset/model';
 
 import type { DocumentImportResult } from '../import-document';
 import {
   capturePreservationBlobs,
-  extractThirdPartyElements,
+  extractThirdPartyElementsWithBudget,
   hydrateDocumentFromFastPath,
   readDocumentXmp,
   readRoundTripMetadata,
@@ -81,6 +86,36 @@ const FAST_PATH_PLACEHOLDER_WARNING =
   'PDF import fast-path: hydrated document id + element ids + types from XMP and marked-content tags. Element geometry (position, width, height, rotation) will be recovered from the operator stream in Phase 6.4b.';
 
 /**
+ * Default byte cap for PDF input. 256 MiB covers every realistic
+ * design-tool export while making a multi-GiB OOM bomb impossible.
+ * Callers can override via `PdfImportOptions.maxBytes`; passing `0`
+ * disables the cap for trusted internal flows.
+ */
+const DEFAULT_PDF_MAX_BYTES = 256 * 1024 * 1024;
+
+/**
+ * Default page-count cap. PDFs above this fire a warning and are
+ * rejected before allocation. Real-world design-tool exports
+ * comfortably fit within this; reports / books that legitimately
+ * exceed it must opt-in via `PdfImportOptions.maxPages`.
+ */
+const DEFAULT_PDF_MAX_PAGES = 1024;
+
+/**
+ * Warning surfaced when the input exceeds the configured byte cap.
+ */
+function buildByteCapWarning(byteLength: number, cap: number): string {
+  return `PDF import rejected: input size ${String(byteLength)} bytes exceeds the configured cap of ${String(cap)} bytes. Re-run with a higher \`maxBytes\` if you trust this file.`;
+}
+
+/**
+ * Warning surfaced when the page count exceeds the configured cap.
+ */
+function buildPageCapWarning(pageCount: number, cap: number): string {
+  return `PDF import rejected: page count ${String(pageCount)} exceeds the configured cap of ${String(cap)}. Re-run with a higher \`maxPages\` if you trust this file.`;
+}
+
+/**
  * PDF file-header signature (ASCII "%PDF-").
  */
 const PDF_HEADER = [0x25, 0x50, 0x44, 0x46, 0x2d] as const;
@@ -150,6 +185,12 @@ export async function importPdfDocument(
     return { document: createEmptyBroadsetDocument(), warnings: [INVALID_PDF_WARNING] };
   }
 
+  const maxBytes = options?.maxBytes ?? DEFAULT_PDF_MAX_BYTES;
+
+  if (maxBytes > 0 && data.byteLength > maxBytes) {
+    return { document: createEmptyBroadsetDocument(), warnings: [buildByteCapWarning(data.byteLength, maxBytes)] };
+  }
+
   const loadResult = await probeLoadPdf(data, options ?? {});
 
   if (loadResult.kind === 'encrypted') {
@@ -162,6 +203,18 @@ export async function importPdfDocument(
 
   const pdf = loadResult.pdf;
   const warnings: string[] = [];
+  const maxPages = options?.maxPages ?? DEFAULT_PDF_MAX_PAGES;
+  let pageCount: number;
+
+  try {
+    pageCount = pdf.getPageCount();
+  } catch {
+    return { document: createEmptyBroadsetDocument(), warnings: [MALFORMED_PDF_WARNING] };
+  }
+
+  if (maxPages > 0 && pageCount > maxPages) {
+    return { document: createEmptyBroadsetDocument(), warnings: [buildPageCapWarning(pageCount, maxPages)] };
+  }
 
   if (hasEmbeddedJavaScript(pdf)) {
     warnings.push(JAVASCRIPT_STRIPPED_WARNING);
@@ -177,9 +230,15 @@ export async function importPdfDocument(
 
   if (xmp === null) {
     const emptyDocument = createEmptyBroadsetDocument();
-    const thirdPartyElements = extractThirdPartyElements(pdf, emptyDocument.canvas);
+    const extraction = extractThirdPartyElementsWithBudget(pdf, emptyDocument.canvas, options?.maxOperatorBytes);
 
-    if (thirdPartyElements.length === 0) {
+    if (extraction.capExceeded) {
+      warnings.push(
+        `PDF import: operator-stream byte cap of ${String(extraction.capBytes)} reached. Some pages were not scanned for text; the imported document is partial. Re-run with a higher \`maxOperatorBytes\` if you trust this file.`,
+      );
+    }
+
+    if (extraction.elements.length === 0) {
       warnings.push(EMPTY_THIRD_PARTY_WARNING);
 
       return { document: attachEmbeddedFilesExtension(emptyDocument, embeddedFileNames), warnings };
@@ -187,9 +246,17 @@ export async function importPdfDocument(
 
     warnings.push(THIRD_PARTY_PARTIAL_WARNING);
 
+    const allElements = [...emptyDocument.elements, ...extraction.elements];
+    const rootInstances = allElements
+      .filter((el) => el.parentId === null)
+      .map(createPageElementInstanceForElement);
+    const pagesWithInstances = emptyDocument.pages.map((page, index) =>
+      index === 0 ? { ...page, elements: rootInstances } : page,
+    );
+
     return {
       document: attachEmbeddedFilesExtension(
-        { ...emptyDocument, elements: [...emptyDocument.elements, ...thirdPartyElements] },
+        { ...emptyDocument, elements: allElements, pages: pagesWithInstances },
         embeddedFileNames,
       ),
       warnings,
@@ -207,7 +274,7 @@ export async function importPdfDocument(
   warnings.push(FAST_PATH_PLACEHOLDER_WARNING);
 
   return {
-    document: attachEmbeddedFilesExtension(document, embeddedFileNames),
+    document: ensureRootElementsHavePageInstances(attachEmbeddedFilesExtension(document, embeddedFileNames)),
     warnings,
   };
 }

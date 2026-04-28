@@ -2,18 +2,14 @@ import type { BroadsetDocument } from '@broadset/model';
 import { type PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
 
 import { fingerprintElement } from '../../_shared/fingerprint';
-import {
-  BROADSET_XMP_VERSION,
-  type BroadsetXmpPacket,
-  writeBroadsetXmp,
-} from '../../_shared/xmp';
+import { BROADSET_XMP_VERSION, type BroadsetXmpPacket, writeBroadsetXmp } from '../../_shared/xmp';
 
 /**
  * Optional fields layered onto the base `broadset:` packet at build
  * time. Today only the PDF/A identifier is carried via this options
  * hatch; future PDF-specific identifiers can extend the shape.
  */
-export interface BroadsetXmpPacketOptions {
+interface BroadsetXmpPacketOptions {
   readonly pdfa?: { readonly part: string; readonly conformance: string };
 }
 

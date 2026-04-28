@@ -67,7 +67,7 @@ describe('Font Embedding', () => {
       ],
     });
 
-    await exportPdfBytes(doc, mockFetch as never);
+    await exportPdfBytes(doc, mockFetch);
 
     const googleCalls = fetchCalls.filter((u) => u.includes('fonts.googleapis.com'));
 
@@ -95,7 +95,7 @@ describe('Font Embedding', () => {
       ],
     });
 
-    await exportPdfBytes(doc, mockFetch as never);
+    await exportPdfBytes(doc, mockFetch);
 
     expect(fetchCalls).toHaveLength(0);
   });

@@ -2,8 +2,26 @@ import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 import fontkit from '@pdf-lib/fontkit';
 import { type PDFDocument, type PDFFont, StandardFonts } from 'pdf-lib';
 
+import { safeFetchBytes } from '../../_shared/network/safe-fetch';
 import { normalizeFontFamily, resolveGoogleFontUrl } from '../fonts';
 import { decompressWoff2Bytes } from './woff2-decompress';
+
+/**
+ * Hosts allowed for the Google Fonts embed path. Tightens the import
+ * boundary so a hostile project file with a `fontFamily` shaped to
+ * coerce an arbitrary URL cannot land remote bytes from outside the
+ * Google Fonts CDN. The CSS endpoint and the static-assets CDN it
+ * redirects to are the only two hosts the export pipeline needs.
+ */
+const GOOGLE_FONTS_ALLOWED_HOSTS = new Set(['fonts.googleapis.com', 'fonts.gstatic.com']);
+
+/**
+ * Cap on font CSS / binary fetches. CSS is a few KB; the largest
+ * statically-served Google Fonts WOFF2 binaries are well under 1 MB.
+ * 4 MB leaves comfortable headroom while bounding the buffer.
+ */
+const FONT_FETCH_MAX_BYTES = 4 * 1024 * 1024;
+const FONT_FETCH_TIMEOUT_MS = 8_000;
 
 /** Weight threshold above which a font is considered bold. */
 const BOLD_WEIGHT_THRESHOLD = 700;
@@ -43,7 +61,7 @@ const STANDARD_BOLD_ITALIC_MAP: ReadonlyMap<StandardFonts, StandardFonts> = new 
  * italic / bold-italic combinations of a family resolve to the
  * matching standard-font variant.
  */
-export interface FontIdentity {
+interface FontIdentity {
   readonly familyKey: string;
   readonly isBold: boolean;
   readonly isItalic: boolean;
@@ -52,7 +70,7 @@ export interface FontIdentity {
 /**
  * Map key for storing a `PDFFont` per `FontIdentity`.
  */
-export function identityKey(id: FontIdentity): string {
+function identityKey(id: FontIdentity): string {
   return `${id.familyKey}|${id.isBold ? 'b' : 'r'}|${id.isItalic ? 'i' : 'u'}`;
 }
 
@@ -76,7 +94,7 @@ export function elementFontIdentity(el: BroadsetElement): FontIdentity {
 /**
  * Pick the bold / italic / bold-italic variant of a Standard 14 font.
  */
-export function selectStandardFontVariant(base: StandardFonts, isBold: boolean, isItalic: boolean): StandardFonts {
+function selectStandardFontVariant(base: StandardFonts, isBold: boolean, isItalic: boolean): StandardFonts {
   if (isBold && isItalic) {
     return STANDARD_BOLD_ITALIC_MAP.get(base) ?? base;
   }
@@ -99,7 +117,7 @@ export function selectStandardFontVariant(base: StandardFonts, isBold: boolean, 
  * to a Standard 14 variant. Per IO-D-18 ("no silent drops") the
  * exporter MUST surface the failure as a preflight warning.
  */
-export interface ResolvedFontIdentity {
+interface ResolvedFontIdentity {
   readonly font: PDFFont;
   readonly failure?: string;
 }
@@ -110,7 +128,7 @@ export interface ResolvedFontIdentity {
  * original face must round-trip byte-for-byte). `subsetFonts: true`
  * (the default) routes through pdf-lib's fontkit-backed subsetter.
  */
-export interface ResolveIdentityOptions {
+interface ResolveIdentityOptions {
   readonly subsetFonts?: boolean | undefined;
 }
 
@@ -184,7 +202,7 @@ export function registerFontkit(pdf: PDFDocument): void {
  * `PDFFont` map plus the list of human-readable failure messages that
  * the export pipeline must surface as preflight warnings (per IO-D-18).
  */
-export interface ResolvedFontMap {
+interface ResolvedFontMap {
   readonly fontMap: ReadonlyMap<string, PDFFont>;
   readonly failures: readonly string[];
 }
@@ -198,7 +216,7 @@ export interface ResolvedFontMap {
  * embed from ~200 KB → ~10 KB by routing through pdf-lib's
  * `CustomFontSubsetEmbedder`.
  */
-export interface ResolveFontsOptions {
+interface ResolveFontsOptions {
   readonly subsetFonts?: boolean | undefined;
 }
 
@@ -257,11 +275,7 @@ export async function resolveFonts(
  * caller's `fallback` (typically a pre-embedded Helvetica) when the
  * map has no entry for the element's identity.
  */
-export function lookupFont(
-  el: BroadsetElement,
-  fontMap: ReadonlyMap<string, PDFFont>,
-  fallback: PDFFont,
-): PDFFont {
+export function lookupFont(el: BroadsetElement, fontMap: ReadonlyMap<string, PDFFont>, fallback: PDFFont): PDFFont {
   const key = identityKey(elementFontIdentity(el));
 
   return fontMap.get(key) ?? fallback;
@@ -306,8 +320,21 @@ async function tryEmbedGoogleFont(
     }
 
     const cssUrl = resolveGoogleFontUrl(family);
-    const cssResponse = await fetchFn(cssUrl);
-    const cssText = await cssResponse.text();
+    const cssResult = await safeFetchBytes(cssUrl, {
+      fetchFn,
+      allowedHosts: GOOGLE_FONTS_ALLOWED_HOSTS,
+      maxBytes: FONT_FETCH_MAX_BYTES,
+      timeoutMs: FONT_FETCH_TIMEOUT_MS,
+    });
+
+    if (!cssResult.ok) {
+      return {
+        font: null,
+        failure: `PDF preflight: font "${family}" — Google Fonts CSS fetch failed (${cssResult.reason}). Falling back to Helvetica.`,
+      };
+    }
+
+    const cssText = new TextDecoder('utf-8').decode(cssResult.bytes);
     const urlMatch = /url\(([^)]+\.(?:ttf|woff2?))\)/.exec(cssText);
     const fontUrl = urlMatch?.[1];
 
@@ -318,14 +345,25 @@ async function tryEmbedGoogleFont(
       };
     }
 
-    const fontResponse = await fetchFn(fontUrl);
-    const compressedOrPlain = new Uint8Array(await fontResponse.arrayBuffer());
+    const fontResult = await safeFetchBytes(fontUrl, {
+      fetchFn,
+      allowedHosts: GOOGLE_FONTS_ALLOWED_HOSTS,
+      maxBytes: FONT_FETCH_MAX_BYTES,
+      timeoutMs: FONT_FETCH_TIMEOUT_MS,
+    });
+
+    if (!fontResult.ok) {
+      return {
+        font: null,
+        failure: `PDF preflight: font "${family}" — font asset fetch failed (${fontResult.reason}). Falling back to Helvetica.`,
+      };
+    }
+
+    const compressedOrPlain = fontResult.bytes;
     // Google Fonts increasingly only serves WOFF2; decompress to the
     // underlying SFNT (TTF/OTF) bytes via wawoff2 before handing to
     // pdf-lib's fontkit, which only understands uncompressed SFNT.
-    const fontBytes = fontUrl.endsWith('.woff2')
-      ? await decompressWoff2(compressedOrPlain)
-      : compressedOrPlain;
+    const fontBytes = fontUrl.endsWith('.woff2') ? await decompressWoff2(compressedOrPlain) : compressedOrPlain;
 
     fontBytesCache.set(family, fontBytes);
 

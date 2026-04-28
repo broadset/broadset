@@ -1,15 +1,4 @@
 export { hydrateDocumentFromFastPath } from './fast-path';
-export { type ExtractedTextItem, extractTextItems } from './operators';
-export {
-  collectEmbeddedFileNames,
-  collectMarkedContentTags,
-  hasEmbeddedJavaScript,
-  loadPdf,
-  type PdfLoadResult,
-  probeLoadPdf,
-  readDocumentXmp,
-  readRoundTripMetadata,
-} from './parse';
-export { capturePreservationBlobs, type PreservationBlobMap } from './preservation-blobs';
-export { extractThirdPartyElements } from './third-party';
-export { type PdfAValidationResult, validatePdfA2b, validatePdfAXmpPacket } from './validate-pdfa';
+export { readDocumentXmp, readRoundTripMetadata } from './parse';
+export { capturePreservationBlobs } from './preservation-blobs';
+export { extractThirdPartyElementsWithBudget } from './third-party';

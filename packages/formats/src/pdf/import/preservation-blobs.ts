@@ -40,7 +40,7 @@ const EMC_OPERATOR = 'EMC';
  * a different `cm` matrix factorisation, different number formatting,
  * or a different graphics-state push order).
  */
-export type PreservationBlobMap = ReadonlyMap<string, string>;
+type PreservationBlobMap = ReadonlyMap<string, string>;
 
 /**
  * Walk every page of `pdf`, decode the page content stream, find each

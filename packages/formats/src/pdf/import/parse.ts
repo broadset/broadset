@@ -49,7 +49,7 @@ const VALID_KINDS: ReadonlySet<MarkedContentKind> = new Set<MarkedContentKind>([
  * differentiate "could not parse bytes" from "encrypted — need
  * password" from "parsed successfully" so UI messaging can be precise.
  */
-export type PdfLoadResult =
+type PdfLoadResult =
   | { readonly kind: 'ok'; readonly pdf: PDFDocument }
   | { readonly kind: 'encrypted' }
   | { readonly kind: 'malformed' };

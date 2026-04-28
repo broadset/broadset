@@ -53,6 +53,29 @@ describe('P6.4b PDF import — third-party operator extraction', () => {
   });
 
   /**
+   * @description Text recovered from an arbitrary third-party PDF is
+   * untrusted input. The importer MUST sanitize script tags and HTML
+   * event-handler attributes before returning Broadset text elements,
+   * so later editing/rendering surfaces never receive active markup
+   * from extracted PDF operators.
+   */
+  it('sanitizes hostile markup extracted from bare third-party PDF text', async () => {
+    const bytes = await buildBarePdfWithText([
+      { content: '<img src=x onerror=alert(1)> safe <script>alert(2)</script>', x: 72, y: 720, size: 14 },
+    ]);
+
+    const result = await importPdfDocument(bytes);
+    const recoveredText = result.document.elements
+      .filter((el) => el.type === 'text')
+      .map((el) => (typeof el.content === 'string' ? el.content : ''))
+      .join('\n');
+
+    expect(recoveredText).toContain('safe');
+    expect(recoveredText.toLowerCase()).not.toContain('<script');
+    expect(recoveredText).not.toMatch(/\son[a-z]+\s*=/i);
+  });
+
+  /**
    * @description Third-party imports MUST surface a warning explaining
    * what extraction did — and what it didn't. Users need to know that
    * shapes / images are Spec Gap today so they don't assume the import

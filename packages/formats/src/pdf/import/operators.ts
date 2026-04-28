@@ -26,32 +26,64 @@ export interface ExtractedTextItem {
 }
 
 /**
- * Scan every page's content stream for text-showing operators (`Tj`
- * and single-string forms of `TJ`) and return their positions + content
- * in raw PDF points. Returns an empty array for PDFs without text or
- * whose content streams cannot be decoded.
- *
- * The text-positioning state machine tracks `BT` (begin text), `Tm`
- * (text matrix), `Td` / `TD` (text line-start offset), and `Tf`
- * (font + size). Text-showing operators emit a text item at the
- * current cursor position. Operators outside the `BT`..`ET` block are
- * ignored.
+ * Default cumulative cap on decoded operator-stream bytes. Sums across
+ * every page; once the running total crosses the cap the importer
+ * stops decoding additional pages and surfaces a structured warning.
+ * 16 MiB covers every realistic design-tool export while bounding the
+ * Latin-1 scan budget on a hostile PDF that fans out into many
+ * compressed-but-huge content streams. Closes the 2026-04-28 audit
+ * follow-up "PDF content streams are still decoded and concatenated
+ * without an operator byte budget".
  */
-export function extractTextItems(pdf: PDFDocument): readonly ExtractedTextItem[] {
+const DEFAULT_MAX_OPERATOR_BYTES = 16 * 1024 * 1024;
+
+interface OperatorExtractionResult {
+  readonly items: readonly ExtractedTextItem[];
+  /**
+   * `true` when the importer stopped extracting because the cumulative
+   * decoded operator-stream bytes crossed the configured cap. Callers
+   * surface a warning so users know the result is partial.
+   */
+  readonly capExceeded: boolean;
+  /** The cap that was active for the run (default or caller-supplied). */
+  readonly capBytes: number;
+}
+
+/**
+ * Cap-aware operator-stream scan. Iterates pages while accumulating
+ * decoded byte count; stops as soon as the cumulative total would
+ * cross `capBytes`. Returns the accumulated items plus a flag for
+ * callers that need to emit a warning. The cap is enforced by
+ * skipping subsequent pages — the page that pushed past the cap is
+ * still scanned in full so its existing text isn't dropped mid-page.
+ */
+export function extractTextItemsWithBudget(
+  pdf: PDFDocument,
+  capBytes: number = DEFAULT_MAX_OPERATOR_BYTES,
+): OperatorExtractionResult {
   const items: ExtractedTextItem[] = [];
   const pages = safeGetPages(pdf);
+  let bytesScanned = 0;
+  let capExceeded = false;
 
   for (const page of pages) {
     const streamBytes = readPageContentBytes(pdf, page);
 
     if (streamBytes === undefined) continue;
 
+    if (capBytes > 0 && bytesScanned + streamBytes.byteLength > capBytes) {
+      capExceeded = true;
+      break;
+    }
+
+    bytesScanned += streamBytes.byteLength;
+
     const text = bytesToLatin1(streamBytes);
 
     items.push(...scanContentStreamForText(text));
   }
 
-  return items;
+  return { items, capExceeded, capBytes };
 }
 
 /**

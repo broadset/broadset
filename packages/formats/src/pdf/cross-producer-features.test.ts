@@ -1,3 +1,4 @@
+import { jsPDF } from 'jspdf';
 import PDFKit from 'pdfkit';
 import { describe, expect, it } from 'vitest';
 
@@ -50,36 +51,12 @@ function buildPdfKitDoc(setup: (doc: InstanceType<typeof PDFKit>) => void, optio
   });
 }
 
-interface JsPdfModuleShape {
-  readonly jsPDF: new () => {
-    text(content: string, x: number, y: number): void;
-    addPage(): void;
-    setProperties(props: Record<string, string>): void;
-    addImage(data: string, format: string, x: number, y: number, width: number, height: number): void;
-    output(format: 'arraybuffer'): ArrayBuffer;
-  };
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object';
-}
-
-async function buildJsPdfDoc(setup: (doc: InstanceType<JsPdfModuleShape['jsPDF']>) => void): Promise<Uint8Array> {
-  const moduleSpecifier = 'jspdf';
-  const moduleResult: unknown = await import(moduleSpecifier);
-
-  if (!isObject(moduleResult)) throw new TypeError('jspdf module did not resolve to an object');
-
-  const Constructor = moduleResult['jsPDF'];
-
-  if (typeof Constructor !== 'function') throw new TypeError('jspdf jsPDF export is not a constructor');
-
-  // The Zod-style narrowing isn't worth the runtime cost for a test
-  // helper — jsPDF's jsPDF export is documented and well-typed at
-  // runtime via its own .d.ts (which we don't import statically here
-  // to avoid coupling the test suite to jspdf's typings surface).
-  const ConstructorFn = Constructor as JsPdfModuleShape['jsPDF'];
-  const doc = new ConstructorFn();
+function buildJsPdfDoc(setup: (doc: jsPDF) => void): Uint8Array {
+  // Static import paired with a minimal `jsPDF` declaration in
+  // `_shared/text-layout/text-layout.types.d.ts` so the dev-only
+  // dependency is visible to `knip` without an `ignoreDependencies`
+  // suppression.
+  const doc = new jsPDF();
 
   setup(doc);
 
@@ -171,7 +148,7 @@ describe('Cross-producer feature coverage — jsPDF', () => {
    * X.Y.Z)". The importer MUST recover the document without crashes.
    */
   it('imports a jsPDF-generated PDF (different producer + content-stream encoding)', async () => {
-    const bytes = await buildJsPdfDoc((doc) => {
+    const bytes = buildJsPdfDoc((doc) => {
       doc.text('Hello from jsPDF', 20, 20);
     });
     const text = new TextDecoder('latin1').decode(bytes);
@@ -190,7 +167,7 @@ describe('Cross-producer feature coverage — jsPDF', () => {
    * the importer handles them.
    */
   it('imports multi-page jsPDF documents', async () => {
-    const bytes = await buildJsPdfDoc((doc) => {
+    const bytes = buildJsPdfDoc((doc) => {
       doc.text('Page 1', 20, 20);
       doc.addPage();
       doc.text('Page 2', 20, 20);
@@ -207,7 +184,7 @@ describe('Cross-producer feature coverage — jsPDF', () => {
    * Subject / Keywords all survive without making the importer fail.
    */
   it('imports jsPDF PDFs with all standard /Info properties set', async () => {
-    const bytes = await buildJsPdfDoc((doc) => {
+    const bytes = buildJsPdfDoc((doc) => {
       doc.setProperties({
         title: 'jsPDF Test Document',
         subject: 'Cross-producer fixture',
@@ -235,7 +212,7 @@ describe('Cross-producer chain round-trip — jsPDF → broadset → broadset', 
    * the export pipeline regardless of source producer.
    */
   it('imports a jsPDF document and re-exports it via Broadset', async () => {
-    const sourceBytes = await buildJsPdfDoc((doc) => {
+    const sourceBytes = buildJsPdfDoc((doc) => {
       doc.setProperties({
         title: 'Cross-producer chain test',
         creator: 'jsPDF',
