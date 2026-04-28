@@ -987,14 +987,14 @@ Each sub-bullet below is a multi-day effort that warrants its own bite-sized pla
 - Preservation blob path in `extensions.psd.unmappedEffects` with `dirty: false` for bevel / satin / pattern overlay so untouched re-export is byte-identical.
 - Use shared `_shared/effects` from Phase 3.2 for parsing.
 
-## 4.4: PSD bitmap layer mask round-trip
+## 4.4: PSD bitmap layer mask round-trip — DONE
 
-**Why moderate leverage:** Closes [psd.md spec gap §2](../spec/formats/psd.md).
+**Closed (commit pending).** Closes [psd.md spec gap §Mask Round-Trip](../spec/formats/psd.md).
 
-**Sub-plan brief:**
-- Capture bitmap alpha-channel masks on import as `extensions.psd.bitmapMask` blob.
-- Re-emit on export when present and unchanged.
-- Add validator coverage in [psd/validate-psd.ts](../../packages/formats/src/psd/validate-psd.ts).
+- Bitmap alpha-channel masks (`Layer.mask.imageData` / `Layer.mask.canvas`) ride a base64-encoded one-byte-per-pixel blob in `extensions.psd.bitmapMask` on import via [packages/formats/src/psd/bitmap-mask.ts](../../packages/formats/src/psd/bitmap-mask.ts).
+- Vector mask still wins as the editable Broadset surface (`style.borderRadius` / `style.customClipPath`); the bitmap rides as preservation when both are present.
+- Re-emission via `applyBitmapMask` in [packages/formats/src/psd/export/masks.ts](../../packages/formats/src/psd/export/masks.ts), wired alongside `applyVectorMasks` in [packages/formats/src/psd/export/layer.ts](../../packages/formats/src/psd/export/layer.ts).
+- Validator now counts `{ vector, bitmap }` masks per [packages/formats/src/psd/validate-psd.ts](../../packages/formats/src/psd/validate-psd.ts) → `PsdValidationResult.masks`.
 
 ## 4.5: PSD text rotation through ag-psd's text-transform field
 

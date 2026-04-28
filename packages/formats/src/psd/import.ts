@@ -9,11 +9,13 @@ import { BUILT_IN_ELEMENT_TYPES, styleSchema } from '@broadset/model';
 import type { Layer } from 'ag-psd';
 import { readPsd } from 'ag-psd';
 
+import { encodeBitmapMaskFromLayerMask } from './bitmap-mask';
 import { isRgbaColor, rgbaToHex } from './color-utils';
 import { PSD_COORD_MAX, REVERSE_BLEND_MAP } from './constants';
 import { bytesToDataUri } from './data-uri';
 import { readDocumentXmpPacket } from './import-xmp';
 import { ensureCanvasInitialized } from './runtime-canvas';
+import type { PsdBitmapMask } from './types';
 import { bezierPathToSvgD } from './vector-mask';
 
 let importIdCounter = 0;
@@ -293,7 +295,7 @@ function importImageDataRectangle(
   } satisfies Partial<BroadsetElementStyleInput>);
 }
 
-function layerToElement(layer: Layer): BroadsetElement | undefined {
+function buildElementBody(layer: Layer): BroadsetElement | undefined {
   const geometry = extractGeometry(layer);
   const style = buildStyleFromLayer(layer, geometry.width);
 
@@ -337,6 +339,44 @@ function layerToElement(layer: Layer): BroadsetElement | undefined {
     geometry.height,
     style as Partial<BroadsetElementStyleInput>,
   );
+}
+
+/**
+ * If the source PSD layer carries a bitmap (alpha-channel) mask, lift
+ * the alpha bytes onto the element under `extensions.psd.bitmapMask`
+ * so re-export reproduces the same mask. The vector mask (if any)
+ * still wins as the editable Broadset surface — the bitmap mask only
+ * rides as preservation.
+ */
+function attachBitmapMaskExtension(
+  element: BroadsetElement,
+  bitmapMask: PsdBitmapMask | undefined,
+): BroadsetElement {
+  if (bitmapMask === undefined) return element;
+
+  const existingExtensions = (element.extensions as Record<string, unknown> | undefined) ?? {};
+  const existingPsdExt = (existingExtensions['psd'] as Record<string, unknown> | undefined) ?? {};
+
+  return {
+    ...element,
+    extensions: {
+      ...existingExtensions,
+      psd: {
+        ...existingPsdExt,
+        bitmapMask,
+      },
+    },
+  } satisfies BroadsetElement;
+}
+
+function layerToElement(layer: Layer): BroadsetElement | undefined {
+  const body = buildElementBody(layer);
+
+  if (body === undefined) return undefined;
+
+  const bitmapMask = layer.mask ? encodeBitmapMaskFromLayerMask(layer.mask) : undefined;
+
+  return attachBitmapMaskExtension(body, bitmapMask);
 }
 
 type PsdPage = {
@@ -455,12 +495,20 @@ export function importPsd(data: Uint8Array): BroadsetDocument {
 
         if (packetEntry === undefined) return el;
 
+        const existingPsdExt =
+          ((el.extensions as Record<string, unknown> | undefined)?.['psd'] as Record<string, unknown> | undefined) ??
+          {};
+
         return {
           ...el,
           id: packetEntry.id,
           extensions: {
             ...el.extensions,
-            psd: { dirty: false, roundTrip: { signature: 'BsPs', elementId: packetEntry.id } },
+            psd: {
+              ...existingPsdExt,
+              dirty: false,
+              roundTrip: { signature: 'BsPs', elementId: packetEntry.id },
+            },
           },
         } satisfies BroadsetElement;
       })

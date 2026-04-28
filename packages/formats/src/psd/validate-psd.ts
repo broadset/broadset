@@ -26,6 +26,18 @@ export interface PsdValidationResult {
   readonly valid: boolean;
   readonly errors: readonly string[];
   readonly warnings: readonly string[];
+  /**
+   * Per-mask-kind counts surfaced for higher-level callers (the
+   * preflight aggregator, the bitmap-mask round-trip tests). Keeps
+   * the validator from having to be re-implemented elsewhere when a
+   * caller cares about coverage rather than just validity.
+   */
+  readonly masks: PsdMaskCounts;
+}
+
+export interface PsdMaskCounts {
+  readonly vector: number;
+  readonly bitmap: number;
 }
 
 const PSD_MAX_DIM = 30000;
@@ -40,6 +52,7 @@ const SOFT_DEPTH_CAP = 16;
 export function validatePsdBytes(bytes: Uint8Array): PsdValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const maskCounts = { vector: 0, bitmap: 0 };
 
   let psd: Psd;
 
@@ -53,17 +66,27 @@ export function validatePsdBytes(bytes: Uint8Array): PsdValidationResult {
       // fail empty / fixture-style documents, so leave them skipped.
       skipCompositeImageData: true,
       skipThumbnail: true,
+      // Bitmap masks ride as raw alpha bytes through `Layer.mask.imageData`;
+      // the `useImageData` toggle keeps them out of the canvas polyfill
+      // path (which is a no-op stub in this repo) so the validator can
+      // count and inspect them directly.
+      useImageData: true,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'unknown parse error';
 
-    return { valid: false, errors: [`PSD validator: ag-psd could not re-read the exported bytes — ${message}`], warnings: [] };
+    return {
+      valid: false,
+      errors: [`PSD validator: ag-psd could not re-read the exported bytes — ${message}`],
+      warnings: [],
+      masks: { vector: 0, bitmap: 0 },
+    };
   }
 
   validateHeader(psd, errors);
-  validateLayerTree(psd.children ?? [], 0, errors, warnings);
+  validateLayerTree(psd.children ?? [], 0, errors, warnings, maskCounts);
 
-  return { valid: errors.length === 0, errors, warnings };
+  return { valid: errors.length === 0, errors, warnings, masks: maskCounts };
 }
 
 function validateHeader(psd: Psd, errors: string[]): void {
@@ -94,21 +117,52 @@ function validateHeader(psd: Psd, errors: string[]): void {
   }
 }
 
-function validateLayerTree(layers: readonly Layer[], depth: number, errors: string[], warnings: string[]): void {
+function validateLayerTree(
+  layers: readonly Layer[],
+  depth: number,
+  errors: string[],
+  warnings: string[],
+  maskCounts: { vector: number; bitmap: number },
+): void {
   if (depth > SOFT_DEPTH_CAP) {
     warnings.push(`PSD validator: layer-tree depth ${String(depth)} exceeds the soft cap of ${String(SOFT_DEPTH_CAP)}; deep nests may stress consumer parsers.`);
   }
 
   for (const layer of layers) {
     validateLayerGeometry(layer, errors, warnings);
-    validateLayerChildren(layer, depth, errors, warnings);
+    countLayerMasks(layer, maskCounts);
+    validateLayerChildren(layer, depth, errors, warnings, maskCounts);
   }
 }
 
-function validateLayerChildren(layer: Layer, depth: number, errors: string[], warnings: string[]): void {
+function validateLayerChildren(
+  layer: Layer,
+  depth: number,
+  errors: string[],
+  warnings: string[],
+  maskCounts: { vector: number; bitmap: number },
+): void {
   if (layer.children === undefined) return;
 
-  validateLayerTree(layer.children, depth + 1, errors, warnings);
+  validateLayerTree(layer.children, depth + 1, errors, warnings, maskCounts);
+}
+
+/**
+ * Count the per-kind masks attached to a layer. Vector masks are
+ * recognised via `vectorMask.paths`; bitmap masks via either of the
+ * two shapes ag-psd surfaces (`mask.imageData` for the raw-bytes path
+ * the polyfill uses, `mask.canvas` for browser callers). Both kinds
+ * may coexist on the same layer (vector wins as the editable surface
+ * in Broadset; the bitmap rides on `extensions.psd.bitmapMask`).
+ */
+function countLayerMasks(layer: Layer, counts: { vector: number; bitmap: number }): void {
+  if (layer.vectorMask?.paths.length) {
+    counts.vector += 1;
+  }
+
+  if (layer.mask?.imageData !== undefined || layer.mask?.canvas !== undefined) {
+    counts.bitmap += 1;
+  }
 }
 
 function validateLayerGeometry(layer: Layer, errors: string[], warnings: string[]): void {

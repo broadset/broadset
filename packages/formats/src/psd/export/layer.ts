@@ -5,7 +5,7 @@ import { BLEND_MODE_MAP } from '../constants';
 import { applyRotationToVectorMask } from '../rotate-vector-mask';
 import { applyBoxShadow, applyFilterGlow, applyStrokeLayerEffect } from './effects';
 import { applyImageContent } from './image';
-import { applyVectorMasks } from './masks';
+import { applyBitmapMask, applyVectorMasks } from './masks';
 import { applyPathContent } from './path';
 import { applyShapeFill } from './shape';
 import { applyTextContent } from './text';
@@ -57,6 +57,7 @@ export function elementToLayer(el: BroadsetElement): Layer {
 
   applyBlendMode(layer, el);
   applyVectorMasks(layer, el);
+  applyBitmapMask(layer, el);
   applyBoxShadow(layer, el);
   applyFilterGlow(layer, el);
   applyStrokeLayerEffect(layer, el);
