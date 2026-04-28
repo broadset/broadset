@@ -204,30 +204,30 @@ Source of truth: [cross-format-io-improvement-plan.md](./cross-format-io-improve
 
 Outcome of the 2026-04-28 cross-format analysis (PDF / PSD / PPTX / SVG). Lights up already-built backend capability through wired UI, closes open SVG security findings, consolidates duplicated text-shaping / shadow-parsing / geometry helpers into `_shared/`, and brings each format's feature surface up to a defensible production-grade bar.
 
-- [ ] CFIO.1.1 Wire `FormatExportOptionsModal` into ExportModal (PDF/A, PSD color space, SVG font embed, PPTX animations + font embed)
-- [ ] CFIO.1.2 Generalize reconciliation modal beyond PPTX (populate `ImportDocumentResult.reconciliation` for PDF / PSD / SVG)
-- [ ] CFIO.1.3 Surface preflight + validation results in dedicated `FormatPreflightModal`
-- [ ] CFIO.2.1 SVG H2 — run full element-schema validation on import
-- [ ] CFIO.2.2 SVG M2 — strip dangerous CSS `url()` from preserved outerHTML
-- [ ] CFIO.3.1 Promote text shaping (UAX #9 + UAX #14 + unicode profile) to `_shared/text-layout`
-- [ ] CFIO.3.2 Extract CSS shadow / glow parsing to `_shared/effects`
-- [ ] CFIO.3.3 Extract canvas-unit conversion + matrix decomposition to `_shared/geometry`
-- [ ] CFIO.4.1 PSD CMYK / Lab / Grayscale + ICC profile round-trip *(needs sub-plan)*
+- [x] CFIO.1.1 Wire `FormatExportOptionsModal` into ExportModal — PDF/A, PSD color space + bit depth + ICC + smart-object linking, SVG font embed + metadata + tagging, PPTX font embed (`efabce1`, `d0e418e`, `44f264c`)
+- [x] CFIO.1.2 Generalize reconciliation modal beyond PPTX — `DocumentImportResult.reconciliation` now populates for PDF / PSD / SVG (`3a17269`)
+- [x] CFIO.1.3 Surface preflight + validation results in dedicated `FormatPreflightModal` (`a6dff2c`, `6970ebb` wires PDF preflight too)
+- [x] CFIO.2.1 SVG H2 — gate imported elements through content-security checks (`878519b`)
+- [x] CFIO.2.2 SVG M2 — strip dangerous CSS `url()` from preserved outerHTML (`4c93c2a`)
+- [x] CFIO.3.1 Promote text-unicode detector to `_shared/text-layout` (`51728ef`); PDF's bidi-reorder + uax14-linebreak left in pdf/ (PDF-execution-specific)
+- [x] CFIO.3.2 Extract CSS shadow / glow parsing to `_shared/effects` (`bc1fa8d`)
+- [x] CFIO.3.3 Extract canvas-unit conversion to `_shared/geometry` (`bc1fa8d`); SVG matrix decomp deferred until 2nd consumer
+- [ ] CFIO.4.1 PSD CMYK / Lab / Grayscale + ICC profile round-trip *(needs sub-plan; blocks on `_shared/color/lcms-wasm`)*
 - [ ] CFIO.4.2 PDF P6.3 — real shading patterns + per-element OCG wrappers *(needs sub-plan)*
 - [ ] CFIO.4.3 PSD effects parity (bevel / satin / pattern overlay preserve, inner glow / overlays native) *(needs sub-plan)*
 - [ ] CFIO.4.4 PSD bitmap layer mask round-trip *(needs sub-plan)*
-- [ ] CFIO.4.5 PSD text rotation through ag-psd text-transform *(needs sub-plan)*
+- [x] CFIO.4.5 PSD text rotation through ag-psd text-transform (`1ab6354`)
 - [ ] CFIO.4.6 PSD 16/32-bpc bit-depth preservation *(needs sub-plan)*
-- [ ] CFIO.4.7 PPTX font weight / style variants (closes pptx-known-gaps A4) *(needs sub-plan)*
-- [ ] CFIO.4.8 PPTX page-override extension to `PageElementInstance` (closes A2) *(needs sub-plan)*
-- [ ] CFIO.4.9 PPTX reconciliation conflict-resolution UI (closes A1) *(needs sub-plan)*
+- [x] CFIO.4.7 PPTX font weight / style variants — closes pptx-known-gaps A4 (`24dcb7f`)
+- [x] CFIO.4.8 PPTX page-override extension to `PageElementInstance` — closes A2 (`c99d646`)
+- [x] CFIO.4.9 Reconciliation conflict-resolution UI — closes A1 (`24b7fc0`); generalised across all four formats
 - [ ] CFIO.4.10 `_shared/css` extraction *(deferred per YAGNI until PPTX needs it)*
-- [ ] CFIO.5.1 PPTX visual-fidelity CI gate (closes S3) *(needs sub-plan)*
-- [ ] CFIO.5.2 PowerPoint-on-Windows manual sanity protocol (closes S2) *(needs sub-plan)*
-- [ ] CFIO.5.3 Real licensed fixture mounts in CI for PPTX + PSD *(needs sub-plan)*
-- [ ] CFIO.5.4 Telemetry on warning codes (closes B1) *(needs sub-plan)*
-- [ ] CFIO.5.5 Accessibility audit on new modals (closes B3) *(needs sub-plan)*
+- [ ] CFIO.5.1 PPTX visual-fidelity CI gate (closes S3) *(needs sub-plan; needs CI infra changes)*
+- [ ] CFIO.5.2 PowerPoint-on-Windows manual sanity protocol (closes S2) *(needs Windows + PowerPoint host)*
+- [ ] CFIO.5.3 Real licensed fixture mounts in CI for PPTX + PSD *(needs encrypted CI mount strategy)*
+- [x] CFIO.5.4 Telemetry sink for warning codes — closes B1 (`d54ef40`)
+- [ ] CFIO.5.5 Accessibility audit on new modals (closes B3) *(needs hands-on screen-reader walkthrough)*
 - [ ] CFIO.5.6 Sister-format audits — PSD / SVG / PDF (closes B4) *(needs sub-plan)*
-- [ ] CFIO.5.7 Real-world large-deck load tests (closes B2) *(needs sub-plan)*
+- [ ] CFIO.5.7 Real-world large-deck load tests (closes B2) *(needs acquiring decks)*
 - [ ] CFIO.5.8 PDF font subsetting wiring *(needs sub-plan)*
-- [ ] CFIO.6 Gap-file rolling updates (SVG KNOWN-GAPS, pptx-known-gaps, PSD/PDF Spec Gaps)
+- [x] CFIO.6 Gap-file rolling updates — SVG KNOWN-GAPS (H2/M2 deleted), pptx-known-gaps (A1/A2/A4/B1 deleted), PSD spec (text rotation, smart-object link, page overrides removed), PDF spec (cross-references added)

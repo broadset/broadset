@@ -13,7 +13,6 @@ Gaps" section in [project/spec/formats/pptx.md](../spec/formats/pptx.md)
 > **Tracked closures:** the entries below are scheduled across the
 > [cross-format I/O improvement plan](cross-format-io-improvement-plan.md):
 >
-> - **B1** (telemetry) — Phase 5.4.
 > - **B3** (accessibility audit on new modals) — Phase 5.5.
 > - **B4** (sister-format audits) — Phase 5.6.
 > - **S1** (CI jobs unverified end-to-end) — closes once branch lands.
@@ -86,16 +85,6 @@ chart, connector, ink) and corresponding model + renderer support.
 Tracked as future Phase work, not Phase 8.
 
 ## Tier B — operational concerns
-
-### B1. No telemetry
-
-We don't know what fraction of real imports hit `unsupported-shape`
-vs `font-embed-skipped` vs structural failures. Without that,
-prioritising follow-up gap-closure is guesswork.
-
-**To close:** add a structured-event sink that the demo emits
-warning codes through. Aggregate counts (no payload bytes) inform
-which gap to invest in next.
 
 ### B2. No real-world large-deck load testing
 
