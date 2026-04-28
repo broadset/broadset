@@ -82,11 +82,35 @@ export function composeTextFromBody(body: TextBody, fallback: TextStyle): Compos
   return { text: parts.join(''), styleRuns: runs };
 }
 
+/**
+ * Build the 6-element ag-psd text affine matrix
+ * `[xx, xy, yx, yy, tx, ty]` for a text element rotated `rotationDeg`
+ * around its visual centre. The translation `(tx, ty)` is the
+ * document-space rotation pivot — Photoshop's text engine treats it
+ * as the origin around which the `[xx, xy, yx, yy]` rotation/scale
+ * is applied, so anchoring it on the un-rotated centre keeps the
+ * visual centre put across export/import. Returns `undefined` when
+ * the rotation is zero — callers omit the field so ag-psd's default
+ * identity is used.
+ */
+function buildTextTransform(el: BroadsetElement): readonly number[] | undefined {
+  if (el.rotation === 0) return undefined;
+
+  const theta = (el.rotation * Math.PI) / 180;
+  const cos = Math.cos(theta);
+  const sin = Math.sin(theta);
+  const cx = el.position.x + el.width / 2;
+  const cy = el.position.y + el.height / 2;
+
+  return [cos, sin, -sin, cos, cx, cy];
+}
+
 export function applyTextContent(layer: Layer, el: BroadsetElement): void {
   const fontSize = el.style.fontSize ?? 12;
   const fontColorCss = resolveStyleColor(el.style.fontColor, { resolveTheme: false });
   const color = fontColorCss ? parseHexColor(fontColorCss) : undefined;
   const fallbackStyle: TextStyle = color ? { fontSize, fillColor: color } : { fontSize };
+  const transform = buildTextTransform(el);
 
   if (isTextBody(el.content)) {
     const composed = composeTextFromBody(el.content, fallbackStyle);
@@ -95,6 +119,7 @@ export function applyTextContent(layer: Layer, el: BroadsetElement): void {
       text: composed.text,
       style: fallbackStyle,
       styleRuns: [...composed.styleRuns],
+      ...(transform === undefined ? {} : { transform: [...transform] }),
     };
 
     return;
@@ -106,5 +131,6 @@ export function applyTextContent(layer: Layer, el: BroadsetElement): void {
     text: plainText,
     style: fallbackStyle,
     styleRuns: [{ length: plainText.length, style: { ...fallbackStyle } }],
+    ...(transform === undefined ? {} : { transform: [...transform] }),
   };
 }

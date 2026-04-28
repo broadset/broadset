@@ -108,20 +108,17 @@ function collectAnimationWarnings(doc: BroadsetDocument): readonly string[] {
 }
 
 /**
- * Rotation composes natively into image (`placedLayer`) transforms,
- * and into the vector-mask AABB for native shape and path layers.
- * Text rotation is the remaining gap: ag-psd's text engine doesn't
- * round-trip an arbitrary transform, so rotated text exports at its
- * axis-aligned bounds and reads back as un-rotated.
+ * Rotation now composes natively across all element types:
+ *   - images: `placedLayer.transform` 4-corner quad,
+ *   - shapes / paths: vector-mask AABB + rotated knots,
+ *   - text: ag-psd's `text.transform` 6-element affine matrix.
+ *
+ * The collector is retained as a hook for any future format
+ * limitations that might re-introduce a rotation gap. It is empty
+ * today.
  */
-function collectRotationWarnings(doc: BroadsetDocument): readonly string[] {
-  const rotated = doc.elements.filter((el) => el.rotation !== 0 && el.type === 'text');
-
-  if (rotated.length === 0) return [];
-
-  return [
-    `PSD preflight: ${String(rotated.length)} rotated text element(s) will export at axis-aligned bounds. Image and shape rotation compose natively; text rotation through ag-psd's text engine lands in a follow-up.`,
-  ];
+function collectRotationWarnings(_doc: BroadsetDocument): readonly string[] {
+  return [];
 }
 
 /**

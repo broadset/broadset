@@ -191,6 +191,28 @@ function buildStyleFromLayer(layer: Layer, width: number): Record<string, unknow
   return style;
 }
 
+/**
+ * Decompose a 6-element ag-psd text-transform `[xx, xy, yx, yy, tx,
+ * ty]` back into degrees of rotation. Mirrors the export-side
+ * `buildTextTransform`: `xx = cos θ`, `xy = sin θ`, so
+ * `θ = atan2(xy, xx)`. Returns `0` when the transform is identity,
+ * absent, or wrong-shaped — uniform rotation only (skew / non-uniform
+ * scale fall back to axis-aligned, which is the closest Broadset
+ * model representation today).
+ */
+function rotationFromTextTransform(transform: readonly number[] | undefined): number {
+  if (transform === undefined || transform.length < 4) return 0;
+
+  const xx = transform[0] ?? 1;
+  const xy = transform[1] ?? 0;
+  const radians = Math.atan2(xy, xx);
+  const degrees = (radians * 180) / Math.PI;
+
+  // Identity matrices commonly stored as `[1, 0, 0, 1, ...]` round to
+  // zero; small floating-point drift is suppressed.
+  return Math.abs(degrees) < 1e-6 ? 0 : degrees;
+}
+
 function importTextLayer(
   layer: Layer & { readonly text: NonNullable<Layer['text']> },
   geometry: LayerGeometry,
@@ -200,12 +222,14 @@ function importTextLayer(
   const fillColor = layer.text.style?.fillColor;
   const fontColor =
     fillColor && isRgbaColor(fillColor) ? { fontColor: rgbaToHex(fillColor.r, fillColor.g, fillColor.b) } : undefined;
-
-  return createImportedElement('text', layer.text.text, geometry.position, geometry.width, geometry.height, {
+  const rotation = rotationFromTextTransform(layer.text.transform);
+  const base = createImportedElement('text', layer.text.text, geometry.position, geometry.width, geometry.height, {
     ...style,
     ...fontSize,
     ...fontColor,
   } satisfies Partial<BroadsetElementStyleInput>);
+
+  return { ...base, rotation };
 }
 
 function importPlacedLayer(layer: Layer, geometry: LayerGeometry, style: Record<string, unknown>): BroadsetElement {

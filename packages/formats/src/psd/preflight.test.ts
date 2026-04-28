@@ -48,22 +48,23 @@ describe('collectPreflightWarnings', () => {
   });
 
   /**
-   * @description Rotated text elements still export at axis-aligned
-   * bounds because ag-psd's text engine doesn't round-trip a
-   * transform — preflight names the count.
+   * @description Phase 4.5 closed the rotated-text gap: rotation now
+   * rides through ag-psd's text-transform field, so preflight no
+   * longer surfaces a warning for rotated text.
    */
-  it('warns when text is rotated', () => {
+  it('does not warn when text is rotated (Phase 4.5 closure)', () => {
     const el = makeElement('text', { id: 't1', rotation: 45, content: 'Hello' });
     const doc = makeDocument({ elements: [el] });
     const warnings = collectPreflightWarnings(doc);
 
-    expect(warnings.some((w) => w.toLowerCase().includes('rotat'))).toBe(true);
+    expect(warnings.some((w) => /rotated text|text rotation/i.test(w))).toBe(false);
   });
 
   /**
    * @description Rotated images and shapes compose natively (via
    * placedLayer.transform for images, via the vector-mask rotation
-   * pass for shapes) — no warning needed.
+   * pass for shapes); rotated text now composes through ag-psd's
+   * text-transform field. None of them surface a rotation warning.
    */
   it('does not warn when only images or shapes are rotated', () => {
     const image = makeElement('image', { id: 'i1', rotation: 90, content: 'data:image/png;base64,xx' });
@@ -116,11 +117,26 @@ describe('exportPsdBytesAsyncWithPreflight', () => {
   /**
    * @description Always returns bytes — preflight never blocks the
    * export per IO-D-14 — and the warning list mirrors the static
-   * preflight + any fetch failures.
+   * preflight + any fetch failures. Uses an animated element to
+   * trigger a static warning since Phase 4.5 closed the rotated-text
+   * gap.
    */
   it('returns bytes alongside the static preflight warnings', async () => {
-    const el = makeElement('text', { id: 't1', rotation: 30, content: 'Hello' });
-    const doc = makeDocument({ elements: [el] });
+    const el = makeElement('rectangle', { id: 'r1' });
+    const doc = makeDocument({
+      elements: [el],
+      animations: [
+        {
+          elementId: 'r1',
+          config: {
+            timelines: [],
+            stateTimelineBindings: [],
+            modifierTimelineBindings: [],
+            textAnimator: null,
+          },
+        },
+      ],
+    });
     const result = await exportPsdBytesAsyncWithPreflight(doc, {
       fetch: () => Promise.resolve(new Response(null, { status: 500 })),
     });
