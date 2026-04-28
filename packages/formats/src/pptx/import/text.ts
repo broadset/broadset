@@ -106,7 +106,7 @@ function extractParagraphProps(canvas: Canvas, p: XmlElement): ParagraphProps | 
     }
   }
 
-  return Object.keys(props).length === 0 ? null : (props as ParagraphProps);
+  return Object.keys(props).length === 0 ? null : (props);
 }
 
 function ooxmlAlignToBroadset(algn: string | undefined): ParagraphAlign | undefined {

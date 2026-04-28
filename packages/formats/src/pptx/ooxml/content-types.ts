@@ -16,12 +16,12 @@ import { XML_DECLARATION } from './xml';
  * to the content-types builder before finalizing the ZIP.
  */
 
-export interface ContentTypeDefault {
+interface ContentTypeDefault {
   readonly extension: string;
   readonly contentType: string;
 }
 
-export interface ContentTypeOverride {
+interface ContentTypeOverride {
   readonly partName: string;
   readonly contentType: string;
 }

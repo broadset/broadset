@@ -21,7 +21,7 @@ interface SrcRect {
   readonly b: number;
 }
 
-export interface BuildPictureElementOptions {
+interface BuildPictureElementOptions {
   readonly shape: XmlElement;
   readonly name: string;
   readonly id: string;

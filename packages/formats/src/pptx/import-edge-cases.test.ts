@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
 import { importPptx } from './import';
 import { encodeText, writeOoxmlPackage } from './ooxml/zip';
+
+const SELF_FILE_PATH = fileURLToPath(import.meta.url);
 
 /**
  * Number of `it.skip` probes in this file. As of the AST migration
@@ -69,8 +71,12 @@ describe('PPTX importer — edge-case probes (regex parser limitations)', () => 
 
   /**
    * @description Entity-encoded text content (`<a:t>A &amp; B</a:t>`)
-   * MUST decode to plain text — already exercised by the existing
-   * decodeXmlEntities helper.
+   * MUST decode to the original plain-text characters. Element
+   * `content` is HTML-shaped, so the importer re-escapes the decoded
+   * text after the entity round-trip to keep literal `<` / `>` / `&`
+   * intact through the renderer's sanitizer — anything else would
+   * cause `<C>` to vanish at render time. The renderer then writes the
+   * escaped entities back as literal characters in the DOM.
    */
   it('decodes entity-encoded text content', () => {
     const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US"/><a:t>A &amp; B &lt;C&gt;</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
@@ -78,9 +84,7 @@ describe('PPTX importer — edge-case probes (regex parser limitations)', () => 
     const text = imported.elements.find((el) => el.type === 'text');
     const content = typeof text?.content === 'string' ? text.content : '';
 
-    expect(content).toContain('A & B <C>');
-    expect(content).not.toContain('&amp;');
-    expect(content).not.toContain('&lt;');
+    expect(content).toBe('A &amp; B &lt;C&gt;');
   });
 
   /**
@@ -137,7 +141,9 @@ describe('PPTX importer — edge-case probes (regex parser limitations)', () => 
     const imported = importPptx(buildPackage(slideXml));
     const text = imported.elements.find((el) => el.type === 'text');
 
-    expect(typeof text?.content === 'string' ? text.content : '').toContain('A & B');
+    // Plain-text fallback HTML-escapes ampersands so the renderer's
+    // sanitizer preserves them as literal characters at render time.
+    expect(typeof text?.content === 'string' ? text.content : '').toContain('A &amp; B');
   });
 
   /**
@@ -209,10 +215,11 @@ describe('PPTX importer — edge-case probes (regex parser limitations)', () => 
    * dilute the gate.
    */
   it('matches the documented skipped-probe count exactly', () => {
-    // vitest runs from the package root (packages/formats) — read the
-    // probe file via that anchor since ESM `import.meta.url` is not a
-    // file: URL in the bundled environment.
-    const source = readFileSync(resolve(process.cwd(), 'src/pptx/import-edge-cases.test.ts'), 'utf8');
+    // Use `import.meta.url` so the test works regardless of CWD —
+    // the prior `process.cwd()` form broke whenever vitest was
+    // launched from the repo root (root `npm run test` /
+    // `npm run test:coverage` workspace mode).
+    const source = readFileSync(SELF_FILE_PATH, 'utf8');
     const skipMatches = source.match(/\bit\.skip\(/g) ?? [];
 
     expect(skipMatches.length).toBe(EXPECTED_SKIPPED_PROBES);

@@ -153,7 +153,7 @@ export const OOXML_PRESET_COLOR_HEX: Readonly<Record<string, string>> = {
  * `<a:prstClr>` allowlist) can validate without round-tripping through
  * `normalizeColor` first.
  */
-export const CSS_BASIC_NAMED_COLORS: ReadonlySet<string> = new Set([
+const CSS_BASIC_NAMED_COLORS: ReadonlySet<string> = new Set([
   'black',
   'blue',
   'brown',

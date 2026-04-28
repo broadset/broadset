@@ -21,7 +21,7 @@ import { parseXml } from './xml';
  */
 
 /** OOXML / DrawingML / Presentation namespace URIs we resolve to canonical prefixes. */
-export const OOXML_NS = {
+const OOXML_NS = {
   drawingml: 'http://schemas.openxmlformats.org/drawingml/2006/main',
   presentationml: 'http://schemas.openxmlformats.org/presentationml/2006/main',
   relationships: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
@@ -31,7 +31,7 @@ export const OOXML_NS = {
 } as const;
 
 /** Canonical prefix → namespace URI. The importer matches by URI, not prefix. */
-export const CANONICAL_PREFIX_TO_NS: Readonly<Record<string, string>> = {
+const CANONICAL_PREFIX_TO_NS: Readonly<Record<string, string>> = {
   a: OOXML_NS.drawingml,
   p: OOXML_NS.presentationml,
   r: OOXML_NS.relationships,
@@ -55,12 +55,12 @@ export interface XmlElement {
   readonly children: readonly XmlNode[];
 }
 
-export interface XmlText {
+interface XmlText {
   readonly kind: 'text';
   readonly text: string;
 }
 
-export type XmlNode = XmlElement | XmlText;
+type XmlNode = XmlElement | XmlText;
 
 /**
  * Parse and normalise an OOXML XML string into a list of typed root

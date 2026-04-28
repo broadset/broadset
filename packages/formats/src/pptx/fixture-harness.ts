@@ -22,7 +22,7 @@ import { importPptxWithReport, type PptxImportReport } from './import';
  * far more often than real bugs. The harness is primarily a "does the
  * importer survive arbitrary input" gate.
  */
-export interface FixtureAssertionResult {
+interface FixtureAssertionResult {
   readonly elementCount: number;
   readonly warningCount: number;
   readonly reExportedBytes: number;

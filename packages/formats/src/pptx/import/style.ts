@@ -327,7 +327,7 @@ function parseColorMods(scheme: XmlElement): ColorMods | null {
     result[name] = raw / 100000;
   }
 
-  return Object.keys(result).length === 0 ? null : (result as ColorMods);
+  return Object.keys(result).length === 0 ? null : (result);
 }
 
 export function parseGradient(gradFill: XmlElement): BroadsetGradient | null {

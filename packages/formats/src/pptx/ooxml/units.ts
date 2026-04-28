@@ -11,10 +11,7 @@ export const EMU_PER_CM = 360000;
 export const EMU_PER_MM = 36000;
 
 /** OOXML rotation unit: 1/60000 of a degree. */
-export const ROTATION_UNITS_PER_DEGREE = 60000;
-
-/** Approximation of twips used by spacing attributes on text (1/20 pt). */
-export const TWIPS_PER_POINT = 20;
+const ROTATION_UNITS_PER_DEGREE = 60000;
 
 /** Convert a millimetre length to EMU (integer). */
 export function mmToEmu(mm: number): number {

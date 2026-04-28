@@ -15,7 +15,7 @@ import { type OoxmlPackage, readTextPart } from '../ooxml/zip';
  * than throwing, so the importer can still report partial content.
  */
 
-export interface ResolvedPackage {
+interface ResolvedPackage {
   readonly slidePaths: readonly string[];
   readonly slideRelsByPath: ReadonlyMap<string, string>;
   readonly canvas: Canvas;

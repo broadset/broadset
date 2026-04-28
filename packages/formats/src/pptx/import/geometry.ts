@@ -2,7 +2,7 @@ import svgpath from 'svgpath';
 
 import { findChildren, findDescendant, getAttr, type XmlElement } from '../ooxml/ast';
 
-export interface DetectedGeometry {
+interface DetectedGeometry {
   readonly kind: 'rectangle' | 'roundRect' | 'ellipse' | 'path' | 'unknown';
   readonly d?: string;
 }
@@ -51,8 +51,7 @@ const OOXML_PRESET_TO_SVG_D: Readonly<Record<string, string>> = {
   hexagon: 'M 25000 0 L 75000 0 L 100000 50000 L 75000 100000 L 25000 100000 L 0 50000 Z',
   heptagon: 'M 50000 0 L 89500 19500 L 100000 61100 L 75000 100000 L 25000 100000 L 0 61100 L 10500 19500 Z',
   octagon: 'M 29289 0 L 70711 0 L 100000 29289 L 100000 70711 L 70711 100000 L 29289 100000 L 0 70711 L 0 29289 Z',
-  star4:
-    'M 50000 0 L 60000 40000 L 100000 50000 L 60000 60000 L 50000 100000 L 40000 60000 L 0 50000 L 40000 40000 Z',
+  star4: 'M 50000 0 L 60000 40000 L 100000 50000 L 60000 60000 L 50000 100000 L 40000 60000 L 0 50000 L 40000 40000 Z',
   star5:
     'M 50000 0 L 61803 38197 L 100000 38197 L 69098 61803 L 80902 100000 L 50000 76393 L 19098 100000 L 30902 61803 L 0 38197 L 38197 38197 Z',
   star6:
@@ -63,12 +62,16 @@ const OOXML_PRESET_TO_SVG_D: Readonly<Record<string, string>> = {
   leftArrow: 'M 100000 25000 L 40000 25000 L 40000 0 L 0 50000 L 40000 100000 L 40000 75000 L 100000 75000 Z',
   upArrow: 'M 25000 100000 L 25000 40000 L 0 40000 L 50000 0 L 100000 40000 L 75000 40000 L 75000 100000 Z',
   downArrow: 'M 25000 0 L 25000 60000 L 0 60000 L 50000 100000 L 100000 60000 L 75000 60000 L 75000 0 Z',
-  leftRightArrow: 'M 0 50000 L 25000 0 L 25000 25000 L 75000 25000 L 75000 0 L 100000 50000 L 75000 100000 L 75000 75000 L 25000 75000 L 25000 100000 Z',
-  upDownArrow: 'M 50000 0 L 100000 25000 L 75000 25000 L 75000 75000 L 100000 75000 L 50000 100000 L 0 75000 L 25000 75000 L 25000 25000 L 0 25000 Z',
+  leftRightArrow:
+    'M 0 50000 L 25000 0 L 25000 25000 L 75000 25000 L 75000 0 L 100000 50000 L 75000 100000 L 75000 75000 L 25000 75000 L 25000 100000 Z',
+  upDownArrow:
+    'M 50000 0 L 100000 25000 L 75000 25000 L 75000 75000 L 100000 75000 L 50000 100000 L 0 75000 L 25000 75000 L 25000 25000 L 0 25000 Z',
   plus: 'M 35000 0 L 65000 0 L 65000 35000 L 100000 35000 L 100000 65000 L 65000 65000 L 65000 100000 L 35000 100000 L 35000 65000 L 0 65000 L 0 35000 L 35000 35000 Z',
   wedgeRectCallout: 'M 0 0 L 100000 0 L 100000 75000 L 60000 75000 L 50000 100000 L 40000 75000 L 0 75000 Z',
-  wedgeRoundRectCallout: 'M 10000 0 L 90000 0 L 100000 10000 L 100000 65000 L 90000 75000 L 60000 75000 L 50000 100000 L 40000 75000 L 10000 75000 L 0 65000 L 0 10000 Z',
-  wedgeEllipseCallout: 'M 50000 0 C 22386 0 0 16863 0 37500 C 0 58137 22386 75000 50000 75000 L 60000 75000 L 50000 100000 L 40000 75000 C 36000 75000 32000 74600 28000 73850 Z',
+  wedgeRoundRectCallout:
+    'M 10000 0 L 90000 0 L 100000 10000 L 100000 65000 L 90000 75000 L 60000 75000 L 50000 100000 L 40000 75000 L 10000 75000 L 0 65000 L 0 10000 Z',
+  wedgeEllipseCallout:
+    'M 50000 0 C 22386 0 0 16863 0 37500 C 0 58137 22386 75000 50000 75000 L 60000 75000 L 50000 100000 L 40000 75000 C 36000 75000 32000 74600 28000 73850 Z',
 };
 
 function custGeomToSvgD(custGeom: XmlElement): string {
@@ -120,7 +123,10 @@ interface PathPoint {
  * forward across operators. Returns `null` when the operator is
  * unrecognised so the caller can warn / drop.
  */
-function opToSvgSegment(op: XmlElement, cursor: PathPoint): { readonly segment: string; readonly cursor: PathPoint } | null {
+function opToSvgSegment(
+  op: XmlElement,
+  cursor: PathPoint,
+): { readonly segment: string; readonly cursor: PathPoint } | null {
   const pts = findChildren(op, 'a:pt').map((pt) => ({
     x: parseFloat(getAttr(pt, 'x') ?? '0'),
     y: parseFloat(getAttr(pt, 'y') ?? '0'),
@@ -133,7 +139,10 @@ function opToSvgSegment(op: XmlElement, cursor: PathPoint): { readonly segment: 
   if (op.local === 'lnTo' && p0 !== undefined) return { segment: `L ${String(p0.x)} ${String(p0.y)}`, cursor: p0 };
 
   if (op.local === 'cubicBezTo' && p0 !== undefined && p1 !== undefined && p2 !== undefined) {
-    return { segment: `C ${String(p0.x)} ${String(p0.y)} ${String(p1.x)} ${String(p1.y)} ${String(p2.x)} ${String(p2.y)}`, cursor: p2 };
+    return {
+      segment: `C ${String(p0.x)} ${String(p0.y)} ${String(p1.x)} ${String(p1.y)} ${String(p2.x)} ${String(p2.y)}`,
+      cursor: p2,
+    };
   }
 
   if (op.local === 'quadBezTo' && p0 !== undefined && p1 !== undefined) {
@@ -158,7 +167,10 @@ function opToSvgSegment(op: XmlElement, cursor: PathPoint): { readonly segment: 
  * to cubics on export, so emitting an arc on import is the
  * round-trip-safe representation.
  */
-function arcToSvgSegment(op: XmlElement, cursor: PathPoint): { readonly segment: string; readonly cursor: PathPoint } | null {
+function arcToSvgSegment(
+  op: XmlElement,
+  cursor: PathPoint,
+): { readonly segment: string; readonly cursor: PathPoint } | null {
   const wR = parseFloat(getAttr(op, 'wR') ?? '0');
   const hR = parseFloat(getAttr(op, 'hR') ?? '0');
   const stAng = parseFloat(getAttr(op, 'stAng') ?? '0') / OOXML_ANGLE_UNITS_PER_DEGREE;

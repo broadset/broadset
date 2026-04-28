@@ -1,6 +1,14 @@
 import type { AnimationDefinition, KeyframeValue, NumberKeyframeValue, StringKeyframeValue } from '@broadset/model';
 
-import { findChild, findDescendant, findDescendants, getAttr, parseOoxml, rootElement, type XmlElement } from '../ooxml/ast';
+import {
+  findChild,
+  findDescendant,
+  findDescendants,
+  getAttr,
+  parseOoxml,
+  rootElement,
+  type XmlElement,
+} from '../ooxml/ast';
 import { decodeShapeName } from '../semantic/shape-name';
 
 /**
@@ -47,7 +55,7 @@ const DEFAULT_EMPHASIS_SCALE = 1.25;
 
 type TimingClass = 'entr' | 'exit' | 'emph' | 'path';
 
-export interface ParsedTimingResult {
+interface ParsedTimingResult {
   readonly animations: readonly AnimationDefinition[];
   readonly warnings: readonly { readonly code: 'unsupported-animation'; readonly message: string }[];
 }
@@ -127,7 +135,9 @@ function parseTimingClass(value: string): TimingClass | null {
  * forms and fall back to the parent `<p:cTn dur>` when the inner is
  * absent.
  */
-function extractTargetFromEntrance(entranceCTn: XmlElement): { readonly durationMs: number; readonly spid: string } | null {
+function extractTargetFromEntrance(
+  entranceCTn: XmlElement,
+): { readonly durationMs: number; readonly spid: string } | null {
   const spTgt = findDescendant(entranceCTn, 'p:spTgt');
   const spid = spTgt !== null ? getAttr(spTgt, 'spid') : undefined;
 
@@ -187,7 +197,12 @@ function buildAnimationForPreset(
   const motionPath = readMotionPath(effectNode);
 
   if (presetId === PRESET_MOTION_PATH || motionPath !== null) {
-    return buildMotionPathAnimation(elementId, motionPath ?? 'M 0 0 L 0 0', durationMs, labelFor('Motion path', timingClass));
+    return buildMotionPathAnimation(
+      elementId,
+      motionPath ?? 'M 0 0 L 0 0',
+      durationMs,
+      labelFor('Motion path', timingClass),
+    );
   }
 
   const rotation = readRotation(effectNode, timingClass);
@@ -208,13 +223,27 @@ function buildAnimationForPreset(
   if (presetId === PRESET_FADE) {
     const values = readOpacityValues(effectNode, timingClass);
 
-    return buildSinglePropertyAnimation(elementId, 'opacity', values.from, values.to, durationMs, labelFor('Fade', timingClass));
+    return buildSinglePropertyAnimation(
+      elementId,
+      'opacity',
+      values.from,
+      values.to,
+      durationMs,
+      labelFor('Fade', timingClass),
+    );
   }
 
   if (presetId === PRESET_ZOOM) {
     const values = defaultZoomValues(timingClass);
 
-    return buildSinglePropertyAnimation(elementId, 'scale', values.from, values.to, durationMs, labelFor('Zoom', timingClass));
+    return buildSinglePropertyAnimation(
+      elementId,
+      'scale',
+      values.from,
+      values.to,
+      durationMs,
+      labelFor('Zoom', timingClass),
+    );
   }
 
   if (presetId === PRESET_WIPE) {
@@ -234,7 +263,8 @@ function buildAnimationForPreset(
     const direction = FLY_SUBTYPE_TO_DIRECTION[presetSubtype] ?? 'bottom';
     const axis = direction === 'top' || direction === 'bottom' ? 'translateY' : 'translateX';
     const sign = direction === 'right' || direction === 'bottom' ? 1 : -1;
-    const values = timingClass === 'exit' ? { from: 0, to: FLY_OFFSET_PIXELS * sign } : { from: FLY_OFFSET_PIXELS * sign, to: 0 };
+    const values =
+      timingClass === 'exit' ? { from: 0, to: FLY_OFFSET_PIXELS * sign } : { from: FLY_OFFSET_PIXELS * sign, to: 0 };
 
     return buildSinglePropertyAnimation(
       elementId,
@@ -331,7 +361,7 @@ function parseRotationAttr(value: string | undefined): number | null {
 function readMotionPath(effectNode: XmlElement): string | null {
   const animMotion = findDescendant(effectNode, 'p:animMotion');
 
-  return animMotion !== null ? getAttr(animMotion, 'path') ?? null : null;
+  return animMotion !== null ? (getAttr(animMotion, 'path') ?? null) : null;
 }
 
 function buildSinglePropertyAnimation(

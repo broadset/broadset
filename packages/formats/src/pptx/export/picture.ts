@@ -59,7 +59,7 @@ interface DecodedMedia {
 }
 
 /** Decode a data URI into MIME + bytes. Returns undefined for malformed input. */
-export function decodeDataUri(uri: string): DecodedMedia | undefined {
+function decodeDataUri(uri: string): DecodedMedia | undefined {
   const match = uri.match(/^data:([^;,]+)(?:;([^,]*))?,([\s\S]*)$/);
 
   if (!match) return undefined;
@@ -86,7 +86,7 @@ export function decodeDataUri(uri: string): DecodedMedia | undefined {
   }
 }
 
-export function extensionForMime(mime: string): string {
+function extensionForMime(mime: string): string {
   const lower = mime.toLowerCase();
 
   if (lower.includes('png')) return 'png';
@@ -100,7 +100,7 @@ export function extensionForMime(mime: string): string {
 }
 
 /** Allocate a media path + register the asset on the context. */
-export function registerMedia(ctx: SlideExportContext, ext: string, bytes: Uint8Array): string {
+function registerMedia(ctx: SlideExportContext, ext: string, bytes: Uint8Array): string {
   const index = allocateMediaIndex(ctx);
   const fileName = `media${String(index)}.${ext}`;
   const path = `ppt/media/${fileName}`;

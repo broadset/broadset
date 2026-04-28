@@ -2,6 +2,7 @@ import {
   type AnimationDefinition,
   type BroadsetDocument,
   createEmptyBroadsetDocument,
+  ensureRootElementsHavePageInstances,
   type FontAsset,
 } from '@broadset/model';
 
@@ -17,22 +18,75 @@ import {
 } from './import/slide';
 import { parseTheme } from './import/theme';
 import { parseXml } from './ooxml/xml';
-import { type OoxmlPackage, readOoxmlPackage, readTextPart } from './ooxml/zip';
+import {
+  type OoxmlPackage,
+  type OoxmlSkippedEntry,
+  readOoxmlPackageWithCaps,
+  readTextPart,
+} from './ooxml/zip';
 import { parseProjectCustomXml } from './semantic/custom-xml';
 import { parseLedgerXml } from './semantic/ledger';
-import type { PptxImportWarning } from './types';
+import type { PptxImportOptions, PptxImportWarning } from './types';
 import { BROADSET_CUSTOM_XML_INTEROP, BROADSET_CUSTOM_XML_PROJECT } from './types';
 
 /**
  * Default caps per the Importer Security Contract in
- * `project/spec/formats/spec.md`.
+ * `project/spec/formats/spec.md`. Defaults are exported so external
+ * callers (demo's import bridge, programmatic CLI) can compose with
+ * them without rebuilding the cap matrix.
  */
 const DEFAULT_MAX_INPUT_BYTES = 200 * 1024 * 1024; // 200 MiB
 const DEFAULT_MAX_PART_BYTES = 50 * 1024 * 1024; // 50 MiB
 const DEFAULT_MAX_ENTRIES = 4096;
+/**
+ * Cumulative uncompressed-bytes budget for the entire ZIP. Stops a
+ * payload that fans out into many small entries (each within the
+ * per-entry cap) but whose total inflates to gigabytes from exhausting
+ * memory before the cap fires.
+ */
+const DEFAULT_MAX_TOTAL_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024; // 1 GiB
 
-export function importPptx(data: Uint8Array): BroadsetDocument {
-  return importPptxWithReport(data).document;
+interface ResolvedPptxCaps {
+  readonly maxInputBytes: number;
+  readonly maxEntries: number;
+  readonly maxPartBytes: number;
+  readonly maxTotalUncompressedBytes: number;
+}
+
+function resolveCaps(options?: PptxImportOptions): ResolvedPptxCaps {
+  return {
+    maxInputBytes: options?.maxInputBytes ?? DEFAULT_MAX_INPUT_BYTES,
+    maxEntries: options?.maxEntries ?? DEFAULT_MAX_ENTRIES,
+    maxPartBytes: options?.maxPartBytes ?? DEFAULT_MAX_PART_BYTES,
+    maxTotalUncompressedBytes: DEFAULT_MAX_TOTAL_UNCOMPRESSED_BYTES,
+  };
+}
+
+function warningForSkippedEntry(entry: OoxmlSkippedEntry, caps: ResolvedPptxCaps): PptxImportWarning {
+  switch (entry.reason) {
+    case 'entry-cap':
+      return {
+        code: 'entry-cap',
+        message: `Skipped entry "${entry.path}" — package exceeds entry-count cap of ${String(caps.maxEntries)} before decompression.`,
+        detail: entry.path,
+      };
+    case 'size-cap':
+      return {
+        code: 'size-cap',
+        message: `Skipped entry "${entry.path}" — declared uncompressed size ${String(entry.originalSize)} exceeds per-part cap ${String(caps.maxPartBytes)}.`,
+        detail: entry.path,
+      };
+    case 'total-size-cap':
+      return {
+        code: 'size-cap',
+        message: `Skipped entry "${entry.path}" — cumulative uncompressed size would exceed total cap ${String(caps.maxTotalUncompressedBytes)} bytes.`,
+        detail: entry.path,
+      };
+  }
+}
+
+export function importPptx(data: Uint8Array, options?: PptxImportOptions): BroadsetDocument {
+  return importPptxWithReport(data, options).document;
 }
 
 /**
@@ -47,13 +101,14 @@ export interface PptxImportReport {
   readonly fontAssets: readonly FontAsset[];
 }
 
-export function importPptxWithReport(data: Uint8Array): PptxImportReport {
+export function importPptxWithReport(data: Uint8Array, options?: PptxImportOptions): PptxImportReport {
   const warnings: PptxImportWarning[] = [];
+  const caps = resolveCaps(options);
 
-  if (data.byteLength > DEFAULT_MAX_INPUT_BYTES) {
+  if (data.byteLength > caps.maxInputBytes) {
     warnings.push({
       code: 'size-cap',
-      message: `Input size ${String(data.byteLength)} exceeds cap ${String(DEFAULT_MAX_INPUT_BYTES)} bytes`,
+      message: `Input size ${String(data.byteLength)} exceeds cap ${String(caps.maxInputBytes)} bytes`,
     });
 
     return { document: createEmptyBroadsetDocument(), warnings, fontAssets: [] };
@@ -62,7 +117,17 @@ export function importPptxWithReport(data: Uint8Array): PptxImportReport {
   let pkg: OoxmlPackage;
 
   try {
-    pkg = readOoxmlPackage(data);
+    const result = readOoxmlPackageWithCaps(data, {
+      maxEntries: caps.maxEntries,
+      maxPartBytes: caps.maxPartBytes,
+      maxTotalUncompressedBytes: caps.maxTotalUncompressedBytes,
+    });
+
+    pkg = result.pkg;
+
+    for (const skipped of result.skippedEntries) {
+      warnings.push(warningForSkippedEntry(skipped, caps));
+    }
   } catch (err) {
     warnings.push({
       code: 'malformed-xml',
@@ -73,7 +138,6 @@ export function importPptxWithReport(data: Uint8Array): PptxImportReport {
     return { document: createEmptyBroadsetDocument(), warnings, fontAssets: [] };
   }
 
-  enforcePackageCaps(pkg, warnings);
   rejectExecutionSurface(pkg, warnings);
 
   // Security floor: route every XML / rels part through fast-xml-parser.
@@ -88,12 +152,13 @@ export function importPptxWithReport(data: Uint8Array): PptxImportReport {
   const fontAssets = extractEmbeddedFonts(pkg);
   const fastPathResult = tryFastPath(pkg);
 
-  if (fastPathResult !== null) return { document: fastPathResult, warnings, fontAssets };
+  if (fastPathResult !== null)
+    return { document: ensureRootElementsHavePageInstances(fastPathResult), warnings, fontAssets };
 
   const operatorLevel = importOperatorLevel(pkg);
 
   return {
-    document: operatorLevel.document,
+    document: ensureRootElementsHavePageInstances(operatorLevel.document),
     warnings: [...warnings, ...operatorLevel.warnings],
     fontAssets,
   };
@@ -105,7 +170,7 @@ export function importPptxWithReport(data: Uint8Array): PptxImportReport {
  * 1. Any `<!DOCTYPE>` declaration rejects the import.
  * 2. `parseXml` succeeds for each XML / rels part.
  */
-function validateXmlSafety(pkg: ReturnType<typeof readOoxmlPackage>): PptxImportWarning | null {
+function validateXmlSafety(pkg: OoxmlPackage): PptxImportWarning | null {
   for (const [path] of pkg) {
     if (!path.endsWith('.xml') && !path.endsWith('.rels')) continue;
 
@@ -148,9 +213,14 @@ function validateXmlSafety(pkg: ReturnType<typeof readOoxmlPackage>): PptxImport
 /**
  * Async importer that merges external edits into the fast-path output.
  */
-export async function importPptxWithMerge(data: Uint8Array): Promise<PptxImportReport> {
-  const baseReport = importPptxWithReport(data);
-  const pkg = readOoxmlPackage(data);
+export async function importPptxWithMerge(data: Uint8Array, options?: PptxImportOptions): Promise<PptxImportReport> {
+  const baseReport = importPptxWithReport(data, options);
+  const caps = resolveCaps(options);
+  const { pkg } = readOoxmlPackageWithCaps(data, {
+    maxEntries: caps.maxEntries,
+    maxPartBytes: caps.maxPartBytes,
+    maxTotalUncompressedBytes: caps.maxTotalUncompressedBytes,
+  });
   const preservedXml = readTextPart(pkg, BROADSET_CUSTOM_XML_PROJECT);
 
   if (preservedXml === null) return baseReport;
@@ -164,7 +234,11 @@ export async function importPptxWithMerge(data: Uint8Array): Promise<PptxImportR
   const ledger = readLedgerEntries(pkg);
   const merged = await mergeFromLedger(preserved, operatorLevel.document, ledger);
 
-  return { document: merged, warnings: baseReport.warnings, fontAssets: baseReport.fontAssets };
+  return {
+    document: ensureRootElementsHavePageInstances(merged),
+    warnings: baseReport.warnings,
+    fontAssets: baseReport.fontAssets,
+  };
 }
 
 function readLedgerEntries(pkg: OoxmlPackage): ReadonlyMap<string, string> {
@@ -237,7 +311,7 @@ function mergeEdited(
     extensions: {
       ...preservedEl.extensions,
       pptx: {
-        ...((preservedEl.extensions['pptx'] as Record<string, unknown> | undefined) ?? {}),
+        ...((preservedEl.extensions['pptx']) ?? {}),
         dirty: true,
       },
     },
@@ -249,29 +323,11 @@ function markDirty(el: BroadsetDocument['elements'][number]): BroadsetDocument['
     ...el,
     extensions: {
       ...el.extensions,
-      pptx: { ...((el.extensions['pptx'] as Record<string, unknown> | undefined) ?? {}), dirty: true },
+      pptx: { ...((el.extensions['pptx']) ?? {}), dirty: true },
     },
   };
 }
 
-function enforcePackageCaps(pkg: OoxmlPackage, warnings: PptxImportWarning[]): void {
-  if (pkg.size > DEFAULT_MAX_ENTRIES) {
-    warnings.push({
-      code: 'entry-cap',
-      message: `Package contains ${String(pkg.size)} entries; cap is ${String(DEFAULT_MAX_ENTRIES)}`,
-    });
-  }
-
-  for (const [path, bytes] of pkg) {
-    if (bytes.byteLength > DEFAULT_MAX_PART_BYTES) {
-      warnings.push({
-        code: 'size-cap',
-        message: `Part ${path} (${String(bytes.byteLength)} bytes) exceeds per-part cap`,
-        detail: path,
-      });
-    }
-  }
-}
 
 /**
  * Reject PPTX macros (`vbaProject.bin`) and OLE embeddings at import

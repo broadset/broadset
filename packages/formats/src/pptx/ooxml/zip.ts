@@ -1,4 +1,4 @@
-import { type Unzipped, unzipSync, zipSync } from 'fflate';
+import { type UnzipFileInfo, type Unzipped, unzipSync, zipSync } from 'fflate';
 
 /**
  * Thin wrapper around fflate for OOXML packages. Exposes a
@@ -15,6 +15,33 @@ import { type Unzipped, unzipSync, zipSync } from 'fflate';
 export type OoxmlPackage = ReadonlyMap<string, Uint8Array>;
 
 /**
+ * Pre-decompression caps enforced via fflate's filter callback. Any
+ * cap that fires causes the matching entry to be skipped and a
+ * structured warning to be emitted by the caller — the package is
+ * still returned, but downstream consumers see only the entries that
+ * cleared the cap. This is the ZIP-bomb defence: per-entry size and
+ * total entry count are checked against the central-directory metadata
+ * before the file's compressed bytes are inflated.
+ */
+interface OoxmlReadCaps {
+  readonly maxEntries?: number;
+  readonly maxPartBytes?: number;
+  readonly maxTotalUncompressedBytes?: number;
+}
+
+interface OoxmlReadResult {
+  readonly pkg: OoxmlPackage;
+  readonly skippedEntries: readonly OoxmlSkippedEntry[];
+}
+
+export interface OoxmlSkippedEntry {
+  readonly path: string;
+  readonly reason: 'entry-cap' | 'size-cap' | 'total-size-cap';
+  /** Reported uncompressed size from the central directory header. */
+  readonly originalSize: number;
+}
+
+/**
  * Read a ZIP archive into an OoxmlPackage.
  *
  * @throws Error when the input is not a valid ZIP (fflate error text).
@@ -28,6 +55,58 @@ export function readOoxmlPackage(bytes: Uint8Array): OoxmlPackage {
   }
 
   return parts;
+}
+
+/**
+ * Read a ZIP archive while enforcing pre-decompression caps via the
+ * fflate filter callback. Entries whose declared uncompressed size,
+ * cumulative count, or cumulative total exceeds a cap are skipped at
+ * the central-directory header check — fflate's inflate path never
+ * runs on those bytes, so a ZIP bomb cannot exhaust memory before the
+ * cap fires.
+ */
+export function readOoxmlPackageWithCaps(bytes: Uint8Array, caps: OoxmlReadCaps): OoxmlReadResult {
+  const skipped: OoxmlSkippedEntry[] = [];
+  let entryCount = 0;
+  let cumulativeBytes = 0;
+
+  const filter = (file: UnzipFileInfo): boolean => {
+    entryCount += 1;
+
+    if (caps.maxEntries !== undefined && entryCount > caps.maxEntries) {
+      skipped.push({ path: file.name, reason: 'entry-cap', originalSize: file.originalSize });
+
+      return false;
+    }
+
+    if (caps.maxPartBytes !== undefined && file.originalSize > caps.maxPartBytes) {
+      skipped.push({ path: file.name, reason: 'size-cap', originalSize: file.originalSize });
+
+      return false;
+    }
+
+    if (
+      caps.maxTotalUncompressedBytes !== undefined &&
+      cumulativeBytes + file.originalSize > caps.maxTotalUncompressedBytes
+    ) {
+      skipped.push({ path: file.name, reason: 'total-size-cap', originalSize: file.originalSize });
+
+      return false;
+    }
+
+    cumulativeBytes += file.originalSize;
+
+    return true;
+  };
+
+  const unzipped: Unzipped = unzipSync(bytes, { filter });
+  const parts = new Map<string, Uint8Array>();
+
+  for (const [path, content] of Object.entries(unzipped)) {
+    parts.set(path, content);
+  }
+
+  return { pkg: parts, skippedEntries: skipped };
 }
 
 /**

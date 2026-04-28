@@ -25,10 +25,7 @@ export async function reconcilePptx(data: Uint8Array): Promise<ReconcileResult> 
   const preservedDocument = preservedXml !== null ? parseProjectCustomXml(preservedXml) : null;
   const currentDocument = importPptx(data);
   const preservedElements = isDocumentShape(preservedDocument) ? preservedDocument.elements : [];
-  const fingerprintsByElementId = await computeFingerprints([
-    ...preservedElements,
-    ...currentDocument.elements,
-  ]);
+  const fingerprintsByElementId = await computeFingerprints([...preservedElements, ...currentDocument.elements]);
 
   return reconcile({
     preservedMetadata: { elements: preservedElements },
@@ -37,9 +34,7 @@ export async function reconcilePptx(data: Uint8Array): Promise<ReconcileResult> 
   });
 }
 
-async function computeFingerprints(
-  elements: readonly BroadsetElement[],
-): Promise<ReadonlyMap<string, string>> {
+async function computeFingerprints(elements: readonly BroadsetElement[]): Promise<ReadonlyMap<string, string>> {
   const map = new Map<string, string>();
 
   for (const element of elements) {
@@ -77,4 +72,3 @@ export function readPreservedPptxDocument(data: Uint8Array): BroadsetDocument | 
 }
 
 /** Convenience re-export for ergonomic consumption. */
-export type { BroadsetElement, ReconcileResult };

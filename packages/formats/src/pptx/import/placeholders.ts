@@ -127,28 +127,3 @@ function extractPlaceholderIndexFromType(type: string | undefined): number | nul
   return null;
 }
 
-/**
- * Merge the slide's shape attributes with a layout placeholder's
- * defaults. Returns a new object with the merged values, favouring
- * slide-side values when both sides specify the property.
- */
-export function mergePlaceholderInheritance(
-  slideValues: {
-    readonly fontFamily?: string | undefined;
-    readonly fontSize?: number | undefined;
-    readonly color?: BroadsetColor | undefined;
-  },
-  layoutPlaceholder: LayoutPlaceholder | undefined,
-): {
-  readonly fontFamily?: string | undefined;
-  readonly fontSize?: number | undefined;
-  readonly color?: BroadsetColor | undefined;
-} {
-  if (layoutPlaceholder === undefined) return slideValues;
-
-  return {
-    fontFamily: slideValues.fontFamily ?? layoutPlaceholder.fontFamily,
-    fontSize: slideValues.fontSize ?? layoutPlaceholder.fontSize,
-    color: slideValues.color ?? layoutPlaceholder.color,
-  };
-}

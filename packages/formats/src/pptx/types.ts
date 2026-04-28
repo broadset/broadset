@@ -144,7 +144,7 @@ export interface PptxImportOptions {
 }
 
 /** Reason an importer emitted a warning. */
-export type PptxImportWarningCode =
+type PptxImportWarningCode =
   | 'unsupported-shape'
   | 'unsupported-animation'
   | 'unsupported-content'
@@ -220,20 +220,6 @@ export interface ElementMetaExtension {
   readonly preservedBlob?: string;
 }
 
-/** A resolved OOXML theme palette (sRGB hex + family names). */
-export interface SlideMasterResolved {
-  readonly theme: ResolvedTheme;
-  readonly majorFont: string;
-  readonly minorFont: string;
-}
-
-/** Slide-layout resolution: placeholder values inherited down the chain. */
-export interface SlideLayoutResolved {
-  readonly master: SlideMasterResolved;
-  /** Placeholder index → default text + properties for inheritance. */
-  readonly placeholders: ReadonlyMap<number, LayoutPlaceholder>;
-}
-
 export interface LayoutPlaceholder {
   readonly index: number;
   readonly type?: string;
@@ -245,20 +231,6 @@ export interface LayoutPlaceholder {
 /** Resolved theme palette keyed by OOXML slot name. */
 export interface ResolvedTheme {
   readonly palette: Readonly<Record<ThemeSlot, string>>;
-}
-
-/**
- * A reference to a colour inside a theme slot, with optional OOXML
- * modifiers (`lumMod`, `lumOff`, `tint`, `shade`, `alpha`) applied via
- * `_shared/color/applyMods()` once the palette is known.
- */
-export interface ThemeColorRef {
-  readonly slot: ThemeSlot;
-  readonly lumMod?: number;
-  readonly lumOff?: number;
-  readonly tint?: number;
-  readonly shade?: number;
-  readonly alpha?: number;
 }
 
 /** Interop ledger entry — stored in `customXml/broadset-interop.xml`. */
@@ -280,6 +252,5 @@ export interface PptxRoundTripLedger {
 
 /** Namespace URIs stable under ECMA-376 — exposed for import / export parity. */
 export const BROADSET_ELEMENT_EXT_URI = '{broadset-element-ext}';
-export const BROADSET_NAMESPACE_URI = 'https://broadset.io/ns/xmp/1.0/';
 export const BROADSET_CUSTOM_XML_PROJECT = 'customXml/broadset-project.xml';
 export const BROADSET_CUSTOM_XML_INTEROP = 'customXml/broadset-interop.xml';

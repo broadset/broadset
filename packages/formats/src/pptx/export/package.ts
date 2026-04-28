@@ -20,7 +20,7 @@ import { emitSlideBackground } from './background';
 import { createSlideContext, type SlideExportContext } from './context';
 import { attachEmbeddedFonts, attachEmbeddedFontsAsync } from './fonts';
 import { buildNotesMasterXml, buildNotesSlideXml } from './notes';
-import { emitShapeTree } from './shapes';
+import { emitShapeTree } from './shape-tree';
 import { buildSlideLayoutXml, buildSlideMasterXml, buildThemeXml, deriveTheme } from './theme';
 
 /**

@@ -171,7 +171,7 @@ function readHexAlpha(hex: string): string {
  * Broadset stores mods as 0–1 fractions; OOXML stores them as
  * 1/1000-percent integers on a 0–100000 scale.
  */
-export function emitColorMods(mods: ColorMods | undefined): string {
+function emitColorMods(mods: ColorMods | undefined): string {
   if (mods === undefined) return '';
 
   const parts: string[] = [];

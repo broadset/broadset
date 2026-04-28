@@ -14,16 +14,16 @@ import { readOoxmlPackage, readTextPart } from './ooxml/zip';
  * deferred to a future external-tool CI gate (documented as a spec gap).
  */
 
-export type ValidationIssueLevel = 'error' | 'warning';
+type ValidationIssueLevel = 'error' | 'warning';
 
-export interface ValidationIssue {
+interface ValidationIssue {
   readonly level: ValidationIssueLevel;
   readonly code: string;
   readonly message: string;
   readonly part?: string;
 }
 
-export interface ValidationResult {
+interface ValidationResult {
   readonly valid: boolean;
   readonly issues: readonly ValidationIssue[];
 }
@@ -52,9 +52,18 @@ export function validatePptxPackage(bytes: Uint8Array): ValidationResult {
   const presPath = rootRels !== null ? findPresentationPath(rootRels) : null;
 
   if (presPath === null) {
-    issues.push({ level: 'error', code: 'no-office-document-rel', message: 'Root rels do not point to a presentation' });
+    issues.push({
+      level: 'error',
+      code: 'no-office-document-rel',
+      message: 'Root rels do not point to a presentation',
+    });
   } else if (pkg.get(presPath) === undefined) {
-    issues.push({ level: 'error', code: 'dangling-presentation-rel', message: `Root rel targets missing part: ${presPath}`, part: presPath });
+    issues.push({
+      level: 'error',
+      code: 'dangling-presentation-rel',
+      message: `Root rel targets missing part: ${presPath}`,
+      part: presPath,
+    });
   }
 
   if (presPath !== null && contentTypes !== null) {

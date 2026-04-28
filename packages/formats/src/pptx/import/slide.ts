@@ -1,7 +1,9 @@
 import {
   type BroadsetDocument,
   type BroadsetElement,
+  createPageElementInstanceForElement,
   type Hyperlink,
+  normalizeElementContent,
   type TextBody,
 } from '@broadset/model';
 
@@ -94,6 +96,21 @@ export function importSingleSlide(
 }
 
 /**
+ * Escape a plain-text string for the Broadset HTML-shaped `content`
+ * field. Encodes `&`, `<`, `>` and quotes so the renderer's sanitizer
+ * preserves the original characters as literal text instead of treating
+ * them as markup.
+ */
+function escapePlainTextForHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * Promote a rectangle / ellipse with embedded text to a text element,
  * and apply layout-placeholder inheritance for font / size / colour.
  */
@@ -124,9 +141,18 @@ function promoteShapeText(
       ) ||
       p.props !== undefined,
   );
-  const content: string | TextBody = hasStructure
+  // PPTX text runs carry plain text (XML entities are already decoded
+  // by the AST). Element `content` is HTML-shaped, so plain text with
+  // bracket-shaped runs (e.g. `A & B <C>`) MUST be HTML-escaped before
+  // passing through `normalizeElementContent` — otherwise the
+  // sanitizer treats `<C>` as an unknown tag and drops it. Structured
+  // `TextBody` paths bypass the HTML rendering surface.
+  const rawContent: string | TextBody = hasStructure
     ? textBody
-    : textBody.paragraphs.map((p) => p.runs.map((r) => r.text).join('')).join('\n');
+    : escapePlainTextForHtml(
+        textBody.paragraphs.map((p) => p.runs.map((r) => r.text).join('')).join('\n'),
+      );
+  const content = normalizeElementContent('text', rawContent);
 
   const placeholder = resolvePlaceholderFromBody(body, layoutPlaceholders);
   const inherited =
@@ -336,35 +362,48 @@ export function composeDocumentFromSlides(
 ): BroadsetDocument {
   const allElements: BroadsetElement[] = [];
   const seenIds = new Map<string, number>();
+  // Track which root elements live on which slide so each slide gets
+  // matching page-instance entries — without this the canvas renders
+  // an empty page even though `document.elements` is populated.
+  const rootIdsBySlide: string[][] = slides.map(() => []);
 
-  for (const slide of slides) {
+  slides.forEach((slide, slideIndex) => {
+    const bucket = rootIdsBySlide[slideIndex] ?? [];
+
     for (const el of slide.elements) {
       const seenCount = seenIds.get(el.id) ?? 0;
 
       seenIds.set(el.id, seenCount + 1);
 
-      if (seenCount === 0) {
-        allElements.push(el);
-        continue;
+      const finalElement: BroadsetElement =
+        seenCount === 0 ? el : { ...el, id: `${el.id}__dup-${slide.id}` };
+
+      allElements.push(finalElement);
+
+      if (finalElement.parentId === null) {
+        bucket.push(finalElement.id);
       }
-
-      const disambiguated: BroadsetElement = {
-        ...el,
-        id: `${el.id}__dup-${slide.id}`,
-      };
-
-      allElements.push(disambiguated);
     }
-  }
 
-  const pages = slides.map((slide) => ({
-    id: slide.id,
-    name: slide.id,
-    elements: [],
-    locale: null,
-    extensions: {},
-    ...(slide.notes !== undefined && slide.notes.length > 0 ? { notes: slide.notes } : {}),
-  }));
+    rootIdsBySlide[slideIndex] = bucket;
+  });
+
+  const elementsById = new Map(allElements.map((el) => [el.id, el]));
+  const pages = slides.map((slide, slideIndex) => {
+    const rootIds = rootIdsBySlide[slideIndex] ?? [];
+
+    return {
+      id: slide.id,
+      name: slide.id,
+      elements: rootIds
+        .map((id) => elementsById.get(id))
+        .filter((el): el is BroadsetElement => el !== undefined)
+        .map(createPageElementInstanceForElement),
+      locale: null,
+      extensions: {},
+      ...(slide.notes !== undefined && slide.notes.length > 0 ? { notes: slide.notes } : {}),
+    };
+  });
 
   return {
     id: 'pptx-import',
