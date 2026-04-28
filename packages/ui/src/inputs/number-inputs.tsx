@@ -260,7 +260,7 @@ export function NumField({
         return;
       }
 
-      handleKeyDown(event as KeyboardEvent);
+      handleKeyDown(event);
     },
     [commitValue, handleKeyDown, localValue],
   );

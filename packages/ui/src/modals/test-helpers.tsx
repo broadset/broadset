@@ -7,7 +7,12 @@ import { buildCommonHeroUi } from '../testing/heroui-mock-common';
 
 // Prefixed with `mock` so Vitest's hoist rule lets the vi.mock factory below
 // reference the shared primitives without needing an async dynamic import.
-const mockCommonHeroUi = buildCommonHeroUi(React);
+// `sanitizeDomProps: true` strips HeroUI-specific props (`isRowHeader`,
+// `textValue`, etc.) before forwarding to the underlying DOM tag, so
+// React's unknown-prop warnings stay out of the unit-test stderr.
+// Closes the 2026-04-28 production-readiness audit's UI-warning noise
+// finding for the Table-driven modal fixtures.
+const mockCommonHeroUi = buildCommonHeroUi(React, { sanitizeDomProps: true });
 
 /* ------------------------------------------------------------------ */
 /*  HeroUI mock — all helpers use mock prefix to pass vi.mock hoist    */
@@ -299,7 +304,12 @@ function mockSelectFragment(p: Record<string, unknown>) {
 }
 
 function mockListBoxItem(p: Record<string, unknown>) {
-  const { children, id, ...rest } = p;
+  // Strip HeroUI / React-Aria collection-only props (`textValue`,
+  // `isDisabled`, etc.) that React would otherwise warn about when the
+  // mock spreads them onto a native `<option>`. The real HeroUI
+  // ListBoxItem absorbs these via context, but the mock renders a
+  // plain DOM element so we must not forward them.
+  const { children, id, textValue: _textValue, isDisabled: _isDisabled, ...rest } = p;
   const optionValue = typeof id === 'string' || typeof id === 'number' ? String(id) : (rest['value'] ?? '');
 
   return React.createElement('option', { ...rest, value: optionValue }, (children as React.ReactNode) ?? null);
@@ -335,7 +345,7 @@ function MockTableRow(p: Record<string, unknown>) {
 
 const mockRadioGroupCtx = React.createContext({
   name: '',
-  value: '' as string,
+  value: '',
   onChange: undefined as ((value: string) => void) | undefined,
 });
 
@@ -471,7 +481,7 @@ function mockNumField(p: Record<string, unknown>) {
     },
     onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter' && typeof p['onCommit'] === 'function') {
-        (p['onCommit'] as (v: number) => void)(Number((e.currentTarget as HTMLInputElement).value));
+        (p['onCommit'] as (v: number) => void)(Number((e.currentTarget).value));
       }
     },
     role: 'spinbutton',
@@ -498,7 +508,10 @@ function mockToggleSwitch(p: Record<string, unknown>) {
 
   return React.createElement(
     'label',
-    { 'data-ariaLabel': ariaLabel },
+    // Use kebab-case so React stops emitting the camelCase
+    // unknown-DOM-attribute warning. The selector callers use
+    // (`[data-aria-label="…"]`) is updated to match.
+    { 'data-aria-label': ariaLabel },
     React.createElement('input', {
       'aria-label': ariaLabel,
       checked: Boolean(p['isSelected']),

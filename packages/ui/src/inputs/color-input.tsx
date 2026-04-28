@@ -354,7 +354,17 @@ export function ColorInput({ value, onChange, label, compact, allowAlpha = true 
       }}
     >
       <Popover>
-        <Popover.Trigger>
+        {/*
+          HeroUI's `Popover.Trigger` wraps its `children` in
+          `<div role="button">` inside React Aria's `<Pressable>`. The
+          div has no native focusability and does not forward
+          `tabIndex={0}`, which makes `<Pressable>` log "child must be
+          focusable" warnings on every test render. Forwarding
+          `tabIndex={0}` through the trigger props makes the inner
+          `<div role="button">` focusable and silences the noise. Closes
+          the 2026-04-28 audit follow-up "Clear UI/a11y warning noise".
+        */}
+        <Popover.Trigger tabIndex={0}>
           <Button
             data-testid="color-swatch"
             data-transparent={isTransparent ? 'true' : 'false'}

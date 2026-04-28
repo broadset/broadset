@@ -178,7 +178,7 @@ export function defaultBindingSectionsProps(
 
 export function defaultEasingGraphProps(overrides: Partial<EasingGraphEditorProps> = {}): EasingGraphEditorProps {
   return {
-    easing: 'ease' as EasingMode,
+    easing: 'ease',
     onChange: vi.fn<(easing: EasingMode) => void>(),
     isPlaying: false,
     playbackProgress: 0,

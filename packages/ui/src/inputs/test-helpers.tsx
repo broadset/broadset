@@ -75,7 +75,7 @@ vi.mock('@heroui/react', async () => {
 
     function Input(props: MockHeroUiProps): React.JSX.Element {
       const { label, onChange, value = '', ...rest } = props;
-      const domProps = pickSafeDomProps(rest as Record<string, unknown>);
+      const domProps = pickSafeDomProps(rest);
 
       return ReactActual.createElement('input', {
         ...domProps,
@@ -94,7 +94,7 @@ vi.mock('@heroui/react', async () => {
     const NumberField = Object.assign(
       function NumberFieldRoot(props: MockHeroUiProps): React.JSX.Element {
         const { children, label, onChange, value = 0, ...rest } = props;
-        const domProps = pickSafeDomProps(rest as Record<string, unknown>);
+        const domProps = pickSafeDomProps(rest);
 
         return ReactActual.createElement(
           'div',
@@ -116,7 +116,7 @@ vi.mock('@heroui/react', async () => {
         Group: createWrapper(),
         Input(props: MockHeroUiProps): React.JSX.Element {
           const context = ReactActual.useContext(NumberFieldContext);
-          const domProps = pickSafeDomProps(props as Record<string, unknown>);
+          const domProps = pickSafeDomProps(props);
           const propOnChange = (props as { readonly onChange?: unknown }).onChange;
 
           return ReactActual.createElement('input', {
@@ -146,7 +146,7 @@ vi.mock('@heroui/react', async () => {
         },
         DecrementButton(props: MockHeroUiProps): React.JSX.Element {
           const context = ReactActual.useContext(NumberFieldContext);
-          const domProps = pickSafeDomProps(props as Record<string, unknown>);
+          const domProps = pickSafeDomProps(props);
 
           return ReactActual.createElement(
             'button',
@@ -162,7 +162,7 @@ vi.mock('@heroui/react', async () => {
         },
         IncrementButton(props: MockHeroUiProps): React.JSX.Element {
           const context = ReactActual.useContext(NumberFieldContext);
-          const domProps = pickSafeDomProps(props as Record<string, unknown>);
+          const domProps = pickSafeDomProps(props);
 
           return ReactActual.createElement(
             'button',
@@ -181,7 +181,7 @@ vi.mock('@heroui/react', async () => {
 
     const SliderBase = function Slider(props: MockHeroUiProps): React.JSX.Element {
       const { label, value = 0, onChange, onValueChange, children, ...rest } = props;
-      const domProps = pickSafeDomProps(rest as Record<string, unknown>);
+      const domProps = pickSafeDomProps(rest);
 
       return ReactActual.createElement(
         'div',
@@ -213,7 +213,7 @@ vi.mock('@heroui/react', async () => {
 
     function Switch(props: MockHeroUiProps): React.JSX.Element {
       const { children, isSelected, onChange, ...rest } = props;
-      const domProps = pickSafeDomProps(rest as Record<string, unknown>);
+      const domProps = pickSafeDomProps(rest);
       const switchOnChange = onChange as ((...args: [boolean]) => void) | undefined;
 
       return ReactActual.createElement(
@@ -241,7 +241,7 @@ vi.mock('@heroui/react', async () => {
     const Select = Object.assign(
       function SelectRoot(props: MockHeroUiProps): React.JSX.Element {
         const { children, label, onChange, value, ...rest } = props;
-        const domProps = pickSafeDomProps(rest as Record<string, unknown>);
+        const domProps = pickSafeDomProps(rest);
 
         return ReactActual.createElement(
           'select',
@@ -293,7 +293,7 @@ vi.mock('@heroui/react', async () => {
     const ColorArea = Object.assign(
       function ColorAreaRoot(props: MockHeroUiProps): React.JSX.Element {
         const { children, value, onChange, ...rest } = props;
-        const domProps = pickSafeDomProps(rest as Record<string, unknown>);
+        const domProps = pickSafeDomProps(rest);
         const dataTestId = (rest as Record<string, unknown>)['data-testid'] ?? 'color-area';
 
         return ReactActual.createElement('div', { ...domProps, 'data-testid': dataTestId }, children ?? null);
@@ -332,7 +332,7 @@ vi.mock('@heroui/react', async () => {
     const ColorSwatchPicker = Object.assign(
       function ColorSwatchPickerRoot(props: MockHeroUiProps): React.JSX.Element {
         const { children, ...rest } = props;
-        const domProps = pickSafeDomProps(rest as Record<string, unknown>);
+        const domProps = pickSafeDomProps(rest);
 
         return ReactActual.createElement('div', domProps, children ?? null);
       },
@@ -344,7 +344,7 @@ vi.mock('@heroui/react', async () => {
     );
 
     function ColorSwatch(props: MockHeroUiProps): React.JSX.Element {
-      const domProps = pickSafeDomProps(props as Record<string, unknown>);
+      const domProps = pickSafeDomProps(props);
 
       return ReactActual.createElement('div', domProps);
     }

@@ -280,14 +280,25 @@ export function FormatReconciliationModal({
         <Accordion data-testid="format-reconciliation-accordion">{sections}</Accordion>
 
         {warnings.length > 0 ?
-          <details data-testid="format-reconciliation-warnings-details">
-            <summary>Other import warnings ({String(warnings.length)})</summary>
-            <ul style={{ margin: '0.5rem 0 0 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              {warnings.map((warning, index) => (
-                <li key={`${String(index)}-${warning}`}>{warning}</li>
-              ))}
-            </ul>
-          </details>
+          <Accordion data-testid="format-reconciliation-warnings-details">
+            <Accordion.Item key="other-warnings">
+              <Accordion.Heading>
+                <Accordion.Trigger
+                  aria-label="Other import warnings"
+                  data-testid="format-reconciliation-warnings-summary"
+                >
+                  Other import warnings ({String(warnings.length)})
+                </Accordion.Trigger>
+              </Accordion.Heading>
+              <Accordion.Panel>
+                <ul style={{ margin: '0.5rem 0 0 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  {warnings.map((warning, index) => (
+                    <li key={`${String(index)}-${warning}`}>{warning}</li>
+                  ))}
+                </ul>
+              </Accordion.Panel>
+            </Accordion.Item>
+          </Accordion>
         : null}
 
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
