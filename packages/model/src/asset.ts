@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import type { FontWeight } from './style';
+
 /**
  * Phase 4 unit #1 — `Asset` becomes a discriminated union over `kind`
  * so font-specific fidelity fields (`format`, `postScriptName`,
@@ -64,6 +66,19 @@ export interface FontAsset extends AssetBase {
   readonly postScriptName: string;
   /** Human-readable family name used by CSS `font-family` and editor pickers. */
   readonly familyName: string;
+  /**
+   * OpenType weight axis (100..900). Defaults to 400 (Regular) when
+   * omitted. Drives the `<p:bold>` vs `<p:regular>` slot selection on
+   * PPTX export and the `font-weight` descriptor on SVG `@font-face`.
+   */
+  readonly weight?: FontWeight | undefined;
+  /**
+   * `true` for italic / oblique faces. Defaults to `false` when
+   * omitted. Drives the `<p:italic>` / `<p:boldItalic>` slot
+   * selection on PPTX export and the `font-style` descriptor on SVG
+   * `@font-face`.
+   */
+  readonly italic?: boolean | undefined;
   /** Declared Unicode coverage — required by the subsetting pipeline (P4.5). */
   readonly subsetRanges?: readonly UnicodeRange[] | undefined;
 }
@@ -160,6 +175,25 @@ const POSTSCRIPT_NAME_PATTERN = /^[A-Za-z0-9._+-]+$/;
 
 const fontFormatSchema = z.enum(['woff2', 'ttf', 'otf']);
 
+/**
+ * OpenType weight axis values. Mirrors {@link FontWeight} re-exported
+ * from `style.ts` so the asset schema and the element style schema
+ * agree on the same nine canonical steps (no hundreds-between
+ * interpolation, since OOXML / PDF font tables only resolve at the
+ * canonical steps anyway).
+ */
+const fontWeightSchema = z.union([
+  z.literal(100),
+  z.literal(200),
+  z.literal(300),
+  z.literal(400),
+  z.literal(500),
+  z.literal(600),
+  z.literal(700),
+  z.literal(800),
+  z.literal(900),
+]);
+
 const assetBaseFields = {
   id: z.string().min(1),
   name: z.string().min(1),
@@ -177,6 +211,8 @@ const fontAssetSchema = z.object({
     message: 'postScriptName must match [A-Za-z0-9._+-]+',
   }),
   familyName: z.string().min(1),
+  weight: fontWeightSchema.optional(),
+  italic: z.boolean().optional(),
   subsetRanges: z.array(unicodeRangeSchema).optional(),
 });
 
@@ -236,6 +272,8 @@ export interface FontAssetInput {
   readonly format: FontFormat;
   readonly postScriptName: string;
   readonly familyName: string;
+  readonly weight?: FontWeight | undefined;
+  readonly italic?: boolean | undefined;
   readonly subsetRanges?: readonly UnicodeRange[] | undefined;
   readonly fileSizeBytes?: number | undefined;
   readonly metadata?: Readonly<Record<string, unknown>> | undefined;
@@ -251,6 +289,8 @@ export function fontAsset(input: FontAssetInput): FontAsset {
     format: input.format,
     postScriptName: input.postScriptName,
     familyName: input.familyName,
+    ...(input.weight === undefined ? {} : { weight: input.weight }),
+    ...(input.italic === undefined ? {} : { italic: input.italic }),
     ...(input.subsetRanges === undefined ? {} : { subsetRanges: input.subsetRanges }),
     ...(input.fileSizeBytes === undefined ? {} : { fileSizeBytes: input.fileSizeBytes }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),

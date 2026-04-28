@@ -95,6 +95,33 @@ describe('FontAsset factory', () => {
     expect(asset.fileSizeBytes).toBe(12_345);
     expect(asset.metadata).toEqual(metadata);
   });
+
+  /**
+   * @description Phase 4.7 — `weight` + `italic` survive the factory so
+   * the PPTX exporter can route bold / italic / boldItalic runs to the
+   * matching `<p:embeddedFont>` slot. Defaults stay `undefined` rather
+   * than a sentinel so a single `Regular` asset doesn't gain implicit
+   * `weight: 400, italic: false` fields it never declared (greenfield
+   * rule — no compat shims).
+   */
+  it('preserves weight and italic when provided', () => {
+    const asset = fontAsset({ ...baseFontAssetInput(), weight: 700, italic: true });
+
+    expect(asset.weight).toBe(700);
+    expect(asset.italic).toBe(true);
+  });
+
+  /**
+   * @description Omitting `weight` / `italic` leaves them `undefined`;
+   * the PPTX exporter applies the default-Regular semantics (`weight ??
+   * 400`, `italic ?? false`) at the call site.
+   */
+  it('leaves weight and italic undefined when omitted', () => {
+    const asset = fontAsset(baseFontAssetInput());
+
+    expect(asset.weight).toBeUndefined();
+    expect(asset.italic).toBeUndefined();
+  });
 });
 
 describe('Font asset schema validation', () => {
@@ -235,6 +262,35 @@ describe('Font asset schema validation', () => {
       subsetRanges: [{ start: 1.5, end: 10 }],
     };
     const parsed = assetSchema.safeParse(asset);
+
+    expect(parsed.success).toBe(false);
+  });
+
+  /**
+   * @description Phase 4.7 — every canonical OpenType weight (100..900
+   * in steps of 100) parses. Values outside that set are rejected so
+   * a typo (`750`) never reaches the PPTX exporter where it would
+   * silently fall through to the regular slot.
+   */
+  it.each([100, 200, 300, 400, 500, 600, 700, 800, 900])('accepts weight %s', (weight) => {
+    const parsed = assetSchema.safeParse({ ...fontAsset(baseFontAssetInput()), weight });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects a non-canonical weight', () => {
+    const parsed = assetSchema.safeParse({ ...fontAsset(baseFontAssetInput()), weight: 750 });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it('accepts italic true and false', () => {
+    expect(assetSchema.safeParse({ ...fontAsset(baseFontAssetInput()), italic: true }).success).toBe(true);
+    expect(assetSchema.safeParse({ ...fontAsset(baseFontAssetInput()), italic: false }).success).toBe(true);
+  });
+
+  it('rejects non-boolean italic', () => {
+    const parsed = assetSchema.safeParse({ ...fontAsset(baseFontAssetInput()), italic: 'yes' });
 
     expect(parsed.success).toBe(false);
   });

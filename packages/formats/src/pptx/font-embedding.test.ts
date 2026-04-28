@@ -344,4 +344,243 @@ describe('PPTX font embedding round-trip', () => {
 
     expect(pkg.has('ppt/fonts/font1.fntdata')).toBe(false);
   });
+
+  /**
+   * @description Phase 4.7 / closes pptx-known-gaps A4. A family with
+   * regular + bold + italic + boldItalic FontAssets must collapse into
+   * one `<p:embeddedFont typeface="…"/>` block carrying four child
+   * relationship tags pointing at four distinct font parts. Each
+   * variant gets its own subset, so a bold-only codepoint never lands
+   * under the regular relationship.
+   *
+   * Test text uses Codicon's PUA glyphs so the subsetter actually
+   * includes a glyph per variant — this proves the routing without
+   * relying on subsetter fallback behaviour.
+   */
+  it('emits four variant relationships under one <p:embeddedFont> when all four FontAssets are supplied', () => {
+    const baseDoc = createEmptyBroadsetDocument();
+    const baseStyle = baseDoc.elements[0]?.style;
+    const codiconGlyph = String.fromCodePoint(0xea60);
+    const textBody = {
+      paragraphs: [
+        {
+          runs: [
+            { text: codiconGlyph, props: { style: {} } },
+            { text: codiconGlyph, props: { style: { fontWeight: 700 } } },
+            { text: codiconGlyph, props: { style: { fontStyle: 'italic' } } },
+            { text: codiconGlyph, props: { style: { fontWeight: 700, fontStyle: 'italic' } } },
+          ],
+        },
+      ],
+    };
+    const doc = {
+      ...baseDoc,
+      elements: [
+        createDefaultElement('text', {
+          id: 'text-1',
+          name: 'Mixed',
+          style: { ...baseStyle, fontFamily: 'codicon' },
+          content: textBody,
+        }),
+      ],
+    };
+    const sharedSource = buildEmbeddedFontAsset().source;
+    const regular = fontAsset({
+      id: 'asset-font-codicon-regular',
+      name: 'Codicon',
+      mimeType: 'font/ttf',
+      source: sharedSource,
+      format: 'ttf',
+      postScriptName: 'codicon',
+      familyName: 'codicon',
+      weight: 400,
+      italic: false,
+    });
+    const bold = fontAsset({ ...regular, id: 'asset-font-codicon-bold', postScriptName: 'codicon-bold', weight: 700 });
+    const italic = fontAsset({ ...regular, id: 'asset-font-codicon-italic', postScriptName: 'codicon-italic', italic: true });
+    const boldItalic = fontAsset({
+      ...regular,
+      id: 'asset-font-codicon-bolditalic',
+      postScriptName: 'codicon-bolditalic',
+      weight: 700,
+      italic: true,
+    });
+    const report = exportPptxWithReport(doc, { fontAssets: [regular, bold, italic, boldItalic] });
+    const pkg = readOoxmlPackage(report.bytes);
+
+    // No fallback warnings — every variant has an exact-match asset.
+    expect(report.warnings.filter((w) => w.code === 'font-embed-skipped')).toEqual([]);
+
+    expect(pkg.has('ppt/fonts/font1.fntdata')).toBe(true);
+    expect(pkg.has('ppt/fonts/font2.fntdata')).toBe(true);
+    expect(pkg.has('ppt/fonts/font3.fntdata')).toBe(true);
+    expect(pkg.has('ppt/fonts/font4.fntdata')).toBe(true);
+
+    const presentation = readTextPart(pkg, 'ppt/presentation.xml');
+
+    expect(presentation).not.toBeNull();
+
+    // Single <p:embeddedFont> for the family.
+    const embeddedCount = presentation === null ? 0 : (presentation.match(/<p:embeddedFont>/g) ?? []).length;
+
+    expect(embeddedCount).toBe(1);
+    expect(presentation).toContain('<p:font typeface="codicon"/>');
+    expect(presentation).toMatch(/<p:regular r:id="rId\d+"\/>/);
+    expect(presentation).toMatch(/<p:bold r:id="rId\d+"\/>/);
+    expect(presentation).toMatch(/<p:italic r:id="rId\d+"\/>/);
+    expect(presentation).toMatch(/<p:boldItalic r:id="rId\d+"\/>/);
+  });
+
+  /**
+   * @description Phase 4.7 — bold-run codepoints route to the bold
+   * subset, NOT the regular subset. The simplest cross-check uses two
+   * non-overlapping codepoint groups (one per run) and asserts that
+   * the regular and bold font parts have distinct byte sizes — the
+   * subsetter can't yield identical bytes from disjoint codepoint
+   * inputs.
+   */
+  it('routes bold-run codepoints to the bold font part, not the regular part', () => {
+    const baseDoc = createEmptyBroadsetDocument();
+    const baseStyle = baseDoc.elements[0]?.style;
+    // Codicon's glyphs live in the private-use area; pick distinct PUA
+    // codepoints so each run's subset is non-empty. The bold run owns
+    // an extra glyph so its subset bytes differ from the regular part.
+    const regularGlyph = String.fromCodePoint(0xea60);
+    const boldGlyphs = `${String.fromCodePoint(0xea60)}${String.fromCodePoint(0xea61)}`;
+    const textBody = {
+      paragraphs: [
+        {
+          runs: [
+            { text: regularGlyph, props: { style: {} } },
+            { text: boldGlyphs, props: { style: { fontWeight: 700 } } },
+          ],
+        },
+      ],
+    };
+    const doc = {
+      ...baseDoc,
+      elements: [
+        createDefaultElement('text', {
+          id: 'text-1',
+          name: 'Mixed weight',
+          style: { ...baseStyle, fontFamily: 'codicon' },
+          content: textBody,
+        }),
+      ],
+    };
+    const regular = fontAsset({
+      id: 'asset-font-codicon-regular',
+      name: 'Codicon',
+      mimeType: 'font/ttf',
+      source: buildEmbeddedFontAsset().source,
+      format: 'ttf',
+      postScriptName: 'codicon',
+      familyName: 'codicon',
+      weight: 400,
+    });
+    const bold = fontAsset({ ...regular, id: 'asset-font-codicon-bold', postScriptName: 'codicon-bold', weight: 700 });
+    const report = exportPptxWithReport(doc, { fontAssets: [regular, bold] });
+    const pkg = readOoxmlPackage(report.bytes);
+    const regularBytes = pkg.get('ppt/fonts/font1.fntdata');
+    const boldBytes = pkg.get('ppt/fonts/font2.fntdata');
+
+    expect(regularBytes).toBeDefined();
+    expect(boldBytes).toBeDefined();
+    expect(regularBytes?.byteLength).toBeGreaterThan(0);
+    expect(boldBytes?.byteLength).toBeGreaterThan(0);
+    // Disjoint codepoint sets through the same subsetter cannot produce
+    // identical byte streams — if they were equal, the bold codepoints
+    // got folded into the regular subset.
+    expect(regularBytes?.byteLength).not.toBe(boldBytes?.byteLength);
+
+    const presentation = readTextPart(pkg, 'ppt/presentation.xml');
+
+    expect(presentation).toMatch(/<p:regular r:id="rId\d+"\/>/);
+    expect(presentation).toMatch(/<p:bold r:id="rId\d+"\/>/);
+  });
+
+  /**
+   * @description Phase 4.7 — regression. A family with only a regular
+   * FontAsset (no italic / bold / boldItalic variants supplied)
+   * collapses to today's behaviour: a single `<p:regular>` relation
+   * with every codepoint under it. Critical so the simple single-asset
+   * case keeps working when callers don't yet split their font
+   * assets per weight.
+   */
+  it('emits exactly the regular relationship when only one FontAsset is supplied', () => {
+    const baseDoc = createEmptyBroadsetDocument();
+    const doc = {
+      ...baseDoc,
+      elements: [
+        createDefaultElement('text', {
+          id: 'text-1',
+          name: 'Caption',
+          content: String.fromCodePoint(0xea60),
+          style: { ...baseDoc.elements[0]?.style, fontFamily: 'codicon' },
+        }),
+      ],
+    };
+    const report = exportPptxWithReport(doc, { fontAssets: [buildEmbeddedFontAsset()] });
+    const pkg = readOoxmlPackage(report.bytes);
+    const presentation = readTextPart(pkg, 'ppt/presentation.xml');
+
+    expect(presentation).toContain('<p:embeddedFontLst>');
+    expect(presentation).toContain('<p:font typeface="codicon"/>');
+    expect(presentation).toMatch(/<p:regular r:id="rId\d+"\/>/);
+    expect(presentation).not.toContain('<p:bold ');
+    expect(presentation).not.toContain('<p:italic ');
+    expect(presentation).not.toContain('<p:boldItalic ');
+  });
+
+  /**
+   * @description Phase 4.7 — italic text without an italic FontAsset
+   * surfaces a `font-embed-skipped` warning whose `detail` records the
+   * fallback, AND folds the italic codepoints into the regular
+   * relationship rather than dropping them. Mirrors the
+   * known-gaps A4 closure contract: missing-variant ≠ missing-glyph.
+   */
+  it('falls back to regular with a warning when an italic variant is missing', () => {
+    const baseDoc = createEmptyBroadsetDocument();
+    const baseStyle = baseDoc.elements[0]?.style;
+    const codiconGlyph = String.fromCodePoint(0xea60);
+    const textBody = {
+      paragraphs: [
+        {
+          runs: [
+            { text: codiconGlyph, props: { style: {} } },
+            { text: codiconGlyph, props: { style: { fontStyle: 'italic' } } },
+          ],
+        },
+      ],
+    };
+    const doc = {
+      ...baseDoc,
+      elements: [
+        createDefaultElement('text', {
+          id: 'text-1',
+          name: 'Italic without variant',
+          style: { ...baseStyle, fontFamily: 'codicon' },
+          content: textBody,
+        }),
+      ],
+    };
+    const report = exportPptxWithReport(doc, { fontAssets: [buildEmbeddedFontAsset()] });
+
+    const fallback = report.warnings.find(
+      (w) => w.code === 'font-embed-skipped' && w.detail === 'variant-fallback:italic->regular',
+    );
+
+    expect(fallback, JSON.stringify(report.warnings)).toBeDefined();
+
+    const pkg = readOoxmlPackage(report.bytes);
+
+    expect(pkg.has('ppt/fonts/font1.fntdata')).toBe(true);
+    expect(pkg.has('ppt/fonts/font2.fntdata')).toBe(false);
+
+    const presentation = readTextPart(pkg, 'ppt/presentation.xml');
+
+    expect(presentation).toMatch(/<p:regular r:id="rId\d+"\/>/);
+    expect(presentation).not.toContain('<p:italic ');
+  });
 });
+

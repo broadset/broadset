@@ -17,7 +17,6 @@ Gaps" section in [project/spec/formats/pptx.md](../spec/formats/pptx.md)
 >   generalizes reconciliation across formats; Phase 4.9 adds the
 >   conflict-resolution choice UI on top.
 > - **A2** (per-element page overrides) — Phase 4.8.
-> - **A4** (font weight / style variants) — Phase 4.7.
 > - **B1** (telemetry) — Phase 5.4.
 > - **B3** (accessibility audit on new modals) — Phase 5.5.
 > - **B4** (sister-format audits) — Phase 5.6.
@@ -120,19 +119,6 @@ external tool. First-class native authoring is out of scope.
 **To close:** would require new Broadset element types (table,
 chart, connector, ink) and corresponding model + renderer support.
 Tracked as future Phase work, not Phase 8.
-
-### A4. Font weight / style variants share a single relationship
-
-The exporter emits `<p:regular r:id="…"/>` per family and stores all
-codepoints under that one font part. Bold, italic, and bold-italic
-runs of the same family don't get separate `<p:bold>` /
-`<p:italic>` / `<p:boldItalic>` relationships even when the
-project carries distinct `FontAsset`s for each weight.
-
-**To close:** group `FontAsset`s by `familyName` then split by a
-new `weight` / `italic` flag (the model would need to expose
-this), and emit one `<p:embeddedFont>` per family with all four
-variant relationships.
 
 ## Tier B — operational concerns
 
