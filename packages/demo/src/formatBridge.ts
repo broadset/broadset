@@ -1,6 +1,7 @@
 import type * as FormatsNS from '@broadset/formats';
 import type { Asset, BroadsetDocument } from '@broadset/model';
 import { broadsetDocumentSchema, isFontAsset } from '@broadset/model';
+import type { PreflightFinding } from '@broadset/ui';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -145,12 +146,19 @@ export interface ImportDocumentResult {
  * Per-format export result. Carries any fidelity-loss warnings that
  * surfaced during emission (today: PPTX `<a:outerShdw>` inset skips,
  * multi-shadow truncation, animations beyond fade-entry per IO-D-16).
- * Other formats currently return an empty array; the shape is
- * uniform so the caller can show a fidelity-loss toast without
- * branching on format.
+ *
+ * Two views of the same data:
+ * - `warnings` — flat strings consumed by the existing toast layer
+ *   (`formatExportWarningMessage`).
+ * - `preflight` — structured `PreflightFinding[]` consumed by the
+ *   `FormatPreflightModal`. Populated for formats whose underlying
+ *   warning shape carries codes (PPTX), and for formats whose prose
+ *   warnings are mapped to a generic `'preflight'` code (PSD, SVG).
+ *   Empty for formats that don't emit structured preflight today.
  */
 export interface ExportDocumentResult {
   readonly warnings: readonly string[];
+  readonly preflight: readonly PreflightFinding[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -187,7 +195,7 @@ const DEFAULT_VIDEO_QUALITY = 0.8;
  * switch to keep that function's cognitive complexity below the
  * sonarjs threshold.
  */
-async function exportSvgVia(formats: FormatsModule, context: ExportContext, name: string): Promise<void> {
+async function exportSvgVia(formats: FormatsModule, context: ExportContext, name: string): Promise<readonly string[]> {
   const projectAssets = context.svgOptions?.projectAssets ?? [];
   const fonts = projectAssets.length > 0 ? formats.buildSvgFontSourcesFromAssets(projectAssets) : undefined;
   // Resolve image / pattern asset ids to URLs (data: for embedded
@@ -221,6 +229,8 @@ async function exportSvgVia(formats: FormatsModule, context: ExportContext, name
   }
 
   formats.triggerDownload(blob, `${name}.svg`);
+
+  return result.warnings;
 }
 
 /**
@@ -266,11 +276,78 @@ function buildPptxExportOptions(context: ExportContext): Record<string, unknown>
   return exportOpts;
 }
 
+/**
+ * Per-format collector output. Extracted so the main `exportDocument`
+ * switch stays under the sonarjs cognitive-complexity threshold and
+ * each format's warning-to-finding mapping lives next to its export
+ * call instead of being inlined into the switch body.
+ */
+interface FormatExportWarnings {
+  readonly warnings: readonly string[];
+  readonly preflight: readonly PreflightFinding[];
+}
+
+const EMPTY_FORMAT_WARNINGS: FormatExportWarnings = { warnings: [], preflight: [] };
+
+/**
+ * SVG warnings are prose-only today (font-embedding gaps, restricted
+ * permissions). Map them to a generic `'svg-preflight'` code so the
+ * modal groups them under the shared severity bucket. Structured
+ * codes will replace the placeholder when SVG preflight grows a
+ * per-cause taxonomy.
+ */
+function collectSvgFormatWarnings(svgWarnings: readonly string[]): FormatExportWarnings {
+  return {
+    warnings: svgWarnings,
+    preflight: svgWarnings.map((warning) => ({
+      code: 'svg-preflight',
+      message: warning,
+      severity: 'warning',
+    })),
+  };
+}
+
+/**
+ * PPTX is the only exporter whose warnings already carry a structured
+ * shape (`PptxExportWarning { code, message, elementId?, detail? }`).
+ * Preserve every field on the way into the modal so users see the
+ * underlying cause rather than a flattened code-prefixed string.
+ */
+function collectPptxFormatWarnings(report: FormatsNS.PptxExportReport): FormatExportWarnings {
+  return {
+    warnings: report.warnings.map((w) => `${w.code}: ${w.message}`),
+    preflight: report.warnings.map((w) => ({
+      code: w.code,
+      message: w.message,
+      severity: 'warning',
+      ...(w.elementId !== undefined ? { elementId: w.elementId } : {}),
+      ...(w.detail !== undefined ? { hint: w.detail } : {}),
+    })),
+  };
+}
+
+/**
+ * PSD warnings are prose-only today — `'preflight'` is the honest
+ * placeholder code until per-cause structured codes land alongside
+ * the lcms-wasm pipeline (cross-format-io improvement plan Phase
+ * 4.1).
+ */
+function collectPsdFormatWarnings(psdWarnings: readonly string[]): FormatExportWarnings {
+  return {
+    warnings: psdWarnings,
+    preflight: psdWarnings.map((warning) => ({
+      code: 'preflight',
+      message: warning,
+      severity: 'warning',
+    })),
+  };
+}
+
 export async function exportDocument(format: ExportFormat, context: ExportContext): Promise<ExportDocumentResult> {
   const formats = await loadFormats();
   const { document: doc } = context;
   const name = formats.sanitizeFilename(doc.name || 'broadset-document');
-  const warnings: string[] = [];
+  let collected: FormatExportWarnings = EMPTY_FORMAT_WARNINGS;
 
   switch (format) {
     case 'json': {
@@ -282,7 +359,9 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
     }
 
     case 'svg': {
-      await exportSvgVia(formats, context, name);
+      const svgWarnings = await exportSvgVia(formats, context, name);
+
+      collected = collectSvgFormatWarnings(svgWarnings);
       break;
     }
 
@@ -299,6 +378,12 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
 
       formats.triggerDownload(blob, `${name}.pdf`);
+      // PDF preflight stays empty: today the bridge calls the
+      // `Uint8Array`-only `exportPdfBytes`. Routing through
+      // `exportPdfWithPreflight` is tracked under
+      // `project/implementation/cross-format-io-improvement-plan.md`
+      // Phase 4.2 / 5.8 — once that lands the structured warnings can
+      // map straight onto `PreflightFinding` here.
       break;
     }
 
@@ -309,19 +394,20 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
       });
 
       formats.triggerDownload(blob, `${name}.pptx`);
-
-      for (const w of pptxReport.warnings) {
-        warnings.push(`${w.code}: ${w.message}`);
-      }
-
+      collected = collectPptxFormatWarnings(pptxReport);
       break;
     }
 
     case 'psd': {
-      const psdBytes = await formats.exportPsdBytesAsync(doc, { ...(context.psdOptions ?? {}) });
-      const blob = new Blob([psdBytes.buffer as ArrayBuffer], { type: 'image/vnd.adobe.photoshop' });
+      // Switch to the preflight-aware variant so the structured
+      // warning list (animations dropped, rotated non-image
+      // elements, colour-mode downgrades, URL fetch failures) reaches
+      // the modal. The bytes are identical to `exportPsdBytesAsync`.
+      const psdResult = await formats.exportPsdBytesAsyncWithPreflight(doc, { ...(context.psdOptions ?? {}) });
+      const blob = new Blob([psdResult.bytes.buffer as ArrayBuffer], { type: 'image/vnd.adobe.photoshop' });
 
       formats.triggerDownload(blob, `${name}.psd`);
+      collected = collectPsdFormatWarnings(psdResult.warnings);
       break;
     }
 
@@ -407,7 +493,7 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
     }
   }
 
-  return { warnings };
+  return { warnings: collected.warnings, preflight: collected.preflight };
 }
 
 function requireSnapshotCanvas(context: ExportContext): asserts context is ExportContext & {

@@ -37,7 +37,14 @@ export {
   readPreservedPptxDocument,
   reconcilePptx,
 } from './pptx';
-export { exportPsdBytes, exportPsdBytesAsync, importPsd, svgPathToPsdVectorMask } from './psd';
+export {
+  exportPsdBytes,
+  exportPsdBytesAsync,
+  exportPsdBytesAsyncWithPreflight,
+  importPsd,
+  type PsdExportResult,
+  svgPathToPsdVectorMask,
+} from './psd';
 export {
   type BatchCaptureSession,
   captureElementToCanvas,

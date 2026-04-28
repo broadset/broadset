@@ -4,7 +4,11 @@ import type { PlaybackController } from '@broadset/playback';
 import type { DocumentPreset, ExportProgress, MediaAsset, TemplateEntry } from '@broadset/ui';
 
 import type { ActiveDialog, ContextMenuState, SidebarTab } from '../demo-types';
-import type { ImportReconciliationModalState, ImportWarningsModalState } from './use-demo-file-handlers';
+import type {
+  ExportPreflightModalState,
+  ImportReconciliationModalState,
+  ImportWarningsModalState,
+} from './use-demo-file-handlers';
 
 export interface DemoAppLayoutProps {
   readonly activeDialog: ActiveDialog;
@@ -45,6 +49,8 @@ export interface DemoAppLayoutProps {
   readonly dismissImportWarningsModal: () => void;
   readonly importReconciliationModal: ImportReconciliationModalState | null;
   readonly dismissImportReconciliationModal: () => void;
+  readonly exportPreflightModal: ExportPreflightModalState | null;
+  readonly dismissExportPreflightModal: () => void;
   readonly handleAnimationAddKeyframe: () => void;
   readonly handleAnimationAddModifierBinding: () => void;
   readonly handleAnimationAddStateBinding: () => void;

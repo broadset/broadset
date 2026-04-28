@@ -5,6 +5,7 @@ import {
   type ExportAnimationInfo,
   ExportModal,
   FormatImportWarningsModal,
+  FormatPreflightModal,
   FormatReconciliationModal,
   MediaLibraryModal,
   NewDocumentModal,
@@ -23,10 +24,12 @@ export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
     activeDialog,
     canvasSettings,
     currentDocument,
+    dismissExportPreflightModal,
     dismissImportReconciliationModal,
     dismissImportWarningsModal,
     editorState,
     editorStore,
+    exportPreflightModal,
     exportProgress,
     handleCreateFromPreset,
     handleExportFormat,
@@ -182,6 +185,13 @@ export function LayoutDialogs(props: DemoAppLayoutProps): React.JSX.Element {
         warnings={importReconciliationModal?.warnings ?? []}
         onAcknowledge={dismissImportReconciliationModal}
         onClose={dismissImportReconciliationModal}
+      />
+
+      <FormatPreflightModal
+        isOpen={exportPreflightModal !== null}
+        formatLabel={exportPreflightModal?.formatLabel ?? ''}
+        findings={exportPreflightModal?.findings ?? []}
+        onClose={dismissExportPreflightModal}
       />
 
       <Toast.Provider className="bottom-7 right-7 z-40" placement="bottom end" />

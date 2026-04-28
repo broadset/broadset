@@ -31,6 +31,10 @@ const mockExportPptxWithReportAsync = vi.fn(
 );
 const mockExportPsdBytes = vi.fn(() => new Uint8Array([7, 8, 9]));
 const mockExportPsdBytesAsync = vi.fn(() => Promise.resolve(new Uint8Array([7, 8, 9])));
+const mockExportPsdBytesAsyncWithPreflight = vi.fn(
+  async (): Promise<{ bytes: Uint8Array; warnings: readonly string[] }> =>
+    Promise.resolve({ bytes: new Uint8Array([7, 8, 9]), warnings: [] }),
+);
 const mockExportPngBlob = vi.fn(() => Promise.resolve(new Blob(['png'], { type: 'image/png' })));
 const mockExportJpegBlob = vi.fn(() => Promise.resolve(new Blob(['jpeg'], { type: 'image/jpeg' })));
 const mockExportEmbeddedSvgBlob = vi.fn(() => Promise.resolve(new Blob(['svg'], { type: 'image/svg+xml' })));
@@ -77,6 +81,7 @@ const mockFormats = {
   exportProjectJson: mockExportProjectJson,
   exportPsdBytes: mockExportPsdBytes,
   exportPsdBytesAsync: mockExportPsdBytesAsync,
+  exportPsdBytesAsyncWithPreflight: mockExportPsdBytesAsyncWithPreflight,
   exportSvgDocument: mockExportSvgDocument,
   exportSvgString: mockExportSvgString,
   exportVideoBlob: mockExportVideoBlob,
@@ -244,11 +249,92 @@ describe('export orchestration', () => {
     expect(result.warnings[1]).toContain('animation-preset-unsupported');
   });
 
-  /** @description PSD export MUST call exportPsdBytesAsync and trigger a file download. */
+  /**
+   * @description PPTX export MUST also populate `preflight` with the
+   * structured `PreflightFinding` shape so the demo can open
+   * `FormatPreflightModal` instead of dropping per-finding metadata
+   * into a flat toast string. Cross-format-io improvement plan
+   * Phase 1.3.
+   */
+  it('emits structured preflight findings for PPTX warnings', async () => {
+    mockExportPptxWithReportAsync.mockResolvedValueOnce({
+      bytes: new Uint8Array([4, 5, 6]),
+      warnings: [
+        { code: 'shadow-truncated', message: 'multi-shadow truncated', elementId: 'el-1' },
+        { code: 'font-embed-skipped', message: 'restricted-permission font' },
+      ],
+    });
+
+    const result = await exportDocument('pptx', makeContext());
+
+    expect(result.preflight).toHaveLength(2);
+    expect(result.preflight[0]).toMatchObject({
+      code: 'shadow-truncated',
+      message: 'multi-shadow truncated',
+      severity: 'warning',
+      elementId: 'el-1',
+    });
+    expect(result.preflight[1]).toMatchObject({
+      code: 'font-embed-skipped',
+      message: 'restricted-permission font',
+      severity: 'warning',
+    });
+    expect(result.preflight[1]?.elementId).toBeUndefined();
+  });
+
+  /**
+   * @description PSD export MUST map each prose warning to a
+   * `PreflightFinding` with the placeholder `'preflight'` code so the
+   * modal can group them. Structured per-cause codes will replace
+   * the placeholder once the lcms-wasm pipeline lands.
+   */
+  it('maps PSD prose warnings to PreflightFinding entries', async () => {
+    mockExportPsdBytesAsyncWithPreflight.mockResolvedValueOnce({
+      bytes: new Uint8Array([7, 8, 9]),
+      warnings: ['Animation dropped on "Hero"', 'Smart object link unsupported'],
+    });
+
+    const result = await exportDocument('psd', makeContext());
+
+    expect(result.warnings).toHaveLength(2);
+    expect(result.preflight).toHaveLength(2);
+    expect(result.preflight[0]).toEqual({
+      code: 'preflight',
+      message: 'Animation dropped on "Hero"',
+      severity: 'warning',
+    });
+  });
+
+  /**
+   * @description SVG export MUST map each prose warning to a
+   * `PreflightFinding` with the `'svg-preflight'` placeholder code.
+   */
+  it('maps SVG prose warnings to PreflightFinding entries', async () => {
+    mockExportSvgDocument.mockResolvedValueOnce({
+      svg: '<svg></svg>',
+      warnings: ['Inter has no embed permission'],
+    });
+
+    const result = await exportDocument('svg', makeContext());
+
+    expect(result.preflight).toHaveLength(1);
+    expect(result.preflight[0]).toEqual({
+      code: 'svg-preflight',
+      message: 'Inter has no embed permission',
+      severity: 'warning',
+    });
+  });
+
+  /**
+   * @description PSD export MUST call the preflight-aware variant
+   * (`exportPsdBytesAsyncWithPreflight`) so the bridge can surface
+   * structured findings via `ExportDocumentResult.preflight` — and
+   * MUST trigger a file download with the .psd extension.
+   */
   it('exports PSD format and triggers download', async () => {
     await exportDocument('psd', makeContext());
 
-    expect(mockExportPsdBytesAsync).toHaveBeenCalledTimes(1);
+    expect(mockExportPsdBytesAsyncWithPreflight).toHaveBeenCalledTimes(1);
     expect(mockTriggerDownload).toHaveBeenCalledTimes(1);
 
     const [, filename] = mockTriggerDownload.mock.calls[0] as [Blob, string];

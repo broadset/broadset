@@ -339,8 +339,10 @@ export function DemoApp(): React.JSX.Element {
   }, []);
 
   const {
+    dismissExportPreflightModal,
     dismissImportReconciliationModal,
     dismissImportWarningsModal,
+    exportPreflightModal,
     exportProgress,
     handleCreateFromPreset,
     handleDebugSnapshotDownload,
@@ -705,6 +707,8 @@ export function DemoApp(): React.JSX.Element {
       dismissImportWarningsModal={dismissImportWarningsModal}
       importReconciliationModal={importReconciliationModal}
       dismissImportReconciliationModal={dismissImportReconciliationModal}
+      exportPreflightModal={exportPreflightModal}
+      dismissExportPreflightModal={dismissExportPreflightModal}
       handleMediaSelect={handleMediaSelect}
       handleOpenImportDialog={handleOpenImportDialog}
       handleResetPlayback={handleResetPlayback}

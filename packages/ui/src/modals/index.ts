@@ -30,6 +30,12 @@ export {
 } from './format-export-options';
 export { FormatImportWarningsModal, type FormatImportWarningsModalProps } from './format-import-warnings';
 export {
+  FormatPreflightModal,
+  type FormatPreflightModalProps,
+  type PreflightFinding,
+  type PreflightSeverity,
+} from './format-preflight';
+export {
   type FormatReconciliationData,
   type FormatReconciliationElementSummary,
   FormatReconciliationModal,

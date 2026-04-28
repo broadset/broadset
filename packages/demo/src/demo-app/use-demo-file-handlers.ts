@@ -4,7 +4,7 @@ import { createEmptyBroadsetDocument } from '@broadset/model';
 import type { PlaybackController } from '@broadset/playback';
 import { computeTimelineLoopDuration, createPlaybackController } from '@broadset/playback';
 import { createScreenRenderer } from '@broadset/renderer';
-import type { DocumentPreset, ExportProgress, MediaAsset, TemplateEntry } from '@broadset/ui';
+import type { DocumentPreset, ExportProgress, MediaAsset, PreflightFinding, TemplateEntry } from '@broadset/ui';
 import type { ChangeEvent, Dispatch, RefObject, SetStateAction } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -106,10 +106,24 @@ export interface ImportReconciliationModalElement {
   readonly description?: string;
 }
 
+/**
+ * Per-format export preflight findings surfaced via
+ * `FormatPreflightModal`. Replaces the silent flatten of
+ * `PptxExportReport.warnings` (and the prose-only PSD/SVG warnings)
+ * into a single toast string. Phase 1.3 of
+ * `project/implementation/cross-format-io-improvement-plan.md`.
+ */
+export interface ExportPreflightModalState {
+  readonly formatLabel: string;
+  readonly findings: readonly PreflightFinding[];
+}
+
 interface DemoFileHandlers {
   readonly exportProgress: ExportProgress | null;
   readonly importWarningsModal: ImportWarningsModalState | null;
   readonly importReconciliationModal: ImportReconciliationModalState | null;
+  readonly exportPreflightModal: ExportPreflightModalState | null;
+  readonly dismissExportPreflightModal: () => void;
   readonly dismissImportReconciliationModal: () => void;
   readonly dismissImportWarningsModal: () => void;
   readonly handleCreateFromPreset: (preset: DocumentPreset) => void;
@@ -562,11 +576,15 @@ export function useDemoFileHandlers({
   const [importReconciliationModal, setImportReconciliationModal] = useState<ImportReconciliationModalState | null>(
     null,
   );
+  const [exportPreflightModal, setExportPreflightModal] = useState<ExportPreflightModalState | null>(null);
   const dismissImportWarningsModal = useCallback((): void => {
     setImportWarningsModal(null);
   }, []);
   const dismissImportReconciliationModal = useCallback((): void => {
     setImportReconciliationModal(null);
+  }, []);
+  const dismissExportPreflightModal = useCallback((): void => {
+    setExportPreflightModal(null);
   }, []);
 
   useEffect(() => {
@@ -792,6 +810,17 @@ export function useDemoFileHandlers({
             pushToast('success', `Exported as ${exporter.toUpperCase()}.`);
           }
 
+          // Cross-format-io improvement plan Phase 1.3 — open the
+          // structured preflight modal whenever the bridge surfaces
+          // findings so users see codes / element ids / hints, not
+          // just the toast preview.
+          if (exportResult.preflight.length > 0) {
+            setExportPreflightModal({
+              formatLabel: exporter.toUpperCase(),
+              findings: exportResult.preflight,
+            });
+          }
+
           document.body.setAttribute('data-export-status', 'done');
         } finally {
           videoSession?.session.dispose();
@@ -835,8 +864,10 @@ export function useDemoFileHandlers({
   );
 
   return {
+    dismissExportPreflightModal,
     dismissImportReconciliationModal,
     dismissImportWarningsModal,
+    exportPreflightModal,
     exportProgress,
     handleCreateFromPreset,
     handleDebugSnapshotDownload,
