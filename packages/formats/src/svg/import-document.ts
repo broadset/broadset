@@ -5,6 +5,7 @@ import {
   type BroadsetElementStyleInput,
   type BroadsetFill,
   type BroadsetGradient,
+  checkElementContentSecurity,
   createDefaultElement,
   createEmptyBroadsetDocument,
   type DataFieldBinding,
@@ -128,6 +129,37 @@ function hydrateEmptyDocument(fileName: string, warnings: string[]): SvgDocument
     document: { ...emptyDoc, name: fileName.replace(/\.svg$/i, '') },
     warnings,
   };
+}
+
+/**
+ * Run the security-relevant element-schema checks
+ * (`isLikelyUrlLikeContent` for image/video href content,
+ * `containsScriptMarkers` for HTML/SVG-rendered content) on a freshly
+ * hydrated element. If any issue fires, the element is dropped from
+ * the persisted document and a warning is surfaced per IO-D-18; an
+ * issue-free element passes through unchanged. Closes KNOWN-GAPS H2:
+ * the importer's own scheme allowlist (`stripJavascriptUrlsFromEl`)
+ * and the renderer's URL allowlist still scrub at their respective
+ * boundaries, but this gate stops the element from reaching the
+ * persisted document with bytes the model schema's `superRefine`
+ * would have rejected — closing the false-sense-of-safety footgun
+ * around re-export.
+ */
+function applyContentSecurityGate(
+  candidate: BroadsetElement,
+  warnings: string[],
+): BroadsetElement | null {
+  const issues = checkElementContentSecurity(candidate);
+
+  if (issues.length === 0) {
+    return candidate;
+  }
+
+  warnings.push(
+    `SVG import: element "${candidate.id}" (type: ${candidate.type}) failed schema content-security validation [${issues.join(', ')}]; element dropped.`,
+  );
+
+  return null;
 }
 
 /**
@@ -284,11 +316,19 @@ function hydrateFastPath(
   let fallbackIndex = 0;
 
   for (const visualEl of visualExtract.elements) {
-    if (visualEl.dataBsId !== undefined) {
-      hydrated.push(hydrateTaggedElement(visualEl, metadataById));
-    } else {
-      hydrated.push(hydrateUntaggedElement(visualEl, fallbackIndex));
+    const candidate =
+      visualEl.dataBsId !== undefined ?
+        hydrateTaggedElement(visualEl, metadataById)
+      : hydrateUntaggedElement(visualEl, fallbackIndex);
+
+    if (visualEl.dataBsId === undefined) {
       fallbackIndex += 1;
+    }
+
+    const validated = applyContentSecurityGate(candidate, warnings);
+
+    if (validated !== null) {
+      hydrated.push(validated);
     }
   }
 
@@ -350,34 +390,44 @@ function hydrateThirdPartyFallbackFromDoc(
     }
   });
 
+  const hydratedElements: BroadsetElement[] = [];
+
+  result.elements.forEach((element, index) => {
+    const id = element.dataBsId ?? `imported-${String(index)}`;
+    const parentSourceId = element.parentDataBsId;
+    const resolvedParentId =
+      typeof parentSourceId === 'string' && parentSourceId !== '' ?
+        (sourceIdToBroadsetId.get(parentSourceId) ?? null)
+      : null;
+    const sourceKind = pickDefaultKindFromVisual(element.type);
+    const friendlyName = resolveImportedName(element, id, sourceKind, index);
+
+    const candidate = createDefaultElement(sourceKind, {
+      id,
+      name: friendlyName,
+      position: { x: element.position.x, y: element.position.y },
+      width: element.width,
+      height: element.height,
+      rotation: element.rotation,
+      content: element.content,
+      style: element.style,
+      ...(resolvedParentId !== null ? { parentId: resolvedParentId } : {}),
+      ...(element.textPathElementId !== undefined ? { textPathElementId: element.textPathElementId } : {}),
+      extensions: { svg: buildSvgExtensions(element) },
+    });
+
+    const validated = applyContentSecurityGate(candidate, warnings);
+
+    if (validated !== null) {
+      hydratedElements.push(validated);
+    }
+  });
+
   const document: BroadsetDocument = {
     ...emptyDoc,
     name: fileName.replace(/\.svg$/i, ''),
     canvas: { ...emptyDoc.canvas, width: result.canvasWidth, height: result.canvasHeight },
-    elements: result.elements.map((element, index) => {
-      const id = element.dataBsId ?? `imported-${String(index)}`;
-      const parentSourceId = element.parentDataBsId;
-      const resolvedParentId =
-        typeof parentSourceId === 'string' && parentSourceId !== '' ?
-          (sourceIdToBroadsetId.get(parentSourceId) ?? null)
-        : null;
-      const sourceKind = pickDefaultKindFromVisual(element.type);
-      const friendlyName = resolveImportedName(element, id, sourceKind, index);
-
-      return createDefaultElement(sourceKind, {
-        id,
-        name: friendlyName,
-        position: { x: element.position.x, y: element.position.y },
-        width: element.width,
-        height: element.height,
-        rotation: element.rotation,
-        content: element.content,
-        style: element.style,
-        ...(resolvedParentId !== null ? { parentId: resolvedParentId } : {}),
-        ...(element.textPathElementId !== undefined ? { textPathElementId: element.textPathElementId } : {}),
-        extensions: { svg: buildSvgExtensions(element) },
-      });
-    }),
+    elements: hydratedElements,
   };
 
   if (document.elements.length === 0) {

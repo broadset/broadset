@@ -95,6 +95,50 @@ function containsScriptMarkers(content: string): boolean {
 }
 
 /**
+ * Tags returned by {@link checkElementContentSecurity} when content
+ * fails the security-relevant checks the element schema's
+ * `superRefine` enforces. Importers MUST treat any non-empty result
+ * as a "drop or sanitise" signal and surface a warning.
+ */
+export type ElementContentSecurityIssue = 'script-markers' | 'unsafe-url-shape';
+
+interface ElementContentSecurityCandidate {
+  readonly type: string;
+  readonly content: string | TextBody;
+}
+
+/**
+ * Runs the security-relevant subset of the element schema's
+ * `superRefine` block — `containsScriptMarkers` for HTML/SVG-rendered
+ * content and `isLikelyUrlLikeContent` for image/video href content —
+ * on a candidate element. Returns the list of issues that fired (an
+ * empty array means the content cleared the security gate). Importers
+ * should call this on every hydrated element before pushing to the
+ * persisted document; this is the defence-in-depth gate that closes
+ * the SVG track's H2 gap (the schema's other checks are correctness
+ * invariants — dimension positivity, path-data validity — that the
+ * importer is responsible for satisfying upstream and that the full
+ * `elementSchema.parse` will still enforce when the document is
+ * persisted or re-imported).
+ */
+export function checkElementContentSecurity(
+  candidate: ElementContentSecurityCandidate,
+): readonly ElementContentSecurityIssue[] {
+  const issues: ElementContentSecurityIssue[] = [];
+  const contentString = resolveContentAsPlainString(candidate.content);
+
+  if ((candidate.type === 'image' || candidate.type === 'video') && !isLikelyUrlLikeContent(contentString)) {
+    issues.push('unsafe-url-shape');
+  }
+
+  if (HTML_RENDERED_ELEMENT_TYPES.has(candidate.type) && containsScriptMarkers(contentString)) {
+    issues.push('script-markers');
+  }
+
+  return issues;
+}
+
+/**
  * Normalizes element content for persisted output. Text elements run
  * the plain-string form through `sanitizeTextContent`; {@link TextBody}
  * payloads are kept verbatim (run-level sanitization happens at the
