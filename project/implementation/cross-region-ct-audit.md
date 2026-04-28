@@ -2,7 +2,7 @@
 
 Date: 2026-04-20
 Owner: Follow-up implementation agent
-Status: ready for Ralph loop execution
+Status: inventory complete; CT gap closure pending as of 2026-04-28
 
 This plan closes the CT Derivation Rule gap left by `test-improvement-plan.md`. TI-3.2 exercised three flows (object-fit, typography, spacing) plus the modal/snapshot flows picked up ad hoc. This plan systematically audits every spec, classifies cross-region scenarios, and writes CT coverage for any that lack it.
 
@@ -66,14 +66,14 @@ Run in this order unless explicitly redirected:
 
 ## Ralph Invocation Notes
 
-Use Ralph with either no argument (first unchecked unit in this file) or an explicit unit id. After CRA-1.4 lands, a materialized batch of CRA-2.x units will appear in this file — resume from the first unchecked one.
+Use Ralph with either no argument (first unchecked unit in this file) or an explicit unit id. CRA-1.4 materialized the CRA-2.x work queue in `cross-region-ct-inventory.md`; resume from the first unchecked CRA-2.x inventory unit.
 
 ## Units
 
 ### Unit CRA-1.1 Inventory cross-region scenarios in `project/spec/editor/**`
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Scope:
 
@@ -97,8 +97,8 @@ Validation:
 
 ### Unit CRA-1.2 Inventory cross-region scenarios in `project/spec/ui/**`
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Scope:
 
@@ -117,8 +117,8 @@ Validation:
 
 ### Unit CRA-1.3 Inventory cross-region scenarios in `project/spec/demo/**`
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Scope:
 
@@ -136,26 +136,26 @@ Validation:
 
 ### Unit CRA-1.4 Map inventory to existing CT coverage → gap list
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Scope:
 
 - For every `cross-region` row in `cross-region-ct-inventory.md`, grep `packages/demo/ct/**` and `packages/ui/ct/**` for a CT that covers it
 - Mark each row **covered** (cite CT file + test title), **partial** (cite gap), or **missing**
 - Output a "Gap List" section at the bottom of the inventory with every `missing` and `partial` row
-- For each gap, draft a CRA-2.x unit stub in this plan (unit id, target spec, target CT file, a one-line scope) — these are the execution units for Phase 2
+- For each gap, draft a CRA-2.x unit stub (unit id, target spec, target CT file, a one-line scope) — these are the execution units for Phase 2
 
 Acceptance criteria:
 
 - every cross-region row has a coverage verdict
 - Gap List is ordered by UI region affected (canvas first, then properties, layers, toolbar, timeline, modal, bottom bar) so related gaps batch together
-- this plan gains a CRA-2.1 … CRA-2.N section at the bottom matching the Gap List
+- `cross-region-ct-inventory.md` gains a CRA-2.1 … CRA-2.N section matching the Gap List
 - no phantom units: every CRA-2.x corresponds to a concrete inventory row
 
 Validation:
 
-- `rg "^### Unit CRA-2" project/implementation/cross-region-ct-audit.md` count equals Gap List length
+- `rg "^### Unit CRA-2" project/implementation/cross-region-ct-inventory.md` count equals Gap List length
 - spot-check: pick 3 gaps, verify the cited CT file truly lacks an assertion for the target flow
 
 ### Unit CRA-2.x Per-gap CT unit (materialized by CRA-1.4)

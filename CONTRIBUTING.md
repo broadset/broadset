@@ -40,12 +40,25 @@ npm install
 npm run dev          # watch mode build
 npm run build        # production build
 npm run test         # run tests
+npm run test:coverage # run tests with V8 coverage reporters (text-summary, json-summary, html under ./coverage)
 npm run lint         # lint source
 npm run typecheck    # type-check
 npm run quality      # full quality gate for demo (lint + prettier + typecheck + test)
 npm run quality:all  # full quality gate for every package
 npm run ct           # Playwright component tests
+npm run audit:prod   # production-only npm audit (release signoff)
+npm run audit:all    # full npm audit (dev + prod, release signoff)
 ```
+
+## Release Signoff Checklist
+
+Before marking a branch release-ready:
+
+1. `npm ci` from a clean checkout succeeds.
+2. `npm run gate:full` exits 0.
+3. `npm run audit:prod` exits 0 (no shipped runtime vulnerabilities).
+4. `npm run audit:all` exits 0, OR every remaining advisory has a written release-risk acceptance in `project/implementation/dev-audit-remediation.md` with owner + expiry.
+5. Producer compatibility validation per `project/implementation/release-quality-closure-plan.md` RQ-5..RQ-8 has passed for the formats this release ships.
 
 ## Spec Writing Conventions
 

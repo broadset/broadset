@@ -80,3 +80,10 @@ Before a feature group in `plan-phase-N.md` can be marked complete:
 - Code is not complete unless it is tested.
 - Run `npm run test` for unit tests, `npm run ct` for Playwright component tests.
 - Run the full Playwright CT suite before every 25th commit or before concluding a major feature block.
+
+## Coverage
+
+- Run `npm run test:coverage` to emit a V8-backed unit-test coverage report under `coverage/` (HTML, JSON summary, and stdout summary). The report is git-ignored.
+- Per-package and workspace baseline numbers live in `project/implementation/coverage-baseline.md`. Refresh that doc when a package coverage drops materially.
+- Coverage is **not** a release gate — it is a release signal. CT-covered flows do not show up in V8 unit coverage; the cross-region CT audit (`project/implementation/cross-region-ct-audit.md`) is the authoritative coverage surface for cross-region behavior.
+- Before opening a PR that touches a path with low coverage, run `npm run test:coverage` and confirm the touched file's coverage is not regressed in `coverage/index.html`.
