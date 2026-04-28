@@ -10,8 +10,10 @@ import type {
   MediaAsset,
   PreflightFinding,
   ReconciliationChoice,
+  TelemetrySink,
   TemplateEntry,
 } from '@broadset/ui';
+import { emitExportPreflightEvents, noopTelemetrySink } from '@broadset/ui';
 import type { ChangeEvent, Dispatch, RefObject, SetStateAction } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -50,6 +52,14 @@ interface UseDemoFileHandlersOptions {
    * file handler just leaves the existing `projectAssets` in place.
    */
   readonly setProjectAssets?: Dispatch<SetStateAction<BroadsetProject['assets']>>;
+  /**
+   * Cross-format-io improvement plan Phase 5.4 — optional sink the
+   * hook emits structured `'export-preflight'` + `'export-completed'`
+   * events through after each export. Default: `noopTelemetrySink`,
+   * which drops every event so the call stays free in environments
+   * without a telemetry pipeline configured.
+   */
+  readonly telemetrySink?: TelemetrySink;
 }
 
 function formatExportWarningMessage(warnings: readonly string[]): string {
@@ -608,6 +618,7 @@ export function useDemoFileHandlers({
   fileInputRef,
   projectAssets,
   setProjectAssets,
+  telemetrySink = noopTelemetrySink,
 }: UseDemoFileHandlersOptions): DemoFileHandlers {
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [importWarningsModal, setImportWarningsModal] = useState<ImportWarningsModalState | null>(null);
@@ -914,6 +925,12 @@ export function useDemoFileHandlers({
               findings: exportResult.preflight,
             });
           }
+
+          // Cross-format-io improvement plan Phase 5.4 — feed the
+          // telemetry sink so production deployments can aggregate
+          // code counts (no payload bytes). Default sink is no-op so
+          // this stays free in the absence of a configured pipeline.
+          emitExportPreflightEvents(telemetrySink, exporter.toUpperCase(), exportResult.preflight);
 
           document.body.setAttribute('data-export-status', 'done');
         } finally {
