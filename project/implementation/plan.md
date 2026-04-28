@@ -15,6 +15,7 @@ Detailed task-level planning still lives in the dedicated companion files:
 - [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md)
 - [coverage-reporting.md](./coverage-reporting.md)
 - [cross-region-ct-audit.md](./cross-region-ct-audit.md)
+- [release-quality-closure-plan.md](./release-quality-closure-plan.md)
 - [package-split.md](./package-split.md)
 
 Use this file for sequencing. Use the companion files for detailed unit scope,
@@ -68,6 +69,7 @@ Phase 8  → PPTX track
 Phase 9  → PDF/A-2b followup
 Parallel A → Coverage reporting
 Parallel B → Cross-region CT audit
+Release D → Release quality closure
 Deferred C → Package split
 ```
 
@@ -471,11 +473,17 @@ This phase is intentionally deferred until the main PDF track is mature enough.
 ### Phase 9 sequence
 
 #### Phase 9.0 — PDF/A audit and spec update
+
 #### Phase 9.1 — font embedding totality
+
 #### Phase 9.2 — color-management and output-intent enforcement
+
 #### Phase 9.3 — forbidden-feature gating
+
 #### Phase 9.4 — PDF/A metadata and trailer correctness
+
 #### Phase 9.5 — validator integration and CI
+
 #### Phase 9.6 — round-trip support for PDF/A exports
 
 Start this phase only after the PDF track has reached Phase 6.5 or later and the exporter/importer behavior is already stable.
@@ -506,10 +514,15 @@ Recommended slot:
 ### Parallel Track A sequence
 
 #### A.1 — wire `@vitest/coverage-v8` into shared Vitest config
+
 #### A.2 — add exclusion rules and per-package overrides
+
 #### A.3 — add root coverage scripts and ignore rules
+
 #### A.4 — capture and document the baseline report
+
 #### A.5 — update docs and testing guidance
+
 #### A.6 — optional follow-up threshold proposal based on baseline numbers
 
 Exit condition:
@@ -543,15 +556,68 @@ Recommended slot:
 ### Parallel Track B sequence
 
 #### B.1 — inventory cross-region scenarios in `project/spec/editor/**`
+
 #### B.2 — inventory cross-region scenarios in `project/spec/ui/**`
+
 #### B.3 — inventory cross-region scenarios in `project/spec/demo/**`
+
 #### B.4 — consolidate into one gap list
+
 #### B.5 — land missing CT coverage in focused batches
+
 #### B.6 — final regression and gate closeout
 
 Exit condition:
 
 - every identified cross-region scenario has CT coverage or an explicit documented waiver in the owning spec
+
+## Release Track D — Release quality closure
+
+Source of truth: [release-quality-closure-plan.md](./release-quality-closure-plan.md)
+
+This is the coordinating release-readiness track for the current gate-clean branch.
+
+Purpose:
+
+- resolve or explicitly risk-accept full dev audit advisories
+- execute coverage reporting and cross-region CT accountability work
+- run and document real producer compatibility checks for PPTX, PDF, PSD, and SVG
+- align specs and release docs with validated external compatibility
+
+Start conditions:
+
+- `npm run gate:full` green on the branch
+- current release-readiness gaps documented in `production-readiness-rerun-2026-04-28.md`
+
+Recommended slot:
+
+- start immediately after the gate-clean hardening branch stabilizes
+- run before declaring a release candidate production-ready
+- execute coverage and CT units before producer compatibility closeout so test-accountability gaps are visible while real files are being validated
+
+### Release Track D sequence
+
+#### D.1 — resolve full dev audit advisories
+
+#### D.2 — wire coverage reporting and baseline docs
+
+#### D.3 — complete cross-region CT inventory and gap closure
+
+#### D.4 — establish real producer fixture governance and harness
+
+#### D.5 — run PPTX real producer checks
+
+#### D.6 — run PDF real producer checks
+
+#### D.7 — run PSD real producer checks
+
+#### D.8 — run SVG real producer checks
+
+#### D.9 — release compatibility report and fresh-checkout validation
+
+Exit condition:
+
+- release-quality closure plan done definition is met, including clean or accepted audit status, coverage baseline, cross-region CT accountability, producer compatibility report, aligned specs, and fresh-checkout validation
 
 ## Deferred Track C — Package split
 
@@ -648,6 +714,7 @@ Followup:
 Supporting tracks:
 	Parallel A Coverage reporting
 	Parallel B Cross-region CT audit
+	Release D Release quality closure
 
 Deferred structural track:
 	Deferred C Package split
@@ -665,6 +732,7 @@ io-prereqs 0 → 1 → 2 → renderer-refactor → io-prereqs 4
 
 parallel: coverage-reporting
 parallel: cross-region-ct-audit
+release: release-quality-closure
 
 deferred-after-main-program: package-split
 ```
@@ -673,7 +741,7 @@ deferred-after-main-program: package-split
 
 Status is collected here so this file is the single place to check planning state.
 
-As of 2026-04-23:
+As of 2026-04-28:
 
 - **io-prereqs:** draft — pre-Phase 0
 - **renderer refactor:** draft — extracted from io-prereqs Phase 3 into its own detailed plan
@@ -683,8 +751,9 @@ As of 2026-04-23:
 - **PPTX support:** draft — pre-Phase 0
 - **PDF/A-2b compliance:** complete — all 7 P9 units shipped (PDF/A spec section + acceptance criteria, bundled minimal sRGB v2 profile via `_shared/color/getDefaultProfile`, `pdfaConformance: '2b'` opt-in on `exportPdfBytes` / `exportPdfWithPreflight`, `/OutputIntents` + `/GTS_PDFA1` + ICC stream, `pdfaid:part`/`pdfaid:conformance` XMP block, deterministic trailer `/ID` array, in-tree `validatePdfA2b` structural validator, round-trip identifier preservation via `extensions.pdf.pdfa`). Real sRGB IEC61966-2.1 profile embed, font-subsetting totality, and veraPDF CI integration recorded as Spec Gaps in `project/spec/formats/pdf.md`.
 - **io-prereqs UI features:** draft companion plan — consumed during io-prereqs Phase 5 interleaves
-- **coverage reporting:** ready for Ralph loop execution
-- **cross-region CT audit:** ready for Ralph loop execution
+- **coverage reporting:** complete — non-gating V8 coverage is wired, documented, and baselined.
+- **cross-region CT audit:** inventory complete; gap closure pending — 120 cross-region bullets mapped, with 65 covered, 22 partial, and 33 missing.
+- **release quality closure:** in progress — audits, coverage, and producer fixture governance/harness are complete; CT gap closure and real producer validation remain.
 - **package split:** proposed planning-only followup — deferred until after the main format program
 
 Completed reference:
@@ -713,6 +782,7 @@ Current master-plan state:
   - P8.6 UI wiring: PPTX dispatch wired through `formatBridge.ts`; shared `FormatImportWarningsModal` + `FormatExportOptionsModal` from I5.1 cover the format
   - **Audit gaps (closed during audit pass):** invalid `<p:spTgt bset-id>` attribute → canonical `spid`; theme-colour preservation; multi-run TextBody; gradient + arrow-end + raw preservation; XMP packet emission; placeholder cascade through master; preset shape expansion. **Known deviations remaining:** importer regex parsing (rebuild to fast-xml-parser AST tracked); page-override content/style/assetId (model-level work); `<a:blipFill>` srcRect crop baking; non-`entr` `<p:timing>` presets.
 - PDF/A-2b followup: not started
-- Coverage reporting: not started
-- Cross-region CT audit: not started
+- Coverage reporting: complete — `npm run test:coverage` emits HTML/JSON/text reports and `coverage-baseline.md` plus threshold proposal are present.
+- Cross-region CT audit: inventory complete; gap closure pending — `cross-region-ct-inventory.md` lists the 74 CRA-2.x work items that remain before closeout.
+- Release quality closure: in progress — D.1, D.2, and D.4 are complete; D.3 gap closure, D.5-D.8 producer runs, and D.9 fresh-checkout validation remain.
 - Package split: deferred, not started

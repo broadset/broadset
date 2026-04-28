@@ -2,7 +2,7 @@
 
 Date: 2026-04-20
 Owner: Follow-up implementation agent
-Status: ready for Ralph loop execution
+Status: complete as of 2026-04-28
 
 Add runtime coverage reporting to the Vitest test stack. Coverage is a signal, not a gate — we want visibility into untested branches without blocking PRs on threshold noise.
 
@@ -22,8 +22,8 @@ Add runtime coverage reporting to the Vitest test stack. Coverage is a signal, n
 
 Each unit below is implemented test-first.
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 A unit is complete only when both boxes are checked and the listed validation commands pass.
 
@@ -63,8 +63,8 @@ Run in this order unless explicitly redirected:
 
 ### Unit CR-1.1 Install `@vitest/coverage-v8` and wire coverage into `vitest.base.ts`
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Scope:
 
@@ -103,8 +103,8 @@ Validation:
 
 ### Unit CR-1.2 Exclusion rules and per-package coverage overrides
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Scope:
 
@@ -134,8 +134,8 @@ Validation:
 
 ### Unit CR-1.3 Root `test:coverage` script + gitignore
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Scope:
 
@@ -163,8 +163,8 @@ Validation:
 
 ### Unit CR-2.1 Baseline measurement
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Scope:
 
@@ -189,8 +189,8 @@ Validation:
 
 ### Unit CR-2.2 Documentation update
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Scope:
 
@@ -212,8 +212,8 @@ Validation:
 
 ### Unit CR-3.1 (Optional) Propose threshold levels
 
-- [ ] tests: red
-- [ ] impl: green
+- [x] tests: red
+- [x] impl: green
 
 Scope:
 

@@ -168,23 +168,37 @@ Source of truth: [plan.md](./plan.md), [pdf-pdfa-compliance-plan.md](./pdf-pdfa-
 
 Source of truth: [plan.md](./plan.md), [coverage-reporting.md](./coverage-reporting.md)
 
-- [ ] A.1 Wire `@vitest/coverage-v8` into shared Vitest config
-- [ ] A.2 Add exclusion rules and per-package overrides
-- [ ] A.3 Add root coverage scripts and ignore rules
-- [ ] A.4 Capture and document the baseline report
-- [ ] A.5 Update docs and testing guidance
-- [ ] A.6 Evaluate a follow-up threshold proposal from baseline numbers
+- [x] A.1 Wire `@vitest/coverage-v8` into shared Vitest config
+- [x] A.2 Add exclusion rules and per-package overrides
+- [x] A.3 Add root coverage scripts and ignore rules
+- [x] A.4 Capture and document the baseline report
+- [x] A.5 Update docs and testing guidance
+- [x] A.6 Evaluate a follow-up threshold proposal from baseline numbers
 
 ### Parallel Track B — Cross-region CT audit
 
 Source of truth: [plan.md](./plan.md), [cross-region-ct-audit.md](./cross-region-ct-audit.md)
 
-- [ ] B.1 Inventory cross-region scenarios in `project/spec/editor/**`
-- [ ] B.2 Inventory cross-region scenarios in `project/spec/ui/**`
-- [ ] B.3 Inventory cross-region scenarios in `project/spec/demo/**`
-- [ ] B.4 Consolidate the gap list
+- [x] B.1 Inventory cross-region scenarios in `project/spec/editor/**`
+- [x] B.2 Inventory cross-region scenarios in `project/spec/ui/**`
+- [x] B.3 Inventory cross-region scenarios in `project/spec/demo/**`
+- [x] B.4 Consolidate the gap list
 - [ ] B.5 Land missing CT coverage in focused batches
 - [ ] B.6 Run final regression and gate closeout
+
+### Release Track D — Release quality closure
+
+Source of truth: [plan.md](./plan.md), [release-quality-closure-plan.md](./release-quality-closure-plan.md)
+
+- [x] D.1 Resolve full dev audit advisories
+- [x] D.2 Wire coverage reporting and baseline docs
+- [ ] D.3 Complete cross-region CT inventory and gap closure (inventory done; gap closure pending)
+- [x] D.4 Establish real producer fixture governance and harness
+- [ ] D.5 Run PPTX real producer compatibility checks
+- [ ] D.6 Run PDF real producer compatibility checks
+- [ ] D.7 Run PSD real producer compatibility checks
+- [ ] D.8 Run SVG real producer compatibility checks
+- [ ] D.9 Complete release compatibility report and fresh-checkout validation
 
 ## Deferred structural track
 
@@ -212,22 +226,22 @@ Outcome of the 2026-04-28 cross-format analysis (PDF / PSD / PPTX / SVG). Lights
 - [x] CFIO.3.1 Promote text-unicode detector to `_shared/text-layout` (`51728ef`); PDF's bidi-reorder + uax14-linebreak left in pdf/ (PDF-execution-specific)
 - [x] CFIO.3.2 Extract CSS shadow / glow parsing to `_shared/effects` (`bc1fa8d`)
 - [x] CFIO.3.3 Extract canvas-unit conversion to `_shared/geometry` (`bc1fa8d`); SVG matrix decomp deferred until 2nd consumer
-- [ ] CFIO.4.1 PSD CMYK / Lab / Grayscale + ICC profile round-trip *(needs sub-plan; blocks on `_shared/color/lcms-wasm`)*
-- [ ] CFIO.4.2 PDF P6.3 — real shading patterns + per-element OCG wrappers *(needs sub-plan)*
-- [ ] CFIO.4.3 PSD effects parity (bevel / satin / pattern overlay preserve, inner glow / overlays native) *(needs sub-plan)*
+- [ ] CFIO.4.1 PSD CMYK / Lab / Grayscale + ICC profile round-trip _(needs sub-plan; blocks on `_shared/color/lcms-wasm`)_
+- [ ] CFIO.4.2 PDF P6.3 — real shading patterns + per-element OCG wrappers _(needs sub-plan)_
+- [ ] CFIO.4.3 PSD effects parity (bevel / satin / pattern overlay preserve, inner glow / overlays native) _(needs sub-plan)_
 - [x] CFIO.4.4 PSD bitmap layer mask round-trip — `extensions.psd.bitmapMask` round-trips alpha bytes; vector mask wins as editable Broadset surface when both present; validator surfaces per-kind mask counts via `PsdValidationResult.masks` (helper + tests landed in `43172a7`, wiring landed in `6844506`)
 - [x] CFIO.4.5 PSD text rotation through ag-psd text-transform (`1ab6354`)
-- [ ] CFIO.4.6 PSD 16/32-bpc bit-depth preservation *(needs sub-plan)*
+- [ ] CFIO.4.6 PSD 16/32-bpc bit-depth preservation _(needs sub-plan)_
 - [x] CFIO.4.7 PPTX font weight / style variants — closes pptx-known-gaps A4 (`24dcb7f`)
 - [x] CFIO.4.8 PPTX page-override extension to `PageElementInstance` — closes A2 (`c99d646`)
 - [x] CFIO.4.9 Reconciliation conflict-resolution UI — closes A1 (`24b7fc0`); generalised across all four formats
-- [ ] CFIO.4.10 `_shared/css` extraction *(deferred per YAGNI until PPTX needs it)*
-- [ ] CFIO.5.1 PPTX visual-fidelity CI gate (closes S3) *(needs sub-plan; needs CI infra changes)*
-- [ ] CFIO.5.2 PowerPoint-on-Windows manual sanity protocol (closes S2) *(needs Windows + PowerPoint host)*
-- [ ] CFIO.5.3 Real licensed fixture mounts in CI for PPTX + PSD *(needs encrypted CI mount strategy)*
+- [ ] CFIO.4.10 `_shared/css` extraction _(deferred per YAGNI until PPTX needs it)_
+- [ ] CFIO.5.1 PPTX visual-fidelity CI gate (closes S3) _(needs sub-plan; needs CI infra changes)_
+- [ ] CFIO.5.2 PowerPoint-on-Windows manual sanity protocol (closes S2) _(needs Windows + PowerPoint host)_
+- [ ] CFIO.5.3 Real licensed fixture mounts in CI for PPTX + PSD _(needs encrypted CI mount strategy)_
 - [x] CFIO.5.4 Telemetry sink for warning codes — closes B1 (`d54ef40`)
-- [ ] CFIO.5.5 Accessibility audit on new modals (closes B3) *(needs hands-on screen-reader walkthrough)*
+- [ ] CFIO.5.5 Accessibility audit on new modals (closes B3) _(needs hands-on screen-reader walkthrough)_
 - [x] CFIO.5.6 Sister-format audits — PSD / SVG / PDF (closes B4) — applied PPTX Phase 8 audit lens (silent drops, lazy-boundary checks, perf scaling, async resource resolvers) to PSD / SVG / PDF tracks. Findings landed in [`project/implementation/sister-format-audit.md`](sister-format-audit.md); High / Critical findings filed back into per-track gap files (PSD = 5 entries in `psd.md` §Spec Gaps, PDF = 6 entries in `pdf.md` §Spec Gaps; SVG had no High findings — track is the best-audited under all four lenses)
-- [ ] CFIO.5.7 Real-world large-deck load tests (closes B2) *(needs acquiring decks)*
+- [ ] CFIO.5.7 Real-world large-deck load tests (closes B2) _(needs acquiring decks)_
 - [x] CFIO.5.8 PDF font subsetting wiring — pdf-lib's `CustomFontSubsetEmbedder` (registered `@pdf-lib/fontkit`) drives subset emission with `/ToUnicode` CMap by default; `PdfExportOptions.subsetFonts: false` plumbed end-to-end for archival full-face embed; closes [pdf.md spec gap §3](../spec/formats/pdf.md). Verified by `font-subset-shared-pipeline.test.ts` + existing `font-subset-effectiveness.test.ts` / `woff2-and-tounicode.test.ts`
 - [x] CFIO.6 Gap-file rolling updates — SVG KNOWN-GAPS (H2/M2 deleted), pptx-known-gaps (A1/A2/A4/B1 deleted), PSD spec (text rotation, smart-object link, page overrides removed), PDF spec (cross-references added)
