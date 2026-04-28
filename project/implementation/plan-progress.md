@@ -227,7 +227,7 @@ Outcome of the 2026-04-28 cross-format analysis (PDF / PSD / PPTX / SVG). Lights
 - [ ] CFIO.5.3 Real licensed fixture mounts in CI for PPTX + PSD *(needs encrypted CI mount strategy)*
 - [x] CFIO.5.4 Telemetry sink for warning codes — closes B1 (`d54ef40`)
 - [ ] CFIO.5.5 Accessibility audit on new modals (closes B3) *(needs hands-on screen-reader walkthrough)*
-- [ ] CFIO.5.6 Sister-format audits — PSD / SVG / PDF (closes B4) *(needs sub-plan)*
+- [x] CFIO.5.6 Sister-format audits — PSD / SVG / PDF (closes B4) — applied PPTX Phase 8 audit lens (silent drops, lazy-boundary checks, perf scaling, async resource resolvers) to PSD / SVG / PDF tracks. Findings landed in [`project/implementation/sister-format-audit.md`](sister-format-audit.md); High / Critical findings filed back into per-track gap files (PSD = 5 entries in `psd.md` §Spec Gaps, PDF = 6 entries in `pdf.md` §Spec Gaps; SVG had no High findings — track is the best-audited under all four lenses)
 - [ ] CFIO.5.7 Real-world large-deck load tests (closes B2) *(needs acquiring decks)*
 - [ ] CFIO.5.8 PDF font subsetting wiring *(needs sub-plan)*
 - [x] CFIO.6 Gap-file rolling updates — SVG KNOWN-GAPS (H2/M2 deleted), pptx-known-gaps (A1/A2/A4/B1 deleted), PSD spec (text rotation, smart-object link, page overrides removed), PDF spec (cross-references added)

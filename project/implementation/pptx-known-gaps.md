@@ -14,7 +14,6 @@ Gaps" section in [project/spec/formats/pptx.md](../spec/formats/pptx.md)
 > [cross-format I/O improvement plan](cross-format-io-improvement-plan.md):
 >
 > - **B3** (accessibility audit on new modals) — Phase 5.5.
-> - **B4** (sister-format audits) — Phase 5.6.
 > - **S1** (CI jobs unverified end-to-end) — closes once branch lands.
 > - **S2** (PowerPoint-on-Windows sanity) — Phase 5.2.
 > - **S3** (visual fidelity coverage) — Phase 5.1.
@@ -110,14 +109,6 @@ of the Accordion expand / collapse.
 **To close:** run the demo with VoiceOver / NVDA, fix focus and
 labelling issues, add CT coverage for keyboard navigation of the
 new modal surfaces.
-
-### B4. Sister formats didn't get this audit
-
-This Phase 8 push focused on PPTX. The same patterns (silent drops,
-lazy-boundary checks, perf scaling, async resource resolvers)
-probably apply to `psd`, `svg`, and `pdf` tracks. They're outside
-Phase 8 scope but a similar audit pass before each format track is
-declared production-ready is wise.
 
 ## Other deferred items
 
