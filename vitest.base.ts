@@ -35,5 +35,41 @@ export const createVitestConfig = ({ environment }: BroadsetVitestOptions): Vite
     include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: environment === 'jsdom' ? [setupFilePath] : [],
     css: false,
+    // Coverage instrumentation slows hot loops measurably; allow
+    // longer timeouts when coverage is on so the SVG fan-out / large-
+    // deck stress tests don't false-fail under v8 instrumentation.
+    testTimeout: process.env['VITEST_COVERAGE'] === '1' ? 60_000 : 5_000,
+    /*
+     * V8-backed coverage collection. Coverage is **opt-in** via
+     * `VITEST_COVERAGE=1` so the default `npm run test` path stays
+     * fast; `npm run test:coverage` flips it on at the workspace
+     * root. Reporter set: `text-summary` (stdout snapshot),
+     * `json-summary` (machine-readable for tooling and the
+     * `coverage-baseline.md` doc), and `html` (browseable locally).
+     * Coverage output is gitignored — see `.gitignore`.
+     */
+    coverage: {
+      provider: 'v8',
+      enabled: process.env['VITEST_COVERAGE'] === '1',
+      reporter: ['text-summary', 'json-summary', 'html'],
+      reportsDirectory: './coverage',
+      exclude: [
+        '**/*.test.{ts,tsx}',
+        '**/*.d.ts',
+        '**/test-helpers*',
+        '**/*-test-utils*',
+        '**/*-test-helpers*',
+        '**/testing/**',
+        '**/__fixtures__/**',
+        '**/_test-helpers/**',
+        '**/vitest.config.ts',
+        'vitest.base.ts',
+        'packages/*/dist/**',
+        'packages/*/ct/**',
+        'packages/demo/playwright/**',
+        'packages/demo/src/main.tsx',
+        'packages/demo/src/sampleDocument.{ts,json}',
+      ],
+    },
   },
 });

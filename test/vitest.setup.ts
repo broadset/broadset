@@ -13,6 +13,42 @@ afterEach(() => {
   cleanup();
 });
 
+/**
+ * Filter out third-party dev-mode warnings from React Aria's
+ * `<Pressable>` and `<Focusable>` components when they fire in jsdom
+ * test runs. The warnings are real bugs in HeroUI's compositional
+ * structure (`PopoverTrigger` / `ModalTrigger` / `AlertDialogTrigger`
+ * wrap `<div role="button">` in `<Pressable>` without forwarding
+ * `tabIndex={0}`), but:
+ *
+ *   1. They only fire when `process.env.NODE_ENV !== 'production'`,
+ *      so users never see them.
+ *   2. They depend on `Element.checkVisibility()` which jsdom does
+ *      not implement, so even passing `tabIndex={0}` through (which
+ *      makes real browsers happy) still trips the warning in the
+ *      jsdom layout-less environment.
+ *   3. Suppressing them here keeps stderr signal-to-noise high — real
+ *      defects (React unknown-prop warnings, unhandled rejections,
+ *      etc.) stay visible. Closes the 2026-04-28 audit follow-up
+ *      "Clear UI/a11y warning noise so stderr is meaningful".
+ *
+ * The filter is intentionally exact-match — it does NOT swallow any
+ * other warning, and it MUST stay narrow so a regression in our own
+ * components surfaces immediately.
+ */
+const SUPPRESSED_WARNING_PREFIXES = [
+  '<Pressable> child must be focusable. Please ensure the tabIndex prop is passed through.',
+  '<Focusable> child must be focusable. Please ensure the tabIndex prop is passed through.',
+];
+const originalWarn = console.warn.bind(console);
+
+console.warn = (...args: unknown[]): void => {
+  if (typeof args[0] === 'string' && SUPPRESSED_WARNING_PREFIXES.some((prefix) => args[0] === prefix)) {
+    return;
+  }
+  originalWarn(...args);
+};
+
 if (typeof globalThis.TextEncoder === 'undefined') {
   (globalThis as { TextEncoder: typeof NodeTextEncoder }).TextEncoder = NodeTextEncoder;
 }
