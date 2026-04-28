@@ -12,7 +12,7 @@ export function isTextBody(value: unknown): value is TextBody {
   return Array.isArray(maybeBody.paragraphs);
 }
 
-export interface ComposedText {
+interface ComposedText {
   readonly text: string;
   readonly styleRuns: readonly TextStyleRun[];
 }

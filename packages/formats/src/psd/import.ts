@@ -4,8 +4,14 @@ import type {
   BroadsetElementStyleInput,
   BuiltInElementType,
   Canvas,
+  PageElementInstance,
 } from '@broadset/model';
-import { BUILT_IN_ELEMENT_TYPES, styleSchema } from '@broadset/model';
+import {
+  BUILT_IN_ELEMENT_TYPES,
+  createPageElementInstanceForElement,
+  normalizeElementContent,
+  styleSchema,
+} from '@broadset/model';
 import type { Layer } from 'ag-psd';
 import { readPsd } from 'ag-psd';
 
@@ -46,7 +52,7 @@ function createImportedElement(
     width,
     height,
     rotation: 0,
-    content,
+    content: normalizeElementContent(validType, content),
     style: styleSchema.parse({ opacity: 1, ...style }),
     parentId: null,
     groupId: null,
@@ -254,7 +260,7 @@ function importPlacedLayer(layer: Layer, geometry: LayerGeometry, style: Record<
     geometry.position,
     geometry.width,
     geometry.height,
-    style as Partial<BroadsetElementStyleInput>,
+    style,
   );
 }
 
@@ -277,7 +283,7 @@ function importOpenVectorPath(
     geometry.position,
     geometry.width,
     geometry.height,
-    style as Partial<BroadsetElementStyleInput>,
+    style,
   );
 }
 
@@ -314,7 +320,7 @@ function buildElementBody(layer: Layer): BroadsetElement | undefined {
       geometry.position,
       geometry.width,
       geometry.height,
-      style as Partial<BroadsetElementStyleInput>,
+      style,
     );
   }
 
@@ -337,7 +343,7 @@ function buildElementBody(layer: Layer): BroadsetElement | undefined {
     geometry.position,
     geometry.width,
     geometry.height,
-    style as Partial<BroadsetElementStyleInput>,
+    style,
   );
 }
 
@@ -382,7 +388,7 @@ function layerToElement(layer: Layer): BroadsetElement | undefined {
 type PsdPage = {
   readonly id: string;
   readonly name: string;
-  readonly elements: readonly [];
+  readonly elements: readonly PageElementInstance[];
   readonly locale: null;
   readonly extensions: Readonly<Record<string, unknown>>;
 };
@@ -414,17 +420,85 @@ function importGroupLayer(layer: Layer, parentId: string | null): BroadsetElemen
   return { ...base, name: layer.name ?? base.name, parentId };
 }
 
-function collectChildElements(children: readonly Layer[] | undefined, parentId: string | null = null): BroadsetElement[] {
+/**
+ * Per-import budget book-keeping. Threaded through every recursive
+ * call into {@link collectChildElements} so the importer can refuse
+ * to descend past the configured nesting depth (`maxDepth`) and stop
+ * collecting once the cumulative raster pixel total crosses
+ * (`maxTotalPixels`). Both warnings are emitted at most once per
+ * import so a deep tree doesn't fan out into thousands of duplicate
+ * entries; the end-user surface still sees a single structured
+ * notice via `importPsdDocument`.
+ */
+interface PsdImportBudget {
+  readonly maxDepth: number;
+  readonly maxTotalPixels: number;
+  pixelTotal: number;
+  depthWarningEmitted: boolean;
+  pixelWarningEmitted: boolean;
+  readonly warnings: string[];
+}
+
+function pixelCostForLayer(layer: Layer): number {
+  const left = layer.left ?? 0;
+  const top = layer.top ?? 0;
+  const right = layer.right ?? left;
+  const bottom = layer.bottom ?? top;
+  const width = Math.max(0, right - left);
+  const height = Math.max(0, bottom - top);
+
+  return width * height;
+}
+
+function emitDepthWarningOnce(budget: PsdImportBudget): void {
+  if (budget.depthWarningEmitted) return;
+  budget.depthWarningEmitted = true;
+  budget.warnings.push(
+    `PSD import: layer-tree depth cap of ${String(budget.maxDepth)} reached. Layers nested past this depth were dropped to avoid unbounded recursion. Re-run with a higher \`maxDepth\` if you trust this file.`,
+  );
+}
+
+function emitPixelWarningOnce(budget: PsdImportBudget): void {
+  if (budget.pixelWarningEmitted) return;
+  budget.pixelWarningEmitted = true;
+  budget.warnings.push(
+    `PSD import: total pixel cap of ${String(budget.maxTotalPixels)} reached. Subsequent raster layers were dropped to avoid unbounded allocation. Re-run with a higher \`maxTotalPixels\` if you trust this file.`,
+  );
+}
+
+function pixelBudgetExceeded(budget: PsdImportBudget): boolean {
+  return budget.maxTotalPixels > 0 && budget.pixelTotal > budget.maxTotalPixels;
+}
+
+function collectChildElements(
+  children: readonly Layer[] | undefined,
+  parentId: string | null,
+  depth: number,
+  budget: PsdImportBudget,
+): BroadsetElement[] {
+  if (budget.maxDepth > 0 && depth > budget.maxDepth) {
+    emitDepthWarningOnce(budget);
+
+    return [];
+  }
+
   const elements: BroadsetElement[] = [];
 
   for (const child of children ?? []) {
+    if (pixelBudgetExceeded(budget)) {
+      emitPixelWarningOnce(budget);
+      break;
+    }
+
     if (isGroupLayer(child)) {
       const groupEl = importGroupLayer(child, parentId);
 
       elements.push(groupEl);
-      elements.push(...collectChildElements(child.children, groupEl.id));
+      elements.push(...collectChildElements(child.children, groupEl.id, depth + 1, budget));
       continue;
     }
+
+    budget.pixelTotal += pixelCostForLayer(child);
 
     const el = layerToElement(child);
 
@@ -436,36 +510,88 @@ function collectChildElements(children: readonly Layer[] | undefined, parentId: 
   return elements;
 }
 
-function makePage(index: number, name: string): PsdPage {
+function makeEmptyPage(index: number, name: string): PsdPage {
   return { id: `page-${String(index + 1)}`, name, elements: [], locale: null, extensions: {} };
 }
 
-function buildPagesAndElements(psd: ReturnType<typeof readPsd>): {
+interface PsdImportShape {
   readonly pages: PsdPage[];
   readonly elements: BroadsetElement[];
-} {
+  /**
+   * Per-page list of root element IDs in the order the importer
+   * produced them. Used after XMP-driven element-ID reconciliation to
+   * stamp `PageElementInstance` entries onto each page so the active
+   * page actually renders.
+   */
+  readonly rootIdsByPageIndex: readonly (readonly string[])[];
+}
+
+function buildPagesAndElements(psd: ReturnType<typeof readPsd>, budget: PsdImportBudget): PsdImportShape {
   const artboardLayers = (psd.children ?? []).filter((child) => child.artboard);
 
   if (artboardLayers.length === 0) {
+    const flat = collectChildElements(psd.children, null, 0, budget);
+    const rootIds = flat.filter((el) => el.parentId === null).map((el) => el.id);
+
     return {
-      pages: [makePage(0, 'Page 1')],
-      elements: collectChildElements(psd.children),
+      pages: [makeEmptyPage(0, 'Page 1')],
+      elements: flat,
+      rootIdsByPageIndex: [rootIds],
     };
   }
 
   const pages: PsdPage[] = [];
   const elements: BroadsetElement[] = [];
+  const rootIdsByPageIndex: string[][] = [];
 
   for (const artboard of artboardLayers) {
-    pages.push(makePage(pages.length, artboard.name ?? `Page ${String(pages.length + 1)}`));
-    elements.push(...collectChildElements(artboard.children));
+    pages.push(makeEmptyPage(pages.length, artboard.name ?? `Page ${String(pages.length + 1)}`));
+
+    const collected = collectChildElements(artboard.children, null, 0, budget);
+    const rootIds = collected.filter((el) => el.parentId === null).map((el) => el.id);
+
+    elements.push(...collected);
+    rootIdsByPageIndex.push(rootIds);
   }
 
-  return { pages, elements };
+  return { pages, elements, rootIdsByPageIndex };
+}
+
+/**
+ * Default depth cap for PSD layer-tree import. Realistic Photoshop
+ * documents nest 5-10 levels deep at the most extreme; 32 covers
+ * every realistic case while bounding hostile layer trees.
+ */
+const DEFAULT_PSD_MAX_DEPTH = 32;
+
+/**
+ * Default total-pixel budget for raster layers (256 megapixels). A
+ * single full-resolution photographic layer is typically <12 MP, so
+ * this comfortably covers a deck of high-res images while bounding a
+ * gigapixel canvas hostile fixture.
+ */
+const DEFAULT_PSD_MAX_TOTAL_PIXELS = 256 * 1024 * 1024;
+
+export interface PsdImportInternalResult {
+  readonly document: BroadsetDocument;
+  readonly warnings: readonly string[];
 }
 
 /** Import a PSD file and recover BroadsetDocument elements. */
 export function importPsd(data: Uint8Array): BroadsetDocument {
+  return importPsdWithBudget(data).document;
+}
+
+/**
+ * Cap-aware import variant. Returns the document plus structured
+ * warnings emitted by the depth/pixel budgets so the
+ * `importPsdDocument` wrapper can surface them on the
+ * `DocumentImportResult.warnings` channel.
+ */
+export function importPsdWithBudget(
+  data: Uint8Array,
+  options?: { readonly maxDepth?: number | undefined; readonly maxTotalPixels?: number | undefined },
+): PsdImportInternalResult {
   ensureCanvasInitialized();
 
   const psd = readPsd(data.buffer as ArrayBuffer, {
@@ -486,42 +612,71 @@ export function importPsd(data: Uint8Array): BroadsetDocument {
     padding: [0, 0, 0, 0],
     backgroundMode: 'solid',
   };
-  const { pages, elements } = buildPagesAndElements(psd);
+  const budget: PsdImportBudget = {
+    maxDepth: options?.maxDepth ?? DEFAULT_PSD_MAX_DEPTH,
+    maxTotalPixels: options?.maxTotalPixels ?? DEFAULT_PSD_MAX_TOTAL_PIXELS,
+    pixelTotal: 0,
+    depthWarningEmitted: false,
+    pixelWarningEmitted: false,
+    warnings: [],
+  };
+  const { pages, elements, rootIdsByPageIndex } = buildPagesAndElements(psd, budget);
   const xmpPacket = readDocumentXmpPacket(psd);
-  const reconciledElements =
-    xmpPacket ?
-      elements.map((el, index) => {
-        const packetEntry = xmpPacket.elements[index];
 
-        if (packetEntry === undefined) return el;
+  // XMP can rewrite element IDs to round-trip the original IDs from the
+  // exporting Broadset session. Track the mapping so the per-page root
+  // ID lists stay valid after reconciliation.
+  const idRemap = new Map<string, string>();
+  const reconciledElements: BroadsetElement[] = elements.map((el, index) => {
+    if (xmpPacket === null) return el;
 
-        const existingPsdExt =
-          ((el.extensions as Record<string, unknown> | undefined)?.['psd'] as Record<string, unknown> | undefined) ??
-          {};
+    const packetEntry = xmpPacket.elements[index];
 
-        return {
-          ...el,
-          id: packetEntry.id,
-          extensions: {
-            ...el.extensions,
-            psd: {
-              ...existingPsdExt,
-              dirty: false,
-              roundTrip: { signature: 'BsPs', elementId: packetEntry.id },
-            },
-          },
-        } satisfies BroadsetElement;
-      })
-    : elements;
+    if (packetEntry === undefined) return el;
+
+    idRemap.set(el.id, packetEntry.id);
+
+    const existingPsdExt =
+      ((el.extensions as Record<string, unknown> | undefined)?.['psd'] as Record<string, unknown> | undefined) ?? {};
+
+    return {
+      ...el,
+      id: packetEntry.id,
+      extensions: {
+        ...el.extensions,
+        psd: {
+          ...existingPsdExt,
+          dirty: false,
+          roundTrip: { signature: 'BsPs', elementId: packetEntry.id },
+        },
+      },
+    } satisfies BroadsetElement;
+  });
+
+  const elementsById = new Map(reconciledElements.map((el) => [el.id, el]));
+  const pagesWithInstances: PsdPage[] = pages.map((page, pageIndex) => {
+    const rootIds = rootIdsByPageIndex[pageIndex] ?? [];
+
+    return {
+      ...page,
+      elements: rootIds
+        .map((id) => elementsById.get(idRemap.get(id) ?? id))
+        .filter((el): el is BroadsetElement => el !== undefined)
+        .map(createPageElementInstanceForElement),
+    };
+  });
 
   return {
-    id: xmpPacket?.documentId ?? 'imported-psd',
-    name: 'Imported PSD',
-    documentMode: 'screen',
-    canvas,
-    elements: reconciledElements,
-    pages,
-    animations: [],
-    dataSchema: { fields: [] },
-  } satisfies BroadsetDocument;
+    document: {
+      id: xmpPacket?.documentId ?? 'imported-psd',
+      name: 'Imported PSD',
+      documentMode: 'screen',
+      canvas,
+      elements: reconciledElements,
+      pages: pagesWithInstances,
+      animations: [],
+      dataSchema: { fields: [] },
+    } satisfies BroadsetDocument,
+    warnings: budget.warnings,
+  };
 }

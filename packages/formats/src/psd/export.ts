@@ -4,6 +4,7 @@ import type { Layer, Psd } from 'ag-psd';
 import { writePsdUint8Array } from 'ag-psd';
 
 import { canvasUnitToMm, MM_PER_INCH } from '../_shared/geometry';
+import { safeFetchBytes } from '../_shared/network/safe-fetch';
 import { elementToLayer, getPendingLinkedFiles, resetExportState, setPrefetchedUrlImages } from './export-layer';
 import { writeBroadsetXmpForDocument } from './export-xmp';
 import { collectExportOptionsWarnings, collectPreflightWarnings } from './preflight';
@@ -21,7 +22,7 @@ interface PsdImageBytes {
  * remote URL bytes itself, so any `image` element pointing at an
  * `http(s)://` URL must come pre-resolved.
  */
-export interface ExportPsdSyncOptions extends PsdExportOptions {
+interface ExportPsdSyncOptions extends PsdExportOptions {
   readonly prefetchedUrlImages?: ReadonlyMap<string, PsdImageBytes>;
 }
 
@@ -30,7 +31,7 @@ export interface ExportPsdSyncOptions extends PsdExportOptions {
  * the shared `PsdExportOptions` surface so test environments can
  * inject a deterministic fetcher without touching `globalThis.fetch`.
  */
-export interface ExportPsdAsyncOptions extends PsdExportOptions {
+interface ExportPsdAsyncOptions extends PsdExportOptions {
   readonly fetch?: typeof globalThis.fetch;
 }
 
@@ -91,19 +92,21 @@ async function fetchImageAsBytes(
   url: string,
   fetchFn: typeof globalThis.fetch,
 ): Promise<{ readonly mime: string; readonly bytes: Uint8Array } | undefined> {
-  try {
-    const response = await fetchFn(url);
+  // Hardened — `safeFetchBytes` enforces scheme allowlist, timeout,
+  // and byte cap so an arbitrary `image` element URL cannot stall the
+  // exporter or buffer multi-gigabyte responses. Default cap matches
+  // realistic raster sizes (32 MiB) while leaving programmatic
+  // callers room to widen the budget when needed.
+  const result = await safeFetchBytes(url, { fetchFn });
 
-    if (!response.ok) return undefined;
+  if (!result.ok) return undefined;
 
-    const contentType = response.headers.get('content-type') ?? 'image/png';
-    const mime = contentType.split(';')[0]?.trim() ?? 'image/png';
-    const arrayBuffer = await response.arrayBuffer();
+  // Default to image/png so the exporter still produces a valid raster
+  // when the upstream omits a Content-Type. ag-psd writes the bytes
+  // verbatim, so the MIME is only used by the linked-files registry.
+  const mime = result.mime === 'application/octet-stream' ? 'image/png' : result.mime;
 
-    return { mime, bytes: new Uint8Array(arrayBuffer) };
-  } catch {
-    return undefined;
-  }
+  return { mime, bytes: result.bytes };
 }
 
 /**
@@ -146,10 +149,7 @@ function isElementVisibleOnPage(
  * multi-page path. With the default (preserve), single-page exports
  * keep emitting every element regardless of instance visibility.
  */
-function filterElementsForSinglePage(
-  doc: BroadsetDocument,
-  preserveVisibility: boolean,
-): readonly BroadsetElement[] {
+function filterElementsForSinglePage(doc: BroadsetDocument, preserveVisibility: boolean): readonly BroadsetElement[] {
   if (preserveVisibility) return doc.elements;
 
   const onlyPage = doc.pages[0];
@@ -253,10 +253,7 @@ export function exportPsdBytes(doc: BroadsetDocument, options?: ExportPsdSyncOpt
  * provided fetch function (defaults to `globalThis.fetch`). Falls
  * back to data URIs for non-URL content.
  */
-export async function exportPsdBytesAsync(
-  doc: BroadsetDocument,
-  options?: ExportPsdAsyncOptions,
-): Promise<Uint8Array> {
+export async function exportPsdBytesAsync(doc: BroadsetDocument, options?: ExportPsdAsyncOptions): Promise<Uint8Array> {
   const fetchFn = options?.fetch ?? globalThis.fetch;
   const prefetched = new Map<string, { readonly mime: string; readonly bytes: Uint8Array }>();
   const urlElements = doc.elements.filter((el) => {
@@ -333,7 +330,9 @@ export async function exportPsdBytesAsyncWithPreflight(
       continue;
     }
 
-    fetchWarnings.push(`PSD preflight: failed to fetch image "${name}" from ${url}; the layer will export with placeholder pixels.`);
+    fetchWarnings.push(
+      `PSD preflight: failed to fetch image "${name}" from ${url}; the layer will export with placeholder pixels.`,
+    );
   }
 
   setPrefetchedUrlImages(prefetched);

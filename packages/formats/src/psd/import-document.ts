@@ -1,7 +1,11 @@
-import { type BroadsetDocument, createEmptyBroadsetDocument } from '@broadset/model';
+import {
+  createEmptyBroadsetDocument,
+  ensureRootElementsHavePageInstances,
+} from '@broadset/model';
 
 import type { DocumentImportResult } from '../import-document-types';
-import { importPsd } from './import';
+import { importPsdWithBudget, type PsdImportInternalResult } from './import';
+import type { PsdImportOptions } from './types';
 
 /**
  * Warning surfaced when the byte stream does not start with the PSD
@@ -29,6 +33,15 @@ const EMPTY_RESULT_WARNING =
   'PSD import: no elements were recovered. The file may be empty, contain only adjustment layers, or use features outside the current mapping coverage.';
 
 /**
+ * Default cap on PSD input bytes. Mirrors the SVG/PPTX defaults — a
+ * 256 MiB ceiling covers every realistic Photoshop document while
+ * making a multi-GiB OOM bomb impossible. Callers can override via
+ * `PsdImportOptions.maxBytes`; passing `0` disables the cap for
+ * trusted internal flows.
+ */
+const DEFAULT_PSD_MAX_BYTES = 256 * 1024 * 1024;
+
+/**
  * PSD file-header signature: "8BPS" (Adobe Photoshop). PSB documents
  * also start with "8BPS" but advertise version 2 in the next two
  * bytes; we accept both and let ag-psd validate the version.
@@ -54,24 +67,38 @@ function looksLikePsd(bytes: Uint8Array): boolean {
  * pipeline and the cross-format parity tests can treat both formats
  * uniformly.
  */
-export function importPsdDocument(data: Uint8Array): DocumentImportResult {
+export function importPsdDocument(data: Uint8Array, options?: PsdImportOptions): DocumentImportResult {
   if (!looksLikePsd(data)) {
     return { document: createEmptyBroadsetDocument(), warnings: [INVALID_PSD_WARNING] };
   }
 
-  let document: BroadsetDocument;
+  const maxBytes = options?.maxBytes ?? DEFAULT_PSD_MAX_BYTES;
+
+  if (maxBytes > 0 && data.byteLength > maxBytes) {
+    return {
+      document: createEmptyBroadsetDocument(),
+      warnings: [
+        `PSD import rejected: input size ${String(data.byteLength)} bytes exceeds the configured cap of ${String(maxBytes)} bytes. Re-run with a higher \`maxBytes\` if you trust this file.`,
+      ],
+    };
+  }
+
+  let result: PsdImportInternalResult;
 
   try {
-    document = importPsd(data);
+    result = importPsdWithBudget(data, {
+      maxDepth: options?.maxDepth,
+      maxTotalPixels: options?.maxTotalPixels,
+    });
   } catch {
     return { document: createEmptyBroadsetDocument(), warnings: [MALFORMED_PSD_WARNING] };
   }
 
-  const warnings: string[] = [];
+  const warnings: string[] = [...result.warnings];
 
-  if (document.elements.length === 0) {
+  if (result.document.elements.length === 0) {
     warnings.push(EMPTY_RESULT_WARNING);
   }
 
-  return { document, warnings };
+  return { document: ensureRootElementsHavePageInstances(result.document), warnings };
 }

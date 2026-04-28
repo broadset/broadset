@@ -3,4 +3,4 @@
 // flag-day rename across every test file.
 export { elementToLayer } from './export/layer';
 export { getPendingLinkedFiles, resetExportState, setPrefetchedUrlImages } from './export/state';
-export { type ComposedText, composeTextFromBody, isTextBody } from './export/text';
+export { composeTextFromBody, isTextBody } from './export/text';

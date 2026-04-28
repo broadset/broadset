@@ -22,7 +22,7 @@ import { type Layer, type Psd, readPsd } from 'ag-psd';
  * test or from `exportPsdBytesAsyncWithPreflight`.
  */
 
-export interface PsdValidationResult {
+interface PsdValidationResult {
   readonly valid: boolean;
   readonly errors: readonly string[];
   readonly warnings: readonly string[];
@@ -35,7 +35,7 @@ export interface PsdValidationResult {
   readonly masks: PsdMaskCounts;
 }
 
-export interface PsdMaskCounts {
+interface PsdMaskCounts {
   readonly vector: number;
   readonly bitmap: number;
 }
@@ -103,11 +103,15 @@ function validateHeader(psd: Psd, errors: string[]): void {
   // the version flag from the parsed structure, so apply the looser
   // cap and only flag truly out-of-range values.
   if (psd.width > PSB_MAX_DIM) {
-    errors.push(`PSD validator: width ${String(psd.width)} exceeds the PSB cap of ${String(PSB_MAX_DIM)}; Photoshop will refuse this file.`);
+    errors.push(
+      `PSD validator: width ${String(psd.width)} exceeds the PSB cap of ${String(PSB_MAX_DIM)}; Photoshop will refuse this file.`,
+    );
   }
 
   if (psd.height > PSB_MAX_DIM) {
-    errors.push(`PSD validator: height ${String(psd.height)} exceeds the PSB cap of ${String(PSB_MAX_DIM)}; Photoshop will refuse this file.`);
+    errors.push(
+      `PSD validator: height ${String(psd.height)} exceeds the PSB cap of ${String(PSB_MAX_DIM)}; Photoshop will refuse this file.`,
+    );
   }
 
   if (psd.width > PSD_MAX_DIM || psd.height > PSD_MAX_DIM) {
@@ -125,7 +129,9 @@ function validateLayerTree(
   maskCounts: { vector: number; bitmap: number },
 ): void {
   if (depth > SOFT_DEPTH_CAP) {
-    warnings.push(`PSD validator: layer-tree depth ${String(depth)} exceeds the soft cap of ${String(SOFT_DEPTH_CAP)}; deep nests may stress consumer parsers.`);
+    warnings.push(
+      `PSD validator: layer-tree depth ${String(depth)} exceeds the soft cap of ${String(SOFT_DEPTH_CAP)}; deep nests may stress consumer parsers.`,
+    );
   }
 
   for (const layer of layers) {
@@ -173,17 +179,23 @@ function validateLayerGeometry(layer: Layer, errors: string[], warnings: string[
     // geometry — Photoshop infers the bounding box from children at
     // open time. Only flag when the layer also has no children.
     if (layer.children === undefined) {
-      warnings.push(`PSD validator: layer "${layer.name ?? '<unnamed>'}" has no bounding box and no children; downstream readers may collapse it.`);
+      warnings.push(
+        `PSD validator: layer "${layer.name ?? '<unnamed>'}" has no bounding box and no children; downstream readers may collapse it.`,
+      );
     }
 
     return;
   }
 
   if (right < left) {
-    errors.push(`PSD validator: layer "${layer.name ?? '<unnamed>'}" has right (${String(right)}) < left (${String(left)}).`);
+    errors.push(
+      `PSD validator: layer "${layer.name ?? '<unnamed>'}" has right (${String(right)}) < left (${String(left)}).`,
+    );
   }
 
   if (bottom < top) {
-    errors.push(`PSD validator: layer "${layer.name ?? '<unnamed>'}" has bottom (${String(bottom)}) < top (${String(top)}).`);
+    errors.push(
+      `PSD validator: layer "${layer.name ?? '<unnamed>'}" has bottom (${String(bottom)}) < top (${String(top)}).`,
+    );
   }
 }

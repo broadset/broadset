@@ -12,7 +12,7 @@ import { type BroadsetXmpPacket, readBroadsetXmp } from '../_shared/xmp';
  * fails Zod validation so the importer can fall back to layer-tree
  * extraction (P5.4b) without throwing.
  */
-export interface PsdWithImageResources {
+interface PsdWithImageResources {
   readonly imageResources?:
     | {
         readonly xmpMetadata?: string | undefined;

@@ -5,8 +5,6 @@ import {
 } from '@broadset/model';
 import { z } from 'zod';
 
-import { type BroadsetXmpPacket } from '../_shared/xmp';
-
 /**
  * Phase 5 P5.1 — PSD-specific types + Zod registration.
  *
@@ -29,8 +27,6 @@ import { type BroadsetXmpPacket } from '../_shared/xmp';
 // Re-exports from shared modules
 // ────────────────────────────────────────────────────────────────────────────
 
-export type { BroadsetXmpPacket };
-
 // ────────────────────────────────────────────────────────────────────────────
 // Color space choice
 // ────────────────────────────────────────────────────────────────────────────
@@ -41,8 +37,6 @@ export type { BroadsetXmpPacket };
  * document-level choice without translating names.
  */
 export type ColorSpaceChoice = 'rgb' | 'cmyk' | 'lab' | 'grayscale';
-
-export const colorSpaceChoiceSchema = z.enum(['rgb', 'cmyk', 'lab', 'grayscale']);
 
 // ────────────────────────────────────────────────────────────────────────────
 // Round-trip metadata
@@ -58,7 +52,7 @@ export interface PsdRoundTripMetadata {
   readonly elementId: string;
 }
 
-export const psdRoundTripMetadataSchema: z.ZodType<PsdRoundTripMetadata> = z.object({
+const psdRoundTripMetadataSchema: z.ZodType<PsdRoundTripMetadata> = z.object({
   signature: z.literal('BsPs'),
   elementId: z.string().min(1),
 });
@@ -77,12 +71,12 @@ export interface PsdPreservedData {
   readonly raw: string;
 }
 
-export const psdPreservedDataSchema: z.ZodType<PsdPreservedData> = z.object({
+const psdPreservedDataSchema: z.ZodType<PsdPreservedData> = z.object({
   mime: z.string().min(1),
   raw: z.string().min(1),
 });
 
-export interface PsdUnmappedEffect {
+interface PsdUnmappedEffect {
   readonly kind: string;
   /** Base64-encoded raw effect parameter bytes. */
   readonly raw: string;
@@ -115,7 +109,7 @@ const psdBitmapMaskSchema: z.ZodType<PsdBitmapMask> = z.object({
  * stable GUID identity across round-trips so Photoshop's
  * "Update linked file" continues to resolve the referenced asset.
  */
-export interface PsdSmartObjectLink {
+interface PsdSmartObjectLink {
   /** PSD linked-file GUID (UUID). Stable across re-exports. */
   readonly guid: string;
   /** MIME type of the linked asset. */
@@ -124,7 +118,7 @@ export interface PsdSmartObjectLink {
   readonly name?: string | undefined;
 }
 
-export const psdSmartObjectLinkSchema: z.ZodType<PsdSmartObjectLink> = z.object({
+const psdSmartObjectLinkSchema: z.ZodType<PsdSmartObjectLink> = z.object({
   guid: z.string().min(1),
   mime: z.string().min(1),
   name: z.string().min(1).optional(),
@@ -156,10 +150,23 @@ export const psdExtensionsSchema: z.ZodType<PsdExtensions> = broadsetFormatExten
  * the shared importer security contract.
  */
 export interface PsdImportOptions {
-  /** Override the default element-tree depth cap from the shared importer security contract. */
+  /**
+   * Cap on layer-tree nesting depth. Layers nested past this depth
+   * are dropped from the imported document and a warning is surfaced.
+   * Default: 32 (covers every realistic PSD; legitimate Photoshop
+   * documents never approach this).
+   */
   readonly maxDepth?: number | undefined;
   /** Override the default total-bytes cap. */
   readonly maxBytes?: number | undefined;
+  /**
+   * Cap on the total number of pixels (sum of `width × height`
+   * across every imported raster layer) the importer will accept.
+   * Default: 256 megapixels — covers a handful of full-resolution
+   * photographic layers while bounding hostile gigapixel canvases.
+   * `0` disables the cap for trusted internal flows.
+   */
+  readonly maxTotalPixels?: number | undefined;
   /** When true, surface a warning for every feature mapped to `PsdPreservedData` rather than silently preserving. */
   readonly warnOnPreservation?: boolean | undefined;
 }

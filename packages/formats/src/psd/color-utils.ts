@@ -1,6 +1,6 @@
 import { MAX_CHANNEL } from './constants';
 
-export interface RgbaColor {
+interface RgbaColor {
   readonly r: number;
   readonly g: number;
   readonly b: number;

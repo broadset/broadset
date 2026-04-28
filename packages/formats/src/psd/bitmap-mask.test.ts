@@ -240,7 +240,7 @@ describe('PSD bitmap layer mask round-trip (Phase 4.4)', () => {
       skipThumbnail: true,
       useImageData: true,
     });
-    const layer = findMaskedLayer(reRead.children as MaskedLayerCarrier[] | undefined);
+    const layer = findMaskedLayer(reRead.children);
 
     expect(layer).toBeDefined();
     expect(layer?.mask?.imageData?.width).toBe(32);

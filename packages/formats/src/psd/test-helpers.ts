@@ -50,5 +50,5 @@ export function makeDocument(overrides: Partial<BroadsetDocument> = {}): Broadse
     animations: [],
     dataSchema: { fields: [] },
     ...overrides,
-  } as BroadsetDocument;
+  };
 }

@@ -14,7 +14,7 @@ import { writePsdUint8Array } from 'ag-psd';
  * resilience against producer choices Broadset itself never makes.
  */
 
-export interface PsdFixture {
+interface PsdFixture {
   readonly name: string;
   readonly description: string;
   readonly bytes: Uint8Array;
@@ -34,7 +34,14 @@ function buildPsd(overrides: Partial<Psd>): Uint8Array {
   return writePsdUint8Array(psd);
 }
 
-function solidFillLayer(name: string, x: number, y: number, w: number, h: number, rgba: readonly [number, number, number, number]): Layer {
+function solidFillLayer(
+  name: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  rgba: readonly [number, number, number, number],
+): Layer {
   const data = new Uint8Array(w * h * 4);
 
   for (let i = 0; i < w * h; i++) {
@@ -125,7 +132,10 @@ function nestedGroupFixture(): PsdFixture {
  */
 function blendModeFixture(): PsdFixture {
   const base = solidFillLayer('Base', 0, 0, 100, 100, [255, 255, 0, 255]);
-  const blended = { ...solidFillLayer('Multiply', 25, 25, 100, 100, [0, 200, 200, 255]), blendMode: 'multiply' as const };
+  const blended = {
+    ...solidFillLayer('Multiply', 25, 25, 100, 100, [0, 200, 200, 255]),
+    blendMode: 'multiply' as const,
+  };
 
   return {
     name: 'blend-mode-multiply',

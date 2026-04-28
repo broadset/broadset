@@ -53,7 +53,7 @@ function canonicalizeElement(el: BroadsetElement): string {
  * serialize via `writeBroadsetXmp()` and attach the result to
  * `psd.imageResources.xmpMetadata`.
  */
-export function buildBroadsetXmpPacket(doc: BroadsetDocument, exportedAt: Date = new Date()): BroadsetXmpPacket {
+function buildBroadsetXmpPacket(doc: BroadsetDocument, exportedAt: Date = new Date()): BroadsetXmpPacket {
   return {
     documentId: doc.id,
     version: '1.0',
