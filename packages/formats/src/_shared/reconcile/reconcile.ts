@@ -19,7 +19,7 @@ import diff, { type Difference } from 'microdiff';
  * or more fields have diverged. `differences` is the flat microdiff
  * list so callers can render per-field conflict markers.
  */
-export interface ElementModification {
+interface ElementModification {
   readonly elementId: string;
   readonly before: BroadsetElement;
   readonly after: BroadsetElement;
@@ -32,7 +32,7 @@ export interface ElementModification {
  * side — reconciliation re-links them so a stripped `data-bs-*` tag
  * doesn't look like a delete + add.
  */
-export interface RecoveredByHashEntry {
+interface RecoveredByHashEntry {
   readonly fingerprint: string;
   readonly preservedElement: BroadsetElement;
   readonly currentElement: BroadsetElement;
@@ -46,7 +46,7 @@ export interface ReconcileResult {
   readonly recoveredByHash: readonly RecoveredByHashEntry[];
 }
 
-export interface ReconcileInput {
+interface ReconcileInput {
   readonly preservedMetadata: { readonly elements: readonly BroadsetElement[] };
   readonly currentVisual: { readonly elements: readonly BroadsetElement[] };
   /**
@@ -76,7 +76,7 @@ function indexByFingerprint(
 }
 
 function diffElement(before: BroadsetElement, after: BroadsetElement): readonly Difference[] {
-  return diff(before as unknown as Record<string, unknown>, after as unknown as Record<string, unknown>);
+  return diff(before, after);
 }
 
 /**

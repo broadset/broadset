@@ -16,25 +16,25 @@ import DOMPurify from 'dompurify';
  * parse into a DOM) plus the raw sanitized root element so native
  * renderers can walk the tree without re-parsing.
  */
-export interface SvgFragmentAst {
+interface SvgFragmentAst {
   /** Sanitized SVG markup, safe to re-emit verbatim. */
   readonly markup: string;
   /** Parsed root element for renderer consumption. `null` when the markup was empty. */
   readonly root: Element | null;
 }
 
-export interface SvgSanitizationRemoval {
+interface SvgSanitizationRemoval {
   readonly kind: 'element' | 'attribute';
   readonly name: string;
   readonly from?: string | undefined;
 }
 
-export interface SvgSanitizationReport {
+interface SvgSanitizationReport {
   readonly removed: readonly SvgSanitizationRemoval[];
   readonly empty: boolean;
 }
 
-export interface SvgSanitizationResult {
+interface SvgSanitizationResult {
   readonly ast: SvgFragmentAst;
   readonly report: SvgSanitizationReport;
 }

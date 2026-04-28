@@ -71,7 +71,7 @@ const pdfaSchema: z.ZodType<BroadsetXmpPdfAIdentifier> = z.object({
   conformance: z.string().min(1),
 });
 
-export const broadsetXmpPacketSchema: z.ZodType<BroadsetXmpPacket> = z.object({
+const broadsetXmpPacketSchema: z.ZodType<BroadsetXmpPacket> = z.object({
   documentId: z.string().min(1),
   version: z.string().min(1),
   exportedAt: z.string().min(1),

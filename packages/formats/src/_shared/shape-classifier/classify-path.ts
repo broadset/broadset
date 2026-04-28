@@ -13,7 +13,7 @@
  * - Anything else → path.
  */
 
-export interface ClassifiedRectangle {
+interface ClassifiedRectangle {
   readonly kind: 'rectangle';
   readonly x: number;
   readonly y: number;
@@ -21,7 +21,7 @@ export interface ClassifiedRectangle {
   readonly height: number;
 }
 
-export interface ClassifiedEllipse {
+interface ClassifiedEllipse {
   readonly kind: 'ellipse';
   readonly cx: number;
   readonly cy: number;
@@ -29,11 +29,11 @@ export interface ClassifiedEllipse {
   readonly ry: number;
 }
 
-export interface ClassifiedPath {
+interface ClassifiedPath {
   readonly kind: 'path';
 }
 
-export type ClassifiedShape = ClassifiedRectangle | ClassifiedEllipse | ClassifiedPath;
+type ClassifiedShape = ClassifiedRectangle | ClassifiedEllipse | ClassifiedPath;
 
 /**
  * Optional caller hints for {@link classifyPath}. Currently holds a
@@ -43,7 +43,7 @@ export type ClassifiedShape = ClassifiedRectangle | ClassifiedEllipse | Classifi
  * consumed by the current heuristics; importers may pass hints without
  * any behavior change today.
  */
-export interface ShapeClassifierHints {
+interface ShapeClassifierHints {
   readonly strokeWidth?: number;
 }
 

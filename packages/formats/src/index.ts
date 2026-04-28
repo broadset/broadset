@@ -28,9 +28,16 @@ export {
   normalizeFontFamily,
   parseCssColor,
   type PdfExportResult,
+  type PdfImportOptions,
   resolveGoogleFontUrl,
 } from './pdf';
-export type { AsyncFontResolver, PptxExportReport, PptxExportWarning, PptxExportWarningCode } from './pptx';
+export type {
+  AsyncFontResolver,
+  PptxExportReport,
+  PptxExportWarning,
+  PptxExportWarningCode,
+  PptxImportOptions,
+} from './pptx';
 export {
   defaultUrlFontResolver,
   exportPptxBytes,
@@ -47,6 +54,7 @@ export {
   exportPsdBytesAsyncWithPreflight,
   importPsd,
   type PsdExportResult,
+  type PsdImportOptions,
   svgPathToPsdVectorMask,
 } from './psd';
 export {

@@ -21,9 +21,9 @@ const WARNING_UNKNOWN_PERMISSION =
 const REASON_RESTRICTED =
   'Font vendor license forbids embedding (OS/2 fsType bit 1). Export will fall back to a reference without embedding.';
 
-export type EmbedAction = 'embed' | 'refuse';
+type EmbedAction = 'embed' | 'refuse';
 
-export interface EmbedDecision {
+interface EmbedDecision {
   readonly action: EmbedAction;
   readonly permission: EmbedPermission;
   readonly warning?: string | undefined;

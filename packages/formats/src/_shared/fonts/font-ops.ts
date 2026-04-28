@@ -9,7 +9,7 @@ import * as fontkit from 'fontkit';
  * glyph → Unicode map every PDF / PDF/A importer needs.
  */
 
-export interface FontMetrics {
+interface FontMetrics {
   readonly ascender: number;
   readonly descender: number;
   readonly lineGap: number;

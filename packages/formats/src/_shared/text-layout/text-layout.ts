@@ -11,7 +11,7 @@ import LineBreaker from 'linebreak';
  * every format exercises today.
  */
 
-export interface LineSegment {
+interface LineSegment {
   readonly text: string;
   readonly width: number;
 }
@@ -29,13 +29,13 @@ export type TextMeasure = (text: string) => number;
  * `bidi-js` API. Callers slicing the input string MUST use
  * `text.slice(start, end + 1)` to include the final character.
  */
-export interface BidiParagraph {
+interface BidiParagraph {
   readonly start: number;
   readonly end: number;
   readonly level: number;
 }
 
-export interface BidiAnalysis {
+interface BidiAnalysis {
   readonly paragraphs: readonly BidiParagraph[];
   readonly levels: Uint8Array;
 }

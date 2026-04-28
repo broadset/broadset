@@ -46,7 +46,7 @@ function rgbToHex(rgb: Rgb): `#${string}` {
  * via `ColorResolutionContext` (this module only accepts RGB colors to
  * keep the surface narrow).
  */
-export interface ResolvedRgb {
+interface ResolvedRgb {
   readonly r: number;
   readonly g: number;
   readonly b: number;

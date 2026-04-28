@@ -75,7 +75,7 @@ function makeRect(id: string, overrides: Partial<BroadsetElement> = {}): Broadse
     booleanOperation: null,
     extensions: {},
     ...overrides,
-  } as BroadsetElement;
+  };
 }
 
 function makeMinimalDocument(): BroadsetDocument {
@@ -88,7 +88,7 @@ function makeMinimalDocument(): BroadsetDocument {
     pages: [{ id: 'page-1', name: 'Page 1', elements: [], locale: null, extensions: {} }],
     animations: [],
     dataSchema: { fields: [] },
-  } as BroadsetDocument;
+  };
 }
 
 describe('cross-format reconciliation populates after Broadset round-trip', () => {

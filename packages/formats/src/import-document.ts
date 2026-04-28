@@ -8,9 +8,19 @@ import type {
   DocumentReconciliationElement,
   DocumentReconciliationModification,
 } from './import-document-types';
-import { importPdfDocument as runPdfImport, readPreservedPdfDocument, reconcilePdf } from './pdf';
-import { importPptxWithMerge, reconcilePptx } from './pptx';
-import { importPsdDocument as runPsdImport, readPreservedPsdDocument, reconcilePsd } from './psd';
+import {
+  importPdfDocument as runPdfImport,
+  type PdfImportOptions,
+  readPreservedPdfDocument,
+  reconcilePdf,
+} from './pdf';
+import { importPptxWithMerge, type PptxImportOptions, reconcilePptx } from './pptx';
+import {
+  importPsdDocument as runPsdImport,
+  type PsdImportOptions,
+  readPreservedPsdDocument,
+  reconcilePsd,
+} from './psd';
 import {
   importSvgDocument as importSvgDocumentRaw,
   reconcileSvg,
@@ -207,8 +217,11 @@ async function reconcileAgainstPreserved(
  * shared `_shared/reconcile/` engine to surface a per-bucket summary
  * of external edits in the import-warnings modal.
  */
-export async function importPptxDocument(data: Uint8Array): Promise<DocumentImportResult> {
-  const report = await importPptxWithMerge(data);
+export async function importPptxDocument(
+  data: Uint8Array,
+  options?: PptxImportOptions,
+): Promise<DocumentImportResult> {
+  const report = await importPptxWithMerge(data, options);
   const structuralWarnings = report.warnings.map(
     (w) => `${w.code}: ${w.message}${w.detail !== undefined ? ` (${w.detail})` : ''}`,
   );
@@ -235,8 +248,11 @@ export async function importPptxDocument(data: Uint8Array): Promise<DocumentImpo
  * `FormatReconciliationModal`. Arbitrary third-party PSDs leave the
  * field null.
  */
-export async function importPsdDocument(data: Uint8Array): Promise<DocumentImportResult> {
-  const result = runPsdImport(data);
+export async function importPsdDocument(
+  data: Uint8Array,
+  options?: PsdImportOptions,
+): Promise<DocumentImportResult> {
+  const result = runPsdImport(data, options);
   const preserved = readPreservedPsdDocument(data);
 
   if (preserved === null) {
@@ -256,8 +272,11 @@ export async function importPsdDocument(data: Uint8Array): Promise<DocumentImpor
  * so the demo can light up its `FormatReconciliationModal`. Arbitrary
  * third-party PDFs leave the field null.
  */
-export async function importPdfDocument(data: Uint8Array): Promise<DocumentImportResult> {
-  const result = await runPdfImport(data);
+export async function importPdfDocument(
+  data: Uint8Array,
+  options?: PdfImportOptions,
+): Promise<DocumentImportResult> {
+  const result = await runPdfImport(data, options);
   const preserved = await readPreservedPdfDocument(data);
 
   if (preserved === null) {

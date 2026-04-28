@@ -1,1 +1,1 @@
-export { canvasUnitToMm, MM_PER_INCH, mmToCanvasUnit } from './canvas-units';
+export { canvasUnitToMm, MM_PER_INCH,  } from './canvas-units';

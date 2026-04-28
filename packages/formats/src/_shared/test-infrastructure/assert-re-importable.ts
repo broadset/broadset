@@ -15,7 +15,7 @@
  * pinpoint the regression.
  */
 
-export interface ReImportableOptions {
+interface ReImportableOptions {
   readonly formatLabel?: string;
 }
 

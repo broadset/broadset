@@ -59,7 +59,7 @@ function makeRect(id: string, overrides: Partial<BroadsetElement> = {}): Broadse
     booleanOperation: null,
     extensions: {},
     ...overrides,
-  } as BroadsetElement;
+  };
 }
 
 function makeDocument(elements: readonly BroadsetElement[]): BroadsetDocument {
@@ -72,7 +72,7 @@ function makeDocument(elements: readonly BroadsetElement[]): BroadsetDocument {
     pages: [{ id: 'page-1', name: 'Page 1', elements: [], locale: null, extensions: {} }],
     animations: [],
     dataSchema: { fields: [] },
-  } as BroadsetDocument;
+  };
 }
 
 describe('applyReconciliationChoices', () => {
