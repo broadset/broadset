@@ -5,16 +5,34 @@ import { writePsdUint8Array } from 'ag-psd';
 
 import { elementToLayer, getPendingLinkedFiles, resetExportState, setPrefetchedUrlImages } from './export-layer';
 import { writeBroadsetXmpForDocument } from './export-xmp';
-import { collectPreflightWarnings } from './preflight';
+import { collectExportOptionsWarnings, collectPreflightWarnings } from './preflight';
 import { ensureCanvasInitialized } from './runtime-canvas';
+import type { PsdExportOptions } from './types';
 
 interface PsdImageBytes {
   readonly mime: string;
   readonly bytes: Uint8Array;
 }
 
-interface ExportPsdSyncOptions {
+const MM_PER_INCH = 25.4;
+
+/**
+ * Sync export options. Adds `prefetchedUrlImages` on top of the
+ * shared `PsdExportOptions` surface — the sync entry cannot fetch
+ * remote URL bytes itself, so any `image` element pointing at an
+ * `http(s)://` URL must come pre-resolved.
+ */
+export interface ExportPsdSyncOptions extends PsdExportOptions {
   readonly prefetchedUrlImages?: ReadonlyMap<string, PsdImageBytes>;
+}
+
+/**
+ * Async export options. Adds the optional `fetch` override on top of
+ * the shared `PsdExportOptions` surface so test environments can
+ * inject a deterministic fetcher without touching `globalThis.fetch`.
+ */
+export interface ExportPsdAsyncOptions extends PsdExportOptions {
+  readonly fetch?: typeof globalThis.fetch;
 }
 
 /**
@@ -64,7 +82,7 @@ function canvasToPixels(canvas: Canvas, value: number): number {
     case 'px':
       return value;
     case 'mm':
-      return (value / 25.4) * canvas.dpi;
+      return (value / MM_PER_INCH) * canvas.dpi;
     case 'in':
       return value * canvas.dpi;
   }
@@ -93,10 +111,67 @@ async function fetchImageAsBytes(
   }
 }
 
-function exportPsdBytesCore(doc: BroadsetDocument): Uint8Array {
+/**
+ * Build the per-page visibility filter applied in multi-page exports.
+ * When `preserveVisibility` is `false` (the explicit "flatten"
+ * choice), every element marked `visible: false` on the page instance
+ * is omitted instead of being emitted-and-hidden. Default behaviour
+ * (undefined or `true`) keeps the existing semantics: only elements
+ * with `visible === true` are exported per page.
+ */
+function isElementVisibleOnPage(
+  element: BroadsetElement,
+  elementsById: ReadonlyMap<string, BroadsetElement>,
+  pageInstanceById: ReadonlyMap<string, { readonly visible: boolean }>,
+): boolean {
+  let current: BroadsetElement = element;
+  let parentId = current.parentId ?? null;
+
+  while (parentId !== null) {
+    const parent = elementsById.get(parentId);
+
+    if (parent === undefined) {
+      return false;
+    }
+
+    current = parent;
+    parentId = current.parentId ?? null;
+  }
+
+  const rootInstance = pageInstanceById.get(current.id);
+
+  return rootInstance?.visible === true;
+}
+
+/**
+ * For single-page documents we previously had no per-instance
+ * visibility filter. With `preserveVisibility: false` callers ask us
+ * to drop invisible elements outright; we honour that by consulting
+ * the sole page's instance map and filtering the same way as the
+ * multi-page path. With the default (preserve), single-page exports
+ * keep emitting every element regardless of instance visibility.
+ */
+function filterElementsForSinglePage(
+  doc: BroadsetDocument,
+  preserveVisibility: boolean,
+): readonly BroadsetElement[] {
+  if (preserveVisibility) return doc.elements;
+
+  const onlyPage = doc.pages[0];
+
+  if (onlyPage === undefined) return doc.elements;
+
+  const elementsById = new Map(doc.elements.map((element) => [element.id, element]));
+  const pageInstanceById = new Map(onlyPage.elements.map((instance) => [instance.elementId, instance]));
+
+  return doc.elements.filter((element) => isElementVisibleOnPage(element, elementsById, pageInstanceById));
+}
+
+function exportPsdBytesCore(doc: BroadsetDocument, options: PsdExportOptions): Uint8Array {
   ensureCanvasInitialized();
   resetExportState();
 
+  const preserveVisibility = options.preserveVisibility !== false;
   const width = Math.round(canvasToPixels(doc.canvas, doc.canvas.width));
   const height = Math.round(canvasToPixels(doc.canvas, doc.canvas.height));
 
@@ -116,23 +191,9 @@ function exportPsdBytesCore(doc: BroadsetDocument): Uint8Array {
 
     for (const page of doc.pages) {
       const pageInstanceById = new Map(page.elements.map((instance) => [instance.elementId, instance]));
-      const visibleElements = doc.elements.filter((element) => {
-        let current = element;
-
-        while (current.parentId !== null) {
-          const parent = elementsById.get(current.parentId);
-
-          if (parent === undefined) {
-            return false;
-          }
-
-          current = parent;
-        }
-
-        const rootInstance = pageInstanceById.get(current.id);
-
-        return rootInstance?.visible === true;
-      });
+      const visibleElements = doc.elements.filter((element) =>
+        isElementVisibleOnPage(element, elementsById, pageInstanceById),
+      );
 
       artboardLayers.push({
         name: page.name,
@@ -149,7 +210,7 @@ function exportPsdBytesCore(doc: BroadsetDocument): Uint8Array {
 
     psd.children = artboardLayers;
   } else {
-    psd.children = buildLayersForParent(doc.elements, null);
+    psd.children = buildLayersForParent(filterElementsForSinglePage(doc, preserveVisibility), null);
   }
 
   const pendingLinkedFiles = getPendingLinkedFiles();
@@ -189,17 +250,19 @@ export function exportPsdBytes(doc: BroadsetDocument, options?: ExportPsdSyncOpt
 
   setPrefetchedUrlImages(prefetched);
 
-  return exportPsdBytesCore(doc);
+  return exportPsdBytesCore(doc, options ?? {});
 }
 
 /**
  * Export a BroadsetDocument to PSD bytes, fetching URL images via the
- * provided fetch function. Falls back to data URIs for non-URL content.
+ * provided fetch function (defaults to `globalThis.fetch`). Falls
+ * back to data URIs for non-URL content.
  */
 export async function exportPsdBytesAsync(
   doc: BroadsetDocument,
-  fetchFn: typeof globalThis.fetch = globalThis.fetch,
+  options?: ExportPsdAsyncOptions,
 ): Promise<Uint8Array> {
+  const fetchFn = options?.fetch ?? globalThis.fetch;
   const prefetched = new Map<string, { readonly mime: string; readonly bytes: Uint8Array }>();
   const urlElements = doc.elements.filter((el) => {
     const text = resolveContentAsPlainString(el.content);
@@ -223,7 +286,7 @@ export async function exportPsdBytesAsync(
 
   setPrefetchedUrlImages(prefetched);
 
-  return exportPsdBytesCore(doc);
+  return exportPsdBytesCore(doc, options ?? {});
 }
 
 /**
@@ -239,15 +302,18 @@ export interface PsdExportResult {
  * Preflight-aware export — runs `collectPreflightWarnings` to surface
  * the static-document concerns (animations dropped, rotated non-image
  * elements, colour-mode downgrades, stale unmapped-effects, URL
- * images) and appends fetch-failure messages from the async
- * resolution. Always returns bytes — preflight warnings never block
- * the export per IO-D-14.
+ * images), `collectExportOptionsWarnings` for caller-supplied options
+ * the writer cannot honour today, and appends fetch-failure messages
+ * from the async resolution. Always returns bytes — preflight
+ * warnings never block the export per IO-D-14.
  */
 export async function exportPsdBytesAsyncWithPreflight(
   doc: BroadsetDocument,
-  fetchFn: typeof globalThis.fetch = globalThis.fetch,
+  options?: ExportPsdAsyncOptions,
 ): Promise<PsdExportResult> {
+  const fetchFn = options?.fetch ?? globalThis.fetch;
   const baseWarnings = collectPreflightWarnings(doc);
+  const optionWarnings = collectExportOptionsWarnings(options);
   const fetchWarnings: string[] = [];
   const prefetched = new Map<string, { readonly mime: string; readonly bytes: Uint8Array }>();
 
@@ -277,7 +343,7 @@ export async function exportPsdBytesAsyncWithPreflight(
 
   setPrefetchedUrlImages(prefetched);
 
-  const bytes = exportPsdBytesCore(doc);
+  const bytes = exportPsdBytesCore(doc, options ?? {});
 
-  return { bytes, warnings: [...baseWarnings, ...fetchWarnings] };
+  return { bytes, warnings: [...baseWarnings, ...optionWarnings, ...fetchWarnings] };
 }

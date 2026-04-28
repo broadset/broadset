@@ -235,7 +235,7 @@ describe('PSD URL Image Fetch Export', () => {
       ],
     });
 
-    const bytes = await exportPsdBytesAsync(doc, mockFetch);
+    const bytes = await exportPsdBytesAsync(doc, { fetch: mockFetch });
 
     expect(bytes.length).toBeGreaterThan(0);
 

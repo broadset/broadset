@@ -53,11 +53,12 @@ export interface PdfExportOptionsInput {
 
 /**
  * PSD-specific options forwarded through {@link exportDocument}.
- * Mirrors `PsdExportOptions` from `@broadset/formats/psd` — the
- * underlying PSD exporter does not yet consume these (Spec Gap), so
- * the bridge currently records them onto the export call without
- * propagating downstream. They are part of the wire contract so a
- * later PR can connect them without changing the UI surface.
+ * Mirrors `PsdExportOptions` from `@broadset/formats/psd`. The
+ * bridge passes the object straight through to `exportPsdBytesAsync`,
+ * which honours `preserveVisibility` today and surfaces preflight
+ * warnings for `colorSpace` / `bitDepth` / `linkSmartObjects` until
+ * the lcms-wasm pipeline (cross-format-io-improvement-plan.md
+ * Phase 4.1) lands.
  */
 export interface PsdExportOptionsInput {
   readonly colorSpace?: 'rgb' | 'cmyk' | 'lab' | 'grayscale';
@@ -315,13 +316,7 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
     }
 
     case 'psd': {
-      // PsdExportOptions are accepted on the bridge surface but the
-      // underlying `exportPsdBytesAsync` does not consume them yet
-      // (Spec Gap — PSD export still reads colour mode from
-      // `document.outputIntent`). Recording the input here so a
-      // future PR can wire the options downstream without a UI
-      // change.
-      const psdBytes = await formats.exportPsdBytesAsync(doc);
+      const psdBytes = await formats.exportPsdBytesAsync(doc, { ...(context.psdOptions ?? {}) });
       const blob = new Blob([psdBytes.buffer as ArrayBuffer], { type: 'image/vnd.adobe.photoshop' });
 
       formats.triggerDownload(blob, `${name}.psd`);

@@ -3,6 +3,7 @@ import { resolveContentAsPlainString } from '@broadset/model';
 
 import { isTextBody } from './export/text';
 import { analyseTextUnicodeProfile, type TextUnicodeProfile } from './text-unicode';
+import type { PsdExportOptions } from './types';
 
 /**
  * PSD preflight warning collector — mirrors `pdf/export/preflight.ts`.
@@ -196,4 +197,41 @@ function hasStaleUnmappedEffects(el: BroadsetElement): boolean {
   if (psd.unmappedEffects === undefined) return false;
 
   return psd.dirty === true;
+}
+
+/**
+ * Surface warnings for `PsdExportOptions` fields the current writer
+ * cannot honour. `colorSpace` (non-RGB) and `bitDepth: 16` require the
+ * lcms-wasm pipeline tracked under cross-format-io-improvement-plan.md
+ * Phase 4.1 / Phase 4.6. `linkSmartObjects: false` would convert
+ * linked smart objects to embedded ones — a >50-line ripple through
+ * `getPendingLinkedFiles` / `pushPendingLinkedFile` — so today we warn
+ * and ship the linked variant. `embedIccProfile: false` is the current
+ * default behaviour (no profile is embedded regardless), so it is a
+ * silent no-op rather than a warning.
+ */
+export function collectExportOptionsWarnings(options: PsdExportOptions | undefined): readonly string[] {
+  if (options === undefined) return [];
+
+  const warnings: string[] = [];
+
+  if (options.colorSpace !== undefined && options.colorSpace !== 'rgb') {
+    warnings.push(
+      `PSD export does not yet honor non-RGB color space (requested: ${options.colorSpace}); output is RGB. Tracked in cross-format-io-improvement-plan.md Phase 4.1.`,
+    );
+  }
+
+  if (options.bitDepth !== undefined && options.bitDepth !== 8) {
+    warnings.push(
+      `PSD export does not yet honor 16-bit bit depth; output is 8-bit. Tracked in cross-format-io-improvement-plan.md Phase 4.1.`,
+    );
+  }
+
+  if (options.linkSmartObjects === false) {
+    warnings.push(
+      `PSD export does not yet honor linkSmartObjects: false; smart objects are exported as linked. Tracked in project/spec/formats/psd.md Spec Gaps.`,
+    );
+  }
+
+  return warnings;
 }

@@ -121,7 +121,9 @@ describe('exportPsdBytesAsyncWithPreflight', () => {
   it('returns bytes alongside the static preflight warnings', async () => {
     const el = makeElement('text', { id: 't1', rotation: 30, content: 'Hello' });
     const doc = makeDocument({ elements: [el] });
-    const result = await exportPsdBytesAsyncWithPreflight(doc, () => Promise.resolve(new Response(null, { status: 500 })));
+    const result = await exportPsdBytesAsyncWithPreflight(doc, {
+      fetch: () => Promise.resolve(new Response(null, { status: 500 })),
+    });
 
     expect(result.bytes.length).toBeGreaterThan(0);
     expect(result.warnings.length).toBeGreaterThan(0);
@@ -134,7 +136,9 @@ describe('exportPsdBytesAsyncWithPreflight', () => {
   it('appends fetch-failure warnings when the supplied fetch returns 404', async () => {
     const el = makeElement('image', { id: 'i1', content: 'https://example.test/missing.png', name: 'BrokenImage' });
     const doc = makeDocument({ elements: [el] });
-    const result = await exportPsdBytesAsyncWithPreflight(doc, () => Promise.resolve(new Response(null, { status: 404 })));
+    const result = await exportPsdBytesAsyncWithPreflight(doc, {
+      fetch: () => Promise.resolve(new Response(null, { status: 404 })),
+    });
 
     expect(result.warnings.some((w) => w.includes('failed to fetch'))).toBe(true);
     expect(result.warnings.some((w) => w.includes('BrokenImage'))).toBe(true);
