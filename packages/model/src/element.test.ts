@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import type { z } from 'zod';
 
 import {
   BROADSET_FORMAT_IDS,
-  type BroadsetFormatExtensions,
   broadsetFormatExtensionsBaseSchema,
   BUILT_IN_ELEMENT_TYPES,
   createDefaultElement,
@@ -260,11 +258,14 @@ describe('Content validation by element type', () => {
   });
 
   /**
-   * @description Script-markers in rendered content are the classic XSS surface.
-   * The element schema MUST reject raw `<script>` tags and HTML event-handler
-   * attributes in text and svg element content so that any importer bypass of
-   * DOMPurify / sanitizeTextContent fails loudly instead of reaching the
-   * renderer.
+   * @description Script-markers in rendered content are the classic XSS
+   * surface. `createDefaultElement` is a trust boundary used by every
+   * importer, so for `text` content it now actively sanitizes hostile
+   * markup before returning. The element schema MUST still reject raw
+   * `<script>` tags and HTML event-handler attributes for any path
+   * (raw JSON parse, bypass of the factory, `svg` type whose payload
+   * the factory does not flatten) so the contract fails loudly when
+   * the factory is sidestepped.
    */
   it.each([
     ["<script>alert('x')</script>", 'text'],
@@ -276,10 +277,34 @@ describe('Content validation by element type', () => {
     ['<a onCLICK="x">link</a>', 'text'],
     ['<svg><script>alert(2)</script></svg>', 'svg'],
     ['<svg><g onload="alert(1)"/></svg>', 'svg'],
-  ])('rejects content %s on type %s as an XSS vector', (content, type) => {
-    const result = elementSchema.safeParse(createDefaultElement(type, { content }));
+  ])('rejects content %s on type %s when bypassing createDefaultElement', (content, type) => {
+    const baseline = createDefaultElement(type);
+    const result = elementSchema.safeParse({ ...baseline, content });
 
     expect(result.success).toBe(false);
+  });
+
+  /**
+   * @description `createDefaultElement` sanitizes hostile text content
+   * at the factory boundary so importers that build elements via this
+   * factory cannot accidentally land script tags or event-handler
+   * attributes in persisted state.
+   */
+  it.each([
+    "<script>alert('x')</script>",
+    '<script type="text/javascript">evil()</script>',
+    '<SCRIPT>Xss</SCRIPT>',
+    '<ScRiPt>mixed</ScRiPt>',
+    '<span onclick="alert(1)">bad</span>',
+    '<img src="x" onerror="alert(1)"/>',
+    '<a onCLICK="x">link</a>',
+  ])('createDefaultElement strips hostile markup from text content: %s', (content) => {
+    const element = createDefaultElement('text', { content });
+    const flattened = typeof element.content === 'string' ? element.content : '';
+
+    expect(flattened.toLowerCase()).not.toContain('<script');
+    expect(flattened).not.toMatch(/\son[a-z]+\s*=/i);
+    expect(elementSchema.safeParse(element).success).toBe(true);
   });
 
   /** @description Benign inline markup without script markers MUST still validate. */
@@ -363,7 +388,7 @@ describe('Element extensions validation (IO-D-11)', () => {
   it('accepts valid registered extensions', () => {
     registerExtensionsSchema(
       'pdf',
-      broadsetFormatExtensionsBaseSchema as unknown as z.ZodType<BroadsetFormatExtensions>,
+      broadsetFormatExtensionsBaseSchema,
     );
 
     const element = {
@@ -378,7 +403,7 @@ describe('Element extensions validation (IO-D-11)', () => {
   it('rejects an element whose registered extensions payload is invalid', () => {
     registerExtensionsSchema(
       'pdf',
-      broadsetFormatExtensionsBaseSchema as unknown as z.ZodType<BroadsetFormatExtensions>,
+      broadsetFormatExtensionsBaseSchema,
     );
 
     const element = {

@@ -560,7 +560,7 @@ export function isEditableTarget(target: EventTarget | null): boolean {
  * formats package at module-eval time (the formats package stays
  * lazy-loaded — see `bundle-boundary.test.ts`).
  */
-export type DemoReconciliationChoice = 'preserved' | 'visual';
+type DemoReconciliationChoice = 'preserved' | 'visual';
 
 /**
  * Per-modification record carrying both element refs the demo needs to
@@ -568,7 +568,7 @@ export type DemoReconciliationChoice = 'preserved' | 'visual';
  * package. Populated when the import flow stashes a reconciliation
  * result; consumed by {@link applyReconciliationChoicesToDocument}.
  */
-export interface DemoReconciliationModification {
+interface DemoReconciliationModification {
   readonly id: string;
   readonly preservedElement: BroadsetElement;
   readonly currentElement: BroadsetElement;

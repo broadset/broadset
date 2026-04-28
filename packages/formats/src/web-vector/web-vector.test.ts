@@ -62,7 +62,7 @@ function makeElement(overrides: Partial<BroadsetElement> = {}): BroadsetElement 
     booleanOperation: null,
     extensions: {},
     ...overrides,
-  } as BroadsetElement;
+  };
 }
 
 function makeDocument(overrides: Partial<BroadsetDocument> = {}): BroadsetDocument {
@@ -76,7 +76,7 @@ function makeDocument(overrides: Partial<BroadsetDocument> = {}): BroadsetDocume
     pages: [],
     dataSchema: { fields: [] },
     ...overrides,
-  } as BroadsetDocument;
+  };
 }
 
 describe('HTML Standalone Export', () => {
@@ -207,6 +207,29 @@ describe('HTML Standalone Export', () => {
 
     expect(html).toContain('overflow');
     expect(html).toContain('hidden');
+  });
+
+  /**
+   * @description Closes the 2026-04-28 production-readiness audit
+   * finding "Standalone HTML export emits raw SVG markup". A project
+   * file with hostile SVG content (`<script>` tag, event-handler
+   * attribute) MUST NOT produce active markup in the standalone HTML
+   * output — the export is its own trust boundary because the
+   * resulting `.html` lands on a public surface.
+   */
+  it('strips hostile SVG content before emitting standalone HTML', () => {
+    const hostileSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><script>window.__bs_xss = true;</script><g onload="window.__bs_xss = true;"/></svg>';
+    const doc = makeDocument({
+      elements: [makeElement({ id: 'svg-1', type: 'svg', content: hostileSvg })],
+    });
+    const html = exportHtmlStandalone(doc);
+
+    // The export injects its own runtime `<script>`; assert that the
+    // hostile *payload* doesn't survive rather than that no `<script>`
+    // tag exists at all.
+    expect(html).not.toContain('window.__bs_xss');
+    expect(html).not.toMatch(/onload\s*=/i);
   });
 });
 

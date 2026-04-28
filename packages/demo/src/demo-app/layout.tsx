@@ -41,6 +41,19 @@ export function DemoAppLayout(props: DemoAppLayoutProps): React.JSX.Element {
           data-testid="demo-shell"
           style={{ backgroundColor: color('surface'), color: color('foreground') }}
         >
+          {/*
+            HeroUI mandate waiver: this hidden `<input type="file">` is
+            the only raw input element in `packages/demo`. The browser's
+            file-picker dialog is gated to a real `<input type="file">`
+            being clicked via `inputRef.current.click()` from a user-
+            initiated event handler — the dialog cannot be opened from
+            a HeroUI button and the OS dialog itself is not skinnable.
+            The element is `hidden`, has no a11y surface, and is
+            triggered exclusively via a real HeroUI `Button`. Documented
+            in the 2026-04-28 production-readiness audit's UI/a11y
+            triage so the HeroUI compliance gate can recognise the
+            exception.
+          */}
           <input
             ref={fileInputRef}
             accept=".json,.bsp,.psd,.pptx,.svg,application/json,image/vnd.adobe.photoshop,image/svg+xml"

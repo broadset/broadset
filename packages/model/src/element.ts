@@ -144,8 +144,15 @@ export function checkElementContentSecurity(
  * payloads are kept verbatim (run-level sanitization happens at the
  * renderer boundary and on import). Non-text elements pass through
  * unchanged.
+ *
+ * Exported so importers and `createDefaultElement` apply the exact same
+ * sanitization as `elementSchema`'s `transform`. This is the
+ * authoritative trust boundary for element content — every code path
+ * that produces a `BroadsetElement` from external bytes (PDF, PSD,
+ * PPTX, SVG) MUST run through this so the inline editor and any other
+ * HTML-rendering surface can trust persisted text.
  */
-function normalizeContent(type: string, content: string | TextBody): string | TextBody {
+export function normalizeElementContent(type: string, content: string | TextBody): string | TextBody {
   if (type === 'text' && typeof content === 'string') {
     return sanitizeTextContent(content);
   }
@@ -263,7 +270,7 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
       width: value.width,
       height: value.height,
       rotation: value.rotation,
-      content: normalizeContent(value.type, value.content),
+      content: normalizeElementContent(value.type, value.content),
       style: normalizedStyle.success ? normalizedStyle.data : createDefaultStyle(),
       parentId: value.parentId ?? null,
       groupId: value.groupId ?? null,
@@ -281,6 +288,8 @@ export const elementSchema: z.ZodType<BroadsetElement> = z
   });
 
 export function createDefaultElement(type: string, overrides?: ElementOverrides): BroadsetElement {
+  const rawContent = overrides?.content ?? defaultContent(type);
+
   return {
     id: overrides?.id ?? crypto.randomUUID(),
     type,
@@ -290,7 +299,7 @@ export function createDefaultElement(type: string, overrides?: ElementOverrides)
     width: overrides?.width ?? 100,
     height: overrides?.height ?? 100,
     rotation: overrides?.rotation ?? 0,
-    content: overrides?.content ?? defaultContent(type),
+    content: normalizeElementContent(type, rawContent),
     style: styleSchema.parse({
       opacity: 1,
       ...(overrides?.style ?? {}),

@@ -1,5 +1,11 @@
 import { commitInlineText, type EditorStore, stopInlineTextEditing } from '@broadset/editor';
-import { type BroadsetElement, type BroadsetElementStyle, resolveStyleColor } from '@broadset/model';
+import {
+  type BroadsetElement,
+  type BroadsetElementStyle,
+  resolveContentAsPlainString,
+  resolveStyleColor,
+  sanitizeTextContent,
+} from '@broadset/model';
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
@@ -108,6 +114,16 @@ export function InlineTextOverlay({
 
   const { element } = snapshot;
   const { style } = element;
+  // Defense in depth: even though `elementSchema` and the importer
+  // boundary normalize text content via `sanitizeTextContent`, we
+  // sanitize again here so any element produced by a path that bypasses
+  // the schema (legacy fixture, future codepath, programmatic API) can
+  // never reach `dangerouslySetInnerHTML` with attacker-controlled
+  // markup. This is the inline editor's last trust boundary before the
+  // browser parses the HTML. `TextBody` content is flattened to its
+  // plain-text projection — the overlay is a flat contenteditable, so
+  // there is no faithful structured view to render here.
+  const safeInitialHtml = sanitizeTextContent(resolveContentAsPlainString(element.content));
 
   const commit = (): void => {
     const node = editorRef.current;
@@ -181,7 +197,7 @@ export function InlineTextOverlay({
         aria-label="Inline text editor"
         contentEditable
         data-testid="inline-text-editor"
-        dangerouslySetInnerHTML={{ __html: element.content }}
+        dangerouslySetInnerHTML={{ __html: safeInitialHtml }}
         role="textbox"
         spellCheck
         tabIndex={0}

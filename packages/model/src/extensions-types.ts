@@ -132,7 +132,7 @@ export function validateExtensions(raw: Readonly<Record<string, unknown>>): Broa
     result[formatId] = schema.parse(value);
   }
 
-  return result as BroadsetExtensions;
+  return result;
 }
 
 /**
@@ -203,7 +203,7 @@ export function getExtensions<F extends BroadsetFormatId>(
     return value as BroadsetExtensionsByFormat[F];
   }
 
-  return schema.parse(value) as BroadsetExtensionsByFormat[F];
+  return schema.parse(value);
 }
 
 /** Maps each format id to its concrete extensions interface. */

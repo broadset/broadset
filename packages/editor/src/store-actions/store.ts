@@ -59,7 +59,7 @@ function normalizeStyleInput(style: Partial<BroadsetElementStyleInput>): Partial
     }
   }
 
-  return result as Partial<BroadsetElementStyle>;
+  return result;
 }
 
 /**

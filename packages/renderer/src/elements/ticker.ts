@@ -9,7 +9,7 @@ const ITEM_SEPARATOR = '   •   ';
  * bullet-separated string. Falls back to the original content when the
  * payload is not a JSON array of strings.
  */
-export function formatTickerText(content: string): string {
+function formatTickerText(content: string): string {
   try {
     const parsed = JSON.parse(content) as unknown;
 

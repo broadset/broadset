@@ -135,13 +135,13 @@ export interface ImportReconciliationModalState {
   readonly modificationRefs: ReadonlyMap<string, ImportReconciliationModificationRefs>;
 }
 
-export interface ImportReconciliationModalElement {
+interface ImportReconciliationModalElement {
   readonly id: string;
   readonly name?: string;
   readonly description?: string;
 }
 
-export interface ImportReconciliationModificationRefs {
+interface ImportReconciliationModificationRefs {
   readonly preservedElement: BroadsetElement;
   readonly currentElement: BroadsetElement;
 }

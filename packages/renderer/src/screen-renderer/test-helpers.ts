@@ -1,7 +1,7 @@
 import type { BroadsetDocument, BroadsetElement, BroadsetElementStyle } from '@broadset/model';
 import { createDefaultStyle } from '@broadset/model';
 
-export interface CreateElementOverrides extends Partial<Omit<BroadsetElement, 'id' | 'type' | 'style'>> {
+interface CreateElementOverrides extends Partial<Omit<BroadsetElement, 'id' | 'type' | 'style'>> {
   readonly id: BroadsetElement['id'];
   readonly type: BroadsetElement['type'];
   readonly style?: Partial<BroadsetElementStyle>;

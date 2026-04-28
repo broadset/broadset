@@ -413,3 +413,75 @@ export function createEmptyBroadsetDocument(): BroadsetDocument {
     extensions: {},
   });
 }
+
+/**
+ * Build a {@link PageElementInstance} that places `element` on a page
+ * at its own document-level position/rotation. The active-page renderer
+ * (`buildRenderableDocumentForActivePage` and friends) only includes
+ * root elements that have a `PageElementInstance` on the active page,
+ * and uses the instance's transform — not the element's own
+ * `position`/`rotation` — as the rendered geometry. Importers (PDF,
+ * PSD, PPTX, SVG) MUST therefore create one of these for every imported
+ * root element, otherwise the document parses cleanly but the canvas
+ * and layer panel render nothing. The instance copies the element's
+ * geometry so the imported document looks the way the source file
+ * looked the moment it was loaded.
+ */
+export function createPageElementInstanceForElement(element: BroadsetElement): PageElementInstance {
+  return {
+    elementId: element.id,
+    transform: {
+      position: { x: element.position.x, y: element.position.y, z: 0 },
+      rotation: { x: 0, y: 0, z: element.rotation },
+      scale: { x: 1, y: 1, z: 1 },
+    },
+    visible: true,
+  };
+}
+
+/**
+ * Defensive post-processing for importers that rehydrate a serialized
+ * Broadset document (PPTX fast-path, custom-XML payload, project JSON
+ * stored in third-party metadata, etc.). Older / externally-edited
+ * payloads can carry root elements without matching `PageElementInstance`
+ * entries — the document parses but renders empty. This helper appends
+ * an identity-transform instance for every root element that is
+ * missing from the first page so the canvas always has something to
+ * render. Existing instance entries on any page are kept as-is.
+ */
+export function ensureRootElementsHavePageInstances(document: BroadsetDocument): BroadsetDocument {
+  const rootElements = document.elements.filter((el) => el.parentId === null);
+
+  if (rootElements.length === 0) return document;
+
+  const referencedIds = new Set(
+    document.pages.flatMap((page) => page.elements.map((inst) => inst.elementId)),
+  );
+  const missingInstances = rootElements
+    .filter((el) => !referencedIds.has(el.id))
+    .map(createPageElementInstanceForElement);
+
+  if (missingInstances.length === 0) return document;
+
+  if (document.pages.length === 0) {
+    return {
+      ...document,
+      pages: [
+        {
+          id: 'page-1',
+          name: 'Default',
+          elements: missingInstances,
+          locale: null,
+          extensions: {},
+        },
+      ],
+    };
+  }
+
+  return {
+    ...document,
+    pages: document.pages.map((page, index) =>
+      index === 0 ? { ...page, elements: [...page.elements, ...missingInstances] } : page,
+    ),
+  };
+}

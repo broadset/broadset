@@ -62,5 +62,5 @@ export function createDataStore(initialElements: ElementDataMap = {}): BroadsetD
         });
       },
     })),
-  ) as BroadsetDataStore;
+  );
 }

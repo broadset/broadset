@@ -41,7 +41,7 @@ function parseFragment(sanitized: string): DocumentFragment {
  * `<br>` linebreak intent. Uses the DOMParser-based fragment so no live
  * DOM node receives untrusted markup via `innerHTML`.
  */
-export function toPlainText(content: string): string {
+function toPlainText(content: string): string {
   const fragment = parseSanitizedTextFragment(content);
 
   return fragment.textContent;

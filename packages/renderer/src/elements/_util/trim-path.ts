@@ -1,4 +1,4 @@
-export interface TrimPathAttributes {
+interface TrimPathAttributes {
   readonly dasharray: string;
   readonly dashoffset: string;
 }

@@ -1,10 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import type { z } from 'zod';
 
 import {
   BROADSET_FORMAT_IDS,
   broadsetDocumentSchema,
-  type BroadsetFormatExtensions,
   broadsetFormatExtensionsBaseSchema,
   createDefaultAnimationConfig,
   createDefaultElement,
@@ -776,7 +774,7 @@ describe('Document extensions validation (IO-D-11)', () => {
   it('accepts valid registered extensions', () => {
     registerExtensionsSchema(
       'pdf',
-      broadsetFormatExtensionsBaseSchema as unknown as z.ZodType<BroadsetFormatExtensions>,
+      broadsetFormatExtensionsBaseSchema,
     );
 
     const result = broadsetDocumentSchema.safeParse(makeValidDoc({ extensions: { pdf: { dirty: false } } }));
@@ -788,7 +786,7 @@ describe('Document extensions validation (IO-D-11)', () => {
   it('rejects a document whose registered extensions payload is invalid and reports the formatId in the path', () => {
     registerExtensionsSchema(
       'pdf',
-      broadsetFormatExtensionsBaseSchema as unknown as z.ZodType<BroadsetFormatExtensions>,
+      broadsetFormatExtensionsBaseSchema,
     );
 
     const result = broadsetDocumentSchema.safeParse(makeValidDoc({ extensions: { pdf: { dirty: 'not a boolean' } } }));

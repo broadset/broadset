@@ -1,7 +1,7 @@
 import type { BroadsetElement } from '@broadset/model';
 import { resolveContentAsPlainString } from '@broadset/model';
 
-export type MediaKind = 'image' | 'video';
+type MediaKind = 'image' | 'video';
 
 /**
  * Render a visible placeholder for broken or empty media elements. Used by
@@ -13,7 +13,8 @@ export function renderMediaPlaceholder(host: HTMLElement, element: BroadsetEleme
   const label = kind === 'image' ? 'Image' : 'Video';
   const contentText = resolveContentAsPlainString(element.content);
 
-  placeholder.textContent = contentText.trim() === '' ? `${label} unavailable` : `${label} unavailable: ${element.name}`;
+  placeholder.textContent =
+    contentText.trim() === '' ? `${label} unavailable` : `${label} unavailable: ${element.name}`;
   placeholder.setAttribute('aria-label', `${element.name} placeholder`);
   placeholder.style.width = '100%';
   placeholder.style.height = '100%';

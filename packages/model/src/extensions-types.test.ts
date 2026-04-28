@@ -3,7 +3,6 @@ import { z } from 'zod';
 
 import {
   BROADSET_FORMAT_IDS,
-  type BroadsetFormatExtensions,
   broadsetFormatExtensionsBaseSchema,
   type BroadsetFormatId,
   broadsetFormatIdSchema,
@@ -64,7 +63,7 @@ describe('extensions registry', () => {
   it('registers and looks up a schema', () => {
     const schema = broadsetFormatExtensionsBaseSchema.extend({ raw: z.string() });
 
-    registerExtensionsSchema('pdf', schema as unknown as z.ZodType<BroadsetFormatExtensions>);
+    registerExtensionsSchema('pdf', schema);
 
     expect(getExtensionsSchema('pdf')).toBeDefined();
     expect(listRegisteredExtensionsFormats()).toContain('pdf');
@@ -75,8 +74,8 @@ describe('extensions registry', () => {
     const v1 = broadsetFormatExtensionsBaseSchema.extend({ field: z.literal('v1') });
     const v2 = broadsetFormatExtensionsBaseSchema.extend({ field: z.literal('v2') });
 
-    registerExtensionsSchema('psd', v1 as unknown as z.ZodType<BroadsetFormatExtensions>);
-    registerExtensionsSchema('psd', v2 as unknown as z.ZodType<BroadsetFormatExtensions>);
+    registerExtensionsSchema('psd', v1);
+    registerExtensionsSchema('psd', v2);
 
     const schema = getExtensionsSchema('psd');
 
@@ -88,7 +87,7 @@ describe('extensions registry', () => {
   it('unregisters a schema cleanly', () => {
     registerExtensionsSchema(
       'svg',
-      broadsetFormatExtensionsBaseSchema as unknown as z.ZodType<BroadsetFormatExtensions>,
+      broadsetFormatExtensionsBaseSchema,
     );
     unregisterExtensionsSchema('svg');
 
@@ -103,7 +102,7 @@ describe('validateExtensions', () => {
   it('validates a registered namespace and returns the typed shape', () => {
     const schema = broadsetFormatExtensionsBaseSchema.extend({ rawHex: z.string() });
 
-    registerExtensionsSchema('pdf', schema as unknown as z.ZodType<BroadsetFormatExtensions>);
+    registerExtensionsSchema('pdf', schema);
 
     const validated = validateExtensions({ pdf: { dirty: false, rawHex: 'deadbeef' } });
 
@@ -114,7 +113,7 @@ describe('validateExtensions', () => {
   it('throws when a registered schema rejects the payload', () => {
     const schema = broadsetFormatExtensionsBaseSchema.extend({ requiredField: z.string() });
 
-    registerExtensionsSchema('psd', schema as unknown as z.ZodType<BroadsetFormatExtensions>);
+    registerExtensionsSchema('psd', schema);
 
     expect(() => validateExtensions({ psd: { dirty: false } })).toThrow();
   });
@@ -142,7 +141,7 @@ describe('validateExtensions', () => {
   it('ignores unknown top-level keys outside the reserved format ids', () => {
     registerExtensionsSchema(
       'pdf',
-      broadsetFormatExtensionsBaseSchema as unknown as z.ZodType<BroadsetFormatExtensions>,
+      broadsetFormatExtensionsBaseSchema,
     );
 
     const validated = validateExtensions({
@@ -162,7 +161,7 @@ describe('getExtensions', () => {
   it('returns the validated payload for the requested format', () => {
     const schema = broadsetFormatExtensionsBaseSchema.extend({ markedContent: z.boolean() });
 
-    registerExtensionsSchema('pdf', schema as unknown as z.ZodType<BroadsetFormatExtensions>);
+    registerExtensionsSchema('pdf', schema);
 
     const value = getExtensions({ pdf: { dirty: true, markedContent: true } }, 'pdf');
 
@@ -187,7 +186,7 @@ describe('getExtensions', () => {
   it('throws when the registered schema rejects the payload', () => {
     const schema = broadsetFormatExtensionsBaseSchema.extend({ required: z.literal('yes') });
 
-    registerExtensionsSchema('pptx', schema as unknown as z.ZodType<BroadsetFormatExtensions>);
+    registerExtensionsSchema('pptx', schema);
 
     expect(() => getExtensions({ pptx: { dirty: false } }, 'pptx')).toThrow();
   });
@@ -202,7 +201,7 @@ describe('BroadsetFormatId type', () => {
     for (const id of ids) {
       registerExtensionsSchema(
         id,
-        broadsetFormatExtensionsBaseSchema as unknown as z.ZodType<BroadsetFormatExtensions>,
+        broadsetFormatExtensionsBaseSchema,
       );
     }
 

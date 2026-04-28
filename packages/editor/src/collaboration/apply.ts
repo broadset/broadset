@@ -319,8 +319,8 @@ function setNestedValue<T>(obj: T, path: string, value: unknown): T {
   const parts = normalizeChangePath(path);
 
   if (parts.length === 1) {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- generic widening; TypeScript cannot infer that the spread result preserves T
-    return { ...obj, [parts[0] as string]: value } as T;
+     
+    return { ...obj, [parts[0] as string]: value };
   }
 
   const [head, ...rest] = parts;
@@ -330,6 +330,6 @@ function setNestedValue<T>(obj: T, path: string, value: unknown): T {
   const current = (obj as Record<string, unknown>)[head];
   const nested = setNestedValue(current ?? {}, rest.join('.'), value);
 
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- generic widening; TypeScript cannot infer that the spread result preserves T
-  return { ...obj, [head]: nested } as T;
+   
+  return { ...obj, [head]: nested };
 }

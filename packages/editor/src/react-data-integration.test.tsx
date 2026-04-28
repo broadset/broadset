@@ -291,7 +291,7 @@ describe('usePlayback hook', () => {
     let hookResult: PlaybackState | null = null;
     const rafCallbacks: Array<(time: number) => void> = [];
     const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
-      rafCallbacks.push(cb as (time: number) => void);
+      rafCallbacks.push(cb);
 
       return rafCallbacks.length;
     });
@@ -339,7 +339,7 @@ describe('usePlayback hook', () => {
     let hookResult: PlaybackState | null = null;
     const rafCallbacks: Array<(time: number) => void> = [];
     const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
-      rafCallbacks.push(cb as (time: number) => void);
+      rafCallbacks.push(cb);
 
       return rafCallbacks.length;
     });

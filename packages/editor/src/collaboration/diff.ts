@@ -268,7 +268,7 @@ function diffAnimations(prev: BroadsetDocument, next: BroadsetDocument, out: Doc
         elementId: def.elementId,
         path: 'config',
         oldValue: undefined,
-        newValue: def.config as unknown,
+        newValue: def.config,
       });
       continue;
     }
@@ -283,7 +283,7 @@ function diffAnimations(prev: BroadsetDocument, next: BroadsetDocument, out: Doc
         documentId: prev.id,
         elementId: def.elementId,
         path: 'config',
-        oldValue: def.config as unknown,
+        oldValue: def.config,
         newValue: undefined,
       });
     }

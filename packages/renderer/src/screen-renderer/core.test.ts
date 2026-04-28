@@ -416,7 +416,7 @@ describe('renderer core', () => {
         createElement({
           id: 'rect-no-opacity',
           type: 'rectangle',
-          style: styleWithoutOpacity as unknown as typeof defaultStyle,
+          style: styleWithoutOpacity,
         }),
       ]),
     });

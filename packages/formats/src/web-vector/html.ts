@@ -11,6 +11,7 @@ import {
   resolveStyleFilter,
 } from '@broadset/model';
 
+import { sanitizeSvg } from '../_shared/sanitize/sanitize-svg';
 import { generateQrSvgFragment } from '../interchange';
 import { escapeXml } from './shared';
 
@@ -154,8 +155,15 @@ function buildTextInlineStyle(el: BroadsetElement): string {
 /* ------------------------------------------------------------------ */
 
 function renderHtmlPath(el: BroadsetElement, dataAttr: string, containerStyle: string): string {
-  const fill = resolveStyleFillToSvgPaint(el.style.fill, { resolveTheme: false });
-  const stroke = resolveStyleColor(el.style.stroke, { resolveTheme: false }) ?? 'none';
+  // `resolveStyleFillToSvgPaint` and `resolveStyleColor` may return
+  // strings derived from element style — escape them as attribute
+  // values before interpolation so a project file with a hostile
+  // theme alias cannot break out of the attribute quote and inject
+  // markup into the standalone HTML export. Closes the 2026-04-28
+  // production-readiness audit finding "Standalone HTML export emits
+  // raw SVG markup".
+  const fill = escapeXml(resolveStyleFillToSvgPaint(el.style.fill, { resolveTheme: false }));
+  const stroke = escapeXml(resolveStyleColor(el.style.stroke, { resolveTheme: false }) ?? 'none');
   const strokeWidth = el.style.strokeWidth ?? 1;
 
   return `<div ${dataAttr} style="${containerStyle}"><svg width="${String(el.width)}" height="${String(el.height)}" style="overflow:visible"><path d="${escapeXml(resolveContentAsPlainString(el.content))}" fill="${fill}" stroke="${stroke}" stroke-width="${String(strokeWidth)}"/></svg></div>`;
@@ -281,8 +289,18 @@ function renderHtmlElement(el: BroadsetElement, allElements: readonly BroadsetEl
     case 'image':
       return `<div ${dataAttr} style="${style}"><img src="${escapeXml(resolveContentAsPlainString(el.content))}" style="width:100%;height:100%;object-fit:${el.style.objectFit ?? 'cover'}"/></div>`;
 
-    case 'svg':
-      return `<div ${dataAttr} style="${style}">${resolveContentAsPlainString(el.content)}</div>`;
+    case 'svg': {
+      // Sanitize at the export boundary — SVG content stored on an
+      // element MAY have arrived from an importer that bypassed the
+      // schema, or may carry markup the schema permits but a hostile
+      // project file shaped to be active when re-rendered as HTML.
+      // The standalone HTML export is its own trust boundary because
+      // it ends up as a publicly-served `.html` file. Closes the
+      // 2026-04-28 production-readiness audit finding.
+      const sanitized = sanitizeSvg(resolveContentAsPlainString(el.content));
+
+      return `<div ${dataAttr} style="${style}">${sanitized.ast.markup}</div>`;
+    }
 
     case 'path':
       return renderHtmlPath(el, dataAttr, style);

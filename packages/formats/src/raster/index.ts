@@ -65,7 +65,7 @@ async function ensureScreenshotModule(): Promise<void> {
   if (domToCanvasFn === null) {
     const mod = await import('modern-screenshot');
 
-    domToCanvasFn = mod.domToCanvas as unknown as NonNullable<typeof domToCanvasFn>;
+    domToCanvasFn = mod.domToCanvas;
     createContextFn = mod.createContext as unknown as NonNullable<typeof createContextFn>;
     destroyContextFn = mod.destroyContext as unknown as NonNullable<typeof destroyContextFn>;
   }

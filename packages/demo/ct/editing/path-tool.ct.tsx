@@ -291,6 +291,51 @@ async function clickAbsolute(page: Page, x: number, y: number): Promise<void> {
   });
 }
 
+/**
+ * Place a path vertex by clicking at the absolute coordinates and
+ * then synchronously polling the rendered `<path>` until the `d`
+ * attribute carries at least `expectedVertexCount` `M`/`L` commands.
+ *
+ * Closes the 2026-04-28 production-readiness audit's CT-flakiness
+ * finding: without a per-click sync the next click can fire before
+ * React has re-rendered the path, occasionally swallowing the
+ * append. The previous helper relied on Playwright's auto-wait for
+ * the click target — which is satisfied by the preview element's
+ * mere presence — leaving the store/DOM update racy.
+ */
+async function clickAndWaitForVertex(page: Page, x: number, y: number, expectedVertexCount: number): Promise<void> {
+  await clickAbsolute(page, x, y);
+
+  await expect
+    .poll(
+      async () => {
+        const result = await page.evaluate(() => {
+          const hosts = document.querySelectorAll<HTMLElement>(
+            '[data-testid="screen-renderer-host"] [data-element-id]',
+          );
+
+          for (let index = hosts.length - 1; index >= 0; index -= 1) {
+            const host = hosts[index];
+
+            if (host === undefined) continue;
+
+            const path = host.querySelector<SVGPathElement>('svg path[d]');
+
+            if (path !== null) {
+              return (path.getAttribute('d') ?? '').match(/[ML]/g)?.length ?? 0;
+            }
+          }
+
+          return 0;
+        });
+
+        return result;
+      },
+      { timeout: 4_000 },
+    )
+    .toBeGreaterThanOrEqual(expectedVertexCount);
+}
+
 test('path vertices land on their click positions at default zoom', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
   await activatePathTool(page);
@@ -302,8 +347,11 @@ test('path vertices land on their click positions at default zoom', async ({ mou
     { x: canvasRect.x + canvasRect.width * 0.45, y: canvasRect.y + canvasRect.height * 0.7 },
   ];
 
-  for (const click of clicks) {
-    await clickAbsolute(page, click.x, click.y);
+  for (let index = 0; index < clicks.length; index += 1) {
+    const click = clicks[index];
+
+    if (click === undefined) continue;
+    await clickAndWaitForVertex(page, click.x, click.y, index + 1);
   }
 
   await assertPathVerticesMatchClicks(page, clicks, 2);
@@ -332,8 +380,11 @@ test('eight scattered clicks each produce a vertex at the exact click position',
     { x: canvasRect.x + canvasRect.width * 0.58, y: canvasRect.y + canvasRect.height * 0.6 },
   ];
 
-  for (const click of clicks) {
-    await clickAbsolute(page, click.x, click.y);
+  for (let index = 0; index < clicks.length; index += 1) {
+    const click = clicks[index];
+
+    if (click === undefined) continue;
+    await clickAndWaitForVertex(page, click.x, click.y, index + 1);
   }
 
   await assertPathVerticesMatchClicks(page, clicks, 2);
@@ -356,8 +407,11 @@ test('a completed path can be re-selected by clicking it', async ({ mount, page 
     { x: canvasRect.x + canvasRect.width * 0.5, y: canvasRect.y + canvasRect.height * 0.6 },
   ];
 
-  for (const click of clicks) {
-    await clickAbsolute(page, click.x, click.y);
+  for (let index = 0; index < clicks.length; index += 1) {
+    const click = clicks[index];
+
+    if (click === undefined) continue;
+    await clickAndWaitForVertex(page, click.x, click.y, index + 1);
   }
 
   // Commit via Enter, then deselect via the store (avoids landing clicks on
@@ -436,8 +490,11 @@ test('clicking the last vertex again ends path drawing', async ({ mount, page })
     { x: canvasRect.x + canvasRect.width * 0.5, y: canvasRect.y + canvasRect.height * 0.6 },
   ];
 
-  for (const click of clicks) {
-    await clickAbsolute(page, click.x, click.y);
+  for (let index = 0; index < clicks.length; index += 1) {
+    const click = clicks[index];
+
+    if (click === undefined) continue;
+    await clickAndWaitForVertex(page, click.x, click.y, index + 1);
   }
 
   const preview = page.getByLabel(/screen preview for/i);
@@ -539,8 +596,11 @@ test('clicks extending the bbox up and left keep every vertex anchored to its cl
   const p4 = { x: p3.x - 100, y: p3.y };
   const clicks = [p1, p2, p3, p4];
 
-  for (const click of clicks) {
-    await clickAbsolute(page, click.x, click.y);
+  for (let index = 0; index < clicks.length; index += 1) {
+    const click = clicks[index];
+
+    if (click === undefined) continue;
+    await clickAndWaitForVertex(page, click.x, click.y, index + 1);
   }
 
   await assertPathVerticesMatchClicks(page, clicks, 2);
@@ -571,8 +631,11 @@ test('clicks in every compass direction keep previous vertices anchored', async 
     { x: center.x + 60, y: center.y - 40 }, // northeast
   ];
 
-  for (const click of clicks) {
-    await clickAbsolute(page, click.x, click.y);
+  for (let index = 0; index < clicks.length; index += 1) {
+    const click = clicks[index];
+
+    if (click === undefined) continue;
+    await clickAndWaitForVertex(page, click.x, click.y, index + 1);
   }
 
   await assertPathVerticesMatchClicks(page, clicks, 2);
@@ -593,8 +656,11 @@ test('path vertices land on their click positions for colinear clicks', async ({
     { x: canvasRect.x + canvasRect.width * 0.7, y: canvasRect.y + canvasRect.height * 0.5 },
   ];
 
-  for (const click of clicks) {
-    await clickAbsolute(page, click.x, click.y);
+  for (let index = 0; index < clicks.length; index += 1) {
+    const click = clicks[index];
+
+    if (click === undefined) continue;
+    await clickAndWaitForVertex(page, click.x, click.y, index + 1);
   }
 
   await assertPathVerticesMatchClicks(page, clicks, 2);
@@ -623,8 +689,11 @@ test('path vertices land on their click positions after zooming in', async ({ mo
     { x: canvasRect.x + canvasRect.width * 0.5, y: canvasRect.y + canvasRect.height * 0.65 },
   ];
 
-  for (const click of clicks) {
-    await clickAbsolute(page, click.x, click.y);
+  for (let index = 0; index < clicks.length; index += 1) {
+    const click = clicks[index];
+
+    if (click === undefined) continue;
+    await clickAndWaitForVertex(page, click.x, click.y, index + 1);
   }
 
   await assertPathVerticesMatchClicks(page, clicks, 2);
@@ -651,8 +720,11 @@ test('path vertices land on their click positions after zooming out', async ({ m
     { x: canvasRect.x + canvasRect.width * 0.5, y: canvasRect.y + canvasRect.height * 0.65 },
   ];
 
-  for (const click of clicks) {
-    await clickAbsolute(page, click.x, click.y);
+  for (let index = 0; index < clicks.length; index += 1) {
+    const click = clicks[index];
+
+    if (click === undefined) continue;
+    await clickAndWaitForVertex(page, click.x, click.y, index + 1);
   }
 
   await assertPathVerticesMatchClicks(page, clicks, 2);
@@ -693,8 +765,11 @@ test('path vertices land on their click positions after pan + zoom', async ({ mo
     { x: canvasRect.x + canvasRect.width * 0.5, y: canvasRect.y + canvasRect.height * 0.65 },
   ];
 
-  for (const click of clicks) {
-    await clickAbsolute(page, click.x, click.y);
+  for (let index = 0; index < clicks.length; index += 1) {
+    const click = clicks[index];
+
+    if (click === undefined) continue;
+    await clickAndWaitForVertex(page, click.x, click.y, index + 1);
   }
 
   await assertPathVerticesMatchClicks(page, clicks, 2);
