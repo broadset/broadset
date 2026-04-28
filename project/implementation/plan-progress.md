@@ -215,7 +215,7 @@ Outcome of the 2026-04-28 cross-format analysis (PDF / PSD / PPTX / SVG). Lights
 - [ ] CFIO.4.1 PSD CMYK / Lab / Grayscale + ICC profile round-trip *(needs sub-plan; blocks on `_shared/color/lcms-wasm`)*
 - [ ] CFIO.4.2 PDF P6.3 — real shading patterns + per-element OCG wrappers *(needs sub-plan)*
 - [ ] CFIO.4.3 PSD effects parity (bevel / satin / pattern overlay preserve, inner glow / overlays native) *(needs sub-plan)*
-- [x] CFIO.4.4 PSD bitmap layer mask round-trip (commit pending)
+- [x] CFIO.4.4 PSD bitmap layer mask round-trip — `extensions.psd.bitmapMask` round-trips alpha bytes; vector mask wins as editable Broadset surface when both present; validator surfaces per-kind mask counts via `PsdValidationResult.masks` (helper + tests landed in `43172a7`, wiring landed in `6844506`)
 - [x] CFIO.4.5 PSD text rotation through ag-psd text-transform (`1ab6354`)
 - [ ] CFIO.4.6 PSD 16/32-bpc bit-depth preservation *(needs sub-plan)*
 - [x] CFIO.4.7 PPTX font weight / style variants — closes pptx-known-gaps A4 (`24dcb7f`)
