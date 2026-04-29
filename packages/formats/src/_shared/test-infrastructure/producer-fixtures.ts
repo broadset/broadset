@@ -1,7 +1,7 @@
 /**
  * Shared producer-fixture harness used by every format's compatibility
- * suite (PPTX, PDF, PSD, SVG). Closes RQ-4.2 in
- * `project/implementation/release-quality-closure-plan.md`.
+ * suite (PPTX, PDF, PSD, SVG). Supports D.4 in
+ * `project/implementation/production-readiness-status.md`.
  *
  * Two fixture surfaces:
  *
@@ -31,13 +31,7 @@ export interface ProducerFixtureManifestRow {
   readonly producerVersion: string;
   readonly os: string;
   readonly exportPath: string;
-  readonly license:
-    | 'public-domain'
-    | 'MIT'
-    | 'CC-BY-4.0'
-    | 'CC0-1.0'
-    | 'MPL-2.0'
-    | 'private-mount';
+  readonly license: 'public-domain' | 'MIT' | 'CC-BY-4.0' | 'CC0-1.0' | 'MPL-2.0' | 'private-mount';
   readonly expectedImport: string;
   readonly expectedReExport: string;
   readonly knownLimitations?: string;

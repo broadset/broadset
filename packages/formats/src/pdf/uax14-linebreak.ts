@@ -44,7 +44,7 @@ export async function prepareLineBreaker(): Promise<void> {
 
   try {
     const moduleSpecifier = 'linebreak';
-    const moduleResult: unknown = await import(moduleSpecifier);
+    const moduleResult: unknown = await import(/* @vite-ignore */ moduleSpecifier);
 
     if (!isObject(moduleResult)) return;
 
