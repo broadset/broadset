@@ -1,20 +1,14 @@
-import {
-  type BroadsetDocument,
-  broadsetDocumentSchema,
-  type BroadsetProject,
-  broadsetProjectSchema,
-} from '@broadset/model';
+import { type BroadsetDocument, type BroadsetProject, broadsetProjectSchema } from '@broadset/model';
 
 import sampleFixture from './sampleDocument.json' with { type: 'json' };
 
-const SAMPLE_DOCUMENT: BroadsetDocument = broadsetDocumentSchema.parse(sampleFixture.sampleDocument);
-const SAMPLE_SOCIAL_DOCUMENT: BroadsetDocument = broadsetDocumentSchema.parse(sampleFixture.sampleSocialDocument);
+const SAMPLE_PROJECT: BroadsetProject = broadsetProjectSchema.parse(sampleFixture.sampleProject);
+const sampleDocument = SAMPLE_PROJECT.documents[0];
 
-const SAMPLE_PROJECT: BroadsetProject = broadsetProjectSchema.parse({
-  ...sampleFixture.sampleProject,
-  documents: [SAMPLE_DOCUMENT, SAMPLE_SOCIAL_DOCUMENT],
-});
+if (sampleDocument === undefined) {
+  throw new Error('Demo sample project must include at least one document.');
+}
 
-const DEMO_DOCUMENT: BroadsetDocument = broadsetDocumentSchema.parse(SAMPLE_DOCUMENT);
+const DEMO_DOCUMENT: BroadsetDocument = sampleDocument;
 
 export { DEMO_DOCUMENT, SAMPLE_PROJECT };

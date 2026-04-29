@@ -375,6 +375,10 @@ function collectPdfFormatWarnings(pdfWarnings: readonly string[]): FormatExportW
   };
 }
 
+function bytesToBlobPart(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
 export async function exportDocument(format: ExportFormat, context: ExportContext): Promise<ExportDocumentResult> {
   const formats = await loadFormats();
   const { document: doc } = context;
@@ -407,7 +411,7 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
 
     case 'pdf': {
       const pdfResult = await formats.exportPdfWithPreflight(doc, buildPdfExportOptions(context));
-      const blob = new Blob([pdfResult.bytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      const blob = new Blob([bytesToBlobPart(pdfResult.bytes)], { type: 'application/pdf' });
 
       formats.triggerDownload(blob, `${name}.pdf`);
       collected = collectPdfFormatWarnings(pdfResult.warnings);
@@ -416,7 +420,7 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
 
     case 'pptx': {
       const pptxReport = await formats.exportPptxWithReportAsync(doc, buildPptxExportOptions(context));
-      const blob = new Blob([pptxReport.bytes.buffer as ArrayBuffer], {
+      const blob = new Blob([bytesToBlobPart(pptxReport.bytes)], {
         type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       });
 
@@ -431,7 +435,7 @@ export async function exportDocument(format: ExportFormat, context: ExportContex
       // elements, colour-mode downgrades, URL fetch failures) reaches
       // the modal. The bytes are identical to `exportPsdBytesAsync`.
       const psdResult = await formats.exportPsdBytesAsyncWithPreflight(doc, { ...(context.psdOptions ?? {}) });
-      const blob = new Blob([psdResult.bytes.buffer as ArrayBuffer], { type: 'image/vnd.adobe.photoshop' });
+      const blob = new Blob([bytesToBlobPart(psdResult.bytes)], { type: 'image/vnd.adobe.photoshop' });
 
       formats.triggerDownload(blob, `${name}.psd`);
       collected = collectPsdFormatWarnings(psdResult.warnings);

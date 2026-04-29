@@ -528,16 +528,21 @@ describe('Raster Download Wrapper', () => {
   it('triggers download with requested filename', () => {
     let capturedDownload = '';
     let capturedHref = '';
+    let clickedWhileAttached = false;
+    const revokeObjectURL = vi.fn();
+
+    vi.useFakeTimers();
 
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
       capturedDownload = this.download;
       capturedHref = this.href;
+      clickedWhileAttached = this.isConnected;
     });
 
     (globalThis as Record<string, unknown>)['URL'] = {
       ...URL,
       createObjectURL: () => 'blob:mock-url',
-      revokeObjectURL: vi.fn(),
+      revokeObjectURL,
     };
 
     const blob = new Blob(['test'], { type: 'image/png' });
@@ -546,7 +551,15 @@ describe('Raster Download Wrapper', () => {
 
     expect(capturedDownload).toBe('my-export.png');
     expect(capturedHref).toContain('blob:');
+    expect(clickedWhileAttached).toBe(true);
+    expect(document.querySelector('a[download="my-export.png"]')).toBeNull();
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+
+    vi.runOnlyPendingTimers();
+
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
 
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 });
