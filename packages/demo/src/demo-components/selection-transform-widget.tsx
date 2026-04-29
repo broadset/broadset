@@ -68,12 +68,14 @@ function buildHandlePositions(screenPxPerCanvasUnit: number): Readonly<Record<Re
 export function SelectionTransformWidget({
   element,
   overlayRoot,
+  zoom,
   onPreviewUpdate,
   onCommitUpdate,
   onDoubleClick,
 }: {
   readonly element: BroadsetElement;
   readonly overlayRoot: HTMLElement;
+  readonly zoom: number;
   readonly onPreviewUpdate: (elementId: string, updates: ElementUpdate) => void;
   readonly onCommitUpdate: (elementId: string, updates: ElementUpdate) => void;
   readonly onDoubleClick?: (elementId: string) => void;
@@ -111,7 +113,7 @@ export function SelectionTransformWidget({
     return () => {
       observer.disconnect();
     };
-  }, [overlayRoot]);
+  }, [overlayRoot, zoom]);
 
   // Inverse ratio used to keep chrome (handles, rotation arm) a constant size
   // on screen even though the widget lives in canvas-unit space.

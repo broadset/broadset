@@ -12,6 +12,7 @@ import { GridOverlay } from './grid-overlay';
 import { InlineTextOverlay } from './inline-text-overlay';
 import { PathEditingOverlay } from './path-editing-overlay';
 import { PlacementPreviewOverlay } from './placement-preview-overlay';
+import { SafetyBoundariesOverlay } from './safety-boundaries-overlay';
 import { SelectionTransformWidget } from './selection-transform-widget';
 
 type ViewportChangeFn = (settings: { readonly panX?: number; readonly panY?: number; readonly zoom?: number }) => void;
@@ -633,6 +634,7 @@ export function ScreenPreview({
           }}
         />
       </div>
+      {overlayRoot === null ? null : <SafetyBoundariesOverlay editorStore={editorStore} overlayRoot={overlayRoot} />}
       {selectedWorldElement === null || overlayRoot === null || isTransformWidgetSuppressed ? null : (
         <SelectionTransformWidget
           element={selectedWorldElement}
@@ -640,6 +642,7 @@ export function ScreenPreview({
           onCommitUpdate={handleCommitTransform}
           onDoubleClick={tryStartInlineTextEditing}
           onPreviewUpdate={handlePreviewTransform}
+          zoom={zoom}
         />
       )}
       {pathEditingWorldElement === null || overlayRoot === null ? null : (
