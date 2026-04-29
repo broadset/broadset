@@ -1,6 +1,6 @@
 # Dev Audit Remediation — 2026-04-28
 
-Snapshot and remediation plan for the dev-only `npm audit` advisories surfaced in the 2026-04-28 production-readiness inspection. Lives next to `release-quality-closure-plan.md` and updates as fixes land.
+Snapshot and remediation plan for the dev-only `npm audit` advisories surfaced in the 2026-04-28 production-readiness inspection. Companion to `production-readiness-status.md` D.1.
 
 Scope: this document covers `npm audit --json` (full audit) only. Production audit (`npm audit --omit=dev --json`) reports zero advisories at the date above.
 
@@ -21,11 +21,11 @@ Production-only audit is clean — no shipped runtime dependency carries an open
 
 ### Full audit (dev included)
 
-| Advisory | Severity | Package | Range | Path | Fixed in |
-| --- | --- | --- | --- | --- | --- |
-| [GHSA-qx2v-qp2m-jg93](https://github.com/advisories/GHSA-qx2v-qp2m-jg93) — PostCSS XSS via unescaped `</style>` | moderate | `postcss` | `<8.5.10` | `node_modules/postcss` (deduped under multiple `vite` paths) | `postcss@8.5.10+` |
-| [GHSA-4w7w-66w2-5vf9](https://github.com/advisories/GHSA-4w7w-66w2-5vf9) — Vite path traversal in optimized-deps `.map` handling | moderate | `vite` | `<=6.4.1` | `node_modules/@playwright/experimental-ct-core/node_modules/vite` | `vite@6.4.2+` |
-| [GHSA-p9ff-h696-f583](https://github.com/advisories/GHSA-p9ff-h696-f583) — Vite arbitrary file read via dev-server WebSocket | high | `vite` | `>=6.0.0 <=6.4.1` | `node_modules/@playwright/experimental-ct-core/node_modules/vite` | `vite@6.4.2+` |
+| Advisory                                                                                                                         | Severity | Package   | Range             | Path                                                              | Fixed in          |
+| -------------------------------------------------------------------------------------------------------------------------------- | -------- | --------- | ----------------- | ----------------------------------------------------------------- | ----------------- |
+| [GHSA-qx2v-qp2m-jg93](https://github.com/advisories/GHSA-qx2v-qp2m-jg93) — PostCSS XSS via unescaped `</style>`                  | moderate | `postcss` | `<8.5.10`         | `node_modules/postcss` (deduped under multiple `vite` paths)      | `postcss@8.5.10+` |
+| [GHSA-4w7w-66w2-5vf9](https://github.com/advisories/GHSA-4w7w-66w2-5vf9) — Vite path traversal in optimized-deps `.map` handling | moderate | `vite`    | `<=6.4.1`         | `node_modules/@playwright/experimental-ct-core/node_modules/vite` | `vite@6.4.2+`     |
+| [GHSA-p9ff-h696-f583](https://github.com/advisories/GHSA-p9ff-h696-f583) — Vite arbitrary file read via dev-server WebSocket     | high     | `vite`    | `>=6.0.0 <=6.4.1` | `node_modules/@playwright/experimental-ct-core/node_modules/vite` | `vite@6.4.2+`     |
 
 ### Dependency graph context
 
@@ -72,7 +72,7 @@ broadset-workspace@0.1.0
 
 ## Applied fix — 2026-04-28
 
-Applied the preferred fix for both classes via root `npm` `overrides` (RQ-1.2 + RQ-1.3). The workspace `package.json` now carries:
+Applied the preferred fix for both classes via root `npm` `overrides` during production-readiness D.1. The workspace `package.json` now carries:
 
 ```json
 "overrides": {
@@ -93,5 +93,5 @@ Re-running `npm install` after the override edit dedupes `postcss@8.5.12` and fo
 ## Release-decision notes
 
 - Production audit (`npm audit --omit=dev`) was already clean and stays clean.
-- Full audit is now clean as of the override above. The override is the minimum-blast-radius fix per the release-quality-closure plan's "Prefer direct fixes over overrides" rule — direct upgrades are blocked by Playwright pinning `vite@^6.4.1` upstream.
+- Full audit is now clean as of the override above. The override is the minimum-blast-radius fix recorded for production-readiness D.1 — direct upgrades are blocked by Playwright pinning `vite@^6.4.1` upstream.
 - Recheck cadence: re-evaluate the override on every Playwright CT minor bump. When `@playwright/experimental-ct-core` ships a stable release whose declared `vite` range is satisfied by `^6.4.2+`, drop the override.

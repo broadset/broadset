@@ -1,8 +1,8 @@
 # Real Producer Compatibility Report — 2026-04-28
 
-Tracks Broadset's compatibility with files emitted by real third-party producers for PPTX, PDF, PSD, and SVG. Companion to `release-quality-closure-plan.md` units RQ-4 through RQ-9.
+Tracks Broadset's compatibility with files emitted by real third-party producers for PPTX, PDF, PSD, and SVG. Companion to `production-readiness-status.md` tracks D.4 through D.9.
 
-This is the **working** report — pass/fail/waived rows update as fixtures land and validation runs. Final release signoff happens at the bottom of this document (RQ-9.1).
+This is the **working** report — pass/fail/waived rows update as fixtures land and validation runs. Final release signoff happens at the bottom of this document (D.9).
 
 ## Fixture Governance
 
@@ -60,7 +60,7 @@ A "required" row means the matrix below has at least one row of that class with 
 
 ## Producer Matrix
 
-Pass/fail/waived state, owners, and validation commands for every producer-tool intersection. Every row stays here until release signoff (RQ-9.1). Add rows; never delete — waivers and historical results are load-bearing for the next release.
+Pass/fail/waived state, owners, and validation commands for every producer-tool intersection. Every row stays here until release signoff (D.9). Add rows; never delete — waivers and historical results are load-bearing for the next release.
 
 ### PPTX
 
@@ -134,7 +134,7 @@ Producer set per `svg-support-plan.md` § "External producer matrix".
 | V-12 | Illustrator chain (Broadset → AI → Broadset)    | macOS / Windows         | D     | release-eng | Manual: export Broadset canonical doc to SVG → open in Illustrator → save → re-import; assert round-trip fidelity per spec.   | untriaged | Required.                                                            |
 | V-13 | Inkscape chain (Broadset → Inkscape → Broadset) | macOS / Linux / Windows | D     | release-eng | Manual: export → open in Inkscape → save → re-import.                                                                         | untriaged | Required.                                                            |
 
-## Release Signoff (RQ-9.1)
+## Release Signoff (D.9)
 
 To be filled in at release time. Every row above MUST be `pass`, `waived`, or `risk-accepted` before signoff.
 
@@ -147,4 +147,4 @@ To be filled in at release time. Every row above MUST be `pass`, `waived`, or `r
 
 ## Audit trail
 
-- 2026-04-28 — initial governance + matrix landed via RQ-4.1. All rows `untriaged` pending fixture acquisition + harness work in RQ-4.2.
+- 2026-04-28 — initial governance + matrix landed via D.4. All rows `untriaged` pending fixture acquisition and validation work in D.5..D.8.

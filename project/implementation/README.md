@@ -10,6 +10,7 @@ These files describe **how the project is structured**, not the behavioral sourc
 - `plan.md` — execution order and current implementation status
 - `renderer-refactor-plan.md` — detailed plan to split a generic renderer core from the Broadset adapter and close renderer-spec drift
 - `plan-progress.md` — per-task execution board for the master roadmap
+- `production-readiness-status.md` — consolidated current release-readiness blockers, status, and closeout bar
 
 ## Tracking split
 

@@ -2,7 +2,7 @@
 
 Date: 2026-04-28
 Status: ready for execution
-Companion to: [`real-producer-compatibility.md`](./real-producer-compatibility.md), [`release-quality-closure-plan.md`](./release-quality-closure-plan.md) RQ-5..RQ-8.
+Companion to: [`real-producer-compatibility.md`](./real-producer-compatibility.md), [`production-readiness-status.md`](./production-readiness-status.md) D.5..D.8.
 
 This is a hand-off doc for an agent (or human) who can run real producer software (Photoshop, PowerPoint, Illustrator, etc.) to acquire the fixtures Broadset needs for release validation. It tells you exactly what to build, in which tool, where to put it, and how to wire it into the test harness.
 

@@ -15,7 +15,7 @@ Detailed task-level planning still lives in the dedicated companion files:
 - [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md)
 - [coverage-reporting.md](./coverage-reporting.md)
 - [cross-region-ct-audit.md](./cross-region-ct-audit.md)
-- [release-quality-closure-plan.md](./release-quality-closure-plan.md)
+- [production-readiness-status.md](./production-readiness-status.md)
 - [package-split.md](./package-split.md)
 
 Use this file for sequencing. Use the companion files for detailed unit scope,
@@ -573,7 +573,7 @@ Exit condition:
 
 ## Release Track D — Release quality closure
 
-Source of truth: [release-quality-closure-plan.md](./release-quality-closure-plan.md)
+Source of truth: [production-readiness-status.md](./production-readiness-status.md)
 
 This is the coordinating release-readiness track for the current gate-clean branch.
 
@@ -587,7 +587,7 @@ Purpose:
 Start conditions:
 
 - `npm run gate:full` green on the branch
-- current release-readiness gaps documented in `production-readiness-rerun-2026-04-28.md`
+- current release-readiness gaps documented in `production-readiness-status.md`
 
 Recommended slot:
 
@@ -617,7 +617,7 @@ Recommended slot:
 
 Exit condition:
 
-- release-quality closure plan done definition is met, including clean or accepted audit status, coverage baseline, cross-region CT accountability, producer compatibility report, aligned specs, and fresh-checkout validation
+- production-readiness status release bar is met, including clean or accepted audit status, coverage baseline refresh, cross-region CT accountability, producer compatibility report, aligned specs, export verification, and fresh-checkout validation
 
 ## Deferred Track C — Package split
 
@@ -732,7 +732,7 @@ io-prereqs 0 → 1 → 2 → renderer-refactor → io-prereqs 4
 
 parallel: coverage-reporting
 parallel: cross-region-ct-audit
-release: release-quality-closure
+release: production-readiness-status
 
 deferred-after-main-program: package-split
 ```

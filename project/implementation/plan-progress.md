@@ -188,7 +188,7 @@ Source of truth: [plan.md](./plan.md), [cross-region-ct-audit.md](./cross-region
 
 ### Release Track D — Release quality closure
 
-Source of truth: [plan.md](./plan.md), [release-quality-closure-plan.md](./release-quality-closure-plan.md)
+Source of truth: [plan.md](./plan.md), [production-readiness-status.md](./production-readiness-status.md)
 
 - [x] D.1 Resolve full dev audit advisories
 - [x] D.2 Wire coverage reporting and baseline docs

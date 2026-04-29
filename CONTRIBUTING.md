@@ -58,7 +58,7 @@ Before marking a branch release-ready:
 2. `npm run gate:full` exits 0.
 3. `npm run audit:prod` exits 0 (no shipped runtime vulnerabilities).
 4. `npm run audit:all` exits 0, OR every remaining advisory has a written release-risk acceptance in `project/implementation/dev-audit-remediation.md` with owner + expiry.
-5. Producer compatibility validation per `project/implementation/release-quality-closure-plan.md` RQ-5..RQ-8 has passed for the formats this release ships.
+5. Producer compatibility validation per `project/implementation/production-readiness-status.md` D.5..D.8 has passed for the formats this release ships.
 
 ## Spec Writing Conventions
 
