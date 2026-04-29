@@ -17,7 +17,8 @@ import { makeDocument, makeElement, makeStyle } from './test-helpers';
  *
  * The exporter emits a placeholder grey solid for image elements
  * (the placedLayer transform carries the real bytes); for native
- * vector shape layers the writer does not emit imageData at all.
+ * vector shape layers the writer emits imageData too because ag-psd
+ * derives written Photoshop layer bounds from that pixel body.
  * The samples below validate the contract Broadset exports under,
  * not what Photoshop would render at composite time.
  */
@@ -29,7 +30,12 @@ interface Rgba {
   readonly a: number;
 }
 
-function sampleImageData(data: Uint8Array | Uint8ClampedArray | undefined, width: number, x: number, y: number): Rgba | undefined {
+function sampleImageData(
+  data: Uint8Array | Uint8ClampedArray | undefined,
+  width: number,
+  x: number,
+  y: number,
+): Rgba | undefined {
   if (data === undefined) return undefined;
 
   const offset = (y * width + x) * 4;
@@ -60,7 +66,8 @@ describe('PSD visual regression — pixel sampling on exporter output', () => {
       position: { x: 10, y: 10 },
       width: 60,
       height: 40,
-      content: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
+      content:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
     });
     const doc = makeDocument({ elements: [el] });
     const bytes = exportPsdBytes(doc);
@@ -82,12 +89,11 @@ describe('PSD visual regression — pixel sampling on exporter output', () => {
   });
 
   /**
-   * @description Native vector shape layers do NOT carry imageData —
-   * the geometry lives in the vector mask. A regression that re-
-   * introduced raster pixels for shape layers would baked the shape
-   * and break re-editability.
+   * @description Native vector shape layers carry imageData because
+   * ag-psd otherwise writes zero-sized Photoshop layers. The geometry
+   * still lives in the vector mask.
    */
-  it('does not emit imageData for native rectangle shape layers', () => {
+  it('emits imageData and vector metadata for rectangle shape layers', () => {
     const el = makeElement('rectangle', {
       id: 'rect-1',
       name: 'Rect',
@@ -104,8 +110,50 @@ describe('PSD visual regression — pixel sampling on exporter output', () => {
     const psd = readPsd(bytes, { skipCompositeImageData: true, skipThumbnail: true, useImageData: true });
     const layer = psd.children?.[0];
 
-    expect(layer?.imageData).toBeUndefined();
+    expect(layer?.imageData?.width).toBe(80);
+    expect(layer?.imageData?.height).toBe(50);
     expect(layer?.vectorFill).toBeDefined();
+  });
+
+  /**
+   * @description Gradient rectangle fills produce visible layer pixels so Photoshop
+   * receives both usable bounds and non-empty channel data for non-solid Broadset fills.
+   */
+  it('emits visible imageData for gradient rectangle shape layers', () => {
+    const el = makeElement('rectangle', {
+      id: 'gradient-rect',
+      name: 'Gradient Rect',
+      position: { x: 0, y: 0 },
+      width: 60,
+      height: 40,
+      style: makeStyle({
+        opacity: 1,
+        fill: {
+          kind: 'gradient',
+          gradient: {
+            type: 'linear',
+            angle: 180,
+            stops: [
+              { color: { kind: 'rgb', hex: '#ff0000' }, position: 0 },
+              { color: { kind: 'rgb', hex: '#0000ff' }, position: 100 },
+            ],
+          },
+        } as never,
+      }),
+    });
+    const doc = makeDocument({ elements: [el] });
+    const bytes = exportPsdBytes(doc);
+    const psd = readPsd(bytes, { skipCompositeImageData: true, skipThumbnail: true, useImageData: true });
+    const imageData = psd.children?.[0]?.imageData;
+    const rawData = imageData?.data;
+    const dataView = rawData instanceof Uint8Array || rawData instanceof Uint8ClampedArray ? rawData : undefined;
+    const topSample = sampleImageData(dataView, imageData?.width ?? 0, 10, 5);
+    const bottomSample = sampleImageData(dataView, imageData?.width ?? 0, 10, 35);
+
+    expect(topSample?.a).toBe(255);
+    expect(bottomSample?.a).toBe(255);
+    expect(topSample?.r).toBeGreaterThan(bottomSample?.r ?? 0);
+    expect(bottomSample?.b).toBeGreaterThan(topSample?.b ?? 0);
   });
 
   /**
@@ -131,7 +179,8 @@ describe('PSD visual regression — pixel sampling on exporter output', () => {
     const psd = readPsd(bytes, { skipCompositeImageData: true, skipThumbnail: true, useImageData: true });
     const layer = psd.children?.[0];
 
-    expect(layer?.imageData).toBeUndefined();
+    expect(layer?.imageData?.width).toBe(40);
+    expect(layer?.imageData?.height).toBe(40);
     expect(layer?.vectorMask?.paths.length).toBeGreaterThan(0);
 
     if (layer?.vectorFill?.type === 'color') {

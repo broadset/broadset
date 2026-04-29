@@ -14,9 +14,8 @@ import { makeElement, makeStyle } from './test-helpers';
  * a rotated shape.
  *
  * These tests inspect the layer object produced by `elementToLayer`
- * directly. Round-tripping through ag-psd's writer + reader collapses
- * the AABB on layers without raster `imageData`, so the in-memory
- * layer is the authoritative surface for geometric correctness.
+ * directly so they can assert vector-mask knot normalisation, not just
+ * the channel bounds that ag-psd writes from layer imageData.
  */
 
 describe('PSD export — shape rotation', () => {

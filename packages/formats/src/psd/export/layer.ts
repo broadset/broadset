@@ -44,6 +44,15 @@ function applyTypeContent(layer: Layer, el: BroadsetElement): void {
   }
 }
 
+function ensureLayerChannelBounds(layer: Layer): void {
+  if (layer.imageData !== undefined) return;
+
+  const width = Math.max(1, Math.round((layer.right ?? 0) - (layer.left ?? 0)));
+  const height = Math.max(1, Math.round((layer.bottom ?? 0) - (layer.top ?? 0)));
+
+  layer.imageData = { width, height, data: new Uint8ClampedArray(width * height * 4) };
+}
+
 export function elementToLayer(el: BroadsetElement): Layer {
   const layer: Layer = {
     name: el.name,
@@ -70,6 +79,8 @@ export function elementToLayer(el: BroadsetElement): Layer {
   if (el.type !== 'image') {
     applyRotationToVectorMask(layer, el.rotation);
   }
+
+  ensureLayerChannelBounds(layer);
 
   return layer;
 }

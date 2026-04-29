@@ -46,59 +46,59 @@ Scoring legend for each of the three columns (Export, Import, Round-trip):
 - **metadata-preserved** — round-tripped via XMP or `additionalInfo`; not visible in the PSD layer but the user sees it in Broadset after re-import.
 - **dropped** — the feature is not representable; deliberately omitted on export, flagged on import.
 
-| Domain | Feature | Export | Import | Round-trip |
-| --- | --- | --- | --- | --- |
-| Text | Single-run plain text | native | native | native |
-| Text | Multi-run styled text (`TextBody` + `Paragraph` + `Run`) | native | native | native |
-| Text | Paragraph style (alignment, leading, tracking, first-line indent) | native | native | native |
-| Text | Font resolution + fallback | native | native | native |
-| Text | Text decoration (underline, strike) | native | native | native |
-| Text | Text-on-path | dropped | metadata-preserved | metadata-preserved |
-| Text | Bullets + numbered lists | native | native | native |
-| Vector | Rectangle / ellipse / path | native | native | native |
-| Vector | Rounded rectangle (`borderRadius`) | native | native | native |
-| Vector | Stroke (cap / join / dasharray / miterlimit / arrowheads) | native | native | native |
-| Vector | Fill — solid colour | native | native | native |
-| Vector | Fill — gradient (linear / radial / conic) | native | native | native |
-| Vector | Fill — pattern | native | native | native |
-| Vector | Fill — picture | native | native | native |
-| Raster | Plain bitmap layer (8-bit) | native | native | native |
-| Raster | 16-bit / 32-bit channels | native | native | native |
-| Raster | ICC profile on image asset | native | native | native |
-| Raster | Last-resort rasterisation fallback | native | n/a | metadata-preserved |
-| Groups | `'group'` element ↔ PSD layer group | native | native | native |
-| Groups | Nested groups + composed transforms | native | native | native |
-| Groups | Group-level opacity / blend mode / effects | native | native | native |
-| Masks | Vector mask | native | native | native |
-| Masks | Bitmap layer mask (alpha channel) | native | native | native |
-| Masks | Clipping mask (clip-to-layer-below) | native | native | native |
-| Masks | Boolean mask ops (add / subtract / intersect / exclude) | native | native | native |
-| Effects | Drop shadow | native | native | native |
-| Effects | Inner shadow | native | native | native |
-| Effects | Outer glow / inner glow | native | native | native |
-| Effects | Bevel / emboss | metadata-preserved | metadata-preserved | metadata-preserved |
-| Effects | Satin | metadata-preserved | metadata-preserved | metadata-preserved |
-| Effects | Colour overlay / gradient overlay | native | native | native |
-| Effects | Pattern overlay | metadata-preserved | metadata-preserved | metadata-preserved |
-| Effects | Stroke (layer effect) | native | native | native |
-| Smart objects | Embedded smart object | native | native | native |
-| Smart objects | Linked smart object (external file + GUID) | native | native | native |
-| Colour | RGB 8-bit | native | native | native |
-| Colour | CMYK (8- or 16-bit) with embedded ICC | native | native | native |
-| Colour | Lab with embedded ICC | native | native | native |
-| Colour | Grayscale with embedded ICC | native | native | native |
-| Colour | Spot colours | native | native | native |
-| Colour | `BroadsetColor.originalColor` preservation | n/a | native | native |
-| Blend | CSS-equivalent blend modes | native | native | native |
-| Blend | PSD-only blend modes | native (CSS fallback on render) | metadata-preserved + native | native |
-| Metadata | Document XMP `broadset:` namespace | native | native | native |
-| Metadata | Per-layer `BsPs` `additionalInfo` signature | native | native | native |
-| Metadata | Content-hash fallback when tags stripped | n/a | native | native |
-| Metadata | `document.metadata` (Dublin Core) | native (XMP) | native (XMP) | native |
-| Metadata | `document.outputIntent` ICC reference | native | native | native |
-| Animation | Animations (`animations` array, keyframes) | dropped (exported IN state) | dropped | dropped — animations are not serialized to XMP or `additionalInfo` per IO-D-16 |
-| Data binding | `dataField`, `visibleWhen`, `repeater` | metadata-preserved | metadata-preserved | metadata-preserved |
-| Adjustment layers | Curves / levels / hue-sat / color-balance on import | n/a | metadata-preserved | metadata-preserved |
+| Domain            | Feature                                                           | Export                          | Import                      | Round-trip                                                                     |
+| ----------------- | ----------------------------------------------------------------- | ------------------------------- | --------------------------- | ------------------------------------------------------------------------------ |
+| Text              | Single-run plain text                                             | native                          | native                      | native                                                                         |
+| Text              | Multi-run styled text (`TextBody` + `Paragraph` + `Run`)          | native                          | native                      | native                                                                         |
+| Text              | Paragraph style (alignment, leading, tracking, first-line indent) | native                          | native                      | native                                                                         |
+| Text              | Font resolution + fallback                                        | native                          | native                      | native                                                                         |
+| Text              | Text decoration (underline, strike)                               | native                          | native                      | native                                                                         |
+| Text              | Text-on-path                                                      | dropped                         | metadata-preserved          | metadata-preserved                                                             |
+| Text              | Bullets + numbered lists                                          | native                          | native                      | native                                                                         |
+| Vector            | Rectangle / ellipse / path                                        | native                          | native                      | native                                                                         |
+| Vector            | Rounded rectangle (`borderRadius`)                                | native                          | native                      | native                                                                         |
+| Vector            | Stroke (cap / join / dasharray / miterlimit / arrowheads)         | native                          | native                      | native                                                                         |
+| Vector            | Fill — solid colour                                               | native                          | native                      | native                                                                         |
+| Vector            | Fill — gradient (linear / radial / conic)                         | native                          | native                      | native                                                                         |
+| Vector            | Fill — pattern                                                    | native                          | native                      | native                                                                         |
+| Vector            | Fill — picture                                                    | native                          | native                      | native                                                                         |
+| Raster            | Plain bitmap layer (8-bit)                                        | native                          | native                      | native                                                                         |
+| Raster            | 16-bit / 32-bit channels                                          | native                          | native                      | native                                                                         |
+| Raster            | ICC profile on image asset                                        | native                          | native                      | native                                                                         |
+| Raster            | Last-resort rasterisation fallback                                | native                          | n/a                         | metadata-preserved                                                             |
+| Groups            | `'group'` element ↔ PSD layer group                               | native                          | native                      | native                                                                         |
+| Groups            | Nested groups + composed transforms                               | native                          | native                      | native                                                                         |
+| Groups            | Group-level opacity / blend mode / effects                        | native                          | native                      | native                                                                         |
+| Masks             | Vector mask                                                       | native                          | native                      | native                                                                         |
+| Masks             | Bitmap layer mask (alpha channel)                                 | native                          | native                      | native                                                                         |
+| Masks             | Clipping mask (clip-to-layer-below)                               | native                          | native                      | native                                                                         |
+| Masks             | Boolean mask ops (add / subtract / intersect / exclude)           | native                          | native                      | native                                                                         |
+| Effects           | Drop shadow                                                       | native                          | native                      | native                                                                         |
+| Effects           | Inner shadow                                                      | native                          | native                      | native                                                                         |
+| Effects           | Outer glow / inner glow                                           | native                          | native                      | native                                                                         |
+| Effects           | Bevel / emboss                                                    | metadata-preserved              | metadata-preserved          | metadata-preserved                                                             |
+| Effects           | Satin                                                             | metadata-preserved              | metadata-preserved          | metadata-preserved                                                             |
+| Effects           | Colour overlay / gradient overlay                                 | native                          | native                      | native                                                                         |
+| Effects           | Pattern overlay                                                   | metadata-preserved              | metadata-preserved          | metadata-preserved                                                             |
+| Effects           | Stroke (layer effect)                                             | native                          | native                      | native                                                                         |
+| Smart objects     | Embedded smart object                                             | native                          | native                      | native                                                                         |
+| Smart objects     | Linked smart object (external file + GUID)                        | native                          | native                      | native                                                                         |
+| Colour            | RGB 8-bit                                                         | native                          | native                      | native                                                                         |
+| Colour            | CMYK (8- or 16-bit) with embedded ICC                             | native                          | native                      | native                                                                         |
+| Colour            | Lab with embedded ICC                                             | native                          | native                      | native                                                                         |
+| Colour            | Grayscale with embedded ICC                                       | native                          | native                      | native                                                                         |
+| Colour            | Spot colours                                                      | native                          | native                      | native                                                                         |
+| Colour            | `BroadsetColor.originalColor` preservation                        | n/a                             | native                      | native                                                                         |
+| Blend             | CSS-equivalent blend modes                                        | native                          | native                      | native                                                                         |
+| Blend             | PSD-only blend modes                                              | native (CSS fallback on render) | metadata-preserved + native | native                                                                         |
+| Metadata          | Document XMP `broadset:` namespace                                | native                          | native                      | native                                                                         |
+| Metadata          | Per-layer `BsPs` `additionalInfo` signature                       | native                          | native                      | native                                                                         |
+| Metadata          | Content-hash fallback when tags stripped                          | n/a                             | native                      | native                                                                         |
+| Metadata          | `document.metadata` (Dublin Core)                                 | native (XMP)                    | native (XMP)                | native                                                                         |
+| Metadata          | `document.outputIntent` ICC reference                             | native                          | native                      | native                                                                         |
+| Animation         | Animations (`animations` array, keyframes)                        | dropped (exported IN state)     | dropped                     | dropped — animations are not serialized to XMP or `additionalInfo` per IO-D-16 |
+| Data binding      | `dataField`, `visibleWhen`, `repeater`                            | metadata-preserved              | metadata-preserved          | metadata-preserved                                                             |
+| Adjustment layers | Curves / levels / hue-sat / color-balance on import               | n/a                             | metadata-preserved          | metadata-preserved                                                             |
 
 ---
 
@@ -183,7 +183,7 @@ Text content MUST round-trip as structured `TextBody` / `Paragraph` / `Run` data
 
 ### Requirement: Native Shape Layer Export
 
-Rectangle, ellipse, and path elements MUST export as native PSD vector shape layers — not rasterised pixels. Rounded corners use the native rounded-rectangle primitive where possible.
+Rectangle, ellipse, and path elements MUST export PSD vector shape metadata (`vectorFill`, `vectorStroke`, and `vectorMask`) so Photoshop can preserve shape geometry. Rounded corners use the native rounded-rectangle primitive where possible. Exporters MAY include a minimal layer pixel body when a PSD writer requires `imageData`/canvas channels to preserve non-zero Photoshop layer bounds; that pixel body is compatibility scaffolding, not the source of shape geometry.
 
 #### Scenario: Rounded rectangle preserves editability
 
@@ -193,7 +193,7 @@ Rectangle, ellipse, and path elements MUST export as native PSD vector shape lay
 
 #### Acceptance Criteria
 
-- [ ] Rectangle / ellipse / path elements emit native PSD shape layers, not rasterised pixels
+- [ ] Rectangle / ellipse / path elements emit PSD vector shape metadata; any emitted pixel body MUST preserve Photoshop-openable non-zero bounds and MUST NOT replace the vector geometry contract
 - [ ] `borderRadius` round-trips via the native rounded-rectangle primitive when all four corners match; otherwise via knot-composed cubic segments
 - [ ] Stroke styling (cap, join, dasharray, miterlimit) round-trips
 - [x] Rotation composes into the exported layer geometry — image rotation flows through `placedLayer.transform`; non-image (rectangle / ellipse / path) rotation expands the layer AABB and re-normalises vector-mask path knots so Photoshop reads back a rotated shape
