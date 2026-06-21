@@ -1,6 +1,10 @@
 # PPTX Support Plan
 
-Status: draft — pre-Phase 0. Supersedes the scope of [project/spec/formats/pptx.md](../spec/formats/pptx.md); the spec file is rewritten in Phase 0.
+Status: historical companion plan. Current task status lives in
+[plan-progress.md](./plan-progress.md), and release readiness lives in
+[production-readiness-status.md](./production-readiness-status.md). This file
+preserves the original PPTX scope and acceptance detail; old "current state"
+sections describe the pre-track baseline, not the present implementation.
 
 This plan captures the full-fidelity PPTX import/export strategy for Broadset, covering round-trip within Broadset, external-source import (PowerPoint for Windows/Mac/Office 365, Keynote, Google Slides, LibreOffice Impress, Canva), and external-target export with minimal-loss editability in PowerPoint. It also covers the "chain" case: Broadset → PPTX → edit in PowerPoint → Save → re-import to Broadset with user edits preserved and Broadset semantics (animations, data bindings, page overrides) preserved wherever PowerPoint did not touch them.
 
@@ -107,6 +111,7 @@ When extension-list tags are stripped by an aggressive external tool and the sha
   - **Add `svgo`** — minimizes the SVG picture fallbacks we embed. Smaller `.pptx` output, cleaner XML, fewer round-trip surprises from namespace bloat and dead attributes.
   - **Devonly: add `python-pptx` as a test oracle** (invoked from a test-fixture-generation script, not shipped). Golden-source PPTX produced by a known-good OOXML library we can import and assert structure against. Catches our misreads of ECMA-376 faster than reading the spec back to ourselves.
   - **Explicitly not added:** `pptxgenjs`, `officegen`, `node-pptx` — all high-level "build a deck" APIs that hide the XML we specifically need to control (extension lists, custom XML parts, `<a:custGeom>`, theme references). `@xmldom/xmldom` — deferred; revisit only if `fast-xml-parser`'s JSON shape becomes a readability problem in the import tree-walk code.
+
 - Public API in [packages/formats/src/pptx/index.ts](../../packages/formats/src/pptx/index.ts): `exportPptxBytes`, `importPptxDocument`, `canRoundTripPptx`.
 - Wire `importPptxDocument` through [import-document.ts](../../packages/formats/src/import-document.ts) (already registered — swap to the new implementation).
 - Split current 1,689 lines into files under the 500-line soft cap per [typescript.instructions.md](../../agents/instructions/typescript.instructions.md), each single-concern:
@@ -125,7 +130,8 @@ When extension-list tags are stripped by an aggressive external tool and the sha
 Gated on io-prereqs **Phase 3** (renderer — nested group transform composition; "groups stay groups" depends on it) before 2a, and io-prereqs **Phase 4** (font asset type, image asset bytes, subsetting, embed-permission) + **Phase 5** (run-edit UI, bullets editor, swatches + theme-aware color picker) before 2b.
 
 Sequencing:
-- **2a — parity rebuild with dom-compositor.** Namespace-safe emission, EMU/rotation/color helpers, relationship manager, transform flattening *only within* `<p:grpSp>` children (groups stay groups), per-corner radii, uniform-radius → `prst="roundRect"`, non-uniform → SVG fallback picture, clip-path masking via SVG fallback, text run/paragraph props, solid fills with alpha.
+
+- **2a — parity rebuild with dom-compositor.** Namespace-safe emission, EMU/rotation/color helpers, relationship manager, transform flattening _only within_ `<p:grpSp>` children (groups stay groups), per-corner radii, uniform-radius → `prst="roundRect"`, non-uniform → SVG fallback picture, clip-path masking via SVG fallback, text run/paragraph props, solid fills with alpha.
 - **2b — surpass prior art.**
   - **Multi-slide.** One Broadset page → one PPTX slide; page overrides are materialized into per-slide shape deltas at export time so the on-slide visual matches what the page renders in Broadset.
   - **Generated theme + master + layout.** Emit a proper `ppt/theme/theme1.xml`, `ppt/slideMasters/slideMaster1.xml`, and one `ppt/slideLayouts/slideLayoutN.xml` per distinct Broadset layout family, populated from the project's style tokens. Shape fills reference theme colors (`<a:schemeClr>` with `lumMod`/`lumOff`) when the Broadset color matches a theme slot, giving users a "Reset to theme" affordance in PowerPoint.
@@ -149,7 +155,7 @@ Gated on io-prereqs **Phase 1** (rich-text runs, `BroadsetColor` with theme slot
 - `import/shape.ts` — walk the slide shape tree recursively, building a per-shape resolved-property record before mapping to Broadset.
 - `import/text.ts` — reconstruct style from resolved font, size (sz/100), bold, italic, underline, color, language, alignment, indent, margin, line spacing, bullets; preserve multi-paragraph, mixed-run paragraphs.
 - `import/geometry.ts` — map `prstGeom` presets to Broadset element kinds with a preset table (rect/roundRect/ellipse/triangle/star/arrow/callout/…); unknown presets become `svg` elements with a rasterized fallback so nothing is lost. `custGeom` → native Broadset `path` with `d` attribute reconstructed from OOXML path operators.
-- `import/picture.ts` — resolve `<p:blipFill>` via rels, handle external image references, preserve original bytes + MIME, re-use dom-compositor's SVG unwrapping heuristic when the picture *is* a Broadset SVG fallback.
+- `import/picture.ts` — resolve `<p:blipFill>` via rels, handle external image references, preserve original bytes + MIME, re-use dom-compositor's SVG unwrapping heuristic when the picture _is_ a Broadset SVG fallback.
 - `import/group.ts` — map `<p:grpSp>` to Broadset groups without flattening; compose `a:chOff`/`a:chExt` child offset transforms correctly.
 - `import/table.ts` — `<a:tbl>` → Broadset's closest representation (group of text boxes with borders until Broadset grows a native table element; tracked as a spec gap).
 - `import/chart.ts` — `<c:chart>` → a picture of the chart's static rendering plus a preserved XML blob in the element extension so re-export doesn't lose it.
@@ -157,6 +163,7 @@ Gated on io-prereqs **Phase 1** (rich-text runs, `BroadsetColor` with theme slot
 - `import/notes.ts` — `notesSlideN.xml` → Broadset document-level speaker-notes field per page.
 
 Sequencing inside Phase 3:
+
 - **3a — fast-path.** When `customXml/broadset-project.xml` and shape-name tags / extensions are present, hydrate the Broadset document directly and use the slide operator tree only to detect post-export edits per-element (hash compare against `broadset-interop.xml` ledger). This is the "we exported it, so we know exactly what it should be" path.
 - **3b — operator-level extraction.** Import arbitrary third-party PPTX as Broadset documents. All of the above modules run even when no Broadset metadata is present.
 

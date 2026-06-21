@@ -1,6 +1,10 @@
 # PDF Support Plan
 
-Status: draft — pre-Phase 0. Not yet reflected in `project/spec/formats/pdf.md`.
+Status: historical companion plan. Current task status lives in
+[plan-progress.md](./plan-progress.md), and release readiness lives in
+[production-readiness-status.md](./production-readiness-status.md). This file
+preserves the original PDF scope and acceptance detail; old "current state"
+sections describe the pre-track baseline, not the present implementation.
 
 This plan captures the full-fidelity PDF import/export strategy for Broadset, covering round-trip within Broadset, external-source import (Illustrator, InDesign, Acrobat, Figma, Word, LaTeX, macOS Preview), and external-target export with minimal-loss editability in Illustrator/Acrobat/InDesign.
 
@@ -57,24 +61,24 @@ Most libraries are added in **io-prereqs Phase 2** and consumed via `packages/fo
 
 ### PDF-specific libraries
 
-| Library | Role | Why this one |
-|---|---|---|
-| **`pdf-lib`** | PDF emitter (replaces `@libpdf/core`) | Mature, battle-tested, covers every primitive we need: raw operator injection (`page.pushOperators(...)`) for marked-content and shading patterns, native CMYK and custom color spaces, OCGs, custom-namespace XMP via `PDFHexString`/`PDFRawStream`, Form XObjects, ExtGState, EmbeddedFiles. Widely deployed, excellent browser support. |
-| **`pdfjs-dist`** | PDF parser for import | Mozilla's reference implementation. Exposes operator lists, text content with font refs, resources (images, XObjects, ExtGState, OCGs), XMP metadata, annotations. Ships as a WASM-accelerated worker we can sandbox. |
-| **`@pdf-lib/fontkit`** | pdf-lib adapter for fontkit subsetting | Official adapter wiring the shared `_shared/fonts/` (fontkit-based) pipeline into pdf-lib. Required for any custom font in PDF output. |
+| Library                | Role                                   | Why this one                                                                                                                                                                                                                                                                                                                               |
+| ---------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`pdf-lib`**          | PDF emitter (replaces `@libpdf/core`)  | Mature, battle-tested, covers every primitive we need: raw operator injection (`page.pushOperators(...)`) for marked-content and shading patterns, native CMYK and custom color spaces, OCGs, custom-namespace XMP via `PDFHexString`/`PDFRawStream`, Form XObjects, ExtGState, EmbeddedFiles. Widely deployed, excellent browser support. |
+| **`pdfjs-dist`**       | PDF parser for import                  | Mozilla's reference implementation. Exposes operator lists, text content with font refs, resources (images, XObjects, ExtGState, OCGs), XMP metadata, annotations. Ships as a WASM-accelerated worker we can sandbox.                                                                                                                      |
+| **`@pdf-lib/fontkit`** | pdf-lib adapter for fontkit subsetting | Official adapter wiring the shared `_shared/fonts/` (fontkit-based) pipeline into pdf-lib. Required for any custom font in PDF output.                                                                                                                                                                                                     |
 
 ### Consumed from `packages/formats/src/_shared/` (added once in io-prereqs Phase 2)
 
-| Shared module | Underlying library | Role in PDF pipeline |
-|---|---|---|
-| **`_shared/color/`** | `culori` + lazy `lcms-wasm` | CSS Color Level 4 parsing, RGB/CMYK/OKLCH/P3/Lab, gamut mapping, ICC transforms. Consumed by `pdf/export/color.ts`. Replaces the hand-rolled 90-line [color.ts](../../packages/formats/src/pdf/color.ts). |
-| **`_shared/fonts/`** | `fontkit` | Font subsetting, glyph metrics, ToUnicode CMap data, `OS/2` `fsType` embed-permission read. Consumed by `pdf/export/fonts.ts` and `pdf/import/fonts.ts`. |
-| **`_shared/text-layout/`** | `linebreak` + `bidi-js` + lazy `harfbuzzjs` | UAX #14 wrapping, UAX #9 BiDi, complex-script shaping. Consumed by `pdf/export/text.ts`. |
-| **`_shared/xmp/`** | `fast-xml-parser` | Read/write `broadset:` XMP packet. Consumed by `pdf/export/xmp.ts` and `pdf/import/parse.ts`. |
-| **`_shared/fingerprint/`** | `xxhash-wasm` | Content-hash fingerprinting. Consumed by `pdf/import/reconcile-hash.ts`. |
-| **`_shared/reconcile/`** | `microdiff` | Structural diffs for reconciliation. Consumed by `pdf/roundtrip.ts`. |
-| **`_shared/shape-classifier/`** | (in-house) | Rectangle / ellipse / path heuristics. Consumed by `pdf/import/shape-classifier.ts`. |
-| **`_shared/sanitize/`** | `dompurify` | Not used by PDF; included for completeness. |
+| Shared module                   | Underlying library                          | Role in PDF pipeline                                                                                                                                                                                      |
+| ------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`_shared/color/`**            | `culori` + lazy `lcms-wasm`                 | CSS Color Level 4 parsing, RGB/CMYK/OKLCH/P3/Lab, gamut mapping, ICC transforms. Consumed by `pdf/export/color.ts`. Replaces the hand-rolled 90-line [color.ts](../../packages/formats/src/pdf/color.ts). |
+| **`_shared/fonts/`**            | `fontkit`                                   | Font subsetting, glyph metrics, ToUnicode CMap data, `OS/2` `fsType` embed-permission read. Consumed by `pdf/export/fonts.ts` and `pdf/import/fonts.ts`.                                                  |
+| **`_shared/text-layout/`**      | `linebreak` + `bidi-js` + lazy `harfbuzzjs` | UAX #14 wrapping, UAX #9 BiDi, complex-script shaping. Consumed by `pdf/export/text.ts`.                                                                                                                  |
+| **`_shared/xmp/`**              | `fast-xml-parser`                           | Read/write `broadset:` XMP packet. Consumed by `pdf/export/xmp.ts` and `pdf/import/parse.ts`.                                                                                                             |
+| **`_shared/fingerprint/`**      | `xxhash-wasm`                               | Content-hash fingerprinting. Consumed by `pdf/import/reconcile-hash.ts`.                                                                                                                                  |
+| **`_shared/reconcile/`**        | `microdiff`                                 | Structural diffs for reconciliation. Consumed by `pdf/roundtrip.ts`.                                                                                                                                      |
+| **`_shared/shape-classifier/`** | (in-house)                                  | Rectangle / ellipse / path heuristics. Consumed by `pdf/import/shape-classifier.ts`.                                                                                                                      |
+| **`_shared/sanitize/`**         | `dompurify`                                 | Not used by PDF; included for completeness.                                                                                                                                                               |
 
 `zod` (already in `@broadset/model`) continues to validate XMP-hydrated project JSON.
 
@@ -134,6 +138,7 @@ Small focused files, each soft-capped at ~300 lines (hard cap 500). All io-prere
 - `pdf/export/core.ts` — orchestration only, ≤ 250 lines.
 
 Sequencing inside Phase 2:
+
 - **2a** parity rebuild with dom-compositor (parent-child flatten, rotation composition, per-corner radii, clip-path masking).
 - **2b** surpasses prior art (real gradients, CMYK/spot, OCGs, marked-content). Animations are discarded per **IO-D-16**; IN-state resolution runs per element.
 
@@ -150,6 +155,7 @@ Gated on io-prereqs **Phase 1** (content hash, `BroadsetColor` union with `origi
 - `pdf/import/reconcile-hash.ts` — thin wrapper over `_shared/fingerprint/fingerprintElement()` so element identity survives when marked-content tags are stripped by external editors.
 
 Sequencing inside Phase 3:
+
 - **3a** XMP + marked-content fast-path — import any PDF Broadset itself exported with perfect fidelity.
 - **3b** operator-level extraction — import arbitrary third-party PDFs as Broadset documents.
 
@@ -181,6 +187,7 @@ Gated on io-prereqs **Phase 6** (external-tool fixture convention, `assertReImpo
   - LaTeX (pdflatex)
 
   Smoke-test: import, count elements, assert no exceptions, snapshot structure so regressions surface immediately.
+
 - **Chain CT (Playwright).** User imports a PDF in the demo, edits one element in a given region, exports, re-imports, and asserts the edit survived across all affected regions — conforms to the cross-region CT rule in [testing.instructions.md](../../agents/instructions/testing.instructions.md).
 
 ### Phase 6 — UI

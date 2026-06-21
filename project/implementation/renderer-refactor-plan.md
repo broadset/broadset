@@ -3,6 +3,12 @@
 Date: 2026-04-22
 Status: complete — all seven subphases (P3.0–P3.6) landed 2026-04-23 under Master Plan Phase 3
 
+Current-status note: this is a historical phase-completion record, not proof
+that every renderer spec item is complete. Release readiness and remaining
+renderer/editor gaps are tracked in
+[production-readiness-status.md](./production-readiness-status.md),
+[plan-progress.md](./plan-progress.md), and the relevant specs.
+
 This plan turns `@broadset/renderer` from a Broadset-centric preview DOM into a reusable HTML motion-graphics renderer with a thin Broadset adapter.
 
 It stays inside the current package boundary defined in [architecture.md](./architecture.md): no new workspace package is introduced unless the architecture doc is changed first. The refactor is internal to `packages/renderer` and keeps the existing package root import surface stable while the internals are re-layered.
@@ -156,7 +162,7 @@ createHtmlMotionRenderer({
   registry,
   runtime,
   settings,
-})
+});
 ```
 
 Where:

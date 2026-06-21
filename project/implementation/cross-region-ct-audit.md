@@ -4,6 +4,11 @@ Date: 2026-04-20
 Owner: Follow-up implementation agent
 Status: inventory complete; CT gap closure pending as of 2026-04-28
 
+Current-status note: use
+[cross-region-ct-inventory.md](./cross-region-ct-inventory.md) for the live
+coverage counts and CRA work queue. This file preserves the audit execution
+plan and closeout criteria.
+
 This plan closes the CT Derivation Rule gap left by `test-improvement-plan.md`. TI-3.2 exercised three flows (object-fit, typography, spacing) plus the modal/snapshot flows picked up ad hoc. This plan systematically audits every spec, classifies cross-region scenarios, and writes CT coverage for any that lack it.
 
 ## Why this is separate

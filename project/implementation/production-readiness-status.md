@@ -22,7 +22,14 @@ Strong signals exist: package quality gates have been green, audits were cleaned
 
 ## Current Worktree Note
 
-The worktree is currently dirty because the PSD/PDF export fix batch and this documentation consolidation are uncommitted. Do not treat earlier "worktree clean" wording from dated reports as current.
+2026-06-21 docs-reconciliation note: this file is being updated as part of a
+docs-only reconciliation pass. Use `git status --short` for the actual current
+worktree state; do not infer clean/dirty status from older dated notes.
+
+Historical 2026-04-28 note: the worktree was dirty because the PSD/PDF export
+fix batch and documentation consolidation were uncommitted. Do not treat any
+dated "worktree clean" or "worktree dirty" wording as current without rerunning
+`git status --short`.
 
 Current export-related dirty work includes:
 
@@ -211,20 +218,22 @@ This replaces the old closure-plan tracker.
 
 Record concrete closeout evidence here as it lands. Keep rows newest-first and link to the source artifact or command output location.
 
-| Date       | Queue ID | Evidence                                                                                                            | Result | Notes                                                                                                                     |
-| ---------- | -------- | ------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------- |
-| 2026-04-29 | RQ-03    | `npm run ct -w @broadset/demo -- ct/state/interleaved-mutations-cross-region.ct.tsx`                                | pass   | 1/1 test passed; closed CRA-2.3 and updated inventory to 77 covered / 12 partial / 31 missing (63 open rows).            |
+| Date       | Queue ID | Evidence                                                                                                                          | Result | Notes                                                                                                                     |
+| ---------- | -------- | --------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------- |
+| 2026-06-21 | RQ-03    | `npm run ct:all`                                                                                                                  | pass   | 167 CT tests passed (7 UI + 160 demo). Confirms existing CT surface is green; does not close remaining inventory gaps.    |
+| 2026-06-21 | RQ-07    | `npm run quality:all`                                                                                                             | pass   | 279 package test files passed, 4 skipped; 2,971 tests passed, 4 skipped. Local workspace run, not fresh-checkout proof.   |
+| 2026-04-29 | RQ-03    | `npm run ct -w @broadset/demo -- ct/state/interleaved-mutations-cross-region.ct.tsx`                                              | pass   | 1/1 test passed; closed CRA-2.3 and updated inventory to 77 covered / 12 partial / 31 missing (63 open rows).             |
 | 2026-04-28 | RQ-03    | `npm run ct -w @broadset/demo -- ct/canvas-transform/safety-overlays.ct.tsx ct/canvas-transform/handle-chip-constant-size.ct.tsx` | pass   | 2/2 tests passed; closed CRA-2.2 + CRA-2.72 and updated inventory to 76 covered / 12 partial / 32 missing (64 open rows). |
-| 2026-04-28 | RQ-03    | `npm run ct -w @broadset/demo -- ct/layout/zoom-toolbar-label.ct.tsx ct/layout/zoom-to-fit-cross-region.ct.tsx`     | pass   | 2/2 tests passed; closed CRA-2.1 + CRA-2.73 and updated inventory to 72 covered / 16 partial / 32 missing (67 open rows). |
-| 2026-04-28 | RQ-07    | Environment stamp                                                                                                   | pass   | OS macOS 26.4.1, Node v22.14.0, npm 10.9.2.                                                                               |
-| 2026-04-28 | RQ-02    | `npm run ct -w @broadset/demo -- ct/state/export-document-downloads.ct.tsx`                                         | pass   | 2/2 tests passed: PDF export browser-path completion and PSD download event from demo Export modal.                       |
-| 2026-04-28 | RQ-02    | Root `npm run gate:full` rerun after adding export browser-path CT coverage                                         | pass   | Full gate remains green with the new CT file included (155 CT tests in the demo/ui sweep).                                |
-| 2026-04-28 | RQ-07    | Root `npm run test:coverage`                                                                                        | pass   | 278 test files passed; 2970 tests passed; coverage summary recorded in this file.                                         |
-| 2026-04-28 | RQ-07    | Root `npm run audit:prod`                                                                                           | pass   | 0 vulnerabilities.                                                                                                        |
-| 2026-04-28 | RQ-07    | Root `npm run audit:all`                                                                                            | pass   | 0 vulnerabilities.                                                                                                        |
-| 2026-04-28 | RQ-02    | Root `npm run gate:full`                                                                                            | pass   | Full quality gate, CT, and build completed successfully in this worktree.                                                 |
-| 2026-04-28 | RQ-02    | `npm run quality -w @broadset/formats`; focused PSD/raster regressions (5 files, 41 tests); demo PSD smoke readback | pass   | Export-fix stream baseline before the later full gate + browser CT closeout entries above.                                |
-| 2026-04-28 | RQ-02    | `npm run quality -w @broadset/demo`                                                                                 | pass   | Ran earlier in the export-fix stream after demo bridge + fixture schema updates.                                          |
+| 2026-04-28 | RQ-03    | `npm run ct -w @broadset/demo -- ct/layout/zoom-toolbar-label.ct.tsx ct/layout/zoom-to-fit-cross-region.ct.tsx`                   | pass   | 2/2 tests passed; closed CRA-2.1 + CRA-2.73 and updated inventory to 72 covered / 16 partial / 32 missing (67 open rows). |
+| 2026-04-28 | RQ-07    | Environment stamp                                                                                                                 | pass   | OS macOS 26.4.1, Node v22.14.0, npm 10.9.2.                                                                               |
+| 2026-04-28 | RQ-02    | `npm run ct -w @broadset/demo -- ct/state/export-document-downloads.ct.tsx`                                                       | pass   | 2/2 tests passed: PDF export browser-path completion and PSD download event from demo Export modal.                       |
+| 2026-04-28 | RQ-02    | Root `npm run gate:full` rerun after adding export browser-path CT coverage                                                       | pass   | Full gate remains green with the new CT file included (155 CT tests in the demo/ui sweep).                                |
+| 2026-04-28 | RQ-07    | Root `npm run test:coverage`                                                                                                      | pass   | 278 test files passed; 2970 tests passed; coverage summary recorded in this file.                                         |
+| 2026-04-28 | RQ-07    | Root `npm run audit:prod`                                                                                                         | pass   | 0 vulnerabilities.                                                                                                        |
+| 2026-04-28 | RQ-07    | Root `npm run audit:all`                                                                                                          | pass   | 0 vulnerabilities.                                                                                                        |
+| 2026-04-28 | RQ-02    | Root `npm run gate:full`                                                                                                          | pass   | Full quality gate, CT, and build completed successfully in this worktree.                                                 |
+| 2026-04-28 | RQ-02    | `npm run quality -w @broadset/formats`; focused PSD/raster regressions (5 files, 41 tests); demo PSD smoke readback               | pass   | Export-fix stream baseline before the later full gate + browser CT closeout entries above.                                |
+| 2026-04-28 | RQ-02    | `npm run quality -w @broadset/demo`                                                                                               | pass   | Ran earlier in the export-fix stream after demo bridge + fixture schema updates.                                          |
 
 ## Superseded Findings From Earlier Reports
 

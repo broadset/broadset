@@ -1,18 +1,22 @@
 # SVG Support Plan
 
-Status: draft — pre-Phase 0. Not yet reflected in [project/spec/formats/web-vector.md](../spec/formats/web-vector.md).
+Status: historical companion plan. Current task status lives in
+[plan-progress.md](./plan-progress.md), and release readiness lives in
+[production-readiness-status.md](./production-readiness-status.md). This file
+preserves the original SVG scope and acceptance detail; old "current state"
+sections describe the pre-track baseline, not the present implementation.
 
 This plan captures the full-fidelity SVG import/export strategy for Broadset, covering round-trip within Broadset, external-source import (Illustrator, Inkscape, Figma/Sketch/Affinity export, d3, hand-authored, Figma-exported, browser `outerHTML`), and external-target export with minimal-loss editability in Illustrator and Inkscape. It also covers the chain case: Broadset → Illustrator → save → Broadset, where the user's Illustrator edits survive and Broadset semantics (animations, data bindings, pages-as-overrides) survive wherever Illustrator didn't touch them.
 
 This plan is intentionally shaped like the sibling [pdf-support-plan.md](./pdf-support-plan.md) so the two formats share vocabulary and can cross-reference shape-classifier, color, and font-subsetting utilities.
 
-**App-level prerequisites are split into [io-prereqs-plan.md](./io-prereqs-plan.md)** — model extensions (strokeMiterlimit, conic gradient center/angle, structured filter primitives, pattern fill, text-fidelity fields, content-hash identity), the renderer refactor (replace `innerHTML` with a safe DOM-builder), the font/asset pipeline, and the shared cross-format modules under [packages/formats/src/_shared/](../../packages/formats/src/) — `_shared/reconcile/`, `_shared/shape-classifier/`, `_shared/fonts/`, `_shared/sanitize/`, `_shared/fingerprint/`, `_shared/color/`, `_shared/text-layout/`, `_shared/xmp/`. The per-format gating matrix in that document calls out exactly which io-prereqs phase unblocks each SVG phase below. Reading this plan in isolation is fine for the shape of the SVG work; no implementation bullet below should land before its corresponding prereq has shipped.
+**App-level prerequisites are split into [io-prereqs-plan.md](./io-prereqs-plan.md)** — model extensions (strokeMiterlimit, conic gradient center/angle, structured filter primitives, pattern fill, text-fidelity fields, content-hash identity), the renderer refactor (replace `innerHTML` with a safe DOM-builder), the font/asset pipeline, and the shared cross-format modules under [packages/formats/src/\_shared/](../../packages/formats/src/) — `_shared/reconcile/`, `_shared/shape-classifier/`, `_shared/fonts/`, `_shared/sanitize/`, `_shared/fingerprint/`, `_shared/color/`, `_shared/text-layout/`, `_shared/xmp/`. The per-format gating matrix in that document calls out exactly which io-prereqs phase unblocks each SVG phase below. Reading this plan in isolation is fine for the shape of the SVG work; no implementation bullet below should land before its corresponding prereq has shipped.
 
 ## Current state (what "absolutely broken" means)
 
 **Broadset today — [packages/formats/src/web-vector/](../../packages/formats/src/web-vector/):**
 
-- `importSvg` ([import.ts](../../packages/formats/src/web-vector/import.ts), 313 lines) uses `DOMParser`, handles `<rect>`, `<path>`, `<ellipse>`, `<circle>`, `<text>`, `<image>`, `<foreignObject>`, and flattens `<g>` when it has no transform — otherwise preserves the group as an opaque `svg`-type element. Transforms support `translate` and `rotate` only; `matrix`/`scale`/`skew` are dropped and the element is kept as an opaque payload with a warning. Styling extraction is limited to `fill`, `stroke`, and `clip-path`; stroke-width, stroke-linecap, stroke-linejoin, opacity, fill-opacity, stroke-opacity, font-*, gradients, filters, patterns, masks, CSS `<style>` blocks, and Illustrator/Inkscape namespaced attributes are silently dropped. Gradients defined in `<defs>` are never parsed — elements come in with no gradient data even when the source SVG clearly had one.
+- `importSvg` ([import.ts](../../packages/formats/src/web-vector/import.ts), 313 lines) uses `DOMParser`, handles `<rect>`, `<path>`, `<ellipse>`, `<circle>`, `<text>`, `<image>`, `<foreignObject>`, and flattens `<g>` when it has no transform — otherwise preserves the group as an opaque `svg`-type element. Transforms support `translate` and `rotate` only; `matrix`/`scale`/`skew` are dropped and the element is kept as an opaque payload with a warning. Styling extraction is limited to `fill`, `stroke`, and `clip-path`; stroke-width, stroke-linecap, stroke-linejoin, opacity, fill-opacity, stroke-opacity, font-\*, gradients, filters, patterns, masks, CSS `<style>` blocks, and Illustrator/Inkscape namespaced attributes are silently dropped. Gradients defined in `<defs>` are never parsed — elements come in with no gradient data even when the source SVG clearly had one.
 - `exportSvg` ([svg.ts](../../packages/formats/src/web-vector/svg.ts), 300 lines) has a critical bug: `group` elements serialize as an empty `<g>` with no recursive rendering of children. Any grouped content is lost on export. Conic gradients and most CSS gradient strings are dropped (first-stop fallback at best). Box-shadow is approximated by a hand-built `<filter><feDropShadow>` with blur divided by 2. Fonts are referenced by family name only — no `@font-face`, no subsetted `<defs>` fonts, no fallback chain — so AI/Inkscape/browser rendering diverges from the Broadset canvas whenever the machine doesn't have the exact font installed. Animations are entirely discarded. The QR code path extracts inner SVG via a loose regex.
 - Rendering — [screen-renderer/element-renderers.ts:352-364](../../packages/renderer/src/screen-renderer/element-renderers.ts) uses `host.innerHTML = element.content` to render `svg`-type elements. No sanitization. Any imported SVG (from an arbitrary file the user drops in) can include `<script>`, event-handler attributes, or foreign-object XSS payloads that execute in the editor.
 - Tests — [web-vector.test.ts](../../packages/formats/src/web-vector/web-vector.test.ts) (881 lines) covers basic primitives, single-level groups, clip-path references, box-shadow filters, and some text attributes. It does **not** cover: recursive group export, gradient import, stroke-width/linecap/linejoin round-trip, matrix/scale/skew transforms, text-on-path, embedded fonts, `<pattern>`, `<mask>`, `<use>`/`<symbol>`, CSS stylesheets inside `<style>`, or round-trip through an external editor.
@@ -37,9 +41,9 @@ Three layers, all standard:
 
 - **Visual layer (what any SVG renderer draws).** Vectors as real `<path>`/`<rect>`/`<ellipse>` with proper `fill`, `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin`, `stroke-miterlimit`, `stroke-dasharray`, `stroke-dashoffset`, `fill-rule`, `fill-opacity`, `stroke-opacity`, `opacity`. Text as `<text>` + `<tspan>` with embedded fonts via `<defs><style>@font-face{…}</style></defs>` (WOFF2 base64) for non-system fonts. Groups as real `<g>` with recursive children and proper transform composition. Gradients as `<linearGradient>`/`<radialGradient>` with full stop arrays (conic is an SVG 2 gap — falls back to a many-stop linear approximation with a metadata hint carrying the true conic spec). Clip-paths as `<clipPath>`, masks as `<mask>`, patterns as `<pattern>`, filters as `<filter>`. Illustrator and Inkscape see a normal, fully-editable SVG.
 - **Document metadata (SVG `<metadata>` with RDF/XML, W3C-recommended).** A `broadset:` XML namespace declared on the root `<svg>` and carried in a document-level `<metadata>` block using RDF/XML (the W3C-recommended encoding, used by Inkscape for its `<cc:Work>` metadata). The `<metadata>` block carries everything that lives above the page level: project settings, canvas unit/dpi declaration, asset registry (with base64 payloads or external refs per asset), data schema, page definitions and their override maps, element ordering, Dublin Core metadata. **No animations** per io-prereqs **IO-D-16** — SVG is a static carrier as far as Broadset is concerned. This is the SVG analogue of PDF's XMP — standards-blessed, preserved by Illustrator and Inkscape on save.
-- **Element tagging (`data-bs-*` attributes + custom-namespace attributes).** Each rendered element carries `data-bs-id`, `data-bs-kind`, optionally `data-bs-data-field`, `data-bs-visible-when`, `data-bs-repeater`, and a `broadset:original-content-hash` namespaced attribute. These are the SVG 2 / HTML5 analogue of PDF marked content. `data-*` is part of SVG 2 ([data-* attributes spec](https://www.w3.org/TR/SVG2/struct.html#HTMLGlobalAttributes)) and survives cleanly through Illustrator, Inkscape, Figma import/export, and browser copy-paste unless the user aggressively flattens or restructures. Namespaced attributes are preserved by Illustrator (which uses its own `ai:` namespace) and Inkscape (`sodipodi:`/`inkscape:`).
+- **Element tagging (`data-bs-*` attributes + custom-namespace attributes).** Each rendered element carries `data-bs-id`, `data-bs-kind`, optionally `data-bs-data-field`, `data-bs-visible-when`, `data-bs-repeater`, and a `broadset:original-content-hash` namespaced attribute. These are the SVG 2 / HTML5 analogue of PDF marked content. `data-*` is part of SVG 2 ([data-\* attributes spec](https://www.w3.org/TR/SVG2/struct.html#HTMLGlobalAttributes)) and survives cleanly through Illustrator, Inkscape, Figma import/export, and browser copy-paste unless the user aggressively flattens or restructures. Namespaced attributes are preserved by Illustrator (which uses its own `ai:` namespace) and Inkscape (`sodipodi:`/`inkscape:`).
 
-When `data-bs-*` is stripped by an aggressive external edit, content-hash re-matching (geometry + text + style fingerprint) recovers element identity as a fallback. Elements that cannot be matched either way become new elements on re-import; elements present in document metadata but missing from the visual layer are flagged as deletions for the user to confirm. This matches the PDF plan's reconciliation model exactly — both importers consume the shared [packages/formats/src/_shared/reconcile/](../../packages/formats/src/) module defined in io-prereqs Phase 2.
+When `data-bs-*` is stripped by an aggressive external edit, content-hash re-matching (geometry + text + style fingerprint) recovers element identity as a fallback. Elements that cannot be matched either way become new elements on re-import; elements present in document metadata but missing from the visual layer are flagged as deletions for the user to confirm. This matches the PDF plan's reconciliation model exactly — both importers consume the shared [packages/formats/src/\_shared/reconcile/](../../packages/formats/src/) module defined in io-prereqs Phase 2.
 
 Security posture is explicit and enforced by the importer, not by the renderer: `<script>`, `on*=` event handlers, `javascript:` URLs in `href`/`xlink:href`, and `<foreignObject>` with active content are stripped on import before the SVG ever reaches the renderer. The renderer's `innerHTML` path is replaced with a safe DOM-builder path that re-serializes from the parsed, sanitized AST.
 
@@ -83,6 +87,7 @@ Gated on io-prereqs **Phase 0** (decisions IO-D-01 through IO-D-15 ratified) and
 ### Phase 2 — Export, rebuilt (fixes the known bugs, then exceeds dom-compositor)
 
 Gated on:
+
 - **Before 2a:** io-prereqs Phase 1 (strokeMiterlimit, content hash, model-level script rejection, unit conversion + length parser) + Phase 2 (`_shared/sanitize/`) + Phase 3 (safe DOM-builder renderer refactor).
 - **Before 2b:** io-prereqs Phase 1 (conic center/angle, BroadsetColor with color-space preservation, structured filter primitives, pattern fill, text fidelity fields) + Phase 2 (`_shared/color/`, `_shared/fonts/`, `_shared/text-layout/`, `_shared/xmp/`) + Phase 3 (native renderer paths, font-asset-aware rendering) + Phase 4 (font asset type, image bytes, subsetting, dedup).
 
@@ -106,12 +111,14 @@ Small focused files, each soft-capped at ~300 lines (hard cap 500):
 - `svg/export/core.ts` — orchestration only, ≤ 250 lines.
 
 Sequencing inside Phase 2:
+
 - **2a** parity + critical-bug fixes: recursive group rendering, full stroke property coverage, correct transform composition, gradient import→export round-trip, safe sanitized output, IN-state resolution for animated elements (per io-prereqs **IO-D-16**).
 - **2b** surpasses prior art: font embedding, conic-fallback with metadata, OKLab color preservation via `_shared/color/` + `BroadsetColor.originalColor`, `data-bs-*` tagging on every rendered element. Animations are discarded per **IO-D-16** — not preserved in metadata.
 
 ### Phase 3 — Import
 
 Gated on:
+
 - **Before 3a:** io-prereqs Phase 1 (content hash) + Phase 2 (`_shared/fingerprint/`, `_shared/sanitize/`, `_shared/xmp/`).
 - **Before 3b:** io-prereqs Phase 2 (`_shared/shape-classifier/`).
 
@@ -127,6 +134,7 @@ Gated on:
 - `svg/import/css.ts` — thin wrapper over `css-tree`'s `parse`, `walk`, and selector-matcher; yields the style map consumed by `style-resolve.ts`. No custom selector engine.
 
 Sequencing inside Phase 3:
+
 - **3a** metadata + `data-bs-*` fast-path — import any SVG Broadset itself exported with perfect fidelity, round-trip golden tests pass.
 - **3b** operator/element-level extraction — import arbitrary third-party SVGs (Illustrator, Inkscape, Figma export, Sketch export, Affinity, d3, hand-authored) as Broadset documents; every non-convertible fragment falls back to an opaque `svg`-type element, preserving information, with a warning.
 
@@ -158,6 +166,7 @@ Gated on io-prereqs **Phase 2** (`_shared/reconcile/`).
   - Browser — `document.querySelector('svg').outerHTML` from a real page
 
   Smoke-test: import, count elements, assert no exceptions, snapshot structure so regressions surface immediately. Every fixture must complete import with either a native mapping or an explicit opaque-fragment preservation — never a silent drop.
+
 - **Chain round-trip fixtures.** For each of Illustrator and Inkscape, commit two SVGs: one that Broadset exported, then opened and saved in the external editor, then re-imported. Assert `data-bs-*` preservation and metadata preservation. Document which tools strip what.
 - **Chain CT (Playwright).** User imports an SVG in the demo, edits one element in each affected region, exports, re-imports, and asserts the edit survived across all affected regions — conforms to the cross-region CT rule in [testing.instructions.md](../../agents/instructions/testing.instructions.md).
 - **Security tests.** A dedicated suite of hostile SVG fixtures (`<script>`, `onclick`, `javascript:` hrefs, `<foreignObject>` with active content, billion-laughs entity expansion, recursive `<use>` depth-bombs). Every one must be sanitized or rejected with a clear error before reaching the renderer.

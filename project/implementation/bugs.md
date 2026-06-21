@@ -3,11 +3,17 @@
 Date: 2026-04-20
 Reviewer: GitHub Copilot (GPT-5.3-Codex)
 
+Status: historical bug-hunt report. This file is not the current defect or
+release-readiness tracker. Some findings may have been fixed or superseded
+after the report date. Current release blockers live in
+[production-readiness-status.md](./production-readiness-status.md), and current
+task tracking lives in [plan-progress.md](./plan-progress.md).
+
 ## Mission Scope
 
 - Objective: strict bug hunt across package code files (non-test scope).
 - Included roots: packages/model, packages/playback, packages/renderer, packages/editor, packages/formats, packages/ui, packages/demo.
-- Excluded by rule: *.test.*, *.spec.*, /test, /tests, /__tests__, /ct, /playwright, /test-results, *.stories.*
+- Excluded by rule: _.test._, _.spec._, /test, /tests, /**tests**, /ct, /playwright, /test-results, _.stories._
 
 ## Strict Coverage Evidence
 
@@ -87,7 +93,7 @@ Total strict-reviewed files: 265 / 265
 - File: packages/formats/src/pptx/import-utils.ts:73
 - Evidence:
   - Regex requires order: Id -> Type -> Target
-  - /<Relationship\s+Id="([^"]+)"\s+Type="[^"]*"\s+Target="([^"]+)"\/>/g
+  - /<Relationship\s+Id="([^"]+)"\s+Type="[^"]\*"\s+Target="([^"]+)"\/>/g
 - Why this is a bug:
   - XML attribute order is not guaranteed.
   - Files with equivalent but reordered attributes will fail relationship extraction.

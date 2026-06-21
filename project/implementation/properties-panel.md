@@ -1,5 +1,12 @@
 # Properties Panel — Parity + Art-Director UX Upgrade (Ralph Plan, Hard-Guarded)
 
+**Status:** historical focused plan. Current UI/demo release readiness lives in
+[production-readiness-status.md](./production-readiness-status.md), and
+cross-region CT status lives in
+[cross-region-ct-inventory.md](./cross-region-ct-inventory.md). This file
+preserves original unit scope and UX acceptance detail; its progress table is
+not the sole source of truth for current panel parity.
+
 **Target packages:** `packages/ui`, `packages/editor`, `packages/demo`, optionally `packages/model`
 **Reference baseline (behavior only):** `../dom-compositor/packages/heroui/src`
 **Primary spec anchors:** `project/spec/ui/panels.md`, `project/spec/ui/inputs.md`, `project/spec/ui/spec.md`

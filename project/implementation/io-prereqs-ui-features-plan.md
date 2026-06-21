@@ -1,6 +1,12 @@
 # IO Prereqs — User-Facing Features Plan
 
-Status: draft — companion to [io-prereqs-plan.md](./io-prereqs-plan.md).
+Status: historical companion plan. Current task status lives in
+[plan-progress.md](./plan-progress.md), cross-region CT status lives in
+[cross-region-ct-inventory.md](./cross-region-ct-inventory.md), and release
+readiness lives in
+[production-readiness-status.md](./production-readiness-status.md). This file
+preserves UX scope and acceptance detail; old unchecked items are not current
+status unless also open in the active trackers.
 
 io-prereqs is a platform refactor. Most of what it adds to the model also surfaces as a first-class user feature in the editor. This plan specifies the UX for each such feature at a level of detail that another engineer or designer can build from without guessing. It is **not** a rationale document; for the why, read the io-prereqs plan. This is the how-it-looks-and-feels spec.
 

@@ -1,6 +1,11 @@
 # PDF/A-2b Compliance Plan (Followup)
 
-Status: draft — depends on [pdf-support-plan.md](./pdf-support-plan.md) reaching Phase 5 completion, and on [io-prereqs-plan.md](./io-prereqs-plan.md) shipping the shared primitives this plan consumes (see "Shared prerequisites" below).
+Status: historical companion plan. Current task status lives in
+[plan-progress.md](./plan-progress.md), and release readiness lives in
+[production-readiness-status.md](./production-readiness-status.md). This file
+preserves the original PDF/A-2b follow-up scope and acceptance detail; old
+dependency wording describes the pre-track plan, not the present task-board
+state.
 
 PDF/A is the ISO 19005 archival subset of PDF. PDF/A-2b (ISO 19005-2, conformance level **b** — "basic visual reproduction") guarantees that a document will render identically decades from now by forbidding anything that depends on external resources or runtime behavior. It is a standard requirement in print, legal, archival, government, and broadcast-traffic contexts.
 

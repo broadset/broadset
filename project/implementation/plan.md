@@ -18,13 +18,22 @@ Detailed task-level planning still lives in the dedicated companion files:
 - [production-readiness-status.md](./production-readiness-status.md)
 - [package-split.md](./package-split.md)
 
-Use this file for sequencing. Use the companion files for detailed unit scope,
-acceptance criteria, and risk notes.
+Use this file for sequencing and a roadmap summary. Use the companion files for
+detailed unit scope, acceptance criteria, and risk notes.
 
-Current planning status is recorded in the [Status](#status) section near the
-end of this file. Update that section whenever any companion plan changes state.
-Per-task execution tracking lives in [plan-progress.md](./plan-progress.md).
-Update that file whenever an individual task moves.
+Live current status is split across the active trackers:
+
+- [production-readiness-status.md](./production-readiness-status.md) owns
+  release readiness, blockers, and command evidence.
+- [plan-progress.md](./plan-progress.md) owns task-by-task roadmap tracking.
+- [cross-region-ct-inventory.md](./cross-region-ct-inventory.md) owns
+  cross-region CT coverage accounting.
+- [real-producer-compatibility.md](./real-producer-compatibility.md) owns
+  producer compatibility signoff.
+
+If this roadmap summary or an older companion plan disagrees with those active
+trackers, the active tracker wins. Update [plan-progress.md](./plan-progress.md)
+whenever an individual task moves.
 
 For repo guidance, see `../../README.md` and `../../AGENTS.md`.
 
@@ -739,50 +748,36 @@ deferred-after-main-program: package-split
 
 ## Status
 
-Status is collected here so this file is the single place to check planning state.
+This section is a roadmap summary, not a proof of full spec parity or release
+readiness. Current release status is maintained in
+[production-readiness-status.md](./production-readiness-status.md), and
+per-task state is maintained in [plan-progress.md](./plan-progress.md).
 
-As of 2026-04-28:
+As of the 2026-06-21 documentation reconciliation pass:
 
-- **io-prereqs:** draft — pre-Phase 0
-- **renderer refactor:** draft — extracted from io-prereqs Phase 3 into its own detailed plan
-- **PSD support:** draft — pre-Phase 0
-- **PDF support:** complete — all 8 units of the PDF track shipped (`pdf-lib` exporter with rebuilt parity, XMP + `/BSET` marked-content round-trip, page boxes, OCGs, XMP fast-path + third-party operator extraction import, reconciliation wrapper, chain round-trip test + demo dispatcher wiring)
-- **SVG support:** draft — pre-Phase 0
-- **PPTX support:** draft — pre-Phase 0
-- **PDF/A-2b compliance:** complete — all 7 P9 units shipped (PDF/A spec section + acceptance criteria, bundled minimal sRGB v2 profile via `_shared/color/getDefaultProfile`, `pdfaConformance: '2b'` opt-in on `exportPdfBytes` / `exportPdfWithPreflight`, `/OutputIntents` + `/GTS_PDFA1` + ICC stream, `pdfaid:part`/`pdfaid:conformance` XMP block, deterministic trailer `/ID` array, in-tree `validatePdfA2b` structural validator, round-trip identifier preservation via `extensions.pdf.pdfa`). Real sRGB IEC61966-2.1 profile embed, font-subsetting totality, and veraPDF CI integration recorded as Spec Gaps in `project/spec/formats/pdf.md`.
-- **io-prereqs UI features:** draft companion plan — consumed during io-prereqs Phase 5 interleaves
-- **coverage reporting:** complete — non-gating V8 coverage is wired, documented, and baselined.
-- **cross-region CT audit:** inventory complete; gap closure pending — 120 cross-region bullets mapped, with 65 covered, 22 partial, and 33 missing.
-- **release quality closure:** in progress — audits, coverage, and producer fixture governance/harness are complete; CT gap closure and real producer validation remain.
-- **package split:** proposed planning-only followup — deferred until after the main format program
+- **Shared foundation, format tracks, and PDF/A roadmap units:** task-board
+  complete through Phase 9. This means the planned units have landed to the
+  level tracked in [plan-progress.md](./plan-progress.md); it does not mean
+  every acceptance criterion in every spec is fully implemented, externally
+  validated, or release-signed.
+- **Cross-format I/O improvements:** several UI, reconciliation, security,
+  shared-helper, and fidelity units are complete, but open CFIO items remain
+  for PSD color/bit-depth/effects parity, PDF/PSD/PPTX operational hardening,
+  visual-fidelity CI, real licensed fixture mounts, modal accessibility, and
+  large-deck stress work.
+- **Cross-region CT audit:** inventory is complete; gap closure is open.
+  Current counts and CRA work items live only in
+  [cross-region-ct-inventory.md](./cross-region-ct-inventory.md).
+- **Release quality closure:** in progress. Broadset is not production-ready
+  until the active queue in
+  [production-readiness-status.md](./production-readiness-status.md) is closed.
+- **Producer compatibility:** governance exists, but the matrix in
+  [real-producer-compatibility.md](./real-producer-compatibility.md) must move
+  required rows out of `untriaged` before release signoff.
+- **Package split:** deferred structural follow-up; not started.
 
-Completed reference:
-
-- **test improvement plan:** complete — not part of the unfinished roadmap
-
-Current master-plan state:
-
-- **Phase 0 (decisions + spec-first updates):** complete
-- **Phase 1 (shared model additions):** complete — all 16 units shipped (IO-D-01 through IO-D-18 ratified; unit utilities, importer security, BroadsetColor / BroadsetFill / FilterStack unions, content-hash identity, stroke + gradient enhancements, TextBody + text-on-path + text fidelity, model-level script rejection, extensions typing + dirty-flag middleware, page / canvas / document additions, importer contract)
-- **Phase 2 (shared libraries + `_shared` modules):** complete — 9 units shipped (shape-classifier, fingerprint, reconcile, sanitize, xmp, color, fonts, text-layout, bundle-size guard). `lcms-wasm` / ICC / CMYK / `harfbuzzjs` / font-resolve / subsetting are spec-gapped and light up when Phase 4 asset pipeline or a concrete caller arrives.
-- **Phase 3 (renderer refactor):** complete — all 7 subphases shipped (P3.0 contract cleanup, P3.1 internal layer split into core/dom/elements/adapters, P3.2 keyed reconciliation with composite child invalidation, P3.3 semantic renderers + safe builders removing innerHTML paths, P3.4 runtime service seams for time/data/state/fonts/assets, P3.5 generic `createHtmlMotionRenderer` entry + Broadset adapter, P3.6 performance tests + spec closure)
-- **Phase 4 (shared asset pipeline):** complete — all 7 units shipped (P4.1 font asset type with `format`/`postScriptName`/`familyName`/`subsetRanges?`; P4.2 image asset `width`/`height` required; P4.3 image `iccProfileAssetId?`; P4.4 `IccProfileAsset` variant; P4.5 `_shared/fonts/subset.ts` + codicon fixture; P4.6 `_shared/fonts/embed-policy.ts`; P4.7 `_shared/asset-dedup/` with `AssetDeduplicator`)
-- **Phase 5 (PSD track):** complete — P5.0 spec + cross-format round-trip metadata requirement; P5.1 PSD types + XMP round-trip spike; P5.2 export parity (groups via parentId tree, rotation, TextBody → styleRuns, `broadset:` XMP packet); P5.4a fast-path XMP import; P5.5 reconciliation wrapper + dirty-flag discipline; P5.6 chain round-trip test via shared harness. Deeper P5.2b/P5.3 surface (native shape layers, all 10 effects, bitmap masks, CMYK/Lab, linked smart objects) recorded as Spec Gaps in `project/spec/formats/psd.md`.
-- **I5.1 PSD UI slice:** complete — `FormatExportOptionsModal` + `FormatImportWarningsModal` in `packages/ui/src/modals/`, format-agnostic so PDF/SVG/PPTX interleaves I6.1/I7.1/I8.1 reuse them unchanged.
-- **I6.2 Phase 6 testing infrastructure:** complete — `_shared/test-infrastructure/` ships `assertReImportableBy`, `runChainRoundTrip`, `assertPreservedBlobSurvives`. PSD chain test wires the harness.
-- **Phase 6 (PDF track):** complete — all 8 units shipped (P6.0 spec + feature matrix; P6.1 `@libpdf/core` → `pdf-lib` swap + `pdfjs-dist` + `@pdf-lib/fontkit` deps; P6.2 parent-child translation + rotation CTM brackets + per-corner radii via kappa cubic Béziers + clip-path via native PDF clipping operators for `inset`/`circle`/`ellipse`/`polygon`; P6.3 `/BSET` marked-content property dicts registered in page `/Resources /Properties` + `broadset:` XMP packet on catalog `/Metadata` + page boxes from `canvas.bleed`/`canvas.safeArea` + one OCG per Broadset page in `/OCProperties`; P6.4a XMP fast-path hydrates document id + element ids + types; P6.4b third-party operator-level text extraction via FlateDecode + Tj / hex-Tj scanner; P6.5 reconciliation wrapper over `_shared/reconcile/` with `dirtyElementIds` for re-export discipline; P6.6 chain round-trip test + demo dispatcher wires `.pdf`). Real PDF shading-pattern gradients, CMYK/Lab/Gray/spot + ICC emission, font subsetting via `@pdf-lib/fontkit`, per-element `/OC` OCG membership, and the external-tool fixture corpus recorded as Spec Gaps in `project/spec/formats/pdf.md`.
-- **Phase 7 (SVG track):** complete — all 8 units shipped (P7.0 spec + scope lock with feature matrix; P7.1 types + architecture with Zod registration and import-tuned DOMPurify sanitizer; P7.2 parity + critical bug fix — recursive `<g>`, full stroke coverage, gradient import, opaque-payload sanitization; P7.3 beyond prior art — `data-bs-*` tagging, `broadset:content-hash`, `<metadata>` RDF packet, conic-fallback with metadata, OKLCH/display-p3 preservation; P7.4a fast-path hydration with nested group identity, `extensions.svg.dirty` init; P7.4b third-party import with `<use>` / `<symbol>` dereferencing + cycle detection, CSS `<style>` block resolution, namespace warnings, no silent drops; P7.5 reconciliation via `_shared/reconcile` with `dirtyElementIds` helper; P7.6 chain round-trip + synthetic external-tool fixtures + hostile-SVG security suite + `FormatExportOptionsModal` SVG fields)
-- **Phase 8 (PPTX track):** substantially complete (audit-closed) — see `project/spec/formats/pptx.md → Spec Gaps` for the honest list of deferred features and known acceptance-criteria deviations
-  - P8.0 spec lockdown: complete
-  - P8.1 types + architecture + dependency swap: complete
-  - P8.2a/2b export: complete (groups via `<p:grpSp>`, text runs, rotation, multi-slide, generated theme/master/layout, custom XML parts, `broadset:` XMP packet at `docProps/custom.xml`, shape-name tags + `<p:extLst>`, native `<a:custGeom>` paths, gradient + theme colours + arrow ends)
-  - P8.3a/3b import: complete (fast-path via `customXml/broadset-project.xml`; operator-level: theme + master cascade, placeholder inheritance, shapes, text as `TextBody` with per-run styling, theme-slot colour preservation with mods, gradients, arrow ends, picture, groups, common-preset expansion to native paths, unsupported shapes preserved under `extensions.pptx.raw` with `dirty: false`, structured import warnings, security-contract size/depth/entry caps + `vbaProject.bin` rejection)
-  - P8.4 reconciliation: complete via `reconcile.ts` wrapping `_shared/reconcile/`
-  - P8.5 tests: 447 tests across 53 files, including per-tool synthesized fixtures (PowerPoint / Keynote / Google Slides / LibreOffice / Canva) and round-trip coverage for fade-entry animations
-  - P8.6 UI wiring: PPTX dispatch wired through `formatBridge.ts`; shared `FormatImportWarningsModal` + `FormatExportOptionsModal` from I5.1 cover the format
-  - **Audit gaps (closed during audit pass):** invalid `<p:spTgt bset-id>` attribute → canonical `spid`; theme-colour preservation; multi-run TextBody; gradient + arrow-end + raw preservation; XMP packet emission; placeholder cascade through master; preset shape expansion. **Known deviations remaining:** importer regex parsing (rebuild to fast-xml-parser AST tracked); page-override content/style/assetId (model-level work); `<a:blipFill>` srcRect crop baking; non-`entr` `<p:timing>` presets.
-- PDF/A-2b followup: not started
-- Coverage reporting: complete — `npm run test:coverage` emits HTML/JSON/text reports and `coverage-baseline.md` plus threshold proposal are present.
-- Cross-region CT audit: inventory complete; gap closure pending — `cross-region-ct-inventory.md` lists the 74 CRA-2.x work items that remain before closeout.
-- Release quality closure: in progress — D.1, D.2, and D.4 are complete; D.3 gap closure, D.5-D.8 producer runs, and D.9 fresh-checkout validation remain.
-- Package split: deferred, not started
+Historical companion plans such as `pdf-support-plan.md`,
+`psd-support-plan.md`, `pptx-support-plan.md`, `svg-support-plan.md`,
+`io-prereqs-plan.md`, and `pdf-pdfa-compliance-plan.md` preserve original
+scope and acceptance detail. Their old `draft`/checkbox state is not a current
+status signal; use the active trackers above.

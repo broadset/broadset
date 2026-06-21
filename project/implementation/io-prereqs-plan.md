@@ -1,6 +1,12 @@
 # IO Prereqs Plan
 
-Status: draft — pre-Phase 0. Shared prerequisite to [psd-support-plan.md](./psd-support-plan.md), [pdf-support-plan.md](./pdf-support-plan.md), [pptx-support-plan.md](./pptx-support-plan.md), and [svg-support-plan.md](./svg-support-plan.md). Every item here is cross-format by design; no format owns any of it.
+Status: historical companion plan. Current task status lives in
+[plan-progress.md](./plan-progress.md), and release readiness lives in
+[production-readiness-status.md](./production-readiness-status.md). This file
+preserves original scope, acceptance detail, and rationale; old unchecked boxes
+below may be stale unless they are also open in the active trackers.
+
+Shared prerequisite to [psd-support-plan.md](./psd-support-plan.md), [pdf-support-plan.md](./pdf-support-plan.md), [pptx-support-plan.md](./pptx-support-plan.md), and [svg-support-plan.md](./svg-support-plan.md). Every item here is cross-format by design; no format owns any of it.
 
 Broadset cannot round-trip PSD, PDF, PPTX, or SVG with minimal loss until the app itself has a set of cross-cutting foundations in place. Those foundations do not belong to any single format — they are shared infrastructure (data model, renderer, asset pipeline, shared modules, editor UI, testing) that every format importer/exporter plugs into. This plan separates that shared work out so it can land once and stay stable, rather than being re-solved inside each format plan.
 

@@ -13,7 +13,14 @@ Use it like this:
 - when a task changes state, update this file and [plan.md](./plan.md) in the
   same change
 
-As of 2026-04-23:
+Docs reconciliation note, 2026-06-21: this file remains the live task-board
+tracker. It records roadmap/checklist state; release readiness lives in
+[production-readiness-status.md](./production-readiness-status.md), CT gap
+accounting lives in [cross-region-ct-inventory.md](./cross-region-ct-inventory.md),
+and producer signoff lives in
+[real-producer-compatibility.md](./real-producer-compatibility.md).
+
+As of the latest tracked roadmap updates:
 
 ## Shared foundation
 

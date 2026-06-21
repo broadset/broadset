@@ -1,6 +1,10 @@
 # PSD Support Plan
 
-Status: draft — pre-Phase 0. Supersedes the scope of [project/spec/formats/psd.md](../spec/formats/psd.md); the spec file is rewritten in Phase 0.
+Status: historical companion plan. Current task status lives in
+[plan-progress.md](./plan-progress.md), and release readiness lives in
+[production-readiness-status.md](./production-readiness-status.md). This file
+preserves the original PSD scope and acceptance detail; old "current state"
+sections describe the pre-track baseline, not the present implementation.
 
 This plan captures the full-fidelity PSD import/export strategy for Broadset, covering round-trip within Broadset, external-source import (Photoshop for macOS/Windows, Photoshop Web/iPad, Affinity Photo, Photopea, GIMP, Krita, Figma export), and external-target export with minimal-loss editability in Photoshop. It also covers the "chain" case: Broadset → PSD → edit in Photoshop → Save → re-import to Broadset with user edits preserved and Broadset semantics (animations, data bindings, page overrides) preserved wherever Photoshop did not touch them.
 
@@ -66,20 +70,20 @@ Most libraries are added in **io-prereqs Phase 2** and consumed from `packages/f
 
 ### PSD-specific
 
-| Library | Role | Why this one |
-|---|---|---|
+| Library                                   | Role                  | Why this one                                                                                                                                                        |
+| ----------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`ag-psd`** (already in repo, `^30.1.0`) | PSD reader and writer | The only actively maintained JS PSD library with write support. Exposes raw `additionalInfo` and `globalAdditionalInfo` slots which we need for the metadata layer. |
 
 ### Consumed from `packages/formats/src/_shared/` (added once in io-prereqs Phase 2)
 
-| Shared module | Underlying library | Role in PSD pipeline |
-|---|---|---|
-| **`_shared/color/`** | `culori` + lazy `lcms-wasm` | CSS color parsing, RGB/CMYK/OKLCH/P3/Lab, gamut mapping, ICC transforms. Consumed by `psd/import/color.ts` and `psd/export/color.ts`. Replaces the hand-rolled RGB-only paths in [color-utils.ts](../../packages/formats/src/psd/color-utils.ts). |
-| **`_shared/fonts/`** | `fontkit` | Font resolution, metrics, PostScript-name lookup, `fsType` embed-permission. Matches Photoshop font references to available web fonts. Consumed by `psd/import/text.ts` and `psd/export/text.ts`. |
-| **`_shared/text-layout/`** | `linebreak` + `bidi-js` + lazy `harfbuzzjs` | UAX #14 wrapping (for Photoshop paragraph text boxes), UAX #9 BiDi, complex-script shaping. |
-| **`_shared/xmp/`** | `fast-xml-parser` | Read Photoshop's XMP packet on import and write the `broadset:` namespace on export. Same XMP namespace shared with PDF and SVG per io-prereqs decision **IO-D-08**. |
-| **`_shared/fingerprint/`** | `xxhash-wasm` | Content-hash fingerprinting for Phase 4 element identity recovery when `additionalInfo` tags are stripped. |
-| **`_shared/reconcile/`** | `microdiff` | Structural diffs for the reconciliation UI. |
+| Shared module              | Underlying library                          | Role in PSD pipeline                                                                                                                                                                                                                              |
+| -------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`_shared/color/`**       | `culori` + lazy `lcms-wasm`                 | CSS color parsing, RGB/CMYK/OKLCH/P3/Lab, gamut mapping, ICC transforms. Consumed by `psd/import/color.ts` and `psd/export/color.ts`. Replaces the hand-rolled RGB-only paths in [color-utils.ts](../../packages/formats/src/psd/color-utils.ts). |
+| **`_shared/fonts/`**       | `fontkit`                                   | Font resolution, metrics, PostScript-name lookup, `fsType` embed-permission. Matches Photoshop font references to available web fonts. Consumed by `psd/import/text.ts` and `psd/export/text.ts`.                                                 |
+| **`_shared/text-layout/`** | `linebreak` + `bidi-js` + lazy `harfbuzzjs` | UAX #14 wrapping (for Photoshop paragraph text boxes), UAX #9 BiDi, complex-script shaping.                                                                                                                                                       |
+| **`_shared/xmp/`**         | `fast-xml-parser`                           | Read Photoshop's XMP packet on import and write the `broadset:` namespace on export. Same XMP namespace shared with PDF and SVG per io-prereqs decision **IO-D-08**.                                                                              |
+| **`_shared/fingerprint/`** | `xxhash-wasm`                               | Content-hash fingerprinting for Phase 4 element identity recovery when `additionalInfo` tags are stripped.                                                                                                                                        |
+| **`_shared/reconcile/`**   | `microdiff`                                 | Structural diffs for the reconciliation UI.                                                                                                                                                                                                       |
 
 `zod` (already in `@broadset/model`) continues to validate XMP-hydrated project JSON.
 
@@ -189,6 +193,7 @@ Gated on io-prereqs **Phase 6** (external-tool fixture convention, `assertReImpo
   - Figma — PSD export
 
   Smoke-test: import, count layers, assert no exceptions, snapshot Broadset structure so regressions surface immediately.
+
 - **Chain CT (Playwright).** User imports a PSD in the demo, edits one element in a given region (text, canvas, properties panel), exports, re-imports, asserts the edit survived across all affected regions — conforms to the cross-region CT rule in [testing.instructions.md](../../agents/instructions/testing.instructions.md). Covers untouched-element byte-preservation.
 
 ### Phase 6 — UI

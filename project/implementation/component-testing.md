@@ -57,29 +57,35 @@ Derive CT coverage from these files:
 
 ## 5. Coverage Baseline (Current)
 
-- Current CT run passes with implemented scenarios already covered in `packages/demo/ct/`.
-- This guide now tracks only remaining, unresolved scenarios.
-- Open scenario count: 0 IDs.
+- Current CT runs can pass while cross-region coverage gaps remain. A green
+  `npm run ct:all` validates implemented CTs; it does not by itself close the
+  CT Derivation Rule.
+- The authoritative cross-region coverage inventory and open work queue is
+  [cross-region-ct-inventory.md](./cross-region-ct-inventory.md).
+- This guide is retained for derivation rules and component-testing rationale.
+  Do not use the matrices below as the live gap count.
 
 ## 6. Remaining CT Matrix (Open Scenarios)
 
-All previously open scenarios in this document are now covered by passing CT tests.
+Superseded by [cross-region-ct-inventory.md](./cross-region-ct-inventory.md).
+That file owns the current `covered` / `partial` / `missing` classifications
+and CRA work-unit list.
 
 ### 6.1 Canvas, Selection, Transform, and Placement
 
-None.
+See [cross-region-ct-inventory.md](./cross-region-ct-inventory.md).
 
 ### 6.2 Toolbar, Context Menu, Element Library, Scene Sorting
 
-None.
+See [cross-region-ct-inventory.md](./cross-region-ct-inventory.md).
 
 ### 6.3 Sidebars, Layers, Properties, and Property Panels
 
-None.
+See [cross-region-ct-inventory.md](./cross-region-ct-inventory.md).
 
 ### 6.4 Demo Host State, Data, and Workflow Integration
 
-None.
+See [cross-region-ct-inventory.md](./cross-region-ct-inventory.md).
 
 ## 7. Component Coverage Checklist (Public UI Components)
 
