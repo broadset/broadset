@@ -1,7 +1,8 @@
-import { Button, ListBox, Select, Switch } from '@heroui/react';
+import { Button, ListBox, Select } from '@heroui/react';
 import type { JSX } from 'react';
 import { useState } from 'react';
 
+import { ToggleSwitch } from '../inputs';
 import { ModalShell } from './modal-shell';
 
 /**
@@ -138,39 +139,39 @@ export function FormatExportOptionsModal({
         : null}
 
         {supportedFields.has('embedIccProfile') ?
-          <Switch
+          <ToggleSwitch
             isSelected={value.embedIccProfile}
             onChange={(isSelected) => {
               setValue((prev) => ({ ...prev, embedIccProfile: isSelected }));
             }}
-            aria-label="Embed ICC profile"
+            ariaLabel="Embed ICC profile"
           >
             Embed ICC profile
-          </Switch>
+          </ToggleSwitch>
         : null}
 
         {supportedFields.has('linkSmartObjects') ?
-          <Switch
+          <ToggleSwitch
             isSelected={value.linkSmartObjects}
             onChange={(isSelected) => {
               setValue((prev) => ({ ...prev, linkSmartObjects: isSelected }));
             }}
-            aria-label="Link smart objects"
+            ariaLabel="Link smart objects"
           >
             Keep smart objects linked
-          </Switch>
+          </ToggleSwitch>
         : null}
 
         {supportedFields.has('preserveVisibility') ?
-          <Switch
+          <ToggleSwitch
             isSelected={value.preserveVisibility}
             onChange={(isSelected) => {
               setValue((prev) => ({ ...prev, preserveVisibility: isSelected }));
             }}
-            aria-label="Preserve visibility"
+            ariaLabel="Preserve visibility"
           >
             Preserve hidden elements
-          </Switch>
+          </ToggleSwitch>
         : null}
 
         {supportedFields.has('fontEmbedding') ?
@@ -202,27 +203,27 @@ export function FormatExportOptionsModal({
         : null}
 
         {supportedFields.has('includeMetadata') ?
-          <Switch
+          <ToggleSwitch
             isSelected={value.includeMetadata}
             onChange={(isSelected) => {
               setValue((prev) => ({ ...prev, includeMetadata: isSelected }));
             }}
-            aria-label="Include document metadata packet"
+            ariaLabel="Include document metadata packet"
           >
             Include document metadata (for round-trip)
-          </Switch>
+          </ToggleSwitch>
         : null}
 
         {supportedFields.has('includeElementTagging') ?
-          <Switch
+          <ToggleSwitch
             isSelected={value.includeElementTagging}
             onChange={(isSelected) => {
               setValue((prev) => ({ ...prev, includeElementTagging: isSelected }));
             }}
-            aria-label="Include per-element tagging"
+            ariaLabel="Include per-element tagging"
           >
             Tag elements for reconciliation
-          </Switch>
+          </ToggleSwitch>
         : null}
 
         {supportedFields.has('pdfaConformance') ?
@@ -254,15 +255,15 @@ export function FormatExportOptionsModal({
         : null}
 
         {supportedFields.has('embedFonts') ?
-          <Switch
+          <ToggleSwitch
             isSelected={value.embedFonts}
             onChange={(isSelected) => {
               setValue((prev) => ({ ...prev, embedFonts: isSelected }));
             }}
-            aria-label="Embed fonts"
+            ariaLabel="Embed fonts"
           >
             Embed project fonts
-          </Switch>
+          </ToggleSwitch>
         : null}
 
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
