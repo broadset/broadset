@@ -1,0 +1,38 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["vitest.base.ts", "test/vitest.setup.ts", "tsconfig.vitest.json"]
+    },
+    "packages/demo": {
+      "entry": ["src/index.css", "src/**/*.test.{ts,tsx}", "ct/**/*.ct.tsx", "vite.config.ts"],
+      "project": ["src/**/*.{ts,tsx}"],
+      "vite": false
+    },
+    "packages/ui": {
+      "entry": ["src/**/*.test.{ts,tsx}", "ct/**/*.ct.tsx"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/editor": {
+      "entry": ["src/**/*.test.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/model": {
+      "entry": ["src/**/*.test.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/playback": {
+      "entry": ["src/**/*.test.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/renderer": {
+      "entry": ["src/**/*.test.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/formats": {
+      "entry": ["src/**/*.test.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignoreBinaries": ["python3"]
+    }
+  }
+}

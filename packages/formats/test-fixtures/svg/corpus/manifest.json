@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "format": "svg",
+  "description": "Curated Web Platform Tests SVG fixtures pinned by upstream commit, SHA-256, and byte count; bytes live only in the gitignored .cache directory.",
+  "sources": {
+    "wpt-svg": {
+      "repository": "https://github.com/web-platform-tests/wpt",
+      "commit": "8c3a65eb65d581f58ab5af381ca94182ed8399b6",
+      "license": "BSD-3-Clause",
+      "licenseUrl": "https://github.com/web-platform-tests/wpt/blob/8c3a65eb65d581f58ab5af381ca94182ed8399b6/LICENSE.md",
+      "fixtureRoot": "svg"
+    }
+  },
+  "fixtures": [
+    {
+      "name": "wpt-circle-01.svg",
+      "source": "wpt-svg",
+      "upstreamName": "shapes/circle-01.svg",
+      "sha256": "6901491f0d65e73ff958fa38ab8d5d4a569d00c1779b35bd5233fdc9cf485ec5",
+      "bytes": 517,
+      "tags": ["shape", "circle"]
+    },
+    {
+      "name": "wpt-rect-04.svg",
+      "source": "wpt-svg",
+      "upstreamName": "shapes/rect-04.svg",
+      "sha256": "cc396df8c8ed2f9c7144dbb331e96e78461588854bcbb987c77587fb75bac6c6",
+      "bytes": 747,
+      "tags": ["shape", "rounded-rect"]
+    },
+    {
+      "name": "wpt-line-dasharray.svg",
+      "source": "wpt-svg",
+      "upstreamName": "shapes/line-dasharray.svg",
+      "sha256": "d408bf7c3e1599b66f39276f700f7d77abc72793ccf0f7a64058d8e1856eb1a5",
+      "bytes": 612,
+      "tags": ["stroke", "dasharray"]
+    },
+    {
+      "name": "wpt-marker-001.svg",
+      "source": "wpt-svg",
+      "upstreamName": "painting/marker-001.svg",
+      "sha256": "eec9ccec0aed8ea091e28ca11e311b9a1b95d3c6044d8aef9ec5fd4b2f3b22d9",
+      "bytes": 3123,
+      "tags": ["marker", "stroke"]
+    },
+    {
+      "name": "wpt-pservers-inheritance.svg",
+      "source": "wpt-svg",
+      "upstreamName": "pservers/inheritance.svg",
+      "sha256": "10140c3e202563bb225ac16fb5a4c3d04bcc96222942daaca69389416b82157e",
+      "bytes": 864,
+      "tags": ["paint-server", "inheritance"]
+    },
+    {
+      "name": "wpt-text-inheritance.svg",
+      "source": "wpt-svg",
+      "upstreamName": "text/inheritance.svg",
+      "sha256": "35bd439feb4ab70d4dc72997864766efe03ef99aa7799a2f4cc36e99cc723962",
+      "bytes": 1038,
+      "tags": ["text", "inheritance"]
+    },
+    {
+      "name": "wpt-coords-trans-03.svg",
+      "source": "wpt-svg",
+      "upstreamName": "import/coords-trans-03-t-manual.svg",
+      "sha256": "40f101f6d7332a6f0dbfb5eaaa97a742ef44a0b0fae50ebfd847a3abb93a1388",
+      "bytes": 5473,
+      "tags": ["transform"]
+    },
+    {
+      "name": "wpt-pservers-grad-01.svg",
+      "source": "wpt-svg",
+      "upstreamName": "import/pservers-grad-01-b-manual.svg",
+      "sha256": "8e14e4141ef77d966046b38ff6d0288f6fbce3a3cf53ae6353ec623f8cf00abf",
+      "bytes": 3889,
+      "tags": ["gradient"]
+    }
+  ]
+}

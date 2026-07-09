@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  Locally authored to mirror Inkscape 1.x default save shape (we
+  can't redistribute someone else's hand-drawn Inkscape file
+  without explicit permission, but the structure is well-known
+  and the namespace surface is what we're testing).
+
+  Pins the third-party tool surface:
+  - `sodipodi:namedview` clutter at the top
+  - `inkscape:label` attrs on shapes
+  - `<g inkscape:groupmode="layer">` wrapping
+  - `<rect x y>` + `<circle cx cy>` positional attrs
+  - vendor namespace declarations on the root
+
+  The importer MUST surface a single warning per recognised
+  vendor namespace and otherwise import every native shape.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.0.dtd"
+     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     width="200" height="100" viewBox="0 0 200 100">
+  <sodipodi:namedview id="namedview-1" pagecolor="#ffffff" bordercolor="#666666" inkscape:zoom="2" inkscape:cx="100" inkscape:cy="50"/>
+  <g inkscape:groupmode="layer" inkscape:label="Layer 1" id="layer-1">
+    <rect x="10" y="10" width="80" height="40" fill="#3366aa" inkscape:label="background"/>
+    <circle cx="150" cy="50" r="20" fill="#cc4422" inkscape:label="dot"/>
+  </g>
+</svg>

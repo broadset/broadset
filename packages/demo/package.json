@@ -1,0 +1,51 @@
+{
+  "name": "@broadset/demo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Broadset reference host application — integrates all @broadset/* packages",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "lint:strict": "npm run lint -- --no-cache --max-warnings 0",
+    "lint:fix": "npm run lint -- --fix --no-cache --max-warnings 0",
+    "prettier:check": "prettier --config ../../.prettierrc.json --ignore-path ../../.prettierignore --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml,cjs,mjs,css,html}\"",
+    "prettier:write": "prettier --config ../../.prettierrc.json --ignore-path ../../.prettierignore --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml,cjs,mjs,css,html}\"",
+    "format": "npm run lint:fix && npm run prettier:write",
+    "typecheck": "tsc -b",
+    "test": "vitest run --passWithNoTests",
+    "test:ct": "npm run ct",
+    "ct": "npx playwright test --config=playwright-ct.config.ts --pass-with-no-tests",
+    "ct:ui": "npx playwright test --config=playwright-ct.config.ts --ui",
+    "quality": "npm run lint && npm run prettier:check && npm run typecheck && npm run test",
+    "quality:strict": "npm run lint:strict && npm run prettier:check && npm run typecheck && npm run test",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@broadset/editor": "^0.1.0",
+    "@broadset/formats": "^0.1.0",
+    "@broadset/model": "^0.1.0",
+    "@broadset/playback": "^0.1.0",
+    "@broadset/renderer": "^0.1.0",
+    "@broadset/ui": "^0.1.0",
+    "@heroui/react": "^3.0.2",
+    "@heroui/styles": "^3.0.2",
+    "lucide-react": "^1.7.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@playwright/experimental-ct-react": "^1.61.0",
+    "@playwright/test": "^1.61.0",
+    "@tailwindcss/vite": "^4.3.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^24.12.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "tailwindcss": "^4.3.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.16"
+  }
+}

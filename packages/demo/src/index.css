@@ -1,0 +1,26 @@
+@import 'tailwindcss';
+@import '@heroui/styles/css';
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--surface);
+}
+
+/* Give expanded accordion headers a subtle background so they don't blend into
+ * the panel body. HeroUI only styles hover + closed; without this, open headers
+ * read as "floating" text without a container hint. */
+.accordion__trigger[aria-expanded='true'] {
+  background-color: rgba(148, 163, 184, 0.08);
+}

@@ -1,0 +1,440 @@
+import {
+  EncryptedPDFError,
+  PDFArray,
+  PDFBool,
+  PDFDict,
+  PDFDocument,
+  PDFName,
+  PDFRawStream,
+  PDFRef,
+  PDFString,
+} from 'pdf-lib';
+
+import { type BroadsetXmpPacket, readBroadsetXmp } from '../../_shared/xmp';
+import type { MarkedContentKind, MarkedContentTag, PdfRoundTripMetadata } from '../types';
+
+const METADATA_KEY = PDFName.of('Metadata');
+const RESOURCES_KEY = PDFName.of('Resources');
+const PROPERTIES_KEY = PDFName.of('Properties');
+const NAMES_KEY = PDFName.of('Names');
+const OPEN_ACTION_KEY = PDFName.of('OpenAction');
+const AA_KEY = PDFName.of('AA');
+const JAVASCRIPT_KEY = PDFName.of('JavaScript');
+const EMBEDDED_FILES_KEY = PDFName.of('EmbeddedFiles');
+const ID_KEY = PDFName.of('ID');
+const KIND_KEY = PDFName.of('Kind');
+const DIRTY_KEY = PDFName.of('Dirty');
+const DATA_FIELD_KEY = PDFName.of('DataField');
+const BLOB_KEY = PDFName.of('Blob');
+
+const BS_PROP_PREFIX = 'BS_';
+
+const MARKED_CONTENT_KIND_FALLBACK: MarkedContentKind = 'path';
+const VALID_KINDS: ReadonlySet<MarkedContentKind> = new Set<MarkedContentKind>([
+  'text',
+  'image',
+  'svg',
+  'path',
+  'rectangle',
+  'ellipse',
+  'qrcode',
+  'group',
+  'video',
+  'clock',
+  'ticker',
+]);
+
+/**
+ * Result of probing a PDF byte stream. Callers use the tag to
+ * differentiate "could not parse bytes" from "encrypted — need
+ * password" from "parsed successfully" so UI messaging can be precise.
+ */
+type PdfLoadResult =
+  | { readonly kind: 'ok'; readonly pdf: PDFDocument }
+  | { readonly kind: 'encrypted' }
+  | { readonly kind: 'malformed' };
+
+/**
+ * Load a PDF byte stream with `pdf-lib`, differentiating encryption
+ * rejection from generic parse failure. Encrypted PDFs are NEVER
+ * silently accepted per `project/spec/formats/pdf.md` §"Security —
+ * Encrypted Input and Active Content": the spec mandates "abort
+ * parsing before allocation" unless an explicit password is supplied.
+ *
+ * The optional `password` field is accepted at the public import
+ * boundary for future parser support, but pdf-lib does not expose a
+ * public password-decryption API today. Classification still depends
+ * on pdf-lib's actual encrypted-document signal; a malformed PDF plus
+ * a password remains malformed.
+ */
+export async function probeLoadPdf(
+  bytes: Uint8Array,
+  _options: { readonly password?: string } = {},
+): Promise<PdfLoadResult> {
+  try {
+    const pdf = await PDFDocument.load(bytes, {
+      ignoreEncryption: false,
+      updateMetadata: false,
+    });
+
+    return { kind: 'ok', pdf };
+  } catch (err) {
+    if (isEncryptionError(err)) {
+      return { kind: 'encrypted' };
+    }
+
+    return { kind: 'malformed' };
+  }
+}
+
+/**
+ * pdf-lib's public `EncryptedPDFError` class is the intended signal
+ * for encrypted-input rejection, but the `Error` thrown by
+ * `PDFDocument.load` can arrive as a plain `Error` instance in some
+ * bundled builds (the `__extends`-patched class loses its constructor
+ * name after minification). Checking the message body is a stable
+ * fallback — pdf-lib's message consistently includes the literal
+ * substring "is encrypted" regardless of subclass plumbing.
+ */
+function isEncryptionError(err: unknown): boolean {
+  if (err instanceof EncryptedPDFError) return true;
+
+  if (err instanceof Error) {
+    return err.message.toLowerCase().includes('is encrypted');
+  }
+
+  return false;
+}
+
+/**
+ * Convenience wrapper that returns the PDFDocument when load succeeds
+ * or `null` when the PDF is encrypted or malformed. Callers that need
+ * to distinguish the two outcomes should use `probeLoadPdf` directly.
+ */
+export async function loadPdf(bytes: Uint8Array): Promise<PDFDocument | null> {
+  const result = await probeLoadPdf(bytes);
+
+  return result.kind === 'ok' ? result.pdf : null;
+}
+
+/**
+ * Detect presence of embedded JavaScript actions on the document
+ * catalog. PDF 1.7 § 12.6.4 lists four JS carriers: `/Names
+ * /JavaScript`, `/OpenAction`, page-level `/AA`, and annotation `/A`.
+ * This probe catches the first two — the most common carriers emitted
+ * by Acrobat — and is sufficient to satisfy the spec's "strip +
+ * warn" floor. Per-annotation JS detection lands with the full
+ * annotation walker in a later iteration.
+ */
+export function hasEmbeddedJavaScript(pdf: PDFDocument): boolean {
+  // pdf-lib's typings say `pdf.catalog` is always defined, but in
+  // practice partially-parsed garbage can leave it undefined.
+  // `lookupMaybeDict` wraps in try/catch so the entire detection
+  // pass falls through to `false` rather than throwing.
+  const names = lookupMaybeDict(pdf.catalog, NAMES_KEY);
+
+  if (names !== undefined) {
+    const js = lookupMaybeDict(names, JAVASCRIPT_KEY);
+
+    if (js !== undefined) return true;
+  }
+
+  // `/OpenAction` can be either an action dict (typed `S /JavaScript`)
+  // or a destination array (`[page /XYZ x y zoom]` from jsPDF, Acrobat,
+  // etc.). We detect only the action-dict form. pdf-lib's
+  // `lookupMaybe` throws when the value's type does not match the
+  // requested class — wrap in try/catch so a destination-array
+  // /OpenAction gracefully falls through rather than aborting import.
+  const openAction = lookupOpenActionDict(pdf);
+
+  if (openAction !== undefined) {
+    const subtype = openAction.lookupMaybe(PDFName.of('S'), PDFName);
+
+    if (subtype?.decodeText() === 'JavaScript') {
+      return true;
+    }
+  }
+
+  return hasDocumentAdditionalActionJs(pdf);
+}
+
+function lookupOpenActionDict(pdf: PDFDocument): PDFDict | undefined {
+  return lookupMaybeDict(pdf.catalog, OPEN_ACTION_KEY);
+}
+
+/**
+ * Safely call `dict.lookupMaybe(key, type)` — pdf-lib throws when the
+ * stored value's type does not match `type`, which on a malformed
+ * input crashes the importer. This helper turns the throw into
+ * `undefined` so the caller treats it the same as a missing key.
+ *
+ * `type` is the same constructor token pdf-lib expects (e.g.
+ * `PDFDict`, `PDFName`); we use a tiny generic-overload-aware shim
+ * to avoid the protected-constructor mismatch TypeScript surfaces
+ * when typing `typeof PDFDict` directly.
+ */
+function lookupMaybeDict(dict: PDFDict | undefined, key: PDFName): PDFDict | undefined {
+  if (dict === undefined) return undefined;
+
+  try {
+    return dict.lookupMaybe(key, PDFDict);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Read a catalog entry by key, tolerating the runtime case where
+ * `pdf.catalog` is undefined (which pdf-lib's typings claim cannot
+ * happen but malformed inputs make true). Returns `undefined` when
+ * the catalog is missing OR the key is missing.
+ */
+function safeCatalogGet(pdf: PDFDocument, key: PDFName): unknown {
+  try {
+    return pdf.catalog.get(key);
+  } catch {
+    return undefined;
+  }
+}
+
+function hasDocumentAdditionalActionJs(pdf: PDFDocument): boolean {
+  const aa = lookupMaybeDict(pdf.catalog, AA_KEY);
+
+  if (aa === undefined) return false;
+
+  for (const [, value] of aa.entries()) {
+    if (!(value instanceof PDFDict)) continue;
+
+    const subtype = value.lookupMaybe(PDFName.of('S'), PDFName);
+
+    if (subtype?.decodeText() === 'JavaScript') {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Collect embedded-file names from the document's `/Names
+ * /EmbeddedFiles` name tree. The spec requires these survive import
+ * as opaque preservation entries under `extensions.pdf.embeddedFiles`;
+ * the collector returns the file names so the caller can surface a
+ * warning listing what was preserved (and therefore what MUST NOT be
+ * assumed "gone").
+ *
+ * Name-tree traversal is simplified — we read the direct entries at
+ * the root plus one level of `/Kids` so common Acrobat-produced
+ * name trees are covered. Deeply-nested name trees produce a partial
+ * list, but that is a "count is at least N" signal, never a silent
+ * drop: the caller always receives at least one entry when any
+ * embedded file is present.
+ */
+export function collectEmbeddedFileNames(pdf: PDFDocument): readonly string[] {
+  const names = lookupMaybeDict(pdf.catalog, NAMES_KEY);
+
+  if (names === undefined) return [];
+
+  const embeddedFilesNode = lookupMaybeDict(names, EMBEDDED_FILES_KEY);
+
+  if (embeddedFilesNode === undefined) return [];
+
+  return collectNameTreeLabels(embeddedFilesNode);
+}
+
+/**
+ * Walk a PDF name-tree node collecting the leaf name strings. PDF
+ * spec §7.9.6 — name-tree nodes carry `/Names` as an alternating
+ * `[name, value, name, value, ...]` PDFArray of leaf entries OR
+ * `/Kids` as a PDFArray of refs to child name-tree dicts.
+ *
+ * Tolerates both spec-compliant PDFArray shape (Acrobat / Illustrator
+ * / InDesign output) AND the legacy PDFDict-of-name-to-value shape
+ * some tools emit. The previous implementation only accepted PDFDict
+ * — pdf-lib threw `UnexpectedObjectTypeError` on every Adobe-style
+ * embedded-files name tree.
+ */
+function collectNameTreeLabels(node: PDFDict): readonly string[] {
+  return [
+    ...collectFromNamesEntry(node.get(PDFName.of('Names'))),
+    ...collectFromKidsEntry(node.context, node.get(PDFName.of('Kids'))),
+  ];
+}
+
+function collectFromNamesEntry(value: unknown): readonly string[] {
+  if (value instanceof PDFArray) return collectNamesFromArray(value);
+  if (value instanceof PDFDict) return collectNamesFromDict(value);
+
+  return [];
+}
+
+function collectNamesFromArray(array: PDFArray): readonly string[] {
+  const labels: string[] = [];
+
+  // Spec-compliant: /Names is `[name1, ref1, name2, ref2, ...]`.
+  // Iterate even indices for the name strings; ignore value refs.
+  for (let i = 0; i < array.size(); i += 2) {
+    const entry = array.get(i);
+
+    if (entry instanceof PDFString) labels.push(entry.decodeText());
+  }
+
+  return labels;
+}
+
+function collectNamesFromDict(dict: PDFDict): readonly string[] {
+  const labels: string[] = [];
+
+  for (const [key] of dict.entries()) {
+    labels.push(key.decodeText());
+  }
+
+  return labels;
+}
+
+function collectFromKidsEntry(context: PDFDict['context'], value: unknown): readonly string[] {
+  if (!(value instanceof PDFArray)) return [];
+
+  const labels: string[] = [];
+
+  for (let i = 0; i < value.size(); i++) {
+    const entry = value.get(i);
+    const resolved = entry instanceof PDFRef ? safeContextLookup(context, entry) : entry;
+
+    if (resolved instanceof PDFDict) {
+      labels.push(...collectNameTreeLabels(resolved));
+    }
+  }
+
+  return labels;
+}
+
+function safeContextLookup(context: { lookup(ref: PDFRef): unknown }, ref: PDFRef): unknown {
+  try {
+    return context.lookup(ref);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Read the `broadset:` XMP packet off the document catalog's `/Metadata`
+ * stream. Returns `null` for PDFs without a metadata stream, for streams
+ * that cannot be decoded, and for packets that fail the shared Zod
+ * schema validation (handled inside `readBroadsetXmp`).
+ */
+export function readDocumentXmp(pdf: PDFDocument): BroadsetXmpPacket | null {
+  const metadataRef = safeCatalogGet(pdf, METADATA_KEY);
+
+  if (metadataRef === undefined) return null;
+
+  // pdf.context.lookup accepts a PDFRef and returns the dereferenced
+  // object. metadataRef arrives typed `unknown` from safeCatalogGet
+  // — narrow via instanceof before passing through.
+  if (!(metadataRef instanceof PDFRef)) return null;
+
+  const stream = pdf.context.lookup(metadataRef);
+
+  if (!(stream instanceof PDFRawStream)) return null;
+
+  return readBroadsetXmp(stream.contents);
+}
+
+/**
+ * Walk every page's `/Resources /Properties` and collect every
+ * `/BS_<id>` marked-content property dict as a typed
+ * `MarkedContentTag`. The `/BS_` prefix filters out third-party
+ * marked-content names so only Broadset-owned tags land in the result.
+ */
+export function collectMarkedContentTags(pdf: PDFDocument): readonly MarkedContentTag[] {
+  const tags: MarkedContentTag[] = [];
+
+  for (const page of pdf.getPages()) {
+    const properties = pagePropertiesDict(page.node);
+
+    if (properties !== undefined) {
+      tags.push(...tagsFromProperties(properties));
+    }
+  }
+
+  return tags;
+}
+
+function pagePropertiesDict(pageNode: PDFDict): PDFDict | undefined {
+  const resources = pageNode.lookupMaybe(RESOURCES_KEY, PDFDict);
+
+  if (resources === undefined) return undefined;
+
+  return resources.lookupMaybe(PROPERTIES_KEY, PDFDict);
+}
+
+function tagsFromProperties(properties: PDFDict): readonly MarkedContentTag[] {
+  const tags: MarkedContentTag[] = [];
+
+  for (const [keyName] of properties.entries()) {
+    if (!keyName.decodeText().startsWith(BS_PROP_PREFIX)) continue;
+
+    const entry = properties.lookupMaybe(keyName, PDFDict);
+
+    if (entry === undefined) continue;
+
+    const tag = tagFromDict(entry);
+
+    if (tag !== null) {
+      tags.push(tag);
+    }
+  }
+
+  return tags;
+}
+
+function tagFromDict(dict: PDFDict): MarkedContentTag | null {
+  const idEntry = dict.lookupMaybe(ID_KEY, PDFString);
+
+  if (idEntry === undefined) return null;
+
+  const kindEntry = dict.lookupMaybe(KIND_KEY, PDFName);
+
+  if (kindEntry === undefined) return null;
+
+  const dirtyEntry = dict.lookupMaybe(DIRTY_KEY, PDFBool);
+  const dataFieldEntry = dict.lookupMaybe(DATA_FIELD_KEY, PDFString);
+  const blobEntry = dict.lookupMaybe(BLOB_KEY, PDFString);
+
+  const rawKind = kindEntry.decodeText().toLowerCase();
+  const kind = isMarkedContentKind(rawKind) ? rawKind : MARKED_CONTENT_KIND_FALLBACK;
+
+  const dataField = dataFieldEntry === undefined ? undefined : dataFieldEntry.decodeText();
+  const preservationBlob = blobEntry === undefined ? undefined : blobEntry.decodeText();
+
+  return {
+    id: idEntry.decodeText(),
+    kind,
+    dirty: dirtyEntry === undefined ? false : dirtyEntry.asBoolean(),
+    ...(dataField !== undefined ? { dataField } : {}),
+    ...(preservationBlob !== undefined ? { preservationBlob } : {}),
+  };
+}
+
+function isMarkedContentKind(value: string): value is MarkedContentKind {
+  return VALID_KINDS.has(value as MarkedContentKind);
+}
+
+/**
+ * Read XMP packet + marked-content tag list from a PDF byte stream in
+ * one pass. Returns `{ xmp: null, markedContentTags: [] }` when the PDF
+ * cannot be loaded (malformed or encrypted) or carries no Broadset
+ * metadata.
+ */
+export async function readRoundTripMetadata(bytes: Uint8Array): Promise<PdfRoundTripMetadata> {
+  const pdf = await loadPdf(bytes);
+
+  if (pdf === null) {
+    return { xmp: null, markedContentTags: [] };
+  }
+
+  return {
+    xmp: readDocumentXmp(pdf),
+    markedContentTags: collectMarkedContentTags(pdf),
+  };
+}

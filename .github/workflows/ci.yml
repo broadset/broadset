@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master, main]
+  push:
+    branches: [master, main]
+
+jobs:
+  quality:
+    name: Quality gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks (secret scan)
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" \
+            ghcr.io/gitleaks/gitleaks:latest \
+            detect --source=/repo --redact --verbose
+
+      - name: actionlint (workflow lint)
+        uses: raven-actions/actionlint@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Fetch import/export corpora (PDF/PPTX/PSD/SVG, pinned by SHA)
+        run: npm run corpus:fetch -w @broadset/formats
+
+      - name: Knip (dead code / unused deps)
+        run: npm run lint:dead
+
+      - name: Type coverage (>= 99.95%)
+        run: npm run lint:typecoverage
+
+      - name: Strict quality - model
+        run: npm run quality:strict -w @broadset/model
+
+      - name: Strict quality - playback
+        run: npm run quality:strict -w @broadset/playback
+
+      - name: Strict quality - renderer
+        run: npm run quality:strict -w @broadset/renderer
+
+      - name: Strict quality - editor
+        run: npm run quality:strict -w @broadset/editor
+
+      - name: Strict quality - formats lint
+        run: npm run lint:strict -w @broadset/formats
+
+      - name: Strict quality - formats typecheck
+        run: npm run typecheck -w @broadset/formats
+
+      - name: Formats tests - shared and cross-format
+        run: >
+          npm run test -w @broadset/formats --
+          _shared
+          apply-reconciliation-choices
+          cross-format-parity
+          cross-format-reconciliation
+          import-document
+          interchange
+          raster
+          web-vector
+
+      - name: Formats tests - pdf
+        run: npm run test -w @broadset/formats -- pdf
+
+      - name: Formats tests - pptx
+        run: npm run test -w @broadset/formats -- pptx
+
+      - name: Formats tests - psd
+        run: npm run test -w @broadset/formats -- psd
+
+      - name: Formats tests - svg
+        run: npm run test -w @broadset/formats -- svg
+
+      - name: Strict quality - ui
+        run: npm run quality:strict -w @broadset/ui
+
+      - name: Strict quality - demo
+        run: npm run quality:strict -w @broadset/demo
+
+      - name: Component tests - ui
+        run: npm run ct -w @broadset/ui
+
+      - name: Component tests - demo
+        run: npm run ct -w @broadset/demo
+
+      - name: Build
+        run: npm run build
+
+  pptx-libreoffice-verify:
+    name: PPTX opens cleanly in LibreOffice
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install LibreOffice
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends libreoffice
+
+      - name: Verify canonical PPTX converts cleanly
+        run: npm run pptx:libreoffice:verify -w @broadset/formats
+
+  pptx-xsd-validate:
+    name: PPTX ECMA-376 XSD validation
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Validate canonical PPTX against ECMA-376 schemas
+        run: npm run pptx:xsd:validate -w @broadset/formats

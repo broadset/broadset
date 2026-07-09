@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "format": "pdf",
+  "description": "Small veraPDF seed corpus fetched from veraPDF/veraPDF-corpus. Fixtures are pinned by upstream commit, SHA-256, and byte count; bytes live only in the gitignored .cache directory.",
+  "sources": {
+    "verapdf-corpus": {
+      "repository": "https://github.com/veraPDF/veraPDF-corpus",
+      "commit": "377728596647e40edf16003d68d620773ce96ec5",
+      "license": "CC-BY-4.0",
+      "licenseUrl": "https://github.com/veraPDF/veraPDF-corpus/blob/377728596647e40edf16003d68d620773ce96ec5/README.md",
+      "fixtureRoot": "."
+    }
+  },
+  "fixtures": [
+    {
+      "name": "pdfa-1b-pass.pdf",
+      "source": "verapdf-corpus",
+      "upstreamName": "PDF_A-1b/6.2 Graphics/6.2.3.3 Uncalibrated color space/veraPDF test suite 6-2-3-3-t03-pass-d.pdf",
+      "sha256": "2a5ba3a4c85ace9bbece0543634ba5447eb51276572424c1a9715d5b758a12a2",
+      "bytes": 2564,
+      "tags": ["pdfa", "1b", "pass"]
+    },
+    {
+      "name": "pdfa-2b-pass.pdf",
+      "source": "verapdf-corpus",
+      "upstreamName": "PDF_A-2b/6.1 File structure/6.1.13 Implementation limits/veraPDF test suite 6-1-13-t09-pass-b.pdf",
+      "sha256": "5297b152a1a0cbc348084a58c90ceb6b24d6ac20093708a0b87769758fc379ae",
+      "bytes": 2392,
+      "tags": ["pdfa", "2b", "pass"]
+    },
+    {
+      "name": "pdfa-2u-pass.pdf",
+      "source": "verapdf-corpus",
+      "upstreamName": "PDF_A-2u/6.2 Graphics/6.2.11 Fonts/6.2.11.7 Unicode character maps/6.2.11.7.2 Level A and Level U conformance/veraPDF test suite 6-2-11-7-2-t01-pass-f.pdf",
+      "sha256": "c77ba0dd71e43823e1fb6a087889a1774ae8c3ea127a8e6861b7b0180eaf2c94",
+      "bytes": 3728,
+      "tags": ["pdfa", "2u", "unicode", "pass"]
+    },
+    {
+      "name": "pdfa-2a-pass.pdf",
+      "source": "verapdf-corpus",
+      "upstreamName": "PDF_A-2a/6.7 Logical structure/6.7.3 Artefacts/6.7.3.4 Structure types/veraPDF test suite 6-7-3-4-t01-pass-a.pdf",
+      "sha256": "e715e6cd3061bf660d4b15043ea045637c13f3470bf03fff693e721656b63b0f",
+      "bytes": 3556,
+      "tags": ["pdfa", "2a", "tagged", "pass"]
+    },
+    {
+      "name": "pdfa-3b-pass.pdf",
+      "source": "verapdf-corpus",
+      "upstreamName": "PDF_A-3b/6.8 Embedded files/veraPDF test suite 6-8-t02-pass-a.pdf",
+      "sha256": "5b8fdee7090f0a0fb7266d10dd0f6f1f8a37d286e3c06b1aa82e01d6d4f0a8a4",
+      "bytes": 4976,
+      "tags": ["pdfa", "3b", "embedded-files", "pass"]
+    },
+    {
+      "name": "pdfa-4-pass.pdf",
+      "source": "verapdf-corpus",
+      "upstreamName": "PDF_A-4/6.2 Graphics/6.2.4 Colour spaces/6.2.4.3 Uncalibrated -Device colour spaces/veraPDF test suite 6-2-4-3-t01-pass-e.pdf",
+      "sha256": "b2b40e60a6a8e2a52cedd2ad520357057a7b48565ed98b566d08bf2d55d8eb46",
+      "bytes": 2644,
+      "tags": ["pdfa", "4", "pdf-2.0", "pass"]
+    },
+    {
+      "name": "pdfua-1-pass.pdf",
+      "source": "verapdf-corpus",
+      "upstreamName": "PDF_UA-1/7.2 Text/7.2-t17-pass-d.pdf",
+      "sha256": "8ed02567ae1276a88627565046d60d62bafdc81fe7c2056c907aca81e163747d",
+      "bytes": 13060,
+      "tags": ["pdfua", "1", "accessibility", "pass"]
+    },
+    {
+      "name": "pdfa-2b-fail.pdf",
+      "source": "verapdf-corpus",
+      "upstreamName": "PDF_A-2b/6.6 Metadata/6.6.2 Metadata streams/6.6.2.1 General/veraPDF test suite 6-6-2-1-t01-fail-a.pdf",
+      "sha256": "38fb31a67c32d558e96ca97f762756b7197bc034e1615c4db06ea4e6490ffd02",
+      "bytes": 2296,
+      "tags": ["pdfa", "2b", "metadata", "fail"]
+    },
+    {
+      "name": "iso-32000-1.pdf",
+      "source": "verapdf-corpus",
+      "upstreamName": "ISO 32000-1/veraPDF test suite 6-2-3-2-t01-fail-b.pdf",
+      "sha256": "058a897a10bbd4a3440740ecfcfad63c94952ca7b5aba2e9eccd218f97319042",
+      "bytes": 3912,
+      "tags": ["iso-32000-1", "plain-pdf"]
+    }
+  ]
+}
