@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines SVG export, import, and round-trip for Broadset. Covers round-trip within Broadset, external-source import (Illustrator, Inkscape, Figma export, Sketch export, Affinity Designer, d3, hand-authored, browser `outerHTML`), and external-target export with minimal-loss editability in Illustrator and Inkscape. Implementation roadmap lives at [project/implementation/svg-support-plan.md](../../implementation/svg-support-plan.md).
+Defines SVG export, import, and round-trip for Broadset. Covers round-trip within Broadset, external-source import (Illustrator, Inkscape, Figma export, Sketch export, Affinity Designer, d3, hand-authored, browser `outerHTML`), and external-target export with minimal-loss editability in Illustrator and Inkscape. Implementation sequencing lives in W3-SVG-01 of the [master roadmap](../../implementation/plan.md).
 
 This spec supersedes prior SVG fidelity requirements that lived under [web-vector.md](web-vector.md) (which now covers only HTML standalone export). It organises the contract as a **Feature Matrix** scoring Export / Import / Round-trip fidelity per feature, followed by acceptance-criteria requirements for the headline behaviours. It inherits the cross-format contracts in [spec.md](spec.md) — importer contract, importer security contract, and the Format Round-Trip Metadata pattern (XMP + per-element tag + content-hash fallback).
 
@@ -500,7 +500,7 @@ The importer MUST resolve styles in CSS precedence order: inherited presentation
 
 The importer MUST handle SVGs produced by any tool that writes the format. Best-effort mapping applies per the cross-format `Import scope: arbitrary external files` principle in [spec.md](spec.md). Tool-specific deviations are documented, not silently accepted.
 
-Covered sources (see Phase 5 of [svg-support-plan.md](../../implementation/svg-support-plan.md) for the fixture list):
+Covered sources (see the SVG matrix in [real-producer compatibility](../../implementation/real-producer-compatibility.md) for the fixture and evidence set):
 
 - Illustrator — Save As SVG (SVG 1.1 + SVG 2)
 - Illustrator — Export As SVG (web-optimised)

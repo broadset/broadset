@@ -1,7 +1,9 @@
 # Sister-format production-readiness audit (PSD / SVG / PDF)
 
+Status: immutable historical audit evidence. Current destinations are the W0 findings ledger and W3 format/corpus/QE initiatives.
+
 > Closes [pptx-known-gaps §B4](pptx-known-gaps.md). Applies the PPTX
-> Phase 8 audit lens (silent drops, lazy-boundary checks, perf scaling,
+> legacy Phase 8 audit lens (silent drops, lazy-boundary checks, perf scaling,
 > async resource resolvers) to the three sister format tracks.
 > Audited 2026-04-29 against `dev2-phase-11`.
 
@@ -66,6 +68,7 @@ Severity scale appears at the bottom of this document.
 ### Lazy-boundary checks
 
 This track is the **best-audited of the three**. P7.7n closed the security audit findings (C1 `<use>` fan-out, C2 byte cap default, H1 scheme allowlist, M2 CSS dangerous URLs, L2 doctype removal, L3 namespaced event handlers). Resource caps are explicit:
+
 - Byte cap: `DEFAULT_SVG_MAX_BYTES = 32 MiB` ([`import-document.ts:37`](../../packages/formats/src/svg/import-document.ts)) enforced **pre-parse**.
 - Element count: `SVG_ELEMENT_COUNT_CAP = 10 000` ([`import-security.ts:15`](../../packages/formats/src/svg/import-security.ts)).
 - Group depth: `DEFAULT_SVG_GROUP_DEPTH_CAP = 100` ([`import-walk.ts:42`](../../packages/formats/src/svg/import-walk.ts)).
@@ -74,6 +77,7 @@ This track is the **best-audited of the three**. P7.7n closed the security audit
 - CSS rule cap: `SVG_CSS_RULE_CAP = 5 000` ([`import-css.ts:39`](../../packages/formats/src/svg/import-css.ts)) — caps mid-selector-list expansion.
 
 Remaining findings:
+
 - **[Low]** No `maxFontSourceBytes` cap on `SvgImportOptions.fontSources` ([`types.ts:288`](../../packages/formats/src/svg/types.ts)). The font-flatten path on third-party SVGs reads each entry's `bytes`. A caller-supplied 1 GB font-source map blows memory before glyph flatten. Mitigated in practice — `fontSources` is only set by trusted demo / test code, not by parsed-input. Recommend documenting the trust boundary.
 - **[Low]** [`import-document.ts:99-115`](../../packages/formats/src/svg/import-document.ts) — when caller passes `maxBytes: 0`, the cap is disabled entirely. Documented as "trusted internal flows" but a config typo turns the protection off silently. Consider rejecting `0` and requiring explicit `Number.POSITIVE_INFINITY` for the disable case.
 
@@ -109,7 +113,7 @@ Remaining findings:
 
 ### Lazy-boundary checks
 
-- **[High]** [`packages/formats/src/pdf/types.ts:66-71`](../../packages/formats/src/pdf/types.ts) `PdfImportOptions { password?, fetch? }` — has **zero size / depth / entry caps**. Compared to PPTX's `maxInputBytes` (200 MiB), `maxPartBytes` (50 MiB), `maxEntries` (4 096), `maxDepth` (100), PDF has nothing. pdf-lib's `PDFDocument.load(bytes)` allocates the entire xref table and object map in memory before yielding control. Attack scenario: a malformed PDF with a 1 GB declared object stream length triggers OOM. The fuzz suite in [`importer-fuzz.test.ts`](../../packages/formats/src/pdf/importer-fuzz.test.ts) covers this for fuzz-bytes inputs, but a pathological *valid* PDF (e.g. a PDF with 10 million empty pages declared) is not caught. Recommend `maxInputBytes` (200 MiB), `maxPages` (~10 000), `maxObjectCount` (~1 000 000), and pre-validating these against the trailer dict before `PDFDocument.load`.
+- **[High]** [`packages/formats/src/pdf/types.ts:66-71`](../../packages/formats/src/pdf/types.ts) `PdfImportOptions { password?, fetch? }` — has **zero size / depth / entry caps**. Compared to PPTX's `maxInputBytes` (200 MiB), `maxPartBytes` (50 MiB), `maxEntries` (4 096), `maxDepth` (100), PDF has nothing. pdf-lib's `PDFDocument.load(bytes)` allocates the entire xref table and object map in memory before yielding control. Attack scenario: a malformed PDF with a 1 GB declared object stream length triggers OOM. The fuzz suite in [`importer-fuzz.test.ts`](../../packages/formats/src/pdf/importer-fuzz.test.ts) covers this for fuzz-bytes inputs, but a pathological _valid_ PDF (e.g. a PDF with 10 million empty pages declared) is not caught. Recommend `maxInputBytes` (200 MiB), `maxPages` (~10 000), `maxObjectCount` (~1 000 000), and pre-validating these against the trailer dict before `PDFDocument.load`.
 - **[High]** [`packages/formats/src/pdf/import.ts:145`](../../packages/formats/src/pdf/import.ts) — `importPdfDocument(data, options?)` does not pass `options` through to any of the cap surfaces because no caps exist (above). Even when the `PdfImportOptions` interface is extended, the importer needs explicit plumbing — currently `options.password` flows to `probeLoadPdf` but `options.fetch` is documented and unused. Recommend wiring the fetch into resource resolution and adding the cap surfaces.
 - **[High]** [`packages/formats/src/pdf/import/operators.ts:156-181`](../../packages/formats/src/pdf/import/operators.ts) — content-stream regex scanners (`BT_RE`, `ET_RE`, `TJ_LITERAL_RE`, `TJ_HEX_RE`, `TJ_ARRAY_RE`) run unbounded over every page's decompressed content stream. A PDF page with a 100 MB compressed content stream that decompresses to 10 GB (a deliberately-engineered Flate bomb) drives the scanner into pathological time. The PSD validator wraps in a soft cap; PDF has none. Recommend a `MAX_CONTENT_STREAM_BYTES` (default ~10 MiB per page) check on `streamBytes.byteLength` before invoking the regex scanners.
 - **[Medium]** [`parse.ts:240-317`](../../packages/formats/src/pdf/import/parse.ts) `collectEmbeddedFileNames` recursively walks `/Kids` arrays without a depth cap. A PDF with a self-referential name tree (`Kids → Kids → ...`) loops indefinitely. Recommend a `MAX_NAME_TREE_DEPTH = 16` cap and a `seen` ref-set to break cycles.
@@ -148,7 +152,7 @@ A small number of patterns repeat across all three sister tracks; closing them o
 
 5. **The IO-D-18 "no silent drops" requirement is enforced unevenly.** PPTX has structured `PptxImportWarningCode` / `PptxExportWarningCode` enums ([`pptx/types.ts:147-189`](../../packages/formats/src/pptx/types.ts)). PSD and PDF emit free-form English warning strings. Recommend lifting the enum + structured warning shape to `_shared/warnings/` so all four tracks share a common code vocabulary the demo's modals can group / count / filter by.
 
-6. **Defence-in-depth caps should be *enforced* not *advised*.** PSD has a validator with `SOFT_DEPTH_CAP = 16` that runs only in tests. SVG has both an enforced cap and a validator-style audit. Recommend the PSD pattern be promoted to a runtime check during import, not a post-hoc validation.
+6. **Defence-in-depth caps should be _enforced_ not _advised_.** PSD has a validator with `SOFT_DEPTH_CAP = 16` that runs only in tests. SVG has both an enforced cap and a validator-style audit. Recommend the PSD pattern be promoted to a runtime check during import, not a post-hoc validation.
 
 ---
 
@@ -162,10 +166,10 @@ A small number of patterns repeat across all three sister tracks; closing them o
 ## Findings summary
 
 | Track | Critical | High | Medium | Low |
-|---|---|---|---|---|
-| PSD | 0 | 5 | 4 | 1 |
-| SVG | 0 | 0 | 3 | 4 |
-| PDF | 0 | 5 | 6 | 1 |
+| ----- | -------- | ---- | ------ | --- |
+| PSD   | 0        | 5    | 4      | 1   |
+| SVG   | 0        | 0    | 3      | 4   |
+| PDF   | 0        | 5    | 6      | 1   |
 
 The SVG track is the best-audited under all four lenses — P7.7n closed the security audit findings, the cap surface is comprehensive, fonts are caller-supplied (no fetch surface), and the fixture corpus is wide. PSD and PDF carry the bulk of the work.
 

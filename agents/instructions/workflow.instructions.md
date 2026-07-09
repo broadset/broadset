@@ -54,7 +54,7 @@ Every feature must have:
 
 No feature is considered complete on the strength of code alone.
 
-When feature is done, mark that task with [DONE]
+When a task is done, check its child-plan evidence step and update the stable initiative row in `project/implementation/plan-progress.md`. Only the tracker owns lifecycle status; do not invent alternate completion markers.
 
 ## Quality Gates
 

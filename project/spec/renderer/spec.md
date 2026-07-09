@@ -25,23 +25,23 @@ The renderer owns the following data attributes. Generic attributes are emitted 
 
 #### Generic attributes
 
-| Attribute              | Placed On             | Consumer                     | Purpose                                                          |
-| ---------------------- | --------------------- | ---------------------------- | ---------------------------------------------------------------- |
-| `data-element-id`      | Element container     | Editor, Playback             | Identifies the element by document ID                            |
-| `data-element-content` | Inner content element | Playback (style writer)      | Marks the animation style target                                 |
-| `data-opacity-target`  | Opacity wrapper       | Playback (style writer)      | Target for opacity animation                                     |
-| `data-visibility`      | Element container     | Playback (state transitions) | Current visibility state                                         |
-| `data-char-index`      | Per-character `<span>` | Playback (animation targets) | Stable index for per-character text animation decorators         |
+| Attribute              | Placed On              | Consumer                     | Purpose                                                  |
+| ---------------------- | ---------------------- | ---------------------------- | -------------------------------------------------------- |
+| `data-element-id`      | Element container      | Editor, Playback             | Identifies the element by document ID                    |
+| `data-element-content` | Inner content element  | Playback (style writer)      | Marks the animation style target                         |
+| `data-opacity-target`  | Opacity wrapper        | Playback (style writer)      | Target for opacity animation                             |
+| `data-visibility`      | Element container      | Playback (state transitions) | Current visibility state                                 |
+| `data-char-index`      | Per-character `<span>` | Playback (animation targets) | Stable index for per-character text animation decorators |
 
 #### Broadset-adapter attributes
 
-| Attribute                          | Placed On                      | Consumer                     | Purpose                                                                                            |
-| ---------------------------------- | ------------------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------- |
-| `data-gradient`                    | Element content wrapper        | Playback (gradient animation) | JSON-encoded gradient spec for playback-driven gradient interpolation                             |
-| `data-broadset-canvas-transform`   | Canvas transform layer         | Export rasterizer, tests      | Marks the perspective/scale transform shell                                                        |
-| `data-broadset-canvas-root`        | Canvas content root             | Export rasterizer, tests      | Marks the semantic canvas content node (no editor chrome)                                          |
-| `data-broadset-element-layer`      | Element container layer         | Export rasterizer, tests      | Marks the element-only layer (for export snapshots that exclude editor chrome)                     |
-| `data-broadset-overlay-root`       | Overlay chrome root             | Editor chrome, tests          | Marks the portal container for editor chrome (selection widgets, snap indicators)                  |
+| Attribute                        | Placed On               | Consumer                      | Purpose                                                                           |
+| -------------------------------- | ----------------------- | ----------------------------- | --------------------------------------------------------------------------------- |
+| `data-gradient`                  | Element content wrapper | Playback (gradient animation) | JSON-encoded gradient spec for playback-driven gradient interpolation             |
+| `data-broadset-canvas-transform` | Canvas transform layer  | Export rasterizer, tests      | Marks the perspective/scale transform shell                                       |
+| `data-broadset-canvas-root`      | Canvas content root     | Export rasterizer, tests      | Marks the semantic canvas content node (no editor chrome)                         |
+| `data-broadset-element-layer`    | Element container layer | Export rasterizer, tests      | Marks the element-only layer (for export snapshots that exclude editor chrome)    |
+| `data-broadset-overlay-root`     | Overlay chrome root     | Editor chrome, tests          | Marks the portal container for editor chrome (selection widgets, snap indicators) |
 
 Other packages MUST NOT invent new `data-*` attributes on rendered elements without updating this registry. Adapter attributes MUST NOT be assumed to exist when the generic core is used without the Broadset adapter.
 
@@ -780,6 +780,7 @@ The renderer MUST support a transparent background mode for alpha-channel export
 - [x] **Incremental Scene Tree Updates:** Automated renderer tests verify that single-element changes rerender only the affected element and that element additions do not remount existing nodes (`packages/renderer/src/screen-renderer/core.test.ts`).
 - [x] **Broken Image Fallback:** Automated renderer tests verify both the empty-content path and the image error-event path swap to a visible placeholder without leaving a broken `<img>` node (`packages/renderer/src/screen-renderer/core.test.ts`).
 - [x] **Text Content Sanitization:** Automated renderer tests verify text rendering strips script tags and inline event-handler markup before visible characters are emitted (`packages/renderer/src/screen-renderer/core.test.ts`).
+- [ ] **Proposed inert-string/typed-run migration:** IO-D-01 and the roadmap propose eventually replacing persisted sanitized HTML authoring content with inert strings plus structured runs. The current sanitization requirement and its evidence remain authoritative until a maintainer-ratified migration updates the model, renderer, importers, clipboard/export boundaries, and security tests together.
 - [x] **Group Element Rendering:** Automated renderer tests verify both boolean-operation group rendering and normal group container behavior with child nodes (`packages/renderer/src/screen-renderer/core.test.ts`).
 - [x] **Dynamic Data Token Format:** Runtime `substituteDynamicTokens` + renderer-level tests verify direct-key resolution, nested dot-notation, and literal fallback for missing keys (`packages/renderer/src/core/runtime.test.ts`).
 - [x] **Rendering Performance (complexity):** Instrumented `insertBefore` mutation-count tests verify that single-element updates leave root-level children untouched, single insertions trigger exactly one reparent, and sibling reorders stay within O(n) moves (`packages/renderer/src/dom/performance.test.ts`).

@@ -1,7 +1,9 @@
 # PPTX known production gaps
 
+Status: historical gap evidence from legacy Phase 8. Current status is in [plan-progress.md](./plan-progress.md); current destinations are W3-CORPUS-01, W3-PPTX-01, W3-QE-01, W2-A11Y-01, and W6-REL-01.
+
 This file lists honest production-readiness gaps for the PPTX
-import / export track as of the end of the Phase 8 push. Items here
+import / export track as of the end of the legacy Phase 8 push. Items here
 are NOT closed — they are tracked here so the spec, the
 implementation plan, and the release readiness review stay aligned.
 
@@ -11,13 +13,13 @@ Gaps" section in [project/spec/formats/pptx.md](../spec/formats/pptx.md)
 (if user-visible) or remove it (if internal). Do not silently delete.
 
 > **Tracked closures:** the entries below are scheduled across the
-> [cross-format I/O improvement plan](cross-format-io-improvement-plan.md):
+> cross-format I/O improvement program (CFIO — status in [plan-progress.md](./plan-progress.md) §CFIO):
 >
-> - **B3** (accessibility audit on new modals) — Phase 5.5.
+> - **B3** (accessibility audit on new modals) — legacy CFIO 5.5 → W2-A11Y-01.
 > - **S1** (CI jobs unverified end-to-end) — closes once branch lands.
-> - **S2** (PowerPoint-on-Windows sanity) — Phase 5.2.
-> - **S3** (visual fidelity coverage) — Phase 5.1.
-> - **B2** (real-world large-deck load testing) — Phase 5.7.
+> - **S2** (PowerPoint-on-Windows sanity) — legacy CFIO 5.2 → W3-QE-01/W6-REL-01.
+> - **S3** (visual fidelity coverage) — legacy CFIO 5.1 → W3-QE-01.
+> - **B2** (real-world large-deck load testing) — legacy CFIO 5.7 → W3-PPTX-01/W3-QE-01.
 
 ## Tier S — verify before general release
 
@@ -81,7 +83,7 @@ external tool. First-class native authoring is out of scope.
 
 **To close:** would require new Broadset element types (table,
 chart, connector, ink) and corresponding model + renderer support.
-Tracked as future Phase work, not Phase 8.
+Tracked under W3-PPTX-01's native-or-explicitly-labeled-fallback decision; legacy Phase 8 did not deliver it.
 
 ## Tier B — operational concerns
 

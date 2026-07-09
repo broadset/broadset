@@ -70,20 +70,21 @@ Each CT test MUST:
 
 ### CT Coverage Gate
 
-Before a feature group in `plan-phase-N.md` can be marked complete:
+Before a roadmap initiative can move to `release` in `plan-progress.md`:
 
 - Every cross-region scenario from that group's specs MUST have a passing CT test
-- `npm run ct` MUST pass with zero failures
+- `npm run ct:all` MUST pass with zero failures
+- The initiative child plan MUST link each scenario ID to its unit/CT evidence
 
 ## General Rules
 
 - Code is not complete unless it is tested.
-- Run `npm run test` for unit tests, `npm run ct` for Playwright component tests.
-- Run the full Playwright CT suite before every 25th commit or before concluding a major feature block.
+- Run `npm run test` for unit tests, the owning package's `ct` command for focused feedback, and `npm run ct:all` for the complete Playwright component suite.
+- Run the full Playwright CT suite before concluding a major initiative or release slice.
 
 ## Coverage
 
 - Run `npm run test:coverage` to emit a V8-backed unit-test coverage report under `coverage/` (HTML, JSON summary, and stdout summary). The report is git-ignored.
 - Per-package and workspace baseline numbers live in `project/implementation/coverage-baseline.md`. Refresh that doc when a package coverage drops materially.
-- Coverage is **not** a release gate — it is a release signal. CT-covered flows do not show up in V8 unit coverage; the cross-region CT audit (`project/implementation/cross-region-ct-audit.md`) is the authoritative coverage surface for cross-region behavior.
+- Blanket percentage coverage is **not** a release gate until W0-QE-01/W0-PERF-01 ratify a risk-weighted policy. Coverage remains a release signal; CT-covered flows do not show up in V8 unit coverage, and `cross-region-ct-inventory.md` is the authoritative cross-region scenario surface.
 - Before opening a PR that touches a path with low coverage, run `npm run test:coverage` and confirm the touched file's coverage is not regressed in `coverage/index.html`.

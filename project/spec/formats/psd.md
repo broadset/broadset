@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines Photoshop (PSD) export, import, and round-trip for Broadset. Covers round-trip within Broadset, external-source import (Photoshop macOS/Windows/Web/iPad, Affinity Photo, Photopea, GIMP, Krita, Figma export), and external-target export with editable fidelity in Photoshop. Implementation roadmap lives at [project/implementation/psd-support-plan.md](../../implementation/psd-support-plan.md).
+Defines Photoshop (PSD) export, import, and round-trip for Broadset. Covers round-trip within Broadset, external-source import (Photoshop macOS/Windows/Web/iPad, Affinity Photo, Photopea, GIMP, Krita, Figma export), and external-target export with editable fidelity in Photoshop. Implementation sequencing lives in W3-PSD-01 of the [master roadmap](../../implementation/plan.md).
 
 This spec supersedes all prior PSD fidelity requirements. It organizes the contract as a **Feature Matrix** scoring Export / Import / Round-trip fidelity per feature, followed by acceptance-criteria requirements for the headline behaviours. It inherits the cross-format contracts in [spec.md](spec.md) — importer contract, importer security contract, and the Format Round-Trip Metadata pattern (XMP + per-element tag + content-hash fallback).
 
@@ -351,7 +351,7 @@ Deletions require user confirmation before being dropped from the Broadset docum
 
 The importer MUST handle PSDs produced by any tool that writes the format — not just Broadset-exported files. Best-effort mapping applies per the cross-format `Import scope: arbitrary external files` principle in [spec.md](spec.md). Tool-specific deviations are documented, not silently accepted.
 
-Covered sources (see Phase 5 of [psd-support-plan.md](../../implementation/psd-support-plan.md) for the fixture list):
+Covered sources (see the PSD matrix in [real-producer compatibility](../../implementation/real-producer-compatibility.md) for the fixture and evidence set):
 
 - Photoshop macOS / Windows / Web / iPad
 - Affinity Photo
@@ -388,8 +388,8 @@ Export preflight and import warnings MUST follow IO-D-14 ("preflight warns and p
 
 The core P5.2a foundation and P5.3a/b/c coverage shipped, plus the parity-with-PDF infrastructure pass: robust importer surface (`importPsdDocument` with `{ document, warnings }`), import fuzz harness, export preflight (`exportPsdBytesAsyncWithPreflight`), cross-reader structural validator (`validatePsdBytes`), producer-quirks fixture corpus, visual regression pixel sampling, UAX #9 / UAX #14 detection on text content, modular `psd/export/` layout. The following deeper round-trip surface is tracked here and will land under later PSD-track iterations:
 
-> **Tracked closures:** scheduled under the
-> [cross-format I/O improvement plan](../../implementation/cross-format-io-improvement-plan.md) Phase 4:
+> **Tracked closures:** scheduled under W3-PSD-01 in the
+> [master roadmap](../../implementation/plan.md):
 > CMYK/Lab/Grayscale + ICC = Phase 4.1; effects parity = Phase 4.3;
 > 16/32-bpc preservation = Phase 4.6;
 > real third-party fixture corpus = Phase 5.3.

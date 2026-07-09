@@ -6,9 +6,13 @@ Status: active per-task tracker for [plan.md](./plan.md).
 
 ## How to read this board
 
-Companion plans ([plan.md](./plan.md), format support plans, [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md)) still own scope and acceptance criteria. This file owns **execution status**.
+[plan.md](./plan.md) owns strategy, initiative scope, dependencies, and W0–W6 sequencing. `project/spec/**` owns behavioral acceptance criteria. This file owns **execution status and evidence**. [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md) is mapped historical UX evidence, while the legacy phase sections below preserve the completed 2026 program and current gap tiers.
 
-### Status tiers
+### Stable initiative lifecycle
+
+New roadmap initiatives use `proposed`, `ready`, `active`, `functional`, `release`, `deferred`, and `blocked` exactly as defined in plan.md §2.2. A `ready` or `active` row requires a named human DRI and an approved child plan. The separate legacy register retains its historical tiers below.
+
+### Legacy evidence tiers
 
 | Tier           | Meaning                                                                                |
 | -------------- | -------------------------------------------------------------------------------------- |
@@ -29,50 +33,161 @@ Legacy `[x]` / `[ ]` checkboxes are retired. Use the tier column instead.
 | Producer pass/fail/waived rows        | [real-producer-compatibility.md](./real-producer-compatibility.md) |
 | Per-format spec gaps                  | `project/spec/formats/{psd,pdf,svg,pptx}.md` §Spec Gaps            |
 
+### Stable initiative register
+
+Every roadmap initiative is registered before execution. `Unassigned` is valid only while `proposed`; promotion requires the named human DRI and evidence contract from plan.md §2.3.
+
+<!-- BEGIN MANAGED: INITIATIVE REGISTER -->
+
+| Initiative     | Status   | DRI        | Dependencies                                                                             | Child plan                         | Evidence |
+| -------------- | -------- | ---------- | ---------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
+| W0-GOV-01      | proposed | unassigned | none                                                                                     | —                                  | —        |
+| W0-GOV-02      | proposed | unassigned | none                                                                                     | [child plan](./plans/W0-GOV-02.md) | —        |
+| W0-DEF-01      | proposed | unassigned | W0-GOV-01                                                                                | [child plan](./plans/W0-DEF-01.md) | —        |
+| W0-RFC-01      | proposed | unassigned | W0-DEF-01                                                                                | [child plan](./plans/W0-RFC-01.md) | —        |
+| W0-UX-01       | proposed | unassigned | none                                                                                     | —                                  | —        |
+| W0-PLAT-01     | proposed | unassigned | W0-RFC-01                                                                                | —                                  | —        |
+| W0-PERF-01     | proposed | unassigned | W0-PLAT-01                                                                               | —                                  | —        |
+| W0-QE-01       | proposed | unassigned | W0-GOV-01                                                                                | —                                  | —        |
+| W0-SEC-01      | proposed | unassigned | RFC-10                                                                                   | —                                  | —        |
+| W0-SEC-02      | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
+| W0-COLLAB-01   | proposed | unassigned | RFC-11                                                                                   | —                                  | —        |
+| W0-COLLAB-02   | proposed | unassigned | W0-COLLAB-01                                                                             | —                                  | —        |
+| W0-TIME-01     | proposed | unassigned | RFC-06                                                                                   | —                                  | —        |
+| W0-IO-01       | proposed | unassigned | W0-RFC-01                                                                                | —                                  | —        |
+| W0-IO-02       | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
+| W0-IO-03       | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
+| W0-IO-04       | proposed | unassigned | W0-IO-01                                                                                 | —                                  | —        |
+| W0-IO-05       | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
+| W0-IO-06       | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
+| W0-IO-07       | proposed | unassigned | W0-IO-03                                                                                 | —                                  | —        |
+| W0-IO-08       | proposed | unassigned | W0-IO-01                                                                                 | —                                  | —        |
+| W0-IO-09       | proposed | unassigned | W0-IO-04                                                                                 | —                                  | —        |
+| W0-IO-10       | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
+| W0-IO-11       | proposed | unassigned | W0-IO-02                                                                                 | —                                  | —        |
+| W0-MODEL-01    | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
+| W0-MODEL-02    | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
+| W0-RECOVER-01  | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
+| W1-TIME-01     | proposed | unassigned | W0-TIME-01                                                                               | —                                  | —        |
+| W1-TIME-02     | proposed | unassigned | RFC-02/RFC-03                                                                            | —                                  | —        |
+| W1-SCENE-01    | proposed | unassigned | RFC-01/RFC-07/RFC-10                                                                     | —                                  | —        |
+| W1-TEXT-01     | proposed | unassigned | W0-PLAT-01/RFC-10                                                                        | —                                  | —        |
+| W1-COLOR-01    | proposed | unassigned | RFC-09/RFC-10                                                                            | —                                  | —        |
+| W1-SEC-01      | proposed | unassigned | RFC-10/W0-SEC-01                                                                         | —                                  | —        |
+| W1-ASSET-01    | proposed | unassigned | RFC-08/W0-PLAT-01                                                                        | —                                  | —        |
+| W1-PERSIST-01  | proposed | unassigned | RFC-08/W1-ASSET-01                                                                       | —                                  | —        |
+| W1-WORKER-01   | proposed | unassigned | W0-PLAT-01/W1-SEC-01                                                                     | —                                  | —        |
+| W1-PLAYBACK-01 | proposed | unassigned | W1-TIME-01/W1-SCENE-01                                                                   | —                                  | —        |
+| W1-RENDER-01   | proposed | unassigned | W1-SCENE-01/W1-PLAYBACK-01                                                               | —                                  | —        |
+| W1-RENDER-02   | proposed | unassigned | W1-COLOR-01/W1-ASSET-01                                                                  | —                                  | —        |
+| W1-PLAYER-01   | proposed | unassigned | W1-PLAYBACK-01/W1-RENDER-01/RFC-12                                                       | —                                  | —        |
+| W1-HISTORY-01  | proposed | unassigned | W1-PERSIST-01                                                                            | —                                  | —        |
+| W2-CMD-01      | proposed | unassigned | W1-HISTORY-01                                                                            | —                                  | —        |
+| W2-CANVAS-01   | proposed | unassigned | W1-SCENE-01/W2-CMD-01                                                                    | —                                  | —        |
+| W2-PATH-01     | proposed | unassigned | W2-CANVAS-01/W1-RENDER-02                                                                | —                                  | —        |
+| W2-TIMELINE-01 | proposed | unassigned | W1-TIME-02/W2-CMD-01                                                                     | —                                  | —        |
+| W2-GRAPH-01    | proposed | unassigned | W2-TIMELINE-01                                                                           | —                                  | —        |
+| W2-COMP-01     | proposed | unassigned | W1-SCENE-01/W2-CMD-01                                                                    | —                                  | —        |
+| W2-VAR-01      | proposed | unassigned | W1-COLOR-01/W2-COMP-01                                                                   | —                                  | —        |
+| W2-DATA-01     | proposed | unassigned | W2-VAR-01/RFC-05                                                                         | —                                  | —        |
+| W2-TEXT-01     | proposed | unassigned | W1-TEXT-01/W2-CANVAS-01                                                                  | —                                  | —        |
+| W2-AUDIO-01    | proposed | unassigned | RFC-14/W1-TIME-01/W1-ASSET-01                                                            | —                                  | —        |
+| W2-STYLE-01    | proposed | unassigned | W1-COLOR-01/W1-RENDER-02                                                                 | —                                  | —        |
+| W2-DOC-01      | proposed | unassigned | W2-STYLE-01/W1-ASSET-01                                                                  | —                                  | —        |
+| W2-ASSET-01    | proposed | unassigned | W1-ASSET-01/W1-PERSIST-01                                                                | —                                  | —        |
+| W2-A11Y-01     | proposed | unassigned | W2-PATH-01/W2-GRAPH-01/W2-DATA-01/W2-TEXT-01/W2-AUDIO-01/W2-DOC-01/W2-ASSET-01/W2-UX-01  | —                                  | —        |
+| W2-UX-01       | proposed | unassigned | W0-UX-01/W2-CMD-01                                                                       | —                                  | —        |
+| W2-QE-01       | proposed | unassigned | W2-A11Y-01                                                                               | —                                  | —        |
+| W3-CORPUS-01   | proposed | unassigned | W0-GOV-01                                                                                | —                                  | —        |
+| W3-RECON-01    | proposed | unassigned | W2-CANVAS-01/W3-CORPUS-01                                                                | —                                  | —        |
+| W3-PSD-01      | proposed | unassigned | W1-COLOR-01/W3-CORPUS-01                                                                 | —                                  | —        |
+| W3-PDF-01      | proposed | unassigned | W1-TEXT-01/W1-WORKER-01/W3-CORPUS-01                                                     | —                                  | —        |
+| W3-PDF-02      | proposed | unassigned | W1-COLOR-01/W3-CORPUS-01                                                                 | —                                  | —        |
+| W3-SVG-01      | proposed | unassigned | W1-SEC-01/W1-WORKER-01/W3-CORPUS-01                                                      | —                                  | —        |
+| W3-PPTX-01     | proposed | unassigned | W1-TEXT-01/W3-CORPUS-01                                                                  | —                                  | —        |
+| W3-MOTION-01   | proposed | unassigned | W2-TIMELINE-01/W2-AUDIO-01/RFC-04                                                        | —                                  | —        |
+| W3-MOTION-02   | proposed | unassigned | RFC-05/W2-DATA-01/W3-MOTION-01                                                           | —                                  | —        |
+| W3-VIDEO-01    | proposed | unassigned | W1-TIME-01/W1-PLAYER-01/W2-AUDIO-01                                                      | —                                  | —        |
+| W3-LOTTIE-01   | proposed | unassigned | W1-SCENE-01/W3-CORPUS-01                                                                 | —                                  | —        |
+| W3-FIGMA-01    | proposed | unassigned | W2-COMP-01/W2-VAR-01/W3-RECON-01                                                         | —                                  | —        |
+| W3-OGRAF-01    | proposed | unassigned | W1-PLAYER-01/W2-DATA-01/RFC-12                                                           | —                                  | —        |
+| W3-PLAYER-01   | proposed | unassigned | W3-OGRAF-01/W3-VIDEO-01                                                                  | —                                  | —        |
+| W3-QE-01       | proposed | unassigned | W3-PSD-01/W3-PDF-01/W3-PDF-02/W3-SVG-01/W3-PPTX-01/W3-LOTTIE-01/W3-FIGMA-01/W3-PLAYER-01 | —                                  | —        |
+| W4-STATE-01    | proposed | unassigned | W2-TIMELINE-01/W2-DATA-01                                                                | —                                  | —        |
+| W4-RUNDOWN-01  | proposed | unassigned | W4-STATE-01                                                                              | —                                  | —        |
+| W4-OP-01       | proposed | unassigned | W4-RUNDOWN-01/W2-A11Y-01                                                                 | —                                  | —        |
+| W4-CONTROL-01  | proposed | unassigned | W2-COMP-01/W3-OGRAF-01                                                                   | —                                  | —        |
+| W4-DATA-01     | proposed | unassigned | W2-DATA-01/W4-CONTROL-01                                                                 | —                                  | —        |
+| W4-VARIANT-01  | proposed | unassigned | W2-VAR-01/W2-CANVAS-01                                                                   | —                                  | —        |
+| W4-PLAYOUT-01  | proposed | unassigned | W3-PLAYER-01/W4-OP-01                                                                    | —                                  | —        |
+| W4-CLOCK-01    | proposed | unassigned | W1-TIME-01/W4-PLAYOUT-01                                                                 | —                                  | —        |
+| W4-SOAK-01     | proposed | unassigned | W4-CLOCK-01/W4-DATA-01/W4-VARIANT-01                                                     | —                                  | —        |
+| W5-SVC-01      | proposed | unassigned | W0-PLAT-01/RFC-11                                                                        | —                                  | —        |
+| W5-STORE-01    | proposed | unassigned | W1-PERSIST-01/W5-SVC-01                                                                  | —                                  | —        |
+| W5-COLLAB-01   | proposed | unassigned | W0-COLLAB-01/W5-STORE-01                                                                 | —                                  | —        |
+| W5-REVIEW-01   | proposed | unassigned | W5-COLLAB-01                                                                             | —                                  | —        |
+| W5-JOBS-01     | proposed | unassigned | W3-PLAYER-01/W5-SVC-01                                                                   | —                                  | —        |
+| W5-LIB-01      | proposed | unassigned | W2-COMP-01/W5-REVIEW-01                                                                  | —                                  | —        |
+| W5-PLUGIN-01   | proposed | unassigned | W2-CMD-01/W5-SVC-01                                                                      | —                                  | —        |
+| W5-MCP-01      | proposed | unassigned | W5-PLUGIN-01/W5-SVC-01                                                                   | —                                  | —        |
+| W5-BCAST-01    | proposed | unassigned | W4-PLAYOUT-01/W5-SVC-01                                                                  | —                                  | —        |
+| W5-OBS-01      | proposed | unassigned | W5-SVC-01                                                                                | —                                  | —        |
+| W6-CRAFT-01    | proposed | unassigned | W0-UX-01/W4-SOAK-01/W5-JOBS-01/W5-LIB-01/W5-MCP-01/W5-BCAST-01/W5-OBS-01                 | —                                  | —        |
+| W6-UX-01       | proposed | unassigned | W2-CMD-01                                                                                | —                                  | —        |
+| W6-ONBOARD-01  | proposed | unassigned | W2-QE-01/W3-RECON-01/W3-MOTION-02/W3-PLAYER-01/W3-QE-01                                  | —                                  | —        |
+| W6-I18N-01     | proposed | unassigned | W2-TEXT-01                                                                               | —                                  | —        |
+| W6-QE-01       | proposed | unassigned | W3-MOTION-02/W3-QE-01/W4-SOAK-01/W5-JOBS-01/W5-LIB-01/W5-MCP-01/W5-BCAST-01/W5-OBS-01    | —                                  | —        |
+| W6-ARCH-01     | proposed | unassigned | W0-PLAT-01/W5-JOBS-01/W5-LIB-01/W5-MCP-01/W5-BCAST-01/W5-OBS-01                          | —                                  | —        |
+| W6-GPU-01      | proposed | unassigned | W1-RENDER-01                                                                             | —                                  | —        |
+| W6-REL-01      | proposed | unassigned | W6-RESEARCH-01/W6-QE-01/W6-ARCH-01/W6-GPU-01/W6-SHOW-01                                  | —                                  | —        |
+| W6-SHOW-01     | proposed | unassigned | W3-PLAYER-01/W6-CRAFT-01/W6-ONBOARD-01                                                   | —                                  | —        |
+| W6-RESEARCH-01 | proposed | unassigned | W6-CRAFT-01/W6-UX-01/W6-ONBOARD-01/W6-I18N-01                                            | —                                  | —        |
+
+<!-- END MANAGED: INITIATIVE REGISTER -->
+
 ---
 
-## Open work queue (priority order)
+## Open work queue (status register)
 
-Work the queue top-down unless a spec explicitly overrides sequencing.
+Sequencing lives in [plan.md](./plan.md) §7 (waves W0–W6); this table registers legacy IDs and their current evidence tiers. Current destinations are mapped in plan.md §3.4.
 
-| Priority | ID                     | Work item                                                                                                                     | Tier today | Exit tier  |
-| -------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------- | ---------- |
-| P0       | **UI.1–UI.15**         | io-prereqs editor features (theme, run-edit, FilterStack, picture/pattern fill, prepress, …)                                  | open       | functional |
-| P0       | **B.5–B.6**            | Cross-region CT gap closure (31 missing + 12 partial bullets; 63 gap-list rows)                                               | open       | release    |
-| P0       | **D.5–D.8**            | Real producer compatibility triage (16 generated/public matrix rows passed; licensed/manual rows remain open)                 | functional | release    |
-| P1       | **CFIO.4.1**           | CMYK / Lab / Grayscale + ICC round-trip (`lcms-wasm`)                                                                         | open       | functional |
-| P1       | **P5.G1**              | PSD per-layer `BsPs` export + id-based reconcile                                                                              | open       | functional |
-| P1       | **P6.G1**              | PDF third-party import beyond text extraction                                                                                 | scaffold   | functional |
-| P1       | **CFIO.4.3**           | PSD effects parity (bevel, satin, pattern overlay, native inner glow/overlays)                                                | open       | functional |
-| P1       | **P3.G1**              | Renderer pattern/picture fill consumption                                                                                     | open       | functional |
-| P2       | **P8.G1**              | PPTX unit `chain-round-trip.test.ts` (PDF/PSD/SVG parity)                                                                     | functional | functional |
-| P2       | **CFIO.5.1, 5.3, 5.7** | PPTX visual CI, licensed fixture mounts, large-deck load tests                                                                | open       | release    |
-| P2       | **CFIO.4.6**           | PSD 16/32-bpc preservation                                                                                                    | open       | functional |
-| P2       | **CFIO.5.5**           | Accessibility audit on format modals (screen reader + keyboard)                                                               | scaffold   | release    |
-| P2       | **D.9**                | Fresh-checkout release validation log                                                                                         | functional | release    |
-| P2       | **M.1–M.3**            | Main integration ([main-integration-plan.md](./main-integration-plan.md)): credibility bundle → baseline PR → workflow switch | scaffold   | —          |
-| P3       | **DOC.1**              | Stale spec/tracker debt (see §Documentation debt below)                                                                       | open       | —          |
-| —        | **C.1–C.5**            | Package split                                                                                                                 | deferred   | —          |
+| Priority | ID                     | Work item                                                                                                     | Tier today | Exit tier  |
+| -------- | ---------------------- | ------------------------------------------------------------------------------------------------------------- | ---------- | ---------- |
+| P0       | **UI.1–UI.15**         | io-prereqs editor features (theme, run-edit, FilterStack, picture/pattern fill, prepress, …)                  | open       | functional |
+| P0       | **B.5–B.6**            | Cross-region CT gap closure (31 missing + 12 partial bullets; 63 gap-list rows)                               | open       | release    |
+| P0       | **D.5–D.8**            | Real producer compatibility triage (16 generated/public matrix rows passed; licensed/manual rows remain open) | functional | release    |
+| P1       | **CFIO.4.1**           | CMYK / Lab / Grayscale + ICC round-trip (`lcms-wasm`)                                                         | open       | functional |
+| P1       | **P5.G1**              | PSD per-layer `BsPs` export + id-based reconcile                                                              | open       | functional |
+| P1       | **P6.G1**              | PDF third-party import beyond text extraction                                                                 | scaffold   | functional |
+| P1       | **CFIO.4.3**           | PSD effects parity (bevel, satin, pattern overlay, native inner glow/overlays)                                | open       | functional |
+| P1       | **P3.G1**              | Renderer pattern/picture fill consumption                                                                     | open       | functional |
+| P2       | **P8.G1**              | PPTX unit `chain-round-trip.test.ts` (PDF/PSD/SVG parity)                                                     | functional | functional |
+| P2       | **CFIO.5.1, 5.3, 5.7** | PPTX visual CI, licensed fixture mounts, large-deck load tests                                                | open       | release    |
+| P2       | **CFIO.4.6**           | PSD 16/32-bpc preservation                                                                                    | open       | functional |
+| P2       | **CFIO.5.5**           | Accessibility audit on format modals (screen reader + keyboard)                                               | scaffold   | release    |
+| P2       | **D.9**                | Fresh-checkout release validation log                                                                         | functional | release    |
+| P3       | **DOC.1**              | Stale spec/tracker debt (see §Documentation debt below)                                                       | open       | —          |
+| —        | **C.1–C.5**            | Package split                                                                                                 | deferred   | —          |
 
 ---
 
 ## Shared foundation
 
-### Phase 0 — Shared decisions and spec lock
+### Legacy Phase 0 — Shared decisions and spec lock
 
-Source: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md)
+Historical source: [decisions.md](./decisions.md) and git history; current routing: plan.md §3.4
 
-| ID   | Task                                              | Tier        | Code evidence                                      |
-| ---- | ------------------------------------------------- | ----------- | -------------------------------------------------- |
-| P0.1 | Ratify IO-D-01…18                                 | **release** | [decisions.md](./decisions.md)                     |
-| P0.2 | Pre-emptive model spec updates for Phase 1 shapes | **release** | `project/spec/model/**`                            |
-| P0.3 | Importer security contract baseline               | **release** | [../spec/formats/spec.md](../spec/formats/spec.md) |
-| P0.4 | Importer contract baseline                        | **release** | same                                               |
-| P0.5 | No-sidecar + no-silent-drops requirements         | **release** | same                                               |
+| ID   | Task                                                     | Tier        | Code evidence                                      |
+| ---- | -------------------------------------------------------- | ----------- | -------------------------------------------------- |
+| P0.1 | Ratify IO-D-01…18                                        | **release** | [decisions.md](./decisions.md)                     |
+| P0.2 | Pre-emptive model spec updates for legacy Phase 1 shapes | **release** | `project/spec/model/**`                            |
+| P0.3 | Importer security contract baseline                      | **release** | [../spec/formats/spec.md](../spec/formats/spec.md) |
+| P0.4 | Importer contract baseline                               | **release** | same                                               |
+| P0.5 | No-sidecar + no-silent-drops requirements                | **release** | same                                               |
 
-### Phase 1 — Shared model additions
+### Legacy Phase 1 — Shared model additions
 
-Source: [io-prereqs-plan.md](./io-prereqs-plan.md)
+Historical source: [decisions.md](./decisions.md) and git history; current routing: plan.md §3.4
 
 | ID    | Task                                      | Tier        | Code evidence                                         |
 | ----- | ----------------------------------------- | ----------- | ----------------------------------------------------- |
@@ -93,9 +208,9 @@ Source: [io-prereqs-plan.md](./io-prereqs-plan.md)
 | P1.15 | Page/canvas/document additions            | **release** | `packages/model/src/document.ts`                      |
 | P1.16 | Importer contract spec closeout           | **release** | formats spec                                          |
 
-### Phase 2 — Shared libraries and `_shared` modules
+### Legacy Phase 2 — Shared libraries and `_shared` modules
 
-Source: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md)
+Historical source: [decisions.md](./decisions.md) and git history; current routing: plan.md §3.4
 
 | ID   | Task                             | Tier           | Code evidence / gap                                                                     |
 | ---- | -------------------------------- | -------------- | --------------------------------------------------------------------------------------- |
@@ -109,9 +224,9 @@ Source: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md)
 | P2.8 | `_shared/sanitize/`              | **release**    | `packages/formats/src/_shared/sanitize/`                                                |
 | P2.9 | Bundle-size guard for lazy paths | **release**    | `packages/formats/src/_shared/bundle-size-guard.test.ts`                                |
 
-### Phase 3 — Renderer refactor
+### Legacy Phase 3 — Renderer refactor
 
-Source: [plan.md](./plan.md), [renderer-refactor-plan.md](./renderer-refactor-plan.md)
+Historical source: retired renderer plan in git history; current routing: plan.md §3.4 and W1-RENDER-01/02
 
 | ID    | Task                               | Tier           | Code evidence / gap                                             |
 | ----- | ---------------------------------- | -------------- | --------------------------------------------------------------- |
@@ -124,9 +239,9 @@ Source: [plan.md](./plan.md), [renderer-refactor-plan.md](./renderer-refactor-pl
 | P3.6  | Spec closure and hardening         | **functional** | architecture complete; see **P3.G1**                            |
 | P3.G1 | Pattern/picture fill rendering     | **open**       | `packages/renderer/src/background.ts` stubs `pattern`/`picture` |
 
-### Phase 4 — Shared asset pipeline
+### Legacy Phase 4 — Shared asset pipeline
 
-Source: [plan.md](./plan.md), [io-prereqs-plan.md](./io-prereqs-plan.md)
+Historical source: [decisions.md](./decisions.md) and git history; current routing: W1-ASSET-01/W2-ASSET-01
 
 | ID   | Task                               | Tier        | Code evidence                                  |
 | ---- | ---------------------------------- | ----------- | ---------------------------------------------- |
@@ -158,7 +273,7 @@ Source: [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md)
 
 Scope: [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md). Model types exist; **editor UX for these fields is overwhelmingly open**.
 
-| ID    | Feature                                                                  | Tier         |
+| ID    | Feature                                                                  | Tier         | Evidence / open remainder                                |
 | ----- | ------------------------------------------------------------------------ | ------------ | -------------------------------------------------------- |
 | UI.1  | Design-token / theme system (swatches panel, theme tab in color pickers) | **open**     |
 | UI.2  | Run styles + run-edit mode                                               | **open**     |
@@ -184,9 +299,9 @@ Each UI feature requires a cross-region CT when landed ([testing.instructions.md
 
 Tier legend for format rows: **functional** = Broadset round-trip + demo wiring + security caps; **release** = spec acceptance + producer/visual evidence.
 
-### Phase 5 — PSD
+### Legacy Phase 5 — PSD
 
-Source: [psd-support-plan.md](./psd-support-plan.md), [../spec/formats/psd.md](../spec/formats/psd.md)
+Source: [../spec/formats/psd.md](../spec/formats/psd.md); roadmap [plan.md](./plan.md)
 
 | ID    | Task                                                             | Tier           | Code evidence / gap                                                               |
 | ----- | ---------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------- |
@@ -204,9 +319,9 @@ Source: [psd-support-plan.md](./psd-support-plan.md), [../spec/formats/psd.md](.
 | P5.G4 | Full layer effects parity                                        | **open**       | bevel, satin, pattern overlay, native inner glow/overlays                         |
 | P5.G5 | Clipping masks + adjustment layers                               | **open**       | not in import/export paths                                                        |
 
-### Phase 6 — PDF
+### Legacy Phase 6 — PDF
 
-Source: [pdf-support-plan.md](./pdf-support-plan.md), [../spec/formats/pdf.md](../spec/formats/pdf.md)
+Source: [../spec/formats/pdf.md](../spec/formats/pdf.md); roadmap [plan.md](./plan.md)
 
 | ID    | Task                                       | Tier           | Code evidence / gap                                                                                                            |
 | ----- | ------------------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -222,9 +337,9 @@ Source: [pdf-support-plan.md](./pdf-support-plan.md), [../spec/formats/pdf.md](.
 | P6.G2 | ICC-based CMYK/Lab/spot emission           | **open**       | device fallback in `core.ts` / `export/color.ts`                                                                               |
 | P6.G3 | Pre-parse xref/object budget caps          | **open**       | spec gap                                                                                                                       |
 
-### Phase 7 — SVG
+### Legacy Phase 7 — SVG
 
-Source: [svg-support-plan.md](./svg-support-plan.md), [../spec/formats/svg.md](../spec/formats/svg.md)
+Source: [../spec/formats/svg.md](../spec/formats/svg.md); roadmap [plan.md](./plan.md)
 
 | ID    | Task                                            | Tier           | Code evidence / gap                                                              |
 | ----- | ----------------------------------------------- | -------------- | -------------------------------------------------------------------------------- |
@@ -240,9 +355,9 @@ Source: [svg-support-plan.md](./svg-support-plan.md), [../spec/formats/svg.md](.
 | P7.G2 | SMIL export                                     | **deferred**   | explicit non-goal; stripped on import                                            |
 | P7.G3 | Large-file module split                         | **open**       | `KNOWN-GAPS.md` lists oversized modules                                          |
 
-### Phase 8 — PPTX
+### Legacy Phase 8 — PPTX
 
-Source: [pptx-support-plan.md](./pptx-support-plan.md), [../spec/formats/pptx.md](../spec/formats/pptx.md)
+Source: [../spec/formats/pptx.md](../spec/formats/pptx.md); roadmap [plan.md](./plan.md)
 
 | ID    | Task                                        | Tier           | Code evidence / gap                                            |
 | ----- | ------------------------------------------- | -------------- | -------------------------------------------------------------- |
@@ -258,9 +373,9 @@ Source: [pptx-support-plan.md](./pptx-support-plan.md), [../spec/formats/pptx.md
 | P8.G2 | Native table/chart elements                 | **open**       | preserved as blobs + rectangle fallback                        |
 | P8.G3 | Visual-fidelity CI + real licensed fixtures | **open**       | `real-fixtures.test.ts` skips when empty                       |
 
-### Phase 9 — PDF/A
+### Legacy Phase 9 — PDF/A
 
-Source: [pdf-pdfa-compliance-plan.md](./pdf-pdfa-compliance-plan.md)
+Source: [../spec/formats/pdf.md](../spec/formats/pdf.md) §PDF/A; roadmap [plan.md](./plan.md)
 
 | ID    | Task                                 | Tier           | Code evidence / gap                                                |
 | ----- | ------------------------------------ | -------------- | ------------------------------------------------------------------ |
@@ -312,7 +427,7 @@ Source: [production-readiness-status.md](./production-readiness-status.md), [rea
 
 ### Deferred Track C — Package split
 
-Source: [package-split.md](./package-split.md)
+Source: [plan.md](./plan.md) §3.4 and §7.2/§7.3/§7.8 (`W0-PLAT-01`, `W1-WORKER-01`, `W6-ARCH-01`)
 
 | ID      | Task                                                  | Tier         |
 | ------- | ----------------------------------------------------- | ------------ |
@@ -322,7 +437,7 @@ Source: [package-split.md](./package-split.md)
 
 ## Cross-format I/O improvement (CFIO)
 
-Source: [cross-format-io-improvement-plan.md](./cross-format-io-improvement-plan.md)
+Source: [plan.md](./plan.md) §3.4 (CFIO items route across W1–W3)
 
 | ID        | Task                                  | Tier           | Code evidence / notes                                                                           |
 | --------- | ------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------- |
@@ -360,14 +475,13 @@ Source: [cross-format-io-improvement-plan.md](./cross-format-io-improvement-plan
 
 Reconciled 2026-07-07 in the same pass as this task board. When touching related code, keep these files aligned with [plan-progress.md](./plan-progress.md) tiers:
 
-| Document                                                     | Maintenance rule                                                                                          |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `project/spec/formats/pdf.md` §Spec Gaps                     | Open gaps = ICC CMYK + third-party import depth + parser caps; shading/OCG/veraPDF live under `_Closed…_` |
-| `project/spec/formats/pptx.md`                               | Font embed + import recovery closed; release CI gaps stay open                                            |
-| `project/spec/formats/psd.md`                                | `BsPs` export write is open; do not blame ag-psd — export path missing                                    |
-| `project/implementation/cross-region-ct-inventory.md`        | Update CT file count when adding/removing `*.ct.tsx` files                                                |
-| `project/implementation/production-readiness-status.md`      | Use `git status` for worktree state; point open work to plan-progress queue                               |
-| `project/implementation/cross-format-io-improvement-plan.md` | Mark phase checkboxes when wave items close                                                               |
+| Document                                                | Maintenance rule                                                                                          |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `project/spec/formats/pdf.md` §Spec Gaps                | Open gaps = ICC CMYK + third-party import depth + parser caps; shading/OCG/veraPDF live under `_Closed…_` |
+| `project/spec/formats/pptx.md`                          | Font embed + import recovery closed; release CI gaps stay open                                            |
+| `project/spec/formats/psd.md`                           | `BsPs` export write is open; do not blame ag-psd — export path missing                                    |
+| `project/implementation/cross-region-ct-inventory.md`   | Update CT file count when adding/removing `*.ct.tsx` files                                                |
+| `project/implementation/production-readiness-status.md` | Use `git status` for worktree state; point open work to plan-progress queue                               |
 
 ---
 
@@ -376,4 +490,4 @@ Reconciled 2026-07-07 in the same pass as this task board. When touching related
 1. When a task changes tier, update this file in the **same change** as the code or spec evidence.
 2. Do not mark **release** without pointing to acceptance tests, CT, or producer row evidence.
 3. New spec acceptance criteria → append a row here and in [cross-region-ct-inventory.md](./cross-region-ct-inventory.md) when UI-crossing.
-4. [plan.md](./plan.md) sequencing still governs order; this board governs **honest completion state**.
+4. [plan.md](./plan.md) governs sequencing and scope; this board governs **honest completion state**. Every stable initiative is registered here at publication and updated in the same change as status/evidence.

@@ -3,14 +3,15 @@
 Date: 2026-04-20
 Owner: Follow-up implementation agent
 Status: complete as of 2026-04-28
+Execution authority: coverage reporting setup is complete; W0-QE-01/W0-PERF-01 own any gating-policy change.
 
 Add runtime coverage reporting to the Vitest test stack. Coverage is a signal, not a gate — we want visibility into untested branches without blocking PRs on threshold noise.
 
 ## Why
 
 - `gate:full` already enforces `type-coverage ≥ 99.95%` (type coverage), but nothing reports which source lines/branches are actually exercised by tests.
-- After the test-improvement-plan rewrites we have 1500+ behavior-asserting tests. Without a coverage report we can't tell which production code paths they actually hit.
-- Coverage data is load-bearing for the future cross-region CT audit (`project/implementation/cross-region-ct-audit.md`) — gaps in branch coverage often map to untested cross-region flows.
+- After the 2026-04 test-improvement program rewrites we have 1500+ behavior-asserting tests. Without a coverage report we can't tell which production code paths they actually hit.
+- Coverage data supports the current cross-region inventory and W2-QE-01, although branch coverage is only a heuristic and never substitutes for scenario traceability.
 
 ## Scope boundary
 
@@ -48,7 +49,7 @@ A unit is complete only when both boxes are checked and the listed validation co
 - `package.json` — root scripts
 - Vitest docs: https://vitest.dev/guide/coverage
 
-## Current Execution Order
+## Historical Setup Order
 
 Run in this order unless explicitly redirected:
 
@@ -141,7 +142,11 @@ Scope:
 
 - Add to root `package.json`:
   ```json
-  "test:coverage": "VITEST_COVERAGE=1 vitest run"
+  {
+    "scripts": {
+      "test:coverage": "VITEST_COVERAGE=1 vitest run"
+    }
+  }
   ```
 - Append to `.gitignore`:
   ```
@@ -218,7 +223,7 @@ Validation:
 Scope:
 
 - Based on the baseline, propose a minimum coverage level per package that allows existing tests to pass but catches regressions
-- Write the proposal to `project/implementation/coverage-thresholds-proposal.md` — **do not** wire thresholds into `gate:full` in this unit
+- The threshold proposal is an input to W0-QE-01/W0-PERF-01 — **do not** wire blanket thresholds into `gate:full` before the risk-weighted policy is approved
 - Concrete recommendation: set each package's threshold ~2 percentage points below its baseline so a meaningful drop fails CI but normal churn doesn't
 - Include a "go / no-go" recommendation on whether to add coverage to `gate:full` at all
 

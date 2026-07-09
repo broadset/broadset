@@ -5,10 +5,10 @@ This is the consolidated production-readiness status for Broadset. It replaces t
 Use this file for the current release status and the active work queue. Keep supporting detail in the focused artifacts linked below:
 
 - [dev-audit-remediation.md](./dev-audit-remediation.md) - audit history and applied dependency overrides.
-- [coverage-reporting.md](./coverage-reporting.md), [coverage-baseline.md](./coverage-baseline.md), and [coverage-thresholds-proposal.md](./coverage-thresholds-proposal.md) - coverage setup, baseline, and threshold decision.
+- [coverage-reporting.md](./coverage-reporting.md) and [coverage-baseline.md](./coverage-baseline.md) - coverage setup and baseline; W0-QE-01/W0-PERF-01 own the risk-weighted coverage and performance-gate decision.
 - [cross-region-ct-inventory.md](./cross-region-ct-inventory.md) - the full cross-region acceptance inventory and CRA-2.x CT work queue.
 - [real-producer-compatibility.md](./real-producer-compatibility.md) and [producer-fixture-acquisition-guide.md](./producer-fixture-acquisition-guide.md) - real producer validation matrix and fixture acquisition instructions.
-- Format-specific implementation plans - [pptx-support-plan.md](./pptx-support-plan.md), [pdf-support-plan.md](./pdf-support-plan.md), [psd-support-plan.md](./psd-support-plan.md), and [svg-support-plan.md](./svg-support-plan.md).
+- Format execution status - [plan-progress.md](./plan-progress.md) §Format tracks; format behavior specs in `project/spec/formats/`.
 
 Do not create new dated readiness reports for the same release track. Update this file instead.
 
@@ -56,15 +56,16 @@ This queue translates the blocker list below into concrete closeout work. Keep i
 
 Status values: `open`, `in-progress`, `blocked`, `done`.
 
-| Queue ID | Priority | Work item                                   | Status      | Exit evidence required                                                                                                                                                         |
-| -------- | -------- | ------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| RQ-01    | P0       | PPTX malformed-input hardening              | done        | High-level PPTX import path always returns controlled warnings/results for malformed ZIP / cap violations; no uncaught rejection; hostile-size tests added at public boundary. |
-| RQ-02    | P0       | PDF/PSD export user-path verification       | in-progress | Browser/demo PDF + PSD download checks recorded; manual Photoshop openability notes recorded; post-fix root `npm run gate:full` recorded.                                      |
-| RQ-03    | P1       | Cross-region CT gap closure                 | in-progress | `cross-region-ct-inventory.md` partial/missing rows reduced to zero or each waived with written spec-gap rationale; repeated `npm run ct:all` clean runs logged.               |
-| RQ-04    | P1       | Resource-budget pre-allocation stress proof | open        | Hostile-size tests prove caps fire before expensive buffering/parsing where possible; unavoidable post-parse caps documented with residual risk and safe envelope.             |
-| RQ-05    | P1       | Real producer compatibility triage          | in-progress | Required producer matrix rows (`PPTX`, `PDF`, `PSD`, `SVG`) moved from `untriaged` to `pass`, `waived`, or `risk-accepted` with owner + expiry where applicable.               |
-| RQ-06    | P2       | Bundle and lazy-load performance signoff    | open        | Measured eager first-load and lazy first-import metrics recorded with release accept/reject decision and any follow-up split plan.                                             |
-| RQ-07    | P2       | Fresh-checkout release validation           | done        | Clean-checkout run log includes OS + Node + npm versions and outcomes for `npm ci`, `npm run gate:full`, `npm run test:coverage`, `npm run audit:prod`, `npm run audit:all`.   |
+| Queue ID | Priority | Work item                                   | Status      | Exit evidence required                                                                                                                                                                       |
+| -------- | -------- | ------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RQ-00    | P0       | Proposed contracts ratified or rejected     | open        | A maintainer explicitly resolves each W0-RFC-01 proposal; only ratified behavior is reconciled into specs and later implemented with release evidence, while rejected proposals are removed. |
+| RQ-01    | P0       | PPTX malformed-input hardening              | done        | High-level PPTX import path always returns controlled warnings/results for malformed ZIP / cap violations; no uncaught rejection; hostile-size tests added at public boundary.               |
+| RQ-02    | P0       | PDF/PSD export user-path verification       | in-progress | Browser/demo PDF + PSD download checks recorded; manual Photoshop openability notes recorded; post-fix root `npm run gate:full` recorded.                                                    |
+| RQ-03    | P1       | Cross-region CT gap closure                 | in-progress | `cross-region-ct-inventory.md` partial/missing rows reduced to zero or each waived with written spec-gap rationale; repeated `npm run ct:all` clean runs logged.                             |
+| RQ-04    | P1       | Resource-budget pre-allocation stress proof | open        | Hostile-size tests prove caps fire before expensive buffering/parsing where possible; unavoidable post-parse caps documented with residual risk and safe envelope.                           |
+| RQ-05    | P1       | Real producer compatibility triage          | in-progress | Required producer matrix rows (`PPTX`, `PDF`, `PSD`, `SVG`) moved from `untriaged` to `pass`, `waived`, or `risk-accepted` with owner + expiry where applicable.                             |
+| RQ-06    | P2       | Bundle and lazy-load performance signoff    | open        | Measured eager first-load and lazy first-import metrics recorded with release accept/reject decision and any follow-up split plan.                                                           |
+| RQ-07    | P2       | Fresh-checkout release validation           | done        | Clean-checkout run log includes OS + Node + npm versions and outcomes for `npm ci`, `npm run gate:full`, `npm run test:coverage`, `npm run audit:prod`, `npm run audit:all`.                 |
 
 ## Readiness Scoreboard (As Of 2026-07-09)
 
@@ -77,6 +78,18 @@ Status values: `open`, `in-progress`, `blocked`, `done`.
 | PDF/PSD real user-path verification | This file (`P0 - PDF/PSD Export Fixes Need Real User-Path Verification`) | Browser-level Playwright CT verification is done; manual Photoshop openability verification remains open.                                                        | Browser + manual-tool verification complete with recorded evidence.                                                         |
 
 ## Broken Or Must Fix Before Release
+
+### P0 - Proposed Target Contracts Require Ratification and Implementation
+
+The timing, typed-text/security, component, canonical `.bsp`, resolved-scene, collaboration-change, and shared preflight contracts are roadmap/ADR proposals. Current `project/spec/**` remains authoritative until an authorized maintainer ratifies a proposal and applies any required behavioral spec change. The architecture status table records the proposal/runtime boundary. Release claims, UI labels, file extensions, MIME types, compatibility matrices, and documentation MUST describe current specified runtime behavior until both ratification and executable release evidence exist.
+
+Fix requirements:
+
+- Implement the shared rational timebase/duration/sampling helpers and cross-package conformance suite under W0-TIME-01/W1-TIME-01.
+- Migrate persisted rich text from sanitized HTML strings to inert plain strings/typed `TextBody` and DOM-safe run rendering under W1-SEC-01/W1-TEXT-01/W2-TEXT-01.
+- Implement the resolved scene and component registry/instance model under W1-SCENE-01/W2-COMP-01.
+- Implement checksummed ZIP `.bsp`, asset integrity, atomic persistence, recovery, and raw JSON representation separation under W1-ASSET-01/W1-PERSIST-01.
+- Complete atomic project diff/apply/invert and common structured preflight/loss reporting under W0-COLLAB-01/02, W2-DOC-01, and W3-RECON-01.
 
 ### P0 - Public PPTX Import Can Throw On Malformed Input (Resolved 2026-06-21)
 
@@ -132,7 +145,7 @@ Fix requirements:
 
 ### P1 - Real Producer Compatibility Needs Licensed/Manual Completion
 
-The matrix and fixture harness exist, and the Phase 0 baseline pass moved 16 generated/public rows to `pass`. Licensed private mounts, latest desktop producer outputs, and manual chain protocols still need real pass/fail/waived/risk-accepted outcomes for PPTX, PDF, PSD, and SVG.
+The matrix and fixture harness exist, and the initial baseline pass moved 16 generated/public rows to `pass`. Licensed private mounts, latest desktop producer outputs, and manual chain protocols still need real pass/fail/waived/risk-accepted outcomes for PPTX, PDF, PSD, and SVG.
 
 Fix requirements:
 
@@ -171,7 +184,7 @@ Known low or under-credited areas include renderer `custom-element.ts`/`fallback
 Fix requirements:
 
 - Refresh [coverage-baseline.md](./coverage-baseline.md) before release.
-- Revisit [coverage-thresholds-proposal.md](./coverage-thresholds-proposal.md) only after cross-region CT gap closure and producer compatibility work.
+- Revisit risk-weighted coverage thresholds under W0-QE-01/W0-PERF-01 after cross-region CT gap closure and producer compatibility work.
 - Add focused unit coverage only where it exercises real behavior CT cannot observe.
 
 ### P2 - Bundle And Performance Signoff Is Missing
@@ -222,7 +235,7 @@ Record concrete closeout evidence here as it lands. Keep rows newest-first and l
 | 2026-07-09 | RQ-03    | Browser smoke from PR #2 worktree: opacity edit, child layer hide, solid/gradient fill switch, timeline context/scrub/reset                                                                  | pass               | Score Bug opacity stayed stable at 0.5 while hiding Home Color Bar; solid/gradient rendered without frame-to-frame jumps; Score Bug In timeline controls were timeline-scoped and scrubbed live.   |
 | 2026-07-09 | RQ-07    | PR #2 (`initial-dev-phase` → `main`) GitHub checks: Quality gate, PDF/A conformance via veraPDF, PPTX ECMA-376 XSD validation, LibreOffice PPTX openability                                  | pass               | Baseline PR is green and mergeable as a functional baseline; release-level producer/manual/tooling gaps remain tracked below.                                                                      |
 | 2026-07-07 | RQ-07    | Clean copied-directory validation from `/tmp/broadset-phase0-validation`: `npm ci`, `npm run gate:full`, `npm run test:coverage`, `npm run audit:prod`, `npm run audit:all`                  | pass/risk-accepted | macOS 26.5.2, Node v25.2.1, npm 11.6.2. `gate:full`, coverage, and prod audit passed; full audit reports known low dev-only `esbuild@0.27.7` advisory risk-accepted in `dev-audit-remediation.md`. |
-| 2026-07-07 | RQ-05    | Phase 0 producer triage in [real-producer-compatibility.md](./real-producer-compatibility.md); focused generated/public harness commands for PPTX/PDF/PSD/SVG                                | pass               | 16 generated/public rows now `pass`; licensed/private/manual producer rows remain untriaged and must not be claimed as release signoff.                                                            |
+| 2026-07-07 | RQ-05    | Initial producer triage in [real-producer-compatibility.md](./real-producer-compatibility.md); focused generated/public harness commands for PPTX/PDF/PSD/SVG                                | pass               | 16 generated/public rows now `pass`; licensed/private/manual producer rows remain untriaged and must not be claimed as release signoff.                                                            |
 | 2026-06-21 | RQ-05    | `npm run corpus:fetch -w @broadset/formats`; focused corpus tests; `npm run quality:all`                                                                                                     | pass               | Fetched 57 public corpus fixtures into gitignored `.cache/` directories (PDF 9, PPTX 29, PSD 11, SVG 8). Focused corpus suite passed 138 tests; root quality passed with 287 files / 3,101 tests.  |
 | 2026-06-21 | RQ-03    | `npm run ct:all`                                                                                                                                                                             | pass               | 167 CT tests passed (7 UI + 160 demo) after the PDF/PSD/SVG hardening continuation. Existing Vite Node-externalization warnings for `wawoff2` remain non-fatal.                                    |
 | 2026-06-21 | RQ-07    | `npm run quality:all`                                                                                                                                                                        | pass               | 280 package test files passed, 4 skipped; 2,991 tests passed, 4 skipped after the PDF/PSD/SVG hardening continuation. Local workspace run, not fresh-checkout proof.                               |

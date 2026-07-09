@@ -302,7 +302,7 @@ When a keyframe pair includes a `motionPath` field, the timeline computation MUS
 
 ## Spec Gaps
 
-_None — all requirements have acceptance criteria._
+- [ ] **Proposed exact timebase and duration contract:** ADR-003/006 proposes replacing the current `0`-for-empty and 300 ms tail rules with a rational timebase and a different default-duration model. The current requirement above remains authoritative unless an authorized maintainer explicitly ratifies that behavioral change and updates its scenarios, migration impact, and cross-package tests.
 
 ---
 

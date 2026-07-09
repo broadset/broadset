@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Defines PDF export, import, and round-trip for Broadset. Covers round-trip within Broadset, external-source import (Illustrator, InDesign, Acrobat, Figma export, macOS Preview, Word, LaTeX), and external-target export with editable fidelity in Illustrator / Acrobat / InDesign. Implementation roadmap lives at [project/implementation/pdf-support-plan.md](../../implementation/pdf-support-plan.md).
+Defines PDF export, import, and round-trip for Broadset. Covers round-trip within Broadset, external-source import (Illustrator, InDesign, Acrobat, Figma export, macOS Preview, Word, LaTeX), and external-target export with editable fidelity in Illustrator / Acrobat / InDesign. Implementation sequencing lives in W3-PDF-01/02 of the [master roadmap](../../implementation/plan.md).
 
 This spec supersedes all prior PDF fidelity requirements. It organizes the contract as a **Feature Matrix** scoring Export / Import / Round-trip fidelity per feature, followed by acceptance-criteria requirements for the headline behaviours. It inherits the cross-format contracts in [spec.md](spec.md) — importer contract, importer security contract, and the Format Round-Trip Metadata pattern (XMP + per-element tag + content-hash fallback).
 
-PDF/A-2b conformance is tracked separately in [project/implementation/pdf-pdfa-compliance-plan.md](../../implementation/pdf-pdfa-compliance-plan.md) and is a deliberate follow-up to the work described here.
+PDF/A-2b conformance is tracked by W3-PDF-02 in the [master roadmap](../../implementation/plan.md) and is a deliberate follow-up to the work described here.
 
 ---
 
@@ -417,7 +417,7 @@ Deletions require user confirmation before being dropped from the Broadset docum
 
 The importer MUST handle PDFs produced by any tool that writes the format — not just Broadset-exported files. Best-effort mapping applies per the cross-format `Import scope: arbitrary external files` principle in [spec.md](spec.md). Tool-specific deviations are documented, not silently accepted.
 
-Covered sources (see Phase 5 of [pdf-support-plan.md](../../implementation/pdf-support-plan.md) for the fixture list):
+Covered sources (see the PDF matrix in [real-producer compatibility](../../implementation/real-producer-compatibility.md) for the fixture and evidence set):
 
 - Illustrator (Save As, Export as PDF)
 - Acrobat (Print to PDF, Optimize PDF)
@@ -510,7 +510,7 @@ When the caller opts into `pdfaConformance: '2b'` (Phase 9 extension), the expor
 #### Spec Gaps
 
 - **Bundled real sRGB IEC61966-2.1 profile** — today `_shared/color/default-profiles` ships a minimal synthetic v2 profile (header + required tags only) that satisfies PDF/A structural validation. Production users provide a real ICC profile via `document.outputIntent.iccProfileAssetId`; the synthetic profile is the fallback so PDF/A export never refuses for "no profile available".
-- **PDF/A CMYK sub-phase** — CMYK OutputIntent for PDF/A remains deferred; see [pdf-pdfa-compliance-plan.md](../../implementation/pdf-pdfa-compliance-plan.md) Phase C.
+- **PDF/A CMYK sub-phase** — CMYK OutputIntent for PDF/A remains deferred to W3-PDF-02 in the [master roadmap](../../implementation/plan.md).
 
 ---
 
@@ -530,8 +530,8 @@ The system MUST convert canvas dimensions to PDF points (1mm = 72/25.4pt, 1in = 
 
 The P6 foundation (standards-only round-trip, feature matrix, import/export/reconcile, security caps) is **functional** on `dev2-phase-11`. The items below are the remaining open gaps. Closed items live in the `_Closed…_` sections further down.
 
-> **Tracked closures:** scheduled under the
-> [cross-format I/O improvement plan](../../implementation/cross-format-io-improvement-plan.md):
+> **Tracked closures:** scheduled under W3-PDF-02 in the
+> [master roadmap](../../implementation/plan.md):
 > CMYK / Lab / Gray / spot colour emission + ICC = Phase 4.1
 > (shares `_shared/color/lcms-wasm` with PSD).
 
@@ -629,7 +629,7 @@ These items are deliberately out of scope. They are NOT bugs, NOT incomplete wor
 
 ### Out-of-track work referenced by other specs
 
-- **PDF/A-2b conformance** — covered by `validate:pdfa` (Docker veraPDF) in this spec, with the `pdf-pdfa-compliance-plan.md` document retained for historical context.
+- **PDF/A-2b conformance** — covered by `validate:pdfa` (Docker veraPDF) in this spec and sequenced by W3-PDF-02 in the [master roadmap](../../implementation/plan.md).
 - **PSD format** — see [psd.md](psd.md).
 - **PPTX format** — see [pptx.md](pptx.md).
 - **SVG / HTML export** — see [web-vector.md](web-vector.md).

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines PowerPoint (PPTX) export, import, and round-trip for Broadset. Covers round-trip within Broadset, external-source import (PowerPoint Windows/Mac/Office 365, Keynote, Google Slides, LibreOffice Impress, Canva), and external-target export that opens cleanly in PowerPoint with editable fidelity. Implementation roadmap lives at [project/implementation/pptx-support-plan.md](../../implementation/pptx-support-plan.md).
+Defines PowerPoint (PPTX) export, import, and round-trip for Broadset. Covers round-trip within Broadset, external-source import (PowerPoint Windows/Mac/Office 365, Keynote, Google Slides, LibreOffice Impress, Canva), and external-target export that opens cleanly in PowerPoint with editable fidelity. Implementation sequencing lives in W3-PPTX-01 of the [master roadmap](../../implementation/plan.md).
 
 This spec supersedes all prior PPTX fidelity requirements. It organizes the contract as a **Feature Matrix** scoring Export / Import / Round-trip fidelity per feature, followed by acceptance-criteria requirements for the headline behaviours. It inherits the cross-format contracts in [spec.md](spec.md) — importer contract, importer security contract, and the Format Round-Trip Metadata pattern (XMP + per-element tag + content-hash fallback).
 

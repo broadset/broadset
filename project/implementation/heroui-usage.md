@@ -1,6 +1,8 @@
 # HeroUI Usage Improvement Audit
 
-This file records only confirmed opportunities to improve HeroUI usage in `packages/ui`, `packages/editor`, and `packages/demo`.
+Status: current audit findings verified 2026-07-09. Sequencing belongs to W2-A11Y-01/W2-QE-01 and the owning child plans.
+
+This file records confirmed opportunities to improve HeroUI usage in `packages/ui`, `packages/editor`, and `packages/demo`. It is evidence, not independent execution authority.
 
 ## Pass 1: `packages/ui`
 
@@ -17,16 +19,16 @@ This file records only confirmed opportunities to improve HeroUI usage in `packa
 
 ## Pass 2: `packages/editor`
 
-### 2) Replace raw reload button in error boundary with HeroUI button
+### 2) Move recovery chrome out of the editor package boundary
 
 - File: `packages/editor/src/react-data-integration.tsx` (inside `EditorErrorBoundary.render` fallback)
 - Current:
   - A raw `<button>` with inline styling is used for "Reload".
 - Improvement:
-  - Use HeroUI `Button` with semantic variant/color and token-compatible styling.
+  - Keep `@broadset/editor` independent of `@heroui/react`. Expose a semantic recovery callback/fallback slot and render the actual recovery `Button` from `@broadset/ui` or the demo host. Until that boundary-safe composition lands, use native semantic button behavior in the headless editor fallback and test keyboard/focus/recovery behavior.
 - Why:
-  - Keeps UI chrome consistent with HeroUI behavior and accessibility.
-  - Avoids hand-rolled focus/interaction styles for a critical recovery action.
+  - Importing HeroUI into `editor` would violate the package graph.
+  - Host-owned recovery chrome keeps the normal product surface consistent without coupling editor state primitives to a UI kit.
 
 ## Pass 3: `packages/demo`
 
@@ -41,12 +43,12 @@ This file records only confirmed opportunities to improve HeroUI usage in `packa
   - Uses native HeroUI interaction semantics instead of manual keyboard emulation.
   - Improves consistency and reduces a11y edge-case risk in menu rows.
 
-### 4) Use explicit Dropdown trigger composition in toolbar menu wrapper
+### 4) Explicit Dropdown trigger composition in toolbar menu wrapper — resolved
 
 - File: `packages/demo/src/demo-components/toolbar-controls.tsx` (`ToolbarMenu`)
 - Current:
-  - `Dropdown` root directly wraps a `Button` and `Dropdown.Popover`.
-- Improvement:
-  - Prefer explicit `Dropdown.Trigger` wrapping the button and keep `Dropdown.Popover`/`Dropdown.Menu` as the content pair.
+  - `ToolbarMenu` uses `Dropdown.Trigger` around the button and keeps `Dropdown.Popover`/`Dropdown.Menu` as the content pair.
+- Evidence:
+  - `packages/demo/src/demo-components/toolbar-controls.tsx`
 - Why:
   - Matches HeroUI compound composition patterns directly and improves readability/maintainability for future contributors.

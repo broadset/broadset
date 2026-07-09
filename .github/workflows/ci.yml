@@ -40,6 +40,9 @@ jobs:
       - name: Fetch import/export corpora (PDF/PPTX/PSD/SVG, pinned by SHA)
         run: npm run corpus:fetch -w @broadset/formats
 
+      - name: Documentation integrity
+        run: npm run test:docs && npm run docs:check
+
       - name: Knip (dead code / unused deps)
         run: npm run lint:dead
 

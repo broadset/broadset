@@ -2,6 +2,8 @@
 
 Snapshot date: 2026-04-22
 
+Status: current gating reference verified against the listed source paths on 2026-07-09. W2 initiative child plans own feature graduation; W6-REL-01 owns release-claim verification.
+
 The demo app hides a set of feature surfaces behind a user-toggleable
 `showExperimentalFeatures` flag. The flag lives on `CanvasSettings`
 (`packages/model/src/config.ts`) as `readonly showExperimentalFeatures: boolean`
@@ -9,7 +11,7 @@ and defaults to `false`. It is exposed as a Switch in the **Document
 Settings** (`CanvasSettingsModal`) demo dialog.
 
 This document records what is **hidden in the demo UI** while the flag is
-off, so those surfaces can be re-introduced in later phases without the
+off, so those surfaces can be re-introduced by their owning initiatives without the
 underlying functionality being lost or rewritten.
 
 > **Scope.** Gating is UI-only. All production code paths, types, store
@@ -19,25 +21,25 @@ underlying functionality being lost or rewritten.
 
 ## Gated surfaces
 
-| Surface | Location | Gated when flag is off |
-|---|---|---|
-| Main toolbar "Open" item | `packages/demo/src/demo-app/layout-main-toolbar.tsx` | hidden |
-| Main toolbar "Import" item | `packages/demo/src/demo-app/layout-main-toolbar.tsx` | hidden |
-| Main toolbar "Export" item | `packages/demo/src/demo-app/layout-main-toolbar.tsx` | hidden |
-| Main toolbar "Browse Templates" item | `packages/demo/src/demo-app/layout-main-toolbar.tsx` | hidden |
-| Main toolbar unit-picker items (`px`/`mm`/`in`) | `packages/demo/src/demo-app/layout-main-toolbar.tsx` | hidden |
-| Main toolbar view-mode items (`none`/`broadcast`/`print`) | `packages/demo/src/demo-app/layout-main-toolbar.tsx` | hidden |
-| CanvasSettingsModal — Ruler-unit `Select` | `packages/ui/src/modals/core-modals.tsx` | hidden |
-| CanvasSettingsModal — View-mode `ButtonGroup` | `packages/ui/src/modals/core-modals.tsx` | hidden |
-| Sidebar — Animation tab | `packages/demo/src/demo-app/layout-side-rails.tsx` | hidden |
-| Sidebar — Pre-flight tab | `packages/demo/src/demo-app/layout-side-rails.tsx` | hidden |
-| Sidebar — Template Groups tab | `packages/demo/src/demo-app/layout-side-rails.tsx` | hidden |
-| Canvas context menu — "Edit motion path" | `packages/demo/src/demo-app/layout-context-menu.tsx` | hidden |
-| Timeline bottom panel | `packages/demo/src/demo-app/layout-timeline-panel.tsx` | component returns `null` |
-| Export dialog | `packages/demo/src/demo-app/layout-dialogs.tsx` | modal is not mounted |
-| Template Browser dialog | `packages/demo/src/demo-app/layout-dialogs.tsx` | modal is not mounted |
-| Preflight diagnostics computation | `packages/demo/src/demo-app/app.tsx` | `preflightIssues` returns `[]` |
-| Document unit passed to sidebar | `packages/demo/src/demo-app/app.tsx` | coerced to `'px'` |
+| Surface                                                   | Location                                               | Gated when flag is off         |
+| --------------------------------------------------------- | ------------------------------------------------------ | ------------------------------ |
+| Main toolbar "Open" item                                  | `packages/demo/src/demo-app/layout-main-toolbar.tsx`   | hidden                         |
+| Main toolbar "Import" item                                | `packages/demo/src/demo-app/layout-main-toolbar.tsx`   | hidden                         |
+| Main toolbar "Export" item                                | `packages/demo/src/demo-app/layout-main-toolbar.tsx`   | hidden                         |
+| Main toolbar "Browse Templates" item                      | `packages/demo/src/demo-app/layout-main-toolbar.tsx`   | hidden                         |
+| Main toolbar unit-picker items (`px`/`mm`/`in`)           | `packages/demo/src/demo-app/layout-main-toolbar.tsx`   | hidden                         |
+| Main toolbar view-mode items (`none`/`broadcast`/`print`) | `packages/demo/src/demo-app/layout-main-toolbar.tsx`   | hidden                         |
+| CanvasSettingsModal — Ruler-unit `Select`                 | `packages/ui/src/modals/core-modals.tsx`               | hidden                         |
+| CanvasSettingsModal — View-mode `ButtonGroup`             | `packages/ui/src/modals/core-modals.tsx`               | hidden                         |
+| Sidebar — Animation tab                                   | `packages/demo/src/demo-app/layout-side-rails.tsx`     | hidden                         |
+| Sidebar — Pre-flight tab                                  | `packages/demo/src/demo-app/layout-side-rails.tsx`     | hidden                         |
+| Sidebar — Template Groups tab                             | `packages/demo/src/demo-app/layout-side-rails.tsx`     | hidden                         |
+| Canvas context menu — "Edit motion path"                  | `packages/demo/src/demo-app/layout-context-menu.tsx`   | hidden                         |
+| Timeline bottom panel                                     | `packages/demo/src/demo-app/layout-timeline-panel.tsx` | component returns `null`       |
+| Export dialog                                             | `packages/demo/src/demo-app/layout-dialogs.tsx`        | modal is not mounted           |
+| Template Browser dialog                                   | `packages/demo/src/demo-app/layout-dialogs.tsx`        | modal is not mounted           |
+| Preflight diagnostics computation                         | `packages/demo/src/demo-app/app.tsx`                   | `preflightIssues` returns `[]` |
+| Document unit passed to sidebar                           | `packages/demo/src/demo-app/app.tsx`                   | coerced to `'px'`              |
 
 The **"Save as JSON"** item in the File menu and the **"Media Library"** item
 are **not gated** — they remain available in the non-experimental UI.
@@ -55,7 +57,7 @@ gated surface is open, `app.tsx` resets:
 ## How to re-introduce a gated surface
 
 1. Remove the `isExperimental ? ... : null` guard (or the `if
-   (!canvasSettings.showExperimentalFeatures) return null;` guard) from the
+(!canvasSettings.showExperimentalFeatures) return null;` guard) from the
    file listed above.
 2. If the setting is being retired entirely, remove
    `showExperimentalFeatures` from `CanvasSettings` in

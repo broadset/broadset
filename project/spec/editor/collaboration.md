@@ -223,6 +223,7 @@ The editor's collaboration system defines the change stream format and remote ch
 ## Spec Gaps
 
 - [ ] **Conflict Resolution is Host-Provided:** No automated tests verify last-writer-wins behavior for sequential remote changes targeting the same element property.
+- [ ] **Proposed atomic collaboration batches:** ADR-011 proposes broader project diff/apply/invert coverage, stable transaction identity, expected-old-value validation, and stable ordering anchors. The current array-based change stream and two-operation reversal scenario remain authoritative until a maintainer ratifies a replacement consistent with `model/changes.md`.
 
 ---
 
