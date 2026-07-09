@@ -1,0 +1,28 @@
+{
+  "name": "@broadset/playback",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:strict": "npm run lint -- --no-cache --max-warnings 0",
+    "typecheck": "tsc -b",
+    "test": "vitest run --passWithNoTests",
+    "quality": "npm run lint && npm run typecheck && npm run test",
+    "quality:strict": "npm run lint:strict && npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "@types/flubber": "^0.4.0",
+    "typescript": "^6.0.2"
+  },
+  "dependencies": {
+    "@broadset/model": "^0.1.0",
+    "flubber": "^0.4.2",
+    "svg-path-properties": "^2.0.2"
+  }
+}

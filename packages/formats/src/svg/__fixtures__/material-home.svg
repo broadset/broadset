@@ -1,0 +1,12 @@
+<!--
+  Source: Google Material Icons — `home` (rounded variant, baseline 24)
+  https://github.com/google/material-design-icons
+  License: Apache-2.0
+
+  Bare-path icon: single `<path>` with implicit black fill. The simplest
+  real-world shape — pins the bare-path import → re-export round-trip
+  for the most common SVG icon dispenser shape.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+</svg>

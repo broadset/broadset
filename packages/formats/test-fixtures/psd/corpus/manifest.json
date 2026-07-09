@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "format": "psd",
+  "description": "Permissively-licensed PSD/PSB corpus fetched from psd-tools tests/psd_files. Fixtures are pinned by upstream commit, SHA-256, and byte count; bytes live only in the gitignored .cache directory.",
+  "sources": {
+    "psd-tools": {
+      "repository": "https://github.com/psd-tools/psd-tools",
+      "commit": "9aa6a5cfa74490b7c524947bc84c0cb33482373c",
+      "license": "MIT",
+      "licenseUrl": "https://github.com/psd-tools/psd-tools/blob/9aa6a5cfa74490b7c524947bc84c0cb33482373c/LICENSE",
+      "fixtureRoot": "tests/psd_files"
+    }
+  },
+  "fixtures": [
+    {
+      "name": "psdt-1layer.psd",
+      "source": "psd-tools",
+      "upstreamName": "1layer.psd",
+      "sha256": "c2b457581d549f4bea2e5c34a04b68b2917f640bce0e958b6bca9c65be75174b",
+      "bytes": 6476,
+      "tags": ["simple-layer"]
+    },
+    {
+      "name": "psdt-2layers.psd",
+      "source": "psd-tools",
+      "upstreamName": "2layers.psd",
+      "sha256": "406ddf7cbf5a1065b992b9c0d2a59be6290a371b90f23b9a04c0e6bbc94beb0c",
+      "bytes": 14176,
+      "tags": ["layer-stack"]
+    },
+    {
+      "name": "psdt-group.psd",
+      "source": "psd-tools",
+      "upstreamName": "group.psd",
+      "sha256": "1aaf572b69f0b0fa7c04b7b3a14c97e310a0c7bbdc06e733c9dd0d0cdcf7df1c",
+      "bytes": 31480,
+      "tags": ["group"]
+    },
+    {
+      "name": "psdt-layer-name-emoji.psd",
+      "source": "psd-tools",
+      "upstreamName": "layer-name-emoji.psd",
+      "sha256": "2ed49149deeffbccb89aebbf8c5a19dee12a864b17641c7bc03a89e957f3eaa8",
+      "bytes": 20824,
+      "tags": ["unicode", "layer-name"]
+    },
+    {
+      "name": "psdt-16bit5x5.psd",
+      "source": "psd-tools",
+      "upstreamName": "16bit5x5.psd",
+      "sha256": "c78689ea7b576f23bbd8b6b4f4993a365266c3ffc9aaa02cc20bef4a36a9d7a0",
+      "bytes": 22592,
+      "tags": ["bit-depth", "16-bit"]
+    },
+    {
+      "name": "psdt-32bit5x5.psd",
+      "source": "psd-tools",
+      "upstreamName": "32bit5x5.psd",
+      "sha256": "66a4260e6bb8a60deff94031a66fa502c74870d75a723b4180aef02c35a97d0e",
+      "bytes": 20012,
+      "tags": ["bit-depth", "32-bit"]
+    },
+    {
+      "name": "psdt-type-layer.psd",
+      "source": "psd-tools",
+      "upstreamName": "layers-minimal/type-layer.psd",
+      "sha256": "b24e6f4c7277dd499ebb20c88ac06698f4563e75bfeb6aa6cb0d2466140fd81f",
+      "bytes": 43944,
+      "tags": ["text-layer"]
+    },
+    {
+      "name": "psdt-shape-layer.psd",
+      "source": "psd-tools",
+      "upstreamName": "layers-minimal/shape-layer.psd",
+      "sha256": "53f4791a888269f835a65e30fd29d2cc775490c35cdefe16987129e00bbd9a18",
+      "bytes": 24146,
+      "tags": ["shape-layer"]
+    },
+    {
+      "name": "psdt-double-stroke-effects.psd",
+      "source": "psd-tools",
+      "upstreamName": "effects/double-stroke-effects.psd",
+      "sha256": "f7c0631ead3370a97aa445f610665796d14475528acc1184e276dd5d3f47ca3e",
+      "bytes": 32528,
+      "tags": ["effects", "stroke"]
+    },
+    {
+      "name": "psdt-path-combine.psd",
+      "source": "psd-tools",
+      "upstreamName": "path-operations/combine.psd",
+      "sha256": "61513fbddb67c94d00f7c8a88191074ea9b259f2fd78a180945c49a1e1aa60e3",
+      "bytes": 29100,
+      "tags": ["path-operations"]
+    },
+    {
+      "name": "psdt-third-party-cactus-top.psd",
+      "source": "psd-tools",
+      "upstreamName": "third-party-psds/cactus_top.psd",
+      "sha256": "405f13bbbcc9001d8771f313d898ba683d79a7e79005650d8c1a017a4fb0ca2a",
+      "bytes": 6092,
+      "tags": ["third-party", "small"]
+    }
+  ]
+}

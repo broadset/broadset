@@ -1,0 +1,27 @@
+<!--
+  W3C-style SMIL animation fixture for import safety coverage.
+
+  Purpose:
+  - Exercise import-time SMIL stripping (`<animate>`, `<set>`,
+    `<animateTransform>`) while retaining static geometry.
+  - Ensure preserved-fragment round-trip does not re-emit SMIL.
+
+  This fixture is intentionally small and standards-shaped.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60" viewBox="0 0 120 60">
+  <rect id="moving-rect" x="10" y="10" width="20" height="20" fill="#336699">
+    <animate attributeName="x" from="10" to="90" dur="2s" repeatCount="indefinite" />
+  </rect>
+  <circle id="pulsing-dot" cx="80" cy="30" r="8" fill="#ff7a00">
+    <set attributeName="fill" to="#00aa66" begin="1s" />
+    <animateTransform
+      attributeName="transform"
+      type="scale"
+      from="1"
+      to="1.5"
+      begin="0s"
+      dur="1s"
+      repeatCount="indefinite"
+    />
+  </circle>
+</svg>

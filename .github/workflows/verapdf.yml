@@ -1,0 +1,32 @@
+name: veraPDF Conformance
+
+on:
+  pull_request:
+    branches: [master, main]
+  push:
+    branches: [master, main]
+
+jobs:
+  pdfa-conformance:
+    name: PDF/A conformance via veraPDF
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Pull veraPDF Docker image
+        run: docker pull verapdf/cli:latest
+
+      - name: Fetch PDF corpus fixtures
+        run: npm run pdf:corpus:fetch -w @broadset/formats
+
+      - name: Run veraPDF against vendored fixtures + fresh Broadset export
+        run: npm run validate:pdfa --workspace @broadset/formats

@@ -1,0 +1,42 @@
+{
+  "name": "@broadset/ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing/heroui-mock-common": "./src/testing/heroui-mock-common.tsx"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:strict": "npm run lint -- --no-cache --max-warnings 0",
+    "typecheck": "tsc -b",
+    "test": "vitest run --passWithNoTests",
+    "ct": "npx playwright test --config=playwright-ct.config.ts --pass-with-no-tests",
+    "quality": "npm run lint && npm run typecheck && npm run test",
+    "quality:strict": "npm run lint:strict && npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "@playwright/experimental-ct-react": "^1.61.0",
+    "@playwright/test": "^1.61.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "typescript": "^6.0.2"
+  },
+  "dependencies": {
+    "@heroui/react": "^3.0.2",
+    "lucide-react": "^1.7.0",
+    "react-aria-components": "^1.16.0"
+  },
+  "peerDependencies": {
+    "@broadset/editor": "^0.1.0",
+    "@broadset/formats": "^0.1.0",
+    "@broadset/model": "^0.1.0",
+    "@broadset/renderer": "^0.1.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  }
+}

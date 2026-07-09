@@ -1,0 +1,5 @@
+# Local-only fixtures developers can drop in to test against real
+# Adobe / Microsoft / Apple binaries without redistributing them.
+# The vendored-fixture test suite picks anything under `local/` up
+# automatically.
+local/

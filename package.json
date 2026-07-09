@@ -1,0 +1,88 @@
+{
+  "name": "broadset-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Workspace scaffold for the Broadset rebuild",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @broadset/demo",
+    "build": "npm run build:workspaces",
+    "build:workspaces": "npm run typecheck:workspaces && npm run build -w @broadset/demo",
+    "lint": "npm run lint --workspaces --if-present",
+    "lint:strict": "npm run lint:strict --workspaces --if-present",
+    "format": "npm run format --workspaces --if-present",
+    "typecheck": "npm run typecheck:workspaces",
+    "typecheck:workspaces": "npm run typecheck -w @broadset/model && npm run typecheck -w @broadset/playback && npm run typecheck -w @broadset/renderer && npm run typecheck -w @broadset/editor && npm run typecheck -w @broadset/formats && npm run typecheck -w @broadset/ui && npm run typecheck -w @broadset/demo",
+    "test": "vitest run",
+    "test:coverage": "VITEST_COVERAGE=1 vitest run",
+    "ct": "npm run ct -w @broadset/demo",
+    "ct:all": "npm run ct -w @broadset/ui && npm run ct -w @broadset/demo",
+    "quality": "npm run quality:workspaces",
+    "quality:workspaces": "npm run quality -w @broadset/model && npm run quality -w @broadset/playback && npm run quality -w @broadset/renderer && npm run quality -w @broadset/editor && npm run quality -w @broadset/formats && npm run quality -w @broadset/ui && npm run quality -w @broadset/demo",
+    "quality:strict": "npm run quality:strict:workspaces",
+    "quality:strict:workspaces": "npm run quality:strict -w @broadset/model && npm run quality:strict -w @broadset/playback && npm run quality:strict -w @broadset/renderer && npm run quality:strict -w @broadset/editor && npm run quality:strict -w @broadset/formats && npm run quality:strict -w @broadset/ui && npm run quality:strict -w @broadset/demo",
+    "quality:all": "npm run quality:workspaces",
+    "quality:all:strict": "npm run quality:strict:workspaces",
+    "lint:dead": "knip",
+    "lint:typecoverage": "node scripts/clean-typecoverage-inputs.mjs && type-coverage --at-least 99.95",
+    "audit:prod": "npm audit --omit=dev",
+    "audit:all": "npm audit",
+    "gate:full": "npm run lint:typecoverage && npm run quality:strict && npm run lint:dead && npm run ct:all && npm run build",
+    "prepare": "husky"
+  },
+  "overrides": {
+    "@babel/core": "^7.29.7",
+    "postcss": "^8.5.12",
+    "undici": "^7.28.0",
+    "fast-uri": "^3.1.2",
+    "esbuild": "^0.28.1",
+    "@eslint/eslintrc": {
+      "js-yaml": "^5.0.0"
+    },
+    "minimatch@10.2.5": {
+      "brace-expansion": "^5.0.6"
+    },
+    "cosmiconfig": {
+      "js-yaml": "^5.0.0"
+    },
+    "@playwright/experimental-ct-core": {
+      "vite": "^6.4.3"
+    }
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
+    "@eslint/js": "^9.39.4",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
+    "@vitest/coverage-v8": "^4.1.9",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import-x": "^4.16.2",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
+    "eslint-plugin-sonarjs": "^4.0.3",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "globals": "^17.4.0",
+    "husky": "^9.1.7",
+    "jsdom": "^29.0.2",
+    "knip": "^6.4.1",
+    "playwright": "^1.61.0",
+    "prettier": "^3.8.1",
+    "svg-path-properties": "^2.0.0",
+    "type-coverage": "^2.29.7",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9"
+  }
+}
