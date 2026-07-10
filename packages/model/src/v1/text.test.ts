@@ -60,6 +60,19 @@ describe('textBodySchema', () => {
     expect(textBodySchema.parse(body)).toEqual(body);
   });
 
+  it.each([
+    ['normal line spacing', { lineSpacing: { kind: 'normal' } }],
+    ['unordered list', { list: { kind: 'unordered', level: 2, marker: 'square' } }],
+  ])('accepts and preserves %s', (_case, propertyOverride) => {
+    const body = textBodySchema.parse(createTextBody());
+    const paragraph = body.paragraphs[0];
+    const value = {
+      paragraphs: [{ ...paragraph, properties: { ...paragraph?.properties, ...propertyOverride } }],
+    };
+
+    expect(textBodySchema.parse(value)).toEqual(value);
+  });
+
   it('rejects duplicate paragraph and run ids', () => {
     const body = createTextBody();
     const paragraph = textBodySchema.parse(body).paragraphs[0];
@@ -100,6 +113,48 @@ describe('textBodySchema', () => {
     expect(
       textBodySchema.safeParse({
         paragraphs: [{ ...paragraph, runs: [{ ...run, properties: { ...run?.properties, html: '<b>x</b>' } }] }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each([
+    ['unknown spacing kind', { lineSpacing: { kind: 'relative', value: 1.2 } }],
+    ['normal spacing payload', { lineSpacing: { kind: 'normal', value: 1 } }],
+    ['multiple spacing missing value', { lineSpacing: { kind: 'multiple' } }],
+    ['absolute spacing at zero', { lineSpacing: { kind: 'absolute', value: 0 } }],
+    ['unknown list kind', { list: { kind: 'bullets', level: 0 } }],
+    ['none list payload', { list: { kind: 'none', level: 0 } }],
+    ['unordered list missing marker', { list: { kind: 'unordered', level: 0 } }],
+    ['ordered list missing start', { list: { kind: 'ordered', level: 0, style: 'decimal' } }],
+    ['unknown paragraph direction', { direction: 'vertical' }],
+  ])('rejects malformed paragraph %s', (_case, propertyOverride) => {
+    const body = textBodySchema.parse(createTextBody());
+    const paragraph = body.paragraphs[0];
+
+    expect(
+      textBodySchema.safeParse({
+        paragraphs: [{ ...paragraph, properties: { ...paragraph?.properties, ...propertyOverride } }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each([
+    ['unknown run direction', { direction: 'vertical' }],
+    ['unknown semantic role', { semanticRole: 'heading' }],
+    ['unknown decoration style', { decoration: { underline: true, strikeThrough: false, style: 'blink' } }],
+  ])('rejects malformed run property discriminant for %s', (_case, propertyOverride) => {
+    const body = textBodySchema.parse(createTextBody());
+    const paragraph = body.paragraphs[0];
+    const run = paragraph?.runs[0];
+
+    expect(
+      textBodySchema.safeParse({
+        paragraphs: [
+          {
+            ...paragraph,
+            runs: [{ ...run, properties: { ...run?.properties, ...propertyOverride } }],
+          },
+        ],
       }).success,
     ).toBe(false);
   });

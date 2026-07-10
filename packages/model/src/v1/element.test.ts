@@ -161,6 +161,44 @@ describe('elementSchema', () => {
     expect(elementSchema.safeParse(withBase('vector', { geometryData })).success).toBe(true);
   });
 
+  it.each([
+    { id: 'segment-a', kind: 'move', pointId: 'point-a' },
+    { id: 'segment-a', kind: 'line', pointId: 'point-a' },
+    { id: 'segment-a', kind: 'quadratic', control: [5, 10], pointId: 'point-a' },
+    { id: 'segment-a', kind: 'cubic', control1: [2, 3], control2: [7, 8], pointId: 'point-a' },
+    { id: 'segment-a', kind: 'close' },
+  ])('accepts and preserves structured path segment $kind', (segment) => {
+    const value = withBase('vector', {
+      geometryData: {
+        kind: 'path',
+        fillRule: 'nonzero',
+        path: { points: [{ id: 'point-a', x: 10, y: 20 }], segments: [segment], closed: segment.kind === 'close' },
+      },
+    });
+
+    expect(elementSchema.parse(value)).toEqual(value);
+  });
+
+  it.each([
+    { id: 'segment-a', kind: 'arc', pointId: 'point-a', radius: [5, 5] },
+    { id: 'segment-a', kind: 'move' },
+    { id: 'segment-a', kind: 'quadratic', pointId: 'point-a' },
+    { id: 'segment-a', kind: 'cubic', control1: [2], control2: [7, 8], pointId: 'point-a' },
+    { id: 'segment-a', kind: 'close', pointId: 'point-a' },
+  ])('rejects unknown or malformed structured path segment $kind', (segment) => {
+    expect(
+      elementSchema.safeParse(
+        withBase('vector', {
+          geometryData: {
+            kind: 'path',
+            fillRule: 'nonzero',
+            path: { points: [{ id: 'point-a', x: 10, y: 20 }], segments: [segment], closed: false },
+          },
+        }),
+      ).success,
+    ).toBe(false);
+  });
+
   it('accepts exact matrix3d and preserves affine skew and reflection', () => {
     const reflected = withBase('vector', {
       geometryData: { kind: 'ellipse' },
@@ -168,7 +206,7 @@ describe('elementSchema', () => {
     });
     const parsed = elementSchema.parse(reflected);
 
-    expect(parsed.geometry.transform.kind).toBe('affine2d');
+    expect(parsed.geometry.transform).toEqual({ kind: 'affine2d', matrix: [-1, 0.25, 0.5, 1, 20, 30] });
 
     const matrix3d = Array.from({ length: 16 }, (_, index) =>
       index === 0 || index === 5 || index === 10 || index === 15 ? 1 : 0,
@@ -195,6 +233,27 @@ describe('elementSchema', () => {
     expect(
       elementSchema.safeParse(
         withBase('group', { group: { clipChildren: false }, geometry: { ...geometry, transform: { kind, matrix } } }),
+      ).success,
+    ).toBe(false);
+  });
+
+  it.each([
+    ['affine2d', Number.NaN],
+    ['affine2d', Number.POSITIVE_INFINITY],
+    ['affine2d', Number.NEGATIVE_INFINITY],
+    ['matrix3d', Number.NaN],
+    ['matrix3d', Number.POSITIVE_INFINITY],
+    ['matrix3d', Number.NEGATIVE_INFINITY],
+  ])('rejects %s matrix containing non-finite value %s', (kind, invalidValue) => {
+    const length = kind === 'affine2d' ? 6 : 16;
+    const matrix = Array.from({ length }, (_, index) => (index === 0 ? invalidValue : 0));
+
+    expect(
+      elementSchema.safeParse(
+        withBase('group', {
+          group: { clipChildren: false },
+          geometry: { ...geometry, transform: { kind, matrix } },
+        }),
       ).success,
     ).toBe(false);
   });
@@ -258,5 +317,33 @@ describe('elementSchema', () => {
     expect(
       elementSchema.safeParse(withBase('plugin', { plugin: { ...plugin, payload: { callback: () => true } } })).success,
     ).toBe(false);
+  });
+
+  it('preserves nested inert plugin JSON exactly without dropping keys', () => {
+    const payload = {
+      title: '世界',
+      enabled: true,
+      nullable: null,
+      series: [
+        { id: 'series-a', values: [1, 2.5, -3], metadata: { source: 'import', visible: false } },
+        ['nested', { empty: {}, values: [] }],
+      ],
+    };
+    const value = withBase('plugin', {
+      plugin: {
+        pluginId: 'com.example.chart',
+        elementType: 'chart',
+        schemaVersion: 3,
+        payload,
+      },
+    });
+    const parsed = elementSchema.parse(value);
+
+    expect(parsed).toEqual(value);
+    expect(parsed.kind).toBe('plugin');
+
+    if (parsed.kind === 'plugin') {
+      expect(parsed.plugin.payload).toEqual(payload);
+    }
   });
 });
