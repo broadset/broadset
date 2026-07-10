@@ -10,7 +10,7 @@ Defines editor mutations for document-owned and component-owned sequences with s
 
 ### Requirement: Sequence Upsert and Removal
 
-The system MUST upsert and remove sequences in their document or component owner by stable `sequenceId` only. Display names MUST NOT serve as identity fallbacks. Upsert MUST preserve unrelated sequences and replace only the matching stable ID. Removal MUST be atomic and MUST reject a sequence that remains referenced by lifecycle, a state-machine action, or a child clip unless the same validated transaction removes or retargets every reference.
+The system MUST upsert and remove sequences in their document or component owner by stable `sequenceId` only. Display names MUST NOT serve as identity fallbacks. Upsert MUST preserve unrelated sequences and replace only the matching stable ID. Removal MUST be atomic and MUST reject a sequence that remains referenced by any `PageDefinition.sequenceId`, lifecycle action, state-machine action, or child clip unless the same validated transaction removes or retargets every reference. Page references MUST be found by stable page ID across the whole document; removing a sequence selected by several pages MUST NOT silently clear or retarget only the active page.
 
 #### Scenario: Upsert replaces one stable sequence
 
@@ -26,16 +26,23 @@ The system MUST upsert and remove sequences in their document or component owner
 
 #### Scenario: Referenced sequence removal is rejected
 
-- GIVEN a lifecycle binding or state-machine action references a sequence
+- GIVEN a lifecycle action or state-machine action references a sequence
 - WHEN removal is requested without retargeting that reference
 - THEN the transaction is rejected without mutation
+
+#### Scenario: Page-selected sequence removal is atomic
+
+- GIVEN two pages reference the same document sequence through `PageDefinition.sequenceId`
+- WHEN that sequence is removed and only one page reference is retargeted
+- THEN the whole transaction is rejected and both pages retain their original sequence reference
 
 #### Acceptance Criteria
 
 - [ ] Given an existing stable sequence ID, upsert replaces only that sequence
 - [ ] Given duplicate display names, every command still resolves by stable ID
 - [ ] Given a stale owner or sequence ID, the command fails without mutation
-- [ ] Given a remaining lifecycle, transition-action, or child-clip reference, sequence removal is rejected atomically
+- [ ] Given any remaining page `sequenceId`, lifecycle, transition-action, or child-clip reference, sequence removal is rejected atomically
+- [ ] Given one sequence referenced by multiple pages, removal succeeds only when the same transaction validly removes or retargets every page reference
 
 ---
 
@@ -122,25 +129,43 @@ The system MUST add, update, remove, and reorder document-owned state machines, 
 
 ### Requirement: Lifecycle and State Event Visibility Mapping
 
-The editor MUST represent onscreen/offscreen changes through lifecycle actions or typed state-machine events whose referenced sequences contain explicit visibility tracks targeting stable elements. Applying IN then OUT MUST preserve the existing onscreen/offscreen result without mutating canonical element-local runtime fields. A convenience command MAY include descendants, but it MUST generate or target explicit descendant property tracks only for descendants that have corresponding canonical lifecycle/state-machine authoring definitions; no implicit recursive runtime field mutation is allowed.
+The editor MUST NOT create a property track targeting an element-level `visible` or `visibility` field. Persisted visibility authoring MUST target either a specific `PageRootInstance.visible` field by stable page ID and root-instance ID or a typed descendant-instance `visible` override by stable page ID, root-instance ID, nested component-instance path, and stable local descendant entity ID. Repeated instances of the same element or component on different pages or under different roots MUST remain independently addressable; element ID alone is never sufficient visibility identity.
+
+Lifecycle actions and typed state-machine events MAY instead treat effective page-instance visibility as runtime evaluation input. In that mode, referenced sequences animate schema-approved properties such as exact transform or opacity, while effective visibility becomes true before IN evaluation and false only after OUT completion. That effective visibility is derived runtime state and MUST NOT create a persisted element field or a synthetic visibility track. A convenience command that includes descendants MUST either author explicit page-root/descendant override targets for every chosen stable composite address—including local descendant identity—or dispatch typed runtime lifecycle/state-machine events; no implicit recursive element mutation is allowed.
 
 #### Scenario: IN and OUT actions drive visibility
 
-- GIVEN lifecycle actions whose sequences target an element's visibility property
+- GIVEN lifecycle IN and OUT actions whose sequences animate a page instance's transform or opacity
 - WHEN IN then OUT is evaluated
-- THEN the resolved element becomes onscreen then offscreen
+- THEN effective runtime instance visibility becomes true before IN and false after OUT completes
+- AND no element-level visibility field or visibility track is persisted
+
+#### Scenario: Repeated page roots remain disambiguated
+
+- GIVEN the same element definition appears as root instances on pages A and B
+- WHEN a visibility track targets page B and its stable root-instance ID
+- THEN only the page-B root instance's typed `visible` value changes
+
+#### Scenario: Nested descendant override uses stable path
+
+- GIVEN two instances of one component contain the same local descendant ID
+- WHEN visibility is authored using page ID, root-instance ID, nested instance path, and that stable local descendant ID
+- THEN only that resolved descendant override changes
 
 #### Scenario: Descendant propagation uses explicit targets
 
 - GIVEN a parent with multiple descendants
 - WHEN an OUT convenience action includes descendants
-- THEN only descendants with corresponding canonical definitions receive explicit targeted visibility contributions
+- THEN only descendants addressed by explicit stable instance paths or typed runtime events receive visibility changes
 
 #### Acceptance Criteria
 
-- [ ] Given valid IN and OUT actions, resolved visibility becomes onscreen then offscreen
-- [ ] Given descendant inclusion, only explicitly targeted descendants with canonical definitions change
-- [ ] Canonical elements do not acquire mutable active-state, modifier, or per-element playback fields
+- [ ] Given lifecycle-driven runtime visibility, IN reveals before sequence evaluation and OUT hides after completion without persisting an element visibility field or synthetic visibility track
+- [ ] Given a persisted root visibility track, its `PropertyTarget` contains stable page and root-instance identity and addresses `PageRootInstance.visible`
+- [ ] Given a persisted descendant visibility track, its `PropertyTarget` contains stable page, root-instance, nested instance-path, and local descendant entity identity and addresses a typed descendant `visible` override
+- [ ] Given repeated instances across pages or roots, visibility authoring changes only the exactly addressed instance path
+- [ ] Given descendant inclusion, only explicitly addressed instance paths or typed runtime events change
+- [ ] Canonical elements do not acquire mutable visibility, active-state, modifier, or per-element playback fields
 
 ---
 
