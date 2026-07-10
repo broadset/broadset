@@ -64,6 +64,18 @@ Expressions MUST be typed AST nodes: literal, field, variable, unary, binary, co
 
 Function registries MUST be closed, deterministic, side-effect-free, locale-explicit, and versioned by the core model.
 
+The v1 safe-function registry is:
+
+- `coalesce`: two or more arguments, each `null` or one common non-null value type; returns the common type, or `null` when every argument is `null`
+- `length`: one string or list argument; returns integer
+- `lowercase` and `uppercase`: one string argument; return string
+- `round`: one numeric argument and optional integer precision; returns number
+- `min` and `max`: two or more numeric arguments; return integer only when every argument is integer, otherwise number
+- `clamp`: three numeric arguments; returns integer only when every argument is integer, otherwise number
+- `format-date`: date-time, pattern string, BCP-47 locale string, and IANA time-zone string arguments; returns string
+
+Expression inference checks the structural argument types. Runtime formatting is responsible for validating literal locale and time-zone identifiers.
+
 #### Acceptance Criteria
 
 - [ ] Given a valid nested conditional expression, type checking produces one deterministic result type
@@ -73,6 +85,16 @@ Function registries MUST be closed, deterministic, side-effect-free, locale-expl
 ### Requirement: Formatter Pipelines
 
 A formatter pipeline contains ordered stable steps with registered formatter IDs and typed arguments. Formatters MUST be deterministic, side-effect-free, locale-explicit, and type-checked step by step.
+
+The v1 formatter registry is:
+
+- `number`: consumes integer or number with one locale string argument; returns string
+- `date-time`: consumes date-time with pattern, locale, and time-zone string arguments; returns string
+- `duration`: consumes integer or number with a unit (`milliseconds`, `seconds`, `minutes`, or `hours`) and locale string arguments; returns string
+- `prefix` and `suffix`: consume string with one string argument; return string
+- `truncate`: consumes string with one non-negative safe-integer maximum-grapheme-count argument; returns string
+
+Formatter arguments are `TypedValue` literals. Locale-independent string formatters have no locale argument.
 
 #### Acceptance Criteria
 
@@ -109,10 +131,6 @@ Sample or live bindings apply after component, page, and variable-mode layers an
 - [ ] Given a data value and a page override on the same target, the data binding takes precedence
 - [ ] Given a later sequence value, it takes precedence over the binding at that tick
 - [ ] Given fallback use, provenance identifies the failed expression and fallback source
-
-## Spec Gaps
-
-- The exact safe-function and formatter registries are versioned implementation deliverables owned by the view-model program.
 
 ## Non-Goals
 

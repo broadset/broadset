@@ -388,6 +388,8 @@ Root-instance order is root z-order. Root transforms are surface-relative; desce
 
 View models contain stable typed fields and sample data. Bindings combine stable property targets with closed expression ASTs, optional deterministic formatter pipelines, and typed fallbacks. Expressions contain no arbitrary code or unparsed expression string.
 
+The v1 safe-function registry contains `coalesce`, `length`, `lowercase`, `uppercase`, `round`, `min`, `max`, `clamp`, and `format-date`. The v1 formatter registry contains `number`, `date-time`, `duration`, `prefix`, `suffix`, and `truncate`. Their exact structural signatures and formatter transitions are defined in [data-schema.md](data-schema.md).
+
 #### Acceptance Criteria
 
 - [ ] Given a type-correct expression and target, validation succeeds
