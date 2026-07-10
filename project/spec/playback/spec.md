@@ -8,11 +8,11 @@ Defines the animation and interpolation engine for broadset. Playback resolves c
 
 ## Sub-Specs
 
-| Sub-Spec                             | Scope                                                           |
-| ------------------------------------ | --------------------------------------------------------------- |
-| [interpolation.md](interpolation.md) | Easing, value interpolation, color lerp, path morphing          |
-| [timeline.md](timeline.md)           | Timeline computation, action state, duration, child composition |
-| [playback.md](playback.md)           | Playback controller, playback handle, style writer, transitions |
+| Sub-Spec                             | Scope                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------- |
+| [interpolation.md](interpolation.md) | Easing, value interpolation, color lerp, path morphing                          |
+| [timeline.md](timeline.md)           | Exact-tick sequence, track, child-clip, lifecycle, and state-machine evaluation |
+| [playback.md](playback.md)           | Sequence transport, playback handle, DOM writer, and transition scheduling      |
 
 ---
 

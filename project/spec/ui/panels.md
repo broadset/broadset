@@ -65,20 +65,21 @@ When no element is selected, the Properties sidebar MUST show a "Select an eleme
 
 ### Requirement: Animation Mode Properties
 
-When a keyframe is selected, the system MUST render an AnimationModePropertiesPanel wrapped in a PropertyEditingProvider. Geometry and Typography panels MUST be rendered for text elements. Animation Builder and Group Settings MUST NOT render in animation mode.
+When a stable keyframe is selected, the system MUST render an AnimationModePropertiesPanel wrapped in a PropertyEditingProvider. The panel shows the selected track's schema-approved target/value editor and compatible interpolation controls. Geometry and Typography panels MAY show other animatable properties as track-creation affordances. Sequence Builder and Group Settings MUST NOT render in keyframe mode.
 
-The PropertyEditingProvider MUST expose a keyframe property adapter that routes property edits to keyframe values instead of element values. The adapter contract:
+The PropertyEditingProvider MUST expose a typed track/keyframe adapter:
 
-- `isIncluded(key)` — returns whether the property is part of this keyframe.
-- `getValue(key)` — returns the current keyframe value for the property.
-- `toggleProperty(key, included, defaultValue)` — adds or removes a property from the keyframe.
-- `updateValue(key, value)` — sets the keyframe value for the property.
+- `target` — the selected track's stable `PropertyTarget`.
+- `getValue()` — returns the selected keyframe's typed value.
+- `updateValue(value)` — validates and commits the selected keyframe's typed value.
+- `createTrack(target, tick, initialValue)` — creates a fresh stable track/keyframe for another schema-approved property.
+- `removeKeyframe(trackId, keyframeId)` — removes the addressed keyframe and removes the track only if it becomes empty.
 
 When the adapter is active (keyframe selected):
 
-- Properties included in the keyframe MUST be editable and route changes to `updateValue`.
-- Properties NOT included MUST render as disabled (read-only, showing the element's base value).
-- Each property MUST show an include/remove toggle button.
+- The selected track target MUST be editable and route to `updateValue`.
+- Other schema-approved properties without a track/keyframe at that tick render their resolved base value read-only with an Add Track button.
+- Add Track creates a separate stable typed track/keyframe at the same exact tick; Remove deletes the addressed keyframe/empty track rather than mutating a multi-property bag.
 
 When no adapter is active (normal mode), all properties route to element updates.
 
@@ -88,24 +89,24 @@ When no adapter is active (normal mode), all properties route to element updates
 - WHEN the sidebar renders
 - THEN AnimationModePropertiesPanel is shown with PropertyEditingProvider
 
-#### Scenario: Included property routes to keyframe
+#### Scenario: Selected track value routes to keyframe
 
-- GIVEN a keyframe with `x` included at value `100`
-- WHEN the user changes `x` to `200`
-- THEN the adapter's `updateValue('x', '200')` is called (not the element update)
+- GIVEN a selected opacity-track keyframe with value `0.5`
+- WHEN the user changes it to `0.8`
+- THEN `updateValue(0.8)` is called and the base element appearance is unchanged
 
 #### Scenario: Excluded property is disabled
 
-- GIVEN a keyframe that does not include `opacity`
+- GIVEN no opacity track/keyframe at the selected tick
 - WHEN the property panel renders
 - THEN `opacity` shows the element's base value and is disabled
 
 #### Acceptance Criteria
 
 - [ ] Given a selected keyframe, AnimationModePropertiesPanel is shown with PropertyEditingProvider
-- [ ] Given a keyframe with a property included, editing routes to the adapter's updateValue
-- [ ] Given a keyframe without a property included, the property renders as disabled with the element's base value
-- [ ] Given a property toggle to include, toggleProperty is called with included=true and the element's current value as default
+- [ ] Given a selected track keyframe, editing routes to its typed `updateValue`
+- [ ] Given no track for another property at that tick, its resolved base value is read-only with Add Track
+- [ ] Given Add Track, a fresh stable typed track/keyframe is created at the same exact tick
 
 ---
 
@@ -264,7 +265,7 @@ The system MUST render a success notification when there are no issues. When iss
 
 ### Requirement: Animation Sidebar
 
-The system MUST render the animation builder when an element is selected and animations are enabled. Empty state MUST be shown when no element is selected. Disabled state MUST be shown when animation feature is off. Lock helper text MUST appear when the selected element is locked.
+The system MUST render the sequence builder when an element is selected and sequence authoring is enabled. It edits document-owned sequences or component-owned sequences in the selected element's identity scope; it never creates a per-element animation registry. Empty state MUST appear without selection, disabled state when sequence authoring is off, and lock helper text when the selected element is locked.
 
 **Header:**
 
@@ -274,16 +275,16 @@ The sidebar MUST display the active element's name and a type chip (HeroUI `Chip
 
 The animation builder MUST be organized as a HeroUI `Accordion` with these sections:
 
-| Section                    | Content                                                                                                                                                                                                                                                  |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Active States & Modifiers  | State selector dropdown (None, Enter, Exit, custom states); modifier checkboxes for each defined modifier (independent toggles)                                                                                                                          |
-| Timelines                  | List of timelines for the element, each with: Edit button (opens TimelineEditor in bottom panel), Rename, Duplicate, Delete actions. "Add Timeline" button creates a new timeline. "Quick setup" button creates Enter/Exit animations with preset values |
-| State Timeline Bindings    | Maps states to timelines. State selector + timeline selector per binding. "Add binding" button links a timeline to a state                                                                                                                               |
-| Modifier Timeline Bindings | Maps modifiers to timelines. Modifier selector + in/out timeline pair. "Add/remove binding" buttons                                                                                                                                                      |
+| Section         | Content                                                                                                                                                                                |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lifecycle       | IN, HOLD/UPDATE, and OUT phase controls referencing resolving sequence IDs or typed state-machine events                                                                               |
+| Sequences       | Lists document/component sequences with Edit, Rename, Duplicate, Delete, and Add Sequence actions; Quick Setup creates explicit IN/OUT sequences with typed tracks and `durationTicks` |
+| Property tracks | Stable typed tracks targeting the selected element through `PropertyTarget`; opens TimelineEditor for exact-tick keyframe editing                                                      |
+| State machines  | Stable states/transitions, typed triggers and guards, deterministic priority, and optional transition sequence actions; friendly independent toggles compile to two-state machines     |
 
-#### Scenario: Element selected with animations on
+#### Scenario: Element selected with sequence authoring on
 
-- GIVEN an element selected and animation feature enabled
+- GIVEN an element selected and sequence authoring enabled
 - WHEN the sidebar renders
 - THEN the animation builder is visible
 
@@ -295,30 +296,30 @@ The animation builder MUST be organized as a HeroUI `Accordion` with these secti
 
 #### Acceptance Criteria
 
-- [ ] Given an element selected and animation feature enabled, the animation builder is visible
+- [ ] Given an element selected and sequence authoring enabled, the builder is visible
 - [ ] Given a locked element selected, lock helper text is displayed
 
 ---
 
-### Requirement: Animation Builder Resilience
+### Requirement: Sequence Builder Resilience
 
-The system MUST NOT crash when animation config is partial or malformed.
+The system MUST NOT crash when its selected sequence/track/state-machine reference becomes stale between renders. Invalid canonical project data is rejected before UI hydration; the builder shows a diagnostic/empty state rather than attempting to edit a partial legacy configuration.
 
 #### Scenario: Partial config does not crash
 
-- GIVEN a malformed animation config
+- GIVEN a runtime selection referencing a sequence removed by a concurrent valid project update
 - WHEN the builder renders
 - THEN no error is thrown
 
 #### Acceptance Criteria
 
-- [ ] Given a malformed animation config, no error is thrown
+- [ ] Given a stale runtime selection, no error is thrown and the builder exposes a recoverable empty/diagnostic state
 
 ---
 
-### Requirement: Property Field Keyframe Integration
+### Requirement: Property Field Track Integration
 
-In normal mode, the system MUST render children directly. In keyframe mode, the system MUST show include/remove buttons. Including a property MUST call `toggleProperty(key, true, defaultValue)`. Removing MUST call `toggleProperty(key, false, defaultValue)`.
+In normal mode, PropertyField renders its normal canonical editor. In keyframe mode, the selected track target shows its typed editor/remove-keyframe action; other animatable properties show read-only resolved values plus Add Track. Add Track calls `createTrack(target, tick, initialValue)`. Remove calls `removeKeyframe(trackId, keyframeId)` and removes an empty track without leaving stale sequence references.
 
 #### Scenario: Normal mode renders children
 
@@ -326,22 +327,22 @@ In normal mode, the system MUST render children directly. In keyframe mode, the 
 - WHEN PropertyField renders
 - THEN children are rendered directly
 
-#### Scenario: Keyframe include/remove
+#### Scenario: Track create/remove
 
 - GIVEN keyframe mode active
-- WHEN include/remove buttons are clicked
-- THEN toggleProperty is called with correct arguments
+- WHEN Add Track or Remove is clicked
+- THEN the adapter creates/removes stable track/keyframe identities with type-compatible values
 
 #### Acceptance Criteria
 
 - [ ] Given no keyframe mode, children are rendered directly
-- [ ] Given keyframe mode active, toggleProperty is called with correct arguments
+- [ ] Given keyframe mode, create/remove actions operate on stable typed tracks/keyframes rather than property bags
 
 ---
 
 ### Requirement: Layers Sidebar
 
-The system MUST render element names from the document. Empty state MUST be shown when no elements exist. Clicking a layer MUST fire setActiveElement. Lock button MUST toggle lock. Visibility toggle MUST update element classes. Delete button MUST remove the element.
+The system MUST render element names from the canonical hierarchy. Empty state appears with no elements. Clicking a layer updates runtime selection; Lock toggles canonical `locked`; Visibility edits the active page's typed root/descendant `visible` override by stable instance path; Delete removes the element through a hierarchy-valid atomic command.
 
 **Layer Row Structure:**
 

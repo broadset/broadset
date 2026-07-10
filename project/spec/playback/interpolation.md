@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines how the system applies easing curves to progress values and interpolates between keyframe property values of various types (numbers, colors, paths, strings, booleans).
+Defines evaluation of the closed typed interpolation variants between type-compatible keyframes on one stable property track.
 
 ---
 
@@ -10,7 +10,7 @@ Defines how the system applies easing curves to progress values and interpolates
 
 ### Requirement: Easing Presets
 
-The system MUST support the named easing presets `linear`, `ease`, `ease-in`, `ease-out`, `ease-in-out`, and `step`. The `ease` preset is equivalent to `cubic-bezier(0.25, 0.1, 0.25, 1.0)`. All presets MUST return `0` at `t=0` and `1` at `t=1`. The `step` preset MUST hold `0` until exactly `t=1`, then snap to `1`. At exactly `t=1.0`, the step function MUST return the target value (1). For all `t < 1.0`, the step function MUST return the source value (0).
+The system MUST support typed hold, step, and cubic-Bézier interpolation. Friendly presets `linear`, `ease`, `ease-in`, `ease-out`, and `ease-in-out` resolve at the UI boundary to closed cubic-Bézier records; `ease` resolves to control points `[0.25, 0.1, 0.25, 1]`. Presets return 0 at normalized progress 0 and 1 at progress 1. Step holds the source until exactly 1.
 
 #### Scenario: Linear easing identity
 
@@ -34,24 +34,24 @@ The system MUST support the named easing presets `linear`, `ease`, `ease-in`, `e
 
 ### Requirement: Cubic-Bezier Easing
 
-The system MUST parse `cubic-bezier(x1,y1,x2,y2)` strings and SHOULD use an efficient curve solver (e.g., Newton's method) to evaluate the bezier curve. The implementation MAY use any algorithm that produces correct results within a tolerance of 1e-6. Malformed cubic-bezier strings MUST fall back to linear.
+The system MUST evaluate a typed cubic-Bézier interpolation record containing four finite control values and SHOULD use an efficient solver such as Newton's method. Structural validation rejects malformed control tuples; canonical playback MUST NOT parse arbitrary easing strings or silently replace invalid data with linear interpolation. A UI text boundary MAY parse CSS-like input before committing the typed record.
 
 #### Scenario: Valid cubic-bezier curve
 
-- GIVEN an easing mode of `cubic-bezier(0.42,0,1,1)` (ease-in-like)
+- GIVEN typed cubic-Bézier control points `[0.42, 0, 1, 1]`
 - WHEN progress `t=0.5` is applied
 - THEN the result is less than `0.5`
 
-#### Scenario: Malformed string falls back to linear
+#### Scenario: Malformed controls rejected
 
-- GIVEN an unknown easing string
-- WHEN progress `t=0.5` is applied
-- THEN the result is `0.5`
+- GIVEN a cubic-Bézier tuple with a non-finite or missing value
+- WHEN validation runs
+- THEN structural validation fails before interpolation
 
 #### Acceptance Criteria
 
-- [ ] Given an easing mode of `cubic-bezier(0.42,0,1,1)` (ease-in-like), the result is less than `0.5`
-- [ ] Given an unknown easing string, the result is `0.5`
+- [ ] Given typed control points `[0.42, 0, 1, 1]`, the result is less than `0.5`
+- [ ] Given invalid controls, validation fails before evaluation
 
 ---
 
@@ -73,7 +73,7 @@ The system MUST clamp easing input `t` to `[0, 1]`. Values below zero MUST produ
 
 ### Requirement: Value Interpolation Type Dispatch
 
-The system MUST interpolate values based on their type: numbers via linear lerp, hex color strings via OKLab perceptual color space, numeric strings as numbers returning strings, number arrays element-wise, and all other types via step (hold from-value until `t=1`).
+Interpolation dispatch MUST use the track's declared value type and closed interpolation variant: numbers use numeric interpolation; `ColorValue` uses the interpolation's declared color space; fixed typed tuples interpolate element-wise; compatible structured paths use structured morph/spatial interpolation; strings, booleans, asset references, and other discrete types use hold/step unless a compatible closed counting variant is declared. Runtime type guessing is forbidden.
 
 #### Scenario: Number lerp
 
@@ -88,9 +88,9 @@ The system MUST interpolate values based on their type: numbers via linear lerp,
 - THEN the result is `true`
 - AND at `t=1` the result is `false`
 
-#### Scenario: Numeric string lerp
+#### Scenario: Numeric string counting
 
-- GIVEN from=`'1'` and to=`'0'`
+- GIVEN a string track from `'1'` to `'0'` with a compatible typed counting interpolation
 - WHEN interpolated at `t=0.5`
 - THEN the result is the string `'0.5'`
 
@@ -98,112 +98,112 @@ The system MUST interpolate values based on their type: numbers via linear lerp,
 
 - [ ] Given from=`0` and to=`100`, the result is `50`
 - [ ] Given from=`true` and to=`false`, the result is `true` and at `t=1` the result is `false`
-- [ ] Given from=`'1'` and to=`'0'`, the result is the string `'0.5'`
+- [ ] Given numeric string endpoints with typed counting interpolation, the result is the formatted string `'0.5'`
 
 ---
 
-### Requirement: OKLab Color Interpolation
+### Requirement: Typed Color Interpolation
 
-The system MUST interpolate hex colors in the OKLab perceptual color space. It MUST support 3, 4, 6, and 8-digit hex formats. Alpha channels MUST be interpolated linearly. After OKLab→RGB conversion, output RGB channel values MUST be clamped to the [0, 255] integer range to prevent NaN or out-of-gamut hex digits in output.
+Color keyframes MUST contain authoritative typed `ColorValue` channels. The interpolation record MUST declare a compatible color space such as OKLab. Alpha interpolates linearly. Output remains a typed concrete color; rendering/export projections perform explicit gamut mapping without replacing canonical source channels.
 
 #### Scenario: Identical colors round-trip
 
-- GIVEN from=`#ff0000` and to=`#ff0000`
+- GIVEN two identical typed sRGB red colors and OKLab interpolation
 - WHEN interpolated at any `t`
-- THEN the result is `#ff0000`
+- THEN the result is the same typed red color
 
 #### Scenario: Alpha interpolation
 
-- GIVEN from=`#ff000000` and to=`#ff0000ff`
+- GIVEN typed red colors whose alpha values are 0 and 1
 - WHEN interpolated at `t=0.5`
 - THEN the result has a partial alpha value
 
 #### Scenario: Gamut boundary clamping
 
-- GIVEN saturated color pairs (e.g. red→blue)
+- GIVEN saturated typed colors such as red and blue
 - WHEN interpolated at `t=0.5`
-- THEN the result is a valid hex string with no `NaN` digits
+- THEN the result has finite typed channels and a valid alpha value
 
 #### Acceptance Criteria
 
-- [ ] Given from=`#ff0000` and to=`#ff0000`, the result is `#ff0000`
-- [ ] Given from=`#ff000000` and to=`#ff0000ff`, the result has a partial alpha value
-- [ ] Given saturated color pairs (e.g. red→blue), the result is a valid hex string with no `NaN` digits
+- [ ] Identical typed colors remain identical
+- [ ] Alpha interpolates linearly
+- [ ] Saturated color interpolation produces finite typed channels and explicit gamut mapping at output boundaries
 
 ---
 
 ### Requirement: Path Morphing
 
-The system MUST interpolate SVG path coordinates element-wise and reassemble a valid `d` attribute string from an SVG command template. Coordinate arrays of different lengths MUST be rejected with an error. Coordinates MUST be rounded to 2 decimal places.
+Structured-path morphing MUST interpolate compatible typed points/segments while preserving stable identity and topology. Incompatible topology fails validation or requires an explicit preprocessing command before canonical commit. Playback MUST NOT create or parse authored SVG `d` strings. Runtime numeric precision is preserved; format exporters apply target-specific rounding.
 
 #### Scenario: Triangle path at midpoint
 
-- GIVEN a command template `['M', 'L', 'Z']` with from and to coordinates
+- GIVEN compatible triangle structured paths with matching stable points/segments
 - WHEN interpolated at `t=0.5`
-- THEN coordinates are element-wise midpoints and output is a valid `d` string
+- THEN point/control coordinates are typed midpoints and topology/identity are preserved
 
 #### Scenario: Mismatched coordinate lengths rejected
 
-- GIVEN coordinate arrays of different lengths
+- GIVEN structured paths with incompatible segment topology
 - WHEN interpolation is attempted
-- THEN an error is thrown
+- THEN validation rejects the morph segment before playback
 
 #### Acceptance Criteria
 
-- [ ] Given a command template `['M', 'L', 'Z']` with from and to coordinates, coordinates are element-wise midpoints and output is a valid `d` string
-- [ ] Given coordinate arrays of different lengths, an error is thrown
+- [ ] Compatible structured paths interpolate coordinates while preserving stable topology
+- [ ] Incompatible path topology is rejected before evaluation
 
 ---
 
 ### Requirement: Property Interpolation
 
-The system MUST interpolate all properties between two keyframes, applying per-property easing from the from-keyframe's interpolation mode. Properties present only in the from-keyframe MUST be held at their from-value. Path morphing MUST be used when `pathCommands` are present.
+The system MUST interpolate one track's declared typed value between adjacent keyframes using the outgoing segment interpolation on the earlier keyframe. Each track has exactly one stable `PropertyTarget`; multi-property keyframe bags and per-property easing maps are forbidden.
 
-#### Scenario: Multi-property interpolation with mixed easing
+#### Scenario: Independent tracks use independent interpolation
 
-- GIVEN from-keyframe with `opacity` (linear) and `translateX` (ease-in)
+- GIVEN an opacity track with linear interpolation and an exact-transform track with typed ease-in interpolation
 - WHEN interpolated at `t=0.5`
-- THEN `opacity` is `0.5` and `translateX` reflects the ease-in curve
+- THEN each track produces its own type-compatible contribution and provenance
 
-#### Scenario: Path morphing via pathCommands
+#### Scenario: Structured path morphing
 
-- GIVEN keyframes with `pathCommands` and coordinate arrays
+- GIVEN compatible structured-path keyframes
 - WHEN interpolated at `t=0.5`
 - THEN the result is typed structured spatial-path geometry with midpoint coordinates and stable topology
 
 #### Acceptance Criteria
 
-- [ ] Given from-keyframe with `opacity` (linear) and `translateX` (ease-in), `opacity` is `0.5` and `translateX` reflects the ease-in curve
+- [ ] Independent tracks use their own compatible interpolation records
 - [ ] Given compatible structured spatial-path keyframes, interpolation returns typed midpoint geometry with stable point/segment identity
 
 ---
 
-### Requirement: Hex-Only Color Input Guarantee
+### Requirement: Typed Color Input Guarantee
 
-Color interpolation functions MUST accept only hexadecimal color strings (`#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA`). All other color formats (named colors, `rgb()`, `hsl()`, etc.) are normalized to hex at the model boundary before reaching the playback engine. If a non-hex color string is received, the interpolation function MUST return the `from` value unchanged.
+Color interpolation MUST accept only validated typed `ColorValue` inputs compatible with the track and interpolation color space. UI/import strings are parsed before canonical commit. A string or mismatched color space reaching a color track is a validation/programming error, not a silent “hold from” fallback.
 
-#### Scenario: Valid hex colors produce a hex result
+#### Scenario: Valid typed colors produce typed result
 
-- GIVEN two hex colors `#ff0000` and `#0000ff`
+- GIVEN typed red and blue colors with OKLab interpolation
 - WHEN interpolation runs at `t=0.5`
-- THEN the result is a valid hex color string representing the OKLab midpoint
+- THEN the result is a typed color representing the OKLab midpoint
 
-#### Scenario: Non-hex input returns from value unchanged
+#### Scenario: String input rejected
 
-- GIVEN a `from` color of `rgb(255,0,0)` (non-hex format)
-- WHEN interpolation runs at any `t`
-- THEN the `from` value is returned unchanged
+- GIVEN an unparsed CSS color string assigned to a color track
+- WHEN validation runs
+- THEN validation fails before interpolation
 
 #### Acceptance Criteria
 
-- [ ] Given two valid hex colors, interpolation produces a valid hex result
-- [ ] Given a non-hex color format as input, the from value is returned unchanged
+- [ ] Given compatible typed colors, interpolation produces a typed color result
+- [ ] Given an unparsed string on a color track, validation fails
 
 ---
 
 ### Requirement: Spring Easing Function
 
-The interpolation system MUST evaluate spring-based easing curves for the `'spring(stiffness, damping, mass)'` interpolation mode and the named spring presets (`'spring-gentle'`, `'spring-bouncy'`, `'spring-stiff'`). The spring function MUST produce a normalized progress value (0 to ~1, with possible overshoot) for a given time fraction `t` (0–1). The spring simulation models a critically/under-damped harmonic oscillator: `x(t) = 1 - e^(-damping*t/2mass) * cos(ωt)` where `ω = sqrt(stiffness/mass - (damping/2mass)^2)`. The function MUST settle to the target value (within 0.001 tolerance) by `t=1`. Named presets resolve to fixed parameter values:
+The interpolation system MUST evaluate typed spring records containing positive finite stiffness, damping, and mass. Friendly preset labels resolve at the UI boundary to these records. The spring produces normalized progress with possible overshoot and models a critically/under-damped harmonic oscillator: `x(t) = 1 - e^(-damping*t/2mass) * cos(ωt)` where `ω = sqrt(stiffness/mass - (damping/2mass)^2)`. It settles within 0.001 at normalized progress 1. Presets resolve to:
 
 | Preset          | Stiffness | Damping | Mass |
 | --------------- | --------- | ------- | ---- |
@@ -213,78 +213,78 @@ The interpolation system MUST evaluate spring-based easing curves for the `'spri
 
 #### Scenario: Spring-bouncy produces overshoot
 
-- GIVEN interpolation mode `'spring-bouncy'` and numeric values 0 → 100
+- GIVEN the typed parameters for `spring-bouncy` and numeric values 0 → 100
 - WHEN interpolated at t=0.3
 - THEN the result exceeds 100 (overshoot due to low damping)
 
 #### Scenario: Spring-stiff settles quickly
 
-- GIVEN interpolation mode `'spring-stiff'` and numeric values 0 → 100
+- GIVEN the typed parameters for `spring-stiff` and numeric values 0 → 100
 - WHEN interpolated at t=0.8
 - THEN the result is within 1 unit of 100 (fast settle)
 
 #### Scenario: Spring-gentle smooth deceleration
 
-- GIVEN interpolation mode `'spring-gentle'` and numeric values 0 → 100
+- GIVEN the typed parameters for `spring-gentle` and numeric values 0 → 100
 - WHEN interpolated at t=0.5
 - THEN the result is between 0 and 100 with no overshoot (high damping)
 
 #### Scenario: Custom spring parameters
 
-- GIVEN interpolation mode `'spring(300, 15, 1)'` and numeric values 0 → 200
+- GIVEN typed spring parameters `{ stiffness: 300, damping: 15, mass: 1 }` and numeric values 0 → 200
 - WHEN interpolated at t=1.0
 - THEN the result is within 0.2 units of 200 (settled)
 
 #### Acceptance Criteria
 
-- [ ] Given `'spring-bouncy'`, interpolation exhibits overshoot past the target value
-- [ ] Given `'spring-stiff'`, interpolation settles to within tolerance of the target by t=0.8
-- [ ] Given `'spring-gentle'`, interpolation progresses smoothly without overshoot
+- [ ] Given the `spring-bouncy` typed preset record, interpolation exhibits overshoot
+- [ ] Given the `spring-stiff` typed preset record, interpolation settles within tolerance by t=0.8
+- [ ] Given the `spring-gentle` typed preset record, interpolation progresses without overshoot
 - [ ] Given custom spring parameters, the decay curve matches the harmonic oscillator model
-- [ ] Given any spring mode at t=1.0, the result is within 0.001 of the target value
+- [ ] Given any valid typed spring at t=1.0, the result is within 0.001 of the target value
 
 ---
 
 ### Requirement: Counting Text Interpolation
 
-The interpolation system MUST support a `'counting'` interpolation mode for keyframe properties where both the `from` and `to` values are numeric strings. When `'counting'` mode is active, the system MUST parse both values as numbers, linearly interpolate the numeric value, and format the result back as a string. An optional `countingFormat` on the keyframe property specifies formatting: `decimalPlaces` (integer ≥ 0, default 0), `thousandsSeparator` (string, default `''`), `prefix` (string, default `''`), and `suffix` (string, default `''`). When either `from` or `to` is not a valid numeric string, the system MUST fall back to discrete value switching (from value until t≥1, then to value).
+The closed counting interpolation variant MUST support string tracks whose adjacent typed string values are valid numeric representations. Its typed configuration contains `decimalPlaces`, `thousandsSeparator`, `prefix`, and `suffix`. Invalid numeric endpoints are rejected for counting interpolation; authors may choose hold/step for arbitrary strings.
 
 #### Scenario: Integer counting
 
-- GIVEN `from: '0'`, `to: '100'`, interpolation mode `'counting'` with default format
+- GIVEN `from: '0'`, `to: '100'`, and the typed counting variant with default format
 - WHEN interpolated at t=0.5
 - THEN the result is `'50'`
 
 #### Scenario: Counting with decimal places
 
-- GIVEN `from: '0'`, `to: '99.9'`, mode `'counting'`, `countingFormat: { decimalPlaces: 1 }`
+- GIVEN `from: '0'`, `to: '99.9'`, and typed counting config `{ decimalPlaces: 1 }`
 - WHEN interpolated at t=0.5
 - THEN the result is `'50.0'`
 
 #### Scenario: Counting with prefix and suffix
 
-- GIVEN `from: '0'`, `to: '1000'`, mode `'counting'`, `countingFormat: { prefix: '$', suffix: 'k', thousandsSeparator: ',' }`
+- GIVEN `from: '0'`, `to: '1000'`, and typed counting config `{ prefix: '$', suffix: 'k', thousandsSeparator: ',' }`
 - WHEN interpolated at t=0.5
 - THEN the result is `'$500k'`
 
-#### Scenario: Non-numeric fallback to discrete
+#### Scenario: Non-numeric endpoints rejected for counting
 
-- GIVEN `from: 'Hello'`, `to: 'World'`, mode `'counting'`
+- GIVEN `from: 'Hello'`, `to: 'World'`, and the typed counting variant
 - WHEN interpolated at t=0.5
-- THEN the result is `'Hello'` (discrete — from value until t≥1)
+- THEN validation rejects counting interpolation for that segment
 
 #### Acceptance Criteria
 
-- [ ] Given two numeric strings with `'counting'` mode, the interpolated value is a formatted numeric string
+- [ ] Given two numeric strings with the typed counting variant, the result is a formatted numeric string
 - [ ] Given `decimalPlaces: 2`, the result has exactly 2 decimal places
-- [ ] Given prefix and suffix in countingFormat, they are prepended and appended to the result
-- [ ] Given non-numeric from or to value, counting falls back to discrete switching
+- [ ] Given prefix and suffix in typed counting config, they are applied to the result
+- [ ] Given non-numeric endpoints, counting interpolation is rejected and hold/step remains available
 
 ---
 
 ## Spec Gaps
 
-- [x] **Hex-Only Color Input Guarantee:** Test coverage exists — `returns from value unchanged for non-hex input` and `returns from value unchanged for named colors` in `interpolation.test.ts`.
+- [ ] **Typed color interpolation:** Tests must cover authoritative typed channels, declared interpolation space, alpha, and invalid string rejection.
 
 ---
 
