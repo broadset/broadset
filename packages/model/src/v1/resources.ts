@@ -9,6 +9,7 @@ import {
   utcTimestampSchema,
 } from './identity';
 import {
+  absoluteHttpsUrlSchema,
   axisTagSchema,
   finiteNumberSchema,
   greatestCommonDivisor,
@@ -18,7 +19,7 @@ import {
   packagePathSchema,
   positiveSafeIntegerSchema,
   validateUniqueIds,
-} from './resource-schema-helpers';
+} from './schema-helpers';
 import { type TypedValue, type ValueType, valueTypeSchema } from './typed-value';
 
 export type BlobSource =
@@ -249,7 +250,7 @@ export interface SharedStyle {
 const packageBlobSourceSchema = z.strictObject({ kind: z.literal('package'), path: packagePathSchema });
 const externalBlobSourceSchema = z.strictObject({
   kind: z.literal('external'),
-  url: z.url().refine((url) => url.startsWith('https://'), 'External blob URLs must use HTTPS'),
+  url: absoluteHttpsUrlSchema,
   integrity: sha256DigestSchema,
   cachedDigest: sha256DigestSchema.optional(),
 });
@@ -384,7 +385,7 @@ const videoAssetSchema = z.strictObject({
       audioTracks: z.array(audioTrackSchema),
     })
     .superRefine((metadata, context) => {
-      validateUniqueIds(metadata.audioTracks, context);
+      validateUniqueIds({ items: metadata.audioTracks, context, path: ['audioTracks'] });
     }),
 });
 const audioAssetSchema = z.strictObject({
@@ -438,8 +439,8 @@ const fontAssetSchema = z.strictObject({
       embeddingPermissions: z.enum(['installable', 'editable', 'preview-print', 'restricted']),
     })
     .superRefine((metadata, context) => {
-      validateUniqueIds(metadata.variableAxes, context);
-      validateUniqueIds(metadata.unicodeCoverage, context);
+      validateUniqueIds({ items: metadata.variableAxes, context, path: ['variableAxes'] });
+      validateUniqueIds({ items: metadata.unicodeCoverage, context, path: ['unicodeCoverage'] });
     }),
 });
 const iccProfileAssetSchema = z.strictObject({
@@ -472,7 +473,7 @@ const dataAssetSchema = z.strictObject({
     recordShape: z.union([
       z.strictObject({ kind: z.literal('opaque') }),
       shapedDataRecordSchema.superRefine((recordShape, context) => {
-        validateUniqueIds(recordShape.fields, context);
+        validateUniqueIds({ items: recordShape.fields, context, path: ['fields'] });
       }),
     ]),
   }),
@@ -509,7 +510,7 @@ export const assetSchema: z.ZodType<Asset> = z
     foreignAssetSchema,
   ])
   .superRefine((asset, context) => {
-    validateUniqueIds(asset.derivatives ?? [], context);
+    validateUniqueIds({ items: asset.derivatives ?? [], context, path: ['derivatives'] });
   });
 
 export {

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { absoluteHttpsUrlSchema } from './schema-helpers';
+
 export type JsonPrimitive = string | number | boolean | null;
 
 export type JsonValue = JsonPrimitive | readonly JsonValue[] | { readonly [key: string]: JsonValue };
@@ -28,7 +30,7 @@ const extensionNamespaceSchema = z
 
 export const extensionEnvelopeSchema: z.ZodType<ExtensionEnvelope> = z.strictObject({
   namespace: extensionNamespaceSchema,
-  schema: z.url(),
+  schema: absoluteHttpsUrlSchema,
   version: z.number().int().positive(),
   payload: jsonValueSchema,
 });

@@ -438,11 +438,12 @@ interface ExtensionEnvelope {
 }
 ```
 
-Interop records retain source, stable target, baseline semantic hash, optional preserved blob and preview, mapping confidence, editability, and warnings. Cleanliness is derived from semantic hashes. Unknown generic extension payloads are inert and preserve semantic JSON equality.
+Interop records retain source, stable target, baseline semantic hash, optional preserved blob and preview, mapping confidence, editability, and warnings. Cleanliness is derived from semantic hashes. A generic extension namespace is a lowercase reverse-DNS-style name with at least two valid dot-separated labels, its schema is an absolute HTTPS URL, and its version is a positive JSON-safe integer. Unknown valid generic extension payloads are inert and preserve semantic JSON equality; malformed envelope identity is structurally invalid rather than preserved as an extension.
 
 #### Acceptance Criteria
 
 - [ ] Given valid interop and extension envelopes, round-trip preservation succeeds
+- [ ] Given a malformed extension namespace, relative or non-HTTPS schema URL, or non-positive, fractional, or unsafe version, structural validation fails
 - [ ] Given missing interop references or duplicate extension namespaces, semantic validation fails
 
 ### Requirement: Validation Stages

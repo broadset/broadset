@@ -117,6 +117,14 @@ describe('v1 blob references', () => {
         digest: DIGEST,
         byteLength: 128,
         mediaType: 'image/png',
+        source: { kind: 'external', url: 'HTTPS://example.com/image.png', integrity: DIGEST },
+      }).success,
+    ).toBe(true);
+    expect(
+      blobReferenceSchema.safeParse({
+        digest: DIGEST,
+        byteLength: 128,
+        mediaType: 'image/png',
         source: { kind: 'missing', lastKnownName: 'image.png' },
       }).success,
     ).toBe(true);
@@ -465,5 +473,34 @@ describe('v1 reusable resources', () => {
         },
       }).success,
     ).toBe(false);
+  });
+
+  it('reports duplicate asset-local IDs at their exact collection paths', () => {
+    const derivativeResult = assetSchema.safeParse({
+      ...assets[0],
+      derivatives: [
+        { id: 'preview', role: 'preview', name: 'Preview', blob },
+        { id: 'preview', role: 'proxy', name: 'Proxy', blob },
+      ],
+    });
+    const audioTrackResult = assetSchema.safeParse({
+      ...assets[1],
+      metadata: {
+        ...assets[1].metadata,
+        audioTracks: [assets[1].metadata.audioTracks[0], assets[1].metadata.audioTracks[0]],
+      },
+    });
+
+    expect(derivativeResult.success).toBe(false);
+    expect(audioTrackResult.success).toBe(false);
+
+    if (derivativeResult.success || audioTrackResult.success) {
+      throw new Error('Expected duplicate local IDs to fail');
+    }
+
+    expect(derivativeResult.error.issues).toContainEqual(expect.objectContaining({ path: ['derivatives', 1, 'id'] }));
+    expect(audioTrackResult.error.issues).toContainEqual(
+      expect.objectContaining({ path: ['metadata', 'audioTracks', 1, 'id'] }),
+    );
   });
 });

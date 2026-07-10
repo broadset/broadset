@@ -27,4 +27,26 @@ describe('JSON values and extension envelopes', () => {
     expect(extensionEnvelopeSchema.parse(envelope)).toEqual(envelope);
     expect(extensionEnvelopeSchema.safeParse({ ...envelope, unknown: true }).success).toBe(false);
   });
+
+  it.each([
+    ['uppercase namespace', { namespace: 'Com.Example.test' }],
+    ['undotted namespace', { namespace: 'example' }],
+    ['empty namespace label', { namespace: 'com..example' }],
+    ['edge-hyphen namespace', { namespace: 'com.-example' }],
+    ['relative schema URL', { schema: '/extension.schema.json' }],
+    ['non-HTTPS schema URL', { schema: 'http://example.com/extension.schema.json' }],
+    ['zero version', { version: 0 }],
+    ['fractional version', { version: 1.5 }],
+    ['unsafe version', { version: Number.MAX_SAFE_INTEGER + 1 }],
+  ])('rejects %s', (_name, defect) => {
+    expect(
+      extensionEnvelopeSchema.safeParse({
+        namespace: 'com.example.test',
+        schema: 'https://example.com/extension.schema.json',
+        version: 1,
+        payload: null,
+        ...defect,
+      }).success,
+    ).toBe(false);
+  });
 });

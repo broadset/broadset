@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { concreteColorValueSchema, type Swatch, type SwatchProducerAlias } from './color';
-import { type Id, idSchema, jsonPointerSchema } from './identity';
+import { idSchema, jsonPointerSchema } from './identity';
 import type {
   FontFaceResource,
   FontFamilyResource,
@@ -9,23 +9,14 @@ import type {
   VariableCollection,
   VariableDefinition,
 } from './resources';
+import {
+  axisTagSchema,
+  finiteNumberSchema,
+  nonEmptyStringSchema,
+  validateUniqueIds,
+  validateUniqueValues,
+} from './schema-helpers';
 import { typedValueSchema, valueTypeSchema } from './typed-value';
-
-const nonEmptyStringSchema = z.string().min(1);
-const finiteNumberSchema = z.number();
-const axisTagSchema = z.string().regex(/^[ -~]{4}$/u);
-
-function validateUniqueIds(items: readonly { readonly id: Id }[], context: z.RefinementCtx): void {
-  const seen = new Set<Id>();
-
-  items.forEach((item, index) => {
-    if (seen.has(item.id)) {
-      context.addIssue({ code: 'custom', message: `Duplicate local ID: ${item.id}`, path: [index, 'id'] });
-    }
-
-    seen.add(item.id);
-  });
-}
 
 const fontSourceSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('asset'), assetId: idSchema }),
@@ -48,11 +39,8 @@ export const fontFamilyResourceSchema: z.ZodType<FontFamilyResource> = z
     faces: z.array(fontFaceResourceSchema),
   })
   .superRefine((font, context) => {
-    validateUniqueIds(font.faces, context);
-    validateUniqueIds(
-      font.fallbackFontIds.map((id) => ({ id })),
-      context,
-    );
+    validateUniqueIds({ items: font.faces, context, path: ['faces'] });
+    validateUniqueValues({ items: font.fallbackFontIds, context, path: ['fallbackFontIds'] });
   });
 
 const swatchProducerAliasSchema: z.ZodType<SwatchProducerAlias> = z.strictObject({
@@ -81,7 +69,7 @@ export const swatchSchema: z.ZodType<Swatch> = z
     }),
   ])
   .superRefine((swatch, context) => {
-    validateUniqueIds(swatch.producerAliases, context);
+    validateUniqueIds({ items: swatch.producerAliases, context, path: ['producerAliases'] });
   });
 
 const variableModeSchema = z.strictObject({ id: idSchema, name: nonEmptyStringSchema });
@@ -102,8 +90,8 @@ export const variableCollectionSchema: z.ZodType<VariableCollection> = z
     variables: z.array(variableDefinitionSchema),
   })
   .superRefine((collection, context) => {
-    validateUniqueIds(collection.modes, context);
-    validateUniqueIds(collection.variables, context);
+    validateUniqueIds({ items: collection.modes, context, path: ['modes'] });
+    validateUniqueIds({ items: collection.variables, context, path: ['variables'] });
 
     const modeIds = new Set<string>(collection.modes.map((mode) => mode.id));
 
@@ -143,7 +131,7 @@ const sharedStyleSourceSchema = z.discriminatedUnion('kind', [
       entries: z.array(sharedStyleEntrySchema),
     })
     .superRefine((source, context) => {
-      validateUniqueIds(source.entries, context);
+      validateUniqueIds({ items: source.entries, context, path: ['entries'] });
     }),
   z.strictObject({ kind: z.literal('alias'), styleId: idSchema }),
 ]);

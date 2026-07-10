@@ -92,11 +92,15 @@ Aspect ratios MUST contain positive safe integers reduced to lowest terms. Membe
 
 ### Requirement: Generic Extensions
 
-`extensions` MUST be an ordered array of envelopes containing `namespace`, `schema`, `version`, and inert JSON `payload`. Namespaces use reverse-domain ownership and MUST be unique within their owning entity. Core parsing validates the envelope without requiring a plugin and preserves unknown payloads with semantic JSON equality.
+`extensions` MUST be an ordered array of envelopes containing `namespace`, `schema`, `version`, and inert JSON `payload`. `namespace` MUST be a lowercase reverse-DNS-style name containing at least two dot-separated labels; each label starts and ends with an ASCII lowercase letter or digit and MAY contain interior ASCII hyphens. `schema` MUST be an absolute HTTPS URL. `version` MUST be a positive JSON-safe integer. Namespaces MUST be unique within their owning entity. Core parsing validates the envelope without requiring a plugin and preserves unknown valid payloads with semantic JSON equality. Malformed envelope identity is structurally invalid and is not preserved as though it were a valid extension.
 
 #### Acceptance Criteria
 
 - [ ] Given an unknown well-formed envelope, parse and serialization preserve its payload
+- [ ] Given a lowercase dotted reverse-DNS namespace, absolute HTTPS schema URL, and positive safe-integer version, structural validation succeeds
+- [ ] Given an uppercase, undotted, empty-label, or edge-hyphen namespace, structural validation fails
+- [ ] Given a relative or non-HTTPS schema URL, structural validation fails
+- [ ] Given a zero, negative, fractional, or unsafe version, structural validation fails
 - [ ] Given duplicate namespaces on one owner, semantic validation fails
 - [ ] Given executable behavior encoded in a payload, core parsing leaves it inert
 
