@@ -28,7 +28,7 @@
 - Create: `project/implementation/decisions/ADR-011-collaboration-changes.md`
 - Create: `project/implementation/decisions/ADR-IO-014-016-preflight-loss.md`
 - Modify: `project/implementation/decisions.md`
-- Modify: `project/implementation/plan.md`
+- Modify: `project/implementation/roadmap/rfc-register.md` (RFC register, moved from plan.md §6)
 
 - [x] Record context, proposed decision, invariants, alternatives, consequences, migration stance, and verification for every ADR draft.
 - [x] Link audited RFC rows to proposal artifacts without claiming ratification or runtime completeness.

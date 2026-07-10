@@ -1,16 +1,16 @@
 # Master Roadmap Task Board
 
-Status: active per-task tracker for [plan.md](./plan.md).
+Status: historical legacy-tier evidence board for [plan.md](./plan.md). Initiative lifecycle lives in [program-state.json](./program-state.json).
 
 **Reconciled 2026-07-09** against actual code in `packages/*`, tests, CI workflows, and CT files on PR #2 (`initial-dev-phase` → `main`). Status here reflects **code reality**, not prior checkbox history. When code and this board disagree, fix the code or update this board in the same change.
 
 ## How to read this board
 
-[plan.md](./plan.md) owns strategy, initiative scope, dependencies, and W0–W6 sequencing. `project/spec/**` owns behavioral acceptance criteria. This file owns **execution status and evidence**. [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md) is mapped historical UX evidence, while the legacy phase sections below preserve the completed 2026 program and current gap tiers.
+[plan.md](./plan.md) owns strategy, initiative scope, dependencies, and W0–W6 sequencing. `project/spec/**` owns behavioral acceptance criteria. This file owns **legacy-tier evidence** (the completed 2026 program and current gap tiers). Initiative lifecycle status and evidence links are owned by [program-state.json](./program-state.json), validated by `npm run roadmap:check`. [io-prereqs-ui-features-plan.md](./io-prereqs-ui-features-plan.md) is mapped historical UX evidence, while the legacy phase sections below preserve the completed 2026 program and current gap tiers.
 
-### Stable initiative lifecycle
+### Stable initiative lifecycle (superseded)
 
-New roadmap initiatives use `proposed`, `ready`, `active`, `functional`, `release`, `deferred`, and `blocked` exactly as defined in plan.md §2.2. A `ready` or `active` row requires a named human DRI and an approved child plan. The separate legacy register retains its historical tiers below.
+Initiative lifecycle moved to [program-state.json](./program-state.json) with the statuses defined in plan.md §2.2 (`discovery`, `approved`, `implementing`, `measuring`, `shipped`, `stopped`, `superseded`). The initiative register that previously lived in this file is retired; the initiative index is plan.md §7 and per-initiative state is program-state.json.
 
 ### Legacy evidence tiers
 
@@ -33,123 +33,15 @@ Legacy `[x]` / `[ ]` checkboxes are retired. Use the tier column instead.
 | Producer pass/fail/waived rows        | [real-producer-compatibility.md](./real-producer-compatibility.md) |
 | Per-format spec gaps                  | `project/spec/formats/{psd,pdf,svg,pptx}.md` §Spec Gaps            |
 
-### Stable initiative register
+### Stable initiative register (superseded)
 
-Every roadmap initiative is registered before execution. `Unassigned` is valid only while `proposed`; promotion requires the named human DRI and evidence contract from plan.md §2.3.
-
-<!-- BEGIN MANAGED: INITIATIVE REGISTER -->
-
-| Initiative     | Status   | DRI        | Dependencies                                                                             | Child plan                         | Evidence |
-| -------------- | -------- | ---------- | ---------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
-| W0-GOV-01      | proposed | unassigned | none                                                                                     | —                                  | —        |
-| W0-GOV-02      | proposed | unassigned | none                                                                                     | [child plan](./plans/W0-GOV-02.md) | —        |
-| W0-DEF-01      | proposed | unassigned | W0-GOV-01                                                                                | [child plan](./plans/W0-DEF-01.md) | —        |
-| W0-RFC-01      | proposed | unassigned | W0-DEF-01                                                                                | [child plan](./plans/W0-RFC-01.md) | —        |
-| W0-UX-01       | proposed | unassigned | none                                                                                     | —                                  | —        |
-| W0-PLAT-01     | proposed | unassigned | W0-RFC-01                                                                                | —                                  | —        |
-| W0-PERF-01     | proposed | unassigned | W0-PLAT-01                                                                               | —                                  | —        |
-| W0-QE-01       | proposed | unassigned | W0-GOV-01                                                                                | —                                  | —        |
-| W0-SEC-01      | proposed | unassigned | RFC-10                                                                                   | —                                  | —        |
-| W0-SEC-02      | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
-| W0-COLLAB-01   | proposed | unassigned | RFC-11                                                                                   | —                                  | —        |
-| W0-COLLAB-02   | proposed | unassigned | W0-COLLAB-01                                                                             | —                                  | —        |
-| W0-TIME-01     | proposed | unassigned | RFC-06                                                                                   | —                                  | —        |
-| W0-IO-01       | proposed | unassigned | W0-RFC-01                                                                                | —                                  | —        |
-| W0-IO-02       | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
-| W0-IO-03       | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
-| W0-IO-04       | proposed | unassigned | W0-IO-01                                                                                 | —                                  | —        |
-| W0-IO-05       | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
-| W0-IO-06       | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
-| W0-IO-07       | proposed | unassigned | W0-IO-03                                                                                 | —                                  | —        |
-| W0-IO-08       | proposed | unassigned | W0-IO-01                                                                                 | —                                  | —        |
-| W0-IO-09       | proposed | unassigned | W0-IO-04                                                                                 | —                                  | —        |
-| W0-IO-10       | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
-| W0-IO-11       | proposed | unassigned | W0-IO-02                                                                                 | —                                  | —        |
-| W0-MODEL-01    | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
-| W0-MODEL-02    | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
-| W0-RECOVER-01  | proposed | unassigned | W0-SEC-01                                                                                | —                                  | —        |
-| W1-TIME-01     | proposed | unassigned | W0-TIME-01                                                                               | —                                  | —        |
-| W1-TIME-02     | proposed | unassigned | RFC-02/RFC-03                                                                            | —                                  | —        |
-| W1-SCENE-01    | proposed | unassigned | RFC-01/RFC-07/RFC-10                                                                     | —                                  | —        |
-| W1-TEXT-01     | proposed | unassigned | W0-PLAT-01/RFC-10                                                                        | —                                  | —        |
-| W1-COLOR-01    | proposed | unassigned | RFC-09/RFC-10                                                                            | —                                  | —        |
-| W1-SEC-01      | proposed | unassigned | RFC-10/W0-SEC-01                                                                         | —                                  | —        |
-| W1-ASSET-01    | proposed | unassigned | RFC-08/W0-PLAT-01                                                                        | —                                  | —        |
-| W1-PERSIST-01  | proposed | unassigned | RFC-08/W1-ASSET-01                                                                       | —                                  | —        |
-| W1-WORKER-01   | proposed | unassigned | W0-PLAT-01/W1-SEC-01                                                                     | —                                  | —        |
-| W1-PLAYBACK-01 | proposed | unassigned | W1-TIME-01/W1-SCENE-01                                                                   | —                                  | —        |
-| W1-RENDER-01   | proposed | unassigned | W1-SCENE-01/W1-PLAYBACK-01                                                               | —                                  | —        |
-| W1-RENDER-02   | proposed | unassigned | W1-COLOR-01/W1-ASSET-01                                                                  | —                                  | —        |
-| W1-PLAYER-01   | proposed | unassigned | W1-PLAYBACK-01/W1-RENDER-01/RFC-12                                                       | —                                  | —        |
-| W1-HISTORY-01  | proposed | unassigned | W1-PERSIST-01                                                                            | —                                  | —        |
-| W2-CMD-01      | proposed | unassigned | W1-HISTORY-01                                                                            | —                                  | —        |
-| W2-CANVAS-01   | proposed | unassigned | W1-SCENE-01/W2-CMD-01                                                                    | —                                  | —        |
-| W2-PATH-01     | proposed | unassigned | W2-CANVAS-01/W1-RENDER-02                                                                | —                                  | —        |
-| W2-TIMELINE-01 | proposed | unassigned | W1-TIME-02/W2-CMD-01                                                                     | —                                  | —        |
-| W2-GRAPH-01    | proposed | unassigned | W2-TIMELINE-01                                                                           | —                                  | —        |
-| W2-COMP-01     | proposed | unassigned | W1-SCENE-01/W2-CMD-01                                                                    | —                                  | —        |
-| W2-VAR-01      | proposed | unassigned | W1-COLOR-01/W2-COMP-01                                                                   | —                                  | —        |
-| W2-DATA-01     | proposed | unassigned | W2-VAR-01/RFC-05                                                                         | —                                  | —        |
-| W2-TEXT-01     | proposed | unassigned | W1-TEXT-01/W2-CANVAS-01                                                                  | —                                  | —        |
-| W2-AUDIO-01    | proposed | unassigned | RFC-14/W1-TIME-01/W1-ASSET-01                                                            | —                                  | —        |
-| W2-STYLE-01    | proposed | unassigned | W1-COLOR-01/W1-RENDER-02                                                                 | —                                  | —        |
-| W2-DOC-01      | proposed | unassigned | W2-STYLE-01/W1-ASSET-01                                                                  | —                                  | —        |
-| W2-ASSET-01    | proposed | unassigned | W1-ASSET-01/W1-PERSIST-01                                                                | —                                  | —        |
-| W2-A11Y-01     | proposed | unassigned | W2-PATH-01/W2-GRAPH-01/W2-DATA-01/W2-TEXT-01/W2-AUDIO-01/W2-DOC-01/W2-ASSET-01/W2-UX-01  | —                                  | —        |
-| W2-UX-01       | proposed | unassigned | W0-UX-01/W2-CMD-01                                                                       | —                                  | —        |
-| W2-QE-01       | proposed | unassigned | W2-A11Y-01                                                                               | —                                  | —        |
-| W3-CORPUS-01   | proposed | unassigned | W0-GOV-01                                                                                | —                                  | —        |
-| W3-RECON-01    | proposed | unassigned | W2-CANVAS-01/W3-CORPUS-01                                                                | —                                  | —        |
-| W3-PSD-01      | proposed | unassigned | W1-COLOR-01/W3-CORPUS-01                                                                 | —                                  | —        |
-| W3-PDF-01      | proposed | unassigned | W1-TEXT-01/W1-WORKER-01/W3-CORPUS-01                                                     | —                                  | —        |
-| W3-PDF-02      | proposed | unassigned | W1-COLOR-01/W3-CORPUS-01                                                                 | —                                  | —        |
-| W3-SVG-01      | proposed | unassigned | W1-SEC-01/W1-WORKER-01/W3-CORPUS-01                                                      | —                                  | —        |
-| W3-PPTX-01     | proposed | unassigned | W1-TEXT-01/W3-CORPUS-01                                                                  | —                                  | —        |
-| W3-MOTION-01   | proposed | unassigned | W2-TIMELINE-01/W2-AUDIO-01/RFC-04                                                        | —                                  | —        |
-| W3-MOTION-02   | proposed | unassigned | RFC-05/W2-DATA-01/W3-MOTION-01                                                           | —                                  | —        |
-| W3-VIDEO-01    | proposed | unassigned | W1-TIME-01/W1-PLAYER-01/W2-AUDIO-01                                                      | —                                  | —        |
-| W3-LOTTIE-01   | proposed | unassigned | W1-SCENE-01/W3-CORPUS-01                                                                 | —                                  | —        |
-| W3-FIGMA-01    | proposed | unassigned | W2-COMP-01/W2-VAR-01/W3-RECON-01                                                         | —                                  | —        |
-| W3-OGRAF-01    | proposed | unassigned | W1-PLAYER-01/W2-DATA-01/RFC-12                                                           | —                                  | —        |
-| W3-PLAYER-01   | proposed | unassigned | W3-OGRAF-01/W3-VIDEO-01                                                                  | —                                  | —        |
-| W3-QE-01       | proposed | unassigned | W3-PSD-01/W3-PDF-01/W3-PDF-02/W3-SVG-01/W3-PPTX-01/W3-LOTTIE-01/W3-FIGMA-01/W3-PLAYER-01 | —                                  | —        |
-| W4-STATE-01    | proposed | unassigned | W2-TIMELINE-01/W2-DATA-01                                                                | —                                  | —        |
-| W4-RUNDOWN-01  | proposed | unassigned | W4-STATE-01                                                                              | —                                  | —        |
-| W4-OP-01       | proposed | unassigned | W4-RUNDOWN-01/W2-A11Y-01                                                                 | —                                  | —        |
-| W4-CONTROL-01  | proposed | unassigned | W2-COMP-01/W3-OGRAF-01                                                                   | —                                  | —        |
-| W4-DATA-01     | proposed | unassigned | W2-DATA-01/W4-CONTROL-01                                                                 | —                                  | —        |
-| W4-VARIANT-01  | proposed | unassigned | W2-VAR-01/W2-CANVAS-01                                                                   | —                                  | —        |
-| W4-PLAYOUT-01  | proposed | unassigned | W3-PLAYER-01/W4-OP-01                                                                    | —                                  | —        |
-| W4-CLOCK-01    | proposed | unassigned | W1-TIME-01/W4-PLAYOUT-01                                                                 | —                                  | —        |
-| W4-SOAK-01     | proposed | unassigned | W4-CLOCK-01/W4-DATA-01/W4-VARIANT-01                                                     | —                                  | —        |
-| W5-SVC-01      | proposed | unassigned | W0-PLAT-01/RFC-11                                                                        | —                                  | —        |
-| W5-STORE-01    | proposed | unassigned | W1-PERSIST-01/W5-SVC-01                                                                  | —                                  | —        |
-| W5-COLLAB-01   | proposed | unassigned | W0-COLLAB-01/W5-STORE-01                                                                 | —                                  | —        |
-| W5-REVIEW-01   | proposed | unassigned | W5-COLLAB-01                                                                             | —                                  | —        |
-| W5-JOBS-01     | proposed | unassigned | W3-PLAYER-01/W5-SVC-01                                                                   | —                                  | —        |
-| W5-LIB-01      | proposed | unassigned | W2-COMP-01/W5-REVIEW-01                                                                  | —                                  | —        |
-| W5-PLUGIN-01   | proposed | unassigned | W2-CMD-01/W5-SVC-01                                                                      | —                                  | —        |
-| W5-MCP-01      | proposed | unassigned | W5-PLUGIN-01/W5-SVC-01                                                                   | —                                  | —        |
-| W5-BCAST-01    | proposed | unassigned | W4-PLAYOUT-01/W5-SVC-01                                                                  | —                                  | —        |
-| W5-OBS-01      | proposed | unassigned | W5-SVC-01                                                                                | —                                  | —        |
-| W6-CRAFT-01    | proposed | unassigned | W0-UX-01/W4-SOAK-01/W5-JOBS-01/W5-LIB-01/W5-MCP-01/W5-BCAST-01/W5-OBS-01                 | —                                  | —        |
-| W6-UX-01       | proposed | unassigned | W2-CMD-01                                                                                | —                                  | —        |
-| W6-ONBOARD-01  | proposed | unassigned | W2-QE-01/W3-RECON-01/W3-MOTION-02/W3-PLAYER-01/W3-QE-01                                  | —                                  | —        |
-| W6-I18N-01     | proposed | unassigned | W2-TEXT-01                                                                               | —                                  | —        |
-| W6-QE-01       | proposed | unassigned | W3-MOTION-02/W3-QE-01/W4-SOAK-01/W5-JOBS-01/W5-LIB-01/W5-MCP-01/W5-BCAST-01/W5-OBS-01    | —                                  | —        |
-| W6-ARCH-01     | proposed | unassigned | W0-PLAT-01/W5-JOBS-01/W5-LIB-01/W5-MCP-01/W5-BCAST-01/W5-OBS-01                          | —                                  | —        |
-| W6-GPU-01      | proposed | unassigned | W1-RENDER-01                                                                             | —                                  | —        |
-| W6-REL-01      | proposed | unassigned | W6-RESEARCH-01/W6-QE-01/W6-ARCH-01/W6-GPU-01/W6-SHOW-01                                  | —                                  | —        |
-| W6-SHOW-01     | proposed | unassigned | W3-PLAYER-01/W6-CRAFT-01/W6-ONBOARD-01                                                   | —                                  | —        |
-| W6-RESEARCH-01 | proposed | unassigned | W6-CRAFT-01/W6-UX-01/W6-ONBOARD-01/W6-I18N-01                                            | —                                  | —        |
-
-<!-- END MANAGED: INITIATIVE REGISTER -->
+Superseded on 2026-07-10: the 101-row register moved to [program-state.json](./program-state.json) (generated by `npm run roadmap:seed-state`, one entry per plan.md §7 registry row). This file keeps only the legacy tier tables below.
 
 ---
 
 ## Open work queue (status register)
 
-Sequencing lives in [plan.md](./plan.md) §7 (waves W0–W6); this table registers legacy IDs and their current evidence tiers. Current destinations are mapped in plan.md §3.4.
+Sequencing lives in [plan.md](./plan.md) §7 (waves W0–W6); this table registers legacy IDs and their current evidence tiers. Current destinations are mapped in [roadmap/current-state.md](./roadmap/current-state.md) → "Legacy open-gap routing".
 
 | Priority | ID                     | Work item                                                                                                     | Tier today | Exit tier  |
 | -------- | ---------------------- | ------------------------------------------------------------------------------------------------------------- | ---------- | ---------- |
@@ -175,7 +67,7 @@ Sequencing lives in [plan.md](./plan.md) §7 (waves W0–W6); this table registe
 
 ### Legacy Phase 0 — Shared decisions and spec lock
 
-Historical source: [decisions.md](./decisions.md) and git history; current routing: plan.md §3.4
+Historical source: [decisions.md](./decisions.md) and git history; current routing: [roadmap/current-state.md](./roadmap/current-state.md) → "Legacy open-gap routing"
 
 | ID   | Task                                                     | Tier        | Code evidence                                      |
 | ---- | -------------------------------------------------------- | ----------- | -------------------------------------------------- |
@@ -187,7 +79,7 @@ Historical source: [decisions.md](./decisions.md) and git history; current routi
 
 ### Legacy Phase 1 — Shared model additions
 
-Historical source: [decisions.md](./decisions.md) and git history; current routing: plan.md §3.4
+Historical source: [decisions.md](./decisions.md) and git history; current routing: [roadmap/current-state.md](./roadmap/current-state.md) → "Legacy open-gap routing"
 
 | ID    | Task                                      | Tier        | Code evidence                                         |
 | ----- | ----------------------------------------- | ----------- | ----------------------------------------------------- |
@@ -210,7 +102,7 @@ Historical source: [decisions.md](./decisions.md) and git history; current routi
 
 ### Legacy Phase 2 — Shared libraries and `_shared` modules
 
-Historical source: [decisions.md](./decisions.md) and git history; current routing: plan.md §3.4
+Historical source: [decisions.md](./decisions.md) and git history; current routing: [roadmap/current-state.md](./roadmap/current-state.md) → "Legacy open-gap routing"
 
 | ID   | Task                             | Tier           | Code evidence / gap                                                                     |
 | ---- | -------------------------------- | -------------- | --------------------------------------------------------------------------------------- |
@@ -226,7 +118,7 @@ Historical source: [decisions.md](./decisions.md) and git history; current routi
 
 ### Legacy Phase 3 — Renderer refactor
 
-Historical source: retired renderer plan in git history; current routing: plan.md §3.4 and W1-RENDER-01/02
+Historical source: retired renderer plan in git history; current routing: [roadmap/current-state.md](./roadmap/current-state.md) → "Legacy open-gap routing" and W1-RENDER-01/02
 
 | ID    | Task                               | Tier           | Code evidence / gap                                             |
 | ----- | ---------------------------------- | -------------- | --------------------------------------------------------------- |
@@ -427,7 +319,7 @@ Source: [production-readiness-status.md](./production-readiness-status.md), [rea
 
 ### Deferred Track C — Package split
 
-Source: [plan.md](./plan.md) §3.4 and §7.2/§7.3/§7.8 (`W0-PLAT-01`, `W1-WORKER-01`, `W6-ARCH-01`)
+Source: [roadmap/current-state.md](./roadmap/current-state.md) → "Legacy open-gap routing" and [roadmap/wave-w0.md](./roadmap/wave-w0.md)/[roadmap/wave-w1.md](./roadmap/wave-w1.md)/[roadmap/wave-w6.md](./roadmap/wave-w6.md) (`W0-PLAT-01`, `W1-WORKER-01`, `W6-ARCH-01`)
 
 | ID      | Task                                                  | Tier         |
 | ------- | ----------------------------------------------------- | ------------ |
@@ -437,7 +329,7 @@ Source: [plan.md](./plan.md) §3.4 and §7.2/§7.3/§7.8 (`W0-PLAT-01`, `W1-WORK
 
 ## Cross-format I/O improvement (CFIO)
 
-Source: [plan.md](./plan.md) §3.4 (CFIO items route across W1–W3)
+Source: [roadmap/current-state.md](./roadmap/current-state.md) → "Legacy open-gap routing" (CFIO items route across W1–W3)
 
 | ID        | Task                                  | Tier           | Code evidence / notes                                                                           |
 | --------- | ------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------- |

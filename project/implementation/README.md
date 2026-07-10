@@ -5,8 +5,12 @@ These files describe **how the project is structured**, not the behavioral sourc
 
 ## The plan
 
-- [`plan.md`](./plan.md) — **the single master roadmap**: strategy, W0–W6 sequencing, workstreams, quality bars, findings, and RFC gates. Deleted phase/support plans remain available in git history; current legacy routing is in plan.md §3.4.
-- [`plan-progress.md`](./plan-progress.md) — stable-initiative lifecycle/status/evidence plus the retained legacy **release / functional / scaffold / open / deferred** evidence register. Specs own behavioral acceptance criteria; plan.md owns sequencing and scope.
+- [`plan.md`](./plan.md) — **the single master roadmap**: strategy, W0–W6 sequencing, workstreams, quality bars, findings, and RFC gates. Deleted phase/support plans remain available in git history; current legacy routing is in [roadmap/current-state.md](./roadmap/current-state.md) → "Legacy open-gap routing".
+- [`roadmap/`](./roadmap/) — wave files (`wave-w<n>.md`, initiative definitions), implementation plans (`impl-w<n>.md`), [`current-state.md`](./roadmap/current-state.md), [`rfc-register.md`](./roadmap/rfc-register.md), and [`program.md`](./roadmap/program.md)
+- [`program-state.json`](./program-state.json) — machine lifecycle state for every initiative (status plus `pr`/`evidence` links)
+- [`directives.md`](./directives.md) — append-only human steering channel
+- [`operating-loop.md`](./operating-loop.md) — the autonomous operating loop and self-merge protocol
+- [`plan-progress.md`](./plan-progress.md) — legacy-tier evidence board; initiative lifecycle lives in [`program-state.json`](./program-state.json). Specs own behavioral acceptance criteria; plan.md owns sequencing and scope.
 - [`plans/`](./plans/) — just-in-time child plans for stable initiatives plus the approved documentation-reconciliation design.
 
 ## Live trackers
@@ -29,7 +33,7 @@ If plan.md and a tracker disagree on _status_, the tracker wins; on _sequencing 
 - [`producer-fixture-acquisition-guide.md`](./producer-fixture-acquisition-guide.md) — how licensed producer fixtures are sourced and mounted
 - [`dev-audit-remediation.md`](./dev-audit-remediation.md) — dependency-advisory remediation and risk acceptances
 - [`experimental-gated.md`](./experimental-gated.md) — what hides behind the experimental flag and its gate-exit criteria
-- [`bugs.md`](./bugs.md) — historical bug-hunt findings (per-item closure tracked via plan.md ledger)
+- [`bugs.md`](./bugs.md) — historical bug-hunt findings (per-item closure tracked via the [roadmap/current-state.md](./roadmap/current-state.md) findings ledger)
 - [`project.md`](./project.md) — historical implementation context; `architecture.md` is the current baseline
 
 ## Scope boundary

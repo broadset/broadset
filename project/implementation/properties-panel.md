@@ -7,7 +7,7 @@ cross-region CT status lives in
 preserves original unit scope and UX acceptance detail; its progress table is
 not the sole source of truth for current panel parity.
 
-**Execution authority:** none. Current behavior lives in `project/spec/ui/**`; current sequencing/status lives in `plan.md` and `plan-progress.md`. Retain this file only as UX research and rationale.
+**Execution authority:** none. Current behavior lives in `project/spec/ui/**`; current sequencing lives in `plan.md`; initiative lifecycle lives in `program-state.json` (plan-progress.md keeps legacy-tier evidence). Retain this file only as UX research and rationale.
 
 **Target packages:** `packages/ui`, `packages/editor`, `packages/demo`, optionally `packages/model`
 **Reference baseline (behavior only):** `../dom-compositor/packages/heroui/src`
