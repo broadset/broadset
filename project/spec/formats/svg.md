@@ -31,7 +31,7 @@ The visual layer alone is a valid, fully-editable SVG 2 document. Illustrator an
 A `broadset:` XML namespace — using the shared URI `https://broadset.io/ns/xmp/1.0/` per IO-D-08 (the same URI used by the PSD `XMPMetadata` packet, the PDF `Metadata` dict, and the PPTX `docProps/custom.xml`; see [spec.md](spec.md) §Broadset XMP Packet) — is declared on the root `<svg>` and carried in a document-level `<metadata>` block using RDF/XML (the W3C-recommended encoding, used by Inkscape for its `<cc:Work>` metadata). The `<metadata>` block carries:
 
 - Project settings, canvas unit/dpi declaration, asset registry (with base64 payloads or external refs per asset), data schema, page definitions and their override maps, element ordering, Dublin Core metadata from `document.metadata`.
-- A `broadset:elements` sequence keyed by element id, each carrying the element's fingerprint (for tag-stripping fallback) and the original-source preservation blob for any SVG construct the importer recognised but cannot represent natively (sanitised `outerHTML` for opaque `svg`-type payloads, metadata-only fields like `dataField` / `visibleWhen` / `repeater`).
+- A `broadset:entities` sequence keyed by stable source identity and baseline semantic hash. Original-source fragments live in content-addressed blobs referenced by interop records rather than element payloads.
 - **No animation data** per IO-D-16 — SVG is a static carrier from Broadset's perspective; animated elements export at their fully-entered "IN" state.
 
 This is the SVG analogue of PDF's XMP and PSD's `BsPs` `additionalInfo` — standards-blessed, preserved by Illustrator and Inkscape across save.
@@ -94,8 +94,8 @@ Scoring legend for each of the three columns (Export, Import, Round-trip):
 | Transforms   | `scale`                                                                                               | n/a (not in Broadset fields per IO-D-02)                                                                                            | native (baked to path)                           | baked                                                               |
 | Transforms   | `skewX` / `skewY`                                                                                     | n/a (not in Broadset fields per IO-D-02)                                                                                            | native (baked to path)                           | baked                                                               |
 | Transforms   | `matrix`                                                                                              | n/a (composed from above)                                                                                                           | native (baked to path when non-decomposable)     | baked                                                               |
-| Masks        | `<clipPath>`                                                                                          | native (`customClipPath` style → `<clipPath>` def)                                                                                  | native                                           | native                                                              |
-| Masks        | `<mask>`                                                                                              | native (`<mask>` def emitted when `style.maskType !== 'none'`, deduplicated by content hash)                                        | n/a                                              | n/a                                                                 |
+| Masks        | `<clipPath>`                                                                                          | native (typed `appearance.clip` vector reference → `<clipPath>` def)                                                                | native                                           | native                                                              |
+| Masks        | `<mask>`                                                                                              | native (typed `appearance.mask` reference and explicit alpha/luminance mode, deduplicated by semantic hash)                         | native                                           | native                                                              |
 | Masks        | `<pattern>` (pattern fill)                                                                            | native (`<pattern>` def with `<image>` body for `fill.kind === 'pattern' \| 'picture'`, deduplicated by content hash)               | n/a                                              | n/a                                                                 |
 | Filters      | `box-shadow` / drop-shadow                                                                            | native (`<filter><feDropShadow>`, deduplicated by content hash)                                                                     | native                                           | native                                                              |
 | Filters      | Blur                                                                                                  | native (`<feGaussianBlur>` via `style.filter` `FilterStack`)                                                                        | n/a                                              | n/a                                                                 |
@@ -114,7 +114,7 @@ Scoring legend for each of the three columns (Export, Import, Round-trip):
 | Animation    | Animations (`animations` array, keyframes)                                                            | dropped (exported IN state)                                                                                                         | dropped                                          | dropped — animations are not serialised to `<metadata>` per IO-D-16 |
 | Data binding | `dataField`, `visibleWhen`, `repeater`                                                                | metadata-preserved (`data-bs-*` + `<metadata>`)                                                                                     | metadata-preserved                               | metadata-preserved                                                  |
 | Pages        | Multi-page override maps                                                                              | metadata-preserved (`<metadata>` `broadset:pages`)                                                                                  | metadata-preserved                               | metadata-preserved                                                  |
-| Preservation | Opaque `svg`-type payload                                                                             | native (sanitised `outerHTML`)                                                                                                      | native                                           | native                                                              |
+| Preservation | Safe foreign fallback plus interop record                                                             | native (inert source blob + preview or shared-policy sanitized vector)                                                              | native                                           | native                                                              |
 | Preservation | Unknown elements (`<use>` / `<symbol>` references)                                                    | n/a (dereferenced inline on import)                                                                                                 | native (dereferenced inline group)               | lossy (structural — visually identical)                             |
 | Security     | `<script>`                                                                                            | dropped + rejected                                                                                                                  | dropped + warning                                | n/a                                                                 |
 | Security     | `on*=` event handlers                                                                                 | dropped + rejected                                                                                                                  | dropped + warning                                | n/a                                                                 |
@@ -391,7 +391,7 @@ The SVG importer MUST sanitize input through `_shared/sanitize/sanitizeSvg` befo
 - [ ] `<script>` elements are stripped before reaching downstream code
 - [ ] `on*=` event handler attributes are stripped, including namespaced event attributes
 - [ ] Unsafe URLs in `href` / `xlink:href` / `src` are stripped; `http(s)`, fragment / relative URLs, and `data:image/*` are allowed
-- [ ] `<foreignObject>` elements are stripped by default (opaque `svg`-type preservation MAY be offered behind an explicit opt-in)
+- [ ] `<foreignObject>` never executes; safe preservation uses an inert source blob and explicit preview with diagnostics
 - [ ] DTD processing and external-entity resolution are disabled on the underlying parser
 - [ ] `<use>` / `<symbol>` follow depth is capped and cycles are detected
 - [ ] A billion-laughs entity-expansion fixture completes parsing with bounded memory
@@ -417,8 +417,8 @@ When a Broadset `'svg'`-type element carries raw SVG markup as its `content` (fr
 
 Any SVG element or attribute that the importer cannot natively map MUST be preserved as one of:
 
-1. An opaque `svg`-type Broadset element carrying the sanitized `outerHTML` of the source fragment.
-2. A namespaced attribute on the nearest recognised ancestor.
+1. A safe `foreign` element referencing a content-addressed preserved source blob and explicit preview.
+2. A typed interop preserved fragment targeting the nearest mapped entity.
 
 Silent drops are prohibited. Every preservation decision MUST surface as a warning in the import report describing what was preserved and why it wasn't natively mapped.
 
@@ -426,20 +426,20 @@ Silent drops are prohibited. Every preservation decision MUST surface as a warni
 
 - GIVEN an SVG with a `<rect>` and a `<foreignObject>` (with active content)
 - WHEN imported
-- THEN the `<rect>` becomes a `rectangle` element
-- AND the `<foreignObject>` is stripped (active content policy) OR preserved as an opaque `svg`-type element with sanitized markup (when active-content opt-in is off)
+- THEN the `<rect>` becomes a native vector rectangle
+- AND the `<foreignObject>` becomes a safe foreign fallback with inert source blob, preview, and diagnostic
 
 #### Scenario: Unknown element preservation
 
 - GIVEN an SVG with an unknown element type (e.g., a vendor-specific extension)
 - WHEN imported
-- THEN the unknown element becomes an opaque `svg`-type element with sanitized `outerHTML`
+- THEN the unknown element becomes a safe foreign fallback or typed interop preserved fragment
 - AND the import report lists the preservation
 
 #### Acceptance Criteria
 
-- [ ] Unknown SVG elements preserve as opaque `svg`-type elements
-- [ ] Unknown attributes on a recognised element preserve as namespaced attributes on that element
+- [ ] Unknown SVG elements preserve through safe foreign fallback or typed interop records
+- [ ] Unknown attributes on a recognised element preserve through a typed interop record targeting that entity
 - [ ] Preservation decisions emit warnings naming the source construct
 
 ---
@@ -581,19 +581,14 @@ If the same SVG is re-imported into Broadset, the animations are NOT recovered; 
 
 ---
 
-### Requirement: Dirty-Flag Discipline
+### Requirement: Derived SVG Interop Cleanliness
 
-Every imported SVG element MUST land with `extensions.svg.dirty === false`. On re-export:
-
-- Untouched elements (`dirty === false`) re-emit the preserved original SVG fragment byte-for-byte.
-- Edited elements (`dirty === true`) re-emit from current Broadset state; the preservation blob is discarded.
-
-The dirty flag flips to `true` automatically when the user edits the element in Broadset via the editor middleware (IO-D-11).
+Every preserved SVG mapping MUST create an `InteropRecord` with source identity, target address, baseline semantic hash, and preserved fragment where applicable. Re-export derives cleanliness from current semantic hash equality; it MUST NOT persist a dirty boolean.
 
 #### Acceptance Criteria
 
-- [ ] Every imported element carries `extensions.svg.dirty === false`
-- [ ] Editing an element in the editor flips the flag to `true` via the dirty-flag middleware
+- [ ] Every preserved mapping has an interop baseline hash and resolving target
+- [ ] Editing relevant semantics changes derived cleanliness; undo restoring the baseline restores clean status
 - [ ] Re-exporting an untouched document produces output with preserved elements identical to the source
 - [ ] Editing one element and re-exporting rewrites that element only; every other element is emitted from the preserved blob
 

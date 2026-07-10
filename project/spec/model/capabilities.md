@@ -1,236 +1,97 @@
-# Model — Element Capability Matrix
+# Model — Derived Element Capabilities
 
 ## Purpose
 
-Defines the per-type capability flags that control which editing features and style properties are available for each element type. These flags drive UI panel visibility, handle rendering, and constraint enforcement. This spec ensures any consumer can determine what editing features apply to any element type. It does NOT cover how capabilities are rendered in UI (→ `project/spec/ui/panels.md`) or how plugins override capabilities (→ `project/spec/renderer/spec.md`). See [conventions](../../README.md).
-
----
+Defines deterministic editor capability profiles derived from canonical v1 element discriminants and typed payloads. Capability profiles are runtime presentation policy and are never persisted.
 
 ## Requirements
 
-### Requirement: Capability Flag Set
+### Requirement: Capability Derivation
 
-Every element type MUST resolve to a capability profile containing exactly these boolean flags: `borderRadius`, `typography`, `appearance`, `boxEffects`, `clipPath`, `objectFit`, `svgStrokeFill`, `pathEditing`, `squareConstrained`, `instantPlace`.
-
-#### Scenario: Profile shape
-
-- GIVEN any element type
-- WHEN its capability profile is resolved
-- THEN the profile contains exactly the 10 defined boolean flags
+Every element resolves a profile containing booleans for geometry editing, appearance editing, typography, media fitting, vector geometry editing, structured-path editing, clip authoring, component-property editing, live-data binding, and timeline targeting. Derivation MUST inspect `kind` and, for `vector`, `geometryData.kind`.
 
 #### Acceptance Criteria
 
-- [ ] Given any element type, the resolved profile contains all 10 capability flags as booleans
+- [ ] Given the same validated element, every editor surface derives the same profile
+- [ ] Given a capability profile, project serialization contains none of its booleans
+- [ ] Given an unknown plugin payload, only explicitly registered sandboxed plugin capabilities are enabled
 
----
+### Requirement: Vector Subtype Capabilities
 
-### Requirement: Text Element Capabilities
-
-Text elements MUST enable: borderRadius, typography, appearance, boxEffects. All other flags MUST be disabled.
-
-#### Scenario: Text capabilities
-
-- GIVEN an element of type `text`
-- WHEN its capability profile is resolved
-- THEN borderRadius, typography, appearance, boxEffects are true; all others are false
+Rectangle, ellipse, path, and boolean shapes are `kind: 'vector'` payload variants, not top-level element kinds. Rectangle vectors enable corner geometry; ellipse vectors enable ellipse geometry; structured-path vectors enable point and segment editing; boolean vectors expose operand and operation editing. All vector variants enable typed appearance and clip-source use.
 
 #### Acceptance Criteria
 
-- [ ] Given a text element, borderRadius, typography, appearance, and boxEffects are enabled
-- [ ] Given a text element, clipPath, objectFit, svgStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
+- [ ] Given `kind: 'vector'` with `geometryData.kind: 'rectangle'`, rectangle geometry controls are enabled
+- [ ] Given `kind: 'vector'` with `geometryData.kind: 'path'`, structured-path editing is enabled
+- [ ] Given a vector subtype mismatch, controls for another subtype remain unavailable
 
----
+### Requirement: Text Capabilities
 
-### Requirement: Rectangle Element Capabilities
-
-Rectangle elements MUST enable: borderRadius, appearance, boxEffects, clipPath. All other flags MUST be disabled.
-
-#### Scenario: Rectangle capabilities
-
-- GIVEN an element of type `rectangle`
-- WHEN its capability profile is resolved
-- THEN borderRadius, appearance, boxEffects, clipPath are true; all others are false
+Text elements enable structured text, paragraph/run typography, text layout, appearance, data binding, and timeline targeting. Text-path controls are enabled only when a valid vector reference can be authored.
 
 #### Acceptance Criteria
 
-- [ ] Given a rectangle element, borderRadius, appearance, boxEffects, and clipPath are enabled
-- [ ] Given a rectangle element, typography, objectFit, svgStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
+- [ ] Given `kind: 'text'`, structured typography controls are enabled
+- [ ] Given no valid vector target, text-path selection cannot commit
+- [ ] Given text animation targeting, only schema-approved text properties are offered
 
----
+### Requirement: Media Capabilities
 
-### Requirement: Ellipse Element Capabilities
-
-Ellipse elements MUST enable: appearance, boxEffects, clipPath. borderRadius MUST be disabled (ellipses always render 50% radius). All other flags MUST be disabled.
-
-#### Scenario: Ellipse capabilities
-
-- GIVEN an element of type `ellipse`
-- WHEN its capability profile is resolved
-- THEN appearance, boxEffects, clipPath are true; borderRadius and all others are false
+Image and video elements enable asset selection, fit/crop/focal-point editing, appearance, clip authoring, binding, and timeline targeting. Audio elements enable asset, routing, cue, binding, and timeline controls without visual fit controls.
 
 #### Acceptance Criteria
 
-- [ ] Given an ellipse element, appearance, boxEffects, and clipPath are enabled
-- [ ] Given an ellipse element, borderRadius is disabled
+- [ ] Given an image or video element, fit controls edit its typed media payload
+- [ ] Given an audio element, visual crop controls are unavailable
+- [ ] Given an incompatible asset kind, selection cannot commit
 
----
+### Requirement: Group and Component Capabilities
 
-### Requirement: Image Element Capabilities
-
-Image elements MUST enable: borderRadius, appearance, boxEffects, clipPath, objectFit. All other flags MUST be disabled.
-
-#### Scenario: Image capabilities
-
-- GIVEN an element of type `image`
-- WHEN its capability profile is resolved
-- THEN borderRadius, appearance, boxEffects, clipPath, objectFit are true; all others are false
+Group elements enable hierarchy, appearance, clip authoring, binding, and timeline targeting. Component-instance elements enable exposed-property editing and instance navigation; definition-internal generic property paths are not exposed as ordinary instance controls.
 
 #### Acceptance Criteria
 
-- [ ] Given an image element, borderRadius, appearance, boxEffects, clipPath, and objectFit are enabled
+- [ ] Given a group, hierarchy controls preserve canonical preorder
+- [ ] Given a component instance, exposed properties are addressed by stable property ID
+- [ ] Given an unexposed internal component property, ordinary instance editing cannot target it
 
----
+### Requirement: Specialized Core Capabilities
 
-### Requirement: SVG Element Capabilities
-
-SVG elements MUST enable: borderRadius, appearance, boxEffects, clipPath, objectFit. All other flags MUST be disabled.
-
-#### Scenario: SVG capabilities
-
-- GIVEN an element of type `svg`
-- WHEN its capability profile is resolved
-- THEN borderRadius, appearance, boxEffects, clipPath, objectFit are true; all others are false
+Clock, ticker, and QR-code elements expose their typed payload controls, appearance, binding, and compatible timeline targets. Foreign elements expose source/preview diagnostics and safe fallback actions. Plugin elements expose only core envelope controls plus authorized plugin-provided controls.
 
 #### Acceptance Criteria
 
-- [ ] Given an SVG element, borderRadius, appearance, boxEffects, clipPath, and objectFit are enabled
+- [ ] Given a QR-code element, QR payload controls are available without generic content editing
+- [ ] Given a foreign element, source markup is not offered for executable editing
+- [ ] Given a plugin element without its plugin, inert payload and preview remain inspectable
 
----
+### Requirement: Typed Clip Authoring
 
-### Requirement: Path Element Capabilities
-
-Path elements MUST enable: svgStrokeFill, pathEditing, instantPlace. All other flags MUST be disabled.
-
-#### Scenario: Path capabilities
-
-- GIVEN an element of type `path`
-- WHEN its capability profile is resolved
-- THEN svgStrokeFill, pathEditing, instantPlace are true; all others are false
+The editor capability historically labeled `clipPath` means permission to author `appearance.clip` through typed vector references. It MUST NOT enable raw CSS clip strings, arbitrary SVG markup, or legacy screen/style clip fields.
 
 #### Acceptance Criteria
 
-- [ ] Given a path element, svgStrokeFill, pathEditing, and instantPlace are enabled
-- [ ] Given a path element, borderRadius, typography, appearance, boxEffects, clipPath, objectFit, and squareConstrained are disabled
+- [ ] Given clip authoring on an eligible element, the committed value is a typed clip definition
+- [ ] Given raw CSS clip text, no canonical mutation is produced
+- [ ] Given a clip source of the wrong entity kind, semantic validation fails
 
----
+### Requirement: Capability Use
 
-### Requirement: QR Code Element Capabilities
-
-QR code elements MUST enable: squareConstrained. All other flags MUST be disabled.
-
-#### Scenario: QR code capabilities
-
-- GIVEN an element of type `qrcode`
-- WHEN its capability profile is resolved
-- THEN squareConstrained is true; all others are false
+Capability profiles control UI visibility and command availability only. Commands MUST still validate the resulting canonical project atomically; hiding a control is not a validation mechanism.
 
 #### Acceptance Criteria
 
-- [ ] Given a qrcode element, squareConstrained is enabled and all other flags are disabled
-
----
-
-### Requirement: Group Element Capabilities
-
-Group elements MUST enable: appearance, clipPath. All other flags MUST be disabled.
-
-#### Scenario: Group capabilities
-
-- GIVEN an element of type `group`
-- WHEN its capability profile is resolved
-- THEN appearance and clipPath are true; all others are false
-
-#### Acceptance Criteria
-
-- [ ] Given a group element, appearance and clipPath are enabled and all other flags are disabled
-
----
-
-### Requirement: Unknown Type Fallback
-
-Unknown element types MUST resolve to a capability profile with all flags disabled.
-
-#### Scenario: Unknown type
-
-- GIVEN an element with a type not in the built-in list and no plugin override
-- WHEN its capability profile is resolved
-- THEN all 10 flags are false
-
-#### Acceptance Criteria
-
-- [ ] Given an unknown element type, all capability flags are false
-
----
-
-### Requirement: Video Element Capabilities
-
-Video elements MUST enable: borderRadius, appearance, boxEffects, clipPath, objectFit. All other flags MUST be disabled.
-
-#### Scenario: Video capabilities
-
-- GIVEN an element of type `video`
-- WHEN its capability profile is resolved
-- THEN borderRadius, appearance, boxEffects, clipPath, objectFit are true; all others are false
-
-#### Acceptance Criteria
-
-- [ ] Given a video element, borderRadius, appearance, boxEffects, clipPath, and objectFit are enabled
-- [ ] Given a video element, typography, svgStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
-
----
-
-### Requirement: Clock Element Capabilities
-
-Clock elements MUST enable: typography, appearance, boxEffects. All other flags MUST be disabled.
-
-#### Scenario: Clock capabilities
-
-- GIVEN an element of type `clock`
-- WHEN its capability profile is resolved
-- THEN typography, appearance, boxEffects are true; all others are false
-
-#### Acceptance Criteria
-
-- [ ] Given a clock element, typography, appearance, and boxEffects are enabled
-- [ ] Given a clock element, borderRadius, clipPath, objectFit, svgStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
-
----
-
-### Requirement: Ticker Element Capabilities
-
-Ticker elements MUST enable: typography, appearance, boxEffects. All other flags MUST be disabled.
-
-#### Scenario: Ticker capabilities
-
-- GIVEN an element of type `ticker`
-- WHEN its capability profile is resolved
-- THEN typography, appearance, boxEffects are true; all others are false
-
-#### Acceptance Criteria
-
-- [ ] Given a ticker element, typography, appearance, and boxEffects are enabled
-- [ ] Given a ticker element, borderRadius, clipPath, objectFit, svgStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
-
----
+- [ ] Given a disabled capability, its ordinary UI command is unavailable
+- [ ] Given a forged command, model validation still rejects invalid canonical state
+- [ ] Given a host restriction, capabilities may be reduced but not expanded past schema legality
 
 ## Spec Gaps
 
-_None — all requirements have acceptance criteria._
-
----
+- Exact runtime flag names and plugin capability negotiation are finalized during editor/UI cutover.
 
 ## Non-Goals
 
-- Plugin capability override merging → see `project/spec/renderer/spec.md`
-- Which UI panels are shown based on capabilities → see `project/spec/ui/panels.md`
-- Which properties are editable per type → see `project/spec/editor/editing.md`
+- Persisting capability flags
+- Treating vector geometry subtypes as element discriminants
+- Using capabilities to bypass structural or semantic validation

@@ -38,13 +38,14 @@ Canonical tick values MUST be non-negative JSON-safe integers. Durations, sequen
 
 ### Requirement: Interval Semantics
 
-Timed media occupies the half-open interval `[0, durationTicks)`. Interactive seek accepts the closed interval through `durationTicks` so the terminal declarative state can be inspected. Sampling beyond `durationTicks` is invalid unless a typed loop or remap explicitly defines it.
+Timed media occupies the half-open interval `[0, durationTicks)`. Interactive seek accepts the closed interval through `durationTicks` so the terminal declarative state can be inspected. An unlooped, unremapped request beyond `durationTicks` MUST fail with a typed `time-out-of-range` diagnostic; it MUST NOT clamp to another tick. A typed loop or remap first maps the requested tick into its declared valid source interval and then samples that exact mapped tick.
 
 #### Acceptance Criteria
 
 - [ ] Given playback at a tick below duration, media sampling is valid
 - [ ] Given interactive seek exactly at duration, terminal state is returned without an out-of-range media sample
-- [ ] Given an unlooped sample after duration, evaluation rejects or clamps according to the owning typed contract
+- [ ] Given an unlooped, unremapped request after duration, evaluation returns `time-out-of-range` and does not sample or clamp
+- [ ] Given a looped or remapped request after duration, evaluation samples the exact in-range tick produced by that declared mapping
 
 ### Requirement: Work Areas and Clip Ranges
 

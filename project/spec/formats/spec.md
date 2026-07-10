@@ -83,7 +83,7 @@ Carrier mechanisms per format (restated from the Format Round-Trip Metadata requ
 
 ### Requirement: No Silent Drops (IO-D-18)
 
-Every format importer (PSD, PDF, PPTX, SVG) MUST account for every piece of source content it encounters via one of three paths: (a) map to a native Broadset element, (b) preserve the raw source fragment under `extensions.<format>.<key>` (or an opaque `svg`-type element for SVG) for lossless re-emission, or (c) emit a structured import warning describing what was dropped and why. A fourth path — silently discarding content — is forbidden. This invariant is what keeps users in control of their own files: anything the importer doesn't fully understand still surfaces somewhere the user can see.
+Every format importer (PSD, PDF, PPTX, SVG) MUST account for every source construct through one of three paths: (a) map it to native canonical v1 semantics, (b) preserve it through a typed interop record or safe foreign fallback, or (c) emit a structured diagnostic explaining why no source fragment can be retained. Unreported discard is forbidden. Anything the importer cannot fully map still remains visible and recoverable wherever safe preservation is possible.
 
 This cross-cutting rule derives from IO-D-18 and is enforced at every importer boundary by the Importer Contract bullets "Preservation by default" and "Warnings, not exceptions" below, plus the format-specific preservation schemas in `extensions.<format>`.
 
@@ -91,7 +91,7 @@ This cross-cutting rule derives from IO-D-18 and is enforced at every importer b
 
 - GIVEN a PSD with a Photoshop-specific effect Broadset does not natively model (e.g. bevel/emboss)
 - WHEN the importer processes the layer
-- THEN the effect parameters are preserved under `extensions.psd.unmappedEffects` with `dirty: false`
+- THEN the effect parameters are preserved through a PSD interop record and content-addressed blob with baseline semantic hash
 - AND the element is otherwise imported normally
 
 #### Scenario: Unknown feature surfaces as warning
@@ -109,9 +109,9 @@ This cross-cutting rule derives from IO-D-18 and is enforced at every importer b
 
 #### Acceptance Criteria
 
-- [ ] Every importer maps recognised content to a native Broadset element OR preserves it under `extensions.<format>` OR emits an import warning
+- [ ] Every importer maps recognised content to native v1 semantics OR preserves it through the project interop registry OR emits an import warning
 - [ ] No importer silently drops source content without the user seeing a warning OR a preservation blob
-- [ ] Every format sub-spec enumerates its preservation surface (`extensions.psd.*`, `extensions.pdf.*`, `extensions.pptx.*`, `extensions.svg.*` or opaque SVG elements)
+- [ ] Every format sub-spec enumerates its native mapping, interop preservation, and foreign fallback surface
 - [ ] Every importer under test reports warnings via the shared `{ document, warnings }` `DocumentImportResult` shape
 - [ ] Importer security-cap hits surface as warnings per the Importer Security Contract `Resource-Limit Failures Emit Warnings` requirement below
 
@@ -122,9 +122,9 @@ This cross-cutting rule derives from IO-D-18 and is enforced at every importer b
 Every format importer MUST satisfy the following contract in addition to the format-specific behaviour in its sub-spec. These rules derive from IO-D-17 and IO-D-18 in the [decision log](../../implementation/decisions.md), and exist so that multi-format round-trip, reconciliation, and preservation behave uniformly across PDF, PSD, PPTX, and SVG.
 
 - **Group-preserving tree.** Every importer MUST build a `parentId` element tree that mirrors the source file's grouping (PSD layer groups, PPTX group shapes, SVG `<g>` / nested SVG, PDF marked-content parents). Flattening groups on import is a bug, not an option.
-- **Preservation by default.** Every importer MUST either map a source construct to a native Broadset element or preserve the raw source fragment for lossless re-emission. Preservation uses typed namespaces under `extensions.<format>.<key>` (PDF, PSD, PPTX) or an opaque `svg`-type element (SVG). Silent drops are prohibited.
-- **Dirty flag initialisation.** Every hydrated element — including SVG opaque elements, which carry the flag under `extensions.svg.dirty` — MUST have its `extensions.<format>.dirty` set to `false` so exporters can distinguish untouched imports (re-emit original blob byte-for-byte) from edited elements (re-emit from current Broadset state).
-- **Structured text by default.** When a source file carries mixed-run text (multiple character-level styles within a paragraph), the importer MUST populate `content` as a `TextBody` rather than flattening to a single string.
+- **Preservation by default.** Every importer MUST either map a source construct to canonical v1 semantics or preserve it in an `InteropRecord`, preserved blob, or safe foreign element with explicit preview and diagnostics. Silent drops are prohibited.
+- **Derived cleanliness.** Every interop record stores a baseline semantic hash. Exporters derive cleanliness by comparing the current defined semantic projection with that baseline; permanent dirty booleans are forbidden.
+- **Structured text by default.** When a source file carries mixed-run text, the importer MUST create stable paragraphs and runs rather than flattening to a string.
 - **Warnings, not exceptions.** Content that cannot be imported MUST surface as an import warning; the importer MUST NOT throw for content it doesn't recognise. The surrounding elements MUST still import.
 
 ---
@@ -262,13 +262,13 @@ Every change to an importer MUST go through the `security-reviewer` agent before
 
 ---
 
-### Requirement: Format Round-Trip Metadata — XMP + Per-Element Tag + Hash Fallback
+### Requirement: Format Round-Trip Metadata and Interop Records
 
-Every layer-or-container format (PSD, PDF, PPTX, SVG) that Broadset round-trips MUST persist Broadset-native state inside the format file using a three-layer pattern so round-trip survives external edits, external-tool normalization, and aggressive tag strippers uniformly. No sidecar files and no app-private streams outside the format's documented extension mechanism (IO-D-17). No silent drops (IO-D-18).
+Every layer-or-container format (PSD, PDF, PPTX, SVG) that Broadset round-trips MUST preserve project-level and entity-level source identity through canonical v1 interop records while using documented format-native metadata carriers. No sidecar files, app-private streams outside documented extension mechanisms, or unreported drops are permitted.
 
-1. **Document XMP (ISO 16684-1) under a shared `broadset:` namespace** (IO-D-08). Every supporting format carries the document-level state (project settings, canvas, asset registry, data schema, page definitions + override maps, animations where preserveable, Dublin Core metadata from `document.metadata`) in a single XMP packet using the same namespace URI across formats. Read via `_shared/xmp/readBroadsetXmp()`; write via `_shared/xmp/writeBroadsetXmp()`.
-2. **Per-element tag under a format-native extension mechanism.** Each Broadset element's format-native carrier (PSD layer, PPTX shape, PDF marked-content range, SVG element) carries a tag containing the element's stable `id`, its `extensions.<format>.dirty` flag, data bindings, animation references, and the original-source blob for any feature the importer recognized but cannot represent natively. The tag carrier MUST be a mechanism the canonical external tool preserves across save (PSD `additionalInfo` under the `BsPs` 4-byte signature, PPTX custom `<ext>` elements, PDF marked-content custom properties, SVG `data-bs-*` attributes).
-3. **Content-hash fallback when tags are stripped.** When an external tool strips or rewrites the per-element tag (aggressive flatten, rasterize, "Export As" rebuild), the reconciliation pipeline recovers element identity by matching the fingerprint produced by `_shared/fingerprint/fingerprintElement()` against the preserved metadata. Elements that cannot be matched either way become new elements on re-import; elements present in the preserved metadata but missing from the stream surface as deletions that the user confirms.
+1. **Document metadata carrier.** A supporting format MAY carry a defined canonical semantic projection in XMP or another documented native metadata mechanism. It MUST identify the projection and semantic hash and MUST NOT substitute a legacy project shape for canonical v1.
+2. **Per-entity source identity.** Format-native tags MAY carry stable Broadset entity addresses and source identities. Preserved source fragments remain content-addressed blobs referenced by `InteropRecord`; permanent dirty booleans are not stored.
+3. **Semantic-hash fallback.** When an external tool strips or rewrites tags, reconciliation compares stable producer identity and defined canonical semantic hashes. Unmatched stream entities become new imported entities; missing baseline entities surface as deletions requiring user confirmation.
 
 #### Scenario: Round-trip from Broadset through an external tool and back
 
@@ -277,18 +277,17 @@ Every layer-or-container format (PSD, PDF, PPTX, SVG) that Broadset round-trips 
 - WHEN the format's reconciliation pipeline runs
 - THEN Broadset-native state (animations, data bindings, override maps) is hydrated from XMP
 - AND per-element identity survives via the per-element tag
-- AND when a tag is stripped, content-hash matching recovers identity
+- AND when a tag is stripped, stable producer identity or semantic-hash matching recovers identity
 
-#### Scenario: Dirty-flag discipline on re-export
+#### Scenario: Derived cleanliness on re-export
 
-- GIVEN an element imported from a format file with `extensions.<format>.dirty === false`
-- AND the user has not touched the element in Broadset
+- GIVEN an imported entity whose current semantic projection matches its `baselineSemanticHash`
 - WHEN the document is re-exported
 - THEN the original format-native blob is emitted byte-for-byte (no re-synthesis from current Broadset state)
 
-- GIVEN an element the user has edited in Broadset (dirty flag flipped to `true`)
+- GIVEN an imported entity whose current semantic projection differs from its baseline
 - WHEN the document is re-exported
-- THEN the element is re-synthesized from current Broadset state (the preserved blob is discarded)
+- THEN the entity is mapped from current canonical state and any intentional loss is reported; preserved source remains available for recovery
 
 #### Scenario: No sidecar files
 
@@ -299,10 +298,10 @@ Every layer-or-container format (PSD, PDF, PPTX, SVG) that Broadset round-trips 
 #### Acceptance Criteria
 
 - [ ] Every round-trippable format exporter writes a `broadset:` XMP packet using the shared namespace URI
-- [ ] Every round-trippable format exporter attaches a per-element tag carrying `id`, `dirty`, and preservation blob
-- [ ] Every round-trippable format importer prefers the per-element tag when present and falls back to `fingerprintElement()` when the tag is absent
-- [ ] Every round-trippable format importer hydrates document-level state (project settings, canvas, animations, page override maps, `document.metadata`) from XMP when present
-- [ ] Untouched elements (`extensions.<format>.dirty === false`) re-export byte-identical to the preserved blob
+- [ ] Every round-trippable format exporter attaches a per-entity tag carrying stable source identity when the format supports it
+- [ ] Every round-trippable format importer prefers stable source identity and falls back to the defined semantic projection hash when the tag is absent
+- [ ] Every round-trippable importer maps any embedded Broadset semantic projection through strict canonical v1 validation
+- [ ] Entities whose current semantic hash equals the baseline may re-export the preserved blob byte-identically
 - [ ] No exporter writes a sidecar file alongside the main format output
 - [ ] Reconciliation reports additions, deletions, and hash-recovered matches per `_shared/reconcile/` contract
 - [ ] Elements present in preserved metadata but missing from the stream surface as deletions that require user confirmation before being dropped
@@ -420,7 +419,7 @@ Contract:
 
 ### Requirement: SVG Sanitization (`_shared/sanitize/`)
 
-The SVG sanitizer wraps DOMPurify with a Broadset-specific policy so the SVG importer, the `svg`-type element re-render path, and any foreign-markup boundary never let an execution surface reach the renderer. Complements the importer security contract earlier in this spec.
+The SVG sanitizer wraps DOMPurify with a Broadset-specific policy so the SVG importer, sanitized-vector foreign fallback, and any foreign-markup boundary never let an execution surface reach the renderer. This complements the importer security contract earlier in this spec.
 
 ```ts
 function sanitizeSvg(input: string): {

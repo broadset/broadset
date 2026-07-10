@@ -19,10 +19,10 @@ Every PDF Broadset writes carries two collaborating layers. This is the concrete
 Native PDF primitives map every Broadset feature that has a PDF counterpart:
 
 - **Text runs** — real `Tj` / `TJ` text showing operators with embedded / subsetted fonts; tracking, kerning, alignment, leading honour the font's true glyph metrics.
-- **Vector paths** — Broadset `path`, `rectangle`, `ellipse`, and rounded-rectangle elements emit native PDF path operators (`m`, `l`, `c`, `h`, `B`, `f`, `re`) so they stay editable in Illustrator and Acrobat.
+- **Vector paths** — Broadset vector path, rectangle, ellipse, and rounded-rectangle payloads emit native PDF path operators (`m`, `l`, `c`, `h`, `B`, `f`, `re`) so they stay editable in Illustrator and Acrobat.
 - **Images** — raster image XObjects with JPEG pass-through (no re-encode), PNG via SMask for alpha; embedded ICC profile when `ImageAsset.iccProfileAssetId` is present.
 - **Groups** — Broadset `'group'` elements emit as PDF Form XObjects so transforms compose and selection survives in Illustrator.
-- **Masks** — CSS / SVG clip-paths emit as PDF clipping paths; transparency groups carry group opacity and blend mode.
+- **Masks** — typed vector clip references emit as PDF clipping paths; transparency groups carry group opacity and blend mode.
 - **Gradients** — linear and radial gradients emit as PDF type 2 and type 3 shading patterns (real gradient fills, not first-stop fallback). Conic gradients emit an SVG-raster fallback and preserve the structured definition in marked-content for round-trip.
 - **Color spaces** — the exporter emits the colour space declared by `document.outputIntent.colorSpace` (DeviceRGB, DeviceCMYK, CalRGB / Lab, DeviceN for spot). ICC profile embedded when declared.
 - **Blend modes** — CSS `mix-blend-mode` maps to PDF blend modes via `ExtGState` where an equivalent exists; otherwise the element renders flattened with a warning.
@@ -195,7 +195,7 @@ Text content MUST round-trip as structured `TextBody` / `Paragraph` / `Run` data
 
 ### Requirement: Native Vector Export
 
-Rectangle, ellipse, and path elements MUST export as native PDF path operators — not rasterised pixels. Vectors stay editable in Illustrator and Acrobat Pro.
+Vector rectangle, ellipse, and structured-path payloads MUST export as native PDF path operators, not rasterised pixels. Vectors stay editable in Illustrator and Acrobat Pro.
 
 #### Scenario: Path stays vector
 
@@ -205,7 +205,7 @@ Rectangle, ellipse, and path elements MUST export as native PDF path operators �
 
 #### Acceptance Criteria
 
-- [ ] Rectangle / ellipse / path elements emit native PDF path operators (`m`, `l`, `c`, `h`, `re`, `B`, `f`)
+- [ ] Vector rectangle, ellipse, and structured-path payloads emit native PDF path operators (`m`, `l`, `c`, `h`, `re`, `B`, `f`)
 - [ ] Per-corner `borderRadius` (tuple `[tl, tr, br, bl]`) round-trips via knot-composed cubic Bézier segments per corner
 - [ ] Stroke styling (cap, join, dasharray, miterlimit) round-trips via PDF graphics-state operators (`w`, `J`, `j`, `M`, `d`)
 - [ ] Rotation composes into the exported geometry
@@ -239,11 +239,11 @@ Linear and radial gradients MUST export as native PDF shading patterns (type 2 f
 
 ### Requirement: Clip-Path and Mask Fidelity
 
-CSS / SVG clip-paths MUST emit as native PDF clipping paths. Group-level opacity MUST emit as a transparency group. Alpha masks MUST emit via the PDF SMask mechanism. Rasterising clipped content is a regression.
+Typed vector clips MUST emit as native PDF clipping paths. Group-level opacity MUST emit as a transparency group. Alpha masks MUST emit via the PDF SMask mechanism. Rasterising clipped content is a regression.
 
 #### Acceptance Criteria
 
-- [ ] SVG / CSS clip-path emits as native PDF clipping path operators (`W`, `W*`)
+- [ ] Given a typed vector clip, export emits native PDF clipping path operators (`W`, `W*`)
 - [ ] Group-level opacity emits as a transparency group on a Form XObject
 - [ ] Alpha masks on images emit via SMask
 - [ ] Clipped paths and nested clipped groups round-trip without rasterisation
@@ -317,7 +317,7 @@ Every painted Broadset element MUST be wrapped in a `/BSET` marked-content pair 
 
 - `/ID` — the element's stable `id` as a PDF string
 - `/Kind` — the element `type` as a PDF name (`/Text`, `/Image`, `/Path`, `/Rectangle`, `/Ellipse`, `/Svg`, `/Group`, `/Qrcode`, `/Video`, `/Clock`, `/Ticker`)
-- `/Dirty` — the `extensions.pdf.dirty` flag as a PDF boolean
+- `/BaselineSemanticHash` — the interop record's baseline hash for reconciliation; current cleanliness remains derived
 - `/DataField` — the element's `dataField` when present
 - `/Blob` — base-64 preservation blob when the importer recognised a feature it cannot emit natively (e.g. unmapped annotation types)
 
@@ -360,19 +360,14 @@ If the same PDF is re-imported into Broadset, animations are NOT recovered; the 
 
 ---
 
-### Requirement: Dirty-Flag Discipline
+### Requirement: Derived PDF Interop Cleanliness
 
-Every imported PDF element MUST land with `extensions.pdf.dirty === false`. On re-export:
-
-- Untouched elements (`dirty === false`) re-emit the preserved original operator sequence byte-for-byte.
-- Edited elements (`dirty === true`) re-emit from current Broadset state; the preservation blob is discarded.
-
-The dirty flag flips to `true` automatically when the user edits the element in Broadset via the editor middleware (IO-D-11).
+Every preserved PDF mapping MUST create an `InteropRecord` with source identity, target address, baseline semantic hash, and preserved operator blob where applicable. Re-export derives cleanliness from current semantic hash equality; it MUST NOT persist a dirty boolean.
 
 #### Acceptance Criteria
 
-- [ ] Every imported element carries `extensions.pdf.dirty === false`
-- [ ] Editing an element in the editor flips the flag to `true` via the dirty-flag middleware
+- [ ] Every preserved mapping has an interop baseline hash and resolving target
+- [ ] Editing relevant semantics changes derived cleanliness; undo restoring the baseline restores clean status
 - [ ] Re-exporting an untouched document produces byte-identical painting-sequence output for every preserved element
 - [ ] Editing one element and re-exporting rewrites that element only; every other element is byte-identical
 
@@ -384,7 +379,7 @@ Broadset → PDF → edit in Illustrator / Acrobat → save → re-import MUST p
 
 - **External-tool edits** — text changes, position moves, colour changes, path edits made in Illustrator appear in Broadset after re-import.
 - **Broadset semantics not touched by the external tool** — data bindings, page override maps, repeater configs, `visibleWhen` expressions (via XMP).
-- **Untouched elements** — byte-identical painting sequences via the `dirty: false` preservation blob.
+- **Baseline-equal elements** — byte-identical painting sequences via the interop preserved blob.
 
 #### Acceptance Criteria
 
@@ -516,13 +511,13 @@ When the caller opts into `pdfaConformance: '2b'` (Phase 9 extension), the expor
 
 ### Requirement: PDF Page Dimensions (retained from prior spec)
 
-The system MUST convert canvas dimensions to PDF points (1mm = 72/25.4pt, 1in = 72pt). Generated PDF page dimensions MUST match the document canvas declared via `canvas.width` / `canvas.height` in their declared `canvas.unit`.
+The system MUST convert surface dimensions to PDF points (1mm = 72/25.4pt, 1in = 72pt). Generated PDF page dimensions MUST match `surface.size` in its declared `surface.unit`.
 
 #### Acceptance Criteria
 
 - [ ] Given a canvas of 210×118 mm, the page width is approximately `(210 × 72) / 25.4` points
 - [ ] Given a canvas of 8.5×11 in, the page width is 612 points
-- [ ] Given a canvas of 800×600 px, the page dimensions honour the document's `canvas.dpi` to convert to points
+- [ ] Given a surface of 800×600 px, the page dimensions honour the document's `surface.dpi` to convert to points
 
 ---
 

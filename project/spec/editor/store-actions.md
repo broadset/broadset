@@ -8,19 +8,19 @@ Defines the behavioral contracts for core editor store actions: document lifecyc
 
 ## Requirements
 
-### Requirement: Document Initialization
+### Requirement: Project Initialization
 
-The system MUST replace the entire document and reset undo history when a template is loaded. Document mode and feature config MUST be derived from the loaded document.
+The system MUST validate and replace the entire canonical project and reset undo history when a template is loaded. Active document selection is runtime UI state, and feature policy MUST be derived from the selected document's canonical `kind` and schema capabilities.
 
 #### Scenario: Load a new template
 
-- GIVEN a stored template document with `documentMode: 'print'`
+- GIVEN a stored canonical project whose selected document has `kind: 'print'`
 - WHEN the template is loaded into the editor
-- THEN the editor state contains the template's document, documentMode is `'print'`, feature config reflects print defaults, and undo history is empty
+- THEN the editor state contains the complete project, print feature policy is derived, and undo history is empty
 
 #### Acceptance Criteria
 
-- [ ] Given a template load, the editor state contains the template document with correct mode and empty undo history
+- [ ] Given a template load, the editor state contains the complete validated project, derives policy from document kind, and has empty undo history
 
 ---
 
@@ -187,17 +187,17 @@ The system MUST reorder elements in the document's element array by direction: `
 
 ### Requirement: Element Add and Remove
 
-Adding an element by type MUST use factory defaults for dimensions and content. Adding by full element data MUST use the provided data. Removing an element MUST also deselect it. Required elements (from EditorConfig) MUST NOT be deletable.
+Adding an element through a tool MUST use schema-valid typed payload and geometry defaults. Adding full element data MUST validate the complete variant. Removing an element MUST also deselect it. Required elements (from EditorConfig) MUST NOT be deletable.
 
 #### Scenario: Add by type uses factory defaults
 
 - GIVEN element type `'text'`
 - WHEN the element is added
-- THEN a text element is created with default width, height, and content `'New Text'`
+- THEN a text element is created with default bounds and structured text containing `New Text`
 
-#### Scenario: Add path element enters drawing mode
+#### Scenario: Add vector path enters drawing mode
 
-- GIVEN element type `'path'` added with empty content
+- GIVEN the path tool creates a `vector` element with `geometryData.kind: 'path'` and an empty structured path
 - WHEN the element is added
 - THEN the element is selected and path drawing mode is activated
 
@@ -215,8 +215,8 @@ Adding an element by type MUST use factory defaults for dimensions and content. 
 
 #### Acceptance Criteria
 
-- [ ] Given add by type, factory defaults are used for dimensions and content
-- [ ] Given add path with empty content, path drawing mode activates automatically
+- [ ] Given add by tool, schema-valid typed payload and geometry defaults are used
+- [ ] Given add vector path with empty structured geometry, path drawing mode activates automatically
 - [ ] Given element removal, the element is also deselected
 - [ ] Given a required element, deletion is blocked
 
@@ -224,7 +224,7 @@ Adding an element by type MUST use factory defaults for dimensions and content. 
 
 ### Requirement: Undo and Redo
 
-The system MUST track committed changes and support undo/redo. Temporal state MUST cover document, documentMode, featureConfig, and animations. Ephemeral updates and selection changes MUST be excluded from history. History size MUST be bounded by `maxUndoSteps` (default 50).
+The system MUST track committed canonical project changes and support undo/redo. History covers the complete project snapshot or invertible atomic project batches, including resources, documents, components, pages, bindings, and sequences. Derived feature policy, ephemeral updates, navigation, and selection MUST be excluded. History size MUST be bounded by `maxUndoSteps` (default 50).
 
 #### Scenario: Undo reverts last committed change
 
@@ -254,13 +254,13 @@ The system MUST track committed changes and support undo/redo. Temporal state MU
 
 ### Requirement: Element Grouping
 
-Grouping MUST assign a shared groupId to all currently selected elements. Ungrouping MUST clear groupId. Grouping MUST require at least 2 selected elements.
+Grouping MUST create a canonical `group` element with a fresh stable ID and atomically reparent all selected sibling roots to it while preserving resolved world transforms and canonical preorder. Ungrouping reparents a selected group's children to its parent, preserves their world transforms and order, then removes the empty group. Grouping requires at least two compatible selected roots.
 
 #### Scenario: Group multi-selection
 
 - GIVEN elements A and B are selected
 - WHEN grouping is invoked
-- THEN both elements share the same non-null groupId
+- THEN a group element contains A and B through their `parentId` references
 
 #### Scenario: Single selection cannot group
 
@@ -268,17 +268,17 @@ Grouping MUST assign a shared groupId to all currently selected elements. Ungrou
 - WHEN grouping is invoked
 - THEN nothing changes
 
-#### Scenario: Ungroup clears groupId
+#### Scenario: Ungroup removes structural group
 
 - GIVEN grouped elements A and B
 - WHEN ungrouping is invoked
-- THEN both elements have `groupId: null`
+- THEN A and B inherit the group's former parent and the group element is removed
 
 #### Acceptance Criteria
 
-- [ ] Given multi-selection, grouping assigns a shared groupId
+- [ ] Given compatible multi-selection, grouping creates one structural group and reparents the selected roots
 - [ ] Given single selection, grouping is a no-op
-- [ ] Given ungrouping, groupId is cleared for all selected elements
+- [ ] Given ungrouping, children preserve world geometry and sibling order while the group is removed
 
 ---
 
@@ -479,46 +479,37 @@ The editor MUST support saving named snapshots of the current document state, in
 
 ---
 
-### Requirement: Per-Format Extensions Dirty Flag
+### Requirement: Derived Interop Cleanliness
 
-Every element-mutating store action MUST flip `extensions.<format>.dirty` to `true` for every Broadset format namespace (`psd`, `pdf`, `pptx`, `svg`) that is present on the mutated element. The per-format dirty flag is the sole signal format exporters consult to decide between re-emitting the element from the current Broadset state (dirty) and re-emitting the preserved original blob byte-for-byte (clean). This mechanism lives in `packages/editor/src/extensions-dirty.ts` as `markElementExtensionsDirty(element)` and is funneled through `updateDocumentElement`, `updateDocumentElements`, `commitGroupMove`, and `commitInlineText` so no element-mutating code path can bypass it.
+Editor mutations MUST NOT persist or flip format dirty booleans. Each `InteropRecord` stores a `baselineSemanticHash`; clean or dirty status is derived by hashing the record's current defined semantic projection. An atomic edit changes derived status only when that projection changes. Undo restoring the projection restores clean status automatically.
 
-Rules:
+Broadset-owned source preservation remains in the project `interop` registry. Generic extension envelopes pass through with semantic JSON equality and are not rewritten by editor middleware.
 
-- An action MUST flip every present format namespace in one pass — partial flips silently corrupt round-trip for whichever format slipped through.
-- Unknown namespaces (outside the four Broadset format ids) MUST pass through unchanged. Third-party extensions on an element are not owned by this middleware.
-- When every present flag is already `true`, the element reference MUST be returned unchanged so Zustand's referential equality checks can skip spurious re-renders.
-- Non-element-mutating actions (`reorderElement`, `toggleVisibility`, `selectElement`, snapshot/page/canvas actions) MUST NOT flip the flag.
-- Document-replacement actions (`setDocument`, `loadTemplate`, `restoreSnapshot`) MUST NOT flip the flag. A just-loaded document's flags represent the authoritative imported baseline; overwriting them with `true` would force an unnecessary re-emit on first export.
-- Undo/redo MUST restore the prior dirty state verbatim — the temporal history is authoritative for each snapshot.
+#### Scenario: Relevant edit derives dirty
 
-#### Scenario: Commit style update flips dirty
+- GIVEN an interop record whose current semantic projection matches `baselineSemanticHash`
+- WHEN a committed edit changes a property included in that projection
+- THEN cleanliness derives dirty without adding a boolean field
 
-- GIVEN an element with `extensions.psd.dirty: false`
-- WHEN `updateElementStyle` is called on that element
-- THEN the element's `extensions.psd.dirty` is `true`
+#### Scenario: Undo restores clean
 
-#### Scenario: Reorder preserves dirty
+- GIVEN a relevant edit made the record derive dirty
+- WHEN undo restores the baseline semantic projection
+- THEN cleanliness derives clean again
 
-- GIVEN an element with `extensions.psd.dirty: false`
-- WHEN `reorderElement` moves it forward in the element array
-- THEN the element's `extensions.psd.dirty` remains `false`
+#### Scenario: Irrelevant runtime edit preserves clean
 
-#### Scenario: Unknown namespace preserved
-
-- GIVEN an element with `extensions.customTool.dirty: false`
-- WHEN any element-mutating action runs
-- THEN `extensions.customTool.dirty` remains `false` (only the four Broadset format ids flip)
+- GIVEN a clean interop record
+- WHEN selection, viewport, or another excluded runtime value changes
+- THEN the semantic projection and derived cleanliness are unchanged
 
 #### Acceptance Criteria
 
-- [ ] Given any of `updateElementEphemeral`, `commitElementUpdate`, `commitGroupMove`, `updateElementStyle`, `groupElements`, `ungroupElements`, `toggleLock`, or `commitInlineText`, every present `extensions.<format>.dirty` on the mutated element flips to `true`
-- [ ] Given `reorderElement` or `toggleVisibility`, no dirty flags flip
-- [ ] Given `setDocument`, `loadTemplate`, or `restoreSnapshot`, no dirty flags flip
-- [ ] Given `undo` after a mutating action, the prior dirty state is restored
-- [ ] Given a mutation of element A, dirty flags on element B are unchanged
-- [ ] Given unknown namespaces in `extensions`, they pass through unchanged
-- [ ] Given a non-plain-object value at a format slot, the middleware skips it defensively without crashing
+- [ ] Given a relevant canonical edit, cleanliness derives from current hash versus `baselineSemanticHash`
+- [ ] Given undo restoring baseline semantics, cleanliness derives clean
+- [ ] Given a runtime-only change, cleanliness is unchanged
+- [ ] Given a project save, no permanent format dirty boolean is serialized
+- [ ] Given unknown generic extensions, editor mutations preserve their payloads unchanged
 
 ---
 

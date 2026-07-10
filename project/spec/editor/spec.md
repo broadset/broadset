@@ -66,27 +66,27 @@ Unit tests verify pure logic in isolation. The following editor interactions inv
 
 - [ ] **Text editing mode:** Double-clicking a text element MUST activate a contenteditable overlay at the element's position, zoom-compensated.
 
-### Clip-path editing
+### Typed clip editing
 
-- [ ] **Enter clip-path editing:** Clicking "Edit Clip Path" in the Clip Path panel MUST render an SVG overlay on the canvas with anchor handles at each clip-path control point.
-- [ ] **Handle drag:** Dragging a clip-path anchor handle MUST update the clip-path shape in real time on the canvas and commit on pointer-up.
+- [ ] **Enter clip editing:** Clicking "Edit Clip" for a typed structured-path clip source MUST render a derived SVG overlay with handles keyed by stable point IDs.
+- [ ] **Handle drag:** Dragging a clip-source anchor MUST update structured vector geometry in real time and commit on pointer-up.
 - [ ] **Point insertion:** Clicking a midpoint handle MUST insert a new control point and begin dragging it.
 - [ ] **Point deletion:** Double-clicking a handle with > 3 points MUST remove that point; with exactly 3 points MUST be a no-op.
-- [ ] **Exit editing:** Pressing Escape or clicking outside the element MUST exit clip-path editing mode and commit changes.
+- [ ] **Exit editing:** Pressing Escape or clicking outside the element MUST exit typed clip editing according to explicit commit/cancel behavior.
 
 ### Path editing
 
 - [ ] **Enter path editing:** Clicking "Edit Path Points" in the Path Properties panel MUST render an SVG overlay with anchor and control handles on the path.
-- [ ] **Handle drag:** Dragging an anchor or control handle MUST update the path `d` attribute in real time and commit on pointer-up.
-- [ ] **Axis constraints:** H-command handles MUST constrain to horizontal movement only; V-command handles to vertical only.
-- [ ] **Bounds refit:** When path editing mode is exited, the element's bounding box MUST be refitted via SVG getBBox().
+- [ ] **Handle drag:** Dragging an anchor or control handle MUST update structured path geometry in real time and commit on pointer-up.
+- [ ] **Segment constraints:** Typed line, curve, and arc segment constraints MUST be preserved during handle movement.
+- [ ] **Bounds refit:** When path editing exits, tight structured-geometry bounds MUST be computed and local coordinates rebased without changing resolved world geometry.
 - [ ] **Exit editing:** Pressing Escape, clicking outside the element, or clicking "Done Editing Points" MUST exit path editing mode.
 
 ### Path drawing
 
-- [ ] **Enter drawing:** Creating a new path element MUST auto-enter drawing mode; clicking "Draw Path" on an existing path also enters drawing mode.
-- [ ] **Click-to-place:** Each click on the canvas MUST append a point (M for first, L for subsequent). The path MUST visually update immediately.
-- [ ] **Close path:** Pressing Enter MUST append a Z command and exit drawing mode.
+- [ ] **Enter drawing:** Creating a vector element with `geometryData.kind: 'path'` MUST auto-enter drawing mode; clicking "Draw Path" on an existing vector path also enters that mode.
+- [ ] **Click-to-place:** Each click MUST append a stable typed point and segment (move first, line thereafter) and update preview immediately.
+- [ ] **Close path:** Pressing Enter MUST set typed path closure and exit drawing mode.
 - [ ] **Commit path:** Pressing Escape MUST commit the current path as-is and exit drawing mode.
 - [ ] **Coordinate conversion:** Clicks MUST be correctly converted from screen coordinates to element-local coordinates accounting for zoom and pan.
 

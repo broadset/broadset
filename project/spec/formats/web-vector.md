@@ -26,9 +26,9 @@ The system MUST generate a self-contained HTML document that embeds the playback
 - WHEN exported to HTML
 - THEN output contains `data-element-id=` attributes
 
-#### Scenario: SVG and path elements rendered
+#### Scenario: Vector and foreign elements rendered
 
-- GIVEN SVG and path elements with clip-path styles
+- GIVEN native vector elements and safe foreign SVG fallbacks with typed clip references
 - WHEN exported to HTML
 - THEN inline SVG markup is rendered and clip-path styles are applied
 
@@ -42,7 +42,7 @@ The system MUST generate a self-contained HTML document that embeds the playback
 
 - [ ] Given a document with animations, output contains `requestAnimationFrame`, easing functions, and serialized animations JSON
 - [ ] Given a document with elements, output contains `data-element-id=` attributes
-- [ ] Given SVG and path elements with clip-path styles, inline SVG markup is rendered and clip-path styles are applied
+- [ ] Given native vectors and safe foreign SVG fallbacks, rendering maps typed geometry and clips without executing source markup
 - [ ] Given rotated and 3D-transformed group elements, group hierarchy and transform styles are preserved
 - [ ] Given the HTML output, a `#canvas` container is positioned with `transform-origin: top left`
 - [ ] Given a viewport resize, the runtime scales the canvas to fit using min(viewportWidth/baseWidth, viewportHeight/baseHeight)

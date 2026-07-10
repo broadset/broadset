@@ -189,11 +189,11 @@ The context menu MUST use HeroUI `Dropdown.Menu` and include items in this order
 | Send to Back     | —                | Selection exists                           |        |
 | _(separator)_    |                  |                                            |        |
 | Group            | Ctrl/Cmd+G       | 2+ elements selected                       |        |
-| Ungroup          | Ctrl/Cmd+Shift+G | Selected element(s) have a groupId         |        |
+| Ungroup          | Ctrl/Cmd+Shift+G | A structural group is selected             |        |
 | _(separator)_    |                  |                                            |        |
 | Lock / Unlock    | Ctrl/Cmd+L       | Selection exists                           |        |
 | Edit Clip Path   | —                | Element has `clipPath` capability          |        |
-| Edit Path Points | —                | Element type is `path`                     |        |
+| Edit Path Points | —                | Selected vector has path geometry          |        |
 
 **Delete** MUST use the HeroUI `color="danger"` variant, rendering the item in the theme's danger color (red text).
 
@@ -278,9 +278,9 @@ Disabled items MUST be visually dimmed and non-interactive.
 - THEN the item label shows "Lock"
 - AND after clicking Lock, re-opening shows "Unlock"
 
-#### Scenario: Edit Path Points on path element
+#### Scenario: Edit points on a vector path
 
-- GIVEN a path element selected
+- GIVEN a vector element with `geometryData.kind: 'path'` selected
 - WHEN "Edit Path Points" is clicked
 - THEN path editing mode is entered
 
@@ -304,7 +304,7 @@ Disabled items MUST be visually dimmed and non-interactive.
 - [ ] Given an element selected, reorderElement is called with the correct direction
 - [ ] Given Lock/Unlock is clicked, the element's locked state toggles and the label updates
 - [ ] Given Edit Clip Path on an element with clipPath capability, clip-path editing activates
-- [ ] Given Edit Path Points on a path element, path editing mode activates
+- [ ] Given Edit Path Points on a vector path, structured-path editing mode activates
 - [ ] Given Delete item, it renders with danger color (red text)
 - [ ] Given the menu would overflow the container edge, it repositions within bounds
 
