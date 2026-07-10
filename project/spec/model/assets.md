@@ -56,6 +56,157 @@ Asset variants MUST carry typed metadata appropriate to their kind:
 - data: encoding, declared schema reference, and record-shape summary;
 - vector or foreign: intrinsic bounds and safe-preview information when applicable.
 
+The persisted records are exactly:
+
+```ts
+interface AssetBase {
+  readonly id: Id;
+  readonly name: string;
+  readonly blob: BlobReference;
+  readonly provenance?:
+    | { readonly kind: 'created'; readonly application: string; readonly createdAt?: UtcTimestamp }
+    | {
+        readonly kind: 'imported';
+        readonly sourceName: string;
+        readonly sourceUri?: string;
+        readonly importer: string;
+        readonly importedAt: UtcTimestamp;
+      };
+  readonly license?: {
+    readonly name: string;
+    readonly spdxIdentifier?: string;
+    readonly url?: string;
+    readonly attribution?: string;
+    readonly permissions: {
+      readonly embedding: boolean;
+      readonly modification: boolean;
+      readonly redistribution: boolean;
+    };
+  };
+  readonly derivatives?: readonly {
+    readonly id: Id;
+    readonly role: 'preview' | 'proxy' | 'thumbnail' | 'optimized';
+    readonly name: string;
+    readonly blob: BlobReference;
+  }[];
+}
+
+type Asset =
+  | (AssetBase & {
+      readonly kind: 'image';
+      readonly metadata: {
+        readonly pixelWidth: number;
+        readonly pixelHeight: number;
+        readonly orientation: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+        readonly hasAlpha: boolean;
+        readonly bitDepth: number;
+        readonly colorModel: 'gray' | 'rgb' | 'cmyk' | 'lab' | 'indexed' | 'unknown';
+        readonly iccProfileAssetId?: Id;
+      };
+    })
+  | (AssetBase & {
+      readonly kind: 'video';
+      readonly metadata: {
+        readonly pixelWidth: number;
+        readonly pixelHeight: number;
+        readonly frameRate: { readonly numerator: number; readonly denominator: number };
+        readonly durationTicks: number;
+        readonly videoCodec: string;
+        readonly hasAlpha: boolean;
+        readonly audioTracks: readonly {
+          readonly id: Id;
+          readonly codec: string;
+          readonly sampleRate: number;
+          readonly channelCount: number;
+          readonly language?: string;
+        }[];
+      };
+    })
+  | (AssetBase & {
+      readonly kind: 'audio';
+      readonly metadata: {
+        readonly durationTicks: number;
+        readonly sampleRate: number;
+        readonly channelCount: number;
+        readonly channelLayout: string;
+        readonly codec: string;
+      };
+    })
+  | (AssetBase & {
+      readonly kind: 'font';
+      readonly metadata: {
+        readonly format: 'opentype' | 'truetype' | 'woff' | 'woff2' | 'type1' | 'collection';
+        readonly postScriptName: string;
+        readonly family: string;
+        readonly weight: number;
+        readonly style: 'normal' | 'italic' | 'oblique';
+        readonly stretch: number;
+        readonly variableAxes: readonly {
+          readonly id: Id;
+          readonly tag: string;
+          readonly minimum: number;
+          readonly defaultValue: number;
+          readonly maximum: number;
+        }[];
+        readonly unicodeCoverage: readonly {
+          readonly id: Id;
+          readonly start: number;
+          readonly end: number;
+        }[];
+        readonly embeddingPermissions: 'installable' | 'editable' | 'preview-print' | 'restricted';
+      };
+    })
+  | (AssetBase & {
+      readonly kind: 'icc-profile';
+      readonly metadata: {
+        readonly profileClass:
+          | 'input'
+          | 'display'
+          | 'output'
+          | 'device-link'
+          | 'color-space'
+          | 'abstract'
+          | 'named-color';
+        readonly colorSpace: string;
+        readonly profileConnectionSpace: 'xyz' | 'lab';
+        readonly description: string;
+        readonly identifier: string;
+      };
+    })
+  | (AssetBase & {
+      readonly kind: 'data';
+      readonly metadata: {
+        readonly encoding: string;
+        readonly schemaUri?: string;
+        readonly recordShape:
+          | { readonly kind: 'opaque' }
+          | {
+              readonly kind: 'records' | 'tabular';
+              readonly fields: readonly {
+                readonly id: Id;
+                readonly name: string;
+                readonly valueType: ValueType;
+                readonly nullable: boolean;
+              }[];
+            };
+      };
+    })
+  | (AssetBase & {
+      readonly kind: 'vector' | 'foreign';
+      readonly metadata: {
+        readonly intrinsicBounds: {
+          readonly x: number;
+          readonly y: number;
+          readonly width: number;
+          readonly height: number;
+        };
+        readonly safePreviewAssetId?: Id;
+      };
+    });
+```
+
+Pixel dimensions, sample rates, channel counts, bit depths, and Unicode scalar values are safe integers. Dimensions, sample rates, channel counts, and bit depths are positive; durations are non-negative. Frame-rate terms are reduced positive safe integers. Font axis defaults lie inclusively between their minimum and maximum; Unicode ranges are ordered and valid. Intrinsic bounds have positive finite width and height. Local IDs are unique within derivatives, audio tracks, variable axes, Unicode ranges, and data fields.
+
 #### Acceptance Criteria
 
 - [ ] Given an image with positive safe-integer pixel dimensions, typed metadata validation succeeds
@@ -67,6 +218,26 @@ Asset variants MUST carry typed metadata appropriate to their kind:
 A font-family resource MUST define stable `id`, `familyName`, `fallbackFontIds`, and ordered `faces`. Each face has a stable ID and either references a font asset or explicitly identifies a system-only face; it MUST declare weight, style, stretch, and optional variable-axis values.
 
 Fallback and face IDs MUST resolve to compatible resources. Export preflight MUST diagnose targets requiring embedding when no compatible embeddable face is available.
+
+```ts
+interface FontFamilyResource {
+  readonly id: Id;
+  readonly familyName: string;
+  readonly fallbackFontIds: readonly Id[];
+  readonly faces: readonly {
+    readonly id: Id;
+    readonly source:
+      | { readonly kind: 'asset'; readonly assetId: Id }
+      | { readonly kind: 'system'; readonly postScriptName: string };
+    readonly weight: number;
+    readonly style: 'normal' | 'italic' | 'oblique';
+    readonly stretch: number;
+    readonly axes?: Readonly<Record<string, number>>;
+  }[];
+}
+```
+
+Weights are finite integers from 1 through 1000 and stretch values are finite percentages greater than zero. Axis tags are four printable ASCII characters and axis values are finite. Face IDs and fallback font IDs are unique within the resource.
 
 #### Acceptance Criteria
 
@@ -80,6 +251,22 @@ A variable collection MUST define stable `id`, `name`, ordered modes, a resolvin
 
 Mode, variable, and value IDs MUST be unique in their scopes. Every value MUST match the declared type. Alias targets MUST resolve, match value types, and form an acyclic graph.
 
+```ts
+interface VariableCollection {
+  readonly id: Id;
+  readonly name: string;
+  readonly modes: readonly { readonly id: Id; readonly name: string }[];
+  readonly defaultModeId: Id;
+  readonly variables: readonly {
+    readonly id: Id;
+    readonly name: string;
+    readonly valueType: ValueType;
+    readonly valuesByMode: Readonly<Record<Id, TypedValue>>;
+    readonly aliasOf?: { readonly collectionId: Id; readonly variableId: Id };
+  }[];
+}
+```
+
 #### Acceptance Criteria
 
 - [ ] Given one type-compatible value for every collection mode, variable validation succeeds
@@ -89,6 +276,29 @@ Mode, variable, and value IDs MUST be unique in their scopes. Every value MUST m
 ### Requirement: Shared Styles
 
 Shared styles MUST have stable identity and hold reusable typed appearance or text-style fragments. They MAY reference variables and swatches. Inheritance and alias relationships MUST resolve, remain type-compatible, and be acyclic. Element-local overrides are sparse.
+
+A shared style uses a closed typed source so the foundation does not introduce an open property bag or depend cyclically on the completed appearance/text schemas:
+
+```ts
+interface SharedStyle {
+  readonly id: Id;
+  readonly name: string;
+  readonly kind: 'appearance' | 'text';
+  readonly source:
+    | {
+        readonly kind: 'properties';
+        readonly inheritedStyleId?: Id;
+        readonly entries: readonly {
+          readonly id: Id;
+          readonly pointer: string;
+          readonly value: TypedValue;
+        }[];
+      }
+    | { readonly kind: 'alias'; readonly styleId: Id };
+}
+```
+
+Property pointers are valid RFC 6901 JSON Pointers. Entry IDs are unique within a style. Pointer legality, value compatibility with the completed appearance/text schema, and inheritance or alias cycles are semantic checks.
 
 #### Acceptance Criteria
 

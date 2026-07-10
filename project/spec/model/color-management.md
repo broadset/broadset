@@ -12,6 +12,8 @@ A color value MUST be either a concrete color or swatch reference. A concrete co
 
 Channel count and numeric ranges MUST validate per space. Canonical colors MUST NOT be authored as CSS strings.
 
+RGB-family channels (`srgb`, `display-p3`, and `rec2020`) are three values in the inclusive range 0 through 1. `lab` is `[L, a, b]` with `L` from 0 through 100 and `a`/`b` from -125 through 125. `oklab` is `[L, a, b]` with `L` from 0 through 1 and `a`/`b` from -0.4 through 0.4. `oklch` is `[L, C, h]` with `L` from 0 through 1, `C` from 0 through 0.4, and hue from 0 through 360. `cmyk` is four channels from 0 through 1. `gray` is one channel from 0 through 1. Alpha is always inclusive 0 through 1.
+
 #### Acceptance Criteria
 
 - [ ] Given valid channel counts and ranges for every supported space, validation succeeds
@@ -21,6 +23,49 @@ Channel count and numeric ranges MUST validate per space. Canonical colors MUST 
 ### Requirement: Swatches
 
 A swatch reference MUST resolve to a project swatch and MAY contain typed adjustments. Swatches MAY define spot-ink metadata, alternate process color, tint behavior, and producer aliases. Producer theme slots map to swatches or interop records rather than becoming the universal color model.
+
+```ts
+type ConcreteColorValue = {
+  readonly kind: 'color';
+  readonly space: 'srgb' | 'display-p3' | 'rec2020' | 'lab' | 'oklab' | 'oklch' | 'cmyk' | 'gray';
+  readonly channels: readonly number[];
+  readonly alpha: number;
+};
+
+type ColorValue =
+  | ConcreteColorValue
+  | {
+      readonly kind: 'swatch';
+      readonly swatchId: Id;
+      readonly adjustments?: readonly { readonly kind: 'tint'; readonly amount: number }[];
+    };
+
+interface SwatchProducerAlias {
+  readonly id: Id;
+  readonly producer: string;
+  readonly name: string;
+}
+
+type Swatch =
+  | {
+      readonly id: Id;
+      readonly kind: 'process';
+      readonly name: string;
+      readonly color: ConcreteColorValue;
+      readonly producerAliases: readonly SwatchProducerAlias[];
+    }
+  | {
+      readonly id: Id;
+      readonly kind: 'spot';
+      readonly name: string;
+      readonly inkName: string;
+      readonly alternateColor: ConcreteColorValue;
+      readonly tintBehavior: 'linear';
+      readonly producerAliases: readonly SwatchProducerAlias[];
+    };
+```
+
+Tint amounts are finite values from 0 through 1. Producer-alias IDs are unique within a swatch. A swatch definition contains a concrete process color rather than recursively referring to another swatch.
 
 #### Acceptance Criteria
 

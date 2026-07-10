@@ -142,9 +142,15 @@ interface BlobReference {
 
 Assets add stable `id`, discriminating `kind`, `name`, typed kind metadata, and optional provenance, license, and derivatives. Element media payloads reference asset IDs rather than URLs or paths.
 
+The closed `Asset` union has exactly the `image`, `video`, `audio`, `font`, `icc-profile`, `data`, `vector`, and `foreign` discriminants. Their exact metadata, provenance, license, derivative, font-family, variable, and shared-style records are defined in [assets.md](assets.md). Font faces discriminate an `asset` source from a `system` source; system faces never carry a pretend asset reference. Shared-style fragments are stable ordered RFC 6901 pointer and `TypedValue` entries or an explicit style alias, not an open JSON property bag.
+
+`ColorValue` and `Swatch` use the exact records and per-space numeric ranges in [color-management.md](color-management.md). Swatches discriminate `process` from `spot`, spot swatches retain an alternate concrete process color, and the only v1 swatch-reference adjustment is a finite normalized `tint`.
+
 #### Acceptance Criteria
 
 - [ ] Given a matching digest, byte length, media type, and source variant, blob validation succeeds
+- [ ] Given every closed asset or resource discriminant with its exact metadata, structural validation succeeds
+- [ ] Given an unknown asset metadata field, ambiguous font source, open shared-style property bag, or recursive swatch definition, structural validation fails
 - [ ] Given a nonexistent asset ID, semantic validation fails rather than selecting an implicit fallback URL
 
 ### Requirement: Template Groups
