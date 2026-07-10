@@ -87,7 +87,7 @@ The toolbar MUST use a compact height (consistent with `sp-08` token). It MUST u
 
 ### Requirement: Element Toolbar
 
-A vertical element toolbar MUST render below the main toolbar in a single column listing all built-in element types and registered custom plugins. Each button MUST be icon-only with a tooltip and MUST enter placement mode for its type. The active placement type MUST be visually highlighted.
+A vertical authoring-tool toolbar MUST render below the main toolbar with core creation/import tools and registered plugin tools. Friendly Rectangle, Ellipse, and Path buttons create canonical vector subtypes; SVG Import maps to native vectors or safe foreign fallback; plugin buttons create `kind: 'plugin'`. Each icon-only button has a tooltip and visually indicates active placement.
 
 **Visual:**
 
@@ -97,13 +97,13 @@ The element toolbar MUST be a vertical strip of icon buttons positioned directly
 
 - GIVEN the demo app with a custom countdown plugin
 - WHEN the element toolbar renders
-- THEN buttons for text, rectangle, ellipse, image, svg, path, qrcode, group, video, clock, ticker, and countdown are visible
+- THEN buttons for Text, Rectangle, Ellipse, Image, SVG Import, Path, QR Code, Group, Video, Audio, Clock, Ticker, Component Instance, and countdown are visible
 
 #### Scenario: Placement mode activation
 
 - GIVEN no active placement
-- WHEN an element type button is pressed
-- THEN placement mode is entered for that type and the button is highlighted
+- WHEN an authoring-tool button is pressed
+- THEN its canonical placement/import action begins and the button is highlighted where placement applies
 
 #### Acceptance Criteria
 
@@ -262,7 +262,7 @@ The context menu MUST display these actions in order. Actions MUST be enabled or
 | Send to Back     |                | Element selected                           |        |
 | — separator —    |                |                                            |        |
 | Group            | Ctrl+G         | 2+ elements selected                       |        |
-| Ungroup          | Ctrl+Shift+G   | Selected element(s) have a groupId         |        |
+| Ungroup          | Ctrl+Shift+G   | A structural group is selected             |        |
 | — separator —    |                |                                            |        |
 | Lock / Unlock    | Ctrl+L         | Element selected                           |        |
 | Edit Clip Path   |                | Element has `clipPath` capability          |        |
@@ -320,13 +320,13 @@ The context menu MUST display only:
 
 #### Scenario: Edit Clip Path opens clip-path editing
 
-- GIVEN a rectangle element selected
+- GIVEN a vector rectangle selected
 - WHEN the user selects "Edit Clip Path" from the context menu
 - THEN clip-path editing mode is entered for that element
 
 #### Scenario: Edit Path Points opens path editing
 
-- GIVEN a path element selected
+- GIVEN a vector structured path selected
 - WHEN the user selects "Edit Path Points" from the context menu
 - THEN path editing mode is entered for that element
 
@@ -345,7 +345,7 @@ The context menu MUST display only:
 - [ ] Given Ungroup with grouped elements, elements are ungrouped
 - [ ] Given Lock/Unlock, the element's locked state toggles
 - [ ] Given Edit Clip Path on an element with clipPath capability, clip-path editing activates
-- [ ] Given Edit Path Points on a path element, path editing mode activates
+- [ ] Given Edit Path Points on a vector structured path, path editing mode activates
 - [ ] Given Delete item, it renders with danger color (red text)
 - [ ] Given a locked element, Lock/Unlock label shows "Unlock"; given an unlocked element, it shows "Lock"
 - [ ] Given a single element selected, Group and Ungroup are not rendered in the menu

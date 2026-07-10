@@ -59,9 +59,9 @@ The system MUST detect element additions, removals, property updates (including 
 
 ---
 
-### Requirement: Page and Settings Diffing
+### Requirement: Page and Surface Diffing
 
-The system MUST detect page additions, page removals, and canvas settings changes.
+The system MUST detect stable page additions/removals and canonical surface changes through atomic operations addressed by stable IDs and RFC 6901 pointers.
 
 #### Scenario: Page add detected
 
@@ -69,22 +69,22 @@ The system MUST detect page additions, page removals, and canvas settings change
 - WHEN diffed
 - THEN the result contains a `page:add` change
 
-#### Scenario: Canvas width change detected
+#### Scenario: Surface width change detected
 
-- GIVEN canvas width changes from default to 500
+- GIVEN `surface.size[0]` changes from its prior value to 500
 - WHEN diffed
-- THEN the result contains a `settings:update` change for `canvas.width`
+- THEN the result contains a typed replace operation targeting the document surface width pointer
 
 #### Acceptance Criteria
 
 - [ ] Given prev has 1 page and next has 2, the result contains a `page:add` change
-- [ ] Given canvas width changes from default to 500, the result contains a `settings:update` change for `canvas.width`
+- [ ] Given surface width changes to 500, the result contains a typed operation targeting `surface.size` with expected prior value
 
 ---
 
 ### Requirement: Animation Diffing
 
-The system MUST detect animation config additions, removals, and per-field changes (timelines, stateTimelineBindings, modifierTimelineBindings). Same-reference animations arrays MUST produce an empty diff.
+The system MUST detect additions, removals, and typed per-field changes in canonical sequences, lifecycle bindings, and state machines. Same-reference immutable sequence arrays MUST produce an empty diff.
 
 #### Scenario: Config added
 

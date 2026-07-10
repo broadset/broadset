@@ -281,7 +281,27 @@ interface ElementGeometry {
   readonly bounds: { readonly width: number; readonly height: number };
   readonly transform:
     | { readonly kind: 'affine2d'; readonly matrix: readonly [number, number, number, number, number, number] }
-    | { readonly kind: 'matrix3d'; readonly matrix: readonly number[] };
+    | {
+        readonly kind: 'matrix3d';
+        readonly matrix: readonly [
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+        ];
+      };
   readonly origin: readonly [number, number, number];
 }
 ```

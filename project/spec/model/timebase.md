@@ -38,22 +38,25 @@ Canonical tick values MUST be non-negative JSON-safe integers. Durations, sequen
 
 ### Requirement: Interval Semantics
 
-Timed media occupies the half-open interval `[0, durationTicks)`. Interactive seek accepts the closed interval through `durationTicks` so the terminal declarative state can be inspected. Sampling beyond `durationTicks` is invalid unless a typed loop or remap explicitly defines it.
+Timed media occupies `[0, durationTicks)`. Interactive seek accepts the closed interval through `durationTicks` so terminal declarative state can be inspected. An unlooped, unremapped request beyond `durationTicks` MUST return typed `time-out-of-range` without sampling or clamping. A declared loop/remap first maps the request to one exact in-range tick and samples that tick.
 
 #### Acceptance Criteria
 
 - [ ] Given playback at a tick below duration, media sampling is valid
 - [ ] Given interactive seek exactly at duration, terminal state is returned without an out-of-range media sample
-- [ ] Given an unlooped sample after duration, evaluation rejects or clamps according to the owning typed contract
+- [ ] Given an unlooped, unremapped request after duration, evaluation returns `time-out-of-range` without sampling or clamping
+- [ ] Given a looped or remapped request after duration, evaluation samples the exact in-range tick produced by the declared mapping
 
 ### Requirement: Work Areas and Clip Ranges
 
-Work areas and clip ranges MUST be ordered tick pairs within their owning duration. Empty ranges are valid only where the specific typed contract declares them meaningful. Time remapping MUST remain deterministic and rationally defined.
+Work areas and sequence-clip source/output ranges MUST be strictly non-empty ordered tick pairs (`startTick < endTick`) within their owning duration. Zero-length point semantics use marker, cue, keyframe, or event ticks rather than ranges. Time remapping MUST remain deterministic and rationally defined.
 
 #### Acceptance Criteria
 
 - [ ] Given an ordered in-bounds work area, validation succeeds
 - [ ] Given reversed or out-of-bounds endpoints, validation fails
+- [ ] Given equal range endpoints, validation fails with `empty-time-range`
+- [ ] Given a zero-length event, it is represented by one marker, cue, keyframe, or event tick rather than an empty range
 - [ ] Given deterministic time remap, direct and sequential evaluation agree at each sampled tick
 
 ### Requirement: Timecode

@@ -189,7 +189,7 @@ The context menu MUST use HeroUI `Dropdown.Menu` and include items in this order
 | Send to Back     | —                | Selection exists                           |        |
 | _(separator)_    |                  |                                            |        |
 | Group            | Ctrl/Cmd+G       | 2+ elements selected                       |        |
-| Ungroup          | Ctrl/Cmd+Shift+G | Selected element(s) have a groupId         |        |
+| Ungroup          | Ctrl/Cmd+Shift+G | A structural group is selected             |        |
 | _(separator)_    |                  |                                            |        |
 | Lock / Unlock    | Ctrl/Cmd+L       | Selection exists                           |        |
 | Edit Clip Path   | —                | Element has `clipPath` capability          |        |
@@ -278,9 +278,9 @@ Disabled items MUST be visually dimmed and non-interactive.
 - THEN the item label shows "Lock"
 - AND after clicking Lock, re-opening shows "Unlock"
 
-#### Scenario: Edit Path Points on path element
+#### Scenario: Edit Path Points on vector path
 
-- GIVEN a path element selected
+- GIVEN a vector structured-path element selected
 - WHEN "Edit Path Points" is clicked
 - THEN path editing mode is entered
 
@@ -304,7 +304,7 @@ Disabled items MUST be visually dimmed and non-interactive.
 - [ ] Given an element selected, reorderElement is called with the correct direction
 - [ ] Given Lock/Unlock is clicked, the element's locked state toggles and the label updates
 - [ ] Given Edit Clip Path on an element with clipPath capability, clip-path editing activates
-- [ ] Given Edit Path Points on a path element, path editing mode activates
+- [ ] Given Edit Path Points on a vector path, structured-path editing mode activates
 - [ ] Given Delete item, it renders with danger color (red text)
 - [ ] Given the menu would overflow the container edge, it repositions within bounds
 
@@ -312,26 +312,29 @@ Disabled items MUST be visually dimmed and non-interactive.
 
 ### Requirement: Element Library
 
-The system MUST render tiles for all 11 built-in element types with labels. Clicking a tile MUST call beginPlacement with the type. Custom types from the registry MUST be included with their icons. Grid layout MUST use 2 columns.
+The system MUST render labeled tiles for canonical authoring tools. Friendly rectangle, ellipse, and path tools create `vector` elements with matching `geometryData.kind`; SVG Import maps source content to native vectors or safe foreign fallback; custom registry tiles create canonical `plugin` elements. Grid layout MUST use 2 columns.
 
 **Built-In Element Types and Icons:**
 
 Each element type MUST have a distinct `lucide-react` icon:
 
-| Type      | Icon name  | Label     |
-| --------- | ---------- | --------- |
-| text      | Type       | Text      |
-| image     | Image      | Image     |
-| rectangle | Square     | Rectangle |
-| ellipse   | Circle     | Ellipse   |
-| path      | PenTool    | Path      |
-| svg       | FileCode2  | SVG       |
-| qrcode    | QrCode     | QR Code   |
-| video     | Video      | Video     |
-| clock     | Clock      | Clock     |
-| ticker    | LetterText | Ticker    |
+| Tool               | Canonical result                        | Icon name  | Label              |
+| ------------------ | --------------------------------------- | ---------- | ------------------ |
+| text               | `kind: 'text'`                          | Type       | Text               |
+| image              | `kind: 'image'`                         | Image      | Image              |
+| rectangle          | vector rectangle                        | Square     | Rectangle          |
+| ellipse            | vector ellipse                          | Circle     | Ellipse            |
+| path               | vector structured path                  | PenTool    | Path               |
+| svg-import         | native vectors or safe foreign fallback | FileCode2  | SVG Import         |
+| qrcode             | `kind: 'qrcode'`                        | QrCode     | QR Code            |
+| group              | `kind: 'group'`                         | Group      | Group              |
+| component-instance | `kind: 'component-instance'`            | Component  | Component Instance |
+| video              | `kind: 'video'`                         | Video      | Video              |
+| audio              | `kind: 'audio'`                         | AudioLines | Audio              |
+| clock              | `kind: 'clock'`                         | Clock      | Clock              |
+| ticker             | `kind: 'ticker'`                        | LetterText | Ticker             |
 
-Custom plugin types MUST appear after the built-in types. If a plugin provides an SVG icon, it MUST be rendered; otherwise a default fallback icon MUST be used.
+Registered plugin tools MUST appear after core tools. A safe plugin icon is rendered when provided; otherwise a fallback icon is used. Clicking one creates `kind: 'plugin'` with registered plugin identity and typed inert defaults.
 
 **Visual States:**
 
@@ -346,18 +349,18 @@ Custom plugin types MUST appear after the built-in types. If a plugin provides a
 
 - GIVEN a default component registry
 - WHEN the library renders
-- THEN 11 built-in element tiles with labels are shown
+- THEN every listed canonical authoring/import tool is shown with its label
 
 #### Scenario: Custom type tile
 
-- GIVEN a registry with a custom `countdown` type
+- GIVEN a registry with a countdown plugin element type
 - WHEN the library renders
 - THEN a countdown tile is shown and clicking it calls beginPlacement
 
 #### Acceptance Criteria
 
-- [ ] Given a default component registry, 11 built-in element tiles with labels are shown
-- [ ] Given a registry with a custom `countdown` type, a countdown tile is shown and clicking it calls beginPlacement
+- [ ] Given the default registry, every listed canonical tool is shown with its label
+- [ ] Given a countdown plugin registration, its tile creates a canonical plugin element through beginPlacement
 
 ---
 

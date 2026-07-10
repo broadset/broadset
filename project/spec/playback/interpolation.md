@@ -169,12 +169,12 @@ The system MUST interpolate all properties between two keyframes, applying per-p
 
 - GIVEN keyframes with `pathCommands` and coordinate arrays
 - WHEN interpolated at `t=0.5`
-- THEN the result is an SVG `d` string with midpoint coordinates
+- THEN the result is typed structured spatial-path geometry with midpoint coordinates and stable topology
 
 #### Acceptance Criteria
 
 - [ ] Given from-keyframe with `opacity` (linear) and `translateX` (ease-in), `opacity` is `0.5` and `translateX` reflects the ease-in curve
-- [ ] Given keyframes with `pathCommands` and coordinate arrays, the result is an SVG `d` string with midpoint coordinates
+- [ ] Given compatible structured spatial-path keyframes, interpolation returns typed midpoint geometry with stable point/segment identity
 
 ---
 

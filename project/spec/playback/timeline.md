@@ -175,7 +175,7 @@ The system MUST route keyframe properties with an explicit `target` to a separat
 
 ### Requirement: Element Timeline Batch Computation
 
-The system MUST compute all named timelines for an element at a given time from the animations array. Elements with no animation entry MUST return an empty array.
+The system MUST compute all sequence tracks targeting an element at an exact tick from the document's canonical `sequences`. Elements with no targeted tracks MUST return an empty array.
 
 #### Scenario: No timelines returns empty
 

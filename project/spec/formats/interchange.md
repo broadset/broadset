@@ -55,7 +55,7 @@ The system MUST export a valid JSON representation of a `BroadsetProject` preser
 - [ ] Given a document with text, image, rectangle, path, ellipse, svg, qrcode, group, video, clock, and ticker elements, all types are preserved
 - [ ] Given an empty document, structure is preserved
 - [ ] Given a document with 100 elements, no data loss occurs
-- [ ] Given a document, the payload is valid BroadsetDocument JSON
+- [ ] Given canonical export, the payload is a strict `BroadsetProjectV1` projection with exact v1 identity; raw canonical JSON uses `.broadset.json`, not `.bsp`
 
 ---
 

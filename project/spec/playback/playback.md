@@ -254,14 +254,14 @@ The system MUST play modifier in-timelines when added and out-timelines when rem
 
 ### Requirement: State and Modifier Timeline Resolution
 
-The system MUST resolve state and modifier timelines from the animations array using a two-step lookup:
+The system MUST resolve state and modifier sequence references from canonical lifecycle/state-machine bindings using stable IDs:
 
-1. **Find binding by name:** Match the requested state/modifier name against the binding's `stateName` or `modifierName`.
-2. **Find timeline by ID:** Use the binding's `timelineId` to locate the timeline, matching against both `id` and `name` fields.
+1. **Find binding by stable identity:** Resolve the requested state/modifier through its declared state-machine or lifecycle binding.
+2. **Find sequence by ID:** Resolve only the stable `sequenceId`; display names are not identity fallbacks.
 
-Unknown states or modifiers (no matching binding) MUST return null. Missing timeline references (binding exists but timeline not found) MUST also return null.
+Unknown runtime names MAY return null. A persisted binding whose sequence ID does not resolve is a semantic-validation error and cannot reach playback.
 
-For modifier bindings, the system MUST support separate `inTimeline` and `outTimeline` references. When no `outTimeline` is defined, removing the modifier MUST stop the in-timeline control.
+Modifier bindings MAY declare separate typed in/out sequence references. When no out sequence is defined, removing the modifier stops the in-sequence control.
 
 #### Scenario: Resolve IN state timeline
 
@@ -275,18 +275,18 @@ For modifier bindings, the system MUST support separate `inTimeline` and `outTim
 - WHEN resolved
 - THEN the result is null
 
-#### Scenario: Timeline matched by name fallback
+#### Scenario: Display name is not an identity fallback
 
-- GIVEN a binding with `timelineId: 'entrance'` and a timeline with `name: 'entrance'` but `id: 'tl-001'`
+- GIVEN a binding whose `sequenceId` is missing but a sequence display name happens to match
 - WHEN resolved
-- THEN the timeline is found via name match
+- THEN semantic validation rejects the stale reference before playback
 
 #### Acceptance Criteria
 
 - [ ] Given a registry with an IN state binding, the correct timeline is returned
 - [ ] Given a request for state `UNKNOWN`, the result is null
-- [ ] Given a binding referencing a timeline by name (not id), the timeline is found via name match
-- [ ] Given a modifier binding with no outTimeline, removing the modifier stops the in-timeline control
+- [ ] Given a persisted binding with a stale or name-only sequence reference, semantic validation rejects it before playback
+- [ ] Given a modifier binding with no out sequence, removing the modifier stops the in-sequence control
 
 ---
 

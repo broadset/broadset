@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines all export and import format converters for broadset. Each format converts between a `BroadsetDocument` and an external file format (PDF, PPTX, PSD, SVG, HTML, JSON, OGraf, video, raster). The formats domain does NOT modify the document model, manage editor state, or drive animation playback. See [conventions](../../README.md).
+Defines all export and import format converters for broadset. Each format converts a validated `BroadsetProjectV1` or an explicitly addressed document/page projection to or from an external file format (PDF, PPTX, PSD, SVG, HTML, JSON, OGraf, video, raster). The formats domain does NOT mutate canonical input, manage editor state, or drive animation playback. See [conventions](../../README.md).
 
 ---
 
@@ -33,12 +33,12 @@ Defines all export and import format converters for broadset. Each format conver
 
 ### Import scope: arbitrary external files
 
-All importers (PPTX, PSD, SVG, etc.) MUST support **arbitrary external files** created by any tool — not only files previously exported from Broadset. The goal is best-effort conversion: map as much of the external file's content as possible to BroadsetDocument elements, and gracefully handle anything that cannot be mapped.
+All importers (PPTX, PSD, SVG, etc.) MUST support **arbitrary external files** created by any tool — not only files previously exported from Broadset. The goal is best-effort conversion into a valid canonical v1 project: map as much source content as possible to closed elements/resources and preserve the rest through interop or safe foreign fallback.
 
 Specifically:
 
 - **Best-effort mapping.** When an external file contains content that has an approximate equivalent in the Broadset model, the importer MUST map it — even if the mapping is lossy. A lossy import is better than a dropped element.
-- **Graceful degradation.** Content that cannot be mapped to any Broadset element type MUST be preserved as a fallback representation (e.g., SVG payload, raster image) rather than silently dropped.
+- **Graceful degradation.** Content that cannot map to a closed native variant MUST use a canonical foreign element with inert blob/preview or a typed interop preserved fragment, rather than a generic SVG/raster payload or silent drop.
 - **No silent data loss.** If the importer skips content, it MUST report warnings describing what was skipped and why.
 - **Round-trip fidelity is a bonus, not the scope.** Re-importing a Broadset-exported file should round-trip cleanly, but this is a secondary goal. The primary goal is useful import of files the user already has.
 
@@ -83,15 +83,15 @@ Carrier mechanisms per format (restated from the Format Round-Trip Metadata requ
 
 ### Requirement: No Silent Drops (IO-D-18)
 
-Every format importer (PSD, PDF, PPTX, SVG) MUST account for every piece of source content it encounters via one of three paths: (a) map to a native Broadset element, (b) preserve the raw source fragment under `extensions.<format>.<key>` (or an opaque `svg`-type element for SVG) for lossless re-emission, or (c) emit a structured import warning describing what was dropped and why. A fourth path — silently discarding content — is forbidden. This invariant is what keeps users in control of their own files: anything the importer doesn't fully understand still surfaces somewhere the user can see.
+Every importer MUST account for every source construct by mapping it to canonical v1 semantics, preserving it through a typed interop record or safe foreign fallback, or emitting a structured diagnostic explaining why no source fragment can be retained. Unreported discard is forbidden.
 
-This cross-cutting rule derives from IO-D-18 and is enforced at every importer boundary by the Importer Contract bullets "Preservation by default" and "Warnings, not exceptions" below, plus the format-specific preservation schemas in `extensions.<format>`.
+This cross-cutting rule is enforced by the importer contract below plus each format's interop preservation schema.
 
-#### Scenario: Unknown feature preserved under extensions
+#### Scenario: Unknown feature preserved through interop
 
 - GIVEN a PSD with a Photoshop-specific effect Broadset does not natively model (e.g. bevel/emboss)
 - WHEN the importer processes the layer
-- THEN the effect parameters are preserved under `extensions.psd.unmappedEffects` with `dirty: false`
+- THEN effect parameters are preserved through a PSD interop record with content-addressed fragment and baseline semantic hash
 - AND the element is otherwise imported normally
 
 #### Scenario: Unknown feature surfaces as warning
@@ -109,9 +109,9 @@ This cross-cutting rule derives from IO-D-18 and is enforced at every importer b
 
 #### Acceptance Criteria
 
-- [ ] Every importer maps recognised content to a native Broadset element OR preserves it under `extensions.<format>` OR emits an import warning
+- [ ] Every importer maps recognized content to canonical v1 semantics OR preserves it through interop/foreign fallback OR emits an import diagnostic
 - [ ] No importer silently drops source content without the user seeing a warning OR a preservation blob
-- [ ] Every format sub-spec enumerates its preservation surface (`extensions.psd.*`, `extensions.pdf.*`, `extensions.pptx.*`, `extensions.svg.*` or opaque SVG elements)
+- [ ] Every format sub-spec enumerates its interop record, preserved-blob, and safe foreign fallback surfaces
 - [ ] Every importer under test reports warnings via the shared `{ document, warnings }` `DocumentImportResult` shape
 - [ ] Importer security-cap hits surface as warnings per the Importer Security Contract `Resource-Limit Failures Emit Warnings` requirement below
 
@@ -122,9 +122,9 @@ This cross-cutting rule derives from IO-D-18 and is enforced at every importer b
 Every format importer MUST satisfy the following contract in addition to the format-specific behaviour in its sub-spec. These rules derive from IO-D-17 and IO-D-18 in the [decision log](../../implementation/decisions.md), and exist so that multi-format round-trip, reconciliation, and preservation behave uniformly across PDF, PSD, PPTX, and SVG.
 
 - **Group-preserving tree.** Every importer MUST build a `parentId` element tree that mirrors the source file's grouping (PSD layer groups, PPTX group shapes, SVG `<g>` / nested SVG, PDF marked-content parents). Flattening groups on import is a bug, not an option.
-- **Preservation by default.** Every importer MUST either map a source construct to a native Broadset element or preserve the raw source fragment for lossless re-emission. Preservation uses typed namespaces under `extensions.<format>.<key>` (PDF, PSD, PPTX) or an opaque `svg`-type element (SVG). Silent drops are prohibited.
-- **Dirty flag initialisation.** Every hydrated element — including SVG opaque elements, which carry the flag under `extensions.svg.dirty` — MUST have its `extensions.<format>.dirty` set to `false` so exporters can distinguish untouched imports (re-emit original blob byte-for-byte) from edited elements (re-emit from current Broadset state).
-- **Structured text by default.** When a source file carries mixed-run text (multiple character-level styles within a paragraph), the importer MUST populate `content` as a `TextBody` rather than flattening to a single string.
+- **Preservation by default.** Every importer maps a construct to canonical v1 or preserves it in an interop record, content-addressed blob, or safe foreign fallback. Unreported drops are prohibited.
+- **Derived cleanliness.** Every preserved mapping stores `baselineSemanticHash`; exporters compare the current defined semantic projection rather than persisting a dirty boolean.
+- **Structured text by default.** Mixed-run source text imports as stable paragraphs/runs with typed properties and never flattens to a string alternative.
 - **Warnings, not exceptions.** Content that cannot be imported MUST surface as an import warning; the importer MUST NOT throw for content it doesn't recognise. The surrounding elements MUST still import.
 
 ---
@@ -262,33 +262,32 @@ Every change to an importer MUST go through the `security-reviewer` agent before
 
 ---
 
-### Requirement: Format Round-Trip Metadata — XMP + Per-Element Tag + Hash Fallback
+### Requirement: Format Round-Trip Metadata and Interop Records
 
-Every layer-or-container format (PSD, PDF, PPTX, SVG) that Broadset round-trips MUST persist Broadset-native state inside the format file using a three-layer pattern so round-trip survives external edits, external-tool normalization, and aggressive tag strippers uniformly. No sidecar files and no app-private streams outside the format's documented extension mechanism (IO-D-17). No silent drops (IO-D-18).
+Every layer/container format that Broadset round-trips MUST preserve project/entity source identity through canonical v1 interop records while using documented format-native metadata carriers. No sidecars, undocumented app-private streams, or unreported drops are permitted.
 
-1. **Document XMP (ISO 16684-1) under a shared `broadset:` namespace** (IO-D-08). Every supporting format carries the document-level state (project settings, canvas, asset registry, data schema, page definitions + override maps, animations where preserveable, Dublin Core metadata from `document.metadata`) in a single XMP packet using the same namespace URI across formats. Read via `_shared/xmp/readBroadsetXmp()`; write via `_shared/xmp/writeBroadsetXmp()`.
-2. **Per-element tag under a format-native extension mechanism.** Each Broadset element's format-native carrier (PSD layer, PPTX shape, PDF marked-content range, SVG element) carries a tag containing the element's stable `id`, its `extensions.<format>.dirty` flag, data bindings, animation references, and the original-source blob for any feature the importer recognized but cannot represent natively. The tag carrier MUST be a mechanism the canonical external tool preserves across save (PSD `additionalInfo` under the `BsPs` 4-byte signature, PPTX custom `<ext>` elements, PDF marked-content custom properties, SVG `data-bs-*` attributes).
-3. **Content-hash fallback when tags are stripped.** When an external tool strips or rewrites the per-element tag (aggressive flatten, rasterize, "Export As" rebuild), the reconciliation pipeline recovers element identity by matching the fingerprint produced by `_shared/fingerprint/fingerprintElement()` against the preserved metadata. Elements that cannot be matched either way become new elements on re-import; elements present in the preserved metadata but missing from the stream surface as deletions that the user confirms.
+1. **Document metadata carrier.** A format MAY carry a defined canonical v1 semantic projection through XMP or another documented native mechanism. The projection and hash are explicit and never substitute a legacy project shape.
+2. **Per-entity source identity.** Format-native tags MAY carry stable entity address, source identity, and baseline semantic hash. Preserved fragments live in content-addressed blobs referenced by interop records.
+3. **Semantic-hash fallback.** When tags are stripped, reconciliation compares stable producer identity and defined RFC 8785/SHA-256 semantic hashes. Unmatched stream entities become additions; missing baselines become deletions requiring confirmation.
 
 #### Scenario: Round-trip from Broadset through an external tool and back
 
 - GIVEN a Broadset project exported in a round-trippable format
 - AND the file is opened in the canonical external tool (Photoshop, PowerPoint, browser, Illustrator), saved, and re-imported
 - WHEN the format's reconciliation pipeline runs
-- THEN Broadset-native state (animations, data bindings, override maps) is hydrated from XMP
+- THEN the defined canonical projection (sequences, stable bindings, and typed page-instance overrides) is hydrated from XMP after strict validation
 - AND per-element identity survives via the per-element tag
 - AND when a tag is stripped, content-hash matching recovers identity
 
-#### Scenario: Dirty-flag discipline on re-export
+#### Scenario: Derived cleanliness on re-export
 
-- GIVEN an element imported from a format file with `extensions.<format>.dirty === false`
-- AND the user has not touched the element in Broadset
+- GIVEN an imported entity whose current semantic projection matches `baselineSemanticHash`
 - WHEN the document is re-exported
 - THEN the original format-native blob is emitted byte-for-byte (no re-synthesis from current Broadset state)
 
-- GIVEN an element the user has edited in Broadset (dirty flag flipped to `true`)
+- GIVEN an imported entity whose current semantic projection differs from baseline
 - WHEN the document is re-exported
-- THEN the element is re-synthesized from current Broadset state (the preserved blob is discarded)
+- THEN current canonical semantics are mapped and intentional loss is reported while preserved source remains recoverable
 
 #### Scenario: No sidecar files
 
@@ -299,10 +298,10 @@ Every layer-or-container format (PSD, PDF, PPTX, SVG) that Broadset round-trips 
 #### Acceptance Criteria
 
 - [ ] Every round-trippable format exporter writes a `broadset:` XMP packet using the shared namespace URI
-- [ ] Every round-trippable format exporter attaches a per-element tag carrying `id`, `dirty`, and preservation blob
-- [ ] Every round-trippable format importer prefers the per-element tag when present and falls back to `fingerprintElement()` when the tag is absent
-- [ ] Every round-trippable format importer hydrates document-level state (project settings, canvas, animations, page override maps, `document.metadata`) from XMP when present
-- [ ] Untouched elements (`extensions.<format>.dirty === false`) re-export byte-identical to the preserved blob
+- [ ] Every round-trippable exporter attaches stable source identity and baseline hash where supported
+- [ ] Every importer prefers source identity and falls back to the defined semantic projection hash
+- [ ] Embedded Broadset projections pass strict canonical v1 validation
+- [ ] Baseline-equal entities may re-export preserved blobs byte-identically
 - [ ] No exporter writes a sidecar file alongside the main format output
 - [ ] Reconciliation reports additions, deletions, and hash-recovered matches per `_shared/reconcile/` contract
 - [ ] Elements present in preserved metadata but missing from the stream surface as deletions that require user confirmation before being dropped
@@ -315,7 +314,7 @@ Cross-format utilities live under `packages/formats/src/_shared/<module>/`. Form
 
 ### Requirement: Shape Classifier (`_shared/shape-classifier/`)
 
-The shape classifier MUST identify canonical SVG rectangle and ellipse paths so every importer (SVG, PDF, PPTX, PSD) maps them back to native Broadset `rectangle` / `ellipse` elements instead of generic `path` payloads.
+The shape classifier MUST identify canonical SVG rectangle and ellipse paths so every importer maps them to `kind: 'vector'` with the most specific `geometryData` subtype instead of an unnecessarily generic structured path.
 
 ```ts
 type ClassifiedShape =
@@ -338,18 +337,12 @@ Contract:
 
 #### Acceptance Criteria
 
-- [ ] Given a canonical absolute-coord rectangle (`M x y L x+w y L x+w y+h L x y+h Z`), the classifier returns `rectangle` with correct `x/y/width/height`
-- [ ] Given a relative-coord rectangle (`M x y l w 0 l 0 h l -w 0 Z`), the classifier returns `rectangle`
-- [ ] Given a rectangle expressed with `H`/`V` commands, the classifier returns `rectangle`
-- [ ] Given a non-axis-aligned quadrilateral (any edge not parallel to an axis), the classifier returns `path`
-- [ ] Given a triangle or other non-rectangle polygon, the classifier returns `path`
-- [ ] Given a canonical four-cubic-Bézier ellipse with kappa control points, the classifier returns `ellipse` with correct `cx/cy/rx/ry`
-- [ ] Given a circle (rx === ry) in the same canonical form, the classifier returns `ellipse` with equal radii
-- [ ] Given an arbitrary four-cubic path that does not match the kappa layout, the classifier returns `path`
-- [ ] Given an empty or whitespace-only `d`, the classifier returns `path` without throwing
-- [ ] Given malformed or unsupported commands, the classifier returns `path` without throwing
-- [ ] Given a rounded rectangle (line + arc commands), the classifier returns `path`
-- [ ] Given a multi-subpath path, the classifier returns `path`
+- [ ] Given an axis-aligned rectangle in absolute, relative, or H/V commands, the classifier returns a vector rectangle payload with correct geometry
+- [ ] Given a non-axis-aligned quadrilateral, triangle, or other polygon, the classifier returns a vector structured-path payload
+- [ ] Given a canonical four-cubic Bézier ellipse or circle, the classifier returns a vector ellipse payload with correct radii
+- [ ] Given an arbitrary curve, rounded rectangle not exactly representable by rectangle payload, or multi-subpath input, the classifier returns a vector structured-path payload
+- [ ] Given empty path input, the classifier returns an empty vector structured-path payload without throwing
+- [ ] Given malformed or unsupported commands, the importer emits diagnostics and preserves source through interop or safe foreign fallback rather than creating invalid canonical geometry
 
 ---
 
@@ -358,38 +351,38 @@ Contract:
 The element fingerprint is a stable cross-document hash used by reconciliation (PSD / PDF / SVG / PPTX re-import) to recover element identity when external tools strip `data-bs-*` tags, XMP entries, or shape-name markers. Visually identical elements MUST hash identically regardless of source-file formatting.
 
 ```ts
-async function fingerprintElement(element: BroadsetElement): Promise<string>;
+async function fingerprintEntity(project: BroadsetProjectV1, address: EntityAddress): Promise<Sha256Digest>;
 ```
 
 Contract:
 
-- Canonicalizes element `type`, `width`, `height`, `rotation`, `content` (flat string or serialized `TextBody`), and a key-sorted projection of `style` so source-file whitespace / attribute-ordering differences do not drift the hash.
-- Wraps `xxhash-wasm` — returns a 16-char lowercase hex `h64` digest.
-- The WASM runtime initializes lazily on first call and caches the API promise; subsequent calls reuse it.
+- Selects the defined semantic projection for the addressed entity: canonical kind and typed payload, bounds/matrix/origin, structured text, ordered appearance, bindings relevant to the format, and referenced semantic resources.
+- Canonicalizes that projection with RFC 8785 and hashes it with SHA-256, returning the canonical `sha256:<hex>` digest.
+- Hash implementation resources initialize lazily when needed and are reused.
 - Two elements that differ only in `id` (or other non-visible identity fields) MUST produce the same fingerprint.
-- Two elements that differ in `content`, geometry, rotation, or any persisted style field MUST produce different fingerprints.
-- Flat-string content and an equivalent `TextBody` structure intentionally hash differently — rich-text metadata (paragraph / run boundaries) is part of identity.
+- Two entities that differ in relevant typed payload, exact geometry, structured text, ordered appearance, or binding semantics MUST produce different fingerprints.
+- Structured paragraph/run boundaries and typed properties are part of identity; flat authored text content is not a canonical alternative.
 
 #### Acceptance Criteria
 
-- [ ] Given a canonical text element, the fingerprint is a 16-char lowercase hex string
+- [ ] Given a canonical text element, the fingerprint is a valid SHA-256 digest
 - [ ] Given two elements that differ only in `id`, the fingerprints match
-- [ ] Given two elements that differ in `content`, the fingerprints differ
-- [ ] Given two elements that differ in `width`, `height`, or `rotation`, the fingerprints differ
-- [ ] The WASM runtime is cached so subsequent calls do not re-initialize the module
-- [ ] A flat-string `content` hashes differently from an equivalent `TextBody` structure
+- [ ] Given two entities that differ in structured text, typed payload, bounds, or exact matrix, fingerprints differ
+- [ ] Given equivalent object-member ordering, RFC 8785 produces the same fingerprint
+- [ ] Hash implementation initialization is reused across calls
+- [ ] Given structured text, paragraph/run boundaries and typed properties affect the fingerprint
 
 ---
 
 ### Requirement: Reconciliation (`_shared/reconcile/`)
 
-Every format importer (PSD / PDF / SVG / PPTX) produces a diff between the last-known Broadset state (preserved in XMP, `extensions.<format>`, or similar metadata) and the current visual document (what the external tool now shows). The reconciliation module unifies that diff into a canonical four-bucket result so downstream UI (import warnings, conflict markers) works against one shape regardless of source format.
+Every format importer produces a diff between baseline interop records/preserved blobs and the current external visual document. Reconciliation exposes one canonical result shape so warnings and conflicts behave uniformly across formats.
 
 ```ts
 interface ReconcileResult {
   readonly modifications: readonly ElementModification[];
-  readonly additions: readonly BroadsetElement[];
-  readonly deletions: readonly BroadsetElement[];
+  readonly additions: readonly Element[];
+  readonly deletions: readonly Element[];
   readonly recoveredByHash: readonly RecoveredByHashEntry[];
 }
 
@@ -420,7 +413,7 @@ Contract:
 
 ### Requirement: SVG Sanitization (`_shared/sanitize/`)
 
-The SVG sanitizer wraps DOMPurify with a Broadset-specific policy so the SVG importer, the `svg`-type element re-render path, and any foreign-markup boundary never let an execution surface reach the renderer. Complements the importer security contract earlier in this spec.
+The SVG sanitizer wraps DOMPurify with a Broadset-specific policy so the SVG importer and authorized sanitized-vector foreign boundary never let an execution surface reach the renderer. Canonical v1 has no raw-SVG core element or generic markup payload.
 
 ```ts
 function sanitizeSvg(input: string): {
@@ -434,7 +427,7 @@ Contract:
 - Strips `<script>` tags, `<foreignObject>` elements, inline event-handler attributes (`onload`, `onclick`, `onmouseover`, `onerror`, `onfocus`, `onblur`), `data-*` attributes, and `javascript:` URIs.
 - Accepts both full `<svg>` documents and bare fragments — fragments are wrapped in a synthetic `<svg>` root for sanitization and unwrapped in the output markup.
 - The `report.removed` list records what was stripped so importers surface "dropped element / attribute" warnings per IO-D-18.
-- The AST `root` carries the parsed SVG element for direct renderer consumption without re-parsing.
+- The AST `root` is importer-boundary data used to derive canonical vectors/foreign fallbacks; raw DOM nodes never become canonical data or direct renderer input.
 - Empty and whitespace-only input returns an empty result (`report.empty = true`) without throwing.
 - Malformed markup MUST NOT throw — the sanitizer returns an empty or best-effort result and the caller continues processing the document.
 
@@ -502,32 +495,32 @@ interface ResolvedRgb {
   readonly alpha?: number;
 }
 
-function toRgb(color: BroadsetColor): ResolvedRgb;
-function gamutMap(color: BroadsetColor, targetSpace?: 'srgb'): BroadsetColor;
-function applyMods(color: BroadsetColor, mods: ColorMods | undefined): BroadsetColor;
+function toRgb(color: ColorValue, resolver: SwatchResolver): ResolvedRgb;
+function gamutMap(color: ColorValue, targetSpace?: 'srgb'): ColorValue;
+function applyMods(color: ColorValue, mods: ColorMods | undefined): ColorValue;
 ```
 
 Contract:
 
-- **toRgb** converts any `RgbBroadsetColor` into culori-parsed 0-1 channels plus optional alpha, honoring `originalColor` so non-sRGB sources (`oklch`, `display-p3`) pass through their source space before being projected to sRGB. Theme-slot colors MUST be resolved against a palette first; passing one throws.
-- **gamutMap** clamps any `BroadsetColor` into the destination gamut (sRGB today). Non-sRGB colors that fall outside sRGB are hue-preserving chroma-reduced via culori's `clampRgb`. Theme colors pass through unchanged (clamping happens after palette resolution).
-- **applyMods** applies PowerPoint-style color modifiers (`lumMod`, `lumOff`, `tint`, `shade`, `alpha`) to a color. Emits a fresh sRGB `RgbBroadsetColor` whose `originalColor` is dropped (the modification alters the source identity). Theme colors pass through unchanged — the palette-aware resolver is the canonical theme + mods path.
+- **toRgb** resolves a typed `ColorValue` (including a swatch through the supplied resolver) and projects authoritative channels to 0–1 sRGB plus alpha without replacing the canonical source value.
+- **gamutMap** returns a typed concrete color in the destination gamut. Out-of-gamut colors are hue-preserving chroma-reduced; swatches resolve before projection and remain unchanged in canonical input.
+- **applyMods** applies PowerPoint-style modifiers (`lumMod`, `lumOff`, `tint`, `shade`, `alpha`) to authoritative typed channels and returns a fresh concrete `ColorValue`. Producer syntax remains recoverable through interop when relevant.
 - `applyMods(color, undefined)` and `applyMods(color, {})` are no-ops that return the input identity so callers can invoke unconditionally.
 
 #### Acceptance Criteria
 
 - [ ] `toRgb` converts an sRGB hex to the expected 0-1 channels
 - [ ] `toRgb` preserves alpha for an RGBA hex input
-- [ ] `toRgb` honors `originalColor` for non-sRGB sources (produces channels distinct from the sRGB-hex fallback)
-- [ ] `toRgb` throws when given a theme-slot color
+- [ ] `toRgb` projects authoritative non-sRGB channels without mutating the input
+- [ ] `toRgb` resolves swatch colors through the supplied resolver and rejects an unresolved swatch
 - [ ] `gamutMap` leaves an in-gamut sRGB color unchanged
 - [ ] `gamutMap` clamps a display-p3 red into a valid sRGB hex
-- [ ] `gamutMap` passes theme colors through unchanged
+- [ ] `gamutMap` does not mutate swatch identity in canonical input
 - [ ] `applyMods` returns the input unchanged for `undefined` or empty `mods`
 - [ ] `applyMods` with `tint: 0.5` lightens the color toward white
 - [ ] `applyMods` with `shade: 0.5` darkens the color toward black
 - [ ] `applyMods` with `alpha: 0.5` reduces the output alpha channel
-- [ ] `applyMods` leaves theme colors as theme colors (palette-aware resolver handles them)
+- [ ] `applyMods` resolves swatches before modification and returns a concrete typed color
 
 ---
 

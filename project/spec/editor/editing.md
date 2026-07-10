@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the interactive editing modes: path editing (modify existing SVG paths), path drawing (create new SVG paths point-by-point), clip-path editing (modify element clip masks visually), and element placement (draw-to-canvas new elements). These modes are mutually exclusive and auto-exit when the active selection changes.
+Defines mutually exclusive interactive editing modes for structured vector paths, typed clip sources, canonical element placement, motion paths, and structured inline text.
 
 ---
 
@@ -54,7 +54,7 @@ The system MUST track a `pathEditingElementId`. Starting path editing MUST selec
 
 ### Requirement: Path Drawing Mode
 
-The system MUST track a `pathDrawingElementId`. Starting drawing MUST select the element and clear any active path editing or clip-path editing. Stopping MUST clear the drawing ID. Adding a path element MUST auto-enter drawing mode. Selection changes to a different element or null MUST auto-exit drawing. Path drawing MUST be completed by one of: (1) the user pressing Escape, which commits the current points and exits drawing mode, (2) the user pressing Enter, which closes the path (connects last point to first) and exits drawing mode, or (3) calling `stopPathDrawing()` programmatically.
+The system MUST track a `pathDrawingElementId`. Starting drawing selects a canonical vector path and clears other editing modes. Adding a vector path auto-enters drawing. Selection changes auto-exit. Escape commits current structured points and exits; Enter sets typed closure and exits; `stopPathDrawing()` exits programmatically.
 
 #### Scenario: Start and stop
 
@@ -105,15 +105,15 @@ The live `<path>` element on the canvas MUST update immediately on each click, s
 
 #### Scenario: Click places first point
 
-- GIVEN path drawing is active for an empty path element
+- GIVEN path drawing is active for a vector path with no points
 - WHEN the user clicks at position (100, 50) on the canvas
-- THEN the path content is updated with an `M` command at the element-local coordinate
+- THEN a stable typed move point is added at the element-local coordinate
 
 #### Scenario: Subsequent click adds line segment
 
 - GIVEN path drawing is active with one existing point
 - WHEN the user clicks at position (200, 100)
-- THEN an `L` command is appended to the path content
+- THEN a stable typed line segment is appended
 
 #### Scenario: Enter closes and exits
 
@@ -143,7 +143,7 @@ When path editing mode is active, the system MUST render an interactive SVG over
 
 **Overlay Structure:**
 
-The overlay MUST be an SVG group element rendered on top of the path element. It MUST contain:
+The overlay MUST be a derived SVG group rendered over the vector path. It MUST contain:
 
 - **Anchor handles** (on-curve points) — one per segment endpoint (M, L, C endpoint, S endpoint, Q endpoint, A endpoint, H, V, T). Rendered as filled circles.
 - **Control handles** (off-curve tangent points) — for Bézier curves (C, S, Q commands). Rendered as smaller unfilled circles.
@@ -170,7 +170,7 @@ Handles MUST be extracted from the parsed path using `extractHandles()` (see pat
 **Drag Interaction:**
 
 1. **Pointer down** on a handle MUST capture the pointer and begin drag tracking.
-2. **Pointer move** MUST update the handle's coordinates in the segment values array, re-serialize the path, and update the element's `content` in real time (ephemeral/live updates). During drag, bounds MUST NOT be refitted (to prevent coordinate drift — see path-geometry.md → Tight SVG Bounding-Box Refit).
+2. **Pointer move** MUST update the addressed stable point/control in ephemeral structured geometry. During drag, bounds MUST NOT be refitted to prevent coordinate drift.
 3. **Pointer up** MUST finalize the drag and commit the path change to the store. On session teardown (when editing stops), the element's bounding box MUST be refitted using the SVG `getBBox()` for tight curve bounds.
 
 **Coordinate Conversion:**
@@ -185,13 +185,13 @@ Screen coordinates MUST be converted to element-local SVG coordinates using the 
 
 #### Scenario: Anchor handles visible in editing mode
 
-- GIVEN path editing is active for a path with content `M10,10 L50,30 L80,10`
+- GIVEN path editing is active for structured move and line segments at those coordinates
 - WHEN the overlay renders
 - THEN 3 anchor handles are rendered at the coordinates (10,10), (50,30), (80,10)
 
 #### Scenario: Bézier control handles visible
 
-- GIVEN path editing is active for a path with content `M10,25 C10,10 40,10 40,25`
+- GIVEN path editing is active for a structured cubic segment with those coordinates
 - WHEN the overlay renders
 - THEN 2 anchor handles and 2 control handles are rendered with connecting control lines
 
@@ -199,7 +199,7 @@ Screen coordinates MUST be converted to element-local SVG coordinates using the 
 
 - GIVEN path editing is active with an anchor handle at (50, 30)
 - WHEN the user drags the anchor to (60, 40)
-- THEN the path content is updated in real time with the new coordinate
+- THEN ephemeral structured geometry updates in real time
 
 #### Scenario: Drag control handle updates curve
 
@@ -223,7 +223,7 @@ Screen coordinates MUST be converted to element-local SVG coordinates using the 
 
 - [ ] Given path editing mode, anchor handles are rendered as white filled circles at each on-curve point
 - [ ] Given path editing mode with Bézier segments, control handles are rendered as unfilled circles with connecting lines to their anchors
-- [ ] Given a handle drag, the path content updates in real time (ephemeral)
+- [ ] Given a handle drag, structured geometry updates ephemerally in real time
 - [ ] Given a drag completed (pointer up), the change is committed to the store
 - [ ] Given path editing stops, the element bounding box is refitted using SVG getBBox()
 - [ ] Given an H command handle, only X movement is allowed
@@ -234,19 +234,19 @@ Screen coordinates MUST be converted to element-local SVG coordinates using the 
 
 ### Requirement: Path Point Appending
 
-The system MUST append SVG path commands during drawing mode. The first point MUST create an `M` command. Subsequent points MUST create `L` commands. Coordinates MUST be relative to the element's bounding box. The bounding box MUST be recalculated to fit all points, padded by half the stroke width. Coordinates MUST be rounded to 2 decimal places. Appending when not in drawing mode MUST be a no-op.
+The system MUST append typed structured path entities during drawing. The first click creates a stable move point; subsequent clicks create stable line segments. Coordinates are element-local in the surface unit. Bounds are recalculated with half-stroke padding while local points and the exact matrix are rebased atomically to preserve world geometry. Display rounding to two decimals MUST NOT reduce canonical precision. Appending outside drawing mode is a no-op.
 
 #### Scenario: First point creates M command
 
 - GIVEN drawing is active for `path-1`
 - WHEN `appendPathPoint(10, 20)` is called
-- THEN content is `"M1,1"` and bounding box is padded by stroke width
+- THEN structured geometry contains one move point and bounds include stroke padding
 
 #### Scenario: Subsequent points create L commands
 
 - GIVEN three points appended: (10,20), (30,40), (50,60)
 - WHEN the element is inspected
-- THEN content is `"M1,1 L21,21 L41,41"` with grown bounding box
+- THEN structured geometry contains one move and two line segments with grown bounds
 
 #### Scenario: Coordinates rounded
 
@@ -258,14 +258,14 @@ The system MUST append SVG path commands during drawing mode. The first point MU
 
 - GIVEN drawing mode is not active
 - WHEN `appendPathPoint(10, 20)` is called
-- THEN element content is unchanged
+- THEN structured geometry is unchanged
 
 #### Acceptance Criteria
 
-- [ ] Given drawing is active for `path-1`, content is `"M1,1"` and bounding box is padded by stroke width
-- [ ] Given three points appended: (10,20), (30,40), (50,60), content is `"M1,1 L21,21 L41,41"` with grown bounding box
+- [ ] Given drawing is active for `path-1`, one stable move point exists and bounds include stroke padding
+- [ ] Given three points appended, structured geometry has one move and two stable line segments with grown bounds
 - [ ] Given `appendPathPoint(10.12345, 20.6789)`, position values are rounded to 2 decimal places
-- [ ] Given drawing mode is not active, element content is unchanged
+- [ ] Given drawing mode is not active, structured geometry is unchanged
 
 ---
 
@@ -275,20 +275,21 @@ The system MUST track a `placement` state — a discriminated union that capture
 
 **Two-click (and three-click) placement model:** Every built-in placement is driven by explicit user clicks. The user's clicks always determine the element's size — built-ins MUST NOT fall back to factory-default dimensions. If the extent click equals the anchor click, it MUST be ignored and the system MUST remain in the sizing sub-state.
 
-**Anchor semantics per element type:**
+**Anchor semantics per authoring tool:**
 
-| Element | Mode | Click 1 | Click 2 | Click 3 |
-|---|---|---|---|---|
-| rectangle, image, svg, video, qrcode, clock, ticker, group, text | two-click (corner) | top-left corner | bottom-right corner | — |
-| ellipse | three-click (center+radius+theta) | center | `rx = \|Δx\|`, `ry = \|Δy\|` from center | `rotation = atan2(Δy, Δx)` in degrees |
-| path | multi-click | first vertex (M) | second vertex (L) | further clicks keep adding; Enter/Esc commits |
-| external plugin element types | single-click | place at plugin's declared default size at click point | — | — |
+| Element                                                     | Mode                              | Click 1                                                   | Click 2                                  | Click 3                                       |
+| ----------------------------------------------------------- | --------------------------------- | --------------------------------------------------------- | ---------------------------------------- | --------------------------------------------- |
+| rectangle, image, video, qrcode, clock, ticker, group, text | two-click (corner)                | top-left corner                                           | bottom-right corner                      | —                                             |
+| ellipse                                                     | three-click (center+radius+theta) | center                                                    | `rx = \|Δx\|`, `ry = \|Δy\|` from center | `rotation = atan2(Δy, Δx)` in degrees         |
+| path                                                        | multi-click                       | first vertex (M)                                          | second vertex (L)                        | further clicks keep adding; Enter/Esc commits |
+| SVG import                                                  | import action                     | maps to native vectors or safe foreign fallback           | —                                        | —                                             |
+| registered plugin tools                                     | single-click                      | place a canonical plugin element at declared default size | —                                        | —                                             |
 
 For corner types the element is placed with its top-left at `(min(anchorX, extentX), min(anchorY, extentY))` and its `width`/`height` at `|Δx|`/`|Δy|`. Negative drags (down-left, up-right, etc.) are normalised.
 
-For ellipse the anchor is the visual centre; `rx`/`ry` come from the component-wise deltas so a diagonal phase-2 click produces an oval and a near-horizontal one a flat oval. The element's top-left is `(anchor.x − rx, anchor.y − ry)` with `width = 2·rx`, `height = 2·ry`. Phase 3 stamps `rotation` (degrees) using `atan2(Δy, Δx)` of the pointer vs. the centre.
+For ellipse, the anchor is the visual centre; component-wise deltas derive vector ellipse bounds. Phase 3 derives rotation through `atan2` and composes it into the exact canonical matrix.
 
-For path the first click creates the path element with a single `M0,0` point at the click and enters `path-drawing`; subsequent clicks dispatch to `appendPathPoint`. Enter commits, Escape cancels.
+For path, the first click creates a vector path with a stable move point and enters drawing; subsequent clicks append structured points/segments. Enter closes; Escape commits open geometry.
 
 External plugins use single-click placement at the plugin's declared default size. They are the only path allowed to create an element at a factory-declared default size.
 
@@ -298,7 +299,7 @@ External plugins use single-click placement at the plugin's declared default siz
 
 - `beginPlacement(store, elementType)` — enters `{ type: 'placement-anchor', elementType }`, clears all other editing modes
 - `cancelPlacement(store)` — resets `placement` and `placementPreview` to `null`, returns `editingMode` to `{ type: 'none' }`
-- `setPlacementAnchor(store, x, y)` — transitions from `placement-anchor` to the correct next sub-state (`placement-extent`, `placement-ellipse-radius`), or — for path — creates the path element with a single `M0,0` point and enters `path-drawing`, or — for external plugins — creates the element at the plugin default size and clears placement
+- `setPlacementAnchor(store, x, y)` — transitions to the next sub-state; for path creates a vector path with a stable move point; for registered plugins creates `kind: 'plugin'` at typed defaults
 - `updatePlacementPreview(store, x, y)` — ephemeral preview pointer update (no history)
 - `commitPlacementExtent(store, x, y)` — corner types only: creates the element from the anchor/extent bounds, selects it, and clears placement. No-op if `(x, y)` equals the anchor
 - `setEllipseRadius(store, x, y)` — ellipse only: transitions `placement-ellipse-radius` → `placement-ellipse-rotation`. No-op if `(x, y)` equals the anchor
@@ -334,13 +335,13 @@ Dispatching any of these actions while `placement` is in the wrong sub-state MUS
 
 - GIVEN `placement` is `{ type: 'placement-anchor', elementType: 'ellipse' }`
 - WHEN `setPlacementAnchor(store, 100, 100)`, then `setEllipseRadius(store, 130, 120)`, then `commitEllipseRotation(store, 150, 100)` is called
-- THEN an ellipse is created with `rx = 30`, `ry = 20`, position `(70, 80)`, `width = 60`, `height = 40`, and `rotation` in degrees from `atan2(0, 50)`
+- THEN a vector ellipse is created with 60×40 bounds and an exact matrix composed from the center and derived rotation
 
 #### Scenario: Path enters drawing on first click
 
 - GIVEN `placement` is `{ type: 'placement-anchor', elementType: 'path' }`
 - WHEN `setPlacementAnchor(store, 120, 80)` is called
-- THEN a path element is created at `(120, 80)` with content `"M0,0"`, `placement` is `null`, and `pathDrawingElementId` is set to the new element
+- THEN a vector path with one stable move point is created at `(120, 80)`, placement clears, and drawing targets its ID
 
 #### Scenario: Plugin single-click creates at default size
 
@@ -360,8 +361,8 @@ Dispatching any of these actions while `placement` is in the wrong sub-state MUS
 - [ ] `beginPlacement("rectangle")` while any other editing mode is active clears that mode and enters `placement-anchor`
 - [ ] Two-click rectangle placement from (50,30) to (110,70) creates a 60×40 element at (50,30)
 - [ ] `commitPlacementExtent(anchor, anchor)` is a no-op and leaves `placement` unchanged
-- [ ] Three-click ellipse with anchor (100,100), radius click (130,120) and rotation click (150,100) creates an ellipse with `rx=30`, `ry=20`, top-left (70,80), and rotation derived from `atan2(Δy, Δx)` in degrees
-- [ ] Path first click creates a path element with `"M0,0"` content, selects it, enters `path-drawing`, and clears `placement`
+- [ ] Three-click ellipse creates a vector ellipse with 60×40 bounds and exact matrix derived from center and angle
+- [ ] Path first click creates a vector path with one stable move point, selects it, enters drawing, and clears placement
 - [ ] External plugin single-click placement creates the element at the plugin's declared default size
 - [ ] Built-in placements MUST NOT fall back to factory default dimensions when the user's extent click lands on the anchor
 - [ ] The floating placement-mode banner MUST NOT be rendered while placement is active
@@ -370,17 +371,17 @@ Dispatching any of these actions while `placement` is in the wrong sub-state MUS
 
 ### Requirement: Clip-Path Editing Mode
 
-The system MUST track a `clipPathEditingElementId`. Clip-path editing is available for any element with the `clipPath` capability flag enabled (rectangle, ellipse, image, svg, group). Starting clip-path editing MUST select the target element and clear any active path editing, path drawing, or placement mode. Stopping MUST clear the ID. Changing the active selection to a different element or null MUST auto-exit clip-path editing. Clip-path editing is mutually exclusive with all other editing modes.
+The system MUST track a `clipPathEditingElementId`. Clip editing is available when derived capability permits typed `appearance.clip` (including vector rectangle/ellipse, image, sanitized-vector foreign, and group). Starting selects the target and clears other modes; selection change auto-exits. The editing ID is runtime state only.
 
 **State management:**
 
-- `startClipPathEditing(elementId)` — enters clip-path editing mode for the given element. If the element's `customClipPath` is empty, a default rectangular clip path (`polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)`) MUST be seeded and `maskType` set to `'custom'`. MUST be a no-op if the element lacks the `clipPath` capability.
+- `startClipPathEditing(elementId)` — enters clip editing. If absent, one atomic batch creates a vector rectangle clip source with fresh stable ID and assigns its typed reference. It is a no-op when capability is absent.
 - `stopClipPathEditing()` — exits clip-path editing mode, clears `clipPathEditingElementId`.
-- `updateClipPathPoint(index, x, y)` — updates a control point at the given index to coordinates `(x, y)` in element-relative percentages. MUST be a no-op when not in clip-path editing mode.
-- `insertClipPathPoint(afterIndex, x, y)` — inserts a new point after the given index. MUST be a no-op when not in editing mode.
-- `deleteClipPathPoint(index)` — removes the point at the given index. MUST be a no-op if the path has 3 or fewer points.
+- `updateClipPathPoint(pointId, x, y)` — updates a stable structured point in clip-source local coordinates; no-op outside editing.
+- `insertClipPathPoint(afterPointId, x, y)` — inserts fresh stable point/segment identity; no-op outside editing.
+- `deleteClipPathPoint(pointId)` — removes by stable ID and rejects geometry with fewer than three required points.
 
-All point mutations MUST update the element's `customClipPath` screen property in the store and be tracked by undo/redo.
+All mutations update structured vector clip-source geometry and are tracked atomically by undo/redo. Raw CSS and arbitrary SVG never enter canonical state.
 
 #### Scenario: Start and stop
 
@@ -408,32 +409,32 @@ All point mutations MUST update the element's `customClipPath` screen property i
 
 #### Scenario: Empty clip-path seeds default
 
-- GIVEN `rect-1` has empty `customClipPath`
+- GIVEN `rect-1` has no typed clip reference
 - WHEN `startClipPathEditing("rect-1")` is called
-- THEN `customClipPath` is set to `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)` and `maskType` is `'custom'`
+- THEN a vector rectangle source is created and `rect-1.appearance.clip` references it
 
 #### Scenario: Update control point
 
 - GIVEN clip-path editing is active with a 4-point polygon
-- WHEN `updateClipPathPoint(1, 80, 0)` is called
-- THEN the second point moves to `80% 0%` and `customClipPath` is updated
+- WHEN `updateClipPathPoint(pointId, 80, 0)` is called
+- THEN that structured point moves in source-local coordinates
 
 #### Scenario: Insert point
 
 - GIVEN clip-path editing is active with a 3-point polygon
-- WHEN `insertClipPathPoint(0, 50, 0)` is called
+- WHEN `insertClipPathPoint(firstPointId, 50, 0)` is called
 - THEN a new point is inserted after index 0, creating a 4-point polygon
 
 #### Scenario: Delete point minimum enforced
 
 - GIVEN clip-path editing is active with exactly 3 points
-- WHEN `deleteClipPathPoint(1)` is called
+- WHEN `deleteClipPathPoint(pointId)` is called
 - THEN the deletion is rejected and the polygon remains 3 points
 
 #### Scenario: Delete point with sufficient points
 
 - GIVEN clip-path editing is active with 5 points
-- WHEN `deleteClipPathPoint(2)` is called
+- WHEN `deleteClipPathPoint(pointId)` is called
 - THEN the point is removed, creating a 4-point polygon
 
 #### Acceptance Criteria
@@ -442,8 +443,8 @@ All point mutations MUST update the element's `customClipPath` screen property i
 - [ ] Given clip-path editing starts, other editing modes (path editing, path drawing, placement) are cleared
 - [ ] Given selection changes to a different element, clip-path editing auto-exits
 - [ ] Given an element without `clipPath` capability, `startClipPathEditing` is a no-op
-- [ ] Given an element with empty `customClipPath`, a default rectangular polygon is seeded and `maskType` set to `'custom'`
-- [ ] Given `updateClipPathPoint`, the corresponding point's coordinates update in `customClipPath`
+- [ ] Given an element without a clip, a vector rectangle source and typed reference are created atomically
+- [ ] Given `updateClipPathPoint`, the addressed structured point updates by stable ID
 - [ ] Given `insertClipPathPoint`, a new point is added to the polygon
 - [ ] Given `deleteClipPathPoint` with > 3 points, the point is removed
 - [ ] Given `deleteClipPathPoint` with exactly 3 points, deletion is rejected
@@ -451,50 +452,51 @@ All point mutations MUST update the element's `customClipPath` screen property i
 
 ---
 
-### Requirement: Path Element Factory Defaults
+### Requirement: Vector Path Factory Defaults
 
-The system MUST create path elements with default dimensions (80×50), empty content, and SVG stroke/fill style defaults. The element MUST be centered on the canvas.
+The system MUST create vector paths with default 80×50 positive bounds, empty structured path geometry, a default black typed stroke layer, and none fill paint. The exact matrix centers the element on the surface.
 
 #### Scenario: Path factory defaults
 
 - GIVEN a canvas of 200×100
-- WHEN a path element is created
-- THEN width=80, height=50, position centers it, and SVG styles are set
+- WHEN a vector path is created
+- THEN bounds are 80×50, its matrix centers it, and typed appearance defaults are set
 
 #### Acceptance Criteria
 
-- [ ] Given a canvas of 200×100, width=80, height=50, position centers it, and SVG styles are set
+- [ ] Given a 200×100 surface, bounds are 80×50, the matrix centers it, and typed appearance defaults are set
 
 ---
 
-### Requirement: Element Factory Defaults
+### Requirement: Canonical Element Factory Defaults
 
-Creating an element by type MUST use predefined default dimensions and content per type. The system MUST support: text (80×20, `'New Text'`), image (60×60, empty), svg (60×60, empty), path (80×50, empty), rectangle (80×50, empty), ellipse (50×50, empty), qrcode (40×40, `'https://example.com'`), group (120×80, empty), video (120×68, empty), clock (160×50, `'HH:mm:ss'`), ticker (400×40, `'["Item 1"]'`). Custom types MUST fall back to plugin-provided defaults or system fallbacks (80×50, empty).
+Creating through a tool MUST use predefined positive bounds and schema-valid typed payload. Defaults remain: text 80×20 with one paragraph/run containing `New Text`; image 60×60 with an explicitly missing placeholder asset; vector path 80×50 empty; vector rectangle 80×50; vector ellipse 50×50; qrcode 40×40 with typed example value; group 120×80; video 120×68 with missing placeholder asset; clock 160×50 with typed `HH:mm:ss` format; ticker 400×40 with one stable typed `Item 1`. SVG uses the importer. Registered plugins supply canonical inert payload defaults or the system plugin fallback 80×50.
 
 #### Scenario: Text factory defaults
 
 - GIVEN element type `'text'`
 - WHEN an element is created via the factory
-- THEN width is 80, height is 20, content is `'New Text'`
+- THEN bounds are 80×20 and structured text contains `New Text`
 
 #### Scenario: Custom type with plugin defaults
 
-- GIVEN a plugin with `defaults: { width: 100, height: 100, content: 'Timer' }`
+- GIVEN a plugin with typed defaults containing 100×100 bounds and inert payload `{ label: 'Timer' }`
 - WHEN an element of the plugin type is created
-- THEN width is 100, height is 100, content is `'Timer'`
+- THEN a canonical plugin element uses those bounds and payload
 
 #### Scenario: Custom type without plugin defaults
 
 - GIVEN a plugin with no defaults specified
 - WHEN an element of the plugin type is created
-- THEN width is 80, height is 50, content is empty
+- THEN a canonical plugin element uses 80×50 bounds and empty object payload
 
 #### Acceptance Criteria
 
-- [ ] Given element type text, factory produces width 80, height 20, content 'New Text'
-- [ ] Given a plugin with defaults, factory uses the plugin's default dimensions and content
+- [ ] Given the text tool, factory produces 80×20 bounds and structured `New Text`
+- [ ] Given a plugin with typed defaults, factory uses its bounds and inert payload
 - [ ] Given a plugin without defaults, factory uses system fallback dimensions
-- [ ] Given each built-in element type (image, svg, rectangle, ellipse, qrcode, group, video, clock, ticker), the factory produces the type-specific default dimensions and content
+- [ ] Given each canonical core tool and vector subtype tool, factory produces schema-valid typed defaults
+- [ ] Given SVG import, mapped vectors or safe foreign fallbacks are created instead of an SVG core kind
 
 ---
 
@@ -523,17 +525,17 @@ EditorConfig MUST be validated at initialization. Invalid font definitions, docu
 
 ### Requirement: Property Capability Mapping
 
-Each element type + document mode combination MUST have a deterministic set of editable style and screen properties. Properties outside the capability set MUST be hidden from the UI. Custom plugins MAY override capabilities.
+Each canonical element kind/vector subtype plus document-kind combination MUST have deterministic editing capabilities. Properties outside the schema-approved capability set are hidden. Authorized plugin registrations MAY reduce or expose payload-specific controls but cannot bypass validation.
 
 #### Scenario: Text element capabilities
 
-- GIVEN a text element in screen mode
+- GIVEN a text element in a motion document
 - WHEN its capability profile is queried
 - THEN typography properties (fontFamily, fontSize, etc.) are editable
 
 #### Scenario: Rectangle lacks typography
 
-- GIVEN a rectangle element
+- GIVEN a vector rectangle
 - WHEN its capability profile is queried
 - THEN typography properties are not editable
 
@@ -546,7 +548,7 @@ Each element type + document mode combination MUST have a deterministic set of e
 #### Acceptance Criteria
 
 - [ ] Given a text element, typography properties are in the editable capability set
-- [ ] Given a rectangle element, typography properties are not in the capability set
+- [ ] Given a vector rectangle, typography properties are not in the capability set
 - [ ] Given a plugin with capability overrides, the overrides are applied
 
 ---
@@ -555,12 +557,12 @@ Each element type + document mode combination MUST have a deterministic set of e
 
 The system MUST provide a preflight checker that inspects the current editor state or a standalone document for issues. Issues MUST have severity (error, warning, info), element name, message, and rule identifier. The following named rules MUST be evaluated:
 
-- **title-safe:** Text, image, and SVG elements extending beyond the 90% title-safe inset MUST produce a `warning`.
+- **title-safe:** Text, image, vector, and foreign-preview elements extending beyond the 90% title-safe inset MUST produce a `warning`.
 - **dpi-resolution:** Image elements whose rendered pixel dimensions exceed 500px MUST produce an `info` recommending a minimum source resolution of 1.5× the rendered size.
-- **bleed:** In print mode, elements extending beyond canvas bounds plus the bleed margin (default 3mm) MUST produce a `warning`.
-- **small-text:** In print mode, text elements with font size below 6pt MUST produce a `warning`.
-- **color-mode:** In print mode, elements using fluorescent or out-of-gamut colors MUST produce an `info`.
-- **unsupported-property:** Elements using style or screen properties unavailable in the current document mode MUST produce a `warning` per unsupported property.
+- **bleed:** In print documents, elements extending beyond `surface` trim/bleed intent MUST produce a warning.
+- **small-text:** In print documents, text runs below 6pt-equivalent MUST produce a warning.
+- **color-mode:** In print documents, out-of-output-gamut colors MUST produce an info diagnostic.
+- **unsupported-property:** Canonical properties not representable by a referenced output profile MUST produce a warning per property.
 
 Diagnostics MUST have stable severity classification and deterministic ordering.
 
@@ -576,7 +578,7 @@ Diagnostics MUST have stable severity classification and deterministic ordering.
 - WHEN preflight is run
 - THEN no issues are reported
 
-#### Scenario: Unsupported property in print mode
+#### Scenario: Unsupported property for print output
 
 - GIVEN a print-mode document with an element using a screen-only property
 - WHEN preflight diagnostics run
@@ -587,9 +589,9 @@ Diagnostics MUST have stable severity classification and deterministic ordering.
 - [ ] Given a text element outside title-safe inset, a warning with rule title-safe is emitted
 - [ ] Given a large image, an info with rule dpi-resolution is emitted
 - [ ] Given a print document with elements beyond bleed, a warning with rule bleed is emitted
-- [ ] Given print mode with text below 6pt, a warning with rule small-text is emitted
-- [ ] Given print mode with fluorescent colors, an info with rule color-mode is emitted
-- [ ] Given a screen-only property in print mode, a warning with rule unsupported-property is emitted
+- [ ] Given print output with text below 6pt, a warning with rule small-text is emitted
+- [ ] Given print output with out-of-gamut colors, an info with rule color-mode is emitted
+- [ ] Given a property unsupported by a referenced print profile, a warning with rule unsupported-property is emitted
 - [ ] Given multiple issues, diagnostics have deterministic ordering
 - [ ] Given a clean document, preflight reports no issues
 
@@ -613,7 +615,7 @@ The system MUST serialize the full editor state to a deterministic JSON string f
 
 ### Requirement: In-Place Text Editing
 
-Double-clicking a text element MUST enter inline text editing mode. In this mode the text element's content becomes editable via a `contenteditable` region overlaid on the canvas at the element's position and dimensions. The editor MUST suppress element drag/resize interactions while inline editing is active. Pressing Escape or clicking outside the element MUST exit inline editing mode and commit the text changes to the store. Pressing Enter MUST insert a line break (not exit editing). The inline editor MUST respect the element's font, size, color, and alignment settings. Only basic text editing is supported inline; advanced properties (font family, font size, alignment) are edited via the properties sidebar.
+Double-clicking a text element MUST enter inline editing through a `contenteditable` transport overlay derived from structured paragraphs/runs. DOM HTML is never project state. The editor suppresses drag/resize while active. Escape or click-outside exits and commits typed text operations; Enter splits/inserts paragraph structure. Stable paragraph/run IDs survive where logical entities survive, and typed formatting is respected.
 
 #### Scenario: Double-click activates inline editing
 
@@ -633,11 +635,11 @@ Double-clicking a text element MUST enter inline text editing mode. In this mode
 - WHEN the user clicks outside the element
 - THEN editing mode exits and text changes are committed to the store
 
-#### Scenario: Typing updates content in real-time
+#### Scenario: Typing updates structured text in real-time
 
 - GIVEN inline editing is active
 - WHEN the user types text
-- THEN the element content updates in real-time on the canvas
+- THEN ephemeral structured text updates in real time and commit preserves stable run identity
 
 #### Scenario: Drag suppressed during inline editing
 
@@ -651,7 +653,7 @@ Double-clicking a text element MUST enter inline text editing mode. In this mode
 - [ ] Given inline editing mode, pressing Escape commits changes and exits
 - [ ] Given inline editing mode, clicking outside commits changes and exits
 - [ ] Given inline editing mode, drag interactions are suppressed
-- [ ] Given inline editing mode, the `contenteditable` region matches the element's visual styling
+- [ ] Given inline editing mode, the transport overlay matches resolved structured-text formatting
 - [ ] Given inline editing mode, pressing Enter inserts a line break
 
 ---
@@ -694,7 +696,7 @@ The editor MUST provide a motion path editing mode for visually authoring the B�
 2. **Control points** (Bézier handles) as draggable circles along the curve
 3. **The element's preview position** as a semi-transparent ghost at the current scrub time, positioned on the path
 
-Dragging control points MUST update the `motionPath` SVG `d` string in real time. The path overlay MUST be zoom-compensated (constant visual size regardless of canvas zoom). Double-clicking the path MUST insert a new control point at the clicked arc position. Selecting a control point and pressing Delete MUST remove it (minimum 2 anchor points: start and end). Escape or clicking outside the path MUST exit motion path editing mode and commit changes. The motion path overlay MUST render above all elements but below the transform widget. Entry and exit follow the same mutex rules as path editing and clip-path editing — only one overlay mode can be active at a time.
+Dragging control points MUST update the sequence track's typed spatial-path geometry with stable point IDs. The derived SVG overlay remains zoom-compensated. Double-click inserts a fresh stable point at the clicked arc position; Delete removes the selected point while enforcing at least start/end anchors. Escape or click-outside exits and commits. The overlay remains between scene elements and transform widget, mutually exclusive with other editing modes.
 
 #### Scenario: Enter motion path editing
 
@@ -729,7 +731,7 @@ Dragging control points MUST update the `motionPath` SVG `d` string in real time
 #### Acceptance Criteria
 
 - [ ] Given an element with motion path animation, entering motion path editing renders the path curve, control points, and element ghost
-- [ ] Given a control point drag, the motionPath SVG `d` string updates in real time
+- [ ] Given a control point drag, typed spatial-path geometry updates ephemerally and commits by stable point ID
 - [ ] Given a double-click on the path, a new control point is inserted
 - [ ] Given Escape pressed, motion path editing exits and changes are committed
 - [ ] Given another overlay mode active, entering motion path editing exits the previous mode first
@@ -749,7 +751,7 @@ When inline text editing is active (double-click on text element) and the user s
 | Text color | Color swatch  | Wraps selection in `<span style="color:...">` tag |
 | Font size  | NumField      | Wraps selection in `<span style="font-size:...">` |
 
-Toggle buttons MUST reflect the current formatting state of the selection (pressed if all selected text has that format). When the selection is collapsed (cursor only, no range), the toolbar MUST be hidden. Applying a format MUST modify the element's `content` HTML using only the allowed rich text tags (b, i, u, br, span, strong, em). The toolbar MUST be zoom-compensated so it remains readable at any canvas zoom level. Clicking a toolbar control MUST NOT exit inline editing mode. The toolbar MUST use pointer-events to prevent accidental text deselection when clicking controls.
+Toggle buttons MUST reflect typed formatting across selected runs. When the selection is collapsed, the toolbar is hidden. Applying a format updates typed run properties and splits/merges runs with stable identity as needed; it MUST NOT author HTML. The toolbar remains zoom-compensated and its pointer handling preserves selection.
 
 #### Scenario: Show toolbar on text selection
 
@@ -761,13 +763,13 @@ Toggle buttons MUST reflect the current formatting state of the selection (press
 
 - GIVEN the formatting toolbar is visible with text selected
 - WHEN the user clicks Bold
-- THEN the selected text is wrapped in `<strong>` tags in the element content
+- THEN selected runs receive typed bold/weight properties
 
 #### Scenario: Apply color to selection
 
 - GIVEN the formatting toolbar is visible with text selected
 - WHEN the user picks a color from the color swatch
-- THEN the selected text is wrapped in `<span style="color:#chosen">` in the element content
+- THEN selected runs receive the chosen typed color
 
 #### Scenario: Toolbar hidden when selection collapses
 
@@ -786,7 +788,7 @@ Toggle buttons MUST reflect the current formatting state of the selection (press
 - [ ] Given a text selection during inline editing, the formatting toolbar appears
 - [ ] Given Bold clicked, the selection is wrapped in `<strong>` tags
 - [ ] Given Italic clicked, the selection is wrapped in `<em>` tags
-- [ ] Given a color selection, the text is wrapped in `<span style="color:...">` tag
+- [ ] Given a color selection, typed run color is updated without authored markup
 - [ ] Given the selection collapses, the toolbar is hidden
 - [ ] Given the toolbar is clicked, inline editing mode is not exited
 - [ ] Given selected text already formatted, the corresponding toggle is in pressed state

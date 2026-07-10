@@ -68,12 +68,13 @@ Optional document lifecycle maps IN, HOLD/UPDATE, and OUT phases to resolving se
 
 ### Requirement: State Machines
 
-Each state machine MUST contain stable ID, stable uniquely identified states and transitions, typed triggers, expression-AST guards, deterministic priorities, and optional sequence actions. Initial and transition target states MUST resolve. Guards MUST be side-effect-free and type-correct.
+Each state machine MUST contain stable ID, stable uniquely identified states and transitions, typed triggers, expression-AST guards, deterministic safe-integer priorities, and optional sequence actions. Initial and transition target states MUST resolve. Guards MUST be side-effect-free and type-correct. Priorities MUST be unique among transitions with the same source state and trigger; the eligible transition with the numerically lowest priority value wins.
 
 #### Acceptance Criteria
 
 - [ ] Given a resolving initial state and valid transitions, validation succeeds
-- [ ] Given equal-priority ambiguous transitions, validation fails unless the schema defines deterministic tie-breaking
+- [ ] Given two transitions with the same source state, trigger, and priority, semantic validation fails
+- [ ] Given multiple eligible transitions with distinct priorities, the transition with the numerically lowest priority value wins
 - [ ] Given an invalid guard or missing state, validation fails
 
 ### Requirement: Deterministic Evaluation and Seeking

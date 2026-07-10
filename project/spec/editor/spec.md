@@ -77,14 +77,14 @@ Unit tests verify pure logic in isolation. The following editor interactions inv
 ### Path editing
 
 - [ ] **Enter path editing:** Clicking "Edit Path Points" in the Path Properties panel MUST render an SVG overlay with anchor and control handles on the path.
-- [ ] **Handle drag:** Dragging an anchor or control handle MUST update the path `d` attribute in real time and commit on pointer-up.
+- [ ] **Handle drag:** Dragging an anchor or control handle MUST update structured path geometry in real time and commit on pointer-up.
 - [ ] **Axis constraints:** H-command handles MUST constrain to horizontal movement only; V-command handles to vertical only.
 - [ ] **Bounds refit:** When path editing mode is exited, the element's bounding box MUST be refitted via SVG getBBox().
 - [ ] **Exit editing:** Pressing Escape, clicking outside the element, or clicking "Done Editing Points" MUST exit path editing mode.
 
 ### Path drawing
 
-- [ ] **Enter drawing:** Creating a new path element MUST auto-enter drawing mode; clicking "Draw Path" on an existing path also enters drawing mode.
+- [ ] **Enter drawing:** Creating a vector structured path through the Path tool MUST auto-enter drawing mode; "Draw Path" on an existing vector path also enters it.
 - [ ] **Click-to-place:** Each click on the canvas MUST append a point (M for first, L for subsequent). The path MUST visually update immediately.
 - [ ] **Close path:** Pressing Enter MUST append a Z command and exit drawing mode.
 - [ ] **Commit path:** Pressing Escape MUST commit the current path as-is and exit drawing mode.

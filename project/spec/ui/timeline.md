@@ -288,7 +288,7 @@ When a keyframe is selected in the timeline, property panels MUST switch to keyf
 
 ### Requirement: Keyframe Deletion
 
-Selected keyframes MUST be deletable via the Delete/Backspace key or a right-click context menu. Deleting a keyframe MUST remove it from the timeline and update the animations array. If the deleted keyframe is the only keyframe in a timeline, the entire timeline entry MUST be removed. Keyframe deletion MUST be undoable.
+Selected keyframes MUST be deletable via Delete/Backspace or a context menu. Deleting a keyframe updates its canonical track in `document.sequences`. If it was the track's only keyframe, the empty track is removed; an empty sequence is removed only when no lifecycle, page, clip, state-machine, or other stable reference targets it. The atomic edit is undoable and must preserve reference validity.
 
 #### Scenario: Delete key removes selected keyframe
 

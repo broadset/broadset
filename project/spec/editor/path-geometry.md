@@ -104,7 +104,7 @@ The system MUST expose editable handle points classified as either `anchor` (on-
 
 ### Requirement: Path Bounds Refit
 
-The system MUST refit edited path elements to tight bounds with stroke padding and rebase path coordinates to the updated element origin.
+The system MUST refit edited vector structured paths to tight bounds with typed stroke padding and rebase structured coordinates to the updated element origin.
 
 #### Scenario: Refit computes padded bounds for edited path coordinates
 
@@ -122,13 +122,13 @@ The system MUST refit edited path elements to tight bounds with stroke padding a
 
 - GIVEN an empty path payload
 - WHEN bounds are refit
-- THEN content updates without geometry changes
+- THEN the structured-path payload updates without bounds/transform changes
 
 #### Acceptance Criteria
 
 - [ ] Given an edited path with drawable coordinates, updated position, width, and height include stroke padding
 - [ ] Given an edited path whose minimum bounds shift, path coordinates are rebased relative to the new origin
-- [ ] Given an empty path payload, content updates without geometry changes
+- [ ] Given an empty structured-path payload, payload identity updates without bounds/transform changes
 
 ---
 
@@ -276,11 +276,11 @@ The system MUST produce debug snapshots with stable shape, complete expected fie
 
 ### Requirement: Path Editor Session Lifecycle
 
-The system MUST support creating an interactive path editor session from an SVG path element. The session MUST render draggable anchor and control-point handles as an SVG overlay. Dragging handles MUST emit updated path `d` attribute strings via a callback. The session MUST be explicitly destroyable, removing the overlay and detaching all event listeners.
+The system MUST create an interactive editor session from a canonical vector structured-path element. It renders draggable anchors/controls as a derived SVG overlay. Dragging emits typed geometry updates addressed by stable point/segment ID. The session is explicitly destroyable and removes overlays/listeners.
 
 #### Scenario: Create and destroy session
 
-- GIVEN an SVG path element with a valid `d` attribute
+- GIVEN a vector path with valid structured geometry
 - WHEN a path editor session is created
 - THEN interactive handles overlay the path, and destroying the session removes all overlays and listeners
 
@@ -298,7 +298,7 @@ The system MUST support creating an interactive path editor session from an SVG 
 
 #### Acceptance Criteria
 
-- [ ] Given an SVG path element, a session creates interactive handles as an SVG overlay
+- [ ] Given a vector structured path, a session creates derived SVG handles keyed by stable IDs
 - [ ] Given handle drag, the change callback fires with the updated path data
 - [ ] Given an active session, current path data is retrievable
 - [ ] Given session destruction, all overlays and event listeners are removed

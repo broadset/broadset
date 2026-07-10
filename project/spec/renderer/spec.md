@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the read-only display layer for broadset. The renderer converts a `BroadsetDocument` into a visual representation, delegates per-type rendering to a component registry, builds a recursive scene tree from the flat element array, and keeps the display in sync on document changes. It does NOT manage editable state, handle pointer interaction, or own the animation engine. See [conventions](../../README.md).
+Defines the read-only display layer for broadset. The renderer consumes a validated `ResolvedSceneSnapshot`, delegates closed variants and authorized plugins to semantic renderers, builds a recursive scene tree from canonical preorder, and keeps display output synchronized. It does NOT validate or mutate project data, handle pointer interaction, or own playback. See [conventions](../../README.md).
 
 ---
 
@@ -10,8 +10,8 @@ Defines the read-only display layer for broadset. The renderer converts a `Broad
 
 The renderer package is split into two layered surfaces:
 
-- **Generic core** — a reusable HTML motion-graphics renderer. Consumes a normalized scene graph plus runtime services (`time`, `data`, `state`, `fonts`, `assets`). Knows nothing about `BroadsetDocument`, Broadset-specific `data-*` structural attributes, the overlay root, the checkerboard preview background, or custom-element registration. Produces semantic DOM: structural containers and per-type semantic renderers (text, image, svg, path, rectangle, ellipse, qrcode, group, video, clock, ticker).
-- **Broadset adapter** — maps `BroadsetDocument` and `CanvasSettings` into the normalized scene graph, attaches Broadset-owned `data-*` attributes via decorators, defines the `BroadsetScreenRendererElement` custom element wrapper, owns the preview checkerboard background policy, and exposes `getOverlayRoot()` for editor chrome portals. Wraps the generic core behind `createScreenRenderer`.
+- **Generic core** — consumes a normalized resolved scene plus runtime resource services and produces semantic DOM for closed text, image, vector, group, component-instance, video, audio, clock, ticker, QR, foreign, and plugin outputs. It knows nothing about canonical serialization, Broadset-specific structural attributes, editor overlays, or custom-element registration.
+- **Broadset adapter** — accepts a validated `ResolvedSceneSnapshot` plus runtime `RenderSettings`, attaches Broadset-owned decorators, owns preview chrome policy, and exposes `getOverlayRoot()` for editor portals. It never maps an unvalidated legacy document shape.
 
 Each requirement below is labeled `[Generic]` or `[Adapter]` to clarify which surface owns the behavior. Where a requirement is a cross-package contract with `@broadset/playback` or `@broadset/editor`, the requirement is labeled `[Cross-package]` and the contract is enforced through the Broadset adapter.
 
@@ -59,9 +59,9 @@ The renderer MUST keep DOM node identity stable across document updates for any 
 ### Identity rules
 
 - Each rendered element MUST have a single stable host node keyed by the element's `id` across updates.
-- An element's host node identity MUST be preserved when only its content or style changes.
+- An element's host node identity MUST be preserved when only its typed payload or resolved appearance changes.
 - An element's host node identity MUST be preserved when a sibling is added, removed, or reordered.
-- An element's host node MUST be remounted (identity replaced) when its `type` changes, because the inner renderer implementation changes.
+- An element's host node MUST be remounted when its closed `kind` or vector subtype changes because the semantic renderer changes.
 - Removing an element from the document MUST destroy its renderer and remove its host node.
 - Reparenting an element MUST move the existing host node into the new parent without remounting the renderer.
 
@@ -70,7 +70,7 @@ The renderer MUST keep DOM node identity stable across document updates for any 
 - A single element property change MUST only mutate that element's host subtree; no sibling host MUST be touched.
 - A new element insertion MUST NOT remount existing siblings.
 - A composite renderer (e.g. boolean-group) MUST recompute only when its own element or one of its declared child-data dependencies changed; it MUST NOT recompute on unrelated sibling changes.
-- Whole-layer `replaceChildren()` of the element layer is only permitted on initial mount, on document replacement, or on page change.
+- Whole-layer `replaceChildren()` of the element layer is only permitted on initial mount, resolved-snapshot replacement, or page-instance change.
 
 ---
 
@@ -78,7 +78,7 @@ The renderer MUST keep DOM node identity stable across document updates for any 
 
 ### Requirement: Component Capability Resolution `[Generic]`
 
-The system MUST return built-in capability flags for known element types. Unknown types MUST return all-false capabilities. Plugin capabilities MUST merge on top of the base (built-in or default), overriding only the specified flags.
+The system MUST resolve built-in capabilities from the closed canonical kind and vector subtype. Plugin capabilities apply only to `kind: 'plugin'` and merge over the all-false plugin baseline; a plugin MUST NOT override core-kind behavior. Foreign fallback capabilities derive from safe render mode.
 
 #### Scenario: Known built-in type
 
@@ -86,28 +86,28 @@ The system MUST return built-in capability flags for known element types. Unknow
 - WHEN capabilities for `text` are requested
 - THEN the built-in capability set for `text` is returned
 
-#### Scenario: Unknown type returns all-false
+#### Scenario: Unknown plugin type returns all-false
 
-- GIVEN a component registry with no plugins
-- WHEN capabilities for `ticker` are requested
+- GIVEN a canonical plugin envelope with no authorized registration
+- WHEN its capabilities are requested
 - THEN every capability flag is `false`
 
 #### Scenario: Plugin merges over defaults
 
-- GIVEN a plugin registering type `countdown` with `borderRadius: true`
+- GIVEN a plugin registering element type `countdown` with the `borderRadius` UI capability true
 - WHEN capabilities for `countdown` are requested
 - THEN `borderRadius` is `true` and unspecified flags remain `false`
 
-#### Scenario: Plugin overrides built-in type
+#### Scenario: Plugin cannot override built-in subtype
 
-- GIVEN a plugin overriding `ellipse` with `borderRadius: true`
-- WHEN capabilities for `ellipse` are requested
-- THEN `borderRadius` is `true` while other built-in caps are preserved
+- GIVEN a plugin registration whose element type string is `ellipse`
+- WHEN capabilities for a core vector ellipse are requested
+- THEN core vector-ellipse capabilities are unchanged
 
 #### Scenario: Plugin without capabilities preserves built-in
 
-- GIVEN a plugin for `rectangle` with no capabilities field
-- WHEN capabilities for `rectangle` are requested
+- GIVEN a vector rectangle and an unrelated plugin element type string `rectangle`
+- WHEN vector-rectangle capabilities are requested
 - THEN the original built-in capabilities are returned unchanged
 
 #### Acceptance Criteria
@@ -115,8 +115,8 @@ The system MUST return built-in capability flags for known element types. Unknow
 - [ ] Given a component registry with no plugins, the built-in capability set for `text` is returned
 - [ ] Given a component registry with no plugins, every capability flag is `false`
 - [ ] Given a plugin registering type `countdown` with `borderRadius: true`, `borderRadius` is `true` and unspecified flags remain `false`
-- [ ] Given a plugin overriding `ellipse` with `borderRadius: true`, `borderRadius` is `true` while other built-in caps are preserved
-- [ ] Given a plugin for `rectangle` with no capabilities field, the original built-in capabilities are returned unchanged
+- [ ] Given a plugin whose element type string matches a core subtype label, core capabilities remain unchanged
+- [ ] Given a vector rectangle and an unrelated plugin registration, vector-rectangle capabilities remain unchanged
 
 ---
 
@@ -145,13 +145,19 @@ The system MUST apply gradient backgrounds via the `background` shorthand and cl
 
 ### Requirement: Scene Tree Construction `[Generic]`
 
-The system MUST build a hierarchical scene tree from the flat document element list by resolving parent references, promoting unresolved parents to roots, and preserving sibling order from document order.
+The system MUST build a hierarchical scene tree from the already validated canonical preorder by resolving `parentId` and preserving sibling order. Missing parents, cycles, or split subtrees are validation failures and produce no partial scene.
 
-#### Scenario: Null and unresolved parents produce root nodes
+#### Scenario: Null parents produce root nodes
 
-- GIVEN elements with null parent references and references to non-existent parents
+- GIVEN validated elements whose root nodes have `parentId: null`
 - WHEN scene tree construction runs
 - THEN those elements appear as root-level nodes
+
+#### Scenario: Invalid parent produces no scene
+
+- GIVEN project data with a non-resolving `parentId`
+- WHEN validation and scene resolution run
+- THEN validation fails and the renderer receives no partial snapshot
 
 #### Scenario: Sibling order is preserved
 
@@ -161,37 +167,38 @@ The system MUST build a hierarchical scene tree from the flat document element l
 
 #### Acceptance Criteria
 
-- [ ] Given elements with null parent references and references to non-existent parents, those elements appear as root-level nodes
+- [ ] Given validated elements with `parentId: null`, those elements appear as root-level nodes
+- [ ] Given a missing parent, validation fails before rendering and no partial scene is produced
 - [ ] Given multiple children under the same parent in document order, sibling order in the scene tree matches the original document order
 
 ---
 
 ### Requirement: Renderer Resolution Priority `[Generic]`
 
-The system MUST resolve renderers in priority order of plugin renderer, built-in renderer, then fallback renderer.
+The system MUST route closed core kinds to built-in renderers, canonical plugin elements to an authorized exact plugin registration, and foreign elements to their declared safe preview/sanitized-vector path. Missing plugin factories use explicit plugin fallback; plugins never override core renderers.
 
-#### Scenario: Plugin renderer takes precedence over built-in
+#### Scenario: Exact plugin renderer is selected
 
-- GIVEN both plugin and built-in renderers for an element kind
+- GIVEN a canonical plugin element and an authorized factory matching plugin ID, element type, and schema version
 - WHEN the element is rendered
-- THEN the plugin renderer is selected
+- THEN the exact plugin renderer is selected
 
-#### Scenario: Unknown type uses fallback renderer
+#### Scenario: Unknown plugin uses fallback renderer
 
-- GIVEN no plugin or built-in renderer for an element kind
+- GIVEN a valid plugin envelope with no authorized matching factory
 - WHEN the element is rendered
 - THEN fallback rendering is used
 
 #### Acceptance Criteria
 
-- [ ] Given both plugin and built-in renderers for an element kind, the plugin renderer is selected
-- [ ] Given no plugin or built-in renderer for an element kind, fallback rendering is used
+- [ ] Given an authorized exact plugin factory, it renders the plugin element without replacing core behavior
+- [ ] Given no authorized exact plugin factory, preview or unsupported-plugin fallback renders
 
 ---
 
 ### Requirement: Element Renderer Lifecycle `[Generic]`
 
-The system MUST mount renderers for new elements, remount when element type changes, clear host output on destroy, and ignore updates after destroy.
+The system MUST mount renderers for new elements, remount when a closed kind/subtype changes through a valid replacement, clear host output on destroy, and ignore updates after destroy.
 
 #### Scenario: Type change remounts renderer
 
@@ -212,25 +219,25 @@ The system MUST mount renderers for new elements, remount when element type chan
 
 ---
 
-### Requirement: Screen Renderer Custom Element Lifecycle `[Adapter]`
+### Requirement: Scene Renderer Custom Element Lifecycle `[Adapter]`
 
-The system MUST initialize rendering resources on connection, tear down resources on disconnection, and perform full document-driven rerender when document input is replaced.
+The system MUST initialize rendering resources on connection, tear them down on disconnection, and perform a full rerender when its validated resolved-snapshot input is replaced.
 
 #### Scenario: Document replacement triggers full rerender
 
-- GIVEN a connected screen renderer element
-- WHEN a new document is assigned
-- THEN existing renderers are replaced and output is rebuilt from the new document
+- GIVEN a connected scene renderer element
+- WHEN a new resolved snapshot is assigned
+- THEN existing renderers are replaced and output is rebuilt from that snapshot
 
 #### Acceptance Criteria
 
-- [ ] Given a connected screen renderer element, existing renderers are replaced and output is rebuilt from the new document
+- [ ] Given a connected scene renderer element, existing renderers are replaced and output is rebuilt from the new resolved snapshot
 
 ---
 
 ### Requirement: Canvas Scaling Behavior `[Generic]`
 
-The system MUST compute base canvas size from document dimensions and update rendered scale responsively as container size changes.
+The system MUST compute base surface size from the resolved `surface.size` and update rendered scale responsively as container size changes.
 
 #### Scenario: Scale tracks container width changes
 
@@ -246,17 +253,17 @@ The system MUST compute base canvas size from document dimensions and update ren
 
 ### Requirement: Dynamic Data Substitution `[Generic]`
 
-The system MUST substitute dynamic content values before delegating content to element renderers when dynamic mapping keys match element content tokens.
+The system MUST apply already validated document bindings before delegating resolved properties to element renderers. Binding evaluation uses stable field IDs, closed expressions, and stable property targets; renderers do not parse content tokens.
 
-#### Scenario: Dynamic content token is substituted
+#### Scenario: Bound typed property is resolved
 
-- GIVEN an element content token with a matching dynamic data value
+- GIVEN a type-correct binding with a matching runtime field value
 - WHEN rendering occurs
-- THEN the renderer receives substituted content
+- THEN the renderer receives the resolved typed property with provenance
 
 #### Acceptance Criteria
 
-- [ ] Given an element content token with a matching dynamic data value, the renderer receives substituted content
+- [ ] Given a type-correct binding and matching field value, the renderer receives the resolved typed property with provenance
 
 ---
 
@@ -301,24 +308,24 @@ The system MUST return null for empty QR payloads and responsive SVG output for 
 
 ### Requirement: Per-Type Renderer Output Contracts `[Generic]`
 
-The system MUST render supported built-in element kinds and unknown kinds with stable observable output contracts.
+The system MUST render every closed core kind, explicit plugin envelope, and foreign fallback with stable observable output contracts.
 
 #### Scenario: Supported built-in element kinds render expected output
 
-- GIVEN document elements for text, image, svg, path, rectangle, ellipse, qrcode, group, video, clock, and ticker kinds
+- GIVEN resolved text, image, vector rectangle/ellipse/path/boolean, group, component-instance, video, audio, clock, ticker, qrcode, foreign, and plugin elements
 - WHEN rendering occurs
 - THEN each kind produces its expected visible output contract
 
-#### Scenario: Unknown kind renders via fallback contract
+#### Scenario: Missing plugin renderer uses explicit fallback
 
-- GIVEN an element with an unknown kind
+- GIVEN a valid plugin element with no authorized renderer
 - WHEN rendering occurs
 - THEN fallback output is rendered instead of failure
 
 #### Acceptance Criteria
 
-- [ ] Given document elements for text, image, svg, path, rectangle, ellipse, qrcode, group, video, clock, and ticker kinds, each kind produces its expected visible output contract
-- [ ] Given an element with an unknown kind, fallback output is rendered instead of failure
+- [ ] Given every closed core kind and vector subtype, each produces its expected visible output contract
+- [ ] Given a plugin without an authorized renderer, its preview or unsupported-plugin fallback renders instead of executing payload
 
 ---
 
@@ -357,34 +364,32 @@ Activating a named state on an element MUST add a state-specific CSS class to th
 
 ---
 
-### Requirement: Custom Component Rendering `[Generic]`
+### Requirement: Plugin Element Rendering `[Generic]`
 
-Custom component plugin types MUST render via their provided rendererFactory. The factory receives element data and produces DOM output. If no factory is provided, fallback rendering is used.
+Canonical `plugin` elements MUST render through the authorized factory registered for their `pluginId`, `elementType`, and plugin schema version. The factory receives inert payload and resolved scene data. If no authorized factory is available, the renderer uses the declared preview asset or an explicit unsupported-plugin placeholder without executing payload data.
 
 #### Scenario: Plugin renderer produces output
 
-- GIVEN a plugin with a rendererFactory for type `'countdown'`
-- WHEN an element of type `'countdown'` is rendered
+- GIVEN a registered factory for `pluginId: 'com.example.clock'` and `elementType: 'countdown'`
+- WHEN a matching canonical plugin element is rendered
 - THEN the rendererFactory produces the DOM output
 
 #### Acceptance Criteria
 
-- [ ] Given a plugin with a rendererFactory, the factory produces DOM output for that type
-- [ ] Given a plugin without a rendererFactory, fallback rendering is used
+- [ ] Given an authorized matching factory, it produces DOM output for the plugin element
+- [ ] Given no matching factory, the preview asset or unsupported-plugin placeholder renders and payload remains inert
 
 ---
 
 ### Requirement: 3D Transform Rendering `[Generic]`
 
-Elements with rotateX, rotateY, rotateZ, or translateZ screen properties MUST render with CSS 3D transform. Perspective MUST be applied from `CanvasSettings.perspective`, accepted via the renderer's `RenderSettings` on create or via `updateSettings({ perspective })`. The renderer MUST apply this perspective on the canvas coordinate layer that contains both element content and editor chrome, so 3D projection is identical for elements and any overlay chrome (e.g. the selection transform widget).
-
-The transform token sequence for each element MUST be stable: `rotate(Xdeg) rotateX(Xdeg) rotateY(Xdeg) rotateZ(Xdeg) translateZ(Xpx)`, with zero-valued tokens omitted. This stable string is the single source of truth — the editor's transform widget consumes the exact same token builder so the widget and the element never drift.
+Elements whose canonical geometry contains a sixteen-number `matrix3d` MUST render that exact matrix without deriving from duplicated component fields. Perspective remains runtime `RenderSettings` view configuration and applies to the coordinate layer containing scene content and editor overlays so projection stays identical. The renderer and transform widget MUST consume the same resolved world matrix.
 
 #### Scenario: 3D transform applied
 
-- GIVEN an element with rotateX=45 and translateZ=50
+- GIVEN an element with a finite canonical `matrix3d`
 - WHEN the element is rendered
-- THEN a CSS 3D transform string including rotateX and translateZ is applied
+- THEN the exact matrix is emitted as a CSS `matrix3d(...)` transform
 
 #### Scenario: Perspective from settings
 
@@ -394,9 +399,9 @@ The transform token sequence for each element MUST be stable: `rotate(Xdeg) rota
 
 #### Acceptance Criteria
 
-- [ ] Given 3D screen properties, a CSS 3D transform is applied to the element
+- [ ] Given canonical matrix3d geometry, the exact CSS matrix3d transform is applied
 - [ ] Given `RenderSettings.perspective` (sourced from `CanvasSettings.perspective`), the perspective value is applied to the canvas coordinate layer
-- [ ] Zero-valued 3D transform components (`rotateX=0`, `rotateY=0`, `rotateZ=0`, `translateZ=0`) are omitted from the transform string
+- [ ] Given any finite matrix entries including zero, all sixteen canonical entries retain their exact positions
 - [ ] The renderer exposes `getOverlayRoot()` returning a DOM node in the same coordinate space as element hosts, so editor chrome (e.g. the selection widget) can portal in and inherit identical scale, pan, and perspective without duplicating transform math
 
 ---
@@ -489,209 +494,208 @@ The renderer MUST support incremental updates to the scene tree. When an element
 
 ### Requirement: Broken Image Fallback `[Generic]`
 
-When an image element's content URL fails to load (404, network error, malformed URL), the renderer MUST display a visible placeholder indicating the broken state. The placeholder MUST include the element's dimensions and a broken-image icon or text indicator. The renderer MUST NOT throw an error or leave an invisible gap.
+When an image element's referenced asset is missing, fails integrity, or cannot be fetched by an authorized asset resolver, the renderer MUST display a visible placeholder. The placeholder includes resolved bounds and a broken-image indicator. Rendering MUST NOT throw or leave an invisible gap.
 
-Image loads use a two-phase strategy to maximize export compatibility: the renderer first attempts to load the image with `crossOrigin="anonymous"` so the browser issues a CORS request — when the server replies with appropriate CORS headers the image is non-tainted and the same URL is reusable by raster/video exporters from the HTTP cache. If the CORS attempt errors, the renderer falls back to a plain `<img>` (no `crossOrigin`) so the image still displays in the editor even when the server does not support CORS; exports of such images will show a placeholder. Only when both attempts error does the broken-image placeholder replace the `<img>`.
+For an explicitly external asset source, an authorized browser fetch adapter MAY use a two-phase display strategy: first CORS-enabled so verified bytes remain exportable, then a display-only plain image fallback when policy permits. The adapter enforces integrity, allowlists, credentials, redirects, MIME, size, and cancellation. Parsing the project never initiates either request. Package and cached sources resolve directly from verified blobs.
 
 #### Scenario: 404 image URL
 
-- GIVEN an image element with a 404 URL
+- GIVEN an image element whose referenced external asset returns 404
 - WHEN the image fails to load
 - THEN a visible broken-image placeholder is rendered at the element's position and dimensions
 
-#### Scenario: Empty image content
+#### Scenario: Explicitly missing image asset
 
-- GIVEN an image element with an empty content string
+- GIVEN an image element referencing an asset whose source kind is `missing`
 - WHEN the element is rendered
 - THEN a placeholder is displayed
 
 #### Scenario: Non-CORS image server
 
-- GIVEN an image element whose server does not send CORS headers
+- GIVEN an image element whose authorized external asset host does not send CORS headers
 - WHEN the CORS-enabled first attempt errors
 - THEN a plain-fetch fallback `<img>` loads the image for editor display
 - AND exports of this image render the broken-image placeholder
 
 #### Acceptance Criteria
 
-- [ ] Given a broken image URL, a visible placeholder is rendered at the element's dimensions
-- [ ] Given an empty image content, a placeholder is rendered
+- [ ] Given an asset fetch failure, a visible placeholder is rendered at resolved bounds
+- [ ] Given an explicitly missing asset source, a placeholder and resource diagnostic are rendered
 - [ ] Given a broken image, no JavaScript error is thrown
-- [ ] Given a CORS-enabled image host, the rendered `<img>` has `crossOrigin="anonymous"` so the same URL can be re-fetched by exporters from the HTTP cache
-- [ ] Given a non-CORS image host, a plain `<img>` fallback loads the image for display after the CORS attempt errors
+- [ ] Given an authorized CORS-enabled external source, rendered image bytes remain usable by exporters
+- [ ] Given a permitted non-CORS display fallback, editor display succeeds while export reports an unavailable verified source
+- [ ] Given project parsing without an authorized fetch action, no network request occurs
 
 ---
 
-### Requirement: Text Content Sanitization `[Generic]`
+### Requirement: Structured Inert Text Rendering `[Generic]`
 
-When rendering text elements, the renderer MUST sanitize HTML content to prevent XSS attacks. Only the following HTML tags are allowed: `<b>`, `<i>`, `<u>`, `<br>`, `<span>`, `<strong>`, `<em>`. All other tags MUST be stripped. Only the `style` attribute is allowed on permitted tags; all other attributes MUST be removed. This sanitization MUST occur at render time as a defense-in-depth measure (the model boundary also sanitizes).
+Text elements MUST render ordered stable paragraphs and runs as inert text nodes with typed run/paragraph properties. Authored HTML is invalid canonical input. At external clipboard/import boundaries, sanitization extracts inert Unicode and supported typed formatting before model validation; renderer defense-in-depth always assigns text through safe text-node APIs rather than HTML injection.
 
 #### Scenario: Script tag stripped
 
-- GIVEN a text element with content `<b>Hello</b> <script>alert('xss')</script>World`
-- WHEN rendered
-- THEN the output contains `<b>Hello</b> World` with the script tag absent
+- GIVEN boundary input `<b>Hello</b> <script>alert('xss')</script>World`
+- WHEN imported and rendered
+- THEN canonical runs contain inert `Hello World`, typed bold formatting for `Hello`, and no script content
 
 #### Scenario: Event handler attribute stripped
 
-- GIVEN a text element with content `<span onclick="evil()">text</span>`
-- WHEN rendered
-- THEN the `onclick` attribute is absent from the rendered output
+- GIVEN boundary input `<span onclick="evil()">text</span>`
+- WHEN imported and rendered
+- THEN a safe text node contains `text` and no event handler exists
 
 #### Acceptance Criteria
 
-- [ ] Given text content with script tags, the script tags are stripped in rendered output
-- [ ] Given text content with event handler attributes, the attributes are stripped
-- [ ] Given text content with allowed tags (`b`, `i`, `u`, `br`, `span`, `strong`, `em`), they are preserved in rendered output
+- [ ] Given hostile boundary markup, only inert Unicode and supported typed formatting enter canonical runs
+- [ ] Given structured runs, renderer output uses safe text nodes with no event attributes
+- [ ] Given typed bold, italic, underline, color, and size properties, equivalent visual formatting is preserved
 
 ---
 
 ### Requirement: Plain Group Element Rendering `[Generic]`
 
-Group-type elements with `booleanOperation === null` MUST render as a container `<div>` element. The container MUST have `data-element-id` set to the group's ID and `data-element-content` on itself. Child elements (those with `parentId` referencing the group) MUST be rendered as descendants within the group container. The group container MUST apply the group's position, rotation, and opacity but MUST NOT clip children by default. A plain group is a structural container only; it MUST NOT compose child geometry into a single combined path.
+Group elements MUST render as structural container `<div>` elements. The container has `data-element-id`; children whose `parentId` references the group render as descendants in canonical preorder. The group applies its resolved matrix and appearance. It clips children only when typed `appearance.clip` or `appearance.mask` requires it and never performs boolean geometry composition.
 
 #### Scenario: Group with children
 
-- GIVEN a group element with two children and `booleanOperation: null`
+- GIVEN a group element with two children
 - WHEN rendered
 - THEN the group renders as a `<div>` containing both children
 
 #### Scenario: Group rotation applied
 
-- GIVEN a group element with rotation 45° and `booleanOperation: null`
+- GIVEN a group element whose exact affine matrix represents 45° rotation
 - WHEN rendered
 - THEN the rotation transform is applied to the group container
 
 #### Acceptance Criteria
 
-- [ ] Given a plain group element (`booleanOperation: null`), it renders as a div container
+- [ ] Given a group element, it renders as a structural div container
 - [ ] Given a plain group with children, child elements render inside the group container
 - [ ] Given a plain group with rotation, the rotation is applied to the container transform
 - [ ] Given a plain group, no combined SVG path is emitted (plain grouping is structural-only)
 
 ---
 
-### Requirement: Boolean Composite Group Rendering `[Generic]`
+### Requirement: Boolean Vector Rendering `[Generic]`
 
-Group-type elements with a non-null `booleanOperation` (`union`, `subtract`, `intersect`, `exclude`) MUST render a single combined SVG `<path>` produced by applying the boolean operation to the path data of all direct path children, in document order. The combined path MUST inherit stroke/fill styling from the first path child. When fewer than two path children contribute usable path data, the renderer MUST produce no visible geometry (empty host content) and MUST NOT throw.
-
-Boolean composite behavior is a separate responsibility from plain group containment; it is NOT expressed as a decorator on the plain group renderer. Only the top-level composite group's output is visible — child path elements themselves MUST NOT render directly when their parent group declares a boolean operation.
+Vector elements with `geometryData.kind: 'boolean'` MUST render combined geometry from their ordered stable `operandIds` using typed `union`, `subtract`, `intersect`, or `exclude`. Operands resolve to compatible vector geometry. The boolean vector uses its own ordered fill/stroke appearance; operand appearance is not implicitly copied. Fewer than two usable operands is a semantic validation error and no canonical scene reaches rendering.
 
 #### Scenario: Union of two path children
 
-- GIVEN a group element with `booleanOperation: 'union'` and two path children
+- GIVEN a boolean vector with `operation: 'union'` and two resolving vector operands
 - WHEN rendered
-- THEN a single SVG `<path>` combining both child paths is mounted inside the group container
+- THEN one combined SVG path is mounted in the boolean vector host
 
 #### Scenario: Invalid boolean operation
 
-- GIVEN a group element with a `booleanOperation` value outside the supported set
-- WHEN rendered
-- THEN no combined path is emitted and the group container is empty
+- GIVEN untrusted input with a boolean operation outside the closed union
+- WHEN validation runs
+- THEN structural validation rejects it before rendering
 
 #### Scenario: Insufficient path children
 
-- GIVEN a group element with `booleanOperation: 'union'` and zero or one path child
-- WHEN rendered
-- THEN no combined path is emitted and the group container is empty
+- GIVEN a boolean vector with fewer than two resolving operands
+- WHEN semantic validation runs
+- THEN validation fails before scene resolution
 
 #### Acceptance Criteria
 
-- [ ] Given a group with `booleanOperation != null` and two or more path children, a single combined `<path>` is emitted
-- [ ] Given the combined path, its stroke, fill, and fill-rule are inherited from the first path child
-- [ ] Given a group with an unsupported `booleanOperation`, no combined path is emitted
-- [ ] Given a group with fewer than two usable path children, no combined path is emitted and the renderer does not throw
-- [ ] Given a boolean composite group, the child path elements' own visible rendering is suppressed (only the combined path is visible)
+- [ ] Given a valid boolean vector with two or more operands, a single combined path is emitted
+- [ ] Given combined geometry, appearance comes from the boolean vector's own typed layers
+- [ ] Given an unsupported operation, structural validation rejects the project
+- [ ] Given fewer than two resolving operands, semantic validation rejects the project
+- [ ] Given operand vectors used elsewhere, their independent resolved identity and visibility remain unchanged
 
 ---
 
-### Requirement: Dynamic Data Token Format `[Generic]`
+### Requirement: Typed Binding Rendering `[Generic]`
 
-Dynamic data tokens in element content MUST use the format `{{key}}` where `key` is a dot-notation path into the data store (e.g., `{{score.home}}`, `{{player.name}}`). The renderer MUST replace tokens with their resolved values from the data store. Unresolved tokens (keys not found in the data store) MUST be rendered as the literal token string `{{key}}`.
+Dynamic data MUST resolve through document bindings that address stable view-model field IDs, closed expression ASTs, deterministic formatter pipelines, and stable property targets. The renderer consumes already resolved values and provenance; it MUST NOT parse dot-string tokens from element content. Missing or stale values follow the field's explicit stale policy.
 
 #### Scenario: Token with matching data
 
-- GIVEN a text element with content `Score: {{score.home}} - {{score.away}}` and a data store with `score.home = 3` and `score.away = 1`
+- GIVEN structured text runs, stable score fields, and bindings that target the corresponding run text properties
 - WHEN rendered
 - THEN the output is `Score: 3 - 1`
 
 #### Scenario: Token without matching data
 
-- GIVEN a text element with content `{{missing.key}}` and no matching data store entry
+- GIVEN a missing bound field whose stale policy is `use-default`
 - WHEN rendered
-- THEN the output is `{{missing.key}}`
+- THEN the field's typed default is rendered and provenance records fallback use
 
 #### Acceptance Criteria
 
-- [ ] Given a token matching a data store key, the token is replaced with the resolved data value
-- [ ] Given a token with no matching data store key, the literal token string is rendered
-- [ ] Given nested dot-notation keys, the correct nested value is resolved
+- [ ] Given valid field-ID bindings, resolved typed values render at their stable targets
+- [ ] Given a missing field value, the declared stale policy determines keep, default, hide, or error behavior
+- [ ] Given nested object data, closed AST `get` nodes use stable field IDs rather than dot strings
 
 ---
 
 ### Requirement: Video Element Rendering `[Generic]`
 
-Video elements MUST render a `<video>` tag within the element wrapper. The `src` attribute MUST be set to the element's `content` (video URL). The video element MUST NOT show browser-native controls (`controls` attribute MUST be absent). The `typeConfig` properties MUST map to video attributes: `loop` → `loop` attribute, `muted` → `muted` attribute, `autoplay` → `autoplay` attribute. The `data-element-content` marker MUST be placed on the `<video>` tag. When `typeConfig.startTimeS` is set, the video's `currentTime` MUST be set to the start time on load. When `typeConfig.endTimeS` is set, the video MUST pause or loop when reaching the end time. Object-fit MUST be applied via CSS on the `<video>` element. The video element MUST respect standard element styling (border-radius, box effects, clip-path, opacity).
+Video elements MUST render a `<video>` tag whose source resolves from typed `video.assetId`. The authorized asset resolver supplies a verified media URL or package blob; parsing alone never fetches it. Typed video payload fields control loop, muted, autoplay, exact in/out ticks, and fit. Browser-native controls remain absent. At the out tick the video pauses or follows typed loop behavior. Resolved appearance supplies opacity, effects, and typed clip/mask behavior.
 
 #### Scenario: Video element renders video tag
 
-- GIVEN a video element with `content: 'https://example.com/video.mp4'` and `typeConfig: { muted: true, autoplay: true }`
+- GIVEN a video element referencing a verified video asset with typed `muted: true` and `autoplay: true`
 - WHEN the element is rendered
 - THEN a `<video>` tag is output with `src`, `muted`, and `autoplay` attributes; no `controls` attribute
 
 #### Scenario: Video with start time
 
-- GIVEN a video element with `typeConfig: { startTimeS: 5 }`
+- GIVEN a video element whose exact `inTick` corresponds to five seconds
 - WHEN the video loads
 - THEN `currentTime` is set to 5
 
 #### Scenario: Video with object-fit
 
-- GIVEN a video element with style `objectFit: 'cover'`
+- GIVEN a video element with typed `fit: 'cover'`
 - WHEN rendered
 - THEN the `<video>` tag has CSS `object-fit: cover`
 
 #### Acceptance Criteria
 
-- [ ] Given a video element, a `<video>` tag is rendered with the content as `src`
+- [ ] Given a video element, a `<video>` tag resolves its source through the referenced video asset
 - [ ] Given a video element, native controls are not shown
-- [ ] Given `typeConfig.muted: true`, the `muted` attribute is present
-- [ ] Given `typeConfig.startTimeS`, the video starts at the specified time
-- [ ] Given standard element styling, video elements respect border-radius, opacity, and clip-path
+- [ ] Given typed `muted: true`, the muted attribute is present
+- [ ] Given an exact in tick, video starts at the corresponding media time
+- [ ] Given resolved appearance, video respects opacity, effects, and typed clip/mask
 
 ---
 
 ### Requirement: Clock Element Rendering `[Generic]`
 
-Clock elements MUST render a text display showing formatted time according to the element's `content` format pattern and `typeConfig.mode`. In `'realtime'` mode, the display MUST update every second (or fraction indicated by the format) showing the current local time. In `'countdown'` mode, the display MUST count down from `typeConfig.startValue` toward `typeConfig.targetValue`. In `'countup'` mode, the display counts up from `typeConfig.startValue`. In `'stopwatch'` mode, the display shows elapsed time from when the element's visibility became `'onscreen'` (derived from animation state). When `typeConfig.countdownTo` is set (ISO 8601 datetime), the clock MUST display remaining time until the target datetime, updating every second; when the target is in the past, the display MUST show `00:00:00` (formatted per the element's format pattern). The `countdownTo` field overrides `startValue`/`targetValue` when present. The format pattern uses `HH` (hours), `mm` (minutes), `ss` (seconds), `S` (tenths), `SS` (hundredths), `SSS` (milliseconds). The rendered output MUST use the same DOM structure as text elements (span with text content) and MUST respect typography capabilities (font, size, color, alignment). The `data-element-content` marker MUST be on the text span.
+Clock elements MUST render inert text from a typed clock payload containing mode, format pattern, and mode-specific values. Realtime shows the configured runtime clock. Countdown, countup, and stopwatch use exact document ticks for relative durations. An optional timezone-qualified countdown target overrides relative values; past targets display zero. Supported format tokens remain `HH`, `mm`, `ss`, `S`, `SS`, and `SSS`. Output uses the structured-text path and resolved typography.
 
 #### Scenario: Realtime clock
 
-- GIVEN a clock element with `content: 'HH:mm:ss'` and `typeConfig: { mode: 'realtime' }`
+- GIVEN a clock element with `clock: { format: 'HH:mm:ss', mode: 'realtime' }`
 - WHEN rendered at 14:30:05 local time
 - THEN the display shows `14:30:05` and updates every second
 
 #### Scenario: Countdown clock
 
-- GIVEN a clock element with `typeConfig: { mode: 'countdown', startValue: '00:10:00', targetValue: '00:00:00' }`
+- GIVEN a countdown clock with a typed ten-minute start duration and zero-tick target
 - WHEN rendered
 - THEN the display counts down from 10 minutes to zero
 
 #### Scenario: Absolute datetime countdown
 
-- GIVEN a clock element with `content: 'HH:mm:ss'` and `typeConfig: { mode: 'countdown', countdownTo: '2026-04-05T15:00:00Z' }`
+- GIVEN a clock element with `clock: { format: 'HH:mm:ss', mode: 'countdown', countdownTo: '2026-04-05T15:00:00Z' }`
 - WHEN rendered at 2026-04-05T14:58:30Z
 - THEN the display shows `00:01:30` and updates every second
 
 #### Scenario: Absolute countdown past target
 
-- GIVEN a clock element with `typeConfig: { mode: 'countdown', countdownTo: '2026-04-05T12:00:00Z' }`
+- GIVEN a clock element with `clock: { mode: 'countdown', countdownTo: '2026-04-05T12:00:00Z' }`
 - WHEN rendered at 2026-04-05T14:00:00Z (target is in the past)
 - THEN the display shows `00:00:00`
 
 #### Scenario: Stopwatch mode
 
-- GIVEN a clock element with `typeConfig: { mode: 'stopwatch' }`
+- GIVEN a clock element with `clock.mode: 'stopwatch'`
 - WHEN the element transitions to visible
 - THEN the stopwatch starts from 00:00:00 and counts up
 
@@ -708,17 +712,17 @@ Clock elements MUST render a text display showing formatted time according to th
 
 ### Requirement: Ticker Element Rendering `[Generic]`
 
-Ticker elements MUST render a continuously scrolling container of text items. Each item in the `content` JSON array MUST be rendered as an individual text span. Items scroll in the direction specified by `typeConfig.direction` at the speed of `typeConfig.speed` pixels per second with `typeConfig.gap` pixels between consecutive items. When the leading item fully scrolls out of view, it MUST be recycled to the trailing end, creating an infinite scroll effect. When `typeConfig.paused` is `true`, scrolling MUST stop at the current position. The ticker container MUST clip overflow content. The ticker MUST respect typography capabilities (font, size, color). Scrolling MUST use CSS transforms (translateX/translateY) animated via `requestAnimationFrame` for smooth, GPU-accelerated motion.
+Ticker elements MUST render a continuously scrolling container from typed ticker items or a resolving binding. Each item renders as inert structured text. Typed `direction`, finite non-negative `speed`, spatial `gap`, and `paused` fields control motion. When the leading item exits, stable item identity is recycled to the trailing end. The container clips overflow through its typed layout, respects resolved typography, and uses transform updates driven by the shared clock.
 
 #### Scenario: Left-scrolling ticker
 
-- GIVEN a ticker element with `content: '["Breaking: Storm Warning", "Sports: Final Score 3-2"]'` and `typeConfig: { direction: 'left', speed: 60 }`
+- GIVEN a ticker with two typed text items, `direction: 'left'`, and `speed: 60`
 - WHEN rendered
 - THEN items scroll leftward at 60px/s with gap between them
 
 #### Scenario: Ticker paused
 
-- GIVEN a ticker element with `typeConfig: { paused: true }`
+- GIVEN a ticker element with typed `paused: true`
 - WHEN rendered
 - THEN items are visible but stationary
 
@@ -730,14 +734,14 @@ Ticker elements MUST render a continuously scrolling container of text items. Ea
 
 #### Scenario: Vertical ticker
 
-- GIVEN a ticker element with `typeConfig: { direction: 'up', speed: 40 }`
+- GIVEN a ticker element with typed `direction: 'up'` and `speed: 40`
 - WHEN rendered
 - THEN items scroll upward at 40px/s
 
 #### Acceptance Criteria
 
 - [ ] Given a ticker element, items scroll in the specified direction at the specified speed
-- [ ] Given `typeConfig.paused: true`, scrolling stops
+- [ ] Given typed `paused: true`, scrolling stops
 - [ ] Given items scrolling out of view, they are recycled to create infinite scroll
 - [ ] Given a ticker, overflow content is clipped to the element bounds
 - [ ] Given a ticker, typography styling is applied to individual items
@@ -746,31 +750,31 @@ Ticker elements MUST render a continuously scrolling container of text items. Ea
 
 ### Requirement: Alpha Background Rendering Mode `[Adapter]`
 
-The renderer MUST support a transparent background mode for alpha-channel export. When the canvas element has `background: 'transparent'` or when an export requests alpha output, the canvas background MUST render with no background color (CSS `background: transparent` or equivalent). All elements MUST render with their specified opacity and backgrounds preserved — only the canvas root background is made transparent. This enables compositing the rendered output over external video feeds or other graphics layers. The alpha background mode MUST NOT affect element rendering, z-order, or any other visual behavior.
+The renderer MUST support transparent background for alpha-channel output. When `surface.background` is typed `Paint` with `kind: 'none'`, or an export explicitly requests alpha output, the surface root renders transparent. Element appearances remain unchanged; only the surface paint is omitted. Alpha mode MUST NOT affect scene resolution, stacking, or other visual behavior.
 
 #### Scenario: Transparent canvas background
 
-- GIVEN a canvas with `background: 'transparent'`
+- GIVEN a surface with `background: { kind: 'none' }`
 - WHEN the scene is rendered
 - THEN the root canvas element has no visible background
 
 #### Scenario: Elements retain their backgrounds
 
-- GIVEN a transparent canvas background and elements with solid background colors
+- GIVEN a transparent surface and elements with solid fill layers
 - WHEN the scene is rendered
 - THEN individual elements render their backgrounds normally against the transparent canvas
 
 #### Scenario: Normal background unchanged
 
-- GIVEN a canvas with `background: '#ffffff'`
+- GIVEN a surface with a typed solid white background paint
 - WHEN the scene is rendered
 - THEN the canvas has a white background (existing behavior)
 
 #### Acceptance Criteria
 
-- [ ] Given `background: 'transparent'`, the canvas root has no visible background
-- [ ] Given transparent canvas, elements retain their own background colors and opacity
-- [ ] Given a normal (non-transparent) background value, existing behavior is unchanged
+- [ ] Given `surface.background.kind: 'none'`, the surface root has no visible background
+- [ ] Given transparent surface output, elements retain their own fills and opacity
+- [ ] Given a non-none typed background paint, existing rendering behavior is unchanged
 
 ---
 
@@ -779,10 +783,9 @@ The renderer MUST support a transparent background mode for alpha-channel export
 - [x] **Animation Target Attribute Contract:** Automated renderer tests verify one animation target per element and group-specific targeting on the container contract (`packages/renderer/src/screen-renderer/core.test.ts`).
 - [x] **Incremental Scene Tree Updates:** Automated renderer tests verify that single-element changes rerender only the affected element and that element additions do not remount existing nodes (`packages/renderer/src/screen-renderer/core.test.ts`).
 - [x] **Broken Image Fallback:** Automated renderer tests verify both the empty-content path and the image error-event path swap to a visible placeholder without leaving a broken `<img>` node (`packages/renderer/src/screen-renderer/core.test.ts`).
-- [x] **Text Content Sanitization:** Automated renderer tests verify text rendering strips script tags and inline event-handler markup before visible characters are emitted (`packages/renderer/src/screen-renderer/core.test.ts`).
-- [ ] **Proposed inert-string/typed-run migration:** IO-D-01 and the roadmap propose eventually replacing persisted sanitized HTML authoring content with inert strings plus structured runs. The current sanitization requirement and its evidence remain authoritative until a maintainer-ratified migration updates the model, renderer, importers, clipboard/export boundaries, and security tests together.
-- [x] **Group Element Rendering:** Automated renderer tests verify both boolean-operation group rendering and normal group container behavior with child nodes (`packages/renderer/src/screen-renderer/core.test.ts`).
-- [x] **Dynamic Data Token Format:** Runtime `substituteDynamicTokens` + renderer-level tests verify direct-key resolution, nested dot-notation, and literal fallback for missing keys (`packages/renderer/src/core/runtime.test.ts`).
+- [ ] **Structured inert text evidence:** Renderer tests must verify stable paragraph/run output uses safe text nodes and typed formatting while hostile boundary markup cannot execute.
+- [ ] **Group and boolean vector evidence:** Renderer tests must verify structural groups and typed boolean vectors independently.
+- [ ] **Typed binding evidence:** Renderer tests must verify resolved field-ID bindings and every stale policy without parsing dot-string tokens.
 - [x] **Rendering Performance (complexity):** Instrumented `insertBefore` mutation-count tests verify that single-element updates leave root-level children untouched, single insertions trigger exactly one reparent, and sibling reorders stay within O(n) moves (`packages/renderer/src/dom/performance.test.ts`).
 
 ---

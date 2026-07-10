@@ -114,26 +114,26 @@ The system MUST map element state activation to visibility semantics and propaga
 
 ---
 
-### Requirement: Modifier and Screen Class Updates
+### Requirement: State Events and Typed Clip Updates
 
-The system MUST support explicit/toggle modifier updates without duplicates, and class-style updates MUST persist custom clip-path values.
+The system MUST support deduplicated runtime state-machine events and atomic typed clip updates. Runtime event state remains outside canonical project data; authoring clip changes update `appearance.clip` through a compatible vector reference.
 
 #### Scenario: Modifier toggles are deterministic and deduplicated
 
-- GIVEN an element and a modifier name
-- WHEN explicit enable/disable and toggle operations are applied
-- THEN the modifier list remains deduplicated and reflects requested state
+- GIVEN an element-targeted runtime event and state machine trigger
+- WHEN explicit enable/disable and toggle event operations are applied
+- THEN the runtime event log remains deduplicated and deterministic
 
-#### Scenario: Custom clip-path update persists in screen properties
+#### Scenario: Typed clip update persists
 
-- GIVEN an element with screen properties
-- WHEN custom mask mode and custom clip-path are updated
-- THEN the persisted screen properties include the requested mask mode and clip-path
+- GIVEN an element eligible for clip authoring and a compatible vector source
+- WHEN the clip command commits
+- THEN `appearance.clip` contains the typed resolving reference
 
 #### Acceptance Criteria
 
-- [ ] Given an element and a modifier name, the modifier list remains deduplicated and reflects requested state
-- [ ] Given an element with screen properties, the persisted screen properties include the requested mask mode and clip-path
+- [ ] Given repeated equivalent runtime events, the event log remains deduplicated and deterministic
+- [ ] Given a valid clip edit, `appearance.clip` stores the typed resolving vector reference
 
 ---
 

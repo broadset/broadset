@@ -72,10 +72,10 @@ When one or more elements are selected, the canvas MUST display a 2D transform w
 
 #### Scenario: Widget stays pixel-aligned with the selected element
 
-- GIVEN a selected element rendered at any combination of canvas pan, canvas zoom, letterboxed aspect ratio, `rotation`, `style.rotateX`, `style.rotateY`, `style.rotateZ`, and `style.translateZ`
+- GIVEN a selected element rendered with any exact affine or matrix3d world transform under canvas pan, zoom, and letterboxing
 - WHEN the widget is displayed
 - THEN the widget outline and handles MUST coincide with the element's rendered bounding box within ±1 px
-- AND the widget MUST apply the same CSS transform chain (2D rotation and any 3D rotation / depth translation) as the element
+- AND the widget MUST consume the same resolved world matrix as the element
 - AND resize / rotation handle chips MUST retain a constant on-screen pixel size regardless of the active zoom or letterbox scale so they remain ergonomic
 - AND the active CanvasSettings.perspective MUST be applied to the canvas coordinate layer so 3D rotations render with real depth
 
@@ -85,7 +85,7 @@ When one or more elements are selected, the canvas MUST display a 2D transform w
 - [ ] Given a pointer drag on a widget handle, the corresponding transform operation from [transforms.md](transforms.md) is applied
 - [ ] Given a pointer drag on the element body, the element is translated following the drag
 - [ ] Given any pan / zoom / letterbox combination, the widget's bounding box coincides with the element's bounding box within ±1 px
-- [ ] Given an element with non-zero `style.rotateX`, `rotateY`, `rotateZ`, or `translateZ`, the widget applies the identical CSS transform chain as the element
+- [ ] Given any finite canonical affine2d or matrix3d transform, the widget consumes the identical resolved world matrix as the element
 - [ ] Given any effective screen scale, resize and rotation handle chips render at a constant on-screen pixel size
 - [ ] Given a document rendered on a canvas with `CanvasSettings.perspective`, the canvas coordinate layer exposes that perspective value as a CSS `perspective` so 3D rotations project correctly
 
@@ -505,7 +505,7 @@ User-created guide lines (dragged from rulers) MUST render as thin solid lines u
 - [ ] **Ruler Drag to Guide:** Dragging from ruler to create a guide requires pointer interaction (requires CT).
 - [ ] **Canvas Inline Text Editing Mode:** Overlay appearance, zoom compensation rendering, and pan/zoom suppression during inline editing are not unit-testable (requires CT). The zoom math is covered by `computeInlineEditOverlay` unit tests.
 - [ ] **Transform Widget:** Displaying the widget, rendering handles, and routing pointer events to transform operations are not unit-testable (requires CT). The transform computations are covered by unit tests in `transforms.test.ts`.
-- [ ] **Transform Widget pointer math on strong 3D:** Pointer delta → canvas-space conversion for drag / resize assumes a 2D projection of the element's bounding box. When an element has large `style.rotateX` or `style.rotateY` (≥ ~30°), drag deltas become approximate because the visible geometry is perspective-foreshortened. Widget alignment still follows the full 3D transform; only interaction-to-delta conversion is approximate. Inverse-matrix pointer conversion for fully 3D-aware interaction is out of scope for this unit.
+- [ ] **Transform Widget pointer math on strong 3D:** Pointer delta → surface-space conversion currently approximates interaction from the projected bounding box when a resolved matrix3d has strong perspective foreshortening. Widget alignment still consumes the exact world matrix; only interaction-to-delta conversion is approximate. Full ray/plane inverse projection is out of scope for this unit.
 
 ---
 
