@@ -67,13 +67,20 @@ describe('outputProfileSchema', () => {
     ).toBe(false);
   });
 
-  it('requires interlaced field order through the scan discriminant', () => {
+  it('covers progressive and both interlaced field-order variants', () => {
     const motion = createMotionProfile();
 
+    expect(outputProfileSchema.safeParse({ ...motion, scan: { kind: 'progressive' } }).success).toBe(true);
     expect(outputProfileSchema.safeParse({ ...motion, scan: { kind: 'interlaced' } }).success).toBe(false);
     expect(
       outputProfileSchema.safeParse({ ...motion, scan: { kind: 'interlaced', fieldOrder: 'top-first' } }).success,
     ).toBe(true);
+    expect(
+      outputProfileSchema.safeParse({ ...motion, scan: { kind: 'interlaced', fieldOrder: 'bottom-first' } }).success,
+    ).toBe(true);
+    expect(
+      outputProfileSchema.safeParse({ ...motion, scan: { kind: 'progressive', fieldOrder: 'top-first' } }).success,
+    ).toBe(false);
   });
 
   it('enforces SDR and HDR transfer and luminance consistency', () => {
@@ -83,6 +90,28 @@ describe('outputProfileSchema', () => {
       outputProfileSchema.safeParse({
         ...motion,
         colorSignal: { ...motion.colorSignal, dynamicRange: { kind: 'sdr', referenceWhiteNits: 100, peakNits: 80 } },
+      }).success,
+    ).toBe(false);
+
+    const hlg = {
+      ...motion,
+      colorSignal: {
+        primaries: 'bt2020',
+        transfer: 'hlg',
+        matrix: 'bt2020-ncl',
+        range: 'limited',
+        dynamicRange: { kind: 'hdr', format: 'hlg', referenceWhiteNits: 203, peakNits: 1_000 },
+      },
+    } as const;
+
+    expect(outputProfileSchema.safeParse(hlg).success).toBe(true);
+    expect(outputProfileSchema.safeParse({ ...hlg, colorSignal: { ...hlg.colorSignal, transfer: 'pq' } }).success).toBe(
+      false,
+    );
+    expect(
+      outputProfileSchema.safeParse({
+        ...hlg,
+        colorSignal: { ...hlg.colorSignal, dynamicRange: { kind: 'sdr', referenceWhiteNits: 100, peakNits: 100 } },
       }).success,
     ).toBe(false);
     expect(
@@ -169,15 +198,27 @@ describe('outputProfileSchema', () => {
     expect(outputProfileSchema.safeParse({ ...motion, alpha: { kind: 'separate-key' } }).success).toBe(false);
   });
 
-  it('validates print edges and closed PDF target/conformance pairs', () => {
+  it('validates print edges and every closed PDF target/conformance pair', () => {
     const print = createPrintProfile();
+    const validTargets = [
+      { standard: 'pdf-1.7', conformance: 'none' },
+      { standard: 'pdf-2.0', conformance: 'none' },
+      { standard: 'pdf-x-1a:2001', conformance: 'strict' },
+      { standard: 'pdf-x-3:2002', conformance: 'strict' },
+      { standard: 'pdf-x-4', conformance: 'strict' },
+      { standard: 'pdf-x-6', conformance: 'strict' },
+    ] as const;
+    const invalidTargets = [
+      { standard: 'pdf-1.7', conformance: 'strict' },
+      { standard: 'pdf-2.0', conformance: 'strict' },
+      { standard: 'pdf-x-1a:2001', conformance: 'none' },
+      { standard: 'pdf-x-3:2002', conformance: 'none' },
+      { standard: 'pdf-x-4', conformance: 'none' },
+      { standard: 'pdf-x-6', conformance: 'none' },
+    ] as const;
 
     expect(outputProfileSchema.safeParse({ ...print, bleed: { ...print.bleed, top: -1 } }).success).toBe(false);
-    expect(
-      outputProfileSchema.safeParse({ ...print, pdf: { standard: 'pdf-2.0', conformance: 'strict' } }).success,
-    ).toBe(false);
-    expect(outputProfileSchema.safeParse({ ...print, pdf: { standard: 'pdf-2.0', conformance: 'none' } }).success).toBe(
-      true,
-    );
+    for (const pdf of validTargets) expect(outputProfileSchema.safeParse({ ...print, pdf }).success).toBe(true);
+    for (const pdf of invalidTargets) expect(outputProfileSchema.safeParse({ ...print, pdf }).success).toBe(false);
   });
 });

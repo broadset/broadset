@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { type ColorValue, colorValueSchema } from './color';
-import { type ExpressionAst, expressionAstSchema } from './data';
+import { type ExpressionAst, expressionAstSchema, validateBooleanExpressionStructure } from './data';
 import { type StructuredPath, structuredPathSchema } from './element';
 import { type Id, idSchema, type PropertyTarget, propertyTargetSchema } from './identity';
 import { nonEmptyStringSchema, validateUniqueIds } from './schema-helpers';
@@ -458,29 +458,38 @@ export const transitionSchema: z.ZodType<Transition> = z.strictObject({
   actions: z.array(sequenceActionSchema),
 });
 
-function inferGuardBoolean(guard: ExpressionAst): boolean | undefined {
-  if (guard.kind === 'literal') return guard.value.type === 'boolean';
-  if (guard.kind === 'unary') return guard.operator === 'not';
-
-  if (guard.kind === 'binary') {
-    return ['and', 'or', 'eq', 'neq', 'lt', 'lte', 'gt', 'gte'].includes(guard.operator);
-  }
-
-  if (guard.kind === 'conditional') {
-    const trueBranch = inferGuardBoolean(guard.whenTrue);
-    const falseBranch = inferGuardBoolean(guard.whenFalse);
-
-    return trueBranch === falseBranch ? trueBranch : undefined;
-  }
-
-  return undefined;
+interface TransitionPriorityIndex {
+  readonly events: Map<Id, Set<number>>;
+  readonly lifecycles: Map<Extract<TransitionTrigger, { readonly kind: 'lifecycle' }>['phase'], Set<number>>;
+  readonly delays: Map<number, Set<number>>;
 }
 
-function triggerKey(trigger: TransitionTrigger): string {
-  if (trigger.kind === 'event') return `event:${trigger.eventId}`;
-  if (trigger.kind === 'lifecycle') return `lifecycle:${trigger.phase}`;
+function createTransitionPriorityIndex(): TransitionPriorityIndex {
+  return { events: new Map(), lifecycles: new Map(), delays: new Map() };
+}
 
-  return `after:${String(trigger.ticks)}`;
+function getTriggerPriorities(index: TransitionPriorityIndex, trigger: TransitionTrigger): Set<number> {
+  if (trigger.kind === 'event') {
+    const priorities = index.events.get(trigger.eventId) ?? new Set<number>();
+
+    index.events.set(trigger.eventId, priorities);
+
+    return priorities;
+  }
+
+  if (trigger.kind === 'lifecycle') {
+    const priorities = index.lifecycles.get(trigger.phase) ?? new Set<number>();
+
+    index.lifecycles.set(trigger.phase, priorities);
+
+    return priorities;
+  }
+
+  const priorities = index.delays.get(trigger.ticks) ?? new Set<number>();
+
+  index.delays.set(trigger.ticks, priorities);
+
+  return priorities;
 }
 
 export const stateMachineSchema: z.ZodType<StateMachine> = z
@@ -500,7 +509,7 @@ export const stateMachineSchema: z.ZodType<StateMachine> = z
     if (!stateIds.has(machine.initialStateId))
       context.addIssue({ code: 'custom', message: 'Initial state does not resolve', path: ['initialStateId'] });
 
-    const priorities = new Set<string>();
+    const prioritiesBySource = new Map<Id, TransitionPriorityIndex>();
 
     machine.transitions.forEach((transition, index) => {
       if (!stateIds.has(transition.sourceStateId))
@@ -516,18 +525,31 @@ export const stateMachineSchema: z.ZodType<StateMachine> = z
           path: ['transitions', index, 'targetStateId'],
         });
 
-      if (transition.guard !== undefined && inferGuardBoolean(transition.guard) === false) {
-        context.addIssue({ code: 'custom', message: 'Guard must be boolean', path: ['transitions', index, 'guard'] });
+      if (transition.guard !== undefined) {
+        const guardResult = validateBooleanExpressionStructure(transition.guard);
+
+        if (
+          guardResult.diagnostics.length > 0 ||
+          (guardResult.valueType !== undefined && guardResult.valueType !== 'boolean')
+        ) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Guard must be a structurally valid boolean expression',
+            path: ['transitions', index, 'guard'],
+          });
+        }
       }
 
-      const priorityKey = `${transition.sourceStateId}:${triggerKey(transition.trigger)}:${String(transition.priority)}`;
+      const sourcePriorities = prioritiesBySource.get(transition.sourceStateId) ?? createTransitionPriorityIndex();
+      const triggerPriorities = getTriggerPriorities(sourcePriorities, transition.trigger);
 
-      if (priorities.has(priorityKey))
+      if (triggerPriorities.has(transition.priority))
         context.addIssue({
           code: 'custom',
           message: 'Duplicate transition priority for source and trigger',
           path: ['transitions', index, 'priority'],
         });
-      priorities.add(priorityKey);
+      triggerPriorities.add(transition.priority);
+      prioritiesBySource.set(transition.sourceStateId, sourcePriorities);
     });
   });

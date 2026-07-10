@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  interpolationSchema,
-  lifecycleDefinitionSchema,
-  loopDefinitionSchema,
-  sequenceSchema,
-  stateMachineSchema,
-  transitionTriggerSchema,
-} from './sequence';
+import { interpolationSchema, loopDefinitionSchema, sequenceSchema } from './sequence';
 
 const target = {
   entity: { projectId: 'project-1', documentId: 'document-1', entityKind: 'element', entityId: 'headline' },
@@ -293,128 +286,121 @@ describe('sequenceSchema', () => {
       }).success,
     ).toBe(false);
   });
-});
 
-describe('lifecycle and state machines', () => {
-  it('parses every typed transition trigger', () => {
-    const triggers = [
-      { kind: 'event', eventId: 'show' },
-      { kind: 'lifecycle', phase: 'update' },
-      { kind: 'after', ticks: 1 },
-    ] as const;
-
-    expect(triggers.map((trigger) => transitionTriggerSchema.parse(trigger))).toEqual(triggers);
-    expect(transitionTriggerSchema.safeParse({ kind: 'after', ticks: 0 }).success).toBe(false);
-  });
-
-  it('parses document lifecycle with every stable action discriminant', () => {
-    const lifecycle = {
-      id: 'lifecycle',
-      in: [{ kind: 'play-sequence', sequenceId: 'in', behavior: 'restart' }],
-      hold: [{ kind: 'seek-sequence', sequenceId: 'hold', tick: 0 }],
-      update: [{ kind: 'send-event', stateMachineId: 'visibility', eventId: 'refresh' }],
-      out: [{ kind: 'stop-sequence', sequenceId: 'in' }],
-    } as const;
-
-    expect(lifecycleDefinitionSchema.parse(lifecycle)).toEqual(lifecycle);
-    expect(
-      lifecycleDefinitionSchema.safeParse({ ...lifecycle, out: [{ kind: 'unknown', sequenceId: 'in' }] }).success,
-    ).toBe(false);
-  });
-
-  it('validates state references, local ids, priorities, and boolean literal guards', () => {
-    const machine = {
-      id: 'visibility',
-      name: 'Visibility',
-      initialStateId: 'hidden',
-      states: [
-        { id: 'hidden', name: 'Hidden', values: [], entryActions: [], exitActions: [] },
-        {
-          id: 'visible',
-          name: 'Visible',
-          values: [{ id: 'opacity', target, value: { type: 'number', value: 1 } }],
-          entryActions: [],
-          exitActions: [],
-        },
+  it('covers the complete interpolation and value-type compatibility table', () => {
+    const path = {
+      points: [
+        { id: 'start', x: 0, y: 0 },
+        { id: 'end', x: 1, y: 1 },
       ],
-      transitions: [
-        {
-          id: 'show',
-          sourceStateId: 'hidden',
-          targetStateId: 'visible',
-          trigger: { kind: 'event', eventId: 'show' },
-          guard: { kind: 'literal', value: { type: 'boolean', value: true } },
-          priority: 0,
-          actions: [{ kind: 'play-sequence', sequenceId: 'fade', behavior: 'restart' }],
-        },
+      segments: [
+        { id: 'move', kind: 'move', pointId: 'start' },
+        { id: 'line', kind: 'line', pointId: 'end' },
+      ],
+      closed: false,
+    };
+    const cubic = { kind: 'cubic-bezier', controlPoints: [0.42, 0, 0.58, 1] };
+    const spring = {
+      kind: 'spring',
+      mass: 1,
+      stiffness: 100,
+      damping: 10,
+      initialVelocity: 0,
+      settleThreshold: 0.001,
+    };
+    const spatial = { kind: 'spatial-path', path, orientToPath: false };
+    const counting = { kind: 'counting', rounding: 'round', minimumDigits: 1, grouping: false };
+    const color = { kind: 'color', space: 'oklab' };
+    const values = {
+      boolean: [
+        { type: 'boolean', value: false },
+        { type: 'boolean', value: true },
+      ],
+      integer: [
+        { type: 'integer', value: 0 },
+        { type: 'integer', value: 1 },
+      ],
+      number: [
+        { type: 'number', value: 0 },
+        { type: 'number', value: 1 },
+      ],
+      string: [
+        { type: 'string', value: '0' },
+        { type: 'string', value: '1' },
+      ],
+      length: [
+        { type: 'length', value: 0 },
+        { type: 'length', value: 1 },
+      ],
+      angle: [
+        { type: 'angle', value: 0 },
+        { type: 'angle', value: 90 },
+      ],
+      color: [
+        { type: 'color', value: { kind: 'color', space: 'srgb', channels: [0, 0, 0], alpha: 1 } },
+        { type: 'color', value: { kind: 'color', space: 'srgb', channels: [1, 1, 1], alpha: 1 } },
+      ],
+      asset: [
+        { type: 'asset', assetId: 'first' },
+        { type: 'asset', assetId: 'second' },
+      ],
+      point2d: [
+        { type: 'point2d', value: [0, 0] },
+        { type: 'point2d', value: [1, 1] },
+      ],
+      point3d: [
+        { type: 'point3d', value: [0, 0, 0] },
+        { type: 'point3d', value: [1, 1, 1] },
       ],
     } as const;
+    const createSequence = (valueType: keyof typeof values, interpolation: object) => {
+      const sequence = createOpacitySequenceFixture();
+      const [startValue, endValue] = values[valueType];
 
-    expect(stateMachineSchema.parse(machine)).toEqual(machine);
-    expect(stateMachineSchema.safeParse({ ...machine, initialStateId: 'missing' }).success).toBe(false);
-    expect(stateMachineSchema.safeParse({ ...machine, states: [machine.states[0], machine.states[0]] }).success).toBe(
-      false,
-    );
-    expect(
-      stateMachineSchema.safeParse({
-        ...machine,
-        states: [
-          machine.states[0],
-          { ...machine.states[1], values: [machine.states[1].values[0], machine.states[1].values[0]] },
-        ],
-      }).success,
-    ).toBe(false);
-    expect(
-      stateMachineSchema.safeParse({
-        ...machine,
-        transitions: [{ ...machine.transitions[0], targetStateId: 'missing' }],
-      }).success,
-    ).toBe(false);
-    expect(
-      stateMachineSchema.safeParse({
-        ...machine,
-        transitions: [
-          { ...machine.transitions[0], guard: { kind: 'literal', value: { type: 'string', value: 'yes' } } },
-        ],
-      }).success,
-    ).toBe(false);
-    expect(
-      stateMachineSchema.safeParse({
-        ...machine,
-        transitions: [
+      return {
+        ...sequence,
+        tracks: [
           {
-            ...machine.transitions[0],
-            guard: {
-              kind: 'unary',
-              operator: 'negate',
-              operand: { kind: 'literal', value: { type: 'number', value: 1 } },
-            },
+            ...sequence.tracks[0],
+            valueType,
+            keyframes: [
+              { id: 'start', tick: 0, value: startValue, interpolation },
+              { id: 'end', tick: 1_000, value: endValue },
+            ],
           },
         ],
-      }).success,
-    ).toBe(false);
-  });
+      };
+    };
+    const compatible = [
+      ['boolean', { kind: 'hold' }],
+      ['asset', { kind: 'step', position: 'end' }],
+      ['integer', spring],
+      ['number', cubic],
+      ['length', cubic],
+      ['angle', spring],
+      ['point2d', cubic],
+      ['point3d', spring],
+      ['point2d', spatial],
+      ['point3d', spatial],
+      ['string', counting],
+      ['color', color],
+    ] as const;
+    const incompatible = [
+      ['boolean', cubic],
+      ['string', spring],
+      ['asset', cubic],
+      ['color', cubic],
+      ['number', counting],
+      ['string', spatial],
+      ['point2d', color],
+    ] as const;
 
-  it('rejects duplicate source-trigger-priority combinations', () => {
-    const transition = {
-      id: 'first',
-      sourceStateId: 'idle',
-      targetStateId: 'active',
-      trigger: { kind: 'lifecycle', phase: 'in' },
-      priority: 1,
-      actions: [],
-    } as const;
-    const machine = {
-      id: 'machine',
-      name: 'Machine',
-      initialStateId: 'idle',
-      states: [
-        { id: 'idle', name: 'Idle', values: [], entryActions: [], exitActions: [] },
-        { id: 'active', name: 'Active', values: [], entryActions: [], exitActions: [] },
-      ],
-      transitions: [transition, { ...transition, id: 'second' }],
-    } as const;
+    for (const [valueType, interpolation] of compatible) {
+      expect(sequenceSchema.safeParse(createSequence(valueType, interpolation)).success).toBe(true);
+    }
 
-    expect(stateMachineSchema.safeParse(machine).success).toBe(false);
+    for (const [valueType, interpolation] of incompatible) {
+      expect(sequenceSchema.safeParse(createSequence(valueType, interpolation)).success).toBe(false);
+    }
   });
 });

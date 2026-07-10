@@ -402,3 +402,4 @@ export const expressionInferenceContextSchema: z.ZodType<ExpressionInferenceCont
 });
 
 export { inferBindingValueType, inferExpressionValueType, inferFormatterPipelineValueType } from './data-inference';
+export { inferExpressionStructuralValueType, validateBooleanExpressionStructure } from './expression-structure';

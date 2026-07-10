@@ -7,6 +7,12 @@ import type {
   ValueSchema,
 } from './data';
 import type { Diagnostic } from './diagnostics';
+import {
+  commonExpressionValueType as commonValueType,
+  createExpressionError as createError,
+  isNumericValueType as isNumeric,
+  validateSafeFunctionArity as validateFunctionArity,
+} from './expression-inference-helpers';
 import type { EntityAddress, PropertyTarget } from './identity';
 import type { TypedValue, ValueType } from './typed-value';
 
@@ -38,26 +44,6 @@ interface StructuralType {
 interface StructuralInferenceResult {
   readonly structuralType?: StructuralType | undefined;
   readonly diagnostics: readonly Diagnostic[];
-}
-
-function createError(code: string, message: string): Diagnostic {
-  return { code, severity: 'error', message };
-}
-
-function isNumeric(valueType: ValueType): boolean {
-  return valueType === 'integer' || valueType === 'number';
-}
-
-function commonValueType(left: ValueType, right: ValueType): ValueType | undefined {
-  if (left === right) {
-    return left;
-  }
-
-  if (isNumeric(left) && isNumeric(right)) {
-    return 'number';
-  }
-
-  return undefined;
 }
 
 function valueSchemaType(schema: ValueSchema): ValueType {
@@ -259,25 +245,6 @@ function inferConditional(
   }
 
   return { structuralType: { valueType }, diagnostics };
-}
-
-function validateFunctionArity(functionId: SafeFunctionId, count: number): boolean {
-  switch (functionId) {
-    case 'coalesce':
-    case 'min':
-    case 'max':
-      return count >= 2;
-    case 'length':
-    case 'lowercase':
-    case 'uppercase':
-      return count === 1;
-    case 'round':
-      return count === 1 || count === 2;
-    case 'clamp':
-      return count === 3;
-    case 'format-date':
-      return count === 4;
-  }
 }
 
 function inferSafeFunction(

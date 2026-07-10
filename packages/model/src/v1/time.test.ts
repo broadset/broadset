@@ -59,26 +59,84 @@ describe('exact rational time', () => {
     expect(frameStartTicks(17_982, timebase)).toBe(17_999_982);
   });
 
-  it('rejects fractional frame ticks and unsupported SMPTE annotations', () => {
+  it('accepts the complete nominal and drop-frame matrix', () => {
+    const validAnnotations = [
+      [24_000, 1_001, 24, false],
+      [30_000, 1_001, 30, false],
+      [30_000, 1_001, 30, true],
+      [60_000, 1_001, 60, false],
+      [60_000, 1_001, 60, true],
+      [24, 1, 24, false],
+      [25, 1, 25, false],
+      [30, 1, 30, false],
+      [50, 1, 50, false],
+      [60, 1, 60, false],
+    ] as const;
+
+    for (const [numerator, denominator, nominalFramesPerSecond, dropFrame] of validAnnotations) {
+      expect(
+        timebaseSchema.safeParse({
+          ...createTimebase(numerator, denominator),
+          timecode: { nominalFramesPerSecond, dropFrame },
+        }).success,
+      ).toBe(true);
+    }
+  });
+
+  it('rejects every unsupported drop-frame family and mismatched nominal annotation', () => {
+    const invalidAnnotations = [
+      [24_000, 1_001, 24, true],
+      [24, 1, 24, true],
+      [25, 1, 25, true],
+      [30, 1, 30, true],
+      [50, 1, 50, true],
+      [60, 1, 60, true],
+      [30_000, 1_001, 29, true],
+      [60_000, 1_001, 59, true],
+      [24_000, 1_001, 23, false],
+      [30_000, 1_001, 29, false],
+      [60_000, 1_001, 59, false],
+      [25, 1, 24, false],
+    ] as const;
+
+    for (const [numerator, denominator, nominalFramesPerSecond, dropFrame] of invalidAnnotations) {
+      expect(
+        timebaseSchema.safeParse({
+          ...createTimebase(numerator, denominator),
+          timecode: { nominalFramesPerSecond, dropFrame },
+        }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('covers the complete canonical rate by nominal and drop-frame cross-product', () => {
+    const rates = [
+      [24_000, 1_001, 24, false],
+      [30_000, 1_001, 30, true],
+      [60_000, 1_001, 60, true],
+      [24, 1, 24, false],
+      [25, 1, 25, false],
+      [30, 1, 30, false],
+      [50, 1, 50, false],
+      [60, 1, 60, false],
+    ] as const;
+
+    for (const [numerator, denominator, nominal, supportsDropFrame] of rates) {
+      const parseAnnotation = (nominalFramesPerSecond: number, dropFrame: boolean) =>
+        timebaseSchema.safeParse({
+          ...createTimebase(numerator, denominator),
+          timecode: { nominalFramesPerSecond, dropFrame },
+        }).success;
+
+      expect(parseAnnotation(nominal, false)).toBe(true);
+      expect(parseAnnotation(nominal + 1, false)).toBe(false);
+      expect(parseAnnotation(nominal, true)).toBe(supportsDropFrame);
+      expect(parseAnnotation(nominal + 1, true)).toBe(false);
+    }
+  });
+
+  it('rejects fractional frame ticks', () => {
     expect(timebaseSchema.safeParse({ ...createTimebase(24, 1), ticksPerSecond: 1 }).success).toBe(false);
-    expect(
-      timebaseSchema.safeParse({
-        ...createTimebase(24_000, 1_001),
-        timecode: { nominalFramesPerSecond: 24, dropFrame: true },
-      }).success,
-    ).toBe(false);
-    expect(
-      timebaseSchema.safeParse({
-        ...createTimebase(30_000, 1_001),
-        timecode: { nominalFramesPerSecond: 29, dropFrame: false },
-      }).success,
-    ).toBe(false);
-    expect(
-      timebaseSchema.safeParse({
-        ...createTimebase(60_000, 1_001),
-        timecode: { nominalFramesPerSecond: 60, dropFrame: true },
-      }).success,
-    ).toBe(true);
   });
 
   it('uses half-open duration frame counting and containing-frame lookup', () => {
