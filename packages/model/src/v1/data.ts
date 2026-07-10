@@ -114,6 +114,23 @@ const constrainedLengthSchema = z.number().int().nonnegative();
 const numericBoundsShape = { minimum: z.number().optional(), maximum: z.number().optional() };
 const integerBoundsShape = { minimum: z.number().int().optional(), maximum: z.number().int().optional() };
 
+function parseChronologicalInstant(value: string): number | undefined {
+  const instant = Date.parse(value);
+
+  return Number.isFinite(instant) ? instant : undefined;
+}
+
+function chronologicallyOrdered(earliest: string | undefined, latest: string | undefined): boolean {
+  if (earliest === undefined || latest === undefined) {
+    return true;
+  }
+
+  const earliestInstant = parseChronologicalInstant(earliest);
+  const latestInstant = parseChronologicalInstant(latest);
+
+  return earliestInstant !== undefined && latestInstant !== undefined && earliestInstant <= latestInstant;
+}
+
 export const valueSchemaSchema: z.ZodType<ValueSchema> = z.lazy(() =>
   z.discriminatedUnion('kind', [
     z
@@ -138,7 +155,7 @@ export const valueSchemaSchema: z.ZodType<ValueSchema> = z.lazy(() =>
     z.strictObject({ kind: z.literal('boolean') }),
     z
       .strictObject({ kind: z.literal('date-time'), earliest: utcTimestampSchema.optional(), latest: utcTimestampSchema.optional() })
-      .refine(({ earliest, latest }) => earliest === undefined || latest === undefined || earliest <= latest, {
+      .refine(({ earliest, latest }) => chronologicallyOrdered(earliest, latest), {
         message: 'earliest must not exceed latest',
       }),
     z.strictObject({ kind: z.literal('color') }),
@@ -206,11 +223,11 @@ function typedValueMatchesSchema(value: TypedValue, schema: ValueSchema): boolea
     case 'boolean':
       return value.type === 'boolean';
     case 'date-time':
-      return (
-        value.type === 'date-time' &&
-        (schema.earliest === undefined || value.value >= schema.earliest) &&
-        (schema.latest === undefined || value.value <= schema.latest)
-      );
+      if (value.type !== 'date-time') {
+        return false;
+      }
+
+      return chronologicallyOrdered(schema.earliest, value.value) && chronologicallyOrdered(value.value, schema.latest);
     case 'color':
       return value.type === 'color';
     case 'asset':

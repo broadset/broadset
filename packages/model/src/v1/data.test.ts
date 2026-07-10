@@ -87,6 +87,52 @@ describe('valueSchemaSchema and viewModelSchema', () => {
     expect(valueSchemaSchema.safeParse({ kind: 'asset', acceptedMediaTypes: ['not-a-media-type'] }).success).toBe(false);
   });
 
+  it('orders date-time schema bounds by chronological instant across unequal offsets', () => {
+    expect(
+      valueSchemaSchema.safeParse({
+        kind: 'date-time',
+        earliest: '2026-01-01T00:00:00+14:00',
+        latest: '2025-12-31T23:00:00-12:00',
+      }).success,
+    ).toBe(true);
+    expect(
+      valueSchemaSchema.safeParse({
+        kind: 'date-time',
+        earliest: '2026-01-01T00:00:00-12:00',
+        latest: '2026-01-01T01:00:00+14:00',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('validates date-time defaults and sample values by chronological instant', () => {
+    const createDateViewModel = (defaultValue: string, sampleValue: string) => ({
+      id: 'schedule',
+      name: 'Schedule',
+      fields: [
+        {
+          id: 'starts-at',
+          name: 'Starts at',
+          schema: { kind: 'date-time', earliest: '2026-01-01T00:00:00Z', latest: '2026-01-02T00:00:00Z' },
+          defaultValue: { type: 'date-time', value: defaultValue },
+        },
+      ],
+      sampleDataSets: [
+        { id: 'sample', name: 'Sample', values: { 'starts-at': { type: 'date-time', value: sampleValue } } },
+      ],
+    });
+
+    expect(
+      viewModelSchema.safeParse(
+        createDateViewModel('2025-12-31T23:00:00-02:00', '2026-01-02T01:00:00+02:00'),
+      ).success,
+    ).toBe(true);
+    expect(
+      viewModelSchema.safeParse(
+        createDateViewModel('2026-01-01T01:00:00+02:00', '2026-01-01T23:00:00-02:00'),
+      ).success,
+    ).toBe(false);
+  });
+
   it('validates field defaults and sample values against recursive schemas', () => {
     const viewModel = {
       id: 'news',
