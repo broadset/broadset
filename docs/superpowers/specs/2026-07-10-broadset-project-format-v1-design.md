@@ -1,4 +1,4 @@
-# Broadset Project Format v2 Design
+# Broadset Project Format v1 Design
 
 **Status:** Approved design direction; non-authoritative until the corresponding files under `project/spec/` are reconciled and ratified.
 
@@ -10,7 +10,7 @@
 
 Broadset needs one project format that can represent professional broadcast, motion, screen, and print graphics without making the editor, renderer, player, or format adapters invent missing semantics.
 
-The v2 format remains human-readable JSON. It replaces the current schema rather than extending it through compatibility branches. A portable `.bsp` file packages the canonical JSON together with content-addressed binary resources.
+The v1 format remains human-readable JSON. It replaces the current schema rather than extending it through compatibility branches. A portable `.bsp` file packages the canonical JSON together with content-addressed binary resources.
 
 The design has four primary outcomes:
 
@@ -45,7 +45,7 @@ The design has four primary outcomes:
 
 ## 4. Chosen approach
 
-Broadset v2 uses a **canonical semantic graph with ordered arrays and stable IDs**.
+Broadset v1 uses a **canonical semantic graph with ordered arrays and stable IDs**.
 
 This approach is preferred over two alternatives:
 
@@ -183,14 +183,14 @@ Every JSON number must be finite. Values declared as integers must be safe integ
 The canonical project root is:
 
 ```ts
-interface BroadsetProjectV2 {
-  readonly $schema: 'https://schema.broadset.dev/v2/project.schema.json';
+interface BroadsetProjectV1 {
+  readonly $schema: 'https://schema.broadset.dev/v1/project.schema.json';
   readonly format: 'broadset-project';
-  readonly schemaVersion: 2;
+  readonly schemaVersion: 1;
   readonly id: Id;
   readonly metadata: ProjectMetadata;
   readonly resources: ProjectResources;
-  readonly documents: readonly BroadsetDocumentV2[];
+  readonly documents: readonly BroadsetDocumentV1[];
   readonly templateGroups: readonly TemplateGroup[];
   readonly interop: InteropRegistry;
   readonly extensions: readonly ExtensionEnvelope[];
@@ -246,7 +246,7 @@ Member IDs are unique within a group. Document references and output-profile ref
 
 ### 6.3 Project ownership
 
-The editor store owns the full `BroadsetProjectV2`. Runtime navigation such as `activeDocumentId` and `activePageId` is separate UI state.
+The editor store owns the full `BroadsetProjectV1`. Runtime navigation such as `activeDocumentId` and `activePageId` is separate UI state.
 
 Main project save and export always serialize the whole project. A document-only interchange export uses a distinct command, file label, and schema and must not be presented as a full `.bsp` save.
 
@@ -296,7 +296,7 @@ interface AssetBase {
 }
 ```
 
-Canonical portable packages use package sources. Raw JSON interchange may reference external or missing sources. Embedded data URIs are not canonical v2 asset sources.
+Canonical portable packages use package sources. Raw JSON interchange may reference external or missing sources. Embedded data URIs are not canonical v1 asset sources.
 
 Asset variants contain typed metadata:
 
@@ -384,7 +384,7 @@ Shared styles hold reusable typed appearance or text-style fragments. They may r
 ## 8. Document shape
 
 ```ts
-interface BroadsetDocumentV2 {
+interface BroadsetDocumentV1 {
   readonly id: Id;
   readonly name: string;
   readonly kind: 'motion' | 'static' | 'print';
@@ -1066,12 +1066,12 @@ Load returns a discriminated result:
 
 ```ts
 type ProjectLoadResult =
-  | { readonly status: 'loaded'; readonly project: BroadsetProjectV2; readonly diagnostics: readonly Diagnostic[] }
+  | { readonly status: 'loaded'; readonly project: BroadsetProjectV1; readonly diagnostics: readonly Diagnostic[] }
   | {
       readonly status: 'quarantined';
       readonly diagnostics: readonly Diagnostic[];
       readonly originalBytes: Blob;
-      readonly lastValidProject?: BroadsetProjectV2;
+      readonly lastValidProject?: BroadsetProjectV1;
     };
 ```
 
@@ -1139,20 +1139,20 @@ Performance gates cover at least 1,000 visible elements, 10,000 assets, 100 comp
 The cutover is intentionally breaking:
 
 1. Ratify this design and reconcile authoritative behavioral specs.
-2. Publish the v2 JSON Schema and Zod types together.
+2. Publish the v1 JSON Schema and Zod types together.
 3. Replace the editor document store with a project store.
 4. Implement structural and semantic validation plus typed load results.
 5. Implement the shared resolver and migrate every visual/export consumer to it.
-6. Replace the generic element/style/content model with v2 unions and typed values.
+6. Replace the generic element/style/content model with v1 unions and typed values.
 7. Implement resources, components, pages, text, color, variables, data, and exact animation.
 8. Replace current format dirty extensions with interop records and content-addressed blobs.
 9. Implement package integrity, portable save/load, atomic persistence, and recovery.
-10. Update all importers to emit v2 and all exporters to consume resolved scenes.
-11. Replace fixtures and sample projects with v2 data.
+10. Update all importers to emit v1 and all exporters to consume resolved scenes.
+11. Replace fixtures and sample projects with v1 data.
 12. Delete legacy color/fill/filter/project migrations and compatibility branches.
-13. Reject old `schemaVersion` values with a clear unsupported-version diagnostic.
+13. Reject unsupported project identity/version combinations with clear typed diagnostics.
 
-No compatibility adapter ships in production. Temporary development adapters may exist only on an unshipped implementation branch and are deleted before the v2 cutover is complete.
+No compatibility adapter ships in production. Temporary development adapters may exist only on an unshipped implementation branch and are deleted before the v1 cutover is complete.
 
 ## 29. Acceptance criteria
 

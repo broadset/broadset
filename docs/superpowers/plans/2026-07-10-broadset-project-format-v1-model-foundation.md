@@ -1,10 +1,10 @@
-# Broadset Project Format v2 Model Foundation Implementation Plan
+# Broadset Project Format v1 Model Foundation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Establish the authoritative v2 project contract, strict DOM-free TypeScript/Zod model, semantic validator, canonical JSON loader, and published JSON Schema without yet migrating editor, renderer, playback, or format consumers.
+**Goal:** Establish the authoritative v1 project contract, strict DOM-free TypeScript/Zod model, semantic validator, canonical JSON loader, and published JSON Schema without yet migrating editor, renderer, playback, or format consumers.
 
-**Architecture:** Add a temporary `packages/model/src/v2/` implementation namespace so the complete v2 model can be built and verified while existing consumers continue compiling. This is development staging, not a compatibility layer: downstream cutover plans replace current imports and delete all v1 model code and migrations before release. Structural Zod parsing, whole-project semantic validation, and bounded package loading remain separate concerns.
+**Architecture:** Add a temporary `packages/model/src/v1/` implementation namespace so the complete v1 model can be built and verified while existing consumers continue compiling. This is development staging, not a compatibility layer: downstream cutover plans replace current imports and delete all legacy model code and migrations before release. Structural Zod parsing, whole-project semantic validation, and bounded package loading remain separate concerns.
 
 **Tech Stack:** Node.js >=24, TypeScript ^6.0.2, Zod ^4.3.0, Vitest ^4.1.9, Ajv ^8.20.0, JSON Schema 2020-12, RFC 6901 JSON Pointer, RFC 8785 JSON Canonicalization Scheme, SHA-256 through the Web Crypto API.
 
@@ -15,7 +15,7 @@
 - `@broadset/model` MUST NOT import another workspace package.
 - Every core Zod object is strict. Open JSON values are allowed only inside versioned extension, plugin, and interop payloads.
 - No `any`, suppressions, skipped tests, warning silencing, or weakened quality gates.
-- Every public v2 symbol is re-exported through `packages/model/src/v2/index.ts` and the package root.
+- Every public v1 symbol is re-exported through `packages/model/src/v1/index.ts` and the package root.
 - Every addressable entity has a stable non-empty ID; array index is never durable identity.
 - Every number is finite. Ticks, byte lengths, and declared integers are JSON-safe integers.
 - Model files remain DOM-free and below the 500 non-empty-line soft limit.
@@ -35,8 +35,8 @@ The approved design requires eight independently testable programs, executed in 
 4. **View models and components:** expression evaluation, bindings, repeaters, exposed properties, unlink and cycle behavior.
 5. **Exact time and playback:** rational timebase, stable tracks/keyframes, sequences, state machines, lifecycle, offline sampling.
 6. **Project store and persistence:** whole-project store, atomic changes, IndexedDB/OPFS, recovery, `.bsp` codec.
-7. **Interoperability and formats:** v2 importer emission, interop records, foreign nodes, resolver-based exporters and preflight.
-8. **Application cutover:** editor/UI/demo/player migration, fixture replacement, v1 deletion, complete quality and producer gates.
+7. **Interoperability and formats:** v1 importer emission, interop records, foreign nodes, resolver-based exporters and preflight.
+8. **Application cutover:** editor/UI/demo/player migration, fixture replacement, legacy-model deletion, complete quality and producer gates.
 
 Programs 2-8 must not begin until this plan's public schemas, validator, canonical loader, and JSON Schema are complete.
 
@@ -79,13 +79,13 @@ Programs 2-8 must not begin until this plan's public schemas, validator, canonic
 
 **Implementation:**
 
-- Create focused modules under `packages/model/src/v2/`: `json-value.ts`, `identity.ts`, `diagnostics.ts`, `typed-value.ts`, `color.ts`, `resources.ts`, `appearance.ts`, `text.ts`, `element.ts`, `component.ts`, `page.ts`, `data.ts`, `time.ts`, `sequence.ts`, `output-profile.ts`, `interop.ts`, `document.ts`, `project.ts`, `semantic-validation.ts`, `canonical-json.ts`, `load.ts`, and `index.ts`.
-- Create adjacent tests and `packages/model/src/v2/fixtures/minimal-project.ts`.
-- Modify `packages/model/src/index.ts` only after the v2 public API is complete.
+- Create focused modules under `packages/model/src/v1/`: `json-value.ts`, `identity.ts`, `diagnostics.ts`, `typed-value.ts`, `color.ts`, `resources.ts`, `appearance.ts`, `text.ts`, `element.ts`, `component.ts`, `page.ts`, `data.ts`, `time.ts`, `sequence.ts`, `output-profile.ts`, `interop.ts`, `document.ts`, `project.ts`, `semantic-validation.ts`, `canonical-json.ts`, `load.ts`, and `index.ts`.
+- Create adjacent tests and `packages/model/src/v1/fixtures/minimal-project.ts`.
+- Modify `packages/model/src/index.ts` only after the v1 public API is complete.
 
 **Generated schema and enforcement:**
 
-- Create `project/schema/v2/project.schema.json`.
+- Create `project/schema/v1/project.schema.json`.
 - Create `scripts/generate-project-schema.mjs` and `scripts/generate-project-schema.test.mjs`.
 - Modify root `package.json`, `scripts/check-documentation.mjs`, and `scripts/check-documentation.test.mjs`.
 
@@ -103,7 +103,7 @@ Programs 2-8 must not begin until this plan's public schemas, validator, canonic
 
 **Interfaces:**
 
-- Consumes: `docs/superpowers/specs/2026-07-10-broadset-project-format-v2-design.md`.
+- Consumes: `docs/superpowers/specs/2026-07-10-broadset-project-format-v1-design.md`.
 - Produces: authoritative names, shapes, resolution order, validation rules, and acceptance criteria consumed by Tasks 2-8.
 
 - [ ] **Step 1: Replace the root identity requirement**
@@ -111,28 +111,28 @@ Programs 2-8 must not begin until this plan's public schemas, validator, canonic
 Use this exact normative contract in `project/spec/model/project.md`:
 
 ```markdown
-### Requirement: Canonical v2 Project Identity
+### Requirement: Canonical v1 Project Identity
 
 Every canonical project MUST contain `$schema`, `format`, and `schemaVersion` with these exact values:
 
-- `$schema: 'https://schema.broadset.dev/v2/project.schema.json'`
+- `$schema: 'https://schema.broadset.dev/v1/project.schema.json'`
 - `format: 'broadset-project'`
-- `schemaVersion: 2`
+- `schemaVersion: 1`
 
-Consumers MUST reject every other schema version with a typed unsupported-version diagnostic. The production v2 loader MUST NOT migrate or accept earlier Broadset-owned project shapes.
+Consumers MUST reject every other schema version with a typed unsupported-version diagnostic. The production v1 loader MUST NOT migrate or accept legacy Broadset-owned project shapes.
 
 #### Acceptance Criteria
 
 - [ ] Given all three exact identity values, structural validation proceeds
 - [ ] Given a missing or different identity value, validation fails at that field
-- [ ] Given `schemaVersion: 1`, loading returns `unsupported-version` and preserves the source bytes
+- [ ] Given `schemaVersion: 2`, loading returns `unsupported-version` and preserves the source bytes
 ```
 
 - [ ] **Step 2: Reconcile every model domain**
 
 Add requirements and self-contained acceptance criteria for the exact approved root vocabulary: `resources`, `documents`, `templateGroups`, `interop`, and `extensions`; and the exact document vocabulary: `surface`, `color`, `elements`, `components`, `pages`, `sequences`, `lifecycle`, `stateMachines`, `viewModels`, `bindings`, `selectedVariableModes`, and `outputProfileIds`.
 
-Remove contradictory v1 normative behavior rather than documenting both behaviors. Move historical rationale to implementation ADRs when it remains useful.
+Remove contradictory legacy-draft normative behavior rather than documenting both behaviors. Move historical rationale to implementation ADRs when it remains useful.
 
 - [ ] **Step 3: Add focused sub-specs and documentation links**
 
@@ -143,29 +143,29 @@ Each new file includes Purpose, Requirements, Acceptance Criteria, Spec Gaps, an
 ```bash
 npx prettier --write "project/spec/**/*.md"
 npm run docs:check
-rg -n "TBD|TODO|FIXME|schemaVersion: 1|plain JSON.*\.bsp|silently ignored" project/spec/model
+rg -n "TBD|TODO|FIXME|plain JSON.*\.bsp|silently ignored" project/spec/model
 ```
 
-Expected: documentation integrity passes and the final search returns no unresolved placeholder, v1 identity, ambiguous `.bsp`, or silent-reference rule in normative v2 text.
+Expected: documentation integrity passes and the final search returns no unresolved placeholder, ambiguous `.bsp`, or silent-reference rule in normative v1 text.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add project/spec/README.md project/spec/model
-git commit -m "docs(model): ratify project format v2"
+git commit -m "docs(model): ratify project format v1"
 ```
 
 ### Task 2: Implement Foundational JSON, Identity, Typed Values, Colors, and Resource Entities
 
 **Files:**
 
-- Create: `packages/model/src/v2/json-value.ts`
-- Create: `packages/model/src/v2/identity.ts`
-- Create: `packages/model/src/v2/diagnostics.ts`
-- Create: `packages/model/src/v2/typed-value.ts`
-- Create: `packages/model/src/v2/color.ts`
-- Create: `packages/model/src/v2/resources.ts`
-- Create: adjacent test files and `packages/model/src/v2/index.ts`
+- Create: `packages/model/src/v1/json-value.ts`
+- Create: `packages/model/src/v1/identity.ts`
+- Create: `packages/model/src/v1/diagnostics.ts`
+- Create: `packages/model/src/v1/typed-value.ts`
+- Create: `packages/model/src/v1/color.ts`
+- Create: `packages/model/src/v1/resources.ts`
+- Create: adjacent test files and `packages/model/src/v1/index.ts`
 
 **Interfaces:**
 
@@ -185,7 +185,7 @@ import {
   utcTimestampSchema,
 } from './index';
 
-describe('v2 foundational schemas', () => {
+describe('v1 foundational schemas', () => {
   it('accepts nested JSON and versioned extension payloads', () => {
     expect(jsonValueSchema.parse({ values: [1, true, null, 'x'] })).toEqual({ values: [1, true, null, 'x'] });
     expect(
@@ -215,9 +215,9 @@ describe('v2 foundational schemas', () => {
 
 - [ ] **Step 2: Run tests and verify failure**
 
-Run: `npm run test -w @broadset/model -- src/v2`
+Run: `npm run test -w @broadset/model -- src/v1`
 
-Expected: FAIL because the v2 modules and exports do not exist.
+Expected: FAIL because the v1 modules and exports do not exist.
 
 - [ ] **Step 3: Implement strict schemas**
 
@@ -245,21 +245,21 @@ Cover every `TypedValue`, color, blob source, asset, and resource discriminant; 
 - [ ] **Step 5: Verify and commit**
 
 ```bash
-npm run test -w @broadset/model -- src/v2
+npm run test -w @broadset/model -- src/v1
 npm run quality:strict -w @broadset/model
-git add packages/model/src/v2
-git commit -m "feat(model): add v2 foundation types"
+git add packages/model/src/v1
+git commit -m "feat(model): add v1 foundation types"
 ```
 
 ### Task 3: Implement Appearance, Structured Text, Geometry, and Elements
 
 **Files:**
 
-- Create: `packages/model/src/v2/appearance.ts`
-- Create: `packages/model/src/v2/text.ts`
-- Create: `packages/model/src/v2/element.ts`
+- Create: `packages/model/src/v1/appearance.ts`
+- Create: `packages/model/src/v1/text.ts`
+- Create: `packages/model/src/v1/element.ts`
 - Create: adjacent test files
-- Modify: `packages/model/src/v2/index.ts`
+- Modify: `packages/model/src/v1/index.ts`
 
 **Interfaces:**
 
@@ -291,7 +291,7 @@ it('preserves affine skew and reflection', () => {
 
 - [ ] **Step 2: Verify failure**
 
-Run: `npm run test -w @broadset/model -- src/v2/appearance.test.ts src/v2/text.test.ts src/v2/element.test.ts`
+Run: `npm run test -w @broadset/model -- src/v1/appearance.test.ts src/v1/text.test.ts src/v1/element.test.ts`
 
 Expected: FAIL because modules and fixtures are absent.
 
@@ -306,20 +306,20 @@ Test all twelve element kinds, every paint/effect kind, multiple ordered fills/s
 - [ ] **Step 5: Verify and commit**
 
 ```bash
-npm run test -w @broadset/model -- src/v2/appearance.test.ts src/v2/text.test.ts src/v2/element.test.ts
+npm run test -w @broadset/model -- src/v1/appearance.test.ts src/v1/text.test.ts src/v1/element.test.ts
 npm run quality:strict -w @broadset/model
-git add packages/model/src/v2
-git commit -m "feat(model): add v2 element model"
+git add packages/model/src/v1
+git commit -m "feat(model): add v1 element model"
 ```
 
 ### Task 4: Implement Pages, View Models, Expressions, and Bindings
 
 **Files:**
 
-- Create: `packages/model/src/v2/page.ts`
-- Create: `packages/model/src/v2/data.ts`
+- Create: `packages/model/src/v1/page.ts`
+- Create: `packages/model/src/v1/data.ts`
 - Create: adjacent test files
-- Modify: `packages/model/src/v2/index.ts`
+- Modify: `packages/model/src/v1/index.ts`
 
 **Interfaces:**
 
@@ -347,7 +347,7 @@ it('rejects unparsed expression strings and unregistered functions', () => {
 
 - [ ] **Step 2: Verify failure**
 
-Run: `npm run test -w @broadset/model -- src/v2/page.test.ts src/v2/data.test.ts`
+Run: `npm run test -w @broadset/model -- src/v1/page.test.ts src/v1/data.test.ts`
 
 Expected: FAIL because modules are missing.
 
@@ -364,21 +364,21 @@ Add `inferExpressionValueType(expression, context): { valueType?: ValueType; dia
 - [ ] **Step 5: Verify and commit**
 
 ```bash
-npm run test -w @broadset/model -- src/v2/page.test.ts src/v2/data.test.ts
+npm run test -w @broadset/model -- src/v1/page.test.ts src/v1/data.test.ts
 npm run quality:strict -w @broadset/model
-git add packages/model/src/v2
-git commit -m "feat(model): add v2 pages and data"
+git add packages/model/src/v1
+git commit -m "feat(model): add v1 pages and data"
 ```
 
 ### Task 5: Implement Rational Time, Sequences, State Machines, and Output Profiles
 
 **Files:**
 
-- Create: `packages/model/src/v2/time.ts`
-- Create: `packages/model/src/v2/sequence.ts`
-- Create: `packages/model/src/v2/output-profile.ts`
+- Create: `packages/model/src/v1/time.ts`
+- Create: `packages/model/src/v1/sequence.ts`
+- Create: `packages/model/src/v1/output-profile.ts`
 - Create: adjacent test files
-- Modify: `packages/model/src/v2/index.ts`
+- Modify: `packages/model/src/v1/index.ts`
 
 **Interfaces:**
 
@@ -405,7 +405,7 @@ it('requires stable track and key ids with homogeneous values', () => {
 
 - [ ] **Step 2: Verify failure**
 
-Run: `npm run test -w @broadset/model -- src/v2/time.test.ts src/v2/sequence.test.ts src/v2/output-profile.test.ts`
+Run: `npm run test -w @broadset/model -- src/v1/time.test.ts src/v1/sequence.test.ts src/v1/output-profile.test.ts`
 
 Expected: FAIL because modules are missing.
 
@@ -420,36 +420,36 @@ Cover rational reduction, safe-integer overflow, 24000/1001, 30000/1001, 60000/1
 - [ ] **Step 5: Verify and commit**
 
 ```bash
-npm run test -w @broadset/model -- src/v2/time.test.ts src/v2/sequence.test.ts src/v2/output-profile.test.ts
+npm run test -w @broadset/model -- src/v1/time.test.ts src/v1/sequence.test.ts src/v1/output-profile.test.ts
 npm run quality:strict -w @broadset/model
-git add packages/model/src/v2
-git commit -m "feat(model): add v2 time contracts"
+git add packages/model/src/v1
+git commit -m "feat(model): add v1 time contracts"
 ```
 
 ### Task 6: Build Components, Project Aggregates, and Whole-Project Semantic Validation
 
 **Files:**
 
-- Create: `packages/model/src/v2/component.ts`
-- Create: `packages/model/src/v2/interop.ts`
-- Create: `packages/model/src/v2/document.ts`
-- Create: `packages/model/src/v2/project.ts`
-- Create: `packages/model/src/v2/semantic-validation.ts`
+- Create: `packages/model/src/v1/component.ts`
+- Create: `packages/model/src/v1/interop.ts`
+- Create: `packages/model/src/v1/document.ts`
+- Create: `packages/model/src/v1/project.ts`
+- Create: `packages/model/src/v1/semantic-validation.ts`
 - Create: adjacent test files
-- Create: `packages/model/src/v2/fixtures/minimal-project.ts`
-- Modify: `packages/model/src/v2/index.ts`
+- Create: `packages/model/src/v1/fixtures/minimal-project.ts`
+- Modify: `packages/model/src/v1/index.ts`
 
 **Interfaces:**
 
 - Consumes: Task 5 `Sequence` and Task 4 `ExpressionAst`, which removes the component/sequence/expression dependency cycle.
-- Produces: `ComponentDefinition`, `ExposedProperty`, `ProjectResources`, `InteropRegistry`, `BroadsetDocumentV2`, `TemplateGroup`, `BroadsetProjectV2`, `broadsetProjectV2Schema`, `validateBroadsetProjectV2Semantics`.
+- Produces: `ComponentDefinition`, `ExposedProperty`, `ProjectResources`, `InteropRegistry`, `BroadsetDocumentV1`, `TemplateGroup`, `BroadsetProjectV1`, `broadsetProjectV1Schema`, `validateBroadsetProjectV1Semantics`.
 
 - [ ] **Step 1: Write failing aggregate tests**
 
 ```ts
-it('parses a complete minimal v2 project without hidden defaults', () => {
-  const project = createMinimalProjectV2();
-  expect(broadsetProjectV2Schema.parse(project)).toEqual(project);
+it('parses a complete minimal v1 project without hidden defaults', () => {
+  const project = createMinimalProjectV1();
+  expect(broadsetProjectV1Schema.parse(project)).toEqual(project);
 });
 
 it.each([
@@ -457,23 +457,23 @@ it.each([
   ['format', 'other-project'],
   ['schemaVersion', 1],
 ])('rejects invalid identity field %s', (field, value) => {
-  expect(broadsetProjectV2Schema.safeParse({ ...createMinimalProjectV2(), [field]: value }).success).toBe(false);
+  expect(broadsetProjectV1Schema.safeParse({ ...createMinimalProjectV1(), [field]: value }).success).toBe(false);
 });
 
 it('rejects runtime UI state at the root', () => {
-  expect(broadsetProjectV2Schema.safeParse({ ...createMinimalProjectV2(), viewport: { zoom: 2 } }).success).toBe(false);
+  expect(broadsetProjectV1Schema.safeParse({ ...createMinimalProjectV1(), viewport: { zoom: 2 } }).success).toBe(false);
 });
 ```
 
 - [ ] **Step 2: Verify aggregate tests fail**
 
-Run: `npm run test -w @broadset/model -- src/v2/component.test.ts src/v2/project.test.ts src/v2/document.test.ts src/v2/interop.test.ts`
+Run: `npm run test -w @broadset/model -- src/v1/component.test.ts src/v1/project.test.ts src/v1/document.test.ts src/v1/interop.test.ts`
 
 Expected: FAIL because aggregate modules are missing.
 
 - [ ] **Step 3: Implement strict structural aggregates**
 
-Component definitions own local elements, root IDs, completed Task 5 sequences, and typed exposed properties; nested component cycles remain a semantic check. Compose `ProjectResources` from Task 2 resource entities plus Task 5 output profiles. The project requires exact v2 identity, metadata, resources, at least one document, template groups, interop, and extensions. Documents require at least one page. Structural parsing must not call runtime registries, insert defaults, run v1 migrations, mutate values, or drop unknown fields. Enforce `updatedAt >= createdAt` structurally.
+Component definitions own local elements, root IDs, completed Task 5 sequences, and typed exposed properties; nested component cycles remain a semantic check. Compose `ProjectResources` from Task 2 resource entities plus Task 5 output profiles. The project requires exact v1 identity, metadata, resources, at least one document, template groups, interop, and extensions. Documents require at least one page. Structural parsing must not call runtime registries, insert defaults, run legacy migrations, mutate values, or drop unknown fields. Enforce `updatedAt >= createdAt` structurally.
 
 - [ ] **Step 4: Write the failing semantic-validation matrix**
 
@@ -482,7 +482,7 @@ Create one-fixture-one-defect cases for duplicate IDs, missing/wrong-kind resour
 Each case asserts a stable error code and JSON Pointer:
 
 ```ts
-expect(validateBroadsetProjectV2Semantics(project)).toContainEqual(
+expect(validateBroadsetProjectV1Semantics(project)).toContainEqual(
   expect.objectContaining({ code: expectedCode, severity: 'error', pointer: expectedPointer }),
 );
 ```
@@ -494,22 +494,22 @@ Build immutable lookup maps once. Validate in this order: global identities, res
 - [ ] **Step 6: Verify and commit**
 
 ```bash
-npm run test -w @broadset/model -- src/v2
+npm run test -w @broadset/model -- src/v1
 npm run quality:strict -w @broadset/model
-git add packages/model/src/v2
-git commit -m "feat(model): validate v2 projects"
+git add packages/model/src/v1
+git commit -m "feat(model): validate v1 projects"
 ```
 
 ### Task 7: Implement Canonical JSON, Typed Loading, and Published JSON Schema
 
 **Files:**
 
-- Create: `packages/model/src/v2/canonical-json.ts`
-- Create: `packages/model/src/v2/load.ts`
+- Create: `packages/model/src/v1/canonical-json.ts`
+- Create: `packages/model/src/v1/load.ts`
 - Create: adjacent tests and `schema-parity.test.ts`
 - Create: `scripts/generate-project-schema.mjs`
 - Create: `scripts/generate-project-schema.test.mjs`
-- Create: `project/schema/v2/project.schema.json`
+- Create: `project/schema/v1/project.schema.json`
 - Modify: root `package.json`
 - Modify: root `package-lock.json`
 - Modify: `project/implementation/architecture.md`
@@ -517,19 +517,19 @@ git commit -m "feat(model): validate v2 projects"
 
 **Interfaces:**
 
-- Produces: `canonicalizeProjectV2`, `computeProjectSemanticHashV2`, `loadProjectV2Json`, `parseProjectV2Unknown`, `ProjectLoadResult`, and `npm run schema:project`.
+- Produces: `canonicalizeProjectV1`, `computeProjectSemanticHashV1`, `loadProjectV1Json`, `parseProjectV1Unknown`, `ProjectLoadResult`, and `npm run schema:project`.
 
 - [ ] **Step 1: Write failing canonicalization and load tests**
 
 ```ts
 it('canonicalizes independent object insertion orders identically', () => {
-  const project = createMinimalProjectV2();
-  const reparsed = broadsetProjectV2Schema.parse(JSON.parse(JSON.stringify(project)) as unknown);
-  expect(canonicalizeProjectV2(project)).toBe(canonicalizeProjectV2(reparsed));
+  const project = createMinimalProjectV1();
+  const reparsed = broadsetProjectV1Schema.parse(JSON.parse(JSON.stringify(project)) as unknown);
+  expect(canonicalizeProjectV1(project)).toBe(canonicalizeProjectV1(reparsed));
 });
 
 it('excludes non-semantic update/build metadata from semantic hashes', async () => {
-  const first = createMinimalProjectV2();
+  const first = createMinimalProjectV1();
   const second = {
     ...first,
     metadata: {
@@ -538,12 +538,12 @@ it('excludes non-semantic update/build metadata from semantic hashes', async () 
       generator: { name: 'Broadset', version: '2.0.0', build: 'other-build' },
     },
   };
-  expect(await computeProjectSemanticHashV2(first)).toBe(await computeProjectSemanticHashV2(second));
+  expect(await computeProjectSemanticHashV1(first)).toBe(await computeProjectSemanticHashV1(second));
 });
 
 it('quarantines v1 JSON without rewriting it', async () => {
   const source = '{"schemaVersion":1,"id":"legacy"}';
-  const result = await loadProjectV2Json(source);
+  const result = await loadProjectV1Json(source);
   expect(result.status).toBe('quarantined');
   expect(result.originalText).toBe(source);
   expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'unsupported-version' }));
@@ -552,7 +552,7 @@ it('quarantines v1 JSON without rewriting it', async () => {
 
 - [ ] **Step 2: Verify failure**
 
-Run: `npm run test -w @broadset/model -- src/v2/canonical-json.test.ts src/v2/load.test.ts`
+Run: `npm run test -w @broadset/model -- src/v1/canonical-json.test.ts src/v1/load.test.ts`
 
 Expected: FAIL because APIs are absent.
 
@@ -562,7 +562,7 @@ Implement RFC 8785-compatible key ordering and accepted-number serialization. Th
 
 - [ ] **Step 4: Write failing schema-generation drift tests**
 
-The Node test generates JSON Schema into a temporary directory and compares parsed JSON with the checked artifact. Documentation checks fail when the artifact is absent or `$id` differs from `https://schema.broadset.dev/v2/project.schema.json`.
+The Node test generates JSON Schema into a temporary directory and compares parsed JSON with the checked artifact. Documentation checks fail when the artifact is absent or `$id` differs from `https://schema.broadset.dev/v1/project.schema.json`.
 
 - [ ] **Step 5: Implement deterministic schema generation**
 
@@ -582,7 +582,7 @@ Add Ajv as an explicit root development dependency and use its JSON Schema 2020-
 npm install --save-dev ajv@^8.20.0
 ```
 
-`scripts/generate-project-schema.mjs` imports `broadsetProjectV2Schema` from `packages/model/dist/v2/project.js` after the script's typecheck build. `schema-parity.test.ts` uses `Ajv2020` from `ajv/dist/2020.js` and compares Ajv acceptance with Zod acceptance for every corpus case.
+`scripts/generate-project-schema.mjs` imports `broadsetProjectV1Schema` from `packages/model/dist/v1/project.js` after the script's typecheck build. `schema-parity.test.ts` uses `Ajv1020` from `ajv/dist/2020.js` and compares Ajv acceptance with Zod acceptance for every corpus case.
 
 Record Ajv's schema-parity purpose in `project/implementation/architecture.md` in the same change, then regenerate the manifest baseline with `npm run docs:architecture`.
 
@@ -593,53 +593,53 @@ npm run schema:project
 npm run docs:architecture
 node --test scripts/generate-project-schema.test.mjs scripts/check-documentation.test.mjs
 npm run docs:check
-npm run test -w @broadset/model -- src/v2
+npm run test -w @broadset/model -- src/v1
 npm run quality:strict -w @broadset/model
-git add package.json package-lock.json scripts project/schema/v2 project/implementation/architecture.md packages/model/src/v2
-git commit -m "feat(model): publish v2 project schema"
+git add package.json package-lock.json scripts project/schema/v1 project/implementation/architecture.md packages/model/src/v1
+git commit -m "feat(model): publish v1 project schema"
 ```
 
-### Task 8: Publish the v2 API and Run the Foundation Gate
+### Task 8: Publish the v1 API and Run the Foundation Gate
 
 **Files:**
 
-- Modify: `packages/model/src/v2/index.ts`
+- Modify: `packages/model/src/v1/index.ts`
 - Modify: `packages/model/src/index.ts`
 - Modify: `packages/model/README.md`
 - Modify: `project/spec/model/format-reference.md`
 - Modify: `project/implementation/architecture.md`
-- Create: `packages/model/src/v2/public-api.test.ts`
-- Create: `packages/model/src/v2/format-roundtrip.test.ts`
+- Create: `packages/model/src/v1/public-api.test.ts`
+- Create: `packages/model/src/v1/format-roundtrip.test.ts`
 
 **Interfaces:**
 
-- Produces package-root exports: `BroadsetProjectV2`, `BroadsetDocumentV2`, `broadsetProjectV2Schema`, `validateBroadsetProjectV2Semantics`, `loadProjectV2Json`, `parseProjectV2Unknown`, `canonicalizeProjectV2`, and `computeProjectSemanticHashV2`.
+- Produces package-root exports: `BroadsetProjectV1`, `BroadsetDocumentV1`, `broadsetProjectV1Schema`, `validateBroadsetProjectV1Semantics`, `loadProjectV1Json`, `parseProjectV1Unknown`, `canonicalizeProjectV1`, and `computeProjectSemanticHashV1`.
 
 - [ ] **Step 1: Write a failing package-root API test**
 
-The test imports only from `../index`, builds the minimal fixture, parses, validates, canonicalizes, hashes, and reloads it. It must not import internal v2 modules.
+The test imports only from `../index`, builds the minimal fixture, parses, validates, canonicalizes, hashes, and reloads it. It must not import internal v1 modules.
 
 - [ ] **Step 2: Verify failure**
 
-Run: `npm run test -w @broadset/model -- src/v2/public-api.test.ts`
+Run: `npm run test -w @broadset/model -- src/v1/public-api.test.ts`
 
 Expected: FAIL because package-root exports are incomplete.
 
 - [ ] **Step 3: Complete barrels and public documentation**
 
-Export every public symbol from the v2 barrel and add this line to the root barrel:
+Export every public symbol from the v1 barrel and add this line to the root barrel:
 
 ```ts
-export * from './v2';
+export * from './v1';
 ```
 
-Document that v2 is the cutover target and current unversioned exports are deleted by program 8 rather than permanently aliased.
+Document that v1 is the cutover target and current unversioned exports are deleted by program 8 rather than permanently aliased.
 
 - [ ] **Step 4: Run complete verification**
 
 ```bash
 npm run schema:project
-npm run test -w @broadset/model -- src/v2
+npm run test -w @broadset/model -- src/v1
 npm run docs:check
 npm run quality:strict
 npm run lint:typecoverage
@@ -647,7 +647,7 @@ npm run lint:dead
 npm run build
 ```
 
-Expected: schema regeneration is clean; all v2 tests pass; documentation and workspace strict quality pass; type coverage remains at least 99.95%; knip reports no new dead code/dependency drift; build succeeds.
+Expected: schema regeneration is clean; all v1 tests pass; documentation and workspace strict quality pass; type coverage remains at least 99.95%; knip reports no new dead code/dependency drift; build succeeds.
 
 - [ ] **Step 5: Perform the manual review gate**
 
@@ -656,12 +656,12 @@ Review the entire diff against `AGENTS.md`, `.claude/agents/code-reviewer.md`, a
 - [ ] **Step 6: Commit**
 
 ```bash
-git add packages/model/src/index.ts packages/model/src/v2 packages/model/README.md project/spec/model/format-reference.md project/implementation/architecture.md
-git commit -m "feat(model): publish project format v2"
+git add packages/model/src/index.ts packages/model/src/v1 packages/model/README.md project/spec/model/format-reference.md project/implementation/architecture.md
+git commit -m "feat(model): publish project format v1"
 ```
 
 ## Completion Boundary
 
-This plan is complete when v2 project JSON can be strictly parsed, semantically validated, canonicalized, hashed, quarantined with typed diagnostics, checked against the published schema corpus, and consumed through the package root.
+This plan is complete when v1 project JSON can be strictly parsed, semantically validated, canonicalized, hashed, quarantined with typed diagnostics, checked against the published schema corpus, and consumed through the package root.
 
-It does not authorize calling v2 the active application file format. That claim waits for programs 2-8 to migrate scene resolution, resources, playback, persistence, formats, editor/UI/demo, fixtures, and finally delete all v1 model code and migrations.
+It does not authorize calling v1 the active application file format. That claim waits for programs 2-8 to migrate scene resolution, resources, playback, persistence, formats, editor/UI/demo, fixtures, and finally delete all legacy model code and migrations.
