@@ -102,16 +102,16 @@ type Paragraph = { runs: readonly Run[]; props?: ParagraphProps };
 type ParagraphProps = {
   align?: 'start' | 'end' | 'center' | 'justify';
   indent?: number;
-  lineSpacing?: number;   // >= 0
-  spaceBefore?: number;   // >= 0
-  spaceAfter?: number;    // >= 0
+  lineSpacing?: number; // >= 0
+  spaceBefore?: number; // >= 0
+  spaceAfter?: number; // >= 0
   bullet?: Bullet;
   level?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 };
 type Run = { text: string; props?: RunProps };
 type RunProps = {
   style?: Record<string, unknown>; // inline text-style overrides
-  lang?: string;                   // BCP 47 tag
+  lang?: string; // BCP 47 tag
   hyperlink?: { url: string; tooltip?: string; target?: '_blank' | '_self' };
 };
 type Bullet =
@@ -646,7 +646,7 @@ The Phase 1 body uses a simple deterministic non-cryptographic hash. The Phase 2
 
 ## Spec Gaps
 
-_None — all requirements have acceptance criteria._
+- [ ] **Proposed component registry and nested instance contract:** ADR-007 proposes document-owned definitions, stable nested instance identity, typed overrides, propagation, and unlink. The current `componentRef` requirement remains authoritative until a maintainer ratifies the new persisted model and updates all affected validation, page, collaboration, serialization, and rendering specs together.
 
 ---
 

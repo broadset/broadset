@@ -15,6 +15,7 @@ A task is **not** done until every box below is true. Apply this checklist befor
 
 ## Quality gates pass
 
+- [ ] `npm run docs:check` passes when Markdown, package manifests, roadmap/tracker data, or agent guidance changed.
 - [ ] `npm run quality:strict` passes for every touched package (lint:strict + prettier:check + typecheck + vitest).
 - [ ] `npm run ct -w @broadset/ui` and `npm run ct -w @broadset/demo` pass when UI/demo source changed.
 - [ ] `npm run build` passes when packaging or bundling-relevant code changed.
@@ -31,7 +32,7 @@ A task is **not** done until every box below is true. Apply this checklist befor
 
 - [ ] **Commit message** follows conventional format (`type(scope): subject`) — enforced by commitlint.
 - [ ] **No unrelated file churn** in the same commit. Reformatting unrelated files, fixing unrelated bugs, or speculative refactors belong in their own commits.
-- [ ] **No comments explaining the obvious** or referencing the current task / PR / issue. Comments only when the *why* is non-obvious.
+- [ ] **No comments explaining the obvious** or referencing the current task / PR / issue. Comments only when the _why_ is non-obvious.
 - [ ] **No half-finished implementations** or `TODO` / `FIXME` placeholders for behavior the change claims to deliver.
 
 ## Persistent learnings (Claude Code only)

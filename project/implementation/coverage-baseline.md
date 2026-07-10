@@ -1,6 +1,6 @@
 # Coverage Baseline — 2026-04-28
 
-Snapshot from the first `npm run test:coverage` run after `@vitest/coverage-v8` was wired into the workspace. Coverage is **non-gating** — these numbers are a release signal, not a CI threshold. See `coverage-reporting.md` and `coverage-thresholds-proposal.md` for the threshold-decision context.
+Snapshot from the first `npm run test:coverage` run after `@vitest/coverage-v8` was wired into the workspace. Coverage is **non-gating** — these numbers are a release signal, not a CI threshold. See `coverage-reporting.md` for tooling; W0-QE-01/W0-PERF-01 own the risk-weighted gate decision.
 
 Date: 2026-04-28
 Vitest: 4.1.5
@@ -129,4 +129,4 @@ The HTML report is at `coverage/index.html`; click into a package to find lowest
 ## Refresh cadence
 
 - Run before every release to confirm no major regression.
-- Re-evaluate against `coverage-thresholds-proposal.md` after D.3 (cross-region CT audit) and D.5..D.8 (producer compatibility) land — those units will fill many of the lowest-covered rows above and the threshold proposal can be revisited.
+- Re-evaluate risk-weighted thresholds under W0-QE-01/W0-PERF-01 after D.3 (cross-region CT audit) and D.5..D.8 (producer compatibility) land — those units will fill many of the lowest-covered rows above.

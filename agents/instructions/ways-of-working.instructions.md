@@ -43,8 +43,8 @@ Code is not complete unless it is heavily tested. You will write tests that prov
 
 ### 1. Unit Testing (Vitest + React Testing Library)
 
-- **The Math:** Write exhaustive unit tests for `packages/model/src/units.ts` (`pxToMm`, `mmToPx`). You must test the edge-anchoring math (`calculateEdgeAnchors`) with multiple simulated canvas sizes and cross-center-line coordinates to guarantee the logic never fails.
-- **The Zustand Store:** Test the vanilla store (`packages/model/src/store.ts`) independently of React. Write tests that prove `updateElementEphemeral` updates coordinates, `commitElementChange` recalculates anchors, and `reorderElement` correctly shifts array indexes without data loss.
+- **The Math:** Keep exhaustive tests for `pxToMm`, `mmToPx`, and `calculateAnchors` in `packages/model/src/utilities.test.ts`, including multiple canvas sizes and cross-center-line coordinates.
+- **The Zustand Store:** Test the vanilla editor store under `packages/editor/src/store-actions*.test.ts` independently of React. Prove `updateElementEphemeral`, `commitElementUpdate`, and `reorderElement` preserve transaction and ordering semantics without data loss.
 - **Custom Hooks:** Test the `useEditorStore` selector logic.
 
 ### 2. Component Testing (Playwright CT)
@@ -58,7 +58,7 @@ Code is not complete unless it is heavily tested. You will write tests that prov
 Your workflow and version control discipline must be flawless.
 
 - **Strict Pre-Commit Hooks:** You MUST execute `npm run format` and `npm run typecheck` successfully before every single commit. Code that does not format cleanly or pass the strict TypeScript compiler is not allowed in the repository.
-- **CT Milestone Checks:** You MUST execute `npm run ct` to run the full Playwright CT suite before every 25th commit, or before concluding any major feature block, to ensure visual regression and drag-and-drop math have not degraded.
+- **CT Milestone Checks:** You MUST execute `npm run ct:all` before concluding any major initiative or release slice so both UI and demo component suites validate cross-region behavior.
 - **Commit Message Standards:** Commit messages must be VERY SHORT, professional, and strictly formatted. Do not write paragraphs. Use conventional prefixes (`feat:`, `fix:`, `chore:`, `refactor:`, `test:`). Example acceptable messages: `feat: add onscreen toggle to HeroUI`, `fix: correct anchor math on center cross`, `chore: update subjx wrapper cleanup`.
 - **Modular Files:** Soft limit of **500 non-empty lines** per file. When a file approaches this, split it — separate interfaces/types, utility functions, Zustand stores, and React components into their own cleanly named files (e.g., `types.ts`, `store.ts`, `EditorCanvas.tsx`).
 - **Self-Documenting Code:** Variables and functions must have descriptive, verb-first names (e.g., `calculateNearestAnchor`, `handleCanvasVoidClick`).

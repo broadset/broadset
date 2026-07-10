@@ -1,8 +1,34 @@
 # IO Prereqs — User-Facing Features Plan
 
-Status: historical companion plan for UX scope and acceptance detail. **Execution status** (including which features are landed vs open) lives in [plan-progress.md](./plan-progress.md) UI.1–UI.15. Cross-region CT accounting lives in [cross-region-ct-inventory.md](./cross-region-ct-inventory.md).
+Status: historical UX evidence; not execution or behavioral authority.
 
-io-prereqs is a platform refactor. Most of what it adds to the model also surfaces as a first-class user feature in the editor. This plan specifies the UX for each such feature at a level of detail that another engineer or designer can build from without guessing. It is **not** a rationale document; for the why, read the io-prereqs plan. This is the how-it-looks-and-feels spec.
+Superseded by: [plan.md](./plan.md) W2/W3 initiatives, current requirements in `project/spec/ui/**`, and execution status in [plan-progress.md](./plan-progress.md). Cross-region evidence lives in [cross-region-ct-inventory.md](./cross-region-ct-inventory.md).
+
+This file preserves useful interaction research from the retired io-prereqs program. It is not a build-ready spec: every child plan must resolve its ideas against current model/UI specs, the command system, accessibility/performance bars, and professional research evidence.
+
+## Current routing
+
+Historical feature numbers are not the same namespace as legacy `UI.*` tracker IDs:
+
+| Historical feature       | Legacy UI IDs | Current destination                    |
+| ------------------------ | ------------- | -------------------------------------- |
+| 1 Theme system           | UI.1          | W1-COLOR-01, W2-STYLE-01, W2-VAR-01    |
+| 2 Rich text              | UI.2, UI.3    | W1-TEXT-01, W2-TEXT-01                 |
+| 3 Filter stack           | UI.4          | W2-STYLE-01                            |
+| 4 Picture/pattern fill   | UI.7, UI.8    | W1-RENDER-02, W2-STYLE-01, W2-ASSET-01 |
+| 5 Arrow endings          | UI.6          | W2-STYLE-01                            |
+| 6 Per-corner radius      | —             | W2-STYLE-01                            |
+| 7 Font upload            | —             | W1-ASSET-01, W2-ASSET-01               |
+| 8 Print/prepress         | UI.11, UI.12  | W2-DOC-01                              |
+| 9 Speaker notes          | UI.13         | W2-DOC-01                              |
+| 10 Conic gradient        | UI.5          | W1-COLOR-01, W2-STYLE-01               |
+| 11 Page sorter           | —             | W2-DOC-01                              |
+| 12 Unit-aware inputs     | UI.14         | W2-CANVAS-01, W2-DOC-01                |
+| 13 Export preflight      | —             | W2-DOC-01, W3-RECON-01                 |
+| 14 Document info         | UI.12         | W2-DOC-01                              |
+| 15 Import/reconciliation | —             | W3-RECON-01                            |
+
+Legacy UI.9 (clip-path editor), UI.10 (3D inputs), and UI.15 (text-on-path) are not specified completely by this historical file; they route to W2-STYLE-01 and W2-PATH-01 and require dedicated child-plan UX/spec work.
 
 ## Guiding principles
 
@@ -314,7 +340,7 @@ No cropping UI. If the user wants a cropped image, they pre-crop in an image edi
 - **File too large (> 5 MB):** reject with a HeroUI `Alert` in the panel: "Font file exceeds 5 MB. Consider subsetting before upload."
 - **Unsupported format:** "Unsupported format. Upload .woff2, .ttf, or .otf."
 - **Font with `fsType = restricted`:** upload succeeds but row shows ⛔; tooltip: "This font's license forbids embedding. It will not be included in PDF / SVG / PPTX exports." Row still selectable in pickers; renderer uses it at edit time; exports fall back to substitution.
-- **Duplicate font (same content hash):** dedup per IO-prereqs Phase 4; toast: "Font already in project." No duplicate entry.
+- **Duplicate font (same content hash):** deduplicate through W1-ASSET-01 content identity; toast: "Font already in project." No duplicate entry.
 
 **Polish.**
 
@@ -339,13 +365,13 @@ No cropping UI. If the user wants a cropped image, they pre-crop in an image edi
 
 1. User opens Canvas settings. Existing unit + DPI inputs at top.
 2. New **Prepress guides** accordion contains: Bleed, Trim, Safe area — each a single dimension input (unit-aware per feature 12). Values default to 0; setting a non-zero value draws a colored guide on canvas (bleed: red outside the canvas; trim: dashed gray at the canvas edge; safe area: dashed green inside).
-3. New **Color mode** row: radio group RGB / CMYK / Spot. Picking CMYK enables the ICC profile row below.
+3. New **Color intent** row: radio group RGB / CMYK / Grayscale / Lab. Picking a profile-managed intent enables the ICC profile row below. Spot-ink authoring remains a W1-COLOR-01 decision and MUST NOT be represented as a document mode string.
 4. **ICC profile** row: "Upload" button + "Use default" dropdown (sRGB2014 / USWebCoatedSWOP / GrayGamma22). Current profile shown as a labeled chip.
 5. Once CMYK is selected: every color picker across the editor grows a gamut indicator dot (🟢 in gamut / 🟡 close / 🔴 out of gamut). The preflight panel (feature 13) surfaces out-of-gamut elements.
 
 **State binding.**
 
-- Model: `canvas.bleed?: number`, `canvas.trim?: number`, `canvas.safeArea?: number` (in canvas unit); `settings.colorMode: 'rgb' | 'cmyk' | 'spot'` (per IO-D-13); `document.outputIntent?: { iccProfileAssetId, colorSpace, identifier? }`.
+- Model: `canvas.bleed`, `canvas.trim`, and `canvas.safeArea` are four-side tuples in canvas units; `document.outputIntent?: { iccProfileAssetId, colorSpace: 'rgb' | 'cmyk' | 'gray' | 'lab', identifier? }` is the sole current document color-intent contract.
 - Store actions: `setCanvasBleed(n)`, `setCanvasTrim(n)`, `setCanvasSafeArea(n)`, `setColorMode(mode)`, `setOutputIntent(intent)`, `uploadIccProfile(file)`.
 - HeroUI: `Accordion`, `Input` with unit parsing, `RadioGroup`, `Select` for default profiles, `Input type="file"` for upload.
 
@@ -500,7 +526,7 @@ No cropping UI. If the user wants a cropped image, they pre-crop in an image edi
 
 **State binding.**
 
-- Model: dimension values remain in canvas unit; `parseLength()` (io-prereqs Phase 1) converts on input, renderer never sees mixed units.
+- Model: dimension values remain in canvas unit; the current `parseLength()` utility converts on input, and renderer boundaries never receive mixed units.
 - Store actions: whatever the input is bound to — `setElementWidth`, `setFontSize`, etc. — no change to store shape.
 - HeroUI: `Input` with an `onBlur` conversion handler.
 
@@ -612,7 +638,7 @@ No cropping UI. If the user wants a cropped image, they pre-crop in an image edi
 2. Reconciler runs via `_shared/reconcile/`. Result: 3 elements modified externally, 1 added externally, 2 present in preserved metadata but missing from the slide (possible deletions).
 3. Modal opens with three tabs: **Modified** (3), **Added** (1), **Deleted** (2).
 4. Each row in Modified shows a per-field diff (e.g. position: before/after). User clicks accept / reject per field or per element. Default: accept-all.
-5. Added tab lists new elements with previews; default: import all onto "Imported from PPTX" page (the staging page from io-prereqs Phase 5).
+5. Added tab lists new elements with previews; W3-RECON-01 decides the accessible default destination and never applies additions without an undoable confirmation.
 6. Deleted tab lists potentially-deleted elements with previews; user must explicitly accept (deletion confirmation modal — IO-D-18 anti-silent-drop).
 7. "Apply" commits the reconciliation; "Cancel" discards the re-import (returns to the prior state).
 8. Layers panel gains a ⚠ marker next to elements that had external edits; clicking the marker re-opens reconciliation for that element only.
@@ -681,40 +707,21 @@ The shared color picker (used by fill, stroke, fontColor, textStroke.color, grad
 Every feature above is covered by at least:
 
 - One unit test exercising the store action.
-- One cross-region CT per IO-prereqs Phase 6 standards.
+- One cross-region CT per the current CT Derivation Rule and stable scenario-ID inventory.
 - One entry in the demo `sampleDocument.json` that exercises the feature end-to-end.
 - One accessibility pass (Tab order, aria labels, color contrast — via automated axe-core in the CT suite).
 
-## Sequencing
+## Dependency guidance
 
-Features map to io-prereqs Phase 5 (editor UI surface). The recommended landing order within Phase 5:
-
-1. **Shared color picker** (foundation for features 1, 4, 10) — prerequisite.
-2. **Feature 12: Unit-aware inputs** — touches every dimension input; landing first avoids a double-migration.
-3. **Feature 1: Theme system** — unlocks color-binding UX for downstream features.
-4. **Feature 2: Rich text editor** — large surface; land in its own commit series (run-edit mode, then bullets + links + lang).
-5. **Feature 3: Filter stack** — independent; can land in parallel with 2.
-6. **Feature 4: Picture fill / pattern fill** — depends on shared color picker + asset panel updates.
-7. **Feature 6: Per-corner radius** — small; land anytime.
-8. **Feature 5: Arrow endings** — small; land anytime.
-9. **Feature 7: Custom font upload** — depends on io-prereqs Phase 4 font asset type.
-10. **Feature 10: Conic gradient editor** — depends on shared color picker. Panel-only controls; no canvas-overlay handles.
-11. **Feature 11: Page sorter upgrade** — independent.
-12. **Feature 8: Print mode** — depends on features 12 (units) + Canvas settings panel.
-13. **Feature 14: Document info panel** — tiny; land alongside feature 8.
-14. **Feature 9: Speaker notes** — tiny; land alongside feature 11.
-15. **Feature 13: Preflight panel** — best landed near the end once most feature data is present.
-16. **Feature 15: Import warnings + reconciliation UI** — lands when the first format's Phase 4 needs it.
-
-Each feature is a small-to-medium commit series. Every feature ends on a green `npm run gate:full` and `npm run ct`.
+Current sequencing is exclusively plan.md §7. The historical interactions depend on W1 scene/text/color/asset/render foundations, then W2-CMD-01 and their owning W2 initiative. Reconciliation remains W3-RECON-01. Each initiative requires a child plan, current specs/scenario IDs, professional research evidence, `npm run gate:full`, and `npm run ct:all` where UI is affected.
 
 ## Decisions taken from prior open questions
 
 - **Speaker notes surface** — menu-only (Document → Speaker notes…). Deliberately hidden from the sorter, toolbar, and bottom bar. No presentation mode today; the menu entry is the one surface.
-- **Canvas-overlay handles** — not introduced by io-prereqs. Cropping (picture fill) removed entirely; conic gradient center / angle are panel-only. If a future dedicated element type needs handles, they live on that element.
-- **Theme** — one theme per document, customizable in place. No preset gallery, no theme swap. The default document ships with one sensible starter theme.
+- **Canvas-overlay handles (historical recommendation)** — this plan proposed panel-only conic controls. W0-UX-01/W2-STYLE-01 may supersede that interaction based on professional testing; current specs decide.
+- **Theme (historical recommendation)** — this plan proposed one editable document theme. W2-VAR-01/W5-LIB-01 own current mode/library decisions.
 - **Color mode** — per-document per IO-D-13. No per-element override. Users who need a mixed-mode document create a separate document for the exception.
 
 ## Open questions
 
-(None currently — will accumulate as Phase 5 work surfaces them.)
+This historical file does not accept new open questions. Record current questions in the owning child plan/RFC/spec gap.

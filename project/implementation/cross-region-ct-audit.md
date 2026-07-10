@@ -3,13 +3,14 @@
 Date: 2026-04-20
 Owner: Follow-up implementation agent
 Status: inventory complete; CT gap closure pending as of 2026-04-28
+Execution authority: none. The generated inventory and W2-QE-01 own closure; the CRA units below are historical method/evidence only.
 
 Current-status note: use
 [cross-region-ct-inventory.md](./cross-region-ct-inventory.md) for the live
 coverage counts and CRA work queue. This file preserves the audit execution
 plan and closeout criteria.
 
-This plan closes the CT Derivation Rule gap left by `test-improvement-plan.md`. TI-3.2 exercised three flows (object-fit, typography, spacing) plus the modal/snapshot flows picked up ad hoc. This plan systematically audits every spec, classifies cross-region scenarios, and writes CT coverage for any that lack it.
+This historical audit method addresses the CT Derivation Rule gap left by the completed 2026-04 test-improvement program. TI-3.2 exercised three flows plus modal/snapshot flows picked up ad hoc. Current status lives in `cross-region-ct-inventory.md`; W0-GOV-01/W2-QE-01 own generated traceability and closure.
 
 ## Why this is separate
 
@@ -17,7 +18,7 @@ The CT Derivation Rule in `agents/instructions/testing.instructions.md` says:
 
 > Every spec scenario where the user performs an action in one UI region and the expected outcome is visible in a different UI region MUST have a Playwright CT test.
 
-TI-3.2 sampled a handful of cross-region flows but never produced a complete inventory. That inventory is load-bearing: every CT gap it surfaces becomes a unit in Phase 2 below, so the scope of Phase 2 only crystallizes after Phase 1 lands.
+TI-3.2 sampled a handful of cross-region flows but never produced a complete inventory. That inventory is load-bearing: every CT gap it surfaced became a CRA-2.x unit after the CRA-1.x inventory pass. Current execution is governed by the live inventory and W2-QE-01, not these historical passes.
 
 ## Ralph Loop Convention
 
@@ -30,7 +31,7 @@ A unit is complete only when both boxes are checked and the listed validation co
 
 ## Prerequisite
 
-- `project/implementation/test-improvement-plan.md` is complete (✓ already true — all TI units checked).
+- The 2026-04 test-improvement program is historical and complete; current initiative routing is W0-GOV-01/W2-QE-01.
 - `npm run gate:full` is green on the current branch before starting.
 
 ## Global Constraints
@@ -58,7 +59,7 @@ A scenario MUST be a CT when:
 
 Otherwise keep it as a unit test.
 
-## Current Execution Order
+## Historical Audit Order
 
 Run in this order unless explicitly redirected:
 
@@ -149,7 +150,7 @@ Scope:
 - For every `cross-region` row in `cross-region-ct-inventory.md`, grep `packages/demo/ct/**` and `packages/ui/ct/**` for a CT that covers it
 - Mark each row **covered** (cite CT file + test title), **partial** (cite gap), or **missing**
 - Output a "Gap List" section at the bottom of the inventory with every `missing` and `partial` row
-- For each gap, draft a CRA-2.x unit stub (unit id, target spec, target CT file, a one-line scope) — these are the execution units for Phase 2
+- For each gap, draft a CRA-2.x unit stub (unit id, target spec, target CT file, a one-line scope) — these became the historical second-pass units; the live inventory owns current execution
 
 Acceptance criteria:
 

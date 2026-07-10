@@ -32,7 +32,10 @@
     "lint:typecoverage": "node scripts/clean-typecoverage-inputs.mjs && type-coverage --at-least 99.95",
     "audit:prod": "npm audit --omit=dev",
     "audit:all": "npm audit",
-    "gate:full": "npm run lint:typecoverage && npm run quality:strict && npm run lint:dead && npm run ct:all && npm run build",
+    "docs:check": "node scripts/check-documentation.mjs",
+    "docs:architecture": "node scripts/check-documentation.mjs --write-architecture",
+    "test:docs": "node --test scripts/check-documentation.test.mjs",
+    "gate:full": "npm run docs:check && npm run lint:typecoverage && npm run quality:strict && npm run lint:dead && npm run ct:all && npm run build",
     "prepare": "husky"
   },
   "overrides": {

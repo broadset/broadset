@@ -72,16 +72,20 @@ broadset-workspace@0.1.0
 
 ## Applied fix — 2026-04-28
 
-Applied the preferred fix for both classes via root `npm` `overrides` during production-readiness D.1. The workspace `package.json` now carries:
+Applied the preferred fix for both classes via root `npm` `overrides` during production-readiness D.1. At that historical snapshot, the relevant `package.json` fragment was:
 
 ```json
-"overrides": {
-  "postcss": "^8.5.12",
-  "@playwright/experimental-ct-core": {
-    "vite": "^6.4.2"
+{
+  "overrides": {
+    "postcss": "^8.5.12",
+    "@playwright/experimental-ct-core": {
+      "vite": "^6.4.2"
+    }
   }
 }
 ```
+
+The current override set and versions are manifest-derived in [architecture.md](./architecture.md), not maintained in this historical record.
 
 Re-running `npm install` after the override edit dedupes `postcss@8.5.12` and forces the nested `vite@6.4.2` so all three advisories disappear from `npm audit --json`. Verified by:
 

@@ -89,7 +89,7 @@ As of 2026-07-07, the baseline credibility pass has **16 pass rows** backed by g
 
 ### PPTX
 
-Producer set per `pptx-support-plan.md` § "External producer matrix".
+Producer set ratified by the rows below (formerly the PPTX support plan's external producer matrix).
 
 | #    | Producer                                  | OS                      | Class | Owner       | Validation command/protocol                                                                                                                                                                                                         | Status    | Notes                                                                                                                                    |
 | ---- | ----------------------------------------- | ----------------------- | ----- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -106,7 +106,7 @@ Producer set per `pptx-support-plan.md` § "External producer matrix".
 
 ### PDF
 
-Producer set per `pdf-support-plan.md` § "External producer matrix".
+Producer set ratified by the rows below (formerly the PDF support plan's external producer matrix).
 
 | #    | Producer                      | OS              | Class | Owner       | Validation command/protocol                                                                                                                                                                  | Status    | Notes                                                                                                                                                                                           |
 | ---- | ----------------------------- | --------------- | ----- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -124,7 +124,7 @@ Producer set per `pdf-support-plan.md` § "External producer matrix".
 
 ### PSD
 
-Producer set per `psd-support-plan.md` § "External producer matrix".
+Producer set ratified by the rows below (formerly the PSD support plan's external producer matrix).
 
 | #    | Producer                            | OS                      | Class | Owner       | Validation command/protocol                                                                                                                                                      | Status    | Notes                                                                                                                                 |
 | ---- | ----------------------------------- | ----------------------- | ----- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------- |
@@ -143,7 +143,7 @@ Producer set per `psd-support-plan.md` § "External producer matrix".
 
 ### SVG
 
-Producer set per `svg-support-plan.md` § "External producer matrix".
+Producer set ratified by the rows below (formerly the SVG support plan's external producer matrix).
 
 | #    | Producer                                        | OS                      | Class | Owner       | Validation command/protocol                                                                                                                                                                                                                       | Status    | Notes                                                                                                                          |
 | ---- | ----------------------------------------------- | ----------------------- | ----- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -174,5 +174,5 @@ To be filled in at release time. Every row above MUST be `pass`, `waived`, or `r
 
 ## Audit trail
 
-- 2026-07-07 — Phase 0 baseline credibility triage: added explicit pass evidence for 16 generated, committed, or fetched-public rows. Focused commands passed: PPTX public corpus bundle (1 passed file, 58 tests; LibreOffice/python-pptx skipped without required gates), PDF generated producer bundle (4 files, 29 tests), PSD generated producer quirks (1 file, 15 tests), and SVG public/tool/security bundle (5 files, 76 tests). Licensed private mounts and manual desktop protocols remain untriaged for post-baseline release signoff.
+- 2026-07-07 — Initial baseline credibility triage: added explicit pass evidence for 16 generated, committed, or fetched-public rows. Focused commands passed: PPTX public corpus bundle (1 passed file, 58 tests; LibreOffice/python-pptx skipped without required gates), PDF generated producer bundle (4 files, 29 tests), PSD generated producer quirks (1 file, 15 tests), and SVG public/tool/security bundle (5 files, 76 tests). Licensed private mounts and manual desktop protocols remain untriaged for post-baseline release signoff.
 - 2026-04-28 — initial governance + matrix landed via D.4. All rows `untriaged` pending fixture acquisition and validation work in D.5..D.8.

@@ -12,9 +12,11 @@
 
 Run the relevant verification before considering work complete:
 
-- `npm run quality` — lint, formatting, typecheck, and unit tests for the demo package
-- `npm run quality:all` — quality gate across **all** packages
-- `npm run ct` — Playwright component tests when UI/editor behavior is affected
+- `npm run quality` — quality gate across **all** packages
+- `npm run quality:all` — compatibility alias for the same all-package gate
+- `npm run ct` — focused demo Playwright component tests
+- `npm run ct:all` — complete UI + demo Playwright component tests
+- `npm run docs:check` — documentation links, tables, roadmap/tracker integrity, stale guidance, and architecture-manifest drift
 - `npm run build` — production build verification when package or bundling changes are involved
 
 ## Cross-Region CT Gate
@@ -43,9 +45,11 @@ npm run test         # run tests
 npm run test:coverage # run tests with V8 coverage reporters (text-summary, json-summary, html under ./coverage)
 npm run lint         # lint source
 npm run typecheck    # type-check
-npm run quality      # full quality gate for demo (lint + prettier + typecheck + test)
-npm run quality:all  # full quality gate for every package
-npm run ct           # Playwright component tests
+npm run quality      # full quality gate for every package
+npm run quality:all  # compatibility alias for the all-package quality gate
+npm run ct           # focused demo Playwright component tests
+npm run ct:all       # full UI + demo Playwright component tests
+npm run docs:check   # documentation integrity and architecture-manifest check
 npm run audit:prod   # production-only npm audit (release signoff)
 npm run audit:all    # full npm audit (dev + prod, release signoff)
 ```

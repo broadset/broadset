@@ -248,3 +248,9 @@ Every major type (`BroadsetProject`, `BroadsetDocument`, `BroadsetElement`, `Pag
 
 - [ ] Given a project with extension data, the extensions survive JSON round-trip
 - [ ] Given unrecognized extension keys, the parser does not fail
+
+---
+
+## Spec Gaps
+
+- [ ] **Proposed canonical package/interchange split:** ADR-008 proposes making checksummed ZIP the only canonical `.bsp` representation and moving raw JSON to a separate extension/MIME type. The current plain-JSON-or-ZIP `.bsp` contract and `application/vnd.broadset.project+json` MIME remain authoritative until explicit maintainer ratification, migration policy, codec limits, and compatibility tests are approved.

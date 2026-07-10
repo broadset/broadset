@@ -576,7 +576,6 @@ Pages define layout variants by explicitly specifying which template elements ar
 
 | Field        | Type                      | Required | Description                                         |
 | ------------ | ------------------------- | -------- | --------------------------------------------------- |
-| ------------ | ------------------------- | -------- | --------------------------------------------------  |
 | `id`         | `string`                  | Yes      | Unique page ID within document.                     |
 | `name`       | `string`                  | Yes      | Human-readable page name.                           |
 | `elements`   | `PageElementInstance[]`   | Yes      | Element instances used on this page (can be empty). |

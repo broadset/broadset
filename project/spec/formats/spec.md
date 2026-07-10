@@ -119,7 +119,7 @@ This cross-cutting rule derives from IO-D-18 and is enforced at every importer b
 
 ### Importer Contract
 
-Every format importer MUST satisfy the following contract in addition to the format-specific behaviour in its sub-spec. These rules derive from [io-prereqs-plan.md](../../implementation/io-prereqs-plan.md) decisions IO-D-17 and IO-D-18, and exist so that multi-format round-trip, reconciliation, and preservation behave uniformly across PDF, PSD, PPTX, and SVG.
+Every format importer MUST satisfy the following contract in addition to the format-specific behaviour in its sub-spec. These rules derive from IO-D-17 and IO-D-18 in the [decision log](../../implementation/decisions.md), and exist so that multi-format round-trip, reconciliation, and preservation behave uniformly across PDF, PSD, PPTX, and SVG.
 
 - **Group-preserving tree.** Every importer MUST build a `parentId` element tree that mirrors the source file's grouping (PSD layer groups, PPTX group shapes, SVG `<g>` / nested SVG, PDF marked-content parents). Flattening groups on import is a bug, not an option.
 - **Preservation by default.** Every importer MUST either map a source construct to a native Broadset element or preserve the raw source fragment for lossless re-emission. Preservation uses typed namespaces under `extensions.<format>.<key>` (PDF, PSD, PPTX) or an opaque `svg`-type element (SVG). Silent drops are prohibited.
@@ -616,3 +616,9 @@ Contract:
 #### Spec Gaps
 
 - `wrapRuns(runs, boxWidth, fontResolver)` and `shapeRuns(runs)` (harfbuzzjs-backed) land when the first PDF / PPTX importer surfaces a concrete need for run-aware layout. The eager `breakLines` / `analyzeBidi` surface above covers the single-style text paths every format emits today.
+
+---
+
+## Cross-Format Spec Gaps
+
+- [ ] **Proposed unified preflight and intentional-loss policy:** ADR-IO-014/016 proposes stable severity codes, explicit overrides for fidelity warnings, blocking unsafe/invalid output, and per-element animation-loss reporting. Current per-format requirements and ratified IO-D-14/16 behavior remain authoritative until an authorized maintainer ratifies and reconciles the replacement across every exporter and authoring surface.

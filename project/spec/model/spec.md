@@ -461,7 +461,7 @@ Every document and every page MAY carry an `extensions` property — a `Record<s
 
 ## Spec Gaps
 
-_None — all requirements have acceptance criteria._
+- [ ] **Proposed page/resolved-scene contract:** ADR-010 proposes ordered root entries plus descendant override records and strict rejection of dangling references. Current root-only page and stale-animation behavior remains authoritative until a maintainer ratifies the behavioral change and reconciles the format reference, validation, collaboration, renderer, playback, and exporter contracts together.
 
 ---
 

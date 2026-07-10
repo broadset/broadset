@@ -7,11 +7,13 @@ cross-region CT status lives in
 preserves original unit scope and UX acceptance detail; its progress table is
 not the sole source of truth for current panel parity.
 
+**Execution authority:** none. Current behavior lives in `project/spec/ui/**`; current sequencing/status lives in `plan.md` and `plan-progress.md`. Retain this file only as UX research and rationale.
+
 **Target packages:** `packages/ui`, `packages/editor`, `packages/demo`, optionally `packages/model`
 **Reference baseline (behavior only):** `../dom-compositor/packages/heroui/src`
 **Primary spec anchors:** `project/spec/ui/panels.md`, `project/spec/ui/inputs.md`, `project/spec/ui/spec.md`
-**Related phase plan:** `project/implementation/plan-phase-5.md`
-**Execution model:** Ralph loop per unit (`tests: red` → `impl: green` → `refactor: done`)
+**Current destinations:** W2-CMD-01, W2-CANVAS-01, W2-TEXT-01, W2-STYLE-01, W2-DOC-01, W2-A11Y-01, and W2-UX-01
+**Historical execution model:** test-first independently reviewable units; current work requires an initiative child plan
 **Audience of the shipped product:** Art directors, designers, motion designers. **Not developers.** They must never see CSS strings, hex grammar, polygon coordinates, or any raw web-platform jargon in the properties panel.
 
 ---
@@ -20,7 +22,7 @@ not the sole source of truth for current panel parity.
 
 ### 0.1 Hard rules
 
-1. Never ship a panel behavior not covered by Jest + (where cross-region) Playwright CT tests.
+1. Never ship a panel behavior without Vitest/unit evidence plus Playwright CT where the scenario crosses UI regions.
 2. Never weaken lint / type / test gates to force green (see `AGENTS.md` §"No cutting corners").
 3. Never replace HeroUI components with raw HTML controls when a HeroUI equivalent exists (see `agents/instructions/heroui.instructions.md`).
 4. Never change model semantics silently to fit UI convenience — update spec first, then model, then UI.
@@ -240,7 +242,7 @@ Units MUST only touch files inside this map. If a unit needs a new file, it MUST
 
 ### 4.3 Required test/CT files
 
-Jest:
+Vitest/component unit tests:
 
 - `packages/ui/src/panels.sidebar.test.tsx` (header + lock)
 - `packages/ui/src/panels.geometry.test.tsx`
@@ -640,7 +642,7 @@ Reviewer must verify **all** are true before approving any unit PR:
 - [ ] HeroUI usage compliant; no raw `<button>`/`<input>`/`<select>` where HeroUI equivalent exists.
 - [ ] Capability-driven visibility preserved per element type.
 - [ ] Screen/print property gating preserved.
-- [ ] New/changed behavior has a Jest test AND (if cross-region) a Playwright CT from §7.
+- [ ] New/changed behavior has a Vitest/unit test AND (if cross-region) a Playwright CT derived from current scenario IDs.
 - [ ] Accessibility: every new control has `aria-label` or linked `Label`; keyboard nav verified.
 - [ ] No unrelated file churn; no touched file outside §4.
 - [ ] Progress tracker (§11) updated; work-log block (§12) filled in.

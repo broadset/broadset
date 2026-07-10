@@ -11,13 +11,13 @@ This document defines:
 2. Why those scenarios must be tested in a browser (not only unit tests).
 3. The expected outcome for each scenario according to specs.
 
-Use this as the source of truth when expanding or refactoring CT coverage.
+Use this as a derivation guide when expanding or refactoring CT coverage. Specs and `agents/instructions/testing.instructions.md` are authoritative; [cross-region-ct-inventory.md](./cross-region-ct-inventory.md) owns live coverage status.
 
 ## 2. Why CT Is Mandatory
 
 - `project/spec/ui/spec.md` requires browser-level CT for interaction flows that unit tests cannot validate completely.
 - `agents/instructions/testing.instructions.md` requires cross-region verification: if a user action happens in one region and outcome is visible in another, CT must assert all affected regions in one test.
-- `CONTRIBUTING.md` and spec gates require `npm run ct` for user-facing interaction changes.
+- `CONTRIBUTING.md` and spec gates require the owning package CT; cross-package UI/demo interaction changes run `npm run ct:all`.
 
 ## 3. Authoritative Sources
 
@@ -132,7 +132,7 @@ All of the following must be true:
 1. Every ID in Sections 6.1 to 6.4 has at least one passing CT case.
 2. Each CT case references its spec requirement in `@description`.
 3. Cross-region cases assert all impacted regions in one test.
-4. `npm run ct` passes from repository root.
+4. `npm run ct:all` passes from repository root.
 5. No acceptance criterion listed in this document remains untested without an explicit, documented exception.
 
 ## 12. Execution Commands
@@ -140,6 +140,6 @@ All of the following must be true:
 From repository root:
 
 ```bash
-npm run ct
-npm run quality:all && npm run build && npm run ct
+npm run ct:all
+npm run quality:all && npm run build && npm run ct:all
 ```
