@@ -334,12 +334,14 @@ const pathSegmentSchema: z.ZodType<PathSegment> = z.discriminatedUnion('kind', [
   }),
   z.strictObject({ id: idSchema, kind: z.literal('close') }),
 ]);
-const structuredPathSchema: z.ZodType<StructuredPath> = z
+
+export const structuredPathSchema: z.ZodType<StructuredPath> = z
   .strictObject({ points: z.array(pathPointSchema), segments: z.array(pathSegmentSchema), closed: z.boolean() })
   .superRefine((path, context) => {
     validateUniqueIds({ items: path.points, context, path: ['points'] });
     validateUniqueIds({ items: path.segments, context, path: ['segments'] });
   });
+
 const vectorGeometryDataSchema: z.ZodType<VectorGeometryData> = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('rectangle'),
