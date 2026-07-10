@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { type Id, idSchema, type PropertyTarget, propertyTargetSchema, utcTimestampSchema } from './identity';
+import { compareExactIsoInstants } from './iso-instant';
 import { mediaTypeSchema, nonEmptyStringSchema, validateUniqueIds } from './schema-helpers';
 import { type TypedValue, typedValueSchema, type ValueType, valueTypeSchema } from './typed-value';
 
@@ -114,21 +115,14 @@ const constrainedLengthSchema = z.number().int().nonnegative();
 const numericBoundsShape = { minimum: z.number().optional(), maximum: z.number().optional() };
 const integerBoundsShape = { minimum: z.number().int().optional(), maximum: z.number().int().optional() };
 
-function parseChronologicalInstant(value: string): number | undefined {
-  const instant = Date.parse(value);
-
-  return Number.isFinite(instant) ? instant : undefined;
-}
-
 function chronologicallyOrdered(earliest: string | undefined, latest: string | undefined): boolean {
   if (earliest === undefined || latest === undefined) {
     return true;
   }
 
-  const earliestInstant = parseChronologicalInstant(earliest);
-  const latestInstant = parseChronologicalInstant(latest);
+  const comparison = compareExactIsoInstants(earliest, latest);
 
-  return earliestInstant !== undefined && latestInstant !== undefined && earliestInstant <= latestInstant;
+  return comparison !== undefined && comparison <= 0;
 }
 
 export const valueSchemaSchema: z.ZodType<ValueSchema> = z.lazy(() =>

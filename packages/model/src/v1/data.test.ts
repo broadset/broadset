@@ -133,6 +133,73 @@ describe('valueSchemaSchema and viewModelSchema', () => {
     ).toBe(false);
   });
 
+  it('orders date-time bounds exactly beyond millisecond precision', () => {
+    expect(
+      valueSchemaSchema.safeParse({
+        kind: 'date-time',
+        earliest: '2026-01-01T00:00:00.123456789001Z',
+        latest: '2026-01-01T00:00:00.123456789002Z',
+      }).success,
+    ).toBe(true);
+    expect(
+      valueSchemaSchema.safeParse({
+        kind: 'date-time',
+        earliest: '2026-01-01T00:00:00.123456789002Z',
+        latest: '2026-01-01T00:00:00.123456789001Z',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('treats trailing zeros and unequal-offset representations of one exact instant as equal', () => {
+    expect(
+      valueSchemaSchema.safeParse({
+        kind: 'date-time',
+        earliest: '2026-01-01T00:00:00.1234000Z',
+        latest: '2026-01-01T00:00:00.1234Z',
+      }).success,
+    ).toBe(true);
+    expect(
+      valueSchemaSchema.safeParse({
+        kind: 'date-time',
+        earliest: '2026-01-01T00:00:00.123456789+02:00',
+        latest: '2025-12-31T22:00:00.123456789000Z',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('validates defaults and samples exactly beyond millisecond precision', () => {
+    const createPreciseViewModel = (defaultValue: string, sampleValue: string) => ({
+      id: 'precise-schedule',
+      name: 'Precise schedule',
+      fields: [
+        {
+          id: 'timestamp',
+          name: 'Timestamp',
+          schema: {
+            kind: 'date-time',
+            earliest: '2026-01-01T00:00:00.123456789002Z',
+            latest: '2026-01-01T00:00:00.123456789004Z',
+          },
+          defaultValue: { type: 'date-time', value: defaultValue },
+        },
+      ],
+      sampleDataSets: [
+        { id: 'sample', name: 'Sample', values: { timestamp: { type: 'date-time', value: sampleValue } } },
+      ],
+    });
+
+    expect(
+      viewModelSchema.safeParse(
+        createPreciseViewModel('2026-01-01T00:00:00.123456789003Z', '2026-01-01T00:00:00.1234567890040Z'),
+      ).success,
+    ).toBe(true);
+    expect(
+      viewModelSchema.safeParse(
+        createPreciseViewModel('2026-01-01T00:00:00.123456789001Z', '2026-01-01T00:00:00.123456789005Z'),
+      ).success,
+    ).toBe(false);
+  });
+
   it('validates field defaults and sample values against recursive schemas', () => {
     const viewModel = {
       id: 'news',
