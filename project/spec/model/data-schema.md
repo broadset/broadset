@@ -1,242 +1,121 @@
-# Model — Data Schema Specification
+# Model — View Models and Bindings
 
 ## Purpose
 
-Defines the `DataSchema` contract — the document-level data binding declaration that tells operators, playout automation, and live data feeds _what_ data a template accepts. Every `BroadsetDocument` MUST have a `dataSchema`. Elements bind to schema fields via `dataField`, and conditional visibility and repeaters reference schema fields by name. This spec ensures any consumer can enumerate, validate, and feed data to a template from the schema alone. See [conventions](../../README.md).
-
----
+Defines typed runtime data contracts, sample data, safe expressions, deterministic formatting, property bindings, and repeater instance generation.
 
 ## Requirements
 
-### Requirement: DataSchema Structure
+### Requirement: View Models
 
-Every document MUST have a `dataSchema` object with:
-
-- `fields`: array of `DataSchemaField` (may be empty — template accepts no external data)
-- `description` (optional): human-readable description of the data contract
-
-Field names MUST be unique within the schema. Field names MUST match the pattern `[a-zA-Z_][a-zA-Z0-9_]*` (identifier-safe).
-
-#### Scenario: Schema with multiple fields
-
-- GIVEN a document with `dataSchema: { fields: [{ name: 'playerName', type: 'string' }, { name: 'score', type: 'number' }] }`
-- WHEN the schema is validated
-- THEN validation succeeds
-
-#### Scenario: Duplicate field names rejected
-
-- GIVEN a schema with two fields both named `'playerName'`
-- WHEN the schema is validated
-- THEN validation fails
-
-#### Scenario: Empty schema is valid
-
-- GIVEN a document with `dataSchema: { fields: [] }`
-- WHEN the document is validated
-- THEN validation succeeds (template takes no external data)
+A document `viewModels` array MUST contain stable, uniquely identified view models. Each view model has `id`, `name`, ordered `fields`, and ordered `sampleDataSets`. Field IDs and sample-data IDs MUST be unique within the view model.
 
 #### Acceptance Criteria
 
-- [ ] Given a schema with unique field names, validation succeeds
-- [ ] Given duplicate field names, validation fails
-- [ ] Given an empty fields array, validation succeeds
-- [ ] Given a field name with invalid characters (spaces, special chars), validation fails
+- [ ] Given uniquely identified fields and sample data sets, structural validation succeeds
+- [ ] Given duplicate field or sample-data IDs, semantic validation fails
+- [ ] Given a page sample-data reference, it resolves within the intended view-model contract
 
----
+### Requirement: Recursive Value Schemas
 
-### Requirement: DataSchemaField Structure
-
-Each field MUST have:
-
-- `name`: identifier-safe string (unique within schema)
-- `type`: `'string'` | `'number'` | `'boolean'` | `'image'` | `'color'` | `'date'` | `'array'`
-- `label` (optional): human-readable display label for operator UIs
-- `defaultValue` (optional): fallback value when no data is provided
-- `constraints` (optional): `DataFieldConstraints` object
-- `arrayItemSchema` (optional, required when `type: 'array'`): nested `DataSchemaField[]` defining the shape of each array item
-
-#### Scenario: String field with default value
-
-- GIVEN a field `{ name: 'title', type: 'string', label: 'Title Text', defaultValue: 'Untitled' }`
-- WHEN no data is provided for this field
-- THEN the element displays `'Untitled'`
-
-#### Scenario: Array field with item schema
-
-- GIVEN a field `{ name: 'standings', type: 'array', arrayItemSchema: [{ name: 'team', type: 'string' }, { name: 'points', type: 'number' }] }`
-- WHEN data provides an array of team/points objects
-- THEN the repeater element generates one instance per array item
+A view-model field MUST define stable `id`, `name`, recursive typed `schema`, and MAY define label, type-compatible default, and stale policy (`keep-last`, `use-default`, `hide`, or `error`). Value schemas form a closed discriminated union for string, number, integer, boolean, date/time, color, asset, enum, object, and array values with type-specific constraints.
 
 #### Acceptance Criteria
 
-- [ ] Given a field with valid name, type, and label, validation succeeds
-- [ ] Given a field with an unsupported type, validation fails
-- [ ] Given an array field without arrayItemSchema, validation fails
-- [ ] Given a field with defaultValue, it is used when no data is provided
+- [ ] Given nested object and array schemas with validating defaults, validation succeeds
+- [ ] Given a default that violates its field schema, validation fails
+- [ ] Given an unknown value-schema kind or constraint for another kind, structural validation fails
 
----
+### Requirement: Typed Values
 
-### Requirement: DataFieldConstraints
-
-Constraints restrict the values a field may receive from external data:
-
-- `required`: boolean — when true, data MUST provide a value for this field
-- `minLength` / `maxLength`: for string fields
-- `min` / `max`: for number fields (inclusive bounds)
-- `pattern`: regex pattern string for string validation
-- `enum`: array of allowed values
-
-#### Scenario: Required field missing in data
-
-- GIVEN a field with `constraints: { required: true }`
-- WHEN data feed omits this field
-- THEN validation warns (or the default value is used if present)
-
-#### Scenario: Number field exceeds max
-
-- GIVEN a field `score` with `constraints: { min: 0, max: 999 }`
-- WHEN data provides `score: 1500`
-- THEN the value is clamped or rejected based on implementation
+Canonical dynamic values MUST use a `TypedValue` discriminated union for null, boolean, integer, number, string, date-time, length, angle, color, asset, point2d, point3d, list, and object. Numbers MUST be finite; integers MUST be JSON-safe; date-times MUST be timezone-qualified; asset references MUST resolve.
 
 #### Acceptance Criteria
 
-- [ ] Given a required field with no data, a warning is emitted or default is used
-- [ ] Given a number field with min/max constraints, out-of-range values are handled
-- [ ] Given a string field with pattern constraint, non-matching values are rejected
-- [ ] Given an enum constraint, only listed values are accepted
+- [ ] Given each typed-value variant with a matching payload, structural validation succeeds
+- [ ] Given a non-finite number, unsafe integer, or mismatched payload, validation fails
+- [ ] Given an asset typed value referencing a missing asset, semantic validation fails
 
----
+### Requirement: Stable Property Targets
 
-### Requirement: Element DataField Binding
+A binding or override target MUST combine an `EntityAddress` with an RFC 6901 JSON Pointer. Entity addresses contain stable project and entity identity, optional document identity, and optional component instance path. Array indexes MUST NOT serve as durable identity.
 
-Elements bind to schema fields via the `dataField` object on the element:
-
-- `fieldName`: MUST reference a field in the document's `dataSchema.fields` by name
-- `overflow`: `'clip'` | `'ellipsis'` | `'shrink'` | `'scroll'` — behavior when data exceeds element bounds
-- `prefix` (optional): string prepended to the data value for display
-- `suffix` (optional): string appended to the data value for display
-- `formatPattern` (optional): format string (e.g., `'##,###'` for numbers, `'MMM dd'` for dates)
-
-When live data provides a value for the referenced field, the element's content is updated to that value (with prefix/suffix/format applied).
-
-#### Scenario: Text element bound to player name
-
-- GIVEN a text element with `dataField: { fieldName: 'playerName', overflow: 'ellipsis' }`
-- AND `dataSchema.fields` includes `{ name: 'playerName', type: 'string' }`
-- WHEN data provides `playerName: 'John Smith'`
-- THEN the element content updates to `'John Smith'`
-
-#### Scenario: Number formatting
-
-- GIVEN a text element with `dataField: { fieldName: 'score', overflow: 'clip', formatPattern: '##,###' }`
-- WHEN data provides `score: 12345`
-- THEN the element content displays `'12,345'`
-
-#### Scenario: Invalid field reference
-
-- GIVEN an element with `dataField: { fieldName: 'nonExistent', overflow: 'clip' }`
-- AND `dataSchema.fields` does not contain a field named `'nonExistent'`
-- WHEN the document is validated
-- THEN validation fails
+The addressed property MUST be schema-approved as overridable, and the expected value type is derived from its schema rather than duplicated on the target.
 
 #### Acceptance Criteria
 
-- [ ] Given a valid fieldName reference, the element binds to the schema field
-- [ ] Given an invalid fieldName, validation fails
-- [ ] Given prefix and suffix, they are prepended/appended to the display value
-- [ ] Given a formatPattern, the value is formatted accordingly
-- [ ] Given overflow 'ellipsis', text that exceeds bounds shows an ellipsis
+- [ ] Given a resolving entity and approved pointer, target validation derives the property type
+- [ ] Given an invalid escape, missing entity, wrong instance path, or forbidden pointer, validation fails
+- [ ] Given a reordered collection, stable target identity continues to address the same entity
 
----
+### Requirement: Bindings
 
-### Requirement: Conditional Visibility Expressions
-
-The `visibleWhen` field on an element contains a boolean expression over data schema fields. Expression syntax:
-
-- Field references: bare field names (e.g., `showSubtitle`)
-- Comparison: `==`, `!=`, `>`, `<`, `>=`, `<=`
-- Logical: `&&`, `||`, `!`
-- Grouping: parentheses `()`
-- Literals: `true`, `false`, number literals, single-quoted strings
-
-The expression MUST be validated at document load time. Invalid expressions MUST cause validation to fail. All field references in the expression MUST exist in the document's `dataSchema`.
-
-#### Scenario: Simple boolean field
-
-- GIVEN `visibleWhen: 'showLogo == true'` and `dataSchema` includes `{ name: 'showLogo', type: 'boolean' }`
-- WHEN data provides `showLogo: false`
-- THEN the element is hidden
-
-#### Scenario: Compound expression
-
-- GIVEN `visibleWhen: "score > 0 && period != 'halftime'"`
-- WHEN data provides `score: 3` and `period: 'halftime'`
-- THEN the element is hidden (second condition fails)
-
-#### Scenario: Invalid field reference in expression
-
-- GIVEN `visibleWhen: 'unknownField == true'` where `unknownField` is not in `dataSchema`
-- WHEN the document is validated
-- THEN validation fails
+A binding MUST contain stable `id`, `target`, and a closed `expression`. It MAY contain deterministic formatter pipeline and type-compatible fallback. Binding IDs MUST be unique in the document. Expression result, formatter result, fallback, and target property types MUST be compatible.
 
 #### Acceptance Criteria
 
-- [ ] Given a valid boolean expression, it is evaluated against provided data
-- [ ] Given a false evaluation result, the element is hidden
-- [ ] Given a true or absent visibleWhen, the element is visible
-- [ ] Given an invalid expression syntax, validation fails
-- [ ] Given a field reference not in dataSchema, validation fails
+- [ ] Given a type-correct expression, formatter, fallback, and target, validation succeeds
+- [ ] Given a result or fallback incompatible with the target, semantic validation fails
+- [ ] Given duplicate binding IDs, validation fails
 
----
+### Requirement: Closed Expression AST
 
-### Requirement: Repeater Data Binding
+Expressions MUST be typed AST nodes: literal, field, variable, unary, binary, conditional, stable-field get, index, or registered safe function. Operators, function IDs, argument counts, operand types, and result types MUST validate. Arbitrary code and unparsed expression strings are forbidden.
 
-The `repeater` field on an element causes it to be replicated for each item in a data array field:
-
-- `dataArrayField`: MUST reference an array-type field in `dataSchema`
-- `direction`: `'horizontal'` | `'vertical'` | `'grid'` — layout direction for instances
-- `gap`: spacing between instances (in document canvas units), non-negative
-- `maxItems` (optional): positive integer cap on visible instances
-
-Child elements within a repeated group bind to the array item's fields via `dataField.fieldName` using the item schema field names.
-
-#### Scenario: Vertical list of standings
-
-- GIVEN a group element with `repeater: { dataArrayField: 'standings', direction: 'vertical', gap: 4 }`
-- AND `dataSchema.fields` includes `{ name: 'standings', type: 'array', arrayItemSchema: [...] }`
-- WHEN data provides `standings` with 10 items
-- THEN 10 instances are rendered vertically with 4-unit gaps
-
-#### Scenario: maxItems caps instances
-
-- GIVEN a repeater with `maxItems: 5` and data provides 10 items
-- THEN only 5 instances are rendered
-
-#### Scenario: Invalid array field reference
-
-- GIVEN a repeater with `dataArrayField: 'nonExistent'`
-- WHEN the document is validated
-- THEN validation fails
+Function registries MUST be closed, deterministic, side-effect-free, locale-explicit, and versioned by the core model.
 
 #### Acceptance Criteria
 
-- [ ] Given a valid array field reference, instances are generated per data item
-- [ ] Given direction 'vertical', instances are stacked vertically
-- [ ] Given direction 'horizontal', instances are placed side by side
-- [ ] Given maxItems, instances are capped at that count
-- [ ] Given an invalid dataArrayField reference, validation fails
-- [ ] Given negative gap, validation fails
+- [ ] Given a valid nested conditional expression, type checking produces one deterministic result type
+- [ ] Given an unknown operator, function, field, or variable, validation fails
+- [ ] Given an expression string or executable function payload, structural validation fails
 
----
+### Requirement: Formatter Pipelines
+
+A formatter pipeline contains ordered stable steps with registered formatter IDs and typed arguments. Formatters MUST be deterministic, side-effect-free, locale-explicit, and type-checked step by step.
+
+#### Acceptance Criteria
+
+- [ ] Given compatible ordered formatter steps, each step consumes the preceding result
+- [ ] Given an unknown formatter or incompatible step, validation fails
+- [ ] Given identical input and locale, formatting is identical across consumers
+
+### Requirement: Sample and Live Data
+
+Sample data sets MUST validate against their view-model fields before entering canonical state. Live input is runtime data and MUST be validated against the same schemas. Stale policies determine explicit behavior when live values are unavailable.
+
+#### Acceptance Criteria
+
+- [ ] Given valid sample data selected by a page, binding evaluation uses it
+- [ ] Given invalid sample or live data, typed diagnostics identify the field
+- [ ] Given stale input, the field's declared policy determines keep, default, hide, or error behavior
+
+### Requirement: Repeaters
+
+Repeaters MUST be explicit typed instance-generation and layout definitions. They define a stable item-key rule, item source, direction, wrap or grid behavior, gap, maximum item count, empty state, and overflow behavior. Generated identity MUST be deterministic for the same stable item keys.
+
+#### Acceptance Criteria
+
+- [ ] Given stable item keys, reordering data preserves generated instance identity
+- [ ] Given duplicate or missing required item keys, resolution returns typed diagnostics
+- [ ] Given more items than the declared maximum, the explicit overflow behavior is applied
+
+### Requirement: Binding Resolution Layer
+
+Sample or live bindings apply after component, page, and variable-mode layers and before state-machine and sequence layers. Every effective value retains binding provenance and fallback use.
+
+#### Acceptance Criteria
+
+- [ ] Given a data value and a page override on the same target, the data binding takes precedence
+- [ ] Given a later sequence value, it takes precedence over the binding at that tick
+- [ ] Given fallback use, provenance identifies the failed expression and fallback source
 
 ## Spec Gaps
 
-_None — all requirements have acceptance criteria._
-
----
+- The exact safe-function and formatter registries are versioned implementation deliverables owned by the view-model program.
 
 ## Non-Goals
 
-- How data is fetched from external sources → application-level concern
-- Real-time data feed protocols → deferred to future phase
-- Data transformation pipelines → application-level concern
+- Network feed configuration or credentials
+- Arbitrary scripting
+- Persisting current live input in the project snapshot
