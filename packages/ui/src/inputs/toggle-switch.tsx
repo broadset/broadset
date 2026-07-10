@@ -1,6 +1,5 @@
 import { Switch } from '@heroui/react';
 import type { JSX, ReactNode } from 'react';
-import { useLayoutEffect, useRef } from 'react';
 
 export interface ToggleSwitchProps {
   readonly ariaLabel: string;
@@ -11,10 +10,8 @@ export interface ToggleSwitchProps {
 }
 
 /**
- * Thin wrapper around HeroUI's compound Switch that renders the track + thumb
- * automatically so callers don't have to repeat `<Switch.Control><Switch.Thumb />`.
- * HeroUI's base `Switch` renders only the children — without the compound
- * subcomponents you get the label text but no visible toggle track.
+ * Thin wrapper around HeroUI's compound Switch that renders its required
+ * interactive content, track, and thumb while keeping call sites concise.
  */
 export function ToggleSwitch({
   ariaLabel,
@@ -23,26 +20,19 @@ export function ToggleSwitch({
   children,
   isDisabled,
 }: ToggleSwitchProps): JSX.Element {
-  const switchRef = useRef<HTMLLabelElement | null>(null);
-
-  useLayoutEffect(() => {
-    switchRef.current?.setAttribute('tabindex', '0');
-  }, []);
-
   return (
     <Switch
-      ref={switchRef}
       aria-label={ariaLabel}
       isSelected={isSelected}
       {...(isDisabled === true ? { isDisabled: true } : {})}
       onChange={onChange}
     >
-      <Switch.Control>
-        <Switch.Thumb />
-      </Switch.Control>
-      {children !== undefined && children !== null ?
-        <Switch.Content>{children}</Switch.Content>
-      : null}
+      <Switch.Content>
+        <Switch.Control>
+          <Switch.Thumb />
+        </Switch.Control>
+        {children}
+      </Switch.Content>
     </Switch>
   );
 }
