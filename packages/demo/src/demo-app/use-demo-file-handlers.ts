@@ -151,7 +151,7 @@ interface ImportReconciliationModificationRefs {
  * `FormatPreflightModal`. Replaces the silent flatten of
  * `PptxExportReport.warnings` (and the prose-only PSD/SVG warnings)
  * into a single toast string. Phase 1.3 of
- * `project/implementation/cross-format-io-improvement-plan.md`.
+ * the CFIO program (`project/implementation/plan-progress.md` §CFIO).
  */
 export interface ExportPreflightModalState {
   readonly formatLabel: string;

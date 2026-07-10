@@ -14,7 +14,7 @@ export interface DocumentReconciliationElement {
 
 /**
  * Richer per-modification entry for the conflict-resolution UX (Phase
- * 4.9 of cross-format-io-improvement-plan.md, closes pptx-known-gaps
+ * CFIO.4.9 (plan-progress.md §CFIO), closes pptx-known-gaps
  * §A1). Carries both the preserved (last Broadset export) element and
  * the current (re-imported, externally edited) element so the demo can
  * resolve "Use preserved" by swapping the element back in `loadTemplate`.

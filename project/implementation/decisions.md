@@ -46,7 +46,7 @@
 
 ### IO-D-01 through IO-D-18 — IO Format Prerequisites
 
-**Decision:** Ratify the 18 cross-format design decisions that gate PSD, PDF, PPTX, SVG, and PDF/A work. The full ratified table is embedded below (folded from the retired io-prereqs plan). The **IO-D-** prefix namespaces these from the unrelated `Unit N.0` series above; they are referenced by number throughout the format specs and [plan.md](./plan.md).
+**Decision:** Ratify the 18 cross-format design decisions that gate PSD, PDF, PPTX, SVG, and PDF/A work. The full ratified table is embedded below (folded from the retired io-prereqs plan). Two entries are not verbatim folds: IO-D-12 and IO-D-13 were amended on 2026-07-09 to match the contracts the specs actually ratified — each amended entry preserves its original wording inline. The **IO-D-** prefix namespaces these from the unrelated `Unit N.0` series above; they are referenced by number throughout the format specs and [plan.md](./plan.md).
 
 Headline decisions (full rationale in the ratified table below):
 
@@ -62,7 +62,7 @@ Headline decisions (full rationale in the ratified table below):
 - **IO-D-10 Properties-panel exposure gates every round-trippable field.**
 - **IO-D-11 `extensions.<format>` validated at load time** — central Zod registry; fail loudly on stale `.bsp`.
 - **IO-D-12 Run-editor keyboard shortcuts deferred** — Ctrl-B etc. land later; range selection + panel suffices.
-- **IO-D-13 Color mode is per-document.**
+- **IO-D-13 Color intent is per-document** — `document.outputIntent.colorSpace`; spot colors are typed swatch/ink resources, not a document mode string (amended 2026-07-09).
 - **IO-D-14 Preflight warns and proceeds** — never blocks export.
 - **IO-D-15 Gradient editor UI ships with the model additions** — per IO-D-10.
 - **IO-D-16 Export emits the fully-entered "IN" state; animations are discarded unless native** — PPTX exempts the `<p:timing>`-mappable subset; PDF/PSD/SVG are static carriers.
@@ -94,8 +94,8 @@ Headline decisions (full rationale in the ratified table below):
 #### Ratified additions (IO-D-11 … IO-D-15)
 
 - **IO-D-11 `extensions.<format>` validated at load time.** Each format package registers a Zod schema for its `extensions.<format>` namespace into a central registry; `.bsp` load validates every present namespace. Fail loudly on stale or corrupt files rather than at re-export.
-- **IO-D-12 Run-editor keyboard shortcuts were deferred by the legacy program.** W2-CMD-01/W2-TEXT-01 now own command-registry integration, discoverability, collision handling, and keyboard parity.
-- **IO-D-13 Color intent is per-document.** `document.outputIntent.colorSpace` is `'rgb' | 'cmyk' | 'gray' | 'lab'` and references an ICC profile asset; absence uses the target format's documented default. There is no per-element color-mode override. Spot colors are typed swatch/ink resources under W1-COLOR-01 rather than a document mode string.
+- **IO-D-12 Run-editor keyboard shortcuts were deferred by the legacy program.** W2-CMD-01/W2-TEXT-01 now own command-registry integration, discoverability, collision handling, and keyboard parity. _Amended 2026-07-09; originally ratified as: "Range selection + properties-panel controls are the Phase 5 scope. Ctrl-B / Ctrl-I / Ctrl-U on a selected range land in a later polish pass."_
+- **IO-D-13 Color intent is per-document.** `document.outputIntent.colorSpace` is `'rgb' | 'cmyk' | 'gray' | 'lab'` and references an ICC profile asset; absence uses the target format's documented default. There is no per-element color-mode override. Spot colors are typed swatch/ink resources under W1-COLOR-01 rather than a document mode string. _Amended 2026-07-09 to match the ratified spec contract; originally ratified as: "`settings.colorMode: 'rgb' | 'cmyk' | 'spot'` on the document. No per-element override in the initial cut; spot overlays are expressed via the swatches panel, not a per-element mode flag."_
 - **IO-D-14 Preflight warns and proceeds.** Preflight surfaces missing fonts, out-of-gamut colors, overflow-bleed, image resolution, and embed-permission issues as warnings. Export is never blocked under the current decision. ADR-IO-014/016 records a proposed replacement policy.
 - **IO-D-15 Gradient editor UI ships in the same phase as the gradient model additions.** Per IO-D-10, shipping the model without its editor surface is forbidden.
 

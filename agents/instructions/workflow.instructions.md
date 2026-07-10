@@ -9,8 +9,8 @@ applyTo: '**'
 
 Quality gates run automatically:
 
-- **Pre-commit (husky)** — three checks in order: [gitleaks-check.sh](../hooks/gitleaks-check.sh) (secret scan, staged files), [quality-gate.sh](../hooks/quality-gate.sh) (`format + typecheck + quality:strict`), [actionlint-check.sh](../hooks/actionlint-check.sh) (workflow YAML lint). gitleaks and actionlint gracefully skip locally if the binaries aren't installed; CI enforces both unconditionally.
-- **Pre-push (husky)** — `npm run gate:full`: `quality:strict + lint:dead (knip) + lint:typecoverage (>= 99.95%) + ct (ui + demo) + build`.
+- **Pre-commit (husky)** — three checks in order: [gitleaks-check.sh](../hooks/gitleaks-check.sh) (secret scan, staged files), [quality-gate.sh](../hooks/quality-gate.sh) (docs and roadmap structural audits + `format + typecheck + quality:strict`), [actionlint-check.sh](../hooks/actionlint-check.sh) (workflow YAML lint). gitleaks and actionlint gracefully skip locally if the binaries aren't installed; CI enforces both unconditionally.
+- **Pre-push (husky)** — `npm run gate:full`: `test:docs + docs:check + test:roadmap + roadmap:check + lint:typecoverage (>= 99.95%) + quality:strict + lint:dead (knip) + ct:all (ui + demo) + build`.
 - **CI** — same gate plus `gitleaks-action` and `actionlint-action` as separate steps for failure visibility.
 
 If you want an early signal before commit, run `agents/hooks/quality-gate.sh` manually. Code that fails the gate must not be committed.
@@ -54,14 +54,14 @@ Every feature must have:
 
 No feature is considered complete on the strength of code alone.
 
-When a task is done, check its child-plan evidence step and update the stable initiative row in `project/implementation/plan-progress.md`. Only the tracker owns lifecycle status; do not invent alternate completion markers.
+When a task is done, check its child-plan evidence step and update the initiative's entry in `project/implementation/program-state.json`. Lifecycle status lives **only** in `program-state.json` (statuses: `discovery`, `approved`, `implementing`, `measuring`, `shipped`, `stopped`, `superseded`); the statuses `implementing`, `measuring`, and `shipped` require a `pr` or `evidence` link (audited by `npm run roadmap:check`). `project/implementation/plan-progress.md` keeps historical legacy-tier evidence only. Do not invent alternate completion markers.
 
 ## Quality Gates
 
 Two gates, both automatic:
 
 - `npm run quality:strict` — lint:strict + prettier:check + typecheck + vitest. Fires on every commit via husky pre-commit.
-- `npm run gate:full` — `quality:strict` + `lint:dead` (knip dead-code/unused-deps) + `lint:typecoverage` (≥ 99.95% explicit types) + `ct:all` (Playwright CT in `packages/ui` and `packages/demo`) + `build`. Fires on every push via husky pre-push, and on every PR / main push via CI.
+- `npm run gate:full` — `test:docs` (documentation-checker unit tests) + `docs:check` (documentation integrity) + `test:roadmap` (roadmap-checker unit tests) + `roadmap:check` (roadmap/execution-model structural audit) + `lint:typecoverage` (≥ 99.95% explicit types) + `quality:strict` + `lint:dead` (knip dead-code/unused-deps) + `ct:all` (Playwright CT in `packages/ui` and `packages/demo`) + `build`. Fires on every push via husky pre-push, and on every PR / main push via CI.
 
 **When a quality gate fails, fix the code — never weaken the check.** Do not add suppression flags, ignore comments, raised warning thresholds, or config changes that make the check more lenient. See [AGENTS.md](../../AGENTS.md) → "No cutting corners".
 
@@ -78,3 +78,5 @@ Do **not** save things derivable from the code, git log, or files in `agents/ins
 ## Keep working
 
 Unless stopped specifically, keep working without asking for permission to go to the next task or phase.
+
+Autonomous agents follow `project/implementation/operating-loop.md` — read `project/implementation/directives.md` first each iteration; silence means continue.

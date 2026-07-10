@@ -43,13 +43,13 @@ Code is not complete unless it is heavily tested. You will write tests that prov
 
 ### 1. Unit Testing (Vitest + React Testing Library)
 
-- **The Math:** Keep exhaustive tests for `pxToMm`, `mmToPx`, and `calculateAnchors` in `packages/model/src/utilities.test.ts`, including multiple canvas sizes and cross-center-line coordinates.
+- **The Math:** Keep exhaustive tests for `pxToMm` and `mmToPx` in `packages/model/src/utilities.test.ts`, and for `calculateAnchors` in `packages/editor/src/transforms.test.ts`, including multiple canvas sizes and cross-center-line coordinates.
 - **The Zustand Store:** Test the vanilla editor store under `packages/editor/src/store-actions*.test.ts` independently of React. Prove `updateElementEphemeral`, `commitElementUpdate`, and `reorderElement` preserve transaction and ordering semantics without data loss.
 - **Custom Hooks:** Test the `useEditorStore` selector logic.
 
 ### 2. Component Testing (Playwright CT)
 
-- **Canvas Interaction:** Write Playwright CT tests that simulate real mouse/pointer events. You must programmatically click a `<TransformableNode>` (from `packages/renderer/src/`), drag it 100px to the right, release the mouse, and assert that the DOM updated and the Zustand state committed the new coordinates.
+- **Canvas Interaction:** Write Playwright CT tests that simulate real mouse/pointer events. You must programmatically click a rendered element node on the canvas (the `data-element-id` DOM node produced by `packages/renderer/src/`), drag it 100px to the right, release the mouse, and assert that the DOM updated and the Zustand state committed the new coordinates.
 - **Broadcast Screen Renderer Parity:** Write visual regression tests or DOM assertions proving that given a specific JSON schema, the `ScreenRenderer` (from `packages/renderer/src/`) outputs the exact expected HTML.
 - **Demo Integration:** Write tests verifying that clicking the "Onscreen" toggle instantly applies the correct CSS class to the DOM node on the canvas.
 

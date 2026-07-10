@@ -12,7 +12,7 @@ import { ModalShell } from './modal-shell';
  * with per-bucket counts and an expandable per-element list inside
  * each.
  *
- * Phase 4.9 of cross-format-io-improvement-plan.md added per-modification
+ * CFIO.4.9 (plan-progress.md §CFIO) added per-modification
  * "Use preserved / Use visual" radio choices on top: every entry in the
  * modifications bucket gets a radio pair so the user can pick — per
  * element — whether to keep the externally-edited version (default,

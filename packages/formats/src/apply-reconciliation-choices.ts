@@ -22,7 +22,7 @@ export type ReconciliationChoice = 'preserved' | 'visual';
  *
  * Pure function — returns a new document with a new `elements` array;
  * never mutates the input. Phase 4.9 of
- * cross-format-io-improvement-plan.md (closes pptx-known-gaps §A1).
+ * the CFIO program (plan-progress.md §CFIO; closes pptx-known-gaps §A1).
  */
 export function applyReconciliationChoices(
   doc: BroadsetDocument,

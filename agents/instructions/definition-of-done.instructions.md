@@ -15,7 +15,7 @@ A task is **not** done until every box below is true. Apply this checklist befor
 
 ## Quality gates pass
 
-- [ ] `npm run docs:check` passes when Markdown, package manifests, roadmap/tracker data, or agent guidance changed.
+- [ ] `npm run docs:check` and `npm run roadmap:check` pass when Markdown, package manifests, roadmap/tracker data, or agent guidance changed.
 - [ ] `npm run quality:strict` passes for every touched package (lint:strict + prettier:check + typecheck + vitest).
 - [ ] `npm run ct -w @broadset/ui` and `npm run ct -w @broadset/demo` pass when UI/demo source changed.
 - [ ] `npm run build` passes when packaging or bundling-relevant code changed.
@@ -27,6 +27,7 @@ A task is **not** done until every box below is true. Apply this checklist befor
 - [ ] **Package boundaries respected.** No new import that crosses an architecture line ([AGENTS.md](../../AGENTS.md) → "Package boundary rules").
 - [ ] **Barrel exports updated.** Any new public type, function, or component is exported from the package's `index.ts`.
 - [ ] **HeroUI compliance** preserved in `packages/ui` and `packages/demo`. No raw `<button>`, `<input>`, etc. where a HeroUI component exists.
+- [ ] **Lifecycle state updated.** If the task advances an initiative, its entry in `project/implementation/program-state.json` is updated with a `pr` or `evidence` link. `plan-progress.md` keeps historical legacy-tier evidence only.
 
 ## Hygiene
 

@@ -35,7 +35,11 @@
     "docs:check": "node scripts/check-documentation.mjs",
     "docs:architecture": "node scripts/check-documentation.mjs --write-architecture",
     "test:docs": "node --test scripts/check-documentation.test.mjs",
-    "gate:full": "npm run docs:check && npm run lint:typecoverage && npm run quality:strict && npm run lint:dead && npm run ct:all && npm run build",
+    "roadmap:check": "node scripts/check-roadmap.mjs",
+    "roadmap:frontier": "node scripts/check-roadmap.mjs --frontier",
+    "roadmap:seed-state": "node scripts/check-roadmap.mjs --seed-state",
+    "test:roadmap": "node --test scripts/check-roadmap.test.mjs",
+    "gate:full": "npm run test:docs && npm run docs:check && npm run test:roadmap && npm run roadmap:check && npm run lint:typecoverage && npm run quality:strict && npm run lint:dead && npm run ct:all && npm run build",
     "prepare": "husky"
   },
   "overrides": {

@@ -199,7 +199,7 @@ function hasStaleUnmappedEffects(el: BroadsetElement): boolean {
 /**
  * Surface warnings for `PsdExportOptions` fields the current writer
  * cannot honour. `colorSpace` (non-RGB) and `bitDepth: 16` require the
- * lcms-wasm pipeline tracked under cross-format-io-improvement-plan.md
+ * lcms-wasm pipeline tracked as CFIO.4.1 in plan-progress.md
  * Phase 4.1 / Phase 4.6. Image smart objects are already embedded as
  * PSD `liFD` linked-file-data records when bytes are available, so
  * `linkSmartObjects: false` is not a warning condition for Broadset-
@@ -214,13 +214,13 @@ export function collectExportOptionsWarnings(options: PsdExportOptions | undefin
 
   if (options.colorSpace !== undefined && options.colorSpace !== 'rgb') {
     warnings.push(
-      `PSD export does not yet honor non-RGB color space (requested: ${options.colorSpace}); output is RGB. Tracked in cross-format-io-improvement-plan.md Phase 4.1.`,
+      `PSD export does not yet honor non-RGB color space (requested: ${options.colorSpace}); output is RGB. Tracked as CFIO.4.1 in plan-progress.md.`,
     );
   }
 
   if (options.bitDepth !== undefined && options.bitDepth !== 8) {
     warnings.push(
-      `PSD export does not yet honor 16-bit bit depth; output is 8-bit. Tracked in cross-format-io-improvement-plan.md Phase 4.1.`,
+      `PSD export does not yet honor 16-bit bit depth; output is 8-bit. Tracked as CFIO.4.1 in plan-progress.md.`,
     );
   }
 

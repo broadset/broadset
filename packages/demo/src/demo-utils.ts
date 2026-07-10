@@ -594,7 +594,7 @@ interface DemoReconciliationModification {
 /**
  * Apply per-modification "Use preserved / Use visual" choices to the
  * re-imported document before `loadTemplate` runs (Phase 4.9 of
- * cross-format-io-improvement-plan.md, closes pptx-known-gaps §A1).
+ * the CFIO program (plan-progress.md §CFIO), closes pptx-known-gaps §A1).
  *
  * For each modification id, looks up the user's choice (defaulting to
  * `'visual'` when unset) and either keeps the current element or swaps

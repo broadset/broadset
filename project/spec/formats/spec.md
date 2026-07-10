@@ -621,4 +621,4 @@ Contract:
 
 ## Cross-Format Spec Gaps
 
-- [ ] **Proposed unified preflight and intentional-loss policy:** ADR-IO-014/016 proposes stable severity codes, explicit overrides for fidelity warnings, blocking unsafe/invalid output, and per-element animation-loss reporting. Current per-format requirements and ratified IO-D-14/16 behavior remain authoritative until an authorized maintainer ratifies and reconciles the replacement across every exporter and authoring surface.
+- [ ] **Proposed unified preflight and intentional-loss policy:** ADR-IO-014/016 proposes stable severity codes, explicit overrides for fidelity warnings, blocking unsafe/invalid output, and per-element animation-loss reporting. Current per-format requirements and ratified IO-D-14/16 behavior remain authoritative until an authorized maintainer ratifies and reconciles a replacement across every exporter and authoring surface.

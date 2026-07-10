@@ -58,7 +58,7 @@ export interface PdfExportOptionsInput {
  * bridge passes the object straight through to `exportPsdBytesAsync`,
  * which honours `preserveVisibility` today and surfaces preflight
  * warnings for `colorSpace` / `bitDepth` / `linkSmartObjects` until
- * the lcms-wasm pipeline (cross-format-io-improvement-plan.md
+ * the lcms-wasm pipeline (CFIO.4.1 in plan-progress.md
  * Phase 4.1) lands.
  */
 export interface PsdExportOptionsInput {

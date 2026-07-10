@@ -388,11 +388,13 @@ Export preflight and import warnings MUST follow IO-D-14 ("preflight warns and p
 
 The core P5.2a foundation and P5.3a/b/c coverage shipped, plus the parity-with-PDF infrastructure pass: robust importer surface (`importPsdDocument` with `{ document, warnings }`), import fuzz harness, export preflight (`exportPsdBytesAsyncWithPreflight`), cross-reader structural validator (`validatePsdBytes`), producer-quirks fixture corpus, visual regression pixel sampling, UAX #9 / UAX #14 detection on text content, modular `psd/export/` layout. The following deeper round-trip surface is tracked here and will land under later PSD-track iterations:
 
-> **Tracked closures:** scheduled under W3-PSD-01 in the
-> [master roadmap](../../implementation/plan.md):
-> CMYK/Lab/Grayscale + ICC = Phase 4.1; effects parity = Phase 4.3;
-> 16/32-bpc preservation = Phase 4.6;
-> real third-party fixture corpus = Phase 5.3.
+> **Tracked closures** (legacy CFIO IDs routed per the
+> [legacy open-gap routing](../../implementation/roadmap/current-state.md#legacy-open-gap-routing) crosswalk):
+> CMYK/Lab/Grayscale + ICC = CFIO.4.1 (W1-COLOR-01 and W3-PSD-01);
+> effects parity = CFIO.4.3 (W3-PSD-01);
+> 16/32-bpc preservation = CFIO.4.6 (W3-PSD-01);
+> real third-party fixture corpus = CFIO.5.3 (licensed fixture mounts via
+> W3-QE-01; corpus manifest under W3-CORPUS-01).
 
 - **Inner glow / color overlay / gradient overlay / bevel / satin / pattern overlay.** Current behaviour: drop shadow, outer glow, inner shadow, stroke-effect emit natively. Target behaviour: CSS-mappable effects (inner glow, solid color overlay from explicit Broadset intent, gradient overlay) emit natively; PSD-only effects (bevel / emboss, satin, pattern overlay) ride in `extensions.psd.unmappedEffects` with `dirty: false` so untouched re-export is byte-identical.
 - **CMYK / Lab / Grayscale + ICC profile round-trip.** Current behaviour: RGB 8-bit only on the current exporter path; preflight surfaces a warning when `document.outputIntent.colorSpace` is non-RGB. Target behaviour: colour mode follows `document.outputIntent.colorSpace`; embedded ICC profile rides via the asset pipeline (`IccProfileAsset` from P4.4 is ready).

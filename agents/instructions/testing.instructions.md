@@ -9,14 +9,14 @@ applyTo: packages/*/src/**/*.test.*, ct/**
 
 ### Math Utilities
 
-- Exhaustive tests for `pxToMm` and `mmToPx` in `units.ts`.
-- Test `calculateEdgeAnchors` with multiple simulated canvas sizes and coordinates that cross the center-line.
+- Exhaustive tests for `pxToMm` and `mmToPx` in `packages/model/src/utilities.test.ts`.
+- Test `calculateAnchors` in `packages/editor/src/transforms.test.ts` with multiple simulated canvas sizes and coordinates that cross the center-line.
 
 ### Zustand Store
 
-- Test the vanilla store **independently of React**.
+- Test the vanilla editor store **independently of React** under `packages/editor/src/store-actions*.test.ts`.
 - Prove `updateElementEphemeral` updates coordinates correctly.
-- Prove `commitElementChange` recalculates anchors on center-line cross.
+- Prove `commitElementUpdate` commits ephemeral changes with transaction semantics intact.
 - Prove `reorderElement` shifts array indexes without data loss.
 
 ### Custom Hooks
@@ -27,7 +27,7 @@ applyTo: packages/*/src/**/*.test.*, ct/**
 
 ### Canvas Interaction
 
-- Simulate real pointer events: click a `<TransformableNode>`, drag 100px, release, assert DOM update and Zustand state commit.
+- Simulate real pointer events: click a rendered element node on the canvas (the `data-element-id` DOM node produced by the renderer), drag 100px, release, assert DOM update and Zustand state commit.
 
 ### CT Derivation Rule — Cross-Region Verification
 
@@ -70,11 +70,11 @@ Each CT test MUST:
 
 ### CT Coverage Gate
 
-Before a roadmap initiative can move to `release` in `plan-progress.md`:
+Before a roadmap initiative can move to `shipped` in `program-state.json`:
 
 - Every cross-region scenario from that group's specs MUST have a passing CT test
 - `npm run ct:all` MUST pass with zero failures
-- The initiative child plan MUST link each scenario ID to its unit/CT evidence
+- The initiative's `program-state.json` evidence link MUST map each scenario ID to its unit/CT evidence
 
 ## General Rules
 

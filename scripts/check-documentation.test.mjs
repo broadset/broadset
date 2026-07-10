@@ -3,13 +3,16 @@ import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   ARCHITECTURE_END_MARKER,
   ARCHITECTURE_START_MARKER,
   checkDocumentation,
   renderManifestBaseline,
+  reportCrossSpecCheckActivation,
 } from './check-documentation.mjs';
+import { stripFencedCode } from './check-documentation-markdown.mjs';
 
 async function createFixture() {
   const root = await mkdtemp(path.join(tmpdir(), 'broadset-docs-'));
@@ -180,161 +183,6 @@ test('reports contradictory animation, component, page, and reorder contracts', 
   assert.ok(codes.has('cross-spec-reorder-semantics-drift'));
 });
 
-test('requires every roadmap initiative definition to have a tracker row', async () => {
-  const root = await createFixture();
-  const baseline = await renderManifestBaseline(root);
-  await writeFile(
-    path.join(root, 'project/implementation/architecture.md'),
-    `# Architecture\n\n${ARCHITECTURE_START_MARKER}\n${baseline}\n${ARCHITECTURE_END_MARKER}\n`,
-  );
-  await writeFile(
-    path.join(root, 'project/implementation/plan.md'),
-    '# Plan\n\n| W0-GOV-01 | outcome | none | evidence |\n| W1-TIME-01 | outcome | W0-GOV-01 | evidence |\n',
-  );
-
-  const findings = await checkDocumentation(root);
-
-  assert.ok(
-    findings.some(
-      (finding) => finding.code === 'initiative-missing-tracker-row' && finding.message.includes('W1-TIME-01'),
-    ),
-  );
-});
-
-test('recognizes alphanumeric initiative domains when checking tracker coverage', async () => {
-  const root = await createFixture();
-  await writeFile(
-    path.join(root, 'project/implementation/plan.md'),
-    '# Plan\n\n| W2-A11Y-01 | outcome | none | evidence |\n',
-  );
-
-  const findings = await checkDocumentation(root);
-
-  assert.ok(
-    findings.some(
-      (finding) => finding.code === 'initiative-missing-tracker-row' && finding.message.includes('W2-A11Y-01'),
-    ),
-  );
-});
-
-test('rejects initiative dependencies that are absent from the roadmap', async () => {
-  const root = await createFixture();
-  await writeFile(
-    path.join(root, 'project/implementation/plan.md'),
-    '# Plan\n\n| W0-GOV-01 | outcome | W1-MISSING-01 | evidence |\n',
-  );
-  await writeFile(
-    path.join(root, 'project/implementation/plan-progress.md'),
-    '# Tracker\n\n| W0-GOV-01 | proposed | unassigned | W1-MISSING-01 | — | — |\n',
-  );
-
-  const findings = await checkDocumentation(root);
-
-  assert.ok(
-    findings.some(
-      (finding) => finding.code === 'initiative-dependency-unknown' && finding.message.includes('W1-MISSING-01'),
-    ),
-  );
-});
-
-test('rejects prose dependency expressions that the roadmap graph cannot validate', async () => {
-  const root = await createFixture();
-  await writeFile(
-    path.join(root, 'project/implementation/plan.md'),
-    '# Plan\n\n| W0-GOV-01 | outcome | all foundations | evidence |\n',
-  );
-  await writeFile(
-    path.join(root, 'project/implementation/plan-progress.md'),
-    '# Tracker\n\n| W0-GOV-01 | proposed | unassigned | all foundations | — | — |\n',
-  );
-
-  const findings = await checkDocumentation(root);
-
-  assert.ok(findings.some((finding) => finding.code === 'initiative-dependency-unparseable'));
-});
-
-test('rejects initiative self-dependencies', async () => {
-  const root = await createFixture();
-  await writeFile(
-    path.join(root, 'project/implementation/plan.md'),
-    '# Plan\n\n| W0-GOV-01 | outcome | W0-GOV-01 | evidence |\n',
-  );
-  await writeFile(
-    path.join(root, 'project/implementation/plan-progress.md'),
-    '# Tracker\n\n| W0-GOV-01 | proposed | unassigned | W0-GOV-01 | — | — |\n',
-  );
-
-  const findings = await checkDocumentation(root);
-
-  assert.ok(findings.some((finding) => finding.code === 'initiative-dependency-self'));
-});
-
-test('rejects cycles in the initiative dependency graph', async () => {
-  const root = await createFixture();
-  await writeFile(
-    path.join(root, 'project/implementation/plan.md'),
-    [
-      '# Plan',
-      '',
-      '| W0-GOV-01 | outcome | W1-TIME-01 | evidence |',
-      '| W1-TIME-01 | outcome | W0-GOV-01 | evidence |',
-      '',
-    ].join('\n'),
-  );
-  await writeFile(
-    path.join(root, 'project/implementation/plan-progress.md'),
-    [
-      '# Tracker',
-      '',
-      '| W0-GOV-01 | proposed | unassigned | W1-TIME-01 | — | — |',
-      '| W1-TIME-01 | proposed | unassigned | W0-GOV-01 | — | — |',
-      '',
-    ].join('\n'),
-  );
-
-  const findings = await checkDocumentation(root);
-
-  assert.ok(
-    findings.some((finding) => finding.code === 'initiative-dependency-cycle' && finding.message.includes('W0-GOV-01')),
-  );
-});
-
-test('requires a one-to-one roadmap register with matching dependencies', async () => {
-  const root = await createFixture();
-  const baseline = await renderManifestBaseline(root);
-  await writeFile(
-    path.join(root, 'project/implementation/architecture.md'),
-    `# Architecture\n\n${ARCHITECTURE_START_MARKER}\n${baseline}\n${ARCHITECTURE_END_MARKER}\n`,
-  );
-  await writeFile(
-    path.join(root, 'project/implementation/plan-progress.md'),
-    '# Tracker\n\n| W0-GOV-01 | proposed | unassigned | RFC-99 | — | — |\n| W1-TIME-01 | proposed | unassigned | W0-GOV-01 | — | — |\n',
-  );
-
-  const findings = await checkDocumentation(root);
-
-  assert.ok(findings.some((finding) => finding.code === 'initiative-dependency-drift'));
-  assert.ok(findings.some((finding) => finding.code === 'initiative-not-in-roadmap'));
-});
-
-test('enforces lifecycle metadata for executable and evidenced initiatives', async () => {
-  const root = await createFixture();
-  const baseline = await renderManifestBaseline(root);
-  await writeFile(
-    path.join(root, 'project/implementation/architecture.md'),
-    `# Architecture\n\n${ARCHITECTURE_START_MARKER}\n${baseline}\n${ARCHITECTURE_END_MARKER}\n`,
-  );
-  await writeFile(
-    path.join(root, 'project/implementation/plan-progress.md'),
-    '# Tracker\n\n| W0-GOV-01 | ready | unassigned | none | — | — |\n',
-  );
-
-  const findings = await checkDocumentation(root);
-
-  assert.ok(findings.some((finding) => finding.code === 'initiative-dri-required'));
-  assert.ok(findings.some((finding) => finding.code === 'initiative-child-plan-required'));
-});
-
 test('reports manifest baseline drift and accepts exact generated content', async () => {
   const root = await createFixture();
   await writeFile(
@@ -353,4 +201,146 @@ test('reports manifest baseline drift and accepts exact generated content', asyn
 
   const clean = await checkDocumentation(root);
   assert.equal(clean.length, 0);
+});
+
+test('skips link, table, and vocabulary scans inside fenced code blocks without shifting line numbers', async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, 'README.md'),
+    [
+      '# Docs',
+      '',
+      '```text',
+      '[missing](./missing.md)',
+      'Continue from io-prereqs-plan.md.',
+      '```',
+      '',
+      '[also-missing](./absent.md)',
+      '',
+    ].join('\n'),
+  );
+  await writeFile(
+    path.join(root, 'agents/instructions/workflow.instructions.md'),
+    '# Workflow\n\n```md\nActive Phase example inside a fence.\n```\n',
+  );
+
+  const findings = await checkDocumentation(root);
+  const brokenLinks = findings.filter((finding) => finding.code === 'broken-local-link');
+
+  assert.equal(brokenLinks.length, 1);
+  assert.equal(brokenLinks[0].line, 8);
+  assert.ok(!findings.some((finding) => finding.code === 'removed-document-reference'));
+  assert.ok(!findings.some((finding) => finding.code === 'stale-execution-guidance'));
+});
+
+test('stripFencedCode preserves the line structure of the document', () => {
+  const body = 'a\n```js\ncode\n```\nb';
+
+  const stripped = stripFencedCode(body);
+
+  assert.equal(stripped.split('\n').length, body.split('\n').length);
+  assert.equal(stripped, 'a\n\n\n\nb');
+});
+
+test('accepts markdown links that carry a quoted title', async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, 'README.md'),
+    '# Docs\n\n[tracker](./project/implementation/plan-progress.md "The live tracker")\n',
+  );
+
+  const findings = await checkDocumentation(root);
+
+  assert.ok(!findings.some((finding) => finding.code === 'broken-local-link'));
+});
+
+test('reports links that resolve outside the repository root', async () => {
+  const root = await createFixture();
+  await writeFile(path.join(root, 'README.md'), '# Docs\n\n[escape](../outside.md)\n');
+
+  const findings = await checkDocumentation(root);
+
+  assert.ok(findings.some((finding) => finding.code === 'broken-local-link'));
+});
+
+test('reports consecutive table separator rows', async () => {
+  const root = await createFixture();
+  await writeFile(path.join(root, 'README.md'), '# Docs\n\n| A |\n| --- |\n| --- |\n');
+
+  const findings = await checkDocumentation(root);
+
+  assert.ok(findings.some((finding) => finding.code === 'consecutive-table-separators'));
+});
+
+test('reports proposed ADRs that omit the non-override disclaimer', async () => {
+  const root = await createFixture();
+  await mkdir(path.join(root, 'project/implementation/decisions'), { recursive: true });
+  await writeFile(
+    path.join(root, 'project/implementation/decisions/ADR-007-components.md'),
+    '# ADR\n\nStatus: proposed 2026-07-09\n\n## Decision\n\nComponents everywhere.\n',
+  );
+
+  const findings = await checkDocumentation(root);
+
+  assert.ok(findings.some((finding) => finding.code === 'proposal-adr-claims-authority'));
+});
+
+test('requires a recognized status on every ADR and allows non-pinned accepted ADRs', async () => {
+  const root = await createFixture();
+  await mkdir(path.join(root, 'project/implementation/decisions'), { recursive: true });
+  await writeFile(
+    path.join(root, 'project/implementation/decisions/ADR-777-example.md'),
+    '# ADR\n\nNo status line at all.\n',
+  );
+  await writeFile(
+    path.join(root, 'project/implementation/decisions/ADR-888-example.md'),
+    '# ADR\n\nStatus: accepted 2026-07-09\n\n## Decision\n\nRatified.\n',
+  );
+
+  const findings = await checkDocumentation(root);
+
+  assert.ok(
+    findings.some(
+      (finding) => finding.code === 'adr-status-unparseable' && finding.file.includes('ADR-777-example.md'),
+    ),
+  );
+  assert.ok(!findings.some((finding) => finding.file.includes('ADR-888-example.md')));
+});
+
+test('reports removed plan references inside package sources', async () => {
+  const root = await createFixture();
+  await mkdir(path.join(root, 'packages/example/src'), { recursive: true });
+  await writeFile(
+    path.join(root, 'packages/example/src/legacy.ts'),
+    '// Tracked in cross-format-io-improvement-plan.md Phase 4.1.\nexport const legacy = true;\n',
+  );
+
+  const findings = await checkDocumentation(root);
+
+  assert.ok(
+    findings.some(
+      (finding) => finding.code === 'removed-document-reference' && finding.file === 'packages/example/src/legacy.ts',
+    ),
+  );
+});
+
+test('pins the armed/dormant state of the cross-spec checks against this repository', async () => {
+  // Three of the four cross-spec checks are dormant by design: their sentinel
+  // phrases only exist in the proposed contract ADRs. If this test fails, a
+  // sentinel phrase was reworded (silently disabling a check) or a proposal
+  // landed in the specs (arming one) — update the checker deliberately.
+  const repoRoot = path.resolve(fileURLToPath(import.meta.url), '../..');
+
+  const activation = await reportCrossSpecCheckActivation(repoRoot);
+
+  assert.deepEqual(activation, {
+    animation: { modelMode: 'ignore', referenceMode: 'ignore' },
+    componentHost: { nestedInstancesProposed: null, documentOnlyHostRule: false },
+    pageCoordinates: {
+      descendantParentRelative: false,
+      canvasOriginPosition: true,
+      rootVersusDescendantResolution: false,
+    },
+    reorderSemantics: { stableAnchorPayloads: false, twoReorderScenario: true, batchRelativeGuard: false },
+  });
 });
