@@ -16,7 +16,9 @@ Run the relevant verification before considering work complete:
 - `npm run quality:all` — compatibility alias for the same all-package gate
 - `npm run ct` — focused demo Playwright component tests
 - `npm run ct:all` — complete UI + demo Playwright component tests
-- `npm run docs:check` — documentation links, tables, roadmap/tracker integrity, stale guidance, and architecture-manifest drift
+- `npm run docs:check` — documentation links, tables, stale guidance, ADR authority, and architecture-manifest drift
+- `npm run roadmap:check` — roadmap/execution-model structural audit (registry, dependencies, slices, state)
+- `npm run test:roadmap` — roadmap-checker unit tests
 - `npm run build` — production build verification when package or bundling changes are involved
 
 ## Cross-Region CT Gate
@@ -50,6 +52,9 @@ npm run quality:all  # compatibility alias for the all-package quality gate
 npm run ct           # focused demo Playwright component tests
 npm run ct:all       # full UI + demo Playwright component tests
 npm run docs:check   # documentation integrity and architecture-manifest check
+npm run roadmap:check # roadmap/execution-model structural audit (registry, dependencies, slices, state)
+npm run roadmap:frontier # roadmap audit plus ready/blocked initiative frontier report
+npm run test:roadmap # roadmap-checker unit tests
 npm run audit:prod   # production-only npm audit (release signoff)
 npm run audit:all    # full npm audit (dev + prod, release signoff)
 ```

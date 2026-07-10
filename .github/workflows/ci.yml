@@ -43,6 +43,9 @@ jobs:
       - name: Documentation integrity
         run: npm run test:docs && npm run docs:check
 
+      - name: Roadmap execution-model audit
+        run: npm run test:roadmap && npm run roadmap:check
+
       - name: Knip (dead code / unused deps)
         run: npm run lint:dead
 

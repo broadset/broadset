@@ -10,6 +10,10 @@ set -e
 
 cd "${WORKSPACE:-$(git -C "$(dirname "$0")" rev-parse --show-toplevel)}"
 
+echo "Running documentation and roadmap structural audits..."
+npm run docs:check
+npm run roadmap:check
+
 echo "Running format..."
 npm run format
 

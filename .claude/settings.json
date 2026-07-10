@@ -36,11 +36,41 @@
       "Bash(agents/hooks/quality-gate.sh *)",
       "mcp__chrome-devtools__take_snapshot",
       "Skill(ralph-loop:ralph-loop)",
-      "Skill(ralph-loop:ralph-loop:*)"
+      "Skill(ralph-loop:ralph-loop:*)",
+      "Bash(npm run docs:check)",
+      "Bash(npm run test:docs)",
+      "Bash(npm run roadmap:check)",
+      "Bash(npm run roadmap:frontier)",
+      "Bash(npm run roadmap:seed-state)",
+      "Bash(npm run test:roadmap)",
+      "Bash(git worktree *)",
+      "Bash(git fetch *)",
+      "Bash(git pull --ff-only*)",
+      "Bash(git push -u origin agent/*)",
+      "Bash(git push origin agent/*)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh run list *)",
+      "Bash(gh run view *)",
+      "Bash(gh pr merge * --squash --delete-branch)",
+      "Bash(gh pr review *)",
+      "Bash(git revert *)",
+      "Bash(git checkout main)",
+      "Bash(npm ci)"
     ],
-    "additionalDirectories": [
-      "/tmp",
-      "/private/tmp"
+    "additionalDirectories": ["/tmp", "/private/tmp"],
+    "deny": [
+      "Bash(git push origin main*)",
+      "Bash(git push -u origin main*)",
+      "Bash(git push* --force*)",
+      "Bash(git push* -f *)",
+      "Bash(git push* --delete*)",
+      "Bash(git push*:*)",
+      "Bash(gh pr merge* --admin*)",
+      "Bash(gh pr merge* --repo*)"
     ]
   },
   "hooks": {
