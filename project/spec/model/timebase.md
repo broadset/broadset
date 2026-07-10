@@ -26,6 +26,21 @@ A timebase MUST contain reduced positive `frameRate` numerator and denominator, 
 - [ ] Given a tick rate that produces fractional frame starts, validation fails
 - [ ] Given the same frame index, every consumer computes the same integer tick
 
+The exact v1 helpers use integer arithmetic only. `frameStartTicks(frame, timebase)` computes
+`frame * ticksPerSecond * denominator / numerator`. `ticksToFrame(tick, timebase)` returns the
+greatest frame index whose start is less than or equal to `tick`. `frameCountForDuration(0,
+timebase)` returns zero; for a positive duration it returns the number of frame starts in
+`[0, durationTicks)`, which is the exact ceiling of
+`durationTicks * numerator / (ticksPerSecond * denominator)`. Implementations MUST reject unsafe
+inputs, non-integral frame durations, and results outside the JSON-safe integer range.
+
+#### Acceptance Criteria
+
+- [ ] Given a tick between two frame starts, `ticksToFrame` returns the earlier frame
+- [ ] Given a positive partial-frame duration, `frameCountForDuration` includes its frame start
+- [ ] Given zero duration, frame count is zero
+- [ ] Given an unsafe input, intermediate result, or output, the helper rejects it without precision loss
+
 ### Requirement: Tick Values
 
 Canonical tick values MUST be non-negative JSON-safe integers. Durations, sequence positions, markers, cues, keyframes, and clip boundaries use document ticks. Spatial or wall-clock units MUST NOT be substituted for ticks.
@@ -63,6 +78,10 @@ Work areas and sequence-clip source/output ranges MUST be strictly non-empty ord
 
 Timecode is a presentation and interchange mapping over exact ticks. Drop-frame MUST be enabled only for supported nominal/rational combinations and MUST skip labels without skipping timeline time. Timecode annotations do not replace canonical ticks.
 
+The v1 non-drop nominal frame rate is the nearest integer to the rational frame rate. Drop-frame is
+supported only for `30000/1001` with nominal 30 and `60000/1001` with nominal 60. In every case,
+`(ticksPerSecond * frameRate.denominator) / frameRate.numerator` MUST be a positive safe integer.
+
 #### Acceptance Criteria
 
 - [ ] Given a supported drop-frame rate, frame and timecode conversion round-trips exactly
@@ -81,7 +100,7 @@ Offline rendering, interactive playback, direct seek, and exporters MUST derive 
 
 ## Spec Gaps
 
-- Complete drop-frame combination tables and media resampling policy are owned by the exact-time program.
+- Media resampling policy is owned by the playback and formats programs.
 
 ## Non-Goals
 

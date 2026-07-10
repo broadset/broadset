@@ -417,12 +417,25 @@ interface Sequence {
 }
 ```
 
-Rates are reduced positive rationals and frame starts map to exact integer ticks. Tracks, keyframes, markers, cues, state machines, and transitions use stable identity. Stale animation references are rejected by semantic validation. See [timebase.md](timebase.md) and [animation.md](animation.md).
+Rates are reduced positive rationals and frame starts map to exact integer ticks. Tracks, keyframes, markers, cues, state machines, and transitions use stable identity. Keyframes are homogeneous with their property track and every non-final keyframe has explicit outgoing interpolation. Child clips use stable sequence IDs, bounded half-open ranges, explicit remap, and explicit deterministic stagger seeds. Lifecycle definitions and state machines are document-owned; component sequences remain valid. Stale animation references are rejected by semantic validation. The exact closed v1 field tables are defined in [timebase.md](timebase.md) and [animation.md](animation.md).
 
 #### Acceptance Criteria
 
 - [ ] Given exact time and valid stable animation targets, validation succeeds
 - [ ] Given fractional ticks, incompatible keyframes, or stale references, validation fails
+
+### Requirement: Closed Output Profiles
+
+`resources.outputProfiles` is a strict discriminated union on `kind: 'motion' | 'print'`. Motion
+profiles contain exact rational pixel/frame geometry, scan, color signal, dynamic-range, alpha,
+audio, safe-area, and runtime intent. Print profiles contain physical page intent, ICC output
+intent, bleed/trim edges, spot/overprint policy, and a closed PDF target. Unknown fields and
+cross-kind fields are invalid. See [output-spec.md](output-spec.md) for the exact v1 field table.
+
+#### Acceptance Criteria
+
+- [ ] Given every required field of one output-profile variant, strict validation succeeds
+- [ ] Given a missing required field, unknown field, or field from the other variant, strict validation fails
 
 ### Requirement: Interop and Extensions
 
