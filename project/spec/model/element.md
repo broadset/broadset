@@ -70,7 +70,7 @@ Image, video, and audio elements MUST reference compatible project assets by ID.
 
 - [ ] Given an image referencing an image asset with a valid crop, validation succeeds
 - [ ] Given media referencing an incompatible asset kind, semantic validation fails
-- [ ] Given editable structured-path geometry, stable point and segment identity is preserved
+- [ ] Given editable path content, stable structured point and segment identity is preserved
 
 ### Requirement: Component Instances
 

@@ -1,127 +1,364 @@
-# Editor — Structured Vector Geometry
+# Editor — Path Geometry Specification
 
 ## Purpose
 
-Defines deterministic editing utilities for canonical structured vector paths, stable point/segment identity, exact bounds refitting, overlays, clipboard remapping, alignment, snapping, and hierarchy traversal.
+Defines editor-side path geometry contracts for parsing and serializing path command strings, extracting editable handle points, and refitting element bounds after path edits. This scope covers observable path-editing data transformations and geometry outcomes, not rendering internals or playback behavior. See [conventions](../../README.md).
+
+---
 
 ## Requirements
 
-### Requirement: Structured Path Contract
+### Requirement: Path Command Parsing
 
-Editor path utilities MUST consume and produce `kind: 'vector'` elements with `geometryData.kind: 'path'`. Path commands, points, and segments are typed and stably identified. SVG path strings are importer/exporter transport forms and MUST NOT be canonical editor state.
+The system MUST parse supported path commands into deterministic segment sequences, including implicit repeated coordinate groups and relative/absolute command forms.
 
-#### Acceptance Criteria
+#### Scenario: Supported command families parse into expected segments
 
-- [ ] Given structured move, line, cubic, quadratic, arc, and close segments, validation preserves their stable IDs
-- [ ] Given an SVG path imported at a format boundary, conversion produces structured geometry before editor state
-- [ ] Given malformed transport path data, import reports diagnostics and commits no invalid vector
+- GIVEN path strings containing line, curve, arc, horizontal/vertical, and close commands
+- WHEN parsed
+- THEN the resulting segments preserve command intent and coordinate ordering
 
-### Requirement: Stable Point and Segment Operations
+#### Scenario: Implicit repeated coordinates are normalized
 
-Insert, update, convert, and delete operations MUST address stable point or segment IDs. Updating coordinates preserves identity. Insertion creates fresh IDs. Deletion removes only explicitly dependent segments and MUST reject geometry that violates the path schema.
+- GIVEN path strings with implicit repeated coordinate groups
+- WHEN parsed
+- THEN each implicit coordinate group is represented as an explicit segment
 
-#### Acceptance Criteria
+#### Scenario: Empty path input yields no segments
 
-- [ ] Given point movement, the point ID and unaffected segment IDs are unchanged
-- [ ] Given insertion, the new point and segment receive fresh non-conflicting IDs
-- [ ] Given invalid deletion, no geometry is mutated
-
-### Requirement: Exact Bounds Refit
-
-Refitting computes tight finite bounds from structured line and curve geometry plus required stroke padding. It MUST atomically rebase local point coordinates and update the element transform so resolved world geometry is unchanged. Empty or invalid geometry does not mutate bounds.
+- GIVEN an empty path string
+- WHEN parsed
+- THEN the parsed segment list is empty
 
 #### Acceptance Criteria
 
-- [ ] Given a structured path and stroke, refit returns positive tight padded bounds
-- [ ] Given refit, every resolved world-space point remains unchanged
-- [ ] Given empty geometry, bounds and transform remain unchanged
+- [ ] Given path strings containing line, curve, arc, horizontal/vertical, and close commands, the resulting segments preserve command intent and coordinate ordering
+- [ ] Given path strings with implicit repeated coordinate groups, each implicit coordinate group is represented as an explicit segment
+- [ ] Given an empty path string, the parsed segment list is empty
 
-### Requirement: Derived Editing Handles
+---
 
-Anchor and control handles are derived from structured geometry. Line endpoints expose anchors; cubic and quadratic segments expose typed controls; arc controls expose their typed radii and axis data. Overlay SVG is runtime UI and MUST NOT be persisted.
+### Requirement: Path Serialization Stability
 
-#### Acceptance Criteria
+The system MUST serialize parsed segments into stable path strings and round coordinate values consistently.
 
-- [ ] Given a cubic segment, the overlay derives two controls and an endpoint anchor
-- [ ] Given a point drag, ephemeral geometry updates while canonical state remains unchanged until commit
-- [ ] Given overlay destruction, all listeners and derived DOM are removed
+#### Scenario: Basic parse/serialize round-trip is stable
 
-### Requirement: Editor Session Lifecycle
+- GIVEN a valid path string
+- WHEN it is parsed and then serialized
+- THEN the serialized output preserves the expected path structure
 
-A path editor session MUST be created only for a valid vector path, expose current structured geometry, emit typed ephemeral updates, commit one atomic batch on completion, and be explicitly destroyable. A session MUST NOT accept or emit path `d` strings as its model contract.
+#### Scenario: Serialized coordinates are rounded consistently
 
-#### Acceptance Criteria
-
-- [ ] Given a vector path, session creation returns handles keyed by stable IDs
-- [ ] Given pointer release, one typed geometry change commits
-- [ ] Given session destruction, later pointer input produces no mutation
-
-### Requirement: Alignment and Distribution
-
-Alignment and distribution operate on resolved bounds and exact transforms. Alignment uses the selected left, center, right, top, middle, or bottom target. Distribution orders by resolved position and creates deterministic equal gaps without changing element identity.
+- GIVEN segment values with higher precision decimals
+- WHEN serialized
+- THEN coordinates are rounded consistently to editor precision
 
 #### Acceptance Criteria
 
-- [ ] Given several elements, alignment produces the selected shared resolved anchor
-- [ ] Given three or more elements, distribution produces equal deterministic gaps
-- [ ] Given locked elements, commands follow the explicit lock policy and report skipped entities
+- [ ] Given a valid path string, the serialized output preserves the expected path structure
+- [ ] Given segment values with higher precision decimals, coordinates are rounded consistently to editor precision
 
-### Requirement: Clipboard Identity Remapping
+---
 
-Clipboard payloads contain validated canonical entities and declared resource dependencies. Paste MUST allocate fresh IDs and remap all internal hierarchy, component, clip/mask, boolean operand, binding, and animation references within the pasted scope. External references remain only when valid in the destination project.
+### Requirement: Editable Handle Extraction
 
-#### Acceptance Criteria
+The system MUST expose editable handle points classified as either `anchor` (on-curve) or `control` (off-curve tangent) handles. Each handle MUST reference its parent segment and the coordinate indices it controls. Handle behavior by command type:
 
-- [ ] Given paste, every duplicated entity receives a fresh ID
-- [ ] Given internal references, all resolve to the corresponding remapped entity
-- [ ] Given an unavailable external dependency, paste rejects or requires explicit user resolution before commit
+- **Move/Line (M, L, T):** One `anchor` handle per endpoint with X and Y indices.
+- **Cubic Bézier (C):** Two `control` handles for the control points, plus one `anchor` handle for the endpoint. All three have X and Y indices.
+- **Smooth Cubic (S):** One `control` handle plus one `anchor` handle.
+- **Quadratic (Q):** One `control` handle plus one `anchor` handle.
+- **Horizontal (H):** One `anchor` handle with X index only; Y is constrained (index = -1).
+- **Vertical (V):** One `anchor` handle with Y index only; X is constrained (index = -1).
+- **Arc (A):** One `anchor` handle for the endpoint coordinates.
+- **Close (Z):** No handles emitted.
 
-### Requirement: Resize Handles and Matrices
+#### Scenario: Cubic Bézier extracts three handles
 
-Resize-handle geometry is derived from resolved bounds and zoom. Dragging computes a new exact affine or 3D matrix and positive bounds; it MUST NOT persist decomposed transform fields. Handles remain constant-size in screen space.
+- GIVEN a cubic Bézier segment (C command) with 6 coordinate values
+- WHEN handles are extracted
+- THEN two `control` handles and one `anchor` handle are returned with correct positions
 
-#### Acceptance Criteria
+#### Scenario: Horizontal command constrains Y axis
 
-- [ ] Given zoom changes, handle screen size remains stable
-- [ ] Given resize, canonical bounds stay positive and transform remains exact
-- [ ] Given a reflected transform, resize preserves reflection unless the user crosses the explicit flip boundary
+- GIVEN a horizontal line segment (H command)
+- WHEN handles are extracted
+- THEN one `anchor` handle is returned with Y index = -1 (constrained)
 
-### Requirement: Smart Guides and Grid Snapping
+#### Scenario: Line segment extracts one anchor
 
-Snapping compares resolved edges, centers, user guides, safe areas, and grid intersections using a screen-space threshold converted through zoom. Precedence and tie-breaking MUST be deterministic. Preview guides remain runtime state.
-
-#### Acceptance Criteria
-
-- [ ] Given multiple equal-distance candidates, documented category then stable-ID order selects one
-- [ ] Given zoom, the visual snap threshold remains constant in screen pixels
-- [ ] Given a snap preview, no guide is serialized into the project unless the user explicitly creates one
-
-### Requirement: Immutable Entity Update and Descendants
-
-Entity update utilities MUST return a new canonical graph and preserve unaffected references. Descendant collection follows `parentId`, returns depth-first preorder, and detects cycles rather than recursing indefinitely.
+- GIVEN a line segment (L command)
+- WHEN handles are extracted
+- THEN one `anchor` handle is returned with both X and Y indices
 
 #### Acceptance Criteria
 
-- [ ] Given an existing entity update, source project objects remain unchanged
-- [ ] Given a missing target, the operation returns a typed diagnostic and unchanged project
-- [ ] Given a hierarchy cycle in untrusted input, traversal terminates and reports validation failure
+- [ ] Given a cubic Bézier segment, two control handles and one anchor handle are extracted
+- [ ] Given a horizontal command, the handle constrains Y axis (index = -1)
+- [ ] Given a vertical command, the handle constrains X axis (index = -1)
+- [ ] Given a line or move command, one anchor handle with both axes is extracted
+- [ ] Given a close (Z) command, no handles are emitted
+
+---
+
+### Requirement: Path Bounds Refit
+
+The system MUST refit edited path elements to tight bounds with stroke padding and rebase path coordinates to the updated element origin.
+
+#### Scenario: Refit computes padded bounds for edited path coordinates
+
+- GIVEN an edited path with drawable coordinates
+- WHEN bounds are refit
+- THEN updated position, width, and height include stroke padding
+
+#### Scenario: Refit rebases coordinates to updated origin
+
+- GIVEN an edited path whose minimum bounds shift
+- WHEN bounds are refit
+- THEN path coordinates are rebased relative to the new origin
+
+#### Scenario: Empty path updates do not mutate geometry
+
+- GIVEN an empty path payload
+- WHEN bounds are refit
+- THEN content updates without geometry changes
+
+#### Acceptance Criteria
+
+- [ ] Given an edited path with drawable coordinates, updated position, width, and height include stroke padding
+- [ ] Given an edited path whose minimum bounds shift, path coordinates are rebased relative to the new origin
+- [ ] Given an empty path payload, content updates without geometry changes
+
+---
+
+### Requirement: Tight SVG Bounding-Box Refit
+
+When a tight SVG bounding box is available, the system MUST support refitting geometry from that box and preserve coordinate rebasing behavior.
+
+#### Scenario: SVG-provided bounds produce tight geometry updates
+
+- GIVEN a provided tight bounding box for a curve path
+- WHEN SVG-based refit is applied
+- THEN resulting geometry reflects the tight bounds
+
+#### Scenario: SVG-based refit rebases coordinates to updated origin
+
+- GIVEN a path and a shifted SVG bounding box
+- WHEN SVG-based refit is applied
+- THEN output path coordinates are rebased to the new element origin
+
+#### Acceptance Criteria
+
+- [ ] Given a provided tight bounding box for a curve path, resulting geometry reflects the tight bounds
+- [ ] Given a path and a shifted SVG bounding box, output path coordinates are rebased to the new element origin
+
+---
+
+### Requirement: Palette Persistence
+
+The system MUST support deterministic palette add/remove behavior, duplicate handling, and persistence/restore across editor lifecycle boundaries.
+
+#### Scenario: Palette updates persist and restore
+
+- GIVEN palette updates including adds, removes, and duplicate candidates
+- WHEN palette persistence lifecycle is exercised
+- THEN persisted palette content restores with deterministic duplicate handling
+
+#### Acceptance Criteria
+
+- [ ] Given palette updates including adds, removes, and duplicate candidates, persisted palette content restores with deterministic duplicate handling
+
+---
+
+### Requirement: Alignment and Distribution Contracts
+
+The system MUST align selected elements to shared alignment anchors and distribute selected elements with deterministic spacing.
+
+#### Scenario: Alignment produces expected shared anchors
+
+- GIVEN multiple selected elements
+- WHEN alignment is applied for left/right/center/top/bottom
+- THEN resulting positions share the expected alignment anchor
+
+#### Scenario: Distribution produces deterministic spacing
+
+- GIVEN multiple selected elements
+- WHEN horizontal or vertical distribution is applied
+- THEN resulting gaps are deterministic for the selected axis
+
+#### Acceptance Criteria
+
+- [ ] Given multiple selected elements, resulting positions share the expected alignment anchor
+- [ ] Given multiple selected elements, resulting gaps are deterministic for the selected axis
+
+---
+
+### Requirement: Clipboard Payload Contracts
+
+The system MUST preserve copied selection payload fidelity and remap identities on paste while preserving relative placement semantics.
+
+#### Scenario: Paste remaps identities and preserves relative placement
+
+- GIVEN copied element selection payload
+- WHEN pasted into a document
+- THEN pasted elements receive remapped identities and preserve relative placement
+
+#### Acceptance Criteria
+
+- [ ] Given copied element selection payload, pasted elements receive remapped identities and preserve relative placement
+
+---
+
+### Requirement: Resize-Handle Geometry
+
+The system MUST expose deterministic edge/corner handle positions and honor applicable geometric constraints for constrained element kinds.
+
+#### Scenario: Edge and corner handles are positioned deterministically
+
+- GIVEN an element bounding box
+- WHEN resize handles are computed
+- THEN edge and corner handles appear at deterministic geometric positions
+
+#### Acceptance Criteria
+
+- [ ] Given an element bounding box, edge and corner handles appear at deterministic geometric positions
+
+---
+
+### Requirement: Shortcut Dispatch Semantics
+
+The system MUST provide deterministic shortcut registration and dispatch precedence, including predictable conflict handling for duplicate bindings.
+
+#### Scenario: Duplicate shortcut bindings resolve deterministically
+
+- GIVEN duplicate shortcut bindings
+- WHEN dispatch is triggered
+- THEN the selected handler follows deterministic precedence rules
+
+#### Acceptance Criteria
+
+- [ ] Given duplicate shortcut bindings, the selected handler follows deterministic precedence rules
+
+---
+
+### Requirement: Smart-Guide Snapping
+
+The system MUST apply deterministic snapping based on snap thresholds, candidate-guide evaluation, and guide precedence.
+
+#### Scenario: Snapping chooses guides by threshold and precedence
+
+- GIVEN multiple candidate guides within snapping thresholds
+- WHEN snapping is evaluated
+- THEN the resulting snap follows deterministic guide precedence
+
+#### Acceptance Criteria
+
+- [ ] Given multiple candidate guides within snapping thresholds, the resulting snap follows deterministic guide precedence
+
+---
 
 ### Requirement: Debug Snapshot Determinism
 
-Debug snapshots MAY expose structured geometry, resolved bounds, stable addresses, and diagnostics. They MUST sort non-semantic diagnostic collections deterministically and exclude DOM nodes, functions, and transient pointer state.
+The system MUST produce debug snapshots with stable shape, complete expected fields, and deterministic serialization for equivalent editor states.
+
+#### Scenario: Equivalent states produce deterministic snapshots
+
+- GIVEN equivalent editor states
+- WHEN debug snapshots are generated
+- THEN snapshot structure and serialized representation are deterministic
 
 #### Acceptance Criteria
 
-- [ ] Given semantically equivalent editor state, debug snapshots are identical
-- [ ] Given transient DOM or pointer changes, canonical debug projection is unchanged
-- [ ] Given diagnostics, stable code and address determine deterministic order
+- [ ] Given equivalent editor states, snapshot structure and serialized representation are deterministic
+
+---
+
+### Requirement: Path Editor Session Lifecycle
+
+The system MUST support creating an interactive path editor session from an SVG path element. The session MUST render draggable anchor and control-point handles as an SVG overlay. Dragging handles MUST emit updated path `d` attribute strings via a callback. The session MUST be explicitly destroyable, removing the overlay and detaching all event listeners.
+
+#### Scenario: Create and destroy session
+
+- GIVEN an SVG path element with a valid `d` attribute
+- WHEN a path editor session is created
+- THEN interactive handles overlay the path, and destroying the session removes all overlays and listeners
+
+#### Scenario: Handle drag emits updated path
+
+- GIVEN an active path editor session
+- WHEN an anchor handle is dragged to a new position
+- THEN the change callback fires with the updated `d` attribute string
+
+#### Scenario: Current path data retrieval
+
+- GIVEN an active path editor session
+- WHEN the current path data is requested
+- THEN the current `d` attribute string is returned reflecting any edits
+
+#### Acceptance Criteria
+
+- [ ] Given an SVG path element, a session creates interactive handles as an SVG overlay
+- [ ] Given handle drag, the change callback fires with the updated path data
+- [ ] Given an active session, current path data is retrievable
+- [ ] Given session destruction, all overlays and event listeners are removed
+
+---
+
+### Requirement: Immutable Document Element Update
+
+The system MUST support immutably updating a single element within a document page by ID. The update MUST produce a new page array with only the targeted element changed. If the element ID is not found on the target page, the pages MUST be returned unchanged.
+
+#### Scenario: Update existing element
+
+- GIVEN a document page containing element "e1"
+- WHEN an immutable update is applied to "e1"
+- THEN a new page array is returned with "e1" updated and all other elements unchanged
+
+#### Scenario: Element not found
+
+- GIVEN a document page that does not contain element "e99"
+- WHEN an immutable update is applied to "e99"
+- THEN the original pages are returned unchanged
+
+#### Acceptance Criteria
+
+- [ ] Given an existing element ID, the update produces a new page array with only that element changed
+- [ ] Given a non-existent element ID, the original pages are returned unchanged
+
+---
+
+### Requirement: Descendant Collection
+
+The system MUST recursively collect all descendant element IDs for a given parent element. The collection MUST follow the `parentId` hierarchy and avoid infinite loops for cyclic references.
+
+#### Scenario: Collect group descendants
+
+- GIVEN a group element "g1" with children "c1" and "c2", where "c1" has child "c1a"
+- WHEN descendants of "g1" are collected
+- THEN the result contains "c1", "c2", and "c1a"
+
+#### Scenario: No descendants
+
+- GIVEN a leaf element "leaf1" with no children
+- WHEN descendants of "leaf1" are collected
+- THEN the result is empty
+
+#### Acceptance Criteria
+
+- [ ] Given a parent element, all descendants are recursively collected following parentId links
+- [ ] Given a leaf element, the descendant set is empty
+
+---
 
 ## Spec Gaps
 
-- Exact structured-path leaf schemas and geometric curve extrema tolerances are finalized by the vector implementation while preserving these identity and fidelity rules.
+_None — all requirements have acceptance criteria._
+
+---
 
 ## Non-Goals
 
-- Persisting SVG `d` strings or overlay DOM
-- Compatibility parsing inside editor state
-- Rasterizing editable vector geometry
+- Path editing mode lifecycle and placement mode behavior → see [editing.md](editing.md)
+- Animation state and timeline mutation behavior → see [animation-state.md](animation-state.md)
+- Renderer-side path and SVG drawing behavior → see `project/spec/renderer/spec.md`

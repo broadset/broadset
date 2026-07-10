@@ -137,56 +137,56 @@ Drag, resize, and rotate deltas MUST be divided by the current zoom level so can
 
 ---
 
-### Requirement: 3D Matrix Persistence
+### Requirement: 3D Transform Persistence
 
-An element's exact sixteen-number `matrix3d` transform MUST survive selection, deselection, and animation transitions without being decomposed or reset.
+3D properties (rotateX, rotateY, rotateZ, translateZ) MUST survive selection, deselection, and animation transitions without being reset.
 
 #### Scenario: 3D values persist across selection
 
-- GIVEN an element with a finite canonical `matrix3d`
+- GIVEN an element with rotateX: 30 and rotateY: 45
 - WHEN the element is deselected then reselected
-- THEN the exact sixteen matrix values are unchanged
+- THEN rotateX is still 30 and rotateY is still 45
 
 #### Scenario: 3D values survive animation transitions
 
-- GIVEN an element with a canonical 3D matrix and an animation playing
+- GIVEN an element with 3D transform values and an animation playing
 - WHEN the animation transitions the element between states
-- THEN the resolved animation uses typed matrix targeting and the base matrix is preserved
+- THEN the 3D transform values from the element data are preserved
 
 #### Acceptance Criteria
 
-- [ ] Given deselection and reselection, the exact sixteen matrix values persist
-- [ ] Given animation transitions, the canonical base matrix is not reset
+- [ ] Given deselection and reselection, 3D transform values persist
+- [ ] Given animation transitions, 3D transform values are not reset
 
 ---
 
-### Requirement: Vector Rectangle Corner-Radius Handles
+### Requirement: Border Radius Handle Interaction
 
-A selected `vector` element whose `geometryData.kind` is `rectangle` MUST show typed corner-radius handles. Dragging a handle adjusts the applicable entry in `geometryData.cornerRadii`. Other vector subtypes and non-vector elements MUST NOT show these handles.
+Rectangle elements MUST show corner-radius handles when selected. Dragging a handle adjusts `borderRadius`. Handles MUST NOT appear for non-rectangle element types (ellipse, image, text, etc.).
 
 #### Scenario: Handles appear for rectangle
 
-- GIVEN a selected vector rectangle
+- GIVEN a selected rectangle element
 - WHEN the selection is inspected
 - THEN corner-radius handles are visible
 
 #### Scenario: Handles hidden for ellipse
 
-- GIVEN a selected vector ellipse
+- GIVEN a selected ellipse element
 - WHEN the selection is inspected
 - THEN no corner-radius handles are visible
 
 #### Scenario: Drag adjusts radius
 
-- GIVEN a vector rectangle with all `cornerRadii` set to 0
+- GIVEN a rectangle with borderRadius 0
 - WHEN a corner-radius handle is dragged inward
-- THEN the applicable typed corner radius increases within valid bounds
+- THEN borderRadius increases
 
 #### Acceptance Criteria
 
-- [ ] Given a selected vector rectangle, corner-radius handles appear
-- [ ] Given any other element variant, corner-radius handles do not appear
-- [ ] Given a corner-radius handle drag, the applicable `cornerRadii` value is adjusted
+- [ ] Given a selected rectangle, corner-radius handles appear
+- [ ] Given a selected non-rectangle element, corner-radius handles do not appear
+- [ ] Given a corner-radius handle drag, borderRadius is adjusted
 
 ---
 

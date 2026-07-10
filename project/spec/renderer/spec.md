@@ -575,7 +575,7 @@ Group-type elements with `booleanOperation === null` MUST render as a container 
 
 Group-type elements with a non-null `booleanOperation` (`union`, `subtract`, `intersect`, `exclude`) MUST render a single combined SVG `<path>` produced by applying the boolean operation to the path data of all direct path children, in document order. The combined path MUST inherit stroke/fill styling from the first path child. When fewer than two path children contribute usable path data, the renderer MUST produce no visible geometry (empty host content) and MUST NOT throw.
 
-Boolean composite behavior belongs to `kind: 'vector'` with `geometryData.kind: 'boolean'`; it is not a group decorator. Operand vector paths remain independently addressable definitions, while the boolean vector resolves their combined geometry according to its typed operation.
+Boolean composite behavior is a separate responsibility from plain group containment; it is NOT expressed as a decorator on the plain group renderer. Only the top-level composite group's output is visible — child path elements themselves MUST NOT render directly when their parent group declares a boolean operation.
 
 #### Scenario: Union of two path children
 
@@ -601,7 +601,7 @@ Boolean composite behavior belongs to `kind: 'vector'` with `geometryData.kind: 
 - [ ] Given the combined path, its stroke, fill, and fill-rule are inherited from the first path child
 - [ ] Given a group with an unsupported `booleanOperation`, no combined path is emitted
 - [ ] Given a group with fewer than two usable path children, no combined path is emitted and the renderer does not throw
-- [ ] Given a boolean vector, the resolver combines its stable vector operands according to the typed operation without changing operand identity
+- [ ] Given a boolean composite group, the child path elements' own visible rendering is suppressed (only the combined path is visible)
 
 ---
 

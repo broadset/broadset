@@ -30,7 +30,7 @@ Native PSD primitives map every Broadset feature that has a PSD counterpart:
 ### Metadata layer — Broadset semantics PSD cannot express visually
 
 - **Document XMP under the shared `broadset:` namespace** (IO-D-08) — project settings, canvas unit/dpi, asset registry, data schema, page definitions with their override maps, Dublin Core metadata from `document.metadata`, `document.outputIntent` referencing an `icc-profile` asset. Animation data is NOT serialized (see "Animated elements" below — PSD is a static carrier per IO-D-16).
-- **Per-layer `additionalInfo` under the `BsPs` signature** — each exported layer may carry stable Broadset source identity and a baseline semantic hash. Preserved PSD features are content-addressed blobs referenced by canonical interop records. Photoshop preserves unknown `additionalInfo` across save; animation references are not carried because PSD is a static carrier.
+- **Per-layer `additionalInfo` under the `BsPs` signature** — each exported layer carries the element's stable `id`, `extensions.psd.dirty` flag, data bindings (`dataField`, `visibleWhen`, `repeater`), and a preservation blob for any PSD feature the importer recognized but cannot represent natively (adjustment layer parameters, unknown effects, exotic layer types). Photoshop preserves unknown `additionalInfo` across save — the same mechanism Illustrator, Sketch, and Affinity use to round-trip their own app state through PSD. Animation references are NOT carried here — PSD is a static carrier per IO-D-16.
 
 ### Tag-stripping fallback
 
@@ -183,7 +183,7 @@ Text content MUST round-trip as structured `TextBody` / `Paragraph` / `Run` data
 
 ### Requirement: Native Shape Layer Export
 
-Vector rectangle, ellipse, and structured-path payloads MUST export PSD vector shape metadata (`vectorFill`, `vectorStroke`, and `vectorMask`) so Photoshop can preserve shape geometry. Rounded corners use the native rounded-rectangle primitive where possible. Exporters MAY include a minimal layer pixel body when a PSD writer requires `imageData` channels to preserve non-zero Photoshop layer bounds; that pixel body is compatibility scaffolding, not the source of shape geometry.
+Rectangle, ellipse, and path elements MUST export PSD vector shape metadata (`vectorFill`, `vectorStroke`, and `vectorMask`) so Photoshop can preserve shape geometry. Rounded corners use the native rounded-rectangle primitive where possible. Exporters MAY include a minimal layer pixel body when a PSD writer requires `imageData`/canvas channels to preserve non-zero Photoshop layer bounds; that pixel body is compatibility scaffolding, not the source of shape geometry.
 
 #### Scenario: Rounded rectangle preserves editability
 
@@ -193,7 +193,7 @@ Vector rectangle, ellipse, and structured-path payloads MUST export PSD vector s
 
 #### Acceptance Criteria
 
-- [ ] Vector rectangle, ellipse, and structured-path payloads emit PSD vector shape metadata; any emitted pixel body MUST preserve Photoshop-openable non-zero bounds and MUST NOT replace vector geometry
+- [ ] Rectangle / ellipse / path elements emit PSD vector shape metadata; any emitted pixel body MUST preserve Photoshop-openable non-zero bounds and MUST NOT replace the vector geometry contract
 - [ ] `borderRadius` round-trips via the native rounded-rectangle primitive when all four corners match; otherwise via knot-composed cubic segments
 - [ ] Stroke styling (cap, join, dasharray, miterlimit) round-trips
 - [x] Rotation composes into the exported layer geometry — image rotation flows through `placedLayer.transform`; non-image (rectangle / ellipse / path) rotation expands the layer AABB and re-normalises vector-mask path knots so Photoshop reads back a rotated shape
@@ -202,7 +202,7 @@ Vector rectangle, ellipse, and structured-path payloads MUST export PSD vector s
 
 ### Requirement: Layer Effects Round-Trip (All Ten)
 
-All ten PSD layer effects MUST round-trip: drop shadow, inner shadow, outer glow, inner glow, bevel/emboss, satin, colour overlay, gradient overlay, pattern overlay, stroke. Effects represented by the closed v1 effect union map natively. PSD-only effects use interop preserved fragments with baseline semantic hashes so baseline-equal re-export can remain byte-identical.
+All ten PSD layer effects MUST round-trip: drop shadow, inner shadow, outer glow, inner glow, bevel/emboss, satin, colour overlay, gradient overlay, pattern overlay, stroke. Effects with a CSS equivalent use native Broadset fields (`FilterPrimitive[]` for shadows/glows, `stroke*` for stroke). Effects without a CSS equivalent (bevel, satin, pattern overlay) ride in `extensions.psd.unmappedEffects` with `dirty: false` so untouched re-export is byte-identical.
 
 #### Scenario: CSS-mappable effect
 
@@ -215,14 +215,14 @@ All ten PSD layer effects MUST round-trip: drop shadow, inner shadow, outer glow
 - GIVEN a PSD layer with a bevel/emboss effect
 - WHEN imported into Broadset and re-exported
 - THEN the re-exported PSD contains the same bevel/emboss parameters byte-for-byte
-- AND the Broadset project has a PSD interop record with preserved effect fragment and baseline semantic hash
+- AND the Broadset document has an `extensions.psd.unmappedEffects` entry with `dirty: false`
 
 #### Acceptance Criteria
 
 - [ ] Drop shadow, inner shadow, outer glow, inner glow export natively and import to `FilterPrimitive[]`
 - [ ] Colour overlay and gradient overlay export natively and import to `BroadsetFill`
 - [ ] Stroke layer effect round-trips via native stroke fields on the element
-- [ ] Bevel, satin, and pattern overlay use PSD interop preserved fragments with structured warnings
+- [ ] Bevel / satin / pattern overlay ride in `extensions.psd.unmappedEffects` with `dirty: false`
 - [ ] Untouched unmappedEffects re-export byte-identical
 
 ---
@@ -273,14 +273,19 @@ Embedded smart objects (data URI or ZIP-resolved bytes) and linked smart objects
 
 ---
 
-### Requirement: Derived PSD Interop Cleanliness
+### Requirement: Dirty-Flag Discipline
 
-Every preserved PSD mapping MUST create an `InteropRecord` with source identity, target address, baseline semantic hash, and preserved layer blob where applicable. Re-export derives cleanliness from current semantic hash equality; it MUST NOT persist a dirty boolean.
+Every imported PSD element MUST land with `extensions.psd.dirty === false`. On re-export:
+
+- Untouched elements (`dirty === false`) re-emit the preserved original layer blob byte-for-byte.
+- Edited elements (`dirty === true`) re-emit from current Broadset state; the preservation blob is discarded.
+
+The dirty flag flips to `true` automatically when the user edits the element in Broadset via the editor middleware (IO-D-11).
 
 #### Acceptance Criteria
 
-- [ ] Every preserved mapping has an interop baseline hash and resolving target
-- [ ] Editing relevant semantics changes derived cleanliness; undo restoring the baseline restores clean status
+- [ ] Every imported element carries `extensions.psd.dirty === false`
+- [ ] Editing an element in the editor flips the flag to `true` via the dirty-flag middleware
 - [ ] Re-exporting an untouched document produces byte-identical output
 - [ ] Editing one element and re-exporting rewrites that element only; every other element is byte-identical
 
@@ -313,7 +318,7 @@ Broadset → PSD → Photoshop → save → re-import MUST preserve:
 
 - **Photoshop-edited fields** — text changes, position moves, colour changes, path edits made in Photoshop appear in Broadset after re-import.
 - **Broadset semantics not touched by Photoshop** — animations (via XMP), data bindings, page override maps, repeater configs, `visibleWhen` expressions (via XMP + `additionalInfo`).
-- **Baseline-equal elements** — byte-identical via the interop preserved blob.
+- **Untouched elements** — byte-identical via the `dirty: false` preservation blob.
 
 #### Acceptance Criteria
 
@@ -391,7 +396,7 @@ The core P5.2a foundation and P5.3a/b/c coverage shipped, plus the parity-with-P
 > real third-party fixture corpus = CFIO.5.3 (licensed fixture mounts via
 > W3-QE-01; corpus manifest under W3-CORPUS-01).
 
-- **Inner glow / color overlay / gradient overlay / bevel / satin / pattern overlay.** Effects in the closed v1 union emit natively. PSD-only effects use interop preserved fragments with baseline semantic hashes so baseline-equal re-export can remain byte-identical.
+- **Inner glow / color overlay / gradient overlay / bevel / satin / pattern overlay.** Current behaviour: drop shadow, outer glow, inner shadow, stroke-effect emit natively. Target behaviour: CSS-mappable effects (inner glow, solid color overlay from explicit Broadset intent, gradient overlay) emit natively; PSD-only effects (bevel / emboss, satin, pattern overlay) ride in `extensions.psd.unmappedEffects` with `dirty: false` so untouched re-export is byte-identical.
 - **CMYK / Lab / Grayscale + ICC profile round-trip.** Current behaviour: RGB 8-bit only on the current exporter path; preflight surfaces a warning when `document.outputIntent.colorSpace` is non-RGB. Target behaviour: colour mode follows `document.outputIntent.colorSpace`; embedded ICC profile rides via the asset pipeline (`IccProfileAsset` from P4.4 is ready).
 - **16-bit / 32-bit-per-channel import preservation.** Current behaviour: bit depth is always 8. Target behaviour: import preserves original depth for re-export (downsampled for rendering).
 - **Real third-party fixture corpus.** Current behaviour: programmatically-generated `producer-quirks.fixture.ts` exercises the importer + validator on seven synthetic shapes; the `__fixtures__/external/` directory is the local-extension contract for users who drop in real Photoshop / Affinity / GIMP / Krita / Figma exports. Target behaviour: a vendored corpus comparable to veraPDF's once an analogous open-source PSD test corpus exists.

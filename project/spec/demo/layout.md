@@ -262,11 +262,11 @@ The context menu MUST display these actions in order. Actions MUST be enabled or
 | Send to Back     |                | Element selected                           |        |
 | — separator —    |                |                                            |        |
 | Group            | Ctrl+G         | 2+ elements selected                       |        |
-| Ungroup          | Ctrl+Shift+G   | A structural group is selected             |        |
+| Ungroup          | Ctrl+Shift+G   | Selected element(s) have a groupId         |        |
 | — separator —    |                |                                            |        |
 | Lock / Unlock    | Ctrl+L         | Element selected                           |        |
 | Edit Clip Path   |                | Element has `clipPath` capability          |        |
-| Edit Path Points |                | Selected vector has path geometry          |        |
+| Edit Path Points |                | Element type is `path`                     |        |
 
 **Delete** MUST use the HeroUI `color="danger"` variant, rendering the item in the theme's danger color (red text).
 
@@ -320,13 +320,13 @@ The context menu MUST display only:
 
 #### Scenario: Edit Clip Path opens clip-path editing
 
-- GIVEN a vector rectangle selected
+- GIVEN a rectangle element selected
 - WHEN the user selects "Edit Clip Path" from the context menu
 - THEN clip-path editing mode is entered for that element
 
 #### Scenario: Edit Path Points opens path editing
 
-- GIVEN a vector path selected
+- GIVEN a path element selected
 - WHEN the user selects "Edit Path Points" from the context menu
 - THEN path editing mode is entered for that element
 
@@ -345,7 +345,7 @@ The context menu MUST display only:
 - [ ] Given Ungroup with grouped elements, elements are ungrouped
 - [ ] Given Lock/Unlock, the element's locked state toggles
 - [ ] Given Edit Clip Path on an element with clipPath capability, clip-path editing activates
-- [ ] Given Edit Path Points on a vector path, structured-path editing mode activates
+- [ ] Given Edit Path Points on a path element, path editing mode activates
 - [ ] Given Delete item, it renders with danger color (red text)
 - [ ] Given a locked element, Lock/Unlock label shows "Unlock"; given an unlocked element, it shows "Lock"
 - [ ] Given a single element selected, Group and Ungroup are not rendered in the menu

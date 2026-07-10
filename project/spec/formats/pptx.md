@@ -138,9 +138,9 @@ The exporter MUST emit every Broadset element using its native OOXML primitive c
 - AND the group's `<p:grpSpPr>` emits `<a:chOff>` / `<a:chExt>` matching the Broadset group transform
 - AND the children are NOT duplicated at the slide root
 
-#### Scenario: Vector path exports as editable custGeom
+#### Scenario: Path element exports as editable custGeom
 
-- GIVEN a Broadset vector path with cubic segments
+- GIVEN a Broadset path element with cubic segments
 - WHEN exported to PPTX
 - THEN the shape emits `<a:custGeom>` with `<a:pathLst>` containing `moveTo` and `cubicBezTo` path operators
 - AND PowerPoint opens the shape in Edit Points mode without "repair" warnings
@@ -263,7 +263,7 @@ The exporter MUST attach the three metadata layers required by the cross-format 
 - GIVEN a Broadset element with id `el-abc`
 - WHEN exported
 - THEN the corresponding `<p:cNvPr>` has `name="BSET:el-abc:rectangle"` (or the element's kind)
-- AND the shape's non-visual properties contain a Broadset extension carrying stable source identity and baseline semantic hash for interop reconciliation
+- AND the shape's non-visual properties contain `<p:extLst><p:ext uri="{broadset-element-ext}">` carrying `id`, `kind`, `dataField`, `visibleWhen`, `repeater`, `dirty`
 
 #### Acceptance Criteria
 
@@ -314,21 +314,21 @@ The importer MUST detect when a PPTX was previously exported by Broadset and hyd
 - GIVEN a Broadset-exported PPTX that has NOT been edited externally
 - WHEN imported
 - THEN the resulting `BroadsetDocument` is deep-equal to the source document (excluding explicitly-lossy fields documented in the feature matrix)
-- AND every preserved mapping's current semantic hash equals its interop baseline
+- AND every element's `extensions.pptx.dirty` is `false`
 
-#### Scenario: External edit changes derived cleanliness
+#### Scenario: External edit flips dirty flag
 
 - GIVEN a Broadset-exported PPTX where the user moved one shape 100 EMU to the right in PowerPoint
 - WHEN imported
-- THEN the moved element's semantic projection no longer matches its baseline hash
+- THEN the moved element's `extensions.pptx.dirty` is `true`
 - AND its new `x` reflects the PowerPoint edit
-- AND untouched elements continue to match their baselines
+- AND the untouched elements remain `dirty: false`
 
 #### Acceptance Criteria
 
 - [ ] When the interop ledger is present, the importer hydrates from custom XML parts first
-- [ ] When the semantic hash matches the interop baseline, preserved source may be re-emitted exactly
-- [ ] When the semantic hash diverges, current slide state is reconciled field-by-field with typed diagnostics
+- [ ] When element hash matches the ledger, `dirty` stays `false` and XML-side defaults win
+- [ ] When element hash diverges from the ledger, `dirty` flips to `true` and current slide state wins field-by-field
 - [ ] Tagged elements missing from the slide tree surface as deletions
 - [ ] Untagged elements in the slide tree surface as additions
 
@@ -364,7 +364,7 @@ The importer MUST handle arbitrary third-party PPTX produced by any tool (PowerP
 - GIVEN a slide with a `<p:grpSp>` containing two `<p:sp>` children
 - WHEN imported
 - THEN a Broadset `group` element is created with `parentId` pointing to the group
-- AND the two children have `parentId` set to the group element's id and appear in canonical preorder
+- AND the two children have `groupId` set to the group's id
 - AND the group's local transform is not baked into the children
 
 #### Scenario: Multi-run paragraph reconstructs as TextBody
@@ -380,7 +380,7 @@ The importer MUST handle arbitrary third-party PPTX produced by any tool (PowerP
 - WHEN imported
 - THEN the element is a `rectangle` with `borderRadius` set
 
-#### Scenario: Custom geometry maps to vector path
+#### Scenario: Custom geometry maps to path element
 
 - GIVEN a shape with `<a:custGeom>` containing `moveTo` / `lnTo` / `cubicBezTo` operators
 - WHEN imported
@@ -397,7 +397,7 @@ The importer MUST handle arbitrary third-party PPTX produced by any tool (PowerP
 - GIVEN a slide containing a shape type Broadset does not recognize natively (e.g. `<a:tbl>`, `<c:chart>`, an ink annotation)
 - WHEN imported
 - THEN the element preserves its original XML fragment under `extensions.pptx.{raw|table|chart|…}`
-- AND the interop baseline matches so re-export may emit the original blob byte-for-byte
+- AND `extensions.pptx.dirty` is `false` so re-export emits the original blob byte-for-byte
 
 #### Scenario: Speaker notes round-trip
 
@@ -419,17 +419,17 @@ The importer MUST handle arbitrary third-party PPTX produced by any tool (PowerP
 - [ ] `lumMod` / `lumOff` / `tint` / `shade` / `alpha` modifiers round-trip via `_shared/color/applyMods`
 - [ ] Multi-run paragraphs import as `TextBody` with per-run styling
 - [ ] `<a:prstGeom>` presets map to Broadset native kinds where possible (rect, roundRect, ellipse, triangle, star, arrow, callout …); unknown presets fall back to `svg` with picture
-- [ ] `<a:custGeom>` imports as a Broadset vector path with structured stable point and segment identity
-- [ ] `<p:grpSp>` imports as Broadset `group` without flattening and preserves the canonical `parentId` tree
+- [ ] `<a:custGeom>` imports as a Broadset `path` with an SVG `d` string reconstructed from path operators
+- [ ] `<p:grpSp>` imports as Broadset `group` without flattening; `parentId`/`groupId` tree preserved
 - [ ] `<p:pic>` imports with original bytes + MIME preserved; no re-encode
 - [ ] `<a:blipFill>` with `srcRect` crop bakes the crop into the source image on import per io-prereqs picture-fill rule
 - [ ] `<a:gradFill>` imports as `BroadsetFill` gradient variant with stops + mods
 - [ ] `<a:ln>` with head/tail arrow endings imports into `strokeHeadEnd` / `strokeTailEnd`
-- [ ] Unknown or unmappable content is preserved through interop blobs or safe foreign fallback with diagnostics
+- [ ] Unknown / unmappable content preserved under `extensions.pptx.*` with `dirty: false`
 - [ ] Speaker notes round-trip via `Page.notes`
 - [ ] Native `<p:timing>` animations import as Broadset animations where the mapping is clean
 - [ ] Unmappable `<p:timing>` entries emit import warnings (IO-D-16 — no round-trip via custom XML)
-- [ ] Every preserved mapping has a baseline semantic hash and resolving target
+- [ ] Every hydrated element has `extensions.pptx.dirty` initialized
 - [ ] `vbaProject.bin` and OLE embeddings emit warnings and are rejected without crashing the import
 - [ ] Every dropped / skipped construct surfaces as an import warning
 
@@ -449,19 +449,19 @@ The system MUST preserve element count, geometry (within EMU / mm tolerance), te
 
 - GIVEN a Broadset-exported PPTX that is opened in PowerPoint, edited (one shape moved), saved, and re-imported
 - WHEN reconciliation runs
-- THEN the moved element's new position wins and its semantic hash diverges from baseline
-- AND every other element remains baseline-equal and matches source semantics
+- THEN the moved element's new position wins; `dirty = true`
+- AND every other element remains `dirty = false` and equals the source values
 
 #### Acceptance Criteria
 
 - [ ] Element count is preserved (mod explicitly-dropped kinds noted in feature matrix)
 - [ ] Rectangle and path geometry preserved within EMU rounding tolerance (≤ 1 EMU = ~0.00882 mm)
 - [ ] Text content (flat and structured `TextBody`) preserved byte-identical
-- [ ] Group hierarchy preserves the canonical `parentId` tree and depth-first preorder
+- [ ] Group hierarchy preserved (`parentId` / `groupId` tree)
 - [ ] Theme colour references preserved (not resolved to sRGB at export and re-imported flat)
 - [ ] Page-override maps preserved via the document custom XML
 - [ ] Mappable animations preserved via `<p:timing>`
-- [ ] Baseline-equal elements may re-export byte-identical preserved blobs
+- [ ] Untouched elements re-export byte-identical to the preserved blob when `dirty === false`
 - [ ] Reconciliation reports additions / deletions / modifications / hash-recovered matches per `_shared/reconcile/` contract
 
 ---
@@ -525,7 +525,7 @@ _Closed in the 2026-06-21 import/export hardening pass:_
 These items are listed here so the spec reflects ground truth — they are NOT closed:
 
 - **Resolved (closed in the AST migration):** the importer is now built on a typed, namespace-aware AST over `fast-xml-parser` (`pptx/ooxml/ast.ts`) instead of regex. Every probe in `pptx/import-edge-cases.test.ts` passes — non-default namespace prefixes, CDATA-wrapped text, attribute-order swap, single-quoted attribute values, decimal `<a:pt>` coordinates, entity-encoded values, whitespace variations, self-close trailing whitespace, and XML comments are all handled. An ESLint rule (`no-restricted-syntax` in `eslint.config.cjs`, scoped to `pptx/import/**` + `pptx/semantic/**`) bans `.match(`, `.matchAll(`, and `new RegExp(` in the importer hot path so regression cannot regrow regex parsing. CSS / data-URI regexes on the export side (`emitEffects` length parser, `decodeDataUri`) remain — they are not OOXML extraction and the rule deliberately doesn't apply to them.
-- **`<a:blipFill>` `srcRect` visual fidelity.** OOXML `<a:srcRect>` crops map to the canonical image payload's typed normalized `crop`. The original producer rectangle is retained through an `InteropRecord` source-identity or preserved fragment so derived-clean round-trip can re-emit it exactly. Edits update canonical crop semantics and derived cleanliness; exporters either map the edited crop or issue structured preflight rather than consulting a permanent dirty flag.
+- **`<a:blipFill>` `srcRect` visual fidelity.** OOXML `<a:srcRect>` crops now apply to the imported image as `style.customClipPath` — the model already supports CSS `inset(top right bottom left)` clip paths (the renderer honours them via the existing clip-path machinery), so the visual matches PowerPoint without baking the crop into the image bytes. The raw srcRect ALSO lives on `extensions.pptx.srcRect` so a clean (un-edited) round-trip re-emits the OOXML crop verbatim. Authoring an entirely new clip in Broadset (one that isn't `inset(...)`) doesn't translate back to OOXML — the export side only emits `<a:srcRect>` from the preserved extension when `dirty=false`.
 - **Gradient slide backgrounds.** Solid and linear/radial gradient `<p:bg>` fills round-trip losslessly through the canvas background model. Conic gradients still export as linear gradients because OOXML has no conic fill primitive; semantic metadata may preserve the original Broadset gradient where available.
 
 ---
