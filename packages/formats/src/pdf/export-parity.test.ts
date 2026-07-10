@@ -211,7 +211,7 @@ describe('P6.2 Parent-child translation composition', () => {
    * "Parented elements use model-space coordinates relative to their parent's top-left"
    * (renderer/src/dom/layout.ts). The PDF exporter previously ignored this and drew
    * children at their raw position.x / position.y, which was the dom-compositor
-   * parity bug called out in pdf-support-plan.md §Current state.
+   * parity bug from the 2026 PDF track (P6.2 in plan-progress.md).
    */
   it('positions a child rectangle at the parent-offset canvas-absolute coordinates', async () => {
     const doc = makeDocument({

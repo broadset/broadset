@@ -153,7 +153,7 @@ Each change variant MUST carry the minimum data needed to apply or invert the mu
 
 ## Spec Gaps
 
-- [ ] **Proposed complete atomic/stable-anchor vocabulary:** ADR-011 proposes versioned batches, stable anchors, JSON Pointer paths, project/document/component lifecycle coverage, and independently invertible operations. Current discriminants, dot paths, and index-based reorder payloads remain authoritative until a maintainer ratifies the replacement and defines deterministic multi-reorder batch semantics, migration, and exhaustive round-trip tests.
+- [ ] **Proposed complete atomic/stable-anchor vocabulary:** ADR-011 proposes versioned batches, stable anchors, JSON Pointer paths, project/document/component lifecycle coverage, and independently invertible operations. Current discriminants, dot paths, and index-based reorder payloads remain authoritative until a maintainer ratifies a replacement and defines deterministic multi-reorder batch semantics, migration, and exhaustive round-trip tests.
 
 ---
 

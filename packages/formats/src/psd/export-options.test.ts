@@ -15,7 +15,7 @@ const PIXEL_PNG =
  * each entry now accepts a single options object. `preserveVisibility`
  * is honoured today; `colorSpace` and `bitDepth` surface preflight
  * warnings pointing at the lcms-wasm work tracked in
- * `cross-format-io-improvement-plan.md` Phase 4.1.
+ * CFIO.4.1 (plan-progress.md §CFIO).
  */
 
 function readPsdLayers(bytes: Uint8Array): readonly Layer[] {
@@ -154,7 +154,7 @@ describe('PSD export — PsdExportOptions plumbing', () => {
 
     expect(result.bytes.length).toBeGreaterThan(0);
     expect(result.warnings.some((w) => w.toLowerCase().includes('non-rgb'))).toBe(true);
-    expect(result.warnings.some((w) => w.includes('Phase 4.1'))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('CFIO.4.1'))).toBe(true);
   });
 
   /**
@@ -168,7 +168,7 @@ describe('PSD export — PsdExportOptions plumbing', () => {
 
     expect(result.bytes.length).toBeGreaterThan(0);
     expect(result.warnings.some((w) => w.toLowerCase().includes('16-bit'))).toBe(true);
-    expect(result.warnings.some((w) => w.includes('Phase 4.1'))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('CFIO.4.1'))).toBe(true);
   });
 
   /**

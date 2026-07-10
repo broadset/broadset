@@ -85,7 +85,7 @@ Applied the preferred fix for both classes via root `npm` `overrides` during pro
 }
 ```
 
-The current override set and versions are manifest-derived in [architecture.md](./architecture.md), not maintained in this historical record.
+The current override set and versions live in the root `package.json` → `overrides` field (the generated baseline in [architecture.md](./architecture.md) renders dependency maps only, not overrides); they are not maintained in this historical record.
 
 Re-running `npm install` after the override edit dedupes `postcss@8.5.12` and forces the nested `vite@6.4.2` so all three advisories disappear from `npm audit --json`. Verified by:
 

@@ -531,8 +531,10 @@ The system MUST convert canvas dimensions to PDF points (1mm = 72/25.4pt, 1in = 
 The P6 foundation (standards-only round-trip, feature matrix, import/export/reconcile, security caps) is **functional** on `dev2-phase-11`. The items below are the remaining open gaps. Closed items live in the `_Closed…_` sections further down.
 
 > **Tracked closures:** scheduled under W3-PDF-02 in the
-> [master roadmap](../../implementation/plan.md):
-> CMYK / Lab / Gray / spot colour emission + ICC = Phase 4.1
+> [master roadmap](../../implementation/plan.md) (legacy CFIO routing per the
+> [legacy open-gap routing](../../implementation/roadmap/current-state.md#legacy-open-gap-routing) crosswalk):
+> CMYK / Lab / Gray / spot colour emission + ICC = CFIO.4.1, with the typed
+> color pipeline shared through W1-COLOR-01
 > (shares `_shared/color/lcms-wasm` with PSD).
 
 - **P6.3 — CMYK / Lab / Gray / spot colour emission + ICC output intent.** Current behaviour: export is sRGB / DeviceRGB with a deterministic CMYK device fallback. Target behaviour: the exporter emits the colour space declared by `document.outputIntent.colorSpace` (IO-D-13); embedded ICC profile rides via the asset pipeline. Colour-mode-specific emission lands with the `_shared/color/lcms-wasm` path (CFIO.4.1).
