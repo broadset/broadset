@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the behavioral requirements for editor utility modules: CSS value parsers, animation binding helpers, keyframe value resolution hooks, and wheel input classification.
+Defines the behavioral requirements for editor utility modules: CSS value parsers, sequence/lifecycle/state-machine authoring helpers, keyframe value resolution hooks, and wheel input classification.
 
 ---
 
@@ -77,61 +77,69 @@ The system MUST parse CSS length strings into value and unit. Empty strings MUST
 
 ---
 
-### Requirement: Animation Binding Normalization
+### Requirement: Lifecycle and State-Machine View Normalization
 
-The system MUST normalize state bindings to always include IN and OUT entries, renumber custom bindings sequentially, and use fallback IDs when binding ID is empty. State options MUST be sorted with labels for reserved states. IN MUST be placed first and OUT last in binding views.
+The system MUST derive a lifecycle authoring view that presents IN first, ordered HOLD/UPDATE actions next, and OUT last. State-machine options are normalized separately in deterministic canonical order. Empty lifecycle slots are view models only and MUST NOT create canonical data. Every persisted selection or mutation MUST use an existing stable owner, sequence, state-machine, state, transition, or event ID; helpers MUST NOT generate missing identity from a label or array position.
 
-#### Scenario: Empty bindings produce IN/OUT
+#### Scenario: Missing lifecycle displays empty IN/OUT slots
 
-- GIVEN an empty binding map
-- WHEN normalized
-- THEN IN and OUT bindings are present
+- GIVEN a document without a lifecycle definition
+- WHEN its authoring view is normalized
+- THEN empty IN and OUT slots are displayed without mutating the project
 
-#### Scenario: Custom bindings renumbered
+#### Scenario: State machines retain stable identity
 
-- GIVEN custom state bindings
-- WHEN normalized
-- THEN orders are sequential
+- GIVEN multiple state machines and transitions
+- WHEN authoring options are normalized
+- THEN their deterministic display order changes neither their stable IDs nor transition priorities
 
 #### Acceptance Criteria
 
-- [ ] Given an empty binding map, IN and OUT bindings are present
-- [ ] Given custom state bindings, orders are sequential
+- [ ] Given a missing lifecycle definition, empty IN and OUT view slots are present without canonical mutation
+- [ ] Given state-machine authoring options, normalization preserves stable IDs and deterministic priority semantics
+- [ ] No normalizer invents canonical identity from display labels or positions
 
 ---
 
-### Requirement: Timeline and State Resolution
+### Requirement: Sequence and State-Machine Resolution
 
-The system MUST build sorted timeline options from timelines (using name as ID fallback). State binding and modifier binding accessors MUST return the config arrays when present or empty arrays when missing.
+The system MUST build authoring options from document-owned or component-owned sequences and document-owned state machines. Options MAY sort by display label, but their values MUST remain canonical stable owner/entity addresses; duplicate names MUST remain distinct and names MUST NOT be identity fallbacks. Lifecycle and transition-action accessors MUST resolve references against the document's permitted sequence/state-machine scope and return typed empty view results when an optional canonical definition is absent.
 
-#### Scenario: Timeline options sorted
+#### Scenario: Sequence options sort without changing identity
 
-- GIVEN timelines with names
+- GIVEN sequences with stable IDs and display names
 - WHEN options are built
-- THEN they are sorted alphabetically
+- THEN they are sorted alphabetically by label while each option value remains its stable owner/sequence address
 
-#### Scenario: Missing bindings return empty array
+#### Scenario: Duplicate names remain distinct
 
-- GIVEN a config without stateTimelineBindings
-- WHEN accessed
-- THEN an empty array is returned
+- GIVEN two sequences with the same name and different IDs
+- WHEN options are built and one is selected
+- THEN the exact selected owner/sequence address resolves without ambiguity
+
+#### Scenario: Missing lifecycle returns empty view slots
+
+- GIVEN a document without a lifecycle definition
+- WHEN lifecycle actions are read for the panel
+- THEN typed empty view slots are returned without creating canonical data
 
 #### Acceptance Criteria
 
-- [ ] Given timelines with names, they are sorted alphabetically
-- [ ] Given a config without stateTimelineBindings, an empty array is returned
+- [ ] Given named sequences, sorted option labels retain their stable owner/sequence addresses
+- [ ] Given duplicate names, stable-address selection resolves exactly one sequence
+- [ ] Given an absent lifecycle or state-machine collection, helpers return typed empty view data without mutation
 
 ---
 
 ### Requirement: Keyframe Value Resolution
 
-For numbers, the system MUST return the element value when no keyframe adapter exists. When a property is not included in the keyframe, it MUST return disabled=true. When included, it MUST return the keyframe value. onChange MUST route to the adapter. Zero keyframe values MUST NOT fall back to element values.
+The keyframe adapter MUST address a stable owner, sequence, property track, and keyframe. The track's `PropertyTarget` determines the edited property and the keyframe contributes exactly one typed value. When no keyframe adapter exists, number and string resolvers MUST return the resolved base property value. When the requested property does not match the selected track target, the resolver MUST return `disabled=true`; when it matches, it MUST return the keyframe's typed value and route `onChange` through the stable-ID adapter. Zero values MUST NOT fall back to base values.
 
-#### Scenario: Number from element (no adapter)
+#### Scenario: Number from resolved base property (no adapter)
 
-- GIVEN adapter is null
+- GIVEN no keyframe adapter
 - WHEN resolveNumber is called
-- THEN element value is returned
+- THEN the resolved base property value is returned
 
 #### Scenario: Keyframe zero preserved
 
@@ -141,15 +149,16 @@ For numbers, the system MUST return the element value when no keyframe adapter e
 
 #### Scenario: String resolution
 
-- GIVEN a string property in a keyframe
+- GIVEN a string keyframe on a string-compatible property track
 - WHEN resolveString is called
 - THEN keyframe value is returned and onChange routes to adapter
 
 #### Acceptance Criteria
 
-- [ ] Given adapter is null, element value is returned
+- [ ] Given no keyframe adapter, the resolved base property value is returned
 - [ ] Given keyframe value is `0`, `0` is returned, not the element fallback
-- [ ] Given a string property in a keyframe, keyframe value is returned and onChange routes to adapter
+- [ ] Given a target-matching string track/keyframe, its typed value is returned and onChange routes through stable IDs
+- [ ] Given a property that does not match the selected track target, the resolver is disabled rather than reading a property bag
 
 ---
 
@@ -185,7 +194,7 @@ The system MUST classify smooth pixel deltas as trackpad gestures. Trackpad scro
 
 ### Requirement: WCAG AA Utility Component Accessibility
 
-Utility components (wheel input classifier, animation binding helpers, CSS parsers) that produce UI-facing output MUST ensure accessible output. The wheel event classifier MUST NOT interfere with assistive technology scroll behavior; when a screen reader is active, wheel zoom MUST be disabled in favor of explicit zoom controls. Animation binding dropdowns and selectors MUST use proper `role="listbox"` or `role="combobox"` semantics.
+Utility components (wheel input classifier, sequence/lifecycle/state-machine helpers, CSS parsers) that produce UI-facing output MUST ensure accessible output. The wheel event classifier MUST NOT interfere with assistive technology scroll behavior; when a screen reader is active, wheel zoom MUST be disabled in favor of explicit zoom controls. Animation authoring dropdowns and selectors MUST use proper `role="listbox"` or `role="combobox"` semantics.
 
 #### Scenario: Screen reader active disables wheel zoom
 
@@ -193,22 +202,22 @@ Utility components (wheel input classifier, animation binding helpers, CSS parse
 - WHEN the user scrolls with a wheel
 - THEN the page scrolls normally (wheel zoom is disabled)
 
-#### Scenario: Animation binding selector has ARIA role
+#### Scenario: Animation authoring selector has ARIA role
 
-- GIVEN an animation binding selector
+- GIVEN a sequence or lifecycle-action selector
 - WHEN inspected
 - THEN it has an appropriate listbox or combobox ARIA role
 
 #### Acceptance Criteria
 
 - [ ] Given a screen reader active, wheel zoom is disabled
-- [ ] Given animation binding selectors, proper ARIA roles are applied
+- [ ] Given animation authoring selectors, proper ARIA roles are applied
 
 ---
 
 ## Spec Gaps
 
-- [ ] **WCAG AA Utility Component Accessibility:** No automated tests verify that wheel zoom is suppressed when a screen reader is active, or that animation binding selectors expose correct ARIA roles — accessibility-focused component and integration tests are needed.
+- [ ] **WCAG AA Utility Component Accessibility:** No automated tests verify that wheel zoom is suppressed when a screen reader is active, or that sequence/lifecycle/state-machine selectors expose correct ARIA roles — accessibility-focused component and integration tests are needed.
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the document diffing engine, animation diffing, change stream controller, and remote change application. These mechanisms enable real-time collaboration by detecting local changes, broadcasting them, and applying incoming remote changes without re-emitting them.
+Defines the document diffing engine, canonical sequence/lifecycle/state-machine diffing, change stream controller, and remote change application. These mechanisms enable real-time collaboration by detecting local changes, broadcasting them, and applying incoming remote changes without re-emitting them.
 
 ---
 
@@ -10,7 +10,7 @@ Defines the document diffing engine, animation diffing, change stream controller
 
 ### Requirement: Document Element Diffing
 
-The system MUST detect element additions, removals, property updates (including nested paths), and reorder changes between two document snapshots. Identical documents MUST produce an empty diff. Runtime animation state (visibility, activeState, modifiers — which are playback-only, not serialized in the document model) MUST be excluded from diffs.
+The system MUST detect element additions, removals, property updates (including nested paths), and reorder changes between two document snapshots. Identical documents MUST produce an empty diff. The runtime event log, derived state-machine state, active sequence controls, and resolved playback contributions are outside canonical project data and MUST be excluded from diffs.
 
 #### Scenario: Element add detected
 
@@ -36,9 +36,9 @@ The system MUST detect element additions, removals, property updates (including 
 - WHEN diffed
 - THEN two `element:reorder` changes are produced
 
-#### Scenario: Runtime animation fields excluded
+#### Scenario: Derived playback state excluded
 
-- GIVEN only runtime animation state (visibility, activeState, modifiers) changed
+- GIVEN only the runtime event log, derived machine state, or active sequence controls changed
 - WHEN diffed
 - THEN no update changes are produced for those fields
 
@@ -54,7 +54,7 @@ The system MUST detect element additions, removals, property updates (including 
 - [ ] Given prev has `el-1` and next is empty, the result contains an `element:remove` change for `el-1`
 - [ ] Given `el-1` position changes from `x=0` to `x=100`, the result contains an `element:update` change with a position path
 - [ ] Given elements `[el-1, el-2]` reordered to `[el-2, el-1]`, two `element:reorder` changes are produced
-- [ ] Given only runtime animation state (visibility, activeState, modifiers) changed, no update changes are produced for those fields
+- [ ] Given only non-canonical runtime playback state changed, no project update changes are produced
 - [ ] Given the same document reference, the result is empty
 
 ---
@@ -82,26 +82,34 @@ The system MUST detect stable page additions/removals and canonical surface chan
 
 ---
 
-### Requirement: Animation Diffing
+### Requirement: Sequence, Lifecycle, and State-Machine Diffing
 
-The system MUST detect additions, removals, and typed per-field changes in canonical sequences, lifecycle bindings, and state machines. Same-reference immutable sequence arrays MUST produce an empty diff.
+The system MUST detect additions, removals, stable reorders, and typed per-field changes in document-owned sequences, component-owned sequences, their property tracks/keyframes, and the document-only lifecycle definition and state machines. Operations MUST address canonical entities by stable ID and properties by RFC 6901 pointer; display names and array indexes MUST NOT be durable identity. Same-reference immutable collections MUST produce an empty diff.
 
-#### Scenario: Config added
+#### Scenario: Sequence added to document owner
 
-- GIVEN prev has no configs and next has config for `el-1`
+- GIVEN the prior document has no sequences and the next document owns sequence `seq-1`
 - WHEN diffed
-- THEN an `animation:update` change is produced
+- THEN a typed stable-ID insertion operation for `seq-1` is produced
 
-#### Scenario: Timeline field change detected
+#### Scenario: Keyframe value change detected
 
-- GIVEN `el-1` config timelines change
+- GIVEN one typed keyframe value changes on track `track-1` in sequence `seq-1`
 - WHEN diffed
-- THEN an `animation:update` change with path `timelines` is produced
+- THEN a typed replace operation addresses that keyframe by stable entity identity and value pointer
+
+#### Scenario: Lifecycle action changes
+
+- GIVEN the document OUT lifecycle action changes from `seq-1` to `seq-2`
+- WHEN diffed
+- THEN a typed replace operation targets the OUT action and retains its expected prior value
 
 #### Acceptance Criteria
 
-- [ ] Given prev has no configs and next has config for `el-1`, an `animation:update` change is produced
-- [ ] Given `el-1` config timelines change, an `animation:update` change with path `timelines` is produced
+- [ ] Given a sequence addition, a stable-ID insertion operation is produced for its canonical owner
+- [ ] Given a typed keyframe change, the operation identifies the owner, sequence, track, keyframe, and exact value pointer without using names as identity
+- [ ] Given lifecycle or state-machine changes, typed operations preserve stable references and expected prior values
+- [ ] Given unchanged immutable canonical collections, no operation is produced
 
 ---
 
@@ -160,7 +168,7 @@ The system MUST only emit changes for committed actions, not ephemeral updates (
 
 ### Requirement: Remote Change Application
 
-The system MUST apply incoming remote changes without re-emitting them through the change stream. It MUST support element add/remove/update/reorder, page add/remove, settings update, and animation update changes.
+The system MUST apply incoming remote changes without re-emitting them through the change stream. It MUST support validated atomic operations for element add/remove/update/reorder, page add/remove, settings updates, and canonical sequence/lifecycle/state-machine changes.
 
 #### Scenario: Remote add does not re-emit
 
@@ -168,22 +176,22 @@ The system MUST apply incoming remote changes without re-emitting them through t
 - WHEN a remote `element:add` is applied
 - THEN the element exists in the document but no changes are emitted
 
-#### Scenario: Runtime animation fields ignored in apply
+#### Scenario: Runtime playback payload rejected in apply
 
-- GIVEN a remote `element:update` for runtime `activeState`
+- GIVEN a remote operation attempts to write derived state-machine state onto an element
 - WHEN applied
-- THEN the local element's runtime `activeState` is unchanged
+- THEN validation rejects the non-canonical target and the project remains unchanged
 
 #### Acceptance Criteria
 
 - [ ] Given a change stream listener, the element exists in the document but no changes are emitted
-- [ ] Given a remote `element:update` for runtime `activeState`, the local element's runtime `activeState` is unchanged
+- [ ] Given a remote operation targeting non-canonical runtime playback state, atomic validation rejects it without project mutation
 
 ---
 
 ### Requirement: Change Round-Trip Fidelity
 
-Diffing two documents and applying the resulting changes to the first document MUST produce a state equivalent to the second document. This MUST hold for element add, remove, update, nested property update, animation changes, settings changes, and page operations.
+Diffing two documents and applying the resulting changes to the first document MUST produce a state equivalent to the second document. This MUST hold for element add, remove, update, nested property update, sequence/lifecycle/state-machine changes, settings changes, and page operations.
 
 #### Scenario: Element add round-trip
 

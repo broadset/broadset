@@ -451,7 +451,7 @@ Multiple sequences MAY be active simultaneously. Contributions to distinct stabl
 - WHEN a superseding transition starts sequence Y on the same target
 - THEN X's runtime control is replaced and Y becomes effective under canonical precedence
 
-#### Scenario: Timelines on different elements are independent
+#### Scenario: Sequences targeting different elements are independent
 
 - GIVEN sequence X targets element A and sequence Y targets element B
 - WHEN both play simultaneously

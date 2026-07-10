@@ -341,7 +341,7 @@ Rapid undo/redo sequences MUST NOT corrupt the store state.
 
 ### Requirement: Interleaved Mutation Stability
 
-Interleaved add/remove/undo operations MUST maintain store invariants (valid pages, consistent selection, no orphaned animation entries).
+Interleaved add/remove/undo operations MUST maintain store invariants (valid pages, consistent selection, and no stale property targets, lifecycle actions, state-machine actions, or child-sequence references).
 
 #### Scenario: Add, remove, undo interleaving
 

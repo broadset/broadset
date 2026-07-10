@@ -575,6 +575,6 @@ Copy and paste operations MUST use the system clipboard (Clipboard API) when ava
 
 - Page, canvas, guide, palette, font, media actions → see [store-ui-actions.md](store-ui-actions.md)
 - Path editing, path drawing, element placement modes → see [editing.md](editing.md)
-- Animation config mutations (timelines, state/modifier bindings) → see [animation-state.md](animation-state.md)
+- Sequence, property-track/keyframe, lifecycle, and state-machine mutations → see [animation-state.md](animation-state.md)
 - Change stream emission and remote change application → see [collaboration.md](collaboration.md)
 - Data store (BroadsetDataStore) for runtime data injection → see [data-store.md](data-store.md)

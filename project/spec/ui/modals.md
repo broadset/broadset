@@ -106,21 +106,21 @@ Only exporters that have their feature flag enabled MUST appear.
 
 When an exporter is selected, the options panel MUST display controls specific to that format:
 
-| Format   | Options                                                                                                                                                                           |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PDF      | Base64-embed assets toggle (HeroUI `Switch`)                                                                                                                                      |
-| PSD      | (no extra options)                                                                                                                                                                |
-| PPTX     | (no extra options)                                                                                                                                                                |
-| PNG      | Pixel ratio (NumField, 1–4), Background color (ColorInput)                                                                                                                        |
-| JPEG     | Pixel ratio (NumField, 1–4), Quality (HeroUI `Slider`, 0–1), Background color (ColorInput)                                                                                        |
-| MP4/WebM | FPS (HeroUI `Select`: 24/25/30/50/60 or custom NumField), Resolution W×H (NumField pair), Bitrate (NumField, kbps), Timeline selector (HeroUI `Select` listing element timelines) |
-| OGraf    | ID prefix (HeroUI `Input`)                                                                                                                                                        |
-| HTML     | (no extra options)                                                                                                                                                                |
-| SVG      | (no extra options)                                                                                                                                                                |
+| Format   | Options                                                                                                                                                                                                                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| PDF      | Base64-embed assets toggle (HeroUI `Switch`)                                                                                                                                                                                                                                         |
+| PSD      | (no extra options)                                                                                                                                                                                                                                                                   |
+| PPTX     | (no extra options)                                                                                                                                                                                                                                                                   |
+| PNG      | Pixel ratio (NumField, 1–4), Background color (ColorInput)                                                                                                                                                                                                                           |
+| JPEG     | Pixel ratio (NumField, 1–4), Quality (HeroUI `Slider`, 0–1), Background color (ColorInput)                                                                                                                                                                                           |
+| MP4/WebM | FPS (HeroUI `Select`: 24/25/30/50/60 or custom NumField), Resolution W×H (NumField pair), Bitrate (NumField, kbps), Sequence selector (HeroUI `Select` listing document sequences and resolved component-instance sequences by name, with stable owner/sequence addresses as values) |
+| OGraf    | ID prefix (HeroUI `Input`)                                                                                                                                                                                                                                                           |
+| HTML     | (no extra options)                                                                                                                                                                                                                                                                   |
+| SVG      | (no extra options)                                                                                                                                                                                                                                                                   |
 
 **Renderer Preview:**
 
-The export modal MUST include an embedded renderer preview showing the current document. For animated formats (MP4, WebM, OGraf), the preview MUST play the selected timeline animation. The preview MUST update when dynamic data fields change.
+The export modal MUST include an embedded renderer preview showing the current document. For animated formats (MP4, WebM, OGraf), the preview MUST play the selected canonical sequence by stable owner/sequence address. The preview MUST update when dynamic data fields change.
 
 **Export Progress:**
 

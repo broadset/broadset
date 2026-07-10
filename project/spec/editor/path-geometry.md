@@ -360,5 +360,5 @@ _None — all requirements have acceptance criteria._
 ## Non-Goals
 
 - Path editing mode lifecycle and placement mode behavior → see [editing.md](editing.md)
-- Animation state and timeline mutation behavior → see [animation-state.md](animation-state.md)
+- Sequence, property-track/keyframe, lifecycle, and state-machine mutation behavior → see [animation-state.md](animation-state.md)
 - Renderer-side path and SVG drawing behavior → see `project/spec/renderer/spec.md`

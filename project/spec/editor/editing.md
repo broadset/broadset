@@ -700,7 +700,7 @@ Dragging control points MUST update the sequence track's typed spatial-path geom
 
 #### Scenario: Enter motion path editing
 
-- GIVEN an element with a motion path animation configured
+- GIVEN a stable transform track targeting the element uses typed spatial-path interpolation
 - WHEN the user activates motion path editing from the timeline panel
 - THEN the canvas renders the path curve, control points, and element ghost
 
@@ -708,7 +708,7 @@ Dragging control points MUST update the sequence track's typed spatial-path geom
 
 - GIVEN motion path editing is active with a visible Bézier curve
 - WHEN the user drags a control point
-- THEN the path curve and the `motionPath` value update in real time
+- THEN the path curve and that track's typed spatial-path geometry update in real time
 
 #### Scenario: Add control point by double-click
 
@@ -730,7 +730,7 @@ Dragging control points MUST update the sequence track's typed spatial-path geom
 
 #### Acceptance Criteria
 
-- [ ] Given an element with motion path animation, entering motion path editing renders the path curve, control points, and element ghost
+- [ ] Given a targeted transform track with spatial-path interpolation, entering motion path editing renders the path curve, control points, and element ghost
 - [ ] Given a control point drag, typed spatial-path geometry updates ephemerally and commits by stable point ID
 - [ ] Given a double-click on the path, a new control point is inserted
 - [ ] Given Escape pressed, motion path editing exits and changes are committed

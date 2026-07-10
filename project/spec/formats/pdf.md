@@ -342,22 +342,24 @@ Large or opaque preserved source fragments MUST remain content-addressed blobs r
 
 ### Requirement: Animated Element Static Export
 
-Broadset sequences and state machines MUST be resolved at the declared static export state/tick before PDF export. Runtime animation is not serialized into PDF; the resolved fully-entered IN state is painted.
+Broadset lifecycle, state machines, and sequences MUST be resolved into one `ResolvedSceneSnapshot` at one declared exact static-export tick before PDF export. By default, the exporter derives a single global settled-IN tick: starting from initial machine states at tick 0, it evaluates the document IN lifecycle action and chooses the latest global completion tick among every finite sequence action it starts, including reachable child clips. It then resolves the whole scene once at that global tick. If the IN action has no finite settled tick, the user MUST supply an explicit valid export tick. Runtime animation is not serialized into PDF; that one fully entered resolved snapshot is painted.
 
 If the same PDF is re-imported into Broadset, animations are NOT recovered; the user must re-author them. This is a documented known-lossy behaviour.
 
 #### Scenario: Animation discarded at export
 
-- GIVEN an element with an animation timeline that translates it from left to right
+- GIVEN a canonical sequence with a transform track targeting an element and selected by the document IN lifecycle action
 - WHEN PDF export runs
-- THEN the element is rendered at the end of the `in` keyframe sequence (the "IN" state)
+- THEN the whole scene is resolved once at the single global settled-IN tick and the element uses that snapshot's typed transform
 - AND no animation data appears in the exported PDF
 
 #### Acceptance Criteria
 
 - [ ] Animations are discarded on export (not serialized to XMP or marked content)
 - [ ] Animated elements render at the fully-entered IN state
-- [ ] Active state modifiers are not applied on export (rest state)
+- [ ] Every painted value comes from one immutable scene snapshot resolved at one exact global tick
+- [ ] Undeclared runtime events are not applied; state machines begin in their canonical initial states before the declared lifecycle action is evaluated
+- [ ] Given unbounded IN behavior and no explicit valid tick, export fails with an actionable diagnostic
 - [ ] Re-importing a Broadset-exported PDF surfaces an import warning that animations were lost
 
 ---

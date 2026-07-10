@@ -562,21 +562,24 @@ Deletions require user confirmation before being dropped from the Broadset docum
 
 ### Requirement: Animated Element Static Export
 
-Broadset sequences and state machines MUST be resolved at the declared static export tick before SVG export. Runtime animation data is not serialized to `<metadata>`; SVG is a static carrier from Broadset's perspective.
+Broadset lifecycle, state machines, and sequences MUST resolve into one `ResolvedSceneSnapshot` at one declared exact static-export tick before SVG export. By default, the exporter derives a single global settled-IN tick: starting from initial machine states at tick 0, it evaluates the document IN lifecycle action and chooses the latest global completion tick among every finite sequence action it starts, including reachable child clips. It then resolves the whole scene once at that global tick. If the IN action has no finite settled tick, the user MUST supply an explicit valid export tick. Runtime animation data is not serialized to `<metadata>`; SVG is a static carrier from Broadset's perspective.
 
 If the same SVG is re-imported into Broadset, the animations are NOT recovered; the user must re-author them. This is documented known-lossy behaviour.
 
 #### Scenario: Animation discarded at export
 
-- GIVEN an element with a translation animation from left to right
+- GIVEN a canonical sequence with a transform track targeting an element and selected by the document IN lifecycle action
 - WHEN SVG export runs
-- THEN the element is rendered at the end of the `in` keyframe sequence (the "IN" state)
+- THEN the whole scene is resolved once at the single global settled-IN tick and the element uses that snapshot's typed transform
 - AND no animation data appears in the exported SVG or its `<metadata>` packet
 
 #### Acceptance Criteria
 
 - [ ] Animations are discarded on export (not serialised to `<metadata>`)
 - [ ] Animated elements render at the fully-entered IN state
+- [ ] Every emitted value comes from one immutable scene snapshot resolved at one exact global tick
+- [ ] Undeclared runtime events are not applied; state machines begin in their canonical initial states before the declared lifecycle action is evaluated
+- [ ] Given unbounded IN behavior and no explicit valid tick, export fails with an actionable diagnostic
 - [ ] No SMIL `<animate>`, `<animateTransform>`, `<animateMotion>`, or `<set>` elements are emitted on export
 - [ ] Re-importing a Broadset-exported SVG surfaces an import warning that animations were lost
 

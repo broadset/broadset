@@ -288,21 +288,24 @@ Every preserved PSD mapping MUST create an interop record with source identity, 
 
 ### Requirement: Animated Element Static Export
 
-Broadset sequences and state machines MUST resolve at the declared static export tick before PSD export. Runtime animation data is not serialized to XMP; PSD is a static carrier.
+Broadset lifecycle, state machines, and sequences MUST resolve into one `ResolvedSceneSnapshot` at one declared exact static-export tick before PSD export. By default, the exporter derives a single global settled-IN tick: starting from initial machine states at tick 0, it evaluates the document IN lifecycle action and chooses the latest global completion tick among every finite sequence action it starts, including reachable child clips. It then resolves the whole scene once at that global tick. If the IN action has no finite settled tick, the user MUST supply an explicit valid export tick. Runtime animation data is not serialized to XMP; PSD is a static carrier.
 
 If the same PSD is re-imported into Broadset, the animations are NOT recovered; the user must re-author them. This is a documented known-lossy behaviour.
 
 #### Scenario: Animation discarded at export
 
-- GIVEN an element with an animation timeline that translates it from left to right
+- GIVEN a canonical sequence with a transform track targeting an element and selected by the document IN lifecycle action
 - WHEN PSD export runs
-- THEN the element is rendered at the end of the `in` keyframe sequence (the "IN" state)
+- THEN the whole scene is resolved once at the single global settled-IN tick and the element uses that snapshot's typed transform
 - AND no animation data appears in the exported PSD
 
 #### Acceptance Criteria
 
 - [ ] Animations are discarded on export (not serialized to XMP or `additionalInfo`)
 - [ ] Animated elements render at the fully-entered IN state
+- [ ] Every painted value comes from one immutable scene snapshot resolved at one exact global tick
+- [ ] Undeclared runtime events are not applied; state machines begin in their canonical initial states before the declared lifecycle action is evaluated
+- [ ] Given unbounded IN behavior and no explicit valid tick, export fails with an actionable diagnostic
 - [ ] Re-importing a Broadset-exported PSD surfaces an import warning that animations were lost
 
 ---

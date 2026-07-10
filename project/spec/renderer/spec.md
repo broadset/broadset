@@ -346,21 +346,22 @@ Toggling element visibility between onscreen and offscreen MUST add or remove th
 
 ---
 
-### Requirement: State Class Management `[Cross-package]`
+### Requirement: Derived State-Machine Class Signaling `[Cross-package]`
 
-Activating a named state on an element MUST add a state-specific CSS class to the rendered DOM node. Deactivating MUST remove it. Only one state class MUST be active at a time.
+When resolved playback output reports a document state machine's active state for a targeted element, the renderer MUST expose a derived CSS class encoded from the stable state-machine ID and state ID on that element's DOM node. State display names MUST NOT be class identity. A transition MUST replace only the previous class for the same state machine; classes from independent state machines MAY coexist. These classes are renderer signals only and MUST NOT create element-local state bindings or canonical mutable state.
 
-#### Scenario: Activate state
+#### Scenario: Derived state changes
 
-- GIVEN an element with state bindings
-- WHEN state `'hover'` is activated
-- THEN a `hover` state CSS class is added to the element's DOM node
+- GIVEN resolved output reports machine `interaction` in state `hovered` for an element
+- WHEN the renderer applies that output
+- THEN a class encoded from stable IDs `interaction` and `hovered` is added to the element's DOM node
 
 #### Acceptance Criteria
 
-- [ ] Given state activation, the corresponding CSS class is added
-- [ ] Given state deactivation, the corresponding CSS class is removed
-- [ ] Given a new state activation, the previous state class is replaced
+- [ ] Given resolved active state output, the corresponding stable-ID-derived class is added
+- [ ] Given state deactivation, that machine's derived class is removed
+- [ ] Given a transition in one machine, its previous class is replaced without removing independent machine classes
+- [ ] Derived state classes never serialize into the element or act as state-machine identity
 
 ---
 

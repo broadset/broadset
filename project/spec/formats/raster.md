@@ -150,7 +150,11 @@ Raster export to JPEG format MUST accept an optional quality parameter in the ra
 
 ### Requirement: WebM Alpha Video Export
 
-The system MUST support exporting an animated canvas sequence as a WebM video file with VP9 codec and alpha channel transparency. The export MUST accept an `alpha: boolean` option (default `false`). When `alpha` is `true`, the renderer MUST use transparent background mode (no canvas background fill), and the video encoder MUST preserve the alpha channel in the VP9 bitstream within a WebM container. When `alpha` is `false`, the video MUST be encoded with the canvas background composited (standard opaque output). The export MUST also accept `frameRate` (from canvas settings, default 50fps), `durationMs` (total export duration), and `quality` (0–1, default 0.8). Frames MUST be captured at the specified frame rate using the canvas rendering pipeline and composed into the video sequentially. The resulting WebM file MUST be downloadable via the same download wrapper pattern as raster exports.
+The system MUST support exporting a canonical sequence as a WebM video file with VP9 codec and alpha channel transparency. The export MUST address the sequence by stable owner/sequence address and accept an `alpha: boolean` option (default `false`). When `alpha` is `true`, the renderer MUST use transparent background mode (no canvas background fill), and the video encoder MUST preserve the alpha channel in the VP9 bitstream within a WebM container. When `alpha` is `false`, the video MUST be encoded with the resolved surface background composited (standard opaque output).
+
+The canonical export interval is `[0, durationTicks)`, where `durationTicks` defaults to the sequence's explicit duration and MUST be a non-negative safe integer within the permitted transport duration. A UI MAY accept a display duration in milliseconds, but MUST convert once at the boundary using exact rational `displayMs × ticksPerSecond / 1000`, rounding to the nearest integer tick with exact halves toward the greater tick; milliseconds MUST NOT enter the export request or project. The export MUST also accept a positive rational output frame rate (defaulting to the document timebase frame rate) and `quality` (0–1, default 0.8).
+
+Frame count is `ceil(durationTicks × outputFrameRate.numerator / (ticksPerSecond × outputFrameRate.denominator))`. For frame index N, the exact rational frame-start time MUST convert to the nearest integer document tick with exact halves toward the greater tick, and the renderer MUST resolve one immutable scene snapshot at that tick using the selected stable sequence address. Frames are composed into the video sequentially. The resulting WebM file MUST be downloadable through the same download wrapper pattern as raster exports.
 
 #### Scenario: WebM export with alpha channel
 
@@ -164,24 +168,26 @@ The system MUST support exporting an animated canvas sequence as a WebM video fi
 - WHEN WebM export runs
 - THEN the output WebM file has an opaque white background
 
-#### Scenario: Frame rate from canvas settings
+#### Scenario: Output frame rate defaults from document timebase
 
-- GIVEN canvas settings with `frameRate: 25`
+- GIVEN a document timebase with frame rate 25/1
 - WHEN WebM export runs with default settings
 - THEN the output video has 25 frames per second
 
 #### Scenario: Export duration
 
-- GIVEN `durationMs: 5000` and `frameRate: 50`
-- WHEN WebM export runs
+- GIVEN the UI receives display duration 5000ms, document `ticksPerSecond`, and output frame rate 50/1
+- WHEN the UI converts the duration once to exact `durationTicks` and WebM export runs
 - THEN the output video has 250 frames (5 seconds × 50fps)
 
 #### Acceptance Criteria
 
 - [ ] Given `alpha: true`, the WebM output preserves alpha channel transparency
 - [ ] Given `alpha: false`, the WebM output has an opaque background
-- [ ] Given a frame rate, the output video uses that frame rate
-- [ ] Given a duration, the correct number of frames are captured
+- [ ] Given a stable owner/sequence address, every frame resolves that canonical sequence without name or element-local fallback
+- [ ] Given an output frame rate, the output video uses that positive rational rate
+- [ ] Given 5000ms converted through the document timebase and 50fps output, exactly 250 frames are captured
+- [ ] Milliseconds and fractional ticks are not stored in canonical data or the export request
 - [ ] Given the export completes, the file is downloadable via the download wrapper
 
 ---

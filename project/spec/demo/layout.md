@@ -369,7 +369,7 @@ The Play/Pause and Reset buttons MUST operate on whichever playback context is c
 
 When a timeline is open, the toolbar MUST visibly identify the timeline context and its play state, and the Play/Pause and Reset accessible labels MUST name the timeline rather than using generic document-playback labels. Opening a timeline from this toolbar MUST stop document-level playback so timeline preview and document playback do not silently compete.
 
-The timeline view toggle MUST be disabled when no selected element has any timelines. When enabled and the panel is closed, activating it MUST open the first timeline of the selected element's animation config. When the panel is open, activating it MUST close the panel.
+The timeline view toggle MUST resolve the selected element's stable identity into its document or component authoring scope. It is disabled when no owned sequence, including its reachable child clips, contains a property track whose `PropertyTarget` resolves to that element. When enabled and the panel is closed, activating it MUST open by stable owner/sequence address the first such sequence in canonical owner order. When the panel is open, activating it MUST close the panel. Sequence display names remain presentation labels and MUST NOT be used as identity fallbacks.
 
 #### Scenario: Animation toolbar controls
 
@@ -379,7 +379,7 @@ The timeline view toggle MUST be disabled when no selected element has any timel
 
 #### Scenario: Timeline toggle enabled state
 
-- GIVEN a selected element has at least one timeline
+- GIVEN a selected element is targeted by at least one canonical sequence track
 - WHEN the bottom toolbar renders
 - THEN the timeline toggle is enabled; activating it opens the first timeline
 
@@ -392,7 +392,8 @@ The timeline view toggle MUST be disabled when no selected element has any timel
 #### Acceptance Criteria
 
 - [ ] Given the demo shell loads, a floating Animation toolbar renders near the bottom-center with Play/Pause, Reset, and a timeline toggle
-- [ ] Given no selected element with timelines, the timeline toggle is disabled
+- [ ] Given no canonical sequence track targets the selected element, the timeline toggle is disabled
+- [ ] Given multiple targeting sequences, activating the toggle opens the first sequence in canonical owner order by stable owner/sequence address
 - [ ] Given a timeline is open, pressing Play calls the timeline playback handler (not document playback)
 - [ ] Given a timeline is open, pressing Reset stops the timeline and resets its playhead to 0
 - [ ] Given no timeline is open, pressing Play toggles document-level animation preview
