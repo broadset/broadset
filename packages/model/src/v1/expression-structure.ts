@@ -6,11 +6,16 @@ import {
   isNumericValueType as isNumeric,
   validateSafeFunctionArity as validFunctionArity,
 } from './expression-inference-helpers';
-import type { ValueType } from './typed-value';
+import type { TypedValue, ValueType } from './typed-value';
 
 export interface StructuralExpressionInferenceResult {
   readonly valueType?: ValueType | undefined;
+  readonly literalValue?: TypedValue | undefined;
   readonly diagnostics: readonly Diagnostic[];
+}
+
+function literalResult(literalValue: TypedValue): StructuralExpressionInferenceResult {
+  return { valueType: literalValue.type, literalValue, diagnostics: [] };
 }
 
 function invalidOperand(message: string, diagnostics: readonly Diagnostic[]): StructuralExpressionInferenceResult {
@@ -289,6 +294,19 @@ function inferSafeFunction(
 function inferGet(expression: Extract<ExpressionAst, { readonly kind: 'get' }>): StructuralExpressionInferenceResult {
   const source = inferExpressionStructuralValueType(expression.source);
 
+  if (source.literalValue?.type === 'object') {
+    const fieldValue = source.literalValue.fields[expression.fieldId];
+
+    return fieldValue === undefined ?
+        {
+          diagnostics: [
+            ...source.diagnostics,
+            createError('expression.object-field-not-found', 'Object field was not found'),
+          ],
+        }
+      : literalResult(fieldValue);
+  }
+
   return source.valueType === undefined || source.valueType === 'object' ?
       { diagnostics: source.diagnostics }
     : {
@@ -314,13 +332,33 @@ function inferIndex(
     diagnostics.push(createError('expression.invalid-index', 'Array index must be integer'));
   }
 
-  return { diagnostics };
+  if (diagnostics.length > 0 || source.literalValue?.type !== 'list') return { diagnostics };
+
+  if (index.literalValue?.type === 'integer') {
+    const item = source.literalValue.items[index.literalValue.value];
+
+    return item === undefined ?
+        { diagnostics: [createError('expression.invalid-index', 'Array index is out of range')] }
+      : literalResult(item);
+  }
+
+  const firstItem = source.literalValue.items[0];
+
+  if (firstItem === undefined) return { diagnostics };
+
+  let commonType: ValueType | undefined = firstItem.type;
+
+  for (const item of source.literalValue.items.slice(1)) {
+    commonType = commonType === undefined ? undefined : commonValueType(commonType, item.type);
+  }
+
+  return commonType === undefined ? { diagnostics } : { valueType: commonType, diagnostics };
 }
 
 export function inferExpressionStructuralValueType(expression: ExpressionAst): StructuralExpressionInferenceResult {
   switch (expression.kind) {
     case 'literal':
-      return { valueType: expression.value.type, diagnostics: [] };
+      return literalResult(expression.value);
     case 'field':
     case 'variable':
       return { diagnostics: [] };

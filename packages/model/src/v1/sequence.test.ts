@@ -312,6 +312,10 @@ describe('sequenceSchema', () => {
     const counting = { kind: 'counting', rounding: 'round', minimumDigits: 1, grouping: false };
     const color = { kind: 'color', space: 'oklab' };
     const values = {
+      null: [
+        { type: 'null', value: null },
+        { type: 'null', value: null },
+      ],
       boolean: [
         { type: 'boolean', value: false },
         { type: 'boolean', value: true },
@@ -327,6 +331,10 @@ describe('sequenceSchema', () => {
       string: [
         { type: 'string', value: '0' },
         { type: 'string', value: '1' },
+      ],
+      'date-time': [
+        { type: 'date-time', value: '2026-01-01T00:00:00Z' },
+        { type: 'date-time', value: '2026-01-02T00:00:00Z' },
       ],
       length: [
         { type: 'length', value: 0 },
@@ -351,6 +359,14 @@ describe('sequenceSchema', () => {
       point3d: [
         { type: 'point3d', value: [0, 0, 0] },
         { type: 'point3d', value: [1, 1, 1] },
+      ],
+      list: [
+        { type: 'list', items: [{ type: 'string', value: 'first' }] },
+        { type: 'list', items: [{ type: 'string', value: 'second' }] },
+      ],
+      object: [
+        { type: 'object', fields: { value: { type: 'string', value: 'first' } } },
+        { type: 'object', fields: { value: { type: 'string', value: 'second' } } },
       ],
     } as const;
     const createSequence = (valueType: keyof typeof values, interpolation: object) => {
@@ -384,6 +400,14 @@ describe('sequenceSchema', () => {
       ['point3d', spatial],
       ['string', counting],
       ['color', color],
+      ['null', { kind: 'hold' }],
+      ['null', { kind: 'step', position: 'start' }],
+      ['date-time', { kind: 'hold' }],
+      ['date-time', { kind: 'step', position: 'end' }],
+      ['list', { kind: 'hold' }],
+      ['list', { kind: 'step', position: 'start' }],
+      ['object', { kind: 'hold' }],
+      ['object', { kind: 'step', position: 'end' }],
     ] as const;
     const incompatible = [
       ['boolean', cubic],
@@ -401,6 +425,15 @@ describe('sequenceSchema', () => {
 
     for (const [valueType, interpolation] of incompatible) {
       expect(sequenceSchema.safeParse(createSequence(valueType, interpolation)).success).toBe(false);
+    }
+
+    const newlyCoveredDiscreteTypes = ['null', 'date-time', 'list', 'object'] as const;
+    const incompatibleContinuousFamilies = [cubic, counting, color, spatial] as const;
+
+    for (const valueType of newlyCoveredDiscreteTypes) {
+      for (const interpolation of incompatibleContinuousFamilies) {
+        expect(sequenceSchema.safeParse(createSequence(valueType, interpolation)).success).toBe(false);
+      }
     }
   });
 });

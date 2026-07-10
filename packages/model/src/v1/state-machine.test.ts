@@ -292,4 +292,83 @@ describe('lifecycle and state machines', () => {
       }).success,
     ).toBe(false);
   });
+
+  it('types literal object get and list index guards through nested access', () => {
+    const createMachine = (guard: unknown) => ({
+      id: 'literal-access-machine',
+      name: 'Literal access machine',
+      initialStateId: 'idle',
+      states: [
+        { id: 'idle', name: 'Idle', values: [], entryActions: [], exitActions: [] },
+        { id: 'active', name: 'Active', values: [], entryActions: [], exitActions: [] },
+      ],
+      transitions: [
+        {
+          id: 'activate',
+          sourceStateId: 'idle',
+          targetStateId: 'active',
+          trigger: { kind: 'event', eventId: 'activate' },
+          guard,
+          priority: 0,
+          actions: [],
+        },
+      ],
+    });
+    const booleanValue = { type: 'boolean', value: true } as const;
+    const numberValue = { type: 'number', value: 1 } as const;
+    const unknownIndex = { kind: 'field', viewModelId: 'external', fieldId: 'index' } as const;
+    const objectLiteral = {
+      kind: 'literal',
+      value: { type: 'object', fields: { enabled: booleanValue, count: numberValue } },
+    } as const;
+    const booleanListLiteral = {
+      kind: 'literal',
+      value: { type: 'list', items: [booleanValue, { type: 'boolean', value: false }] },
+    } as const;
+    const numericListLiteral = {
+      kind: 'literal',
+      value: { type: 'list', items: [numberValue, { type: 'integer', value: 2 }] },
+    } as const;
+    const heterogeneousListLiteral = {
+      kind: 'literal',
+      value: { type: 'list', items: [booleanValue, numberValue] },
+    } as const;
+    const nestedLiteral = {
+      kind: 'literal',
+      value: {
+        type: 'object',
+        fields: {
+          rows: {
+            type: 'list',
+            items: [{ type: 'object', fields: { visible: booleanValue, opacity: numberValue } }],
+          },
+        },
+      },
+    } as const;
+    const get = (source: unknown, fieldId: string) => ({ kind: 'get', source, fieldId });
+    const index = (source: unknown, itemIndex: unknown) => ({ kind: 'index', source, index: itemIndex });
+    const integerIndex = (value: number) => ({ kind: 'literal', value: { type: 'integer', value } });
+
+    expect(stateMachineSchema.safeParse(createMachine(get(objectLiteral, 'enabled'))).success).toBe(true);
+    expect(stateMachineSchema.safeParse(createMachine(get(objectLiteral, 'count'))).success).toBe(false);
+    expect(stateMachineSchema.safeParse(createMachine(index(booleanListLiteral, integerIndex(0)))).success).toBe(true);
+    expect(stateMachineSchema.safeParse(createMachine(index(numericListLiteral, integerIndex(1)))).success).toBe(false);
+
+    const firstRow = index(get(nestedLiteral, 'rows'), integerIndex(0));
+
+    expect(stateMachineSchema.safeParse(createMachine(get(firstRow, 'visible'))).success).toBe(true);
+    expect(stateMachineSchema.safeParse(createMachine(get(firstRow, 'opacity'))).success).toBe(false);
+    expect(stateMachineSchema.safeParse(createMachine(index(booleanListLiteral, unknownIndex))).success).toBe(true);
+    expect(stateMachineSchema.safeParse(createMachine(index(numericListLiteral, unknownIndex))).success).toBe(false);
+    expect(stateMachineSchema.safeParse(createMachine(index(heterogeneousListLiteral, unknownIndex))).success).toBe(
+      true,
+    );
+    expect(stateMachineSchema.safeParse(createMachine(index(booleanListLiteral, integerIndex(2)))).success).toBe(false);
+    expect(stateMachineSchema.safeParse(createMachine(get(objectLiteral, 'missing'))).success).toBe(false);
+    expect(
+      stateMachineSchema.safeParse(
+        createMachine(index(booleanListLiteral, { kind: 'literal', value: { type: 'number', value: 0.5 } })),
+      ).success,
+    ).toBe(false);
+  });
 });
