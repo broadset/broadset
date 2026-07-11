@@ -44,6 +44,15 @@ interface ElementScope {
   readonly nestedEntities: ElementNestedIndexes;
 }
 
+export type PageAddressScope = Extract<AddressScope, { readonly kind: 'page-instance' }>;
+type PageAddressScopes = ReadonlyMap<Id, ReadonlyMap<Id, PageAddressScope>>;
+
+type PageInstanceElementAddress = {
+  readonly rootInstanceId: Id;
+  readonly componentInstancePath: readonly Id[];
+  readonly elementId: Id;
+};
+
 function createOrdinaryRootScope(elements: ReadonlyMap<Id, Element>, rootId: Id): ElementScope {
   const children = new Map<Id, Element[]>();
 
@@ -72,6 +81,68 @@ function createOrdinaryRootScope(elements: ReadonlyMap<Id, Element>, rootId: Id)
   }
 
   return { elements: rootElements, nestedEntities: createElementNestedIndexes([...rootElements.values()]) };
+}
+
+function resolveSelectedRootId({
+  elements,
+  selectedRootIds,
+  owners,
+  elementId,
+}: {
+  readonly elements: ReadonlyMap<Id, Element>;
+  readonly selectedRootIds: ReadonlySet<Id>;
+  readonly owners: Map<Id, Id | undefined>;
+  readonly elementId: Id;
+}): Id | undefined {
+  const path: Id[] = [];
+  const seen = new Set<Id>();
+  let currentId: Id | undefined = elementId;
+  let owner: Id | undefined;
+
+  while (currentId !== undefined) {
+    if (owners.has(currentId)) {
+      owner = owners.get(currentId);
+      break;
+    }
+
+    if (seen.has(currentId)) break;
+    seen.add(currentId);
+    path.push(currentId);
+
+    if (selectedRootIds.has(currentId)) {
+      owner = currentId;
+      break;
+    }
+
+    const parentId: Id | null | undefined = elements.get(currentId)?.parentId;
+
+    currentId = parentId === null ? undefined : parentId;
+  }
+
+  path.forEach((id) => owners.set(id, owner));
+
+  return owner;
+}
+
+function createOrdinaryRootScopes(
+  elements: ReadonlyMap<Id, Element>,
+  selectedRootIds: ReadonlySet<Id>,
+): ReadonlyMap<Id, ElementScope> {
+  const owners = new Map<Id, Id | undefined>();
+  const partitions = new Map<Id, Map<Id, Element>>(
+    [...selectedRootIds].map((rootId) => [rootId, new Map<Id, Element>()]),
+  );
+
+  elements.forEach((element) => {
+    const rootId = resolveSelectedRootId({ elements, selectedRootIds, owners, elementId: element.id });
+
+    if (rootId !== undefined) partitions.get(rootId)?.set(element.id, element);
+  });
+
+  return new Map([...partitions].map(([rootId, rootElements]) => [
+    rootId,
+    { elements: rootElements, nestedEntities: createElementNestedIndexes([...rootElements.values()]) },
+  ]));
 }
 
 function descendComponentPath(
@@ -332,6 +403,50 @@ export function createPageAddressScope(
   return { kind: 'page-instance', document, page, root, ordinaryRootScope };
 }
 
+export function createPageAddressScopes(document: DocumentSemanticIndex): PageAddressScopes {
+  const selectedOrdinaryRootIds = new Set<Id>();
+
+  document.document.pages.forEach((page) => {
+    page.rootInstances.forEach((root) => {
+      const rootElement = document.elements.get(root.elementId);
+
+      if (rootElement !== undefined && rootElement.kind !== 'component-instance') selectedOrdinaryRootIds.add(rootElement.id);
+    });
+  });
+
+  const ordinaryScopes = createOrdinaryRootScopes(document.elements, selectedOrdinaryRootIds);
+
+  return new Map(document.document.pages.map((page) => [
+    page.id,
+    new Map(page.rootInstances.map((root) => [
+      root.id,
+      {
+        kind: 'page-instance' as const,
+        document,
+        page,
+        root,
+        ordinaryRootScope: ordinaryScopes.get(root.elementId),
+      },
+    ])),
+  ]));
+}
+
+export function resolvePageInstanceElementInScope(
+  scope: PageAddressScope,
+  address: PageInstanceElementAddress,
+): ResolvedTargetEntity | undefined {
+  if (address.rootInstanceId !== scope.root.id) return undefined;
+
+  return resolveTargetEntityAddress(scope, {
+    projectId: scope.document.projectId,
+    documentId: scope.document.document.id,
+    pageId: scope.page.id,
+    entityKind: 'element',
+    entityId: address.elementId,
+    instancePath: [scope.root.id, ...address.componentInstancePath],
+  });
+}
+
 export function resolvePageInstanceElement(
   document: DocumentSemanticIndex,
   page: PageDefinition,
@@ -341,14 +456,11 @@ export function resolvePageInstanceElement(
 
   if (root === undefined) return undefined;
 
-  return resolveTargetEntityAddress(createPageAddressScope(document, page, root), {
-    projectId: document.projectId,
-    documentId: document.document.id,
-    pageId: page.id,
-    entityKind: 'element',
-    entityId: address.elementId,
-    instancePath: [root.id, ...address.componentInstancePath],
-  });
+  const scope = createPageAddressScope(document, page, root);
+
+  if (scope.kind !== 'page-instance') return undefined;
+
+  return resolvePageInstanceElementInScope(scope, address);
 }
 
 function resolvePagePathEntity(document: DocumentSemanticIndex, address: EntityAddress): boolean {

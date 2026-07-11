@@ -19,7 +19,16 @@ export * from './load';
 export * from './output-profile';
 export * from './page';
 export * from './project';
-export * from './resolved-address';
+export {
+  type AddressScope,
+  createComponentAddressScope,
+  createDocumentAddressScope,
+  createPageAddressScope,
+  type ResolvedTargetEntity,
+  resolvePageInstanceElement,
+  resolveProjectEntityAddress,
+  resolveTargetEntityAddress,
+} from './resolved-address';
 export * from './resources';
 export * from './semantic-validation';
 export * from './sequence';

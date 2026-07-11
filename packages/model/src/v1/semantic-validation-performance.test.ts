@@ -189,4 +189,78 @@ describe('semantic validation indexing', () => {
     expect(parentIdReads).toBeLessThan(descendantIds.length * 10);
     expect(componentKindReads).toBeLessThan(900);
   }, 20_000);
+
+  it('builds 2k independent ordinary page-root scopes in one hierarchy traversal', () => {
+    const project = createMinimalProjectV1();
+    const document = project.documents[0];
+    const page = document?.pages[0];
+
+    if (document === undefined || page === undefined) throw new Error('Expected fixture page');
+
+    const rootCount = 2_000;
+    const ordinaryRoots = Array.from({ length: rootCount }, (_, index) => createReviewGroup(`root-${String(index)}`));
+    const firstRoot = ordinaryRoots[0];
+
+    if (firstRoot === undefined) throw new Error('Expected ordinary root');
+
+    const child = createReviewGroup('child', firstRoot.id);
+    const local = createReviewGroup('component-local');
+    const component = createReviewComponent({
+      id: 'component', name: 'Component', elements: [local], rootElementIds: [local.id],
+      sequences: [], exposedProperties: [], extensions: [],
+    });
+    const componentRoot = createReviewComponentInstance('component-root', component.id);
+    const ordinaryInstances = ordinaryRoots.map((root, index) => ({
+      id: `root-instance-${String(index)}`, elementId: root.id, overrides: [], componentPropertyValues: [],
+    }));
+    const ordinaryTarget = createReviewTarget(project, child.id, '/appearance/opacity', ['root-instance-0']);
+    const componentTarget = createReviewTarget(project, local.id, '/appearance/opacity', ['component-instance']);
+    const pageId = idSchema.parse(page.id);
+    const actual = parseReviewProject({
+      ...project,
+      documents: [{
+        ...document,
+        elements: [firstRoot, child, ...ordinaryRoots.slice(1), componentRoot],
+        components: [component],
+        pages: [{
+          ...page,
+          rootInstances: [
+            ...ordinaryInstances,
+            { id: 'component-instance', elementId: componentRoot.id, overrides: [], componentPropertyValues: [] },
+          ],
+          descendantOverrides: [
+            {
+              address: { rootInstanceId: 'root-instance-0', componentInstancePath: [], elementId: child.id },
+              overrides: [{ target: { ...ordinaryTarget, entity: { ...ordinaryTarget.entity, pageId } }, value: { type: 'number', value: 0.5 } }],
+            },
+            {
+              address: { rootInstanceId: 'component-instance', componentInstancePath: [], elementId: local.id },
+              overrides: [{ target: { ...componentTarget, entity: { ...componentTarget.entity, pageId } }, value: { type: 'number', value: 0.5 } }],
+            },
+          ],
+        }],
+      }],
+    });
+    const actualDocument = actual.documents[0];
+
+    if (actualDocument === undefined) throw new Error('Expected multi-root document');
+
+    let parentIdReads = 0;
+
+    actualDocument.elements.forEach((element) => {
+      const parentId = element.parentId;
+
+      Object.defineProperty(element, 'parentId', {
+        configurable: true,
+        get: () => {
+          parentIdReads += 1;
+
+          return parentId;
+        },
+      });
+    });
+
+    expect(validateBroadsetProjectV1Semantics(actual)).toEqual([]);
+    expect(parentIdReads).toBeLessThan(rootCount * 10);
+  }, 20_000);
 });

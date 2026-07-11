@@ -10,10 +10,11 @@ import {
 import type { Diagnostic } from './diagnostics';
 import type { Id } from './identity';
 import {
-  type AddressScope,
   createDocumentAddressScope,
-  createPageAddressScope,
+  createPageAddressScopes,
+  type PageAddressScope,
   type ResolvedTargetEntity,
+  resolvePageInstanceElementInScope,
   resolveTargetEntityAddress,
 } from './resolved-address';
 import type { ComponentSemanticIndex, DocumentSemanticIndex, SemanticIndexes } from './semantic-index';
@@ -29,44 +30,6 @@ import {
   resolvePropertyTargetValueTypeInScope,
 } from './target-resolution';
 import type { TypedValue } from './typed-value';
-
-type PageAddressScope = Extract<AddressScope, { readonly kind: 'page-instance' }>;
-type PageAddressScopes = ReadonlyMap<Id, ReadonlyMap<Id, PageAddressScope>>;
-
-function createSemanticPageAddressScope(
-  document: DocumentSemanticIndex,
-  page: DocumentSemanticIndex['document']['pages'][number],
-  root: DocumentSemanticIndex['document']['pages'][number]['rootInstances'][number],
-): PageAddressScope {
-  const scope = createPageAddressScope(document, page, root);
-
-  if (scope.kind !== 'page-instance') throw new Error('Expected page address scope');
-
-  return scope;
-}
-
-function createPageAddressScopes(document: DocumentSemanticIndex): PageAddressScopes {
-  return new Map(document.document.pages.map((page) => [
-    page.id,
-    new Map(page.rootInstances.map((root) => [root.id, createSemanticPageAddressScope(document, page, root)])),
-  ]));
-}
-
-function resolvePageInstanceElementInScope(
-  scope: PageAddressScope,
-  address: DocumentSemanticIndex['document']['pages'][number]['descendantOverrides'][number]['address'],
-): ResolvedTargetEntity | undefined {
-  if (address.rootInstanceId !== scope.root.id) return undefined;
-
-  return resolveTargetEntityAddress(scope, {
-    projectId: scope.document.projectId,
-    documentId: scope.document.document.id,
-    pageId: scope.page.id,
-    entityKind: 'element',
-    entityId: address.elementId,
-    instancePath: [scope.root.id, ...address.componentInstancePath],
-  });
-}
 
 function escapePointerSegment(segment: string): string {
   return segment.replaceAll('~', '~0').replaceAll('/', '~1');
@@ -143,7 +106,7 @@ function projectInferenceDiagnostics(
 
 function targetBelongsToRoot(
   document: DocumentSemanticIndex,
-  pageScope: ReturnType<typeof createPageAddressScope>,
+  pageScope: PageAddressScope,
   rootElementId: Id,
   target: Binding['target'],
 ): ResolvedTargetEntity | undefined {
