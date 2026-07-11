@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build every semantic-validation page-root address scope once and reuse it for root and descendant overrides without changing public resolver behavior.
+**Goal:** Build all semantic-validation page-root address scopes in one memoized hierarchy traversal and reuse them without changing the package API.
 
-**Architecture:** A document-local `PageAddressScopes` map in `semantic-validation-pages.ts` owns page/root scopes for one validation call. `resolved-address.ts` adds an in-scope page-element resolver; the existing public resolver remains a wrapper.
+**Architecture:** `resolved-address.ts` bulk-partitions elements by selected ordinary root using memoized parent ownership, builds nested indexes per partition, and returns page/root scopes. It also owns the module-only in-scope resolver; the public wrapper delegates. The package barrel explicitly retains only existing resolved-address exports.
 
 **Tech Stack:** TypeScript, Zod-parsed Broadset v1 fixtures, Vitest, ESLint.
 
@@ -76,3 +76,36 @@ Run focused tests, model strict, `npm run lint:dead`, `npm run docs:check`, diff
 - [ ] **Step 3: Commit**
 
 Stage only task files and commit with `fix(model): cache page address scopes`. Confirm the worktree is clean and update the ignored final report.
+
+### Task 4: Eliminate multi-root scope construction scans
+
+**Files:**
+- Modify: `packages/model/src/v1/semantic-validation-performance.test.ts`
+- Modify: `packages/model/src/v1/resolved-address.ts`
+- Modify: `packages/model/src/v1/semantic-validation-pages.ts`
+- Modify: `packages/model/src/v1/index.ts`
+- Modify: `project/spec/model/format-reference.md`
+
+**Interfaces:**
+- Produces: module-only `createPageAddressScopes(document)` and `resolvePageInstanceElementInScope(scope, address)`.
+- Preserves: the existing v1 runtime/type compiler export inventory and public `resolvePageInstanceElement` behavior.
+
+- [ ] **Step 1: Add the multi-root RED regression**
+
+Create 2,000 independent ordinary roots on one page, instrument every element `parentId`, validate, and assert reads are proportional to elements plus roots. Retain the single-root stress and add representative descendant overrides plus mixed component roots.
+
+- [ ] **Step 2: Verify RED**
+
+Run the focused performance test. Expect approximately four million reads because standalone scope construction scans every element for every root.
+
+- [ ] **Step 3: Implement bulk ownership partitioning**
+
+In `resolved-address.ts`, memoize each element's nearest selected-root ownership while following parent links, partition elements by owner, and call `createElementNestedIndexes` once per partition. Build every page/root scope from those partitions. Move in-scope resolution here and delegate from the public wrapper.
+
+- [ ] **Step 4: Preserve the package API**
+
+Replace `export * from './resolved-address'` with explicit exports for the existing six runtime functions and two types so module-only helpers do not enter the v1/package API.
+
+- [ ] **Step 5: Verify and commit**
+
+Run focused tests, exact 284-symbol API inventory, model strict, dead-code/docs/type-coverage checks, diff/size/security review, and full workspace strict. Commit with `fix(model): build page scopes in one traversal`.
