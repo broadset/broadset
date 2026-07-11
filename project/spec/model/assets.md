@@ -34,7 +34,7 @@ A blob reference MUST contain a SHA-256 digest, non-negative safe-integer `byteL
 
 ### Requirement: Asset Source Semantics
 
-Canonical `.bsp` packages MUST use package blob sources. Raw `.broadset.json` interchange MAY use external or explicitly missing sources. Data URIs and large base64 payloads are not canonical asset sources. Parsing an external URL MUST NOT fetch it.
+Canonical `.bsp` packages MUST use package blob sources. Raw `.broadset.json` interchange MAY use external or explicitly missing sources. Data URIs and large base64 payloads are not canonical asset sources. Parsing an external URL MUST NOT fetch it. Structural validation owns the JSON-Schema-expressible URI/HTTPS string shape; semantic validation owns standards parsing and protocol, authority, credential, host, and port correctness for every declared URL-bearing field.
 
 An explicitly missing source remains structurally valid, produces a required-resource diagnostic, and renders an explicit placeholder. A reference to a nonexistent asset ID is invalid.
 
@@ -43,6 +43,11 @@ An explicitly missing source remains structurally valid, produces a required-res
 - [ ] Given a packaged asset, its normalized blob path resolves to a manifest-listed entry
 - [ ] Given an explicitly missing asset source, structural validation succeeds and resolution reports a placeholder diagnostic
 - [ ] Given an element referencing an absent asset ID, semantic validation fails
+- [ ] Given a structurally shaped URL with malformed authority, IPv6, credentials, DNS labels, or port, semantic validation fails at the exact persisted field
+- [ ] Given invalid URI characters, a backslash-confusable authority, or malformed percent escape, semantic validation rejects the URL before parser normalization
+- [ ] Given a page override, state value, keyframe, binding fallback, or component property that targets a text-run hyperlink, its persisted string value is subject to the same absolute-HTTPS validation as a literal run hyperlink
+- [ ] Given a non-literal or formatted binding targeting a text-run hyperlink, semantic validation fails closed because the persisted project cannot prove the resolved navigation URL safe
+- [ ] Given valid HTTPS, `file:///`, or non-hierarchical absolute URI input, semantic validation succeeds without rewriting or fetching it
 
 ### Requirement: Typed Asset Variants
 
@@ -272,6 +277,7 @@ interface VariableCollection {
 - [ ] Given one type-compatible value for every collection mode, variable validation succeeds
 - [ ] Given a missing mode value or mismatched value type, validation fails
 - [ ] Given a direct or indirect variable-alias cycle, semantic validation fails
+- [ ] Given a large valid or cyclic variable-alias graph, validation indexes targets and visits the graph in linear whole-graph work
 
 ### Requirement: Shared Styles
 
@@ -330,6 +336,7 @@ references MUST resolve to the same shared-style kind and remain acyclic.
 - [ ] Given every approved scalar leaf with a compatible typed value, semantic validation succeeds
 - [ ] Given a conditional line-spacing or list leaf absent from its selected variant, semantic validation fails
 - [ ] Given a local override, provenance retains both the shared source and effective local source
+- [ ] Given a large text-style inheritance chain, effective font-family inheritance is memoized per style and cycles fail without recursive chain copying
 
 ### Requirement: Asset Integrity and Safety
 

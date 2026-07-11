@@ -4,6 +4,7 @@ import type { BroadsetProjectV1 } from './project';
 import { greatestCommonDivisor } from './schema-helpers';
 import { validateProjectedIdUniqueness, validateSparsePageUniqueness } from './semantic-validation-collections';
 import { createSemanticError } from './semantic-validation-helpers';
+import { validateProjectUrls } from './semantic-validation-urls';
 import { validateValueAndResourceInvariants } from './semantic-validation-values';
 import { validateTimebaseSemantics } from './time';
 
@@ -12,6 +13,7 @@ export function validateProjectInvariants(project: BroadsetProjectV1): readonly 
     ...validateProjectedIdUniqueness(project),
     ...validateSparsePageUniqueness(project),
     ...validateValueAndResourceInvariants(project),
+    ...validateProjectUrls(project),
   ];
   const metadataOrder = compareExactIsoInstants(project.metadata.createdAt, project.metadata.updatedAt);
 

@@ -35,6 +35,7 @@ CSS paint strings and producer-specific tokens are not canonical values.
 - [ ] Given any paint discriminant with its matching payload, structural validation succeeds
 - [ ] Given a mismatched paint payload or raw CSS paint string, structural validation fails
 - [ ] Given a pattern or picture asset of the wrong kind, semantic validation fails
+- [ ] Given a picture crop on a surface background or any document/component fill or stroke, `x + width` and `y + height` remain at most one or semantic validation fails at that paint
 
 ### Requirement: Gradients
 

@@ -618,6 +618,15 @@ cross-field comparison, arbitrary-precision instant comparison, arithmetic, refe
 graph traversal are semantic. Consumers MUST use the load boundary, which executes both stages,
 rather than treating successful leaf-schema parsing as complete project validation.
 
+Absolute URI and HTTPS fields follow this same boundary: structural validation enforces the shared
+scheme, whitespace, and minimum hierarchical HTTPS pattern, while semantic validation parses every
+declared URL-bearing field and validates protocol, authority, credentials, host syntax, and port.
+Validation occurs before URL-parser normalization, rejects malformed percent escapes and authority-confusable
+backslashes, and follows typed targets so persisted override, animation, state, binding, and component values
+cannot bypass hyperlink HTTPS validation. Non-literal or formatted hyperlink bindings fail closed.
+Opaque extension or interop JSON strings are never inferred to be URLs, and validation never fetches
+network content.
+
 Before parsing or canonicalization, implementations enforce these v1 resource limits iteratively:
 32 MiB of UTF-8 JSON text, nesting depth 256, and 250,000 visited JSON values. Excess input is
 quarantined with `input-too-large`, `input-too-deep`, or `input-too-complex`; cyclic in-memory input

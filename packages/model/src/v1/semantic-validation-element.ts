@@ -13,9 +13,7 @@ function validateVectorReference(elements: ReadonlyMap<Id, Element>, elementId: 
   if (elements.get(elementId)?.kind !== 'vector') diagnostics.push(createSemanticError('element.invalid-vector-reference', 'Vector element does not resolve', pointer));
 }
 
-export function validateElementReferences(indexes: SemanticIndexes, scope: readonly Element[], element: Element, pointer: string, diagnostics: Diagnostic[]): void {
-  const elements = new Map(scope.map((candidate) => [candidate.id, candidate]));
-
+export function validateElementReferences(indexes: SemanticIndexes, elements: ReadonlyMap<Id, Element>, element: Element, pointer: string, diagnostics: Diagnostic[]): void {
   if (element.kind === 'text' && element.textPath !== undefined) validateVectorReference(elements, element.textPath.vectorElementId, `${pointer}/textPath/vectorElementId`, diagnostics);
 
   if (element.kind === 'vector' && element.geometryData.kind === 'boolean') {

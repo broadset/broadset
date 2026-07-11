@@ -13,7 +13,7 @@ export const STRUCTURAL_COVERAGE_MATRIX = {
   ],
   absoluteHttpsUris: [
     'Task 2 rejects non-HTTPS extension schema URLs',
-    'Task 2 rejects HTTPS URLs without a host',
+    'Task 2 delegates malformed HTTPS authority to semantics',
   ],
   exactTimestamps: ['Task 2 rejects impossible UTC timestamps'],
   safeIntegers: ['Task 5 rejects fractional safe-integer timebase fields'],

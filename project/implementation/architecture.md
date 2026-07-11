@@ -41,6 +41,11 @@ Manifest baseline: generated from the current working tree; verified by `npm run
 
 <!-- END GENERATED: MANIFEST BASELINE -->
 
+`ajv` and its official `ajv-formats` companion are root development dependencies used only to
+compile the published draft-2020-12 project schema under strict mode and verify its standard format
+vocabulary and acceptance against the Zod load boundary. They are not runtime model dependencies
+and introduce no network behavior.
+
 ### 2.2 Repository Structure
 
 - Behavioral specs: `project/spec/**`

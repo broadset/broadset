@@ -1,5 +1,5 @@
 import type { Diagnostic } from './diagnostics';
-import type { Id } from './identity';
+import { type Id, idSchema } from './identity';
 import type { BroadsetProjectV1 } from './project';
 import { resolveProjectEntityAddress } from './resolved-address';
 import type { SharedStyle } from './resources';
@@ -172,16 +172,15 @@ function validateStyleFontReferences(
   style: SharedStyle,
   entries: readonly StyleEntry[],
   pointer: string,
+  effectiveFontFamilyIds: ReadonlyMap<Id, Id | undefined>,
   diagnostics: Diagnostic[],
 ): void {
   const familyPosition = entries.findIndex((entry) => entry.pointer === '/fontFamilyId');
   const facePosition = entries.findIndex((entry) => entry.pointer === '/fontFaceId');
   const familyValue = entries[familyPosition]?.value;
   const faceValue = entries[facePosition]?.value;
-  const effectiveFamilyId = findEffectiveFontFamilyId(indexes, style, new Set());
-  const family = effectiveFamilyId === undefined
-    ? undefined
-    : indexes.project.resources.fonts.find((font) => font.id === effectiveFamilyId);
+  const effectiveFamilyId = effectiveFontFamilyIds.get(style.id);
+  const family = effectiveFamilyId === undefined ? undefined : indexes.fonts.get(effectiveFamilyId);
 
   if (familyValue?.type === 'string' && family === undefined) {
     diagnostics.push(
@@ -207,23 +206,50 @@ function validateStyleFontReferences(
   }
 }
 
-function findEffectiveFontFamilyId(
-  indexes: SemanticIndexes,
-  style: SharedStyle,
-  seen: ReadonlySet<Id>,
-): string | undefined {
-  if (seen.has(style.id)) return undefined;
+function ownStyleFontFamilyId(style: SharedStyle): Id | undefined {
+  if (style.source.kind !== 'properties') return undefined;
 
-  if (style.source.kind === 'properties') {
-    const own = findStyleStringValue(style.source.entries, '/fontFamilyId');
+  const value = findStyleStringValue(style.source.entries, '/fontFamilyId');
+  const parsed = idSchema.safeParse(value);
 
-    if (own !== undefined) return own;
-  }
+  return parsed.success ? parsed.data : undefined;
+}
 
+function inheritedStyle(indexes: SemanticIndexes, style: SharedStyle): SharedStyle | undefined {
   const inheritedId = style.source.kind === 'alias' ? style.source.styleId : style.source.inheritedStyleId;
-  const inherited = inheritedId === undefined ? undefined : indexes.styles.get(inheritedId);
 
-  return inherited === undefined ? undefined : findEffectiveFontFamilyId(indexes, inherited, new Set([...seen, style.id]));
+  return inheritedId === undefined ? undefined : indexes.styles.get(inheritedId);
+}
+
+function buildEffectiveFontFamilyIds(indexes: SemanticIndexes): ReadonlyMap<Id, Id | undefined> {
+  const effective = new Map<Id, Id | undefined>();
+
+  indexes.project.resources.styles.forEach((style) => {
+    if (effective.has(style.id)) return;
+
+    const path: Id[] = [];
+    const positions = new Set<Id>();
+    let current: SharedStyle | undefined = style;
+    let resolved: Id | undefined;
+
+    while (current !== undefined && !effective.has(current.id) && !positions.has(current.id)) {
+      positions.add(current.id);
+      path.push(current.id);
+      resolved = ownStyleFontFamilyId(current);
+      if (resolved !== undefined) break;
+      current = inheritedStyle(indexes, current);
+    }
+
+    if (current !== undefined && effective.has(current.id)) resolved = effective.get(current.id);
+
+    for (let index = path.length - 1; index >= 0; index -= 1) {
+      const id = path[index];
+
+      if (id !== undefined) effective.set(id, resolved);
+    }
+  });
+
+  return effective;
 }
 
 function styleEnumValueIsValid(entry: StyleEntry): boolean {
@@ -288,6 +314,7 @@ function validateSharedStyle(
   style: SharedStyle,
   stylePosition: number,
   cyclicStyleIds: ReadonlySet<Id>,
+  effectiveFontFamilyIds: ReadonlyMap<Id, Id | undefined>,
   diagnostics: Diagnostic[],
 ): void {
   const targetId = style.source.kind === 'alias' ? style.source.styleId : style.source.inheritedStyleId;
@@ -316,7 +343,8 @@ function validateSharedStyle(
     else if (!typedValueMatchesType(entry.value, expected)) diagnostics.push(createSemanticError('style.incompatible-value', 'Shared-style value is incompatible', `${entryPointer}/value`));
     else if (!styleEnumValueIsValid(entry)) diagnostics.push(createSemanticError('style.incompatible-value', 'Shared-style enum value is not approved', `${entryPointer}/value`));
   });
-  if (style.kind === 'text') validateStyleFontReferences(indexes, style, entries, pointer, diagnostics);
+  if (style.kind === 'text')
+    validateStyleFontReferences(indexes, style, entries, pointer, effectiveFontFamilyIds, diagnostics);
 }
 
 function findCyclicStyleIds(indexes: SemanticIndexes): ReadonlySet<Id> {
@@ -377,9 +405,10 @@ export function validateAdditionalResources(indexes: SemanticIndexes, diagnostic
   });
 
   const cyclicStyleIds = findCyclicStyleIds(indexes);
+  const effectiveFontFamilyIds = buildEffectiveFontFamilyIds(indexes);
 
   indexes.project.resources.styles.forEach((style, stylePosition) => {
-    validateSharedStyle(indexes, style, stylePosition, cyclicStyleIds, diagnostics);
+    validateSharedStyle(indexes, style, stylePosition, cyclicStyleIds, effectiveFontFamilyIds, diagnostics);
   });
   indexes.documentList.forEach(({ document }, documentPosition) => {
     document.elements.forEach((element, elementPosition) => {

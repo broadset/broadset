@@ -2,7 +2,7 @@ import type { ComponentDefinition } from './component';
 import { typedValueMatchesSchema, valueSchemaValueType } from './data';
 import type { Diagnostic } from './diagnostics';
 import type { Element } from './element';
-import { findGraphCycleEdges, graphEdgeKey } from './graph-cycles';
+import { findGraphCycleEdges, findGraphCycleNodes, graphEdgeKey } from './graph-cycles';
 import type { Id } from './identity';
 import type { BroadsetProjectV1 } from './project';
 import { createComponentAddressScope } from './resolved-address';
@@ -164,18 +164,22 @@ function validateResources(indexes: SemanticIndexes, diagnostics: DiagnosticList
       );
   });
   indexes.documentList.forEach(({ document }, documentIndex) => {
+    const documentElements = new Map(document.elements.map((element) => [element.id, element]));
+
     document.elements.forEach((element, index) => {
       const pointer = `/documents/${String(documentIndex)}/elements/${String(index)}`;
 
       validateElementResources(indexes, element, pointer, diagnostics);
-      validateElementReferences(indexes, document.elements, element, pointer, diagnostics);
+      validateElementReferences(indexes, documentElements, element, pointer, diagnostics);
     });
     document.components.forEach((component, componentIndex) => {
+      const componentElements = new Map(component.elements.map((element) => [element.id, element]));
+
       component.elements.forEach((element, elementIndex) => {
         const pointer = `/documents/${String(documentIndex)}/components/${String(componentIndex)}/elements/${String(elementIndex)}`;
 
         validateElementResources(indexes, element, pointer, diagnostics);
-        validateElementReferences(indexes, component.elements, element, pointer, diagnostics);
+        validateElementReferences(indexes, componentElements, element, pointer, diagnostics);
       });
     });
     if (document.color.workingSpace.kind === 'icc')
@@ -438,38 +442,33 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
 }
 
 function validateVariables(indexes: SemanticIndexes, diagnostics: DiagnosticList): void {
+  const variableKey = (collectionId: Id, variableId: Id): string => JSON.stringify([collectionId, variableId]);
+  const variables = new Map<string, VariableDefinition>();
+
+  indexes.project.resources.variables.forEach((collection) => {
+    collection.variables.forEach((variable) => variables.set(variableKey(collection.id, variable.id), variable));
+  });
+
+  const cyclicVariables = findGraphCycleNodes([...variables.keys()], (key: string) => {
+    const alias = variables.get(key)?.aliasOf;
+
+    return alias === undefined ? undefined : variableKey(alias.collectionId, alias.variableId);
+  });
+
   indexes.project.resources.variables.forEach((collection, collectionIndex) => {
     collection.variables.forEach((variable, variableIndex) => {
       if (variable.aliasOf === undefined) return;
 
       const pointer = `/resources/variables/${String(collectionIndex)}/variables/${String(variableIndex)}/aliasOf`;
-      const seen = new Set<string>([`${collection.id}\u0000${variable.id}`]);
-      let alias: { readonly collectionId: Id; readonly variableId: Id } | undefined = variable.aliasOf;
+      const sourceKey = variableKey(collection.id, variable.id);
+      const target = variables.get(variableKey(variable.aliasOf.collectionId, variable.aliasOf.variableId));
 
-      while (alias !== undefined) {
-        const currentAlias: { readonly collectionId: Id; readonly variableId: Id } = alias;
-        const key = `${currentAlias.collectionId}\u0000${currentAlias.variableId}`;
-        const targetCollection = indexes.variables.get(currentAlias.collectionId);
-        const target: VariableDefinition | undefined = targetCollection?.variables.find(
-          (candidate) => candidate.id === currentAlias.variableId,
-        );
-
-        if (target === undefined) {
-          diagnostics.push(createSemanticError('variable.missing-alias', 'Variable alias does not resolve', pointer));
-          break;
-        }
-
-        if (target.valueType !== variable.valueType)
-          diagnostics.push(createSemanticError('variable.incompatible-alias', 'Variable alias type mismatch', pointer));
-
-        if (seen.has(key)) {
-          diagnostics.push(createSemanticError('variable.alias-cycle', 'Variable alias cycle', pointer));
-          break;
-        }
-
-        seen.add(key);
-        alias = target.aliasOf;
-      }
+      if (target === undefined)
+        diagnostics.push(createSemanticError('variable.missing-alias', 'Variable alias does not resolve', pointer));
+      else if (target.valueType !== variable.valueType)
+        diagnostics.push(createSemanticError('variable.incompatible-alias', 'Variable alias type mismatch', pointer));
+      if (cyclicVariables.has(sourceKey))
+        diagnostics.push(createSemanticError('variable.alias-cycle', 'Variable alias cycle', pointer));
     });
   });
   indexes.documentList.forEach(({ document }, documentIndex) => {
@@ -516,7 +515,7 @@ export function validateBroadsetProjectV1Semantics(project: BroadsetProjectV1): 
   validateTemplateGroups(indexes, diagnostics);
   validateInterop(indexes, diagnostics);
 
-  const uniqueDiagnostics = new Map(
+  const uniqueDiagnostics = new Map<string, Diagnostic>(
     diagnostics.map((diagnostic) => [
       JSON.stringify([diagnostic.pointer ?? '', diagnostic.code, diagnostic.message, diagnostic.severity]),
       diagnostic,
@@ -524,7 +523,7 @@ export function validateBroadsetProjectV1Semantics(project: BroadsetProjectV1): 
   );
 
   return [...uniqueDiagnostics.values()].sort(
-    (left, right) =>
+    (left: Diagnostic, right: Diagnostic) =>
       compareCodeUnits(left.pointer ?? '', right.pointer ?? '') || compareCodeUnits(left.code, right.code),
   );
 }

@@ -214,9 +214,9 @@ export const parityCorpus: readonly ParityCase[] = [
     },
   },
   {
-    name: 'Task 2 rejects HTTPS URLs without a host',
+    name: 'Task 2 delegates malformed HTTPS authority to semantics',
     task: 2,
-    expected: false,
+    expected: true,
     input: {
       ...baseProject,
       extensions: [

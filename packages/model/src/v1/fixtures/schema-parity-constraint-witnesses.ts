@@ -1,7 +1,7 @@
 import { broadsetProjectV1Schema } from '../project';
 import { schemaParityWitnessRegistry } from './schema-parity-witnesses';
 
-export function createTextRunWitnessProject(text: string): unknown {
+export function createTextRunWitnessProject(text: string, hyperlink?: string): unknown {
   const elementFamily = schemaParityWitnessRegistry.find(({ family }) => family === 'element');
   const textVariant = elementFamily?.variants.find(({ discriminant }) => discriminant === 'text');
 
@@ -23,6 +23,7 @@ export function createTextRunWitnessProject(text: string): unknown {
       fontFamilyId: 'font-family', fontFaceId: 'font-face', size: 18, color: { kind: 'color' as const, space: 'srgb' as const, channels: [0, 0, 0] as const, alpha: 1 }, weight: 400,
       variationAxes: [], openTypeFeatures: [], language: 'en-US', script: 'Latn', direction: 'ltr' as const,
       decoration: { underline: false, strikeThrough: false, style: 'solid' as const }, baselineShift: 0, tracking: 0, semanticRole: 'none' as const,
+      ...(hyperlink === undefined ? {} : { hyperlink }),
     },
   };
 
