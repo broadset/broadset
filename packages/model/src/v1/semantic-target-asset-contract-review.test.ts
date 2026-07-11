@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { createMinimalProjectV1 } from './fixtures/minimal-project';
 import {
   assetSchema,
-  createMinimalProjectV1,
   elementSchema,
   resolvePropertyTargetContract,
   sha256DigestSchema,

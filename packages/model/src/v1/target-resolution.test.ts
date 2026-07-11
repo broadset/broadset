@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { createMinimalProjectV1, elementSchema, idSchema, resolvePropertyTargetValueType } from './index';
+import { createMinimalProjectV1 } from './fixtures/minimal-project';
+import { elementSchema, idSchema, resolvePropertyTargetValueType } from './index';
 import { createReviewGroup, parseReviewProject } from './semantic-review-fixtures';
 
 describe('property target resolution', () => {

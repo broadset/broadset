@@ -4,6 +4,29 @@
 
 Defines the authoritative persisted names, shapes, ownership scopes, validation stages, serialization rules, resolution order, and package identity for Broadset Project Format v1. Behavioral details are expanded in the linked model sub-specs.
 
+## Published Model Foundation
+
+`@broadset/model` publishes the v1 structural schemas, whole-project semantic validator, bounded JSON loader, canonical serializer, and semantic hasher through its package root. The primary entry points are:
+
+| Entry point                                | Contract                                                                          |
+| ------------------------------------------ | --------------------------------------------------------------------------------- |
+| `BroadsetProjectV1` / `BroadsetDocumentV1` | Canonical persisted root and document types                                       |
+| `broadsetProjectV1Schema`                  | Strict structural parser; inserts no runtime defaults                             |
+| `validateBroadsetProjectV1Semantics`       | Whole-graph reference, identity, type, ordering, constraint, and cycle validation |
+| `parseProjectV1Unknown`                    | Bounded validation for an already decoded unknown value                           |
+| `loadProjectV1Json`                        | Bounded JSON-text loading with typed quarantine and source-text preservation      |
+| `canonicalizeProjectV1`                    | Lossless canonical JSON serialization of the complete project                     |
+| `computeProjectSemanticHashV1`             | SHA-256 over the canonical semantic projection defined by this specification      |
+
+This published foundation is the greenfield application cutover target. It does not make v1 the active editor, renderer, player, persistence, or format-adapter representation by itself. Those consumers migrate in the remaining cutover programs, and the final program deletes the unversioned legacy model. No v1 loader accepts legacy Broadset-owned records, and no compatibility alias changes persisted field names.
+
+#### Acceptance Criteria
+
+- [ ] Given a package-root-only consumer, it can structurally parse, semantically validate, canonicalize, hash, and reload a valid v1 project
+- [ ] Given canonical project JSON containing nested extension JSON values, a complete load and canonicalize round trip preserves the decoded JSON value
+- [ ] Given structurally or semantically invalid JSON text, loading returns typed diagnostics and the exact original text without inserting defaults
+- [ ] Given a legacy Broadset-owned project shape, the v1 load boundary quarantines it rather than migrating or aliasing it
+
 ## Requirements
 
 ### Requirement: Foundational Values
@@ -30,15 +53,7 @@ type ValueType =
   | 'list'
   | 'object';
 
-type AssetKind =
-  | 'image'
-  | 'video'
-  | 'audio'
-  | 'font'
-  | 'icc-profile'
-  | 'data'
-  | 'vector'
-  | 'foreign';
+type AssetKind = 'image' | 'video' | 'audio' | 'font' | 'icc-profile' | 'data' | 'vector' | 'foreign';
 
 type AssetValueSchema = {
   readonly kind: 'asset';
@@ -635,18 +650,18 @@ JSON Pointer is the empty string.
 
 The closed v1 property-target matrix is:
 
-| Entity kind | Approved pointer(s) and resulting `ValueType` |
-| --- | --- |
-| `element` | `/geometry/bounds/width|height` → `length`; `/geometry/origin` → `point3d`; affine `/geometry/transform/matrix/0..3` → `number`, `/4..5` → `length`; matrix3d `/0..11|15` → `number`, `/12..14` → `length`; `/appearance/opacity` → `number`; `/accessibility/label|description` → `string`; image/video/audio asset ID → `asset`; video autoplay/loop/muted/controls and audio autoplay/loop → `boolean`; audio volume → `number`; clock format/timeZone/locale → `string`; ticker direction → `string`, speed/gap → `number`, repeat → `boolean`; QR value/errorCorrection → `string`, quietZone → `length`; image focalPoint → `point2d`; text layout columns → `integer`, columnGap → `length`, verticalAlignment/overflow/autoSize → `string`, textPath startOffset → `length`; group clipChildren → `boolean`; foreign previewAssetId → `asset` |
-| `page-root` | `/visible` → `boolean`; transform tuple positions use the same affine/matrix3d mapping |
-| `text-run` | `/text` → `string`; `/properties/size` → `length`, color → `color`, weight → `integer`, baselineShift → `length`, tracking → `number`, hyperlink → `string` |
-| `paragraph` | alignment/direction/hyphenation → `string`; spacing/indents → `length`; keep flags → `boolean` |
-| `fill` | enabled → `boolean`, opacity → `number`, solid color → `color`, picture/pattern assetId → `asset` |
-| `stroke` | fill mappings plus width/dashOffset → `length` |
-| `effect` | enabled → `boolean`, opacity → `number`, radius/spread/depth/soften → `length`, offset/scale → `point2d`, color/highlightColor/shadowColor → `color`, amount → `number`, angle/altitude → `angle`, assetId → `asset` |
-| `gradient-stop` | color → `color`; opacity/offset/midpoint → `number` |
-| `path-point` | x/y → `length` |
-| `guide` | position → `length`; locked → `boolean` |
+| Entity kind     | Approved pointer(s) and resulting `ValueType`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `element`       | `/geometry/bounds/width\|height` → `length`; `/geometry/origin` → `point3d`; affine `/geometry/transform/matrix/0..3` → `number`, `/4..5` → `length`; matrix3d `/0..11\|15` → `number`, `/12..14` → `length`; `/appearance/opacity` → `number`; `/accessibility/label\|description` → `string`; image/video/audio asset ID → `asset`; video autoplay/loop/muted/controls and audio autoplay/loop → `boolean`; audio volume → `number`; clock format/timeZone/locale → `string`; ticker direction → `string`, speed/gap → `number`, repeat → `boolean`; QR value/errorCorrection → `string`, quietZone → `length`; image focalPoint → `point2d`; text layout columns → `integer`, columnGap → `length`, verticalAlignment/overflow/autoSize → `string`, textPath startOffset → `length`; group clipChildren → `boolean`; foreign previewAssetId → `asset` |
+| `page-root`     | `/visible` → `boolean`; transform tuple positions use the same affine/matrix3d mapping                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `text-run`      | `/text` → `string`; `/properties/size` → `length`, color → `color`, weight → `integer`, baselineShift → `length`, tracking → `number`, hyperlink → `string`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `paragraph`     | alignment/direction/hyphenation → `string`; spacing/indents → `length`; keep flags → `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `fill`          | enabled → `boolean`, opacity → `number`, solid color → `color`, picture/pattern assetId → `asset`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `stroke`        | fill mappings plus width/dashOffset → `length`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `effect`        | enabled → `boolean`, opacity → `number`, radius/spread/depth/soften → `length`, offset/scale → `point2d`, color/highlightColor/shadowColor → `color`, amount → `number`, angle/altitude → `angle`, assetId → `asset`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `gradient-stop` | color → `color`; opacity/offset/midpoint → `number`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `path-point`    | x/y → `length`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `guide`         | position → `length`; locked → `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 The actual element or nested variant MUST contain the conditional property before its pointer is
 accepted. Stable nested entity IDs and component/page `instancePath` provide identity. Collection

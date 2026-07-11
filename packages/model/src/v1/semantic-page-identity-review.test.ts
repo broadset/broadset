@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { createMinimalProjectV1, elementSchema, idSchema, validateBroadsetProjectV1Semantics } from './index';
+import { createMinimalProjectV1 } from './fixtures/minimal-project';
+import { elementSchema, idSchema, validateBroadsetProjectV1Semantics } from './index';
 import {
   createReviewComponent,
   createReviewComponentInstance,

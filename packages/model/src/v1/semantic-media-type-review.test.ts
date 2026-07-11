@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { assetSchema, createMinimalProjectV1, sha256DigestSchema, validateBroadsetProjectV1Semantics } from './index';
+import { createMinimalProjectV1 } from './fixtures/minimal-project';
+import { assetSchema, sha256DigestSchema, validateBroadsetProjectV1Semantics } from './index';
 import { parseReviewProject } from './semantic-review-fixtures';
 
 function createImageAsset(mediaType: string) {

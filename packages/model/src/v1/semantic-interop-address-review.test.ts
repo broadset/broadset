@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { createMinimalProjectV1, entityAddressSchema, resolveProjectEntityAddress, sha256DigestSchema } from './index';
+import { createMinimalProjectV1 } from './fixtures/minimal-project';
+import { entityAddressSchema, resolveProjectEntityAddress, sha256DigestSchema } from './index';
 import { createSemanticIndexes } from './semantic-index';
 import { createReviewGroup, parseReviewProject } from './semantic-review-fixtures';
 

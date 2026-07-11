@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { createMinimalProjectV1, validateBroadsetProjectV1Semantics } from './index';
+import { createMinimalProjectV1 } from './fixtures/minimal-project';
+import { validateBroadsetProjectV1Semantics } from './index';
 import { createReviewGroup, createReviewTarget, parseReviewProject } from './semantic-review-fixtures';
 
 function createStateProject(): ReturnType<typeof createMinimalProjectV1> {

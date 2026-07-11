@@ -6,11 +6,15 @@ export * from './data';
 export * from './diagnostics';
 export * from './document';
 export * from './element';
-export * from './fixtures/minimal-project';
 export * from './identity';
 export * from './interop';
 export * from './json-value';
-export { PROJECT_V1_LIMITS, type ProjectV1LimitCode,ProjectV1LimitError } from './limits';
+export {
+  PROJECT_V1_LIMITS,
+  type ProjectV1LimitCode,
+  ProjectV1LimitError,
+  type ProjectV1LimitViolation,
+} from './limits';
 export * from './load';
 export * from './output-profile';
 export * from './page';
