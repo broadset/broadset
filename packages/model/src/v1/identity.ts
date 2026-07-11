@@ -5,7 +5,7 @@ export type Sha256Digest = `sha256:${string}`;
 const C0_CONTROL_END = 0x1f;
 const DELETE_CONTROL = 0x7f;
 const C1_CONTROL_END = 0x9f;
-const SHA256_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
+const SHA256_HEXADECIMAL_PATTERN = /^[0-9a-f]{64}$/u;
 
 function hasControlCharacters(value: string): boolean {
   for (const character of value) {
@@ -34,10 +34,10 @@ export const utcTimestampSchema = z.iso.datetime({ offset: true }).brand<'UtcTim
 
 export type UtcTimestamp = z.infer<typeof utcTimestampSchema>;
 
-export const sha256DigestSchema: z.ZodType<Sha256Digest> = z.custom<Sha256Digest>(
-  (value) => typeof value === 'string' && SHA256_DIGEST_PATTERN.test(value),
-  'Expected a lowercase sha256 digest',
-);
+export const sha256DigestSchema: z.ZodType<Sha256Digest> = z.templateLiteral([
+  'sha256:',
+  z.string().regex(SHA256_HEXADECIMAL_PATTERN, 'Expected a lowercase sha256 digest'),
+]);
 
 export interface EntityAddress {
   readonly projectId: Id;

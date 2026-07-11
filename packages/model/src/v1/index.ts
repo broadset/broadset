@@ -1,4 +1,5 @@
 export * from './appearance';
+export * from './canonical-json';
 export * from './color';
 export * from './component';
 export * from './data';
@@ -9,6 +10,7 @@ export * from './fixtures/minimal-project';
 export * from './identity';
 export * from './interop';
 export * from './json-value';
+export * from './load';
 export * from './output-profile';
 export * from './page';
 export * from './project';

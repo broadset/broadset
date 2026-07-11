@@ -153,6 +153,8 @@ The generated block in §2.1 is the complete manifest baseline. Package manifest
 
 The generated snapshot is descriptive, not an authorization. Adding a new external dependency to any package remains an architecture decision per `AGENTS.md` → "Package boundary rules": it MUST be justified before or alongside the manifest change — in §7 for optional stack additions, or in a `decisions.md` entry/ADR for new baseline dependencies. Regenerating the baseline with `npm run docs:architecture` records the change but does not by itself authorize it.
 
+Zod is an explicit root development dependency because the project-schema generator executes the built model schema. Ajv is an explicit root development dependency used only to verify that the published JSON Schema 2020-12 project contract accepts and rejects the same structural corpus as the authoritative Zod v1 schema. Neither is added to a runtime package by this tooling.
+
 ---
 
 ## 6. Testing and Quality Baseline

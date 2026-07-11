@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -18,6 +18,7 @@ async function createFixture() {
   const root = await mkdtemp(path.join(tmpdir(), 'broadset-docs-'));
   await Promise.all([
     mkdir(path.join(root, 'project/implementation'), { recursive: true }),
+    mkdir(path.join(root, 'project/schema/v1'), { recursive: true }),
     mkdir(path.join(root, 'packages/example'), { recursive: true }),
     mkdir(path.join(root, 'agents/instructions'), { recursive: true }),
   ]);
@@ -45,6 +46,10 @@ async function createFixture() {
   await writeFile(
     path.join(root, 'project/implementation/plan-progress.md'),
     '# Tracker\n\n| W0-GOV-01 | proposed | unassigned | none | — | — |\n',
+  );
+  await writeFile(
+    path.join(root, 'project/schema/v1/project.schema.json'),
+    JSON.stringify({ $id: 'https://schema.broadset.dev/v1/project.schema.json' }),
   );
   return root;
 }
@@ -79,6 +84,40 @@ test('reports malformed strict JSON code fences', async () => {
   const findings = await checkDocumentation(root);
 
   assert.ok(findings.some((finding) => finding.code === 'invalid-json-fence'));
+});
+
+test('reports a missing published v1 project schema', async () => {
+  const root = await createFixture();
+  await rm(path.join(root, 'project/schema/v1/project.schema.json'));
+
+  const findings = await checkDocumentation(root);
+
+  assert.ok(findings.some((finding) => finding.code === 'project-schema-missing'));
+});
+
+test('reports drift in the published v1 project schema identity', async () => {
+  const root = await createFixture();
+  await mkdir(path.join(root, 'project/schema/v1'), { recursive: true });
+  await writeFile(
+    path.join(root, 'project/schema/v1/project.schema.json'),
+    JSON.stringify({ $id: 'https://schema.broadset.dev/v2/project.schema.json' }),
+  );
+
+  const findings = await checkDocumentation(root);
+
+  assert.ok(findings.some((finding) => finding.code === 'project-schema-id-drift'));
+});
+
+test('reports malformed published v1 project schema JSON or shape', async () => {
+  const root = await createFixture();
+  await writeFile(path.join(root, 'project/schema/v1/project.schema.json'), '{');
+
+  const malformedJsonFindings = await checkDocumentation(root);
+  await writeFile(path.join(root, 'project/schema/v1/project.schema.json'), 'null');
+  const malformedShapeFindings = await checkDocumentation(root);
+
+  assert.ok(malformedJsonFindings.some((finding) => finding.code === 'project-schema-invalid'));
+  assert.ok(malformedShapeFindings.some((finding) => finding.code === 'project-schema-invalid'));
 });
 
 test('reports removed phase workflow vocabulary in active guidance', async () => {

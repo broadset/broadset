@@ -20,3 +20,12 @@ export * from './style';
 export * from './text-body';
 export * from './text-path-validation';
 export * from './utilities';
+export * as projectFormatV1 from './v1';
+export { canonicalizeProjectV1, computeProjectSemanticHashV1 } from './v1/canonical-json';
+export {
+  loadProjectV1Json,
+  parseProjectV1Unknown,
+  type ProjectLoadOptions,
+  type ProjectLoadResult,
+  type ProjectParseResult,
+} from './v1/load';
