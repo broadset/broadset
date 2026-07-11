@@ -46,7 +46,7 @@ interface StructuralInferenceResult {
   readonly diagnostics: readonly Diagnostic[];
 }
 
-function valueSchemaType(schema: ValueSchema): ValueType {
+export function valueSchemaValueType(schema: ValueSchema): ValueType {
   switch (schema.kind) {
     case 'enum':
     case 'string':
@@ -337,7 +337,7 @@ function inferStructuralType(expression: ExpressionAst, context: ExpressionInfer
 
       return field === undefined
         ? { diagnostics: [createError('expression.field-not-found', 'Expression field was not found')] }
-        : { structuralType: { valueType: valueSchemaType(field.schema), schema: field.schema }, diagnostics: [] };
+        : { structuralType: { valueType: valueSchemaValueType(field.schema), schema: field.schema }, diagnostics: [] };
     }
 
     case 'variable': {
@@ -379,7 +379,7 @@ function inferGet(expression: Extract<ExpressionAst, { readonly kind: 'get' }>, 
 
   return field === undefined
     ? { diagnostics: [...source.diagnostics, createError('expression.object-field-not-found', 'Object field was not found')] }
-    : { structuralType: { valueType: valueSchemaType(field.schema), schema: field.schema }, diagnostics: source.diagnostics };
+    : { structuralType: { valueType: valueSchemaValueType(field.schema), schema: field.schema }, diagnostics: source.diagnostics };
 }
 
 function inferIndex(expression: Extract<ExpressionAst, { readonly kind: 'index' }>, context: ExpressionInferenceContext): StructuralInferenceResult {
@@ -400,7 +400,10 @@ function inferIndex(expression: Extract<ExpressionAst, { readonly kind: 'index' 
   }
 
   return {
-    structuralType: { valueType: valueSchemaType(source.structuralType.schema.items), schema: source.structuralType.schema.items },
+    structuralType: {
+      valueType: valueSchemaValueType(source.structuralType.schema.items),
+      schema: source.structuralType.schema.items,
+    },
     diagnostics,
   };
 }

@@ -194,7 +194,7 @@ export const valueSchemaSchema: z.ZodType<ValueSchema> = z.lazy(() =>
   ]),
 );
 
-function typedValueMatchesSchema(value: TypedValue, schema: ValueSchema): boolean {
+export function typedValueMatchesSchema(value: TypedValue, schema: ValueSchema): boolean {
   switch (schema.kind) {
     case 'string':
       return (
@@ -401,5 +401,10 @@ export const expressionInferenceContextSchema: z.ZodType<ExpressionInferenceCont
   targets: z.array(z.strictObject({ target: propertyTargetSchema, valueType: valueTypeSchema })),
 });
 
-export { inferBindingValueType, inferExpressionValueType, inferFormatterPipelineValueType } from './data-inference';
+export {
+  inferBindingValueType,
+  inferExpressionValueType,
+  inferFormatterPipelineValueType,
+  valueSchemaValueType,
+} from './data-inference';
 export { inferExpressionStructuralValueType, validateBooleanExpressionStructure } from './expression-structure';
