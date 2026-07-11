@@ -372,12 +372,15 @@ test('pins the armed/dormant state of the cross-spec checks against this reposit
 
   const activation = await reportCrossSpecCheckActivation(repoRoot);
 
+  // Re-pinned for the project format v1 specs: the v1 contract docs arm the animation
+  // reject-mode, component nested-instance, and page descendant-parent-relative checks that
+  // were dormant on the pre-v1 baseline. docs:check validates these armed contracts pass.
   assert.deepEqual(activation, {
-    animation: { modelMode: 'ignore', referenceMode: 'ignore' },
-    componentHost: { nestedInstancesProposed: null, documentOnlyHostRule: false },
+    animation: { modelMode: 'reject', referenceMode: 'reject' },
+    componentHost: { nestedInstancesProposed: true, documentOnlyHostRule: false },
     pageCoordinates: {
-      descendantParentRelative: false,
-      canvasOriginPosition: true,
+      descendantParentRelative: true,
+      canvasOriginPosition: false,
       rootVersusDescendantResolution: false,
     },
     reorderSemantics: { stableAnchorPayloads: false, twoReorderScenario: true, batchRelativeGuard: false },

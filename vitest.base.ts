@@ -38,7 +38,11 @@ export const createVitestConfig = ({ environment }: BroadsetVitestOptions): Vite
     // Coverage instrumentation slows hot loops measurably; allow
     // longer timeouts when coverage is on so the SVG fan-out / large-
     // deck stress tests don't false-fail under v8 instrumentation.
-    testTimeout: process.env['VITEST_COVERAGE'] === '1' ? 60_000 : 5_000,
+    // The default is generous enough that heavy tsc-program and React
+    // component suites don't false-fail on contended machines (e.g. the
+    // full quality gate running many workers at once); dedicated CI is
+    // faster and unaffected.
+    testTimeout: process.env['VITEST_COVERAGE'] === '1' ? 60_000 : 20_000,
     /*
      * V8-backed coverage collection. Coverage is **opt-in** via
      * `VITEST_COVERAGE=1` so the default `npm run test` path stays

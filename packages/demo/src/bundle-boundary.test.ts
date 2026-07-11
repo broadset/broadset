@@ -1,5 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -98,7 +98,7 @@ describe('demo lazy-formats bundle boundary', () => {
 
     for (const file of files) {
       const source = await readFile(file, 'utf8');
-      const fileName = file.split('/').pop() ?? '';
+      const fileName = basename(file);
       const dynamicMatches = source.match(DYNAMIC_IMPORT) ?? [];
 
       if (dynamicMatches.length === 0) continue;
