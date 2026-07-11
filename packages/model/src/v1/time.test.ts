@@ -22,7 +22,7 @@ describe('exact rational time', () => {
     expect(() => reduceRational(Number.MAX_SAFE_INTEGER + 1, 1)).toThrow(RangeError);
   });
 
-  it('requires reduced positive safe-integer rationals', () => {
+  it('structurally requires positive safe-integer rational terms and defers reduction', () => {
     expect(rationalSchema.parse({ numerator: 30_000, denominator: 1_001 })).toEqual({
       numerator: 30_000,
       denominator: 1_001,
@@ -31,12 +31,13 @@ describe('exact rational time', () => {
     for (const value of [
       { numerator: 0, denominator: 1 },
       { numerator: 1, denominator: -1 },
-      { numerator: 60_000, denominator: 2_002 },
       { numerator: 1.5, denominator: 1 },
       { numerator: Number.MAX_SAFE_INTEGER + 1, denominator: 1 },
     ]) {
       expect(rationalSchema.safeParse(value).success).toBe(false);
     }
+
+    expect(rationalSchema.safeParse({ numerator: 60_000, denominator: 2_002 }).success).toBe(true);
   });
 
   it.each([
@@ -83,7 +84,7 @@ describe('exact rational time', () => {
     }
   });
 
-  it('rejects every unsupported drop-frame family and mismatched nominal annotation', () => {
+  it('structurally accepts but operationally rejects unsupported timecode annotations', () => {
     const invalidAnnotations = [
       [24_000, 1_001, 24, true],
       [24, 1, 24, true],
@@ -100,12 +101,12 @@ describe('exact rational time', () => {
     ] as const;
 
     for (const [numerator, denominator, nominalFramesPerSecond, dropFrame] of invalidAnnotations) {
-      expect(
-        timebaseSchema.safeParse({
-          ...createTimebase(numerator, denominator),
-          timecode: { nominalFramesPerSecond, dropFrame },
-        }).success,
-      ).toBe(false);
+      const timebase = timebaseSchema.parse({
+        ...createTimebase(numerator, denominator),
+        timecode: { nominalFramesPerSecond, dropFrame },
+      });
+
+      expect(() => frameStartTicks(0, timebase)).toThrow(RangeError);
     }
   });
 
@@ -122,21 +123,32 @@ describe('exact rational time', () => {
     ] as const;
 
     for (const [numerator, denominator, nominal, supportsDropFrame] of rates) {
-      const parseAnnotation = (nominalFramesPerSecond: number, dropFrame: boolean) =>
-        timebaseSchema.safeParse({
+      const acceptsAnnotation = (nominalFramesPerSecond: number, dropFrame: boolean) => {
+        const timebase = timebaseSchema.parse({
           ...createTimebase(numerator, denominator),
           timecode: { nominalFramesPerSecond, dropFrame },
-        }).success;
+        });
 
-      expect(parseAnnotation(nominal, false)).toBe(true);
-      expect(parseAnnotation(nominal + 1, false)).toBe(false);
-      expect(parseAnnotation(nominal, true)).toBe(supportsDropFrame);
-      expect(parseAnnotation(nominal + 1, true)).toBe(false);
+        try {
+          frameStartTicks(0, timebase);
+
+          return true;
+        } catch {
+          return false;
+        }
+      };
+
+      expect(acceptsAnnotation(nominal, false)).toBe(true);
+      expect(acceptsAnnotation(nominal + 1, false)).toBe(false);
+      expect(acceptsAnnotation(nominal, true)).toBe(supportsDropFrame);
+      expect(acceptsAnnotation(nominal + 1, true)).toBe(false);
     }
   });
 
-  it('rejects fractional frame ticks', () => {
-    expect(timebaseSchema.safeParse({ ...createTimebase(24, 1), ticksPerSecond: 1 }).success).toBe(false);
+  it('defers fractional frame-tick rejection to operational semantics', () => {
+    const timebase = timebaseSchema.parse({ ...createTimebase(24, 1), ticksPerSecond: 1 });
+
+    expect(() => frameStartTicks(0, timebase)).toThrow(RangeError);
   });
 
   it('uses half-open duration frame counting and containing-frame lookup', () => {

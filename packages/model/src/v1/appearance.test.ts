@@ -62,7 +62,7 @@ describe('paintSchema', () => {
     expect(paintSchema.safeParse(gradient).success).toBe(true);
   });
 
-  it('rejects duplicate gradient stop ids and raw CSS paints', () => {
+  it('defers duplicate gradient stop ids but rejects raw CSS paints', () => {
     const duplicateStops = {
       kind: 'gradient',
       gradient: {
@@ -80,7 +80,7 @@ describe('paintSchema', () => {
       },
     };
 
-    expect(paintSchema.safeParse(duplicateStops).success).toBe(false);
+    expect(paintSchema.safeParse(duplicateStops).success).toBe(true);
     expect(paintSchema.safeParse('linear-gradient(red, blue)').success).toBe(false);
   });
 
@@ -123,10 +123,15 @@ describe('paintSchema', () => {
   it.each([
     { x: -0.01, y: 0, width: 1, height: 1 },
     { x: 0, y: 0, width: 1.01, height: 1 },
+  ])('structurally rejects out-of-range picture crop $x/$y/$width/$height', (crop) => {
+    expect(paintSchema.safeParse({ kind: 'picture', assetId: 'asset-a', fit: 'cover', crop }).success).toBe(false);
+  });
+
+  it.each([
     { x: 0.2, y: 0, width: 0.9, height: 1 },
     { x: 0, y: 0.2, width: 1, height: 0.9 },
-  ])('rejects out-of-range picture crop $x/$y/$width/$height', (crop) => {
-    expect(paintSchema.safeParse({ kind: 'picture', assetId: 'asset-a', fit: 'cover', crop }).success).toBe(false);
+  ])('defers crop extent arithmetic $x/$y/$width/$height', (crop) => {
+    expect(paintSchema.safeParse({ kind: 'picture', assetId: 'asset-a', fit: 'cover', crop }).success).toBe(true);
   });
 });
 
@@ -247,11 +252,11 @@ describe('appearanceSchema', () => {
     expect(appearanceSchema.parse(appearance)).toEqual(appearance);
   });
 
-  it('rejects duplicate layer ids, malformed strokes, and unknown fields', () => {
+  it('defers duplicate layer ids while rejecting malformed strokes and unknown fields', () => {
     const base = { opacity: 1, blendMode: 'normal', isolation: false, strokes: [], effects: [] };
     const fill = { id: 'same', enabled: true, opacity: 1, blendMode: 'normal', paint: { kind: 'none' } };
 
-    expect(appearanceSchema.safeParse({ ...base, fills: [fill, fill] }).success).toBe(false);
+    expect(appearanceSchema.safeParse({ ...base, fills: [fill, fill] }).success).toBe(true);
     expect(appearanceSchema.safeParse({ ...base, fills: [], strokes: [{ ...fill, width: -1 }] }).success).toBe(false);
     expect(appearanceSchema.safeParse({ ...base, fills: [], customClipPath: 'polygon(0 0)' }).success).toBe(false);
   });

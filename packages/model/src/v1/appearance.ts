@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { type ColorValue, colorValueSchema } from './color';
 import { type Id, idSchema } from './identity';
-import { nonEmptyStringSchema, validateUniqueIds } from './schema-helpers';
+import { nonEmptyStringSchema } from './schema-helpers';
 
 export type BlendMode =
   | 'normal'
@@ -238,18 +238,12 @@ export const affine2dSchema: z.ZodType<Affine2D> = z.strictObject({
   matrix: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number(), z.number()]),
 });
 
-export const normalizedRectSchema: z.ZodType<NormalizedRect> = z
-  .strictObject({
-    x: normalizedNumberSchema,
-    y: normalizedNumberSchema,
-    width: normalizedNumberSchema,
-    height: normalizedNumberSchema,
-  })
-  .superRefine((rect, context) => {
-    if (rect.x + rect.width > 1 || rect.y + rect.height > 1) {
-      context.addIssue({ code: 'custom', message: 'Normalized rectangle must remain within bounds' });
-    }
-  });
+export const normalizedRectSchema: z.ZodType<NormalizedRect> = z.strictObject({
+  x: normalizedNumberSchema,
+  y: normalizedNumberSchema,
+  width: normalizedNumberSchema,
+  height: normalizedNumberSchema,
+});
 
 const gradientStopSchema: z.ZodType<GradientStop> = z.strictObject({
   id: idSchema,
@@ -267,28 +261,24 @@ const gradientBaseShape = {
   interpolation: z.enum(['srgb', 'linear-srgb', 'oklab']),
 };
 
-export const gradientSchema: z.ZodType<Gradient> = z
-  .discriminatedUnion('kind', [
-    z.strictObject({ ...gradientBaseShape, kind: z.literal('linear'), start: pointSchema, end: pointSchema }),
-    z.strictObject({
-      ...gradientBaseShape,
-      kind: z.literal('radial'),
-      center: pointSchema,
-      radius: pointSchema,
-      focalPoint: pointSchema.optional(),
-    }),
-    z.strictObject({ ...gradientBaseShape, kind: z.literal('conic'), center: pointSchema, startAngle: z.number() }),
-    z.strictObject({ ...gradientBaseShape, kind: z.literal('diamond'), center: pointSchema, radius: pointSchema }),
-    z.strictObject({
-      ...gradientBaseShape,
-      kind: z.literal('producer-preserved'),
-      producer: nonEmptyStringSchema,
-      typeName: nonEmptyStringSchema,
-    }),
-  ])
-  .superRefine((gradient, context) => {
-    validateUniqueIds({ items: gradient.stops, context, path: ['stops'] });
-  });
+export const gradientSchema: z.ZodType<Gradient> = z.discriminatedUnion('kind', [
+  z.strictObject({ ...gradientBaseShape, kind: z.literal('linear'), start: pointSchema, end: pointSchema }),
+  z.strictObject({
+    ...gradientBaseShape,
+    kind: z.literal('radial'),
+    center: pointSchema,
+    radius: pointSchema,
+    focalPoint: pointSchema.optional(),
+  }),
+  z.strictObject({ ...gradientBaseShape, kind: z.literal('conic'), center: pointSchema, startAngle: z.number() }),
+  z.strictObject({ ...gradientBaseShape, kind: z.literal('diamond'), center: pointSchema, radius: pointSchema }),
+  z.strictObject({
+    ...gradientBaseShape,
+    kind: z.literal('producer-preserved'),
+    producer: nonEmptyStringSchema,
+    typeName: nonEmptyStringSchema,
+  }),
+]);
 
 export const paintSchema: z.ZodType<Paint> = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('none') }),
@@ -442,19 +432,13 @@ const maskDefinitionSchema: z.ZodType<MaskDefinition> = z.discriminatedUnion('ki
   z.strictObject({ kind: z.literal('asset'), assetId: idSchema, mode: z.enum(['alpha', 'luminance']) }),
 ]);
 
-export const appearanceSchema: z.ZodType<Appearance> = z
-  .strictObject({
-    opacity: normalizedNumberSchema,
-    blendMode: blendModeSchema,
-    isolation: z.boolean(),
-    fills: z.array(fillLayerSchema),
-    strokes: z.array(strokeLayerSchema),
-    effects: z.array(effectSchema),
-    clip: clipDefinitionSchema.optional(),
-    mask: maskDefinitionSchema.optional(),
-  })
-  .superRefine((appearance, context) => {
-    validateUniqueIds({ items: appearance.fills, context, path: ['fills'] });
-    validateUniqueIds({ items: appearance.strokes, context, path: ['strokes'] });
-    validateUniqueIds({ items: appearance.effects, context, path: ['effects'] });
-  });
+export const appearanceSchema: z.ZodType<Appearance> = z.strictObject({
+  opacity: normalizedNumberSchema,
+  blendMode: blendModeSchema,
+  isolation: z.boolean(),
+  fills: z.array(fillLayerSchema),
+  strokes: z.array(strokeLayerSchema),
+  effects: z.array(effectSchema),
+  clip: clipDefinitionSchema.optional(),
+  mask: maskDefinitionSchema.optional(),
+});

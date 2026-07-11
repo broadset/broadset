@@ -2,35 +2,22 @@ import { z } from 'zod';
 
 export type Sha256Digest = `sha256:${string}`;
 
-const C0_CONTROL_END = 0x1f;
-const DELETE_CONTROL = 0x7f;
-const C1_CONTROL_END = 0x9f;
 const SHA256_HEXADECIMAL_PATTERN = /^[0-9a-f]{64}$/u;
-
-function hasControlCharacters(value: string): boolean {
-  for (const character of value) {
-    const codePoint = character.codePointAt(0);
-
-    if (
-      codePoint !== undefined &&
-      (codePoint <= C0_CONTROL_END || (codePoint >= DELETE_CONTROL && codePoint <= C1_CONTROL_END))
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
+const CONTROL_CHARACTER_RANGES = ['\\x00-', '\\x1f', '\\x7f-', '\\x9f'].join('');
+const ID_PATTERN = new RegExp(`^[^${CONTROL_CHARACTER_RANGES}]+$`, 'u');
 
 export const idSchema = z
   .string()
   .min(1)
-  .refine((value) => !hasControlCharacters(value), 'IDs must not contain control characters')
+  .regex(ID_PATTERN, 'IDs must not contain control characters')
   .brand<'Id'>();
 
 export type Id = z.infer<typeof idSchema>;
 
-export const utcTimestampSchema = z.iso.datetime({ offset: true }).brand<'UtcTimestamp'>();
+export const utcTimestampSchema = z.iso
+  .datetime({ offset: true })
+  .regex(/T[0-2]\d:[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-][0-2]\d:[0-5]\d)$/u)
+  .brand<'UtcTimestamp'>();
 
 export type UtcTimestamp = z.infer<typeof utcTimestampSchema>;
 
@@ -57,33 +44,7 @@ export const entityAddressSchema: z.ZodType<EntityAddress> = z.strictObject({
   instancePath: z.array(idSchema).optional(),
 });
 
-export const jsonPointerSchema = z.string().superRefine((pointer, context) => {
-  if (pointer === '') {
-    return;
-  }
-
-  if (!pointer.startsWith('/')) {
-    context.addIssue({ code: 'custom', message: 'Expected an RFC 6901 JSON Pointer' });
-
-    return;
-  }
-
-  for (let index = 0; index < pointer.length; index += 1) {
-    if (pointer[index] !== '~') {
-      continue;
-    }
-
-    const escaped = pointer[index + 1];
-
-    if (escaped !== '0' && escaped !== '1') {
-      context.addIssue({ code: 'custom', message: 'Invalid RFC 6901 escape' });
-
-      return;
-    }
-
-    index += 1;
-  }
-});
+export const jsonPointerSchema = z.string().regex(/^(?:\/(?:[^~/]|~[01])*)*$/u, 'Expected an RFC 6901 JSON Pointer');
 
 export interface PropertyTarget {
   readonly entity: EntityAddress;

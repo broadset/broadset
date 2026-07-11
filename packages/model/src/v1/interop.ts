@@ -71,6 +71,12 @@ export const interopDiagnosticSchema: z.ZodType<InteropDiagnostic> = z
   })
   .refine(({ pointer, entity }) => pointer !== undefined || entity !== undefined, {
     message: 'Interop diagnostics require a pointer or entity',
+  })
+  .meta({
+    anyOf: [
+      { type: 'object', properties: { pointer: {} }, required: ['pointer'], 'x-broadset-partial': true },
+      { type: 'object', properties: { entity: {} }, required: ['entity'], 'x-broadset-partial': true },
+    ],
   });
 
 export const interopRecordSchema: z.ZodType<InteropRecord> = z.strictObject({

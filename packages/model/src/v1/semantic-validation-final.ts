@@ -287,6 +287,7 @@ function validateSharedStyle(
   indexes: SemanticIndexes,
   style: SharedStyle,
   stylePosition: number,
+  cyclicStyleIds: ReadonlySet<Id>,
   diagnostics: Diagnostic[],
 ): void {
   const targetId = style.source.kind === 'alias' ? style.source.styleId : style.source.inheritedStyleId;
@@ -299,7 +300,7 @@ function validateSharedStyle(
     if (target === undefined) diagnostics.push(createSemanticError('resource.missing-reference', 'Shared style does not resolve', referencePointer));
     else {
       if (target.kind !== style.kind) diagnostics.push(createSemanticError('style.incompatible-inheritance', 'Shared-style kinds are incompatible', referencePointer));
-      if (targetId === style.id || styleReaches(indexes, targetId, style.id, new Set())) diagnostics.push(createSemanticError('style.cycle', 'Shared-style dependency cycle', referencePointer));
+      if (cyclicStyleIds.has(style.id)) diagnostics.push(createSemanticError('style.cycle', 'Shared-style dependency cycle', referencePointer));
     }
   }
 
@@ -318,18 +319,40 @@ function validateSharedStyle(
   if (style.kind === 'text') validateStyleFontReferences(indexes, style, entries, pointer, diagnostics);
 }
 
-function styleReaches(indexes: SemanticIndexes, startId: Id, targetId: Id, seen: ReadonlySet<Id>): boolean {
-  if (seen.has(startId)) return false;
+function findCyclicStyleIds(indexes: SemanticIndexes): ReadonlySet<Id> {
+  const processed = new Set<Id>();
+  const cyclic = new Set<Id>();
 
-  const style = indexes.styles.get(startId);
+  indexes.project.resources.styles.forEach((style) => {
+    if (processed.has(style.id)) return;
 
-  if (style === undefined) return false;
+    const path: Id[] = [];
+    const positions = new Map<Id, number>();
+    let current: SharedStyle | undefined = style;
 
-  const nextId = style.source.kind === 'alias' ? style.source.styleId : style.source.inheritedStyleId;
+    while (current !== undefined && !processed.has(current.id)) {
+      const cycleStart = positions.get(current.id);
 
-  if (nextId === undefined) return false;
+      if (cycleStart !== undefined) {
+        path.slice(cycleStart).forEach((id) => cyclic.add(id));
+        break;
+      }
 
-  return nextId === targetId || styleReaches(indexes, nextId, targetId, new Set([...seen, startId]));
+      positions.set(current.id, path.length);
+      path.push(current.id);
+
+      let nextId: Id | undefined;
+
+      if (current.source.kind === 'alias') nextId = current.source.styleId;
+      else nextId = current.source.inheritedStyleId;
+
+      current = nextId === undefined ? undefined : indexes.styles.get(nextId);
+    }
+
+    path.forEach((id) => processed.add(id));
+  });
+
+  return cyclic;
 }
 
 export function validateAdditionalResources(indexes: SemanticIndexes, diagnostics: Diagnostic[]): void {
@@ -352,8 +375,11 @@ export function validateAdditionalResources(indexes: SemanticIndexes, diagnostic
       if (face.source.kind === 'asset') validateAssetReference(indexes, face.source.assetId, ['font'], `/resources/fonts/${String(fontPosition)}/faces/${String(index)}/source/assetId`, diagnostics);
     });
   });
+
+  const cyclicStyleIds = findCyclicStyleIds(indexes);
+
   indexes.project.resources.styles.forEach((style, stylePosition) => {
-    validateSharedStyle(indexes, style, stylePosition, diagnostics);
+    validateSharedStyle(indexes, style, stylePosition, cyclicStyleIds, diagnostics);
   });
   indexes.documentList.forEach(({ document }, documentPosition) => {
     document.elements.forEach((element, elementPosition) => {

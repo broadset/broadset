@@ -120,22 +120,22 @@ describe('pageDefinitionSchema', () => {
     expect(pageDefinitionSchema.safeParse(createPage([root])).success).toBe(true);
   });
 
-  it('rejects duplicate root instance ids without rejecting a repeated definition id', () => {
+  it('defers duplicate root instance ids and permits a repeated definition id structurally', () => {
     expect(
       pageDefinitionSchema.safeParse(
         createPage([createRootInstance('same-instance', 'shared-root'), createRootInstance('same-instance', 'other-root')]),
       ).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it('rejects duplicate descendant instance addresses', () => {
+  it('defers duplicate descendant instance addresses', () => {
     const page = createPage([createRootInstance('instance-a', 'shared-root')]);
     const descendant = page.descendantOverrides[0];
 
-    expect(pageDefinitionSchema.safeParse({ ...page, descendantOverrides: [descendant, descendant] }).success).toBe(false);
+    expect(pageDefinitionSchema.safeParse({ ...page, descendantOverrides: [descendant, descendant] }).success).toBe(true);
   });
 
-  it('rejects duplicate sparse override targets within one instance layer', () => {
+  it('defers duplicate sparse override targets within one instance layer', () => {
     const target = {
       entity: { projectId: 'project-1', entityKind: 'element', entityId: 'shared-root' },
       pointer: '/appearance/opacity',
@@ -143,7 +143,7 @@ describe('pageDefinitionSchema', () => {
     const override = { target, value: { type: 'number', value: 0.5 } };
     const root = { ...createRootInstance('instance-a', 'shared-root'), overrides: [override, override] };
 
-    expect(pageDefinitionSchema.safeParse(createPage([root])).success).toBe(false);
+    expect(pageDefinitionSchema.safeParse(createPage([root])).success).toBe(true);
   });
 
   it('rejects unknown fields at every page layer', () => {

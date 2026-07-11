@@ -1,19 +1,15 @@
 import { z } from 'zod';
 
 import { type ColorValue, colorValueSchema } from './color';
-import { type ExpressionAst, expressionAstSchema, validateBooleanExpressionStructure } from './data';
+import { type ExpressionAst, expressionAstSchema } from './data';
 import { type StructuredPath, structuredPathSchema } from './element';
 import { type Id, idSchema, type PropertyTarget, propertyTargetSchema } from './identity';
-import { nonEmptyStringSchema, validateUniqueIds } from './schema-helpers';
+import { nonEmptyStringSchema, nonNegativeSafeIntegerSchema, positiveSafeIntegerSchema } from './schema-helpers';
 import { type TypedValue, typedValueSchema, type ValueType, valueTypeSchema } from './typed-value';
 
-const nonNegativeSafeIntegerSchema = z.number().refine((value) => Number.isSafeInteger(value) && value >= 0);
-const positiveSafeIntegerSchema = z.number().refine((value) => Number.isSafeInteger(value) && value > 0);
 const nonNegativeFiniteNumberSchema = z.number().nonnegative();
 const positiveFiniteNumberSchema = z.number().positive();
-const timeRangeSchema = z
-  .tuple([nonNegativeSafeIntegerSchema, nonNegativeSafeIntegerSchema])
-  .refine(([startTick, endTick]) => startTick < endTick, 'Time range must be non-empty and ordered');
+const timeRangeSchema = z.tuple([nonNegativeSafeIntegerSchema, nonNegativeSafeIntegerSchema]);
 
 export type LoopDefinition =
   | { readonly kind: 'none' }
@@ -176,7 +172,7 @@ export const keyframeSchema: z.ZodType<Keyframe> = z.strictObject({
   interpolation: interpolationSchema.optional(),
 });
 
-function interpolationMatchesType(interpolation: Interpolation, valueType: ValueType): boolean {
+export function interpolationMatchesType(interpolation: Interpolation, valueType: ValueType): boolean {
   if (interpolation.kind === 'hold' || interpolation.kind === 'step') return true;
   if (interpolation.kind === 'counting') return valueType === 'string';
   if (interpolation.kind === 'color') return valueType === 'color';
@@ -185,54 +181,13 @@ function interpolationMatchesType(interpolation: Interpolation, valueType: Value
   return ['integer', 'number', 'length', 'angle', 'point2d', 'point3d'].includes(valueType);
 }
 
-export const trackSchema: z.ZodType<Track> = z
-  .strictObject({
-    id: idSchema,
-    name: nonEmptyStringSchema,
-    target: propertyTargetSchema,
-    valueType: valueTypeSchema,
-    keyframes: z.array(keyframeSchema).min(1),
-  })
-  .superRefine((track, context) => {
-    validateUniqueIds({ items: track.keyframes, context, path: ['keyframes'] });
-    track.keyframes.forEach((keyframe, index) => {
-      if (keyframe.value.type !== track.valueType) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Keyframe value must match track valueType',
-          path: ['keyframes', index, 'value'],
-        });
-      }
-
-      const previousKeyframe = track.keyframes[index - 1];
-
-      if (previousKeyframe !== undefined && keyframe.tick <= previousKeyframe.tick) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Keyframe ticks must be strictly increasing',
-          path: ['keyframes', index, 'tick'],
-        });
-      }
-
-      const isFinal = index === track.keyframes.length - 1;
-
-      if (isFinal === (keyframe.interpolation !== undefined)) {
-        context.addIssue({
-          code: 'custom',
-          message: isFinal ? 'Final keyframe forbids interpolation' : 'Non-final keyframe requires interpolation',
-          path: ['keyframes', index, 'interpolation'],
-        });
-      }
-
-      if (keyframe.interpolation !== undefined && !interpolationMatchesType(keyframe.interpolation, track.valueType)) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Interpolation is incompatible with track valueType',
-          path: ['keyframes', index, 'interpolation'],
-        });
-      }
-    });
-  });
+export const trackSchema: z.ZodType<Track> = z.strictObject({
+  id: idSchema,
+  name: nonEmptyStringSchema,
+  target: propertyTargetSchema,
+  valueType: valueTypeSchema,
+  keyframes: z.array(keyframeSchema).min(1),
+});
 
 export const markerSchema: z.ZodType<Marker> = z.strictObject({
   id: idSchema,
@@ -284,87 +239,17 @@ export const sequenceClipSchema: z.ZodType<SequenceClip> = z.strictObject({
     .optional(),
 });
 
-export const sequenceSchema: z.ZodType<Sequence> = z
-  .strictObject({
-    id: idSchema,
-    name: nonEmptyStringSchema,
-    durationTicks: nonNegativeSafeIntegerSchema,
-    workArea: timeRangeSchema.optional(),
-    loop: loopDefinitionSchema,
-    tracks: z.array(trackSchema),
-    markers: z.array(markerSchema),
-    cues: z.array(cueSchema),
-    childClips: z.array(sequenceClipSchema),
-  })
-  .superRefine((sequence, context) => {
-    validateUniqueIds({ items: sequence.tracks, context, path: ['tracks'] });
-    validateUniqueIds({ items: sequence.markers, context, path: ['markers'] });
-    validateUniqueIds({ items: sequence.cues, context, path: ['cues'] });
-    validateUniqueIds({ items: sequence.childClips, context, path: ['childClips'] });
-
-    if (sequence.workArea !== undefined && sequence.workArea[1] > sequence.durationTicks) {
-      context.addIssue({ code: 'custom', message: 'Work area exceeds sequence duration', path: ['workArea'] });
-    }
-
-    sequence.tracks.forEach((track, trackIndex) => {
-      track.keyframes.forEach((keyframe, keyframeIndex) => {
-        if (keyframe.tick > sequence.durationTicks)
-          context.addIssue({
-            code: 'custom',
-            message: 'Keyframe exceeds sequence duration',
-            path: ['tracks', trackIndex, 'keyframes', keyframeIndex, 'tick'],
-          });
-      });
-    });
-    sequence.markers.forEach((marker, index) => {
-      if (marker.tick > sequence.durationTicks)
-        context.addIssue({
-          code: 'custom',
-          message: 'Marker exceeds sequence duration',
-          path: ['markers', index, 'tick'],
-        });
-    });
-    sequence.cues.forEach((cue, index) => {
-      if (cue.tick > sequence.durationTicks)
-        context.addIssue({ code: 'custom', message: 'Cue exceeds sequence duration', path: ['cues', index, 'tick'] });
-    });
-    sequence.childClips.forEach((clip, index) => {
-      if (clip.outputRange[1] > sequence.durationTicks)
-        context.addIssue({
-          code: 'custom',
-          message: 'Child clip exceeds sequence duration',
-          path: ['childClips', index, 'outputRange'],
-        });
-
-      if (clip.stagger !== undefined) {
-        const maximumEnd =
-          BigInt(clip.outputRange[1]) +
-          BigInt(clip.stagger.index) * BigInt(clip.stagger.intervalTicks) +
-          BigInt(clip.stagger.jitterTicks);
-
-        if (maximumEnd > BigInt(sequence.durationTicks)) {
-          context.addIssue({
-            code: 'custom',
-            message: 'Staggered child clip exceeds sequence duration',
-            path: ['childClips', index, 'stagger'],
-          });
-        }
-      }
-    });
-
-    if (sequence.loop.kind !== 'none' && sequence.loop.count !== undefined) {
-      const count = BigInt(sequence.loop.count);
-      const transportDuration = BigInt(sequence.durationTicks) * count + BigInt(sequence.loop.gapTicks) * (count - 1n);
-
-      if (transportDuration > BigInt(Number.MAX_SAFE_INTEGER)) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Finite loop duration exceeds the safe integer range',
-          path: ['loop'],
-        });
-      }
-    }
-  });
+export const sequenceSchema: z.ZodType<Sequence> = z.strictObject({
+  id: idSchema,
+  name: nonEmptyStringSchema,
+  durationTicks: nonNegativeSafeIntegerSchema,
+  workArea: timeRangeSchema.optional(),
+  loop: loopDefinitionSchema,
+  tracks: z.array(trackSchema),
+  markers: z.array(markerSchema),
+  cues: z.array(cueSchema),
+  childClips: z.array(sequenceClipSchema),
+});
 
 export type SequenceAction =
   | { readonly kind: 'play-sequence'; readonly sequenceId: Id; readonly behavior: 'restart' | 'resume' }
@@ -432,17 +317,13 @@ export const stateValueSchema: z.ZodType<StateValue> = z.strictObject({
   target: propertyTargetSchema,
   value: typedValueSchema,
 });
-export const stateSchema: z.ZodType<State> = z
-  .strictObject({
-    id: idSchema,
-    name: nonEmptyStringSchema,
-    values: z.array(stateValueSchema),
-    entryActions: z.array(sequenceActionSchema),
-    exitActions: z.array(sequenceActionSchema),
-  })
-  .superRefine((state, context) => {
-    validateUniqueIds({ items: state.values, context, path: ['values'] });
-  });
+export const stateSchema: z.ZodType<State> = z.strictObject({
+  id: idSchema,
+  name: nonEmptyStringSchema,
+  values: z.array(stateValueSchema),
+  entryActions: z.array(sequenceActionSchema),
+  exitActions: z.array(sequenceActionSchema),
+});
 export const transitionTriggerSchema: z.ZodType<TransitionTrigger> = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('event'), eventId: idSchema }),
   z.strictObject({ kind: z.literal('lifecycle'), phase: z.enum(['in', 'hold', 'update', 'out']) }),
@@ -458,98 +339,10 @@ export const transitionSchema: z.ZodType<Transition> = z.strictObject({
   actions: z.array(sequenceActionSchema),
 });
 
-interface TransitionPriorityIndex {
-  readonly events: Map<Id, Set<number>>;
-  readonly lifecycles: Map<Extract<TransitionTrigger, { readonly kind: 'lifecycle' }>['phase'], Set<number>>;
-  readonly delays: Map<number, Set<number>>;
-}
-
-function createTransitionPriorityIndex(): TransitionPriorityIndex {
-  return { events: new Map(), lifecycles: new Map(), delays: new Map() };
-}
-
-function getTriggerPriorities(index: TransitionPriorityIndex, trigger: TransitionTrigger): Set<number> {
-  if (trigger.kind === 'event') {
-    const priorities = index.events.get(trigger.eventId) ?? new Set<number>();
-
-    index.events.set(trigger.eventId, priorities);
-
-    return priorities;
-  }
-
-  if (trigger.kind === 'lifecycle') {
-    const priorities = index.lifecycles.get(trigger.phase) ?? new Set<number>();
-
-    index.lifecycles.set(trigger.phase, priorities);
-
-    return priorities;
-  }
-
-  const priorities = index.delays.get(trigger.ticks) ?? new Set<number>();
-
-  index.delays.set(trigger.ticks, priorities);
-
-  return priorities;
-}
-
-export const stateMachineSchema: z.ZodType<StateMachine> = z
-  .strictObject({
-    id: idSchema,
-    name: nonEmptyStringSchema,
-    initialStateId: idSchema,
-    states: z.array(stateSchema).min(1),
-    transitions: z.array(transitionSchema),
-  })
-  .superRefine((machine, context) => {
-    validateUniqueIds({ items: machine.states, context, path: ['states'] });
-    validateUniqueIds({ items: machine.transitions, context, path: ['transitions'] });
-
-    const stateIds = new Set(machine.states.map((state) => state.id));
-
-    if (!stateIds.has(machine.initialStateId))
-      context.addIssue({ code: 'custom', message: 'Initial state does not resolve', path: ['initialStateId'] });
-
-    const prioritiesBySource = new Map<Id, TransitionPriorityIndex>();
-
-    machine.transitions.forEach((transition, index) => {
-      if (!stateIds.has(transition.sourceStateId))
-        context.addIssue({
-          code: 'custom',
-          message: 'Source state does not resolve',
-          path: ['transitions', index, 'sourceStateId'],
-        });
-      if (!stateIds.has(transition.targetStateId))
-        context.addIssue({
-          code: 'custom',
-          message: 'Target state does not resolve',
-          path: ['transitions', index, 'targetStateId'],
-        });
-
-      if (transition.guard !== undefined) {
-        const guardResult = validateBooleanExpressionStructure(transition.guard);
-
-        if (
-          guardResult.diagnostics.length > 0 ||
-          (guardResult.valueType !== undefined && guardResult.valueType !== 'boolean')
-        ) {
-          context.addIssue({
-            code: 'custom',
-            message: 'Guard must be a structurally valid boolean expression',
-            path: ['transitions', index, 'guard'],
-          });
-        }
-      }
-
-      const sourcePriorities = prioritiesBySource.get(transition.sourceStateId) ?? createTransitionPriorityIndex();
-      const triggerPriorities = getTriggerPriorities(sourcePriorities, transition.trigger);
-
-      if (triggerPriorities.has(transition.priority))
-        context.addIssue({
-          code: 'custom',
-          message: 'Duplicate transition priority for source and trigger',
-          path: ['transitions', index, 'priority'],
-        });
-      triggerPriorities.add(transition.priority);
-      prioritiesBySource.set(transition.sourceStateId, sourcePriorities);
-    });
-  });
+export const stateMachineSchema: z.ZodType<StateMachine> = z.strictObject({
+  id: idSchema,
+  name: nonEmptyStringSchema,
+  initialStateId: idSchema,
+  states: z.array(stateSchema).min(1),
+  transitions: z.array(transitionSchema),
+});

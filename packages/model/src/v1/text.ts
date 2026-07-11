@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { type ColorValue, colorValueSchema } from './color';
 import { type Id, idSchema } from './identity';
-import { absoluteHttpsUrlSchema, axisTagSchema, nonEmptyStringSchema, validateUniqueIds } from './schema-helpers';
+import { absoluteHttpsUrlSchema, axisTagSchema, nonEmptyStringSchema } from './schema-helpers';
 
 export interface TextTab {
   readonly id: Id;
@@ -124,26 +124,22 @@ const textListSchema: z.ZodType<TextList> = z.discriminatedUnion('kind', [
   }),
 ]);
 
-export const paragraphPropertiesSchema: z.ZodType<ParagraphProperties> = z
-  .strictObject({
-    alignment: z.enum(['start', 'center', 'end', 'justify']),
-    direction: z.enum(['ltr', 'rtl', 'auto']),
-    lineSpacing: lineSpacingSchema,
-    spaceBefore: nonNegativeNumberSchema,
-    spaceAfter: nonNegativeNumberSchema,
-    firstLineIndent: z.number(),
-    startIndent: z.number(),
-    endIndent: z.number(),
-    tabs: z.array(textTabSchema),
-    list: textListSchema,
-    hyphenation: z.enum(['none', 'manual', 'auto']),
-    keepTogether: z.boolean(),
-    keepWithNext: z.boolean(),
-    widowControl: z.boolean(),
-  })
-  .superRefine((properties, context) => {
-    validateUniqueIds({ items: properties.tabs, context, path: ['tabs'] });
-  });
+export const paragraphPropertiesSchema: z.ZodType<ParagraphProperties> = z.strictObject({
+  alignment: z.enum(['start', 'center', 'end', 'justify']),
+  direction: z.enum(['ltr', 'rtl', 'auto']),
+  lineSpacing: lineSpacingSchema,
+  spaceBefore: nonNegativeNumberSchema,
+  spaceAfter: nonNegativeNumberSchema,
+  firstLineIndent: z.number(),
+  startIndent: z.number(),
+  endIndent: z.number(),
+  tabs: z.array(textTabSchema),
+  list: textListSchema,
+  hyphenation: z.enum(['none', 'manual', 'auto']),
+  keepTogether: z.boolean(),
+  keepWithNext: z.boolean(),
+  widowControl: z.boolean(),
+});
 
 const fontAxisValueSchema: z.ZodType<FontAxisValue> = z.strictObject({ tag: axisTagSchema, value: z.number() });
 const openTypeFeatureValueSchema: z.ZodType<OpenTypeFeatureValue> = z.strictObject({
@@ -175,37 +171,16 @@ export const runPropertiesSchema: z.ZodType<RunProperties> = z.strictObject({
   semanticRole: z.enum(['none', 'strong', 'emphasis', 'code', 'citation', 'subscript', 'superscript']),
 });
 
-function containsAuthoredMarkup(text: string): boolean {
-  for (let index = 0; index < text.length; index += 1) {
-    if (text[index] !== '<') {
-      continue;
-    }
-
-    const next = text[index + 1];
-    const closingBracket = text.indexOf('>', index + 1);
-
-    if (closingBracket > index && next !== undefined && (next === '/' || next === '!' || /[A-Za-z]/u.test(next))) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 export const textRunSchema: z.ZodType<TextRun> = z.strictObject({
   id: idSchema,
-  text: z.string().refine((text) => !containsAuthoredMarkup(text), 'Authored markup is not canonical text'),
+  text: z.string().regex(/^[^<]*(?:<(?![/!A-Za-z])[^<]*)*$/u, 'Authored markup is not canonical text'),
   properties: runPropertiesSchema,
 });
 
-export const textParagraphSchema: z.ZodType<TextParagraph> = z
-  .strictObject({ id: idSchema, properties: paragraphPropertiesSchema, runs: z.array(textRunSchema) })
-  .superRefine((paragraph, context) => {
-    validateUniqueIds({ items: paragraph.runs, context, path: ['runs'] });
-  });
+export const textParagraphSchema: z.ZodType<TextParagraph> = z.strictObject({
+  id: idSchema,
+  properties: paragraphPropertiesSchema,
+  runs: z.array(textRunSchema),
+});
 
-export const textBodySchema: z.ZodType<TextBody> = z
-  .strictObject({ paragraphs: z.array(textParagraphSchema) })
-  .superRefine((body, context) => {
-    validateUniqueIds({ items: body.paragraphs, context, path: ['paragraphs'] });
-  });
+export const textBodySchema: z.ZodType<TextBody> = z.strictObject({ paragraphs: z.array(textParagraphSchema) });

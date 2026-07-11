@@ -4,7 +4,7 @@ import { type Appearance, appearanceSchema, type NormalizedRect, normalizedRectS
 import { type Id, idSchema } from './identity';
 import { type ExtensionEnvelope, extensionEnvelopeSchema, type JsonValue, jsonValueSchema } from './json-value';
 import { type BlobReference, blobReferenceSchema } from './resources';
-import { mediaTypeSchema, nonEmptyStringSchema, validateUniqueIds, validateUniqueValues } from './schema-helpers';
+import { mediaTypeSchema, nonEmptyStringSchema, validateUniqueValues } from './schema-helpers';
 import { type TextBody, textBodySchema } from './text';
 import { type TypedValue, typedValueSchema } from './typed-value';
 
@@ -335,12 +335,11 @@ const pathSegmentSchema: z.ZodType<PathSegment> = z.discriminatedUnion('kind', [
   z.strictObject({ id: idSchema, kind: z.literal('close') }),
 ]);
 
-export const structuredPathSchema: z.ZodType<StructuredPath> = z
-  .strictObject({ points: z.array(pathPointSchema), segments: z.array(pathSegmentSchema), closed: z.boolean() })
-  .superRefine((path, context) => {
-    validateUniqueIds({ items: path.points, context, path: ['points'] });
-    validateUniqueIds({ items: path.segments, context, path: ['segments'] });
-  });
+export const structuredPathSchema: z.ZodType<StructuredPath> = z.strictObject({
+  points: z.array(pathPointSchema),
+  segments: z.array(pathSegmentSchema),
+  closed: z.boolean(),
+});
 
 const vectorGeometryDataSchema: z.ZodType<VectorGeometryData> = z.discriminatedUnion('kind', [
   z.strictObject({
@@ -354,15 +353,16 @@ const vectorGeometryDataSchema: z.ZodType<VectorGeometryData> = z.discriminatedU
   }),
   z.strictObject({ kind: z.literal('ellipse') }),
   z.strictObject({ kind: z.literal('path'), path: structuredPathSchema, fillRule: z.enum(['nonzero', 'evenodd']) }),
-  z
-    .strictObject({
-      kind: z.literal('boolean'),
-      operation: z.enum(['union', 'subtract', 'intersect', 'exclude']),
-      operandIds: z.array(idSchema),
-    })
-    .superRefine((data, context) => {
-      validateUniqueValues({ items: data.operandIds, context, path: ['operandIds'] });
-    }),
+  z.strictObject({
+    kind: z.literal('boolean'),
+    operation: z.enum(['union', 'subtract', 'intersect', 'exclude']),
+    operandIds: z
+      .array(idSchema)
+      .superRefine((operandIds, context) => {
+        validateUniqueValues({ items: operandIds, context, path: [] });
+      })
+      .meta({ uniqueItems: true }),
+  }),
 ]);
 const vectorElementSchema = z.strictObject({
   ...elementBaseShape,
@@ -379,18 +379,12 @@ const propertyValueSchema: z.ZodType<ExposedPropertyValue> = z.strictObject({
   exposedPropertyId: idSchema,
   value: typedValueSchema,
 });
-const componentInstanceElementSchema = z
-  .strictObject({
-    ...elementBaseShape,
-    kind: z.literal('component-instance'),
-    componentId: idSchema,
-    propertyValues: z.array(propertyValueSchema),
-  })
-  .superRefine((element, context) => {
-    const values = element.propertyValues.map(({ exposedPropertyId }) => ({ id: exposedPropertyId }));
-
-    validateUniqueIds({ items: values, context, path: ['propertyValues'] });
-  });
+const componentInstanceElementSchema = z.strictObject({
+  ...elementBaseShape,
+  kind: z.literal('component-instance'),
+  componentId: idSchema,
+  propertyValues: z.array(propertyValueSchema),
+});
 
 const videoElementSchema = z.strictObject({
   ...elementBaseShape,
@@ -424,21 +418,17 @@ const clockElementSchema = z.strictObject({
   }),
 });
 const tickerItemSchema: z.ZodType<TickerItem> = z.strictObject({ id: idSchema, text: z.string() });
-const tickerElementSchema = z
-  .strictObject({
-    ...elementBaseShape,
-    kind: z.literal('ticker'),
-    ticker: z.strictObject({
-      items: z.array(tickerItemSchema),
-      direction: z.enum(['left', 'right', 'up', 'down']),
-      speed: z.number().nonnegative(),
-      gap: z.number().nonnegative(),
-      repeat: z.boolean(),
-    }),
-  })
-  .superRefine((element, context) => {
-    validateUniqueIds({ items: element.ticker.items, context, path: ['ticker', 'items'] });
-  });
+const tickerElementSchema = z.strictObject({
+  ...elementBaseShape,
+  kind: z.literal('ticker'),
+  ticker: z.strictObject({
+    items: z.array(tickerItemSchema),
+    direction: z.enum(['left', 'right', 'up', 'down']),
+    speed: z.number().nonnegative(),
+    gap: z.number().nonnegative(),
+    repeat: z.boolean(),
+  }),
+});
 const qrCodeElementSchema = z.strictObject({
   ...elementBaseShape,
   kind: z.literal('qrcode'),

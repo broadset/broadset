@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { greatestCommonDivisor } from './schema-helpers';
+import { greatestCommonDivisor, positiveSafeIntegerSchema } from './schema-helpers';
 
 export interface Rational {
   readonly numerator: number;
@@ -17,13 +17,11 @@ export interface Timebase {
 }
 
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
-const positiveSafeIntegerSchema = z.number().refine((value) => Number.isSafeInteger(value) && value > 0);
 
-export const rationalSchema: z.ZodType<Rational> = z
-  .strictObject({ numerator: positiveSafeIntegerSchema, denominator: positiveSafeIntegerSchema })
-  .refine(({ numerator, denominator }) => greatestCommonDivisor(numerator, denominator) === 1, {
-    message: 'Rational terms must be reduced',
-  });
+export const rationalSchema: z.ZodType<Rational> = z.strictObject({
+  numerator: positiveSafeIntegerSchema,
+  denominator: positiveSafeIntegerSchema,
+});
 
 function isIntegralSafeFrameDuration(frameRate: Rational, ticksPerSecond: number): boolean {
   const dividend = BigInt(ticksPerSecond) * BigInt(frameRate.denominator);
@@ -50,21 +48,23 @@ function hasSupportedTimecode(timebase: Timebase): boolean {
   );
 }
 
-export const timebaseSchema: z.ZodType<Timebase> = z
-  .strictObject({
-    frameRate: rationalSchema,
-    ticksPerSecond: positiveSafeIntegerSchema,
-    timecode: z.strictObject({ nominalFramesPerSecond: positiveSafeIntegerSchema, dropFrame: z.boolean() }),
-  })
-  .superRefine((timebase, context) => {
-    if (!isIntegralSafeFrameDuration(timebase.frameRate, timebase.ticksPerSecond)) {
-      context.addIssue({ code: 'custom', message: 'Frame duration must be a positive safe integer tick count' });
-    }
+export const timebaseSchema: z.ZodType<Timebase> = z.strictObject({
+  frameRate: rationalSchema,
+  ticksPerSecond: positiveSafeIntegerSchema,
+  timecode: z.strictObject({ nominalFramesPerSecond: positiveSafeIntegerSchema, dropFrame: z.boolean() }),
+});
 
-    if (!hasSupportedTimecode(timebase)) {
-      context.addIssue({ code: 'custom', message: 'Unsupported SMPTE timecode annotation', path: ['timecode'] });
-    }
-  });
+export function validateTimebaseSemantics(timebase: Timebase): readonly string[] {
+  const issues: string[] = [];
+
+  if (!isIntegralSafeFrameDuration(timebase.frameRate, timebase.ticksPerSecond)) {
+    issues.push('Frame duration must be a positive safe integer tick count');
+  }
+
+  if (!hasSupportedTimecode(timebase)) issues.push('Unsupported SMPTE timecode annotation');
+
+  return issues;
+}
 
 function assertNonNegativeSafeInteger(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
@@ -82,6 +82,13 @@ function toSafeNumber(value: bigint, name: string): number {
 
 function frameTickDivisor(timebase: Timebase): bigint {
   const parsed = timebaseSchema.parse(timebase);
+  const semanticIssues = [...validateTimebaseSemantics(parsed)];
+
+  if (greatestCommonDivisor(parsed.frameRate.numerator, parsed.frameRate.denominator) !== 1) {
+    semanticIssues.push('Frame-rate rational must be reduced');
+  }
+
+  if (semanticIssues.length > 0) throw new RangeError(semanticIssues.join('; '));
 
   return BigInt(parsed.ticksPerSecond) * BigInt(parsed.frameRate.denominator);
 }

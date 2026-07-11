@@ -612,6 +612,18 @@ Validation proceeds in three stages:
 
 No validation stage mutates input. Open JSON is permitted only inside declared plugin, extension, and interop payload containers.
 
+The structural contract is the exact intersection published by Zod and JSON Schema. Constraints
+that JSON Schema can express are structural; constraints requiring projected object keys,
+cross-field comparison, arbitrary-precision instant comparison, arithmetic, reference indexes, or
+graph traversal are semantic. Consumers MUST use the load boundary, which executes both stages,
+rather than treating successful leaf-schema parsing as complete project validation.
+
+Before parsing or canonicalization, implementations enforce these v1 resource limits iteratively:
+32 MiB of UTF-8 JSON text, nesting depth 256, and 250,000 visited JSON values. Excess input is
+quarantined with `input-too-large`, `input-too-deep`, or `input-too-complex`; cyclic in-memory input
+uses `cyclic-input`, and canonical output beyond 32 MiB uses `canonical-output-too-large`. The root
+JSON Pointer is the empty string.
+
 The closed v1 property-target matrix is:
 
 | Entity kind | Approved pointer(s) and resulting `ValueType` |
@@ -645,7 +657,9 @@ case-insensitive type/subtype equality. The model exports a pure resolver for re
 
 - [ ] Given invalid container metadata, failure occurs before project hydration
 - [ ] Given an unknown core field, both Zod and JSON Schema reject it
+- [ ] Given every structural parity corpus case, Zod and the published JSON Schema return the same acceptance result
 - [ ] Given a cross-reference error, semantic validation returns a stable diagnostic location
+- [ ] Given excessive text, depth, node count, or an in-memory cycle, loading returns a typed quarantine result without recursion overflow
 - [ ] Given an approved target on its actual entity variant, the pure resolver returns the matrix `ValueType`
 - [ ] Given an array index or forbidden identity, hierarchy, runtime, extension, or raw-payload pointer, target resolution fails
 
@@ -670,12 +684,14 @@ The immutable DOM-free `ResolvedSceneSnapshot` contains expanded identity, prove
 
 ### Requirement: Canonical JSON Serialization
 
-Raw canonical JSON is UTF-8 without BOM and contains no `undefined`, functions, non-finite numbers, bigint values, or cycles. Arrays retain semantic order; object-member order is not semantic. Human-facing JSON is pretty printed. Semantic hashes use RFC 8785 JSON Canonicalization Scheme over a defined projection excluding non-semantic timestamps and package metadata.
+Raw canonical JSON is UTF-8 without BOM and contains no `undefined`, functions, non-finite numbers, bigint values, lone UTF-16 surrogates, or cycles. Arrays retain semantic order; object-member order is not semantic. Human-facing JSON is pretty printed. Semantic hashes use RFC 8785 JSON Canonicalization Scheme over a defined projection excluding `metadata.updatedAt` and `metadata.generator.build`; all other project fields, including generator name and version, remain semantic. Object keys sort by UTF-16 code units and accepted numbers use ECMAScript shortest-round-trip serialization.
 
 #### Acceptance Criteria
 
 - [ ] Given repeated serialization of one project, semantic content and ordered arrays are stable
 - [ ] Given different object-member order, canonical semantic hashing returns the same digest
+- [ ] Given edge numbers, escapes, multilingual keys and values, and the published known digest vector, canonicalization matches RFC 8785 behavior
+- [ ] Given a lone surrogate, non-finite number, excessive output, or cycle, canonicalization fails deterministically
 - [ ] Given runtime indexes or materialized defaults, they do not enter canonical serialization
 
 ### Requirement: File and Package Identity

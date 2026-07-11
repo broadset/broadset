@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { sharedStyleSchema, variableCollectionSchema } from './index';
 
-describe('v1 resource collection diagnostics', () => {
-  it('reports duplicate mode IDs at the exact collection path', () => {
+describe('v1 resource collection structural ownership', () => {
+  it('defers projected duplicate mode IDs to semantic validation', () => {
     const result = variableCollectionSchema.safeParse({
       id: 'variables',
       name: 'Variables',
@@ -15,16 +15,10 @@ describe('v1 resource collection diagnostics', () => {
       variables: [],
     });
 
-    expect(result.success).toBe(false);
-
-    if (result.success) {
-      throw new Error('Expected duplicate modes to fail');
-    }
-
-    expect(result.error.issues).toContainEqual(expect.objectContaining({ path: ['modes', 1, 'id'] }));
+    expect(result.success).toBe(true);
   });
 
-  it('reports duplicate style entry IDs at the exact nested collection path', () => {
+  it('defers projected duplicate style entry IDs to semantic validation', () => {
     const result = sharedStyleSchema.safeParse({
       id: 'style',
       name: 'Style',
@@ -38,12 +32,6 @@ describe('v1 resource collection diagnostics', () => {
       },
     });
 
-    expect(result.success).toBe(false);
-
-    if (result.success) {
-      throw new Error('Expected duplicate style entries to fail');
-    }
-
-    expect(result.error.issues).toContainEqual(expect.objectContaining({ path: ['source', 'entries', 1, 'id'] }));
+    expect(result.success).toBe(true);
   });
 });

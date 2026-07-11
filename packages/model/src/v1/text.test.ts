@@ -73,16 +73,16 @@ describe('textBodySchema', () => {
     expect(textBodySchema.parse(value)).toEqual(value);
   });
 
-  it('rejects duplicate paragraph and run ids', () => {
+  it('defers duplicate paragraph and run ids', () => {
     const body = createTextBody();
     const paragraph = textBodySchema.parse(body).paragraphs[0];
 
     expect(paragraph).toBeDefined();
-    expect(textBodySchema.safeParse({ paragraphs: [paragraph, paragraph] }).success).toBe(false);
+    expect(textBodySchema.safeParse({ paragraphs: [paragraph, paragraph] }).success).toBe(true);
     expect(
       textBodySchema.safeParse({ paragraphs: [{ ...paragraph, runs: [paragraph?.runs[0], paragraph?.runs[0]] }] })
         .success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('rejects authored executable markup and unknown shaped data', () => {

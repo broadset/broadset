@@ -3,6 +3,7 @@ import type { ValueSchema } from './data';
 import { isExactDecimalStepAligned } from './decimal-step';
 import type { Diagnostic } from './diagnostics';
 import type { Element } from './element';
+import { findGraphCycleNodes } from './graph-cycles';
 import type { Id } from './identity';
 import type { SemanticIndexes } from './semantic-index';
 import type { PropertyTargetContract } from './target-resolution';
@@ -39,48 +40,50 @@ export function findDuplicateIdDiagnostics(
   return diagnostics;
 }
 
-function hasParentCycle(element: Element, elements: ReadonlyMap<Id, Element>): boolean {
-  const seen = new Set<Id>([element.id]);
-  let parentId = element.parentId;
-
-  while (parentId !== null) {
-    if (seen.has(parentId)) return true;
-    seen.add(parentId);
-    parentId = elements.get(parentId)?.parentId ?? null;
-  }
-
-  return false;
-}
-
 export function validateHierarchy(elements: readonly Element[], pointer: string): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const byId = new Map(elements.map((element) => [element.id, element]));
+  const indexById = new Map(elements.map((element, index) => [element.id, index]));
   const activeAncestors: Id[] = [];
+  const activePositions = new Map<Id, number>();
+  const cyclicNodes = findGraphCycleNodes(
+    elements.map(({ id }) => id),
+    (id) => byId.get(id)?.parentId ?? undefined,
+  );
+
+  const truncateActiveAncestors = (length: number): void => {
+    while (activeAncestors.length > length) {
+      const removed = activeAncestors.pop();
+
+      if (removed !== undefined) activePositions.delete(removed);
+    }
+  };
 
   elements.forEach((element, index) => {
     const parentPointer = `${pointer}/${String(index)}/parentId`;
 
     if (element.parentId === null) {
-      activeAncestors.length = 0;
+      truncateActiveAncestors(0);
     } else if (!byId.has(element.parentId)) {
       diagnostics.push(createSemanticError('hierarchy.orphan-parent', 'Parent does not resolve', parentPointer));
     } else {
-      const parentIndex = elements.findIndex((candidate) => candidate.id === element.parentId);
-      const activeIndex = activeAncestors.lastIndexOf(element.parentId);
+      const parentIndex = indexById.get(element.parentId) ?? -1;
+      const activeIndex = activePositions.get(element.parentId) ?? -1;
 
       if (parentIndex >= index || activeIndex < 0) {
         diagnostics.push(
           createSemanticError('hierarchy.non-preorder', 'Hierarchy is not contiguous preorder', parentPointer),
         );
       } else {
-        activeAncestors.length = activeIndex + 1;
+        truncateActiveAncestors(activeIndex + 1);
       }
     }
 
-    if (hasParentCycle(element, byId)) {
+    if (cyclicNodes.has(element.id)) {
       diagnostics.push(createSemanticError('hierarchy.cycle', 'Element parent cycle', parentPointer));
     }
 
+    activePositions.set(element.id, activeAncestors.length);
     activeAncestors.push(element.id);
   });
 

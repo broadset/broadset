@@ -497,11 +497,125 @@ const semanticCases: readonly SemanticCase[] = [
         );
     },
   },
+  {
+    name: 'unreduced document frame rate',
+    code: 'timebase.unreduced-rate',
+    pointer: '/documents/0/timebase/frameRate',
+    create: () => {
+      const project = createMinimalProjectV1();
+      const document = project.documents[0];
+
+      return document === undefined
+        ? project
+        : {
+            ...project,
+            documents: [
+              {
+                ...document,
+                kind: 'motion',
+                timebase: {
+                  frameRate: { numerator: 50, denominator: 2 },
+                  ticksPerSecond: 50,
+                  timecode: { nominalFramesPerSecond: 25, dropFrame: false },
+                },
+              },
+            ],
+          };
+    },
+  },
+  {
+    name: 'package blob path inconsistent with digest',
+    code: 'asset.invalid-blob-source',
+    pointer: '/resources/assets/0/blob/source/path',
+    create: () => {
+      const project = createMinimalProjectV1();
+      const asset = createDataAsset('data');
+
+      return {
+        ...project,
+        resources: {
+          ...project.resources,
+          assets: [{ ...asset, blob: { ...asset.blob, source: { kind: 'package', path: `blobs/sha256/${'1'.repeat(64)}` } } }],
+        },
+      };
+    },
+  },
+  {
+    name: 'inverted recursive value-schema bounds',
+    code: 'data.invalid-bounds',
+    pointer: '/documents/0/viewModels/0/fields/0/schema',
+    create: () => {
+      const project = createMinimalProjectV1();
+      const document = project.documents[0];
+
+      return document === undefined
+        ? project
+        : {
+            ...project,
+            documents: [
+              {
+                ...document,
+                viewModels: [
+                  {
+                    id: 'values',
+                    name: 'Values',
+                    fields: [{ id: 'count', name: 'Count', schema: { kind: 'number', minimum: 10, maximum: 5 } }],
+                    sampleDataSets: [],
+                  },
+                ],
+              },
+            ],
+          };
+    },
+  },
+  {
+    name: 'duplicate page root identity',
+    code: 'identity.duplicate',
+    pointer: '/documents/0/pages/0/rootInstances/1/id',
+    create: () => {
+      const project = withElements(createMinimalProjectV1(), [createGroupElement('element')]);
+      const document = project.documents[0];
+      const page = document?.pages[0];
+
+      if (document === undefined || page === undefined) return project;
+
+      const root = { id: 'root', elementId: 'element', overrides: [], componentPropertyValues: [] };
+
+      return { ...project, documents: [{ ...document, pages: [{ ...page, rootInstances: [root, root] }] }] };
+    },
+  },
 ];
 
 describe('validateBroadsetProjectV1Semantics', () => {
   it('accepts the canonical minimal fixture without throwing', () => {
     expect(validateBroadsetProjectV1Semantics(createMinimalProjectV1())).toEqual([]);
+  });
+
+  it('does not interpret IDs inside opaque extension payloads as core identities', () => {
+    const project = createMinimalProjectV1();
+    const extended = broadsetProjectV1Schema.parse({
+      ...project,
+      extensions: [
+        {
+          namespace: 'com.example.opaque',
+          schema: 'https://example.com/opaque.schema.json',
+          version: 1,
+          payload: { rows: [{ id: 'same' }, { id: 'same' }] },
+        },
+      ],
+    });
+
+    expect(validateBroadsetProjectV1Semantics(extended)).toEqual([]);
+  });
+
+  it('validates a large cyclic hierarchy with bounded whole-graph work', () => {
+    const count = 10_000;
+    const elements = Array.from({ length: count }, (_, index) =>
+      createGroupElement(`element-${String(index)}`, `element-${String((index + 1) % count)}`),
+    );
+    const diagnostics = validateBroadsetProjectV1Semantics(withElements(createMinimalProjectV1(), elements));
+
+    expect(diagnostics.some(({ code }) => code === 'hierarchy.cycle')).toBe(true);
   });
   it.each(semanticCases)('reports $name with a stable code and pointer', ({ create, code, pointer }) => {
     const project = broadsetProjectV1Schema.parse(create());

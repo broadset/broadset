@@ -73,7 +73,7 @@ describe('valueSchemaSchema and viewModelSchema', () => {
     expect(schemas.map((schema) => valueSchemaSchema.parse(schema))).toEqual(schemas);
   });
 
-  it('rejects unknown cross-kind constraints and duplicate recursive field ids', () => {
+  it('rejects unknown cross-kind constraints and defers duplicate recursive field ids', () => {
     expect(valueSchemaSchema.safeParse({ kind: 'boolean', minLength: 1 }).success).toBe(false);
     expect(
       valueSchemaSchema.safeParse({
@@ -83,7 +83,7 @@ describe('valueSchemaSchema and viewModelSchema', () => {
           { id: 'duplicate', name: 'Second', required: true, schema: { kind: 'number' } },
         ],
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('rejects fractional integer bounds and malformed asset media types', () => {
@@ -112,7 +112,7 @@ describe('valueSchemaSchema and viewModelSchema', () => {
         earliest: '2026-01-01T00:00:00-12:00',
         latest: '2026-01-01T01:00:00+14:00',
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('validates date-time defaults and sample values by chronological instant', () => {
@@ -141,7 +141,7 @@ describe('valueSchemaSchema and viewModelSchema', () => {
       viewModelSchema.safeParse(
         createDateViewModel('2026-01-01T01:00:00+02:00', '2026-01-01T23:00:00-02:00'),
       ).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('orders date-time bounds exactly beyond millisecond precision', () => {
@@ -158,7 +158,7 @@ describe('valueSchemaSchema and viewModelSchema', () => {
         earliest: '2026-01-01T00:00:00.123456789002Z',
         latest: '2026-01-01T00:00:00.123456789001Z',
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('treats trailing zeros and unequal-offset representations of one exact instant as equal', () => {
@@ -208,7 +208,7 @@ describe('valueSchemaSchema and viewModelSchema', () => {
       viewModelSchema.safeParse(
         createPreciseViewModel('2026-01-01T00:00:00.123456789001Z', '2026-01-01T00:00:00.123456789005Z'),
       ).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('validates field defaults and sample values against recursive schemas', () => {
@@ -235,25 +235,25 @@ describe('valueSchemaSchema and viewModelSchema', () => {
         ...viewModel,
         fields: [{ ...viewModel.fields[0], defaultValue: { type: 'string', value: 'x' } }],
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       viewModelSchema.safeParse({
         ...viewModel,
         sampleDataSets: [{ ...viewModel.sampleDataSets[0], values: { headline: { type: 'number', value: 3 } } }],
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it('rejects duplicate view-model field and sample-data ids and unknown fields', () => {
+  it('defers duplicate view-model field and sample-data ids but rejects unknown fields', () => {
     const field = { id: 'title', name: 'Title', schema: { kind: 'string' } };
     const sample = { id: 'sample', name: 'Sample', values: {} };
 
     expect(
       viewModelSchema.safeParse({ id: 'vm', name: 'VM', fields: [field, field], sampleDataSets: [] }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       viewModelSchema.safeParse({ id: 'vm', name: 'VM', fields: [], sampleDataSets: [sample, sample] }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(valueSchemaSchema.safeParse({ kind: 'string', unexpected: true }).success).toBe(false);
   });
 
@@ -265,7 +265,7 @@ describe('valueSchemaSchema and viewModelSchema', () => {
         fields: [{ id: 'title', name: 'Title', schema: { kind: 'string' } }],
         sampleDataSets: [{ id: 'sample', name: 'Sample', values: {} }],
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 

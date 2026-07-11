@@ -170,10 +170,13 @@ Every resolved property MUST retain its complete provenance chain. Consumers MUS
 Structural validation MUST reject unknown core fields and invalid primitive shapes. Whole-project semantic validation MUST reject duplicate identity, unresolved or wrong-kind references, invalid ordering, cycles, incompatible values, and invalid target paths. Neither stage mutates or repairs input.
 
 Whole-project semantic validation accepts a structurally parsed `BroadsetProjectV1`. Structural
-collection invariants, including duplicate track IDs and time values outside a sequence duration,
-are reported by structural parsing rather than being reintroduced as impossible semantic-validator
-inputs. Cross-reference, type, ordering, and graph invariants that require project-wide indexes are
-reported by semantic validation with deterministic codes and JSON Pointers.
+validation is limited to constraints expressible with identical acceptance in Zod and the published
+JSON Schema, including closed shapes, discriminants, primitive ranges and patterns, required fields,
+primitive-array uniqueness, and local conditional presence. Projected object-key uniqueness,
+cross-field comparisons, reduced rationals, range arithmetic, chronological ordering, homogeneous
+keyframes, reference/type resolution, and graph invariants are semantic constraints. The load
+boundary always runs both stages and reports semantic failures with deterministic codes and JSON
+Pointers; direct leaf-schema parsing is not a complete project-validity check.
 
 Persisted property targets use a closed v1 allowlist. Collection array indexes are never target
 identity; fixed tuple positions are semantic components. The resolver first resolves the addressed
@@ -199,7 +202,7 @@ The load boundary preserves original bytes and typed diagnostics for invalid inp
 - [ ] Given a stale animation reference, semantic validation rejects the project
 - [ ] Given invalid source bytes, loading returns a quarantined result that preserves those bytes
 - [ ] Given a structurally invalid project, resolution does not produce a scene snapshot
-- [ ] Given duplicate track IDs or an out-of-duration keyframe, structural aggregate parsing fails at the offending collection member
+- [ ] Given duplicate track IDs or an out-of-duration keyframe, structural parsing succeeds and whole-project semantic validation fails at the offending collection member
 - [ ] Given a structurally valid project with multiple semantic defects, validation returns every independently establishable diagnostic sorted by pointer then code
 - [ ] Given an approved stable entity and pointer, target resolution returns its deterministic `ValueType`
 - [ ] Given a collection index, identity field, hierarchy field, raw payload, or pointer not approved for the resolved variant, target resolution fails

@@ -84,18 +84,30 @@ function inheritReferencedTypes(value, root = value) {
   Object.values(value).forEach((item) => inheritReferencedTypes(item, root));
 }
 
-function assertClosedCoreObjects(value, pointer = '') {
+function assertClosedCoreObjects(value, pointer = '', partial = false) {
   if (Array.isArray(value)) {
-    value.forEach((item, index) => assertClosedCoreObjects(item, `${pointer}/${String(index)}`));
+    value.forEach((item, index) => assertClosedCoreObjects(item, `${pointer}/${String(index)}`, partial));
     return;
   }
   if (value === null || typeof value !== 'object') return;
 
-  if (value.type === 'object' && 'properties' in value && value.additionalProperties !== false) {
+  const markedPartial = value['x-broadset-partial'] === true;
+
+  delete value['x-broadset-partial'];
+
+  if (
+    value.type === 'object' &&
+    'properties' in value &&
+    !partial &&
+    !markedPartial &&
+    value.additionalProperties !== false
+  ) {
     throw new Error(`Core object permits unknown properties at ${pointer || '/'}`);
   }
 
-  Object.entries(value).forEach(([key, item]) => assertClosedCoreObjects(item, `${pointer}/${key}`));
+  Object.entries(value).forEach(([key, item]) =>
+    assertClosedCoreObjects(item, `${pointer}/${key}`, partial || markedPartial || key === 'if' || key === 'then'),
+  );
 }
 
 function readOutputArgument() {

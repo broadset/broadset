@@ -4,7 +4,6 @@ import { type Swatch } from './color';
 import { type BroadsetDocumentV1, broadsetDocumentV1Schema } from './document';
 import { type Id, idSchema, type UtcTimestamp, utcTimestampSchema } from './identity';
 import { type InteropRegistry, interopRegistrySchema } from './interop';
-import { compareExactIsoInstants } from './iso-instant';
 import { type ExtensionEnvelope, extensionEnvelopeSchema } from './json-value';
 import { type OutputProfile, outputProfileSchema } from './output-profile';
 import {
@@ -20,7 +19,7 @@ import {
   type SharedStyle,
   type VariableCollection,
 } from './resources';
-import { greatestCommonDivisor, nonEmptyStringSchema, positiveSafeIntegerSchema } from './schema-helpers';
+import { nonEmptyStringSchema, positiveSafeIntegerSchema } from './schema-helpers';
 
 export interface ProjectMetadata {
   readonly name: string;
@@ -73,31 +72,22 @@ export interface BroadsetProjectV1 {
   readonly extensions: readonly ExtensionEnvelope[];
 }
 
-const projectMetadataSchema: z.ZodType<ProjectMetadata> = z
-  .strictObject({
-    name: nonEmptyStringSchema,
-    createdAt: utcTimestampSchema,
-    updatedAt: utcTimestampSchema,
-    description: z.string().optional(),
-    authors: z.array(nonEmptyStringSchema).optional(),
-    keywords: z.array(nonEmptyStringSchema).optional(),
-    rights: z.string().optional(),
-    generator: z
-      .strictObject({
-        name: nonEmptyStringSchema,
-        version: nonEmptyStringSchema,
-        build: nonEmptyStringSchema.optional(),
-      })
-      .optional(),
-  })
-  .refine(
-    ({ createdAt, updatedAt }) => {
-      const comparison = compareExactIsoInstants(createdAt, updatedAt);
-
-      return comparison !== undefined && comparison <= 0;
-    },
-    { message: 'updatedAt must not precede createdAt', path: ['updatedAt'] },
-  );
+const projectMetadataSchema: z.ZodType<ProjectMetadata> = z.strictObject({
+  name: nonEmptyStringSchema,
+  createdAt: utcTimestampSchema,
+  updatedAt: utcTimestampSchema,
+  description: z.string().optional(),
+  authors: z.array(nonEmptyStringSchema).optional(),
+  keywords: z.array(nonEmptyStringSchema).optional(),
+  rights: z.string().optional(),
+  generator: z
+    .strictObject({
+      name: nonEmptyStringSchema,
+      version: nonEmptyStringSchema,
+      build: nonEmptyStringSchema.optional(),
+    })
+    .optional(),
+});
 
 export const projectResourcesSchema: z.ZodType<ProjectResources> = z.strictObject({
   assets: z.array(assetSchema),
@@ -108,9 +98,7 @@ export const projectResourcesSchema: z.ZodType<ProjectResources> = z.strictObjec
   outputProfiles: z.array(outputProfileSchema),
 });
 
-const aspectRatioSchema = z
-  .tuple([positiveSafeIntegerSchema, positiveSafeIntegerSchema])
-  .refine(([width, height]) => greatestCommonDivisor(width, height) === 1, 'Aspect ratio must be reduced');
+const aspectRatioSchema = z.tuple([positiveSafeIntegerSchema, positiveSafeIntegerSchema]);
 
 const templateGroupMemberSchema: z.ZodType<TemplateGroupMember> = z.strictObject({
   id: idSchema,

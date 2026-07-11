@@ -131,21 +131,21 @@ describe('v1 blob references', () => {
   });
 
   it.each([
-    { ...blob, source: { kind: 'package', path: `blobs/sha256/${'b'.repeat(64)}` } },
-    { ...blob, source: { kind: 'package', path: `../blobs/sha256/${DIGEST_HEX}` } },
-    { ...blob, source: { kind: 'package', path: `/blobs/sha256/${DIGEST_HEX}` } },
-    { ...blob, source: { kind: 'package', path: `blobs\\sha256\\${DIGEST_HEX}` } },
-    { ...blob, source: { kind: 'external', url: 'http://example.com/image.png', integrity: DIGEST } },
-    { ...blob, source: { kind: 'external', url: 'data:image/png;base64,AA==', integrity: DIGEST } },
-    {
+    [{ ...blob, source: { kind: 'package', path: `blobs/sha256/${'b'.repeat(64)}` } }, true],
+    [{ ...blob, source: { kind: 'package', path: `../blobs/sha256/${DIGEST_HEX}` } }, false],
+    [{ ...blob, source: { kind: 'package', path: `/blobs/sha256/${DIGEST_HEX}` } }, false],
+    [{ ...blob, source: { kind: 'package', path: `blobs\\sha256\\${DIGEST_HEX}` } }, false],
+    [{ ...blob, source: { kind: 'external', url: 'http://example.com/image.png', integrity: DIGEST } }, false],
+    [{ ...blob, source: { kind: 'external', url: 'data:image/png;base64,AA==', integrity: DIGEST } }, false],
+    [{
       ...blob,
       source: { kind: 'external', url: 'https://example.com/image.png', integrity: `sha256:${'b'.repeat(64)}` },
-    },
-    { ...blob, byteLength: Number.MAX_SAFE_INTEGER + 1 },
-    { ...blob, mediaType: '' },
-    { ...blob, unknown: true },
-  ])('rejects invalid blob reference %#', (value) => {
-    expect(blobReferenceSchema.safeParse(value).success).toBe(false);
+    }, true],
+    [{ ...blob, byteLength: Number.MAX_SAFE_INTEGER + 1 }, false],
+    [{ ...blob, mediaType: '' }, false],
+    [{ ...blob, unknown: true }, false],
+  ])('applies structural ownership to blob reference %#', (value, structurallyValid) => {
+    expect(blobReferenceSchema.safeParse(value).success).toBe(structurallyValid);
   });
 });
 
@@ -203,27 +203,27 @@ describe('v1 assets', () => {
   });
 
   it.each([
-    { ...assets[0], metadata: { ...assets[0].metadata, pixelWidth: 0 } },
-    { ...assets[1], metadata: { ...assets[1].metadata, frameRate: { numerator: 60, denominator: 2 } } },
-    {
+    [{ ...assets[0], metadata: { ...assets[0].metadata, pixelWidth: 0 } }, false],
+    [{ ...assets[1], metadata: { ...assets[1].metadata, frameRate: { numerator: 60, denominator: 2 } } }, true],
+    [{
       ...assets[1],
       metadata: {
         ...assets[1].metadata,
         audioTracks: [assets[1].metadata.audioTracks[0], assets[1].metadata.audioTracks[0]],
       },
-    },
-    {
+    }, true],
+    [{
       ...assets[3],
       metadata: {
         ...assets[3].metadata,
         variableAxes: [{ id: 'weight', tag: 'wght', minimum: 500, defaultValue: 400, maximum: 900 }],
       },
-    },
-    { ...assets[6], metadata: { ...assets[6].metadata, intrinsicBounds: { x: 0, y: 0, width: 0, height: 1 } } },
-    { ...assets[0], metadata: { ...assets[0].metadata, unknown: true } },
-    { ...assets[0], unknown: true },
-  ])('rejects invalid asset %#', (asset) => {
-    expect(assetSchema.safeParse(asset).success).toBe(false);
+    }, true],
+    [{ ...assets[6], metadata: { ...assets[6].metadata, intrinsicBounds: { x: 0, y: 0, width: 0, height: 1 } } }, false],
+    [{ ...assets[0], metadata: { ...assets[0].metadata, unknown: true } }, false],
+    [{ ...assets[0], unknown: true }, false],
+  ])('applies structural ownership to asset %#', (asset, structurallyValid) => {
+    expect(assetSchema.safeParse(asset).success).toBe(structurallyValid);
   });
 });
 
@@ -322,7 +322,7 @@ describe('v1 reusable resources', () => {
         ...collection,
         variables: [{ ...collection.variables[0], valuesByMode: { light: { type: 'string', value: 'Only one' } } }],
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       variableCollectionSchema.safeParse({
         ...collection,
@@ -336,7 +336,7 @@ describe('v1 reusable resources', () => {
           },
         ],
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       variableCollectionSchema.safeParse({
         id: 'variables',
@@ -361,7 +361,7 @@ describe('v1 reusable resources', () => {
           },
         ],
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('accepts closed shared-style properties and aliases', () => {
@@ -419,7 +419,7 @@ describe('v1 reusable resources', () => {
           { id: 'alias', producer: 'B', name: 'blue' },
         ],
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('rejects duplicate IDs in every nested asset and style scope', () => {
@@ -431,7 +431,7 @@ describe('v1 reusable resources', () => {
           { id: 'preview', role: 'proxy', name: 'Proxy', blob },
         ],
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       assetSchema.safeParse({
         ...assets[3],
@@ -443,7 +443,7 @@ describe('v1 reusable resources', () => {
           ],
         },
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       assetSchema.safeParse({
         ...assets[5],
@@ -458,7 +458,7 @@ describe('v1 reusable resources', () => {
           },
         },
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       sharedStyleSchema.safeParse({
         id: 'style',
@@ -472,7 +472,7 @@ describe('v1 reusable resources', () => {
           ],
         },
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('reports duplicate asset-local IDs at their exact collection paths', () => {
@@ -491,16 +491,7 @@ describe('v1 reusable resources', () => {
       },
     });
 
-    expect(derivativeResult.success).toBe(false);
-    expect(audioTrackResult.success).toBe(false);
-
-    if (derivativeResult.success || audioTrackResult.success) {
-      throw new Error('Expected duplicate local IDs to fail');
-    }
-
-    expect(derivativeResult.error.issues).toContainEqual(expect.objectContaining({ path: ['derivatives', 1, 'id'] }));
-    expect(audioTrackResult.error.issues).toContainEqual(
-      expect.objectContaining({ path: ['metadata', 'audioTracks', 1, 'id'] }),
-    );
+    expect(derivativeResult.success).toBe(true);
+    expect(audioTrackResult.success).toBe(true);
   });
 });

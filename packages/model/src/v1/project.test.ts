@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import { createMinimalProjectV1 } from './fixtures/minimal-project';
-import { broadsetProjectV1Schema } from './index';
+import { broadsetProjectV1Schema, parseProjectV1Unknown } from './index';
+
+function expectSemanticRejection(project: unknown, code: string): void {
+  expect(broadsetProjectV1Schema.safeParse(project).success).toBe(true);
+
+  const result = parseProjectV1Unknown(project);
+
+  expect(result.status).toBe('quarantined');
+  expect(result.diagnostics.some((diagnostic) => diagnostic.code === code)).toBe(true);
+}
 
 describe('broadsetProjectV1Schema', () => {
   it('parses a complete minimal v1 project without hidden defaults', () => {
@@ -24,22 +33,23 @@ describe('broadsetProjectV1Schema', () => {
     );
   });
 
-  it('rejects metadata with updatedAt earlier by an exact instant', () => {
+  it('defers metadata instant ordering to semantic validation', () => {
     const project = createMinimalProjectV1();
 
-    expect(
-      broadsetProjectV1Schema.safeParse({
+    expectSemanticRejection(
+      {
         ...project,
         metadata: {
           ...project.metadata,
           createdAt: '2025-01-01T00:00:00.000000001Z',
           updatedAt: '2025-01-01T00:00:00.000000000Z',
         },
-      }).success,
-    ).toBe(false);
+      },
+      'project.invalid-timestamp-order',
+    );
   });
 
-  it('rejects duplicate track IDs through aggregate structural parsing', () => {
+  it('defers duplicate track IDs to semantic validation', () => {
     const project = createMinimalProjectV1();
     const target = {
       entity: {
@@ -68,15 +78,16 @@ describe('broadsetProjectV1Schema', () => {
       childClips: [],
     };
 
-    expect(
-      broadsetProjectV1Schema.safeParse({
+    expectSemanticRejection(
+      {
         ...project,
         documents: [{ ...project.documents[0], sequences: [sequence] }],
-      }).success,
-    ).toBe(false);
+      },
+      'identity.duplicate',
+    );
   });
 
-  it('rejects an out-of-duration keyframe through aggregate structural parsing', () => {
+  it('defers out-of-duration keyframes to semantic validation', () => {
     const project = createMinimalProjectV1();
     const sequence = {
       id: 'sequence',
@@ -105,11 +116,12 @@ describe('broadsetProjectV1Schema', () => {
       childClips: [],
     };
 
-    expect(
-      broadsetProjectV1Schema.safeParse({
+    expectSemanticRejection(
+      {
         ...project,
         documents: [{ ...project.documents[0], sequences: [sequence] }],
-      }).success,
-    ).toBe(false);
+      },
+      'sequence.invalid-keyframe-tick',
+    );
   });
 });

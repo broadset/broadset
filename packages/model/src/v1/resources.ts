@@ -10,15 +10,14 @@ import {
 } from './identity';
 import {
   absoluteHttpsUrlSchema,
+  absoluteUriSchema,
   axisTagSchema,
   finiteNumberSchema,
-  greatestCommonDivisor,
   mediaTypeSchema,
   nonEmptyStringSchema,
   nonNegativeSafeIntegerSchema,
   packagePathSchema,
   positiveSafeIntegerSchema,
-  validateUniqueIds,
 } from './schema-helpers';
 import { type TypedValue, type ValueType, valueTypeSchema } from './typed-value';
 
@@ -263,45 +262,12 @@ const missingBlobSourceSchema = z.strictObject({
   lastKnownName: nonEmptyStringSchema.optional(),
 });
 
-export const blobReferenceSchema: z.ZodType<BlobReference> = z
-  .strictObject({
-    digest: sha256DigestSchema,
-    byteLength: nonNegativeSafeIntegerSchema,
-    mediaType: mediaTypeSchema,
-    source: z.discriminatedUnion('kind', [packageBlobSourceSchema, externalBlobSourceSchema, missingBlobSourceSchema]),
-  })
-  .superRefine((blobReference, context) => {
-    if (
-      blobReference.source.kind === 'package' &&
-      blobReference.source.path !== `blobs/sha256/${blobReference.digest.slice('sha256:'.length)}`
-    ) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Package blob path must match its digest',
-        path: ['source', 'path'],
-      });
-    }
-
-    if (blobReference.source.kind === 'external' && blobReference.source.integrity !== blobReference.digest) {
-      context.addIssue({
-        code: 'custom',
-        message: 'External integrity must match its digest',
-        path: ['source', 'integrity'],
-      });
-    }
-
-    if (
-      blobReference.source.kind === 'external' &&
-      blobReference.source.cachedDigest !== undefined &&
-      blobReference.source.cachedDigest !== blobReference.digest
-    ) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Cached digest must match its digest',
-        path: ['source', 'cachedDigest'],
-      });
-    }
-  });
+export const blobReferenceSchema: z.ZodType<BlobReference> = z.strictObject({
+  digest: sha256DigestSchema,
+  byteLength: nonNegativeSafeIntegerSchema,
+  mediaType: mediaTypeSchema,
+  source: z.discriminatedUnion('kind', [packageBlobSourceSchema, externalBlobSourceSchema, missingBlobSourceSchema]),
+});
 
 const provenanceSchema: z.ZodType<AssetProvenance> = z.discriminatedUnion('kind', [
   z.strictObject({
@@ -312,7 +278,7 @@ const provenanceSchema: z.ZodType<AssetProvenance> = z.discriminatedUnion('kind'
   z.strictObject({
     kind: z.literal('imported'),
     sourceName: nonEmptyStringSchema,
-    sourceUri: z.url().optional(),
+    sourceUri: absoluteUriSchema.optional(),
     importer: nonEmptyStringSchema,
     importedAt: utcTimestampSchema,
   }),
@@ -320,7 +286,7 @@ const provenanceSchema: z.ZodType<AssetProvenance> = z.discriminatedUnion('kind'
 const licenseSchema: z.ZodType<AssetLicense> = z.strictObject({
   name: nonEmptyStringSchema,
   spdxIdentifier: nonEmptyStringSchema.optional(),
-  url: z.url().optional(),
+  url: absoluteUriSchema.optional(),
   attribution: nonEmptyStringSchema.optional(),
   permissions: z.strictObject({ embedding: z.boolean(), modification: z.boolean(), redistribution: z.boolean() }),
 });
@@ -368,29 +334,22 @@ const audioTrackSchema = z.strictObject({
   channelCount: positiveSafeIntegerSchema,
   language: nonEmptyStringSchema.optional(),
 });
-const frameRateSchema = z
-  .strictObject({ numerator: positiveSafeIntegerSchema, denominator: positiveSafeIntegerSchema })
-  .superRefine((frameRate, context) => {
-    if (greatestCommonDivisor(frameRate.numerator, frameRate.denominator) !== 1) {
-      context.addIssue({ code: 'custom', message: 'Frame rate must be reduced' });
-    }
-  });
+const frameRateSchema = z.strictObject({
+  numerator: positiveSafeIntegerSchema,
+  denominator: positiveSafeIntegerSchema,
+});
 const videoAssetSchema = z.strictObject({
   ...assetBaseShape,
   kind: z.literal('video'),
-  metadata: z
-    .strictObject({
-      pixelWidth: positiveSafeIntegerSchema,
-      pixelHeight: positiveSafeIntegerSchema,
-      frameRate: frameRateSchema,
-      durationTicks: nonNegativeSafeIntegerSchema,
-      videoCodec: nonEmptyStringSchema,
-      hasAlpha: z.boolean(),
-      audioTracks: z.array(audioTrackSchema),
-    })
-    .superRefine((metadata, context) => {
-      validateUniqueIds({ items: metadata.audioTracks, context, path: ['audioTracks'] });
-    }),
+  metadata: z.strictObject({
+    pixelWidth: positiveSafeIntegerSchema,
+    pixelHeight: positiveSafeIntegerSchema,
+    frameRate: frameRateSchema,
+    durationTicks: nonNegativeSafeIntegerSchema,
+    videoCodec: nonEmptyStringSchema,
+    hasAlpha: z.boolean(),
+    audioTracks: z.array(audioTrackSchema),
+  }),
 });
 const audioAssetSchema = z.strictObject({
   ...assetBaseShape,
@@ -403,49 +362,32 @@ const audioAssetSchema = z.strictObject({
     codec: nonEmptyStringSchema,
   }),
 });
-const variableAxisSchema = z
-  .strictObject({
-    id: idSchema,
-    tag: axisTagSchema,
-    minimum: finiteNumberSchema,
-    defaultValue: finiteNumberSchema,
-    maximum: finiteNumberSchema,
-  })
-  .superRefine((axis, context) => {
-    if (axis.minimum > axis.defaultValue || axis.defaultValue > axis.maximum) {
-      context.addIssue({ code: 'custom', message: 'Axis default must be within its range' });
-    }
-  });
-const unicodeRangeSchema = z
-  .strictObject({
-    id: idSchema,
-    start: z.number().int().min(0).max(0x10ffff),
-    end: z.number().int().min(0).max(0x10ffff),
-  })
-  .superRefine((range, context) => {
-    if (range.start > range.end || (range.start <= 0xdfff && range.end >= 0xd800)) {
-      context.addIssue({ code: 'custom', message: 'Expected an ordered Unicode scalar range' });
-    }
-  });
+const variableAxisSchema = z.strictObject({
+  id: idSchema,
+  tag: axisTagSchema,
+  minimum: finiteNumberSchema,
+  defaultValue: finiteNumberSchema,
+  maximum: finiteNumberSchema,
+});
+const unicodeRangeSchema = z.strictObject({
+  id: idSchema,
+  start: z.number().int().min(0).max(0x10ffff),
+  end: z.number().int().min(0).max(0x10ffff),
+});
 const fontAssetSchema = z.strictObject({
   ...assetBaseShape,
   kind: z.literal('font'),
-  metadata: z
-    .strictObject({
-      format: z.enum(['opentype', 'truetype', 'woff', 'woff2', 'type1', 'collection']),
-      postScriptName: nonEmptyStringSchema,
-      family: nonEmptyStringSchema,
-      weight: z.number().int().min(1).max(1000),
-      style: z.enum(['normal', 'italic', 'oblique']),
-      stretch: z.number().positive(),
-      variableAxes: z.array(variableAxisSchema),
-      unicodeCoverage: z.array(unicodeRangeSchema),
-      embeddingPermissions: z.enum(['installable', 'editable', 'preview-print', 'restricted']),
-    })
-    .superRefine((metadata, context) => {
-      validateUniqueIds({ items: metadata.variableAxes, context, path: ['variableAxes'] });
-      validateUniqueIds({ items: metadata.unicodeCoverage, context, path: ['unicodeCoverage'] });
-    }),
+  metadata: z.strictObject({
+    format: z.enum(['opentype', 'truetype', 'woff', 'woff2', 'type1', 'collection']),
+    postScriptName: nonEmptyStringSchema,
+    family: nonEmptyStringSchema,
+    weight: z.number().int().min(1).max(1000),
+    style: z.enum(['normal', 'italic', 'oblique']),
+    stretch: z.number().positive(),
+    variableAxes: z.array(variableAxisSchema),
+    unicodeCoverage: z.array(unicodeRangeSchema),
+    embeddingPermissions: z.enum(['installable', 'editable', 'preview-print', 'restricted']),
+  }),
 });
 const iccProfileAssetSchema = z.strictObject({
   ...assetBaseShape,
@@ -473,13 +415,8 @@ const dataAssetSchema = z.strictObject({
   kind: z.literal('data'),
   metadata: z.strictObject({
     encoding: nonEmptyStringSchema,
-    schemaUri: z.url().optional(),
-    recordShape: z.union([
-      z.strictObject({ kind: z.literal('opaque') }),
-      shapedDataRecordSchema.superRefine((recordShape, context) => {
-        validateUniqueIds({ items: recordShape.fields, context, path: ['fields'] });
-      }),
-    ]),
+    schemaUri: absoluteUriSchema.optional(),
+    recordShape: z.union([z.strictObject({ kind: z.literal('opaque') }), shapedDataRecordSchema]),
   }),
 });
 const intrinsicMetadataSchema = z.strictObject({
@@ -502,20 +439,16 @@ const foreignAssetSchema = z.strictObject({
   metadata: intrinsicMetadataSchema,
 });
 
-export const assetSchema: z.ZodType<Asset> = z
-  .discriminatedUnion('kind', [
-    imageAssetSchema,
-    videoAssetSchema,
-    audioAssetSchema,
-    fontAssetSchema,
-    iccProfileAssetSchema,
-    dataAssetSchema,
-    vectorAssetSchema,
-    foreignAssetSchema,
-  ])
-  .superRefine((asset, context) => {
-    validateUniqueIds({ items: asset.derivatives ?? [], context, path: ['derivatives'] });
-  });
+export const assetSchema: z.ZodType<Asset> = z.discriminatedUnion('kind', [
+  imageAssetSchema,
+  videoAssetSchema,
+  audioAssetSchema,
+  fontAssetSchema,
+  iccProfileAssetSchema,
+  dataAssetSchema,
+  vectorAssetSchema,
+  foreignAssetSchema,
+]);
 
 export {
   fontFamilyResourceSchema,

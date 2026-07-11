@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { Diagnostic } from './diagnostics';
+import { inspectProjectV1JsonText, inspectProjectV1Unknown, type ProjectV1LimitViolation } from './limits';
 import type { BroadsetProjectV1 } from './project';
 import { broadsetProjectV1Schema } from './project';
 import { validateBroadsetProjectV1Semantics } from './semantic-validation';
@@ -49,7 +50,11 @@ function escapePointerSegment(segment: PropertyKey): string {
 }
 
 function issuePointer(issue: z.core.$ZodIssue): string {
-  return `/${issue.path.map(escapePointerSegment).join('/')}`;
+  return issue.path.length === 0 ? '' : `/${issue.path.map(escapePointerSegment).join('/')}`;
+}
+
+function createLimitResult(violation: ProjectV1LimitViolation): ProjectParseResult {
+  return { status: 'quarantined', diagnostics: [createDiagnostic(violation.code, violation.message)] };
 }
 
 function hasSupportedIdentity(input: unknown): boolean {
@@ -57,6 +62,19 @@ function hasSupportedIdentity(input: unknown): boolean {
 }
 
 export function parseProjectV1Unknown(input: unknown): ProjectParseResult {
+  try {
+    const violation = inspectProjectV1Unknown(input);
+
+    if (violation !== undefined) return createLimitResult(violation);
+  } catch (error) {
+    return {
+      status: 'quarantined',
+      diagnostics: [
+        createDiagnostic('structural-invalid', error instanceof Error ? error.message : 'Unreadable input'),
+      ],
+    };
+  }
+
   if (!hasSupportedIdentity(input)) {
     return {
       status: 'quarantined',
@@ -64,7 +82,18 @@ export function parseProjectV1Unknown(input: unknown): ProjectParseResult {
     };
   }
 
-  const structural = broadsetProjectV1Schema.safeParse(input);
+  let structural: ReturnType<typeof broadsetProjectV1Schema.safeParse>;
+
+  try {
+    structural = broadsetProjectV1Schema.safeParse(input);
+  } catch (error) {
+    return {
+      status: 'quarantined',
+      diagnostics: [
+        createDiagnostic('structural-invalid', error instanceof Error ? error.message : 'Structural validation failed'),
+      ],
+    };
+  }
 
   if (!structural.success) {
     return {
@@ -75,7 +104,21 @@ export function parseProjectV1Unknown(input: unknown): ProjectParseResult {
     };
   }
 
-  const semanticDiagnostics = validateBroadsetProjectV1Semantics(structural.data);
+  let semanticDiagnostics: readonly Diagnostic[];
+
+  try {
+    semanticDiagnostics = validateBroadsetProjectV1Semantics(structural.data);
+  } catch (error) {
+    return {
+      status: 'quarantined',
+      diagnostics: [
+        createDiagnostic(
+          'semantic-validation-failed',
+          error instanceof Error ? error.message : 'Semantic validation failed',
+        ),
+      ],
+    };
+  }
 
   if (semanticDiagnostics.some(({ severity }) => severity === 'error')) {
     return {
@@ -91,6 +134,17 @@ export function parseProjectV1Unknown(input: unknown): ProjectParseResult {
 }
 
 export function loadProjectV1Json(originalText: string, options: ProjectLoadOptions = {}): Promise<ProjectLoadResult> {
+  const violation = inspectProjectV1JsonText(originalText);
+
+  if (violation !== undefined) {
+    return Promise.resolve({
+      ...createLimitResult(violation),
+      status: 'quarantined',
+      originalText,
+      ...(options.lastValidProject === undefined ? {} : { lastValidProject: options.lastValidProject }),
+    });
+  }
+
   let input: unknown;
 
   try {

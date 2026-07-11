@@ -83,7 +83,7 @@ describe('outputProfileSchema', () => {
     ).toBe(false);
   });
 
-  it('enforces SDR and HDR transfer and luminance consistency', () => {
+  it('enforces transfer compatibility structurally and defers luminance arithmetic', () => {
     const motion = createMotionProfile();
 
     expect(
@@ -91,7 +91,7 @@ describe('outputProfileSchema', () => {
         ...motion,
         colorSignal: { ...motion.colorSignal, dynamicRange: { kind: 'sdr', referenceWhiteNits: 100, peakNits: 80 } },
       }).success,
-    ).toBe(false);
+    ).toBe(true);
 
     const hlg = {
       ...motion,
@@ -173,7 +173,7 @@ describe('outputProfileSchema', () => {
           title: { x: 0, y: 0, width: 1, height: 1 },
         },
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       outputProfileSchema.safeParse({
         ...motion,
@@ -188,7 +188,7 @@ describe('outputProfileSchema', () => {
     expect(outputProfileSchema.safeParse({ ...motion, dimensions: { width: 0, height: 1_080 } }).success).toBe(false);
     expect(
       outputProfileSchema.safeParse({ ...motion, pixelAspectRatio: { numerator: 2, denominator: 2 } }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       outputProfileSchema.safeParse({
         ...motion,

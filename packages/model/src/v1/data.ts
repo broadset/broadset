@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { type Id, idSchema, type PropertyTarget, propertyTargetSchema, utcTimestampSchema } from './identity';
 import { compareExactIsoInstants } from './iso-instant';
 import { type AssetKind, assetKindSchema } from './resources';
-import { mediaTypeSchema, nonEmptyStringSchema, validateUniqueIds } from './schema-helpers';
+import { mediaTypeSchema, nonEmptyStringSchema } from './schema-helpers';
 import { type TypedValue, typedValueSchema, type ValueType, valueTypeSchema } from './typed-value';
 
 export type ValueSchema =
@@ -93,7 +93,11 @@ export type ExpressionAst =
     }
   | { readonly kind: 'get'; readonly source: ExpressionAst; readonly fieldId: Id }
   | { readonly kind: 'index'; readonly source: ExpressionAst; readonly index: ExpressionAst }
-  | { readonly kind: 'safe-function'; readonly functionId: SafeFunctionId; readonly arguments: readonly ExpressionAst[] };
+  | {
+      readonly kind: 'safe-function';
+      readonly functionId: SafeFunctionId;
+      readonly arguments: readonly ExpressionAst[];
+    };
 
 export const FORMATTER_IDS = ['number', 'date-time', 'duration', 'prefix', 'suffix', 'truncate'] as const;
 export type FormatterId = (typeof FORMATTER_IDS)[number];
@@ -132,31 +136,19 @@ function chronologicallyOrdered(earliest: string | undefined, latest: string | u
 
 export const valueSchemaSchema: z.ZodType<ValueSchema> = z.lazy(() =>
   z.discriminatedUnion('kind', [
-    z
-      .strictObject({
-        kind: z.literal('string'),
-        minLength: constrainedLengthSchema.optional(),
-        maxLength: constrainedLengthSchema.optional(),
-      })
-      .refine(({ minLength, maxLength }) => minLength === undefined || maxLength === undefined || minLength <= maxLength, {
-        message: 'minLength must not exceed maxLength',
-      }),
-    z
-      .strictObject({ kind: z.literal('number'), ...numericBoundsShape })
-      .refine(({ minimum, maximum }) => minimum === undefined || maximum === undefined || minimum <= maximum, {
-        message: 'minimum must not exceed maximum',
-      }),
-    z
-      .strictObject({ kind: z.literal('integer'), ...integerBoundsShape })
-      .refine(({ minimum, maximum }) => minimum === undefined || maximum === undefined || minimum <= maximum, {
-        message: 'minimum must not exceed maximum',
-      }),
+    z.strictObject({
+      kind: z.literal('string'),
+      minLength: constrainedLengthSchema.optional(),
+      maxLength: constrainedLengthSchema.optional(),
+    }),
+    z.strictObject({ kind: z.literal('number'), ...numericBoundsShape }),
+    z.strictObject({ kind: z.literal('integer'), ...integerBoundsShape }),
     z.strictObject({ kind: z.literal('boolean') }),
-    z
-      .strictObject({ kind: z.literal('date-time'), earliest: utcTimestampSchema.optional(), latest: utcTimestampSchema.optional() })
-      .refine(({ earliest, latest }) => chronologicallyOrdered(earliest, latest), {
-        message: 'earliest must not exceed latest',
-      }),
+    z.strictObject({
+      kind: z.literal('date-time'),
+      earliest: utcTimestampSchema.optional(),
+      latest: utcTimestampSchema.optional(),
+    }),
     z.strictObject({ kind: z.literal('color') }),
     z.strictObject({
       kind: z.literal('asset'),
@@ -167,50 +159,51 @@ export const valueSchemaSchema: z.ZodType<ValueSchema> = z.lazy(() =>
           const seen = new Set<AssetKind>();
 
           items.forEach((item, index) => {
-            if (seen.has(item)) context.addIssue({ code: 'custom', message: `Duplicate asset kind: ${item}`, path: [index] });
+            if (seen.has(item))
+              context.addIssue({ code: 'custom', message: `Duplicate asset kind: ${item}`, path: [index] });
             seen.add(item);
           });
         })
+        .meta({ uniqueItems: true })
         .optional(),
       acceptedMediaTypes: z.array(mediaTypeSchema).optional(),
     }),
-    z
-      .strictObject({ kind: z.literal('enum'), values: z.array(nonEmptyStringSchema).min(1) })
-      .superRefine(({ values }, context) => {
-        const seen = new Set<string>();
+    z.strictObject({
+      kind: z.literal('enum'),
+      values: z
+        .array(nonEmptyStringSchema)
+        .min(1)
+        .superRefine((values, context) => {
+          const seen = new Set<string>();
 
-        values.forEach((value, index) => {
-          if (seen.has(value)) {
-            context.addIssue({ code: 'custom', message: `Duplicate enum value: ${value}`, path: ['values', index] });
-          }
+          values.forEach((value, index) => {
+            if (seen.has(value)) {
+              context.addIssue({ code: 'custom', message: `Duplicate enum value: ${value}`, path: [index] });
+            }
 
-          seen.add(value);
-        });
-      }),
-    z
-      .strictObject({
-        kind: z.literal('object'),
-        fields: z.array(
-          z.strictObject({
-            id: idSchema,
-            name: nonEmptyStringSchema,
-            label: nonEmptyStringSchema.optional(),
-            required: z.boolean(),
-            schema: valueSchemaSchema,
-          }),
-        ),
-      })
-      .superRefine(({ fields }, context) => { validateUniqueIds({ items: fields, context, path: ['fields'] }); }),
-    z
-      .strictObject({
-        kind: z.literal('array'),
-        items: valueSchemaSchema,
-        minItems: constrainedLengthSchema.optional(),
-        maxItems: constrainedLengthSchema.optional(),
-      })
-      .refine(({ minItems, maxItems }) => minItems === undefined || maxItems === undefined || minItems <= maxItems, {
-        message: 'minItems must not exceed maxItems',
-      }),
+            seen.add(value);
+          });
+        })
+        .meta({ uniqueItems: true }),
+    }),
+    z.strictObject({
+      kind: z.literal('object'),
+      fields: z.array(
+        z.strictObject({
+          id: idSchema,
+          name: nonEmptyStringSchema,
+          label: nonEmptyStringSchema.optional(),
+          required: z.boolean(),
+          schema: valueSchemaSchema,
+        }),
+      ),
+    }),
+    z.strictObject({
+      kind: z.literal('array'),
+      items: valueSchemaSchema,
+      minItems: constrainedLengthSchema.optional(),
+      maxItems: constrainedLengthSchema.optional(),
+    }),
   ]),
 );
 
@@ -268,20 +261,14 @@ export function typedValueMatchesSchema(value: TypedValue, schema: ValueSchema):
   }
 }
 
-const viewModelFieldSchema: z.ZodType<ViewModelField> = z
-  .strictObject({
-    id: idSchema,
-    name: nonEmptyStringSchema,
-    label: nonEmptyStringSchema.optional(),
-    schema: valueSchemaSchema,
-    defaultValue: typedValueSchema.optional(),
-    stalePolicy: z.enum(['keep-last', 'use-default', 'hide', 'error']).optional(),
-  })
-  .superRefine((field, context) => {
-    if (field.defaultValue !== undefined && !typedValueMatchesSchema(field.defaultValue, field.schema)) {
-      context.addIssue({ code: 'custom', message: 'Default value does not match the field schema', path: ['defaultValue'] });
-    }
-  });
+const viewModelFieldSchema: z.ZodType<ViewModelField> = z.strictObject({
+  id: idSchema,
+  name: nonEmptyStringSchema,
+  label: nonEmptyStringSchema.optional(),
+  schema: valueSchemaSchema,
+  defaultValue: typedValueSchema.optional(),
+  stalePolicy: z.enum(['keep-last', 'use-default', 'hide', 'error']).optional(),
+});
 
 const sampleDataSetSchema: z.ZodType<SampleDataSet> = z.strictObject({
   id: idSchema,
@@ -289,41 +276,12 @@ const sampleDataSetSchema: z.ZodType<SampleDataSet> = z.strictObject({
   values: z.record(idSchema, typedValueSchema),
 });
 
-export const viewModelSchema: z.ZodType<ViewModel> = z
-  .strictObject({
-    id: idSchema,
-    name: nonEmptyStringSchema,
-    fields: z.array(viewModelFieldSchema),
-    sampleDataSets: z.array(sampleDataSetSchema),
-  })
-  .superRefine((viewModel, context) => {
-    validateUniqueIds({ items: viewModel.fields, context, path: ['fields'] });
-    validateUniqueIds({ items: viewModel.sampleDataSets, context, path: ['sampleDataSets'] });
-    viewModel.sampleDataSets.forEach((sample, sampleIndex) => {
-      viewModel.fields.forEach((field) => {
-        if (!Object.keys(sample.values).includes(field.id)) {
-          context.addIssue({
-            code: 'custom',
-            message: 'Sample data set omits a declared field',
-            path: ['sampleDataSets', sampleIndex, 'values', field.id],
-          });
-        }
-      });
-
-      for (const fieldId of Object.keys(sample.values)) {
-        const field = viewModel.fields.find((candidate) => candidate.id === fieldId);
-        const sampleValue = Object.entries(sample.values).find(([candidateId]) => candidateId === fieldId)?.[1];
-
-        if (field === undefined || sampleValue === undefined || !typedValueMatchesSchema(sampleValue, field.schema)) {
-          context.addIssue({
-            code: 'custom',
-            message: field === undefined ? 'Sample value references an unknown field' : 'Sample value does not match the field schema',
-            path: ['sampleDataSets', sampleIndex, 'values', fieldId],
-          });
-        }
-      }
-    });
-  });
+export const viewModelSchema: z.ZodType<ViewModel> = z.strictObject({
+  id: idSchema,
+  name: nonEmptyStringSchema,
+  fields: z.array(viewModelFieldSchema),
+  sampleDataSets: z.array(sampleDataSetSchema),
+});
 
 export const expressionAstSchema: z.ZodType<ExpressionAst> = z.lazy(() =>
   z.discriminatedUnion('kind', [
@@ -378,9 +336,9 @@ const formatterStepSchema: z.ZodType<FormatterStep> = z.discriminatedUnion('form
   z.strictObject({ id: idSchema, formatterId: z.literal('truncate'), arguments: z.tuple([integerArgumentSchema]) }),
 ]);
 
-export const formatterPipelineSchema: z.ZodType<FormatterPipeline> = z
-  .strictObject({ steps: z.array(formatterStepSchema) })
-  .superRefine(({ steps }, context) => { validateUniqueIds({ items: steps, context, path: ['steps'] }); });
+export const formatterPipelineSchema: z.ZodType<FormatterPipeline> = z.strictObject({
+  steps: z.array(formatterStepSchema),
+});
 
 export const bindingSchema: z.ZodType<Binding> = z.strictObject({
   id: idSchema,
@@ -415,9 +373,7 @@ export interface ExpressionInferenceContext {
 
 export const expressionInferenceContextSchema: z.ZodType<ExpressionInferenceContext> = z.strictObject({
   fields: z.array(z.strictObject({ viewModelId: idSchema, fieldId: idSchema, schema: valueSchemaSchema })),
-  variables: z.array(
-    z.strictObject({ collectionId: idSchema, variableId: idSchema, valueType: valueTypeSchema }),
-  ),
+  variables: z.array(z.strictObject({ collectionId: idSchema, variableId: idSchema, valueType: valueTypeSchema })),
   targets: z.array(z.strictObject({ target: propertyTargetSchema, valueType: valueTypeSchema })),
 });
 

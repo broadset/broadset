@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { type Id, idSchema } from './identity';
-import { nonEmptyStringSchema } from './schema-helpers';
+import { nonEmptyStringSchema, positiveSafeIntegerSchema } from './schema-helpers';
 import { type Rational, rationalSchema } from './time';
 
 interface NormalizedRect {
@@ -107,28 +107,22 @@ export interface PrintOutputProfile {
 
 export type OutputProfile = MotionOutputProfile | PrintOutputProfile;
 
-const positiveSafeIntegerSchema = z.number().refine((value) => Number.isSafeInteger(value) && value > 0);
 const positiveFiniteNumberSchema = z.number().positive();
 const nonNegativeFiniteNumberSchema = z.number().nonnegative();
 
-const normalizedRectSchema: z.ZodType<NormalizedRect> = z
-  .strictObject({
-    x: z.number().min(0).max(1),
-    y: z.number().min(0).max(1),
-    width: z.number().positive().max(1),
-    height: z.number().positive().max(1),
-  })
-  .refine(({ x, width }) => x + width <= 1, 'Normalized rectangle exceeds horizontal bounds')
-  .refine(({ y, height }) => y + height <= 1, 'Normalized rectangle exceeds vertical bounds');
+const normalizedRectSchema: z.ZodType<NormalizedRect> = z.strictObject({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  width: z.number().positive().max(1),
+  height: z.number().positive().max(1),
+});
 
 const dynamicRangeSchema: z.ZodType<DynamicRange> = z.discriminatedUnion('kind', [
-  z
-    .strictObject({
-      kind: z.literal('sdr'),
-      referenceWhiteNits: positiveFiniteNumberSchema,
-      peakNits: positiveFiniteNumberSchema,
-    })
-    .refine(({ referenceWhiteNits, peakNits }) => peakNits >= referenceWhiteNits, 'Peak must reach reference white'),
+  z.strictObject({
+    kind: z.literal('sdr'),
+    referenceWhiteNits: positiveFiniteNumberSchema,
+    peakNits: positiveFiniteNumberSchema,
+  }),
   z
     .strictObject({
       kind: z.literal('hdr'),
@@ -139,13 +133,17 @@ const dynamicRangeSchema: z.ZodType<DynamicRange> = z.discriminatedUnion('kind',
       maxFallNits: positiveFiniteNumberSchema.optional(),
     })
     .superRefine((range, context) => {
-      if (range.peakNits < range.referenceWhiteNits) {
-        context.addIssue({ code: 'custom', message: 'Peak must reach reference white', path: ['peakNits'] });
-      }
-
       if (range.format === 'hdr10' && (range.maxCllNits === undefined || range.maxFallNits === undefined)) {
         context.addIssue({ code: 'custom', message: 'HDR10 requires maxCLL and maxFALL metadata' });
       }
+    })
+    .meta({
+      if: { type: 'object', properties: { format: { const: 'hdr10' } }, required: ['format'] },
+      then: {
+        type: 'object',
+        properties: { maxCllNits: {}, maxFallNits: {} },
+        required: ['maxCllNits', 'maxFallNits'],
+      },
     }),
 ]);
 
@@ -173,6 +171,45 @@ const colorSignalSchema: z.ZodType<ColorSignal> = z
     if (dynamicRange.format === 'hlg' && transfer !== 'hlg') {
       context.addIssue({ code: 'custom', message: 'HLG signaling requires HLG transfer', path: ['transfer'] });
     }
+  })
+  .meta({
+    allOf: [
+      {
+        if: {
+          type: 'object',
+          properties: {
+            dynamicRange: { type: 'object', properties: { kind: { const: 'sdr' } }, required: ['kind'] },
+          },
+        },
+        then: { type: 'object', properties: { transfer: { enum: ['srgb', 'bt1886'] } } },
+      },
+      {
+        if: {
+          type: 'object',
+          properties: {
+            dynamicRange: {
+              type: 'object',
+              properties: { kind: { const: 'hdr' }, format: { const: 'hdr10' } },
+              required: ['kind', 'format'],
+            },
+          },
+        },
+        then: { type: 'object', properties: { transfer: { const: 'pq' } } },
+      },
+      {
+        if: {
+          type: 'object',
+          properties: {
+            dynamicRange: {
+              type: 'object',
+              properties: { kind: { const: 'hdr' }, format: { const: 'hlg' } },
+              required: ['kind', 'format'],
+            },
+          },
+        },
+        then: { type: 'object', properties: { transfer: { const: 'hlg' } } },
+      },
+    ],
   });
 
 const alphaSchema: z.ZodType<MotionAlpha> = z.discriminatedUnion('kind', [
@@ -199,7 +236,7 @@ const targetRuntimeSchema: z.ZodType<TargetRuntime> = z
     id: idSchema,
     kind: z.enum(['browser', 'broadcast-player', 'video-file']),
     minimumVersion: nonEmptyStringSchema.optional(),
-    requirements: z.array(nonEmptyStringSchema),
+    requirements: z.array(nonEmptyStringSchema).meta({ uniqueItems: true }),
   })
   .superRefine(({ requirements }, context) => {
     const seen = new Set<string>();

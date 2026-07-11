@@ -245,7 +245,7 @@ describe('expression inference error evidence', () => {
 });
 
 describe('formatter and binding error evidence', () => {
-  it('rejects argument failures for every formatter and duplicate step ids', () => {
+  it('rejects formatter argument failures and defers duplicate step ids', () => {
     const invalidSteps = [
       { id: 'number', formatterId: 'number', arguments: [{ type: 'integer', value: 1 }] },
       { id: 'date', formatterId: 'date-time', arguments: [{ type: 'string', value: 'yyyy' }] },
@@ -269,7 +269,7 @@ describe('formatter and binding error evidence', () => {
       arguments: [{ type: 'string', value: '$' }],
     };
 
-    expect(formatterPipelineSchema.safeParse({ steps: [duplicate, duplicate] }).success).toBe(false);
+    expect(formatterPipelineSchema.safeParse({ steps: [duplicate, duplicate] }).success).toBe(true);
   });
 
   it('points a later formatter failure at its own stable step index', () => {

@@ -8,7 +8,7 @@ import { type Element, elementSchema } from './element';
 import { type Id, idSchema } from './identity';
 import { type ExtensionEnvelope, extensionEnvelopeSchema } from './json-value';
 import { type PageDefinition, pageDefinitionSchema } from './page';
-import { nonEmptyStringSchema, validateUniqueIds } from './schema-helpers';
+import { nonEmptyStringSchema } from './schema-helpers';
 import {
   type LifecycleDefinition,
   lifecycleDefinitionSchema,
@@ -194,7 +194,8 @@ export const broadsetDocumentV1Schema: z.ZodType<BroadsetDocumentV1> = z
     if (document.kind === 'motion' && document.timebase === undefined) {
       context.addIssue({ code: 'custom', message: 'Motion documents require a timebase', path: ['timebase'] });
     }
-
-    validateUniqueIds({ items: document.surface.guides, context, path: ['surface', 'guides'] });
-    validateUniqueIds({ items: document.surface.broadcastSafeAreas, context, path: ['surface', 'broadcastSafeAreas'] });
+  })
+  .meta({
+    if: { type: 'object', properties: { kind: { const: 'motion' } }, required: ['kind'] },
+    then: { type: 'object', properties: { timebase: {} }, required: ['timebase'] },
   });

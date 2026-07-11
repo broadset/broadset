@@ -2,11 +2,12 @@ import type { ComponentDefinition } from './component';
 import { typedValueMatchesSchema, valueSchemaValueType } from './data';
 import type { Diagnostic } from './diagnostics';
 import type { Element } from './element';
+import { findGraphCycleEdges, graphEdgeKey } from './graph-cycles';
 import type { Id } from './identity';
 import type { BroadsetProjectV1 } from './project';
 import { createComponentAddressScope } from './resolved-address';
 import type { VariableDefinition } from './resources';
-import { createSemanticIndexes, type DocumentSemanticIndex, type SemanticIndexes } from './semantic-index';
+import { createSemanticIndexes, type SemanticIndexes } from './semantic-index';
 import { validateElementReferences } from './semantic-validation-element';
 import {
   validateAdditionalResources,
@@ -25,6 +26,7 @@ import {
   valueSchemaMatchesTargetContract,
 } from './semantic-validation-helpers';
 import { validateGlobalIdentities } from './semantic-validation-identities';
+import { validateProjectInvariants } from './semantic-validation-invariants';
 import { validatePagesAndBindings } from './semantic-validation-pages';
 import { validateSequences } from './semantic-validation-sequences';
 import { validateProjectTypedValueReferences } from './semantic-validation-typed-values';
@@ -165,24 +167,14 @@ function validateResources(indexes: SemanticIndexes, diagnostics: DiagnosticList
     document.elements.forEach((element, index) => {
       const pointer = `/documents/${String(documentIndex)}/elements/${String(index)}`;
 
-      validateElementResources(
-        indexes,
-        element,
-        pointer,
-        diagnostics,
-      );
+      validateElementResources(indexes, element, pointer, diagnostics);
       validateElementReferences(indexes, document.elements, element, pointer, diagnostics);
     });
     document.components.forEach((component, componentIndex) => {
       component.elements.forEach((element, elementIndex) => {
         const pointer = `/documents/${String(documentIndex)}/components/${String(componentIndex)}/elements/${String(elementIndex)}`;
 
-        validateElementResources(
-          indexes,
-          element,
-          pointer,
-          diagnostics,
-        );
+        validateElementResources(indexes, element, pointer, diagnostics);
         validateElementReferences(indexes, component.elements, element, pointer, diagnostics);
       });
     });
@@ -218,27 +210,6 @@ function validateHierarchies(indexes: SemanticIndexes, diagnostics: DiagnosticLi
       ),
     );
   });
-}
-
-function componentDependsOn(
-  document: DocumentSemanticIndex,
-  startId: Id,
-  targetId: Id,
-  seen: ReadonlySet<Id>,
-): boolean {
-  if (seen.has(startId)) return false;
-
-  const component = document.components.get(startId)?.component;
-
-  if (component === undefined) return false;
-
-  const nextSeen = new Set([...seen, startId]);
-
-  return component.elements.some(
-    (element) =>
-      element.kind === 'component-instance' &&
-      (element.componentId === targetId || componentDependsOn(document, element.componentId, targetId, nextSeen)),
-  );
 }
 
 function validateComponentPropertyValues(
@@ -278,6 +249,14 @@ function validateComponentPropertyValues(
 
 function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticList): void {
   indexes.documentList.forEach((documentIndex, documentPosition) => {
+    const componentCycleEdges = findGraphCycleEdges(
+      documentIndex.document.components.map(({ id }) => id),
+      (id) =>
+        documentIndex.components
+          .get(id)
+          ?.component.elements.flatMap((element) => (element.kind === 'component-instance' ? [element.componentId] : [])) ?? [],
+    );
+
     documentIndex.document.elements.forEach((element, elementPosition) => {
       if (element.kind !== 'component-instance') return;
 
@@ -289,7 +268,13 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
           createSemanticError('component.missing-reference', 'Component does not resolve', `${pointer}/componentId`),
         );
       } else {
-        validateComponentPropertyValues(indexes, definition, element.propertyValues, `${pointer}/propertyValues`, diagnostics);
+        validateComponentPropertyValues(
+          indexes,
+          definition,
+          element.propertyValues,
+          `${pointer}/propertyValues`,
+          diagnostics,
+        );
       }
     });
     documentIndex.document.components.forEach((component, componentPosition) => {
@@ -305,7 +290,11 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
 
         if (seenRootIds.has(id)) {
           diagnostics.push(
-            createSemanticError('identity.duplicate', 'Duplicate component root ID', `${base}/rootElementIds/${String(index)}`),
+            createSemanticError(
+              'identity.duplicate',
+              'Duplicate component root ID',
+              `${base}/rootElementIds/${String(index)}`,
+            ),
           );
         }
 
@@ -349,13 +338,7 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
           );
         }
 
-        if (
-          definition !== undefined &&
-          (
-          element.componentId === component.id ||
-          componentDependsOn(documentIndex, element.componentId, component.id, new Set())
-          )
-        ) {
+        if (definition !== undefined && componentCycleEdges.has(graphEdgeKey(component.id, element.componentId))) {
           diagnostics.push(createSemanticError('component.cycle', 'Component dependency cycle', pointer));
         }
       });
@@ -397,7 +380,10 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
             constraint.values.forEach((value, valuePosition) => {
               const key = semanticValueKey(value);
 
-              if (!typedValueMatchesSchema(value, property.valueSchema) || !typedValueMatchesResolvedAssetConstraints(indexes, value, property.valueSchema))
+              if (
+                !typedValueMatchesSchema(value, property.valueSchema) ||
+                !typedValueMatchesResolvedAssetConstraints(indexes, value, property.valueSchema)
+              )
                 diagnostics.push(
                   createSemanticError(
                     'component.incompatible-constraint',
@@ -420,12 +406,12 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
         property.bindings.forEach((binding, bindingPosition) => {
           const componentIndex = documentIndex.components.get(component.id);
           const expected =
-            componentIndex === undefined
-              ? undefined
-              : resolvePropertyTargetContractInScope(
-                  createComponentAddressScope(documentIndex, componentIndex),
-                  binding.target,
-                );
+            componentIndex === undefined ? undefined : (
+              resolvePropertyTargetContractInScope(
+                createComponentAddressScope(documentIndex, componentIndex),
+                binding.target,
+              )
+            );
           const pointer = `${propertyBase}/bindings/${String(bindingPosition)}/target`;
 
           if (expected === undefined) {
@@ -518,6 +504,7 @@ export function validateBroadsetProjectV1Semantics(project: BroadsetProjectV1): 
   const diagnostics: DiagnosticList = [];
 
   validateGlobalIdentities(indexes, diagnostics);
+  diagnostics.push(...validateProjectInvariants(project));
   validateResources(indexes, diagnostics);
   validateProjectTypedValueReferences(indexes, diagnostics);
   validateHierarchies(indexes, diagnostics);
@@ -529,7 +516,14 @@ export function validateBroadsetProjectV1Semantics(project: BroadsetProjectV1): 
   validateTemplateGroups(indexes, diagnostics);
   validateInterop(indexes, diagnostics);
 
-  return [...diagnostics].sort(
+  const uniqueDiagnostics = new Map(
+    diagnostics.map((diagnostic) => [
+      JSON.stringify([diagnostic.pointer ?? '', diagnostic.code, diagnostic.message, diagnostic.severity]),
+      diagnostic,
+    ]),
+  );
+
+  return [...uniqueDiagnostics.values()].sort(
     (left, right) =>
       compareCodeUnits(left.pointer ?? '', right.pointer ?? '') || compareCodeUnits(left.code, right.code),
   );
