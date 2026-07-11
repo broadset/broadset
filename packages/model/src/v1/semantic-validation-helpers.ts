@@ -8,6 +8,13 @@ export function createSemanticError(code: string, message: string, pointer: stri
   return { code, severity: 'error', message, pointer };
 }
 
+export function compareCodeUnits(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+
+  return 0;
+}
+
 export function findDuplicateIdDiagnostics(
   items: readonly { readonly id: Id }[],
   pointer: string,
@@ -85,18 +92,18 @@ export function typedValueMatchesType(value: TypedValue, expected: ValueType): b
 }
 
 export function semanticValueKey(value: TypedValue): string {
-  if (value.type === 'asset') return `asset:${value.assetId}`;
-  if (value.type === 'list') return `list:[${value.items.map(semanticValueKey).join(',')}]`;
+  if (value.type === 'asset') return JSON.stringify(['asset', value.assetId]);
+  if (value.type === 'list') return JSON.stringify(['list', value.items.map(semanticValueKey)]);
 
   if (value.type === 'object') {
     const entries = Object.entries(value.fields)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => `${key}:${semanticValueKey(item)}`);
+      .sort(([left], [right]) => compareCodeUnits(left, right))
+      .map(([key, item]) => [key, semanticValueKey(item)]);
 
-    return `object:{${entries.join(',')}}`;
+    return JSON.stringify(['object', entries]);
   }
 
-  return `${value.type}:${JSON.stringify(value.value)}`;
+  return JSON.stringify([value.type, value.value]);
 }
 
 export function typedValueSatisfiesConstraints(

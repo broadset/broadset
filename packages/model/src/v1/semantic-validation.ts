@@ -4,6 +4,7 @@ import type { Diagnostic } from './diagnostics';
 import type { Element } from './element';
 import type { Id } from './identity';
 import type { BroadsetProjectV1 } from './project';
+import { createComponentAddressScope } from './resolved-address';
 import type { VariableDefinition } from './resources';
 import { createSemanticIndexes, type DocumentSemanticIndex, type SemanticIndexes } from './semantic-index';
 import { validateElementReferences } from './semantic-validation-element';
@@ -14,6 +15,7 @@ import {
   validateTemplateGroups,
 } from './semantic-validation-final';
 import {
+  compareCodeUnits,
   createSemanticError,
   findDuplicateIdDiagnostics,
   semanticValueKey,
@@ -21,68 +23,16 @@ import {
   validateHierarchy,
   valueTypesCompatible,
 } from './semantic-validation-helpers';
+import { validateGlobalIdentities } from './semantic-validation-identities';
 import { validatePagesAndBindings } from './semantic-validation-pages';
 import { validateSequences } from './semantic-validation-sequences';
-import { resolvePropertyTargetValueTypeFromIndexes } from './target-resolution';
+import { resolvePropertyTargetValueTypeInScope } from './target-resolution';
 import type { TypedValue } from './typed-value';
 
 type DiagnosticList = Diagnostic[];
 
 function escapePointerSegment(segment: string): string {
   return segment.replaceAll('~', '~0').replaceAll('/', '~1');
-}
-
-function validateExtensionNamespaces(
-  extensions: BroadsetProjectV1['extensions'],
-  pointer: string,
-  diagnostics: DiagnosticList,
-): void {
-  const seen = new Set<string>();
-
-  extensions.forEach((extension, index) => {
-    if (seen.has(extension.namespace)) {
-      diagnostics.push(
-        createSemanticError(
-          'extension.duplicate-namespace',
-          'Extension namespace must be unique on its owner',
-          `${pointer}/${String(index)}/namespace`,
-        ),
-      );
-    }
-
-    seen.add(extension.namespace);
-  });
-}
-
-function validateGlobalIdentities(indexes: SemanticIndexes, diagnostics: DiagnosticList): void {
-  diagnostics.push(...findDuplicateIdDiagnostics(indexes.project.documents, '/documents'));
-  diagnostics.push(...findDuplicateIdDiagnostics(indexes.project.templateGroups, '/templateGroups'));
-  diagnostics.push(...findDuplicateIdDiagnostics(indexes.project.interop.sources, '/interop/sources'));
-  diagnostics.push(...findDuplicateIdDiagnostics(indexes.project.interop.records, '/interop/records'));
-  validateExtensionNamespaces(indexes.project.extensions, '/extensions', diagnostics);
-
-  indexes.documentList.forEach(({ document }, documentIndex) => {
-    const base = `/documents/${String(documentIndex)}`;
-
-    diagnostics.push(...findDuplicateIdDiagnostics(document.elements, `${base}/elements`));
-    diagnostics.push(...findDuplicateIdDiagnostics(document.components, `${base}/components`));
-    diagnostics.push(...findDuplicateIdDiagnostics(document.pages, `${base}/pages`));
-    diagnostics.push(...findDuplicateIdDiagnostics(document.sequences, `${base}/sequences`));
-    diagnostics.push(...findDuplicateIdDiagnostics(document.stateMachines, `${base}/stateMachines`));
-    diagnostics.push(...findDuplicateIdDiagnostics(document.viewModels, `${base}/viewModels`));
-    diagnostics.push(...findDuplicateIdDiagnostics(document.bindings, `${base}/bindings`));
-    validateExtensionNamespaces(document.extensions, `${base}/extensions`, diagnostics);
-    document.pages.forEach((page, pageIndex) => {
-      validateExtensionNamespaces(page.extensions, `${base}/pages/${String(pageIndex)}/extensions`, diagnostics);
-    });
-    document.components.forEach((component, componentIndex) => {
-      validateExtensionNamespaces(
-        component.extensions,
-        `${base}/components/${String(componentIndex)}/extensions`,
-        diagnostics,
-      );
-    });
-  });
 }
 
 function validateAssetReference(
@@ -141,15 +91,23 @@ function validateElementResources(
       );
   });
 
-  const layers = [...element.appearance.fills, ...element.appearance.strokes];
-
-  layers.forEach((layer, index) => {
+  element.appearance.fills.forEach((layer, index) => {
     if (layer.paint.kind === 'picture' || layer.paint.kind === 'pattern')
       validateAssetReference(
         indexes,
         layer.paint.assetId,
         ['image', 'vector'],
-        `${pointer}/appearance/layers/${String(index)}/paint/assetId`,
+        `${pointer}/appearance/fills/${String(index)}/paint/assetId`,
+        diagnostics,
+      );
+  });
+  element.appearance.strokes.forEach((layer, index) => {
+    if (layer.paint.kind === 'picture' || layer.paint.kind === 'pattern')
+      validateAssetReference(
+        indexes,
+        layer.paint.assetId,
+        ['image', 'vector'],
+        `${pointer}/appearance/strokes/${String(index)}/paint/assetId`,
         diagnostics,
       );
   });
@@ -359,17 +317,42 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
           );
       });
       component.elements.forEach((element, elementPosition) => {
+        if (element.parentId === null && !seenRootIds.has(element.id)) {
+          diagnostics.push(
+            createSemanticError(
+              'component.missing-root',
+              'Every component-local root must appear exactly once',
+              `${base}/elements/${String(elementPosition)}/id`,
+            ),
+          );
+        }
+      });
+      component.elements.forEach((element, elementPosition) => {
         if (element.kind !== 'component-instance') return;
 
         const pointer = `${base}/elements/${String(elementPosition)}/componentId`;
+        const definition = documentIndex.components.get(element.componentId)?.component;
 
-        if (!documentIndex.components.has(element.componentId))
+        if (definition === undefined) {
           diagnostics.push(createSemanticError('component.missing-reference', 'Component does not resolve', pointer));
-        else if (
+        } else {
+          validateComponentPropertyValues(
+            definition,
+            element.propertyValues,
+            `${base}/elements/${String(elementPosition)}/propertyValues`,
+            diagnostics,
+          );
+        }
+
+        if (
+          definition !== undefined &&
+          (
           element.componentId === component.id ||
           componentDependsOn(documentIndex, element.componentId, component.id, new Set())
-        )
+          )
+        ) {
           diagnostics.push(createSemanticError('component.cycle', 'Component dependency cycle', pointer));
+        }
       });
       component.exposedProperties.forEach((property, propertyPosition) => {
         const propertyBase = `${base}/exposedProperties/${String(propertyPosition)}`;
@@ -429,13 +412,24 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
           }
         });
         property.bindings.forEach((binding, bindingPosition) => {
-          const expected = resolvePropertyTargetValueTypeFromIndexes(indexes, binding.target);
+          const componentIndex = documentIndex.components.get(component.id);
+          const expected =
+            componentIndex === undefined
+              ? undefined
+              : resolvePropertyTargetValueTypeInScope(
+                  createComponentAddressScope(documentIndex, componentIndex),
+                  binding.target,
+                );
           const schemaType = valueSchemaValueType(property.valueSchema);
           const pointer = `${propertyBase}/bindings/${String(bindingPosition)}/target`;
 
           if (expected === undefined) {
             diagnostics.push(
-              createSemanticError('target.invalid-pointer', 'Exposed-property target is invalid', pointer),
+              createSemanticError(
+                'component.target-outside-scope',
+                'Exposed-property target is outside its component scope or invalid',
+                pointer,
+              ),
             );
           } else if (!valueTypesCompatible(schemaType, expected)) {
             diagnostics.push(
@@ -530,6 +524,7 @@ export function validateBroadsetProjectV1Semantics(project: BroadsetProjectV1): 
   validateInterop(indexes, diagnostics);
 
   return [...diagnostics].sort(
-    (left, right) => (left.pointer ?? '').localeCompare(right.pointer ?? '') || left.code.localeCompare(right.code),
+    (left, right) =>
+      compareCodeUnits(left.pointer ?? '', right.pointer ?? '') || compareCodeUnits(left.code, right.code),
   );
 }

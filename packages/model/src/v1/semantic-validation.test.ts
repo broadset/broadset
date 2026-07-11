@@ -10,7 +10,6 @@ import {
   componentDefinitionSchema,
   type Element,
   elementSchema,
-  resolvePropertyTargetValueType,
   sha256DigestSchema,
   validateBroadsetProjectV1Semantics,
 } from './index';
@@ -520,18 +519,4 @@ describe('validateBroadsetProjectV1Semantics', () => {
     expect(keys).toEqual([...keys].sort((left, right) => left.localeCompare(right)));
   });
 
-  it('resolves only approved pointers for the actual entity variant', () => {
-    const project = withElements(createMinimalProjectV1(), [createGroupElement('element')]);
-    const document = project.documents[0];
-    const entity = {
-      projectId: project.id,
-      documentId: document?.id,
-      entityKind: 'element',
-      entityId: document?.elements[0]?.id ?? project.id,
-    };
-
-    expect(resolvePropertyTargetValueType(project, { entity, pointer: '/appearance/opacity' })).toBe('number');
-    expect(resolvePropertyTargetValueType(project, { entity, pointer: '/id' })).toBeUndefined();
-    expect(resolvePropertyTargetValueType(project, { entity, pointer: '/image/assetId' })).toBeUndefined();
-  });
 });

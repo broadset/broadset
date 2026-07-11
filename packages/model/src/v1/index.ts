@@ -12,6 +12,7 @@ export * from './json-value';
 export * from './output-profile';
 export * from './page';
 export * from './project';
+export * from './resolved-address';
 export * from './resources';
 export * from './semantic-validation';
 export * from './sequence';

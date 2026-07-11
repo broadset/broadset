@@ -1,7 +1,21 @@
 import type { ComponentDefinition } from './component';
-import { type ExpressionAst, inferBindingValueType, typedValueMatchesSchema } from './data';
+import {
+  type Binding,
+  type ExpressionAst,
+  type ExpressionTargetContext,
+  inferBindingValueType,
+  inferExpressionValueType,
+  typedValueMatchesSchema,
+} from './data';
 import type { Diagnostic } from './diagnostics';
 import type { Id } from './identity';
+import {
+  createDocumentAddressScope,
+  createPageAddressScope,
+  type ResolvedTargetEntity,
+  resolvePageInstanceElement,
+  resolveTargetEntityAddress,
+} from './resolved-address';
 import type { DocumentSemanticIndex, SemanticIndexes } from './semantic-index';
 import {
   createSemanticError,
@@ -9,7 +23,7 @@ import {
   typedValueSatisfiesConstraints,
   valueTypesCompatible,
 } from './semantic-validation-helpers';
-import { resolvePropertyTargetValueTypeFromIndexes } from './target-resolution';
+import { resolvePropertyTargetValueTypeInScope } from './target-resolution';
 import type { TypedValue } from './typed-value';
 
 function validateComponentPropertyValues(
@@ -33,89 +47,273 @@ function validateComponentPropertyValues(
   });
 }
 
-function expressionHasMissingField(expression: ExpressionAst, document: DocumentSemanticIndex): boolean {
-  if (expression.kind === 'field') return !document.document.viewModels.some((viewModel) => viewModel.id === expression.viewModelId && viewModel.fields.some((field) => field.id === expression.fieldId));
-  if (expression.kind === 'unary') return expressionHasMissingField(expression.operand, document);
-  if (expression.kind === 'binary') return expressionHasMissingField(expression.left, document) || expressionHasMissingField(expression.right, document);
-  if (expression.kind === 'conditional') return expressionHasMissingField(expression.condition, document) || expressionHasMissingField(expression.whenTrue, document) || expressionHasMissingField(expression.whenFalse, document);
-  if (expression.kind === 'get') return expressionHasMissingField(expression.source, document);
-  if (expression.kind === 'index') return expressionHasMissingField(expression.source, document) || expressionHasMissingField(expression.index, document);
-  if (expression.kind === 'safe-function') return expression.arguments.some((argument) => expressionHasMissingField(argument, document));
+function findIdentifierExpressionPointer(expression: ExpressionAst, code: string, pointer: string): string | undefined {
+  if (code === 'expression.field-not-found' && expression.kind === 'field') return `${pointer}/fieldId`;
+  if (code === 'expression.variable-not-found' && expression.kind === 'variable') return `${pointer}/variableId`;
+  if (code === 'expression.object-field-not-found' && expression.kind === 'get') return `${pointer}/fieldId`;
 
-  return false;
+  return undefined;
 }
 
-function validatePageOverrides(indexes: SemanticIndexes, documentIndex: DocumentSemanticIndex, documentPosition: number, diagnostics: Diagnostic[]): void {
-  const { document } = documentIndex;
+function findInvalidExpressionPointer(expression: ExpressionAst, code: string, pointer: string): string | undefined {
+  const codesByKind: Partial<Record<ExpressionAst['kind'], readonly string[]>> = {
+    get: ['expression.invalid-get-source'],
+    index: ['expression.invalid-index', 'expression.invalid-index-source'],
+    unary: ['expression.invalid-operand'],
+    binary: ['expression.invalid-operand'],
+    conditional: ['expression.invalid-condition', 'expression.branch-type-mismatch'],
+    'safe-function': ['expression.invalid-function-argument', 'expression.invalid-function-arity'],
+  };
 
-  document.pages.forEach((page, pagePosition) => {
-    const base = `/documents/${String(documentPosition)}/pages/${String(pagePosition)}`;
+  return codesByKind[expression.kind]?.includes(code) === true ? pointer : undefined;
+}
 
-    page.rootInstances.forEach((root, rootPosition) => {
-      const element = documentIndex.elements.get(root.elementId);
-      const rootPointer = `${base}/rootInstances/${String(rootPosition)}`;
+function findDirectExpressionPointer(expression: ExpressionAst, code: string, pointer: string): string | undefined {
+  return findIdentifierExpressionPointer(expression, code, pointer) ?? findInvalidExpressionPointer(expression, code, pointer);
+}
 
-      if (element?.parentId !== null) diagnostics.push(createSemanticError('page.missing-root', 'Page root must resolve to a document root element', `${rootPointer}/elementId`));
-      if (element?.kind === 'component-instance') {
-        const definition = documentIndex.components.get(element.componentId)?.component;
+function getOwnerElementId(entity: ResolvedTargetEntity | undefined): Id | undefined {
+  return entity !== undefined && 'ownerElementId' in entity ? entity.ownerElementId : undefined;
+}
 
-        if (definition !== undefined) validateComponentPropertyValues(definition, root.componentPropertyValues, `${rootPointer}/componentPropertyValues`, diagnostics);
-      } else if (root.componentPropertyValues.length > 0) diagnostics.push(createSemanticError('component.invalid-property-owner', 'Only component roots accept component property values', `${rootPointer}/componentPropertyValues`));
-      root.overrides.forEach((override, overridePosition) => {
-        const overridePointer = `${rootPointer}/overrides/${String(overridePosition)}`;
-        const expected = resolvePropertyTargetValueTypeFromIndexes(indexes, override.target);
+function getExpressionChildren(
+  expression: ExpressionAst,
+  pointer: string,
+): readonly { readonly expression: ExpressionAst; readonly pointer: string }[] {
+  switch (expression.kind) {
+    case 'unary':
+      return [{ expression: expression.operand, pointer: `${pointer}/operand` }];
+    case 'binary':
+      return [
+        { expression: expression.left, pointer: `${pointer}/left` },
+        { expression: expression.right, pointer: `${pointer}/right` },
+      ];
+    case 'conditional':
+      return [
+        { expression: expression.condition, pointer: `${pointer}/condition` },
+        { expression: expression.whenTrue, pointer: `${pointer}/whenTrue` },
+        { expression: expression.whenFalse, pointer: `${pointer}/whenFalse` },
+      ];
+    case 'get':
+      return [{ expression: expression.source, pointer: `${pointer}/source` }];
+    case 'index':
+      return [
+        { expression: expression.source, pointer: `${pointer}/source` },
+        { expression: expression.index, pointer: `${pointer}/index` },
+      ];
+    case 'safe-function':
+      return expression.arguments.map((argument, index) => ({
+        expression: argument,
+        pointer: `${pointer}/arguments/${String(index)}`,
+      }));
+    default:
+      return [];
+  }
+}
 
-        if (expected === undefined) diagnostics.push(createSemanticError('target.invalid-pointer', 'Override target is invalid', `${overridePointer}/target/pointer`));
-        else if (!typedValueMatchesType(override.value, expected)) diagnostics.push(createSemanticError('target.incompatible-value', 'Override value is incompatible', `${overridePointer}/value`));
-      });
-    });
-    page.descendantOverrides.forEach((override, overridePosition) => {
-      const overridePointer = `${base}/descendantOverrides/${String(overridePosition)}`;
-      const root = page.rootInstances.find((candidate) => candidate.id === override.address.rootInstanceId);
+function findExpressionNodePointer(expression: ExpressionAst, code: string, pointer: string): string | undefined {
+  const direct = findDirectExpressionPointer(expression, code, pointer);
 
-      if (root === undefined || !documentIndex.elements.has(override.address.elementId)) diagnostics.push(createSemanticError('page.orphan-override', 'Descendant override address does not resolve', `${overridePointer}/address`));
-      override.overrides.forEach((typedOverride, typedOverridePosition) => {
-        const typedPointer = `${overridePointer}/overrides/${String(typedOverridePosition)}`;
-        const expected = resolvePropertyTargetValueTypeFromIndexes(indexes, typedOverride.target);
+  if (direct !== undefined) return direct;
 
-        if (expected === undefined) diagnostics.push(createSemanticError('target.invalid-pointer', 'Descendant override target is invalid', `${typedPointer}/target/pointer`));
-        else if (!typedValueMatchesType(typedOverride.value, expected)) diagnostics.push(createSemanticError('target.incompatible-value', 'Descendant override value is incompatible', `${typedPointer}/value`));
-      });
-    });
-    if (page.sampleDataSetId !== undefined && !document.viewModels.some((viewModel) => viewModel.sampleDataSets.some((sample) => sample.id === page.sampleDataSetId))) diagnostics.push(createSemanticError('page.missing-sample-data', 'Sample data set does not resolve', `${base}/sampleDataSetId`));
-    if (page.sequenceId !== undefined && !documentIndex.sequences.has(page.sequenceId)) diagnostics.push(createSemanticError('sequence.missing-reference', 'Page sequence does not resolve', `${base}/sequenceId`));
+  for (const child of getExpressionChildren(expression, pointer)) {
+    const result = findExpressionNodePointer(child.expression, code, child.pointer);
+
+    if (result !== undefined) return result;
+  }
+
+  return undefined;
+}
+
+function createInferenceContext(indexes: SemanticIndexes, document: DocumentSemanticIndex, binding?: Binding): Parameters<typeof inferExpressionValueType>[0]['context'] {
+  const fields = document.document.viewModels.flatMap((viewModel) =>
+    viewModel.fields.map((field) => ({ viewModelId: viewModel.id, fieldId: field.id, schema: field.schema })),
+  );
+  const variables = indexes.project.resources.variables.flatMap((collection) =>
+    collection.variables.map((variable) => ({ collectionId: collection.id, variableId: variable.id, valueType: variable.valueType })),
+  );
+  const targets: ExpressionTargetContext[] = [];
+
+  if (binding !== undefined) {
+    const targetType = resolvePropertyTargetValueTypeInScope(createDocumentAddressScope(document), binding.target);
+
+    if (targetType !== undefined) targets.push({ target: binding.target, valueType: targetType });
+  }
+
+  return { fields, variables, targets };
+}
+
+function projectInferenceDiagnostics(
+  binding: Binding,
+  result: ReturnType<typeof inferBindingValueType>,
+  pointer: string,
+  diagnostics: Diagnostic[],
+): void {
+  const seen = new Set<string>();
+
+  result.diagnostics.forEach((diagnostic) => {
+    let code = diagnostic.code;
+    let location = findExpressionNodePointer(binding.expression, diagnostic.code, `${pointer}/expression`);
+
+    if (code === 'expression.field-not-found') code = 'binding.missing-field';
+    if (code === 'binding.incompatible-target') code = 'binding.incompatible-result';
+
+    if (diagnostic.code.startsWith('formatter.')) location = `${pointer}/formatter/steps/0`;
+
+    if (diagnostic.code === 'binding.incompatible-target' || diagnostic.code === 'binding.target-not-found') {
+      location = `${pointer}/target`;
+    }
+
+    if (diagnostic.code === 'binding.incompatible-fallback') location = `${pointer}/fallback`;
+    location ??= `${pointer}/expression`;
+
+    const key = `${code}\u0000${location}`;
+
+    if (!seen.has(key)) diagnostics.push(createSemanticError(code, diagnostic.message, location));
+    seen.add(key);
   });
 }
 
-function validateBindings(indexes: SemanticIndexes, documentIndex: DocumentSemanticIndex, documentPosition: number, diagnostics: Diagnostic[]): void {
-  const { document } = documentIndex;
+function targetBelongsToRoot(
+  document: DocumentSemanticIndex,
+  pageScope: ReturnType<typeof createPageAddressScope>,
+  rootElementId: Id,
+  target: Binding['target'],
+): ResolvedTargetEntity | undefined {
+  const pageEntity = resolveTargetEntityAddress(pageScope, target.entity);
 
-  document.bindings.forEach((binding, bindingPosition) => {
+  if (pageEntity !== undefined) {
+    return 'ownerElementId' in pageEntity && pageEntity.ownerElementId === rootElementId ? pageEntity : undefined;
+  }
+
+  const documentEntity = resolveTargetEntityAddress(createDocumentAddressScope(document), target.entity);
+
+  return documentEntity !== undefined && 'ownerElementId' in documentEntity && documentEntity.ownerElementId === rootElementId
+    ? documentEntity
+    : undefined;
+}
+
+function validateRootOverrides(
+  indexes: SemanticIndexes,
+  document: DocumentSemanticIndex,
+  page: DocumentSemanticIndex['document']['pages'][number],
+  pagePosition: number,
+  diagnostics: Diagnostic[],
+): void {
+  page.rootInstances.forEach((root, rootPosition) => {
+    const base = `/documents/${String(indexes.documentList.indexOf(document))}/pages/${String(pagePosition)}/rootInstances/${String(rootPosition)}`;
+    const element = document.elements.get(root.elementId);
+
+    if (element?.parentId !== null) diagnostics.push(createSemanticError('page.missing-root', 'Page root must resolve to a document root element', `${base}/elementId`));
+    if (element?.kind === 'component-instance') {
+      const definition = document.components.get(element.componentId)?.component;
+
+      if (definition !== undefined) validateComponentPropertyValues(definition, root.componentPropertyValues, `${base}/componentPropertyValues`, diagnostics);
+    } else if (root.componentPropertyValues.length > 0) diagnostics.push(createSemanticError('component.invalid-property-owner', 'Only component roots accept component property values', `${base}/componentPropertyValues`));
+
+    const scope = createPageAddressScope(document, page, root);
+
+    root.overrides.forEach((override, overridePosition) => {
+      const overridePointer = `${base}/overrides/${String(overridePosition)}`;
+      const owner = targetBelongsToRoot(document, scope, root.elementId, override.target);
+
+      if (owner === undefined) { diagnostics.push(createSemanticError('page.override-address-mismatch', 'Root override target is outside its root instance', `${overridePointer}/target`));
+
+ return; }
+
+      const expected = resolvePropertyTargetValueTypeInScope(scope, override.target) ?? resolvePropertyTargetValueTypeInScope(createDocumentAddressScope(document), override.target);
+
+      if (expected === undefined) diagnostics.push(createSemanticError('target.invalid-pointer', 'Override target is invalid', `${overridePointer}/target/pointer`));
+      else if (!typedValueMatchesType(override.value, expected)) diagnostics.push(createSemanticError('target.incompatible-value', 'Override value is incompatible', `${overridePointer}/value`));
+    });
+  });
+}
+
+function validateDescendantOverrides(
+  document: DocumentSemanticIndex,
+  page: DocumentSemanticIndex['document']['pages'][number],
+  documentPosition: number,
+  pagePosition: number,
+  diagnostics: Diagnostic[],
+): void {
+  page.descendantOverrides.forEach((override, overridePosition) => {
+    const base = `/documents/${String(documentPosition)}/pages/${String(pagePosition)}/descendantOverrides/${String(overridePosition)}`;
+    const resolved = resolvePageInstanceElement(document, page, override.address);
+
+    if (resolved === undefined) {
+      diagnostics.push(createSemanticError('page.orphan-override', 'Descendant override address does not resolve', `${base}/address`));
+
+      return;
+    }
+
+    const root = page.rootInstances.find((candidate) => candidate.id === override.address.rootInstanceId);
+
+    if (root === undefined) return;
+
+    const scope = createPageAddressScope(document, page, root);
+
+    override.overrides.forEach((typedOverride, typedPosition) => {
+      const pointer = `${base}/overrides/${String(typedPosition)}`;
+      const targetEntity = resolveTargetEntityAddress(scope, typedOverride.target.entity);
+
+      if (getOwnerElementId(targetEntity) !== getOwnerElementId(resolved)) {
+        diagnostics.push(createSemanticError('page.override-address-mismatch', 'Override target does not identify its addressed descendant', `${pointer}/target`));
+
+        return;
+      }
+
+      const expected = resolvePropertyTargetValueTypeInScope(scope, typedOverride.target);
+
+      if (expected === undefined) diagnostics.push(createSemanticError('target.invalid-pointer', 'Descendant override target is invalid', `${pointer}/target/pointer`));
+      else if (!typedValueMatchesType(typedOverride.value, expected)) diagnostics.push(createSemanticError('target.incompatible-value', 'Descendant override value is incompatible', `${pointer}/value`));
+    });
+  });
+}
+
+function validatePages(indexes: SemanticIndexes, document: DocumentSemanticIndex, documentPosition: number, diagnostics: Diagnostic[]): void {
+  document.document.pages.forEach((page, pagePosition) => {
+    const base = `/documents/${String(documentPosition)}/pages/${String(pagePosition)}`;
+
+    validateRootOverrides(indexes, document, page, pagePosition, diagnostics);
+    validateDescendantOverrides(document, page, documentPosition, pagePosition, diagnostics);
+    if (page.sampleDataSetId !== undefined && !document.document.viewModels.some((viewModel) => viewModel.sampleDataSets.some((sample) => sample.id === page.sampleDataSetId))) diagnostics.push(createSemanticError('page.missing-sample-data', 'Sample data set does not resolve', `${base}/sampleDataSetId`));
+    if (page.sequenceId !== undefined && !document.sequences.has(page.sequenceId)) diagnostics.push(createSemanticError('sequence.missing-reference', 'Page sequence does not resolve', `${base}/sequenceId`));
+  });
+}
+
+function validateBindings(indexes: SemanticIndexes, document: DocumentSemanticIndex, documentPosition: number, diagnostics: Diagnostic[]): void {
+  const scope = createDocumentAddressScope(document);
+
+  document.document.bindings.forEach((binding, bindingPosition) => {
     const base = `/documents/${String(documentPosition)}/bindings/${String(bindingPosition)}`;
-
-    if (expressionHasMissingField(binding.expression, documentIndex)) diagnostics.push(createSemanticError('binding.missing-field', 'Binding field does not resolve', `${base}/expression/fieldId`));
-
-    const targetType = resolvePropertyTargetValueTypeFromIndexes(indexes, binding.target);
+    const targetType = resolvePropertyTargetValueTypeInScope(scope, binding.target);
 
     if (targetType === undefined) { diagnostics.push(createSemanticError('target.invalid-pointer', 'Binding target is invalid', `${base}/target`));
 
  return; }
 
-    const context = {
-      fields: document.viewModels.flatMap((viewModel) => viewModel.fields.map((field) => ({ viewModelId: viewModel.id, fieldId: field.id, schema: field.schema }))),
-      variables: indexes.project.resources.variables.flatMap((collection) => collection.variables.map((variable) => ({ collectionId: collection.id, variableId: variable.id, valueType: variable.valueType }))),
-      targets: [{ target: binding.target, valueType: targetType }],
-    };
+    const context = createInferenceContext(indexes, document, binding);
     const result = inferBindingValueType({ binding, context });
 
-    if (result.diagnostics.some((item) => item.code === 'binding.incompatible-target') || (result.valueType !== undefined && !valueTypesCompatible(result.valueType, targetType))) diagnostics.push(createSemanticError('binding.incompatible-result', 'Binding result is incompatible with target', `${base}/target`));
+    projectInferenceDiagnostics(binding, result, base, diagnostics);
+    if (result.valueType !== undefined && !valueTypesCompatible(result.valueType, targetType)) diagnostics.push(createSemanticError('binding.incompatible-result', 'Binding result is incompatible with target', `${base}/target`));
     if (binding.fallback !== undefined && !typedValueMatchesType(binding.fallback, targetType)) diagnostics.push(createSemanticError('binding.incompatible-fallback', 'Binding fallback is incompatible', `${base}/fallback`));
   });
 }
 
+export function validateGuardExpression(
+  indexes: SemanticIndexes,
+  document: DocumentSemanticIndex,
+  expression: ExpressionAst,
+): boolean {
+  const result = inferExpressionValueType({ expression, context: createInferenceContext(indexes, document) });
+
+  return result.diagnostics.length === 0 && result.valueType === 'boolean';
+}
+
 export function validatePagesAndBindings(indexes: SemanticIndexes, diagnostics: Diagnostic[]): void {
-  indexes.documentList.forEach((documentIndex, documentPosition) => {
-    validatePageOverrides(indexes, documentIndex, documentPosition, diagnostics);
-    validateBindings(indexes, documentIndex, documentPosition, diagnostics);
+  indexes.documentList.forEach((document, documentPosition) => {
+    validatePages(indexes, document, documentPosition, diagnostics);
+    validateBindings(indexes, document, documentPosition, diagnostics);
   });
 }

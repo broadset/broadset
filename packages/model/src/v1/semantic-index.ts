@@ -12,6 +12,7 @@ export interface ComponentSemanticIndex {
 }
 
 export interface DocumentSemanticIndex {
+  readonly projectId: Id;
   readonly document: BroadsetDocumentV1;
   readonly elements: ReadonlyMap<Id, Element>;
   readonly components: ReadonlyMap<Id, ComponentSemanticIndex>;
@@ -42,10 +43,11 @@ function createComponentIndex(component: ComponentDefinition): ComponentSemantic
   };
 }
 
-function createDocumentIndex(document: BroadsetDocumentV1): DocumentSemanticIndex {
+function createDocumentIndex(projectId: Id, document: BroadsetDocumentV1): DocumentSemanticIndex {
   const components = document.components.map((component) => [component.id, createComponentIndex(component)] as const);
 
   return {
+    projectId,
     document,
     elements: indexById(document.elements),
     components: new Map(components),
@@ -54,7 +56,7 @@ function createDocumentIndex(document: BroadsetDocumentV1): DocumentSemanticInde
 }
 
 export function createSemanticIndexes(project: BroadsetProjectV1): SemanticIndexes {
-  const documentList = project.documents.map(createDocumentIndex);
+  const documentList = project.documents.map((document) => createDocumentIndex(project.id, document));
 
   return {
     project,
