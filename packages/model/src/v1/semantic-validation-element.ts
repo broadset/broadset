@@ -30,12 +30,21 @@ export function validateElementReferences(indexes: SemanticIndexes, elements: Re
   const mask = element.appearance.mask;
 
   if (mask?.kind === 'vector') validateVectorReference(elements, mask.vectorElementId, `${pointer}/appearance/mask/vectorElementId`, diagnostics);
-  [...element.appearance.fills, ...element.appearance.strokes].forEach((layer, layerIndex) => {
-    const paintPointer = `${pointer}/appearance/layers/${String(layerIndex)}/paint`;
 
-    if (layer.paint.kind === 'solid') validateColor(indexes, layer.paint.color, `${paintPointer}/color`, diagnostics);
-    if (layer.paint.kind === 'gradient') layer.paint.gradient.stops.forEach((stop, stopIndex) => { validateColor(indexes, stop.color, `${paintPointer}/gradient/stops/${String(stopIndex)}/color`, diagnostics); });
-  });
+  const validatePaintColors = (
+    layers: Element['appearance']['fills'] | Element['appearance']['strokes'],
+    collectionPointer: string,
+  ): void => {
+    layers.forEach((layer, layerIndex) => {
+      const paintPointer = `${collectionPointer}/${String(layerIndex)}/paint`;
+
+      if (layer.paint.kind === 'solid') validateColor(indexes, layer.paint.color, `${paintPointer}/color`, diagnostics);
+      if (layer.paint.kind === 'gradient') layer.paint.gradient.stops.forEach((stop, stopIndex) => { validateColor(indexes, stop.color, `${paintPointer}/gradient/stops/${String(stopIndex)}/color`, diagnostics); });
+    });
+  };
+
+  validatePaintColors(element.appearance.fills, `${pointer}/appearance/fills`);
+  validatePaintColors(element.appearance.strokes, `${pointer}/appearance/strokes`);
   element.appearance.effects.forEach((effect, effectIndex) => {
     const effectPointer = `${pointer}/appearance/effects/${String(effectIndex)}`;
 

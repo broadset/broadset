@@ -64,6 +64,7 @@ both `bleed` and `trim`, spot-color policy `preserve|convert-to-process|reject`,
 `preserve|simulate|reject`, and a PDF target. The PDF target is either general
 `{standard:'pdf-1.7'|'pdf-2.0',conformance:'none'}` or PDF/X
 `{standard:'pdf-x-1a:2001'|'pdf-x-3:2002'|'pdf-x-4'|'pdf-x-6',conformance:'strict'}`.
+The referenced ICC asset MUST be an output-class profile with a CMYK color-space signature.
 
 ### Requirement: Timebase Compatibility
 

@@ -626,6 +626,9 @@ Validation proceeds in three stages:
 3. Whole-project semantic validation enforces identity scopes, reference kinds, ordering, acyclicity, override legality, expression and target types, time constraints, output compatibility, color/profile compatibility, and interop integrity.
 
 No validation stage mutates input. Open JSON is permitted only inside declared plugin, extension, and interop payload containers.
+Semantic reference validation MUST index stable identities and remain near-linear for large valid
+interop registries, variable/sample selections, component exposed values, and address resolution;
+it MUST NOT perform a full owner-collection scan for every referenced item.
 
 The structural contract is the exact intersection published by Zod and JSON Schema. Constraints
 that JSON Schema can express are structural; constraints requiring projected object keys,

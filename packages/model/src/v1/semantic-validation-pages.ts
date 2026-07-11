@@ -1,5 +1,4 @@
 import { expressionMatchesAssetTargetContract } from './asset-kind-inference';
-import type { ComponentDefinition } from './component';
 import {
   type Binding,
   type ExpressionAst,
@@ -17,7 +16,7 @@ import {
   resolvePageInstanceElement,
   resolveTargetEntityAddress,
 } from './resolved-address';
-import type { DocumentSemanticIndex, SemanticIndexes } from './semantic-index';
+import type { ComponentSemanticIndex, DocumentSemanticIndex, SemanticIndexes } from './semantic-index';
 import {
   createSemanticError,
   typedValueMatchesResolvedAssetConstraints,
@@ -36,14 +35,16 @@ function escapePointerSegment(segment: string): string {
 }
 
 function validateComponentPropertyValues(
-  indexes: SemanticIndexes,
-  definition: ComponentDefinition,
-  values: readonly { readonly exposedPropertyId: Id; readonly value: TypedValue }[],
-  pointer: string,
-  diagnostics: Diagnostic[],
+  { indexes, definition, values, pointer, diagnostics }: {
+    readonly indexes: SemanticIndexes;
+    readonly definition: ComponentSemanticIndex;
+    readonly values: readonly { readonly exposedPropertyId: Id; readonly value: TypedValue }[];
+    readonly pointer: string;
+    readonly diagnostics: Diagnostic[];
+  },
 ): void {
   values.forEach((value, index) => {
-    const property = definition.exposedProperties.find((candidate) => candidate.id === value.exposedPropertyId);
+    const property = definition.exposedProperties.get(value.exposedPropertyId);
     const valuePointer = `${pointer}/${String(index)}`;
 
     if (property === undefined) {
@@ -125,18 +126,18 @@ function validateRootOverrides(
   indexes: SemanticIndexes,
   document: DocumentSemanticIndex,
   page: DocumentSemanticIndex['document']['pages'][number],
-  pagePosition: number,
+  pageBase: string,
   diagnostics: Diagnostic[],
 ): void {
   page.rootInstances.forEach((root, rootPosition) => {
-    const base = `/documents/${String(indexes.documentList.indexOf(document))}/pages/${String(pagePosition)}/rootInstances/${String(rootPosition)}`;
+    const base = `${pageBase}/rootInstances/${String(rootPosition)}`;
     const element = document.elements.get(root.elementId);
 
     if (element?.parentId !== null) diagnostics.push(createSemanticError('page.missing-root', 'Page root must resolve to a document root element', `${base}/elementId`));
     if (element?.kind === 'component-instance') {
-      const definition = document.components.get(element.componentId)?.component;
+      const definition = document.components.get(element.componentId);
 
-      if (definition !== undefined) validateComponentPropertyValues(indexes, definition, root.componentPropertyValues, `${base}/componentPropertyValues`, diagnostics);
+      if (definition !== undefined) validateComponentPropertyValues({ indexes, definition, values: root.componentPropertyValues, pointer: `${base}/componentPropertyValues`, diagnostics });
     } else if (root.componentPropertyValues.length > 0) diagnostics.push(createSemanticError('component.invalid-property-owner', 'Only component roots accept component property values', `${base}/componentPropertyValues`));
 
     const scope = createPageAddressScope(document, page, root);
@@ -175,7 +176,7 @@ function validateDescendantOverrides(
       return;
     }
 
-    const root = page.rootInstances.find((candidate) => candidate.id === override.address.rootInstanceId);
+    const root = document.pageRoots.get(page.id)?.get(override.address.rootInstanceId);
 
     if (root === undefined) return;
 
@@ -203,10 +204,10 @@ function validatePages(indexes: SemanticIndexes, document: DocumentSemanticIndex
   document.document.pages.forEach((page, pagePosition) => {
     const base = `/documents/${String(documentPosition)}/pages/${String(pagePosition)}`;
 
-    validateRootOverrides(indexes, document, page, pagePosition, diagnostics);
+    validateRootOverrides(indexes, document, page, base, diagnostics);
     validateDescendantOverrides(indexes, document, page, documentPosition, pagePosition, diagnostics);
     Object.entries(page.selectedSampleDataSets).forEach(([viewModelId, sampleDataSetId]) => {
-      const viewModel = document.document.viewModels.find((candidate) => candidate.id === viewModelId);
+      const viewModel = document.viewModels.get(viewModelId);
 
       if (viewModel === undefined) {
         diagnostics.push(
@@ -216,7 +217,7 @@ function validatePages(indexes: SemanticIndexes, document: DocumentSemanticIndex
             `${base}/selectedSampleDataSets/${escapePointerSegment(viewModelId)}`,
           ),
         );
-      } else if (!viewModel.sampleDataSets.some((sample) => sample.id === sampleDataSetId)) {
+      } else if (!viewModel.sampleDataSets.has(sampleDataSetId)) {
         diagnostics.push(
           createSemanticError(
             'page.missing-sample-data',

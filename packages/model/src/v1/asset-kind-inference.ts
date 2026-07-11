@@ -33,9 +33,7 @@ function expressionSchema(
   expression: ExpressionAst,
 ): ValueSchema | undefined {
   if (expression.kind === 'field') {
-    return document.document.viewModels
-      .find((viewModel) => viewModel.id === expression.viewModelId)
-      ?.fields.find((field) => field.id === expression.fieldId)?.schema;
+    return document.viewModels.get(expression.viewModelId)?.fields.get(expression.fieldId)?.schema;
   }
 
   if (expression.kind === 'get') {
@@ -65,7 +63,7 @@ function variableAssetKinds(
 
   if (seen.has(key)) return undefined;
 
-  const variable = indexes.variables.get(collectionId)?.variables.find((candidate) => candidate.id === variableId);
+  const variable = indexes.variableDefinitions.get(collectionId)?.get(variableId);
 
   if (variable === undefined) return undefined;
 

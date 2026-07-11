@@ -3,7 +3,13 @@ import type { GuideDefinition } from './document';
 import type { Element } from './element';
 import type { EntityAddress, Id } from './identity';
 import type { PageDefinition, PageRootInstance } from './page';
-import type { ComponentSemanticIndex, DocumentSemanticIndex, SemanticIndexes } from './semantic-index';
+import {
+  type ComponentSemanticIndex,
+  createElementNestedIndexes,
+  type DocumentSemanticIndex,
+  type ElementNestedIndexes,
+  type SemanticIndexes,
+} from './semantic-index';
 import type { TextParagraph, TextRun } from './text';
 
 export type AddressScope =
@@ -18,6 +24,7 @@ export type AddressScope =
       readonly document: DocumentSemanticIndex;
       readonly page: PageDefinition;
       readonly root: PageRootInstance;
+      readonly ordinaryRootScope: ElementScope | undefined;
     };
 
 export type ResolvedTargetEntity =
@@ -34,57 +41,79 @@ export type ResolvedTargetEntity =
 
 interface ElementScope {
   readonly elements: ReadonlyMap<Id, Element>;
+  readonly nestedEntities: ElementNestedIndexes;
 }
 
-function isDescendant(elements: ReadonlyMap<Id, Element>, elementId: Id, rootId: Id): boolean {
-  let current = elements.get(elementId);
-  const seen = new Set<Id>();
+function createOrdinaryRootScope(elements: ReadonlyMap<Id, Element>, rootId: Id): ElementScope {
+  const children = new Map<Id, Element[]>();
 
-  while (current !== undefined && !seen.has(current.id)) {
-    if (current.id === rootId) return true;
-    seen.add(current.id);
-    current = current.parentId === null ? undefined : elements.get(current.parentId);
+  elements.forEach((element) => {
+    if (element.parentId === null) return;
+
+    const siblings = children.get(element.parentId) ?? [];
+
+    siblings.push(element);
+    children.set(element.parentId, siblings);
+  });
+
+  const rootElements = new Map<Id, Element>();
+  const pending = [rootId];
+
+  while (pending.length > 0) {
+    const elementId = pending.pop();
+
+    if (elementId === undefined || rootElements.has(elementId)) continue;
+
+    const element = elements.get(elementId);
+
+    if (element === undefined) continue;
+    rootElements.set(elementId, element);
+    children.get(elementId)?.forEach((child) => pending.push(child.id));
   }
 
-  return false;
+  return { elements: rootElements, nestedEntities: createElementNestedIndexes([...rootElements.values()]) };
 }
 
 function descendComponentPath(
   document: DocumentSemanticIndex,
-  initial: ReadonlyMap<Id, Element>,
+  initial: ElementScope,
   path: readonly Id[],
-): ReadonlyMap<Id, Element> | undefined {
-  let elements = initial;
+): ElementScope | undefined {
+  let scope = initial;
 
   for (const instanceId of path) {
-    const instance = elements.get(instanceId);
+    const instance = scope.elements.get(instanceId);
 
     if (instance?.kind !== 'component-instance') return undefined;
 
     const component = document.components.get(instance.componentId);
 
     if (component === undefined) return undefined;
-    elements = component.elements;
+    scope = { elements: component.elements, nestedEntities: component.nestedEntities };
   }
 
-  return elements;
+  return scope;
 }
 
 function resolveDocumentElementScope(scope: Extract<AddressScope, { readonly kind: 'document' }>, address: EntityAddress): ElementScope | undefined {
   if (address.pageId !== undefined) return undefined;
   if ((address.instancePath?.length ?? 0) !== 0) return undefined;
 
-  return { elements: scope.document.elements };
+  return { elements: scope.document.elements, nestedEntities: scope.document.nestedEntities };
 }
 
 function resolveComponentElementScope(scope: Extract<AddressScope, { readonly kind: 'component' }>, address: EntityAddress): ElementScope | undefined {
   if (address.pageId !== undefined) return undefined;
 
-  const elements = descendComponentPath(scope.document, scope.component.elements, address.instancePath ?? []);
+  const elements = descendComponentPath(
+    scope.document,
+    { elements: scope.component.elements, nestedEntities: scope.component.nestedEntities },
+    address.instancePath ?? [],
+  );
 
   if (elements === undefined) return undefined;
 
-  return { elements };
+  return elements;
 }
 
 function resolveOrdinaryPageRootScope(
@@ -94,38 +123,29 @@ function resolveOrdinaryPageRootScope(
 ): ElementScope | undefined {
   const rootElement = scope.document.elements.get(scope.root.elementId);
 
-  if (rootElement === undefined || rootElement.kind === 'component-instance') return undefined;
+  if (rootElement === undefined || rootElement.kind === 'component-instance' || scope.ordinaryRootScope === undefined) return undefined;
 
   const [firstInstanceId, ...nestedPath] = path.slice(1);
 
   if (firstInstanceId === undefined) {
-    if (!isDescendant(scope.document.elements, address.entityId, rootElement.id)) return undefined;
-
-    const elements = new Map(
-      [...scope.document.elements].filter(([elementId]) =>
-        isDescendant(scope.document.elements, elementId, rootElement.id),
-      ),
-    );
-
-    return { elements };
+    return scope.ordinaryRootScope.elements.has(address.entityId) ? scope.ordinaryRootScope : undefined;
   }
 
-  const firstInstance = scope.document.elements.get(firstInstanceId);
+  const firstInstance = scope.ordinaryRootScope.elements.get(firstInstanceId);
 
-  if (
-    firstInstance?.kind !== 'component-instance' ||
-    !isDescendant(scope.document.elements, firstInstance.id, rootElement.id)
-  ) {
-    return undefined;
-  }
+  if (firstInstance?.kind !== 'component-instance') return undefined;
 
   const component = scope.document.components.get(firstInstance.componentId);
 
   if (component === undefined) return undefined;
 
-  const elements = descendComponentPath(scope.document, component.elements, nestedPath);
+  const elements = descendComponentPath(
+    scope.document,
+    { elements: component.elements, nestedEntities: component.nestedEntities },
+    nestedPath,
+  );
 
-  return elements === undefined ? undefined : { elements };
+  return elements;
 }
 
 function resolvePageElementScope(scope: Extract<AddressScope, { readonly kind: 'page-instance' }>, address: EntityAddress): ElementScope | undefined {
@@ -144,11 +164,15 @@ function resolvePageElementScope(scope: Extract<AddressScope, { readonly kind: '
 
   if (component === undefined) return undefined;
 
-  const elements = descendComponentPath(scope.document, component.elements, path.slice(1));
+  const elements = descendComponentPath(
+    scope.document,
+    { elements: component.elements, nestedEntities: component.nestedEntities },
+    path.slice(1),
+  );
 
   if (elements === undefined) return undefined;
 
-  return { elements };
+  return elements;
 }
 
 function resolveElementScope(scope: AddressScope, address: EntityAddress): ElementScope | undefined {
@@ -164,77 +188,6 @@ function resolveElementScope(scope: AddressScope, address: EntityAddress): Eleme
   }
 }
 
-function collectTextEntities(
-  elements: ReadonlyMap<Id, Element>,
-  kind: 'paragraph' | 'text-run',
-  id: Id,
-): readonly ResolvedTargetEntity[] {
-  const results: ResolvedTargetEntity[] = [];
-
-  elements.forEach((element) => {
-    if (element.kind !== 'text') return;
-    element.text.paragraphs.forEach((paragraph) => {
-      if (kind === 'paragraph' && paragraph.id === id) {
-        results.push({ kind, value: paragraph, ownerElementId: element.id });
-      }
-
-      paragraph.runs.forEach((run) => {
-        if (kind === 'text-run' && run.id === id) results.push({ kind, value: run, ownerElementId: element.id });
-      });
-    });
-  });
-
-  return results;
-}
-
-function collectAppearanceEntities(
-  elements: ReadonlyMap<Id, Element>,
-  kind: 'effect' | 'fill' | 'gradient-stop' | 'stroke',
-  id: Id,
-): readonly ResolvedTargetEntity[] {
-  const results: ResolvedTargetEntity[] = [];
-
-  elements.forEach((element) => {
-    const fill = element.appearance.fills.find((candidate) => candidate.id === id);
-    const stroke = element.appearance.strokes.find((candidate) => candidate.id === id);
-    const effect = element.appearance.effects.find((candidate) => candidate.id === id);
-
-    if (kind === 'fill' && fill !== undefined) results.push({ kind, value: fill, ownerElementId: element.id });
-    if (kind === 'stroke' && stroke !== undefined) results.push({ kind, value: stroke, ownerElementId: element.id });
-    if (kind === 'effect' && effect !== undefined) results.push({ kind, value: effect, ownerElementId: element.id });
-
-    if (kind === 'gradient-stop') {
-      [...element.appearance.fills, ...element.appearance.strokes].forEach((layer) => {
-        if (layer.paint.kind !== 'gradient') return;
-
-        const stop = layer.paint.gradient.stops.find((candidate) => candidate.id === id);
-
-        if (stop !== undefined) results.push({ kind, value: stop, ownerElementId: element.id });
-      });
-    }
-  });
-
-  return results;
-}
-
-function collectPathPoints(elements: ReadonlyMap<Id, Element>, id: Id): readonly ResolvedTargetEntity[] {
-  const results: ResolvedTargetEntity[] = [];
-
-  elements.forEach((element) => {
-    if (element.kind !== 'vector' || element.geometryData.kind !== 'path') return;
-
-    const point = element.geometryData.path.points.find((candidate) => candidate.id === id);
-
-    if (point !== undefined) results.push({ kind: 'path-point', value: point, ownerElementId: element.id });
-  });
-
-  return results;
-}
-
-function resolveUnique(results: readonly ResolvedTargetEntity[]): ResolvedTargetEntity | undefined {
-  return results.length === 1 ? results[0] : undefined;
-}
-
 function resolveSpecialTargetEntity(scope: AddressScope, address: EntityAddress): ResolvedTargetEntity | undefined {
   if (address.projectId !== scope.document.projectId || address.documentId !== scope.document.document.id) return undefined;
 
@@ -248,7 +201,7 @@ function resolveSpecialTargetEntity(scope: AddressScope, address: EntityAddress)
   if (address.entityKind === 'guide') {
     if (scope.kind !== 'document' || address.pageId !== undefined || (address.instancePath?.length ?? 0) !== 0) return undefined;
 
-    const guide = scope.document.document.surface.guides.find((candidate) => candidate.id === address.entityId);
+    const guide = scope.document.guides.get(address.entityId);
 
     return guide === undefined ? undefined : { kind: 'guide', value: guide };
   }
@@ -256,27 +209,91 @@ function resolveSpecialTargetEntity(scope: AddressScope, address: EntityAddress)
   return undefined;
 }
 
-function resolveElementScopedEntity(scope: ElementScope, address: EntityAddress): ResolvedTargetEntity | undefined {
+function resolveTextEntity(scope: ElementScope, address: EntityAddress): ResolvedTargetEntity | undefined {
   switch (address.entityKind) {
-    case 'element': {
-      const element = scope.elements.get(address.entityId);
+    case 'paragraph': {
+      const entries = scope.nestedEntities.paragraphs.get(address.entityId);
+      const entry = entries?.length === 1 ? entries[0] : undefined;
 
-      return element === undefined ? undefined : { kind: 'element', value: element, ownerElementId: element.id };
+      return entry === undefined ? undefined : { kind: 'paragraph', ...entry };
     }
 
-    case 'paragraph':
-    case 'text-run':
-      return resolveUnique(collectTextEntities(scope.elements, address.entityKind, address.entityId));
-    case 'fill':
-    case 'stroke':
-    case 'effect':
-    case 'gradient-stop':
-      return resolveUnique(collectAppearanceEntities(scope.elements, address.entityKind, address.entityId));
-    case 'path-point':
-      return resolveUnique(collectPathPoints(scope.elements, address.entityId));
+    case 'text-run': {
+      const entries = scope.nestedEntities.textRuns.get(address.entityId);
+      const entry = entries?.length === 1 ? entries[0] : undefined;
+
+      return entry === undefined ? undefined : { kind: 'text-run', ...entry };
+    }
+
     default:
       return undefined;
   }
+}
+
+function resolvePaintLayerEntity(scope: ElementScope, address: EntityAddress): ResolvedTargetEntity | undefined {
+  switch (address.entityKind) {
+
+    case 'fill': {
+      const entries = scope.nestedEntities.fills.get(address.entityId);
+      const entry = entries?.length === 1 ? entries[0] : undefined;
+
+      return entry === undefined ? undefined : { kind: 'fill', ...entry };
+    }
+
+    case 'stroke': {
+      const entries = scope.nestedEntities.strokes.get(address.entityId);
+      const entry = entries?.length === 1 ? entries[0] : undefined;
+
+      return entry === undefined ? undefined : { kind: 'stroke', ...entry };
+    }
+
+    default:
+      return undefined;
+  }
+}
+
+function resolveAppearanceEntity(scope: ElementScope, address: EntityAddress): ResolvedTargetEntity | undefined {
+  switch (address.entityKind) {
+    case 'effect': {
+      const entries = scope.nestedEntities.effects.get(address.entityId);
+      const entry = entries?.length === 1 ? entries[0] : undefined;
+
+      return entry === undefined ? undefined : { kind: 'effect', ...entry };
+    }
+
+    case 'gradient-stop': {
+      const entries = scope.nestedEntities.gradientStops.get(address.entityId);
+      const entry = entries?.length === 1 ? entries[0] : undefined;
+
+      return entry === undefined ? undefined : { kind: 'gradient-stop', ...entry };
+    }
+
+    default:
+      return undefined;
+  }
+}
+
+function resolveElementScopedEntity(scope: ElementScope, address: EntityAddress): ResolvedTargetEntity | undefined {
+  if (address.entityKind === 'element') {
+    const element = scope.elements.get(address.entityId);
+
+    return element === undefined ? undefined : { kind: 'element', value: element, ownerElementId: element.id };
+  }
+
+  const textEntity = resolveTextEntity(scope, address);
+
+  if (textEntity !== undefined) return textEntity;
+
+  const appearanceEntity = resolvePaintLayerEntity(scope, address) ?? resolveAppearanceEntity(scope, address);
+
+  if (appearanceEntity !== undefined) return appearanceEntity;
+
+  if (address.entityKind !== 'path-point') return undefined;
+
+  const entries = scope.nestedEntities.pathPoints.get(address.entityId);
+  const entry = entries?.length === 1 ? entries[0] : undefined;
+
+  return entry === undefined ? undefined : { kind: 'path-point', ...entry };
 }
 
 export function resolveTargetEntityAddress(scope: AddressScope, address: EntityAddress): ResolvedTargetEntity | undefined {
@@ -307,7 +324,12 @@ export function createPageAddressScope(
   page: PageDefinition,
   root: PageRootInstance,
 ): AddressScope {
-  return { kind: 'page-instance', document, page, root };
+  const rootElement = document.elements.get(root.elementId);
+  const ordinaryRootScope = rootElement === undefined || rootElement.kind === 'component-instance'
+    ? undefined
+    : createOrdinaryRootScope(document.elements, rootElement.id);
+
+  return { kind: 'page-instance', document, page, root, ordinaryRootScope };
 }
 
 export function resolvePageInstanceElement(
@@ -315,7 +337,7 @@ export function resolvePageInstanceElement(
   page: PageDefinition,
   address: { readonly rootInstanceId: Id; readonly componentInstancePath: readonly Id[]; readonly elementId: Id },
 ): ResolvedTargetEntity | undefined {
-  const root = page.rootInstances.find((candidate) => candidate.id === address.rootInstanceId);
+  const root = document.pageRoots.get(page.id)?.get(address.rootInstanceId);
 
   if (root === undefined) return undefined;
 
@@ -331,11 +353,11 @@ export function resolvePageInstanceElement(
 
 function resolvePagePathEntity(document: DocumentSemanticIndex, address: EntityAddress): boolean {
   const rootId = address.instancePath?.[0];
-  const page = document.document.pages.find((candidate) => candidate.id === address.pageId);
+  const page = address.pageId === undefined ? undefined : document.pages.get(address.pageId);
 
   if (page === undefined) return false;
 
-  const root = page.rootInstances.find((candidate) => candidate.id === rootId);
+  const root = rootId === undefined ? undefined : document.pageRoots.get(page.id)?.get(rootId);
 
   return root !== undefined && resolveTargetEntityAddress(createPageAddressScope(document, page, root), address) !== undefined;
 }
@@ -350,13 +372,13 @@ function resolveDocumentOwnedEntity(document: DocumentSemanticIndex, address: En
     case 'sequence':
       return document.sequences.has(address.entityId);
     case 'page':
-      return document.document.pages.some((page) => page.id === address.entityId);
+      return document.pages.has(address.entityId);
     case 'state-machine':
-      return document.document.stateMachines.some((machine) => machine.id === address.entityId);
+      return document.stateMachines.has(address.entityId);
     case 'view-model':
-      return document.document.viewModels.some((viewModel) => viewModel.id === address.entityId);
+      return document.viewModels.has(address.entityId);
     case 'binding':
-      return document.document.bindings.some((binding) => binding.id === address.entityId);
+      return document.bindings.has(address.entityId);
     default:
       return false;
   }
@@ -385,24 +407,24 @@ function resolveProjectOwnedEntity(indexes: SemanticIndexes, address: EntityAddr
     case 'output-profile':
       return indexes.outputProfiles.has(address.entityId);
     case 'template-group':
-      return indexes.project.templateGroups.some((group) => group.id === address.entityId);
+      return indexes.templateGroups.has(address.entityId);
     case 'interop-source':
-      return indexes.project.interop.sources.some((source) => source.id === address.entityId);
+      return indexes.interopSources.has(address.entityId);
     case 'interop-record':
-      return indexes.project.interop.records.some((record) => record.id === address.entityId);
+      return indexes.interopRecords.has(address.entityId);
     default:
       return false;
   }
 }
 
 function resolvePageOwnedEntity(document: DocumentSemanticIndex, address: EntityAddress): boolean {
-  const page = document.document.pages.find((candidate) => candidate.id === address.pageId);
+  const page = address.pageId === undefined ? undefined : document.pages.get(address.pageId);
 
   if (page === undefined) return false;
 
   if (address.entityKind !== 'page-root') return false;
 
-  const root = page.rootInstances.find((candidate) => candidate.id === address.entityId);
+  const root = document.pageRoots.get(page.id)?.get(address.entityId);
 
   return root !== undefined && resolveTargetEntityAddress(createPageAddressScope(document, page, root), address) !== undefined;
 }

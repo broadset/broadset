@@ -77,6 +77,11 @@ Tint amounts are finite values from 0 through 1. Producer-alias IDs are unique w
 
 Every document `color` configuration MUST declare a typed working space and `compositing: 'linear-premultiplied'`. The working space is authoring truth and is distinct from display preview and output profile transformations.
 
+For an ICC working space, the profile color-space signature is normalized as an ASCII ICC signature
+and MUST match the declared model (`RGB`, `CMYK`, `GRAY`, or `LAB`). Working profiles accept only
+`input`, `display`, `output`, or `color-space` classes; device-link, abstract, and named-color
+profiles are not authoring working spaces.
+
 #### Acceptance Criteria
 
 - [ ] Given a supported working space and required compositing mode, validation succeeds
@@ -97,10 +102,15 @@ Opacity, blending, masks, and effects MUST resolve in the document working space
 
 An optional document output intent MUST reference an ICC-profile asset and declare rendering intent (`perceptual`, `relative-colorimetric`, `saturation`, or `absolute-colorimetric`) plus black-point compensation. Profile class, color space, and output target MUST be compatible.
 
+Output intents require an `output`-class profile. Motion and static document targets require an RGB
+profile; print documents and reusable print output profiles require CMYK. A matching asset kind
+alone is insufficient.
+
 #### Acceptance Criteria
 
 - [ ] Given a compatible ICC-profile asset and rendering intent, validation succeeds
 - [ ] Given a missing, wrong-kind, or incompatible profile, semantic validation fails
+- [ ] Given an ICC class or color-space signature incompatible with its working/output target, semantic validation fails
 - [ ] Given black-point compensation, its boolean setting is explicit rather than inferred
 
 ### Requirement: Output and Interop Fidelity

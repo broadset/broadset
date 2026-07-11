@@ -249,6 +249,7 @@ export function validateValueAndResourceInvariants(project: BroadsetProjectV1): 
 
     document.viewModels.forEach((viewModel, viewModelIndex) => {
       const base = `${documentBase}/viewModels/${String(viewModelIndex)}`;
+      const fieldIds = new Set<string>(viewModel.fields.map(({ id }) => id));
 
       viewModel.fields.forEach((field, fieldIndex) => {
         const fieldBase = `${base}/fields/${String(fieldIndex)}`;
@@ -280,7 +281,7 @@ export function validateValueAndResourceInvariants(project: BroadsetProjectV1): 
           }
         });
         Object.keys(sample.values).forEach((fieldId) => {
-          if (!viewModel.fields.some((field) => field.id === fieldId)) {
+          if (!fieldIds.has(fieldId)) {
             addError(
               diagnostics,
               'data.unknown-sample-field',

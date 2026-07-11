@@ -236,6 +236,7 @@ function validateDocumentValues(
 
   document.viewModels.forEach((viewModel, viewModelIndex) => {
     const viewModelPointer = `${pointer}/viewModels/${String(viewModelIndex)}`;
+    const fields = new Map<string, (typeof viewModel.fields)[number]>(viewModel.fields.map((field) => [field.id, field]));
 
     viewModel.fields.forEach((field, fieldIndex) => {
       if (field.defaultValue !== undefined) {
@@ -253,7 +254,7 @@ function validateDocumentValues(
     viewModel.sampleDataSets.forEach((sample, sampleIndex) => {
       Object.entries(sample.values).forEach(([fieldId, value]) => {
         const valuePointer = `${viewModelPointer}/sampleDataSets/${String(sampleIndex)}/values/${escapePointerSegment(fieldId)}`;
-        const field = viewModel.fields.find((candidate) => candidate.id === fieldId);
+        const field = fields.get(fieldId);
 
         validateTypedValueReferences({
           indexes,

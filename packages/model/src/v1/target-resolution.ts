@@ -228,8 +228,8 @@ export function resolvePropertyTargetContractFromIndexes(
   if (target.entity.entityKind === 'page-root') {
     if (target.entity.pageId === undefined || (target.entity.instancePath?.length ?? 0) > 0) return undefined;
 
-    const page = document.document.pages.find((candidate) => candidate.id === target.entity.pageId);
-    const root = page?.rootInstances.find((candidate) => candidate.id === target.entity.entityId);
+    const page = document.pages.get(target.entity.pageId);
+    const root = document.pageRoots.get(target.entity.pageId)?.get(target.entity.entityId);
 
     return page === undefined || root === undefined
       ? undefined
@@ -239,11 +239,11 @@ export function resolvePropertyTargetContractFromIndexes(
   const rootId = target.entity.instancePath?.[0];
 
   if (rootId !== undefined) {
-    const page = document.document.pages.find((candidate) => candidate.id === target.entity.pageId);
+    const page = target.entity.pageId === undefined ? undefined : document.pages.get(target.entity.pageId);
 
     if (page === undefined) return undefined;
 
-    const root = page.rootInstances.find((candidate) => candidate.id === rootId);
+    const root = document.pageRoots.get(page.id)?.get(rootId);
 
     if (root !== undefined) return resolvePropertyTargetContractInScope(createPageAddressScope(document, page, root), target);
 

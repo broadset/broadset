@@ -54,11 +54,18 @@ Singular transforms MAY be preserved only as explicitly diagnosed external conte
 
 A text element MUST contain inert `TextBody` with ordered paragraphs. Each paragraph and run MUST have stable identity and typed properties; each run contains Unicode text. Paragraph properties cover alignment, direction, spacing, indents, tabs, lists, hyphenation, and keep rules. Run properties cover fonts, size, color, variation axes, OpenType features, language, script, direction, decoration, baseline, tracking, hyperlink, and semantic role.
 
+Paragraph IDs and run IDs MUST each be unique across the owning document or component element
+scope, matching property-target resolution. Every run font family MUST resolve, and its font face
+MUST belong to that family. The same rules apply to text elements inside component definitions;
+shared-style font references resolve through their effective acyclic inheritance chain.
+
 Authored HTML is forbidden. Glyph shaping, line breaks, measured layout, and DOM nodes are derived and are not persisted.
 
 #### Acceptance Criteria
 
 - [ ] Given multilingual Unicode runs with stable paragraph and run IDs, validation succeeds
+- [ ] Given a missing font family, or a face owned by another family, semantic validation fails at the run property
+- [ ] Given duplicate paragraph or run IDs anywhere in one resolver scope, semantic validation fails
 - [ ] Given authored HTML or executable markup in text content, validation fails
 - [ ] Given repeated shaping of identical text, no shaped-glyph cache is added to canonical data
 
@@ -66,11 +73,17 @@ Authored HTML is forbidden. Glyph shaping, line breaks, measured layout, and DOM
 
 Image, video, and audio elements MUST reference compatible project assets by ID. Image payloads declare fit and optional normalized crop and focal point. Vector payloads MUST be a typed rectangle, ellipse, structured path, or boolean operation. Clock, ticker, and QR-code variants use typed purpose-specific fields rather than generic content strings.
 
+Every non-close structured-path segment `pointId` MUST resolve to exactly one point in that path.
+Path-point IDs are unique across their owning document or component resolver scope. Fill, stroke,
+effect, and gradient-stop IDs are likewise unique per entity kind across that scope, because those
+entities are addressed by kind plus ID rather than by collection position.
+
 #### Acceptance Criteria
 
 - [ ] Given an image referencing an image asset with a valid crop, validation succeeds
 - [ ] Given media referencing an incompatible asset kind, semantic validation fails
 - [ ] Given editable path content, stable structured point and segment identity is preserved
+- [ ] Given an orphan or ambiguous path-segment point reference, semantic validation fails at `pointId`
 
 ### Requirement: Component Instances
 

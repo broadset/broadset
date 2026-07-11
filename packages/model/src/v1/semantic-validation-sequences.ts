@@ -57,17 +57,13 @@ function validateAction(
   diagnostics: Diagnostic[],
 ): void {
   if (action.kind === 'send-event') {
-    const machine = document.document.stateMachines.find((candidate) => candidate.id === action.stateMachineId);
+    const machine = document.stateMachines.get(action.stateMachineId);
 
     if (machine === undefined)
       diagnostics.push(
         createSemanticError('state.missing-machine', 'State machine does not resolve', `${pointer}/stateMachineId`),
       );
-    else if (
-      !machine.transitions.some(
-        (transition) => transition.trigger.kind === 'event' && transition.trigger.eventId === action.eventId,
-      )
-    )
+    else if (document.stateMachineEvents.get(machine.id)?.has(action.eventId) !== true)
       diagnostics.push(
         createSemanticError('state.missing-event', 'State-machine event does not resolve', `${pointer}/eventId`),
       );

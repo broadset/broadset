@@ -1,13 +1,17 @@
-import type { ComponentDefinition } from './component';
 import { typedValueMatchesSchema, valueSchemaValueType } from './data';
 import type { Diagnostic } from './diagnostics';
 import type { Element } from './element';
 import { findGraphCycleEdges, findGraphCycleNodes, graphEdgeKey } from './graph-cycles';
+import {
+  documentOutputColorModel,
+  isOutputIccProfileCompatible,
+  isWorkingIccProfileCompatible,
+} from './icc-profile-compatibility';
 import type { Id } from './identity';
 import type { BroadsetProjectV1 } from './project';
 import { createComponentAddressScope } from './resolved-address';
 import type { VariableDefinition } from './resources';
-import { createSemanticIndexes, type SemanticIndexes } from './semantic-index';
+import { type ComponentSemanticIndex, createSemanticIndexes, type SemanticIndexes } from './semantic-index';
 import { validateElementReferences } from './semantic-validation-element';
 import {
   validateAdditionalResources,
@@ -28,6 +32,7 @@ import {
 import { validateGlobalIdentities } from './semantic-validation-identities';
 import { validateProjectInvariants } from './semantic-validation-invariants';
 import { validatePagesAndBindings } from './semantic-validation-pages';
+import { validateScopedReferences } from './semantic-validation-scoped-references';
 import { validateSequences } from './semantic-validation-sequences';
 import { validateProjectTypedValueReferences } from './semantic-validation-typed-values';
 import { resolvePropertyTargetContractInScope } from './target-resolution';
@@ -182,7 +187,8 @@ function validateResources(indexes: SemanticIndexes, diagnostics: DiagnosticList
         validateElementReferences(indexes, componentElements, element, pointer, diagnostics);
       });
     });
-    if (document.color.workingSpace.kind === 'icc')
+
+    if (document.color.workingSpace.kind === 'icc') {
       validateAssetReference(
         indexes,
         document.color.workingSpace.iccProfileAssetId,
@@ -190,7 +196,15 @@ function validateResources(indexes: SemanticIndexes, diagnostics: DiagnosticList
         `/documents/${String(documentIndex)}/color/workingSpace/iccProfileAssetId`,
         diagnostics,
       );
-    if (document.color.outputIntent !== undefined)
+
+      const profile = indexes.assets.get(document.color.workingSpace.iccProfileAssetId);
+
+      if (profile?.kind === 'icc-profile' && !isWorkingIccProfileCompatible(profile, document.color.workingSpace.model)) {
+        diagnostics.push(createSemanticError('color.incompatible-profile', 'ICC working profile is incompatible with the declared model', `/documents/${String(documentIndex)}/color/workingSpace/iccProfileAssetId`));
+      }
+    }
+
+    if (document.color.outputIntent !== undefined) {
       validateAssetReference(
         indexes,
         document.color.outputIntent.iccProfileAssetId,
@@ -198,6 +212,13 @@ function validateResources(indexes: SemanticIndexes, diagnostics: DiagnosticList
         `/documents/${String(documentIndex)}/color/outputIntent/iccProfileAssetId`,
         diagnostics,
       );
+
+      const profile = indexes.assets.get(document.color.outputIntent.iccProfileAssetId);
+
+      if (profile?.kind === 'icc-profile' && !isOutputIccProfileCompatible(profile, documentOutputColorModel(document.kind))) {
+        diagnostics.push(createSemanticError('color.incompatible-profile', 'ICC output profile is incompatible with the document target', `/documents/${String(documentIndex)}/color/outputIntent/iccProfileAssetId`));
+      }
+    }
   });
   validateAdditionalResources(indexes, diagnostics);
 }
@@ -217,14 +238,16 @@ function validateHierarchies(indexes: SemanticIndexes, diagnostics: DiagnosticLi
 }
 
 function validateComponentPropertyValues(
-  indexes: SemanticIndexes,
-  definition: ComponentDefinition,
-  values: readonly { readonly exposedPropertyId: Id; readonly value: TypedValue }[],
-  pointer: string,
-  diagnostics: DiagnosticList,
+  { indexes, definition, values, pointer, diagnostics }: {
+    readonly indexes: SemanticIndexes;
+    readonly definition: ComponentSemanticIndex;
+    readonly values: readonly { readonly exposedPropertyId: Id; readonly value: TypedValue }[];
+    readonly pointer: string;
+    readonly diagnostics: DiagnosticList;
+  },
 ): void {
   values.forEach((value, index) => {
-    const property = definition.exposedProperties.find((candidate) => candidate.id === value.exposedPropertyId);
+    const property = definition.exposedProperties.get(value.exposedPropertyId);
     const valuePointer = `${pointer}/${String(index)}`;
 
     if (property === undefined) {
@@ -264,7 +287,7 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
     documentIndex.document.elements.forEach((element, elementPosition) => {
       if (element.kind !== 'component-instance') return;
 
-      const definition = documentIndex.components.get(element.componentId)?.component;
+      const definition = documentIndex.components.get(element.componentId);
       const pointer = `/documents/${String(documentPosition)}/elements/${String(elementPosition)}`;
 
       if (definition === undefined) {
@@ -272,13 +295,7 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
           createSemanticError('component.missing-reference', 'Component does not resolve', `${pointer}/componentId`),
         );
       } else {
-        validateComponentPropertyValues(
-          indexes,
-          definition,
-          element.propertyValues,
-          `${pointer}/propertyValues`,
-          diagnostics,
-        );
+        validateComponentPropertyValues({ indexes, definition, values: element.propertyValues, pointer: `${pointer}/propertyValues`, diagnostics });
       }
     });
     documentIndex.document.components.forEach((component, componentPosition) => {
@@ -328,18 +345,18 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
         if (element.kind !== 'component-instance') return;
 
         const pointer = `${base}/elements/${String(elementPosition)}/componentId`;
-        const definition = documentIndex.components.get(element.componentId)?.component;
+        const definition = documentIndex.components.get(element.componentId);
 
         if (definition === undefined) {
           diagnostics.push(createSemanticError('component.missing-reference', 'Component does not resolve', pointer));
         } else {
-          validateComponentPropertyValues(
+          validateComponentPropertyValues({
             indexes,
             definition,
-            element.propertyValues,
-            `${base}/elements/${String(elementPosition)}/propertyValues`,
+            values: element.propertyValues,
+            pointer: `${base}/elements/${String(elementPosition)}/propertyValues`,
             diagnostics,
-          );
+          });
         }
 
         if (definition !== undefined && componentCycleEdges.has(graphEdgeKey(component.id, element.componentId))) {
@@ -474,9 +491,7 @@ function validateVariables(indexes: SemanticIndexes, diagnostics: DiagnosticList
   indexes.documentList.forEach(({ document }, documentIndex) => {
     const validateSelections = (selections: Readonly<Record<Id, Id>>, pointer: string): void => {
       Object.entries(selections).forEach(([collectionId, modeId]) => {
-        const collection = indexes.project.resources.variables.find((candidate) => candidate.id === collectionId);
-
-        if (!collection?.modes.some((mode) => mode.id === modeId)) {
+        if (indexes.variableModes.get(collectionId)?.has(modeId) !== true) {
           diagnostics.push(
             createSemanticError(
               'variable.invalid-mode-selection',
@@ -505,6 +520,7 @@ export function validateBroadsetProjectV1Semantics(project: BroadsetProjectV1): 
   validateGlobalIdentities(indexes, diagnostics);
   diagnostics.push(...validateProjectInvariants(project));
   validateResources(indexes, diagnostics);
+  validateScopedReferences(indexes, diagnostics);
   validateProjectTypedValueReferences(indexes, diagnostics);
   validateHierarchies(indexes, diagnostics);
   validateComponents(indexes, diagnostics);

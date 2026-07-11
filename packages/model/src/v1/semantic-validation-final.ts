@@ -1,4 +1,5 @@
 import type { Diagnostic } from './diagnostics';
+import { isOutputIccProfileCompatible } from './icc-profile-compatibility';
 import { type Id, idSchema } from './identity';
 import type { BroadsetProjectV1 } from './project';
 import { resolveProjectEntityAddress } from './resolved-address';
@@ -72,6 +73,12 @@ export function validateOutputProfiles(indexes: SemanticIndexes, diagnostics: Di
         `/resources/outputProfiles/${String(profilePosition)}/outputIntent/iccAssetId`,
         diagnostics,
       );
+
+      const iccProfile = indexes.assets.get(profile.outputIntent.iccAssetId);
+
+      if (iccProfile?.kind === 'icc-profile' && !isOutputIccProfileCompatible(iccProfile, 'cmyk')) {
+        diagnostics.push(createSemanticError('output.incompatible-icc-profile', 'Print output intent requires an output-class CMYK ICC profile', `/resources/outputProfiles/${String(profilePosition)}/outputIntent/iccAssetId`));
+      }
     }
   });
 }
@@ -179,6 +186,7 @@ function validateStyleFontReferences(
   const facePosition = entries.findIndex((entry) => entry.pointer === '/fontFaceId');
   const familyValue = entries[familyPosition]?.value;
   const faceValue = entries[facePosition]?.value;
+  const faceId = faceValue?.type === 'string' ? idSchema.safeParse(faceValue.value) : undefined;
   const effectiveFamilyId = effectiveFontFamilyIds.get(style.id);
   const family = effectiveFamilyId === undefined ? undefined : indexes.fonts.get(effectiveFamilyId);
 
@@ -194,7 +202,7 @@ function validateStyleFontReferences(
 
   if (
     faceValue?.type === 'string' &&
-    !family?.faces.some((face) => face.id === faceValue.value)
+    (family === undefined || faceId?.success !== true || indexes.fontFaces.get(family.id)?.has(faceId.data) !== true)
   ) {
     diagnostics.push(
       createSemanticError(
@@ -494,7 +502,7 @@ export function validateInterop(indexes: SemanticIndexes, diagnostics: Diagnosti
   indexes.project.interop.records.forEach((record, recordPosition) => {
     const base = `/interop/records/${String(recordPosition)}`;
 
-    if (!indexes.project.interop.sources.some((source) => source.id === record.sourceId)) {
+    if (!indexes.interopSources.has(record.sourceId)) {
       diagnostics.push(
         createSemanticError('interop.invalid-source', 'Interop source does not resolve', `${base}/sourceId`),
       );
