@@ -327,7 +327,7 @@ export const V1_PUBLIC_NAME_COLLISIONS = [...V1_TYPE_COLLISION_NAMES, ...V1_RUNT
 
 export const V1_COMPLETE_EXPORT_NAMES = [...new Set([...V1_RUNTIME_EXPORT_NAMES, ...V1_TYPE_EXPORT_NAMES])] as const;
 
-export interface CompilerExportInventory {
+interface CompilerExportInventory {
   readonly names: readonly string[];
   readonly runtimeNames: readonly string[];
   readonly typeNames: readonly string[];
