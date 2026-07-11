@@ -7,5 +7,7 @@ export * from './core/scene-graph';
 export { createSemanticTextRenderer } from './elements/text-semantic';
 export * from './scene-tree';
 export * from './screen-renderer';
+export { type AppearanceStyle,appearanceToStyle } from './v1/appearance-css';
 export { gradientToCss } from './v1/gradient-css';
 export { colorValueToCss } from './v1/paint-css';
+export { type ElementBoxStyle, geometryToBoxStyle, transformToCss } from './v1/transform-css';
