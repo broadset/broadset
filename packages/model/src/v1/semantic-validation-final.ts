@@ -169,6 +169,7 @@ function resolveStylePointerType(
 
 function validateStyleFontReferences(
   indexes: SemanticIndexes,
+  style: SharedStyle,
   entries: readonly StyleEntry[],
   pointer: string,
   diagnostics: Diagnostic[],
@@ -177,10 +178,10 @@ function validateStyleFontReferences(
   const facePosition = entries.findIndex((entry) => entry.pointer === '/fontFaceId');
   const familyValue = entries[familyPosition]?.value;
   const faceValue = entries[facePosition]?.value;
-  const family =
-    familyValue?.type === 'string'
-      ? indexes.project.resources.fonts.find((font) => font.id === familyValue.value)
-      : undefined;
+  const effectiveFamilyId = findEffectiveFontFamilyId(indexes, style, new Set());
+  const family = effectiveFamilyId === undefined
+    ? undefined
+    : indexes.project.resources.fonts.find((font) => font.id === effectiveFamilyId);
 
   if (familyValue?.type === 'string' && family === undefined) {
     diagnostics.push(
@@ -194,8 +195,7 @@ function validateStyleFontReferences(
 
   if (
     faceValue?.type === 'string' &&
-    family !== undefined &&
-    !family.faces.some((face) => face.id === faceValue.value)
+    !family?.faces.some((face) => face.id === faceValue.value)
   ) {
     diagnostics.push(
       createSemanticError(
@@ -205,6 +205,33 @@ function validateStyleFontReferences(
       ),
     );
   }
+}
+
+function findEffectiveFontFamilyId(
+  indexes: SemanticIndexes,
+  style: SharedStyle,
+  seen: ReadonlySet<Id>,
+): string | undefined {
+  if (seen.has(style.id)) return undefined;
+
+  if (style.source.kind === 'properties') {
+    const own = findStyleStringValue(style.source.entries, '/fontFamilyId');
+
+    if (own !== undefined) return own;
+  }
+
+  const inheritedId = style.source.kind === 'alias' ? style.source.styleId : style.source.inheritedStyleId;
+  const inherited = inheritedId === undefined ? undefined : indexes.styles.get(inheritedId);
+
+  return inherited === undefined ? undefined : findEffectiveFontFamilyId(indexes, inherited, new Set([...seen, style.id]));
+}
+
+function styleEnumValueIsValid(entry: StyleEntry): boolean {
+  if (entry.value.type !== 'string') return true;
+  if (entry.pointer === '/paragraph/lineSpacing/kind') return ['normal', 'multiple', 'absolute'].includes(entry.value.value);
+  if (entry.pointer === '/paragraph/list/kind') return ['none', 'unordered', 'ordered'].includes(entry.value.value);
+
+  return true;
 }
 
 function validateMissingBlobSource(
@@ -286,8 +313,9 @@ function validateSharedStyle(
 
     if (expected === undefined) diagnostics.push(createSemanticError('style.invalid-pointer', 'Shared-style pointer is not approved', `${entryPointer}/pointer`));
     else if (!typedValueMatchesType(entry.value, expected)) diagnostics.push(createSemanticError('style.incompatible-value', 'Shared-style value is incompatible', `${entryPointer}/value`));
+    else if (!styleEnumValueIsValid(entry)) diagnostics.push(createSemanticError('style.incompatible-value', 'Shared-style enum value is not approved', `${entryPointer}/value`));
   });
-  if (style.kind === 'text') validateStyleFontReferences(indexes, entries, pointer, diagnostics);
+  if (style.kind === 'text') validateStyleFontReferences(indexes, style, entries, pointer, diagnostics);
 }
 
 function styleReaches(indexes: SemanticIndexes, startId: Id, targetId: Id, seen: ReadonlySet<Id>): boolean {

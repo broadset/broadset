@@ -2,7 +2,7 @@ import type { ExpressionAst } from './data';
 import type { Diagnostic } from './diagnostics';
 import type { Element } from './element';
 import type { SemanticIndexes } from './semantic-index';
-import { createSemanticError } from './semantic-validation-helpers';
+import { createSemanticError, typedValueMatchesResolvedMediaTypes } from './semantic-validation-helpers';
 import type { Sequence } from './sequence';
 import type { TypedValue } from './typed-value';
 
@@ -239,22 +239,29 @@ function validateDocumentValues(
 
     viewModel.fields.forEach((field, fieldIndex) => {
       if (field.defaultValue !== undefined) {
+        const valuePointer = `${viewModelPointer}/fields/${String(fieldIndex)}/defaultValue`;
+
         validateTypedValueReferences({
           indexes,
           value: field.defaultValue,
-          pointer: `${viewModelPointer}/fields/${String(fieldIndex)}/defaultValue`,
+          pointer: valuePointer,
           diagnostics,
         });
+        if (!typedValueMatchesResolvedMediaTypes(indexes, field.defaultValue, field.schema)) diagnostics.push(createSemanticError('data.incompatible-media-type', 'Asset media type is not accepted by the field schema', valuePointer));
       }
     });
     viewModel.sampleDataSets.forEach((sample, sampleIndex) => {
       Object.entries(sample.values).forEach(([fieldId, value]) => {
+        const valuePointer = `${viewModelPointer}/sampleDataSets/${String(sampleIndex)}/values/${escapePointerSegment(fieldId)}`;
+        const field = viewModel.fields.find((candidate) => candidate.id === fieldId);
+
         validateTypedValueReferences({
           indexes,
           value,
-          pointer: `${viewModelPointer}/sampleDataSets/${String(sampleIndex)}/values/${escapePointerSegment(fieldId)}`,
+          pointer: valuePointer,
           diagnostics,
         });
+        if (field !== undefined && !typedValueMatchesResolvedMediaTypes(indexes, value, field.schema)) diagnostics.push(createSemanticError('data.incompatible-media-type', 'Asset media type is not accepted by the field schema', valuePointer));
       });
     });
   });

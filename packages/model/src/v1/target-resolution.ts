@@ -9,8 +9,14 @@ import {
   type ResolvedTargetEntity,
   resolveTargetEntityAddress,
 } from './resolved-address';
+import type { Asset } from './resources';
 import { createSemanticIndexes, type SemanticIndexes } from './semantic-index';
 import type { ValueType } from './typed-value';
+
+export interface PropertyTargetContract {
+  readonly valueType: ValueType;
+  readonly assetKinds?: readonly Asset['kind'][] | undefined;
+}
 
 function resolveMatrixIndex(pointer: string, transformKind: 'affine2d' | 'matrix3d'): ValueType | undefined {
   const prefix = '/geometry/transform/matrix/';
@@ -172,25 +178,63 @@ function resolveEntityPointer(entity: ResolvedTargetEntity, pointer: string): Va
   }
 }
 
+const ASSET_POINTER_KINDS: Readonly<Record<string, readonly Asset['kind'][]>> = {
+  'element:image:/image/assetId': ['image'],
+  'element:video:/video/assetId': ['video'],
+  'element:audio:/audio/assetId': ['audio'],
+  'element:foreign:/foreign/previewAssetId': ['image', 'vector'],
+  'fill:/paint/assetId': ['image', 'vector'],
+  'stroke:/paint/assetId': ['image', 'vector'],
+  'effect:displacement:/assetId': ['image'],
+};
+
+function resolveAssetKinds(entity: ResolvedTargetEntity, pointer: string): readonly Asset['kind'][] | undefined {
+  if (entity.kind === 'element') return ASSET_POINTER_KINDS[`element:${entity.value.kind}:${pointer}`];
+  if (entity.kind === 'effect') return ASSET_POINTER_KINDS[`effect:${entity.value.kind}:${pointer}`];
+
+  return ASSET_POINTER_KINDS[`${entity.kind}:${pointer}`];
+}
+
+export function resolvePropertyTargetContractInScope(
+  scope: AddressScope,
+  target: PropertyTarget,
+): PropertyTargetContract | undefined {
+  const entity = resolveTargetEntityAddress(scope, target.entity);
+  const valueType = entity === undefined ? undefined : resolveEntityPointer(entity, target.pointer);
+
+  return entity === undefined || valueType === undefined
+    ? undefined
+    : { valueType, assetKinds: resolveAssetKinds(entity, target.pointer) };
+}
+
 export function resolvePropertyTargetValueTypeInScope(
   scope: AddressScope,
   target: PropertyTarget,
 ): ValueType | undefined {
-  const entity = resolveTargetEntityAddress(scope, target.entity);
-
-  return entity === undefined ? undefined : resolveEntityPointer(entity, target.pointer);
+  return resolvePropertyTargetContractInScope(scope, target)?.valueType;
 }
 
-export function resolvePropertyTargetValueTypeFromIndexes(
+export function resolvePropertyTargetContractFromIndexes(
   indexes: SemanticIndexes,
   target: PropertyTarget,
-): ValueType | undefined {
+): PropertyTargetContract | undefined {
   if (target.entity.projectId !== indexes.project.id) return undefined;
   if (target.entity.documentId === undefined) return undefined;
 
   const document = indexes.documents.get(target.entity.documentId);
 
   if (document === undefined) return undefined;
+
+  if (target.entity.entityKind === 'page-root') {
+    if (target.entity.pageId === undefined || (target.entity.instancePath?.length ?? 0) > 0) return undefined;
+
+    const page = document.document.pages.find((candidate) => candidate.id === target.entity.pageId);
+    const root = page?.rootInstances.find((candidate) => candidate.id === target.entity.entityId);
+
+    return page === undefined || root === undefined
+      ? undefined
+      : resolvePropertyTargetContractInScope(createPageAddressScope(document, page, root), target);
+  }
 
   const rootId = target.entity.instancePath?.[0];
 
@@ -201,14 +245,28 @@ export function resolvePropertyTargetValueTypeFromIndexes(
 
     const root = page.rootInstances.find((candidate) => candidate.id === rootId);
 
-    if (root !== undefined) return resolvePropertyTargetValueTypeInScope(createPageAddressScope(document, page, root), target);
+    if (root !== undefined) return resolvePropertyTargetContractInScope(createPageAddressScope(document, page, root), target);
 
     return undefined;
   }
 
-  return resolvePropertyTargetValueTypeInScope(createDocumentAddressScope(document), target);
+  return resolvePropertyTargetContractInScope(createDocumentAddressScope(document), target);
+}
+
+export function resolvePropertyTargetValueTypeFromIndexes(
+  indexes: SemanticIndexes,
+  target: PropertyTarget,
+): ValueType | undefined {
+  return resolvePropertyTargetContractFromIndexes(indexes, target)?.valueType;
 }
 
 export function resolvePropertyTargetValueType(project: BroadsetProjectV1, target: PropertyTarget): ValueType | undefined {
   return resolvePropertyTargetValueTypeFromIndexes(createSemanticIndexes(project), target);
+}
+
+export function resolvePropertyTargetContract(
+  project: BroadsetProjectV1,
+  target: PropertyTarget,
+): PropertyTargetContract | undefined {
+  return resolvePropertyTargetContractFromIndexes(createSemanticIndexes(project), target);
 }

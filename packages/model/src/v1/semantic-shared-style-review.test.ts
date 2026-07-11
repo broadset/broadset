@@ -108,6 +108,15 @@ describe('complete shared-style pointer matrices', () => {
     );
   });
 
+  it.each([
+    ['/paragraph/lineSpacing/kind', 'custom'],
+    ['/paragraph/list/kind', 'bullets'],
+  ] as const)('rejects unknown enum value %s=%s', (pointer, value) => {
+    expect(validateBroadsetProjectV1Semantics(createStyleProject([[pointer, { type: 'string', value }]]))).toContainEqual(
+      expect.objectContaining({ code: 'style.incompatible-value', pointer: '/resources/styles/0/source/entries/0/value' }),
+    );
+  });
+
   it('rejects a missing font family referenced by a text style', () => {
     expect(validateBroadsetProjectV1Semantics(createStyleProject([
       ['/fontFamilyId', { type: 'string', value: 'missing-family' }],
@@ -154,6 +163,43 @@ describe('complete shared-style pointer matrices', () => {
       expect.objectContaining({
         code: 'resource.missing-reference',
         pointer: '/resources/styles/0/source/entries/1/value/value',
+      }),
+    );
+  });
+
+  it('resolves a font face against an inherited font family', () => {
+    const project = createMinimalProjectV1();
+    const font = {
+      id: 'family', familyName: 'Family', fallbackFontIds: [],
+      faces: [{ id: 'regular', source: { kind: 'system', postScriptName: 'Family-Regular' }, weight: 400, style: 'normal', stretch: 100 }],
+    };
+    const styles = [
+      {
+        id: 'base', name: 'Base', kind: 'text',
+        source: { kind: 'properties', entries: [{ id: 'family', pointer: '/fontFamilyId', value: { type: 'string', value: 'family' } }] },
+      },
+      {
+        id: 'derived', name: 'Derived', kind: 'text',
+        source: {
+          kind: 'properties', inheritedStyleId: 'base',
+          entries: [{ id: 'face', pointer: '/fontFaceId', value: { type: 'string', value: 'regular' } }],
+        },
+      },
+    ];
+    const actual = parseReviewProject({ ...project, resources: { ...project.resources, fonts: [font], styles } });
+
+    expect(validateBroadsetProjectV1Semantics(actual)).not.toContainEqual(
+      expect.objectContaining({ code: 'resource.missing-reference', pointer: '/resources/styles/1/source/entries/0/value/value' }),
+    );
+  });
+
+  it('rejects a standalone font face without an effective family', () => {
+    expect(validateBroadsetProjectV1Semantics(createStyleProject([
+      ['/fontFaceId', { type: 'string', value: 'regular' }],
+    ]))).toContainEqual(
+      expect.objectContaining({
+        code: 'resource.missing-reference',
+        pointer: '/resources/styles/0/source/entries/0/value/value',
       }),
     );
   });

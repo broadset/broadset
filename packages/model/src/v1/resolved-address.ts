@@ -400,10 +400,6 @@ function resolvePageOwnedEntity(document: DocumentSemanticIndex, address: Entity
 
   if (page === undefined) return false;
 
-  if (address.entityKind === 'page') {
-    return address.entityId === page.id && (address.instancePath?.length ?? 0) === 0;
-  }
-
   if (address.entityKind !== 'page-root') return false;
 
   const root = page.rootInstances.find((candidate) => candidate.id === address.entityId);

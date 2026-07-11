@@ -19,11 +19,17 @@ import {
 import type { DocumentSemanticIndex, SemanticIndexes } from './semantic-index';
 import {
   createSemanticError,
-  typedValueMatchesType,
+  typedValueMatchesResolvedMediaTypes,
+  typedValueMatchesTargetContract,
   typedValueSatisfiesConstraints,
+  valueSchemaMatchesTargetContract,
   valueTypesCompatible,
 } from './semantic-validation-helpers';
-import { resolvePropertyTargetValueTypeInScope } from './target-resolution';
+import {
+  type PropertyTargetContract,
+  resolvePropertyTargetContractInScope,
+  resolvePropertyTargetValueTypeInScope,
+} from './target-resolution';
 import type { TypedValue } from './typed-value';
 
 function escapePointerSegment(segment: string): string {
@@ -31,6 +37,7 @@ function escapePointerSegment(segment: string): string {
 }
 
 function validateComponentPropertyValues(
+  indexes: SemanticIndexes,
   definition: ComponentDefinition,
   values: readonly { readonly exposedPropertyId: Id; readonly value: TypedValue }[],
   pointer: string,
@@ -44,6 +51,7 @@ function validateComponentPropertyValues(
       diagnostics.push(createSemanticError('component.unknown-exposed-property', 'Exposed property does not resolve', `${valuePointer}/exposedPropertyId`));
     } else if (
       !typedValueMatchesSchema(value.value, property.valueSchema) ||
+      !typedValueMatchesResolvedMediaTypes(indexes, value.value, property.valueSchema) ||
       !typedValueSatisfiesConstraints(value.value, property.constraints)
     ) {
       diagnostics.push(createSemanticError('component.incompatible-property-value', 'Component property value is incompatible', `${valuePointer}/value`));
@@ -95,6 +103,37 @@ function projectInferenceDiagnostics(
   });
 }
 
+function expressionMatchesTargetContract(
+  indexes: SemanticIndexes,
+  document: DocumentSemanticIndex,
+  expression: ExpressionAst,
+  contract: PropertyTargetContract,
+): boolean {
+  if (expression.kind === 'literal') return typedValueMatchesTargetContract(indexes, expression.value, contract);
+
+  if (expression.kind === 'field') {
+    const viewModel = document.document.viewModels.find((candidate) => candidate.id === expression.viewModelId);
+    const field = viewModel?.fields.find((candidate) => candidate.id === expression.fieldId);
+
+    return field === undefined || valueSchemaMatchesTargetContract(field.schema, contract);
+  }
+
+  if (expression.kind === 'variable') {
+    const collection = indexes.variables.get(expression.collectionId);
+    const variable = collection?.variables.find((candidate) => candidate.id === expression.variableId);
+
+    return variable === undefined || Object.values(variable.valuesByMode).every((value) =>
+      typedValueMatchesTargetContract(indexes, value, contract));
+  }
+
+  if (expression.kind === 'conditional') {
+    return expressionMatchesTargetContract(indexes, document, expression.whenTrue, contract)
+      && expressionMatchesTargetContract(indexes, document, expression.whenFalse, contract);
+  }
+
+  return true;
+}
+
 function targetBelongsToRoot(
   document: DocumentSemanticIndex,
   pageScope: ReturnType<typeof createPageAddressScope>,
@@ -129,7 +168,7 @@ function validateRootOverrides(
     if (element?.kind === 'component-instance') {
       const definition = document.components.get(element.componentId)?.component;
 
-      if (definition !== undefined) validateComponentPropertyValues(definition, root.componentPropertyValues, `${base}/componentPropertyValues`, diagnostics);
+      if (definition !== undefined) validateComponentPropertyValues(indexes, definition, root.componentPropertyValues, `${base}/componentPropertyValues`, diagnostics);
     } else if (root.componentPropertyValues.length > 0) diagnostics.push(createSemanticError('component.invalid-property-owner', 'Only component roots accept component property values', `${base}/componentPropertyValues`));
 
     const scope = createPageAddressScope(document, page, root);
@@ -142,15 +181,16 @@ function validateRootOverrides(
 
  return; }
 
-      const expected = resolvePropertyTargetValueTypeInScope(scope, override.target) ?? resolvePropertyTargetValueTypeInScope(createDocumentAddressScope(document), override.target);
+      const expected = resolvePropertyTargetContractInScope(scope, override.target) ?? resolvePropertyTargetContractInScope(createDocumentAddressScope(document), override.target);
 
       if (expected === undefined) diagnostics.push(createSemanticError('target.invalid-pointer', 'Override target is invalid', `${overridePointer}/target/pointer`));
-      else if (!typedValueMatchesType(override.value, expected)) diagnostics.push(createSemanticError('target.incompatible-value', 'Override value is incompatible', `${overridePointer}/value`));
+      else if (!typedValueMatchesTargetContract(indexes, override.value, expected)) diagnostics.push(createSemanticError('target.incompatible-value', 'Override value is incompatible', `${overridePointer}/value`));
     });
   });
 }
 
 function validateDescendantOverrides(
+  indexes: SemanticIndexes,
   document: DocumentSemanticIndex,
   page: DocumentSemanticIndex['document']['pages'][number],
   documentPosition: number,
@@ -183,10 +223,10 @@ function validateDescendantOverrides(
         return;
       }
 
-      const expected = resolvePropertyTargetValueTypeInScope(scope, typedOverride.target);
+      const expected = resolvePropertyTargetContractInScope(scope, typedOverride.target);
 
       if (expected === undefined) diagnostics.push(createSemanticError('target.invalid-pointer', 'Descendant override target is invalid', `${pointer}/target/pointer`));
-      else if (!typedValueMatchesType(typedOverride.value, expected)) diagnostics.push(createSemanticError('target.incompatible-value', 'Descendant override value is incompatible', `${pointer}/value`));
+      else if (!typedValueMatchesTargetContract(indexes, typedOverride.value, expected)) diagnostics.push(createSemanticError('target.incompatible-value', 'Descendant override value is incompatible', `${pointer}/value`));
     });
   });
 }
@@ -196,7 +236,7 @@ function validatePages(indexes: SemanticIndexes, document: DocumentSemanticIndex
     const base = `/documents/${String(documentPosition)}/pages/${String(pagePosition)}`;
 
     validateRootOverrides(indexes, document, page, pagePosition, diagnostics);
-    validateDescendantOverrides(document, page, documentPosition, pagePosition, diagnostics);
+    validateDescendantOverrides(indexes, document, page, documentPosition, pagePosition, diagnostics);
     Object.entries(page.selectedSampleDataSets).forEach(([viewModelId, sampleDataSetId]) => {
       const viewModel = document.document.viewModels.find((candidate) => candidate.id === viewModelId);
 
@@ -227,7 +267,8 @@ function validateBindings(indexes: SemanticIndexes, document: DocumentSemanticIn
 
   document.document.bindings.forEach((binding, bindingPosition) => {
     const base = `/documents/${String(documentPosition)}/bindings/${String(bindingPosition)}`;
-    const targetType = resolvePropertyTargetValueTypeInScope(scope, binding.target);
+    const targetContract = resolvePropertyTargetContractInScope(scope, binding.target);
+    const targetType = targetContract?.valueType;
 
     if (targetType === undefined) {
       diagnostics.push(createSemanticError('target.invalid-pointer', 'Binding target is invalid', `${base}/target`));
@@ -238,7 +279,14 @@ function validateBindings(indexes: SemanticIndexes, document: DocumentSemanticIn
 
     projectInferenceDiagnostics(binding, result, base, diagnostics);
     if (targetType !== undefined && result.valueType !== undefined && !valueTypesCompatible(result.valueType, targetType)) diagnostics.push(createSemanticError('binding.incompatible-result', 'Binding result is incompatible with target', `${base}/target`));
-    if (targetType !== undefined && binding.fallback !== undefined && !typedValueMatchesType(binding.fallback, targetType)) diagnostics.push(createSemanticError('binding.incompatible-fallback', 'Binding fallback is incompatible', `${base}/fallback`));
+
+    if (targetContract !== undefined && !expressionMatchesTargetContract(indexes, document, binding.expression, targetContract)) {
+      const expressionPointer = binding.expression.kind === 'literal' ? `${base}/expression/value` : `${base}/expression`;
+
+      diagnostics.push(createSemanticError('binding.incompatible-result', 'Binding result violates the target contract', expressionPointer));
+    }
+
+    if (targetContract !== undefined && binding.fallback !== undefined && !typedValueMatchesTargetContract(indexes, binding.fallback, targetContract)) diagnostics.push(createSemanticError('binding.incompatible-fallback', 'Binding fallback is incompatible', `${base}/fallback`));
   });
 }
 

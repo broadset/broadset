@@ -41,12 +41,17 @@ Canonical dynamic values MUST use a `TypedValue` discriminated union for null, b
 A binding or override target MUST combine an `EntityAddress` with an RFC 6901 JSON Pointer. Entity addresses contain stable project and entity identity, optional document identity, optional page identity, and optional component instance path. Array indexes MUST NOT serve as durable identity.
 
 Page-root and page-descendant addresses MUST contain `documentId` and `pageId`; a page-descendant
-`instancePath` is page-relative and begins with the root-instance ID. Project-resource addresses
+`instancePath` is page-relative and begins with the root-instance ID. A page-root address uses its
+root-instance ID as `entityId` and omits `instancePath`. Pages are document-owned: their canonical
+address uses the page ID as `entityId` and omits both `pageId` and `instancePath`. Project-resource addresses
 MUST omit `documentId`, `pageId`, and `instancePath`. Document-definition and component-definition
 addresses MUST omit `pageId`. `InstanceAddress` remains page-local because it is contained by a
 specific `PageDefinition`.
 
 The addressed property MUST be schema-approved as overridable, and the expected value type is derived from its schema rather than duplicated on the target.
+For asset-valued properties, compatibility also includes the target's accepted asset kinds. A
+`ValueSchema.acceptedMediaTypes` list is matched against the resolved asset blob media type by an
+exact ASCII case-insensitive type/subtype comparison.
 
 #### Acceptance Criteria
 

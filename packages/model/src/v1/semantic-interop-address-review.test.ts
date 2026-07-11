@@ -156,4 +156,24 @@ describe('interop entity-address legality', () => {
     expect(resolveProjectEntityAddress(indexes, valid)).toBe(true);
     expect(resolveProjectEntityAddress(indexes, ambiguous)).toBe(false);
   });
+
+  it('treats pages as document-owned addresses only', () => {
+    const project = createMinimalProjectV1();
+    const document = project.documents[0];
+    const page = document?.pages[0];
+
+    if (document === undefined || page === undefined) throw new Error('Expected fixture page');
+
+    const indexes = createSemanticIndexes(project);
+    const canonical = entityAddressSchema.parse({
+      projectId: project.id,
+      documentId: document.id,
+      entityKind: 'page',
+      entityId: page.id,
+    });
+    const duplicateOwnership = entityAddressSchema.parse({ ...canonical, pageId: page.id });
+
+    expect(resolveProjectEntityAddress(indexes, canonical)).toBe(true);
+    expect(resolveProjectEntityAddress(indexes, duplicateOwnership)).toBe(false);
+  });
 });

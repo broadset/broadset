@@ -44,7 +44,11 @@ interface EntityAddress {
 page-local. Page-descendant addresses also require `documentId` and a page-relative `instancePath`
 beginning with the addressed root-instance ID. Project-owned resources and project identity forbid
 `documentId`, `pageId`, and `instancePath`. Document-owned definitions require `documentId` and
-forbid `pageId`; component-definition scope also forbids `pageId`. An `InstanceAddress` remains
+forbid `pageId`; this includes `page`, whose canonical address uses `documentId`, `entityKind:
+'page'`, and the page ID as `entityId`. A page address carrying the same ID again in `pageId` is
+invalid. Page-root addresses use `documentId`, `pageId`, and the root-instance ID as `entityId`
+without `instancePath`; page descendants use a root-prefixed `instancePath`. Component-definition
+scope also forbids `pageId`. An `InstanceAddress` remains
 page-local because its containing `PageDefinition` supplies the page context.
 
 #### Acceptance Criteria
@@ -568,7 +572,8 @@ Interop entity addresses resolve project resources with the exact kinds `asset`,
 `template-group`, `interop-source`, and `interop-record` IDs are also addressable. These addresses
 MUST omit `documentId`, `pageId`, and `instancePath`. Project identity has the same omission rule.
 Document definitions require `documentId` and forbid `pageId` and `instancePath`; page-root and
-page-descendant addresses require the exact owning `pageId`. Warning addresses use the identical
+page-descendant addresses require the exact owning `pageId`. Pages themselves are document-owned:
+their address omits `pageId` and uses the page ID as `entityId`. Warning addresses use the identical
 resolver and legality rules as record targets.
 
 #### Acceptance Criteria
@@ -610,7 +615,11 @@ The actual element or nested variant MUST contain the conditional property befor
 accepted. Stable nested entity IDs and component/page `instancePath` provide identity. Collection
 array indexes are forbidden. IDs, kinds, parents, hierarchy/order, editor flags, extensions,
 shared-style IDs, component IDs/property values, and raw plugin or foreign payloads are not
-overridable. The model exports a pure resolver for reuse by bindings, tracks, state, and components.
+overridable. Asset-valued targets additionally declare compatible asset kinds: image/video/audio
+element targets require their corresponding kind; foreign previews and picture/pattern paints
+accept image or vector; displacement effects require image. Every override, binding, state value,
+keyframe, and exposed-property binding MUST satisfy this target contract in document, component,
+and page scope. The model exports a pure resolver for reuse by all consumers.
 
 #### Acceptance Criteria
 

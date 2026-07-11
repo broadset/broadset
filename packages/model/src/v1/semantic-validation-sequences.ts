@@ -6,23 +6,25 @@ import {
   createDocumentAddressScope,
 } from './resolved-address';
 import type { ComponentSemanticIndex, DocumentSemanticIndex, SemanticIndexes } from './semantic-index';
-import { createSemanticError, typedValueMatchesType, valueTypesCompatible } from './semantic-validation-helpers';
+import { createSemanticError, typedValueMatchesTargetContract, valueTypesCompatible } from './semantic-validation-helpers';
 import { validateGuardExpression } from './semantic-validation-pages';
 import type { Sequence, SequenceAction } from './sequence';
-import { resolvePropertyTargetValueTypeInScope } from './target-resolution';
-import type { ValueType } from './typed-value';
+import { resolvePropertyTargetContractInScope } from './target-resolution';
 
 function validateTarget(
+  indexes: SemanticIndexes,
   scope: AddressScope,
-  target: Sequence['tracks'][number]['target'],
-  valueType: ValueType,
+  track: Sequence['tracks'][number],
   pointer: string,
   diagnostics: Diagnostic[],
 ): void {
-  const expected = resolvePropertyTargetValueTypeInScope(scope, target);
+  const expected = resolvePropertyTargetContractInScope(scope, track.target);
 
   if (expected === undefined) diagnostics.push(createSemanticError('target.invalid-pointer', 'Property target does not resolve in its owning scope', pointer));
-  else if (!valueTypesCompatible(valueType, expected)) diagnostics.push(createSemanticError('target.incompatible-value', 'Property value type is incompatible', pointer));
+  else if (!valueTypesCompatible(track.valueType, expected.valueType)) diagnostics.push(createSemanticError('target.incompatible-value', 'Property value type is incompatible', pointer));
+  else track.keyframes.forEach((keyframe, index) => {
+    if (!typedValueMatchesTargetContract(indexes, keyframe.value, expected)) diagnostics.push(createSemanticError('target.incompatible-value', 'Keyframe value is incompatible', `${pointer.replace(/\/target$/u, '')}/keyframes/${String(index)}/value`));
+  });
 }
 
 function validateAudioAsset(indexes: SemanticIndexes, assetId: Id, pointer: string, diagnostics: Diagnostic[]): void {
@@ -82,7 +84,7 @@ function validateSequenceGroup(
     const base = `${pointer}/${String(sequencePosition)}`;
 
     sequence.tracks.forEach((track, trackPosition) => {
-      validateTarget(scope, track.target, track.valueType, `${base}/tracks/${String(trackPosition)}/target`, diagnostics);
+      validateTarget(indexes, scope, track, `${base}/tracks/${String(trackPosition)}/target`, diagnostics);
     });
     sequence.cues.forEach((cue, cuePosition) => {
       if (cue.kind === 'audio') validateAudioAsset(indexes, cue.assetId, `${base}/cues/${String(cuePosition)}/assetId`, diagnostics);
@@ -121,11 +123,11 @@ function validateStateMachines(
       const statePointer = `${machinePointer}/states/${String(statePosition)}`;
 
       state.values.forEach((stateValue, valuePosition) => {
-        const targetType = resolvePropertyTargetValueTypeInScope(scope, stateValue.target);
+        const targetContract = resolvePropertyTargetContractInScope(scope, stateValue.target);
         const pointer = `${statePointer}/values/${String(valuePosition)}`;
 
-        if (targetType === undefined) diagnostics.push(createSemanticError('target.invalid-pointer', 'State target is invalid', `${pointer}/target`));
-        else if (!typedValueMatchesType(stateValue.value, targetType)) diagnostics.push(createSemanticError('target.incompatible-value', 'State value is incompatible', `${pointer}/value`));
+        if (targetContract === undefined) diagnostics.push(createSemanticError('target.invalid-pointer', 'State target is invalid', `${pointer}/target`));
+        else if (!typedValueMatchesTargetContract(indexes, stateValue.value, targetContract)) diagnostics.push(createSemanticError('target.incompatible-value', 'State value is incompatible', `${pointer}/value`));
       });
       state.entryActions.forEach((action, actionPosition) => { validateAction(action, document.sequences, document, `${statePointer}/entryActions/${String(actionPosition)}`, diagnostics); });
       state.exitActions.forEach((action, actionPosition) => { validateAction(action, document.sequences, document, `${statePointer}/exitActions/${String(actionPosition)}`, diagnostics); });

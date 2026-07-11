@@ -19,15 +19,16 @@ import {
   createSemanticError,
   findDuplicateIdDiagnostics,
   semanticValueKey,
+  typedValueMatchesResolvedMediaTypes,
   typedValueSatisfiesConstraints,
   validateHierarchy,
-  valueTypesCompatible,
+  valueSchemaMatchesTargetContract,
 } from './semantic-validation-helpers';
 import { validateGlobalIdentities } from './semantic-validation-identities';
 import { validatePagesAndBindings } from './semantic-validation-pages';
 import { validateSequences } from './semantic-validation-sequences';
 import { validateProjectTypedValueReferences } from './semantic-validation-typed-values';
-import { resolvePropertyTargetValueTypeInScope } from './target-resolution';
+import { resolvePropertyTargetContractInScope } from './target-resolution';
 import type { TypedValue } from './typed-value';
 
 type DiagnosticList = Diagnostic[];
@@ -241,6 +242,7 @@ function componentDependsOn(
 }
 
 function validateComponentPropertyValues(
+  indexes: SemanticIndexes,
   definition: ComponentDefinition,
   values: readonly { readonly exposedPropertyId: Id; readonly value: TypedValue }[],
   pointer: string,
@@ -260,6 +262,7 @@ function validateComponentPropertyValues(
       );
     } else if (
       !typedValueMatchesSchema(value.value, property.valueSchema) ||
+      !typedValueMatchesResolvedMediaTypes(indexes, value.value, property.valueSchema) ||
       !typedValueSatisfiesConstraints(value.value, property.constraints)
     ) {
       diagnostics.push(
@@ -286,7 +289,7 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
           createSemanticError('component.missing-reference', 'Component does not resolve', `${pointer}/componentId`),
         );
       } else {
-        validateComponentPropertyValues(definition, element.propertyValues, `${pointer}/propertyValues`, diagnostics);
+        validateComponentPropertyValues(indexes, definition, element.propertyValues, `${pointer}/propertyValues`, diagnostics);
       }
     });
     documentIndex.document.components.forEach((component, componentPosition) => {
@@ -338,6 +341,7 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
           diagnostics.push(createSemanticError('component.missing-reference', 'Component does not resolve', pointer));
         } else {
           validateComponentPropertyValues(
+            indexes,
             definition,
             element.propertyValues,
             `${base}/elements/${String(elementPosition)}/propertyValues`,
@@ -360,6 +364,7 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
 
         if (
           !typedValueMatchesSchema(property.defaultValue, property.valueSchema) ||
+          !typedValueMatchesResolvedMediaTypes(indexes, property.defaultValue, property.valueSchema) ||
           !typedValueSatisfiesConstraints(property.defaultValue, property.constraints)
         )
           diagnostics.push(
@@ -392,7 +397,7 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
             constraint.values.forEach((value, valuePosition) => {
               const key = semanticValueKey(value);
 
-              if (!typedValueMatchesSchema(value, property.valueSchema))
+              if (!typedValueMatchesSchema(value, property.valueSchema) || !typedValueMatchesResolvedMediaTypes(indexes, value, property.valueSchema))
                 diagnostics.push(
                   createSemanticError(
                     'component.incompatible-constraint',
@@ -417,11 +422,10 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
           const expected =
             componentIndex === undefined
               ? undefined
-              : resolvePropertyTargetValueTypeInScope(
+              : resolvePropertyTargetContractInScope(
                   createComponentAddressScope(documentIndex, componentIndex),
                   binding.target,
                 );
-          const schemaType = valueSchemaValueType(property.valueSchema);
           const pointer = `${propertyBase}/bindings/${String(bindingPosition)}/target`;
 
           if (expected === undefined) {
@@ -432,7 +436,7 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
                 pointer,
               ),
             );
-          } else if (!valueTypesCompatible(schemaType, expected)) {
+          } else if (!valueSchemaMatchesTargetContract(property.valueSchema, expected)) {
             diagnostics.push(
               createSemanticError(
                 'component.incompatible-binding',

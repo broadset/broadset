@@ -316,6 +316,10 @@ The closed v1 shared-style matrix contains these representable scalar leaves:
   (`string`) only for unordered.
 
 Conditional leaves MUST be accompanied by the matching kind entry in the same properties source.
+Line-spacing kinds are closed to `normal`, `multiple`, and `absolute`; list kinds are closed to
+`none`, `unordered`, and `ordered`. A `/fontFaceId` entry MUST have an effective `/fontFamilyId`
+from the same properties source or its acyclic inheritance/alias chain, and the face MUST belong to
+that family; a standalone or otherwise unresolvable face fails closed.
 Typed asset values and swatch-backed colors MUST resolve recursively. Alias and inherited-style
 references MUST resolve to the same shared-style kind and remain acyclic.
 

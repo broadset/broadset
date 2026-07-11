@@ -700,7 +700,7 @@ interface PageDefinition {
   readonly rootInstances: readonly PageRootInstance[];
   readonly descendantOverrides: readonly DescendantOverride[];
   readonly selectedVariableModes: Readonly<Record<Id, Id>>;
-  readonly sampleDataSetId?: Id;
+  readonly selectedSampleDataSets: Readonly<Record<Id, Id>>;
   readonly sequenceId?: Id;
   readonly extensions: readonly ExtensionEnvelope[];
 }
