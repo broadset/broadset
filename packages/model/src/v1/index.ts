@@ -30,7 +30,9 @@ export {
   resolveProjectEntityAddress,
   resolveTargetEntityAddress,
 } from './resolved-address';
+export * from './resolved-scene';
 export * from './resources';
+export * from './semantic-index';
 export * from './semantic-validation';
 export * from './sequence';
 export * from './target-resolution';

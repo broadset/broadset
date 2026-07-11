@@ -139,6 +139,9 @@ export const V1_RUNTIME_EXPORT_NAMES = [
   'createPageV1',
   'createDocumentV1',
   'createProjectV1',
+  'createSemanticIndexes',
+  'createElementNestedIndexes',
+  'resolvePageInstanceTree',
 ] as const;
 
 export const V1_TYPE_EXPORT_NAMES = [
@@ -309,6 +312,11 @@ export const V1_TYPE_EXPORT_NAMES = [
   'ViewModelField',
   'ElementBaseOptions',
   'CreateElementV1Input',
+  'SemanticIndexes',
+  'DocumentSemanticIndex',
+  'ComponentSemanticIndex',
+  'ElementNestedIndexes',
+  'ResolvedSceneInstance',
 ] as const;
 
 export const V1_RUNTIME_COLLISION_NAMES = [
