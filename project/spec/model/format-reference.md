@@ -201,6 +201,13 @@ interface BroadsetDocumentV1 {
   readonly outputProfileIds: readonly Id[];
   readonly extensions: readonly ExtensionEnvelope[];
 }
+
+interface DocumentMetadata {
+  readonly description?: string;
+  readonly authors: readonly string[];
+  readonly keywords: readonly string[];
+  readonly rights?: string;
+}
 ```
 
 | Field                   | Required                      | Contract                                                |
@@ -247,6 +254,38 @@ interface SurfaceDefinition {
   readonly broadcastSafeAreas: readonly NamedPercentageInsets[];
   readonly prepress?: { readonly bleed: Insets; readonly trim: Insets; readonly safe: Insets };
 }
+
+interface Insets {
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+  readonly left: number;
+}
+
+interface GuideDefinition {
+  readonly id: Id;
+  readonly name: string;
+  readonly axis: 'x' | 'y';
+  readonly position: number;
+  readonly locked: boolean;
+}
+
+interface NamedPercentageInsets {
+  readonly id: Id;
+  readonly name: string;
+  readonly insets: readonly [number, number, number, number];
+}
+
+type ColorSpaceDefinition =
+  | {
+      readonly kind: 'named';
+      readonly space: 'srgb' | 'display-p3' | 'rec2020' | 'lab' | 'oklab' | 'oklch' | 'cmyk' | 'gray';
+    }
+  | {
+      readonly kind: 'icc';
+      readonly iccProfileAssetId: Id;
+      readonly model: 'rgb' | 'cmyk' | 'gray' | 'lab';
+    };
 
 interface DocumentColorConfiguration {
   readonly workingSpace: ColorSpaceDefinition;
@@ -342,6 +381,21 @@ interface ComponentDefinition {
   readonly exposedProperties: readonly ExposedProperty[];
   readonly extensions: readonly ExtensionEnvelope[];
 }
+
+interface ExposedProperty {
+  readonly id: Id;
+  readonly label: string;
+  readonly group: string;
+  readonly valueSchema: ValueSchema;
+  readonly defaultValue: TypedValue;
+  readonly constraints: readonly ExposedPropertyConstraint[];
+  readonly bindings: readonly { readonly id: Id; readonly target: PropertyTarget }[];
+}
+
+type ExposedPropertyConstraint =
+  | { readonly kind: 'numeric-range'; readonly minimum?: number; readonly maximum?: number; readonly step?: number }
+  | { readonly kind: 'string-length'; readonly minimum?: number; readonly maximum?: number }
+  | { readonly kind: 'allowed-values'; readonly values: readonly TypedValue[] };
 ```
 
 Component element identity is local to its definition. Nested component instances are valid in a component-local collection when the dependency graph remains acyclic. Instance values address stable exposed-property IDs. See [components.md](components.md).
@@ -350,6 +404,7 @@ Component element identity is local to its definition. Nested component instance
 
 - [ ] Given acyclic nested components and typed exposed values, validation succeeds
 - [ ] Given a dependency cycle or invalid exposed-property value, semantic validation fails
+- [ ] Given an exposed property without a binding, duplicate binding IDs, or a constraint incompatible with its value schema, validation fails
 
 ### Requirement: Pages and Instances
 
@@ -445,6 +500,37 @@ interface InteropRegistry {
   readonly records: readonly InteropRecord[];
 }
 
+interface InteropSource {
+  readonly id: Id;
+  readonly format: string;
+  readonly sourceAssetId: Id;
+  readonly importerVersion: string;
+  readonly importedAt: UtcTimestamp;
+}
+
+interface InteropRecord {
+  readonly id: Id;
+  readonly sourceId: Id;
+  readonly target: EntityAddress;
+  readonly baselineSemanticHash: Sha256Digest;
+  readonly mappingConfidence: number;
+  readonly editability: 'native' | 'partial' | 'appearance-only';
+  readonly warnings: readonly InteropDiagnostic[];
+  readonly sourceIdentity?: JsonValue;
+  readonly preservedBlob?: BlobReference;
+  readonly previewAssetId?: Id;
+}
+
+interface InteropDiagnostic {
+  readonly code: string;
+  readonly severity: 'info' | 'warning' | 'error';
+  readonly message: string;
+  readonly dimension: 'appearance' | 'editability' | 'semantics' | 'output';
+  readonly pointer?: string;
+  readonly entity?: EntityAddress;
+  readonly remediation?: string;
+}
+
 interface ExtensionEnvelope {
   readonly namespace: string;
   readonly schema: string;
@@ -460,6 +546,8 @@ Interop records retain source, stable target, baseline semantic hash, optional p
 - [ ] Given valid interop and extension envelopes, round-trip preservation succeeds
 - [ ] Given a malformed extension namespace, relative or non-HTTPS schema URL, or non-positive, fractional, or unsafe version, structural validation fails
 - [ ] Given missing interop references or duplicate extension namespaces, semantic validation fails
+- [ ] Given an interop warning without a pointer or entity, structural validation fails
+- [ ] Given an interop preview referencing an asset other than image or vector, semantic validation fails
 
 ### Requirement: Validation Stages
 
@@ -471,11 +559,34 @@ Validation proceeds in three stages:
 
 No validation stage mutates input. Open JSON is permitted only inside declared plugin, extension, and interop payload containers.
 
+The closed v1 property-target matrix is:
+
+| Entity kind | Approved pointer(s) and resulting `ValueType` |
+| --- | --- |
+| `element` | `/geometry/bounds/width|height` → `length`; `/geometry/origin` → `point3d`; affine `/geometry/transform/matrix/0..3` → `number`, `/4..5` → `length`; matrix3d `/0..11|15` → `number`, `/12..14` → `length`; `/appearance/opacity` → `number`; `/accessibility/label|description` → `string`; image/video/audio asset ID → `asset`; video autoplay/loop/muted/controls and audio autoplay/loop → `boolean`; audio volume → `number`; clock format/timeZone/locale → `string`; ticker direction → `string`, speed/gap → `number`, repeat → `boolean`; QR value/errorCorrection → `string`, quietZone → `length`; image focalPoint → `point2d`; text layout columns → `integer`, columnGap → `length`, verticalAlignment/overflow/autoSize → `string`, textPath startOffset → `length`; group clipChildren → `boolean`; foreign previewAssetId → `asset` |
+| `page-root` | `/visible` → `boolean`; transform tuple positions use the same affine/matrix3d mapping |
+| `text-run` | `/text` → `string`; `/properties/size` → `length`, color → `color`, weight → `integer`, baselineShift → `length`, tracking → `number`, hyperlink → `string` |
+| `paragraph` | alignment/direction/hyphenation → `string`; spacing/indents → `length`; keep flags → `boolean` |
+| `fill` | enabled → `boolean`, opacity → `number`, solid color → `color`, picture/pattern assetId → `asset` |
+| `stroke` | fill mappings plus width/dashOffset → `length` |
+| `effect` | enabled → `boolean`, opacity → `number`, radius/spread/depth/soften → `length`, offset/scale → `point2d`, color/highlightColor/shadowColor → `color`, amount → `number`, angle/altitude → `angle`, assetId → `asset` |
+| `gradient-stop` | color → `color`; opacity/offset/midpoint → `number` |
+| `path-point` | x/y → `length` |
+| `guide` | position → `length`; locked → `boolean` |
+
+The actual element or nested variant MUST contain the conditional property before its pointer is
+accepted. Stable nested entity IDs and component/page `instancePath` provide identity. Collection
+array indexes are forbidden. IDs, kinds, parents, hierarchy/order, editor flags, extensions,
+shared-style IDs, component IDs/property values, and raw plugin or foreign payloads are not
+overridable. The model exports a pure resolver for reuse by bindings, tracks, state, and components.
+
 #### Acceptance Criteria
 
 - [ ] Given invalid container metadata, failure occurs before project hydration
 - [ ] Given an unknown core field, both Zod and JSON Schema reject it
 - [ ] Given a cross-reference error, semantic validation returns a stable diagnostic location
+- [ ] Given an approved target on its actual entity variant, the pure resolver returns the matrix `ValueType`
+- [ ] Given an array index or forbidden identity, hierarchy, runtime, extension, or raw-payload pointer, target resolution fails
 
 ### Requirement: Scene Resolution
 

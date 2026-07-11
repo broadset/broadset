@@ -46,6 +46,14 @@ A project MUST contain exactly these core fields: `$schema`, `format`, `schemaVe
 - [ ] Given a local or timezone-free timestamp, validation fails at that timestamp
 - [ ] Given `updatedAt` earlier than `createdAt`, semantic validation fails
 
+Document metadata, when present, is a separate strict
+`{description?,authors,keywords,rights?}` record. Its author and keyword arrays are explicit, may be
+empty, and contain only non-empty strings. It does not duplicate project timestamps or persist
+locale or UI state.
+
+- [ ] Given document metadata with explicit empty author and keyword arrays, structural validation succeeds without inserting defaults
+- [ ] Given document metadata containing timestamps, locale, or UI state, structural validation fails
+
 ### Requirement: Project Resources
 
 `resources` MUST contain ordered arrays named `assets`, `fonts`, `swatches`, `variables`, `styles`, and `outputProfiles`. Resource IDs MUST be stable and unique in their respective project scopes. Documents and component definitions reference these project-owned resources by ID.

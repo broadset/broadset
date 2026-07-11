@@ -24,6 +24,14 @@ Every document MUST contain `id`, `name`, `kind`, `surface`, `color`, `elements`
 
 Spatial values use the declared surface unit unless their type explicitly declares another basis. DPI converts physical units and pixels but does not reinterpret stored physical coordinates.
 
+Optional document metadata is strict `{description?, authors, keywords, rights?}`; authors and
+keywords are explicit arrays of non-empty strings and may be empty. It contains no timestamps,
+locale, or UI state. Surface insets are strict non-negative finite `{top,right,bottom,left}` values.
+Guides are strict `{id,name,axis:'x'|'y',position,locked}` records with finite position. Named
+broadcast-safe areas are strict `{id,name,insets:[top,right,bottom,left]}` records with every
+percentage from 0 through 50. Working color space is either a named v1 color space or an ICC asset
+reference with an explicit `rgb`, `cmyk`, `gray`, or `lab` model.
+
 #### Acceptance Criteria
 
 - [ ] Given a positive surface size and the fixed coordinate system, validation succeeds
@@ -156,6 +164,29 @@ Every resolved property MUST retain its complete provenance chain. Consumers MUS
 
 Structural validation MUST reject unknown core fields and invalid primitive shapes. Whole-project semantic validation MUST reject duplicate identity, unresolved or wrong-kind references, invalid ordering, cycles, incompatible values, and invalid target paths. Neither stage mutates or repairs input.
 
+Whole-project semantic validation accepts a structurally parsed `BroadsetProjectV1`. Structural
+collection invariants, including duplicate track IDs and time values outside a sequence duration,
+are reported by structural parsing rather than being reintroduced as impossible semantic-validator
+inputs. Cross-reference, type, ordering, and graph invariants that require project-wide indexes are
+reported by semantic validation with deterministic codes and JSON Pointers.
+
+Persisted property targets use a closed v1 allowlist. Collection array indexes are never target
+identity; fixed tuple positions are semantic components. The resolver first resolves the addressed
+entity and variant, then accepts only the following target families and derives the listed value
+type:
+
+- element geometry bounds `width|height` as `length`, origin as `point3d`, affine matrix `0..3` as
+  `number` and `4..5` as `length`, matrix3d `0..11|15` as `number` and `12..14` as `length`;
+- element opacity as `number`, accessibility label/description as `string`, and the closed
+  type-specific image, video, audio, clock, ticker, QR, text-layout, text-path, group, and foreign
+  properties defined in the format reference;
+- page-root visibility as `boolean` and transform tuple positions using the same matrix mapping;
+- stable nested `text-run`, `paragraph`, `fill`, `stroke`, `effect`, `gradient-stop`, `path-point`,
+  and `guide` entities using their closed format-reference mappings.
+
+Core identity, discriminants, hierarchy/order, lock/editor state, extensions, shared-style links,
+component definition/value links, and raw plugin or foreign payloads are never overridable.
+
 The load boundary preserves original bytes and typed diagnostics for invalid input. A structurally invalid project MUST NOT produce a partial scene or default project.
 
 #### Acceptance Criteria
@@ -163,6 +194,10 @@ The load boundary preserves original bytes and typed diagnostics for invalid inp
 - [ ] Given a stale animation reference, semantic validation rejects the project
 - [ ] Given invalid source bytes, loading returns a quarantined result that preserves those bytes
 - [ ] Given a structurally invalid project, resolution does not produce a scene snapshot
+- [ ] Given duplicate track IDs or an out-of-duration keyframe, structural aggregate parsing fails at the offending collection member
+- [ ] Given a structurally valid project with multiple semantic defects, validation returns every independently establishable diagnostic sorted by pointer then code
+- [ ] Given an approved stable entity and pointer, target resolution returns its deterministic `ValueType`
+- [ ] Given a collection index, identity field, hierarchy field, raw payload, or pointer not approved for the resolved variant, target resolution fails
 
 ## Sub-Specs
 

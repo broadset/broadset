@@ -40,11 +40,38 @@ Component-instance elements MAY occur in document and component-local element ar
 
 An exposed property MUST have stable ID, label, group, typed value schema, type-compatible default, validation constraints, and one or more internal typed bindings. Instance values MUST address exposed-property IDs only; generic internal paths are not the ordinary instance contract.
 
+The strict v1 record is:
+
+```ts
+interface ExposedProperty {
+  readonly id: Id;
+  readonly label: string;
+  readonly group: string;
+  readonly valueSchema: ValueSchema;
+  readonly defaultValue: TypedValue;
+  readonly constraints: readonly ExposedPropertyConstraint[];
+  readonly bindings: readonly { readonly id: Id; readonly target: PropertyTarget }[];
+}
+
+type ExposedPropertyConstraint =
+  | { readonly kind: 'numeric-range'; readonly minimum?: number; readonly maximum?: number; readonly step?: number }
+  | { readonly kind: 'string-length'; readonly minimum?: number; readonly maximum?: number }
+  | { readonly kind: 'allowed-values'; readonly values: readonly TypedValue[] };
+```
+
+Labels and groups are non-empty. Bindings are non-empty and have unique IDs. Numeric bounds are
+finite and ordered, steps are positive finite values, string bounds are ordered non-negative safe
+integers, and allowed-value lists are non-empty and semantically unique. Defaults, allowed values,
+constraint kinds, and internal targets MUST be compatible with the declared value schema. A binding
+applies the exposed value directly to one closed, schema-approved internal property target.
+
 #### Acceptance Criteria
 
 - [ ] Given a type-compatible instance value for an exposed property, validation succeeds
 - [ ] Given an unknown property ID or constraint-violating value, validation fails
 - [ ] Given a definition-internal refactor that preserves exposed IDs, instance contracts remain valid
+- [ ] Given a default, allowed value, constraint kind, or internal target incompatible with the declared schema, semantic validation fails at that value or target
+- [ ] Given no internal binding or duplicate binding IDs, validation fails
 
 ### Requirement: Sparse Instance Values and Propagation
 
@@ -88,7 +115,7 @@ Unlink MUST materialize the fully resolved component instance into ordinary docu
 
 ## Spec Gaps
 
-- Exact exposed-property constraint variants and editor propagation UX are owned by the components and view-model program.
+- Editor propagation UX is owned by the components and view-model program.
 
 ## Non-Goals
 
