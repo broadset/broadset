@@ -124,6 +124,21 @@ export const V1_RUNTIME_EXPORT_NAMES = [
   'valueTypeSchema',
   'variableCollectionSchema',
   'viewModelSchema',
+  'IDENTITY_AFFINE2D',
+  'createDefaultAppearance',
+  'createBlackColorValue',
+  'createElementGeometry',
+  'createRunProperties',
+  'createParagraphProperties',
+  'createEmptyTextBody',
+  'createRectangleGeometry',
+  'createEllipseGeometry',
+  'createElementV1',
+  'createDefaultSurface',
+  'createDefaultColorConfiguration',
+  'createPageV1',
+  'createDocumentV1',
+  'createProjectV1',
 ] as const;
 
 export const V1_TYPE_EXPORT_NAMES = [
@@ -292,6 +307,8 @@ export const V1_TYPE_EXPORT_NAMES = [
   'VideoElement',
   'ViewModel',
   'ViewModelField',
+  'ElementBaseOptions',
+  'CreateElementV1Input',
 ] as const;
 
 export const V1_RUNTIME_COLLISION_NAMES = [

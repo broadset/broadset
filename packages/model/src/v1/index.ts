@@ -2,6 +2,7 @@ export * from './appearance';
 export * from './canonical-json';
 export * from './color';
 export * from './component';
+export * from './construction';
 export * from './data';
 export * from './diagnostics';
 export * from './document';
