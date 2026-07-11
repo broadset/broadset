@@ -8,7 +8,7 @@ import {
 } from './expression-inference-helpers';
 import type { TypedValue, ValueType } from './typed-value';
 
-export interface StructuralExpressionInferenceResult {
+interface StructuralExpressionInferenceResult {
   readonly valueType?: ValueType | undefined;
   readonly literalValue?: TypedValue | undefined;
   readonly diagnostics: readonly Diagnostic[];

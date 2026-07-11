@@ -16,22 +16,22 @@ import {
 import type { EntityAddress, PropertyTarget } from './identity';
 import type { TypedValue, ValueType } from './typed-value';
 
-export interface ExpressionInferenceOptions {
+interface ExpressionInferenceOptions {
   readonly expression: ExpressionAst;
   readonly context: ExpressionInferenceContext;
 }
 
-export interface FormatterInferenceOptions {
+interface FormatterInferenceOptions {
   readonly inputType: ValueType;
   readonly pipeline: FormatterPipeline;
 }
 
-export interface BindingInferenceOptions {
+interface BindingInferenceOptions {
   readonly binding: Binding;
   readonly context: ExpressionInferenceContext;
 }
 
-export interface ValueTypeInferenceResult {
+interface ValueTypeInferenceResult {
   readonly valueType?: ValueType | undefined;
   readonly diagnostics: readonly Diagnostic[];
 }

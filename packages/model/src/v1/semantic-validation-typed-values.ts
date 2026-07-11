@@ -24,7 +24,7 @@ function escapePointerSegment(segment: string): string {
   return segment.replaceAll('~', '~0').replaceAll('/', '~1');
 }
 
-export function validateTypedValueReferences({
+function validateTypedValueReferences({
   indexes,
   value,
   pointer,

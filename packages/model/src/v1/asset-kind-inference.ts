@@ -111,7 +111,7 @@ function literalIndexAssetKinds(
   return unionProofs(items.map((item) => valueAssetKinds(indexes, item)));
 }
 
-export function inferExpressionAssetKinds(
+function inferExpressionAssetKinds(
   indexes: SemanticIndexes,
   document: DocumentSemanticIndex,
   expression: ExpressionAst,
