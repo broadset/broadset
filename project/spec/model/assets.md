@@ -300,10 +300,31 @@ interface SharedStyle {
 
 Property pointers are valid RFC 6901 JSON Pointers. Entry IDs are unique within a style. Pointer legality, value compatibility with the completed appearance/text schema, and inheritance or alias cycles are semantic checks.
 
+The closed v1 shared-style matrix contains these representable scalar leaves:
+
+- appearance: `/opacity` (`number`), `/blendMode` (`string`), and `/isolation` (`boolean`);
+- text run: `/fontFamilyId` and `/fontFaceId` (`string`), `/size` (`length`), `/color`
+  (`color`), `/weight` (`integer`), `/language`, `/script`, `/direction`, `/hyperlink`, and
+  `/semanticRole` (`string`), `/baselineShift` (`length`), and `/tracking` (`number`);
+- decoration: `/decoration/underline` and `/decoration/strikeThrough` (`boolean`),
+  `/decoration/style` (`string`), and `/decoration/color` (`color`);
+- paragraph: `/paragraph/alignment`, `/paragraph/direction`, and `/paragraph/hyphenation`
+  (`string`); spacing and indents (`length`); keep flags (`boolean`);
+  `/paragraph/lineSpacing/kind` (`string`) with `/value` as `number` for `multiple`, `length` for
+  `absolute`, and absent for `normal`; `/paragraph/list/kind` (`string`) with `level` (`integer`) for
+  ordered/unordered, `startAt` (`integer`) and `style` (`string`) only for ordered, and `marker`
+  (`string`) only for unordered.
+
+Conditional leaves MUST be accompanied by the matching kind entry in the same properties source.
+Typed asset values and swatch-backed colors MUST resolve recursively. Alias and inherited-style
+references MUST resolve to the same shared-style kind and remain acyclic.
+
 #### Acceptance Criteria
 
 - [ ] Given an element referencing a shared style, resolution applies the shared fragment before local overrides
 - [ ] Given a missing shared style or inheritance cycle, semantic validation fails
+- [ ] Given every approved scalar leaf with a compatible typed value, semantic validation succeeds
+- [ ] Given a conditional line-spacing or list leaf absent from its selected variant, semantic validation fails
 - [ ] Given a local override, provenance retains both the shared source and effective local source
 
 ### Requirement: Asset Integrity and Safety

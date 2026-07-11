@@ -195,11 +195,13 @@ export function resolvePropertyTargetValueTypeFromIndexes(
   const rootId = target.entity.instancePath?.[0];
 
   if (rootId !== undefined) {
-    for (const page of document.document.pages) {
-      const root = page.rootInstances.find((candidate) => candidate.id === rootId);
+    const page = document.document.pages.find((candidate) => candidate.id === target.entity.pageId);
 
-      if (root !== undefined) return resolvePropertyTargetValueTypeInScope(createPageAddressScope(document, page, root), target);
-    }
+    if (page === undefined) return undefined;
+
+    const root = page.rootInstances.find((candidate) => candidate.id === rootId);
+
+    if (root !== undefined) return resolvePropertyTargetValueTypeInScope(createPageAddressScope(document, page, root), target);
 
     return undefined;
   }

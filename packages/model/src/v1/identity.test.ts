@@ -5,6 +5,7 @@ import { entityAddressSchema, jsonPointerSchema, propertyTargetSchema, utcTimest
 const entity = {
   projectId: 'project',
   documentId: 'document',
+  pageId: 'page',
   entityKind: 'element',
   entityId: 'element',
   instancePath: ['root', 'nested'],
@@ -15,6 +16,10 @@ describe('v1 identities and stable targets', () => {
     expect(utcTimestampSchema.safeParse('2026-07-10T12:34:56Z').success).toBe(true);
     expect(utcTimestampSchema.safeParse('2026-07-10T15:34:56+03:00').success).toBe(true);
     expect(entityAddressSchema.parse(entity)).toEqual(entity);
+  });
+
+  it('preserves page identity as part of a stable entity address', () => {
+    expect(entityAddressSchema.parse(entity).pageId).toBe('page');
   });
 
   it.each(['', '/appearance/opacity', '/a~1b/~0key'])('accepts RFC 6901 pointer %j', (pointer) => {

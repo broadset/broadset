@@ -40,7 +40,7 @@ Canonical dynamic values MUST use a `TypedValue` discriminated union for null, b
 
 A binding or override target MUST combine an `EntityAddress` with an RFC 6901 JSON Pointer. Entity addresses contain stable project and entity identity, optional document identity, optional page identity, and optional component instance path. Array indexes MUST NOT serve as durable identity.
 
-Page-root and page-descendant addresses MUST contain `documentId` and `pageId`; their
+Page-root and page-descendant addresses MUST contain `documentId` and `pageId`; a page-descendant
 `instancePath` is page-relative and begins with the root-instance ID. Project-resource addresses
 MUST omit `documentId`, `pageId`, and `instancePath`. Document-definition and component-definition
 addresses MUST omit `pageId`. `InstanceAddress` remains page-local because it is contained by a

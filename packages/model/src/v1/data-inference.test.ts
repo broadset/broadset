@@ -53,6 +53,20 @@ describe('expression inference error evidence', () => {
     }
   });
 
+  it('keeps exact pointers for repeated same-code defects in separate expression branches', () => {
+    const result = infer({
+      kind: 'binary',
+      operator: 'add',
+      left: { kind: 'variable', collectionId: 'missing', variableId: 'left' },
+      right: { kind: 'variable', collectionId: 'missing', variableId: 'right' },
+    });
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'expression.variable-not-found', pointer: '/left/variableId' }),
+      expect.objectContaining({ code: 'expression.variable-not-found', pointer: '/right/variableId' }),
+    ]));
+  });
+
   it('covers valid and incompatible operands for every binary operator family', () => {
     const cases = [
       {
@@ -204,6 +218,17 @@ describe('expression inference error evidence', () => {
       ).toEqual(['expression.duplicate-context-address']);
     }
   });
+
+  it('treats targets on different pages as distinct context addresses', () => {
+    const first = { ...target, entity: { ...target.entity, pageId: 'page-a' } };
+    const second = { ...target, entity: { ...target.entity, pageId: 'page-b' } };
+    const pageContext = expressionInferenceContextSchema.parse({ ...context, targets: [
+      { target: first, valueType: 'number' },
+      { target: second, valueType: 'number' },
+    ] });
+
+    expect(infer(literal('number', 1), pageContext).diagnostics).toEqual([]);
+  });
 });
 
 describe('formatter and binding error evidence', () => {
@@ -232,6 +257,17 @@ describe('formatter and binding error evidence', () => {
     };
 
     expect(formatterPipelineSchema.safeParse({ steps: [duplicate, duplicate] }).success).toBe(false);
+  });
+
+  it('points a later formatter failure at its own stable step index', () => {
+    const pipeline = formatterPipelineSchema.parse({ steps: [
+      { id: 'prefix', formatterId: 'prefix', arguments: [{ type: 'string', value: '$' }] },
+      { id: 'number', formatterId: 'number', arguments: [{ type: 'string', value: 'fi-FI' }] },
+    ] });
+
+    expect(inferFormatterPipelineValueType({ inputType: 'string', pipeline }).diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'formatter.invalid-input', pointer: '/steps/1' }),
+    );
   });
 
   it('diagnoses invalid inputs for every formatter transition', () => {

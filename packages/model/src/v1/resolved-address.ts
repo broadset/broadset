@@ -71,12 +71,15 @@ function descendComponentPath(
 }
 
 function resolveDocumentElementScope(scope: Extract<AddressScope, { readonly kind: 'document' }>, address: EntityAddress): ElementScope | undefined {
+  if (address.pageId !== undefined) return undefined;
   if ((address.instancePath?.length ?? 0) !== 0) return undefined;
 
   return { elements: scope.document.elements };
 }
 
 function resolveComponentElementScope(scope: Extract<AddressScope, { readonly kind: 'component' }>, address: EntityAddress): ElementScope | undefined {
+  if (address.pageId !== undefined) return undefined;
+
   const elements = descendComponentPath(scope.document, scope.component.elements, address.instancePath ?? []);
 
   if (elements === undefined) return undefined;
@@ -84,7 +87,50 @@ function resolveComponentElementScope(scope: Extract<AddressScope, { readonly ki
   return { elements };
 }
 
+function resolveOrdinaryPageRootScope(
+  scope: Extract<AddressScope, { readonly kind: 'page-instance' }>,
+  address: EntityAddress,
+  path: readonly Id[],
+): ElementScope | undefined {
+  const rootElement = scope.document.elements.get(scope.root.elementId);
+
+  if (rootElement === undefined || rootElement.kind === 'component-instance') return undefined;
+
+  const [firstInstanceId, ...nestedPath] = path.slice(1);
+
+  if (firstInstanceId === undefined) {
+    if (!isDescendant(scope.document.elements, address.entityId, rootElement.id)) return undefined;
+
+    const elements = new Map(
+      [...scope.document.elements].filter(([elementId]) =>
+        isDescendant(scope.document.elements, elementId, rootElement.id),
+      ),
+    );
+
+    return { elements };
+  }
+
+  const firstInstance = scope.document.elements.get(firstInstanceId);
+
+  if (
+    firstInstance?.kind !== 'component-instance' ||
+    !isDescendant(scope.document.elements, firstInstance.id, rootElement.id)
+  ) {
+    return undefined;
+  }
+
+  const component = scope.document.components.get(firstInstance.componentId);
+
+  if (component === undefined) return undefined;
+
+  const elements = descendComponentPath(scope.document, component.elements, nestedPath);
+
+  return elements === undefined ? undefined : { elements };
+}
+
 function resolvePageElementScope(scope: Extract<AddressScope, { readonly kind: 'page-instance' }>, address: EntityAddress): ElementScope | undefined {
+  if (address.pageId !== scope.page.id) return undefined;
+
   const path = address.instancePath;
 
   if (path?.[0] !== scope.root.id) return undefined;
@@ -92,16 +138,7 @@ function resolvePageElementScope(scope: Extract<AddressScope, { readonly kind: '
   const rootElement = scope.document.elements.get(scope.root.elementId);
 
   if (rootElement === undefined) return undefined;
-
-  if (rootElement.kind !== 'component-instance') {
-    if (path.length !== 1) return undefined;
-
-    const elements = new Map(
-      [...scope.document.elements].filter(([elementId]) => isDescendant(scope.document.elements, elementId, rootElement.id)),
-    );
-
-    return { elements };
-  }
+  if (rootElement.kind !== 'component-instance') return resolveOrdinaryPageRootScope(scope, address, path);
 
   const component = scope.document.components.get(rootElement.componentId);
 
@@ -202,13 +239,14 @@ function resolveSpecialTargetEntity(scope: AddressScope, address: EntityAddress)
   if (address.projectId !== scope.document.projectId || address.documentId !== scope.document.document.id) return undefined;
 
   if (address.entityKind === 'page-root' && scope.kind === 'page-instance') {
+    if (address.pageId !== scope.page.id) return undefined;
     if (address.entityId !== scope.root.id || (address.instancePath?.length ?? 0) !== 0) return undefined;
 
     return { kind: 'page-root', value: scope.root, ownerElementId: scope.root.elementId };
   }
 
   if (address.entityKind === 'guide') {
-    if (scope.kind !== 'document' || (address.instancePath?.length ?? 0) !== 0) return undefined;
+    if (scope.kind !== 'document' || address.pageId !== undefined || (address.instancePath?.length ?? 0) !== 0) return undefined;
 
     const guide = scope.document.document.surface.guides.find((candidate) => candidate.id === address.entityId);
 
@@ -284,6 +322,7 @@ export function resolvePageInstanceElement(
   return resolveTargetEntityAddress(createPageAddressScope(document, page, root), {
     projectId: document.projectId,
     documentId: document.document.id,
+    pageId: page.id,
     entityKind: 'element',
     entityId: address.elementId,
     instancePath: [root.id, ...address.componentInstancePath],
@@ -292,23 +331,18 @@ export function resolvePageInstanceElement(
 
 function resolvePagePathEntity(document: DocumentSemanticIndex, address: EntityAddress): boolean {
   const rootId = address.instancePath?.[0];
+  const page = document.document.pages.find((candidate) => candidate.id === address.pageId);
 
-  for (const page of document.document.pages) {
-    const root = page.rootInstances.find((candidate) => candidate.id === rootId);
+  if (page === undefined) return false;
 
-    if (
-      root !== undefined &&
-      resolveTargetEntityAddress(createPageAddressScope(document, page, root), address) !== undefined
-    ) {
-      return true;
-    }
-  }
+  const root = page.rootInstances.find((candidate) => candidate.id === rootId);
 
-  return false;
+  return root !== undefined && resolveTargetEntityAddress(createPageAddressScope(document, page, root), address) !== undefined;
 }
 
 function resolveDocumentOwnedEntity(document: DocumentSemanticIndex, address: EntityAddress): boolean {
   if (resolveTargetEntityAddress(createDocumentAddressScope(document), address) !== undefined) return true;
+  if (address.pageId !== undefined || (address.instancePath?.length ?? 0) !== 0) return false;
 
   switch (address.entityKind) {
     case 'component':
@@ -328,17 +362,83 @@ function resolveDocumentOwnedEntity(document: DocumentSemanticIndex, address: En
   }
 }
 
+function resolveProjectOwnedEntity(indexes: SemanticIndexes, address: EntityAddress): boolean {
+  if (
+    address.documentId !== undefined ||
+    address.pageId !== undefined ||
+    (address.instancePath?.length ?? 0) !== 0
+  ) {
+    return false;
+  }
+
+  switch (address.entityKind) {
+    case 'asset':
+      return indexes.assets.has(address.entityId);
+    case 'font-family':
+      return indexes.fonts.has(address.entityId);
+    case 'swatch':
+      return indexes.swatches.has(address.entityId);
+    case 'variable-collection':
+      return indexes.variables.has(address.entityId);
+    case 'shared-style':
+      return indexes.styles.has(address.entityId);
+    case 'output-profile':
+      return indexes.outputProfiles.has(address.entityId);
+    case 'template-group':
+      return indexes.project.templateGroups.some((group) => group.id === address.entityId);
+    case 'interop-source':
+      return indexes.project.interop.sources.some((source) => source.id === address.entityId);
+    case 'interop-record':
+      return indexes.project.interop.records.some((record) => record.id === address.entityId);
+    default:
+      return false;
+  }
+}
+
+function resolvePageOwnedEntity(document: DocumentSemanticIndex, address: EntityAddress): boolean {
+  const page = document.document.pages.find((candidate) => candidate.id === address.pageId);
+
+  if (page === undefined) return false;
+
+  if (address.entityKind === 'page') {
+    return address.entityId === page.id && (address.instancePath?.length ?? 0) === 0;
+  }
+
+  if (address.entityKind !== 'page-root') return false;
+
+  const root = page.rootInstances.find((candidate) => candidate.id === address.entityId);
+
+  return root !== undefined && resolveTargetEntityAddress(createPageAddressScope(document, page, root), address) !== undefined;
+}
+
 export function resolveProjectEntityAddress(indexes: SemanticIndexes, address: EntityAddress): boolean {
   if (address.projectId !== indexes.project.id) return false;
-  if (address.entityKind === 'project') return address.entityId === indexes.project.id && address.documentId === undefined;
-  if (address.documentId === undefined) return false;
+
+  if (address.entityKind === 'project') {
+    return (
+      address.entityId === indexes.project.id &&
+      address.documentId === undefined &&
+      address.pageId === undefined &&
+      (address.instancePath?.length ?? 0) === 0
+    );
+  }
+
+  if (address.documentId === undefined) return resolveProjectOwnedEntity(indexes, address);
 
   const document = indexes.documents.get(address.documentId);
 
   if (document === undefined) return false;
-  if (address.entityKind === 'document') return address.entityId === document.document.id && (address.instancePath?.length ?? 0) === 0;
 
-  return (address.instancePath?.length ?? 0) > 0
-    ? resolvePagePathEntity(document, address)
-    : resolveDocumentOwnedEntity(document, address);
+  if (address.entityKind === 'document') {
+    return (
+      address.entityId === document.document.id &&
+      address.pageId === undefined &&
+      (address.instancePath?.length ?? 0) === 0
+    );
+  }
+
+  if ((address.instancePath?.length ?? 0) > 0) return resolvePagePathEntity(document, address);
+  if (address.pageId !== undefined) return resolvePageOwnedEntity(document, address);
+
+  return resolveDocumentOwnedEntity(document, address);
 }

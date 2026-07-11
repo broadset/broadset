@@ -1,4 +1,5 @@
 import type { ExposedPropertyConstraint } from './component';
+import { isExactDecimalStepAligned } from './decimal-step';
 import type { Diagnostic } from './diagnostics';
 import type { Element } from './element';
 import type { Id } from './identity';
@@ -131,6 +132,6 @@ export function typedValueSatisfiesConstraints(
     if (constraint.maximum !== undefined && value.value > constraint.maximum) return false;
     if (constraint.step === undefined) return true;
 
-    return Number.isInteger((value.value - (constraint.minimum ?? 0)) / constraint.step);
+    return isExactDecimalStepAligned(value.value, constraint.minimum ?? 0, constraint.step);
   });
 }

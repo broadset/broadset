@@ -176,6 +176,51 @@ describe('resource and shared-style semantic traversal', () => {
     );
   });
 
+  it.each([
+    ['accepts exactly aligned decimal steps', 0.1, 0.3, false],
+    ['rejects non-aligned decimal steps', 0.1, 0.31, true],
+    ['accepts exactly aligned exponent steps', 1e-7, 3e-7, false],
+    ['rejects non-aligned exponent steps', 1e-7, 3.1e-7, true],
+  ])('%s', (_name, step, value, expectsError) => {
+    const project = createMinimalProjectV1();
+    const document = project.documents[0];
+
+    if (document === undefined) throw new Error('Expected fixture document');
+
+    const element = createReviewGroup('element');
+    const component = createReviewComponent({
+      id: 'component',
+      name: 'Component',
+      elements: [element],
+      rootElementIds: [element.id],
+      sequences: [],
+      exposedProperties: [{
+        id: 'value',
+        label: 'Value',
+        group: 'Data',
+        valueSchema: { kind: 'number' },
+        defaultValue: { type: 'number', value },
+        constraints: [{ kind: 'numeric-range', minimum: step, maximum: 1, step }],
+        bindings: [{ id: 'binding', target: createReviewTarget(project, element.id, '/appearance/opacity') }],
+      }],
+      extensions: [],
+    });
+    const actual = parseReviewProject({ ...project, documents: [{ ...document, components: [component] }] });
+    const diagnostics = validateBroadsetProjectV1Semantics(actual);
+
+    if (expectsError) {
+      expect(diagnostics).toContainEqual(expect.objectContaining({
+        code: 'component.incompatible-default',
+        pointer: '/documents/0/components/0/exposedProperties/0/defaultValue',
+      }));
+    } else {
+      expect(diagnostics).not.toContainEqual(expect.objectContaining({
+        code: 'component.incompatible-default',
+        pointer: '/documents/0/components/0/exposedProperties/0/defaultValue',
+      }));
+    }
+  });
+
   it('requires every component-local root exactly once', () => {
     const project = createMinimalProjectV1();
     const document = project.documents[0];

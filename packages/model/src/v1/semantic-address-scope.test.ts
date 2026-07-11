@@ -89,16 +89,12 @@ describe('resolved page and component address scopes', () => {
 
     if (document === undefined || page === undefined) throw new Error('Expected fixture document and page');
 
+    const target = createReviewTarget(project, 'local', '/appearance/opacity', ['root-instance', 'nested']);
     const descendant = {
       address: { rootInstanceId: 'root-instance', componentInstancePath: ['nested'], elementId: 'local' },
       overrides: [
         {
-          target: createReviewTarget(
-            project,
-            'local',
-            '/appearance/opacity',
-            ['root-instance', 'nested'],
-          ),
+          target: { ...target, entity: { ...target.entity, pageId: page.id } },
           value: { type: 'number', value: 0.5 },
         },
       ],

@@ -2,8 +2,10 @@ import type { SafeFunctionId } from './data';
 import type { Diagnostic } from './diagnostics';
 import type { ValueType } from './typed-value';
 
-export function createExpressionError(code: string, message: string): Diagnostic {
-  return { code, severity: 'error', message };
+export function createExpressionError(code: string, message: string, pointer?: string): Diagnostic {
+  return pointer === undefined
+    ? { code, severity: 'error', message }
+    : { code, severity: 'error', message, pointer };
 }
 
 export function isNumericValueType(valueType: ValueType): boolean {

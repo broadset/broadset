@@ -40,7 +40,7 @@ export interface PageDefinition {
   readonly rootInstances: readonly PageRootInstance[];
   readonly descendantOverrides: readonly DescendantOverride[];
   readonly selectedVariableModes: Readonly<Record<Id, Id>>;
-  readonly sampleDataSetId?: Id | undefined;
+  readonly selectedSampleDataSets: Readonly<Record<Id, Id>>;
   readonly sequenceId?: Id | undefined;
   readonly extensions: readonly ExtensionEnvelope[];
 }
@@ -68,6 +68,7 @@ function sameEntityAddress(left: EntityAddress, right: EntityAddress): boolean {
   return (
     left.projectId === right.projectId &&
     left.documentId === right.documentId &&
+    left.pageId === right.pageId &&
     left.entityKind === right.entityKind &&
     left.entityId === right.entityId &&
     sameIdPath(left.instancePath, right.instancePath)
@@ -129,7 +130,7 @@ export const pageDefinitionSchema: z.ZodType<PageDefinition> = z
     rootInstances: z.array(pageRootInstanceSchema),
     descendantOverrides: z.array(descendantOverrideSchema),
     selectedVariableModes: z.record(idSchema, idSchema),
-    sampleDataSetId: idSchema.optional(),
+    selectedSampleDataSets: z.record(idSchema, idSchema),
     sequenceId: idSchema.optional(),
     extensions: z.array(extensionEnvelopeSchema),
   })

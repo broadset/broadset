@@ -39,6 +39,7 @@ export function createMinimalProjectV1(): BroadsetProjectV1 {
             rootInstances: [],
             descendantOverrides: [],
             selectedVariableModes: {},
+            selectedSampleDataSets: {},
             extensions: [],
           },
         ],

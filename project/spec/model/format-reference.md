@@ -41,8 +41,8 @@ interface EntityAddress {
 ```
 
 `pageId` is required for page-root and page-descendant addresses because root-instance identity is
-page-local. Such addresses also require `documentId` and a page-relative `instancePath` beginning
-with the addressed root-instance ID. Project-owned resources and project identity forbid
+page-local. Page-descendant addresses also require `documentId` and a page-relative `instancePath`
+beginning with the addressed root-instance ID. Project-owned resources and project identity forbid
 `documentId`, `pageId`, and `instancePath`. Document-owned definitions require `documentId` and
 forbid `pageId`; component-definition scope also forbids `pageId`. An `InstanceAddress` remains
 page-local because its containing `PageDefinition` supplies the page context.
@@ -563,6 +563,14 @@ interface ExtensionEnvelope {
 
 Interop records retain source, stable target, baseline semantic hash, optional preserved blob and preview, mapping confidence, editability, and warnings. Cleanliness is derived from semantic hashes. A generic extension namespace is a lowercase reverse-DNS-style name with at least two valid dot-separated labels, its schema is an absolute HTTPS URL, and its version is a positive JSON-safe integer. Unknown valid generic extension payloads are inert and preserve semantic JSON equality; malformed envelope identity is structurally invalid rather than preserved as an extension.
 
+Interop entity addresses resolve project resources with the exact kinds `asset`, `font-family`,
+`swatch`, `variable-collection`, `shared-style`, and `output-profile`. Project-owned
+`template-group`, `interop-source`, and `interop-record` IDs are also addressable. These addresses
+MUST omit `documentId`, `pageId`, and `instancePath`. Project identity has the same omission rule.
+Document definitions require `documentId` and forbid `pageId` and `instancePath`; page-root and
+page-descendant addresses require the exact owning `pageId`. Warning addresses use the identical
+resolver and legality rules as record targets.
+
 #### Acceptance Criteria
 
 - [ ] Given valid interop and extension envelopes, round-trip preservation succeeds
@@ -570,6 +578,8 @@ Interop records retain source, stable target, baseline semantic hash, optional p
 - [ ] Given missing interop references or duplicate extension namespaces, semantic validation fails
 - [ ] Given an interop warning without a pointer or entity, structural validation fails
 - [ ] Given an interop preview referencing an asset other than image or vector, semantic validation fails
+- [ ] Given an exact project-resource or other ratified project-owned address, interop resolution succeeds
+- [ ] Given an address with ownership fields forbidden for its entity kind, interop resolution fails closed
 
 ### Requirement: Validation Stages
 

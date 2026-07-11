@@ -31,6 +31,7 @@ function createPage(rootInstances: readonly Readonly<Record<string, unknown>>[])
               entity: {
                 projectId: 'project-1',
                 documentId: 'document-1',
+                pageId: 'page-1',
                 entityKind: 'element',
                 entityId: 'headline',
                 instancePath: ['instance-a', 'nested-instance'],
@@ -43,7 +44,7 @@ function createPage(rootInstances: readonly Readonly<Record<string, unknown>>[])
       },
     ],
     selectedVariableModes: { 'brand-colors': 'night' },
-    sampleDataSetId: 'sample-evening',
+    selectedSampleDataSets: { 'news-data': 'sample-evening' },
     sequenceId: 'sequence-in',
     extensions: [],
   };
@@ -80,6 +81,43 @@ describe('pageDefinitionSchema', () => {
     const page = createPage([root]);
 
     expect(pageDefinitionSchema.parse(page)).toEqual(page);
+  });
+
+  it('requires an explicit per-view-model sample-data selection map', () => {
+    const page = createPage([createRootInstance('instance-a', 'shared-root')]);
+
+    expect(pageDefinitionSchema.safeParse({ ...page, selectedSampleDataSets: undefined }).success).toBe(false);
+    expect(
+      pageDefinitionSchema.safeParse({
+        ...page,
+        selectedSampleDataSets: undefined,
+        sampleDataSetId: 'sample-evening',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('treats page identity as part of sparse override target equality', () => {
+    const target = {
+      entity: {
+        projectId: 'project-1',
+        documentId: 'document-1',
+        pageId: 'page-1',
+        entityKind: 'element',
+        entityId: 'shared-root',
+        instancePath: ['instance-a'],
+      },
+      pointer: '/appearance/opacity',
+    };
+    const otherPageTarget = { ...target, entity: { ...target.entity, pageId: 'page-2' } };
+    const root = {
+      ...createRootInstance('instance-a', 'shared-root'),
+      overrides: [
+        { target, value: { type: 'number', value: 0.5 } },
+        { target: otherPageTarget, value: { type: 'number', value: 0.75 } },
+      ],
+    };
+
+    expect(pageDefinitionSchema.safeParse(createPage([root])).success).toBe(true);
   });
 
   it('rejects duplicate root instance ids without rejecting a repeated definition id', () => {

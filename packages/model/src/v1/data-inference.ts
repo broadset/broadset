@@ -46,6 +46,32 @@ interface StructuralInferenceResult {
   readonly diagnostics: readonly Diagnostic[];
 }
 
+function localizeStructuralResult(result: StructuralInferenceResult, pointer = ''): StructuralInferenceResult {
+  return {
+    ...result,
+    diagnostics: result.diagnostics.map((diagnostic) =>
+      diagnostic.pointer === undefined ? { ...diagnostic, pointer } : diagnostic,
+    ),
+  };
+}
+
+function prefixStructuralResult(result: StructuralInferenceResult, prefix: string): StructuralInferenceResult {
+  return {
+    ...result,
+    diagnostics: result.diagnostics.map((diagnostic) => ({
+      ...diagnostic,
+      pointer: `${prefix}${diagnostic.pointer ?? ''}`,
+    })),
+  };
+}
+
+function prefixDiagnostics(diagnostics: readonly Diagnostic[], prefix: string): readonly Diagnostic[] {
+  return diagnostics.map((diagnostic) => ({
+    ...diagnostic,
+    pointer: `${prefix}${diagnostic.pointer ?? ''}`,
+  }));
+}
+
 export function valueSchemaValueType(schema: ValueSchema): ValueType {
   switch (schema.kind) {
     case 'enum':
@@ -86,6 +112,7 @@ function sameEntityAddress(left: EntityAddress, right: EntityAddress): boolean {
   return (
     left.projectId === right.projectId &&
     left.documentId === right.documentId &&
+    left.pageId === right.pageId &&
     left.entityKind === right.entityKind &&
     left.entityId === right.entityId &&
     sameIdPath(left.instancePath, right.instancePath)
@@ -132,7 +159,7 @@ function findDuplicateContextDiagnostics(context: ExpressionInferenceContext): r
 }
 
 function inferUnary(expression: Extract<ExpressionAst, { readonly kind: 'unary' }>, context: ExpressionInferenceContext): StructuralInferenceResult {
-  const operand = inferStructuralType(expression.operand, context);
+  const operand = prefixStructuralResult(inferStructuralType(expression.operand, context), '/operand');
 
   if (operand.structuralType === undefined) {
     return operand;
@@ -154,8 +181,8 @@ function inferUnary(expression: Extract<ExpressionAst, { readonly kind: 'unary' 
 }
 
 function inferBinary(expression: Extract<ExpressionAst, { readonly kind: 'binary' }>, context: ExpressionInferenceContext): StructuralInferenceResult {
-  const left = inferStructuralType(expression.left, context);
-  const right = inferStructuralType(expression.right, context);
+  const left = prefixStructuralResult(inferStructuralType(expression.left, context), '/left');
+  const right = prefixStructuralResult(inferStructuralType(expression.right, context), '/right');
   const diagnostics = [...left.diagnostics, ...right.diagnostics];
 
   if (left.structuralType === undefined || right.structuralType === undefined) {
@@ -219,9 +246,9 @@ function inferConditional(
   expression: Extract<ExpressionAst, { readonly kind: 'conditional' }>,
   context: ExpressionInferenceContext,
 ): StructuralInferenceResult {
-  const condition = inferStructuralType(expression.condition, context);
-  const whenTrue = inferStructuralType(expression.whenTrue, context);
-  const whenFalse = inferStructuralType(expression.whenFalse, context);
+  const condition = prefixStructuralResult(inferStructuralType(expression.condition, context), '/condition');
+  const whenTrue = prefixStructuralResult(inferStructuralType(expression.whenTrue, context), '/whenTrue');
+  const whenFalse = prefixStructuralResult(inferStructuralType(expression.whenFalse, context), '/whenFalse');
   const diagnostics = [...condition.diagnostics, ...whenTrue.diagnostics, ...whenFalse.diagnostics];
 
   if (condition.structuralType !== undefined && condition.structuralType.valueType !== 'boolean') {
@@ -255,7 +282,9 @@ function inferSafeFunction(
     return { diagnostics: [createError('expression.invalid-function-arity', 'Safe function argument count is invalid')] };
   }
 
-  const argumentsResults = expression.arguments.map((argument) => inferStructuralType(argument, context));
+  const argumentsResults = expression.arguments.map((argument, index) =>
+    prefixStructuralResult(inferStructuralType(argument, context), `/arguments/${String(index)}`),
+  );
   const diagnostics = argumentsResults.flatMap((result) => result.diagnostics);
   const argumentTypes = argumentsResults.map((result) => result.structuralType?.valueType);
 
@@ -265,7 +294,7 @@ function inferSafeFunction(
 
   const types = argumentTypes.filter((valueType) => valueType !== undefined);
 
-  return inferRegisteredFunction(expression.functionId, types, diagnostics);
+  return localizeStructuralResult(inferRegisteredFunction(expression.functionId, types, diagnostics));
 }
 
 function inferRegisteredFunction(
@@ -336,7 +365,7 @@ function inferStructuralType(expression: ExpressionAst, context: ExpressionInfer
       );
 
       return field === undefined
-        ? { diagnostics: [createError('expression.field-not-found', 'Expression field was not found')] }
+        ? { diagnostics: [createError('expression.field-not-found', 'Expression field was not found', '/fieldId')] }
         : { structuralType: { valueType: valueSchemaValueType(field.schema), schema: field.schema }, diagnostics: [] };
     }
 
@@ -346,30 +375,30 @@ function inferStructuralType(expression: ExpressionAst, context: ExpressionInfer
       );
 
       return variable === undefined
-        ? { diagnostics: [createError('expression.variable-not-found', 'Expression variable was not found')] }
+        ? { diagnostics: [createError('expression.variable-not-found', 'Expression variable was not found', '/variableId')] }
         : { structuralType: { valueType: variable.valueType }, diagnostics: [] };
     }
 
     case 'unary':
-      return inferUnary(expression, context);
+      return localizeStructuralResult(inferUnary(expression, context));
     case 'binary':
-      return inferBinary(expression, context);
+      return localizeStructuralResult(inferBinary(expression, context));
     case 'conditional':
-      return inferConditional(expression, context);
+      return localizeStructuralResult(inferConditional(expression, context));
 
     case 'get':
-      return inferGet(expression, context);
+      return localizeStructuralResult(inferGet(expression, context));
 
     case 'index':
-      return inferIndex(expression, context);
+      return localizeStructuralResult(inferIndex(expression, context));
 
     case 'safe-function':
-      return inferSafeFunction(expression, context);
+      return localizeStructuralResult(inferSafeFunction(expression, context));
   }
 }
 
 function inferGet(expression: Extract<ExpressionAst, { readonly kind: 'get' }>, context: ExpressionInferenceContext): StructuralInferenceResult {
-  const source = inferStructuralType(expression.source, context);
+  const source = prefixStructuralResult(inferStructuralType(expression.source, context), '/source');
 
   if (source.structuralType?.schema?.kind !== 'object') {
     return { diagnostics: [...source.diagnostics, createError('expression.invalid-get-source', 'Get source must have an object schema')] };
@@ -378,13 +407,13 @@ function inferGet(expression: Extract<ExpressionAst, { readonly kind: 'get' }>, 
   const field = source.structuralType.schema.fields.find((candidate) => candidate.id === expression.fieldId);
 
   return field === undefined
-    ? { diagnostics: [...source.diagnostics, createError('expression.object-field-not-found', 'Object field was not found')] }
+    ? { diagnostics: [...source.diagnostics, createError('expression.object-field-not-found', 'Object field was not found', '/fieldId')] }
     : { structuralType: { valueType: valueSchemaValueType(field.schema), schema: field.schema }, diagnostics: source.diagnostics };
 }
 
 function inferIndex(expression: Extract<ExpressionAst, { readonly kind: 'index' }>, context: ExpressionInferenceContext): StructuralInferenceResult {
-  const source = inferStructuralType(expression.source, context);
-  const index = inferStructuralType(expression.index, context);
+  const source = prefixStructuralResult(inferStructuralType(expression.source, context), '/source');
+  const index = prefixStructuralResult(inferStructuralType(expression.index, context), '/index');
   const diagnostics = [...source.diagnostics, ...index.diagnostics];
 
   if (source.structuralType?.schema?.kind !== 'array') {
@@ -417,16 +446,25 @@ export function inferExpressionValueType({ expression, context }: ExpressionInfe
 
   const result = inferStructuralType(expression, context);
 
-  return { valueType: result.structuralType?.valueType, diagnostics: result.diagnostics };
+  return {
+    valueType: result.structuralType?.valueType,
+    diagnostics: result.diagnostics,
+  };
 }
 
 export function inferFormatterPipelineValueType({ inputType, pipeline }: FormatterInferenceOptions): ValueTypeInferenceResult {
   let valueType: ValueType = inputType;
 
-  for (const step of pipeline.steps) {
+  for (const [index, step] of pipeline.steps.entries()) {
     if (!formatterAcceptsInput(step.formatterId, valueType)) {
       return {
-        diagnostics: [createError('formatter.invalid-input', `Formatter ${step.formatterId} cannot consume ${valueType}`)],
+        diagnostics: [
+          createError(
+            'formatter.invalid-input',
+            `Formatter ${step.formatterId} cannot consume ${valueType}`,
+            `/steps/${String(index)}`,
+          ),
+        ],
       };
     }
 
@@ -450,28 +488,32 @@ function isTypeCompatible(actual: ValueType, expected: ValueType): boolean {
 
 export function inferBindingValueType({ binding, context }: BindingInferenceOptions): ValueTypeInferenceResult {
   const expressionResult = inferExpressionValueType({ expression: binding.expression, context });
-  const diagnostics = [...expressionResult.diagnostics];
+  const diagnostics = [...prefixDiagnostics(expressionResult.diagnostics, '/expression')];
   let valueType = expressionResult.valueType;
 
   if (valueType !== undefined && binding.formatter !== undefined) {
     const formatterResult = inferFormatterPipelineValueType({ inputType: valueType, pipeline: binding.formatter });
 
-    diagnostics.push(...formatterResult.diagnostics);
+    diagnostics.push(...prefixDiagnostics(formatterResult.diagnostics, '/formatter'));
     valueType = formatterResult.valueType;
   }
 
   const target = context.targets.find((candidate) => samePropertyTarget(candidate.target, binding.target));
 
   if (target === undefined) {
-    diagnostics.push(createError('binding.target-not-found', 'Binding target was not found'));
+    diagnostics.push(createError('binding.target-not-found', 'Binding target was not found', '/target'));
   } else {
     if (valueType !== undefined && !isTypeCompatible(valueType, target.valueType)) {
-      diagnostics.push(createError('binding.incompatible-target', 'Binding result is incompatible with its target'));
+      diagnostics.push(
+        createError('binding.incompatible-target', 'Binding result is incompatible with its target', '/target'),
+      );
       valueType = undefined;
     }
 
     if (binding.fallback !== undefined && !isTypeCompatible(binding.fallback.type, target.valueType)) {
-      diagnostics.push(createError('binding.incompatible-fallback', 'Binding fallback is incompatible with its target'));
+      diagnostics.push(
+        createError('binding.incompatible-fallback', 'Binding fallback is incompatible with its target', '/fallback'),
+      );
     }
   }
 

@@ -26,6 +26,10 @@ import {
 import { resolvePropertyTargetValueTypeInScope } from './target-resolution';
 import type { TypedValue } from './typed-value';
 
+function escapePointerSegment(segment: string): string {
+  return segment.replaceAll('~', '~0').replaceAll('/', '~1');
+}
+
 function validateComponentPropertyValues(
   definition: ComponentDefinition,
   values: readonly { readonly exposedPropertyId: Id; readonly value: TypedValue }[],
@@ -47,82 +51,8 @@ function validateComponentPropertyValues(
   });
 }
 
-function findIdentifierExpressionPointer(expression: ExpressionAst, code: string, pointer: string): string | undefined {
-  if (code === 'expression.field-not-found' && expression.kind === 'field') return `${pointer}/fieldId`;
-  if (code === 'expression.variable-not-found' && expression.kind === 'variable') return `${pointer}/variableId`;
-  if (code === 'expression.object-field-not-found' && expression.kind === 'get') return `${pointer}/fieldId`;
-
-  return undefined;
-}
-
-function findInvalidExpressionPointer(expression: ExpressionAst, code: string, pointer: string): string | undefined {
-  const codesByKind: Partial<Record<ExpressionAst['kind'], readonly string[]>> = {
-    get: ['expression.invalid-get-source'],
-    index: ['expression.invalid-index', 'expression.invalid-index-source'],
-    unary: ['expression.invalid-operand'],
-    binary: ['expression.invalid-operand'],
-    conditional: ['expression.invalid-condition', 'expression.branch-type-mismatch'],
-    'safe-function': ['expression.invalid-function-argument', 'expression.invalid-function-arity'],
-  };
-
-  return codesByKind[expression.kind]?.includes(code) === true ? pointer : undefined;
-}
-
-function findDirectExpressionPointer(expression: ExpressionAst, code: string, pointer: string): string | undefined {
-  return findIdentifierExpressionPointer(expression, code, pointer) ?? findInvalidExpressionPointer(expression, code, pointer);
-}
-
 function getOwnerElementId(entity: ResolvedTargetEntity | undefined): Id | undefined {
   return entity !== undefined && 'ownerElementId' in entity ? entity.ownerElementId : undefined;
-}
-
-function getExpressionChildren(
-  expression: ExpressionAst,
-  pointer: string,
-): readonly { readonly expression: ExpressionAst; readonly pointer: string }[] {
-  switch (expression.kind) {
-    case 'unary':
-      return [{ expression: expression.operand, pointer: `${pointer}/operand` }];
-    case 'binary':
-      return [
-        { expression: expression.left, pointer: `${pointer}/left` },
-        { expression: expression.right, pointer: `${pointer}/right` },
-      ];
-    case 'conditional':
-      return [
-        { expression: expression.condition, pointer: `${pointer}/condition` },
-        { expression: expression.whenTrue, pointer: `${pointer}/whenTrue` },
-        { expression: expression.whenFalse, pointer: `${pointer}/whenFalse` },
-      ];
-    case 'get':
-      return [{ expression: expression.source, pointer: `${pointer}/source` }];
-    case 'index':
-      return [
-        { expression: expression.source, pointer: `${pointer}/source` },
-        { expression: expression.index, pointer: `${pointer}/index` },
-      ];
-    case 'safe-function':
-      return expression.arguments.map((argument, index) => ({
-        expression: argument,
-        pointer: `${pointer}/arguments/${String(index)}`,
-      }));
-    default:
-      return [];
-  }
-}
-
-function findExpressionNodePointer(expression: ExpressionAst, code: string, pointer: string): string | undefined {
-  const direct = findDirectExpressionPointer(expression, code, pointer);
-
-  if (direct !== undefined) return direct;
-
-  for (const child of getExpressionChildren(expression, pointer)) {
-    const result = findExpressionNodePointer(child.expression, code, child.pointer);
-
-    if (result !== undefined) return result;
-  }
-
-  return undefined;
 }
 
 function createInferenceContext(indexes: SemanticIndexes, document: DocumentSemanticIndex, binding?: Binding): Parameters<typeof inferExpressionValueType>[0]['context'] {
@@ -144,7 +74,7 @@ function createInferenceContext(indexes: SemanticIndexes, document: DocumentSema
 }
 
 function projectInferenceDiagnostics(
-  binding: Binding,
+  _binding: Binding,
   result: ReturnType<typeof inferBindingValueType>,
   pointer: string,
   diagnostics: Diagnostic[],
@@ -153,19 +83,10 @@ function projectInferenceDiagnostics(
 
   result.diagnostics.forEach((diagnostic) => {
     let code = diagnostic.code;
-    let location = findExpressionNodePointer(binding.expression, diagnostic.code, `${pointer}/expression`);
+    const location = `${pointer}${diagnostic.pointer ?? '/expression'}`;
 
     if (code === 'expression.field-not-found') code = 'binding.missing-field';
     if (code === 'binding.incompatible-target') code = 'binding.incompatible-result';
-
-    if (diagnostic.code.startsWith('formatter.')) location = `${pointer}/formatter/steps/0`;
-
-    if (diagnostic.code === 'binding.incompatible-target' || diagnostic.code === 'binding.target-not-found') {
-      location = `${pointer}/target`;
-    }
-
-    if (diagnostic.code === 'binding.incompatible-fallback') location = `${pointer}/fallback`;
-    location ??= `${pointer}/expression`;
 
     const key = `${code}\u0000${location}`;
 
@@ -276,7 +197,27 @@ function validatePages(indexes: SemanticIndexes, document: DocumentSemanticIndex
 
     validateRootOverrides(indexes, document, page, pagePosition, diagnostics);
     validateDescendantOverrides(document, page, documentPosition, pagePosition, diagnostics);
-    if (page.sampleDataSetId !== undefined && !document.document.viewModels.some((viewModel) => viewModel.sampleDataSets.some((sample) => sample.id === page.sampleDataSetId))) diagnostics.push(createSemanticError('page.missing-sample-data', 'Sample data set does not resolve', `${base}/sampleDataSetId`));
+    Object.entries(page.selectedSampleDataSets).forEach(([viewModelId, sampleDataSetId]) => {
+      const viewModel = document.document.viewModels.find((candidate) => candidate.id === viewModelId);
+
+      if (viewModel === undefined) {
+        diagnostics.push(
+          createSemanticError(
+            'page.missing-view-model',
+            'Selected sample-data view model does not resolve',
+            `${base}/selectedSampleDataSets/${escapePointerSegment(viewModelId)}`,
+          ),
+        );
+      } else if (!viewModel.sampleDataSets.some((sample) => sample.id === sampleDataSetId)) {
+        diagnostics.push(
+          createSemanticError(
+            'page.missing-sample-data',
+            'Sample data set does not resolve in its selected view model',
+            `${base}/selectedSampleDataSets/${escapePointerSegment(viewModelId)}`,
+          ),
+        );
+      }
+    });
     if (page.sequenceId !== undefined && !document.sequences.has(page.sequenceId)) diagnostics.push(createSemanticError('sequence.missing-reference', 'Page sequence does not resolve', `${base}/sequenceId`));
   });
 }
@@ -288,16 +229,16 @@ function validateBindings(indexes: SemanticIndexes, document: DocumentSemanticIn
     const base = `/documents/${String(documentPosition)}/bindings/${String(bindingPosition)}`;
     const targetType = resolvePropertyTargetValueTypeInScope(scope, binding.target);
 
-    if (targetType === undefined) { diagnostics.push(createSemanticError('target.invalid-pointer', 'Binding target is invalid', `${base}/target`));
-
- return; }
+    if (targetType === undefined) {
+      diagnostics.push(createSemanticError('target.invalid-pointer', 'Binding target is invalid', `${base}/target`));
+    }
 
     const context = createInferenceContext(indexes, document, binding);
     const result = inferBindingValueType({ binding, context });
 
     projectInferenceDiagnostics(binding, result, base, diagnostics);
-    if (result.valueType !== undefined && !valueTypesCompatible(result.valueType, targetType)) diagnostics.push(createSemanticError('binding.incompatible-result', 'Binding result is incompatible with target', `${base}/target`));
-    if (binding.fallback !== undefined && !typedValueMatchesType(binding.fallback, targetType)) diagnostics.push(createSemanticError('binding.incompatible-fallback', 'Binding fallback is incompatible', `${base}/fallback`));
+    if (targetType !== undefined && result.valueType !== undefined && !valueTypesCompatible(result.valueType, targetType)) diagnostics.push(createSemanticError('binding.incompatible-result', 'Binding result is incompatible with target', `${base}/target`));
+    if (targetType !== undefined && binding.fallback !== undefined && !typedValueMatchesType(binding.fallback, targetType)) diagnostics.push(createSemanticError('binding.incompatible-fallback', 'Binding fallback is incompatible', `${base}/fallback`));
   });
 }
 

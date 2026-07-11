@@ -13,6 +13,52 @@ function createStateProject(): ReturnType<typeof createMinimalProjectV1> {
 }
 
 describe('state machine and lifecycle semantics', () => {
+  it.each([
+    ['source tick equal to duration', 10, 10],
+    ['zero-duration child', 0, 0],
+  ])('rejects a freeze remap with %s', (_name, childDuration, sourceTick) => {
+    const project = createStateProject();
+    const document = project.documents[0];
+
+    if (document === undefined) throw new Error('Expected fixture document');
+
+    const child = {
+      id: 'child', name: 'Child', durationTicks: childDuration,
+      loop: { kind: 'none' }, tracks: [], markers: [], cues: [], childClips: [],
+    };
+    const parent = {
+      id: 'parent', name: 'Parent', durationTicks: 10,
+      loop: { kind: 'none' }, tracks: [], markers: [], cues: [],
+      childClips: [{
+        id: 'clip', sequenceId: child.id, outputRange: [0, 1],
+        remap: { kind: 'freeze', sourceTick },
+      }],
+    };
+    const actual = parseReviewProject({ ...project, documents: [{ ...document, sequences: [child, parent] }] });
+
+    expect(validateBroadsetProjectV1Semantics(actual)).toContainEqual(
+      expect.objectContaining({ code: 'sequence.invalid-interval', pointer: '/documents/0/sequences/1/childClips/0/remap' }),
+    );
+  });
+
+  it('accepts a linear remap whose range ends at child duration', () => {
+    const project = createStateProject();
+    const document = project.documents[0];
+
+    if (document === undefined) throw new Error('Expected fixture document');
+
+    const child = { id: 'child', name: 'Child', durationTicks: 10, loop: { kind: 'none' }, tracks: [], markers: [], cues: [], childClips: [] };
+    const parent = {
+      id: 'parent', name: 'Parent', durationTicks: 10, loop: { kind: 'none' }, tracks: [], markers: [], cues: [],
+      childClips: [{ id: 'clip', sequenceId: child.id, outputRange: [0, 10], remap: { kind: 'linear', sourceRange: [0, 10], direction: 'forward' } }],
+    };
+    const actual = parseReviewProject({ ...project, documents: [{ ...document, sequences: [child, parent] }] });
+
+    expect(validateBroadsetProjectV1Semantics(actual)).not.toContainEqual(
+      expect.objectContaining({ code: 'sequence.invalid-interval' }),
+    );
+  });
+
   it('rejects an invalid state-value target', () => {
     const project = createStateProject();
     const document = project.documents[0];
@@ -109,6 +155,54 @@ describe('state machine and lifecycle semantics', () => {
 });
 
 describe('binding inference diagnostic projection', () => {
+  it('preserves distinct expression diagnostics when the binding target is invalid', () => {
+    const project = createStateProject();
+    const document = project.documents[0];
+
+    if (document === undefined) throw new Error('Expected fixture document');
+
+    const binding = {
+      id: 'binding',
+      target: createReviewTarget(project, 'element', '/id'),
+      expression: {
+        kind: 'binary',
+        operator: 'add',
+        left: { kind: 'variable', collectionId: 'missing', variableId: 'left' },
+        right: { kind: 'variable', collectionId: 'missing', variableId: 'right' },
+      },
+    };
+    const actual = parseReviewProject({ ...project, documents: [{ ...document, bindings: [binding] }] });
+    const diagnostics = validateBroadsetProjectV1Semantics(actual);
+
+    expect(diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'target.invalid-pointer', pointer: '/documents/0/bindings/0/target' }),
+      expect.objectContaining({ code: 'expression.variable-not-found', pointer: '/documents/0/bindings/0/expression/left/variableId' }),
+      expect.objectContaining({ code: 'expression.variable-not-found', pointer: '/documents/0/bindings/0/expression/right/variableId' }),
+    ]));
+  });
+
+  it('projects a later formatter failure to its exact step', () => {
+    const project = createStateProject();
+    const document = project.documents[0];
+
+    if (document === undefined) throw new Error('Expected fixture document');
+
+    const binding = {
+      id: 'binding',
+      target: createReviewTarget(project, 'element', '/appearance/opacity'),
+      expression: { kind: 'literal', value: { type: 'string', value: 'x' } },
+      formatter: { steps: [
+        { id: 'prefix', formatterId: 'prefix', arguments: [{ type: 'string', value: '$' }] },
+        { id: 'number', formatterId: 'number', arguments: [{ type: 'string', value: 'fi-FI' }] },
+      ] },
+    };
+    const actual = parseReviewProject({ ...project, documents: [{ ...document, bindings: [binding] }] });
+
+    expect(validateBroadsetProjectV1Semantics(actual)).toContainEqual(
+      expect.objectContaining({ code: 'formatter.invalid-input', pointer: '/documents/0/bindings/0/formatter/steps/1' }),
+    );
+  });
+
   it('projects a missing variable diagnostic to the variable reference', () => {
     const project = createStateProject();
     const document = project.documents[0];

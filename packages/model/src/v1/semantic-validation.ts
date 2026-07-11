@@ -26,6 +26,7 @@ import {
 import { validateGlobalIdentities } from './semantic-validation-identities';
 import { validatePagesAndBindings } from './semantic-validation-pages';
 import { validateSequences } from './semantic-validation-sequences';
+import { validateProjectTypedValueReferences } from './semantic-validation-typed-values';
 import { resolvePropertyTargetValueTypeInScope } from './target-resolution';
 import type { TypedValue } from './typed-value';
 
@@ -514,6 +515,7 @@ export function validateBroadsetProjectV1Semantics(project: BroadsetProjectV1): 
 
   validateGlobalIdentities(indexes, diagnostics);
   validateResources(indexes, diagnostics);
+  validateProjectTypedValueReferences(indexes, diagnostics);
   validateHierarchies(indexes, diagnostics);
   validateComponents(indexes, diagnostics);
   validateVariables(indexes, diagnostics);

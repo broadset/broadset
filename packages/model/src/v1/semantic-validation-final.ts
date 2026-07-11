@@ -2,13 +2,14 @@ import type { Diagnostic } from './diagnostics';
 import type { Id } from './identity';
 import type { BroadsetProjectV1 } from './project';
 import { resolveProjectEntityAddress } from './resolved-address';
+import type { SharedStyle } from './resources';
 import type { SemanticIndexes } from './semantic-index';
 import {
   createSemanticError,
   findDuplicateIdDiagnostics,
   typedValueMatchesType,
 } from './semantic-validation-helpers';
-import type { TypedValue, ValueType } from './typed-value';
+import type { ValueType } from './typed-value';
 
 function validateAssetReference(
   indexes: SemanticIndexes,
@@ -75,32 +76,65 @@ export function validateOutputProfiles(indexes: SemanticIndexes, diagnostics: Di
   });
 }
 
-function validateTypedAssetValues(
-  indexes: SemanticIndexes,
-  value: TypedValue,
-  pointer: string,
-  diagnostics: Diagnostic[],
-): void {
-  if (value.type === 'asset') {
-    validateAssetReference(indexes, value.assetId, ['image', 'video', 'audio', 'font', 'icc-profile', 'data', 'vector', 'foreign'], pointer, diagnostics);
-  } else if (value.type === 'list') {
-    value.items.forEach((item, index) => { validateTypedAssetValues(indexes, item, `${pointer}/items/${String(index)}`, diagnostics); });
-  } else if (value.type === 'object') {
-    Object.entries(value.fields).forEach(([fieldId, item]) => { validateTypedAssetValues(indexes, item, `${pointer}/fields/${fieldId}`, diagnostics); });
-  }
+type StyleEntry = Extract<
+  SharedStyle['source'],
+  { readonly kind: 'properties' }
+>['entries'][number];
 
-  if (value.type === 'color' && value.value.kind === 'swatch' && !indexes.swatches.has(value.value.swatchId)) {
-    diagnostics.push(createSemanticError('resource.missing-reference', 'Swatch does not resolve', `${pointer}/value/swatchId`));
-  }
+function findStyleStringValue(entries: readonly StyleEntry[], pointer: string): string | undefined {
+  const value = entries.find((entry) => entry.pointer === pointer)?.value;
+
+  return value?.type === 'string' ? value.value : undefined;
 }
 
-function resolveStylePointerType(kind: 'appearance' | 'text', pointer: string): ValueType | undefined {
+function resolveLineSpacingPointer(entries: readonly StyleEntry[], pointer: string): ValueType | undefined {
+  const lineSpacingKind = findStyleStringValue(entries, '/paragraph/lineSpacing/kind');
+
+  if (pointer === '/paragraph/lineSpacing/kind') return 'string';
+
+  if (pointer === '/paragraph/lineSpacing/value') {
+    if (lineSpacingKind === 'multiple') return 'number';
+    if (lineSpacingKind === 'absolute') return 'length';
+
+    return undefined;
+  }
+
+  return undefined;
+}
+
+function resolveListPointer(entries: readonly StyleEntry[], pointer: string): ValueType | undefined {
+  const listKind = findStyleStringValue(entries, '/paragraph/list/kind');
+
+  if (pointer === '/paragraph/list/kind') return 'string';
+
+  if (pointer === '/paragraph/list/level') {
+    return listKind === 'ordered' || listKind === 'unordered' ? 'integer' : undefined;
+  }
+
+  if (pointer === '/paragraph/list/startAt') return listKind === 'ordered' ? 'integer' : undefined;
+  if (pointer === '/paragraph/list/style') return listKind === 'ordered' ? 'string' : undefined;
+  if (pointer === '/paragraph/list/marker') return listKind === 'unordered' ? 'string' : undefined;
+
+  return undefined;
+}
+
+function resolveConditionalParagraphPointer(entries: readonly StyleEntry[], pointer: string): ValueType | undefined {
+  return resolveLineSpacingPointer(entries, pointer) ?? resolveListPointer(entries, pointer);
+}
+
+function resolveStylePointerType(
+  kind: 'appearance' | 'text',
+  entries: readonly StyleEntry[],
+  pointer: string,
+): ValueType | undefined {
   const appearance: Readonly<Record<string, ValueType>> = {
     '/opacity': 'number',
     '/blendMode': 'string',
     '/isolation': 'boolean',
   };
   const text: Readonly<Record<string, ValueType>> = {
+    '/fontFamilyId': 'string',
+    '/fontFaceId': 'string',
     '/size': 'length',
     '/color': 'color',
     '/weight': 'integer',
@@ -109,10 +143,68 @@ function resolveStylePointerType(kind: 'appearance' | 'text', pointer: string): 
     '/language': 'string',
     '/script': 'string',
     '/direction': 'string',
+    '/hyperlink': 'string',
     '/semanticRole': 'string',
+    '/decoration/underline': 'boolean',
+    '/decoration/strikeThrough': 'boolean',
+    '/decoration/style': 'string',
+    '/decoration/color': 'color',
+    '/paragraph/alignment': 'string',
+    '/paragraph/direction': 'string',
+    '/paragraph/spaceBefore': 'length',
+    '/paragraph/spaceAfter': 'length',
+    '/paragraph/firstLineIndent': 'length',
+    '/paragraph/startIndent': 'length',
+    '/paragraph/endIndent': 'length',
+    '/paragraph/hyphenation': 'string',
+    '/paragraph/keepTogether': 'boolean',
+    '/paragraph/keepWithNext': 'boolean',
+    '/paragraph/widowControl': 'boolean',
   };
 
-  return (kind === 'appearance' ? appearance : text)[pointer];
+  if (kind === 'appearance') return appearance[pointer];
+
+  return text[pointer] ?? resolveConditionalParagraphPointer(entries, pointer);
+}
+
+function validateStyleFontReferences(
+  indexes: SemanticIndexes,
+  entries: readonly StyleEntry[],
+  pointer: string,
+  diagnostics: Diagnostic[],
+): void {
+  const familyPosition = entries.findIndex((entry) => entry.pointer === '/fontFamilyId');
+  const facePosition = entries.findIndex((entry) => entry.pointer === '/fontFaceId');
+  const familyValue = entries[familyPosition]?.value;
+  const faceValue = entries[facePosition]?.value;
+  const family =
+    familyValue?.type === 'string'
+      ? indexes.project.resources.fonts.find((font) => font.id === familyValue.value)
+      : undefined;
+
+  if (familyValue?.type === 'string' && family === undefined) {
+    diagnostics.push(
+      createSemanticError(
+        'resource.missing-reference',
+        'Font family does not resolve',
+        `${pointer}/entries/${String(familyPosition)}/value/value`,
+      ),
+    );
+  }
+
+  if (
+    faceValue?.type === 'string' &&
+    family !== undefined &&
+    !family.faces.some((face) => face.id === faceValue.value)
+  ) {
+    diagnostics.push(
+      createSemanticError(
+        'resource.missing-reference',
+        'Font face does not resolve in the selected family',
+        `${pointer}/entries/${String(facePosition)}/value/value`,
+      ),
+    );
+  }
 }
 
 function validateMissingBlobSource(
@@ -164,6 +256,40 @@ function validateForeignElementSource(
   }
 }
 
+function validateSharedStyle(
+  indexes: SemanticIndexes,
+  style: SharedStyle,
+  stylePosition: number,
+  diagnostics: Diagnostic[],
+): void {
+  const targetId = style.source.kind === 'alias' ? style.source.styleId : style.source.inheritedStyleId;
+  const pointer = `/resources/styles/${String(stylePosition)}/source`;
+
+  if (targetId !== undefined) {
+    const target = indexes.styles.get(targetId);
+    const referencePointer = style.source.kind === 'alias' ? `${pointer}/styleId` : `${pointer}/inheritedStyleId`;
+
+    if (target === undefined) diagnostics.push(createSemanticError('resource.missing-reference', 'Shared style does not resolve', referencePointer));
+    else {
+      if (target.kind !== style.kind) diagnostics.push(createSemanticError('style.incompatible-inheritance', 'Shared-style kinds are incompatible', referencePointer));
+      if (targetId === style.id || styleReaches(indexes, targetId, style.id, new Set())) diagnostics.push(createSemanticError('style.cycle', 'Shared-style dependency cycle', referencePointer));
+    }
+  }
+
+  if (style.source.kind !== 'properties') return;
+
+  const entries = style.source.entries;
+
+  entries.forEach((entry, entryPosition) => {
+    const entryPointer = `${pointer}/entries/${String(entryPosition)}`;
+    const expected = resolveStylePointerType(style.kind, entries, entry.pointer);
+
+    if (expected === undefined) diagnostics.push(createSemanticError('style.invalid-pointer', 'Shared-style pointer is not approved', `${entryPointer}/pointer`));
+    else if (!typedValueMatchesType(entry.value, expected)) diagnostics.push(createSemanticError('style.incompatible-value', 'Shared-style value is incompatible', `${entryPointer}/value`));
+  });
+  if (style.kind === 'text') validateStyleFontReferences(indexes, entries, pointer, diagnostics);
+}
+
 function styleReaches(indexes: SemanticIndexes, startId: Id, targetId: Id, seen: ReadonlySet<Id>): boolean {
   if (seen.has(startId)) return false;
 
@@ -199,36 +325,7 @@ export function validateAdditionalResources(indexes: SemanticIndexes, diagnostic
     });
   });
   indexes.project.resources.styles.forEach((style, stylePosition) => {
-    const targetId = style.source.kind === 'alias' ? style.source.styleId : style.source.inheritedStyleId;
-
-    const pointer = `/resources/styles/${String(stylePosition)}/source`;
-
-    if (targetId !== undefined) {
-      const target = indexes.styles.get(targetId);
-      const referencePointer = style.source.kind === 'alias' ? `${pointer}/styleId` : `${pointer}/inheritedStyleId`;
-
-      if (target === undefined) diagnostics.push(createSemanticError('resource.missing-reference', 'Shared style does not resolve', referencePointer));
-      else {
-        if (target.kind !== style.kind) diagnostics.push(createSemanticError('style.incompatible-inheritance', 'Shared-style kinds are incompatible', referencePointer));
-        if (targetId === style.id || styleReaches(indexes, targetId, style.id, new Set())) diagnostics.push(createSemanticError('style.cycle', 'Shared-style dependency cycle', referencePointer));
-      }
-    }
-
-    if (style.source.kind === 'properties') {
-      style.source.entries.forEach((entry, entryPosition) => {
-        const entryPointer = `${pointer}/entries/${String(entryPosition)}`;
-        const expected = resolveStylePointerType(style.kind, entry.pointer);
-
-        if (expected === undefined) diagnostics.push(createSemanticError('style.invalid-pointer', 'Shared-style pointer is not approved', `${entryPointer}/pointer`));
-        else if (!typedValueMatchesType(entry.value, expected)) diagnostics.push(createSemanticError('style.incompatible-value', 'Shared-style value is incompatible', `${entryPointer}/value`));
-        validateTypedAssetValues(indexes, entry.value, `${entryPointer}/value`, diagnostics);
-      });
-    }
-  });
-  indexes.project.resources.variables.forEach((collection, collectionPosition) => {
-    collection.variables.forEach((variable, variablePosition) => {
-      Object.entries(variable.valuesByMode).forEach(([modeId, value]) => { validateTypedAssetValues(indexes, value, `/resources/variables/${String(collectionPosition)}/variables/${String(variablePosition)}/valuesByMode/${modeId}`, diagnostics); });
-    });
+    validateSharedStyle(indexes, style, stylePosition, diagnostics);
   });
   indexes.documentList.forEach(({ document }, documentPosition) => {
     document.elements.forEach((element, elementPosition) => {

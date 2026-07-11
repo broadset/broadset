@@ -95,9 +95,12 @@ function validateSequenceGroup(
 
  return; }
 
-      const sourceEnd = clip.remap.kind === 'linear' ? clip.remap.sourceRange[1] : clip.remap.sourceTick;
+      const invalidRemap =
+        clip.remap.kind === 'linear'
+          ? clip.remap.sourceRange[1] > child.durationTicks
+          : clip.remap.sourceTick >= child.durationTicks;
 
-      if (sourceEnd > child.durationTicks) diagnostics.push(createSemanticError('sequence.invalid-interval', 'Child remap exceeds sequence duration', `${clipPointer}/remap`));
+      if (invalidRemap) diagnostics.push(createSemanticError('sequence.invalid-interval', 'Child remap exceeds sequence duration', `${clipPointer}/remap`));
       if (clip.sequenceId === sequence.id || sequenceReaches(byId, clip.sequenceId, sequence.id, new Set())) diagnostics.push(createSemanticError('sequence.cycle', 'Child sequence dependency cycle', `${clipPointer}/sequenceId`));
     });
   });

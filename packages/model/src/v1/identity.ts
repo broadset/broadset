@@ -42,6 +42,7 @@ export const sha256DigestSchema: z.ZodType<Sha256Digest> = z.custom<Sha256Digest
 export interface EntityAddress {
   readonly projectId: Id;
   readonly documentId?: Id | undefined;
+  readonly pageId?: Id | undefined;
   readonly entityKind: string;
   readonly entityId: Id;
   readonly instancePath?: readonly Id[] | undefined;
@@ -50,6 +51,7 @@ export interface EntityAddress {
 export const entityAddressSchema: z.ZodType<EntityAddress> = z.strictObject({
   projectId: idSchema,
   documentId: idSchema.optional(),
+  pageId: idSchema.optional(),
   entityKind: idSchema,
   entityId: idSchema,
   instancePath: z.array(idSchema).optional(),
