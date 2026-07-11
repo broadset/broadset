@@ -1,3 +1,4 @@
+import { expressionMatchesAssetTargetContract } from './asset-kind-inference';
 import type { ComponentDefinition } from './component';
 import {
   type Binding,
@@ -19,14 +20,12 @@ import {
 import type { DocumentSemanticIndex, SemanticIndexes } from './semantic-index';
 import {
   createSemanticError,
-  typedValueMatchesResolvedMediaTypes,
+  typedValueMatchesResolvedAssetConstraints,
   typedValueMatchesTargetContract,
   typedValueSatisfiesConstraints,
-  valueSchemaMatchesTargetContract,
   valueTypesCompatible,
 } from './semantic-validation-helpers';
 import {
-  type PropertyTargetContract,
   resolvePropertyTargetContractInScope,
   resolvePropertyTargetValueTypeInScope,
 } from './target-resolution';
@@ -51,7 +50,7 @@ function validateComponentPropertyValues(
       diagnostics.push(createSemanticError('component.unknown-exposed-property', 'Exposed property does not resolve', `${valuePointer}/exposedPropertyId`));
     } else if (
       !typedValueMatchesSchema(value.value, property.valueSchema) ||
-      !typedValueMatchesResolvedMediaTypes(indexes, value.value, property.valueSchema) ||
+      !typedValueMatchesResolvedAssetConstraints(indexes, value.value, property.valueSchema) ||
       !typedValueSatisfiesConstraints(value.value, property.constraints)
     ) {
       diagnostics.push(createSemanticError('component.incompatible-property-value', 'Component property value is incompatible', `${valuePointer}/value`));
@@ -101,37 +100,6 @@ function projectInferenceDiagnostics(
     if (!seen.has(key)) diagnostics.push(createSemanticError(code, diagnostic.message, location));
     seen.add(key);
   });
-}
-
-function expressionMatchesTargetContract(
-  indexes: SemanticIndexes,
-  document: DocumentSemanticIndex,
-  expression: ExpressionAst,
-  contract: PropertyTargetContract,
-): boolean {
-  if (expression.kind === 'literal') return typedValueMatchesTargetContract(indexes, expression.value, contract);
-
-  if (expression.kind === 'field') {
-    const viewModel = document.document.viewModels.find((candidate) => candidate.id === expression.viewModelId);
-    const field = viewModel?.fields.find((candidate) => candidate.id === expression.fieldId);
-
-    return field === undefined || valueSchemaMatchesTargetContract(field.schema, contract);
-  }
-
-  if (expression.kind === 'variable') {
-    const collection = indexes.variables.get(expression.collectionId);
-    const variable = collection?.variables.find((candidate) => candidate.id === expression.variableId);
-
-    return variable === undefined || Object.values(variable.valuesByMode).every((value) =>
-      typedValueMatchesTargetContract(indexes, value, contract));
-  }
-
-  if (expression.kind === 'conditional') {
-    return expressionMatchesTargetContract(indexes, document, expression.whenTrue, contract)
-      && expressionMatchesTargetContract(indexes, document, expression.whenFalse, contract);
-  }
-
-  return true;
 }
 
 function targetBelongsToRoot(
@@ -280,7 +248,11 @@ function validateBindings(indexes: SemanticIndexes, document: DocumentSemanticIn
     projectInferenceDiagnostics(binding, result, base, diagnostics);
     if (targetType !== undefined && result.valueType !== undefined && !valueTypesCompatible(result.valueType, targetType)) diagnostics.push(createSemanticError('binding.incompatible-result', 'Binding result is incompatible with target', `${base}/target`));
 
-    if (targetContract !== undefined && !expressionMatchesTargetContract(indexes, document, binding.expression, targetContract)) {
+    if (
+      targetContract !== undefined &&
+      result.valueType === 'asset' &&
+      !expressionMatchesAssetTargetContract(indexes, document, binding.expression, targetContract)
+    ) {
       const expressionPointer = binding.expression.kind === 'literal' ? `${base}/expression/value` : `${base}/expression`;
 
       diagnostics.push(createSemanticError('binding.incompatible-result', 'Binding result violates the target contract', expressionPointer));

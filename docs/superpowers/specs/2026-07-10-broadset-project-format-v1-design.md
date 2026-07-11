@@ -159,6 +159,7 @@ type TypedValue =
 interface EntityAddress {
   readonly projectId: Id;
   readonly documentId?: Id;
+  readonly pageId?: Id;
   readonly entityKind: string;
   readonly entityId: Id;
   readonly instancePath?: readonly Id[];
@@ -170,7 +171,6 @@ interface PropertyTarget {
 }
 
 interface TypedOverride {
-  readonly id: Id;
   readonly target: PropertyTarget;
   readonly value: TypedValue;
 }
@@ -753,7 +753,7 @@ interface ViewModelField {
 }
 ```
 
-`ValueSchema` is a recursive discriminated union covering string, number, integer, boolean, date/time, color, asset, enum, object, and array values. Constraints are type-specific and defaults must validate against them.
+`ValueSchema` is a recursive discriminated union covering string, number, integer, boolean, date/time, color, asset, enum, object, and array values. Asset schemas may independently restrict a non-empty unique `acceptedAssetKinds` set and `acceptedMediaTypes`; constraints are type-specific and defaults must validate against them.
 
 Bindings address stable field IDs and stable property targets:
 

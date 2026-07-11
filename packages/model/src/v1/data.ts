@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { type Id, idSchema, type PropertyTarget, propertyTargetSchema, utcTimestampSchema } from './identity';
 import { compareExactIsoInstants } from './iso-instant';
+import { type AssetKind, assetKindSchema } from './resources';
 import { mediaTypeSchema, nonEmptyStringSchema, validateUniqueIds } from './schema-helpers';
 import { type TypedValue, typedValueSchema, type ValueType, valueTypeSchema } from './typed-value';
 
@@ -16,7 +17,11 @@ export type ValueSchema =
   | { readonly kind: 'boolean' }
   | { readonly kind: 'date-time'; readonly earliest?: string | undefined; readonly latest?: string | undefined }
   | { readonly kind: 'color' }
-  | { readonly kind: 'asset'; readonly acceptedMediaTypes?: readonly string[] | undefined }
+  | {
+      readonly kind: 'asset';
+      readonly acceptedAssetKinds?: readonly AssetKind[] | undefined;
+      readonly acceptedMediaTypes?: readonly string[] | undefined;
+    }
   | { readonly kind: 'enum'; readonly values: readonly string[] }
   | { readonly kind: 'object'; readonly fields: readonly ValueSchemaField[] }
   | {
@@ -153,7 +158,22 @@ export const valueSchemaSchema: z.ZodType<ValueSchema> = z.lazy(() =>
         message: 'earliest must not exceed latest',
       }),
     z.strictObject({ kind: z.literal('color') }),
-    z.strictObject({ kind: z.literal('asset'), acceptedMediaTypes: z.array(mediaTypeSchema).optional() }),
+    z.strictObject({
+      kind: z.literal('asset'),
+      acceptedAssetKinds: z
+        .array(assetKindSchema)
+        .min(1)
+        .superRefine((items, context) => {
+          const seen = new Set<AssetKind>();
+
+          items.forEach((item, index) => {
+            if (seen.has(item)) context.addIssue({ code: 'custom', message: `Duplicate asset kind: ${item}`, path: [index] });
+            seen.add(item);
+          });
+        })
+        .optional(),
+      acceptedMediaTypes: z.array(mediaTypeSchema).optional(),
+    }),
     z
       .strictObject({ kind: z.literal('enum'), values: z.array(nonEmptyStringSchema).min(1) })
       .superRefine(({ values }, context) => {

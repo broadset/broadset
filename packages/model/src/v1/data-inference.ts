@@ -400,6 +400,14 @@ function inferStructuralType(expression: ExpressionAst, context: ExpressionInfer
 function inferGet(expression: Extract<ExpressionAst, { readonly kind: 'get' }>, context: ExpressionInferenceContext): StructuralInferenceResult {
   const source = prefixStructuralResult(inferStructuralType(expression.source, context), '/source');
 
+  if (expression.source.kind === 'literal' && expression.source.value.type === 'object') {
+    const value = expression.source.value.fields[expression.fieldId];
+
+    return value === undefined
+      ? { diagnostics: [...source.diagnostics, createError('expression.object-field-not-found', 'Object field was not found', '/fieldId')] }
+      : { structuralType: typedValueType(value), diagnostics: source.diagnostics };
+  }
+
   if (source.structuralType?.schema?.kind !== 'object') {
     return { diagnostics: [...source.diagnostics, createError('expression.invalid-get-source', 'Get source must have an object schema')] };
   }
@@ -411,10 +419,44 @@ function inferGet(expression: Extract<ExpressionAst, { readonly kind: 'get' }>, 
     : { structuralType: { valueType: valueSchemaValueType(field.schema), schema: field.schema }, diagnostics: source.diagnostics };
 }
 
+function inferLiteralListIndex(
+  expression: Extract<ExpressionAst, { readonly kind: 'index' }>,
+  index: StructuralInferenceResult,
+  diagnostics: readonly Diagnostic[],
+): StructuralInferenceResult | undefined {
+  if (
+    expression.source.kind !== 'literal' ||
+    expression.source.value.type !== 'list' ||
+    index.structuralType?.valueType !== 'integer'
+  ) {
+    return undefined;
+  }
+
+  const items = expression.source.value.items;
+
+  if (expression.index.kind === 'literal' && expression.index.value.type === 'integer') {
+    const exactValue = items[expression.index.value.value];
+
+    return exactValue === undefined
+      ? { diagnostics: [...diagnostics, createError('expression.invalid-index', 'Array literal index is out of bounds')] }
+      : { structuralType: typedValueType(exactValue), diagnostics };
+  }
+
+  const firstType = items[0]?.type;
+  const valueType = firstType !== undefined && items.every((item) => item.type === firstType) ? firstType : undefined;
+
+  return valueType === undefined
+    ? { diagnostics: [...diagnostics, createError('expression.invalid-index-source', 'Array literal items must have a common type')] }
+    : { structuralType: { valueType }, diagnostics };
+}
+
 function inferIndex(expression: Extract<ExpressionAst, { readonly kind: 'index' }>, context: ExpressionInferenceContext): StructuralInferenceResult {
   const source = prefixStructuralResult(inferStructuralType(expression.source, context), '/source');
   const index = prefixStructuralResult(inferStructuralType(expression.index, context), '/index');
   const diagnostics = [...source.diagnostics, ...index.diagnostics];
+  const literalResult = inferLiteralListIndex(expression, index, diagnostics);
+
+  if (literalResult !== undefined) return literalResult;
 
   if (source.structuralType?.schema?.kind !== 'array') {
     diagnostics.push(createError('expression.invalid-index-source', 'Index source must have an array schema'));

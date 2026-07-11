@@ -19,7 +19,7 @@ import {
   createSemanticError,
   findDuplicateIdDiagnostics,
   semanticValueKey,
-  typedValueMatchesResolvedMediaTypes,
+  typedValueMatchesResolvedAssetConstraints,
   typedValueSatisfiesConstraints,
   validateHierarchy,
   valueSchemaMatchesTargetContract,
@@ -262,7 +262,7 @@ function validateComponentPropertyValues(
       );
     } else if (
       !typedValueMatchesSchema(value.value, property.valueSchema) ||
-      !typedValueMatchesResolvedMediaTypes(indexes, value.value, property.valueSchema) ||
+      !typedValueMatchesResolvedAssetConstraints(indexes, value.value, property.valueSchema) ||
       !typedValueSatisfiesConstraints(value.value, property.constraints)
     ) {
       diagnostics.push(
@@ -364,7 +364,7 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
 
         if (
           !typedValueMatchesSchema(property.defaultValue, property.valueSchema) ||
-          !typedValueMatchesResolvedMediaTypes(indexes, property.defaultValue, property.valueSchema) ||
+          !typedValueMatchesResolvedAssetConstraints(indexes, property.defaultValue, property.valueSchema) ||
           !typedValueSatisfiesConstraints(property.defaultValue, property.constraints)
         )
           diagnostics.push(
@@ -397,7 +397,7 @@ function validateComponents(indexes: SemanticIndexes, diagnostics: DiagnosticLis
             constraint.values.forEach((value, valuePosition) => {
               const key = semanticValueKey(value);
 
-              if (!typedValueMatchesSchema(value, property.valueSchema) || !typedValueMatchesResolvedMediaTypes(indexes, value, property.valueSchema))
+              if (!typedValueMatchesSchema(value, property.valueSchema) || !typedValueMatchesResolvedAssetConstraints(indexes, value, property.valueSchema))
                 diagnostics.push(
                   createSemanticError(
                     'component.incompatible-constraint',

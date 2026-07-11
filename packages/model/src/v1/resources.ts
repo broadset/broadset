@@ -186,6 +186,10 @@ export interface AssetIntrinsicMetadata {
   readonly safePreviewAssetId?: Id | undefined;
 }
 
+export const ASSET_KINDS = ['image', 'video', 'audio', 'font', 'icc-profile', 'data', 'vector', 'foreign'] as const;
+export type AssetKind = (typeof ASSET_KINDS)[number];
+export const assetKindSchema: z.ZodType<AssetKind> = z.enum(ASSET_KINDS);
+
 export type Asset =
   | ImageAsset
   | VideoAsset

@@ -144,6 +144,19 @@ describe('expression inference error evidence', () => {
     }
   });
 
+  it('infers get and index results from structural typed literals', () => {
+    expect(infer({
+      kind: 'get',
+      source: { kind: 'literal', value: { type: 'object', fields: { media: { type: 'asset', assetId: 'image' } } } },
+      fieldId: 'media',
+    })).toEqual({ valueType: 'asset', diagnostics: [] });
+    expect(infer({
+      kind: 'index',
+      source: { kind: 'literal', value: { type: 'list', items: [{ type: 'asset', assetId: 'image' }] } },
+      index: literal('integer', 0),
+    })).toEqual({ valueType: 'asset', diagnostics: [] });
+  });
+
   it('diagnoses arity failures for every safe function', () => {
     const cases = [
       ['coalesce', [literal('string', 'one')]],

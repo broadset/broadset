@@ -30,6 +30,22 @@ type ValueType =
   | 'list'
   | 'object';
 
+type AssetKind =
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'font'
+  | 'icc-profile'
+  | 'data'
+  | 'vector'
+  | 'foreign';
+
+type AssetValueSchema = {
+  readonly kind: 'asset';
+  readonly acceptedAssetKinds?: readonly AssetKind[];
+  readonly acceptedMediaTypes?: readonly string[];
+};
+
 interface EntityAddress {
   readonly projectId: Id;
   readonly documentId?: Id;
@@ -619,7 +635,11 @@ overridable. Asset-valued targets additionally declare compatible asset kinds: i
 element targets require their corresponding kind; foreign previews and picture/pattern paints
 accept image or vector; displacement effects require image. Every override, binding, state value,
 keyframe, and exposed-property binding MUST satisfy this target contract in document, component,
-and page scope. The model exports a pure resolver for reuse by all consumers.
+and page scope. `acceptedAssetKinds`, when present, is a non-empty duplicate-free closed kind set and
+is independent of `acceptedMediaTypes`. A schema can feed a kind-restricted target only when it
+declares an asset-kind subset; expression branches are unioned conservatively and unknown kinds
+fail closed. MIME is compared only with actual resolved asset blobs, using exact ASCII
+case-insensitive type/subtype equality. The model exports a pure resolver for reuse by all consumers.
 
 #### Acceptance Criteria
 

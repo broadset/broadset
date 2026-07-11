@@ -54,7 +54,11 @@ describe('valueSchemaSchema and viewModelSchema', () => {
       { kind: 'boolean' },
       { kind: 'date-time', earliest: '2026-01-01T00:00:00Z', latest: '2026-12-31T23:59:59Z' },
       { kind: 'color' },
-      { kind: 'asset', acceptedMediaTypes: ['image/png', 'image/jpeg'] },
+      {
+        kind: 'asset',
+        acceptedAssetKinds: ['image', 'vector'],
+        acceptedMediaTypes: ['image/png', 'image/jpeg'],
+      },
       { kind: 'enum', values: ['draft', 'published'] },
       {
         kind: 'object',
@@ -85,6 +89,13 @@ describe('valueSchemaSchema and viewModelSchema', () => {
   it('rejects fractional integer bounds and malformed asset media types', () => {
     expect(valueSchemaSchema.safeParse({ kind: 'integer', minimum: 0.5 }).success).toBe(false);
     expect(valueSchemaSchema.safeParse({ kind: 'asset', acceptedMediaTypes: ['not-a-media-type'] }).success).toBe(false);
+  });
+
+  it('requires accepted asset kinds to be a unique non-empty closed set when present', () => {
+    expect(valueSchemaSchema.safeParse({ kind: 'asset', acceptedAssetKinds: ['image'] }).success).toBe(true);
+    expect(valueSchemaSchema.safeParse({ kind: 'asset', acceptedAssetKinds: [] }).success).toBe(false);
+    expect(valueSchemaSchema.safeParse({ kind: 'asset', acceptedAssetKinds: ['image', 'image'] }).success).toBe(false);
+    expect(valueSchemaSchema.safeParse({ kind: 'asset', acceptedAssetKinds: ['spreadsheet'] }).success).toBe(false);
   });
 
   it('orders date-time schema bounds by chronological instant across unequal offsets', () => {

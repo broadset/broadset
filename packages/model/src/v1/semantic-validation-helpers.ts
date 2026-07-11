@@ -112,17 +112,6 @@ function asciiLower(value: string): string {
   return value.replace(/[A-Z]/gu, (character) => character.toLowerCase());
 }
 
-function mediaTypeCanMatchAssetKind(mediaType: string, kind: NonNullable<PropertyTargetContract['assetKinds']>[number]): boolean {
-  const normalized = asciiLower(mediaType);
-
-  if (kind === 'image') return normalized.startsWith('image/') && normalized !== 'image/svg+xml';
-  if (kind === 'vector') return normalized === 'image/svg+xml';
-  if (kind === 'video') return normalized.startsWith('video/');
-  if (kind === 'audio') return normalized.startsWith('audio/');
-
-  return false;
-}
-
 function valueSchemaType(schema: ValueSchema): ValueType {
   if (schema.kind === 'array') return 'list';
   if (schema.kind === 'enum') return 'string';
@@ -137,14 +126,15 @@ export function valueSchemaMatchesTargetContract(schema: ValueSchema, contract: 
     return false;
   }
 
-  if (schema.kind !== 'asset' || contract.assetKinds === undefined || schema.acceptedMediaTypes === undefined) return true;
+  if (schema.kind !== 'asset' || contract.assetKinds === undefined) return true;
 
-  return schema.acceptedMediaTypes.every((mediaType) =>
-    contract.assetKinds?.some((kind) => mediaTypeCanMatchAssetKind(mediaType, kind)),
-  );
+  const targetKinds = contract.assetKinds;
+
+  return schema.acceptedAssetKinds !== undefined && schema.acceptedAssetKinds.length > 0
+    && schema.acceptedAssetKinds.every((kind) => targetKinds.includes(kind));
 }
 
-export function typedValueMatchesResolvedMediaTypes(
+export function typedValueMatchesResolvedAssetConstraints(
   indexes: SemanticIndexes,
   value: TypedValue,
   schema: ValueSchema,
@@ -153,18 +143,21 @@ export function typedValueMatchesResolvedMediaTypes(
     const accepted = schema.acceptedMediaTypes;
     const asset = indexes.assets.get(value.assetId);
 
-    return accepted === undefined || asset === undefined || accepted.some((mediaType) => asciiLower(mediaType) === asciiLower(asset.blob.mediaType));
+    return asset === undefined || (
+      (schema.acceptedAssetKinds === undefined || schema.acceptedAssetKinds.includes(asset.kind))
+      && (accepted === undefined || accepted.some((mediaType) => asciiLower(mediaType) === asciiLower(asset.blob.mediaType)))
+    );
   }
 
   if (schema.kind === 'array' && value.type === 'list') {
-    return value.items.every((item) => typedValueMatchesResolvedMediaTypes(indexes, item, schema.items));
+    return value.items.every((item) => typedValueMatchesResolvedAssetConstraints(indexes, item, schema.items));
   }
 
   if (schema.kind === 'object' && value.type === 'object') {
     return schema.fields.every((field) => {
       const fieldValue = value.fields[field.id];
 
-      return fieldValue === undefined || typedValueMatchesResolvedMediaTypes(indexes, fieldValue, field.schema);
+      return fieldValue === undefined || typedValueMatchesResolvedAssetConstraints(indexes, fieldValue, field.schema);
     });
   }
 

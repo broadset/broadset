@@ -20,6 +20,11 @@ A document `viewModels` array MUST contain stable, uniquely identified view mode
 
 A view-model field MUST define stable `id`, `name`, recursive typed `schema`, and MAY define label, type-compatible default, and stale policy (`keep-last`, `use-default`, `hide`, or `error`). Value schemas form a closed discriminated union for string, number, integer, boolean, date/time, color, asset, enum, object, and array values with type-specific constraints.
 
+An asset schema MAY declare `acceptedAssetKinds`, a non-empty duplicate-free subset of the closed
+asset kinds (`image`, `video`, `audio`, `font`, `icc-profile`, `data`, `vector`, `foreign`), and MAY
+independently declare `acceptedMediaTypes`. Concrete defaults and samples MUST satisfy both declared
+constraints against the resolved asset record.
+
 #### Acceptance Criteria
 
 - [ ] Given nested object and array schemas with validating defaults, validation succeeds
@@ -51,7 +56,9 @@ specific `PageDefinition`.
 The addressed property MUST be schema-approved as overridable, and the expected value type is derived from its schema rather than duplicated on the target.
 For asset-valued properties, compatibility also includes the target's accepted asset kinds. A
 `ValueSchema.acceptedMediaTypes` list is matched against the resolved asset blob media type by an
-exact ASCII case-insensitive type/subtype comparison.
+exact ASCII case-insensitive type/subtype comparison. MIME types do not imply asset kinds. A schema
+feeding a kind-restricted target MUST declare a non-empty `acceptedAssetKinds` subset of that
+target's kinds; an unrestricted schema cannot prove compatibility.
 
 #### Acceptance Criteria
 
@@ -65,10 +72,19 @@ exact ASCII case-insensitive type/subtype comparison.
 
 A binding MUST contain stable `id`, `target`, and a closed `expression`. It MAY contain deterministic formatter pipeline and type-compatible fallback. Binding IDs MUST be unique in the document. Expression result, formatter result, fallback, and target property types MUST be compatible.
 
+For a kind-restricted asset target, semantic validation MUST prove that every possible asset result
+is within the target contract. The proof uses resolved literal assets, field schemas, every variable
+mode and alias, both conditional branches, every non-null `coalesce` branch, object-field schemas or
+literals for `get`, and array item schemas or literal items for `index` (the exact item for a known
+index, otherwise the union). Any unknown or unrestricted possible kind fails closed. The same subset
+rule applies to component exposed-property schemas feeding internal bindings.
+
 #### Acceptance Criteria
 
 - [ ] Given a type-correct expression, formatter, fallback, and target, validation succeeds
 - [ ] Given a result or fallback incompatible with the target, semantic validation fails
+- [ ] Given any possible asset expression branch outside a kind-restricted target, semantic validation fails
+- [ ] Given every possible asset kind is a declared subset of the target contract, validation succeeds
 - [ ] Given duplicate binding IDs, validation fails
 
 ### Requirement: Closed Expression AST

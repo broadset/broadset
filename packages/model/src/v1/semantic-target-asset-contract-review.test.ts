@@ -54,6 +54,48 @@ describe('asset-valued property target contracts', () => {
     expect(resolvePropertyTargetContract(actual, target)).toEqual({ valueType: 'asset', assetKinds: ['image'] });
   });
 
+  it('requires explicit exposed-property kind proof and validates concrete defaults', () => {
+    const project = createMinimalProjectV1();
+    const document = project.documents[0];
+
+    if (document === undefined) throw new Error('Expected fixture document');
+
+    const localImage = createImage('local-image');
+    const target = createReviewTarget(project, localImage.id, '/image/assetId');
+    const createProperty = (id: string, valueSchema: object, assetId: string) => ({
+      id, label: id, group: 'Data', valueSchema, defaultValue: { type: 'asset', assetId },
+      constraints: [], bindings: [{ id: `${id}-binding`, target }],
+    });
+    const component = createReviewComponent({
+      id: 'component', name: 'Component', elements: [localImage], rootElementIds: [localImage.id], sequences: [],
+      exposedProperties: [
+        createProperty('unrestricted', { kind: 'asset' }, 'data'),
+        createProperty('wrong-default', { kind: 'asset', acceptedAssetKinds: ['image'] }, 'data'),
+        createProperty('compatible', { kind: 'asset', acceptedAssetKinds: ['image'] }, 'image'),
+      ],
+      extensions: [],
+    });
+    const actual = parseReviewProject({
+      ...project,
+      resources: { ...project.resources, assets: [createAsset('image', 'image'), createAsset('data', 'data')] },
+      documents: [{ ...document, components: [component] }],
+    });
+    const diagnostics = validateBroadsetProjectV1Semantics(actual);
+
+    expect(diagnostics).toContainEqual(expect.objectContaining({
+      code: 'component.incompatible-binding',
+      pointer: '/documents/0/components/0/exposedProperties/0/bindings/0/target',
+    }));
+    expect(diagnostics).toContainEqual(expect.objectContaining({
+      code: 'component.incompatible-default',
+      pointer: '/documents/0/components/0/exposedProperties/1/defaultValue',
+    }));
+    expect(diagnostics).not.toContainEqual(expect.objectContaining({
+      code: 'component.incompatible-binding',
+      pointer: '/documents/0/components/0/exposedProperties/2/bindings/0/target',
+    }));
+  });
+
   it('rejects wrong-kind assets at every target consumer', () => {
     const project = createMinimalProjectV1();
     const document = project.documents[0];
