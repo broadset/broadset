@@ -12,6 +12,184 @@ import {
   validateBroadsetProjectV1Semantics,
 } from '../index';
 
+const V1_RUNTIME_EXPORT_NAMES = [
+  'ASSET_KINDS',
+  'FORMATTER_IDS',
+  'PROJECT_V1_LIMITS',
+  'ProjectV1LimitError',
+  'SAFE_FUNCTION_IDS',
+  'VALUE_TYPES',
+  'affine2dSchema',
+  'appearanceSchema',
+  'assetKindSchema',
+  'assetSchema',
+  'bindingSchema',
+  'blendModeSchema',
+  'blobReferenceSchema',
+  'broadsetDocumentV1Schema',
+  'broadsetProjectV1Schema',
+  'canonicalizeProjectV1',
+  'clipRemapSchema',
+  'colorAdjustmentSchema',
+  'colorValueSchema',
+  'componentDefinitionSchema',
+  'computeProjectSemanticHashV1',
+  'concreteColorValueSchema',
+  'createComponentAddressScope',
+  'createDocumentAddressScope',
+  'createPageAddressScope',
+  'cueSchema',
+  'diagnosticSchema',
+  'effectSchema',
+  'elementGeometrySchema',
+  'elementSchema',
+  'elementTransformSchema',
+  'entityAddressSchema',
+  'exposedPropertyBindingSchema',
+  'exposedPropertyConstraintSchema',
+  'exposedPropertySchema',
+  'expressionAstSchema',
+  'expressionInferenceContextSchema',
+  'extensionEnvelopeSchema',
+  'fillLayerSchema',
+  'fontFamilyResourceSchema',
+  'formatterPipelineSchema',
+  'frameCountForDuration',
+  'frameStartTicks',
+  'gradientSchema',
+  'idSchema',
+  'inferBindingValueType',
+  'inferExpressionStructuralValueType',
+  'inferExpressionValueType',
+  'inferFormatterPipelineValueType',
+  'instanceAddressSchema',
+  'interopDiagnosticSchema',
+  'interopRecordSchema',
+  'interopRegistrySchema',
+  'interopSourceSchema',
+  'interpolationMatchesType',
+  'interpolationSchema',
+  'jsonPointerSchema',
+  'jsonValueSchema',
+  'keyframeSchema',
+  'lifecycleDefinitionSchema',
+  'loadProjectV1Json',
+  'loopDefinitionSchema',
+  'markerSchema',
+  'motionOutputProfileSchema',
+  'normalizedRectSchema',
+  'outputProfileSchema',
+  'pageDefinitionSchema',
+  'pageRootInstanceSchema',
+  'paintSchema',
+  'paragraphPropertiesSchema',
+  'parseProjectV1Unknown',
+  'printOutputProfileSchema',
+  'projectResourcesSchema',
+  'propertyTargetSchema',
+  'rationalSchema',
+  'reduceRational',
+  'resolvePageInstanceElement',
+  'resolveProjectEntityAddress',
+  'resolvePropertyTargetContract',
+  'resolvePropertyTargetContractFromIndexes',
+  'resolvePropertyTargetContractInScope',
+  'resolvePropertyTargetValueType',
+  'resolvePropertyTargetValueTypeFromIndexes',
+  'resolvePropertyTargetValueTypeInScope',
+  'resolveTargetEntityAddress',
+  'runPropertiesSchema',
+  'sequenceActionSchema',
+  'sequenceClipSchema',
+  'sequenceSchema',
+  'sha256DigestSchema',
+  'sharedStyleSchema',
+  'stateMachineSchema',
+  'stateSchema',
+  'stateValueSchema',
+  'strokeLayerSchema',
+  'structuredPathSchema',
+  'surfaceDefinitionSchema',
+  'swatchColorValueSchema',
+  'swatchSchema',
+  'templateGroupSchema',
+  'textBodySchema',
+  'textParagraphSchema',
+  'textRunSchema',
+  'ticksToFrame',
+  'timebaseSchema',
+  'trackSchema',
+  'transitionSchema',
+  'transitionTriggerSchema',
+  'typedOverrideSchema',
+  'typedValueMatchesSchema',
+  'typedValueSchema',
+  'utcTimestampSchema',
+  'validateBooleanExpressionStructure',
+  'validateBroadsetProjectV1Semantics',
+  'validateTimebaseSemantics',
+  'valueSchemaSchema',
+  'valueSchemaValueType',
+  'valueTypeSchema',
+  'variableCollectionSchema',
+  'viewModelSchema',
+] as const;
+
+const V1_RUNTIME_COLLISION_NAMES = [
+  'assetSchema',
+  'elementSchema',
+  'keyframeSchema',
+  'swatchSchema',
+  'templateGroupSchema',
+  'textBodySchema',
+] as const;
+
+const V1_TYPE_COLLISION_NAMES = [
+  'Asset',
+  'AssetBase',
+  'AssetKind',
+  'AudioAsset',
+  'ColorSpace',
+  'DataAsset',
+  'DocumentMetadata',
+  'FontAsset',
+  'IccProfileAsset',
+  'ImageAsset',
+  'Keyframe',
+  'PatternRepeat',
+  'Swatch',
+  'TemplateGroup',
+  'TemplateGroupMember',
+  'TextBody',
+  'VideoAsset',
+] as const;
+
+const V1_PUBLIC_NAME_COLLISIONS = [
+  'Asset',
+  'AssetBase',
+  'AssetKind',
+  'AudioAsset',
+  'ColorSpace',
+  'DataAsset',
+  'DocumentMetadata',
+  'FontAsset',
+  'IccProfileAsset',
+  'ImageAsset',
+  'Keyframe',
+  'PatternRepeat',
+  'Swatch',
+  'TemplateGroup',
+  'TemplateGroupMember',
+  'TextBody',
+  'VideoAsset',
+  'assetSchema',
+  'elementSchema',
+  'keyframeSchema',
+  'swatchSchema',
+  'templateGroupSchema',
+  'textBodySchema',
+] as const;
+
 type PackageRootV1TypeInventory = readonly [
   PublicTypes.AddressScope,
   PublicTypes.Affine2D,
@@ -107,6 +285,7 @@ type PackageRootV1TypeInventory = readonly [
   PublicTypes.ProjectMetadata,
   PublicTypes.ProjectParseResult,
   PublicTypes.ProjectResources,
+  PublicTypes.ProjectV1LimitError,
   PublicTypes.ProjectV1LimitCode,
   PublicTypes.ProjectV1LimitViolation,
   PublicTypes.PropertyTarget,
@@ -160,14 +339,63 @@ type PackageRootV1TypeInventory = readonly [
   PublicTypes.ViewModelField,
 ];
 
-const LEGACY_RUNTIME_NAME_COLLISIONS = new Set([
-  'assetSchema',
-  'elementSchema',
-  'keyframeSchema',
-  'swatchSchema',
-  'templateGroupSchema',
-  'textBodySchema',
-]);
+type NamespaceV1CollisionTypeInventory = readonly [
+  projectFormatV1.Asset,
+  projectFormatV1.AssetBase,
+  projectFormatV1.AssetKind,
+  projectFormatV1.AudioAsset,
+  projectFormatV1.ColorSpace,
+  projectFormatV1.DataAsset,
+  projectFormatV1.DocumentMetadata,
+  projectFormatV1.FontAsset,
+  projectFormatV1.IccProfileAsset,
+  projectFormatV1.ImageAsset,
+  projectFormatV1.Keyframe,
+  projectFormatV1.PatternRepeat,
+  projectFormatV1.Swatch,
+  projectFormatV1.TemplateGroup,
+  projectFormatV1.TemplateGroupMember,
+  projectFormatV1.TextBody,
+  projectFormatV1.VideoAsset,
+];
+
+type RootLegacyCollisionTypeInventory = readonly [
+  PublicTypes.Asset,
+  PublicTypes.AssetBase,
+  PublicTypes.AssetKind,
+  PublicTypes.AudioAsset,
+  PublicTypes.ColorSpace,
+  PublicTypes.DataAsset,
+  PublicTypes.DocumentMetadata,
+  PublicTypes.FontAsset,
+  PublicTypes.IccProfileAsset,
+  PublicTypes.ImageAsset,
+  PublicTypes.Keyframe,
+  PublicTypes.PatternRepeat,
+  PublicTypes.Swatch,
+  PublicTypes.TemplateGroup,
+  PublicTypes.TemplateGroupMember,
+  PublicTypes.TextBody,
+  PublicTypes.VideoAsset,
+];
+
+const ROOT_LEGACY_RUNTIME_COLLISIONS = {
+  assetSchema: packageRoot.assetSchema,
+  elementSchema: packageRoot.elementSchema,
+  keyframeSchema: packageRoot.keyframeSchema,
+  swatchSchema: packageRoot.swatchSchema,
+  templateGroupSchema: packageRoot.templateGroupSchema,
+  textBodySchema: packageRoot.textBodySchema,
+} as const;
+
+const NAMESPACE_V1_RUNTIME_COLLISIONS = {
+  assetSchema: projectFormatV1.assetSchema,
+  elementSchema: projectFormatV1.elementSchema,
+  keyframeSchema: projectFormatV1.keyframeSchema,
+  swatchSchema: projectFormatV1.swatchSchema,
+  templateGroupSchema: projectFormatV1.templateGroupSchema,
+  textBodySchema: projectFormatV1.textBodySchema,
+} as const;
 
 function createMinimalProject(): PublicTypes.BroadsetProjectV1 {
   return broadsetProjectV1Schema.parse({
@@ -226,14 +454,28 @@ function createMinimalProject(): PublicTypes.BroadsetProjectV1 {
 }
 
 describe('v1 package public API', () => {
-  it('directly exports every non-conflicting production runtime symbol', () => {
+  it('locks the exact public symbol inventory and legacy collision boundary', () => {
     const compileTimeTypes: PackageRootV1TypeInventory | undefined = undefined;
-    const expectedDirectExports = Object.keys(projectFormatV1).filter(
-      (name) => !LEGACY_RUNTIME_NAME_COLLISIONS.has(name),
+    const compileTimeNamespacedTypes: NamespaceV1CollisionTypeInventory | undefined = undefined;
+    const compileTimeLegacyTypes: RootLegacyCollisionTypeInventory | undefined = undefined;
+    const expectedDirectExports = V1_RUNTIME_EXPORT_NAMES.filter(
+      (name) => !V1_RUNTIME_COLLISION_NAMES.some((collision) => collision === name),
     );
 
     expect(compileTimeTypes).toBeUndefined();
+    expect(compileTimeNamespacedTypes).toBeUndefined();
+    expect(compileTimeLegacyTypes).toBeUndefined();
+    expect(Object.keys(projectFormatV1)).toHaveLength(V1_RUNTIME_EXPORT_NAMES.length);
+    expect(new Set(Object.keys(projectFormatV1))).toEqual(new Set(V1_RUNTIME_EXPORT_NAMES));
+    expect(Object.keys(ROOT_LEGACY_RUNTIME_COLLISIONS)).toEqual(V1_RUNTIME_COLLISION_NAMES);
+    expect(Object.keys(NAMESPACE_V1_RUNTIME_COLLISIONS)).toEqual(V1_RUNTIME_COLLISION_NAMES);
+    expect([...V1_TYPE_COLLISION_NAMES, ...V1_RUNTIME_COLLISION_NAMES]).toEqual(V1_PUBLIC_NAME_COLLISIONS);
     expect(Object.keys(packageRoot)).toEqual(expect.arrayContaining(expectedDirectExports));
+
+    for (const name of V1_RUNTIME_COLLISION_NAMES) {
+      expect(ROOT_LEGACY_RUNTIME_COLLISIONS[name]).not.toBe(NAMESPACE_V1_RUNTIME_COLLISIONS[name]);
+    }
+
     expect('createMinimalProjectV1' in projectFormatV1).toBe(false);
   });
 
