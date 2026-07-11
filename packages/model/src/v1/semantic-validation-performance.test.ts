@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createMinimalProjectV1 } from './fixtures/minimal-project';
-import { assetSchema, sha256DigestSchema, validateBroadsetProjectV1Semantics } from './index';
+import { assetSchema, elementSchema, idSchema, sha256DigestSchema, validateBroadsetProjectV1Semantics } from './index';
 import { createReviewComponent, createReviewComponentInstance, createReviewGroup, createReviewTarget, parseReviewProject } from './semantic-review-fixtures';
 
 const STRESS_ITEM_COUNT = 5_000;
@@ -99,5 +99,94 @@ describe('semantic validation indexing', () => {
 
     expect(validateBroadsetProjectV1Semantics(actual)).toEqual([]);
     expect(readCounts.map((read) => read())).toEqual([0, 0, 0, 0]);
+  }, 20_000);
+
+  it('builds ordinary and component page-root address scopes once for 2k descendant overrides', () => {
+    const project = createMinimalProjectV1();
+    const document = project.documents[0];
+    const page = document?.pages[0];
+
+    if (document === undefined || page === undefined) throw new Error('Expected fixture page');
+
+    const descendantIds = Array.from({ length: 2_000 }, (_, index) => `descendant-${String(index)}`);
+    const ordinaryRoot = createReviewGroup('ordinary-root');
+    const descendants = descendantIds.map((id) => elementSchema.parse({ ...createReviewGroup(id), parentId: ordinaryRoot.id }));
+    const componentElementIds = Array.from({ length: 250 }, (_, index) => `local-${String(index)}`);
+    const componentElements = componentElementIds.map((id) => createReviewGroup(id));
+    const component = createReviewComponent({
+      id: 'component', name: 'Component', elements: componentElements, rootElementIds: componentElementIds,
+      sequences: [], exposedProperties: [], extensions: [],
+    });
+    const componentRoot = createReviewComponentInstance('component-root', component.id);
+    const pageId = idSchema.parse(page.id);
+    const ordinaryOverrides = descendants.map((element) => {
+      const target = createReviewTarget(project, element.id, '/appearance/opacity', ['ordinary-instance']);
+
+      return {
+        address: { rootInstanceId: 'ordinary-instance', componentInstancePath: [], elementId: element.id },
+        overrides: [{ target: { ...target, entity: { ...target.entity, pageId } }, value: { type: 'number', value: 0.5 } }],
+      };
+    });
+    const componentOverrides = componentElements.map((element) => {
+      const target = createReviewTarget(project, element.id, '/appearance/opacity', ['component-instance']);
+
+      return {
+        address: { rootInstanceId: 'component-instance', componentInstancePath: [], elementId: element.id },
+        overrides: [{ target: { ...target, entity: { ...target.entity, pageId } }, value: { type: 'number', value: 0.5 } }],
+      };
+    });
+    const actual = parseReviewProject({
+      ...project,
+      documents: [{
+        ...document,
+        elements: [ordinaryRoot, ...descendants, componentRoot],
+        components: [component],
+        pages: [{
+          ...page,
+          rootInstances: [
+            { id: 'ordinary-instance', elementId: ordinaryRoot.id, overrides: [], componentPropertyValues: [] },
+            { id: 'component-instance', elementId: componentRoot.id, overrides: [], componentPropertyValues: [] },
+          ],
+          descendantOverrides: [...ordinaryOverrides, ...componentOverrides],
+        }],
+      }],
+    });
+    const actualDocument = actual.documents[0];
+
+    if (actualDocument === undefined) throw new Error('Expected stress document');
+
+    let parentIdReads = 0;
+
+    actualDocument.elements.forEach((element) => {
+      const parentId = element.parentId;
+
+      Object.defineProperty(element, 'parentId', {
+        configurable: true,
+        get: () => {
+          parentIdReads += 1;
+
+          return parentId;
+        },
+      });
+    });
+
+    const actualComponentRoot = actualDocument.elements.at(-1);
+
+    if (actualComponentRoot?.kind !== 'component-instance') throw new Error('Expected component root');
+
+    let componentKindReads = 0;
+
+    Object.defineProperty(actualComponentRoot, 'kind', {
+      configurable: true,
+      get: () => {
+        componentKindReads += 1;
+
+        return 'component-instance';
+      },
+    });
+
+    expect(validateBroadsetProjectV1Semantics(actual)).toEqual([]);
+    expect(parentIdReads).toBeLessThan(descendantIds.length * 10);
+    expect(componentKindReads).toBeLessThan(900);
   }, 20_000);
 });

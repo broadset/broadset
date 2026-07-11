@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { createMinimalProjectV1 } from './fixtures/minimal-project';
-import { validateBroadsetProjectV1Semantics } from './index';
+import { elementSchema, idSchema, validateBroadsetProjectV1Semantics } from './index';
+import { createPageAddressScope, resolveTargetEntityAddress } from './resolved-address';
+import { createSemanticIndexes } from './semantic-index';
 import {
   createReviewComponent,
   createReviewComponentInstance,
@@ -83,6 +85,45 @@ function createNestedProject(): ReturnType<typeof createMinimalProjectV1> {
 }
 
 describe('resolved page and component address scopes', () => {
+  it('keeps duplicate nested entities ambiguous in an ordinary page-root scope', () => {
+    const project = createMinimalProjectV1();
+    const document = project.documents[0];
+    const page = document?.pages[0];
+
+    if (document === undefined || page === undefined) throw new Error('Expected fixture document and page');
+
+    const root = createReviewGroup('root');
+    const effect = { id: 'effect', enabled: true, opacity: 1, blendMode: 'normal', kind: 'blur', radius: 1 };
+    const children = ['first', 'second'].map((id) => {
+      const group = createReviewGroup(id, root.id);
+
+      return elementSchema.parse({ ...group, appearance: { ...group.appearance, effects: [effect] } });
+    });
+    const rootInstance = { id: 'root-instance', elementId: root.id, overrides: [], componentPropertyValues: [] };
+    const actual = parseReviewProject({
+      ...project,
+      documents: [{
+        ...document,
+        elements: [root, ...children],
+        pages: [{ ...page, rootInstances: [rootInstance] }],
+      }],
+    });
+    const index = createSemanticIndexes(actual).documentList[0];
+    const actualPage = index?.document.pages[0];
+    const actualRoot = actualPage?.rootInstances[0];
+
+    if (index === undefined || actualPage === undefined || actualRoot === undefined) throw new Error('Expected indexed page root');
+
+    expect(resolveTargetEntityAddress(createPageAddressScope(index, actualPage, actualRoot), {
+      projectId: actual.id,
+      documentId: index.document.id,
+      pageId: actualPage.id,
+      entityKind: 'effect',
+      entityId: idSchema.parse('effect'),
+      instancePath: [actualRoot.id],
+    })).toBeUndefined();
+  });
+
   it('accepts a valid nested instance path despite repeated component-local IDs', () => {
     const project = createNestedProject();
     const document = project.documents[0];

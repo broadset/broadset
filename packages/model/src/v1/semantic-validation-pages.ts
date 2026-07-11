@@ -10,10 +10,10 @@ import {
 import type { Diagnostic } from './diagnostics';
 import type { Id } from './identity';
 import {
+  type AddressScope,
   createDocumentAddressScope,
   createPageAddressScope,
   type ResolvedTargetEntity,
-  resolvePageInstanceElement,
   resolveTargetEntityAddress,
 } from './resolved-address';
 import type { ComponentSemanticIndex, DocumentSemanticIndex, SemanticIndexes } from './semantic-index';
@@ -29,6 +29,44 @@ import {
   resolvePropertyTargetValueTypeInScope,
 } from './target-resolution';
 import type { TypedValue } from './typed-value';
+
+type PageAddressScope = Extract<AddressScope, { readonly kind: 'page-instance' }>;
+type PageAddressScopes = ReadonlyMap<Id, ReadonlyMap<Id, PageAddressScope>>;
+
+function createSemanticPageAddressScope(
+  document: DocumentSemanticIndex,
+  page: DocumentSemanticIndex['document']['pages'][number],
+  root: DocumentSemanticIndex['document']['pages'][number]['rootInstances'][number],
+): PageAddressScope {
+  const scope = createPageAddressScope(document, page, root);
+
+  if (scope.kind !== 'page-instance') throw new Error('Expected page address scope');
+
+  return scope;
+}
+
+function createPageAddressScopes(document: DocumentSemanticIndex): PageAddressScopes {
+  return new Map(document.document.pages.map((page) => [
+    page.id,
+    new Map(page.rootInstances.map((root) => [root.id, createSemanticPageAddressScope(document, page, root)])),
+  ]));
+}
+
+function resolvePageInstanceElementInScope(
+  scope: PageAddressScope,
+  address: DocumentSemanticIndex['document']['pages'][number]['descendantOverrides'][number]['address'],
+): ResolvedTargetEntity | undefined {
+  if (address.rootInstanceId !== scope.root.id) return undefined;
+
+  return resolveTargetEntityAddress(scope, {
+    projectId: scope.document.projectId,
+    documentId: scope.document.document.id,
+    pageId: scope.page.id,
+    entityKind: 'element',
+    entityId: address.elementId,
+    instancePath: [scope.root.id, ...address.componentInstancePath],
+  });
+}
 
 function escapePointerSegment(segment: string): string {
   return segment.replaceAll('~', '~0').replaceAll('/', '~1');
@@ -126,6 +164,7 @@ function validateRootOverrides(
   indexes: SemanticIndexes,
   document: DocumentSemanticIndex,
   page: DocumentSemanticIndex['document']['pages'][number],
+  pageScopes: ReadonlyMap<Id, PageAddressScope>,
   pageBase: string,
   diagnostics: Diagnostic[],
 ): void {
@@ -140,7 +179,9 @@ function validateRootOverrides(
       if (definition !== undefined) validateComponentPropertyValues({ indexes, definition, values: root.componentPropertyValues, pointer: `${base}/componentPropertyValues`, diagnostics });
     } else if (root.componentPropertyValues.length > 0) diagnostics.push(createSemanticError('component.invalid-property-owner', 'Only component roots accept component property values', `${base}/componentPropertyValues`));
 
-    const scope = createPageAddressScope(document, page, root);
+    const scope = pageScopes.get(root.id);
+
+    if (scope === undefined) return;
 
     root.overrides.forEach((override, overridePosition) => {
       const overridePointer = `${base}/overrides/${String(overridePosition)}`;
@@ -160,15 +201,16 @@ function validateRootOverrides(
 
 function validateDescendantOverrides(
   indexes: SemanticIndexes,
-  document: DocumentSemanticIndex,
   page: DocumentSemanticIndex['document']['pages'][number],
+  pageScopes: ReadonlyMap<Id, PageAddressScope>,
   documentPosition: number,
   pagePosition: number,
   diagnostics: Diagnostic[],
 ): void {
   page.descendantOverrides.forEach((override, overridePosition) => {
     const base = `/documents/${String(documentPosition)}/pages/${String(pagePosition)}/descendantOverrides/${String(overridePosition)}`;
-    const resolved = resolvePageInstanceElement(document, page, override.address);
+    const scope = pageScopes.get(override.address.rootInstanceId);
+    const resolved = scope === undefined ? undefined : resolvePageInstanceElementInScope(scope, override.address);
 
     if (resolved === undefined) {
       diagnostics.push(createSemanticError('page.orphan-override', 'Descendant override address does not resolve', `${base}/address`));
@@ -176,11 +218,7 @@ function validateDescendantOverrides(
       return;
     }
 
-    const root = document.pageRoots.get(page.id)?.get(override.address.rootInstanceId);
-
-    if (root === undefined) return;
-
-    const scope = createPageAddressScope(document, page, root);
+    if (scope === undefined) return;
 
     override.overrides.forEach((typedOverride, typedPosition) => {
       const pointer = `${base}/overrides/${String(typedPosition)}`;
@@ -201,11 +239,14 @@ function validateDescendantOverrides(
 }
 
 function validatePages(indexes: SemanticIndexes, document: DocumentSemanticIndex, documentPosition: number, diagnostics: Diagnostic[]): void {
+  const addressScopes = createPageAddressScopes(document);
+
   document.document.pages.forEach((page, pagePosition) => {
     const base = `/documents/${String(documentPosition)}/pages/${String(pagePosition)}`;
+    const pageScopes = addressScopes.get(page.id) ?? new Map<Id, PageAddressScope>();
 
-    validateRootOverrides(indexes, document, page, base, diagnostics);
-    validateDescendantOverrides(indexes, document, page, documentPosition, pagePosition, diagnostics);
+    validateRootOverrides(indexes, document, page, pageScopes, base, diagnostics);
+    validateDescendantOverrides(indexes, page, pageScopes, documentPosition, pagePosition, diagnostics);
     Object.entries(page.selectedSampleDataSets).forEach(([viewModelId, sampleDataSetId]) => {
       const viewModel = document.viewModels.get(viewModelId);
 
