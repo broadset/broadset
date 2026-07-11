@@ -38,7 +38,13 @@ Canonical dynamic values MUST use a `TypedValue` discriminated union for null, b
 
 ### Requirement: Stable Property Targets
 
-A binding or override target MUST combine an `EntityAddress` with an RFC 6901 JSON Pointer. Entity addresses contain stable project and entity identity, optional document identity, and optional component instance path. Array indexes MUST NOT serve as durable identity.
+A binding or override target MUST combine an `EntityAddress` with an RFC 6901 JSON Pointer. Entity addresses contain stable project and entity identity, optional document identity, optional page identity, and optional component instance path. Array indexes MUST NOT serve as durable identity.
+
+Page-root and page-descendant addresses MUST contain `documentId` and `pageId`; their
+`instancePath` is page-relative and begins with the root-instance ID. Project-resource addresses
+MUST omit `documentId`, `pageId`, and `instancePath`. Document-definition and component-definition
+addresses MUST omit `pageId`. `InstanceAddress` remains page-local because it is contained by a
+specific `PageDefinition`.
 
 The addressed property MUST be schema-approved as overridable, and the expected value type is derived from its schema rather than duplicated on the target.
 
@@ -46,6 +52,8 @@ The addressed property MUST be schema-approved as overridable, and the expected 
 
 - [ ] Given a resolving entity and approved pointer, target validation derives the property type
 - [ ] Given an invalid escape, missing entity, wrong instance path, or forbidden pointer, validation fails
+- [ ] Given two pages reuse a root-instance ID, each page-aware address resolves only within its declared page
+- [ ] Given a page field on a project resource, document definition, or component-definition target, validation fails
 - [ ] Given a reordered collection, stable target identity continues to address the same entity
 
 ### Requirement: Bindings
@@ -106,9 +114,15 @@ Formatter arguments are `TypedValue` literals. Locale-independent string formatt
 
 Sample data sets MUST validate against their view-model fields before entering canonical state. Live input is runtime data and MUST be validated against the same schemas. Stale policies determine explicit behavior when live values are unavailable.
 
+Every page MUST contain `selectedSampleDataSets`, a possibly empty map from view-model ID to one
+sample-data-set ID owned by that view model. Each key and value pair MUST resolve together. A page
+MUST NOT select a sample-data-set ID without identifying its owning view model.
+
 #### Acceptance Criteria
 
 - [ ] Given valid sample data selected by a page, binding evaluation uses it
+- [ ] Given selections for multiple view models, each resolves independently within its owning view model
+- [ ] Given a missing view model or a sample data set owned by another view model, semantic validation fails
 - [ ] Given invalid sample or live data, typed diagnostics identify the field
 - [ ] Given stale input, the field's declared policy determines keep, default, hide, or error behavior
 

@@ -29,7 +29,23 @@ type ValueType =
   | 'point3d'
   | 'list'
   | 'object';
+
+interface EntityAddress {
+  readonly projectId: Id;
+  readonly documentId?: Id;
+  readonly pageId?: Id;
+  readonly entityKind: string;
+  readonly entityId: Id;
+  readonly instancePath?: readonly Id[];
+}
 ```
+
+`pageId` is required for page-root and page-descendant addresses because root-instance identity is
+page-local. Such addresses also require `documentId` and a page-relative `instancePath` beginning
+with the addressed root-instance ID. Project-owned resources and project identity forbid
+`documentId`, `pageId`, and `instancePath`. Document-owned definitions require `documentId` and
+forbid `pageId`; component-definition scope also forbids `pageId`. An `InstanceAddress` remains
+page-local because its containing `PageDefinition` supplies the page context.
 
 #### Acceptance Criteria
 
@@ -417,7 +433,7 @@ interface PageDefinition {
   readonly rootInstances: readonly PageRootInstance[];
   readonly descendantOverrides: readonly DescendantOverride[];
   readonly selectedVariableModes: Readonly<Record<Id, Id>>;
-  readonly sampleDataSetId?: Id;
+  readonly selectedSampleDataSets: Readonly<Record<Id, Id>>;
   readonly sequenceId?: Id;
   readonly extensions: readonly ExtensionEnvelope[];
 }
@@ -434,9 +450,15 @@ interface PageRootInstance {
 
 Root-instance order is root z-order. Root transforms are surface-relative; descendant local transforms remain parent-relative. Descendant overrides use stable root and nested instance paths. Orphan references are invalid.
 
+`selectedSampleDataSets` maps each selected view-model ID to exactly one sample-data-set ID owned by
+that view model. The map is required and may be empty. Every key and value MUST resolve as a pair;
+sample-data-set IDs are not resolved globally across view models.
+
 #### Acceptance Criteria
 
 - [ ] Given repeated roots with distinct instance IDs, each resolves independently
+- [ ] Given equal root-instance IDs on different pages, page-aware addresses resolve independently
+- [ ] Given one selected sample data set per view model, every map key and value resolves in that view model
 - [ ] Given an orphan override or invalid nested path, semantic validation rejects the project
 
 ### Requirement: View Models, Expressions, and Bindings

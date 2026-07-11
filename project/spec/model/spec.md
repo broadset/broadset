@@ -70,13 +70,18 @@ reference with an explicit `rgb`, `cmyk`, `gray`, or `lab` model.
 
 ### Requirement: Document Pages
 
-`pages` MUST contain at least one page. A page contains ordered root instances with identity separate from element-definition identity, typed descendant overrides, variable-mode selections, and optional sample-data and sequence references. The same root element definition MAY be instantiated more than once.
+`pages` MUST contain at least one page. A page contains ordered root instances with identity separate from element-definition identity, typed descendant overrides, variable-mode selections, a required possibly empty `selectedSampleDataSets` map, and an optional sequence reference. The same root element definition MAY be instantiated more than once.
 
 Root-instance order defines root z-order. Override targets MUST resolve through stable instance paths, be schema-approved as overridable, and receive type-compatible values.
+Page-instance targets MUST carry the page ID because root-instance IDs are page-local. Every
+`selectedSampleDataSets` entry maps a resolving view-model ID to one sample-data-set ID owned by that
+view model.
 
 #### Acceptance Criteria
 
 - [ ] Given two root instances of one element definition with different instance IDs, both resolve independently
+- [ ] Given two pages reuse a root-instance ID, page-aware targets remain unambiguous
+- [ ] Given sample selections for several view models, each selection resolves within its owning view model
 - [ ] Given an orphan override, invalid path, forbidden target, or incompatible value, semantic validation fails
 - [ ] Given an empty page array, document validation fails
 
