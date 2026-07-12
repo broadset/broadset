@@ -37,6 +37,24 @@ function styleFromRunOverrides(
     style.fontSize = fontSize;
   }
 
+  const fontFamily = overrides['fontFamily'];
+
+  if (typeof fontFamily === 'string' && fontFamily.length > 0) {
+    style.font = { name: fontFamily };
+  }
+
+  const fontWeight = overrides['fontWeight'];
+
+  if (typeof fontWeight === 'number' && Number.isFinite(fontWeight)) {
+    style.fauxBold = fontWeight >= 600;
+  }
+
+  const fontStyle = overrides['fontStyle'];
+
+  if (typeof fontStyle === 'string') {
+    style.fauxItalic = fontStyle === 'italic' || fontStyle === 'oblique';
+  }
+
   const fontColor = overrides['fontColor'];
 
   if (typeof fontColor === 'string') {
