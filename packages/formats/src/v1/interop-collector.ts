@@ -26,6 +26,7 @@ export interface InteropCollectorV1 {
     readonly mappingConfidence: number;
     readonly editability: 'native' | 'partial' | 'appearance-only';
     readonly warnings?: readonly ProjectFormatV1.InteropDiagnostic[];
+    readonly sourceIdentity?: ProjectFormatV1.JsonValue;
     readonly preservedBlob?: ProjectFormatV1.BlobReference;
     readonly previewAssetId?: ProjectFormatV1.Id;
     readonly id?: ProjectFormatV1.Id;
@@ -70,6 +71,7 @@ export function createInteropCollectorV1(): InteropCollectorV1 {
     readonly mappingConfidence: number;
     readonly editability: 'native' | 'partial' | 'appearance-only';
     readonly warnings?: readonly ProjectFormatV1.InteropDiagnostic[];
+    readonly sourceIdentity?: ProjectFormatV1.JsonValue;
     readonly preservedBlob?: ProjectFormatV1.BlobReference;
     readonly previewAssetId?: ProjectFormatV1.Id;
     readonly id?: ProjectFormatV1.Id;
@@ -85,6 +87,7 @@ export function createInteropCollectorV1(): InteropCollectorV1 {
       mappingConfidence: normalizedConfidence(input.mappingConfidence),
       editability: input.editability,
       warnings: [...(input.warnings ?? [])],
+      ...(input.sourceIdentity === undefined ? {} : { sourceIdentity: input.sourceIdentity }),
       ...(input.preservedBlob === undefined ? {} : { preservedBlob: input.preservedBlob }),
       ...(input.previewAssetId === undefined ? {} : { previewAssetId: input.previewAssetId }),
     };

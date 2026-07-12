@@ -77,14 +77,18 @@ describe('createInteropCollectorV1', () => {
       mappingConfidence: 0.5,
       editability: 'partial',
       warnings: [],
+      sourceIdentity: { externalId: 'shape-42' },
       preservedBlob,
       previewAssetId: id('preview'),
     });
     const record = collector.build().records[0];
 
     expect(recordId).toBe(id('record-explicit'));
-    expect(record).toMatchObject({ preservedBlob, previewAssetId: id('preview') });
-    expect(Object.hasOwn(record ?? {}, 'sourceIdentity')).toBe(false);
+    expect(record).toMatchObject({
+      preservedBlob,
+      previewAssetId: id('preview'),
+      sourceIdentity: { externalId: 'shape-42' },
+    });
   });
 
   it('returns snapshots that are unaffected by later additions', () => {
