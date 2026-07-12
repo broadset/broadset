@@ -2,6 +2,11 @@ import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { createProjectEditorStore } from './project-store';
+import {
+  selectActiveDocumentV1,
+  selectActiveElementsV1,
+  selectActivePageV1,
+} from './project-store-selectors';
 
 function id(value: string): projectFormatV1.Id {
   return projectFormatV1.idSchema.parse(value);
@@ -225,5 +230,51 @@ describe('createProjectEditorStore', () => {
     expect(store.getState().activeElementIds).toEqual([]);
     expect(store.getState().setActivePage(id('missing-page'))).toBe(false);
     expect(store.getState().project).toBe(project);
+  });
+
+  it('keeps ephemeral geometry outside history and commits grouped moves as one project edit', () => {
+    const project = createProject();
+    const store = createProjectEditorStore({ project });
+    const parentId = project.documents[0]?.elements[0]?.id ?? id('parent');
+    const childId = project.documents[0]?.elements[1]?.id ?? id('child');
+
+    store.getState().updateElementEphemeral(childId, { width: 180 });
+    store.getState().commitElementUpdate(childId, { width: 240, position: { x: 12, y: 18 } });
+
+    expect(store.getState().project.documents[0]?.elements[1]?.geometry.bounds.width).toBe(240);
+    expect(store.getState().project.documents[0]?.elements[1]?.geometry.transform).toEqual({
+      kind: 'affine2d',
+      matrix: [1, 0, 0, 1, 12, 18],
+    });
+
+    store.getState().undo();
+    expect(store.getState().project.documents[0]?.elements[1]?.geometry.bounds.width).toBe(180);
+
+    store.getState().commitGroupMove([
+      { elementId: parentId, position: { x: 20, y: 30 } },
+      { elementId: childId, position: { x: 40, y: 50 } },
+    ]);
+    expect(store.getState().project.documents[0]?.elements.map((element) => element.geometry.transform)).toEqual([
+      { kind: 'affine2d', matrix: [1, 0, 0, 1, 20, 30] },
+      { kind: 'affine2d', matrix: [1, 0, 0, 1, 40, 50] },
+    ]);
+
+    store.getState().undo();
+    expect(store.getState().project.documents[0]?.elements.map((element) => element.geometry.transform)).toEqual([
+      { kind: 'affine2d', matrix: [1, 0, 0, 1, 0, 0] },
+      { kind: 'affine2d', matrix: [1, 0, 0, 1, 0, 0] },
+    ]);
+  });
+
+  it('derives active documents, pages, and elements without duplicating them in state', () => {
+    const project = createProject();
+    const store = createProjectEditorStore({ project });
+    const elementId = project.documents[0]?.elements[1]?.id ?? id('child');
+
+    store.getState().setActiveElements([elementId]);
+
+    expect(selectActiveDocumentV1(store.getState())).toBe(project.documents[0]);
+    expect(selectActivePageV1(store.getState())).toBe(project.documents[0]?.pages[0]);
+    expect(selectActiveElementsV1(store.getState())).toEqual([project.documents[0]?.elements[1]]);
   });
 });

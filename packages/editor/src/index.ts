@@ -16,3 +16,4 @@ export * from './store-ui-actions';
 export * from './template-groups';
 export * from './timeline-playback';
 export * from './transforms';
+export * from './v1-element-geometry';
