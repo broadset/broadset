@@ -39,3 +39,4 @@ export {
   type UnitSystem,
   unitSystemSchema,
 } from './types';
+export { importSvgProjectV1 } from './v1';
