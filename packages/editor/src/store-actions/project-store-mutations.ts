@@ -254,3 +254,83 @@ export function reorderElementInProject(options: {
 
   return isValidProject(candidate) ? candidate : options.project;
 }
+
+export function insertPageIntoProject(options: {
+  readonly project: projectFormatV1.BroadsetProjectV1;
+  readonly documentId: projectFormatV1.Id;
+  readonly page: projectFormatV1.PageDefinition;
+}): projectFormatV1.BroadsetProjectV1 {
+  const document = options.project.documents.find((candidate) => candidate.id === options.documentId);
+
+  if (document === undefined || document.pages.some((page) => page.id === options.page.id)) return options.project;
+
+  const nextDocument: projectFormatV1.BroadsetDocumentV1 = {
+    ...document,
+    pages: [...document.pages, options.page],
+  };
+  const candidate: projectFormatV1.BroadsetProjectV1 = {
+    ...options.project,
+    documents: options.project.documents.map((entry) => (entry.id === document.id ? nextDocument : entry)),
+  };
+
+  return isValidProject(candidate) ? candidate : options.project;
+}
+
+export function removePageFromProject(options: {
+  readonly project: projectFormatV1.BroadsetProjectV1;
+  readonly documentId: projectFormatV1.Id;
+  readonly pageId: projectFormatV1.Id;
+}): projectFormatV1.BroadsetProjectV1 {
+  const document = options.project.documents.find((candidate) => candidate.id === options.documentId);
+
+  if (document === undefined || document.pages.length <= 1 || !document.pages.some((page) => page.id === options.pageId)) {
+    return options.project;
+  }
+
+  const nextDocument: projectFormatV1.BroadsetDocumentV1 = {
+    ...document,
+    pages: document.pages.filter((page) => page.id !== options.pageId),
+  };
+  const candidate: projectFormatV1.BroadsetProjectV1 = {
+    ...options.project,
+    documents: options.project.documents.map((entry) => (entry.id === document.id ? nextDocument : entry)),
+  };
+
+  return isValidProject(candidate) ? candidate : options.project;
+}
+
+export function setPageRootVisibilityInProject(options: {
+  readonly project: projectFormatV1.BroadsetProjectV1;
+  readonly documentId: projectFormatV1.Id;
+  readonly pageId: projectFormatV1.Id;
+  readonly elementId: projectFormatV1.Id;
+  readonly visible: boolean;
+}): projectFormatV1.BroadsetProjectV1 {
+  const document = options.project.documents.find((candidate) => candidate.id === options.documentId);
+  const page = document?.pages.find((candidate) => candidate.id === options.pageId);
+  const instance = page?.rootInstances.find((candidate) => candidate.elementId === options.elementId);
+
+  if (document === undefined || page === undefined || instance === undefined || instance.visible === options.visible) {
+    return options.project;
+  }
+
+  const nextDocument: projectFormatV1.BroadsetDocumentV1 = {
+    ...document,
+    pages: document.pages.map((candidate) =>
+      candidate.id === page.id
+        ? {
+            ...candidate,
+            rootInstances: candidate.rootInstances.map((root) =>
+              root.id === instance.id ? { ...root, visible: options.visible } : root,
+            ),
+          }
+        : candidate,
+    ),
+  };
+  const candidate: projectFormatV1.BroadsetProjectV1 = {
+    ...options.project,
+    documents: options.project.documents.map((entry) => (entry.id === document.id ? nextDocument : entry)),
+  };
+
+  return isValidProject(candidate) ? candidate : options.project;
+}

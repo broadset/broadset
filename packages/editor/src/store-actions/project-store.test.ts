@@ -232,6 +232,35 @@ describe('createProjectEditorStore', () => {
     expect(store.getState().project).toBe(project);
   });
 
+  it('adds, activates, edits, and removes v1 page override layers without invalid state', () => {
+    const project = createProject();
+    const store = createProjectEditorStore({ project });
+    const document = project.documents[0];
+    const rootElementId = document?.elements[0]?.id ?? id('parent');
+    const secondPage = projectFormatV1.createPageV1({
+      id: id('second-page'),
+      name: 'Second page',
+      rootInstances: [
+        {
+          id: id('second-parent-instance'),
+          elementId: rootElementId,
+          overrides: [],
+          componentPropertyValues: [],
+        },
+      ],
+    });
+
+    expect(store.getState().addPage(secondPage)).toBe(true);
+    expect(store.getState().setActivePage(secondPage.id)).toBe(true);
+    expect(store.getState().setPageRootVisibility(rootElementId, false)).toBe(true);
+    expect(selectActivePageV1(store.getState())?.rootInstances[0]?.visible).toBe(false);
+
+    expect(store.getState().removePage(secondPage.id)).toBe(true);
+    expect(store.getState().activePageId).toBe(document?.pages[0]?.id);
+    expect(store.getState().removePage(document?.pages[0]?.id ?? id('page'))).toBe(false);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
+
   it('keeps ephemeral geometry outside history and commits grouped moves as one project edit', () => {
     const project = createProject();
     const store = createProjectEditorStore({ project });

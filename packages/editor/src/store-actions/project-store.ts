@@ -8,8 +8,11 @@ import { updateElementRectV1 } from '../v1-element-geometry';
 import type { ProjectReorderDirection } from './project-store-mutations';
 import {
   insertElementIntoProject,
+  insertPageIntoProject,
+  removePageFromProject,
   reorderElementInProject,
   reparentElementInProject,
+  setPageRootVisibilityInProject,
   updateElementInProject,
   updateElementsInProject,
 } from './project-store-mutations';
@@ -45,6 +48,9 @@ export interface ProjectEditorState {
   readonly getProject: () => projectFormatV1.BroadsetProjectV1;
   readonly setActiveDocument: (documentId: projectFormatV1.Id) => boolean;
   readonly setActivePage: (pageId: projectFormatV1.Id) => boolean;
+  readonly addPage: (page: projectFormatV1.PageDefinition) => boolean;
+  readonly removePage: (pageId: projectFormatV1.Id) => boolean;
+  readonly setPageRootVisibility: (elementId: projectFormatV1.Id, visible: boolean) => boolean;
   readonly setActiveElements: (elementIds: readonly projectFormatV1.Id[]) => void;
   readonly selectElement: (elementId: projectFormatV1.Id | null) => void;
   readonly toggleSelectElement: (elementId: projectFormatV1.Id) => void;
@@ -229,6 +235,70 @@ export function createProjectEditorStore(
           });
 
           return activated;
+        },
+        addPage(page: projectFormatV1.PageDefinition): boolean {
+          let added = false;
+
+          set((state) => {
+            const project = insertPageIntoProject({
+              project: state.project,
+              documentId: state.activeDocumentId,
+              page,
+            });
+
+            if (project === state.project) return {};
+
+            added = true;
+
+            return { project };
+          });
+
+          return added;
+        },
+        removePage(pageId: projectFormatV1.Id): boolean {
+          let removed = false;
+
+          set((state) => {
+            const project = removePageFromProject({
+              project: state.project,
+              documentId: state.activeDocumentId,
+              pageId,
+            });
+
+            if (project === state.project) return {};
+
+            const document = project.documents.find((candidate) => candidate.id === state.activeDocumentId);
+            const activePageId = state.activePageId === pageId ? document?.pages[0]?.id : state.activePageId;
+
+            if (activePageId === undefined) return {};
+
+            removed = true;
+
+            return { project, activePageId, activeElementIds: [] };
+          });
+
+          return removed;
+        },
+        setPageRootVisibility(elementId: projectFormatV1.Id, visible: boolean): boolean {
+          let updated = false;
+
+          set((state) => {
+            const project = setPageRootVisibilityInProject({
+              project: state.project,
+              documentId: state.activeDocumentId,
+              pageId: state.activePageId,
+              elementId,
+              visible,
+            });
+
+            if (project === state.project) return {};
+
+            updated = true;
+
+            return { project };
+          });
+
+          return updated;
         },
         setActiveElements(elementIds: readonly projectFormatV1.Id[]): void {
           set((state) => createSelectionUpdate(state, elementIds));
