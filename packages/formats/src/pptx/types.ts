@@ -173,6 +173,8 @@ export interface PptxImportWarning {
  * fidelity-loss toast based on these codes.
  */
 export type PptxExportWarningCode =
+  /** Native v1 content used a diagnosed legacy-writer fallback during the temporary cutover bridge. */
+  | 'v1-adapter-loss'
   /** `style.boxShadow` couldn't be parsed into `<a:outerShdw>` / `<a:innerShdw>` (e.g. unrecognised colour, malformed length unit). */
   | 'shadow-dropped'
   /** Multi-shadow list truncated — OOXML carries at most one outer shadow + one inner shadow per shape. */
