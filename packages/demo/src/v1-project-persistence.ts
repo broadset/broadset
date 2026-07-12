@@ -37,8 +37,8 @@ export async function loadStoredProjectV1(options: {
     lastValidProject: options.fallbackProject,
   });
 
-  return result.status === 'loaded'
-    ? { project: result.project, diagnostics: result.diagnostics }
+  return result.status === 'loaded' ?
+      { project: result.project, diagnostics: result.diagnostics }
     : {
         project: options.fallbackProject,
         diagnostics: result.diagnostics,

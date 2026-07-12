@@ -39,8 +39,10 @@ import {
   reorderDocumentLayers,
 } from '../demo-utils';
 import { COUNTDOWN_PLUGIN, DEMO_EDITOR_CONFIG } from '../demoConfig';
+import { SAMPLE_PROJECT_V1 } from '../sample-project-v1';
 import { SAMPLE_PROJECT } from '../sampleDocument';
 import { useLiveData } from '../useLiveData';
+import { buildMediaAssetsV1 } from '../v1-demo-project';
 import { useCommandHandlers } from './command-handlers';
 import { getElementLabel, useEditorSelector } from './helpers';
 import { DemoAppLayout } from './layout';
@@ -101,41 +103,7 @@ function areEditorStateEqualIgnoringCanvas(
   return true;
 }
 
-function resolveAssetSourceUrl(source: {
-  readonly type: string;
-  readonly url?: string;
-  readonly dataUri?: string;
-}): string | null {
-  if (source.type === 'url') return source.url ?? null;
-  if (source.type === 'embedded') return source.dataUri ?? null;
-
-  return null;
-}
-
-const SAMPLE_MEDIA_ASSETS: readonly MediaAsset[] = (() => {
-  const parsedProject = broadsetProjectSchema.safeParse(SAMPLE_PROJECT);
-
-  if (!parsedProject.success) {
-    return [];
-  }
-
-  return parsedProject.data.assets.flatMap((asset) => {
-    const sourceUrl = resolveAssetSourceUrl(asset.source);
-
-    if (sourceUrl === null) {
-      return [];
-    }
-
-    return [
-      {
-        id: asset.id,
-        name: asset.name,
-        url: sourceUrl,
-        category: asset.kind,
-      },
-    ];
-  });
-})();
+const SAMPLE_MEDIA_ASSETS: readonly MediaAsset[] = buildMediaAssetsV1(SAMPLE_PROJECT_V1);
 
 export function DemoApp(): React.JSX.Element {
   const [editorStore] = useState<EditorStore>(() => {

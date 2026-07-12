@@ -1,10 +1,10 @@
 import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it, vi } from 'vitest';
 
-import sampleFixture from './sampleDocument.v1.json' with { type: 'json' };
+import { SAMPLE_PROJECT_V1 } from './sample-project-v1';
 import { loadStoredProjectV1, saveStoredProjectV1 } from './v1-project-persistence';
 
-const project = projectFormatV1.broadsetProjectV1Schema.parse(sampleFixture.sampleProject);
+const project = SAMPLE_PROJECT_V1;
 
 describe('v1 project persistence', () => {
   it('loads stored JSON through the bounded v1 loader', async () => {
@@ -35,7 +35,12 @@ describe('v1 project persistence', () => {
   });
 
   it('fails soft when storage is unavailable', () => {
-    const storage = { getItem: vi.fn(() => null), setItem: vi.fn(() => { throw new Error('quota'); }) };
+    const storage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(() => {
+        throw new Error('quota');
+      }),
+    };
 
     expect(saveStoredProjectV1({ storage, storageKey: 'project', project })).toBe(false);
   });

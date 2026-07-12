@@ -1,5 +1,5 @@
 import { projectFormatV1 } from '@broadset/model';
-import type { LayerInfo } from '@broadset/ui';
+import type { LayerInfo, MediaAsset } from '@broadset/ui';
 
 function layerType(element: projectFormatV1.Element): string {
   if (element.kind !== 'vector') return element.kind;
@@ -46,8 +46,7 @@ export function buildLayerInfoListV1(options: {
   }
 
   return instances.map((instance) => {
-    const parent =
-      instance.parentElementId === null ? undefined : elementsById.get(instance.parentElementId);
+    const parent = instance.parentElementId === null ? undefined : elementsById.get(instance.parentElementId);
 
     return {
       id: instance.element.id,
@@ -70,4 +69,12 @@ export function resolveProjectAssetUrlV1(
   const asset = project.resources.assets.find((candidate) => candidate.id === assetId);
 
   return asset?.blob.source.kind === 'external' ? asset.blob.source.url : null;
+}
+
+export function buildMediaAssetsV1(project: projectFormatV1.BroadsetProjectV1): readonly MediaAsset[] {
+  return project.resources.assets.flatMap((asset) => {
+    const url = resolveProjectAssetUrlV1(project, asset.id);
+
+    return url === null ? [] : [{ id: asset.id, name: asset.name, url, category: asset.kind }];
+  });
 }

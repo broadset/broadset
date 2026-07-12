@@ -1,15 +1,16 @@
 import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
-import sampleFixture from './sampleDocument.v1.json' with { type: 'json' };
+import { SAMPLE_PROJECT_V1 } from './sample-project-v1';
 import {
   buildLayerInfoListV1,
+  buildMediaAssetsV1,
   resolveProjectAssetUrlV1,
   selectDocumentV1,
   selectPageV1,
 } from './v1-demo-project';
 
-const project = projectFormatV1.broadsetProjectV1Schema.parse(sampleFixture.sampleProject);
+const project = SAMPLE_PROJECT_V1;
 const documentId = projectFormatV1.idSchema.parse('doc-broadcast-main');
 const pageId = projectFormatV1.idSchema.parse('page-match-live');
 
@@ -33,5 +34,6 @@ describe('v1 demo project selectors', () => {
       'https://picsum.photos/id/102/150/150',
     );
     expect(resolveProjectAssetUrlV1(project, projectFormatV1.idSchema.parse('asset-replay-clip'))).toBeNull();
+    expect(buildMediaAssetsV1(project)).toHaveLength(4);
   });
 });
