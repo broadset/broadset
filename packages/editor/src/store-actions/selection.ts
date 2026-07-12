@@ -1,6 +1,7 @@
 import type { BroadsetDocument } from '@broadset/model';
 
-import type { EditingMode, EditorState, PlacementState } from './store';
+import type { EditingMode, PlacementState } from '../editing-state';
+import type { EditorState } from './store';
 
 function createEditingMode(
   placement: PlacementState | null,

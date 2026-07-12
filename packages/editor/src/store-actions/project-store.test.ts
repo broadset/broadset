@@ -277,4 +277,23 @@ describe('createProjectEditorStore', () => {
     expect(selectActivePageV1(store.getState())).toBe(project.documents[0]?.pages[0]);
     expect(selectActiveElementsV1(store.getState())).toEqual([project.documents[0]?.elements[1]]);
   });
+
+  it('keeps selection and editing-mode side effects on v1 element identities', () => {
+    const project = createProject();
+    const store = createProjectEditorStore({ project });
+    const parentId = project.documents[0]?.elements[0]?.id ?? id('parent');
+    const childId = project.documents[0]?.elements[1]?.id ?? id('child');
+
+    store.getState().selectElement(parentId);
+    store.getState().toggleSelectElement(childId);
+
+    expect(store.getState().activeElementIds).toEqual([parentId, childId]);
+
+    store.getState().enterPathEditing(childId);
+    expect(store.getState().editingMode).toEqual({ type: 'path-editing', elementId: childId });
+
+    store.getState().selectElement(parentId);
+    expect(store.getState().pathEditingElementId).toBeNull();
+    expect(store.getState().editingMode).toEqual({ type: 'none' });
+  });
 });

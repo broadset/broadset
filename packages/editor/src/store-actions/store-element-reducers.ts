@@ -1,7 +1,7 @@
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 
+import type { PlacementState } from '../editing-state';
 import { createInteractionState } from './selection';
-import type { PlacementState } from './store';
 import { collectDescendantIds } from './transform';
 
 export type ReorderDirection = 'forward' | 'backward' | 'front' | 'back';

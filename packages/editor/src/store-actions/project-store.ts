@@ -2,6 +2,7 @@ import { projectFormatV1 } from '@broadset/model';
 import { temporal, type TemporalState } from 'zundo';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
+import type { EditingMode, PlacementPoint, PlacementState } from '../editing-state';
 import { removeDocumentElementsV1 } from '../project-v1-mutations';
 import { updateElementRectV1 } from '../v1-element-geometry';
 import type { ProjectReorderDirection } from './project-store-mutations';
@@ -32,11 +33,22 @@ export interface ProjectEditorState {
   readonly activeDocumentId: projectFormatV1.Id;
   readonly activePageId: projectFormatV1.Id;
   readonly activeElementIds: readonly projectFormatV1.Id[];
+  readonly placement: PlacementState | null;
+  readonly placementPreview: PlacementPoint | null;
+  readonly pathEditingElementId: projectFormatV1.Id | null;
+  readonly pathDrawingElementId: projectFormatV1.Id | null;
+  readonly clipPathEditingElementId: projectFormatV1.Id | null;
+  readonly motionPathEditingElementId: projectFormatV1.Id | null;
+  readonly inlineTextEditingElementId: projectFormatV1.Id | null;
+  readonly editingMode: EditingMode;
   readonly setProject: (project: projectFormatV1.BroadsetProjectV1) => void;
   readonly getProject: () => projectFormatV1.BroadsetProjectV1;
   readonly setActiveDocument: (documentId: projectFormatV1.Id) => boolean;
   readonly setActivePage: (pageId: projectFormatV1.Id) => boolean;
   readonly setActiveElements: (elementIds: readonly projectFormatV1.Id[]) => void;
+  readonly selectElement: (elementId: projectFormatV1.Id | null) => void;
+  readonly toggleSelectElement: (elementId: projectFormatV1.Id) => void;
+  readonly enterPathEditing: (elementId: projectFormatV1.Id) => void;
   readonly addElement: (element: projectFormatV1.Element) => projectFormatV1.Id | null;
   readonly updateElement: (
     elementId: projectFormatV1.Id,
@@ -125,6 +137,33 @@ function applyProjectElementUpdate(
     : { ...geometryUpdated, name: update.name };
 }
 
+function createSelectionUpdate(
+  state: ProjectEditorState,
+  elementIds: readonly projectFormatV1.Id[],
+): Partial<ProjectEditorState> {
+  const activeElementIds = filterElementIds(state.project, state.activeDocumentId, elementIds);
+  const editingElementId =
+    state.pathEditingElementId ??
+    state.pathDrawingElementId ??
+    state.clipPathEditingElementId ??
+    state.motionPathEditingElementId ??
+    state.inlineTextEditingElementId;
+  const preservesEditing =
+    editingElementId !== null && activeElementIds.length === 1 && activeElementIds[0] === editingElementId;
+
+  return preservesEditing
+    ? { activeElementIds }
+    : {
+        activeElementIds,
+        pathEditingElementId: null,
+        pathDrawingElementId: null,
+        clipPathEditingElementId: null,
+        motionPathEditingElementId: null,
+        inlineTextEditingElementId: null,
+        editingMode: { type: 'none' },
+      };
+}
+
 export function createProjectEditorStore(
   options: CreateProjectEditorStoreOptions = {},
 ): ProjectEditorStore {
@@ -137,6 +176,14 @@ export function createProjectEditorStore(
         project: initialProject,
         ...initialLocation,
         activeElementIds: [],
+        placement: null,
+        placementPreview: null,
+        pathEditingElementId: null,
+        pathDrawingElementId: null,
+        clipPathEditingElementId: null,
+        motionPathEditingElementId: null,
+        inlineTextEditingElementId: null,
+        editingMode: { type: 'none' },
         setProject(project: projectFormatV1.BroadsetProjectV1): void {
           const location = resolveInitialLocation(project);
 
@@ -184,9 +231,36 @@ export function createProjectEditorStore(
           return activated;
         },
         setActiveElements(elementIds: readonly projectFormatV1.Id[]): void {
-          set((state) => ({
-            activeElementIds: filterElementIds(state.project, state.activeDocumentId, elementIds),
-          }));
+          set((state) => createSelectionUpdate(state, elementIds));
+        },
+        selectElement(elementId: projectFormatV1.Id | null): void {
+          set((state) => createSelectionUpdate(state, elementId === null ? [] : [elementId]));
+        },
+        toggleSelectElement(elementId: projectFormatV1.Id): void {
+          set((state) => {
+            const elementIds = state.activeElementIds.includes(elementId)
+              ? state.activeElementIds.filter((activeId) => activeId !== elementId)
+              : [...state.activeElementIds, elementId];
+
+            return createSelectionUpdate(state, elementIds);
+          });
+        },
+        enterPathEditing(elementId: projectFormatV1.Id): void {
+          set((state) => {
+            const selection = filterElementIds(state.project, state.activeDocumentId, [elementId]);
+
+            return selection.length === 0
+              ? {}
+              : {
+                  activeElementIds: selection,
+                  pathEditingElementId: elementId,
+                  pathDrawingElementId: null,
+                  clipPathEditingElementId: null,
+                  motionPathEditingElementId: null,
+                  inlineTextEditingElementId: null,
+                  editingMode: { type: 'path-editing', elementId },
+                };
+          });
         },
         addElement(element: projectFormatV1.Element): projectFormatV1.Id | null {
           let addedElementId: projectFormatV1.Id | null = null;

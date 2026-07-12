@@ -12,12 +12,20 @@ import React, {
 } from 'react';
 
 import type { BroadsetDataStore, ElementData } from './data-store';
-import type { EditorStore } from './store-actions';
+import type { EditorStore, ProjectEditorStore } from './store-actions';
 
 const DataStoreContext = createContext<BroadsetDataStore | null>(null);
 
 const EditorContext = createContext<{
   readonly store: EditorStore;
+  readonly components: ReadonlyArray<{
+    readonly type: string;
+    readonly [key: string]: unknown;
+  }>;
+} | null>(null);
+
+const ProjectEditorContext = createContext<{
+  readonly store: ProjectEditorStore;
   readonly components: ReadonlyArray<{
     readonly type: string;
     readonly [key: string]: unknown;
@@ -84,6 +92,32 @@ export function EditorProvider({
     );
 }
 
+/** Provider for the v1 project-backed editor store during the host cutover. */
+export function ProjectEditorProvider({
+  store,
+  dataStore,
+  components,
+  children,
+}: {
+  readonly store: ProjectEditorStore;
+  readonly dataStore: BroadsetDataStore | null;
+  readonly components?: ReadonlyArray<{
+    readonly type: string;
+    readonly [key: string]: unknown;
+  }>;
+  readonly children: ReactNode;
+}): React.JSX.Element {
+  const editorTree = (
+    <ProjectEditorContext.Provider value={{ store, components: components ?? [] }}>
+      {children}
+    </ProjectEditorContext.Provider>
+  );
+
+  return dataStore === null ? editorTree : (
+      <BroadsetDataStoreProvider store={dataStore}>{editorTree}</BroadsetDataStoreProvider>
+    );
+}
+
 /** Returns the current editor store. Must be used inside an EditorProvider. */
 export function useEditorStore(): EditorStore {
   const contextValue = useContext(EditorContext);
@@ -95,18 +129,30 @@ export function useEditorStore(): EditorStore {
   return contextValue.store;
 }
 
+/** Returns the v1 project-backed editor store. Must be used inside a ProjectEditorProvider. */
+export function useProjectEditorStore(): ProjectEditorStore {
+  const contextValue = useContext(ProjectEditorContext);
+
+  if (contextValue === null) {
+    throw new Error('useProjectEditorStore must be used inside a ProjectEditorProvider');
+  }
+
+  return contextValue.store;
+}
+
 /** Returns the registered component plugins inside the EditorProvider tree. */
 export function useComponentRegistry(): ReadonlyArray<{
   readonly type: string;
   readonly [key: string]: unknown;
 }> {
   const contextValue = useContext(EditorContext);
+  const projectContextValue = useContext(ProjectEditorContext);
 
-  if (contextValue === null) {
+  if (contextValue === null && projectContextValue === null) {
     throw new Error('useComponentRegistry must be used inside an EditorProvider');
   }
 
-  return contextValue.components;
+  return projectContextValue?.components ?? contextValue?.components ?? [];
 }
 
 export interface PlaybackState {

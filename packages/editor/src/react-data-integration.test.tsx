@@ -9,16 +9,16 @@ import { createDataStore } from './data-store';
 import {
   BroadsetDataStoreProvider,
   EditorErrorBoundary,
-  EditorProvider,
   PlaybackProvider,
   type PlaybackState,
+  ProjectEditorProvider,
   useComponentRegistry,
   useDataStoreApi,
-  useEditorStore,
   useElementData,
   usePlayback,
+  useProjectEditorStore,
 } from './react-data-integration';
-import { createEditorStore } from './store-actions';
+import { createProjectEditorStore } from './store-actions';
 
 function DataWrapper({
   store,
@@ -179,22 +179,22 @@ describe('reactive propagation and selector isolation', () => {
 describe('editor provider and error boundary', () => {
   /** @description The editor provider must expose the editor store and component registry throughout the React tree for all editor shell integrations. */
   it('provides editor store access and registered component plugins', () => {
-    const editorStore = createEditorStore();
+    const editorStore = createProjectEditorStore();
     const components = [{ type: 'custom-widget', label: 'Widget' }];
     let resolvedStore: unknown = null;
     let resolvedRegistry: unknown = null;
 
     function Consumer(): React.JSX.Element {
-      resolvedStore = useEditorStore();
+      resolvedStore = useProjectEditorStore();
       resolvedRegistry = useComponentRegistry();
 
       return <span>ok</span>;
     }
 
     render(
-      <EditorProvider store={editorStore} dataStore={null} components={components}>
+      <ProjectEditorProvider store={editorStore} dataStore={null} components={components}>
         <Consumer />
-      </EditorProvider>,
+      </ProjectEditorProvider>,
     );
 
     expect(resolvedStore).toBe(editorStore);
