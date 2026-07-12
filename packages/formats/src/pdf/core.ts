@@ -673,8 +673,9 @@ export async function exportPdfWithPreflight(
   doc: BroadsetDocument,
   fetchOrOptions?: typeof globalThis.fetch | PdfExportOptions,
 ): Promise<PdfExportResult> {
-  const preflightWarnings = collectPreflightWarnings(doc);
-  const { bytes, runtimeWarnings } = await runExport(doc, fetchOrOptions);
+  const options = resolveOptions(fetchOrOptions);
+  const preflightWarnings = collectPreflightWarnings(doc, options);
+  const { bytes, runtimeWarnings } = await runExport(doc, options);
 
   return { bytes, warnings: [...preflightWarnings, ...runtimeWarnings] };
 }
@@ -741,6 +742,7 @@ async function runExport(
     subsetFonts: options.subsetFonts,
     fontFetchTimeoutMs: options.fontFetchTimeoutMs,
     fontMaxBytes: options.fontMaxBytes,
+    fontBytesByFamily: options.fontBytesByFamily,
   });
   const elementsById = indexElementsById(doc.elements);
 

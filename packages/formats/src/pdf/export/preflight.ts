@@ -1,6 +1,7 @@
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 
 import { normalizeFontFamily } from '../fonts';
+import type { PdfExportOptions } from '../types';
 import { elementFontIdentity } from './fonts';
 
 /**
@@ -36,17 +37,20 @@ const STANDARD_FAMILIES: ReadonlySet<string> = new Set([
  * effecting fetches itself; the actual font-resolution / image-fetch
  * pipeline upgrades the warnings during render with extra detail.
  */
-export function collectPreflightWarnings(doc: BroadsetDocument): readonly string[] {
+export function collectPreflightWarnings(doc: BroadsetDocument, options: PdfExportOptions = {}): readonly string[] {
   const warnings: string[] = [];
 
-  warnings.push(...collectFontWarnings(doc));
+  warnings.push(...collectFontWarnings(doc, options.fontBytesByFamily ?? new Map()));
   warnings.push(...collectAnimationWarnings(doc));
   warnings.push(...collectRasterFallbackWarnings(doc));
 
   return warnings;
 }
 
-function collectFontWarnings(doc: BroadsetDocument): readonly string[] {
+function collectFontWarnings(
+  doc: BroadsetDocument,
+  fontBytesByFamily: ReadonlyMap<string, Uint8Array>,
+): readonly string[] {
   const warnings: string[] = [];
   const seenFamilies = new Set<string>();
 
@@ -60,6 +64,7 @@ function collectFontWarnings(doc: BroadsetDocument): readonly string[] {
     const normalized = normalizeFontFamily(family);
 
     if (STANDARD_FAMILIES.has(normalized)) continue;
+    if (fontBytesByFamily.has(normalized)) continue;
 
     if (seenFamilies.has(normalized)) continue;
 
@@ -70,7 +75,7 @@ function collectFontWarnings(doc: BroadsetDocument): readonly string[] {
   }
 
   // Variant warnings — bold/italic without a Standard 14 base family will fall back too.
-  if (doc.elements.some(usesNonStandardBoldOrItalic)) {
+  if (doc.elements.some((element) => usesNonStandardBoldOrItalic(element, fontBytesByFamily))) {
     warnings.push(
       'PDF preflight: text elements with bold or italic styles outside the Standard 14 family set will use the matching Helvetica variant fallback unless the font asset pipeline (Phase 4 P4.5 subsetting) is wired.',
     );
@@ -79,14 +84,14 @@ function collectFontWarnings(doc: BroadsetDocument): readonly string[] {
   return warnings;
 }
 
-function usesNonStandardBoldOrItalic(el: BroadsetElement): boolean {
+function usesNonStandardBoldOrItalic(el: BroadsetElement, fontBytesByFamily: ReadonlyMap<string, Uint8Array>): boolean {
   if (el.type !== 'text') return false;
 
   const id = elementFontIdentity(el);
 
   if (!id.isBold && !id.isItalic) return false;
 
-  return !STANDARD_FAMILIES.has(id.familyKey);
+  return !STANDARD_FAMILIES.has(id.familyKey) && !fontBytesByFamily.has(id.familyKey);
 }
 
 function collectAnimationWarnings(doc: BroadsetDocument): readonly string[] {
