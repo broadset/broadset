@@ -9,6 +9,7 @@ export * from './extensions-dirty';
 export * from './inline-text';
 export * from './keyboard';
 export * from './path-geometry';
+export * from './project-v1-mutations';
 export * from './react-data-integration';
 export * from './store-actions';
 export * from './store-ui-actions';
