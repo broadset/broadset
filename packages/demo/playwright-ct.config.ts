@@ -10,7 +10,9 @@ export default defineConfig({
   reporter: [['list']],
   fullyParallel: true,
   forbidOnly: !!process.env['CI'],
-  retries: process.env['CI'] ? 1 : 0,
+  // Mirror CI's flake-tolerance locally too: timing-variant CT retries once before failing, so the
+  // local pre-push gate predicts CI instead of failing on transient flakes CI would have absorbed.
+  retries: 1,
   timeout: 30_000,
   ...(process.env['CI'] ? { workers: 2 } : {}),
   expect: {
