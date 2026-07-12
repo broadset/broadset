@@ -158,6 +158,52 @@ describe('createProjectEditorStore', () => {
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
   });
 
+  it('accepts timeline and data-model document edits only when whole-project invariants survive', () => {
+    const project = createProject();
+    const store = createProjectEditorStore({ project });
+
+    expect(
+      store.getState().updateActiveDocument((document) => ({
+        ...document,
+        sequences: [
+          {
+            id: id('sequence'),
+            name: 'Sequence',
+            durationTicks: 1000,
+            loop: { kind: 'none' },
+            tracks: [],
+            markers: [],
+            cues: [],
+            childClips: [],
+          },
+        ],
+        viewModels: [
+          {
+            id: id('view-model'),
+            name: 'Data',
+            fields: [
+              {
+                id: id('headline'),
+                name: 'headline',
+                schema: { kind: 'string' },
+                defaultValue: { type: 'string', value: 'Live' },
+              },
+            ],
+            sampleDataSets: [],
+          },
+        ],
+      })),
+    ).toBe(true);
+    expect(store.getState().project.documents[0]?.sequences[0]?.id).toBe(id('sequence'));
+    expect(store.getState().project.documents[0]?.viewModels[0]?.fields[0]?.id).toBe(id('headline'));
+
+    const validProject = store.getState().project;
+
+    expect(store.getState().updateActiveDocument((document) => ({ ...document, pages: [] }))).toBe(false);
+    expect(store.getState().project).toBe(validProject);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(validProject)).toEqual([]);
+  });
+
   it('reparents elements while maintaining root placements and rejecting invalid parents', () => {
     const project = createProject();
     const store = createProjectEditorStore({ project });

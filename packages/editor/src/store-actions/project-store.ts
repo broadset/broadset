@@ -13,6 +13,7 @@ import {
   reorderElementInProject,
   reparentElementInProject,
   setPageRootVisibilityInProject,
+  updateDocumentInProject,
   updateElementInProject,
   updateElementsInProject,
 } from './project-store-mutations';
@@ -51,6 +52,9 @@ export interface ProjectEditorState {
   readonly addPage: (page: projectFormatV1.PageDefinition) => boolean;
   readonly removePage: (pageId: projectFormatV1.Id) => boolean;
   readonly setPageRootVisibility: (elementId: projectFormatV1.Id, visible: boolean) => boolean;
+  readonly updateActiveDocument: (
+    updater: (document: projectFormatV1.BroadsetDocumentV1) => projectFormatV1.BroadsetDocumentV1,
+  ) => boolean;
   readonly setActiveElements: (elementIds: readonly projectFormatV1.Id[]) => void;
   readonly selectElement: (elementId: projectFormatV1.Id | null) => void;
   readonly toggleSelectElement: (elementId: projectFormatV1.Id) => void;
@@ -289,6 +293,27 @@ export function createProjectEditorStore(
               pageId: state.activePageId,
               elementId,
               visible,
+            });
+
+            if (project === state.project) return {};
+
+            updated = true;
+
+            return { project };
+          });
+
+          return updated;
+        },
+        updateActiveDocument(
+          updater: (document: projectFormatV1.BroadsetDocumentV1) => projectFormatV1.BroadsetDocumentV1,
+        ): boolean {
+          let updated = false;
+
+          set((state) => {
+            const project = updateDocumentInProject({
+              project: state.project,
+              documentId: state.activeDocumentId,
+              updater,
             });
 
             if (project === state.project) return {};

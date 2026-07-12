@@ -113,6 +113,27 @@ export function updateElementsInProject(options: {
   return isValidProject(candidate) ? candidate : options.project;
 }
 
+export function updateDocumentInProject(options: {
+  readonly project: projectFormatV1.BroadsetProjectV1;
+  readonly documentId: projectFormatV1.Id;
+  readonly updater: (document: projectFormatV1.BroadsetDocumentV1) => projectFormatV1.BroadsetDocumentV1;
+}): projectFormatV1.BroadsetProjectV1 {
+  const document = options.project.documents.find((candidate) => candidate.id === options.documentId);
+
+  if (document === undefined) return options.project;
+
+  const nextDocument = options.updater(document);
+
+  if (nextDocument === document || nextDocument.id !== document.id) return options.project;
+
+  const candidate: projectFormatV1.BroadsetProjectV1 = {
+    ...options.project,
+    documents: options.project.documents.map((entry) => (entry.id === document.id ? nextDocument : entry)),
+  };
+
+  return isValidProject(candidate) ? candidate : options.project;
+}
+
 function collectSubtreeIds(
   elements: readonly projectFormatV1.Element[],
   rootElementId: projectFormatV1.Id,
