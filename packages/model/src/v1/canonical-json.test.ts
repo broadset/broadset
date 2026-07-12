@@ -4,7 +4,11 @@ import { createMinimalProjectV1 } from './fixtures/minimal-project';
 import {
   broadsetProjectV1Schema,
   canonicalizeProjectV1,
+  computeCanonicalJsonHashV1,
   computeProjectSemanticHashV1,
+  createElementGeometry,
+  createElementV1,
+  idSchema,
   type JsonValue,
   PROJECT_V1_LIMITS,
   ProjectV1LimitError,
@@ -145,6 +149,31 @@ describe('v1 canonical JSON', () => {
         metadata: { ...second.metadata, generator: { ...second.metadata.generator, version: '2.0.0' } },
       }),
     ).not.toBe(await computeProjectSemanticHashV1(second));
+  });
+
+  it('hashes arbitrary semantic JSON independently of object insertion order', async () => {
+    const first = { z: [1, true, null], a: { label: 'Ångström' } };
+    const reordered = { a: { label: 'Ångström' }, z: [1, true, null] };
+
+    expect(await computeCanonicalJsonHashV1(first)).toBe(await computeCanonicalJsonHashV1(reordered));
+    expect(await computeCanonicalJsonHashV1({ ...reordered, z: [2, true, null] })).not.toBe(
+      await computeCanonicalJsonHashV1(first),
+    );
+  });
+
+  it.each([
+    ['pdf-root', 'PDF page root', 'sha256:054fcbd2a39a8c63a8dd6bb4153aaeaeabb0e1ed80b6137d4ef667b8e993f123'],
+    ['psd-import-root', 'PSD root', 'sha256:4a95f230785c5f859d1d43e3fafa8ed7ce56d9cce4727b9cfd619030c4095865'],
+    ['pptx-fallback-root', 'PPTX fallback', 'sha256:a656d6a0cfe01994e28993fba7cbffd197a2f51e072ff52913559a7ae7f000f4'],
+  ])('pins the canonical fallback element vector for %s', async (elementId, name, expected) => {
+    const element = createElementV1({
+      id: idSchema.parse(elementId),
+      name,
+      geometry: createElementGeometry({ width: 1, height: 1 }),
+      kind: 'group',
+    });
+
+    expect(await computeCanonicalJsonHashV1(element)).toBe(expected);
   });
 
   it('matches the published multilingual semantic-hash vector', async () => {

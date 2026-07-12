@@ -11,8 +11,8 @@ describe('v1 compiler export inventory', () => {
   it('matches every value and type symbol against fixed public API oracles', () => {
     const actual = readV1CompilerExportInventory();
 
-    expect(V1_COMPLETE_EXPORT_NAMES).toHaveLength(309);
-    expect(V1_RUNTIME_EXPORT_NAMES).toHaveLength(138);
+    expect(V1_COMPLETE_EXPORT_NAMES).toHaveLength(310);
+    expect(V1_RUNTIME_EXPORT_NAMES).toHaveLength(139);
     expect(V1_TYPE_EXPORT_NAMES).toHaveLength(172);
     expect(actual.names).toHaveLength(V1_COMPLETE_EXPORT_NAMES.length);
     expect(actual.runtimeNames).toHaveLength(V1_RUNTIME_EXPORT_NAMES.length);

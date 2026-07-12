@@ -5,6 +5,7 @@ import * as packageRoot from '../index';
 import {
   broadsetProjectV1Schema,
   canonicalizeProjectV1,
+  computeCanonicalJsonHashV1,
   computeProjectSemanticHashV1,
   loadProjectV1Json,
   parseProjectV1Unknown,
@@ -316,6 +317,9 @@ describe('v1 package public API', () => {
     expect(parseProjectV1Unknown(project)).toEqual({ status: 'loaded', project, diagnostics: [] });
     expect(validateBroadsetProjectV1Semantics(project)).toEqual([]);
     expect(canonicalizeProjectV1(project)).toBe(projectFormatV1.canonicalizeProjectV1(project));
+    await expect(computeCanonicalJsonHashV1(document)).resolves.toBe(
+      await projectFormatV1.computeCanonicalJsonHashV1(document),
+    );
     await expect(computeProjectSemanticHashV1(project)).resolves.toBe(
       await projectFormatV1.computeProjectSemanticHashV1(project),
     );
@@ -328,6 +332,7 @@ describe('v1 package public API', () => {
     expect(broadsetProjectV1Schema).toBe(projectFormatV1.broadsetProjectV1Schema);
     expect(validateBroadsetProjectV1Semantics).toBe(projectFormatV1.validateBroadsetProjectV1Semantics);
     expect(canonicalizeProjectV1).toBe(projectFormatV1.canonicalizeProjectV1);
+    expect(computeCanonicalJsonHashV1).toBe(projectFormatV1.computeCanonicalJsonHashV1);
     expect(computeProjectSemanticHashV1).toBe(projectFormatV1.computeProjectSemanticHashV1);
     expect(loadProjectV1Json).toBe(projectFormatV1.loadProjectV1Json);
     expect(parseProjectV1Unknown).toBe(projectFormatV1.parseProjectV1Unknown);

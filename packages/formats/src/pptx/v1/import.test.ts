@@ -36,9 +36,12 @@ describe('importPptxProjectV1', () => {
   it('maps PowerPoint text and preset shapes to native v1 elements', async () => {
     const result = await importPptxProjectV1({ bytes: powerpointFixture(), importedAt: IMPORTED_AT });
     const elements = result.project.documents[0]?.elements ?? [];
+    const baseline = result.project.interop.records[0];
+    const firstMapped = elements.find(({ id }) => id === baseline?.target.entityId);
 
     expect(elements.some(({ kind }) => kind === 'text')).toBe(true);
     expect(elements.filter(({ kind }) => kind === 'vector').length).toBeGreaterThanOrEqual(2);
+    expect(baseline?.baselineSemanticHash).toBe(await projectFormatV1.computeCanonicalJsonHashV1(firstMapped));
     expectValid(result);
   });
 
