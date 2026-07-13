@@ -39,9 +39,13 @@ export function V1DemoCanvasSurface({
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
     const elementId = readElementId(event.target);
 
-    if (elementId === undefined) return;
-
     const state = editorStore.getState();
+
+    if (elementId === undefined) {
+      state.selectElement(null);
+
+      return;
+    }
 
     if (event.ctrlKey || event.metaKey || event.shiftKey) state.toggleSelectElement(elementId);
     else state.selectElement(elementId);

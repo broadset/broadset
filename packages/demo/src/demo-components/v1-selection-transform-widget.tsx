@@ -13,6 +13,7 @@ import { geometryToBoxStyle } from '@broadset/renderer';
 import { useRef, useState } from 'react';
 
 import { useEditorSelector } from '../demo-app/helpers';
+import { V1MultiSelectionTransformWidget } from './v1-multi-selection-transform-widget';
 
 interface V1SelectionTransformWidgetProps {
   readonly editorStore: ProjectEditorStore;
@@ -99,9 +100,15 @@ export function V1SelectionTransformWidget({
   const gestureRef = useRef<TransformGestureV1 | null>(null);
   const [preview, setPreview] = useState<TransformPreviewV1 | null>(null);
 
+  if (state.activeElementIds.length > 1) {
+    return <V1MultiSelectionTransformWidget editorStore={editorStore} zoom={zoom} />;
+  }
+
   if (element === undefined) return null;
 
   const beginDrag = (event: React.PointerEvent<HTMLButtonElement>): void => {
+    if (event.button !== 0) return;
+
     const rect = getEditorElementRectV1(element);
 
     event.preventDefault();
@@ -123,6 +130,8 @@ export function V1SelectionTransformWidget({
   };
   const beginResize = (handle: ResizeHandle): ((event: React.PointerEvent<HTMLButtonElement>) => void) => {
     return (event): void => {
+      if (event.button !== 0) return;
+
       const rect = getEditorElementRectV1(element);
 
       event.preventDefault();
@@ -145,6 +154,8 @@ export function V1SelectionTransformWidget({
     };
   };
   const beginRotate = (event: React.PointerEvent<HTMLButtonElement>): void => {
+    if (event.button !== 0) return;
+
     const rect = getEditorElementRectV1(element);
     const widgetBounds = event.currentTarget.parentElement?.getBoundingClientRect();
     const hasMeasuredBounds = widgetBounds !== undefined && widgetBounds.width > 0 && widgetBounds.height > 0;

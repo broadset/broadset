@@ -273,4 +273,124 @@ describe('V1DemoCanvasSurface', () => {
     expect(matrix?.[5]).toBe(36);
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
   });
+
+  it('clears v1 selection on empty-canvas pointer-down', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+    const { getByTestId } = render(
+      <V1DemoCanvasSurface
+        documentId={projectFormatV1.idSchema.parse('doc-broadcast-main')}
+        editorStore={store}
+        pageId={projectFormatV1.idSchema.parse('page-match-live')}
+        project={SAMPLE_PROJECT_V1}
+      />,
+    );
+
+    act(() => {
+      store.getState().selectElement(projectFormatV1.idSchema.parse('el-scorebug'));
+    });
+
+    fireEvent.pointerDown(getByTestId('v1-canvas-surface'));
+
+    expect(store.getState().activeElementIds).toEqual([]);
+  });
+
+  it('shows v1 transform bounds for a multi-element selection', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+    const { getByTestId } = render(
+      <V1DemoCanvasSurface
+        documentId={projectFormatV1.idSchema.parse('doc-broadcast-main')}
+        editorStore={store}
+        pageId={projectFormatV1.idSchema.parse('page-match-live')}
+        project={SAMPLE_PROJECT_V1}
+      />,
+    );
+
+    act(() => {
+      store
+        .getState()
+        .setActiveElements([
+          projectFormatV1.idSchema.parse('el-scorebug'),
+          projectFormatV1.idSchema.parse('el-network-bug'),
+        ]);
+    });
+
+    const widget = getByTestId('demo-transform-widget');
+
+    expect(widget.style.width).toBe('1832px');
+    expect(widget.style.height).toBe('76px');
+    expect(widget.style.transform).toBe('matrix(1, 0, 0, 1, 48, 36)');
+  });
+
+  it('moves a v1 multi-selection as one undoable project edit', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+    const scorebugId = projectFormatV1.idSchema.parse('el-scorebug');
+    const networkBugId = projectFormatV1.idSchema.parse('el-network-bug');
+    const { getByTestId } = render(
+      <V1DemoCanvasSurface
+        documentId={projectFormatV1.idSchema.parse('doc-broadcast-main')}
+        editorStore={store}
+        pageId={projectFormatV1.idSchema.parse('page-match-live')}
+        project={SAMPLE_PROJECT_V1}
+      />,
+    );
+
+    act(() => {
+      store.getState().setActiveElements([scorebugId, networkBugId]);
+    });
+
+    const bounds = getByTestId('transform-bounds');
+
+    fireEvent.pointerDown(bounds, { clientX: 100, clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(bounds, { clientX: 120, clientY: 110, pointerId: 1 });
+    fireEvent.pointerUp(bounds, { clientX: 120, clientY: 110, pointerId: 1 });
+
+    const moved = store
+      .getState()
+      .project.documents[0]?.elements.filter((element) => element.id === scorebugId || element.id === networkBugId);
+
+    expect(moved?.map((element) => element.geometry.transform)).toEqual([
+      { kind: 'affine2d', matrix: [1, 0, 0, 1, 68, 46] },
+      { kind: 'affine2d', matrix: [1, 0, 0, 1, 1828, 46] },
+    ]);
+
+    act(() => {
+      store.getState().undo();
+    });
+
+    const restored = store
+      .getState()
+      .project.documents[0]?.elements.filter((element) => element.id === scorebugId || element.id === networkBugId);
+
+    expect(restored?.map((element) => element.geometry.transform)).toEqual([
+      { kind: 'affine2d', matrix: [1, 0, 0, 1, 48, 36] },
+      { kind: 'affine2d', matrix: [1, 0, 0, 1, 1808, 36] },
+    ]);
+  });
+
+  it('ignores non-primary pointer gestures on v1 transform bounds', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+    const elementId = projectFormatV1.idSchema.parse('el-scorebug');
+    const { getByTestId } = render(
+      <V1DemoCanvasSurface
+        documentId={projectFormatV1.idSchema.parse('doc-broadcast-main')}
+        editorStore={store}
+        pageId={projectFormatV1.idSchema.parse('page-match-live')}
+        project={SAMPLE_PROJECT_V1}
+      />,
+    );
+
+    act(() => {
+      store.getState().selectElement(elementId);
+    });
+
+    const bounds = getByTestId('transform-bounds');
+
+    fireEvent.pointerDown(bounds, { button: 2, clientX: 100, clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(bounds, { button: 2, clientX: 125, clientY: 130, pointerId: 1 });
+    fireEvent.pointerUp(bounds, { button: 2, clientX: 125, clientY: 130, pointerId: 1 });
+
+    const element = store.getState().project.documents[0]?.elements.find((candidate) => candidate.id === elementId);
+
+    expect(element?.geometry.transform).toEqual({ kind: 'affine2d', matrix: [1, 0, 0, 1, 48, 36] });
+  });
 });
