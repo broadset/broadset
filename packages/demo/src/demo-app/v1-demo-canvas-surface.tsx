@@ -37,6 +37,57 @@ interface CanvasContextMenuV1 {
   readonly y: number;
 }
 
+interface PlacementAnchorV1 {
+  readonly x: number;
+  readonly y: number;
+}
+
+function placementName(elementType: string): string {
+  if (elementType === 'ellipse') return 'Ellipse';
+  if (elementType === 'group') return 'Group';
+
+  return 'Rectangle';
+}
+
+function createPlacedElement(options: {
+  readonly elementType: string;
+  readonly start: PlacementAnchorV1;
+  readonly end: PlacementAnchorV1;
+}): projectFormatV1.Element {
+  const x = Math.min(options.start.x, options.end.x);
+  const y = Math.min(options.start.y, options.end.y);
+  const width = Math.max(1, Math.abs(options.end.x - options.start.x));
+  const height = Math.max(1, Math.abs(options.end.y - options.start.y));
+  const geometry = projectFormatV1.createElementGeometry({
+    width,
+    height,
+    transform: { kind: 'affine2d', matrix: [1, 0, 0, 1, x, y] },
+  });
+  const id = projectFormatV1.idSchema.parse(crypto.randomUUID());
+  const name = placementName(options.elementType);
+
+  if (options.elementType === 'ellipse') {
+    return projectFormatV1.createElementV1({
+      id,
+      geometry,
+      kind: 'vector',
+      name,
+      geometryData: projectFormatV1.createEllipseGeometry(),
+    });
+  }
+
+  if (options.elementType === 'group') return projectFormatV1.createElementV1({ id, geometry, kind: 'group', name });
+
+  // Tools without an authoring payload start as a schema-valid editable vector placeholder.
+  return projectFormatV1.createElementV1({
+    id,
+    geometry,
+    kind: 'vector',
+    name,
+    geometryData: projectFormatV1.createRectangleGeometry(),
+  });
+}
+
 function readElementId(target: EventTarget | null): projectFormatV1.Id | undefined {
   if (!(target instanceof Element)) return undefined;
 
@@ -103,6 +154,7 @@ export function V1DemoCanvasSurface({
   const placementActive = useEditorSelector(editorStore, (state) => state.placement !== null);
   const document = project.documents.find((candidate) => candidate.id === documentId);
   const panGestureRef = useRef<CanvasPanGestureV1 | null>(null);
+  const placementAnchorRef = useRef<PlacementAnchorV1 | null>(null);
   const clipboardRef = useRef<readonly projectFormatV1.Element[]>([]);
   const [contextMenu, setContextMenu] = useState<CanvasContextMenuV1 | null>(null);
   const [hasClipboardContents, setHasClipboardContents] = useState(false);
@@ -128,6 +180,30 @@ export function V1DemoCanvasSurface({
     }
 
     if (event.button === 2) return;
+
+    const placement = editorStore.getState().placement;
+
+    if (placement?.type === 'placement-anchor') {
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const point = {
+        x: (event.clientX - bounds.left - viewport.panX) / viewport.zoom,
+        y: (event.clientY - bounds.top - viewport.panY) / viewport.zoom,
+      };
+
+      if (placementAnchorRef.current === null) {
+        placementAnchorRef.current = point;
+      } else {
+        editorStore.getState().addElement(
+          createPlacedElement({ elementType: placement.elementType, start: placementAnchorRef.current, end: point }),
+        );
+        placementAnchorRef.current = null;
+        editorStore.getState().cancelPlacement();
+      }
+
+      event.preventDefault();
+
+      return;
+    }
 
     if (redispatchRetargetedOverlayPointer(event)) {
       event.preventDefault();

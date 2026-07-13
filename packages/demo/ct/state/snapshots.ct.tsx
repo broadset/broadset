@@ -34,7 +34,7 @@ test('save captures state, mutation diverges, restore reverts canvas and layers 
   await saveSnapshotWithName(page, 'Before Delete');
 
   // --- Switch to Layers panel so we can observe the secondary region ---
-  await page.locator('button[aria-label="Layers"]').first().click();
+  await page.getByRole('tab', { name: 'Layers' }).click();
 
   const liveDotLayer = page.getByLabel(`Select ${FIXTURE_LAYER_LABELS.liveOrb}`);
 

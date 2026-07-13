@@ -13,6 +13,13 @@ interface V1ViewportToolbarProps {
   readonly editorStore: ProjectEditorStore;
 }
 
+interface NamedProjectSnapshotV1 {
+  readonly id: string;
+  readonly name: string;
+  readonly project: projectFormatV1.BroadsetProjectV1;
+  readonly blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>;
+}
+
 const EMPTY_PAGES: readonly projectFormatV1.PageDefinition[] = [];
 
 function updateZoom(editorStore: ProjectEditorStore, delta: number): void {
@@ -58,12 +65,16 @@ function V1ViewMenu({ editorStore }: V1ViewportToolbarProps): React.JSX.Element 
 }
 
 function V1FileMenu({
+  editorStore,
   onDialogOpen,
   onSettingsOpen,
 }: {
+  readonly editorStore: ProjectEditorStore;
   readonly onDialogOpen: (dialog: Exclude<V1HostDialog, null>) => void;
   readonly onSettingsOpen: () => void;
 }): React.JSX.Element {
+  const [snapshots, setSnapshots] = useState<readonly NamedProjectSnapshotV1[]>([]);
+
   return (
     <ToolbarMenu icon={<FolderOpen aria-hidden="true" size={16} />} label="File">
       <Dropdown.Item
@@ -93,6 +104,37 @@ function V1FileMenu({
       <Dropdown.Item key="document-settings" onAction={onSettingsOpen}>
         Document Settings
       </Dropdown.Item>
+      <Dropdown.Item
+        key="save-snapshot"
+        onAction={() => {
+          const name = window.prompt('Snapshot name:')?.trim();
+
+          if (name === undefined || name === '') return;
+
+          const state = editorStore.getState();
+          const snapshot: NamedProjectSnapshotV1 = {
+            id: crypto.randomUUID(),
+            name,
+            project: state.project,
+            blobs: state.blobs,
+          };
+
+          setSnapshots((current) => [...current.filter((entry) => entry.name !== name), snapshot]);
+        }}
+      >
+        <span>Save Snapshot</span>
+        {snapshots.length === 0 ? null : <span>{snapshots.length}</span>}
+      </Dropdown.Item>
+      {snapshots.map((snapshot) => (
+        <Dropdown.Item
+          key={`restore-${snapshot.id}`}
+          onAction={() => {
+            editorStore.getState().setProject(snapshot.project, snapshot.blobs);
+          }}
+        >
+          {snapshot.name}
+        </Dropdown.Item>
+      ))}
     </ToolbarMenu>
   );
 }
@@ -205,6 +247,7 @@ export function V1ViewportToolbar({ editorStore }: V1ViewportToolbarProps): Reac
     <>
       <Toolbar aria-label="Main editor toolbar" isAttached>
         <V1FileMenu
+          editorStore={editorStore}
           onDialogOpen={setActiveDialog}
           onSettingsOpen={() => {
             setSettingsOpen(true);

@@ -162,6 +162,32 @@ function appendClock(container: HTMLElement, element: projectFormatV1.ClockEleme
   container.append(span);
 }
 
+function appendTicker(options: {
+  readonly container: HTMLElement;
+  readonly element: projectFormatV1.TickerElement;
+  readonly document: Document;
+}): void {
+  const { container, element, document: domDocument } = options;
+  const track = domDocument.createElement('div');
+
+  applyStyle(track, {
+    display: 'flex',
+    gap: `${String(element.ticker.gap)}px`,
+    whiteSpace: 'nowrap',
+  });
+  track.dataset['tickerDirection'] = element.ticker.direction;
+  track.dataset['tickerSpeed'] = String(element.ticker.speed);
+
+  element.ticker.items.forEach((item) => {
+    const span = domDocument.createElement('span');
+
+    span.dataset['tickerItemId'] = item.id;
+    span.textContent = item.text;
+    track.append(span);
+  });
+  container.append(track);
+}
+
 function appendElementContent(options: {
   readonly container: HTMLElement;
   readonly element: Element;
@@ -187,11 +213,14 @@ function appendElementContent(options: {
       appendClock(container, element, domDocument);
 
       return;
+    case 'ticker':
+      appendTicker({ container, element, document: domDocument });
+
+      return;
     case 'group':
     case 'component-instance':
       return;
     case 'qrcode':
-    case 'ticker':
     case 'video':
     case 'audio':
     case 'foreign':

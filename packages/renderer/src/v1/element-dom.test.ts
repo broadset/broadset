@@ -253,6 +253,28 @@ describe('renderElementV1', () => {
     expect(renderElementV1(element, context()).querySelector('span')?.textContent).toBe('HH:mm:ss');
   });
 
+  it('renders ticker items as readable content', () => {
+    const element = projectFormatV1.createElementV1({
+      id: ELEMENT_ID,
+      name: 'Ticker',
+      geometry: geometry(),
+      kind: 'ticker',
+      ticker: {
+        items: [
+          { id: projectFormatV1.idSchema.parse('ticker-item-1'), text: 'First headline' },
+          { id: projectFormatV1.idSchema.parse('ticker-item-2'), text: 'Second headline' },
+        ],
+        direction: 'left',
+        speed: 70,
+        gap: 80,
+        repeat: true,
+      },
+    });
+
+    expect(renderElementV1(element, context()).textContent).toContain('First headline');
+    expect(renderElementV1(element, context()).textContent).toContain('Second headline');
+  });
+
   it('maps accessibility role, label, and decorative state', () => {
     const node = renderElementV1(
       rectangle({ accessibility: { decorative: true, role: 'img', label: 'Decorative flourish' } }),

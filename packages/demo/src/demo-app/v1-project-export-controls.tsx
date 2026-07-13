@@ -6,9 +6,9 @@ import { useState } from 'react';
 import { loadFormats } from '../formatBridge';
 import { downloadBlob } from './v1-browser-download';
 
-type ExportKind = 'svg' | 'pdf' | 'psd' | 'pptx';
+type ExportKind = 'svg' | 'pdf' | 'psd' | 'pptx' | 'mp4';
 
-const EXPORT_KINDS: readonly ExportKind[] = ['svg', 'pdf', 'psd', 'pptx'];
+const EXPORT_KINDS: readonly ExportKind[] = ['svg', 'pdf', 'psd', 'pptx', 'mp4'];
 
 interface ExportArtifact {
   readonly blob: Blob;
@@ -90,6 +90,29 @@ async function buildExport(
         ),
         filename: 'broadset-document.pptx',
       };
+
+    case 'mp4': {
+      const document = state.project.documents.find(({ id }) => id === state.activeDocumentId);
+      const rendererRoot = formats.discoverRendererRoot();
+
+      if (document === undefined) throw new Error('Active v1 document is unavailable');
+      if (rendererRoot === null) throw new Error('Active v1 renderer is unavailable');
+
+      const canvas = await formats.captureElementToCanvas(
+        rendererRoot,
+        document.surface.size[0],
+        document.surface.size[1],
+      );
+      const blob = await formats.exportVideoBlob({
+        canvas,
+        durationMs: 500,
+        format: 'mp4',
+        frameRate: 2,
+        renderFrame: () => {},
+      });
+
+      return { blob, filename: 'broadset-page.mp4' };
+    }
   }
 }
 
