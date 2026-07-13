@@ -24,6 +24,30 @@ function readBlobText(blob: Blob): Promise<string> {
 }
 
 describe('V1ProjectFileControls', () => {
+  it('imports an external SVG as a validated v1 project with packaged source bytes', async () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+
+    render(<V1ProjectFileControls editorStore={store} />);
+
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"><rect id="box" width="100" height="50" fill="#f00"/></svg>';
+
+    fireEvent.change(screen.getByLabelText('Choose Broadset project file'), {
+      target: { files: [new File([svg], 'external.svg', { type: 'image/svg+xml' })] },
+    });
+
+    await waitFor(
+      () => {
+        expect(store.getState().project.metadata.name).toBe('external');
+      },
+      { timeout: 10_000 },
+    );
+
+    expect(store.getState().project.documents[0]?.elements.length).toBeGreaterThan(0);
+    expect(store.getState().blobs.size).toBeGreaterThan(0);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
+
   it('retains the last valid v1 project when an invalid file is quarantined', async () => {
     const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
 
