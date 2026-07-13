@@ -7,6 +7,28 @@ import { SAMPLE_PROJECT_V1 } from '../sample-project-v1';
 import { V1DemoCanvasSurface } from './v1-demo-canvas-surface';
 
 describe('V1DemoCanvasSurface', () => {
+  it('renders v1 rulers from viewport state and honors their visibility setting', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+    const { getByTestId, queryByTestId } = render(
+      <V1DemoCanvasSurface
+        documentId={projectFormatV1.idSchema.parse('doc-broadcast-main')}
+        editorStore={store}
+        pageId={projectFormatV1.idSchema.parse('page-match-live')}
+        project={SAMPLE_PROJECT_V1}
+      />,
+    );
+
+    expect(getByTestId('ruler-horizontal-strip')).toBeTruthy();
+    expect(getByTestId('ruler-vertical-strip')).toBeTruthy();
+
+    act(() => {
+      store.getState().updateCanvasSettings({ showRulers: false });
+    });
+
+    expect(queryByTestId('ruler-horizontal-strip')).toBeNull();
+    expect(queryByTestId('ruler-vertical-strip')).toBeNull();
+  });
+
   it('renders the active v1 page through project-store viewport state', () => {
     const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
     const { container } = render(

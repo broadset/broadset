@@ -1,8 +1,8 @@
 import type { ProjectEditorStore } from '@broadset/editor';
-import { Separator, Toolbar } from '@heroui/react';
-import { Maximize2, Minus, Plus, RotateCcw } from 'lucide-react';
+import { Dropdown, Separator, Toolbar } from '@heroui/react';
+import { Grid3X3, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react';
 
-import { IconToolButton } from '../demo-components';
+import { IconToolButton, ToolbarMenu } from '../demo-components';
 import { useCanvasZoomPercent, useEditorSelector } from './helpers';
 
 interface V1ViewportToolbarProps {
@@ -16,6 +16,41 @@ function updateZoom(editorStore: ProjectEditorStore, delta: number): void {
   editorStore.getState().updateCanvasSettings({ zoom });
 }
 
+function V1ViewMenu({ editorStore }: V1ViewportToolbarProps): React.JSX.Element {
+  const showRulers = useEditorSelector(editorStore, (state) => state.canvasSettings.showRulers);
+  const showGrid = useEditorSelector(editorStore, (state) => state.gridSettings.showGrid);
+  const snapToGrid = useEditorSelector(editorStore, (state) => state.gridSettings.snapToGrid);
+
+  return (
+    <ToolbarMenu icon={<Grid3X3 aria-hidden="true" size={16} />} label="View">
+      <Dropdown.Item
+        key="show-rulers"
+        onAction={() => {
+          editorStore.getState().updateCanvasSettings({ showRulers: !showRulers });
+        }}
+      >
+        Show rulers
+      </Dropdown.Item>
+      <Dropdown.Item
+        key="show-grid"
+        onAction={() => {
+          editorStore.getState().updateGridSettings({ showGrid: !showGrid });
+        }}
+      >
+        Show grid
+      </Dropdown.Item>
+      <Dropdown.Item
+        key="snap-grid"
+        onAction={() => {
+          editorStore.getState().updateGridSettings({ snapToGrid: !snapToGrid });
+        }}
+      >
+        Snap to grid
+      </Dropdown.Item>
+    </ToolbarMenu>
+  );
+}
+
 export function V1ViewportToolbar({ editorStore }: V1ViewportToolbarProps): React.JSX.Element {
   const zoomPercent = useCanvasZoomPercent(editorStore);
   const undoCount = useEditorSelector(editorStore.temporal, (state) => state.pastStates.length);
@@ -23,6 +58,8 @@ export function V1ViewportToolbar({ editorStore }: V1ViewportToolbarProps): Reac
 
   return (
     <Toolbar aria-label="Main editor toolbar" isAttached>
+      <V1ViewMenu editorStore={editorStore} />
+      <Separator orientation="vertical" />
       <IconToolButton
         isDisabled={undoCount === 0}
         label="Undo"

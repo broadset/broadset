@@ -68,4 +68,15 @@ describe('V1ViewportToolbar', () => {
     expect(store.getState().canvasSettings).toMatchObject({ panX: 0, panY: 0, zoom: 1 });
     expect(screen.getByLabelText('Zoom level').textContent).toBe('100%');
   });
+
+  it('toggles v1 ruler visibility from the View menu', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+
+    render(<V1ViewportToolbar editorStore={store} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+    fireEvent.click(screen.getByText('Show rulers'));
+
+    expect(store.getState().canvasSettings.showRulers).toBe(false);
+  });
 });
