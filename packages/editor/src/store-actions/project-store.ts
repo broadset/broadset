@@ -64,6 +64,8 @@ export interface ProjectEditorState extends ProjectEditorUiState {
   readonly setActiveElements: (elementIds: readonly projectFormatV1.Id[]) => void;
   readonly selectElement: (elementId: projectFormatV1.Id | null) => void;
   readonly toggleSelectElement: (elementId: projectFormatV1.Id) => void;
+  readonly beginPlacement: (elementType: string) => void;
+  readonly cancelPlacement: () => void;
   readonly enterPathEditing: (elementId: projectFormatV1.Id) => void;
   readonly addElement: (element: projectFormatV1.Element) => projectFormatV1.Id | null;
   readonly updateElement: (
@@ -347,6 +349,32 @@ export function createProjectEditorStore(options: CreateProjectEditorStoreOption
               : [...state.activeElementIds, elementId];
 
             return createSelectionUpdate(state, elementIds);
+          });
+        },
+        beginPlacement(elementType: string): void {
+          const placement: PlacementState = { type: 'placement-anchor', elementType };
+
+          set({
+            placement,
+            placementPreview: null,
+            pathEditingElementId: null,
+            pathDrawingElementId: null,
+            clipPathEditingElementId: null,
+            motionPathEditingElementId: null,
+            inlineTextEditingElementId: null,
+            editingMode: placement,
+          });
+        },
+        cancelPlacement(): void {
+          set({
+            placement: null,
+            placementPreview: null,
+            pathEditingElementId: null,
+            pathDrawingElementId: null,
+            clipPathEditingElementId: null,
+            motionPathEditingElementId: null,
+            inlineTextEditingElementId: null,
+            editingMode: { type: 'none' },
           });
         },
         enterPathEditing(elementId: projectFormatV1.Id): void {

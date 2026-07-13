@@ -372,6 +372,22 @@ describe('createProjectEditorStore', () => {
     expect(store.getState().editingMode).toEqual({ type: 'none' });
   });
 
+  it('starts and cancels v1 placement without mutating project history', () => {
+    const store = createProjectEditorStore({ project: createProject() });
+
+    store.getState().beginPlacement('rectangle');
+
+    expect(store.getState().placement).toEqual({ type: 'placement-anchor', elementType: 'rectangle' });
+    expect(store.getState().editingMode).toEqual({ type: 'placement-anchor', elementType: 'rectangle' });
+    expect(store.temporal.getState().pastStates).toEqual([]);
+
+    store.getState().cancelPlacement();
+
+    expect(store.getState().placement).toBeNull();
+    expect(store.getState().editingMode).toEqual({ type: 'none' });
+    expect(store.temporal.getState().pastStates).toEqual([]);
+  });
+
   it('owns host canvas and guide state without duplicating project content', () => {
     const store = createProjectEditorStore({ project: createProject() });
 

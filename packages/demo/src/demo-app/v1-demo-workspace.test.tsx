@@ -100,4 +100,25 @@ describe('V1DemoWorkspace', () => {
     expect(screen.getByTestId('v1-canvas-viewport').style.transform).toBe('translate(0px, 0px) scale(1.1)');
     expect(screen.getByLabelText('Zoom level').textContent).toBe('110%');
   });
+
+  it('toggles v1 element placement and cancels it with Escape', () => {
+    render(<V1DemoWorkspace project={SAMPLE_PROJECT_V1} />);
+
+    const preview = screen.getByLabelText(/screen preview for/i);
+    const rectangle = screen.getByRole('button', { name: 'Rectangle' });
+
+    fireEvent.click(rectangle);
+
+    expect(preview.style.cursor).toBe('crosshair');
+    expect(screen.queryByTestId('placement-mode-banner')).toBeNull();
+
+    fireEvent.click(rectangle);
+    expect(preview.style.cursor).toBe('default');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Countdown' }));
+    expect(preview.style.cursor).toBe('crosshair');
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(preview.style.cursor).toBe('default');
+  });
 });

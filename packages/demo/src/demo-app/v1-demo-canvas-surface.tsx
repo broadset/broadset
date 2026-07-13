@@ -4,7 +4,7 @@ import { type PointerEvent as ReactPointerEvent, useRef, type WheelEvent as Reac
 
 import { V1PagePreview } from '../demo-components/v1-page-preview';
 import { V1SelectionTransformWidget } from '../demo-components/v1-selection-transform-widget';
-import { useCanvasViewport } from './helpers';
+import { useCanvasViewport, useEditorSelector } from './helpers';
 
 const EMPTY_BLOBS: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array> = new Map();
 
@@ -42,6 +42,7 @@ export function V1DemoCanvasSurface({
   pageId,
 }: V1DemoCanvasSurfaceProps): React.JSX.Element {
   const viewport = useCanvasViewport(editorStore);
+  const placementActive = useEditorSelector(editorStore, (state) => state.placement !== null);
   const panGestureRef = useRef<CanvasPanGestureV1 | null>(null);
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (event.button === 1) {
@@ -126,6 +127,7 @@ export function V1DemoCanvasSurface({
 
   return (
     <div
+      aria-label="Screen preview for active page"
       data-testid="v1-canvas-surface"
       onPointerCancel={finishPan}
       onPointerDown={handlePointerDown}
@@ -134,6 +136,7 @@ export function V1DemoCanvasSurface({
       onWheel={handleWheel}
       style={{
         inset: 0,
+        cursor: placementActive ? 'crosshair' : 'default',
         overflow: 'hidden',
         perspective: viewport.perspective,
         position: 'absolute',

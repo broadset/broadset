@@ -14,6 +14,7 @@ import { useEditorSelector } from './helpers';
 import { V1DataSidebar } from './v1-data-sidebar';
 import { V1DemoCanvasSurface } from './v1-demo-canvas-surface';
 import { V1ElementSidebar } from './v1-element-sidebar';
+import { V1ElementToolbar } from './v1-element-toolbar';
 import { V1ProjectExportControls } from './v1-project-export-controls';
 import { V1ProjectFileControls } from './v1-project-file-controls';
 import { V1SequenceSidebar } from './v1-sequence-sidebar';
@@ -56,8 +57,19 @@ function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
+function cancelPlacementFromEscape(store: ProjectEditorStore, event: KeyboardEvent): boolean {
+  if (event.key !== 'Escape' || store.getState().placement === null) return false;
+
+  event.preventDefault();
+  store.getState().cancelPlacement();
+
+  return true;
+}
+
 function handleWorkspaceKeyDown(store: ProjectEditorStore, event: KeyboardEvent): void {
   if (isEditableTarget(event.target)) return;
+
+  if (cancelPlacementFromEscape(store, event)) return;
 
   const state = store.getState();
   const modifier = event.ctrlKey || event.metaKey;
@@ -174,6 +186,7 @@ export function V1DemoWorkspace({
         <V1ProjectFileControls editorStore={editorStore} />
         <V1ProjectExportControls editorStore={editorStore} />
         <V1ViewportToolbar editorStore={editorStore} />
+        <V1ElementToolbar editorStore={editorStore} />
         <PageSorter
           activePageIndex={activePageIndex}
           pages={document?.pages ?? []}
