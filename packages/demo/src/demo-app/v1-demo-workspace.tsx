@@ -234,7 +234,7 @@ export function V1DemoWorkspace({
   }, [editorStore, initialElementId, persistence, project]);
 
   return (
-    <ProjectEditorProvider components={[]} dataStore={null} store={editorStore}>
+    <ProjectEditorProvider store={editorStore}>
       <div
         data-testid="v1-demo-workspace"
         style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%' }}
