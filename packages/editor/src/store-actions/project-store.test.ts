@@ -2,11 +2,7 @@ import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { createProjectEditorStore } from './project-store';
-import {
-  selectActiveDocumentV1,
-  selectActiveElementsV1,
-  selectActivePageV1,
-} from './project-store-selectors';
+import { selectActiveDocumentV1, selectActiveElementsV1, selectActivePageV1 } from './project-store-selectors';
 
 function id(value: string): projectFormatV1.Id {
   return projectFormatV1.idSchema.parse(value);
@@ -24,8 +20,8 @@ function createElement(options: {
     ...(options.parentId === undefined ? {} : { parentId: options.parentId }),
   };
 
-  return options.kind === 'group'
-    ? projectFormatV1.createElementV1({ ...base, kind: 'group' })
+  return options.kind === 'group' ?
+      projectFormatV1.createElementV1({ ...base, kind: 'group' })
     : projectFormatV1.createElementV1({
         ...base,
         kind: 'vector',
@@ -83,10 +79,7 @@ describe('createProjectEditorStore', () => {
     store.getState().undo();
 
     expect(store.getState().project).toBe(project);
-    expect(store.getState().project.documents[0]?.elements.map((element) => element.id)).toEqual([
-      parentId,
-      childId,
-    ]);
+    expect(store.getState().project.documents[0]?.elements.map((element) => element.id)).toEqual([parentId, childId]);
 
     store.getState().redo();
     expect(store.getState().project.documents[0]?.elements).toEqual([]);
@@ -99,11 +92,14 @@ describe('createProjectEditorStore', () => {
       documents: [projectFormatV1.createDocumentV1({ id: id('replacement-document') })],
     });
     const store = createProjectEditorStore({ project: initialProject });
+    const digest = projectFormatV1.sha256DigestSchema.parse(`sha256:${'a'.repeat(64)}`);
+    const blobs = new Map([[digest, new Uint8Array([1, 2, 3])]]);
 
     store.getState().setActiveElements([initialProject.documents[0]?.elements[0]?.id ?? id('parent')]);
-    store.getState().setProject(replacement);
+    store.getState().setProject(replacement, blobs);
 
     expect(store.getState().project).toBe(replacement);
+    expect(store.getState().blobs).toBe(blobs);
     expect(store.getState().activeElementIds).toEqual([]);
     expect(store.getState().activeDocumentId).toBe(replacement.documents[0]?.id);
 
@@ -215,7 +211,9 @@ describe('createProjectEditorStore', () => {
     expect(store.getState().reparentElement(child.id, null)).toBe(true);
     expect(store.getState().project.documents[0]?.elements[1]?.parentId).toBeNull();
     expect(
-      store.getState().project.documents[0]?.pages[0]?.rootInstances.some((instance) => instance.elementId === child.id),
+      store
+        .getState()
+        .project.documents[0]?.pages[0]?.rootInstances.some((instance) => instance.elementId === child.id),
     ).toBe(true);
 
     const beforeRejectedMove = store.getState().project;
@@ -226,7 +224,9 @@ describe('createProjectEditorStore', () => {
     expect(store.getState().reparentElement(child.id, parent.id)).toBe(true);
     expect(store.getState().project.documents[0]?.elements[1]?.parentId).toBe(parent.id);
     expect(
-      store.getState().project.documents[0]?.pages[0]?.rootInstances.some((instance) => instance.elementId === child.id),
+      store
+        .getState()
+        .project.documents[0]?.pages[0]?.rootInstances.some((instance) => instance.elementId === child.id),
     ).toBe(false);
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
   });
@@ -415,7 +415,9 @@ describe('createProjectEditorStore', () => {
     expect(selectActivePageV1(store.getState())?.rootInstances[0]?.visible).toBe(false);
 
     store.getState().removeElement(childId);
-    expect(selectActiveDocumentV1(store.getState())?.elements.map(({ id: elementId }) => elementId)).toEqual([parentId]);
+    expect(selectActiveDocumentV1(store.getState())?.elements.map(({ id: elementId }) => elementId)).toEqual([
+      parentId,
+    ]);
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
   });
 });

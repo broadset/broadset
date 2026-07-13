@@ -35,6 +35,7 @@ interface ProjectHistoryState {
 
 export interface ProjectEditorState extends ProjectEditorUiState {
   readonly project: projectFormatV1.BroadsetProjectV1;
+  readonly blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>;
   readonly activeDocumentId: projectFormatV1.Id;
   readonly activePageId: projectFormatV1.Id;
   readonly activeElementIds: readonly projectFormatV1.Id[];
@@ -46,7 +47,10 @@ export interface ProjectEditorState extends ProjectEditorUiState {
   readonly motionPathEditingElementId: projectFormatV1.Id | null;
   readonly inlineTextEditingElementId: projectFormatV1.Id | null;
   readonly editingMode: EditingMode;
-  readonly setProject: (project: projectFormatV1.BroadsetProjectV1) => void;
+  readonly setProject: (
+    project: projectFormatV1.BroadsetProjectV1,
+    blobs?: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>,
+  ) => void;
   readonly getProject: () => projectFormatV1.BroadsetProjectV1;
   readonly setActiveDocument: (documentId: projectFormatV1.Id) => boolean;
   readonly setActivePage: (pageId: projectFormatV1.Id) => boolean;
@@ -66,22 +70,10 @@ export interface ProjectEditorState extends ProjectEditorUiState {
     elementId: projectFormatV1.Id,
     updater: (element: projectFormatV1.Element) => projectFormatV1.Element,
   ) => boolean;
-  readonly reparentElement: (
-    elementId: projectFormatV1.Id,
-    parentId: projectFormatV1.Id | null,
-  ) => boolean;
-  readonly reorderElement: (
-    elementId: projectFormatV1.Id,
-    direction: ProjectReorderDirection,
-  ) => boolean;
-  readonly updateElementEphemeral: (
-    elementId: projectFormatV1.Id,
-    update: ProjectElementUpdateV1,
-  ) => boolean;
-  readonly commitElementUpdate: (
-    elementId: projectFormatV1.Id,
-    update: ProjectElementUpdateV1,
-  ) => boolean;
+  readonly reparentElement: (elementId: projectFormatV1.Id, parentId: projectFormatV1.Id | null) => boolean;
+  readonly reorderElement: (elementId: projectFormatV1.Id, direction: ProjectReorderDirection) => boolean;
+  readonly updateElementEphemeral: (elementId: projectFormatV1.Id, update: ProjectElementUpdateV1) => boolean;
+  readonly commitElementUpdate: (elementId: projectFormatV1.Id, update: ProjectElementUpdateV1) => boolean;
   readonly commitGroupMove: (
     updates: readonly {
       readonly elementId: projectFormatV1.Id;
@@ -102,6 +94,7 @@ export type ProjectEditorStore = StoreApi<ProjectEditorState> & {
 
 export interface CreateProjectEditorStoreOptions {
   readonly project?: projectFormatV1.BroadsetProjectV1;
+  readonly blobs?: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>;
   readonly maxUndoSteps?: number;
   readonly config?: Partial<EditorConfig>;
 }
@@ -148,8 +141,8 @@ function applyProjectElementUpdate(
     ...(update.rotation === undefined ? {} : { rotation: update.rotation }),
   });
 
-  return update.name === undefined || update.name === geometryUpdated.name
-    ? geometryUpdated
+  return update.name === undefined || update.name === geometryUpdated.name ?
+      geometryUpdated
     : { ...geometryUpdated, name: update.name };
 }
 
@@ -167,8 +160,8 @@ function createSelectionUpdate(
   const preservesEditing =
     editingElementId !== null && activeElementIds.length === 1 && activeElementIds[0] === editingElementId;
 
-  return preservesEditing
-    ? { activeElementIds }
+  return preservesEditing ?
+      { activeElementIds }
     : {
         activeElementIds,
         pathEditingElementId: null,
@@ -180,9 +173,7 @@ function createSelectionUpdate(
       };
 }
 
-export function createProjectEditorStore(
-  options: CreateProjectEditorStoreOptions = {},
-): ProjectEditorStore {
+export function createProjectEditorStore(options: CreateProjectEditorStoreOptions = {}): ProjectEditorStore {
   const initialProject = options.project ?? projectFormatV1.createProjectV1();
   const initialLocation = resolveInitialLocation(initialProject);
   const temporalReference: { current: StoreApi<TemporalState<ProjectHistoryState>> | null } = { current: null };
@@ -190,6 +181,7 @@ export function createProjectEditorStore(
     temporal(
       (set, get) => ({
         project: initialProject,
+        blobs: options.blobs ?? new Map<projectFormatV1.Sha256Digest, Uint8Array>(),
         ...initialLocation,
         activeElementIds: [],
         placement: null,
@@ -203,10 +195,13 @@ export function createProjectEditorStore(
         ...createProjectEditorUiState((updater) => {
           set((state) => updater(state));
         }, options.config),
-        setProject(project: projectFormatV1.BroadsetProjectV1): void {
+        setProject(
+          project: projectFormatV1.BroadsetProjectV1,
+          blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array> = new Map(),
+        ): void {
           const location = resolveInitialLocation(project);
 
-          set({ project, ...location, activeElementIds: [] });
+          set({ project, blobs, ...location, activeElementIds: [] });
           temporalReference.current?.getState().clear();
         },
         getProject(): projectFormatV1.BroadsetProjectV1 {
@@ -236,9 +231,7 @@ export function createProjectEditorStore(
           let activated = false;
 
           set((state) => {
-            const document = state.project.documents.find(
-              (candidate) => candidate.id === state.activeDocumentId,
-            );
+            const document = state.project.documents.find((candidate) => candidate.id === state.activeDocumentId);
 
             if (document?.pages.some((page) => page.id === pageId) !== true) return {};
 
@@ -250,9 +243,7 @@ export function createProjectEditorStore(
           return activated;
         },
         switchPage(index: number): boolean {
-          const document = get().project.documents.find(
-            (candidate) => candidate.id === get().activeDocumentId,
-          );
+          const document = get().project.documents.find((candidate) => candidate.id === get().activeDocumentId);
           const page = document?.pages[index];
 
           return page !== undefined && get().setActivePage(page.id);
@@ -350,8 +341,9 @@ export function createProjectEditorStore(
         },
         toggleSelectElement(elementId: projectFormatV1.Id): void {
           set((state) => {
-            const elementIds = state.activeElementIds.includes(elementId)
-              ? state.activeElementIds.filter((activeId) => activeId !== elementId)
+            const elementIds =
+              state.activeElementIds.includes(elementId) ?
+                state.activeElementIds.filter((activeId) => activeId !== elementId)
               : [...state.activeElementIds, elementId];
 
             return createSelectionUpdate(state, elementIds);
@@ -361,8 +353,8 @@ export function createProjectEditorStore(
           set((state) => {
             const selection = filterElementIds(state.project, state.activeDocumentId, [elementId]);
 
-            return selection.length === 0
-              ? {}
+            return selection.length === 0 ?
+                {}
               : {
                   activeElementIds: selection,
                   pathEditingElementId: elementId,
@@ -525,8 +517,8 @@ export function createProjectEditorStore(
               elementIds,
             });
 
-            return project === state.project
-              ? {}
+            return project === state.project ?
+                {}
               : {
                   project,
                   activeElementIds: filterElementIds(project, state.activeDocumentId, state.activeElementIds),
@@ -541,9 +533,7 @@ export function createProjectEditorStore(
         },
         toggleVisibility(elementId: projectFormatV1.Id): boolean {
           const state = get();
-          const document = state.project.documents.find(
-            (candidate) => candidate.id === state.activeDocumentId,
-          );
+          const document = state.project.documents.find((candidate) => candidate.id === state.activeDocumentId);
           const elementsById = new Map(document?.elements.map((element) => [element.id, element]) ?? []);
           let root = elementsById.get(elementId);
 
