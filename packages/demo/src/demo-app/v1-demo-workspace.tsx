@@ -17,6 +17,7 @@ import { V1ElementSidebar } from './v1-element-sidebar';
 import { V1ProjectExportControls } from './v1-project-export-controls';
 import { V1ProjectFileControls } from './v1-project-file-controls';
 import { V1SequenceSidebar } from './v1-sequence-sidebar';
+import { V1ViewportToolbar } from './v1-viewport-toolbar';
 
 interface V1DemoWorkspaceProps {
   readonly project: projectFormatV1.BroadsetProjectV1;
@@ -172,6 +173,7 @@ export function V1DemoWorkspace({
       >
         <V1ProjectFileControls editorStore={editorStore} />
         <V1ProjectExportControls editorStore={editorStore} />
+        <V1ViewportToolbar editorStore={editorStore} />
         <PageSorter
           activePageIndex={activePageIndex}
           pages={document?.pages ?? []}

@@ -91,4 +91,13 @@ describe('V1DemoWorkspace', () => {
 
     expect(persisted.status).toBe('loaded');
   });
+
+  it('drives the rendered v1 viewport from the workspace toolbar', () => {
+    render(<V1DemoWorkspace project={SAMPLE_PROJECT_V1} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+
+    expect(screen.getByTestId('v1-canvas-viewport').style.transform).toBe('translate(0px, 0px) scale(1.1)');
+    expect(screen.getByLabelText('Zoom level').textContent).toBe('110%');
+  });
 });
