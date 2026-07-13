@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 
 import { loadStoredProjectV1, saveStoredProjectV1 } from '../v1-project-persistence';
 import { useEditorSelector } from './helpers';
+import { V1DataSidebar } from './v1-data-sidebar';
 import { V1DemoCanvasSurface } from './v1-demo-canvas-surface';
 import { V1ElementSidebar } from './v1-element-sidebar';
 import { V1ProjectFileControls } from './v1-project-file-controls';
@@ -29,6 +30,20 @@ interface V1DemoWorkspaceProps {
         readonly storageKey: string;
       }
     | undefined;
+}
+
+type WorkspaceTab = 'layers' | 'properties' | 'animation' | 'data';
+
+function renderWorkspaceSidebar(editorStore: ProjectEditorStore, tab: WorkspaceTab): React.JSX.Element {
+  switch (tab) {
+    case 'animation':
+      return <V1SequenceSidebar editorStore={editorStore} />;
+    case 'data':
+      return <V1DataSidebar editorStore={editorStore} />;
+    case 'layers':
+    case 'properties':
+      return <V1ElementSidebar editorStore={editorStore} tab={tab} />;
+  }
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -91,7 +106,7 @@ export function V1DemoWorkspace({
 
     return store;
   });
-  const [tab, setTab] = useState<'layers' | 'properties' | 'animation'>('properties');
+  const [tab, setTab] = useState<WorkspaceTab>('properties');
   const state = useEditorSelector(editorStore, (current) => current);
   const document = selectActiveDocumentV1(state);
   const activePageIndex = document?.pages.findIndex((page) => page.id === state.activePageId) ?? 0;
@@ -185,20 +200,17 @@ export function V1DemoWorkspace({
               onSelectionChange={(key) => {
                 const next = String(key);
 
-                if (next === 'layers' || next === 'properties' || next === 'animation') setTab(next);
+                if (next === 'layers' || next === 'properties' || next === 'animation' || next === 'data') setTab(next);
               }}
             >
               <Tabs.List>
                 <Tabs.Tab id="layers">Layers</Tabs.Tab>
                 <Tabs.Tab id="properties">Properties</Tabs.Tab>
                 <Tabs.Tab id="animation">Animation</Tabs.Tab>
+                <Tabs.Tab id="data">Data</Tabs.Tab>
               </Tabs.List>
             </Tabs>
-            <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-              {tab === 'animation' ?
-                <V1SequenceSidebar editorStore={editorStore} />
-              : <V1ElementSidebar editorStore={editorStore} tab={tab} />}
-            </div>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>{renderWorkspaceSidebar(editorStore, tab)}</div>
           </aside>
           <main style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
             <V1DemoCanvasSurface
