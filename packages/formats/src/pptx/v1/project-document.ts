@@ -1,7 +1,7 @@
 import type { projectFormatV1 } from '@broadset/model';
 
-import { toPsdProjectDocumentV1 } from '../../psd/project-document';
 import type { PptxSourceDocument, PptxSourceElement } from '../project-model';
+import { toPptxSourceDocumentV1 } from '../project-source-document';
 
 interface PptxProjectDocumentResultV1 {
   readonly document: PptxSourceDocument;
@@ -31,7 +31,7 @@ export async function toPptxProjectDocumentV1(input: {
   readonly resolveBlob: ((digest: projectFormatV1.Sha256Digest) => Promise<Uint8Array | undefined>) | undefined;
 }): Promise<PptxProjectDocumentResultV1> {
   // Temporary format-owned bridge; Slice E removes it with the legacy serializers.
-  const mapped = await toPsdProjectDocumentV1(input);
+  const mapped = await toPptxSourceDocumentV1(input);
   const elements = mapped.document.elements.map((element) => ({
     ...element,
     groupId: element.parentId,

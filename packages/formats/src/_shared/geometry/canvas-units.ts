@@ -1,7 +1,7 @@
 import type { Canvas } from '@broadset/model';
 
 /** Inches → mm conversion factor. Exact (1 in == 25.4 mm by definition). */
-export const MM_PER_INCH = 25.4;
+const MM_PER_INCH = 25.4;
 
 /**
  * Convert a length expressed in the canvas's declared unit

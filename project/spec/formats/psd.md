@@ -403,12 +403,12 @@ The core P5.2a foundation and P5.3a/b/c coverage shipped, plus the parity-with-P
 
 _Closed in the 2026-06-21 import/export hardening pass:_
 
-- **Importer caps wired.** `importPsdDocument(data, options)` now accepts `PsdImportOptions`, enforces a default byte cap before ag-psd parsing, and threads depth / total-pixel budgets into `importPsdWithBudget`. Verified by [`import-resource-caps.test.ts`](../../../packages/formats/src/psd/import-resource-caps.test.ts).
-- **Unmapped-layer placeholder warnings.** Layers that can only be represented as generic placeholder rectangles now emit an import warning naming the source layer, satisfying IO-D-18 no-silent-drop behavior. Verified by [`import-resource-caps.test.ts`](../../../packages/formats/src/psd/import-resource-caps.test.ts).
-- **XMP/layer count mismatch warning.** When a PSD's Broadset XMP packet declares a different number of elements than the parsed layer tree yields, import emits a warning with both counts. Verified by [`import-xmp-roundtrip.test.ts`](../../../packages/formats/src/psd/import-xmp-roundtrip.test.ts).
-- **ag-psd parser error detail.** Malformed PSD-looking bytes still return a safe empty document, but the warning now includes ag-psd's parser message for support triage. Verified by [`import-document.test.ts`](../../../packages/formats/src/psd/import-document.test.ts).
-- **Async URL-image fetch budget.** Async PSD export routes URL image fetches through `safeFetchBytes`, exposes `imageFetchTimeoutMs`, `maxImageBytes`, and `allowedImageHosts` on `PsdExportOptions`, and surfaces over-cap failures in `exportPsdBytesAsyncWithPreflight` warnings. Verified by [`preflight.test.ts`](../../../packages/formats/src/psd/preflight.test.ts).
-- **Embedded smart-object option warning removed.** `linkSmartObjects: false` no longer emits a stale warning for Broadset-authored image smart objects, and the exported PSD contains embedded `liFD` bytes with no external `linkedFile` descriptor. Verified by [`export-options.test.ts`](../../../packages/formats/src/psd/export-options.test.ts).
+- **Importer caps wired.** Native v1 import enforces byte, depth, and total-pixel budgets before or during ag-psd parsing. Verified by [`v1/import.test.ts`](../../../packages/formats/src/psd/v1/import.test.ts).
+- **Unmapped-layer placeholder warnings.** Layers that can only be represented as generic placeholders emit an interop diagnostic naming the source layer, satisfying IO-D-18 no-silent-drop behavior. Verified by [`v1/import.test.ts`](../../../packages/formats/src/psd/v1/import.test.ts).
+- **XMP/layer mismatch preservation.** Native v1 import records producer-only state in the interop registry instead of relying on the retired legacy XMP reconciliation path. Verified by [`v1/import.test.ts`](../../../packages/formats/src/psd/v1/import.test.ts).
+- **ag-psd parser error detail.** Malformed PSD-looking bytes return a schema- and semantically-valid fallback project with an importer diagnostic. Verified by [`v1/import.test.ts`](../../../packages/formats/src/psd/v1/import.test.ts).
+- **Self-contained image resolution.** Native v1 export consumes project blobs or the caller-provided resolver and diagnoses unavailable image data without fetching implicitly. Verified by [`v1/export.test.ts`](../../../packages/formats/src/psd/v1/export.test.ts).
+- **Smart-object fallback.** Native v1 export emits linked-file descriptors when source bytes are available and reports diagnosed fallbacks otherwise. Verified by [`v1/export.test.ts`](../../../packages/formats/src/psd/v1/export.test.ts).
 
 _The following items are intentionally scoped out of the PSD track and tracked by other specs:_
 

@@ -1,10 +1,10 @@
 import { projectFormatV1 } from '@broadset/model';
 
 import { toPdfProjectDocumentV1 } from '../pdf/project-document';
-import type { PsdSourceDocument, PsdSourceElement } from './project-model';
+import type { PptxSourceDocument, PptxSourceElement } from './project-model';
 
-interface PsdProjectDocumentResultV1 {
-  readonly document: PsdSourceDocument;
+interface PptxSourceDocumentResultV1 {
+  readonly document: PptxSourceDocument;
   readonly warnings: readonly string[];
 }
 
@@ -84,7 +84,7 @@ function legacyLineSpacing(value: projectFormatV1.LineSpacing): number | undefin
 function legacyTextContent(input: {
   readonly element: projectFormatV1.Element;
   readonly project: projectFormatV1.BroadsetProjectV1;
-}): PsdSourceElement['content'] | undefined {
+}): PptxSourceElement['content'] | undefined {
   if (input.element.kind !== 'text') return undefined;
 
   return {
@@ -130,11 +130,11 @@ function legacyTextContent(input: {
 }
 
 function renamedElements(input: {
-  readonly elements: readonly PsdSourceElement[];
+  readonly elements: readonly PptxSourceElement[];
   readonly instances: readonly projectFormatV1.ResolvedSceneInstance[];
   readonly pageIndex: number;
   readonly project: projectFormatV1.BroadsetProjectV1;
-}): readonly PsdSourceElement[] {
+}): readonly PptxSourceElement[] {
   const prefix = `psd-v1-page-${String(input.pageIndex + 1)}-`;
   const ids = new Map(input.elements.map(({ id }, index) => [id, `${prefix}${String(index + 1)}`]));
 
@@ -155,17 +155,17 @@ function psdWarning(warning: string): string {
   return warning.replace(/^PDF v1 export:/u, 'PSD v1 export:');
 }
 
-export async function toPsdProjectDocumentV1(input: {
+export async function toPptxSourceDocumentV1(input: {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly document: projectFormatV1.BroadsetDocumentV1;
   readonly pages: readonly projectFormatV1.PageDefinition[];
   readonly blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>;
   readonly resolveBlob: ((digest: projectFormatV1.Sha256Digest) => Promise<Uint8Array | undefined>) | undefined;
-}): Promise<PsdProjectDocumentResultV1> {
-  const allElements: PsdSourceElement[] = [];
-  const allPages: PsdSourceDocument['pages'][number][] = [];
+}): Promise<PptxSourceDocumentResultV1> {
+  const allElements: PptxSourceElement[] = [];
+  const allPages: PptxSourceDocument['pages'][number][] = [];
   const warnings: string[] = [];
-  let template: PsdSourceDocument | undefined;
+  let template: PptxSourceDocument | undefined;
 
   for (let pageIndex = 0; pageIndex < input.pages.length; pageIndex += 1) {
     const page = input.pages[pageIndex];

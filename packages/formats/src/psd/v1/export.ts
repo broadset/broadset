@@ -1,8 +1,22 @@
 import type { projectFormatV1 } from '@broadset/model';
 
-import type { PsdExportResult } from '../export';
-import type { PsdExportOptions } from '../types';
 import { serializePsdProjectV1 } from './serialize';
+
+interface PsdExportOptions {
+  readonly colorSpace?: 'rgb' | 'cmyk' | 'lab' | 'grayscale';
+  readonly bitDepth?: 8 | 16;
+  readonly embedIccProfile?: boolean;
+  readonly linkSmartObjects?: boolean;
+  readonly preserveVisibility?: boolean;
+  readonly imageFetchTimeoutMs?: number;
+  readonly maxImageBytes?: number;
+  readonly allowedImageHosts?: ReadonlySet<string>;
+}
+
+interface PsdExportResult {
+  readonly bytes: Uint8Array;
+  readonly warnings: readonly string[];
+}
 
 export interface PsdExportInputV1 {
   readonly project: projectFormatV1.BroadsetProjectV1;

@@ -5,7 +5,7 @@ import { writePsdUint8Array } from 'ag-psd';
 import { ensureCanvasInitialized } from '../runtime-canvas';
 import { buildEllipseMask, buildRectangleMask, buildRoundedRectMask, svgPathToPsdVectorMask } from '../vector-mask';
 
-export interface PsdSerializationResultV1 {
+interface PsdSerializationResultV1 {
   readonly bytes: Uint8Array;
   readonly warnings: readonly string[];
 }

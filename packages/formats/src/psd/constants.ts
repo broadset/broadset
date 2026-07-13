@@ -6,11 +6,8 @@ export const DEFAULT_FILL_RULE = 'even-odd' as const;
 /** PSD coordinates are normalized to [0, 1] relative to image size. */
 export const PSD_COORD_MAX = 1;
 
-/** Maximum value for an 8-bit colour channel. */
-export const MAX_CHANNEL = 255;
-
 /** CSS blend mode -> PSD blend mode mapping. */
-export const BLEND_MODE_MAP: Readonly<Record<string, BlendMode>> = {
+const BLEND_MODE_MAP: Readonly<Record<string, BlendMode>> = {
   normal: 'normal',
   multiply: 'multiply',
   screen: 'screen',
