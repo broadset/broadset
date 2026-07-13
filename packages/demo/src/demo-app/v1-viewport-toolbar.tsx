@@ -1,9 +1,9 @@
 import type { ProjectEditorStore } from '@broadset/editor';
-import { Toolbar } from '@heroui/react';
-import { Maximize2, Minus, Plus } from 'lucide-react';
+import { Separator, Toolbar } from '@heroui/react';
+import { Maximize2, Minus, Plus, RotateCcw } from 'lucide-react';
 
 import { IconToolButton } from '../demo-components';
-import { useCanvasZoomPercent } from './helpers';
+import { useCanvasZoomPercent, useEditorSelector } from './helpers';
 
 interface V1ViewportToolbarProps {
   readonly editorStore: ProjectEditorStore;
@@ -18,9 +18,30 @@ function updateZoom(editorStore: ProjectEditorStore, delta: number): void {
 
 export function V1ViewportToolbar({ editorStore }: V1ViewportToolbarProps): React.JSX.Element {
   const zoomPercent = useCanvasZoomPercent(editorStore);
+  const undoCount = useEditorSelector(editorStore.temporal, (state) => state.pastStates.length);
+  const redoCount = useEditorSelector(editorStore.temporal, (state) => state.futureStates.length);
 
   return (
-    <Toolbar aria-label="Canvas viewport toolbar" isAttached>
+    <Toolbar aria-label="Main editor toolbar" isAttached>
+      <IconToolButton
+        isDisabled={undoCount === 0}
+        label="Undo"
+        onPress={() => {
+          editorStore.getState().undo();
+        }}
+      >
+        <RotateCcw aria-hidden="true" size={16} />
+      </IconToolButton>
+      <IconToolButton
+        isDisabled={redoCount === 0}
+        label="Redo"
+        onPress={() => {
+          editorStore.getState().redo();
+        }}
+      >
+        <RotateCcw aria-hidden="true" size={16} style={{ transform: 'scaleX(-1)' }} />
+      </IconToolButton>
+      <Separator orientation="vertical" />
       <IconToolButton
         label="Zoom out"
         onPress={() => {

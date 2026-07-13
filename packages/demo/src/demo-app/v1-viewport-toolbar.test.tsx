@@ -1,11 +1,37 @@
 import { createProjectEditorStore } from '@broadset/editor';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { projectFormatV1 } from '@broadset/model';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { SAMPLE_PROJECT_V1 } from '../sample-project-v1';
 import { V1ViewportToolbar } from './v1-viewport-toolbar';
 
 describe('V1ViewportToolbar', () => {
+  it('exposes undo and redo state from the v1 project history', async () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+    const elementId = projectFormatV1.idSchema.parse('el-sb-home-score');
+
+    render(<V1ViewportToolbar editorStore={store} />);
+
+    const undo = screen.getByRole('button', { name: 'Undo' });
+    const redo = screen.getByRole('button', { name: 'Redo' });
+
+    expect(undo.hasAttribute('disabled')).toBe(true);
+    expect(redo.hasAttribute('disabled')).toBe(true);
+
+    store.getState().commitElementUpdate(elementId, { position: { x: 240, y: 72 } });
+
+    await waitFor(() => {
+      expect(undo.hasAttribute('disabled')).toBe(false);
+    });
+
+    fireEvent.click(undo);
+
+    await waitFor(() => {
+      expect(redo.hasAttribute('disabled')).toBe(false);
+    });
+  });
+
   it('zooms the v1 canvas in and reports the current percentage', () => {
     const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
 
