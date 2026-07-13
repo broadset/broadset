@@ -1,11 +1,11 @@
 import { projectFormatV1 } from '@broadset/model';
 
-export interface ProjectStorageV1 {
+interface ProjectStorageV1 {
   readonly getItem: (key: string) => string | null;
   readonly setItem: (key: string, value: string) => void;
 }
 
-export interface StoredProjectResultV1 {
+interface StoredProjectResultV1 {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly diagnostics: readonly projectFormatV1.Diagnostic[];
   readonly quarantinedText?: string | undefined;

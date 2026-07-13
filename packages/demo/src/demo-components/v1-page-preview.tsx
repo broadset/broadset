@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef } from 'react';
 
 import { resolveProjectAssetUrlV1, selectDocumentV1 } from '../v1-demo-project';
 
-export interface V1PagePreviewProps {
+interface V1PagePreviewProps {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly documentId: projectFormatV1.Id;
   readonly pageId: projectFormatV1.Id;
