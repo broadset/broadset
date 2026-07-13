@@ -1,11 +1,10 @@
-import type { BooleanOperation } from '@broadset/model';
 import { Accordion, Button, Input, ListBox, Select, Slider, TextArea } from '@heroui/react';
 import type { JSX } from 'react';
 import { useState } from 'react';
 
 import { ColorInput, FieldRow, NumField, SegmentedSwitcher, ToggleSwitch } from '../inputs';
 import { type MediaAsset, MediaLibraryModal } from '../modals';
-import type { PropertyValue } from '../panel-types';
+import type { BooleanOperation, PropertyValue } from '../panel-types';
 import {
   BOOLEAN_OPERATION_OPTIONS,
   ERROR_CORRECTION_OPTIONS,

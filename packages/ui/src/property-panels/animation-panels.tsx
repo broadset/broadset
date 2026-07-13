@@ -1,7 +1,7 @@
-import { getCapabilityProfile } from '@broadset/model';
 import { Accordion } from '@heroui/react';
 import type { JSX } from 'react';
 
+import { getElementCapabilityProfile } from '../element-capabilities';
 import type { PanelElement, PropertyFieldAdapter, PropertyValue } from '../panel-types';
 import { color, font, glassPanelStyle, sp } from '../tokens';
 import { AppearancePanel, GeometryPanel } from './layout-panels';
@@ -185,7 +185,7 @@ export function AnimationModePropertiesPanel({
   keyframeName,
   keyframeTargetName,
 }: AnimationModePropertiesPanelProps): JSX.Element {
-  const profile = getCapabilityProfile(element.type);
+  const profile = getElementCapabilityProfile(element.type);
   const helperText = formatAnimationHelperText(timelineName, keyframeName, keyframeTargetName);
   const defaultExpandedKeys = [
     ...(hasIncludedProperty(adapter, GEOMETRY_PROPERTY_KEYS) ? ['geometry'] : []),

@@ -1,8 +1,8 @@
-import { getCapabilityProfile } from '@broadset/model';
 import { Accordion } from '@heroui/react';
 import { Type } from 'lucide-react';
 import type { JSX, ReactNode } from 'react';
 
+import { type ElementCapabilityProfile,getElementCapabilityProfile } from './element-capabilities';
 import type { MediaAsset } from './modals';
 import type { CustomPanelComponent, PanelElement, PropertyValue } from './panel-types';
 import { ICON_SIZE } from './panel-types';
@@ -183,12 +183,10 @@ interface PanelDescriptor {
   readonly render: () => JSX.Element;
 }
 
-type CapabilityProfile = ReturnType<typeof getCapabilityProfile>;
-
 interface PanelBuildContext {
   readonly props: PropertiesSidebarProps;
   readonly primary: PanelElement;
-  readonly profile: CapabilityProfile;
+  readonly profile: ElementCapabilityProfile;
   readonly isScreenMode: boolean;
 }
 
@@ -522,7 +520,7 @@ function buildPanelDescriptors(props: PropertiesSidebarProps, primary: PanelElem
   const ctx: PanelBuildContext = {
     props,
     primary,
-    profile: getCapabilityProfile(primary.type),
+    profile: getElementCapabilityProfile(primary.type),
     isScreenMode: props.documentMode === 'screen',
   };
 

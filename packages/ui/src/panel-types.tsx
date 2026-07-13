@@ -1,4 +1,3 @@
-import type { BooleanOperation, TemplateGroupRole, VerticalAlignment } from '@broadset/model';
 import { ListBox, Select } from '@heroui/react';
 import type { JSX, ReactNode } from 'react';
 import { cloneElement, isValidElement, useId } from 'react';
@@ -49,14 +48,6 @@ export const TEXT_TRANSFORM_OPTIONS = ['none', 'uppercase', 'lowercase', 'capita
 export const VERTICAL_ALIGNMENT_OPTIONS = ['top', 'middle', 'bottom'] as const;
 export const ISOLATION_OPTIONS = ['auto', 'isolate'] as const;
 
-export const TEMPLATE_GROUP_ROLE_OPTIONS = ['16:9', '9:16', '1:1', '4:3', 'custom'] as const;
-
-const VALID_TEMPLATE_GROUP_ROLES = new Set<string>(TEMPLATE_GROUP_ROLE_OPTIONS);
-
-export function isTemplateGroupRole(value: string): value is TemplateGroupRole {
-  return VALID_TEMPLATE_GROUP_ROLES.has(value);
-}
-
 export const CLIP_PATH_PRESETS = [
   { label: 'None', value: '', maskType: 'none' as const },
   { label: 'Circle', value: 'circle(50%)', maskType: 'custom' as const },
@@ -88,6 +79,9 @@ export const TICKER_DIRECTIONS = ['left', 'right', 'up', 'down'] as const;
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
+
+export type BooleanOperation = 'union' | 'subtract' | 'intersect' | 'exclude';
+export type VerticalAlignment = (typeof VERTICAL_ALIGNMENT_OPTIONS)[number];
 
 export interface PanelElement {
   readonly id: string;
