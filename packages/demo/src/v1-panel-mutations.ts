@@ -117,19 +117,8 @@ function updateSolidFill(element: projectFormatV1.Element, color: projectFormatV
   };
 }
 
-interface LegacyRgbColor {
-  readonly kind: 'rgb';
-  readonly hex: string;
-}
-
-interface LegacyThemeColor {
-  readonly kind: 'theme';
-}
-
-function legacyColorToV1(color: LegacyRgbColor | LegacyThemeColor): projectFormatV1.ColorValue {
-  return color.kind === 'rgb' ?
-      (parseHexColor(color.hex) ?? projectFormatV1.createBlackColorValue())
-    : projectFormatV1.createBlackColorValue();
+function cssColorToV1(color: string): projectFormatV1.ColorValue {
+  return parseHexColor(color) ?? projectFormatV1.createBlackColorValue();
 }
 
 function cssAngleVector(angle: number): readonly [number, number] {
@@ -177,7 +166,7 @@ function mapCssGradient(element: projectFormatV1.Element, value: string): projec
   const base: V1GradientBase = {
     stops: parsed.stops.map((stop, index) => ({
       id: projectFormatV1.idSchema.parse(`${element.id}-ui-gradient-stop-${String(index)}`),
-      color: legacyColorToV1(stop.color),
+      color: cssColorToV1(stop.color),
       opacity: 1,
       offset: stop.position / 100,
     })),
@@ -189,25 +178,25 @@ function mapCssGradient(element: projectFormatV1.Element, value: string): projec
 
   switch (parsed.type) {
     case 'linear': {
-      const [x, y] = cssAngleVector(parsed.angle ?? 180);
+      const [x, y] = cssAngleVector(parsed.angle);
 
       return { ...base, kind: 'linear', start: [0.5 - x, 0.5 - y], end: [0.5 + x, 0.5 + y] };
     }
 
     case 'radial': {
-      const center = parsed.center ?? [50, 50];
+      const center = parsed.center;
 
       return { ...base, kind: 'radial', center: [center[0] / 100, center[1] / 100], radius: [0.5, 0.5] };
     }
 
     case 'conic': {
-      const center = parsed.center ?? [50, 50];
+      const center = parsed.center;
 
       return {
         ...base,
         kind: 'conic',
         center: [center[0] / 100, center[1] / 100],
-        startAngle: parsed.startAngle ?? 0,
+        startAngle: parsed.startAngle,
       };
     }
   }

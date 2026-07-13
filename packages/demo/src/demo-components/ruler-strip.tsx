@@ -1,4 +1,4 @@
-import { RULER_SIZE } from '../demo-types';
+const RULER_SIZE = 20;
 
 export function RulerStrip({
   ticks,

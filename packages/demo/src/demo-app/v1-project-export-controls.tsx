@@ -3,7 +3,7 @@ import type { projectFormatV1 } from '@broadset/model';
 import { Button } from '@heroui/react';
 import { useState } from 'react';
 
-import { loadFormats } from '../formatBridge';
+import { loadFormats } from '../formats-loader';
 import { downloadBlob } from './v1-browser-download';
 
 type ExportKind = 'svg' | 'pdf' | 'psd' | 'pptx' | 'mp4';

@@ -1,20 +1,27 @@
-import {
-  type BroadsetColor,
-  type BroadsetElement,
-  type BroadsetGradient,
-  type BroadsetGradientStop,
-  migrateLegacyColor,
-  rgbColor,
-} from '@broadset/model';
+interface CssGradientStop {
+  readonly color: string;
+  readonly position: number;
+}
 
-const DEFAULT_GRADIENT: BroadsetGradient = {
-  type: 'linear',
-  angle: 90,
-  stops: [
-    { color: rgbColor('#ff0000'), position: 0 },
-    { color: rgbColor('#0000ff'), position: 100 },
-  ],
-};
+type CssGradient =
+  | {
+      readonly type: 'linear';
+      readonly angle: number;
+      readonly stops: readonly CssGradientStop[];
+    }
+  | {
+      readonly type: 'radial';
+      readonly center: readonly [number, number];
+      readonly stops: readonly CssGradientStop[];
+    }
+  | {
+      readonly type: 'conic';
+      readonly startAngle: number;
+      readonly center: readonly [number, number];
+      readonly stops: readonly CssGradientStop[];
+    };
+
+const DEFAULT_LINEAR_ANGLE = 90;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -71,15 +78,11 @@ function findFunctionEnd(value: string, openParenIndex: number): number {
   return -1;
 }
 
-function parseColorToken(colorText: string): BroadsetColor | null {
-  try {
-    return migrateLegacyColor(colorText) ?? null;
-  } catch {
-    return null;
-  }
+function parseColorToken(colorText: string): string | null {
+  return colorText.trim() === '' ? null : colorText.trim();
 }
 
-function extractColorToken(value: string): { readonly color: BroadsetColor; readonly rest: string } | null {
+function extractColorToken(value: string): { readonly color: string; readonly rest: string } | null {
   const trimmed = value.trim();
 
   if (trimmed === '') {
@@ -121,9 +124,7 @@ function extractColorToken(value: string): { readonly color: BroadsetColor; read
   return color === null ? null : { color, rest: trimmed.slice(colorText.length).trim() };
 }
 
-function parseStopPart(
-  value: string,
-): { readonly color: BroadsetColor; readonly position?: number | undefined } | null {
+function parseStopPart(value: string): { readonly color: string; readonly position?: number | undefined } | null {
   const colorToken = extractColorToken(value);
 
   if (colorToken === null) {
@@ -140,8 +141,8 @@ function parseStopPart(
 }
 
 function withResolvedStopPositions(
-  parsedStops: readonly { readonly color: BroadsetColor; readonly position?: number | undefined }[],
-): readonly BroadsetGradientStop[] {
+  parsedStops: readonly { readonly color: string; readonly position?: number | undefined }[],
+): readonly CssGradientStop[] {
   const lastIndex = Math.max(parsedStops.length - 1, 1);
 
   return parsedStops
@@ -152,7 +153,7 @@ function withResolvedStopPositions(
     .sort((left, right) => left.position - right.position);
 }
 
-function parseStops(parts: readonly string[]): readonly BroadsetGradientStop[] | null {
+function parseStops(parts: readonly string[]): readonly CssGradientStop[] | null {
   const parsedStops = parts.map(parseStopPart);
 
   if (parsedStops.some((stop) => stop === null)) {
@@ -161,7 +162,7 @@ function parseStops(parts: readonly string[]): readonly BroadsetGradientStop[] |
 
   const stops = withResolvedStopPositions(
     parsedStops.filter(
-      (stop): stop is { readonly color: BroadsetColor; readonly position?: number | undefined } => stop !== null,
+      (stop): stop is { readonly color: string; readonly position?: number | undefined } => stop !== null,
     ),
   );
 
@@ -222,14 +223,14 @@ function parseLinearDirectionAngle(value: string): number | undefined {
   return undefined;
 }
 
-function parseLinearGradientParts(parts: readonly string[]): BroadsetGradient | null {
+function parseLinearGradientParts(parts: readonly string[]): CssGradient | null {
   const firstPart = parts[0] ?? '';
   const angleMatch = /^(-?\d+(?:\.\d+)?)deg$/iu.exec(firstPart);
   const directionAngle = parseLinearDirectionAngle(firstPart);
   const hasDescriptor = angleMatch !== null || directionAngle !== undefined;
   const angle =
     angleMatch === null ?
-      (directionAngle ?? DEFAULT_GRADIENT.angle)
+      (directionAngle ?? DEFAULT_LINEAR_ANGLE)
     : normalizeAngle(Number.parseFloat(angleMatch[1] ?? '0'));
   const stopParts = hasDescriptor ? parts.slice(1) : parts;
   const stops = parseStops(stopParts);
@@ -237,7 +238,7 @@ function parseLinearGradientParts(parts: readonly string[]): BroadsetGradient | 
   return stops === null ? null : { type: 'linear', angle, stops };
 }
 
-function parseRadialGradientParts(parts: readonly string[]): BroadsetGradient | null {
+function parseRadialGradientParts(parts: readonly string[]): CssGradient | null {
   const firstStop = parseStopPart(parts[0] ?? '');
   const descriptor = firstStop === null ? (parts[0] ?? '') : '';
   const stopParts = firstStop === null ? parts.slice(1) : parts;
@@ -254,7 +255,7 @@ function parseRadialGradientParts(parts: readonly string[]): BroadsetGradient | 
   };
 }
 
-function parseConicGradientParts(parts: readonly string[]): BroadsetGradient | null {
+function parseConicGradientParts(parts: readonly string[]): CssGradient | null {
   const firstStop = parseStopPart(parts[0] ?? '');
   const descriptor = firstStop === null ? (parts[0] ?? '') : '';
   const stopParts = firstStop === null ? parts.slice(1) : parts;
@@ -272,7 +273,7 @@ function parseConicGradientParts(parts: readonly string[]): BroadsetGradient | n
   };
 }
 
-export function parseCssGradient(value: string): BroadsetGradient | null {
+export function parseCssGradient(value: string): CssGradient | null {
   const trimmed = value.trim();
 
   if (trimmed === '') {
@@ -301,16 +302,4 @@ export function parseCssGradient(value: string): BroadsetGradient | null {
     default:
       return null;
   }
-}
-
-export function resolveSolidFillColorForGradientClear(element: BroadsetElement): BroadsetColor {
-  if (element.style.fill.kind === 'solid') {
-    return element.style.fill.color;
-  }
-
-  if (element.style.fill.kind === 'gradient') {
-    return element.style.fill.gradient.stops[0]?.color ?? rgbColor('#ffffff');
-  }
-
-  return rgbColor('#ffffff');
 }

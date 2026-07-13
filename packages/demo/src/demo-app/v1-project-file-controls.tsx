@@ -4,7 +4,7 @@ import { projectFormatV1 } from '@broadset/model';
 import { Button } from '@heroui/react';
 import { type ChangeEvent, useRef, useState } from 'react';
 
-import { loadFormats } from '../formatBridge';
+import { loadFormats } from '../formats-loader';
 import { downloadBlob } from './v1-browser-download';
 
 const PROJECT_MIME = 'application/vnd.broadset.project+json';

@@ -30,7 +30,7 @@ import { describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FORMATS_MODULE = '@broadset/formats';
-const ALLOWED_DYNAMIC_IMPORTERS: ReadonlySet<string> = new Set(['formatBridge.ts']);
+const ALLOWED_DYNAMIC_IMPORTERS: ReadonlySet<string> = new Set(['formatBridge.ts', 'formats-loader.ts']);
 
 interface Offender {
   readonly file: string;
@@ -92,7 +92,7 @@ describe('demo lazy-formats bundle boundary', () => {
     ).toHaveLength(0);
   });
 
-  it('only formatBridge.ts uses dynamic import("@broadset/formats")', async () => {
+  it('only approved lazy loaders use dynamic import("@broadset/formats")', async () => {
     const files = await collectSourceFiles(HERE);
     const offenders: Offender[] = [];
 
@@ -111,7 +111,7 @@ describe('demo lazy-formats bundle boundary', () => {
 
     expect(
       offenders,
-      `Dynamic import("@broadset/formats") outside formatBridge.ts:\n${JSON.stringify(offenders, null, 2)}`,
+      `Dynamic import("@broadset/formats") outside approved lazy loaders:\n${JSON.stringify(offenders, null, 2)}`,
     ).toHaveLength(0);
   });
 });

@@ -1,7 +1,5 @@
 import { useCallback, useRef, useSyncExternalStore } from 'react';
 
-import { ELEMENT_TOOL_TYPES } from './constants';
-
 interface SelectorStore<TState> {
   readonly getState: () => TState;
   readonly subscribe: (listener: () => void) => () => void;
@@ -78,12 +76,4 @@ export function useCanvasViewport<TState extends CanvasViewportHostState>(
 
 export function useCanvasZoomPercent<TState extends CanvasViewportHostState>(store: SelectorStore<TState>): number {
   return useEditorSelector(store, (state) => Math.round(state.canvasSettings.zoom * 100));
-}
-
-export function getElementLabel(type: string | null): string {
-  if (type === null) {
-    return 'Element';
-  }
-
-  return ELEMENT_TOOL_TYPES.find((entry) => entry.type === type)?.label ?? type;
 }
