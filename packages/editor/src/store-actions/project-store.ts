@@ -1,4 +1,4 @@
-import { projectFormatV1 } from '@broadset/model';
+import { type EditorConfig, projectFormatV1 } from '@broadset/model';
 import { temporal, type TemporalState } from 'zundo';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
@@ -17,6 +17,7 @@ import {
   updateElementInProject,
   updateElementsInProject,
 } from './project-store-mutations';
+import { createProjectEditorUiState, type ProjectEditorUiState } from './project-store-ui';
 
 export type { ProjectReorderDirection } from './project-store-mutations';
 
@@ -32,7 +33,7 @@ interface ProjectHistoryState {
   readonly project: projectFormatV1.BroadsetProjectV1;
 }
 
-export interface ProjectEditorState {
+export interface ProjectEditorState extends ProjectEditorUiState {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly activeDocumentId: projectFormatV1.Id;
   readonly activePageId: projectFormatV1.Id;
@@ -49,6 +50,7 @@ export interface ProjectEditorState {
   readonly getProject: () => projectFormatV1.BroadsetProjectV1;
   readonly setActiveDocument: (documentId: projectFormatV1.Id) => boolean;
   readonly setActivePage: (pageId: projectFormatV1.Id) => boolean;
+  readonly switchPage: (index: number) => boolean;
   readonly addPage: (page: projectFormatV1.PageDefinition) => boolean;
   readonly removePage: (pageId: projectFormatV1.Id) => boolean;
   readonly setPageRootVisibility: (elementId: projectFormatV1.Id, visible: boolean) => boolean;
@@ -87,6 +89,9 @@ export interface ProjectEditorState {
     }[],
   ) => boolean;
   readonly removeElements: (elementIds: readonly projectFormatV1.Id[]) => void;
+  readonly removeElement: (elementId: projectFormatV1.Id) => void;
+  readonly toggleLock: (elementId: projectFormatV1.Id) => boolean;
+  readonly toggleVisibility: (elementId: projectFormatV1.Id) => boolean;
   readonly undo: () => void;
   readonly redo: () => void;
 }
@@ -98,6 +103,7 @@ export type ProjectEditorStore = StoreApi<ProjectEditorState> & {
 export interface CreateProjectEditorStoreOptions {
   readonly project?: projectFormatV1.BroadsetProjectV1;
   readonly maxUndoSteps?: number;
+  readonly config?: Partial<EditorConfig>;
 }
 
 const DEFAULT_MAX_UNDO_STEPS = 50;
@@ -194,6 +200,9 @@ export function createProjectEditorStore(
         motionPathEditingElementId: null,
         inlineTextEditingElementId: null,
         editingMode: { type: 'none' },
+        ...createProjectEditorUiState((updater) => {
+          set((state) => updater(state));
+        }, options.config),
         setProject(project: projectFormatV1.BroadsetProjectV1): void {
           const location = resolveInitialLocation(project);
 
@@ -239,6 +248,14 @@ export function createProjectEditorStore(
           });
 
           return activated;
+        },
+        switchPage(index: number): boolean {
+          const document = get().project.documents.find(
+            (candidate) => candidate.id === get().activeDocumentId,
+          );
+          const page = document?.pages[index];
+
+          return page !== undefined && get().setActivePage(page.id);
         },
         addPage(page: projectFormatV1.PageDefinition): boolean {
           let added = false;
@@ -515,6 +532,29 @@ export function createProjectEditorStore(
                   activeElementIds: filterElementIds(project, state.activeDocumentId, state.activeElementIds),
                 };
           });
+        },
+        removeElement(elementId: projectFormatV1.Id): void {
+          get().removeElements([elementId]);
+        },
+        toggleLock(elementId: projectFormatV1.Id): boolean {
+          return get().updateElement(elementId, (element) => ({ ...element, locked: !element.locked }));
+        },
+        toggleVisibility(elementId: projectFormatV1.Id): boolean {
+          const state = get();
+          const document = state.project.documents.find(
+            (candidate) => candidate.id === state.activeDocumentId,
+          );
+          const elementsById = new Map(document?.elements.map((element) => [element.id, element]) ?? []);
+          let root = elementsById.get(elementId);
+
+          while (root?.parentId !== null && root !== undefined) root = elementsById.get(root.parentId);
+
+          if (root === undefined) return false;
+
+          const page = document?.pages.find((candidate) => candidate.id === state.activePageId);
+          const instance = page?.rootInstances.find((candidate) => candidate.elementId === root.id);
+
+          return instance !== undefined && get().setPageRootVisibility(root.id, instance.visible === false);
         },
         undo(): void {
           temporalReference.current?.getState().undo();

@@ -371,4 +371,51 @@ describe('createProjectEditorStore', () => {
     expect(store.getState().pathEditingElementId).toBeNull();
     expect(store.getState().editingMode).toEqual({ type: 'none' });
   });
+
+  it('owns host canvas and guide state without duplicating project content', () => {
+    const store = createProjectEditorStore({ project: createProject() });
+
+    store.getState().updateCanvasSettings({ zoom: 1.5, panX: 40, panY: -20 });
+    store.getState().updateGridSettings({ showGrid: true, gridSize: 24 });
+    store.getState().addGuide({ type: 'v', pos: 120, locked: false });
+
+    expect(store.getState().canvasSettings).toMatchObject({
+      zoom: 1.5,
+      panX: 40,
+      panY: -20,
+      grid: { showGrid: true, gridSize: 24 },
+    });
+    expect(store.getState().gridSettings).toMatchObject({ showGrid: true, gridSize: 24 });
+    expect(store.getState().canvasSettings.guides).toEqual([
+      expect.objectContaining({ type: 'v', pos: 120, locked: false }),
+    ]);
+    expect(store.getState().project).toBe(store.getState().getProject());
+  });
+
+  it('provides identity-based host command wrappers over v1 mutations', () => {
+    const initial = createProject();
+    const document = initial.documents[0];
+    const secondPage = projectFormatV1.createPageV1({
+      id: id('second-page'),
+      rootInstances: document?.pages[0]?.rootInstances ?? [],
+    });
+    const project: projectFormatV1.BroadsetProjectV1 = {
+      ...initial,
+      documents: document === undefined ? initial.documents : [{ ...document, pages: [...document.pages, secondPage] }],
+    };
+    const store = createProjectEditorStore({ project });
+    const parentId = document?.elements[0]?.id ?? id('parent');
+    const childId = document?.elements[1]?.id ?? id('child');
+
+    expect(store.getState().switchPage(1)).toBe(true);
+    expect(store.getState().activePageId).toBe(secondPage.id);
+    expect(store.getState().toggleLock(childId)).toBe(true);
+    expect(selectActiveDocumentV1(store.getState())?.elements[1]?.locked).toBe(true);
+    expect(store.getState().toggleVisibility(childId)).toBe(true);
+    expect(selectActivePageV1(store.getState())?.rootInstances[0]?.visible).toBe(false);
+
+    store.getState().removeElement(childId);
+    expect(selectActiveDocumentV1(store.getState())?.elements.map(({ id: elementId }) => elementId)).toEqual([parentId]);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
 });
