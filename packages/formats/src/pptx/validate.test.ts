@@ -1,7 +1,6 @@
-import { createDefaultElement, createEmptyBroadsetDocument } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
-import { exportPptxBytes } from './export';
+import { buildCanonicalPptxV1 } from './fixtures/canonical-v1';
 import { encodeText, writeOoxmlPackage } from './ooxml/zip';
 import { validatePptxPackage } from './validate';
 
@@ -12,24 +11,16 @@ import { validatePptxPackage } from './validate';
  * error codes.
  */
 describe('validatePptxPackage — Broadset-exported PPTX', () => {
-  it('reports a Broadset-exported empty document as valid', () => {
-    const bytes = exportPptxBytes(createEmptyBroadsetDocument());
+  it('reports a Broadset-exported v1 document as valid', async () => {
+    const bytes = await buildCanonicalPptxV1();
     const result = validatePptxPackage(bytes);
 
     expect(result.valid).toBe(true);
     expect(result.issues.filter((i) => i.level === 'error')).toEqual([]);
   });
 
-  it('reports a Broadset-exported document with elements as valid', () => {
-    const doc = {
-      ...createEmptyBroadsetDocument(),
-      elements: [
-        createDefaultElement('rectangle', { id: 'r1' }),
-        createDefaultElement('text', { id: 't1', content: 'hello' }),
-        createDefaultElement('ellipse', { id: 'e1' }),
-      ],
-    };
-    const bytes = exportPptxBytes(doc);
+  it('reports a native v1 deck with elements as valid', async () => {
+    const bytes = await buildCanonicalPptxV1();
     const result = validatePptxPackage(bytes);
 
     expect(result.valid).toBe(true);

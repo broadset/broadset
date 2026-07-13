@@ -85,28 +85,3 @@ function isDocumentShape(value: unknown): value is BroadsetDocument {
 
   return Array.isArray(record['elements']) && typeof record['id'] === 'string';
 }
-
-/**
- * Diff the document-level metadata (settings, pages, data schema) that
- * the custom XML preserves against the current visible state. Returns
- * the preserved document itself when available so callers can present
- * a "use preserved / use visual" choice for per-document values that
- * don't reduce to per-element deltas.
- */
-export function readPreservedPptxDocument(data: Uint8Array, options?: PptxImportOptions): BroadsetDocument | null {
-  const caps = resolvePptxImportCaps(options);
-
-  if (data.byteLength > caps.maxInputBytes) return null;
-
-  const pkgResult = tryReadPackage(data, options);
-
-  if (pkgResult === null) return null;
-
-  const pkg = pkgResult.pkg;
-  const preservedXml = readTextPart(pkg, BROADSET_CUSTOM_XML_PROJECT);
-  const value = preservedXml !== null ? parseProjectCustomXml(preservedXml) : null;
-
-  return isDocumentShape(value) ? value : null;
-}
-
-/** Convenience re-export for ergonomic consumption. */

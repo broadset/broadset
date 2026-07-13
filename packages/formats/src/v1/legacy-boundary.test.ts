@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -61,5 +61,10 @@ describe('native v1 format boundary', () => {
       : [];
 
     expect(findings).toEqual([]);
+  });
+
+  it('does not retain the retired PPTX writer tree', () => {
+    expect(existsSync(join(formatsSourceDirectory, 'pptx/export.ts'))).toBe(false);
+    expect(existsSync(join(formatsSourceDirectory, 'pptx/export'))).toBe(false);
   });
 });

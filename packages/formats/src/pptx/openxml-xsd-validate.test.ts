@@ -5,8 +5,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { exportPptxBytes } from './export';
-import { buildCanonicalDocument } from './fixtures/canonical';
+import { buildCanonicalPptxV1 } from './fixtures/canonical-v1';
 
 /**
  * @description ECMA-376 / ISO/IEC 29500 schema validation gate.
@@ -70,10 +69,6 @@ function findDotnet(): string | null {
   return null;
 }
 
-function buildCanonicalFixture(): Uint8Array {
-  return exportPptxBytes(buildCanonicalDocument());
-}
-
 function writeValidatorProject(rootDir: string): string {
   const projectDir = join(rootDir, 'openxml-validator');
 
@@ -105,12 +100,12 @@ describe('ECMA-376 / ISO/IEC 29500 schema validation', () => {
 
   it(
     'canonical Broadset PPTX passes the Open XML SDK schema validator',
-    () => {
+    async () => {
       const dir = mkdtempSync(join(tmpdir(), 'broadset-openxml-xsd-'));
       const pptxPath = join(dir, 'canonical.pptx');
       const projectPath = writeValidatorProject(dir);
 
-      writeFileSync(pptxPath, buildCanonicalFixture());
+      writeFileSync(pptxPath, await buildCanonicalPptxV1());
 
       const result = spawnSync(
         dotnet,

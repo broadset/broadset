@@ -31,7 +31,7 @@ export function importPptx(data: Uint8Array, options?: PptxImportOptions): Broad
  * enforcement caps) and any embedded `ppt/fonts/` assets recovered
  * from the package.
  */
-export interface PptxImportReport {
+interface PptxImportReport {
   readonly document: BroadsetDocument;
   readonly warnings: readonly PptxImportWarning[];
   readonly fontAssets: readonly FontAsset[];
