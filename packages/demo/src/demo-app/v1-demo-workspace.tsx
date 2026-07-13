@@ -14,6 +14,7 @@ import { useEditorSelector } from './helpers';
 import { V1DemoCanvasSurface } from './v1-demo-canvas-surface';
 import { V1ElementSidebar } from './v1-element-sidebar';
 import { V1ProjectFileControls } from './v1-project-file-controls';
+import { V1SequenceSidebar } from './v1-sequence-sidebar';
 
 interface V1DemoWorkspaceProps {
   readonly project: projectFormatV1.BroadsetProjectV1;
@@ -90,7 +91,7 @@ export function V1DemoWorkspace({
 
     return store;
   });
-  const [tab, setTab] = useState<'layers' | 'properties'>('properties');
+  const [tab, setTab] = useState<'layers' | 'properties' | 'animation'>('properties');
   const state = useEditorSelector(editorStore, (current) => current);
   const document = selectActiveDocumentV1(state);
   const activePageIndex = document?.pages.findIndex((page) => page.id === state.activePageId) ?? 0;
@@ -184,16 +185,19 @@ export function V1DemoWorkspace({
               onSelectionChange={(key) => {
                 const next = String(key);
 
-                if (next === 'layers' || next === 'properties') setTab(next);
+                if (next === 'layers' || next === 'properties' || next === 'animation') setTab(next);
               }}
             >
               <Tabs.List>
                 <Tabs.Tab id="layers">Layers</Tabs.Tab>
                 <Tabs.Tab id="properties">Properties</Tabs.Tab>
+                <Tabs.Tab id="animation">Animation</Tabs.Tab>
               </Tabs.List>
             </Tabs>
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-              <V1ElementSidebar editorStore={editorStore} tab={tab} />
+              {tab === 'animation' ?
+                <V1SequenceSidebar editorStore={editorStore} />
+              : <V1ElementSidebar editorStore={editorStore} tab={tab} />}
             </div>
           </aside>
           <main style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
