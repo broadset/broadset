@@ -3,6 +3,7 @@ import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { SAMPLE_PROJECT_V1 } from './sample-project-v1';
+import { toPanelElementV1 } from './v1-panel-adapter';
 import { updateElementFromPanelV1 } from './v1-panel-mutations';
 
 describe('updateElementFromPanelV1', () => {
@@ -52,5 +53,34 @@ describe('updateElementFromPanelV1', () => {
 
     expect(updateElementFromPanelV1({ element, key: 'opacity', value: 'opaque' })).toBe(element);
     expect(updateElementFromPanelV1({ element, key: 'fontColor', value: 'not-a-color' })).toBe(element);
+  });
+
+  it('round-trips v1 rotation X/Y and translation Z through a canonical matrix3d', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+    const elementId = projectFormatV1.idSchema.parse('el-sb-home-score');
+
+    const updates: readonly (readonly [string, number])[] = [
+      ['rotateX', 35],
+      ['rotateY', 25],
+      ['translateZ', 120],
+    ];
+
+    for (const [key, value] of updates) {
+      expect(
+        store.getState().updateElement(elementId, (element) => updateElementFromPanelV1({ element, key, value })),
+      ).toBe(true);
+    }
+
+    const element = store.getState().project.documents[0]?.elements.find((candidate) => candidate.id === elementId);
+
+    if (element === undefined) throw new Error('Expected the updated v1 element');
+
+    const panelElement = toPanelElementV1({ project: store.getState().project, element });
+
+    expect(element.geometry.transform.kind).toBe('matrix3d');
+    expect(panelElement.rotateX).toBeCloseTo(35, 8);
+    expect(panelElement.rotateY).toBeCloseTo(25, 8);
+    expect(panelElement.translateZ).toBe(120);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
   });
 });

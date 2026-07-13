@@ -3,6 +3,8 @@ import { projectFormatV1 } from '@broadset/model';
 import { colorValueToCss, gradientToCss } from '@broadset/renderer';
 import type { PanelElement } from '@broadset/ui';
 
+import { readV1TransformAxes } from './v1-transform-axes';
+
 type SwatchMap = ReadonlyMap<projectFormatV1.Id, projectFormatV1.Swatch>;
 
 function getPanelType(element: projectFormatV1.Element): string {
@@ -128,6 +130,7 @@ export function toPanelElementV1(options: {
 }): PanelElement {
   const { project, element } = options;
   const rect = getEditorElementRectV1(element);
+  const transformAxes = readV1TransformAxes(element.geometry.transform);
   const swatches = new Map(project.resources.swatches.map((swatch) => [swatch.id, swatch]));
   const fill = element.appearance.fills.find((candidate) => candidate.enabled);
   const stroke = element.appearance.strokes.find((candidate) => candidate.enabled);
@@ -188,10 +191,10 @@ export function toPanelElementV1(options: {
     maskType: element.appearance.mask?.kind ?? 'none',
     customClipPath: '',
     clipChildren: element.kind === 'group' ? element.group.clipChildren : false,
-    rotateX: 0,
-    rotateY: 0,
-    rotateZ: rect.rotation,
-    translateZ: element.geometry.transform.kind === 'matrix3d' ? element.geometry.transform.matrix[14] : 0,
+    rotateX: transformAxes.rotateX,
+    rotateY: transformAxes.rotateY,
+    rotateZ: transformAxes.rotateZ,
+    translateZ: transformAxes.translateZ,
     objectFit: getObjectFit(element),
     autoSize: element.kind === 'text' ? element.layout.autoSize : 'none',
     errorCorrection: element.kind === 'qrcode' ? element.qrcode.errorCorrection : 'M',

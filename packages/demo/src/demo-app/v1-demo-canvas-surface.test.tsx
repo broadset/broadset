@@ -348,7 +348,7 @@ describe('V1DemoCanvasSurface', () => {
       store.getState().project.documents[0]?.elements.find((candidate) => candidate.id === elementId)?.locked,
     ).toBe(true);
 
-    fireEvent.click(getByTestId('v1-canvas-surface'));
+    fireEvent.pointerDown(getByTestId('v1-canvas-surface'), { button: 0 });
     fireEvent.contextMenu(getByTestId('v1-canvas-surface'), { clientX: 10, clientY: 20 });
 
     expect(getByText('Paste')).toBeTruthy();

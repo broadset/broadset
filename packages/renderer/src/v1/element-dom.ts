@@ -212,6 +212,8 @@ export function renderElementV1(element: Element, context: RenderContextV1): HTM
   applyStyle(container, {
     position: 'absolute',
     boxSizing: 'border-box',
+    pointerEvents: 'auto',
+    transformStyle: 'preserve-3d',
     ...geometryToBoxStyle(element.geometry),
     ...appearanceToStyle(element.appearance, context.swatches),
   });

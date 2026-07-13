@@ -2,6 +2,8 @@ import { updateElementRectV1 } from '@broadset/editor';
 import { projectFormatV1 } from '@broadset/model';
 import type { PropertyValue } from '@broadset/ui';
 
+import { updateV1TransformAxis } from './v1-transform-axes';
+
 const HEX_COLOR_PATTERN = /^#([0-9a-f]{6})([0-9a-f]{2})?$/iu;
 
 function parseHexColor(value: string): projectFormatV1.ColorValue | undefined {
@@ -148,6 +150,26 @@ function updateTextProperty(options: {
   return options.element;
 }
 
+function updateTransformAxisProperty(options: {
+  readonly element: projectFormatV1.Element;
+  readonly key: 'rotateX' | 'rotateY' | 'rotateZ' | 'translateZ';
+  readonly value: PropertyValue;
+}): projectFormatV1.Element {
+  if (typeof options.value !== 'number' || !Number.isFinite(options.value)) return options.element;
+
+  return {
+    ...options.element,
+    geometry: {
+      ...options.element.geometry,
+      transform: updateV1TransformAxis({
+        transform: options.element.geometry.transform,
+        axis: options.key,
+        value: options.value,
+      }),
+    },
+  };
+}
+
 function updateGeometryProperty(options: {
   readonly element: projectFormatV1.Element;
   readonly key: string;
@@ -166,6 +188,11 @@ function updateGeometryProperty(options: {
       return typeof value === 'number' && value > 0 ? updateElementRectV1(element, { height: value }) : element;
     case 'rotation':
       return typeof value === 'number' ? updateElementRectV1(element, { rotation: value }) : element;
+    case 'rotateX':
+    case 'rotateY':
+    case 'rotateZ':
+    case 'translateZ':
+      return updateTransformAxisProperty({ element, key, value });
     default:
       return undefined;
   }

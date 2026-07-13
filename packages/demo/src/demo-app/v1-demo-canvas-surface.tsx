@@ -49,6 +49,49 @@ function readElementId(target: EventTarget | null): projectFormatV1.Id | undefin
   return result.success ? result.data : undefined;
 }
 
+function isTransformOverlayTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest('[data-broadset-transform-overlay="true"]') !== null;
+}
+
+function redispatchRetargetedOverlayPointer(event: ReactPointerEvent<HTMLDivElement>): boolean {
+  if (isTransformOverlayTarget(event.target)) return false;
+
+  const ownerDocument = event.currentTarget.ownerDocument;
+  const elementsFromPoint: unknown = Reflect.get(ownerDocument, 'elementsFromPoint');
+
+  if (typeof elementsFromPoint !== 'function') return false;
+
+  const hitStack: unknown = Reflect.apply(elementsFromPoint, ownerDocument, [event.clientX, event.clientY]);
+
+  if (!Array.isArray(hitStack)) return false;
+
+  const overlayTarget: unknown = hitStack.find(
+    (candidate: unknown) => candidate instanceof Element && isTransformOverlayTarget(candidate),
+  );
+
+  if (!(overlayTarget instanceof Element)) return false;
+
+  // Chromium can retarget preserve-3d pointer hits to the flat canvas plane even when the overlay is visually first.
+  overlayTarget.dispatchEvent(
+    new PointerEvent('pointerdown', {
+      bubbles: true,
+      button: event.button,
+      buttons: event.buttons,
+      cancelable: true,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      composed: true,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      pointerId: event.pointerId,
+      pointerType: event.pointerType,
+      shiftKey: event.shiftKey,
+    }),
+  );
+
+  return true;
+}
+
 export function V1DemoCanvasSurface({
   editorStore,
   project,
@@ -60,12 +103,11 @@ export function V1DemoCanvasSurface({
   const placementActive = useEditorSelector(editorStore, (state) => state.placement !== null);
   const document = project.documents.find((candidate) => candidate.id === documentId);
   const panGestureRef = useRef<CanvasPanGestureV1 | null>(null);
-  const surfaceRef = useRef<HTMLDivElement | null>(null);
   const clipboardRef = useRef<readonly projectFormatV1.Element[]>([]);
   const [contextMenu, setContextMenu] = useState<CanvasContextMenuV1 | null>(null);
   const [hasClipboardContents, setHasClipboardContents] = useState(false);
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
-    if (event.button === 1) {
+    if (event.button === 1 || (event.button === 0 && event.shiftKey)) {
       const current = editorStore.getState().canvasSettings;
 
       event.preventDefault();
@@ -86,6 +128,14 @@ export function V1DemoCanvasSurface({
     }
 
     if (event.button === 2) return;
+
+    if (redispatchRetargetedOverlayPointer(event)) {
+      event.preventDefault();
+
+      return;
+    }
+
+    if (isTransformOverlayTarget(event.target)) return;
 
     const elementId = readElementId(event.target);
 
@@ -209,31 +259,10 @@ export function V1DemoCanvasSurface({
     };
   }, [contextMenu]);
 
-  useEffect(() => {
-    const surface = surfaceRef.current;
-
-    if (surface === null) return undefined;
-
-    const handleClick = (event: MouseEvent): void => {
-      if (event.target instanceof Element && event.target.closest('[data-testid="demo-context-menu"]') !== null) return;
-
-      if (readElementId(event.target) === undefined) editorStore.getState().selectElement(null);
-
-      setContextMenu(null);
-    };
-
-    surface.addEventListener('click', handleClick);
-
-    return () => {
-      surface.removeEventListener('click', handleClick);
-    };
-  }, [editorStore]);
-
   return (
     <div
       aria-label="Screen preview for active page"
       data-testid="v1-canvas-surface"
-      ref={surfaceRef}
       onContextMenu={handleContextMenu}
       onPointerCancel={finishPan}
       onPointerDown={handlePointerDown}
@@ -244,20 +273,53 @@ export function V1DemoCanvasSurface({
         inset: 0,
         cursor: placementActive ? 'crosshair' : 'default',
         overflow: 'hidden',
-        perspective: viewport.perspective,
         position: 'absolute',
         touchAction: 'none',
       }}
     >
       <div
-        data-testid="v1-canvas-viewport"
+        data-broadset-canvas-transform="true"
         style={{
-          transform: `translate(${String(viewport.panX)}px, ${String(viewport.panY)}px) scale(${String(viewport.zoom)})`,
-          transformOrigin: '0 0',
+          inset: 0,
+          perspective: viewport.perspective,
+          position: 'absolute',
+          transformStyle: 'preserve-3d',
         }}
       >
-        <V1PagePreview blobs={blobs} documentId={documentId} pageId={pageId} project={project} />
-        <V1SelectionTransformWidget editorStore={editorStore} zoom={viewport.zoom} />
+        <div
+          data-broadset-canvas-root="true"
+          data-testid="v1-canvas-viewport"
+          style={{
+            position: 'relative',
+            transform: `translate(${String(viewport.panX)}px, ${String(viewport.panY)}px) scale(${String(viewport.zoom)})`,
+            transformOrigin: '0 0',
+            transformStyle: 'preserve-3d',
+            zIndex: 0,
+          }}
+        >
+          <V1PagePreview blobs={blobs} documentId={documentId} pageId={pageId} project={project} />
+        </div>
+        <div
+          data-testid="v1-canvas-overlay"
+          style={{
+            inset: 0,
+            pointerEvents: 'none',
+            position: 'absolute',
+            transformStyle: 'preserve-3d',
+            zIndex: 1,
+          }}
+        >
+          <div
+            style={{
+              pointerEvents: 'none',
+              transform: `translate(${String(viewport.panX)}px, ${String(viewport.panY)}px) scale(${String(viewport.zoom)})`,
+              transformOrigin: '0 0',
+              transformStyle: 'preserve-3d',
+            }}
+          >
+            <V1SelectionTransformWidget editorStore={editorStore} zoom={viewport.zoom} />
+          </div>
+        </div>
       </div>
       {document === undefined ? null : <V1Rulers editorStore={editorStore} surfaceSize={document.surface.size} />}
       {contextMenu === null ? null : (

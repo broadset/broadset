@@ -137,6 +137,7 @@ describe('renderResolvedSceneV1', () => {
     const groupNode = scene.firstElementChild;
 
     expect(scene.dataset['sceneRoot']).toBe('true');
+    expect(scene.style.transformStyle).toBe('preserve-3d');
     expect(scene.style.position).toBe('relative');
     expect(scene.children).toHaveLength(1);
     expect(groupNode).not.toBeNull();

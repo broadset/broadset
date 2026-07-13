@@ -87,11 +87,14 @@ export function V1PagePreview({
     <div
       ref={hostRef}
       className={className}
+      data-broadset-element-layer="true"
       data-testid="v1-page-preview"
       style={{
         height: document?.surface.size[1],
-        overflow: 'hidden',
+        overflow: 'visible',
+        pointerEvents: 'none',
         position: 'relative',
+        transformStyle: 'preserve-3d',
         width: document?.surface.size[0],
       }}
     />

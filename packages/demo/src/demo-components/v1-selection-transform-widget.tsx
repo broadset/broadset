@@ -13,6 +13,12 @@ import { geometryToBoxStyle } from '@broadset/renderer';
 import { useRef, useState } from 'react';
 
 import { useEditorSelector } from '../demo-app/helpers';
+import {
+  createV1GesturePlaneProjection,
+  projectV1GestureDelta,
+  projectV1GesturePoint,
+  type V1GesturePlaneProjection,
+} from './v1-gesture-projection';
 import { V1MultiSelectionTransformWidget } from './v1-multi-selection-transform-widget';
 
 interface V1SelectionTransformWidgetProps {
@@ -98,6 +104,8 @@ export function V1SelectionTransformWidget({
   const elementId = state.activeElementIds.length === 1 ? state.activeElementIds[0] : undefined;
   const element = elementId === undefined ? undefined : selectElementByIdV1(state, elementId);
   const gestureRef = useRef<TransformGestureV1 | null>(null);
+  const projectionRef = useRef<V1GesturePlaneProjection | null>(null);
+  const widgetRef = useRef<HTMLDivElement | null>(null);
   const [preview, setPreview] = useState<TransformPreviewV1 | null>(null);
 
   if (state.activeElementIds.length > 1) {
@@ -119,6 +127,10 @@ export function V1SelectionTransformWidget({
     }
 
     setPreview(null);
+    projectionRef.current =
+      widgetRef.current === null ?
+        null
+      : createV1GesturePlaneProjection(widgetRef.current, { x: event.clientX, y: event.clientY });
     gestureRef.current = {
       kind: 'drag',
       elementId: element.id,
@@ -142,6 +154,10 @@ export function V1SelectionTransformWidget({
       }
 
       setPreview(null);
+      projectionRef.current =
+        widgetRef.current === null ?
+          null
+        : createV1GesturePlaneProjection(widgetRef.current, { x: event.clientX, y: event.clientY });
       gestureRef.current = {
         kind: 'resize',
         elementId: element.id,
@@ -159,10 +175,16 @@ export function V1SelectionTransformWidget({
     const rect = getEditorElementRectV1(element);
     const widgetBounds = event.currentTarget.parentElement?.getBoundingClientRect();
     const hasMeasuredBounds = widgetBounds !== undefined && widgetBounds.width > 0 && widgetBounds.height > 0;
+    const projection =
+      widgetRef.current === null ?
+        null
+      : createV1GesturePlaneProjection(widgetRef.current, { x: event.clientX, y: event.clientY });
+    const projectedPoint = projectV1GesturePoint(projection, { x: event.clientX, y: event.clientY });
     const rotationCenter =
       hasMeasuredBounds ?
         { x: widgetBounds.left + widgetBounds.width / 2, y: widgetBounds.top + widgetBounds.height / 2 }
       : { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    const localCenter = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
 
     event.preventDefault();
     event.stopPropagation();
@@ -172,6 +194,7 @@ export function V1SelectionTransformWidget({
     }
 
     setPreview(null);
+    projectionRef.current = projection;
     gestureRef.current = {
       kind: 'rotate',
       elementId: element.id,
@@ -179,7 +202,10 @@ export function V1SelectionTransformWidget({
       latestRotation: rect.rotation,
       pointerId: event.pointerId,
       rotationCenter,
-      startAngle: Math.atan2(event.clientY - rotationCenter.y, event.clientX - rotationCenter.x),
+      startAngle:
+        projectedPoint === null ?
+          Math.atan2(event.clientY - rotationCenter.y, event.clientX - rotationCenter.x)
+        : Math.atan2(projectedPoint.y - localCenter.y, projectedPoint.x - localCenter.x),
     };
   };
   const moveGesture = (event: React.PointerEvent<HTMLButtonElement>): void => {
@@ -191,12 +217,18 @@ export function V1SelectionTransformWidget({
     event.stopPropagation();
 
     const scale = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+    const projectedPoint = projectV1GesturePoint(projectionRef.current, { x: event.clientX, y: event.clientY });
+    const projectedDelta = projectV1GestureDelta(projectionRef.current, { x: event.clientX, y: event.clientY });
 
     if (gesture.kind === 'rotate') {
-      const currentAngle = Math.atan2(
-        event.clientY - gesture.rotationCenter.y,
-        event.clientX - gesture.rotationCenter.x,
-      );
+      const localCenter = {
+        x: gesture.initialRect.x + gesture.initialRect.width / 2,
+        y: gesture.initialRect.y + gesture.initialRect.height / 2,
+      };
+      const currentAngle =
+        projectedPoint === null ?
+          Math.atan2(event.clientY - gesture.rotationCenter.y, event.clientX - gesture.rotationCenter.x)
+        : Math.atan2(projectedPoint.y - localCenter.y, projectedPoint.x - localCenter.x);
       const latestRotation = gesture.initialRect.rotation + ((currentAngle - gesture.startAngle) * 180) / Math.PI;
       const rect = { ...gesture.initialRect, rotation: latestRotation };
 
@@ -210,9 +242,9 @@ export function V1SelectionTransformWidget({
       const resized = applyResize(
         gesture.initialRect,
         gesture.handle,
-        event.clientX - gesture.startPointer.x,
-        event.clientY - gesture.startPointer.y,
-        scale,
+        projectedDelta?.x ?? event.clientX - gesture.startPointer.x,
+        projectedDelta?.y ?? event.clientY - gesture.startPointer.y,
+        projectedDelta === null ? scale : 1,
         gesture.initialRect.rotation,
         1,
       );
@@ -225,8 +257,8 @@ export function V1SelectionTransformWidget({
     }
 
     const latestPosition = {
-      x: gesture.initialPosition.x + (event.clientX - gesture.startPointer.x) / scale,
-      y: gesture.initialPosition.y + (event.clientY - gesture.startPointer.y) / scale,
+      x: gesture.initialPosition.x + (projectedDelta?.x ?? (event.clientX - gesture.startPointer.x) / scale),
+      y: gesture.initialPosition.y + (projectedDelta?.y ?? (event.clientY - gesture.startPointer.y) / scale),
     };
 
     gestureRef.current = { ...gesture, latestPosition };
@@ -243,6 +275,7 @@ export function V1SelectionTransformWidget({
     event.preventDefault();
     event.stopPropagation();
     gestureRef.current = null;
+    projectionRef.current = null;
     setPreview(null);
 
     if (gesture.kind === 'rotate') {
@@ -269,20 +302,25 @@ export function V1SelectionTransformWidget({
     event.preventDefault();
     event.stopPropagation();
     gestureRef.current = null;
+    projectionRef.current = null;
     setPreview(null);
   };
 
   const displayedElement = preview?.elementId === element.id ? updateElementRectV1(element, preview.rect) : element;
-
   let widget: React.JSX.Element = (
     <div
+      ref={widgetRef}
+      data-broadset-transform-overlay="true"
       data-testid="demo-transform-widget"
       style={{
         ...geometryToBoxStyle(displayedElement.geometry),
         border: '1px solid rgba(59, 130, 246, 0.95)',
         boxSizing: 'border-box',
-        pointerEvents: 'none',
+        left: 0,
+        pointerEvents: 'auto',
         position: 'absolute',
+        top: 0,
+        zIndex: 1,
       }}
     >
       <button
@@ -361,8 +399,12 @@ export function V1SelectionTransformWidget({
         data-testid={`v1-transform-ancestor-${ancestor.id}`}
         style={{
           ...geometryToBoxStyle(ancestor.geometry),
+          left: 0,
           pointerEvents: 'none',
           position: 'absolute',
+          top: 0,
+          transformStyle: 'preserve-3d',
+          zIndex: 1,
         }}
       >
         {widget}

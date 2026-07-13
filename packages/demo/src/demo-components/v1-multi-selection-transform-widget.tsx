@@ -137,11 +137,14 @@ export function V1MultiSelectionTransformWidget({
         border: '1px solid rgba(59, 130, 246, 0.95)',
         boxSizing: 'border-box',
         height: bounds.height,
+        left: 0,
         pointerEvents: 'none',
         position: 'absolute',
+        top: 0,
         transform: `matrix(1, 0, 0, 1, ${String(bounds.x + previewDelta.x)}, ${String(bounds.y + previewDelta.y)})`,
         transformOrigin: '0 0 0',
         width: bounds.width,
+        zIndex: 1,
       }}
     >
       <button
