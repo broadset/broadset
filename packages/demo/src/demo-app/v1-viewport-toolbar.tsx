@@ -1,8 +1,9 @@
 import type { ProjectEditorStore } from '@broadset/editor';
+import { projectFormatV1 } from '@broadset/model';
 import { CanvasSettingsModal } from '@broadset/ui';
 import { Dropdown, Separator, Toolbar } from '@heroui/react';
-import { FolderOpen, Grid3X3, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react';
-import { useState } from 'react';
+import { FolderOpen, Grid3X3, Layers, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import { IconToolButton, ToolbarMenu } from '../demo-components';
 import { useCanvasZoomPercent, useEditorSelector } from './helpers';
@@ -11,6 +12,8 @@ import { type V1HostDialog, V1HostDialogs } from './v1-host-dialogs';
 interface V1ViewportToolbarProps {
   readonly editorStore: ProjectEditorStore;
 }
+
+const EMPTY_PAGES: readonly projectFormatV1.PageDefinition[] = [];
 
 function updateZoom(editorStore: ProjectEditorStore, delta: number): void {
   const current = editorStore.getState().canvasSettings.zoom;
@@ -121,6 +124,71 @@ function V1HelpMenu({
   );
 }
 
+function V1ScenesMenu({ editorStore }: V1ViewportToolbarProps): React.JSX.Element {
+  const [message, setMessage] = useState('');
+  const pages = useEditorSelector(
+    editorStore,
+    (state) => state.project.documents.find((document) => document.id === state.activeDocumentId)?.pages ?? EMPTY_PAGES,
+  );
+  const activePageId = useEditorSelector(editorStore, (state) => state.activePageId);
+
+  useEffect(() => {
+    if (message === '') return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      setMessage('');
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [message]);
+
+  return (
+    <>
+      <ToolbarMenu icon={<Layers aria-hidden="true" size={16} />} label="Scenes">
+        {pages.map((page) => (
+          <Dropdown.Item
+            key={page.id}
+            onAction={() => {
+              editorStore.getState().setActivePage(page.id);
+            }}
+          >
+            {page.name}
+          </Dropdown.Item>
+        ))}
+        <Dropdown.Item
+          key="add-scene"
+          onAction={() => {
+            const state = editorStore.getState();
+            const page = projectFormatV1.createPageV1({
+              id: projectFormatV1.idSchema.parse(crypto.randomUUID()),
+              name: `Scene ${String(pages.length + 1)}`,
+            });
+
+            if (state.addPage(page)) {
+              state.setActivePage(page.id);
+              setMessage('Added a new scene.');
+            }
+          }}
+        >
+          Add scene
+        </Dropdown.Item>
+        <Dropdown.Item
+          key="remove-scene"
+          isDisabled={pages.length <= 1}
+          onAction={() => {
+            editorStore.getState().removePage(activePageId);
+          }}
+        >
+          Remove scene
+        </Dropdown.Item>
+      </ToolbarMenu>
+      {message === '' ? null : <span role="status">{message}</span>}
+    </>
+  );
+}
+
 export function V1ViewportToolbar({ editorStore }: V1ViewportToolbarProps): React.JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeDialog, setActiveDialog] = useState<V1HostDialog>(null);
@@ -143,6 +211,7 @@ export function V1ViewportToolbar({ editorStore }: V1ViewportToolbarProps): Reac
           }}
         />
         <V1ViewMenu editorStore={editorStore} />
+        <V1ScenesMenu editorStore={editorStore} />
         <V1HelpMenu onDialogOpen={setActiveDialog} />
         <Separator orientation="vertical" />
         <IconToolButton

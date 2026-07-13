@@ -30,11 +30,13 @@ export function V1DemoApp(): React.JSX.Element {
   }, []);
 
   return (
-    <V1DemoWorkspace
-      initialElementId={INITIAL_ELEMENT_ID}
-      persistence={persistence}
-      project={SAMPLE_PROJECT_V1}
-      onStoreReady={exposeStore}
-    />
+    <div data-testid="demo-shell" style={{ height: '100%', minHeight: 0, width: '100%' }}>
+      <V1DemoWorkspace
+        initialElementId={INITIAL_ELEMENT_ID}
+        persistence={persistence}
+        project={SAMPLE_PROJECT_V1}
+        onStoreReady={exposeStore}
+      />
+    </div>
   );
 }

@@ -119,4 +119,24 @@ describe('V1ViewportToolbar', () => {
 
     expect(screen.getByRole('dialog', { name: 'Broadset' })).toBeTruthy();
   });
+
+  it('switches, adds, and removes v1 scenes by page identity', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+    const initialPageCount = store.getState().project.documents[0]?.pages.length ?? 0;
+
+    render(<V1ViewportToolbar editorStore={store} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Scenes' }));
+    fireEvent.click(screen.getByText('Half-Time'));
+    expect(store.getState().activePageId).toBe(projectFormatV1.idSchema.parse('page-halftime'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Scenes' }));
+    fireEvent.click(screen.getByText('Add scene'));
+    expect(store.getState().project.documents[0]?.pages).toHaveLength(initialPageCount + 1);
+    expect(screen.getByText('Added a new scene.')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Scenes' }));
+    fireEvent.click(screen.getByText('Remove scene'));
+    expect(store.getState().project.documents[0]?.pages).toHaveLength(initialPageCount);
+  });
 });
