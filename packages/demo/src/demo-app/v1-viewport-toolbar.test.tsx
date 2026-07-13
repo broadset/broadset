@@ -79,4 +79,28 @@ describe('V1ViewportToolbar', () => {
 
     expect(store.getState().canvasSettings.showRulers).toBe(false);
   });
+
+  it('edits v1 canvas state through the Document Settings dialog', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+
+    render(<V1ViewportToolbar editorStore={store} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByText('Document Settings'));
+
+    const dialog = screen.getByRole('dialog', { name: 'Canvas Settings' });
+    const grid = screen.getByRole('switch', { name: 'Show grid' });
+
+    expect(dialog).toBeTruthy();
+
+    if (!(grid instanceof HTMLInputElement)) throw new Error('Expected Show grid to render as an input');
+
+    expect(grid.checked).toBe(false);
+
+    fireEvent.click(grid);
+    expect(store.getState().gridSettings.showGrid).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByRole('dialog', { name: 'Canvas Settings' })).toBeNull();
+  });
 });
