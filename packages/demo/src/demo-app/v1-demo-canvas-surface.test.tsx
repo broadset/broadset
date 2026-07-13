@@ -393,4 +393,46 @@ describe('V1DemoCanvasSurface', () => {
 
     expect(element?.geometry.transform).toEqual({ kind: 'affine2d', matrix: [1, 0, 0, 1, 48, 36] });
   });
+
+  it('zooms the v1 viewport around the wheel pointer', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+    const { getByTestId } = render(
+      <V1DemoCanvasSurface
+        documentId={projectFormatV1.idSchema.parse('doc-broadcast-main')}
+        editorStore={store}
+        pageId={projectFormatV1.idSchema.parse('page-match-live')}
+        project={SAMPLE_PROJECT_V1}
+      />,
+    );
+
+    fireEvent.wheel(getByTestId('v1-canvas-surface'), {
+      clientX: 100,
+      clientY: 50,
+      deltaMode: 0,
+      deltaY: -100,
+    });
+
+    expect(store.getState().canvasSettings).toMatchObject({ panX: -20, panY: -10, zoom: 1.2 });
+    expect(getByTestId('v1-canvas-viewport').style.transform).toBe('translate(-20px, -10px) scale(1.2)');
+  });
+
+  it('pans the v1 viewport with a middle-button pointer drag', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+    const { getByTestId } = render(
+      <V1DemoCanvasSurface
+        documentId={projectFormatV1.idSchema.parse('doc-broadcast-main')}
+        editorStore={store}
+        pageId={projectFormatV1.idSchema.parse('page-match-live')}
+        project={SAMPLE_PROJECT_V1}
+      />,
+    );
+    const surface = getByTestId('v1-canvas-surface');
+
+    fireEvent.pointerDown(surface, { button: 1, clientX: 100, clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(surface, { button: 1, clientX: 130, clientY: 80, pointerId: 1 });
+    fireEvent.pointerUp(surface, { button: 1, clientX: 130, clientY: 80, pointerId: 1 });
+
+    expect(store.getState().canvasSettings).toMatchObject({ panX: 30, panY: -20, zoom: 1 });
+    expect(getByTestId('v1-canvas-viewport').style.transform).toBe('translate(30px, -20px) scale(1)');
+  });
 });
