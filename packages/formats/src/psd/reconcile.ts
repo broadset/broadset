@@ -1,9 +1,6 @@
-import { type BroadsetDocument, type BroadsetElement, createEmptyBroadsetDocument } from '@broadset/model';
-import { readPsd } from 'ag-psd';
+import { type BroadsetDocument, type BroadsetElement } from '@broadset/model';
 
 import { reconcile, type ReconcileResult } from '../_shared/reconcile';
-import type { BroadsetXmpElementEntry } from '../_shared/xmp';
-import { readDocumentXmpPacket } from './import-xmp';
 
 /**
  * Phase 5 P5.5 — PSD reconciliation. Wraps `_shared/reconcile` to
@@ -79,74 +76,4 @@ function isDirty(element: BroadsetElement): boolean {
   if (psd === undefined) return false;
 
   return psd.dirty === true;
-}
-
-/**
- * Hydrate the preserved Broadset document a Broadset-exported PSD
- * carries in its XMP packet. Mirrors `readPreservedPptxDocument` so
- * cross-format reconciliation wiring can ask each format the same
- * question — "do you have a preserved snapshot to diff against?" —
- * without reaching into format-specific internals.
- *
- * Returns `null` when the byte stream is not a recognisable PSD,
- * carries no XMP packet, or carries a packet whose `elements[]` lack
- * the JSON `payload` reconciliation depends on (older Broadset
- * exports, third-party PSDs, or aggressive metadata-strip tools).
- */
-export function readPreservedPsdDocument(data: Uint8Array): BroadsetDocument | null {
-  let parsed: { readonly imageResources?: { readonly xmpMetadata?: string } };
-
-  try {
-    parsed = readPsd(data.buffer as ArrayBuffer, {
-      skipCompositeImageData: true,
-      skipThumbnail: true,
-      // Skip pixel-image data entirely — we only need the
-      // image-resources block for the XMP packet, not the layer
-      // bitmaps. Saves the heavy decode pass on the reconciliation
-      // probe path.
-      useImageData: false,
-    });
-  } catch {
-    return null;
-  }
-
-  const packet = readDocumentXmpPacket(parsed);
-
-  if (packet === null) return null;
-
-  const elements: BroadsetElement[] = [];
-
-  for (const entry of packet.elements) {
-    const element = tryParseElementPayload(entry);
-
-    if (element !== null) elements.push(element);
-  }
-
-  if (elements.length === 0) return null;
-
-  const empty = createEmptyBroadsetDocument();
-
-  return { ...empty, id: packet.documentId, elements };
-}
-
-/**
- * Best-effort parse of an XMP element entry's JSON payload into a
- * `BroadsetElement`. Returns `null` when the payload is absent,
- * unparseable, or carries a mismatching `id` — corrupt payloads fall
- * through so reconciliation never crashes on a tampered packet.
- */
-function tryParseElementPayload(entry: BroadsetXmpElementEntry): BroadsetElement | null {
-  if (entry.payload === undefined) return null;
-
-  try {
-    const value = JSON.parse(entry.payload) as unknown;
-
-    if (value === null || typeof value !== 'object') return null;
-    if (!('id' in value) || !('type' in value) || !('style' in value)) return null;
-    if ((value as { id: unknown }).id !== entry.id) return null;
-
-    return value as BroadsetElement;
-  } catch {
-    return null;
-  }
 }

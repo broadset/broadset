@@ -56,10 +56,12 @@ function compareStringAscending(a: string, b: string): number {
 
 function canonicalizeStyle(style: BroadsetElement['style']): string {
   const entries: Array<readonly [string, unknown]> = Object.entries(style)
-    .filter(([, value]) => value !== undefined)
-    .sort(([keyA], [keyB]) => compareStringAscending(keyA, keyB));
+    .filter((entry: [string, unknown]): boolean => entry[1] !== undefined)
+    .sort((entryA: [string, unknown], entryB: [string, unknown]): number =>
+      compareStringAscending(entryA[0], entryB[0]),
+    );
 
-  return entries.map(([key, value]) => `${key}=${JSON.stringify(value)}`).join('|');
+  return entries.map((entry: readonly [string, unknown]): string => `${entry[0]}=${JSON.stringify(entry[1])}`).join('|');
 }
 
 /** Canonicalises an element into the string form consumed by the hash body. */

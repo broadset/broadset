@@ -1,12 +1,3 @@
-export function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
 /**
  * URL scheme allowlist for image/pattern hrefs emitted on export.
  * Symmetric to the importer's `javascript:` / `data:text/html`

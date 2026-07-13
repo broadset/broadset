@@ -6,7 +6,7 @@ import type { BroadsetDocument, BroadsetElement, FontAsset } from '@broadset/mod
  * `_shared/reconcile/` produces but only carries the user-visible
  * fields (id + name + a one-line description for modifications).
  */
-export interface DocumentReconciliationElement {
+interface DocumentReconciliationElement {
   readonly id: string;
   readonly name?: string;
   readonly description?: string;
@@ -24,14 +24,14 @@ export interface DocumentReconciliationElement {
  * UI's plain summaries (id + name + description) and keeps the element
  * references for choice resolution after the user acknowledges.
  */
-export interface DocumentReconciliationModification extends DocumentReconciliationElement {
+interface DocumentReconciliationModification extends DocumentReconciliationElement {
   /** The element as it was in the preserved (last Broadset-export) document. */
   readonly preservedElement: BroadsetElement;
   /** The element as it is in the visual (re-imported) document. */
   readonly currentElement: BroadsetElement;
 }
 
-export interface DocumentReconciliation {
+interface DocumentReconciliation {
   readonly modifications: readonly DocumentReconciliationModification[];
   readonly additions: readonly DocumentReconciliationElement[];
   readonly deletions: readonly DocumentReconciliationElement[];

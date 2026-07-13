@@ -11,6 +11,13 @@ import { type Matrix } from 'transformation-matrix';
 
 import { type DecomposedTransform } from './transform';
 
+export interface SvgFontSource {
+  readonly bytes?: Uint8Array | undefined;
+  readonly url?: string | undefined;
+  readonly format: 'woff2' | 'ttf' | 'otf';
+  readonly __testPermissionOverride?: 'installable' | 'editable' | 'preview-print' | 'restricted' | undefined;
+}
+
 export interface ImportedElement {
   readonly type: string;
   /**

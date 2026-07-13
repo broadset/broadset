@@ -496,8 +496,12 @@ export function inferExpressionValueType({ expression, context }: ExpressionInfe
 
 export function inferFormatterPipelineValueType({ inputType, pipeline }: FormatterInferenceOptions): ValueTypeInferenceResult {
   let valueType: ValueType = inputType;
+  const indexedSteps: Iterable<readonly [number, FormatterPipeline['steps'][number]]> = pipeline.steps.entries();
 
-  for (const [index, step] of pipeline.steps.entries()) {
+  for (const entry of indexedSteps) {
+    const index: number = entry[0];
+    const step: FormatterPipeline['steps'][number] = entry[1];
+
     if (!formatterAcceptsInput(step.formatterId, valueType)) {
       return {
         diagnostics: [

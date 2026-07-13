@@ -386,28 +386,3 @@ export function warnToolNamespaces(xmlDoc: Document, warnings: string[]): void {
     }
   }
 }
-
-/**
- * Scan the raw input string for tool-specific namespace prefixes
- * before sanitization strips them. DOMPurify's SVG profile removes
- * namespaced attributes whose namespace isn't declared on an
- * allowed list, so by the time we walk the sanitized DOM those
- * attrs are gone. A source-text regex scan catches them first and
- * emits the preservation warning.
- */
-export function warnRawToolNamespaces(input: string, warnings: string[]): void {
-  const emitted = new Set<string>();
-
-  for (const ns of TOOL_NAMESPACE_WARNINGS) {
-    // Look for `<tag prefix:attr=` or ` prefix:attr=` anywhere in
-    // the source. Linear time per IO-D regex safety rule.
-    const pattern = new RegExp(`(?:<|\\s)${ns.prefix}:[a-zA-Z][a-zA-Z0-9-]*\\s*=`);
-
-    if (pattern.test(input) && !emitted.has(ns.label)) {
-      warnings.push(
-        `Preserved ${ns.label} namespace attributes on native elements; vendor metadata is not natively mapped.`,
-      );
-      emitted.add(ns.label);
-    }
-  }
-}

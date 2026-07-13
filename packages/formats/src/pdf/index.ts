@@ -7,5 +7,3 @@ export { canRoundTrip, importPdfDocument, readPdfRoundTripMetadata } from './imp
 export { validatePdfA2b, validatePdfAXmpPacket } from './import/validate-pdfa';
 export { buildMaskedSvgSource } from './masked-svg';
 export { drawQrOnPage } from './qr';
-export { readPreservedPdfDocument, reconcilePdf } from './roundtrip';
-export type { PdfImportOptions } from './types';

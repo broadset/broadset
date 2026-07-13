@@ -298,7 +298,7 @@ export function parsePdfDocumentV1(pdf: PDFDocument): ParsedPdfDocumentV1 | unde
   });
   const xObjects = collectImageResources(pdf, page);
 
-  for (const resourceName of xObjects.nonImageNames) {
+  xObjects.nonImageNames.forEach((resourceName: string): void => {
     if (parsed.imageUses.some((use) => use.resourceName === resourceName)) {
       warnings.push(diagnostic(
         'pdf.form-xobject-omitted',
@@ -306,7 +306,7 @@ export function parsePdfDocumentV1(pdf: PDFDocument): ParsedPdfDocumentV1 | unde
         'semantics',
       ));
     }
-  }
+  });
 
   return {
     pageCount: pages.length,

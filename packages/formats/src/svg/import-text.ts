@@ -19,8 +19,7 @@ import {
 } from '@broadset/model';
 
 import { layoutTextAsPathD, safeOpenFont } from './flatten-text';
-import { bakePathWithMatrix, type ImportedElement, type ShapeBakeContext } from './import-types';
-import type { SvgFontSource } from './types';
+import { bakePathWithMatrix, type ImportedElement, type ShapeBakeContext, type SvgFontSource } from './import-types';
 
 
 /**

@@ -30,8 +30,7 @@ import {
   readInheritedStrokeStyle,
 } from './import-style';
 import { importTextElement } from './import-text';
-import { type ImportedElement, type ShapeBakeContext, type TransformState } from './import-types';
-import type { SvgFontSource } from './types';
+import { type ImportedElement, type ShapeBakeContext, type SvgFontSource, type TransformState } from './import-types';
 
 /**
  * Group-depth cap per the importer security contract. Bounds the
@@ -187,13 +186,6 @@ function synthesiseGroupId(el: Element): string {
   }
 
   return `${SYNTHETIC_GROUP_ID_PREFIX}${segments.join('-')}`;
-}
-
-/**
- * `true` when an id was produced by `synthesiseGroupId`.
- */
-export function isSyntheticGroupId(id: string): boolean {
-  return /^__bs-g-\d+(-\d+)*$/.test(id);
 }
 
 /**
@@ -419,19 +411,6 @@ function importSwitchElement(
   return [];
 }
 
-export function importSvg(input: string): SvgImportResult {
-  const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(input, 'image/svg+xml');
-
-  const parseError = xmlDoc.querySelector('parsererror');
-
-  if (parseError) {
-    throw new Error(`SVG import failed: invalid XML - ${parseError.textContent}`);
-  }
-
-  return walkSvgDocument(xmlDoc);
-}
-
 export function walkSvgDocument(xmlDoc: Document, options: SvgWalkOptions = {}): SvgImportResult {
   const svgRoot = xmlDoc.documentElement;
 
@@ -466,64 +445,6 @@ export function walkSvgDocument(xmlDoc: Document, options: SvgWalkOptions = {}):
     const child = children[i];
 
     if (!child || child.tagName.toLowerCase() === 'defs') {
-      continue;
-    }
-
-    elements.push(...importElement(child, defs, warnings, rootTransform, null, 0, options));
-  }
-
-  return { elements, canvasWidth, canvasHeight, warnings };
-}
-
-interface VisualImportResult {
-  readonly elements: readonly ImportedElement[];
-  readonly canvasWidth: number;
-  readonly canvasHeight: number;
-  readonly warnings: readonly string[];
-}
-
-/**
- * Alternate entry point used by the fast-path importer: walks an
- * already-parsed DOM tree (so callers that did their own
- * `parseMetadataPacket(xmlDoc)` don't re-parse).
- */
-export function importSvgFromXmlDoc(xmlDoc: Document, options: SvgWalkOptions = {}): VisualImportResult {
-  const svgRoot = xmlDoc.documentElement;
-  let canvasWidth = 800;
-  let canvasHeight = 600;
-  const widthAttr = svgRoot.getAttribute('width');
-  const heightAttr = svgRoot.getAttribute('height');
-
-  if (widthAttr && heightAttr) {
-    canvasWidth = parseFloat(widthAttr);
-    canvasHeight = parseFloat(heightAttr);
-  } else {
-    const viewBox = svgRoot.getAttribute('viewBox');
-
-    if (viewBox) {
-      const parts = viewBox.split(/[\s,]+/);
-
-      canvasWidth = parseFloat(parts[2] ?? '800');
-      canvasHeight = parseFloat(parts[3] ?? '600');
-    }
-  }
-
-  const defs = buildDefsBundle(xmlDoc);
-  const warnings: string[] = [];
-  const elements: ImportedElement[] = [];
-  const children = svgRoot.children;
-  const rootTransform: TransformState = { x: 0, y: 0, rotation: 0, matrix: IDENTITY_MATRIX, requiresBake: false };
-
-  for (let i = 0; i < children.length; i++) {
-    const child = children[i];
-
-    if (!child) {
-      continue;
-    }
-
-    const tag = child.tagName.toLowerCase();
-
-    if (tag === 'defs' || tag === 'metadata') {
       continue;
     }
 

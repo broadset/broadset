@@ -1,9 +1,14 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { importSvgProjectV1 } from './import';
 
 const importedAt = projectFormatV1.utcTimestampSchema.parse('2026-07-12T00:00:00Z');
+const fixturesDirectory = join(dirname(fileURLToPath(import.meta.url)), '..', '__fixtures__');
 
 async function importSvg(svg: string) {
   return importSvgProjectV1({ svg, importedAt, fileName: 'fixture.svg' });
@@ -14,6 +19,22 @@ function childElements(result: Awaited<ReturnType<typeof importSvgProjectV1>>) {
 }
 
 describe('importSvgProjectV1', () => {
+  it.each(readdirSync(fixturesDirectory).filter((name) => name.endsWith('.svg')))(
+    'imports real producer fixture %s as valid v1',
+    async (name) => {
+      const result = await importSvgProjectV1({
+        svg: readFileSync(join(fixturesDirectory, name), 'utf8'),
+        importedAt,
+        fileName: name,
+      });
+
+      expect(projectFormatV1.parseProjectV1Unknown(result.project).diagnostics).not.toContainEqual(
+        expect.objectContaining({ code: 'structural-invalid' }),
+      );
+      expect(projectFormatV1.validateBroadsetProjectV1Semantics(result.project)).toEqual([]);
+    },
+  );
+
   it.each([
     ['rect', '<rect x="1" y="2" width="30" height="40" fill="#123456"/>', 'rectangle'],
     ['circle', '<circle cx="10" cy="10" r="5"/>', 'ellipse'],

@@ -60,16 +60,14 @@ Severity scale appears at the bottom of this document.
 
 ### Silent drops
 
-- **[Medium]** [`packages/formats/src/svg/import-document.ts:506-510`](../../packages/formats/src/svg/import-document.ts) `parseJsonOrNull` — JSON parse failures on `data-bs-data-field` / `data-bs-repeater` metadata return `null` silently. A malformed JSON in a Broadset-exported SVG silently drops data bindings on re-import. Recommend `svg-import: failed to parse data-binding metadata for element "${id}" — bindings dropped`.
-- **[Medium]** [`packages/formats/src/svg/import-document.ts:583-599`](../../packages/formats/src/svg/import-document.ts) `safeParseConicGradient` — same pattern: invalid conic-gradient metadata silently degrades to no gradient.
 - **[Low]** [`packages/formats/src/svg/import-walk.ts:468`](../../packages/formats/src/svg/import-walk.ts) — `Math.min(children.length, SVG_ELEMENT_COUNT_CAP)` truncates the walk silently per child node (the cap warning is emitted from `sanitizeDomInPlace`, but the walker enforces a second copy of the cap silently). Acceptable defence-in-depth, but consider a structured "cap reached during walk" warning so users know the walker also hit it.
-- **[Low]** [`packages/formats/src/svg/import-document.ts:148-163`](../../packages/formats/src/svg/import-document.ts) `applyContentSecurityGate` — drops elements that fail schema content-security validation. The warning surface is correct (line 158), so this is hygiene only — the path is well-instrumented.
+- **[Low]** [`packages/formats/src/svg/v1/import.ts`](../../packages/formats/src/svg/v1/import.ts) returns a minimal valid v1 fallback when even fallback assembly fails. This is intentionally fail-soft, but the final branch has no interop record because no source resource could be assembled.
 
 ### Lazy-boundary checks
 
 This track is the **best-audited of the three**. P7.7n closed the security audit findings (C1 `<use>` fan-out, C2 byte cap default, H1 scheme allowlist, M2 CSS dangerous URLs, L2 doctype removal, L3 namespaced event handlers). Resource caps are explicit:
 
-- Byte cap: `DEFAULT_SVG_MAX_BYTES = 32 MiB` ([`import-document.ts:37`](../../packages/formats/src/svg/import-document.ts)) enforced **pre-parse**.
+- Byte cap: `DEFAULT_MAX_BYTES = 32 MiB` ([`v1/import.ts`](../../packages/formats/src/svg/v1/import.ts)) enforced **pre-parse**.
 - Element count: `SVG_ELEMENT_COUNT_CAP = 10 000` ([`import-security.ts:15`](../../packages/formats/src/svg/import-security.ts)).
 - Group depth: `DEFAULT_SVG_GROUP_DEPTH_CAP = 100` ([`import-walk.ts:42`](../../packages/formats/src/svg/import-walk.ts)).
 - `<use>` depth: `USE_DEREFERENCE_DEPTH_CAP = 16` ([`import-security.ts:3`](../../packages/formats/src/svg/import-security.ts)).
@@ -78,12 +76,11 @@ This track is the **best-audited of the three**. P7.7n closed the security audit
 
 Remaining findings:
 
-- **[Low]** No `maxFontSourceBytes` cap on `SvgImportOptions.fontSources` ([`types.ts:288`](../../packages/formats/src/svg/types.ts)). The font-flatten path on third-party SVGs reads each entry's `bytes`. A caller-supplied 1 GB font-source map blows memory before glyph flatten. Mitigated in practice — `fontSources` is only set by trusted demo / test code, not by parsed-input. Recommend documenting the trust boundary.
-- **[Low]** [`import-document.ts:99-115`](../../packages/formats/src/svg/import-document.ts) — when caller passes `maxBytes: 0`, the cap is disabled entirely. Documented as "trusted internal flows" but a config typo turns the protection off silently. Consider rejecting `0` and requiring explicit `Number.POSITIVE_INFINITY` for the disable case.
+- **[Low]** [`v1/import.ts`](../../packages/formats/src/svg/v1/import.ts) — when caller passes `maxBytes: 0`, the cap is disabled entirely. A config typo can therefore turn protection off silently. Consider rejecting `0` and requiring explicit `Number.POSITIVE_INFINITY` for the disable case.
 
 ### Perf scaling
 
-- **[Medium]** No SVG perf test file exists. The closest coverage is [`real-world-fixtures.test.ts`](../../packages/formats/src/svg/real-world-fixtures.test.ts) (15 hand-curated 5–50 KB fixtures) and [`import-resource-caps.test.ts:47-60`](../../packages/formats/src/svg/import-resource-caps.test.ts) which deliberately disables wall-clock thresholds for the cap test. The CSS rule cap test does pin a 5 s budget for 6 000 rules, and the security-audit suite covers billion-laughs / `<use>` bombs, but there is no positive perf budget for realistic-load shapes (e.g. 5 000-element design-tool export, 200-element fixture with deep CSS rule cascade).
+- **[Medium]** No standalone SVG performance test exists. The closest coverage is the real-producer validity loop in [`v1/import.test.ts`](../../packages/formats/src/svg/v1/import.test.ts) and the native round-trip fixture suite in [`v1/fixtures-round-trip.test.ts`](../../packages/formats/src/svg/v1/fixtures-round-trip.test.ts), but neither pins a positive wall-clock budget for realistic-load shapes.
 - Recommended additions to a new `packages/formats/src/svg/performance.test.ts`:
   - 5 000-rectangle SVG (just under cap) — pin import budget < 3 s.
   - 1 000-element SVG with 1 000 CSS rules in `<style>` — pin total time < 5 s (this is the path most likely to go non-linear via `applyStyleBlocks`).
@@ -93,8 +90,8 @@ Remaining findings:
 
 ### Async resource resolvers
 
-- **[N/A]** SVG export does **not** fetch fonts. [`export-fonts.ts`](../../packages/formats/src/svg/export-fonts.ts) consumes caller-supplied `SvgFontSource.bytes` or emits a `src: url('${source.url}')` reference for the consumer to resolve. SVG export thus has no fetch-resource attack surface — by design, all bytes are caller-supplied.
-- **[Low]** Recommend documenting the no-fetch contract explicitly in [`svg/types.ts`](../../packages/formats/src/svg/types.ts) `SvgExportOptions.fonts` so future contributors don't accidentally introduce a fetch. SVG-import has no resource-fetch path either (data URIs only); the same documentation note applies.
+- **[N/A]** Native v1 SVG export does **not** fetch resources. [`v1/export.ts`](../../packages/formats/src/svg/v1/export.ts) serializes project-owned values and resolved asset references only, so it has no network fetch-resource attack surface.
+- **[Low]** Recommend documenting the no-fetch contract explicitly beside the public v1 SVG export API in [`v1/index.ts`](../../packages/formats/src/svg/v1/index.ts) so future contributors do not accidentally introduce a network boundary.
 
 ---
 
