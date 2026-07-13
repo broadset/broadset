@@ -5,9 +5,12 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import { V1PagePreview } from '../demo-components/v1-page-preview';
 import { useCanvasViewport } from './helpers';
 
+const EMPTY_BLOBS: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array> = new Map();
+
 interface V1DemoCanvasSurfaceProps {
   readonly editorStore: ProjectEditorStore;
   readonly project: projectFormatV1.BroadsetProjectV1;
+  readonly blobs?: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array> | undefined;
   readonly documentId: projectFormatV1.Id;
   readonly pageId: projectFormatV1.Id;
 }
@@ -27,6 +30,7 @@ function readElementId(target: EventTarget | null): projectFormatV1.Id | undefin
 export function V1DemoCanvasSurface({
   editorStore,
   project,
+  blobs = EMPTY_BLOBS,
   documentId,
   pageId,
 }: V1DemoCanvasSurfaceProps): React.JSX.Element {
@@ -55,7 +59,7 @@ export function V1DemoCanvasSurface({
           transformOrigin: '0 0',
         }}
       >
-        <V1PagePreview documentId={documentId} pageId={pageId} project={project} />
+        <V1PagePreview blobs={blobs} documentId={documentId} pageId={pageId} project={project} />
       </div>
     </div>
   );

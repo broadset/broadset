@@ -216,6 +216,7 @@ export function V1DemoWorkspace({
           </aside>
           <main style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
             <V1DemoCanvasSurface
+              blobs={state.blobs}
               documentId={state.activeDocumentId}
               editorStore={editorStore}
               pageId={state.activePageId}
