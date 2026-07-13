@@ -15,7 +15,6 @@ import { V1DataSidebar } from './v1-data-sidebar';
 import { V1DemoCanvasSurface } from './v1-demo-canvas-surface';
 import { V1ElementSidebar } from './v1-element-sidebar';
 import { V1ElementToolbar } from './v1-element-toolbar';
-import { V1ProjectExportControls } from './v1-project-export-controls';
 import { V1ProjectFileControls } from './v1-project-file-controls';
 import { V1SequenceSidebar } from './v1-sequence-sidebar';
 import { V1ViewportToolbar } from './v1-viewport-toolbar';
@@ -184,7 +183,6 @@ export function V1DemoWorkspace({
         style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%' }}
       >
         <V1ProjectFileControls editorStore={editorStore} />
-        <V1ProjectExportControls editorStore={editorStore} />
         <V1ViewportToolbar editorStore={editorStore} />
         <V1ElementToolbar editorStore={editorStore} />
         <PageSorter

@@ -103,4 +103,20 @@ describe('V1ViewportToolbar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(screen.queryByRole('dialog', { name: 'Canvas Settings' })).toBeNull();
   });
+
+  it('opens v1-native File and Help dialogs', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+
+    render(<V1ViewportToolbar editorStore={store} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByText('New Document'));
+    expect(screen.getByRole('dialog', { name: 'New Document' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Help' }));
+    fireEvent.click(screen.getByText('About'));
+
+    expect(screen.getByRole('dialog', { name: 'Broadset' })).toBeTruthy();
+  });
 });

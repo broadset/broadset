@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { IconToolButton, ToolbarMenu } from '../demo-components';
 import { useCanvasZoomPercent, useEditorSelector } from './helpers';
+import { type V1HostDialog, V1HostDialogs } from './v1-host-dialogs';
 
 interface V1ViewportToolbarProps {
   readonly editorStore: ProjectEditorStore;
@@ -53,9 +54,39 @@ function V1ViewMenu({ editorStore }: V1ViewportToolbarProps): React.JSX.Element 
   );
 }
 
-function V1FileMenu({ onSettingsOpen }: { readonly onSettingsOpen: () => void }): React.JSX.Element {
+function V1FileMenu({
+  onDialogOpen,
+  onSettingsOpen,
+}: {
+  readonly onDialogOpen: (dialog: Exclude<V1HostDialog, null>) => void;
+  readonly onSettingsOpen: () => void;
+}): React.JSX.Element {
   return (
     <ToolbarMenu icon={<FolderOpen aria-hidden="true" size={16} />} label="File">
+      <Dropdown.Item
+        key="new-document"
+        onAction={() => {
+          onDialogOpen('new-document');
+        }}
+      >
+        New Document
+      </Dropdown.Item>
+      <Dropdown.Item
+        key="media-library"
+        onAction={() => {
+          onDialogOpen('media-library');
+        }}
+      >
+        Media Library
+      </Dropdown.Item>
+      <Dropdown.Item
+        key="export"
+        onAction={() => {
+          onDialogOpen('export');
+        }}
+      >
+        Export
+      </Dropdown.Item>
       <Dropdown.Item key="document-settings" onAction={onSettingsOpen}>
         Document Settings
       </Dropdown.Item>
@@ -63,8 +94,36 @@ function V1FileMenu({ onSettingsOpen }: { readonly onSettingsOpen: () => void })
   );
 }
 
+function V1HelpMenu({
+  onDialogOpen,
+}: {
+  readonly onDialogOpen: (dialog: Exclude<V1HostDialog, null>) => void;
+}): React.JSX.Element {
+  return (
+    <ToolbarMenu icon={<span aria-hidden="true">?</span>} label="Help">
+      <Dropdown.Item
+        key="shortcuts"
+        onAction={() => {
+          onDialogOpen('shortcuts');
+        }}
+      >
+        Keyboard shortcuts
+      </Dropdown.Item>
+      <Dropdown.Item
+        key="about"
+        onAction={() => {
+          onDialogOpen('about');
+        }}
+      >
+        About
+      </Dropdown.Item>
+    </ToolbarMenu>
+  );
+}
+
 export function V1ViewportToolbar({ editorStore }: V1ViewportToolbarProps): React.JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activeDialog, setActiveDialog] = useState<V1HostDialog>(null);
   const zoomPercent = useCanvasZoomPercent(editorStore);
   const undoCount = useEditorSelector(editorStore.temporal, (state) => state.pastStates.length);
   const redoCount = useEditorSelector(editorStore.temporal, (state) => state.futureStates.length);
@@ -78,11 +137,13 @@ export function V1ViewportToolbar({ editorStore }: V1ViewportToolbarProps): Reac
     <>
       <Toolbar aria-label="Main editor toolbar" isAttached>
         <V1FileMenu
+          onDialogOpen={setActiveDialog}
           onSettingsOpen={() => {
             setSettingsOpen(true);
           }}
         />
         <V1ViewMenu editorStore={editorStore} />
+        <V1HelpMenu onDialogOpen={setActiveDialog} />
         <Separator orientation="vertical" />
         <IconToolButton
           isDisabled={undoCount === 0}
@@ -167,6 +228,13 @@ export function V1ViewportToolbar({ editorStore }: V1ViewportToolbarProps): Reac
           if (viewMode === 'broadcast' || viewMode === 'none' || viewMode === 'print') {
             editorStore.getState().updateCanvasSettings({ viewMode });
           }
+        }}
+      />
+      <V1HostDialogs
+        activeDialog={activeDialog}
+        editorStore={editorStore}
+        onClose={() => {
+          setActiveDialog(null);
         }}
       />
     </>
