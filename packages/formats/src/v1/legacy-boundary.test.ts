@@ -48,4 +48,18 @@ describe('native v1 format boundary', () => {
 
     expect(findings).toEqual([]);
   });
+
+  it('keeps the native PPTX exporter independent of the retired writer', () => {
+    const path = join(formatsSourceDirectory, 'pptx/v1/export.ts');
+    const findings =
+      (
+        /from ['"](?:\.\.\/(?:export|project-model|project-source-document)|\.\/project-document)['"]/u.test(
+          readFileSync(path, 'utf8'),
+        )
+      ) ?
+        [path]
+      : [];
+
+    expect(findings).toEqual([]);
+  });
 });

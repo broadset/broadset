@@ -4,9 +4,7 @@ import {
   type BroadsetDocument,
   type BroadsetElement,
   type BroadsetElementStyle,
-  createEmptyBroadsetDocument,
   type FontAsset,
-  fontAsset,
   isTextBody,
 } from '@broadset/model';
 
@@ -18,5 +16,3 @@ export type PptxEmbeddedFontAsset = FontAsset;
 
 export const pptxSourceColorSchema = broadsetColorSchema;
 export const isPptxSourceTextBody = isTextBody;
-export const createEmptyPptxSourceDocument = createEmptyBroadsetDocument;
-export const createPptxEmbeddedFontAsset = fontAsset;
