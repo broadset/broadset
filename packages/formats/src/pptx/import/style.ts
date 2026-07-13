@@ -1,22 +1,24 @@
-import {
-  type ArrowEnd,
-  type BroadsetColor,
-  type BroadsetElement,
-  type BroadsetFill,
-  type BroadsetGradient,
-  type BroadsetGradientStop,
-  type Canvas,
-  type ColorMods,
-  normalizeColor,
-  solidFill,
-  type ThemeSlot,
-} from '@broadset/model';
-
 import { findChild, findChildren, findDescendant, getAttr, type XmlElement } from '../ooxml/ast';
 import { OOXML_PRESET_COLOR_HEX } from '../ooxml/preset-colors';
-import { emuToCanvasLength, emuToMm, rotationUnitsToDegrees } from '../ooxml/units';
+import { emuToMm, emuToPptxSourceCanvasLength, rotationUnitsToDegrees } from '../ooxml/units';
+import {
+  type PptxSourceArrowEnd,
+  type PptxSourceCanvas,
+  type PptxSourceColor,
+  type PptxSourceColorMods,
+  type PptxSourceElement,
+  type PptxSourceFill,
+  type PptxSourceGradient,
+  type PptxSourceGradientStop,
+  type PptxThemeSlot,
+  solidPptxFill,
+} from '../project-model';
 
-export function applyShapeStyle(canvas: Canvas, element: BroadsetElement, shape: XmlElement): BroadsetElement {
+export function applyShapeStyle(
+  canvas: PptxSourceCanvas,
+  element: PptxSourceElement,
+  shape: XmlElement,
+): PptxSourceElement {
   const fill = detectFill(shape);
   const stroke = parseStrokeFromBody(canvas, shape);
   const boxShadow = parseOuterShadow(shape);
@@ -38,12 +40,15 @@ export function applyShapeStyle(canvas: Canvas, element: BroadsetElement, shape:
   };
 }
 
-function parseStrokeFromBody(canvas: Canvas, shape: XmlElement): {
+function parseStrokeFromBody(
+  canvas: PptxSourceCanvas,
+  shape: XmlElement,
+): {
   readonly borderWidth?: number;
-  readonly borderColor?: BroadsetColor;
+  readonly borderColor?: PptxSourceColor;
   readonly strokeDasharray?: string;
-  readonly strokeHeadEnd?: ArrowEnd;
-  readonly strokeTailEnd?: ArrowEnd;
+  readonly strokeHeadEnd?: PptxSourceArrowEnd;
+  readonly strokeTailEnd?: PptxSourceArrowEnd;
 } | null {
   const ln = findDescendant(shape, 'a:ln');
 
@@ -51,15 +56,15 @@ function parseStrokeFromBody(canvas: Canvas, shape: XmlElement): {
 
   const result: {
     borderWidth?: number;
-    borderColor?: BroadsetColor;
+    borderColor?: PptxSourceColor;
     strokeDasharray?: string;
-    strokeHeadEnd?: ArrowEnd;
-    strokeTailEnd?: ArrowEnd;
+    strokeHeadEnd?: PptxSourceArrowEnd;
+    strokeTailEnd?: PptxSourceArrowEnd;
   } = {};
 
   const widthAttr = getAttr(ln, 'w');
 
-  if (widthAttr !== undefined) result.borderWidth = emuToCanvasLength(canvas, parseInt(widthAttr, 10));
+  if (widthAttr !== undefined) result.borderWidth = emuToPptxSourceCanvasLength(canvas, parseInt(widthAttr, 10));
 
   const colour = parseColorElement(ln);
 
@@ -70,8 +75,8 @@ function parseStrokeFromBody(canvas: Canvas, shape: XmlElement): {
 
   if (dashStyle !== undefined && dashStyle !== 'solid') result.strokeDasharray = dashStyle;
 
-  const headEnd = parseArrowEnd(ln, 'a:headEnd');
-  const tailEnd = parseArrowEnd(ln, 'a:tailEnd');
+  const headEnd = parsePptxSourceArrowEnd(ln, 'a:headEnd');
+  const tailEnd = parsePptxSourceArrowEnd(ln, 'a:tailEnd');
 
   if (headEnd !== null) result.strokeHeadEnd = headEnd;
   if (tailEnd !== null) result.strokeTailEnd = tailEnd;
@@ -79,7 +84,7 @@ function parseStrokeFromBody(canvas: Canvas, shape: XmlElement): {
   return Object.keys(result).length === 0 ? null : result;
 }
 
-function parseArrowEnd(ln: XmlElement, qname: 'a:headEnd' | 'a:tailEnd'): ArrowEnd | null {
+function parsePptxSourceArrowEnd(ln: XmlElement, qname: 'a:headEnd' | 'a:tailEnd'): PptxSourceArrowEnd | null {
   const node = findChild(ln, qname);
 
   if (node === null) return null;
@@ -95,7 +100,7 @@ function parseArrowEnd(ln: XmlElement, qname: 'a:headEnd' | 'a:tailEnd'): ArrowE
   };
 }
 
-function ooxmlArrowShapeToBroadset(type: string): ArrowEnd['shape'] {
+function ooxmlArrowShapeToBroadset(type: string): PptxSourceArrowEnd['shape'] {
   if (type === 'triangle' || type === 'arrow') return 'triangle';
   if (type === 'stealth') return 'stealth';
   if (type === 'diamond') return 'diamond';
@@ -156,7 +161,7 @@ function formatMm(value: number): string {
   return `${value.toFixed(2)}mm`;
 }
 
-function detectFill(shape: XmlElement): BroadsetFill | null {
+function detectFill(shape: XmlElement): PptxSourceFill | null {
   // Look for spPr fill children only — a paint inside `<a:ln>` is the
   // border colour, not the fill, and per-run colours live in the text body.
   const spPr = findDescendant(shape, 'p:spPr');
@@ -166,7 +171,7 @@ function detectFill(shape: XmlElement): BroadsetFill | null {
   if (solid !== null) {
     const color = parseColorElement(solid);
 
-    if (color !== null) return solidFill(color);
+    if (color !== null) return solidPptxFill(color);
   }
 
   const gradient = findChild(scope, 'a:gradFill');
@@ -181,12 +186,12 @@ function detectFill(shape: XmlElement): BroadsetFill | null {
 }
 
 /**
- * Parse an OOXML colour primitive into a BroadsetColor. The function
+ * Parse an OOXML colour primitive into a PptxSourceColor. The function
  * accepts any node containing one of the colour primitives directly as
  * a descendant (`<a:srgbClr>`, `<a:schemeClr>`, `<a:scrgbClr>`,
  * `<a:hslClr>`, `<a:prstClr>`).
  */
-export function parseColorElement(node: XmlElement): BroadsetColor | null {
+export function parseColorElement(node: XmlElement): PptxSourceColor | null {
   const srgb = findDescendant(node, 'a:srgbClr');
 
   if (srgb !== null) {
@@ -202,8 +207,8 @@ export function parseColorElement(node: XmlElement): BroadsetColor | null {
   const scheme = findDescendant(node, 'a:schemeClr');
 
   if (scheme !== null) {
-    const slot = (getAttr(scheme, 'val') ?? '') as ThemeSlot;
-    const mods = parseColorMods(scheme);
+    const slot = (getAttr(scheme, 'val') ?? '') as PptxThemeSlot;
+    const mods = parsePptxSourceColorMods(scheme);
 
     return mods === null ? { kind: 'theme', slot } : { kind: 'theme', slot, mods };
   }
@@ -275,11 +280,7 @@ function hslToSrgbHex(hueDegrees: number, saturationPct: number, lightnessPct: n
   const [r1, g1, b1] = hslSegment(hp, c, x);
   const m = l - c / 2;
 
-  return rgbToHex(
-    Math.round((r1 + m) * 255),
-    Math.round((g1 + m) * 255),
-    Math.round((b1 + m) * 255),
-  );
+  return rgbToHex(Math.round((r1 + m) * 255), Math.round((g1 + m) * 255), Math.round((b1 + m) * 255));
 }
 
 function hslSegment(hp: number, c: number, x: number): readonly [number, number, number] {
@@ -293,27 +294,19 @@ function hslSegment(hp: number, c: number, x: number): readonly [number, number,
 }
 
 function rgbToHex(r: number, g: number, b: number): `#${string}` {
-  const hex = `${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase();
+  const hex =
+    `${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase();
 
   return `#${hex}`;
 }
 
 function prstNameToSrgbHex(name: string): `#${string}` | null {
-  try {
-    const normalized = normalizeColor(name);
-    const stripped = normalized.startsWith('#') ? normalized.slice(1) : normalized;
+  const fallback = OOXML_PRESET_COLOR_HEX[name];
 
-    return `#${stripped.slice(0, 6).toUpperCase()}`;
-  } catch {
-    const fallback = OOXML_PRESET_COLOR_HEX[name];
-
-    if (fallback === undefined) return null;
-
-    return `#${fallback.toUpperCase()}`;
-  }
+  return fallback === undefined ? null : `#${fallback.toUpperCase()}`;
 }
 
-function parseColorMods(scheme: XmlElement): ColorMods | null {
+function parsePptxSourceColorMods(scheme: XmlElement): PptxSourceColorMods | null {
   const result: Record<string, number> = {};
   const modNames = ['lumMod', 'lumOff', 'tint', 'shade', 'alpha'] as const;
 
@@ -327,11 +320,11 @@ function parseColorMods(scheme: XmlElement): ColorMods | null {
     result[name] = raw / 100000;
   }
 
-  return Object.keys(result).length === 0 ? null : (result);
+  return Object.keys(result).length === 0 ? null : result;
 }
 
-export function parseGradient(gradFill: XmlElement): BroadsetGradient | null {
-  const stops: BroadsetGradientStop[] = [];
+export function parseGradient(gradFill: XmlElement): PptxSourceGradient | null {
+  const stops: PptxSourceGradientStop[] = [];
   const gsLst = findChild(gradFill, 'a:gsLst');
 
   if (gsLst === null) return null;
@@ -356,4 +349,3 @@ export function parseGradient(gradFill: XmlElement): BroadsetGradient | null {
 
   return { type: 'linear', stops, angle };
 }
-

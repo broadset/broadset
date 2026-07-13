@@ -1,10 +1,9 @@
-import type { Canvas } from '@broadset/model';
-
 import { findChild, getAttr, parseOoxml, rootElement } from '../ooxml/ast';
 import { OOXML_REL_TYPES } from '../ooxml/namespaces';
 import { parseRelationshipsXml } from '../ooxml/relationships';
 import { emuToMm } from '../ooxml/units';
 import { type OoxmlPackage, readTextPart } from '../ooxml/zip';
+import type { PptxSourceCanvas } from '../project-model';
 
 /**
  * Package-level resolution — given an OoxmlPackage, find the slide
@@ -18,13 +17,13 @@ import { type OoxmlPackage, readTextPart } from '../ooxml/zip';
 interface ResolvedPackage {
   readonly slidePaths: readonly string[];
   readonly slideRelsByPath: ReadonlyMap<string, string>;
-  readonly canvas: Canvas;
+  readonly canvas: PptxSourceCanvas;
   readonly themePath: string | null;
   readonly masterPath: string | null;
   readonly layoutPaths: readonly string[];
 }
 
-const DEFAULT_CANVAS: Canvas = {
+const DEFAULT_CANVAS: PptxSourceCanvas = {
   width: 254, // 10 inches in mm
   height: 190.5, // 7.5 inches in mm
   unit: 'mm',
@@ -36,7 +35,7 @@ const DEFAULT_CANVAS: Canvas = {
 export function resolvePackage(pkg: OoxmlPackage): ResolvedPackage {
   const presXml = readTextPart(pkg, 'ppt/presentation.xml') ?? '';
   const presRelsXml = readTextPart(pkg, 'ppt/_rels/presentation.xml.rels') ?? '';
-  const canvas = parseCanvasFromPresentation(presXml);
+  const canvas = parsePptxSourceCanvasFromPresentation(presXml);
   const presRels = parseRelationshipsXml(presRelsXml);
 
   const slidePaths: string[] = [];
@@ -83,7 +82,7 @@ export function resolvePackage(pkg: OoxmlPackage): ResolvedPackage {
   return { slidePaths, slideRelsByPath, canvas, themePath, masterPath, layoutPaths };
 }
 
-function parseCanvasFromPresentation(xml: string): Canvas {
+function parsePptxSourceCanvasFromPresentation(xml: string): PptxSourceCanvas {
   const root = rootElement(parseOoxml(xml));
 
   if (root === null) return DEFAULT_CANVAS;

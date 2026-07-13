@@ -67,4 +67,14 @@ describe('native v1 format boundary', () => {
     expect(existsSync(join(formatsSourceDirectory, 'pptx/export.ts'))).toBe(false);
     expect(existsSync(join(formatsSourceDirectory, 'pptx/export'))).toBe(false);
   });
+
+  it('keeps native PPTX import and reconciliation independent of retired entry points', () => {
+    const findings = ['import.ts', 'reconcile.ts'].filter((fileName) => {
+      const source = readFileSync(join(formatsSourceDirectory, 'pptx/v1', fileName), 'utf8');
+
+      return /from ['"]\.\.\/(?:import|reconcile)['"]/u.test(source);
+    });
+
+    expect(findings).toEqual([]);
+  });
 });

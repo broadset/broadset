@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { importPptxWithMerge, importPptxWithReport } from './import';
 import { writeOoxmlPackage } from './ooxml/zip';
+import { importPptxSourceWithReport as importPptxWithReport } from './source-import';
 
 /**
  * @description PPTX importer fuzz harness.
@@ -196,8 +196,8 @@ describe('PPTX importer fuzz harness', () => {
     });
   }
 
-  it('merge import returns the controlled base report when ZIP bytes are malformed', async () => {
-    const result = await importPptxWithMerge(new Uint8Array([0x50, 0x4b, 0x03, 0x04]));
+  it('source import returns the controlled base report when ZIP bytes are malformed', () => {
+    const result = importPptxWithReport(new Uint8Array([0x50, 0x4b, 0x03, 0x04]));
 
     expect(result.document.elements).toEqual([]);
     expect(result.warnings.some((warning) => warning.code === 'malformed-xml')).toBe(true);

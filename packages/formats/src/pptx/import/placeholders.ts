@@ -1,6 +1,13 @@
-import type { BroadsetColor, ThemeSlot } from '@broadset/model';
-
-import { findChild, findDescendant, findDescendants, getAttr, parseOoxml, rootElement, type XmlElement } from '../ooxml/ast';
+import {
+  findChild,
+  findDescendant,
+  findDescendants,
+  getAttr,
+  parseOoxml,
+  rootElement,
+  type XmlElement,
+} from '../ooxml/ast';
+import type { PptxSourceColor, PptxThemeSlot } from '../project-model';
 import type { LayoutPlaceholder, ResolvedTheme } from '../types';
 
 /**
@@ -16,7 +23,10 @@ import type { LayoutPlaceholder, ResolvedTheme } from '../types';
  * `ResolvedTheme` for that.
  */
 
-export function parseLayoutPlaceholders(xml: string | null, theme: ResolvedTheme): ReadonlyMap<number, LayoutPlaceholder> {
+export function parseLayoutPlaceholders(
+  xml: string | null,
+  theme: ResolvedTheme,
+): ReadonlyMap<number, LayoutPlaceholder> {
   const map = new Map<number, LayoutPlaceholder>();
 
   if (xml === null || xml.length === 0) return map;
@@ -44,7 +54,7 @@ function extractPlaceholder(spNode: XmlElement, theme: ResolvedTheme): LayoutPla
 
   if (index === null) return null;
 
-  const rPrProps = extractRunProps(spNode, theme);
+  const rPrProps = extractPptxSourceRunProps(spNode, theme);
 
   return {
     index,
@@ -61,13 +71,13 @@ function resolvePlaceholderIndex(phNode: XmlElement, type: string | undefined): 
   return extractPlaceholderIndexFromType(type);
 }
 
-function extractRunProps(
+function extractPptxSourceRunProps(
   spNode: XmlElement,
   theme: ResolvedTheme,
 ): {
   readonly fontFamily?: string;
   readonly fontSize?: number;
-  readonly color?: BroadsetColor;
+  readonly color?: PptxSourceColor;
 } {
   const rPr = findDescendant(spNode, 'a:rPr');
 
@@ -86,7 +96,7 @@ function extractRunProps(
   };
 }
 
-function extractColorFromRPr(rPrNode: XmlElement, theme: ResolvedTheme): BroadsetColor | undefined {
+function extractColorFromRPr(rPrNode: XmlElement, theme: ResolvedTheme): PptxSourceColor | undefined {
   const solid = findChild(rPrNode, 'a:solidFill');
 
   if (solid === null) return undefined;
@@ -106,7 +116,7 @@ function extractColorFromRPr(rPrNode: XmlElement, theme: ResolvedTheme): Broadse
   const scheme = findChild(solid, 'a:schemeClr');
 
   if (scheme !== null) {
-    const slot = getAttr(scheme, 'val') as ThemeSlot | undefined;
+    const slot = getAttr(scheme, 'val') as PptxThemeSlot | undefined;
 
     if (slot !== undefined && slot in theme.palette) {
       return { kind: 'rgb', hex: theme.palette[slot] as `#${string}` };
@@ -126,4 +136,3 @@ function extractPlaceholderIndexFromType(type: string | undefined): number | nul
 
   return null;
 }
-

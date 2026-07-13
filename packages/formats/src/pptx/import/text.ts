@@ -1,15 +1,4 @@
 import {
-  type Bullet,
-  type Canvas,
-  type Hyperlink,
-  type Paragraph,
-  type ParagraphAlign,
-  type ParagraphProps,
-  type Run,
-  type TextBody,
-} from '@broadset/model';
-
-import {
   findChild,
   findChildren,
   findDescendant,
@@ -19,7 +8,17 @@ import {
   rootElement,
   type XmlElement,
 } from '../ooxml/ast';
-import { emuToCanvasLength } from '../ooxml/units';
+import { emuToPptxSourceCanvasLength } from '../ooxml/units';
+import {
+  type PptxSourceBullet,
+  type PptxSourceCanvas,
+  type PptxSourceHyperlink,
+  type PptxSourceParagraph,
+  type PptxSourceParagraphAlign,
+  type PptxSourceParagraphProps,
+  type PptxSourceRun,
+  type PptxSourceTextBody,
+} from '../project-model';
 import { parseColorElement } from './style';
 
 const PML_NS = 'http://schemas.openxmlformats.org/presentationml/2006/main';
@@ -27,15 +26,15 @@ const DML_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 const REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
 /**
- * Recover text content from a `<p:sp>` body as a structured TextBody
+ * Recover text content from a `<p:sp>` body as a structured PptxSourceTextBody
  * with per-run styling. Public API takes a raw XML body string for
  * backward compatibility.
  */
-export function extractTextBody(
-  canvas: Canvas,
+export function extractPptxSourceTextBody(
+  canvas: PptxSourceCanvas,
   body: string,
-  hyperlinks?: ReadonlyMap<string, Hyperlink>,
-): TextBody | null {
+  hyperlinks?: ReadonlyMap<string, PptxSourceHyperlink>,
+): PptxSourceTextBody | null {
   // Wrap the body fragment so fast-xml-parser sees a single root, then
   // navigate down to the `<p:txBody>` via the AST.
   const wrapped = `<sp xmlns:p="${PML_NS}" xmlns:a="${DML_NS}" xmlns:r="${REL_NS}">${body}</sp>`;
@@ -43,26 +42,26 @@ export function extractTextBody(
 
   if (root === null) return null;
 
-  return extractTextBodyFromNode(canvas, root, hyperlinks);
+  return extractPptxSourceTextBodyFromNode(canvas, root, hyperlinks);
 }
 
-function extractTextBodyFromNode(
-  canvas: Canvas,
+function extractPptxSourceTextBodyFromNode(
+  canvas: PptxSourceCanvas,
   shape: XmlElement,
-  hyperlinks: ReadonlyMap<string, Hyperlink> | undefined,
-): TextBody | null {
+  hyperlinks: ReadonlyMap<string, PptxSourceHyperlink> | undefined,
+): PptxSourceTextBody | null {
   const txBody = findDescendant(shape, 'p:txBody');
 
   if (txBody === null) return null;
 
-  const paragraphs: Paragraph[] = [];
+  const paragraphs: PptxSourceParagraph[] = [];
 
   for (const p of findChildren(txBody, 'a:p')) {
-    const runs = extractRuns(p, hyperlinks);
-    const props = extractParagraphProps(canvas, p);
-    const finalRuns: readonly Run[] = runs.length === 0 ? [{ text: '' }] : runs;
+    const runs = extractPptxSourceRuns(p, hyperlinks);
+    const props = extractPptxSourceParagraphProps(canvas, p);
+    const finalPptxSourceRuns: readonly PptxSourceRun[] = runs.length === 0 ? [{ text: '' }] : runs;
 
-    paragraphs.push(props === null ? { runs: finalRuns } : { runs: finalRuns, props });
+    paragraphs.push(props === null ? { runs: finalPptxSourceRuns } : { runs: finalPptxSourceRuns, props });
   }
 
   if (paragraphs.length === 0) return null;
@@ -70,12 +69,12 @@ function extractTextBodyFromNode(
   return { paragraphs };
 }
 
-function extractParagraphProps(canvas: Canvas, p: XmlElement): ParagraphProps | null {
+function extractPptxSourceParagraphProps(canvas: PptxSourceCanvas, p: XmlElement): PptxSourceParagraphProps | null {
   const pPr = findChild(p, 'a:pPr');
 
   if (pPr === null) return null;
 
-  const props: { -readonly [K in keyof ParagraphProps]?: ParagraphProps[K] } = {};
+  const props: { -readonly [K in keyof PptxSourceParagraphProps]?: PptxSourceParagraphProps[K] } = {};
 
   const algn = getAttr(pPr, 'algn');
   const align = ooxmlAlignToBroadset(algn);
@@ -84,15 +83,15 @@ function extractParagraphProps(canvas: Canvas, p: XmlElement): ParagraphProps | 
 
   const indentAttr = getAttr(pPr, 'indent');
 
-  if (indentAttr !== undefined) props.indent = emuToCanvasLength(canvas, parseInt(indentAttr, 10));
+  if (indentAttr !== undefined) props.indent = emuToPptxSourceCanvasLength(canvas, parseInt(indentAttr, 10));
 
   const marLAttr = getAttr(pPr, 'marL');
 
   if (marLAttr !== undefined) {
-    props.indent ??= emuToCanvasLength(canvas, parseInt(marLAttr, 10));
+    props.indent ??= emuToPptxSourceCanvasLength(canvas, parseInt(marLAttr, 10));
   }
 
-  const bullet = parseBulletFromPPr(pPr);
+  const bullet = parsePptxSourceBulletFromPPr(pPr);
 
   if (bullet !== null) props.bullet = bullet;
 
@@ -106,10 +105,10 @@ function extractParagraphProps(canvas: Canvas, p: XmlElement): ParagraphProps | 
     }
   }
 
-  return Object.keys(props).length === 0 ? null : (props);
+  return Object.keys(props).length === 0 ? null : props;
 }
 
-function ooxmlAlignToBroadset(algn: string | undefined): ParagraphAlign | undefined {
+function ooxmlAlignToBroadset(algn: string | undefined): PptxSourceParagraphAlign | undefined {
   if (algn === 'l') return 'start';
   if (algn === 'r') return 'end';
   if (algn === 'ctr') return 'center';
@@ -118,7 +117,7 @@ function ooxmlAlignToBroadset(algn: string | undefined): ParagraphAlign | undefi
   return undefined;
 }
 
-function parseBulletFromPPr(pPr: XmlElement): Bullet | null {
+function parsePptxSourceBulletFromPPr(pPr: XmlElement): PptxSourceBullet | null {
   if (findChild(pPr, 'a:buNone') !== null) return { kind: 'none' };
 
   const buChar = findChild(pPr, 'a:buChar');
@@ -135,22 +134,22 @@ function parseBulletFromPPr(pPr: XmlElement): Bullet | null {
     const format = getAttr(buAuto, 'type') ?? 'arabicPeriod';
     const startAtAttr = getAttr(buAuto, 'startAt');
 
-    return startAtAttr !== undefined
-      ? { kind: 'auto', format, startAt: parseInt(startAtAttr, 10) }
+    return startAtAttr !== undefined ?
+        { kind: 'auto', format, startAt: parseInt(startAtAttr, 10) }
       : { kind: 'auto', format };
   }
 
   return null;
 }
 
-function extractRuns(
+function extractPptxSourceRuns(
   paragraph: XmlElement,
-  hyperlinks: ReadonlyMap<string, Hyperlink> | undefined,
-): Run[] {
-  const runs: Run[] = [];
+  hyperlinks: ReadonlyMap<string, PptxSourceHyperlink> | undefined,
+): PptxSourceRun[] {
+  const runs: PptxSourceRun[] = [];
 
   for (const r of findChildren(paragraph, 'a:r')) {
-    runs.push(buildRunFromElement(r, hyperlinks));
+    runs.push(buildPptxSourceRunFromElement(r, hyperlinks));
   }
 
   // Fallback: paragraphs without `<a:r>` wrapper but with raw `<a:t>`
@@ -164,10 +163,10 @@ function extractRuns(
   return runs;
 }
 
-function buildRunFromElement(
+function buildPptxSourceRunFromElement(
   r: XmlElement,
-  hyperlinks: ReadonlyMap<string, Hyperlink> | undefined,
-): Run {
+  hyperlinks: ReadonlyMap<string, PptxSourceHyperlink> | undefined,
+): PptxSourceRun {
   const t = findChild(r, 'a:t');
   const text = t !== null ? getText(t) : '';
   const rPr = findChild(r, 'a:rPr');
@@ -176,7 +175,7 @@ function buildRunFromElement(
 
   const style = runStyleFromRPr(rPr);
   const lang = getAttr(rPr, 'lang');
-  const hyperlink = parseRunHyperlink(rPr, hyperlinks);
+  const hyperlink = parsePptxSourceRunPptxSourceHyperlink(rPr, hyperlinks);
   const hasStyle = Object.keys(style).length > 0;
 
   if (!hasStyle && lang === undefined && hyperlink === undefined) return { text };
@@ -190,10 +189,10 @@ function buildRunFromElement(
   return { text, props };
 }
 
-function parseRunHyperlink(
+function parsePptxSourceRunPptxSourceHyperlink(
   rPr: XmlElement,
-  hyperlinks: ReadonlyMap<string, Hyperlink> | undefined,
-): Hyperlink | undefined {
+  hyperlinks: ReadonlyMap<string, PptxSourceHyperlink> | undefined,
+): PptxSourceHyperlink | undefined {
   if (hyperlinks === undefined) return undefined;
 
   const hlink = findChild(rPr, 'a:hlinkClick');

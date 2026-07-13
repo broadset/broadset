@@ -1,7 +1,11 @@
-import { type BroadsetElement, type Canvas, createDefaultElement, type Hyperlink } from '@broadset/model';
-
 import { findDescendant, getAttr, parseOoxml, rootElement, serializeNode, type XmlElement } from '../ooxml/ast';
-import { emuToCanvasLength, rotationUnitsToDegrees } from '../ooxml/units';
+import { emuToPptxSourceCanvasLength, rotationUnitsToDegrees } from '../ooxml/units';
+import {
+  createPptxSourceElement,
+  type PptxSourceCanvas,
+  type PptxSourceElement,
+  type PptxSourceHyperlink,
+} from '../project-model';
 import { parseElementExt } from '../semantic/element-ext';
 import { decodeShapeName } from '../semantic/shape-name';
 import type { ElementMetaExtension, LayoutPlaceholder, ResolvedTheme } from '../types';
@@ -13,14 +17,14 @@ import { applyShapeStyle } from './style';
 import { classifyTableGraphicFrame, type UnsupportedShapeInfo } from './table';
 
 export interface SlideImportContext {
-  readonly canvas: Canvas;
+  readonly canvas: PptxSourceCanvas;
   readonly theme: ResolvedTheme;
   /** Layout placeholder defaults — `idx` → font / size / colour. */
   readonly layoutPlaceholders: ReadonlyMap<number, LayoutPlaceholder>;
   /** `rId` → media-file path (inside the ZIP) for picture resolution. */
   readonly mediaByRelId: ReadonlyMap<string, PictureSourceRef>;
   /** `rId` → hyperlink target for `<a:hlinkClick>` resolution on text runs. */
-  readonly hyperlinkByRelId: ReadonlyMap<string, Hyperlink>;
+  readonly hyperlinkByRelId: ReadonlyMap<string, PptxSourceHyperlink>;
   /**
    * Importer warning sink. Populated as the shape walker encounters
    * content it drops or preserves as a raw blob. Returned to callers
@@ -32,11 +36,11 @@ export interface SlideImportContext {
 }
 
 /**
- * Parse one slide XML into a flat list of `BroadsetElement` plus the
+ * Parse one slide XML into a flat list of `PptxSourceElement` plus the
  * parent / group relationships. The caller can splice the elements
  * into the document's `elements` array.
  */
-export function parseSlideShapes(ctx: SlideImportContext, slideXml: string): readonly BroadsetElement[] {
+export function parseSlideShapes(ctx: SlideImportContext, slideXml: string): readonly PptxSourceElement[] {
   const root = rootElement(parseOoxml(slideXml));
 
   if (root === null) return [];
@@ -45,7 +49,7 @@ export function parseSlideShapes(ctx: SlideImportContext, slideXml: string): rea
 
   if (spTree === null) return [];
 
-  const elements: BroadsetElement[] = [];
+  const elements: PptxSourceElement[] = [];
 
   walkShapeTree(ctx, spTree, null, elements);
 
@@ -56,7 +60,7 @@ function walkShapeTree(
   ctx: SlideImportContext,
   parent: XmlElement,
   parentGroupId: string | null,
-  out: BroadsetElement[],
+  out: PptxSourceElement[],
 ): void {
   for (const child of parent.children) {
     if (child.kind !== 'element') continue;
@@ -101,7 +105,7 @@ function handleUnsupportedShape(
   ctx: SlideImportContext,
   node: XmlElement,
   parentGroupId: string | null,
-): BroadsetElement | null {
+): PptxSourceElement | null {
   const info = unsupportedShapeKind(node);
 
   if (info === null) return null;
@@ -175,7 +179,7 @@ function emitElementFromShape(
   tagName: 'p:sp' | 'p:pic' | 'p:grpSp',
   shape: XmlElement,
   parentGroupId: string | null,
-): BroadsetElement | null {
+): PptxSourceElement | null {
   const transform = extractTransform(ctx.canvas, shape);
 
   if (transform === null) return null;
@@ -202,7 +206,7 @@ function buildElementByTag(
   transform: ParsedTransform,
   shape: XmlElement,
   parentGroupId: string | null,
-): BroadsetElement | null {
+): PptxSourceElement | null {
   if (tagName === 'p:grpSp') {
     return buildBase(id, name, 'group', transform, parentGroupId);
   }
@@ -269,10 +273,10 @@ const NATIVE_BROADSET_KINDS: ReadonlySet<string> = new Set([
  * 2. `bsetTag.kind` (from the shape name) — fallback when extLst was stripped.
  */
 function applyMetaOverrides(
-  element: BroadsetElement,
+  element: PptxSourceElement,
   meta: ElementMetaExtension | null,
   nameMatch: CNvPrAttrs | null,
-): BroadsetElement {
+): PptxSourceElement {
   const overrideKind = pickOverrideKind(element.type, meta, nameMatch);
   const dataFieldFromMeta = meta?.dataField ?? nameMatch?.bsetDataField;
   const dataFieldBinding =
@@ -280,7 +284,7 @@ function applyMetaOverrides(
       { fieldName: dataFieldFromMeta, overflow: 'clip' as const }
     : null;
 
-  const result: BroadsetElement = {
+  const result: PptxSourceElement = {
     ...element,
     ...(overrideKind !== null ? { type: overrideKind } : {}),
     ...(dataFieldBinding !== null ? { dataField: dataFieldBinding } : {}),
@@ -331,7 +335,7 @@ function preserveRawShape(
   transform: ParsedTransform,
   shape: XmlElement,
   parentGroupId: string | null,
-): BroadsetElement {
+): PptxSourceElement {
   const base = buildBase(id, name, 'rectangle', transform, parentGroupId);
   const styled = applyShapeStyle(ctx.canvas, base, shape);
   // Serialise the shape's children back to a raw-XML string so the
@@ -357,17 +361,17 @@ interface ParsedTransform {
   readonly flipV: boolean;
 }
 
-function extractTransform(canvas: Canvas, shape: XmlElement): ParsedTransform | null {
+function extractTransform(canvas: PptxSourceCanvas, shape: XmlElement): ParsedTransform | null {
   const xfrm = findDescendant(shape, 'a:xfrm');
 
   if (xfrm === null) return { x: 0, y: 0, width: 1, height: 1, rotation: 0, flipH: false, flipV: false };
 
   const off = findDescendant(xfrm, 'a:off');
   const ext = findDescendant(xfrm, 'a:ext');
-  const x = off !== null ? emuToCanvasLength(canvas, parseInt(getAttr(off, 'x') ?? '0', 10)) : 0;
-  const y = off !== null ? emuToCanvasLength(canvas, parseInt(getAttr(off, 'y') ?? '0', 10)) : 0;
-  const width = ext !== null ? emuToCanvasLength(canvas, parseInt(getAttr(ext, 'cx') ?? '1', 10)) : 1;
-  const height = ext !== null ? emuToCanvasLength(canvas, parseInt(getAttr(ext, 'cy') ?? '1', 10)) : 1;
+  const x = off !== null ? emuToPptxSourceCanvasLength(canvas, parseInt(getAttr(off, 'x') ?? '0', 10)) : 0;
+  const y = off !== null ? emuToPptxSourceCanvasLength(canvas, parseInt(getAttr(off, 'y') ?? '0', 10)) : 0;
+  const width = ext !== null ? emuToPptxSourceCanvasLength(canvas, parseInt(getAttr(ext, 'cx') ?? '1', 10)) : 1;
+  const height = ext !== null ? emuToPptxSourceCanvasLength(canvas, parseInt(getAttr(ext, 'cy') ?? '1', 10)) : 1;
   const rotAttr = getAttr(xfrm, 'rot');
   const rotation = rotAttr !== undefined ? rotationUnitsToDegrees(parseInt(rotAttr, 10)) : 0;
   const flipH = getAttr(xfrm, 'flipH') === '1';
@@ -430,16 +434,16 @@ function extractElementMeta(shape: XmlElement): ElementMetaExtension | null {
 function buildBase(
   id: string,
   name: string,
-  kind: BroadsetElement['type'],
+  kind: PptxSourceElement['type'],
   transform: ParsedTransform,
   parentGroupId: string | null,
-): BroadsetElement {
+): PptxSourceElement {
   const pptxExt: Record<string, unknown> = { dirty: false };
 
   if (transform.flipH) pptxExt['flipH'] = true;
   if (transform.flipV) pptxExt['flipV'] = true;
 
-  const base = createDefaultElement(kind, {
+  const base = createPptxSourceElement(kind, {
     id,
     name,
     position: { x: transform.x, y: transform.y },
@@ -459,7 +463,7 @@ function buildRectangle(
   transform: ParsedTransform,
   shape: XmlElement,
   parentGroupId: string | null,
-): BroadsetElement {
+): PptxSourceElement {
   return applyShapeStyle(ctx.canvas, buildBase(id, name, 'rectangle', transform, parentGroupId), shape);
 }
 
@@ -470,7 +474,7 @@ function buildEllipse(
   transform: ParsedTransform,
   shape: XmlElement,
   parentGroupId: string | null,
-): BroadsetElement {
+): PptxSourceElement {
   return applyShapeStyle(ctx.canvas, buildBase(id, name, 'ellipse', transform, parentGroupId), shape);
 }
 
@@ -482,7 +486,7 @@ function buildPath(
   shape: XmlElement,
   parentGroupId: string | null,
   d: string,
-): BroadsetElement {
+): PptxSourceElement {
   const base = applyShapeStyle(ctx.canvas, buildBase(id, name, 'path', transform, parentGroupId), shape);
 
   return { ...base, content: d };

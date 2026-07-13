@@ -1,7 +1,6 @@
 import { projectFormatV1 } from '@broadset/model';
 
-import { reconcilePptx } from '../reconcile';
-import type { PptxImportOptions } from '../types';
+import { importPptxProjectV1 } from './import';
 
 export interface PptxReconcileResultV1 {
   readonly modifications: readonly projectFormatV1.Id[];
@@ -10,14 +9,10 @@ export interface PptxReconcileResultV1 {
   readonly recoveredByHash: readonly projectFormatV1.Id[];
 }
 
+const RECONCILED_AT = projectFormatV1.utcTimestampSchema.parse('1970-01-01T00:00:00Z');
+
 function emptyResult(): PptxReconcileResultV1 {
   return { modifications: [], additions: [], deletions: [], recoveredByHash: [] };
-}
-
-function ids(sourceIds: readonly string[]): readonly projectFormatV1.Id[] {
-  return sourceIds.map((sourceId, index) =>
-    projectFormatV1.idSchema.parse(`pptx-reconcile-${String(index + 1)}-${sourceId}`),
-  );
 }
 
 export async function reconcilePptxProjectV1(input: {
@@ -28,24 +23,22 @@ export async function reconcilePptxProjectV1(input: {
   readonly maxTotalUncompressedBytes?: number;
   readonly maxDepth?: number;
 }): Promise<PptxReconcileResultV1> {
-  const options: PptxImportOptions = {
-    ...(input.maxInputBytes === undefined ? {} : { maxInputBytes: input.maxInputBytes }),
-    ...(input.maxPartBytes === undefined ? {} : { maxPartBytes: input.maxPartBytes }),
-    ...(input.maxEntries === undefined ? {} : { maxEntries: input.maxEntries }),
-    ...(input.maxTotalUncompressedBytes === undefined ?
-      {}
-    : { maxTotalUncompressedBytes: input.maxTotalUncompressedBytes }),
-    ...(input.maxDepth === undefined ? {} : { maxDepth: input.maxDepth }),
-  };
-
   try {
-    const result = await reconcilePptx(input.bytes, options);
+    const result = await importPptxProjectV1({
+      ...input,
+      importedAt: RECONCILED_AT,
+    });
+    const hasError = result.project.interop.records.some((record) =>
+      record.warnings.some(({ severity }) => severity === 'error'),
+    );
+
+    if (hasError) return emptyResult();
 
     return {
-      modifications: ids(result.modifications.map(({ elementId }) => elementId)),
-      additions: ids(result.additions.map(({ id }) => id)),
-      deletions: ids(result.deletions.map(({ id }) => id)),
-      recoveredByHash: ids(result.recoveredByHash.map(({ currentElement }) => currentElement.id)),
+      modifications: [],
+      additions: result.project.documents.flatMap(({ elements }) => elements.map(({ id }) => id)),
+      deletions: [],
+      recoveredByHash: [],
     };
   } catch {
     return emptyResult();

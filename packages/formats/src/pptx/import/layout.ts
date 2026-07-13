@@ -1,4 +1,4 @@
-import { type OoxmlPackage,readTextPart } from '../ooxml/zip';
+import { type OoxmlPackage, readTextPart } from '../ooxml/zip';
 import type { LayoutPlaceholder } from '../types';
 import { findMasterPaths } from './master';
 import { parseLayoutPlaceholders } from './placeholders';

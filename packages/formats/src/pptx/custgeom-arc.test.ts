@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { importPptx } from './import';
 import { writeOoxmlPackage } from './ooxml/zip';
+import { importPptxSource as importPptx } from './source-import';
 
 /**
  * @description `<a:arcTo>` + `<a:close/>` round-trip from OOXML

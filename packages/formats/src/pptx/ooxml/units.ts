@@ -1,5 +1,4 @@
-import type { Canvas } from '@broadset/model';
-import { mmToPx, pxToMm } from '@broadset/model';
+import type { PptxSourceCanvas } from '../project-model';
 
 /**
  * OOXML English Metric Units — 914400 EMU per inch, 360000 per centimetre,
@@ -9,6 +8,14 @@ import { mmToPx, pxToMm } from '@broadset/model';
 export const EMU_PER_INCH = 914400;
 export const EMU_PER_CM = 360000;
 export const EMU_PER_MM = 36000;
+
+function pxToMm(px: number, dpi: number): number {
+  return (px / dpi) * 25.4;
+}
+
+function mmToPx(mm: number, dpi: number): number {
+  return (mm / 25.4) * dpi;
+}
 
 /** OOXML rotation unit: 1/60000 of a degree. */
 const ROTATION_UNITS_PER_DEGREE = 60000;
@@ -25,10 +32,10 @@ export function emuToMm(emu: number): number {
 
 /**
  * Convert a length expressed in the canvas's declared unit (`px`/`mm`/`in`)
- * to EMU. Canvas declares its unit; all spatial values in Broadset are in
+ * to EMU. PptxSourceCanvas declares its unit; all spatial values in Broadset are in
  * that unit, so conversion to EMU goes via mm as the lossless middle.
  */
-export function canvasLengthToEmu(canvas: Canvas, value: number): number {
+export function canvasLengthToEmu(canvas: PptxSourceCanvas, value: number): number {
   if (canvas.unit === 'mm') return mmToEmu(value);
   if (canvas.unit === 'in') return mmToEmu(value * 25.4);
 
@@ -42,7 +49,7 @@ export function canvasLengthToEmu(canvas: Canvas, value: number): number {
  * Convert an EMU length to the canvas's declared unit. Inverse of
  * {@link canvasLengthToEmu}; preserves the canvas's `unit` invariant.
  */
-export function emuToCanvasLength(canvas: Canvas, emu: number): number {
+export function emuToPptxSourceCanvasLength(canvas: PptxSourceCanvas, emu: number): number {
   const mm = emuToMm(emu);
 
   if (canvas.unit === 'mm') return mm;
@@ -67,9 +74,9 @@ export function hexToOoxmlColor(hex: string): string {
 
   // Expand 3-char (#abc) to 6-char (#aabbcc).
   const expanded =
-    stripped.length === 3
-      ? (stripped[0] ?? '').repeat(2) + (stripped[1] ?? '').repeat(2) + (stripped[2] ?? '').repeat(2)
-      : stripped;
+    stripped.length === 3 ?
+      (stripped[0] ?? '').repeat(2) + (stripped[1] ?? '').repeat(2) + (stripped[2] ?? '').repeat(2)
+    : stripped;
 
   // Keep the first 6 hex chars (drop any alpha channel — OOXML uses <a:alpha> separately).
   return expanded.slice(0, 6).toUpperCase();

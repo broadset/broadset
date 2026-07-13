@@ -6,7 +6,7 @@ import {
   createResourceCollectorV1,
   type ProjectImportResultV1,
 } from '../../v1';
-import { importPptxWithReport } from '../import';
+import { importPptxSourceWithReport } from '../source-import';
 import type { PptxImportOptions, PptxImportWarning } from '../types';
 import { createPptxFontRegistryV1 } from './font-registry';
 import { type MappedPptxElementV1, mapPptxElementsV1 } from './map-elements';
@@ -152,8 +152,8 @@ function fallbackResult(input: {
 }
 
 function pages(input: {
-  readonly sourcePages: ReturnType<typeof importPptxWithReport>['document']['pages'];
-  readonly sourceElements: ReturnType<typeof importPptxWithReport>['document']['elements'];
+  readonly sourcePages: ReturnType<typeof importPptxSourceWithReport>['document']['pages'];
+  readonly sourceElements: ReturnType<typeof importPptxSourceWithReport>['document']['elements'];
   readonly mapped: readonly MappedPptxElementV1[];
 }): readonly projectFormatV1.PageDefinition[] {
   const mappedIdBySource = new Map(input.mapped.map(({ sourceId, element }) => [sourceId, element.id]));
@@ -209,7 +209,7 @@ async function buildResult(input: {
   readonly importedAt: projectFormatV1.UtcTimestamp;
   readonly options: PptxImportOptions;
 }): Promise<ProjectImportResultV1> {
-  const report = importPptxWithReport(input.bytes, input.options);
+  const report = importPptxSourceWithReport(input.bytes, input.options);
   const width = Math.max(1, report.document.canvas.width);
   const height = Math.max(1, report.document.canvas.height);
   const resources = createResourceCollectorV1();
