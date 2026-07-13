@@ -1,5 +1,7 @@
 import type { projectFormatV1 } from '@broadset/model';
 
+import { applyResize, type ResizeHandle } from './transforms';
+
 const DEGREES_PER_HALF_TURN = 180;
 
 export interface EditorElementRectV1 {
@@ -16,6 +18,36 @@ export interface EditorElementRectUpdateV1 {
   readonly width?: number;
   readonly height?: number;
   readonly rotation?: number;
+}
+
+function oppositeAnchor(handle: ResizeHandle, width: number, height: number): readonly [number, number] {
+  switch (handle) {
+    case 'e': return [0, height / 2];
+    case 'w': return [width, height / 2];
+    case 'n': return [width / 2, height];
+    case 's': return [width / 2, 0];
+    case 'se': return [0, 0];
+    case 'nw': return [width, height];
+    case 'ne': return [0, height];
+    case 'sw': return [width, 0];
+  }
+}
+
+/** Resize a v1 matrix while keeping the opposite local anchor fixed in world space. */
+export function resizeElementRectV1(options: {
+  readonly rect: EditorElementRectV1;
+  readonly handle: ResizeHandle;
+  readonly dx: number;
+  readonly dy: number;
+  readonly zoom: number;
+  readonly minSize?: number;
+}): EditorElementRectV1 {
+  const resized = applyResize(options.rect, options.handle, options.dx, options.dy, options.zoom, options.rect.rotation, options.minSize);
+  const oldAnchor = oppositeAnchor(options.handle, options.rect.width, options.rect.height);
+  const newAnchor = oppositeAnchor(options.handle, resized.width, resized.height);
+  const delta = rotatePair(oldAnchor[0] - newAnchor[0], oldAnchor[1] - newAnchor[1], degreesToRadians(options.rect.rotation));
+
+  return { ...resized, rotation: options.rect.rotation, x: options.rect.x + delta[0], y: options.rect.y + delta[1] };
 }
 
 function radiansToDegrees(radians: number): number {

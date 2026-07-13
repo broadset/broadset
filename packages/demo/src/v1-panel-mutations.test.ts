@@ -55,6 +55,43 @@ describe('updateElementFromPanelV1', () => {
     expect(updateElementFromPanelV1({ element, key: 'fontColor', value: 'not-a-color' })).toBe(element);
   });
 
+  it('writes image fit and text padding through their canonical v1 fields', () => {
+    const image = SAMPLE_PROJECT_V1.documents[0]?.elements.find(({ kind }) => kind === 'image');
+    const text = SAMPLE_PROJECT_V1.documents[0]?.elements.find(({ kind }) => kind === 'text');
+
+    if (image === undefined || text === undefined) throw new Error('Expected image and text fixtures');
+
+    const updatedImage = updateElementFromPanelV1({ element: image, key: 'objectFit', value: 'cover' });
+    const updatedText = updateElementFromPanelV1({ element: text, key: 'padding', value: [24, 24, 24, 24] });
+
+    if (updatedImage.kind !== 'image' || updatedText.kind !== 'text') throw new Error('Expected preserved kinds');
+
+    expect(updatedImage.image.fit).toBe('cover');
+    expect(updatedText.layout.padding).toEqual([24, 24, 24, 24]);
+  });
+
+  it('converts CSS gradient panel values into canonical v1 paints and clears back to solid', () => {
+    const element = SAMPLE_PROJECT_V1.documents[0]?.elements.find(({ id }) => id === 'el-scorebug');
+
+    if (element === undefined) throw new Error('Expected score bug fixture');
+
+    const gradient = updateElementFromPanelV1({
+      element,
+      key: 'backgroundGradient',
+      value: 'linear-gradient(90deg, #ff0000 0%, #0000ff 100%)',
+    });
+    const canonicalCssGradient = updateElementFromPanelV1({
+      element,
+      key: 'backgroundGradient',
+      value: 'linear-gradient(180deg, color(srgb 1 0 0) 0%, color(srgb 0 0 1 / 0.5) 100%)',
+    });
+    const cleared = updateElementFromPanelV1({ element: gradient, key: 'backgroundGradient', value: '' });
+
+    expect(gradient.appearance.fills[0]?.paint.kind).toBe('gradient');
+    expect(canonicalCssGradient.appearance.fills[0]?.paint.kind).toBe('gradient');
+    expect(cleared.appearance.fills[0]?.paint.kind).toBe('solid');
+  });
+
   it('round-trips v1 rotation X/Y and translation Z through a canonical matrix3d', () => {
     const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
     const elementId = projectFormatV1.idSchema.parse('el-sb-home-score');

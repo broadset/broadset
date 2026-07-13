@@ -1,8 +1,8 @@
 import {
-  applyResize,
   type EditorElementRectV1,
   getEditorElementRectV1,
   type ProjectEditorStore,
+  resizeElementRectV1,
   type ResizeHandle,
   selectActiveDocumentV1,
   selectElementByIdV1,
@@ -64,35 +64,37 @@ interface TransformPreviewV1 {
 
 const RESIZE_HANDLES: readonly ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
-function resizeHandleStyle(handle: ResizeHandle): React.CSSProperties {
+function resizeHandleStyle(handle: ResizeHandle, zoom: number): React.CSSProperties {
+  const scale = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+  const radius = 5 / scale;
   const base: React.CSSProperties = {
     background: '#ffffff',
-    border: '1px solid rgba(37, 99, 235, 0.95)',
+    border: `${String(1 / scale)}px solid rgba(37, 99, 235, 0.95)`,
     borderRadius: '9999px',
-    height: 10,
+    height: 10 / scale,
     padding: 0,
     pointerEvents: 'auto',
     position: 'absolute',
-    width: 10,
+    width: 10 / scale,
   };
 
   switch (handle) {
     case 'n':
-      return { ...base, cursor: 'ns-resize', left: '50%', top: -5, transform: 'translateX(-50%)' };
+      return { ...base, cursor: 'ns-resize', left: '50%', top: -radius, transform: 'translateX(-50%)' };
     case 'ne':
-      return { ...base, cursor: 'nesw-resize', right: -5, top: -5 };
+      return { ...base, cursor: 'nesw-resize', right: -radius, top: -radius };
     case 'e':
-      return { ...base, cursor: 'ew-resize', right: -5, top: '50%', transform: 'translateY(-50%)' };
+      return { ...base, cursor: 'ew-resize', right: -radius, top: '50%', transform: 'translateY(-50%)' };
     case 'se':
-      return { ...base, bottom: -5, cursor: 'nwse-resize', right: -5 };
+      return { ...base, bottom: -radius, cursor: 'nwse-resize', right: -radius };
     case 's':
-      return { ...base, bottom: -5, cursor: 'ns-resize', left: '50%', transform: 'translateX(-50%)' };
+      return { ...base, bottom: -radius, cursor: 'ns-resize', left: '50%', transform: 'translateX(-50%)' };
     case 'sw':
-      return { ...base, bottom: -5, cursor: 'nesw-resize', left: -5 };
+      return { ...base, bottom: -radius, cursor: 'nesw-resize', left: -radius };
     case 'w':
-      return { ...base, cursor: 'ew-resize', left: -5, top: '50%', transform: 'translateY(-50%)' };
+      return { ...base, cursor: 'ew-resize', left: -radius, top: '50%', transform: 'translateY(-50%)' };
     case 'nw':
-      return { ...base, cursor: 'nwse-resize', left: -5, top: -5 };
+      return { ...base, cursor: 'nwse-resize', left: -radius, top: -radius };
   }
 }
 
@@ -239,16 +241,14 @@ export function V1SelectionTransformWidget({
     }
 
     if (gesture.kind === 'resize') {
-      const resized = applyResize(
-        gesture.initialRect,
-        gesture.handle,
-        projectedDelta?.x ?? event.clientX - gesture.startPointer.x,
-        projectedDelta?.y ?? event.clientY - gesture.startPointer.y,
-        projectedDelta === null ? scale : 1,
-        gesture.initialRect.rotation,
-        1,
-      );
-      const latestRect: EditorElementRectV1 = { ...resized, rotation: gesture.initialRect.rotation };
+      const latestRect: EditorElementRectV1 = resizeElementRectV1({
+        rect: gesture.initialRect,
+        handle: gesture.handle,
+        dx: projectedDelta?.x ?? event.clientX - gesture.startPointer.x,
+        dy: projectedDelta?.y ?? event.clientY - gesture.startPointer.y,
+        zoom: projectedDelta === null ? scale : 1,
+        minSize: 1,
+      });
 
       gestureRef.current = { ...gesture, latestRect };
       setPreview({ elementId: gesture.elementId, rect: latestRect });
@@ -350,7 +350,7 @@ export function V1SelectionTransformWidget({
           onPointerDown={beginResize(handle)}
           onPointerMove={moveGesture}
           onPointerUp={finishDrag}
-          style={resizeHandleStyle(handle)}
+          style={resizeHandleStyle(handle, zoom)}
         />
       ))}
       <button
@@ -363,17 +363,17 @@ export function V1SelectionTransformWidget({
         onPointerUp={finishDrag}
         style={{
           background: '#ffffff',
-          border: '1px solid rgba(37, 99, 235, 0.95)',
+          border: `${String(1 / zoom)}px solid rgba(37, 99, 235, 0.95)`,
           borderRadius: '9999px',
           cursor: 'grab',
-          height: 10,
+          height: 10 / zoom,
           left: '50%',
           padding: 0,
           pointerEvents: 'auto',
           position: 'absolute',
-          top: -30,
+          top: -30 / zoom,
           transform: 'translateX(-50%)',
-          width: 10,
+          width: 10 / zoom,
         }}
       />
     </div>

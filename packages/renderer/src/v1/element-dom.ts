@@ -117,6 +117,16 @@ function appendText(options: {
   readonly document: Document;
 }): void {
   const { container, element, context, document: domDocument } = options;
+  const content = domDocument.createElement('div');
+  const padding = element.layout.padding ?? [0, 0, 0, 0];
+
+  content.dataset['elementContent'] = '';
+  applyStyle(content, {
+    boxSizing: 'border-box',
+    height: FULL_SIZE,
+    padding: padding.map((value) => `${formatCssNumber(value)}${PIXEL_UNIT}`).join(' '),
+    width: FULL_SIZE,
+  });
 
   for (const paragraph of element.text.paragraphs) {
     const paragraphNode = domDocument.createElement('div');
@@ -131,8 +141,10 @@ function appendText(options: {
       paragraphNode.append(span);
     }
 
-    container.append(paragraphNode);
+    content.append(paragraphNode);
   }
+
+  container.append(content);
 }
 
 function appendImage(options: {

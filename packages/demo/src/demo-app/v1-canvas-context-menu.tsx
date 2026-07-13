@@ -1,4 +1,4 @@
-import { type ProjectEditorStore, selectActiveDocumentV1 } from '@broadset/editor';
+import { getEditorElementRectV1, type ProjectEditorStore, selectActiveDocumentV1 } from '@broadset/editor';
 import { projectFormatV1 } from '@broadset/model';
 import { color, glassPanelStyle } from '@broadset/ui';
 import { Card, CardContent, Dropdown } from '@heroui/react';
@@ -78,6 +78,77 @@ function ungroupSelection(editorStore: ProjectEditorStore): void {
   });
 
   editorStore.getState().setActiveElements(nextSelection);
+}
+
+function createDefaultClipPath(target: projectFormatV1.Element): projectFormatV1.Element {
+  const rect = getEditorElementRectV1(target);
+  const pointIds = [0, 1, 2, 3].map(() => projectFormatV1.idSchema.parse(crypto.randomUUID()));
+  const [topLeftId, topRightId, bottomRightId, bottomLeftId] = pointIds;
+
+  if (
+    topLeftId === undefined ||
+    topRightId === undefined ||
+    bottomRightId === undefined ||
+    bottomLeftId === undefined
+  ) {
+    return target;
+  }
+
+  return projectFormatV1.createElementV1({
+    id: projectFormatV1.idSchema.parse(crypto.randomUUID()),
+    name: `${target.name} clip path`,
+    hiddenInEditor: true,
+    geometry: projectFormatV1.createElementGeometry({
+      width: rect.width,
+      height: rect.height,
+      transform: { kind: 'affine2d', matrix: [1, 0, 0, 1, rect.x, rect.y] },
+    }),
+    kind: 'vector',
+    geometryData: {
+      kind: 'path',
+      fillRule: 'nonzero',
+      path: {
+        points: [
+          { id: topLeftId, x: 0, y: 0 },
+          { id: topRightId, x: rect.width, y: 0 },
+          { id: bottomRightId, x: rect.width, y: rect.height },
+          { id: bottomLeftId, x: 0, y: rect.height },
+        ],
+        segments: [
+          { id: projectFormatV1.idSchema.parse(crypto.randomUUID()), kind: 'move', pointId: topLeftId },
+          { id: projectFormatV1.idSchema.parse(crypto.randomUUID()), kind: 'line', pointId: topRightId },
+          { id: projectFormatV1.idSchema.parse(crypto.randomUUID()), kind: 'line', pointId: bottomRightId },
+          { id: projectFormatV1.idSchema.parse(crypto.randomUUID()), kind: 'line', pointId: bottomLeftId },
+          { id: projectFormatV1.idSchema.parse(crypto.randomUUID()), kind: 'close' },
+        ],
+        closed: true,
+      },
+    },
+  });
+}
+
+function startClipPathEditing(editorStore: ProjectEditorStore, target: projectFormatV1.Element): void {
+  const existingClipId = target.appearance.clip?.kind === 'vector' ? target.appearance.clip.vectorElementId : undefined;
+
+  if (existingClipId === undefined) {
+    const clip = createDefaultClipPath(target);
+
+    if (clip === target) return;
+
+    editorStore.getState().updateActiveDocument((document) => ({
+      ...document,
+      elements: [...document.elements, clip],
+    }));
+    editorStore.getState().updateElement(target.id, (element) => ({
+      ...element,
+      appearance: {
+        ...element.appearance,
+        clip: { kind: 'vector', vectorElementId: clip.id, fillRule: 'nonzero' },
+      },
+    }));
+  }
+
+  editorStore.getState().enterClipPathEditing(target.id);
 }
 
 export function V1CanvasContextMenu({
@@ -162,6 +233,28 @@ export function V1CanvasContextMenu({
               >
                 Send backward
               </Dropdown.Item>
+              {contextElement.kind === 'vector' && contextElement.geometryData.kind === 'path' ?
+                <Dropdown.Item
+                  key="edit-path-points"
+                  onAction={() => {
+                    state.enterPathEditing(contextElement.id);
+                    onClose();
+                  }}
+                >
+                  Edit path points
+                </Dropdown.Item>
+              : null}
+              {contextElement.kind !== 'audio' ?
+                <Dropdown.Item
+                  key="edit-clip-path"
+                  onAction={() => {
+                    startClipPathEditing(editorStore, contextElement);
+                    onClose();
+                  }}
+                >
+                  Edit clip path
+                </Dropdown.Item>
+              : null}
               {state.activeElementIds.length > 1 ?
                 <>
                   <Dropdown.Item

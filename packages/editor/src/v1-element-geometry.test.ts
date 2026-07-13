@@ -1,7 +1,7 @@
 import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
-import { getEditorElementRectV1, updateElementRectV1 } from './v1-element-geometry';
+import { getEditorElementRectV1, resizeElementRectV1, updateElementRectV1 } from './v1-element-geometry';
 
 function id(value: string): projectFormatV1.Id {
   return projectFormatV1.idSchema.parse(value);
@@ -18,6 +18,18 @@ function createVector(transform: projectFormatV1.ElementTransform): projectForma
 }
 
 describe('v1 editor element geometry', () => {
+  it('preserves the west anchor when a rotated east resize clamps at minimum width', () => {
+    const resized = resizeElementRectV1({
+      rect: { x: 100, y: 50, width: 100, height: 60, rotation: 35 },
+      handle: 'e',
+      dx: -500,
+      dy: 0,
+      zoom: 1,
+      minSize: 1,
+    });
+
+    expect(resized).toMatchObject({ x: 100, y: 50, width: 1, height: 60, rotation: 35 });
+  });
   it('projects affine bounds, translation, and rotation into editor rect fields', () => {
     const element = createVector({ kind: 'affine2d', matrix: [0, 2, -3, 0, 10, 20] });
 

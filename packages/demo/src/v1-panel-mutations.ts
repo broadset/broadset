@@ -2,9 +2,15 @@ import { updateElementRectV1 } from '@broadset/editor';
 import { projectFormatV1 } from '@broadset/model';
 import type { PropertyValue } from '@broadset/ui';
 
+import { parseCssGradient } from './gradient-css';
 import { updateV1TransformAxis } from './v1-transform-axes';
 
 const HEX_COLOR_PATTERN = /^#([0-9a-f]{6})([0-9a-f]{2})?$/iu;
+const SRGB_COLOR_FUNCTION_PATTERN = /color\(srgb\s+([^)]*)\)/giu;
+
+function isObjectFit(value: PropertyValue): value is projectFormatV1.ImageElement['image']['fit'] {
+  return value === 'fill' || value === 'contain' || value === 'cover' || value === 'none' || value === 'scale-down';
+}
 
 function parseHexColor(value: string): projectFormatV1.ColorValue | undefined {
   const match = HEX_COLOR_PATTERN.exec(value.trim());
@@ -111,6 +117,133 @@ function updateSolidFill(element: projectFormatV1.Element, color: projectFormatV
   };
 }
 
+interface LegacyRgbColor {
+  readonly kind: 'rgb';
+  readonly hex: string;
+}
+
+interface LegacyThemeColor {
+  readonly kind: 'theme';
+}
+
+function legacyColorToV1(color: LegacyRgbColor | LegacyThemeColor): projectFormatV1.ColorValue {
+  return color.kind === 'rgb' ?
+      (parseHexColor(color.hex) ?? projectFormatV1.createBlackColorValue())
+    : projectFormatV1.createBlackColorValue();
+}
+
+function cssAngleVector(angle: number): readonly [number, number] {
+  const radians = (angle * Math.PI) / 180;
+
+  return [Math.sin(radians) / 2, -Math.cos(radians) / 2];
+}
+
+function channelToHex(value: number): string {
+  return Math.round(Math.max(0, Math.min(1, value)) * 255)
+    .toString(16)
+    .padStart(2, '0');
+}
+
+function normalizeSrgbColorFunction(match: string, body: string): string {
+  const [channelsText, alphaText] = body.split('/').map((part) => part.trim());
+  const channels = channelsText?.split(/\s+/u).map(Number);
+
+  if (channels?.length !== 3 || channels.some((channel) => !Number.isFinite(channel))) return match;
+
+  const alpha = alphaText === undefined ? undefined : Number(alphaText);
+
+  if (alpha !== undefined && !Number.isFinite(alpha)) return match;
+
+  return `#${channels.map(channelToHex).join('')}${alpha === undefined ? '' : channelToHex(alpha)}`;
+}
+
+function normalizeCanonicalGradientCss(value: string): string {
+  return value.replace(SRGB_COLOR_FUNCTION_PATTERN, normalizeSrgbColorFunction);
+}
+
+interface V1GradientBase {
+  readonly stops: readonly projectFormatV1.GradientStop[];
+  readonly coordinateSpace: 'object-bounds';
+  readonly transform: projectFormatV1.Affine2D;
+  readonly spread: 'pad';
+  readonly interpolation: 'srgb';
+}
+
+function mapCssGradient(element: projectFormatV1.Element, value: string): projectFormatV1.Gradient | undefined {
+  const parsed = parseCssGradient(normalizeCanonicalGradientCss(value));
+
+  if (parsed === null) return undefined;
+
+  const base: V1GradientBase = {
+    stops: parsed.stops.map((stop, index) => ({
+      id: projectFormatV1.idSchema.parse(`${element.id}-ui-gradient-stop-${String(index)}`),
+      color: legacyColorToV1(stop.color),
+      opacity: 1,
+      offset: stop.position / 100,
+    })),
+    coordinateSpace: 'object-bounds',
+    transform: { kind: 'affine2d', matrix: [1, 0, 0, 1, 0, 0] },
+    spread: 'pad',
+    interpolation: 'srgb',
+  };
+
+  switch (parsed.type) {
+    case 'linear': {
+      const [x, y] = cssAngleVector(parsed.angle ?? 180);
+
+      return { ...base, kind: 'linear', start: [0.5 - x, 0.5 - y], end: [0.5 + x, 0.5 + y] };
+    }
+
+    case 'radial': {
+      const center = parsed.center ?? [50, 50];
+
+      return { ...base, kind: 'radial', center: [center[0] / 100, center[1] / 100], radius: [0.5, 0.5] };
+    }
+
+    case 'conic': {
+      const center = parsed.center ?? [50, 50];
+
+      return {
+        ...base,
+        kind: 'conic',
+        center: [center[0] / 100, center[1] / 100],
+        startAngle: parsed.startAngle ?? 0,
+      };
+    }
+  }
+}
+
+function updateGradientFill(element: projectFormatV1.Element, value: string): projectFormatV1.Element {
+  if (value.trim() === '') {
+    const firstPaint = element.appearance.fills[0]?.paint;
+    const color = firstPaint?.kind === 'gradient' ? firstPaint.gradient.stops[0]?.color : undefined;
+
+    return updateSolidFill(element, color ?? projectFormatV1.createBlackColorValue());
+  }
+
+  const gradient = mapCssGradient(element, value);
+
+  if (gradient === undefined) return element;
+
+  const fills = element.appearance.fills;
+  const firstFill = fills[0];
+  const fill: projectFormatV1.FillLayer = {
+    id: firstFill?.id ?? projectFormatV1.idSchema.parse(`${element.id}-ui-fill`),
+    enabled: true,
+    opacity: firstFill?.opacity ?? 1,
+    blendMode: firstFill?.blendMode ?? 'normal',
+    paint: { kind: 'gradient', gradient },
+  };
+
+  return {
+    ...element,
+    appearance: {
+      ...element.appearance,
+      fills: firstFill === undefined ? [fill] : fills.map((candidate, index) => (index === 0 ? fill : candidate)),
+    },
+  };
+}
+
 function updateTextProperty(options: {
   readonly element: projectFormatV1.Element;
   readonly key: string;
@@ -198,17 +331,12 @@ function updateGeometryProperty(options: {
   }
 }
 
-export function updateElementFromPanelV1(options: {
+function updateAppearanceProperty(options: {
   readonly element: projectFormatV1.Element;
   readonly key: string;
   readonly value: PropertyValue;
-}): projectFormatV1.Element {
+}): projectFormatV1.Element | undefined {
   const { element, key, value } = options;
-  const geometryUpdated = updateGeometryProperty(options);
-
-  if (key === 'name' && typeof value === 'string') return { ...element, name: value };
-  if (key === 'content' && typeof value === 'string') return updateContent(element, value);
-  if (geometryUpdated !== undefined) return geometryUpdated;
 
   if (key === 'opacity' && typeof value === 'number' && value >= 0 && value <= 1) {
     return { ...element, appearance: { ...element.appearance, opacity: value } };
@@ -218,6 +346,33 @@ export function updateElementFromPanelV1(options: {
     const color = parseHexColor(value);
 
     return color === undefined ? element : updateSolidFill(element, color);
+  }
+
+  if (key === 'backgroundGradient' && typeof value === 'string') return updateGradientFill(element, value);
+
+  return undefined;
+}
+
+export function updateElementFromPanelV1(options: {
+  readonly element: projectFormatV1.Element;
+  readonly key: string;
+  readonly value: PropertyValue;
+}): projectFormatV1.Element {
+  const { element, key, value } = options;
+  const geometryUpdated = updateGeometryProperty(options);
+  const appearanceUpdated = updateAppearanceProperty(options);
+
+  if (key === 'name' && typeof value === 'string') return { ...element, name: value };
+  if (key === 'content' && typeof value === 'string') return updateContent(element, value);
+  if (geometryUpdated !== undefined) return geometryUpdated;
+  if (appearanceUpdated !== undefined) return appearanceUpdated;
+
+  if (key === 'objectFit' && element.kind === 'image' && isObjectFit(value)) {
+    return { ...element, image: { ...element.image, fit: value } };
+  }
+
+  if (key === 'padding' && element.kind === 'text' && typeof value === 'object') {
+    return { ...element, layout: { ...element.layout, padding: value } };
   }
 
   return updateTextProperty(options);

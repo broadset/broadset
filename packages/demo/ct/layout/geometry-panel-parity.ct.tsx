@@ -33,14 +33,14 @@ test('editing Position X in the Geometry panel updates canvas widget position', 
 
   // Select Network Bug via Layers — its position values are far from
   // any anchor edge so a +50px commit can't clamp.
-  await page.locator('button[aria-label="Layers"]').first().click();
+  await page.getByRole('tab', { name: 'Layers' }).click();
 
-  const sidebar = page.getByTestId('demo-properties-sidebar');
+  const sidebar = page;
 
   await sidebar.getByRole('button', { name: 'Select Network Bug', exact: true }).click();
 
   // Switch to Properties; expand Geometry if collapsed.
-  await page.locator('button[aria-label="Properties"]').first().click();
+  await page.getByRole('tab', { name: 'Properties' }).click();
 
   const geometryHeader = page.getByRole('button', { name: 'Geometry', exact: true }).first();
 
@@ -57,7 +57,7 @@ test('editing Position X in the Geometry panel updates canvas widget position', 
   // Read the canvas widget's painted left coordinate before the commit
   // so we can assert it changed afterward.
   const widget = page.getByTestId('demo-transform-widget');
-  const initialWidgetLeft = await widget.evaluate((el) => parseFloat((el as HTMLElement).style.left));
+  const initialWidgetLeft = await widget.evaluate((element) => new DOMMatrix(element.style.transform).e);
   const startX = parseFieldNumber(await xField.inputValue());
   const targetX = startX + 50;
 
@@ -75,10 +75,10 @@ test('editing Position X in the Geometry panel updates canvas widget position', 
   // value within rounding tolerance. If the panel commit did not
   // propagate to the canvas the widget would stay at its initial left.
   await expect
-    .poll(async () => widget.evaluate((el) => parseFloat((el as HTMLElement).style.left)))
+    .poll(async () => widget.evaluate((element) => new DOMMatrix(element.style.transform).e))
     .not.toBe(initialWidgetLeft);
 
-  const widgetLeft = await widget.evaluate((el) => parseFloat((el as HTMLElement).style.left));
+  const widgetLeft = await widget.evaluate((element) => new DOMMatrix(element.style.transform).e);
 
   expect(Math.abs(widgetLeft - targetX)).toBeLessThanOrEqual(1);
 });

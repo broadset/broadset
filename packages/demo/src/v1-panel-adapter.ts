@@ -173,7 +173,7 @@ export function toPanelElementV1(options: {
     textShadow: '',
     writingMode: 'horizontal-tb',
     fontVariationSettings: '',
-    padding: [0, 0, 0, 0],
+    padding: element.kind === 'text' ? (element.layout.padding ?? [0, 0, 0, 0]) : [0, 0, 0, 0],
     stroke: getSolidPaintColor(stroke?.paint, swatches),
     strokeWidth: stroke?.width ?? 1,
     strokeDasharray: stroke?.dash.join(' ') ?? '',

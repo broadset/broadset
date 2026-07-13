@@ -5,6 +5,7 @@ import { createStore, type StoreApi } from 'zustand/vanilla';
 import type { EditingMode, PlacementPoint, PlacementState } from '../editing-state';
 import { removeDocumentElementsV1 } from '../project-v1-mutations';
 import { updateElementRectV1 } from '../v1-element-geometry';
+import { createProjectEditorEditingActions } from './project-store-editing';
 import type { ProjectReorderDirection } from './project-store-mutations';
 import {
   insertElementIntoProject,
@@ -65,8 +66,12 @@ export interface ProjectEditorState extends ProjectEditorUiState {
   readonly selectElement: (elementId: projectFormatV1.Id | null) => void;
   readonly toggleSelectElement: (elementId: projectFormatV1.Id) => void;
   readonly beginPlacement: (elementType: string) => void;
+  readonly updatePlacement: (placement: PlacementState, preview?: PlacementPoint | null) => void;
   readonly cancelPlacement: () => void;
   readonly enterPathEditing: (elementId: projectFormatV1.Id) => void;
+  readonly enterClipPathEditing: (elementId: projectFormatV1.Id) => void;
+  readonly startPathDrawing: (elementId: projectFormatV1.Id) => void;
+  readonly finishPathDrawing: () => void;
   readonly addElement: (element: projectFormatV1.Element) => projectFormatV1.Id | null;
   readonly updateElement: (
     elementId: projectFormatV1.Id,
@@ -351,49 +356,7 @@ export function createProjectEditorStore(options: CreateProjectEditorStoreOption
             return createSelectionUpdate(state, elementIds);
           });
         },
-        beginPlacement(elementType: string): void {
-          const placement: PlacementState = { type: 'placement-anchor', elementType };
-
-          set({
-            placement,
-            placementPreview: null,
-            pathEditingElementId: null,
-            pathDrawingElementId: null,
-            clipPathEditingElementId: null,
-            motionPathEditingElementId: null,
-            inlineTextEditingElementId: null,
-            editingMode: placement,
-          });
-        },
-        cancelPlacement(): void {
-          set({
-            placement: null,
-            placementPreview: null,
-            pathEditingElementId: null,
-            pathDrawingElementId: null,
-            clipPathEditingElementId: null,
-            motionPathEditingElementId: null,
-            inlineTextEditingElementId: null,
-            editingMode: { type: 'none' },
-          });
-        },
-        enterPathEditing(elementId: projectFormatV1.Id): void {
-          set((state) => {
-            const selection = filterElementIds(state.project, state.activeDocumentId, [elementId]);
-
-            return selection.length === 0 ?
-                {}
-              : {
-                  activeElementIds: selection,
-                  pathEditingElementId: elementId,
-                  pathDrawingElementId: null,
-                  clipPathEditingElementId: null,
-                  motionPathEditingElementId: null,
-                  inlineTextEditingElementId: null,
-                  editingMode: { type: 'path-editing', elementId },
-                };
-          });
-        },
+        ...createProjectEditorEditingActions(set),
         addElement(element: projectFormatV1.Element): projectFormatV1.Id | null {
           let addedElementId: projectFormatV1.Id | null = null;
 

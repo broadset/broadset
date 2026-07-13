@@ -49,9 +49,7 @@ test('restores a canonical v1 project from localStorage', async ({ mount, page }
   await mount(<DemoApp />);
 
   await expect
-    .poll(() =>
-      page.evaluate(() => window.__broadsetProjectEditorStore?.getState().project.metadata.name ?? null),
-    )
+    .poll(() => page.evaluate(() => window.__broadsetProjectEditorStore?.getState().project.metadata.name ?? null))
     .toBe('Restored v1 project');
 });
 

@@ -65,11 +65,55 @@ function cancelPlacementFromEscape(store: ProjectEditorStore, event: KeyboardEve
   return true;
 }
 
-function handleWorkspaceKeyDown(store: ProjectEditorStore, event: KeyboardEvent): void {
-  if (isEditableTarget(event.target)) return;
+function finishPathDrawingFromKeyboard(store: ProjectEditorStore, event: KeyboardEvent): boolean {
+  const state = store.getState();
+  const elementId = state.pathDrawingElementId;
 
-  if (cancelPlacementFromEscape(store, event)) return;
+  if (elementId === null || (event.key !== 'Enter' && event.key !== 'Escape')) return false;
 
+  event.preventDefault();
+
+  if (event.key === 'Enter') {
+    state.updateElement(elementId, (element) => {
+      if (element.kind !== 'vector' || element.geometryData.kind !== 'path') return element;
+      if (element.geometryData.path.closed) return element;
+
+      return {
+        ...element,
+        geometryData: {
+          ...element.geometryData,
+          path: {
+            ...element.geometryData.path,
+            closed: true,
+            segments: [
+              ...element.geometryData.path.segments,
+              { id: projectFormatV1.idSchema.parse(crypto.randomUUID()), kind: 'close' },
+            ],
+          },
+        },
+      };
+    });
+  }
+
+  store.getState().finishPathDrawing();
+
+  return true;
+}
+
+function exitEditingFromEscape(store: ProjectEditorStore, event: KeyboardEvent): boolean {
+  const state = store.getState();
+
+  if (event.key !== 'Escape' || (state.pathEditingElementId === null && state.clipPathEditingElementId === null)) {
+    return false;
+  }
+
+  event.preventDefault();
+  state.finishPathDrawing();
+
+  return true;
+}
+
+function handleGeneralWorkspaceShortcut(store: ProjectEditorStore, event: KeyboardEvent): void {
   const state = store.getState();
   const modifier = event.ctrlKey || event.metaKey;
   const key = event.key.toLowerCase();
@@ -106,6 +150,15 @@ function handleWorkspaceKeyDown(store: ProjectEditorStore, event: KeyboardEvent)
   }
 }
 
+function handleWorkspaceKeyDown(store: ProjectEditorStore, event: KeyboardEvent): void {
+  if (isEditableTarget(event.target)) return;
+  if (finishPathDrawingFromKeyboard(store, event)) return;
+  if (exitEditingFromEscape(store, event)) return;
+  if (cancelPlacementFromEscape(store, event)) return;
+
+  handleGeneralWorkspaceShortcut(store, event);
+}
+
 export function V1DemoWorkspace({
   project,
   initialElementId,
@@ -123,6 +176,10 @@ export function V1DemoWorkspace({
   const state = useEditorSelector(editorStore, (current) => current);
   const document = selectActiveDocumentV1(state);
   const activePageIndex = document?.pages.findIndex((page) => page.id === state.activePageId) ?? 0;
+
+  useEffect(() => {
+    if (state.activeElementIds.length === 0 && (tab === 'properties' || tab === 'animation')) setTab('layers');
+  }, [state.activeElementIds.length, tab]);
 
   useEffect(() => {
     onStoreReady?.(editorStore);
@@ -220,8 +277,12 @@ export function V1DemoWorkspace({
             >
               <Tabs.List>
                 <Tabs.Tab id="layers">Layers</Tabs.Tab>
-                <Tabs.Tab id="properties">Properties</Tabs.Tab>
-                <Tabs.Tab id="animation">Animation</Tabs.Tab>
+                <Tabs.Tab id="properties" isDisabled={state.activeElementIds.length === 0}>
+                  Properties
+                </Tabs.Tab>
+                <Tabs.Tab id="animation" isDisabled={state.activeElementIds.length === 0}>
+                  Animation
+                </Tabs.Tab>
                 <Tabs.Tab id="data">Data</Tabs.Tab>
               </Tabs.List>
             </Tabs>

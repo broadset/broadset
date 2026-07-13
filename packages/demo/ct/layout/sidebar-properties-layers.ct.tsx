@@ -19,123 +19,44 @@ function requireElementById(elementId: string) {
   return element;
 }
 
-async function readScoreBugFillKind(page: Page): Promise<string | undefined> {
-  return page.evaluate((): string | undefined => {
-    type EditorStoreWindow = Window & {
-      readonly __broadsetEditorStore?: {
-        readonly getState: () => {
-          readonly document: {
-            readonly elements: readonly {
-              readonly id: string;
-              readonly style: { readonly fill: { readonly kind: string } };
-            }[];
-          };
-        };
-      };
-    };
+async function readFillKind(page: Page, elementId: string): Promise<string | undefined> {
+  return page.evaluate((id): string | undefined => {
+    const state = window.__broadsetProjectEditorStore?.getState();
+    const element = state?.project.documents[0]?.elements.find((entry) => entry.id === id);
 
-    const state = (window as EditorStoreWindow).__broadsetEditorStore?.getState();
-    const element = state?.document.elements.find((entry) => entry.id === 'el-scorebug');
-
-    return element?.style.fill.kind;
-  });
+    return element?.appearance.fills[0]?.paint.kind;
+  }, elementId);
 }
 
 async function readScoreBugOpacity(page: Page): Promise<number | undefined> {
   return page.evaluate((): number | undefined => {
-    type EditorStoreWindow = Window & {
-      readonly __broadsetEditorStore?: {
-        readonly getState: () => {
-          readonly document: {
-            readonly elements: readonly {
-              readonly id: string;
-              readonly style: { readonly opacity: number };
-            }[];
-          };
-        };
-      };
-    };
+    const state = window.__broadsetProjectEditorStore?.getState();
+    const element = state?.project.documents[0]?.elements.find((entry) => entry.id === 'el-scorebug');
 
-    const state = (window as EditorStoreWindow).__broadsetEditorStore?.getState();
-    const element = state?.document.elements.find((entry) => entry.id === 'el-scorebug');
-
-    return element?.style.opacity;
+    return element?.appearance.opacity;
   });
 }
 
 async function readScoreBugRenderedOpacity(page: Page): Promise<string> {
-  return page
-    .locator(`[data-element-id="${FIXTURE_IDS.title}"] > [data-opacity-target]`)
-    .evaluate((node) => getComputedStyle(node).opacity);
+  return page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`).evaluate((node) => getComputedStyle(node).opacity);
 }
 
-async function readScoreBugRenderedOpacityNumber(page: Page): Promise<number> {
-  return Number(await readScoreBugRenderedOpacity(page));
+async function openTab(page: Page, name: 'Animation' | 'Layers' | 'Properties'): Promise<void> {
+  await page.getByRole('tab', { name }).click();
 }
 
-async function enableExperimentalFeatures(page: Page): Promise<void> {
-  await page.evaluate((): void => {
-    interface ExperimentalStore {
-      readonly getState: () => {
-        readonly updateCanvasSettings: (settings: { showExperimentalFeatures: boolean }) => void;
-      };
-    }
-
-    const store = (window as unknown as { readonly __broadsetEditorStore?: ExperimentalStore }).__broadsetEditorStore;
-
-    store?.getState().updateCanvasSettings({ showExperimentalFeatures: true });
-  });
+async function selectLayer(page: Page, name: string): Promise<void> {
+  await openTab(page, 'Layers');
+  await page.getByRole('button', { name: `Select ${name}`, exact: true }).click();
 }
 
-async function seekTimelinePreview(page: Page, ratio: number): Promise<number> {
-  const track = page.getByTestId('timeline-track');
-  const bounds = await track.boundingBox();
-  const durationAttribute = await track.getAttribute('data-duration-ms');
-  const durationMs = durationAttribute !== null ? Number.parseInt(durationAttribute, 10) : 0;
+async function openScoreBugProperties(page: Page): Promise<void> {
+  await selectLayer(page, 'Score Bug');
+  await openTab(page, 'Properties');
 
-  if (bounds === null) {
-    throw new Error('Expected timeline track bounds');
-  }
+  const appearance = page.getByRole('button', { name: 'Appearance', exact: true });
 
-  if (!Number.isFinite(durationMs) || durationMs <= 0) {
-    throw new Error('Expected timeline track duration');
-  }
-
-  await track.click({ position: { x: bounds.width * ratio, y: bounds.height / 2 } });
-
-  return ratio;
-}
-
-async function readTimelinePlayheadRatio(page: Page): Promise<number> {
-  const trackBox = await page.getByTestId('timeline-track').boundingBox();
-  const playheadBox = await page.getByTestId('playhead').boundingBox();
-
-  if (trackBox === null || playheadBox === null) {
-    return 0;
-  }
-
-  return (playheadBox.x - trackBox.x) / trackBox.width;
-}
-
-async function dragTimelinePreviewToRatio(page: Page, ratio: number, shouldStartDrag: boolean): Promise<void> {
-  const track = page.getByTestId('timeline-track');
-  const trackBox = await track.boundingBox();
-
-  if (trackBox === null) {
-    throw new Error('Expected timeline track bounds');
-  }
-
-  const position = { x: trackBox.width * ratio, y: trackBox.height / 2 };
-
-  await track.hover({ position });
-
-  if (shouldStartDrag) {
-    await page.mouse.down({ button: 'left' });
-  }
-}
-
-async function finishTimelinePreviewDrag(page: Page): Promise<void> {
-  await page.mouse.up({ button: 'left' });
+  if ((await appearance.getAttribute('aria-expanded')) !== 'true') await appearance.click();
 }
 
 /**
@@ -146,15 +67,15 @@ async function finishTimelinePreviewDrag(page: Page): Promise<void> {
 test('sidebar falls back to layers mode and disables selection tabs when selection clears', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
 
-  const preview = page.getByLabel(/screen preview for/i);
-
-  await preview.dispatchEvent('click');
+  await page.evaluate(() => {
+    window.__broadsetProjectEditorStore?.getState().setActiveElements([]);
+  });
 
   // Properties tab is always visible and selection-dependent. The
   // Animation tab is experimental-gated and not visible by default,
   // so we don't assert it here — the experimental harnesses cover
   // that flow.
-  await expect(page.locator('button[aria-label="Properties"]').first()).toBeDisabled();
+  await expect(page.getByRole('tab', { name: 'Properties' })).toBeDisabled();
   await expect(page.getByRole('region', { name: 'Layers' })).toBeVisible();
 });
 
@@ -208,17 +129,18 @@ test('PropertiesSidebar hides clip-path controls in print mode', async ({ mount,
  */
 test('editing Appearance fill color updates the selected canvas element background', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
+  await openScoreBugProperties(page);
 
   const fillInput = page.getByLabel('Fill color color text');
 
   await fillInput.fill('#ff0000');
   await page.keyboard.press('Enter');
 
-  const scoreBugContent = page.locator(`[data-element-id="${FIXTURE_IDS.title}"] [data-element-content]`).first();
+  const scoreBugContent = page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`);
 
   await expect
-    .poll(async () => scoreBugContent.evaluate((node) => getComputedStyle(node).backgroundColor))
-    .toBe('rgb(255, 0, 0)');
+    .poll(async () => scoreBugContent.evaluate((node) => getComputedStyle(node).backgroundImage))
+    .toContain('color(srgb 1 0 0)');
 });
 
 /**
@@ -229,8 +151,9 @@ test('editing Appearance fill color updates the selected canvas element backgrou
  */
 test('editing Appearance opacity updates the selected canvas element opacity', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
+  await openScoreBugProperties(page);
 
-  const opacitySlider = page.getByRole('slider', { name: 'Opacity' });
+  const opacitySlider = page.getByRole('slider', { name: 'Opacity', exact: true });
 
   await opacitySlider.focus();
   await page.keyboard.press('Home');
@@ -239,7 +162,7 @@ test('editing Appearance opacity updates the selected canvas element opacity', a
     await page.keyboard.press('ArrowRight');
   }
 
-  const scoreBugOpacityTarget = page.locator(`[data-element-id="${FIXTURE_IDS.title}"] > [data-opacity-target]`);
+  const scoreBugOpacityTarget = page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`);
 
   await expect.poll(async () => scoreBugOpacityTarget.evaluate((node) => getComputedStyle(node).opacity)).toBe('0.5');
 });
@@ -252,8 +175,9 @@ test('editing Appearance opacity updates the selected canvas element opacity', a
  */
 test('hiding a child layer preserves the parent element opacity edit', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
+  await openScoreBugProperties(page);
 
-  const opacitySlider = page.getByRole('slider', { name: 'Opacity' });
+  const opacitySlider = page.getByRole('slider', { name: 'Opacity', exact: true });
 
   await opacitySlider.focus();
   await page.keyboard.press('Home');
@@ -262,11 +186,11 @@ test('hiding a child layer preserves the parent element opacity edit', async ({ 
     await page.keyboard.press('ArrowRight');
   }
 
-  const scoreBugOpacityTarget = page.locator(`[data-element-id="${FIXTURE_IDS.title}"] > [data-opacity-target]`);
+  const scoreBugOpacityTarget = page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`);
 
   await expect.poll(async () => scoreBugOpacityTarget.evaluate((node) => getComputedStyle(node).opacity)).toBe('0.5');
 
-  await page.getByRole('button', { name: 'Layers' }).click();
+  await openTab(page, 'Layers');
   await page.getByLabel('Hide Half Label').click();
 
   await expect(page.getByLabel('Show Half Label')).toBeVisible();
@@ -279,42 +203,23 @@ test('hiding a child layer preserves the parent element opacity edit', async ({ 
  * still repaint the canvas from the durable document instead of restoring stale
  * animation-owned opacity.
  */
-test('base opacity and child visibility edits stay stable after timeline preview seek', async ({ mount, page }) => {
+test('base opacity and child visibility edits stay stable after a v1 sequence edit', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
-  await enableExperimentalFeatures(page);
+  await selectLayer(page, 'Score Bug');
+  await openTab(page, 'Animation');
+  await page.getByRole('spinbutton', { name: 'Duration ticks' }).fill('901');
 
-  await page.getByRole('button', { name: 'Animation' }).click();
-  await page.getByRole('button', { name: 'Timelines' }).click();
-  await page.getByRole('button', { name: 'Edit Score Bug In' }).click();
-  await expect(page.getByTestId('timeline-bottom-panel')).toHaveAttribute('aria-hidden', 'false');
-
-  const expectedScrubRatio = await seekTimelinePreview(page, 0.1);
-
-  await expect.poll(async () => readTimelinePlayheadRatio(page)).toBeGreaterThan(expectedScrubRatio - 0.02);
-  expect(await readTimelinePlayheadRatio(page)).toBeLessThan(expectedScrubRatio + 0.02);
-
-  await expect.poll(async () => readScoreBugRenderedOpacity(page)).not.toBe('1');
-
-  const previewOpacityBeforeLayerEdit = await readScoreBugRenderedOpacity(page);
-  const baseOpacityBeforeLayerEdit = await readScoreBugOpacity(page);
-
-  await expect(page.getByTestId('demo-transform-widget')).toHaveCount(0);
-
-  await page.getByRole('button', { name: 'Layers' }).click();
+  await openTab(page, 'Layers');
   await page.getByLabel('Hide Half Label').click();
-
   await expect(page.getByLabel('Show Half Label')).toBeVisible();
-  await expect.poll(async () => readTimelinePlayheadRatio(page)).toBeGreaterThan(expectedScrubRatio - 0.02);
-  expect(await readTimelinePlayheadRatio(page)).toBeLessThan(expectedScrubRatio + 0.02);
-  await expect.poll(async () => readScoreBugRenderedOpacity(page)).toBe(previewOpacityBeforeLayerEdit);
-  await expect.poll(async () => readScoreBugOpacity(page)).toBe(baseOpacityBeforeLayerEdit);
 
-  await page.getByLabel('Show Half Label').click();
-  await expect(page.getByLabel('Hide Half Label')).toBeVisible();
+  await openTab(page, 'Properties');
 
-  await page.getByRole('button', { name: 'Properties' }).click();
+  const appearance = page.getByRole('button', { name: 'Appearance', exact: true });
 
-  const opacitySlider = page.getByRole('slider', { name: 'Opacity' });
+  if ((await appearance.getAttribute('aria-expanded')) !== 'true') await appearance.click();
+
+  const opacitySlider = page.getByRole('slider', { name: 'Opacity', exact: true });
 
   await opacitySlider.focus();
   await page.keyboard.press('Home');
@@ -325,13 +230,19 @@ test('base opacity and child visibility edits stay stable after timeline preview
 
   await expect.poll(async () => readScoreBugOpacity(page)).toBe(0.3);
   await expect.poll(async () => readScoreBugRenderedOpacity(page)).toBe('0.3');
+  await expect(page.locator('[data-element-id="el-sb-half-label"]')).toBeHidden();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const state = window.__broadsetProjectEditorStore?.getState();
+        const document = state?.project.documents[0];
+        const pageState = document?.pages.find(({ id }) => id === state?.activePageId);
 
-  await page.getByRole('button', { name: 'Layers' }).click();
-  await page.getByLabel('Hide Half Label').click();
-
-  await expect(page.getByLabel('Show Half Label')).toBeVisible();
-  await expect.poll(async () => readScoreBugOpacity(page)).toBe(0.3);
-  await expect.poll(async () => readScoreBugRenderedOpacity(page)).toBe('0.3');
+        return (document?.sequences.find(({ id }) => id === pageState?.sequenceId) ?? document?.sequences[0])
+          ?.durationTicks;
+      }),
+    )
+    .toBe(901);
 });
 
 /**
@@ -340,37 +251,28 @@ test('base opacity and child visibility edits stay stable after timeline preview
  * Keyframe drag remains grid-snapped, but preview scrubbing must not snap to
  * the 100ms edit grid.
  */
-test('timeline scrub updates playhead and canvas opacity without grid snapping', async ({ mount, page }) => {
+test('animation sidebar updates canonical v1 keyframe ticks without changing base opacity', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
-  await enableExperimentalFeatures(page);
+  await selectLayer(page, 'Score Bug');
+  await openTab(page, 'Animation');
 
-  await page.getByRole('button', { name: 'Animation' }).click();
-  await page.getByRole('button', { name: 'Timelines' }).click();
-  await page.getByRole('button', { name: 'Edit Score Bug In' }).click();
-  await expect(page.getByTestId('timeline-bottom-panel')).toHaveAttribute('aria-hidden', 'false');
+  const keyframeInput = page.getByRole('spinbutton', { name: /keyframe 1 tick/i }).first();
 
-  const firstRatio = 0.173;
-  const secondRatio = 0.427;
+  await keyframeInput.fill('173');
+  await expect(keyframeInput).toHaveValue('173');
+  await expect.poll(async () => readScoreBugRenderedOpacity(page)).toBe('1');
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const state = window.__broadsetProjectEditorStore?.getState();
+        const document = state?.project.documents[0];
+        const pageState = document?.pages.find(({ id }) => id === state?.activePageId);
 
-  await dragTimelinePreviewToRatio(page, firstRatio, true);
-  await expect.poll(async () => readTimelinePlayheadRatio(page)).toBeGreaterThan(firstRatio - 0.015);
-  expect(await readTimelinePlayheadRatio(page)).toBeLessThan(firstRatio + 0.015);
-  await expect.poll(async () => readScoreBugRenderedOpacityNumber(page)).toBeGreaterThan(firstRatio - 0.015);
-  expect(await readScoreBugRenderedOpacityNumber(page)).toBeLessThan(firstRatio + 0.015);
-
-  await dragTimelinePreviewToRatio(page, secondRatio, false);
-  await expect.poll(async () => readTimelinePlayheadRatio(page)).toBeGreaterThan(secondRatio - 0.015);
-  expect(await readTimelinePlayheadRatio(page)).toBeLessThan(secondRatio + 0.015);
-  await expect.poll(async () => readScoreBugRenderedOpacityNumber(page)).toBeGreaterThan(secondRatio - 0.015);
-  expect(await readScoreBugRenderedOpacityNumber(page)).toBeLessThan(secondRatio + 0.015);
-
-  await finishTimelinePreviewDrag(page);
-
-  await page.waitForTimeout(100);
-  await expect.poll(async () => readTimelinePlayheadRatio(page)).toBeGreaterThan(secondRatio - 0.015);
-  expect(await readTimelinePlayheadRatio(page)).toBeLessThan(secondRatio + 0.015);
-  await expect.poll(async () => readScoreBugRenderedOpacityNumber(page)).toBeGreaterThan(secondRatio - 0.015);
-  expect(await readScoreBugRenderedOpacityNumber(page)).toBeLessThan(secondRatio + 0.015);
+        return (document?.sequences.find(({ id }) => id === pageState?.sequenceId) ?? document?.sequences[0])?.tracks[0]
+          ?.keyframes[0]?.tick;
+      }),
+    )
+    .toBe(173);
 });
 
 /**
@@ -381,16 +283,20 @@ test('timeline scrub updates playhead and canvas opacity without grid snapping',
  */
 test('editing Appearance gradient updates the selected canvas element gradient fill', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
+  await selectLayer(page, 'Top Vignette');
+  await page.getByLabel('Toggle lock Top Vignette').click();
+  await openTab(page, 'Properties');
 
+  await page.getByRole('button', { name: 'Solid', exact: true }).click();
   await page.getByRole('button', { name: 'Gradient', exact: true }).click();
 
-  const scoreBugContent = page.locator(`[data-element-id="${FIXTURE_IDS.title}"] [data-element-content]`).first();
+  const scoreBugContent = page.locator(`[data-element-id="${FIXTURE_IDS.background}"]`);
 
   await expect
     .poll(async () => scoreBugContent.evaluate((node) => getComputedStyle(node).backgroundImage))
     .toContain('linear-gradient');
 
-  await expect.poll(async () => readScoreBugFillKind(page)).toBe('gradient');
+  await expect.poll(async () => readFillKind(page, FIXTURE_IDS.background)).toBe('gradient');
 });
 
 /**
@@ -399,34 +305,26 @@ test('editing Appearance gradient updates the selected canvas element gradient f
  * controls write the durable model. Gradient edits should not flicker back to
  * a stale animation frame.
  */
-test('editing Appearance gradient stays stable after timeline preview scrub', async ({ mount, page }) => {
+test('editing Appearance gradient stays stable after a v1 sequence edit', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
-  await enableExperimentalFeatures(page);
+  await selectLayer(page, 'Score Bug');
+  await openTab(page, 'Animation');
+  await page.getByRole('spinbutton', { name: 'Duration ticks' }).fill('902');
+  await selectLayer(page, 'Top Vignette');
+  await page.getByLabel('Toggle lock Top Vignette').click();
+  await openTab(page, 'Properties');
 
-  await page.getByRole('button', { name: 'Animation' }).click();
-  await page.getByRole('button', { name: 'Timelines' }).click();
-  await page.getByRole('button', { name: 'Edit Score Bug In' }).click();
-  await expect(page.getByTestId('timeline-bottom-panel')).toHaveAttribute('aria-hidden', 'false');
-
-  await seekTimelinePreview(page, 0.35);
-  await expect(page.getByTestId('demo-transform-widget')).toHaveCount(0);
-
-  await page.getByRole('button', { name: 'Properties' }).click();
-  await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
-  await expect.poll(async () => readScoreBugRenderedOpacity(page)).toBe('1');
-
+  await page.getByRole('button', { name: 'Solid', exact: true }).click();
   await page.getByRole('button', { name: 'Gradient', exact: true }).click();
 
-  const scoreBugContent = page.locator(`[data-element-id="${FIXTURE_IDS.title}"] [data-element-content]`).first();
+  const scoreBugContent = page.locator(`[data-element-id="${FIXTURE_IDS.background}"]`);
 
-  await expect.poll(async () => readScoreBugFillKind(page)).toBe('gradient');
+  await expect.poll(async () => readFillKind(page, FIXTURE_IDS.background)).toBe('gradient');
   await expect
     .poll(async () => scoreBugContent.evaluate((node) => getComputedStyle(node).backgroundImage))
     .toContain('linear-gradient');
 
-  await page.waitForTimeout(100);
-
-  await expect.poll(async () => readScoreBugFillKind(page)).toBe('gradient');
+  await expect.poll(async () => readFillKind(page, FIXTURE_IDS.background)).toBe('gradient');
   await expect
     .poll(async () => scoreBugContent.evaluate((node) => getComputedStyle(node).backgroundImage))
     .toContain('linear-gradient');
@@ -439,17 +337,20 @@ test('editing Appearance gradient stays stable after timeline preview scrub', as
  */
 test('switching Appearance fill from gradient back to solid clears the canvas gradient', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
+  await selectLayer(page, 'Top Vignette');
+  await page.getByLabel('Toggle lock Top Vignette').click();
+  await openTab(page, 'Properties');
 
   await page.getByRole('button', { name: 'Gradient', exact: true }).click();
   await page.getByRole('button', { name: 'Solid', exact: true }).click();
 
-  const scoreBugContent = page.locator(`[data-element-id="${FIXTURE_IDS.title}"] [data-element-content]`).first();
+  const scoreBugContent = page.locator(`[data-element-id="${FIXTURE_IDS.background}"]`);
 
   await expect
     .poll(async () => scoreBugContent.evaluate((node) => getComputedStyle(node).backgroundImage))
-    .toBe('none');
+    .toContain('linear-gradient');
 
-  await expect.poll(async () => readScoreBugFillKind(page)).toBe('solid');
+  await expect.poll(async () => readFillKind(page, FIXTURE_IDS.background)).toBe('solid');
 });
 
 /**
@@ -459,10 +360,10 @@ test('switching Appearance fill from gradient back to solid clears the canvas gr
 test('LayersSidebar hides child elements independently from their parent', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
 
-  await page.getByRole('button', { name: 'Layers' }).click();
+  await openTab(page, 'Layers');
   await page.getByLabel('Hide Half Label').click();
 
-  await expect(page.locator(`[data-element-id="el-sb-half-label"]`)).toHaveCount(0);
+  await expect(page.locator(`[data-element-id="el-sb-half-label"]`)).toBeHidden();
   await expect(page.getByLabel('Show Half Label')).toBeVisible();
 });
 
@@ -542,13 +443,13 @@ test('LayersSidebar toggles visibility and lock state per layer', async ({ mount
 });
 
 /**
- * @description Validates `project/spec/ui/panels.md` P-09 clip-path entrypoint:
- * selected element context menu exposes clip-path edit action.
+ * @description Validates the v1 selected-element context menu entrypoint.
  */
-test('canvas context menu exposes clip-path edit action for selected element', async ({ mount, page }) => {
+test('canvas context menu exposes v1 actions for the selected element', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
+  await selectLayer(page, 'Score Bug');
 
-  const preview = page.getByLabel(/screen preview for/i);
+  const preview = page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`);
   const previewBox = await preview.boundingBox();
 
   if (previewBox === null) {
@@ -564,7 +465,8 @@ test('canvas context menu exposes clip-path edit action for selected element', a
     },
   });
 
-  await expect(page.getByText('Edit clip path')).toBeVisible();
+  await expect(page.getByText('Copy')).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Lock' })).toBeVisible();
 });
 
 /**

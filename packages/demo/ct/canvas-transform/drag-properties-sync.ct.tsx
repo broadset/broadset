@@ -32,18 +32,18 @@ test('dragging an element commits new X/Y values into the Geometry panel', async
   // Select the network bug via the layers panel — same path the
   // panel-to-canvas-parity tests exercise, with a known stable Geometry
   // sidebar binding.
-  await page.locator('button[aria-label="Layers"]').first().click();
+  await page.getByRole('tab', { name: 'Layers' }).click();
 
-  const sidebar = page.getByTestId('demo-properties-sidebar');
+  const sidebar = page;
 
-  await sidebar.getByRole('button', { name: 'Select Network Bug', exact: true }).click();
+  await sidebar.getByRole('button', { name: 'Select Goal Icon', exact: true }).click();
 
   const widget = page.getByTestId('demo-transform-widget');
 
   await expect(widget).toBeVisible();
 
   // Switch to the Properties tab so the Geometry section is rendered.
-  await page.locator('button[aria-label="Properties"]').first().click();
+  await page.getByRole('tab', { name: 'Properties' }).click();
 
   // Geometry lives inside an Accordion; expand it if collapsed.
   const geometryHeader = page.getByRole('button', { name: 'Geometry', exact: true }).first();
@@ -93,11 +93,14 @@ test('dragging an element commits new X/Y values into the Geometry panel', async
   // widget's painted position within rounding tolerance. The widget's
   // inline `left` / `top` carry the canonical px coordinates the
   // renderer uses, so this assertion ties properties → canvas exactly.
-  const widgetLeft = await widget.evaluate((el) => parseFloat((el as HTMLElement).style.left));
-  const widgetTop = await widget.evaluate((el) => parseFloat((el as HTMLElement).style.top));
+  const widgetPosition = await widget.evaluate((element) => {
+    const matrix = new DOMMatrix(element.style.transform);
+
+    return { x: matrix.e, y: matrix.f };
+  });
   const fieldX = parseFieldNumber(await xField.inputValue());
   const fieldY = parseFieldNumber(await yField.inputValue());
 
-  expect(Math.abs(fieldX - widgetLeft)).toBeLessThanOrEqual(1);
-  expect(Math.abs(fieldY - widgetTop)).toBeLessThanOrEqual(1);
+  expect(Math.abs(fieldX - widgetPosition.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(fieldY - widgetPosition.y)).toBeLessThanOrEqual(1);
 });

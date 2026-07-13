@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/experimental-ct-react';
 
 import { DemoApp } from '../../src/DemoApp';
 import { FIXTURE_IDS } from '../fixture-selectors';
+import { getWidgetRotation } from './helpers';
 
 /* ------------------------------------------------------------------ */
 /*  Handle resize gestures — directional correctness                   */
@@ -227,9 +228,9 @@ test('dragging the rotation handle changes the widget rotation', async ({ mount,
 
   // Element starts unrotated in the sample document; the shared transform
   // builder emits an empty string when rotation and 3D transforms are absent.
-  const initialTransform = await widget.evaluate((el) => el.style.transform);
+  const initialRotation = await getWidgetRotation(page);
 
-  expect(initialTransform).toBe('');
+  expect(initialRotation).toBeCloseTo(0, 4);
 
   const rotationHandle = page.getByTestId('transform-rotation-handle');
   const rotationBox = await rotationHandle.boundingBox();
@@ -247,16 +248,16 @@ test('dragging the rotation handle changes the widget rotation', async ({ mount,
   await page.mouse.move(startX + 80, startY + 30, { steps: 10 });
   await page.mouse.up();
 
-  let newTransform = await widget.evaluate((el) => el.style.transform);
+  let newRotation = await getWidgetRotation(page);
 
   // In CI the first drag can occasionally land on the 0deg axis.
-  if (newTransform === '' || newTransform === 'rotate(0deg)') {
+  if (Math.abs(newRotation) < 0.01) {
     await page.mouse.move(startX, startY);
     await page.mouse.down();
     await page.mouse.move(startX - 90, startY + 45, { steps: 12 });
     await page.mouse.up();
-    newTransform = await widget.evaluate((el) => el.style.transform);
+    newRotation = await getWidgetRotation(page);
   }
 
-  expect(newTransform).toMatch(/^rotate\([\d.-]+deg\)$/);
+  expect(Math.abs(newRotation)).toBeGreaterThan(0.01);
 });

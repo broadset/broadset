@@ -9,10 +9,18 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from 'react';
 
+import { V1ClipPathEditingOverlay } from '../demo-components/v1-clip-path-editing-overlay';
 import { V1PagePreview } from '../demo-components/v1-page-preview';
+import { V1PathEditingOverlay } from '../demo-components/v1-path-editing-overlay';
 import { V1SelectionTransformWidget } from '../demo-components/v1-selection-transform-widget';
 import { useCanvasViewport, useEditorSelector } from './helpers';
 import { V1CanvasContextMenu } from './v1-canvas-context-menu';
+import {
+  handlePathDrawingPoint,
+  handlePlacementPoint,
+  lastPathPoint,
+  type PlacementAnchorV1,
+} from './v1-placement-authoring';
 import { V1Rulers } from './v1-rulers';
 
 const EMPTY_BLOBS: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array> = new Map();
@@ -35,57 +43,6 @@ interface CanvasContextMenuV1 {
   readonly elementId: projectFormatV1.Id | null;
   readonly x: number;
   readonly y: number;
-}
-
-interface PlacementAnchorV1 {
-  readonly x: number;
-  readonly y: number;
-}
-
-function placementName(elementType: string): string {
-  if (elementType === 'ellipse') return 'Ellipse';
-  if (elementType === 'group') return 'Group';
-
-  return 'Rectangle';
-}
-
-function createPlacedElement(options: {
-  readonly elementType: string;
-  readonly start: PlacementAnchorV1;
-  readonly end: PlacementAnchorV1;
-}): projectFormatV1.Element {
-  const x = Math.min(options.start.x, options.end.x);
-  const y = Math.min(options.start.y, options.end.y);
-  const width = Math.max(1, Math.abs(options.end.x - options.start.x));
-  const height = Math.max(1, Math.abs(options.end.y - options.start.y));
-  const geometry = projectFormatV1.createElementGeometry({
-    width,
-    height,
-    transform: { kind: 'affine2d', matrix: [1, 0, 0, 1, x, y] },
-  });
-  const id = projectFormatV1.idSchema.parse(crypto.randomUUID());
-  const name = placementName(options.elementType);
-
-  if (options.elementType === 'ellipse') {
-    return projectFormatV1.createElementV1({
-      id,
-      geometry,
-      kind: 'vector',
-      name,
-      geometryData: projectFormatV1.createEllipseGeometry(),
-    });
-  }
-
-  if (options.elementType === 'group') return projectFormatV1.createElementV1({ id, geometry, kind: 'group', name });
-
-  // Tools without an authoring payload start as a schema-valid editable vector placeholder.
-  return projectFormatV1.createElementV1({
-    id,
-    geometry,
-    kind: 'vector',
-    name,
-    geometryData: projectFormatV1.createRectangleGeometry(),
-  });
 }
 
 function readElementId(target: EventTarget | null): projectFormatV1.Id | undefined {
@@ -143,6 +100,61 @@ function redispatchRetargetedOverlayPointer(event: ReactPointerEvent<HTMLDivElem
   return true;
 }
 
+function V1SafetyBoundaries({
+  document,
+  viewMode,
+}: {
+  readonly document: projectFormatV1.BroadsetDocumentV1;
+  readonly viewMode: 'broadcast' | 'none' | 'print';
+}): React.JSX.Element | null {
+  if (viewMode === 'none') return null;
+
+  const [width, height] = document.surface.size;
+  const padding = document.surface.padding;
+  const fill = viewMode === 'broadcast' ? 'rgba(220, 38, 38, 0.2)' : 'rgba(37, 99, 235, 0.2)';
+
+  return (
+    <svg
+      aria-hidden="true"
+      data-testid="safety-boundaries-overlay"
+      height={height}
+      width={width}
+      style={{ inset: 0, pointerEvents: 'none', position: 'absolute', zIndex: 2 }}
+    >
+      <rect data-testid="safety-boundary-top" fill={fill} height={padding.top} width={width} x={0} y={0} />
+      <rect
+        data-testid="safety-boundary-right"
+        fill={fill}
+        height={height}
+        width={padding.right}
+        x={width - padding.right}
+        y={0}
+      />
+      <rect
+        data-testid="safety-boundary-bottom"
+        fill={fill}
+        height={padding.bottom}
+        width={width}
+        x={0}
+        y={height - padding.bottom}
+      />
+      <rect data-testid="safety-boundary-left" fill={fill} height={height} width={padding.left} x={0} y={0} />
+    </svg>
+  );
+}
+
+function canvasPointFromEvent(
+  event: ReactPointerEvent<HTMLDivElement>,
+  viewport: { readonly panX: number; readonly panY: number; readonly zoom: number },
+): PlacementAnchorV1 {
+  const bounds = event.currentTarget.getBoundingClientRect();
+
+  return {
+    x: (event.clientX - bounds.left - viewport.panX) / viewport.zoom,
+    y: (event.clientY - bounds.top - viewport.panY) / viewport.zoom,
+  };
+}
+
 export function V1DemoCanvasSurface({
   editorStore,
   project,
@@ -151,13 +163,19 @@ export function V1DemoCanvasSurface({
   pageId,
 }: V1DemoCanvasSurfaceProps): React.JSX.Element {
   const viewport = useCanvasViewport(editorStore);
-  const placementActive = useEditorSelector(editorStore, (state) => state.placement !== null);
+  const placement = useEditorSelector(editorStore, (state) => state.placement);
+  const placementPreview = useEditorSelector(editorStore, (state) => state.placementPreview);
+  const pathDrawingElementId = useEditorSelector(editorStore, (state) => state.pathDrawingElementId);
+  const pathEditingElementId = useEditorSelector(editorStore, (state) => state.pathEditingElementId);
+  const clipPathEditingElementId = useEditorSelector(editorStore, (state) => state.clipPathEditingElementId);
+  const viewMode = useEditorSelector(editorStore, (state) => state.canvasSettings.viewMode);
+  const placementActive = placement !== null;
   const document = project.documents.find((candidate) => candidate.id === documentId);
   const panGestureRef = useRef<CanvasPanGestureV1 | null>(null);
-  const placementAnchorRef = useRef<PlacementAnchorV1 | null>(null);
   const clipboardRef = useRef<readonly projectFormatV1.Element[]>([]);
   const [contextMenu, setContextMenu] = useState<CanvasContextMenuV1 | null>(null);
   const [hasClipboardContents, setHasClipboardContents] = useState(false);
+  const [pathPreview, setPathPreview] = useState<PlacementAnchorV1 | null>(null);
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (event.button === 1 || (event.button === 0 && event.shiftKey)) {
       const current = editorStore.getState().canvasSettings;
@@ -183,22 +201,29 @@ export function V1DemoCanvasSurface({
 
     const placement = editorStore.getState().placement;
 
-    if (placement?.type === 'placement-anchor') {
-      const bounds = event.currentTarget.getBoundingClientRect();
-      const point = {
-        x: (event.clientX - bounds.left - viewport.panX) / viewport.zoom,
-        y: (event.clientY - bounds.top - viewport.panY) / viewport.zoom,
-      };
+    if (placement !== null) {
+      handlePlacementPoint({
+        editorStore,
+        placement,
+        point: canvasPointFromEvent(event, viewport),
+        setPathPreview,
+      });
 
-      if (placementAnchorRef.current === null) {
-        placementAnchorRef.current = point;
-      } else {
-        editorStore.getState().addElement(
-          createPlacedElement({ elementType: placement.elementType, start: placementAnchorRef.current, end: point }),
-        );
-        placementAnchorRef.current = null;
-        editorStore.getState().cancelPlacement();
-      }
+      event.preventDefault();
+
+      return;
+    }
+
+    const drawingElementId = editorStore.getState().pathDrawingElementId;
+
+    if (drawingElementId !== null) {
+      handlePathDrawingPoint({
+        editorStore,
+        elementId: drawingElementId,
+        point: canvasPointFromEvent(event, viewport),
+        setPathPreview,
+        zoom: viewport.zoom,
+      });
 
       event.preventDefault();
 
@@ -228,6 +253,29 @@ export function V1DemoCanvasSurface({
   };
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
     const gesture = panGestureRef.current;
+    const currentPlacement = editorStore.getState().placement;
+
+    if (gesture === null && currentPlacement !== null) {
+      const bounds = event.currentTarget.getBoundingClientRect();
+
+      editorStore.getState().updatePlacement(currentPlacement, {
+        x: (event.clientX - bounds.left - viewport.panX) / viewport.zoom,
+        y: (event.clientY - bounds.top - viewport.panY) / viewport.zoom,
+      });
+
+      return;
+    }
+
+    if (gesture === null && editorStore.getState().pathDrawingElementId !== null) {
+      const bounds = event.currentTarget.getBoundingClientRect();
+
+      setPathPreview({
+        x: (event.clientX - bounds.left - viewport.panX) / viewport.zoom,
+        y: (event.clientY - bounds.top - viewport.panY) / viewport.zoom,
+      });
+
+      return;
+    }
 
     if (gesture?.pointerId !== event.pointerId) return;
 
@@ -335,6 +383,19 @@ export function V1DemoCanvasSurface({
     };
   }, [contextMenu]);
 
+  useEffect(() => {
+    if (pathDrawingElementId === null) setPathPreview(null);
+  }, [pathDrawingElementId]);
+
+  const drawingElement = document?.elements.find((candidate) => candidate.id === pathDrawingElementId);
+  const drawingLastPoint = lastPathPoint(drawingElement);
+  const pathEditingElement = document?.elements.find((candidate) => candidate.id === pathEditingElementId);
+  const clipTarget = document?.elements.find((candidate) => candidate.id === clipPathEditingElementId);
+  const clipElement =
+    clipTarget?.appearance.clip?.kind === 'vector' ?
+      document?.elements.find((candidate) => candidate.id === clipTarget.appearance.clip?.vectorElementId)
+    : undefined;
+
   return (
     <div
       aria-label="Screen preview for active page"
@@ -347,7 +408,7 @@ export function V1DemoCanvasSurface({
       onWheel={handleWheel}
       style={{
         inset: 0,
-        cursor: placementActive ? 'crosshair' : 'default',
+        cursor: placementActive || pathDrawingElementId !== null ? 'crosshair' : 'default',
         overflow: 'hidden',
         position: 'absolute',
         touchAction: 'none',
@@ -374,6 +435,7 @@ export function V1DemoCanvasSurface({
           }}
         >
           <V1PagePreview blobs={blobs} documentId={documentId} pageId={pageId} project={project} />
+          {document === undefined ? null : <V1SafetyBoundaries document={document} viewMode={viewMode} />}
         </div>
         <div
           data-testid="v1-canvas-overlay"
@@ -393,11 +455,57 @@ export function V1DemoCanvasSurface({
               transformStyle: 'preserve-3d',
             }}
           >
-            <V1SelectionTransformWidget editorStore={editorStore} zoom={viewport.zoom} />
+            {placementActive || pathDrawingElementId !== null ? null : (
+              <V1SelectionTransformWidget editorStore={editorStore} zoom={viewport.zoom} />
+            )}
           </div>
         </div>
       </div>
       {document === undefined ? null : <V1Rulers editorStore={editorStore} surfaceSize={document.surface.size} />}
+      {placement === null || placementPreview === null ? null : (
+        <div
+          data-testid="placement-preview-overlay"
+          style={{
+            border: '1px dashed rgba(59, 130, 246, 0.9)',
+            height: 12,
+            left: placementPreview.x * viewport.zoom + viewport.panX - 6,
+            pointerEvents: 'none',
+            position: 'absolute',
+            top: placementPreview.y * viewport.zoom + viewport.panY - 6,
+            width: 12,
+          }}
+        />
+      )}
+      {pathDrawingElementId === null || drawingLastPoint === undefined || pathPreview === null ? null : (
+        <svg aria-hidden="true" style={{ inset: 0, pointerEvents: 'none', position: 'absolute' }}>
+          <line
+            data-testid="placement-preview-path-line"
+            stroke="rgba(59, 130, 246, 0.9)"
+            strokeDasharray="4 3"
+            x1={drawingLastPoint.x * viewport.zoom + viewport.panX}
+            x2={pathPreview.x * viewport.zoom + viewport.panX}
+            y1={drawingLastPoint.y * viewport.zoom + viewport.panY}
+            y2={pathPreview.y * viewport.zoom + viewport.panY}
+          />
+        </svg>
+      )}
+      {pathEditingElement === undefined ? null : (
+        <V1PathEditingOverlay
+          editorStore={editorStore}
+          element={pathEditingElement}
+          panX={viewport.panX}
+          panY={viewport.panY}
+          zoom={viewport.zoom}
+        />
+      )}
+      {clipElement === undefined ? null : (
+        <V1ClipPathEditingOverlay
+          clipElement={clipElement}
+          panX={viewport.panX}
+          panY={viewport.panY}
+          zoom={viewport.zoom}
+        />
+      )}
       {contextMenu === null ? null : (
         <V1CanvasContextMenu
           editorStore={editorStore}

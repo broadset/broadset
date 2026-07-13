@@ -73,9 +73,9 @@ test('repositions the transform widget when a different element is selected', as
   }
 
   // Select el-live-ellipse via layers panel (x:1010, y:126, 96×96)
-  await page.locator('button[aria-label="Layers"]').first().click();
+  await page.getByRole('tab', { name: 'Layers' }).click();
 
-  const sidebar = page.getByTestId('demo-properties-sidebar');
+  const sidebar = page;
 
   await sidebar.locator('[role="button"]', { hasText: FIXTURE_LAYER_LABELS.liveOrb }).click();
 
@@ -103,7 +103,7 @@ test('widget transform matches the selected element transform', async ({ mount, 
 
   const widgetTransform = await widget.evaluate((el) => el.style.transform);
   const elementTransform = await page
-    .locator(`[data-element-id="${FIXTURE_IDS.title}"]`)
+    .locator(`[data-element-id="${FIXTURE_IDS.initialSelection}"]`)
     .evaluate((el) => (el as HTMLElement).style.transform);
 
   expect(widgetTransform).toBe(elementTransform);
@@ -121,7 +121,7 @@ test('widget transform matches the selected element transform', async ({ mount, 
 test('updates the properties sidebar when a different element is selected via layers', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  const sidebar = page.getByTestId('demo-properties-sidebar');
+  const sidebar = page;
 
   // Initial selection is el-score-title — properties should be populated (no empty message)
   await expect(sidebar.getByText('Select an element to edit its properties')).toHaveCount(0);
@@ -132,10 +132,10 @@ test('updates the properties sidebar when a different element is selected via la
   await expect(xField).toBeVisible();
 
   // Select a different element via layers panel
-  await page.locator('button[aria-label="Layers"]').first().click();
+  await page.getByRole('tab', { name: 'Layers' }).click();
   await sidebar.locator('[role="button"]', { hasText: FIXTURE_LAYER_LABELS.liveOrb }).click();
 
-  await page.locator('button[aria-label="Properties"]').first().click();
+  await page.getByRole('tab', { name: 'Properties' }).click();
 
   // Properties tab should expose geometry fields for the newly selected element.
   await expect(xField).toBeVisible();
@@ -164,9 +164,9 @@ test('selects an element via the layers panel and repositions the transform widg
   }
 
   // Switch to layers tab
-  await page.locator('button[aria-label="Layers"]').first().click();
+  await page.getByRole('tab', { name: 'Layers' }).click();
 
-  const sidebar = page.getByTestId('demo-properties-sidebar');
+  const sidebar = page;
 
   // Click on the el-live-ellipse layer (named "Live Orb")
   await sidebar.locator('[role="button"]', { hasText: FIXTURE_LAYER_LABELS.liveOrb }).click();
@@ -194,9 +194,9 @@ test('removes a selected element from the canvas when Delete is pressed', async 
   await mount(<DemoApp />);
 
   // Select el-accent-svg via layers panel (avoids transform widget overlay)
-  await page.locator('button[aria-label="Layers"]').first().click();
+  await page.getByRole('tab', { name: 'Layers' }).click();
 
-  const sidebar = page.getByTestId('demo-properties-sidebar');
+  const sidebar = page;
 
   await sidebar.locator('[role="button"]', { hasText: FIXTURE_LAYER_LABELS.accentSvg }).click();
 
@@ -227,9 +227,9 @@ test('restores a deleted element when Ctrl+Z undo is pressed', async ({ mount, p
   await mount(<DemoApp />);
 
   // Select el-accent-svg via layers panel
-  await page.locator('button[aria-label="Layers"]').first().click();
+  await page.getByRole('tab', { name: 'Layers' }).click();
 
-  const sidebar = page.getByTestId('demo-properties-sidebar');
+  const sidebar = page;
 
   await sidebar.locator('[role="button"]', { hasText: FIXTURE_LAYER_LABELS.accentSvg }).click();
 
@@ -283,7 +283,7 @@ test('shows element-specific context menu actions when an element is selected', 
   await expect(contextMenu.getByText('Cut')).toBeVisible();
   await expect(contextMenu.getByText('Copy')).toBeVisible();
   await expect(contextMenu.getByText('Delete')).toBeVisible();
-  await expect(contextMenu.getByText('Duplicate')).toBeVisible();
+  await expect(contextMenu.getByText('Paste')).toBeVisible();
 });
 
 /* ------------------------------------------------------------------ */

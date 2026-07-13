@@ -25,6 +25,6 @@ test('Ctrl+Y redoes a previously undone delete across canvas, layers, and proper
   await expect(svgElement).toHaveCount(0);
   await expect(layerRow).toHaveCount(0);
 
-  await page.getByRole('tab', { name: 'Properties' }).click();
+  await expect(page.getByRole('tab', { name: 'Properties' })).toBeDisabled();
   await expect(page.getByRole('textbox', { name: 'Element name' })).toHaveCount(0);
 });

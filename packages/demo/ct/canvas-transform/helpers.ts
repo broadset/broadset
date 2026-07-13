@@ -56,28 +56,20 @@ export async function clickCanvasOffset(page: Page, offsetX: number, offsetY: nu
 }
 
 export async function clickCanvasPoint(page: Page, x: number, y: number): Promise<void> {
-  await page.getByLabel(/screen preview for/i).dispatchEvent('click', {
+  await page.getByLabel(/screen preview for/i).dispatchEvent('pointerdown', {
     bubbles: true,
     button: 0,
+    buttons: 1,
     cancelable: true,
     clientX: x,
     clientY: y,
-    detail: 1,
+    pointerId: 1,
+    pointerType: 'mouse',
   });
 }
 
 export async function getPlacementType(page: Page): Promise<string | null> {
-  return page.evaluate(() => {
-    const store = (
-      window as unknown as {
-        __broadsetEditorStore?: {
-          getState: () => { readonly placement: { readonly type: string } | null };
-        };
-      }
-    ).__broadsetEditorStore;
-
-    return store?.getState().placement?.type ?? null;
-  });
+  return page.evaluate(() => window.__broadsetProjectEditorStore?.getState().placement?.type ?? null);
 }
 
 export async function waitForPlacementType(page: Page, expectedType: string | null): Promise<void> {
@@ -110,12 +102,13 @@ export async function rotateSelectedElement(page: Page, deltaX: number, deltaY: 
   await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 10 });
   await page.mouse.up();
 
-  const transform = await page.getByTestId('demo-transform-widget').evaluate((el) => el.style.transform);
-  const match = /^rotate\(([\d.-]+)deg\)$/.exec(transform);
+  return getWidgetRotation(page);
+}
 
-  if (match?.[1] === undefined) {
-    throw new Error(`Unexpected widget transform after rotation: ${transform}`);
-  }
+export async function getWidgetRotation(page: Page): Promise<number> {
+  return page.getByTestId('demo-transform-widget').evaluate((element) => {
+    const matrix = new DOMMatrix(element.style.transform);
 
-  return parseFloat(match[1]);
+    return (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI;
+  });
 }
