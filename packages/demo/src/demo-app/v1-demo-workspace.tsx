@@ -14,6 +14,7 @@ import { useEditorSelector } from './helpers';
 import { V1DataSidebar } from './v1-data-sidebar';
 import { V1DemoCanvasSurface } from './v1-demo-canvas-surface';
 import { V1ElementSidebar } from './v1-element-sidebar';
+import { V1ProjectExportControls } from './v1-project-export-controls';
 import { V1ProjectFileControls } from './v1-project-file-controls';
 import { V1SequenceSidebar } from './v1-sequence-sidebar';
 
@@ -170,6 +171,7 @@ export function V1DemoWorkspace({
         style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%' }}
       >
         <V1ProjectFileControls editorStore={editorStore} />
+        <V1ProjectExportControls editorStore={editorStore} />
         <PageSorter
           activePageIndex={activePageIndex}
           pages={document?.pages ?? []}

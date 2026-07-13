@@ -5,6 +5,7 @@ import { Button } from '@heroui/react';
 import { type ChangeEvent, useRef, useState } from 'react';
 
 import { loadFormats } from '../formatBridge';
+import { downloadBlob } from './v1-browser-download';
 
 const PROJECT_MIME = 'application/vnd.broadset.project+json';
 
@@ -78,21 +79,6 @@ async function importExternalFile(
 interface V1ProjectFileControlsProps {
   readonly editorStore: ProjectEditorStore;
   readonly download?: ((blob: Blob, filename: string) => void) | undefined;
-}
-
-function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-
-  anchor.download = filename;
-  anchor.href = url;
-  anchor.style.display = 'none';
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 0);
 }
 
 export function V1ProjectFileControls({
