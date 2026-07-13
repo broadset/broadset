@@ -1,5 +1,5 @@
-import type { Asset, AssetSource, BroadsetDocument, BroadsetElement, FontAsset, FontFormat } from '@broadset/model';
-import { isFontAsset, resolveContentAsPlainString, resolveStyleColor } from '@broadset/model';
+import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
+import { resolveContentAsPlainString, resolveStyleColor } from '@broadset/model';
 import * as fontkit from 'fontkit';
 
 import { resolveEmbedDecision } from '../_shared/fonts/embed-policy';
@@ -610,22 +610,6 @@ function isAllowedFontUrlScheme(url: string): boolean {
  * wiring gap surfaced in the P7.7 review — callers can now
  * populate `SvgExportOptions.fonts` from any project.
  */
-export function buildSvgFontSourcesFromAssets(assets: readonly Asset[]): Map<string, SvgFontSource> {
-  const map = new Map<string, SvgFontSource>();
-
-  for (const asset of assets) {
-    if (!isFontAsset(asset)) continue;
-
-    const source = buildSourceFromFontAsset(asset);
-
-    if (source !== null) {
-      map.set(asset.familyName, source);
-    }
-  }
-
-  return map;
-}
-
 /**
  * Build an `assetResolver` callback for `SvgExportOptions` from
  * a `BroadsetProject.assets` array. Image / video / picture
@@ -640,87 +624,3 @@ export function buildSvgFontSourcesFromAssets(assets: readonly Asset[]): Map<str
  * <image href>`, which standalone viewers (Illustrator /
  * Inkscape / browsers) couldn't resolve.
  */
-export function buildSvgAssetResolverFromAssets(assets: readonly Asset[]): (assetId: string) => string | undefined {
-  const urlById = new Map<string, string>();
-
-  for (const asset of assets) {
-    if (asset.kind === 'font' || asset.kind === 'icc-profile') continue;
-
-    const url = resolveAssetSourceUrl(asset.source);
-
-    if (url !== undefined) {
-      urlById.set(asset.id, url);
-    }
-  }
-
-  return (assetId) => urlById.get(assetId);
-}
-
-function resolveAssetSourceUrl(source: AssetSource): string | undefined {
-  if (source.type === 'url') {
-    return source.url;
-  }
-
-  if (source.type === 'embedded') {
-    return source.dataUri;
-  }
-
-  // 'file' source — bytes aren't directly available without async
-  // file I/O. Skip; the export emits the bare asset id as a
-  // best-effort fallback.
-  return undefined;
-}
-
-function buildSourceFromFontAsset(asset: FontAsset): SvgFontSource | null {
-  const format: FontFormat = asset.format;
-  const src = asset.source;
-
-  if (src.type === 'url') {
-    return { url: src.url, format };
-  }
-
-  if (src.type === 'embedded') {
-    const bytes = decodeFontDataUri(src.dataUri);
-
-    if (bytes === null) return null;
-
-    return { bytes, format };
-  }
-
-  // 'file' source — bytes aren't directly available without async
-  // file I/O. Skip so the caller's render path falls back to
-  // consumer-side font resolution.
-  return null;
-}
-
-function decodeFontDataUri(dataUri: string): Uint8Array | null {
-  const match = /^data:[^;,]+(?:;[^,]+)?,(.+)$/.exec(dataUri);
-
-  if (match === null) return null;
-
-  const payload = match[1] ?? '';
-  const isBase64 = /;base64,/i.test(dataUri.slice(0, dataUri.length - payload.length));
-
-  if (!isBase64) {
-    // URL-encoded — fonts are binary, so this is unsupported in
-    // practice. Skip.
-    return null;
-  }
-
-  try {
-    if (typeof Buffer !== 'undefined') {
-      return new Uint8Array(Buffer.from(payload, 'base64'));
-    }
-
-    const binary = atob(payload);
-    const bytes = new Uint8Array(binary.length);
-
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-
-    return bytes;
-  } catch {
-    return null;
-  }
-}

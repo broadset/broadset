@@ -6,8 +6,6 @@ import {
   resolveContentAsPlainString,
   resolveStyleColor,
 } from '@broadset/model';
-import type { VideoEncodingConfig } from 'mediabunny';
-import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, WebMOutputFormat } from 'mediabunny';
 import qrcode from 'qrcode-generator';
 
 /* ------------------------------------------------------------------ */
@@ -105,117 +103,6 @@ export function generateQrSvgFragment(content: string): string | null {
 /**
  * Returns true if VideoEncoder API is available in the current environment.
  */
-export function isVideoExportSupported(): boolean {
-  return typeof globalThis.VideoEncoder !== 'undefined';
-}
-
-/** Options for frame-by-frame video export. */
-export interface VideoExportOptions {
-  /** Target canvas to capture frames from. */
-  readonly canvas: HTMLCanvasElement;
-  /** Callback that renders the scene at the given time (ms) before frame capture. May be async (e.g. when capturing DOM-rendered frames to canvas). */
-  readonly renderFrame: (timeMs: number) => void | Promise<void>;
-  /** Total animation duration in milliseconds. */
-  readonly durationMs: number;
-  /** Frames per second (defaults to 30). */
-  readonly frameRate?: number;
-  /** Enable alpha channel transparency for broadcast overlay (defaults to false). */
-  readonly alpha?: boolean;
-  /** Encoding quality 0–1 (defaults to 0.8). */
-  readonly quality?: number;
-  /** Progress callback invoked with a value in [0, 1] and an optional stage descriptor. */
-  readonly onProgress?: (progress: number, stage?: string) => void;
-  /** Target container format. Defaults to 'webm'. */
-  readonly format?: 'webm' | 'mp4';
-}
-
-/** Maximum bitrate in bits/sec, scaled by quality 0–1. */
-const MAX_VIDEO_BITRATE = 4_000_000;
-
-/**
- * Exports video as a Blob using mediabunny for proper container muxing.
- *
- * - WebM: VP9 codec (supports alpha transparency)
- * - MP4: H.264 (AVC) codec (opaque only — alpha is silently discarded)
- *
- * Rejects when VideoEncoder is unavailable or when encoding fails.
- */
-export async function exportVideoBlob(options: VideoExportOptions): Promise<Blob> {
-  const format = options.format ?? 'webm';
-
-  if (!isVideoExportSupported()) {
-    throw new Error('Video export is not supported: VideoEncoder API is unavailable');
-  }
-
-  const frameRate = options.frameRate ?? 30;
-  const alpha = format === 'webm' ? (options.alpha ?? false) : false;
-  const quality = options.quality ?? 0.8;
-
-  if (frameRate <= 0) {
-    throw new Error('frameRate must be positive');
-  }
-
-  if (options.durationMs <= 0 || !Number.isFinite(options.durationMs)) {
-    throw new Error('durationMs must be a positive finite number');
-  }
-
-  if (quality < 0 || quality > 1) {
-    throw new Error('quality must be in range [0, 1]');
-  }
-
-  options.onProgress?.(0, 'Initializing encoder');
-
-  const bitrate = Math.round(quality * MAX_VIDEO_BITRATE);
-  const codec = format === 'mp4' ? 'avc' : 'vp9';
-
-  const encodingConfig: VideoEncodingConfig = {
-    codec,
-    bitrate,
-    alpha: alpha ? 'keep' : 'discard',
-  };
-
-  const canvasSource = new CanvasSource(options.canvas, encodingConfig);
-  const outputFormat = format === 'mp4' ? new Mp4OutputFormat({ fastStart: 'in-memory' }) : new WebMOutputFormat();
-  const target = new BufferTarget();
-  const output = new Output({ format: outputFormat, target });
-
-  output.addVideoTrack(canvasSource);
-  await output.start();
-
-  const totalFrames = Math.ceil((options.durationMs / 1000) * frameRate);
-  const frameDurationSec = 1 / frameRate;
-
-  options.onProgress?.(0.1, 'Rendering frames');
-
-  for (let i = 0; i < totalFrames; i++) {
-    const timeMs = (i / frameRate) * 1000;
-    const timestampSec = i * frameDurationSec;
-
-    await options.renderFrame(timeMs);
-    await canvasSource.add(timestampSec, frameDurationSec);
-
-    const frameProgress = 0.1 + 0.8 * ((i + 1) / totalFrames);
-
-    options.onProgress?.(frameProgress, 'Rendering frames');
-  }
-
-  options.onProgress?.(0.9, 'Finalizing');
-
-  await output.finalize();
-
-  const buffer = target.buffer;
-
-  if (!buffer) {
-    throw new Error('Video export failed: output buffer is null after finalization');
-  }
-
-  options.onProgress?.(1, 'Complete');
-
-  const mimeType = format === 'mp4' ? 'video/mp4' : 'video/webm';
-
-  return new Blob([buffer], { type: mimeType });
-}
-
 /* ------------------------------------------------------------------ */
 /*  OGraf Package Generation                                         */
 /* ------------------------------------------------------------------ */

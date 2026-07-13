@@ -1,2 +1,2 @@
-export { importSvgDocument, type SvgDocumentImportResult } from './import-document';
-export { importSvg, type SvgImportResult } from './import-walk';
+export { importSvgDocument } from './import-document';
+export { importSvg } from './import-walk';

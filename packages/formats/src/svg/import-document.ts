@@ -20,7 +20,7 @@ import { importSvgFromXmlDoc, isSyntheticGroupId, walkSvgDocument } from './impo
 import { type ParsedElementMetadata, parseMetadataPacket } from './metadata';
 import type { SvgImportOptions } from './types';
 
-export interface SvgDocumentImportResult {
+interface SvgDocumentImportResult {
   readonly document: BroadsetDocument;
   readonly warnings: readonly string[];
 }

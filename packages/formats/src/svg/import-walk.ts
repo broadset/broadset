@@ -47,7 +47,7 @@ interface SvgWalkOptions {
   readonly warnOnPreservation?: boolean | undefined;
 }
 
-export interface SvgImportResult {
+interface SvgImportResult {
   readonly elements: readonly ImportedElement[];
   readonly canvasWidth: number;
   readonly canvasHeight: number;

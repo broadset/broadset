@@ -5,7 +5,7 @@ import {
 } from '@broadset/model';
 import { z } from 'zod';
 
-import { BROADSET_XMP_NAMESPACE, type BroadsetXmpPacket } from '../_shared/xmp';
+import { BROADSET_XMP_NAMESPACE } from '../_shared/xmp';
 
 /**
  * Phase 7 P7.1 — SVG-specific types + Zod registration.
@@ -35,7 +35,6 @@ import { BROADSET_XMP_NAMESPACE, type BroadsetXmpPacket } from '../_shared/xmp';
 // Re-exports from shared modules
 // ────────────────────────────────────────────────────────────────────────────
 
-export type { BroadsetXmpPacket };
 
 /**
  * The namespace URI declared on the root `<svg>` element and on every
@@ -212,9 +211,9 @@ export const elementTagAttrsSchema: z.ZodType<ElementTagAttrs> = z.object({
 // Sanitization report
 // ────────────────────────────────────────────────────────────────────────────
 
-export type SvgSanitizationRemovalKind = 'element' | 'attribute' | 'url';
+type SvgSanitizationRemovalKind = 'element' | 'attribute' | 'url';
 
-export interface SvgSanitizationRemoval {
+interface SvgSanitizationRemoval {
   readonly kind: SvgSanitizationRemovalKind;
   readonly name: string;
 }

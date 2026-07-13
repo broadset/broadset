@@ -5,7 +5,7 @@ import {
   ensureRootElementsHavePageInstances,
 } from '@broadset/model';
 
-import type { DocumentImportResult } from '../import-document';
+import type { DocumentImportResult } from '../import-document-types';
 import {
   capturePreservationBlobs,
   extractThirdPartyElementsWithBudget,

@@ -4,7 +4,7 @@ import { fingerprintElement } from '../_shared/fingerprint';
 import { reconcile, type ReconcileResult } from '../_shared/reconcile';
 import { importSvgDocument } from './import';
 
-export interface ReconcileSvgInput {
+interface ReconcileSvgInput {
   /** The last-known preserved document (from `.bsp` or prior export). */
   readonly preserved: BroadsetDocument;
   /** The current visual SVG string (e.g. a file from Illustrator / Inkscape). */

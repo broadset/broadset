@@ -794,7 +794,7 @@ export async function exportSvgString(doc: BroadsetDocument, options?: SvgExport
   return result.svg;
 }
 
-export interface SvgExportResult {
+interface SvgExportResult {
   readonly svg: string;
   readonly warnings: readonly string[];
 }

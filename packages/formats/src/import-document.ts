@@ -28,13 +28,6 @@ import {
   type SvgImportOptions,
 } from './svg';
 
-export type {
-  DocumentImportResult,
-  DocumentReconciliation,
-  DocumentReconciliationElement,
-  DocumentReconciliationModification,
-} from './import-document-types';
-
 function createDocumentImportResult(
   document: BroadsetDocument,
   warnings: readonly string[] = [],

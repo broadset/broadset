@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { createDefaultElement, createEmptyBroadsetDocument, fontAsset, projectFormatV1 } from '@broadset/model';
 import { describe, expect, it, vi } from 'vitest';
 
-import { exportPptxBytes, importPptxProjectV1, reconcilePptxProjectV1 } from '../../index';
+import { importPptxProjectV1, reconcilePptxProjectV1 } from '../../index';
+import { exportPptxBytes } from '../export';
 import {
   canvaCroppedFixture,
   canvaFixture,
