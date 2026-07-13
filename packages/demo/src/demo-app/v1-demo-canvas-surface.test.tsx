@@ -316,6 +316,76 @@ describe('V1DemoCanvasSurface', () => {
     expect(store.getState().activeElementIds).toEqual([]);
   });
 
+  it('opens a v1 element context menu, toggles locking, and uses a paste-only empty-canvas menu', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+    const elementId = projectFormatV1.idSchema.parse('el-network-bug');
+    const { container, getByRole, getByTestId, getByText, queryByText } = render(
+      <V1DemoCanvasSurface
+        documentId={projectFormatV1.idSchema.parse('doc-broadcast-main')}
+        editorStore={store}
+        pageId={projectFormatV1.idSchema.parse('page-match-live')}
+        project={SAMPLE_PROJECT_V1}
+      />,
+    );
+    const element = container.querySelector<HTMLElement>(`[data-element-id="${elementId}"]`);
+
+    if (element === null) throw new Error('Expected the v1 fixture element');
+
+    act(() => {
+      store.getState().selectElement(elementId);
+    });
+
+    fireEvent.pointerDown(getByTestId('v1-canvas-surface'), { button: 2 });
+    fireEvent.contextMenu(getByTestId('v1-canvas-surface'), { clientX: 40, clientY: 50 });
+
+    expect(getByTestId('demo-context-menu')).toBeTruthy();
+    expect(getByText('Cut')).toBeTruthy();
+    expect(getByText('Delete')).toBeTruthy();
+
+    fireEvent.click(getByRole('menuitem', { name: /lock/i }));
+
+    expect(
+      store.getState().project.documents[0]?.elements.find((candidate) => candidate.id === elementId)?.locked,
+    ).toBe(true);
+
+    fireEvent.click(getByTestId('v1-canvas-surface'));
+    fireEvent.contextMenu(getByTestId('v1-canvas-surface'), { clientX: 10, clientY: 20 });
+
+    expect(getByText('Paste')).toBeTruthy();
+    expect(queryByText('Cut')).toBeNull();
+    expect(queryByText('Delete')).toBeNull();
+  });
+
+  it('preserves a v1 multi-selection on right-click and exposes group and ordering actions', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+    const firstId = projectFormatV1.idSchema.parse('el-network-bug');
+    const secondId = projectFormatV1.idSchema.parse('el-sb-clock');
+    const { container, getByText } = render(
+      <V1DemoCanvasSurface
+        documentId={projectFormatV1.idSchema.parse('doc-broadcast-main')}
+        editorStore={store}
+        pageId={projectFormatV1.idSchema.parse('page-match-live')}
+        project={SAMPLE_PROJECT_V1}
+      />,
+    );
+    const first = container.querySelector<HTMLElement>(`[data-element-id="${firstId}"]`);
+
+    if (first === null) throw new Error('Expected the first v1 fixture element');
+
+    act(() => {
+      store.getState().setActiveElements([firstId, secondId]);
+    });
+
+    fireEvent.pointerDown(first, { button: 2 });
+    fireEvent.contextMenu(first, { clientX: 40, clientY: 50 });
+
+    expect(store.getState().activeElementIds).toEqual([firstId, secondId]);
+    expect(getByText('Group')).toBeTruthy();
+    expect(getByText('Ungroup')).toBeTruthy();
+    expect(getByText('Bring forward')).toBeTruthy();
+    expect(getByText('Send backward')).toBeTruthy();
+  });
+
   it('shows v1 transform bounds for a multi-element selection', () => {
     const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
     const { getByTestId } = render(

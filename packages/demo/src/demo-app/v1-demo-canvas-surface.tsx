@@ -1,10 +1,18 @@
 import type { ProjectEditorStore } from '@broadset/editor';
 import { projectFormatV1 } from '@broadset/model';
-import { type PointerEvent as ReactPointerEvent, useRef, type WheelEvent as ReactWheelEvent } from 'react';
+import {
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useRef,
+  useState,
+  type WheelEvent as ReactWheelEvent,
+} from 'react';
 
 import { V1PagePreview } from '../demo-components/v1-page-preview';
 import { V1SelectionTransformWidget } from '../demo-components/v1-selection-transform-widget';
 import { useCanvasViewport, useEditorSelector } from './helpers';
+import { V1CanvasContextMenu } from './v1-canvas-context-menu';
 import { V1Rulers } from './v1-rulers';
 
 const EMPTY_BLOBS: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array> = new Map();
@@ -21,6 +29,12 @@ interface CanvasPanGestureV1 {
   readonly origin: { readonly x: number; readonly y: number };
   readonly pointerId: number;
   readonly startPointer: { readonly x: number; readonly y: number };
+}
+
+interface CanvasContextMenuV1 {
+  readonly elementId: projectFormatV1.Id | null;
+  readonly x: number;
+  readonly y: number;
 }
 
 function readElementId(target: EventTarget | null): projectFormatV1.Id | undefined {
@@ -46,6 +60,10 @@ export function V1DemoCanvasSurface({
   const placementActive = useEditorSelector(editorStore, (state) => state.placement !== null);
   const document = project.documents.find((candidate) => candidate.id === documentId);
   const panGestureRef = useRef<CanvasPanGestureV1 | null>(null);
+  const surfaceRef = useRef<HTMLDivElement | null>(null);
+  const clipboardRef = useRef<readonly projectFormatV1.Element[]>([]);
+  const [contextMenu, setContextMenu] = useState<CanvasContextMenuV1 | null>(null);
+  const [hasClipboardContents, setHasClipboardContents] = useState(false);
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (event.button === 1) {
       const current = editorStore.getState().canvasSettings;
@@ -66,6 +84,8 @@ export function V1DemoCanvasSurface({
 
       return;
     }
+
+    if (event.button === 2) return;
 
     const elementId = readElementId(event.target);
 
@@ -126,11 +146,95 @@ export function V1DemoCanvasSurface({
       zoom,
     });
   };
+  const closeContextMenu = (): void => {
+    setContextMenu(null);
+  };
+  const copySelection = (): void => {
+    const state = editorStore.getState();
+    const activeDocument = state.project.documents.find((candidate) => candidate.id === state.activeDocumentId);
+    const selectedIds = new Set(state.activeElementIds);
+
+    clipboardRef.current = activeDocument?.elements.filter((element) => selectedIds.has(element.id)) ?? [];
+    setHasClipboardContents(clipboardRef.current.length > 0);
+    closeContextMenu();
+  };
+  const cutSelection = (): void => {
+    const selectedIds = [...editorStore.getState().activeElementIds];
+
+    copySelection();
+    editorStore.getState().removeElements(selectedIds);
+  };
+  const pasteSelection = (): void => {
+    const nextIds: projectFormatV1.Id[] = [];
+
+    clipboardRef.current.forEach((element) => {
+      const clone: projectFormatV1.Element = {
+        ...element,
+        id: projectFormatV1.idSchema.parse(crypto.randomUUID()),
+        name: `${element.name} copy`,
+        parentId: null,
+      };
+      const nextId = editorStore.getState().addElement(clone);
+
+      if (nextId !== null) nextIds.push(nextId);
+    });
+    editorStore.getState().setActiveElements(nextIds);
+    closeContextMenu();
+  };
+  const handleContextMenu = (event: ReactMouseEvent<HTMLDivElement>): void => {
+    event.preventDefault();
+
+    const state = editorStore.getState();
+    const hitElementId = readElementId(event.target);
+    const elementId = hitElementId ?? state.activeElementIds[0] ?? null;
+
+    if (elementId !== null && !(state.activeElementIds.length > 1 && state.activeElementIds.includes(elementId))) {
+      state.selectElement(elementId);
+    }
+
+    setContextMenu({ elementId, x: event.clientX, y: event.clientY });
+  };
+
+  useEffect(() => {
+    if (contextMenu === null) return undefined;
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') closeContextMenu();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [contextMenu]);
+
+  useEffect(() => {
+    const surface = surfaceRef.current;
+
+    if (surface === null) return undefined;
+
+    const handleClick = (event: MouseEvent): void => {
+      if (event.target instanceof Element && event.target.closest('[data-testid="demo-context-menu"]') !== null) return;
+
+      if (readElementId(event.target) === undefined) editorStore.getState().selectElement(null);
+
+      setContextMenu(null);
+    };
+
+    surface.addEventListener('click', handleClick);
+
+    return () => {
+      surface.removeEventListener('click', handleClick);
+    };
+  }, [editorStore]);
 
   return (
     <div
       aria-label="Screen preview for active page"
       data-testid="v1-canvas-surface"
+      ref={surfaceRef}
+      onContextMenu={handleContextMenu}
       onPointerCancel={finishPan}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -156,6 +260,19 @@ export function V1DemoCanvasSurface({
         <V1SelectionTransformWidget editorStore={editorStore} zoom={viewport.zoom} />
       </div>
       {document === undefined ? null : <V1Rulers editorStore={editorStore} surfaceSize={document.surface.size} />}
+      {contextMenu === null ? null : (
+        <V1CanvasContextMenu
+          editorStore={editorStore}
+          elementId={contextMenu.elementId}
+          hasClipboardContents={hasClipboardContents}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={closeContextMenu}
+          onCopy={copySelection}
+          onCut={cutSelection}
+          onPaste={pasteSelection}
+        />
+      )}
     </div>
   );
 }
