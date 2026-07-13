@@ -29,6 +29,53 @@ interface V1DemoWorkspaceProps {
     | undefined;
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    (target instanceof HTMLElement && target.isContentEditable)
+  );
+}
+
+function handleWorkspaceKeyDown(store: ProjectEditorStore, event: KeyboardEvent): void {
+  if (isEditableTarget(event.target)) return;
+
+  const state = store.getState();
+  const modifier = event.ctrlKey || event.metaKey;
+  const key = event.key.toLowerCase();
+
+  if ((event.key === 'Delete' || event.key === 'Backspace') && state.activeElementIds.length > 0) {
+    event.preventDefault();
+    state.removeElements(state.activeElementIds);
+
+    return;
+  }
+
+  if (modifier && key === 'a') {
+    const document = selectActiveDocumentV1(state);
+
+    if (document === undefined) return;
+
+    event.preventDefault();
+    state.setActiveElements(document.elements.map(({ id }) => id));
+
+    return;
+  }
+
+  if (modifier && key === 'z') {
+    event.preventDefault();
+    if (event.shiftKey) state.redo();
+    else state.undo();
+
+    return;
+  }
+
+  if (modifier && key === 'y') {
+    event.preventDefault();
+    state.redo();
+  }
+}
+
 export function V1DemoWorkspace({
   project,
   initialElementId,
@@ -50,6 +97,18 @@ export function V1DemoWorkspace({
   useEffect(() => {
     onStoreReady?.(editorStore);
   }, [editorStore, onStoreReady]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      handleWorkspaceKeyDown(editorStore, event);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [editorStore]);
 
   useEffect(() => {
     if (persistence === undefined) return undefined;
