@@ -1,10 +1,12 @@
 /** @vitest-environment jsdom */
 
+import './demo-app-test-helpers';
+
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { DemoApp } from './demo-app/app';
 import { enableExperimentalFeatures, setupDemoShellMocks } from './demo-shell-test-utils';
-import { DemoApp } from './DemoApp';
 
 describe('9-F: Preflight Diagnostics', () => {
   function renderDemoApp(): void {

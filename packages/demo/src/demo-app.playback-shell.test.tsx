@@ -1,10 +1,12 @@
 /** @vitest-environment jsdom */
 
+import './demo-app-test-helpers';
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { DemoApp } from './demo-app/app';
 import { enableExperimentalFeatures, setupDemoShellMocks } from './demo-shell-test-utils';
-import { DemoApp } from './DemoApp';
 import { createDemoAppPlaybackTestDocument } from './test-fixtures';
 
 describe('DemoApp playback shell lifecycle', () => {

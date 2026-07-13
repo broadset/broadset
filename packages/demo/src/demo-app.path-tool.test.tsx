@@ -1,12 +1,14 @@
 /** @vitest-environment jsdom */
 
+import './demo-app-test-helpers';
+
 import type { BroadsetDocument, BroadsetElement } from '@broadset/model';
 import { resolveContentAsPlainString } from '@broadset/model';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { DemoApp } from './demo-app/app';
 import { setupDemoShellMocks } from './demo-shell-test-utils';
-import { DemoApp } from './DemoApp';
 
 function mockCanvasBounds(element: HTMLElement, rect: Partial<DOMRect>): void {
   const merged = {

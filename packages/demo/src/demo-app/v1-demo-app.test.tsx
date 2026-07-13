@@ -3,6 +3,7 @@ import { projectFormatV1 } from '@broadset/model';
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { DemoApp } from '../DemoApp';
 import { V1DemoApp } from './v1-demo-app';
 
 describe('V1DemoApp', () => {
@@ -28,5 +29,11 @@ describe('V1DemoApp', () => {
     if (store === undefined) throw new Error('Expected the production v1 editor store');
 
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
+
+  it('exposes the v1 host from the public DemoApp entry', () => {
+    render(<DemoApp />);
+
+    expect(screen.getByTestId('v1-demo-workspace')).toBeTruthy();
   });
 });

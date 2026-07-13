@@ -1,10 +1,12 @@
 /** @vitest-environment jsdom */
 
+import './demo-app-test-helpers';
+
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { DemoApp } from './demo-app/app';
 import { enableExperimentalFeatures, setupDemoShellMocks } from './demo-shell-test-utils';
-import { DemoApp } from './DemoApp';
 
 describe('DemoApp modal dialog integration (9-D)', () => {
   /** @description The New Document dialog must show preset categories and, after the user picks a preset and confirms, apply that preset (closing the dialog and surfacing a success toast) — proving the primary action is wired, not just the chrome. */

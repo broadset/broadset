@@ -1,10 +1,12 @@
 /** @vitest-environment jsdom */
 
+import './demo-app-test-helpers';
+
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { DemoApp } from './demo-app/app';
 import { setupDemoShellMocks } from './demo-shell-test-utils';
-import { DemoApp } from './DemoApp';
 
 describe('DemoApp toolbar density rebalance', () => {
   /** @description The main toolbar must have visual separators between action clusters for clearer task-category grouping. */

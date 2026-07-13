@@ -1,11 +1,13 @@
 /** @vitest-environment jsdom */
 
+import './demo-app-test-helpers';
+
 import { type BroadsetElement, createDefaultElement } from '@broadset/model';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { DemoApp } from './demo-app/app';
 import { dispatchDeleteKey, enableExperimentalFeatures, setupDemoShellMocks } from './demo-shell-test-utils';
-import { DemoApp } from './DemoApp';
 import { createDemoAppChromeTestDocument, createParentingTransformTestDocument } from './test-fixtures';
 
 describe('DemoApp chrome and menu integration', () => {
