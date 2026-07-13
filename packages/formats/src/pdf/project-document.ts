@@ -1,9 +1,10 @@
-import { type BroadsetDocument, type BroadsetElement, createDefaultElement, projectFormatV1 } from '@broadset/model';
+import { projectFormatV1 } from '@broadset/model';
 
-import { toLegacyBackgroundV1, toLegacyCssColorV1, toLegacyStyleV1 } from './to-legacy-style';
+import { createPdfSourceElement, type PdfSourceDocument, type PdfSourceElement } from './project-model';
+import { toPdfProjectBackgroundV1, toPdfProjectCssColorV1, toPdfProjectStyleV1 } from './project-style';
 
-interface LegacyPdfDocumentResultV1 {
-  readonly document: BroadsetDocument;
+interface PdfProjectDocumentResultV1 {
+  readonly document: PdfSourceDocument;
   readonly warnings: readonly string[];
 }
 
@@ -176,7 +177,7 @@ function textStyle(input: {
   const family = input.project.resources.fonts.find(({ id }) => id === run.properties.fontFamilyId);
   const paragraph = input.element.text.paragraphs[0];
   const textAlignment = legacyAlignment(paragraph?.properties.alignment);
-  const fontColor = toLegacyCssColorV1({ color: run.properties.color, project: input.project });
+  const fontColor = toPdfProjectCssColorV1({ color: run.properties.color, project: input.project });
 
   return {
     ...(family === undefined ? {} : { fontFamily: family.familyName }),
@@ -229,10 +230,10 @@ async function mapElement(input: {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>;
   readonly resolveBlob: ((digest: projectFormatV1.Sha256Digest) => Promise<Uint8Array | undefined>) | undefined;
-}): Promise<{ readonly element: BroadsetElement; readonly warnings: readonly string[] }> {
+}): Promise<{ readonly element: PdfSourceElement; readonly warnings: readonly string[] }> {
   const source = input.instance.element;
   const geometry = transformGeometry(source);
-  const mappedStyle = toLegacyStyleV1({ appearance: source.appearance, project: input.project });
+  const mappedStyle = toPdfProjectStyleV1({ appearance: source.appearance, project: input.project });
   const content = await imageContent({
     element: source,
     project: input.project,
@@ -249,7 +250,7 @@ async function mapElement(input: {
   ];
 
   return {
-    element: createDefaultElement(legacyType(source), {
+    element: createPdfSourceElement(legacyType(source), {
       id: input.legacyId,
       name: source.name,
       locked: source.locked,
@@ -282,7 +283,7 @@ function legacyIccColorSpace(value: string): 'rgb' | 'cmyk' | 'gray' | 'lab' {
 function outputIntent(input: {
   readonly document: projectFormatV1.BroadsetDocumentV1;
   readonly project: projectFormatV1.BroadsetProjectV1;
-}): BroadsetDocument['outputIntent'] {
+}): PdfSourceDocument['outputIntent'] {
   const intent = input.document.color.outputIntent;
 
   if (intent === undefined) return undefined;
@@ -300,13 +301,13 @@ function outputIntent(input: {
   };
 }
 
-export async function toLegacyPdfDocumentV1(input: {
+export async function toPdfProjectDocumentV1(input: {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly document: projectFormatV1.BroadsetDocumentV1;
   readonly page: projectFormatV1.PageDefinition;
   readonly blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>;
   readonly resolveBlob: ((digest: projectFormatV1.Sha256Digest) => Promise<Uint8Array | undefined>) | undefined;
-}): Promise<LegacyPdfDocumentResultV1> {
+}): Promise<PdfProjectDocumentResultV1> {
   const instances = projectFormatV1
     .resolvePageInstanceTree({
       project: input.project,
@@ -314,7 +315,7 @@ export async function toLegacyPdfDocumentV1(input: {
       pageId: input.page.id,
     })
     .filter(({ visible }) => visible);
-  const elements: BroadsetElement[] = [];
+  const elements: PdfSourceElement[] = [];
   const warnings: string[] = [];
   const idAtDepth = new Map<number, string>();
 
@@ -339,7 +340,7 @@ export async function toLegacyPdfDocumentV1(input: {
     warnings.push(...mapped.warnings);
   }
 
-  const background = toLegacyBackgroundV1({
+  const background = toPdfProjectBackgroundV1({
     paint: input.document.surface.background,
     project: input.project,
   });
@@ -348,7 +349,7 @@ export async function toLegacyPdfDocumentV1(input: {
 
   const prepress = input.document.surface.prepress;
   const legacyOutputIntent = outputIntent(input);
-  const document: BroadsetDocument = {
+  const document: PdfSourceDocument = {
     id: input.document.id,
     name: input.document.name,
     documentMode: input.document.kind === 'print' ? 'print' : 'screen',

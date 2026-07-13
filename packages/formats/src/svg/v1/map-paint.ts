@@ -1,12 +1,7 @@
-import {
-  type BroadsetColor,
-  type BroadsetElementStyleInput,
-  colorToCss,
-  projectFormatV1,
-} from '@broadset/model';
+import { projectFormatV1 } from '@broadset/model';
 
 import { mapCssColorV1 } from './paint-color';
-import type { SvgSourceDetailsV1 } from './types';
+import type { SvgImportedStyle, SvgSourceDetailsV1 } from './types';
 
 const DEFAULT_STROKE_WIDTH = 1;
 const DEFAULT_MITER_LIMIT = 4;
@@ -19,21 +14,19 @@ function colorValue(color: string): projectFormatV1.ColorValue {
   return mapCssColorV1(color);
 }
 
-function broadsetColorValue(color: BroadsetColor): projectFormatV1.ColorValue {
-  try {
-    return colorValue(colorToCss(color));
-  } catch {
-    return colorValue('#00000000');
-  }
+type SvgImportedColor = Exclude<Exclude<SvgImportedStyle['stroke'], string>, undefined>;
+
+function importedColorValue(color: SvgImportedColor): projectFormatV1.ColorValue {
+  return color.kind === 'rgb' ? colorValue(color.originalColor ?? color.hex) : colorValue('#00000000');
 }
 
-function mapStrokeColor(stroke: BroadsetElementStyleInput['stroke']): projectFormatV1.ColorValue | undefined {
+function mapStrokeColor(stroke: SvgImportedStyle['stroke']): projectFormatV1.ColorValue | undefined {
   if (stroke === undefined || stroke === 'none') return undefined;
 
-  return typeof stroke === 'string' ? colorValue(stroke) : broadsetColorValue(stroke);
+  return typeof stroke === 'string' ? colorValue(stroke) : importedColorValue(stroke);
 }
 
-function fillColor(style: Partial<BroadsetElementStyleInput>): {
+function fillColor(style: SvgImportedStyle): {
   readonly color: projectFormatV1.ColorValue | undefined;
   readonly fallback: boolean;
 } {
@@ -42,18 +35,18 @@ function fillColor(style: Partial<BroadsetElementStyleInput>): {
   if (fill === undefined && typeof style.backgroundGradient === 'object') {
     const first = style.backgroundGradient.stops[0];
 
-    return { color: first === undefined ? colorValue('#00000000') : broadsetColorValue(first.color), fallback: true };
+    return { color: first === undefined ? colorValue('#00000000') : importedColorValue(first.color), fallback: true };
   }
 
   if (fill === undefined || fill === 'none') return { color: undefined, fallback: false };
   if (typeof fill === 'string') return { color: colorValue(fill), fallback: fill.startsWith('url(') };
   if (fill.kind === 'none') return { color: undefined, fallback: false };
-  if (fill.kind === 'solid') return { color: broadsetColorValue(fill.color), fallback: false };
+  if (fill.kind === 'solid') return { color: importedColorValue(fill.color), fallback: false };
 
   if (fill.kind === 'gradient') {
     const first = fill.gradient.stops[0];
 
-    return { color: first === undefined ? colorValue('#00000000') : broadsetColorValue(first.color), fallback: true };
+    return { color: first === undefined ? colorValue('#00000000') : importedColorValue(first.color), fallback: true };
   }
 
   return { color: colorValue('#00000000'), fallback: true };
@@ -69,7 +62,7 @@ function parseDash(value: string | undefined): readonly number[] {
 }
 
 export function mapAppearanceV1(input: {
-  readonly style: Partial<BroadsetElementStyleInput>;
+  readonly style: SvgImportedStyle;
   readonly source: SvgSourceDetailsV1;
   readonly elementId: projectFormatV1.Id;
 }): { readonly appearance: projectFormatV1.Appearance; readonly fallback: boolean } {

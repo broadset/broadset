@@ -1,16 +1,17 @@
-import type { BroadsetDocument, BroadsetElement, projectFormatV1 } from '@broadset/model';
+import type { projectFormatV1 } from '@broadset/model';
 
-import { toLegacyPsdDocumentV1 } from '../../psd/v1/to-legacy-document';
+import { toPsdProjectDocumentV1 } from '../../psd/project-document';
+import type { PptxSourceDocument, PptxSourceElement } from '../project-model';
 
-interface LegacyPptxDocumentResultV1 {
-  readonly document: BroadsetDocument;
+interface PptxProjectDocumentResultV1 {
+  readonly document: PptxSourceDocument;
   readonly warnings: readonly string[];
 }
 
 function pageElement(
-  element: BroadsetElement,
+  element: PptxSourceElement,
   visible: boolean,
-): BroadsetDocument['pages'][number]['elements'][number] {
+): PptxSourceDocument['pages'][number]['elements'][number] {
   return {
     elementId: element.id,
     transform: {
@@ -22,15 +23,15 @@ function pageElement(
   };
 }
 
-export async function toLegacyPptxDocumentV1(input: {
+export async function toPptxProjectDocumentV1(input: {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly document: projectFormatV1.BroadsetDocumentV1;
   readonly pages: readonly projectFormatV1.PageDefinition[];
   readonly blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>;
   readonly resolveBlob: ((digest: projectFormatV1.Sha256Digest) => Promise<Uint8Array | undefined>) | undefined;
-}): Promise<LegacyPptxDocumentResultV1> {
+}): Promise<PptxProjectDocumentResultV1> {
   // Temporary format-owned bridge; Slice E removes it with the legacy serializers.
-  const mapped = await toLegacyPsdDocumentV1(input);
+  const mapped = await toPsdProjectDocumentV1(input);
   const elements = mapped.document.elements.map((element) => ({
     ...element,
     groupId: element.parentId,

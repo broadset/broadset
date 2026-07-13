@@ -1,9 +1,10 @@
-import { type BroadsetDocument, type BroadsetElement, projectFormatV1 } from '@broadset/model';
+import { projectFormatV1 } from '@broadset/model';
 
-import { toLegacyPdfDocumentV1 } from '../../pdf/v1/to-legacy-document';
+import { toPdfProjectDocumentV1 } from '../pdf/project-document';
+import type { PsdSourceDocument, PsdSourceElement } from './project-model';
 
-interface LegacyPsdDocumentResultV1 {
-  readonly document: BroadsetDocument;
+interface PsdProjectDocumentResultV1 {
+  readonly document: PsdSourceDocument;
   readonly warnings: readonly string[];
 }
 
@@ -17,7 +18,7 @@ function concreteColor(input: {
 }): projectFormatV1.ConcreteColorValue | undefined {
   if (input.color.kind === 'color') return input.color;
 
-  const swatchId = input.color.swatchId;
+  const swatchId: projectFormatV1.Id = input.color.swatchId;
   const swatch = input.project.resources.swatches.find(({ id }) => id === swatchId);
 
   if (swatch === undefined) return undefined;
@@ -83,7 +84,7 @@ function legacyLineSpacing(value: projectFormatV1.LineSpacing): number | undefin
 function legacyTextContent(input: {
   readonly element: projectFormatV1.Element;
   readonly project: projectFormatV1.BroadsetProjectV1;
-}): BroadsetElement['content'] | undefined {
+}): PsdSourceElement['content'] | undefined {
   if (input.element.kind !== 'text') return undefined;
 
   return {
@@ -118,9 +119,9 @@ function legacyTextContent(input: {
         align: paragraph.properties.alignment,
         indent: paragraph.properties.startIndent,
         bullet: legacyBullet(paragraph.properties.list),
-        ...(legacyLineSpacing(paragraph.properties.lineSpacing) === undefined ?
-          {}
-        : { lineSpacing: legacyLineSpacing(paragraph.properties.lineSpacing) }),
+        ...(legacyLineSpacing(paragraph.properties.lineSpacing) === undefined
+          ? {}
+          : { lineSpacing: legacyLineSpacing(paragraph.properties.lineSpacing) }),
         spaceBefore: paragraph.properties.spaceBefore,
         spaceAfter: paragraph.properties.spaceAfter,
       },
@@ -129,11 +130,11 @@ function legacyTextContent(input: {
 }
 
 function renamedElements(input: {
-  readonly elements: readonly BroadsetElement[];
+  readonly elements: readonly PsdSourceElement[];
   readonly instances: readonly projectFormatV1.ResolvedSceneInstance[];
   readonly pageIndex: number;
   readonly project: projectFormatV1.BroadsetProjectV1;
-}): readonly BroadsetElement[] {
+}): readonly PsdSourceElement[] {
   const prefix = `psd-v1-page-${String(input.pageIndex + 1)}-`;
   const ids = new Map(input.elements.map(({ id }, index) => [id, `${prefix}${String(index + 1)}`]));
 
@@ -154,17 +155,17 @@ function psdWarning(warning: string): string {
   return warning.replace(/^PDF v1 export:/u, 'PSD v1 export:');
 }
 
-export async function toLegacyPsdDocumentV1(input: {
+export async function toPsdProjectDocumentV1(input: {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly document: projectFormatV1.BroadsetDocumentV1;
   readonly pages: readonly projectFormatV1.PageDefinition[];
   readonly blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>;
   readonly resolveBlob: ((digest: projectFormatV1.Sha256Digest) => Promise<Uint8Array | undefined>) | undefined;
-}): Promise<LegacyPsdDocumentResultV1> {
-  const allElements: BroadsetElement[] = [];
-  const allPages: BroadsetDocument['pages'][number][] = [];
+}): Promise<PsdProjectDocumentResultV1> {
+  const allElements: PsdSourceElement[] = [];
+  const allPages: PsdSourceDocument['pages'][number][] = [];
   const warnings: string[] = [];
-  let template: BroadsetDocument | undefined;
+  let template: PsdSourceDocument | undefined;
 
   for (let pageIndex = 0; pageIndex < input.pages.length; pageIndex += 1) {
     const page = input.pages[pageIndex];
@@ -174,7 +175,7 @@ export async function toLegacyPsdDocumentV1(input: {
     const instances: readonly projectFormatV1.ResolvedSceneInstance[] = projectFormatV1
       .resolvePageInstanceTree({ project: input.project, documentId: input.document.id, pageId: page.id })
       .filter(({ visible }) => visible);
-    const mapped = await toLegacyPdfDocumentV1({
+    const mapped = await toPdfProjectDocumentV1({
       project: input.project,
       document: input.document,
       page,

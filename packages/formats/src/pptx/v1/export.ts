@@ -1,8 +1,13 @@
-import { createEmptyBroadsetDocument, type FontAsset, fontAsset, type projectFormatV1 } from '@broadset/model';
+import type { projectFormatV1 } from '@broadset/model';
 
 import { exportPptxWithReport, exportPptxWithReportAsync } from '../export';
+import {
+  createEmptyPptxSourceDocument,
+  createPptxEmbeddedFontAsset,
+  type PptxEmbeddedFontAsset,
+} from '../project-model';
 import type { PptxExportOptions, PptxExportReport, PptxExportWarning } from '../types';
-import { toLegacyPptxDocumentV1 } from './to-legacy-document';
+import { toPptxProjectDocumentV1 } from './project-document';
 
 export interface PptxExportInputV1 {
   readonly project: projectFormatV1.BroadsetProjectV1;
@@ -21,7 +26,7 @@ function exportWarning(message: string): PptxExportWarning {
 
 function fallback(message: string): PptxExportReport {
   try {
-    const result = exportPptxWithReport(createEmptyBroadsetDocument(), {
+    const result = exportPptxWithReport(createEmptyPptxSourceDocument(), {
       preserveBroadsetMetadata: false,
       includeInteropLedger: false,
       exportedAt: 0,
@@ -85,10 +90,10 @@ function legacyFontWeight(value: number): 100 | 200 | 300 | 400 | 500 | 600 | 70
 }
 
 async function embeddedFonts(input: PptxExportInputV1): Promise<{
-  readonly assets: readonly FontAsset[];
+  readonly assets: readonly PptxEmbeddedFontAsset[];
   readonly warnings: readonly PptxExportWarning[];
 }> {
-  const assets: FontAsset[] = [];
+  const assets: PptxEmbeddedFontAsset[] = [];
   const warnings: PptxExportWarning[] = [];
 
   for (const asset of input.project.resources.assets) {
@@ -116,7 +121,7 @@ async function embeddedFonts(input: PptxExportInputV1): Promise<{
     }
 
     assets.push(
-      fontAsset({
+      createPptxEmbeddedFontAsset({
         id: asset.id,
         name: asset.name,
         mimeType: asset.blob.mediaType,
@@ -153,7 +158,7 @@ export async function exportPptxWithReportV1(input: PptxExportInputV1): Promise<
 
     if (pages.length === 0) return fallback(`PPTX v1 export: page ${input.pageId ?? '(default)'} was not found.`);
 
-    const mapped = await toLegacyPptxDocumentV1({
+    const mapped = await toPptxProjectDocumentV1({
       project: input.project,
       document,
       pages,

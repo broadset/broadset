@@ -1,4 +1,4 @@
-import type { BroadsetElementStyleInput, projectFormatV1 } from '@broadset/model';
+import type { projectFormatV1 } from '@broadset/model';
 
 import type { ResourceCollectorV1 } from '../../v1';
 import type { ImportedElement } from '../import-types';
@@ -43,4 +43,5 @@ export interface MappedElementV1 {
   readonly editability: 'native' | 'partial' | 'appearance-only';
 }
 
-export type LegacyStyle = Partial<BroadsetElementStyleInput>;
+export type SvgImportedStyle = ImportedElement['style'];
+export type SvgImportedTextBody = Exclude<ImportedElement['content'], string>;

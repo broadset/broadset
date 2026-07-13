@@ -1,11 +1,11 @@
 import type { projectFormatV1 } from '@broadset/model';
-import { iccProfileAsset } from '@broadset/model';
 import { PDFDocument } from 'pdf-lib';
 
 import { exportPdfWithPreflight } from '../core';
 import { normalizeFontFamily } from '../fonts';
+import { toPdfProjectDocumentV1 } from '../project-document';
+import { createPdfIccProfileAsset } from '../project-model';
 import type { PdfExportOptions, PdfExportResult } from '../types';
-import { toLegacyPdfDocumentV1 } from './to-legacy-document';
 
 export interface PdfExportInputV1 {
   readonly project: projectFormatV1.BroadsetProjectV1;
@@ -111,10 +111,10 @@ async function fontBytesByFamily(input: PdfExportInputV1): Promise<ReadonlyMap<s
 }
 
 async function legacyIccAssets(input: PdfExportInputV1): Promise<{
-  readonly assets: readonly ReturnType<typeof iccProfileAsset>[];
+  readonly assets: readonly ReturnType<typeof createPdfIccProfileAsset>[];
   readonly warnings: readonly string[];
 }> {
-  const assets: ReturnType<typeof iccProfileAsset>[] = [];
+  const assets: ReturnType<typeof createPdfIccProfileAsset>[] = [];
   const warnings: string[] = [];
 
   for (const asset of input.project.resources.assets) {
@@ -128,7 +128,7 @@ async function legacyIccAssets(input: PdfExportInputV1): Promise<{
     }
 
     assets.push(
-      iccProfileAsset({
+      createPdfIccProfileAsset({
         id: asset.id,
         name: asset.name,
         mimeType: asset.blob.mediaType,
@@ -160,7 +160,7 @@ export async function exportPdfWithPreflightV1(input: PdfExportInputV1): Promise
 
     if (page === undefined) return await fallback(`PDF v1 export: page ${input.pageId ?? '(default)'} was not found.`);
 
-    const mapped = await toLegacyPdfDocumentV1({
+    const mapped = await toPdfProjectDocumentV1({
       project: input.project,
       document,
       page,

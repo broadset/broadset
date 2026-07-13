@@ -1,8 +1,13 @@
-import type { BroadsetElementStyleInput, BroadsetGradient, projectFormatV1 } from '@broadset/model';
-import { parseColor } from '@broadset/model';
+import type { projectFormatV1 } from '@broadset/model';
 
-interface LegacyStyleResultV1 {
-  readonly style: BroadsetElementStyleInput;
+import {
+  parsePdfSourceColor,
+  type PdfSourceGradient,
+  type PdfSourceStyleInput,
+} from './project-model';
+
+interface PdfProjectStyleResultV1 {
+  readonly style: PdfSourceStyleInput;
   readonly warnings: readonly string[];
 }
 
@@ -25,7 +30,7 @@ function concreteColor(input: {
   return swatch.kind === 'process' ? swatch.color : swatch.alternateColor;
 }
 
-export function toLegacyCssColorV1(input: {
+export function toPdfProjectCssColorV1(input: {
   readonly color: projectFormatV1.ColorValue;
   readonly project: projectFormatV1.BroadsetProjectV1;
 }): string | undefined {
@@ -50,27 +55,27 @@ export function toLegacyCssColorV1(input: {
   return `rgba(${String(red)}, ${String(green)}, ${String(blue)}, ${String(alpha)})`;
 }
 
-function legacyColor(input: {
+function projectColor(input: {
   readonly color: projectFormatV1.ColorValue;
   readonly project: projectFormatV1.BroadsetProjectV1;
-}): ReturnType<typeof parseColor> | undefined {
-  const css = toLegacyCssColorV1(input);
+}): ReturnType<typeof parsePdfSourceColor> | undefined {
+  const css = toPdfProjectCssColorV1(input);
 
   if (css === undefined) return undefined;
 
   try {
-    return parseColor(css);
+    return parsePdfSourceColor(css);
   } catch {
     return undefined;
   }
 }
 
-function legacyGradient(input: {
+function projectGradient(input: {
   readonly gradient: projectFormatV1.Gradient;
   readonly project: projectFormatV1.BroadsetProjectV1;
-}): BroadsetGradient {
+}): PdfSourceGradient {
   const stops = input.gradient.stops.map((stop) => ({
-    color: legacyColor({ color: stop.color, project: input.project }) ?? parseColor('#000000'),
+    color: projectColor({ color: stop.color, project: input.project }) ?? parsePdfSourceColor('#000000'),
     position: clamp(stop.offset) * 100,
   }));
   const center: readonly [number, number] | undefined =
@@ -96,21 +101,21 @@ function legacyGradient(input: {
 function gradientFill(input: {
   readonly gradient: projectFormatV1.Gradient;
   readonly project: projectFormatV1.BroadsetProjectV1;
-}): BroadsetElementStyleInput['fill'] {
-  return { kind: 'gradient', gradient: legacyGradient(input) };
+}): PdfSourceStyleInput['fill'] {
+  return { kind: 'gradient', gradient: projectGradient(input) };
 }
 
-export function toLegacyBackgroundV1(input: {
+export function toPdfProjectBackgroundV1(input: {
   readonly paint: projectFormatV1.Paint;
   readonly project: projectFormatV1.BroadsetProjectV1;
 }): {
   readonly backgroundMode: 'transparent' | 'solid' | 'gradient';
   readonly backgroundColor?: string;
-  readonly backgroundGradient?: BroadsetGradient;
+  readonly backgroundGradient?: PdfSourceGradient;
   readonly warnings: readonly string[];
 } {
   if (input.paint.kind === 'solid') {
-    const backgroundColor = toLegacyCssColorV1({ color: input.paint.color, project: input.project });
+    const backgroundColor = toPdfProjectCssColorV1({ color: input.paint.color, project: input.project });
     const concrete = concreteColor({ color: input.paint.color, project: input.project });
     const warnings =
       concrete !== undefined && !['srgb', 'gray'].includes(concrete.space) ?
@@ -128,7 +133,7 @@ export function toLegacyBackgroundV1(input: {
   if (input.paint.kind === 'gradient') {
     return {
       backgroundMode: 'gradient',
-      backgroundGradient: legacyGradient({ gradient: input.paint.gradient, project: input.project }),
+      backgroundGradient: projectGradient({ gradient: input.paint.gradient, project: input.project }),
       warnings: [],
     };
   }
@@ -144,13 +149,13 @@ export function toLegacyBackgroundV1(input: {
 function fill(input: {
   readonly appearance: projectFormatV1.Appearance;
   readonly project: projectFormatV1.BroadsetProjectV1;
-}): BroadsetElementStyleInput['fill'] {
+}): PdfSourceStyleInput['fill'] {
   const layer = input.appearance.fills.find(({ enabled }) => enabled);
 
   if (layer === undefined || layer.paint.kind === 'none') return { kind: 'none' };
 
   if (layer.paint.kind === 'solid') {
-    const color = legacyColor({ color: layer.paint.color, project: input.project });
+    const color = projectColor({ color: layer.paint.color, project: input.project });
 
     return color === undefined ? { kind: 'none' } : { kind: 'solid', color };
   }
@@ -194,13 +199,13 @@ function unsupportedWarnings(appearance: projectFormatV1.Appearance): readonly s
   return warnings;
 }
 
-export function toLegacyStyleV1(input: {
+export function toPdfProjectStyleV1(input: {
   readonly appearance: projectFormatV1.Appearance;
   readonly project: projectFormatV1.BroadsetProjectV1;
-}): LegacyStyleResultV1 {
+}): PdfProjectStyleResultV1 {
   const stroke = input.appearance.strokes.find(({ enabled, paint }) => enabled && paint.kind === 'solid');
   const strokeColor =
-    stroke?.paint.kind === 'solid' ? legacyColor({ color: stroke.paint.color, project: input.project }) : undefined;
+    stroke?.paint.kind === 'solid' ? projectColor({ color: stroke.paint.color, project: input.project }) : undefined;
   const fillLayer = input.appearance.fills.find(({ enabled }) => enabled);
 
   return {
