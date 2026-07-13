@@ -19,96 +19,12 @@ import {
  * runs, kerning, complex scripts, and font metric-aware sizing ride
  * with a dedicated operator engine in a later iteration.
  */
-export interface ExtractedTextItem {
+interface ExtractedTextItem {
   readonly text: string;
   readonly xPt: number;
   readonly yPt: number;
   readonly fontSizePt: number;
   readonly fontName: string;
-}
-
-/**
- * Default cumulative cap on decoded operator-stream bytes. Sums across
- * every page; once the running total crosses the cap the importer
- * stops decoding additional pages and surfaces a structured warning.
- * 16 MiB covers every realistic design-tool export while bounding the
- * Latin-1 scan budget on a hostile PDF that fans out into many
- * compressed-but-huge content streams. Closes the 2026-04-28 audit
- * follow-up "PDF content streams are still decoded and concatenated
- * without an operator byte budget".
- */
-const DEFAULT_MAX_OPERATOR_BYTES = 16 * 1024 * 1024;
-
-interface OperatorExtractionResult {
-  readonly items: readonly ExtractedTextItem[];
-  readonly warnings: readonly string[];
-  /**
-   * `true` when the importer stopped extracting because the cumulative
-   * decoded operator-stream bytes crossed the configured cap. Callers
-   * surface a warning so users know the result is partial.
-   */
-  readonly capExceeded: boolean;
-  /** The cap that was active for the run (default or caller-supplied). */
-  readonly capBytes: number;
-}
-
-/**
- * Cap-aware operator-stream scan. Iterates pages while accumulating
- * decoded byte count; stops as soon as the next decoded content stream
- * would cross `capBytes`. Returns the accumulated items plus a flag
- * for callers that need to emit a warning. The cap is enforced at
- * content-stream granularity, so recoverable earlier streams on the
- * same page are kept instead of being discarded with a later huge
- * stream.
- */
-export function extractTextItemsWithBudget(
-  pdf: PDFDocument,
-  capBytes: number = DEFAULT_MAX_OPERATOR_BYTES,
-): OperatorExtractionResult {
-  const items: ExtractedTextItem[] = [];
-  const pages = safeGetPages(pdf);
-  const warnings: string[] = [];
-  let bytesScanned = 0;
-  let capExceeded = false;
-
-  pageLoop: for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
-    const page = pages[pageIndex];
-
-    if (page === undefined) continue;
-
-    const streamResult = readPageContentChunks(pdf, page, pageIndex);
-
-    warnings.push(...streamResult.warnings);
-
-    for (const streamBytes of streamResult.chunks) {
-      if (capBytes > 0 && bytesScanned + streamBytes.byteLength > capBytes) {
-        capExceeded = true;
-        break pageLoop;
-      }
-
-      bytesScanned += streamBytes.byteLength;
-
-      const text = bytesToLatin1(streamBytes);
-
-      items.push(...scanContentStreamForText(text));
-    }
-  }
-
-  return { items, warnings, capExceeded, capBytes };
-}
-
-/**
- * Walk the document's pages safely. pdf-lib's `getPages` throws when
- * the catalog's `/Pages` tree is missing or malformed (which happens
- * with truncated / fuzzed inputs). Wrap so the caller treats the
- * "no pages" case as an empty extraction rather than crashing.
- */
-function safeGetPages(pdf: PDFDocument): readonly PDFPage[] {
-  try {
-    return pdf.getPages();
-  } catch {
-    return [];
-  }
 }
 
 interface ContentReadResult {
@@ -260,10 +176,6 @@ function describeStreamFilters(stream: PDFStream): readonly string[] {
   }
 
   return [];
-}
-
-function bytesToLatin1(bytes: Uint8Array): string {
-  return new TextDecoder('latin1').decode(bytes);
 }
 
 /* ------------------------------------------------------------------ */

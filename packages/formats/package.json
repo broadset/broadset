@@ -28,14 +28,12 @@
     "pptx:libreoffice:verify": "BROADSET_REQUIRE_LIBREOFFICE=1 vitest run --passWithNoTests pptx/libreoffice-verify"
   },
   "devDependencies": {
-    "@napi-rs/canvas": "^0.1.100",
     "@types/css-tree": "^2.3.11",
     "@types/culori": "^4.0.1",
     "@types/fontkit": "^2.0.9",
     "@types/pdfkit": "^0.17.6",
     "jspdf": "^4.2.1",
     "pdfkit": "^0.18.0",
-    "pixelmatch": "^7.1.0",
     "tsx": "^4.22.4",
     "typescript": "^6.0.2"
   },
@@ -55,11 +53,8 @@
     "microdiff": "^1.5.0",
     "modern-screenshot": "^4.6.8",
     "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "^5.4.296",
-    "qrcode-generator": "^2.0.4",
     "svgpath": "^2.6.0",
     "transformation-matrix": "^3.1.0",
-    "wawoff2": "^2.0.1",
     "xxhash-wasm": "^1.1.0",
     "zod": "^4.3.0"
   }

@@ -1,11 +1,24 @@
 import type { projectFormatV1 } from '@broadset/model';
 import { PDFDocument } from 'pdf-lib';
 
-import { exportPdfWithPreflight } from '../core';
-import { normalizeFontFamily } from '../fonts';
-import { toPdfProjectDocumentV1 } from '../project-document';
-import { createPdfIccProfileAsset } from '../project-model';
-import type { PdfExportOptions, PdfExportResult } from '../types';
+import { serializePdfProjectV1 } from './serialize';
+
+interface PdfExportOptionsV1 {
+  readonly fetch?: typeof globalThis.fetch | undefined;
+  readonly fontFetchTimeoutMs?: number | undefined;
+  readonly fontMaxBytes?: number | undefined;
+  readonly fontBytesByFamily?: ReadonlyMap<string, Uint8Array> | undefined;
+  readonly subsetFonts?: boolean | undefined;
+  readonly emitOcgs?: boolean | undefined;
+  readonly colorSpace?: 'rgb' | 'cmyk' | 'spot' | undefined;
+  readonly pdfaConformance?: '2b' | '2u' | '2a' | undefined;
+  readonly assets?: readonly projectFormatV1.Asset[] | undefined;
+}
+
+interface PdfExportResultV1 {
+  readonly bytes: Uint8Array;
+  readonly warnings: readonly string[];
+}
 
 export interface PdfExportInputV1 {
   readonly project: projectFormatV1.BroadsetProjectV1;
@@ -15,7 +28,7 @@ export interface PdfExportInputV1 {
   readonly resolveBlob?: (
     digest: projectFormatV1.Sha256Digest,
   ) => Uint8Array | undefined | Promise<Uint8Array | undefined>;
-  readonly options?: PdfExportOptions;
+  readonly options?: PdfExportOptionsV1;
 }
 
 function emergencyPdfBytes(): Uint8Array {
@@ -41,7 +54,7 @@ function emergencyPdfBytes(): Uint8Array {
   return new TextEncoder().encode(body + xref + trailer);
 }
 
-async function fallback(message: string): Promise<PdfExportResult> {
+async function fallback(message: string): Promise<PdfExportResultV1> {
   try {
     const pdf = await PDFDocument.create();
 
@@ -69,82 +82,7 @@ async function resolveBlobBytes(
   }
 }
 
-function bytesToDataUri(bytes: Uint8Array, mediaType: string): string {
-  let binary = '';
-
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-
-  return `data:${mediaType};base64,${btoa(binary)}`;
-}
-
-function legacyIccColorSpace(value: string): 'rgb' | 'cmyk' | 'gray' | 'lab' {
-  const normalized = value.toLowerCase();
-
-  if (normalized.includes('cmyk')) return 'cmyk';
-  if (normalized.includes('gray')) return 'gray';
-  if (normalized.includes('lab')) return 'lab';
-
-  return 'rgb';
-}
-
-async function fontBytesByFamily(input: PdfExportInputV1): Promise<ReadonlyMap<string, Uint8Array>> {
-  const fonts = new Map<string, Uint8Array>();
-
-  for (const family of input.project.resources.fonts) {
-    const assetFace = family.faces.find(({ source }) => source.kind === 'asset');
-
-    if (assetFace?.source.kind !== 'asset') continue;
-
-    const assetId = assetFace.source.assetId;
-    const asset = input.project.resources.assets.find(
-      (candidate) => candidate.id === assetId && candidate.kind === 'font',
-    );
-
-    if (asset?.kind !== 'font') continue;
-
-    const bytes = await resolveBlobBytes(input, asset.blob.digest);
-
-    if (bytes !== undefined) fonts.set(normalizeFontFamily(family.familyName), bytes);
-  }
-
-  return fonts;
-}
-
-async function legacyIccAssets(input: PdfExportInputV1): Promise<{
-  readonly assets: readonly ReturnType<typeof createPdfIccProfileAsset>[];
-  readonly warnings: readonly string[];
-}> {
-  const assets: ReturnType<typeof createPdfIccProfileAsset>[] = [];
-  const warnings: string[] = [];
-
-  for (const asset of input.project.resources.assets) {
-    if (asset.kind !== 'icc-profile') continue;
-
-    const bytes = await resolveBlobBytes(input, asset.blob.digest);
-
-    if (bytes === undefined) {
-      warnings.push(`PDF v1 export: ICC profile blob ${asset.blob.digest} is unavailable.`);
-      continue;
-    }
-
-    assets.push(
-      createPdfIccProfileAsset({
-        id: asset.id,
-        name: asset.name,
-        mimeType: asset.blob.mediaType,
-        source: { type: 'embedded', dataUri: bytesToDataUri(bytes, asset.blob.mediaType) },
-        colorSpace: legacyIccColorSpace(asset.metadata.colorSpace),
-        description: asset.metadata.description,
-        identifier: asset.metadata.identifier,
-        fileSizeBytes: bytes.byteLength,
-      }),
-    );
-  }
-
-  return { assets, warnings };
-}
-
-export async function exportPdfWithPreflightV1(input: PdfExportInputV1): Promise<PdfExportResult> {
+export async function exportPdfWithPreflightV1(input: PdfExportInputV1): Promise<PdfExportResultV1> {
   try {
     const document =
       input.project.documents.find(({ id }) => id === input.documentId) ??
@@ -160,33 +98,13 @@ export async function exportPdfWithPreflightV1(input: PdfExportInputV1): Promise
 
     if (page === undefined) return await fallback(`PDF v1 export: page ${input.pageId ?? '(default)'} was not found.`);
 
-    const mapped = await toPdfProjectDocumentV1({
+    return await serializePdfProjectV1({
       project: input.project,
       document,
       page,
-      blobs: input.blobs ?? new Map(),
-      resolveBlob:
-        input.resolveBlob === undefined ?
-          undefined
-        : async (digest): Promise<Uint8Array | undefined> => input.resolveBlob?.(digest),
+      resolveBlob: async (digest): Promise<Uint8Array | undefined> => resolveBlobBytes(input, digest),
+      options: input.options ?? {},
     });
-    const embeddedFonts = await fontBytesByFamily(input);
-    const configuredFonts = new Map(embeddedFonts);
-
-    for (const [family, bytes] of input.options?.fontBytesByFamily ?? []) configuredFonts.set(family, bytes);
-
-    const icc = await legacyIccAssets(input);
-
-    const exported = await exportPdfWithPreflight(mapped.document, {
-      ...input.options,
-      fontBytesByFamily: configuredFonts,
-      assets: [...icc.assets, ...(input.options?.assets ?? [])],
-    });
-
-    return {
-      bytes: exported.bytes,
-      warnings: [...mapped.warnings, ...icc.warnings, ...exported.warnings],
-    };
   } catch (error: unknown) {
     return await fallback(
       `PDF v1 export failed soft: ${error instanceof Error ? error.message : 'unknown export failure'}`,

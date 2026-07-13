@@ -4,7 +4,6 @@ import {
   type BroadsetElementStyleInput,
   type BroadsetGradient,
   createDefaultElement,
-  iccProfileAsset,
   parseColor,
 } from '@broadset/model';
 
@@ -14,5 +13,4 @@ export type PdfSourceStyleInput = BroadsetElementStyleInput;
 export type PdfSourceGradient = BroadsetGradient;
 
 export const createPdfSourceElement = createDefaultElement;
-export const createPdfIccProfileAsset = iccProfileAsset;
 export const parsePdfSourceColor = parseColor;

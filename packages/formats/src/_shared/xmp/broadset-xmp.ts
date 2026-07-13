@@ -16,7 +16,6 @@ import { z } from 'zod';
  */
 
 export const BROADSET_XMP_NAMESPACE = 'https://broadset.io/ns/xmp/1.0/';
-export const BROADSET_XMP_VERSION = '1.0';
 
 const XMP_META_OPEN = '<x:xmpmeta xmlns:x="adobe:ns:meta/">';
 const XMP_META_CLOSE = '</x:xmpmeta>';
@@ -36,7 +35,7 @@ const RDF_CLOSE = '</rdf:RDF>';
  * resource) MAY omit it; the importer falls back to placeholder
  * geometry in that case.
  */
-export interface BroadsetXmpElementEntry {
+interface BroadsetXmpElementEntry {
   readonly id: string;
   readonly fingerprint: string;
   readonly payload?: string | undefined;
@@ -47,7 +46,7 @@ export interface BroadsetXmpElementEntry {
  * via the standard `pdfaid:` namespace (ISO 19005-1 Annex C). Only PDF
  * exporters populate this; every other format leaves it `undefined`.
  */
-export interface BroadsetXmpPdfAIdentifier {
+interface BroadsetXmpPdfAIdentifier {
   readonly part: string;
   readonly conformance: string;
 }

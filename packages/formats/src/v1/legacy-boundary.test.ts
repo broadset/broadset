@@ -40,4 +40,12 @@ describe('native v1 format boundary', () => {
 
     expect(findings).toEqual([]);
   });
+
+  it('keeps the native PDF exporter independent of the retired writer', () => {
+    const findings = productionTypeScriptFiles(join(formatsSourceDirectory, 'pdf/v1')).filter((path) =>
+      /from ['"]\.\.\/(?:core|project-document|project-model)['"]/u.test(readFileSync(path, 'utf8')),
+    );
+
+    expect(findings).toEqual([]);
+  });
 });
