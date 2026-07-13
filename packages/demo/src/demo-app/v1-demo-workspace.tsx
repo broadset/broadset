@@ -13,6 +13,7 @@ import { loadStoredProjectV1, saveStoredProjectV1 } from '../v1-project-persiste
 import { useEditorSelector } from './helpers';
 import { V1DemoCanvasSurface } from './v1-demo-canvas-surface';
 import { V1ElementSidebar } from './v1-element-sidebar';
+import { V1ProjectFileControls } from './v1-project-file-controls';
 
 interface V1DemoWorkspaceProps {
   readonly project: projectFormatV1.BroadsetProjectV1;
@@ -152,6 +153,7 @@ export function V1DemoWorkspace({
         data-testid="v1-demo-workspace"
         style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%' }}
       >
+        <V1ProjectFileControls editorStore={editorStore} />
         <PageSorter
           activePageIndex={activePageIndex}
           pages={document?.pages ?? []}
