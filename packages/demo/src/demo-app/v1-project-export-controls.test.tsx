@@ -30,9 +30,11 @@ function readBlobBytes(blob: Blob): Promise<Uint8Array> {
       if (reader.result instanceof ArrayBuffer) resolve(new Uint8Array(reader.result));
       else reject(new Error('Expected exported bytes'));
     };
+
     reader.onerror = () => {
       reject(reader.error ?? new Error('Could not read export'));
     };
+
     reader.readAsArrayBuffer(blob);
   });
 }

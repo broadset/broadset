@@ -3,6 +3,7 @@ import { projectFormatV1 } from '@broadset/model';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 
 import { V1PagePreview } from '../demo-components/v1-page-preview';
+import { V1SelectionTransformWidget } from '../demo-components/v1-selection-transform-widget';
 import { useCanvasViewport } from './helpers';
 
 const EMPTY_BLOBS: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array> = new Map();
@@ -60,6 +61,7 @@ export function V1DemoCanvasSurface({
         }}
       >
         <V1PagePreview blobs={blobs} documentId={documentId} pageId={pageId} project={project} />
+        <V1SelectionTransformWidget editorStore={editorStore} zoom={viewport.zoom} />
       </div>
     </div>
   );
