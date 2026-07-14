@@ -164,7 +164,7 @@ The keyframe adapter MUST address a stable owner, sequence, property track, and 
 
 ### Requirement: Wheel Input Classification
 
-The system MUST classify smooth pixel deltas as trackpad gestures. Trackpad scroll without modifiers MUST be pan. Trackpad + Alt MUST be zoom. Pinch-style Ctrl+wheel MUST be zoom. Coarse wheel steps MUST stay in legacy mode.
+The system MUST classify smooth pixel deltas as trackpad gestures. Trackpad scroll without modifiers MUST be pan. Trackpad + Alt MUST be zoom. Pinch-style Ctrl+wheel MUST be zoom. Coarse wheel steps MUST stay in coarse-wheel mode.
 
 #### Scenario: Trackpad pan
 

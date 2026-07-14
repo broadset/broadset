@@ -11,7 +11,7 @@ Defines the read-only display layer for broadset. The renderer consumes a valida
 The renderer package is split into two layered surfaces:
 
 - **Generic core** — consumes a normalized resolved scene plus runtime resource services and produces semantic DOM for closed text, image, vector, group, component-instance, video, audio, clock, ticker, QR, foreign, and plugin outputs. It knows nothing about canonical serialization, Broadset-specific structural attributes, editor overlays, or custom-element registration.
-- **Broadset adapter** — accepts a validated `ResolvedSceneSnapshot` plus runtime `RenderSettings`, attaches Broadset-owned decorators, owns preview chrome policy, and exposes `getOverlayRoot()` for editor portals. It never maps an unvalidated legacy document shape.
+- **Broadset adapter** — accepts a validated `ResolvedSceneSnapshot` plus runtime `RenderSettings`, attaches Broadset-owned decorators, owns preview chrome policy, and exposes `getOverlayRoot()` for editor portals. It never maps an unvalidated pre-v1 document shape.
 
 Each requirement below is labeled `[Generic]` or `[Adapter]` to clarify which surface owns the behavior. Where a requirement is a cross-package contract with `@broadset/playback` or `@broadset/editor`, the requirement is labeled `[Cross-package]` and the contract is enforced through the Broadset adapter.
 

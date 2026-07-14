@@ -359,7 +359,7 @@ Total strict-reviewed files: 265 / 265
 - File: packages/formats/src/import-document.ts:50
 - Evidence:
   - `importSvgDocument` fills `elements` from parsed SVG but does not populate page root instances.
-  - Base document comes from `createEmptyBroadsetDocument()` with default page `elements: []`.
+  - The then-current empty-document helper produced a default page with `elements: []`.
 - Why this is a bug:
   - Imported roots are not represented on active page instance layer.
 - Failure scenario:

@@ -14,7 +14,7 @@ Every canonical project MUST contain `$schema`, `format`, and `schemaVersion` wi
 - `format: 'broadset-project'`
 - `schemaVersion: 1`
 
-Consumers MUST reject every other schema version with a typed unsupported-version diagnostic. The production v1 loader MUST NOT migrate or accept legacy Broadset-owned project shapes.
+Consumers MUST reject every other schema version with a typed unsupported-version diagnostic. The production v1 loader MUST NOT migrate or accept pre-v1 Broadset-owned project shapes.
 
 #### Acceptance Criteria
 
@@ -128,7 +128,7 @@ The canonical project MUST exclude editor selection, viewport, open panels, acti
 
 ## Non-Goals
 
-- Backward compatibility with legacy Broadset-owned draft shapes
+- Backward compatibility with pre-v1 Broadset-owned draft shapes
 - Runtime navigation or editor-state persistence
 - Document-only interchange schema details
 - Plugin execution or plugin payload semantics

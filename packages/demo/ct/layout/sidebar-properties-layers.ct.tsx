@@ -124,7 +124,7 @@ test('PropertiesSidebar hides clip-path controls in print mode', async ({ mount,
 /**
  * @description Cross-region regression: editing the Appearance fill color in
  * the sidebar must update the canonical model fill and repaint the selected
- * canvas element. Previously the panel wrote a legacy backgroundColor field
+ * canvas element. Previously the panel wrote a retired backgroundColor field
  * that the renderer ignored.
  */
 test('editing Appearance fill color updates the selected canvas element background', async ({ mount, page }) => {
