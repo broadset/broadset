@@ -1,17 +1,20 @@
-import { colorToCss, parseColor, type projectFormatV1 } from '@broadset/model';
+import type { projectFormatV1 } from '@broadset/model';
+import { converter, parse } from 'culori';
 
-import { parseCssColor } from '../../pdf/color';
+const toRgb = converter('rgb');
+
+function channel(value: number | undefined): number {
+  return value === undefined || !Number.isFinite(value) ? 0 : Math.min(1, Math.max(0, value));
+}
 
 export function mapCssColorV1(color: string): projectFormatV1.ColorValue {
-  let normalized = color;
+  const parsed = parse(color);
+  const rgb = parsed === undefined ? undefined : toRgb(parsed);
 
-  try {
-    normalized = colorToCss(parseColor(color));
-  } catch {
-    normalized = '#00000000';
-  }
-
-  const parsed = parseCssColor(normalized) ?? { r: 0, g: 0, b: 0, a: 0 };
-
-  return { kind: 'color', space: 'srgb', channels: [parsed.r, parsed.g, parsed.b], alpha: parsed.a };
+  return {
+    kind: 'color',
+    space: 'srgb',
+    channels: [channel(rgb?.r), channel(rgb?.g), channel(rgb?.b)],
+    alpha: rgb === undefined ? 0 : channel(rgb.alpha ?? 1),
+  };
 }

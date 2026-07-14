@@ -1,7 +1,7 @@
-import { type BroadsetElementStyleInput } from '@broadset/model';
 import { compose as composeMatrix, type Matrix } from 'transformation-matrix';
 
 import { type TransformState } from './import-types';
+import type { SvgSourceStyle } from './source-model';
 import { type DecomposedTransform, decomposeMatrix, parseAndDecomposeTransform } from './transform';
 
 export const IDENTITY_MATRIX: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
@@ -85,7 +85,7 @@ export function getInheritedAttr(el: Element, name: string): string | null {
  * Returns an object that's spread into the importer's
  * `baseStyle`; absent attrs are omitted entirely.
  */
-export function readInheritedStrokeStyle(el: Element): Partial<BroadsetElementStyleInput> {
+export function readInheritedStrokeStyle(el: Element): SvgSourceStyle {
   const out: Record<string, string | number> = {};
   const widthRaw = getInheritedAttr(el, 'stroke-width');
   const linecap = getInheritedAttr(el, 'stroke-linecap');

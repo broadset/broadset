@@ -17,7 +17,7 @@ function colorValue(color: string): projectFormatV1.ColorValue {
 type SvgImportedColor = Exclude<Exclude<SvgImportedStyle['stroke'], string>, undefined>;
 
 function importedColorValue(color: SvgImportedColor): projectFormatV1.ColorValue {
-  return color.kind === 'rgb' ? colorValue(color.originalColor ?? color.hex) : colorValue('#00000000');
+  return colorValue(color.originalColor ?? color.hex);
 }
 
 function mapStrokeColor(stroke: SvgImportedStyle['stroke']): projectFormatV1.ColorValue | undefined {

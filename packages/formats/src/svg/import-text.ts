@@ -7,25 +7,23 @@
  * Split out of `import.ts` in P7.7m to bring the orchestrator
  * back under the soft size limit.
  */
-import {
-  type Paragraph,
-  paragraph as makeParagraph,
-  type Run,
-  run as makeRun,
-  type RunProps,
-  type TextBody,
-  textBody as makeTextBody,
-  textBodyToPlainString,
-} from '@broadset/model';
-
 import { layoutTextAsPathD, safeOpenFont } from './flatten-text';
 import { bakePathWithMatrix, type ImportedElement, type ShapeBakeContext, type SvgFontSource } from './import-types';
-
+import {
+  createSvgSourceParagraph,
+  createSvgSourceRun,
+  createSvgSourceTextBody,
+  type SvgSourceParagraph,
+  type SvgSourceRun,
+  type SvgSourceRunProperties,
+  type SvgSourceTextBody,
+  svgSourceTextToPlainString,
+} from './source-model';
 
 /**
  * Read the text content of a `<text>` (or wrapped `<textPath>`)
  * element. When the source has `<tspan>` children, build a
- * structured `TextBody` carrying each run's text plus any inline
+ * structured source text body carrying each run's text plus any inline
  * style overrides (`font-family` / `font-size` / `font-weight` /
  * `font-style` / `fill` / `text-decoration`). Otherwise return
  * the plain string body — preserves the existing single-line
@@ -36,7 +34,7 @@ import { bakePathWithMatrix, type ImportedElement, type ShapeBakeContext, type S
  * spec feature-matrix promise that multi-run text is native on
  * import + export).
  */
-function readTextContent(source: Element): string | TextBody {
+function readTextContent(source: Element): string | SvgSourceTextBody {
   const directTspans = collectDirectTspanChildren(source);
 
   if (directTspans.length === 0) {
@@ -49,8 +47,8 @@ function readTextContent(source: Element): string | TextBody {
   // bytes). The walker below recurses into nested children but
   // emits one Run per leaf, so each text byte appears exactly once.
   // P7.7l review #4 blocker.
-  const paragraphs: Paragraph[] = [];
-  let currentRuns: Run[] = [];
+  const paragraphs: SvgSourceParagraph[] = [];
+  let currentRuns: SvgSourceRun[] = [];
 
   for (const tspan of directTspans) {
     // `dy="1em"` is the canonical SVG paragraph-break convention
@@ -60,7 +58,7 @@ function readTextContent(source: Element): string | TextBody {
     const isParagraphBreak = currentRuns.length > 0 && tspanIsParagraphBreak(tspan);
 
     if (isParagraphBreak) {
-      paragraphs.push(makeParagraph(currentRuns));
+      paragraphs.push(createSvgSourceParagraph(currentRuns));
       currentRuns = [];
     }
 
@@ -68,14 +66,14 @@ function readTextContent(source: Element): string | TextBody {
   }
 
   if (currentRuns.length > 0) {
-    paragraphs.push(makeParagraph(currentRuns));
+    paragraphs.push(createSvgSourceParagraph(currentRuns));
   }
 
   if (paragraphs.length === 0 || paragraphs.every((p) => p.runs.length === 0)) {
     return source.textContent;
   }
 
-  return makeTextBody(paragraphs);
+  return createSvgSourceTextBody(paragraphs);
 }
 
 function collectDirectTspanChildren(source: Element): Element[] {
@@ -110,12 +108,12 @@ function tspanIsParagraphBreak(tspan: Element): boolean {
  * the child's overrides taking precedence. The result is exactly
  * one Run per visible text segment — no duplication.
  */
-function appendRunsFromTspan(tspan: Element, out: Run[]): void {
+function appendRunsFromTspan(tspan: Element, out: SvgSourceRun[]): void {
   const ownProps = readRunPropsFromTspan(tspan);
   const flushText = (text: string): void => {
     if (text === '') return;
 
-    out.push(ownProps !== undefined ? makeRun(text, ownProps) : makeRun(text));
+    out.push(ownProps !== undefined ? createSvgSourceRun(text, ownProps) : createSvgSourceRun(text));
   };
   const childNodes = tspan.childNodes;
   let directText = '';
@@ -146,7 +144,7 @@ function appendRunsFromTspan(tspan: Element, out: Run[]): void {
  * `font-size`, etc.); the importer maps them back to the
  * camelCase keys the model's `RunProps.style` consumes.
  */
-function readRunPropsFromTspan(tspan: Element): RunProps | undefined {
+function readRunPropsFromTspan(tspan: Element): SvgSourceRunProperties | undefined {
   const style: Record<string, string> = {};
   const fontFamily = tspan.getAttribute('font-family');
   const fontSize = tspan.getAttribute('font-size');
@@ -191,10 +189,10 @@ export function importTextElement(
 
   if (ctx.transform.requiresBake) {
     // Flatten path needs a single string for fontkit layout —
-    // collapse a TextBody to its plain-string projection. Per-run
+    // collapse a structured body to its plain-string projection. Per-run
     // styling is lost (the bake produces glyph paths regardless),
     // which matches the export `flatten` mode's contract.
-    const plainText = typeof content === 'string' ? content : textBodyToPlainString(content);
+    const plainText = typeof content === 'string' ? content : svgSourceTextToPlainString(content);
     const flattened = tryFlattenTextOnImport(el, ctx, plainText, fontSources, warnings);
 
     if (flattened !== null) {

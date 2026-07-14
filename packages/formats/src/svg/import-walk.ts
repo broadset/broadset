@@ -1,5 +1,3 @@
-import { type BroadsetElementStyleInput } from '@broadset/model';
-
 import { sanitizeStyleAttribute } from '../_shared/sanitize';
 import {
   buildDefsBundle,
@@ -31,6 +29,7 @@ import {
 } from './import-style';
 import { importTextElement } from './import-text';
 import { type ImportedElement, type ShapeBakeContext, type SvgFontSource, type TransformState } from './import-types';
+import type { SvgSourceStyle } from './source-model';
 
 /**
  * Group-depth cap per the importer security contract. Bounds the
@@ -72,7 +71,7 @@ function importUnsupportedElement(el: Element, transform: TransformState, warnin
 interface GroupImportContext {
   readonly transformStr: string;
   readonly transform: TransformState;
-  readonly baseStyle: Partial<BroadsetElementStyleInput>;
+  readonly baseStyle: SvgSourceStyle;
   readonly ownDataBsId: string | undefined;
   readonly ownDataBsKind: string | undefined;
   readonly tagMeta: Readonly<{
@@ -248,7 +247,7 @@ function importElement(
   const strokeStyle = readInheritedStrokeStyle(el);
   const effectiveClipPath = maskPath ?? clipPath;
   const isFillFromGradientOrPattern = gradient !== undefined || pattern !== undefined;
-  const baseStyle: Partial<BroadsetElementStyleInput> = {
+  const baseStyle: SvgSourceStyle = {
     ...(effectiveClipPath !== undefined ? { customClipPath: effectiveClipPath } : undefined),
     ...(maskPath !== undefined ? { maskType: 'alpha' } : undefined),
     ...(pattern !== undefined ? { fill: pattern } : undefined),

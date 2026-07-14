@@ -7,7 +7,7 @@ import * as fontkit from 'fontkit';
  * subsetting, and PPTX font embedding per the asset-pipeline plan.
  *
  * Inputs are `Uint8Array` bytes plus an iterable of codepoints; the
- * caller resolves `FontAsset.source` to bytes before invoking. This
+ * caller resolves a font resource to bytes before invoking. This
  * keeps the subsetter pure: no async / network / ZIP access, and
  * safe to invoke from sync export pipelines.
  *
