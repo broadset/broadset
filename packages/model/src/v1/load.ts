@@ -66,7 +66,7 @@ export function parseProjectV1Unknown(input: unknown): ProjectParseResult {
     const violation = inspectProjectV1Unknown(input);
 
     if (violation !== undefined) return createLimitResult(violation);
-  } catch (error) {
+  } catch (error: unknown) {
     return {
       status: 'quarantined',
       diagnostics: [
@@ -86,7 +86,7 @@ export function parseProjectV1Unknown(input: unknown): ProjectParseResult {
 
   try {
     structural = broadsetProjectV1Schema.safeParse(input);
-  } catch (error) {
+  } catch (error: unknown) {
     return {
       status: 'quarantined',
       diagnostics: [
@@ -108,7 +108,7 @@ export function parseProjectV1Unknown(input: unknown): ProjectParseResult {
 
   try {
     semanticDiagnostics = validateBroadsetProjectV1Semantics(structural.data);
-  } catch (error) {
+  } catch (error: unknown) {
     return {
       status: 'quarantined',
       diagnostics: [
@@ -149,7 +149,7 @@ export function loadProjectV1Json(originalText: string, options: ProjectLoadOpti
 
   try {
     input = JSON.parse(originalText) as unknown;
-  } catch (error) {
+  } catch (error: unknown) {
     return Promise.resolve({
       status: 'quarantined',
       originalText,

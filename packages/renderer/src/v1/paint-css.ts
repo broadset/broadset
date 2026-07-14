@@ -1,8 +1,6 @@
 import type { projectFormatV1 } from '@broadset/model';
 
-// v1 model types are reached through the `projectFormatV1` namespace: several color names (`Swatch`,
-// `ColorSpace`) collide with legacy exports at the `@broadset/model` barrel root and would otherwise
-// resolve to the legacy symbol during the migration coexistence window.
+// Keep v1 ownership explicit at the rendering boundary.
 type ColorValue = projectFormatV1.ColorValue;
 type ConcreteColorValue = projectFormatV1.ConcreteColorValue;
 type ColorAdjustment = projectFormatV1.ColorAdjustment;

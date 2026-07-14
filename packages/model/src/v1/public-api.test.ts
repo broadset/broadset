@@ -188,7 +188,7 @@ type NamespaceV1CollisionTypeInventory = readonly [
   projectFormatV1.VideoAsset,
 ];
 
-type RootLegacyCollisionTypeInventory = readonly [
+type RootV1CollisionTypeInventory = readonly [
   PublicTypes.Asset,
   PublicTypes.AssetBase,
   PublicTypes.AssetKind,
@@ -208,7 +208,7 @@ type RootLegacyCollisionTypeInventory = readonly [
   PublicTypes.VideoAsset,
 ];
 
-const ROOT_LEGACY_RUNTIME_COLLISIONS = {
+const ROOT_V1_RUNTIME_COLLISIONS = {
   assetSchema: packageRoot.assetSchema,
   elementSchema: packageRoot.elementSchema,
   keyframeSchema: packageRoot.keyframeSchema,
@@ -283,26 +283,23 @@ function createMinimalProject(): PublicTypes.BroadsetProjectV1 {
 }
 
 describe('v1 package public API', () => {
-  it('locks the exact public symbol inventory and legacy collision boundary', () => {
+  it('publishes collision-prone v1 names directly and through the namespace', () => {
     const compileTimeTypes: PackageRootV1TypeInventory | undefined = undefined;
     const compileTimeNamespacedTypes: NamespaceV1CollisionTypeInventory | undefined = undefined;
-    const compileTimeLegacyTypes: RootLegacyCollisionTypeInventory | undefined = undefined;
-    const expectedDirectExports = V1_RUNTIME_EXPORT_NAMES.filter(
-      (name) => !V1_RUNTIME_COLLISION_NAMES.some((collision) => collision === name),
-    );
+    const compileTimeRootCollisionTypes: RootV1CollisionTypeInventory | undefined = undefined;
 
     expect(compileTimeTypes).toBeUndefined();
     expect(compileTimeNamespacedTypes).toBeUndefined();
-    expect(compileTimeLegacyTypes).toBeUndefined();
+    expect(compileTimeRootCollisionTypes).toBeUndefined();
     expect(Object.keys(projectFormatV1)).toHaveLength(V1_RUNTIME_EXPORT_NAMES.length);
     expect(new Set(Object.keys(projectFormatV1))).toEqual(new Set(V1_RUNTIME_EXPORT_NAMES));
-    expect(Object.keys(ROOT_LEGACY_RUNTIME_COLLISIONS)).toEqual(V1_RUNTIME_COLLISION_NAMES);
+    expect(Object.keys(ROOT_V1_RUNTIME_COLLISIONS)).toEqual(V1_RUNTIME_COLLISION_NAMES);
     expect(Object.keys(NAMESPACE_V1_RUNTIME_COLLISIONS)).toEqual(V1_RUNTIME_COLLISION_NAMES);
     expect([...V1_TYPE_COLLISION_NAMES, ...V1_RUNTIME_COLLISION_NAMES]).toEqual(V1_PUBLIC_NAME_COLLISIONS);
-    expect(Object.keys(packageRoot)).toEqual(expect.arrayContaining(expectedDirectExports));
+    expect(Object.keys(packageRoot)).toEqual(expect.arrayContaining([...V1_RUNTIME_EXPORT_NAMES]));
 
     for (const name of V1_RUNTIME_COLLISION_NAMES) {
-      expect(ROOT_LEGACY_RUNTIME_COLLISIONS[name]).not.toBe(NAMESPACE_V1_RUNTIME_COLLISIONS[name]);
+      expect(ROOT_V1_RUNTIME_COLLISIONS[name]).toBe(NAMESPACE_V1_RUNTIME_COLLISIONS[name]);
     }
 
     expect('createMinimalProjectV1' in projectFormatV1).toBe(false);

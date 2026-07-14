@@ -5,8 +5,9 @@ import { createSemanticError } from './semantic-validation-helpers';
 
 function readProjectedId(value: object): string | undefined {
   const descriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(value, 'id');
+  const descriptorValue: unknown = descriptor?.value;
 
-  return typeof descriptor?.value === 'string' ? descriptor.value : undefined;
+  return typeof descriptorValue === 'string' ? descriptorValue : undefined;
 }
 
 function escapePointerSegment(segment: string): string {
@@ -63,7 +64,9 @@ export function validateProjectedIdUniqueness(project: BroadsetProjectV1): reado
       continue;
     }
 
-    Object.entries(frame.value).forEach(([key, value]) => {
+    const entries: ReadonlyArray<readonly [string, unknown]> = Object.entries(frame.value);
+
+    entries.forEach(([key, value]: readonly [string, unknown]) => {
       if (isOpaqueJsonProperty(key)) return;
       stack.push({ value, pointer: `${frame.pointer}/${escapePointerSegment(key)}` });
     });
