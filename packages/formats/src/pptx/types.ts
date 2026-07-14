@@ -16,6 +16,10 @@ export interface PptxImportOptions {
   readonly maxEntries?: number;
   readonly maxTotalUncompressedBytes?: number;
   readonly maxDepth?: number;
+  readonly authoredSurface?: {
+    readonly unit: 'px' | 'mm' | 'in';
+    readonly dpi: number;
+  };
 }
 
 type PptxImportWarningCode =

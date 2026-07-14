@@ -157,9 +157,22 @@ export async function mapPptxElementsV1(input: {
   readonly fontRegistry: PptxFontRegistryV1;
 }): Promise<readonly MappedPptxElementV1[]> {
   const ids = new Map<string, projectFormatV1.Id>();
+  const usedIds = new Set<projectFormatV1.Id>();
 
   input.document.elements.forEach((element, index) => {
-    ids.set(element.id, projectFormatV1.idSchema.parse(`pptx-element-${String(index + 1)}`));
+    const parsed = projectFormatV1.idSchema.safeParse(element.id);
+    let candidate = projectFormatV1.idSchema.parse(`pptx-element-${String(index + 1)}`);
+    let suffix = 1;
+
+    if (parsed.success && !usedIds.has(parsed.data)) candidate = parsed.data;
+
+    while (usedIds.has(candidate)) {
+      candidate = projectFormatV1.idSchema.parse(`pptx-element-${String(index + 1)}-${String(suffix)}`);
+      suffix += 1;
+    }
+
+    ids.set(element.id, candidate);
+    usedIds.add(candidate);
   });
 
   const mapped: MappedPptxElementV1[] = [];

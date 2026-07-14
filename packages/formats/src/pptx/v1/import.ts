@@ -6,10 +6,13 @@ import {
   createResourceCollectorV1,
   type ProjectImportResultV1,
 } from '../../v1';
+import { readOoxmlPackageWithCaps } from '../ooxml/zip';
 import { importPptxSourceWithReport } from '../source-import';
 import type { PptxImportOptions, PptxImportWarning } from '../types';
 import { createPptxFontRegistryV1 } from './font-registry';
 import { type MappedPptxElementV1, mapPptxElementsV1 } from './map-elements';
+import { collectMetadataBlobs, readProjectMetadataV1 } from './metadata';
+import { reconcileMetadataProjectV1 } from './reconcile-metadata';
 
 const IMPORTER_VERSION = 'broadset-pptx-v1/1';
 const PROJECT_ID = projectFormatV1.idSchema.parse('pptx-import-project');
@@ -203,13 +206,37 @@ function pages(input: {
   });
 }
 
+interface PptxMetadataContextV1 {
+  readonly pkg: ReturnType<typeof readOoxmlPackageWithCaps>['pkg'];
+  readonly project: projectFormatV1.BroadsetProjectV1;
+}
+
+async function readMetadataContextV1(
+  bytes: Uint8Array,
+  options: PptxImportOptions,
+): Promise<PptxMetadataContextV1 | undefined> {
+  try {
+    const pkg = readOoxmlPackageWithCaps(bytes, options).pkg;
+    const project = await readProjectMetadataV1(pkg);
+
+    return project === undefined ? undefined : { pkg, project };
+  } catch {
+    return undefined;
+  }
+}
+
 async function buildResult(input: {
   readonly bytes: Uint8Array;
   readonly fileName: string | undefined;
   readonly importedAt: projectFormatV1.UtcTimestamp;
   readonly options: PptxImportOptions;
 }): Promise<ProjectImportResultV1> {
-  const report = importPptxSourceWithReport(input.bytes, input.options);
+  const metadata = await readMetadataContextV1(input.bytes, input.options);
+  const authoredSurface = metadata?.project.documents[0]?.surface;
+  const report = importPptxSourceWithReport(input.bytes, {
+    ...input.options,
+    ...(authoredSurface === undefined ? {} : { authoredSurface: { unit: authoredSurface.unit, dpi: authoredSurface.dpi } }),
+  });
   const width = Math.max(1, report.document.canvas.width);
   const height = Math.max(1, report.document.canvas.height);
   const resources = createResourceCollectorV1();
@@ -219,6 +246,30 @@ async function buildResult(input: {
   });
   const mappedElements = await mapPptxElementsV1({ document: report.document, resources, fontRegistry: fonts });
   const mapped = mappedElements.length === 0 ? [fallbackRoot(width, height)] : mappedElements;
+  const currentDocument = projectFormatV1.createDocumentV1({
+    id: DOCUMENT_ID,
+    name: projectName(input.fileName),
+    surface: {
+      ...projectFormatV1.createDefaultSurface(),
+      size: [width, height],
+      unit: report.document.canvas.unit,
+      dpi: report.document.canvas.dpi,
+    },
+    elements: mapped.map(({ element }) => element),
+    pages: pages({ sourcePages: report.document.pages, sourceElements: report.document.elements, mapped }),
+  });
+
+  if (metadata !== undefined) {
+    const reconciled = reconcileMetadataProjectV1({
+      preservedProject: metadata.project,
+      currentDocument,
+      currentResources: resources.collect(),
+      preservedBlobs: collectMetadataBlobs(metadata.pkg, metadata.project),
+    });
+
+    if (reconciled !== undefined) return reconciled;
+  }
+
   const sourceAssetId = await resources.addForeignAsset({
     bytes: input.bytes,
     mediaType: PPTX_MEDIA_TYPE,
@@ -250,23 +301,10 @@ async function buildResult(input: {
     });
   }
 
-  const document = projectFormatV1.createDocumentV1({
-    id: DOCUMENT_ID,
-    name: projectName(input.fileName),
-    surface: {
-      ...projectFormatV1.createDefaultSurface(),
-      size: [width, height],
-      unit: report.document.canvas.unit,
-      dpi: report.document.canvas.dpi,
-    },
-    elements: mapped.map(({ element }) => element),
-    pages: pages({ sourcePages: report.document.pages, sourceElements: report.document.elements, mapped }),
-  });
-
   return assembleImportedProjectV1({
     id: PROJECT_ID,
     name: projectName(input.fileName),
-    document,
+    document: currentDocument,
     resources: resources.collect(),
     interop: interop.build(),
   });

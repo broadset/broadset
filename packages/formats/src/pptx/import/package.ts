@@ -4,6 +4,7 @@ import { parseRelationshipsXml } from '../ooxml/relationships';
 import { emuToMm } from '../ooxml/units';
 import { type OoxmlPackage, readTextPart } from '../ooxml/zip';
 import type { PptxSourceCanvas } from '../project-model';
+import type { PptxImportOptions } from '../types';
 
 /**
  * Package-level resolution — given an OoxmlPackage, find the slide
@@ -32,10 +33,10 @@ const DEFAULT_CANVAS: PptxSourceCanvas = {
   backgroundMode: 'solid',
 };
 
-export function resolvePackage(pkg: OoxmlPackage): ResolvedPackage {
+export function resolvePackage(pkg: OoxmlPackage, authoredSurface?: PptxImportOptions['authoredSurface']): ResolvedPackage {
   const presXml = readTextPart(pkg, 'ppt/presentation.xml') ?? '';
   const presRelsXml = readTextPart(pkg, 'ppt/_rels/presentation.xml.rels') ?? '';
-  const canvas = parsePptxSourceCanvasFromPresentation(presXml);
+  const canvas = parsePptxSourceCanvasFromPresentation(presXml, authoredSurface);
   const presRels = parseRelationshipsXml(presRelsXml);
 
   const slidePaths: string[] = [];
@@ -82,7 +83,10 @@ export function resolvePackage(pkg: OoxmlPackage): ResolvedPackage {
   return { slidePaths, slideRelsByPath, canvas, themePath, masterPath, layoutPaths };
 }
 
-function parsePptxSourceCanvasFromPresentation(xml: string): PptxSourceCanvas {
+function parsePptxSourceCanvasFromPresentation(
+  xml: string,
+  authoredSurface?: PptxImportOptions['authoredSurface'],
+): PptxSourceCanvas {
   const root = rootElement(parseOoxml(xml));
 
   if (root === null) return DEFAULT_CANVAS;
@@ -96,11 +100,22 @@ function parsePptxSourceCanvasFromPresentation(xml: string): PptxSourceCanvas {
 
   if (cx <= 0 || cy <= 0) return DEFAULT_CANVAS;
 
+  const dpi = authoredSurface?.dpi ?? 72;
+  const unit = authoredSurface?.unit ?? 'mm';
+  const widthMm = emuToMm(cx);
+  const heightMm = emuToMm(cy);
+  const unitLength = (millimetres: number): number => {
+    if (unit === 'in') return millimetres / 25.4;
+    if (unit === 'px') return (millimetres / 25.4) * dpi;
+
+    return millimetres;
+  };
+
   return {
-    width: emuToMm(cx),
-    height: emuToMm(cy),
-    unit: 'mm',
-    dpi: 72,
+    width: unitLength(widthMm),
+    height: unitLength(heightMm),
+    unit,
+    dpi,
     padding: [0, 0, 0, 0],
     backgroundMode: 'solid',
   };

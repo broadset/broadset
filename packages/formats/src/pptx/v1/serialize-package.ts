@@ -5,6 +5,14 @@ import { OOXML_CONTENT_TYPES, OOXML_REL_TYPES } from '../ooxml/namespaces';
 import { buildRelationshipsXml, RelationshipAllocator } from '../ooxml/relationships';
 import { escapeXmlAttribute, XML_DECLARATION } from '../ooxml/xml';
 import { encodeText, writeOoxmlPackage } from '../ooxml/zip';
+import {
+  BROADSET_CUSTOM_PROPERTIES_PART,
+  BROADSET_INTEROP_PART,
+  BROADSET_PROJECT_PART,
+  buildCustomPropertiesXml,
+  buildInteropMetadataXml,
+  buildProjectMetadataXml,
+} from './metadata';
 import { type PptxV1SerializeWarning, serializeSlideV1 } from './serialize-shapes';
 
 interface SerializePptxProjectV1Options {
@@ -12,6 +20,7 @@ interface SerializePptxProjectV1Options {
   readonly document: projectFormatV1.BroadsetDocumentV1;
   readonly pages: readonly projectFormatV1.PageDefinition[];
   readonly resolveBlob: (digest: projectFormatV1.Sha256Digest) => Promise<Uint8Array | undefined>;
+  readonly exportedAt: number;
 }
 
 export interface SerializedPptxProjectV1 {
@@ -125,9 +134,9 @@ async function attachFonts(options: {
       continue;
     }
 
-    const index = entries.length + 1;
-    const path = `ppt/fonts/font${String(index)}.fntdata`;
-    const relationshipId = options.relationships.add(OOXML_REL_TYPES.font, `fonts/font${String(index)}.fntdata`);
+    const digestName = asset.blob.digest.slice('sha256:'.length);
+    const path = `ppt/fonts/broadset-${digestName}.fntdata`;
+    const relationshipId = options.relationships.add(OOXML_REL_TYPES.font, `fonts/broadset-${digestName}.fntdata`);
 
     options.parts.set(path, bytes);
     options.contentTypes.addOverride(`/${path}`, OOXML_CONTENT_TYPES.font);
@@ -148,6 +157,8 @@ export async function serializePptxProjectV1(options: SerializePptxProjectV1Opti
 
   presentationRelationships.add(OOXML_REL_TYPES.slideMaster, 'slideMasters/slideMaster1.xml');
   presentationRelationships.add(OOXML_REL_TYPES.theme, 'theme/theme1.xml');
+  presentationRelationships.add(OOXML_REL_TYPES.customXml, '../customXml/broadset-project.xml');
+  presentationRelationships.add(OOXML_REL_TYPES.customXml, '../customXml/broadset-interop.xml');
   registerStaticParts(parts, contentTypes);
 
   for (let index = 0; index < options.pages.length; index += 1) {
@@ -192,10 +203,22 @@ export async function serializePptxProjectV1(options: SerializePptxProjectV1Opti
   );
   parts.set('ppt/_rels/presentation.xml.rels', encodeText(buildRelationshipsXml(presentationRelationships.entries())));
   contentTypes.addOverride('/ppt/presentation.xml', OOXML_CONTENT_TYPES.presentation);
+  parts.set(BROADSET_PROJECT_PART, encodeText(buildProjectMetadataXml(options.project)));
+  parts.set(BROADSET_INTEROP_PART, encodeText(buildInteropMetadataXml(options.project.interop)));
+  parts.set(
+    BROADSET_CUSTOM_PROPERTIES_PART,
+    encodeText(
+      buildCustomPropertiesXml({ project: options.project, document: options.document, exportedAt: options.exportedAt }),
+    ),
+  );
+  contentTypes.addOverride(BROADSET_PROJECT_PART, OOXML_CONTENT_TYPES.customXml);
+  contentTypes.addOverride(BROADSET_INTEROP_PART, OOXML_CONTENT_TYPES.customXml);
+  contentTypes.addOverride(BROADSET_CUSTOM_PROPERTIES_PART, OOXML_CONTENT_TYPES.customProperties);
 
   const rootRelationships = new RelationshipAllocator();
 
   rootRelationships.add(OOXML_REL_TYPES.officeDocument, 'ppt/presentation.xml');
+  rootRelationships.add(OOXML_REL_TYPES.customProperties, BROADSET_CUSTOM_PROPERTIES_PART);
   parts.set('_rels/.rels', encodeText(buildRelationshipsXml(rootRelationships.entries())));
   parts.set('[Content_Types].xml', encodeText(contentTypes.build()));
 

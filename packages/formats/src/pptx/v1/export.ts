@@ -4,8 +4,6 @@ import { type SerializedPptxProjectV1, serializePptxProjectV1 } from './serializ
 import type { PptxV1SerializeWarning } from './serialize-shapes';
 
 interface PptxExportOptionsV1 {
-  readonly preserveBroadsetMetadata?: boolean;
-  readonly includeInteropLedger?: boolean;
   readonly exportedAt?: number;
 }
 
@@ -63,6 +61,7 @@ async function fallback(message: string): Promise<PptxExportReportV1> {
       document,
       pages: document.pages,
       resolveBlob: (): Promise<undefined> => Promise.resolve(undefined),
+      exportedAt: 0,
     });
 
     return { bytes: result.bytes, warnings: [exportWarning(message), ...result.warnings] };
@@ -108,6 +107,7 @@ export async function exportPptxWithReportV1(input: PptxExportInputV1): Promise<
       document,
       pages,
       resolveBlob: (digest): Promise<Uint8Array | undefined> => resolveBlobBytes(input, digest),
+      exportedAt: input.options?.exportedAt ?? 0,
     });
 
     return result;

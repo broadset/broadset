@@ -69,7 +69,7 @@ export function importPptxSourceWithReport(data: Uint8Array, options?: PptxImpor
   }
 
   const fontAssets = extractEmbeddedFonts(pkg);
-  const operatorLevel = importOperatorLevel(pkg);
+  const operatorLevel = importOperatorLevel(pkg, options?.authoredSurface);
 
   return { document: operatorLevel.document, warnings: [...warnings, ...operatorLevel.warnings], fontAssets };
 }
@@ -135,8 +135,8 @@ interface OperatorSlide {
   readonly elements: readonly PptxSourceElement[];
 }
 
-function importOperatorLevel(pkg: OoxmlPackage): OperatorLevelResult {
-  const resolved = resolvePackage(pkg);
+function importOperatorLevel(pkg: OoxmlPackage, authoredSurface?: PptxImportOptions['authoredSurface']): OperatorLevelResult {
+  const resolved = resolvePackage(pkg, authoredSurface);
   const warnings: PptxImportWarning[] = [];
 
   if (resolved.slidePaths.length === 0) {

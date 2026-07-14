@@ -5,7 +5,7 @@ import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { exportPptxBytesV1, exportPptxWithReportV1, importPptxProjectV1 } from '../../index';
-import { readOoxmlPackage, readTextPart } from '../ooxml/zip';
+import { encodeText, readOoxmlPackage, readTextPart, writeOoxmlPackage } from '../ooxml/zip';
 
 const IMPORTED_AT = projectFormatV1.utcTimestampSchema.parse('2026-07-12T00:00:00Z');
 const PNG_BYTES = Uint8Array.from(
@@ -202,6 +202,50 @@ describe('exportPptxBytesV1', () => {
     expect(slide).toContain('u="sng"');
     expect(slide).toContain('typeface="Arial"');
     expect([...pkg.keys()].some((path: string): boolean => path.startsWith('ppt/media/'))).toBe(true);
+    expectValid(imported);
+  });
+
+  it('writes the standard custom XML carriers and preserves authored surface units on re-import', async () => {
+    const input = testProject();
+    const bytes = await exportPptxBytesV1({ ...input, options: { exportedAt: 0 } });
+    const pkg = readOoxmlPackage(bytes);
+    const slide = readTextPart(pkg, 'ppt/slides/slide1.xml') ?? '';
+    const relationships = readTextPart(pkg, 'ppt/_rels/presentation.xml.rels') ?? '';
+    const contentTypes = readTextPart(pkg, '[Content_Types].xml') ?? '';
+    const imported = await importPptxProjectV1({ bytes, importedAt: IMPORTED_AT });
+    const rectangle = imported.project.documents[0]?.elements.find(({ id: elementId }) => elementId === id('rectangle'));
+    const matrix = rectangle?.geometry.transform.kind === 'affine2d' ? rectangle.geometry.transform.matrix : undefined;
+
+    expect(readTextPart(pkg, 'customXml/broadset-project.xml')).toContain('<bset:canonicalJson>');
+    expect(readTextPart(pkg, 'customXml/broadset-interop.xml')).toContain('<bset:interopJson>');
+    expect(readTextPart(pkg, 'docProps/custom.xml')).toContain('https://broadset.io/ns/xmp/1.0/');
+    expect(relationships.match(/relationships\/customXml/gu)).toHaveLength(2);
+    expect(contentTypes).toContain('/customXml/broadset-project.xml');
+    expect(contentTypes).toContain('/customXml/broadset-interop.xml');
+    expect(slide).toContain('name="BSET:rectangle:vector"');
+    expect(slide).toContain('{broadset-element-ext}');
+    expect(imported.project.documents[0]?.surface).toMatchObject({ unit: 'px', dpi: 72, size: [320, 180] });
+    expect(matrix?.[4]).toBeCloseTo(20, 5);
+    expect(matrix?.[5]).toBeCloseTo(30, 5);
+    expectValid(imported);
+  });
+
+  it('reconciles an externally moved tagged shape over preserved custom XML metadata', async () => {
+    const input = testProject();
+    const bytes = await exportPptxBytesV1({ ...input, options: { exportedAt: 0 } });
+    const pkg = new Map(readOoxmlPackage(bytes));
+    const slide = readTextPart(pkg, 'ppt/slides/slide1.xml') ?? '';
+    const moved = slide.replace('<a:off x="254000" y="381000"/>', '<a:off x="1016000" y="381000"/>');
+
+    expect(moved).not.toBe(slide);
+    pkg.set('ppt/slides/slide1.xml', encodeText(moved));
+
+    const imported = await importPptxProjectV1({ bytes: writeOoxmlPackage(pkg), importedAt: IMPORTED_AT });
+    const rectangle = imported.project.documents[0]?.elements.find(({ id: elementId }) => elementId === id('rectangle'));
+    const matrix = rectangle?.geometry.transform.kind === 'affine2d' ? rectangle.geometry.transform.matrix : undefined;
+
+    expect(matrix?.[4]).toBeCloseTo(80, 5);
+    expect(matrix?.[5]).toBeCloseTo(30, 5);
     expectValid(imported);
   });
 

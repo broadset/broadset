@@ -3,6 +3,8 @@ import type { projectFormatV1 } from '@broadset/model';
 import { OOXML_REL_TYPES } from '../ooxml/namespaces';
 import { RelationshipAllocator } from '../ooxml/relationships';
 import { escapeXmlAttribute, escapeXmlText } from '../ooxml/xml';
+import { buildElementExt } from '../semantic/element-ext';
+import { encodeShapeName } from '../semantic/shape-name';
 
 export interface PptxV1SerializeWarning {
   readonly code: 'v1-adapter-loss';
@@ -132,13 +134,14 @@ function fillXml(ctx: ShapeContext, element: projectFormatV1.Element): string {
 }
 
 function nonVisualXml(shapeId: number, element: projectFormatV1.Element, kind: 'sp' | 'pic'): string {
-  const name = escapeXmlAttribute(element.name);
+  const name = escapeXmlAttribute(encodeShapeName({ id: element.id, kind: element.kind }));
+  const extension = `<p:extLst>${buildElementExt({ id: element.id, kind: element.kind, dirty: false })}</p:extLst>`;
 
   if (kind === 'pic') {
-    return `<p:nvPicPr><p:cNvPr id="${String(shapeId)}" name="${name}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`;
+    return `<p:nvPicPr><p:cNvPr id="${String(shapeId)}" name="${name}">${extension}</p:cNvPr><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`;
   }
 
-  return `<p:nvSpPr><p:cNvPr id="${String(shapeId)}" name="${name}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>`;
+  return `<p:nvSpPr><p:cNvPr id="${String(shapeId)}" name="${name}">${extension}</p:cNvPr><p:cNvSpPr/><p:nvPr/></p:nvSpPr>`;
 }
 
 function paragraphAlignment(alignment: projectFormatV1.ParagraphProperties['alignment']): string {
@@ -235,7 +238,7 @@ async function imageXml(ctx: ShapeContext, element: projectFormatV1.ImageElement
   }
 
   const extension = imageExtension(asset.blob.mediaType);
-  const path = `ppt/media/image${String(ctx.media.size + 1)}.${extension}`;
+  const path = `ppt/media/broadset-${asset.blob.digest.slice('sha256:'.length)}.${extension}`;
   const relId = ctx.relationships.add(OOXML_REL_TYPES.image, `../media/${path.split('/').pop() ?? ''}`);
 
   ctx.media.set(path, bytes);
@@ -255,7 +258,10 @@ async function elementXml(ctx: ShapeContext, element: projectFormatV1.Element): 
     '<a:chOff x="0" y="0"/><a:chExt cx="914400" cy="914400"/></a:xfrm>',
   );
 
-  return `<p:grpSp><p:nvGrpSpPr><p:cNvPr id="${String(ctx.ids.next())}" name="${escapeXmlAttribute(element.name)}"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr>${xfrm}</p:grpSpPr>${childXml}</p:grpSp>`;
+  const name = escapeXmlAttribute(encodeShapeName({ id: element.id, kind: element.kind }));
+  const extension = `<p:extLst>${buildElementExt({ id: element.id, kind: element.kind, dirty: false })}</p:extLst>`;
+
+  return `<p:grpSp><p:nvGrpSpPr><p:cNvPr id="${String(ctx.ids.next())}" name="${name}">${extension}</p:cNvPr><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr>${xfrm}</p:grpSpPr>${childXml}</p:grpSp>`;
 }
 
 export async function serializeSlideV1(options: SerializeSlideOptions): Promise<SerializedSlideV1> {
