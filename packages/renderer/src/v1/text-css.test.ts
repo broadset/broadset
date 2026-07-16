@@ -202,6 +202,22 @@ describe('runToStyle', () => {
     expect(runToStyle(run(), fonts, NO_SWATCHES).fontFamily).toBe('"Open Sans"');
   });
 
+  it('escapes quotes and backslashes in a quoted font family', () => {
+    const fonts = new Map<projectFormatV1.Id, projectFormatV1.FontFamilyResource>([
+      [FONT_FAMILY_ID, { id: FONT_FAMILY_ID, familyName: 'Open "Display" \\ Pro', fallbackFontIds: [], faces: [] }],
+    ]);
+
+    expect(runToStyle(run(), fonts, NO_SWATCHES).fontFamily).toBe('"Open \\"Display\\" \\\\ Pro"');
+  });
+
+  it('quotes a font family containing a CSS string special character', () => {
+    const fonts = new Map<projectFormatV1.Id, projectFormatV1.FontFamilyResource>([
+      [FONT_FAMILY_ID, { id: FONT_FAMILY_ID, familyName: 'Display"Pro', fallbackFontIds: [], faces: [] }],
+    ]);
+
+    expect(runToStyle(run(), fonts, NO_SWATCHES).fontFamily).toBe('"Display\\"Pro"');
+  });
+
   it('omits fontFamily when the resource id is unresolved', () => {
     expect(runToStyle(run(), NO_FONTS, NO_SWATCHES)).not.toHaveProperty('fontFamily');
   });

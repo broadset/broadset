@@ -49,12 +49,20 @@ function pixels(value: number): string {
   return `${formatCssNumber(value)}${PIXEL_UNIT}`;
 }
 
+function quotedCssString(value: string): string {
+  const escaped = value.replaceAll('\\', '\\\\').replaceAll(QUOTATION_MARK, `\\${QUOTATION_MARK}`);
+
+  return `${QUOTATION_MARK}${escaped}${QUOTATION_MARK}`;
+}
+
+function requiresQuotedCssString(value: string): boolean {
+  return WHITESPACE_PATTERN.test(value) || value.includes(QUOTATION_MARK) || value.includes("'") || value.includes('\\');
+}
+
 function fontFamilyToCss(font: FontFamilyResource | undefined): string | undefined {
   if (font === undefined) return undefined;
 
-  return WHITESPACE_PATTERN.test(font.familyName)
-    ? `${QUOTATION_MARK}${font.familyName}${QUOTATION_MARK}`
-    : font.familyName;
+  return requiresQuotedCssString(font.familyName) ? quotedCssString(font.familyName) : font.familyName;
 }
 
 function decorationLine(run: RunProperties): string | undefined {
