@@ -55,6 +55,7 @@ export {
   exportPsdBytesAsync,
   exportPsdBytesAsyncWithPreflight,
   importPsd,
+  importPsdProjectV1,
   type PsdExportOptions,
   type PsdExportResult,
   type PsdImportOptions,
