@@ -90,6 +90,7 @@ export {
   type FontEmbedChoice,
   fontEmbedChoiceSchema,
   importSvg,
+  importSvgProjectV1,
   reconcileSvg,
   type ReconcileSvgInput,
   SVG_BROADSET_NAMESPACE,

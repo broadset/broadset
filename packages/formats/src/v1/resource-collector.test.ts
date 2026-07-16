@@ -74,6 +74,30 @@ describe('createResourceCollectorV1', () => {
     expect(collection.blobs).toHaveLength(1);
   });
 
+  it('registers content-addressed vector assets with intrinsic bounds', async () => {
+    const collector = createResourceCollectorV1();
+    const bytes = new TextEncoder().encode('<svg/>');
+    const digest = await computeSha256DigestV1(bytes);
+
+    const assetId = await collector.addVectorAsset({
+      bytes,
+      mediaType: 'image/svg+xml',
+      name: 'source.svg',
+      intrinsicBounds: { x: 0, y: 0, width: 20, height: 10 },
+    });
+    const collection = collector.collect();
+
+    expect(assetId).toBe(id(`vector-${digest.slice('sha256:'.length)}`));
+    expect(collection.resources.assets).toContainEqual(
+      expect.objectContaining({
+        id: assetId,
+        kind: 'vector',
+        metadata: { intrinsicBounds: { x: 0, y: 0, width: 20, height: 10 } },
+      }),
+    );
+    expect(Array.from(collection.blobs.get(digest) ?? [])).toEqual(Array.from(bytes));
+  });
+
   it('normalizes malformed media types to schema-valid asset defaults', async () => {
     const collector = createResourceCollectorV1();
 

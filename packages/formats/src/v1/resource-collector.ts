@@ -1,7 +1,7 @@
 import type { projectFormatV1 as ProjectFormatV1 } from '@broadset/model';
 import { projectFormatV1 } from '@broadset/model';
 
-import { packageBlobReferenceV1 } from './blob-reference';
+import { computeSha256DigestV1, packageBlobReferenceV1 } from './blob-reference';
 
 const DIGEST_PREFIX = 'sha256:';
 const DEFAULT_PIXEL_SIZE = 1;
@@ -22,11 +22,25 @@ export interface ResourceCollectorV1 {
     readonly id?: ProjectFormatV1.Id;
     readonly pixelSize?: readonly [number, number];
   }): Promise<ProjectFormatV1.Id>;
+  addMissingImageAsset(input: {
+    readonly reference: string;
+    readonly mediaType?: string;
+    readonly name?: string;
+    readonly id?: ProjectFormatV1.Id;
+    readonly pixelSize?: readonly [number, number];
+  }): Promise<ProjectFormatV1.Id>;
   addFontAsset(input: {
     readonly bytes: Uint8Array;
     readonly mediaType: string;
     readonly name?: string;
     readonly id?: ProjectFormatV1.Id;
+  }): Promise<ProjectFormatV1.Id>;
+  addVectorAsset(input: {
+    readonly bytes: Uint8Array;
+    readonly mediaType: string;
+    readonly name?: string;
+    readonly id?: ProjectFormatV1.Id;
+    readonly intrinsicBounds: ProjectFormatV1.AssetIntrinsicMetadata['intrinsicBounds'];
   }): Promise<ProjectFormatV1.Id>;
   addFontFamily(input: {
     readonly familyName: string;
@@ -99,6 +113,41 @@ export function createResourceCollectorV1(): ResourceCollectorV1 {
     return assetId;
   }
 
+  async function addMissingImageAsset(input: {
+    readonly reference: string;
+    readonly mediaType?: string;
+    readonly name?: string;
+    readonly id?: ProjectFormatV1.Id;
+    readonly pixelSize?: readonly [number, number];
+  }): Promise<ProjectFormatV1.Id> {
+    const digest = await computeSha256DigestV1(new TextEncoder().encode(input.reference));
+    const assetId = input.id ?? contentAddressedId('asset', digest);
+    const [pixelWidth, pixelHeight] = input.pixelSize ?? [DEFAULT_PIXEL_SIZE, DEFAULT_PIXEL_SIZE];
+    const asset: ProjectFormatV1.ImageAsset = {
+      id: assetId,
+      kind: 'image',
+      name: validName(input.name, 'External image'),
+      blob: {
+        digest,
+        byteLength: 0,
+        mediaType: input.mediaType ?? 'application/octet-stream',
+        source: { kind: 'missing', ...(input.reference === '' ? {} : { lastKnownName: input.reference }) },
+      },
+      metadata: {
+        pixelWidth: positiveInteger(pixelWidth),
+        pixelHeight: positiveInteger(pixelHeight),
+        orientation: 1,
+        hasAlpha: false,
+        bitDepth: DEFAULT_BIT_DEPTH,
+        colorModel: 'unknown',
+      },
+    };
+
+    if (!assets.has(assetId)) assets.set(assetId, asset);
+
+    return assetId;
+  }
+
   async function addFontAsset(input: {
     readonly bytes: Uint8Array;
     readonly mediaType: string;
@@ -125,6 +174,30 @@ export function createResourceCollectorV1(): ResourceCollectorV1 {
         unicodeCoverage: [],
         embeddingPermissions: 'restricted',
       },
+    };
+
+    blobs.set(blob.digest, bytes);
+    if (!assets.has(assetId)) assets.set(assetId, asset);
+
+    return assetId;
+  }
+
+  async function addVectorAsset(input: {
+    readonly bytes: Uint8Array;
+    readonly mediaType: string;
+    readonly name?: string;
+    readonly id?: ProjectFormatV1.Id;
+    readonly intrinsicBounds: ProjectFormatV1.AssetIntrinsicMetadata['intrinsicBounds'];
+  }): Promise<ProjectFormatV1.Id> {
+    const bytes = Uint8Array.from(input.bytes);
+    const blob = await packageBlobReferenceV1(bytes, input.mediaType);
+    const assetId = input.id ?? contentAddressedId('vector', blob.digest);
+    const asset: ProjectFormatV1.VectorAsset = {
+      id: assetId,
+      kind: 'vector',
+      name: validName(input.name, 'Imported vector'),
+      blob,
+      metadata: { intrinsicBounds: input.intrinsicBounds },
     };
 
     blobs.set(blob.digest, bytes);
@@ -168,5 +241,5 @@ export function createResourceCollectorV1(): ResourceCollectorV1 {
     };
   }
 
-  return { addImageAsset, addFontAsset, addFontFamily, collect };
+  return { addImageAsset, addMissingImageAsset, addFontAsset, addVectorAsset, addFontFamily, collect };
 }
