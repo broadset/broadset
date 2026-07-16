@@ -27,7 +27,9 @@ export function buildCustomPropertiesXml(input: {
   readonly document: projectFormatV1.BroadsetDocumentV1;
   readonly exportedAt: number;
 }): string {
-  return `${XML_DECLARATION}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes" xmlns:broadset="${BROADSET_XMP_NS}"><property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" name="BroadsetProject"><vt:lpwstr broadset:documentId="${escapeXmlAttribute(input.document.id)}" broadset:version="1" broadset:exportedAt="${String(input.exportedAt)}">${escapeXmlText(input.project.id)}</vt:lpwstr></property></Properties>`;
+  const xmp = `<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:broadset="${BROADSET_XMP_NS}" broadset:projectId="${escapeXmlAttribute(input.project.id)}" broadset:documentId="${escapeXmlAttribute(input.document.id)}" broadset:version="1" broadset:exportedAt="${String(input.exportedAt)}"/></rdf:RDF>`;
+
+  return `${XML_DECLARATION}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" name="BroadsetProject"><vt:lpwstr>${escapeXmlText(xmp)}</vt:lpwstr></property></Properties>`;
 }
 
 function projectJsonFromXml(xml: string): string | undefined {

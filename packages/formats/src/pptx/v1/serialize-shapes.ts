@@ -135,7 +135,7 @@ function fillXml(ctx: ShapeContext, element: projectFormatV1.Element): string {
 
 function nonVisualXml(shapeId: number, element: projectFormatV1.Element, kind: 'sp' | 'pic'): string {
   const name = escapeXmlAttribute(encodeShapeName({ id: element.id, kind: element.kind }));
-  const extension = `<p:extLst>${buildElementExt({ id: element.id, kind: element.kind, dirty: false })}</p:extLst>`;
+  const extension = `<a:extLst>${buildElementExt({ id: element.id, kind: element.kind, dirty: false })}</a:extLst>`;
 
   if (kind === 'pic') {
     return `<p:nvPicPr><p:cNvPr id="${String(shapeId)}" name="${name}">${extension}</p:cNvPr><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`;
@@ -259,7 +259,7 @@ async function elementXml(ctx: ShapeContext, element: projectFormatV1.Element): 
   );
 
   const name = escapeXmlAttribute(encodeShapeName({ id: element.id, kind: element.kind }));
-  const extension = `<p:extLst>${buildElementExt({ id: element.id, kind: element.kind, dirty: false })}</p:extLst>`;
+  const extension = `<a:extLst>${buildElementExt({ id: element.id, kind: element.kind, dirty: false })}</a:extLst>`;
 
   return `<p:grpSp><p:nvGrpSpPr><p:cNvPr id="${String(ctx.ids.next())}" name="${name}">${extension}</p:cNvPr><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr>${xfrm}</p:grpSpPr>${childXml}</p:grpSp>`;
 }

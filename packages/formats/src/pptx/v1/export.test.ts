@@ -212,18 +212,23 @@ describe('exportPptxBytesV1', () => {
     const slide = readTextPart(pkg, 'ppt/slides/slide1.xml') ?? '';
     const relationships = readTextPart(pkg, 'ppt/_rels/presentation.xml.rels') ?? '';
     const contentTypes = readTextPart(pkg, '[Content_Types].xml') ?? '';
+    const customProperties = readTextPart(pkg, 'docProps/custom.xml') ?? '';
     const imported = await importPptxProjectV1({ bytes, importedAt: IMPORTED_AT });
     const rectangle = imported.project.documents[0]?.elements.find(({ id: elementId }) => elementId === id('rectangle'));
     const matrix = rectangle?.geometry.transform.kind === 'affine2d' ? rectangle.geometry.transform.matrix : undefined;
 
     expect(readTextPart(pkg, 'customXml/broadset-project.xml')).toContain('<bset:canonicalJson>');
     expect(readTextPart(pkg, 'customXml/broadset-interop.xml')).toContain('<bset:interopJson>');
-    expect(readTextPart(pkg, 'docProps/custom.xml')).toContain('https://broadset.io/ns/xmp/1.0/');
+    expect(customProperties).toContain('https://broadset.io/ns/xmp/1.0/');
+    expect(customProperties).toContain('&lt;rdf:RDF');
+    expect(customProperties).not.toMatch(/<vt:lpwstr\s+[^>]*broadset:/u);
     expect(relationships.match(/relationships\/customXml/gu)).toHaveLength(2);
     expect(contentTypes).toContain('/customXml/broadset-project.xml');
     expect(contentTypes).toContain('/customXml/broadset-interop.xml');
     expect(slide).toContain('name="BSET:rectangle:vector"');
     expect(slide).toContain('{broadset-element-ext}');
+    expect(slide).toContain('<a:extLst><a:ext uri="{broadset-element-ext}"');
+    expect(slide).not.toContain('<p:extLst>');
     expect(imported.project.documents[0]?.surface).toMatchObject({ unit: 'px', dpi: 72, size: [320, 180] });
     expect(matrix?.[4]).toBeCloseTo(20, 5);
     expect(matrix?.[5]).toBeCloseTo(30, 5);

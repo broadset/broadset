@@ -4,9 +4,9 @@ import type { ElementMetaExtension } from '../types';
 import { buildElementExt, parseElementExt } from './element-ext';
 
 /**
- * @description `<p:ext>` entries carry every per-element Broadset
+ * @description `<a:ext>` entries carry every per-element Broadset
  * semantic that doesn't fit in the shape name. PowerPoint and Keynote
- * MUST preserve unknown `<p:ext>` elements verbatim on save, so the
+ * MUST preserve unknown `<a:ext>` elements verbatim on save, so the
  * build → parse round-trip is the spec's durability test.
  */
 describe('buildElementExt / parseElementExt', () => {
@@ -14,7 +14,7 @@ describe('buildElementExt / parseElementExt', () => {
     const meta: ElementMetaExtension = { id: 'el-1', kind: 'rectangle', dirty: false };
     const xml = buildElementExt(meta);
 
-    expect(xml).toContain('<p:ext uri="{broadset-element-ext}"');
+    expect(xml).toContain('<a:ext uri="{broadset-element-ext}"');
     expect(xml).toContain('id="el-1"');
     expect(xml).toContain('kind="rectangle"');
     expect(xml).toContain('dirty="0"');
@@ -74,16 +74,16 @@ describe('buildElementExt / parseElementExt', () => {
   });
 
   it('returns null for XML without the broadset-element-ext URI', () => {
-    expect(parseElementExt('<p:ext uri="{some-other-ext}" />')).toBeNull();
+    expect(parseElementExt('<a:ext uri="{some-other-ext}" />')).toBeNull();
     expect(parseElementExt('<p:cNvPr/>')).toBeNull();
     expect(parseElementExt('')).toBeNull();
   });
 
   it('parses dirty="1" as true and dirty="0" as false (also accepts legacy "true"/"false")', () => {
     const ns = ' xmlns:bset="https://broadset.io/ns/pptx/1.0/"';
-    const xmlDirty = `<p:ext uri="{broadset-element-ext}"><bset:elementMeta${ns} id="x" kind="y" dirty="1"/></p:ext>`;
-    const xmlClean = `<p:ext uri="{broadset-element-ext}"><bset:elementMeta${ns} id="x" kind="y" dirty="0"/></p:ext>`;
-    const xmlLegacy = `<p:ext uri="{broadset-element-ext}"><bset:elementMeta${ns} id="x" kind="y" dirty="true"/></p:ext>`;
+    const xmlDirty = `<a:ext uri="{broadset-element-ext}"><bset:elementMeta${ns} id="x" kind="y" dirty="1"/></a:ext>`;
+    const xmlClean = `<a:ext uri="{broadset-element-ext}"><bset:elementMeta${ns} id="x" kind="y" dirty="0"/></a:ext>`;
+    const xmlLegacy = `<a:ext uri="{broadset-element-ext}"><bset:elementMeta${ns} id="x" kind="y" dirty="true"/></a:ext>`;
 
     expect(parseElementExt(xmlDirty)?.dirty).toBe(true);
     expect(parseElementExt(xmlClean)?.dirty).toBe(false);
