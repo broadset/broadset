@@ -134,6 +134,7 @@ interface ResolveIdentityOptions {
   readonly subsetFonts?: boolean | undefined;
   readonly fontFetchTimeoutMs?: number | undefined;
   readonly fontMaxBytes?: number | undefined;
+  readonly fontBytes?: Uint8Array | undefined;
 }
 
 /**
@@ -164,6 +165,28 @@ export async function resolveIdentity(
 ): Promise<ResolvedFontIdentity> {
   const normalized = normalizeFontFamily(family);
   const standard = STANDARD_FONT_MAP.get(normalized);
+
+  if (options.fontBytes !== undefined) {
+    const maxBytes = positiveIntegerOrDefault(options.fontMaxBytes, DEFAULT_FONT_FETCH_MAX_BYTES);
+
+    if (options.fontBytes.byteLength > maxBytes) {
+      return {
+        font: await pdf.embedFont(selectStandardFontVariant(StandardFonts.Helvetica, isBold, isItalic)),
+        failure: `PDF preflight: font "${family}" exceeds configured cap (${String(maxBytes)}); falling back to Helvetica.`,
+      };
+    }
+
+    try {
+      return { font: await embedFontBytes(pdf, options.fontBytes, options) };
+    } catch (error: unknown) {
+      const reason = error instanceof Error ? error.message : 'fontkit rejected the supplied bytes';
+
+      return {
+        font: await pdf.embedFont(selectStandardFontVariant(StandardFonts.Helvetica, isBold, isItalic)),
+        failure: `PDF preflight: font "${family}" failed to embed (${reason}); falling back to Helvetica.`,
+      };
+    }
+  }
 
   if (standard !== undefined) {
     return { font: await pdf.embedFont(selectStandardFontVariant(standard, isBold, isItalic)) };
@@ -224,6 +247,7 @@ interface ResolveFontsOptions {
   readonly subsetFonts?: boolean | undefined;
   readonly fontFetchTimeoutMs?: number | undefined;
   readonly fontMaxBytes?: number | undefined;
+  readonly fontBytesByFamily?: ReadonlyMap<string, Uint8Array> | undefined;
 }
 
 /**
@@ -268,6 +292,7 @@ export async function resolveFonts(
       subsetFonts: options.subsetFonts,
       fontFetchTimeoutMs: options.fontFetchTimeoutMs,
       fontMaxBytes: options.fontMaxBytes,
+      fontBytes: options.fontBytesByFamily?.get(normalizeFontFamily(family)),
     });
 
     fontMap.set(key, resolved.font);

@@ -49,6 +49,8 @@ export interface PdfExportOptions {
    * non-finite values fall back to the default.
    */
   readonly fontMaxBytes?: number | undefined;
+  /** Trusted in-memory SFNT bytes keyed by normalized font family; avoids network lookup for self-contained projects. */
+  readonly fontBytesByFamily?: ReadonlyMap<string, Uint8Array> | undefined;
   /** Subset embedded fonts to the glyphs used in the document (default true per IO-D-09). */
   readonly subsetFonts?: boolean | undefined;
   /** Emit OCGs (Optional Content Groups), one per page (default true). */
