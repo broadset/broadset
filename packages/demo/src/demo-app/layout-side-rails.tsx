@@ -52,6 +52,8 @@ export function LayoutSideRails(props: DemoAppLayoutProps): React.JSX.Element {
           {ELEMENT_TOOL_TYPES.map((elementType) => {
             return (
               <IconToolButton
+                // Placement must begin before an overlay can cancel release-time press completion.
+                activateOnPressStart
                 key={elementType.type}
                 isActive={activePlacementType === elementType.type}
                 label={elementType.label}
