@@ -87,6 +87,7 @@ export {
   elementTagAttrsSchema,
   exportSvgDocument,
   exportSvgString,
+  exportSvgStringV1,
   type FontEmbedChoice,
   fontEmbedChoiceSchema,
   importSvg,
