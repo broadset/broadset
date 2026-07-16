@@ -1,153 +1,192 @@
 import type { ProjectEditorStore } from '@broadset/editor';
-import type { ProjectImportResultV1 } from '@broadset/formats';
 import { projectFormatV1 } from '@broadset/model';
-import { Button } from '@heroui/react';
-import { type ChangeEvent, useRef, useState } from 'react';
+import { Button, toast } from '@heroui/react';
+import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 
 import { loadFormats } from '../formats-loader';
 import { downloadBlob } from './v1-browser-download';
 
-const PROJECT_MIME = 'application/vnd.broadset.project+json';
+const PROJECT_JSON_MIME = 'application/vnd.broadset.project+json';
 
-type ProjectFileKind = 'bsp' | 'svg' | 'pdf' | 'psd' | 'pptx' | 'unsupported';
+type ProjectFileKind = 'bsp-package' | 'bsp-json' | 'unsupported';
 
 function projectFileKind(fileName: string): ProjectFileKind {
   const normalized = fileName.toLowerCase();
 
-  if (normalized.endsWith('.bsp') || normalized.endsWith('.json')) return 'bsp';
-  if (normalized.endsWith('.svg')) return 'svg';
-  if (normalized.endsWith('.pdf')) return 'pdf';
-  if (normalized.endsWith('.psd')) return 'psd';
-  if (normalized.endsWith('.pptx')) return 'pptx';
+  if (normalized.endsWith('.bsp')) return 'bsp-package';
+  if (normalized.endsWith('.broadset.json') || normalized.endsWith('.json')) return 'bsp-json';
 
   return 'unsupported';
 }
 
-function readFileText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      if (typeof reader.result === 'string') resolve(reader.result);
-      else reject(new Error('Broadset project file did not contain text'));
-    };
-
-    reader.onerror = () => {
-      reject(reader.error ?? new Error('Broadset project file could not be read'));
-    };
-
-    reader.readAsText(file);
-  });
+async function readFileBytes(file: File): Promise<Uint8Array> {
+  return new Uint8Array(await file.arrayBuffer());
 }
 
-function readFileBytes(file: File): Promise<Uint8Array> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      if (reader.result instanceof ArrayBuffer) resolve(new Uint8Array(reader.result));
-      else reject(new Error('Broadset project file did not contain bytes'));
-    };
-
-    reader.onerror = () => {
-      reject(reader.error ?? new Error('Broadset project file could not be read'));
-    };
-
-    reader.readAsArrayBuffer(file);
-  });
+function replaceProject(input: {
+  readonly editorStore: ProjectEditorStore;
+  readonly project: projectFormatV1.BroadsetProjectV1;
+  readonly blobs?: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array> | undefined;
+}): string {
+  return input.editorStore.getState().setProject(input.project, input.blobs) ?
+      'Project loaded'
+    : 'Project was rejected';
 }
 
-async function importExternalFile(
-  file: File,
-  kind: Exclude<ProjectFileKind, 'bsp' | 'unsupported'>,
-  importedAt: projectFormatV1.UtcTimestamp,
-): Promise<ProjectImportResultV1> {
-  const formats = await loadFormats();
+async function loadBroadsetProject(input: {
+  readonly editorStore: ProjectEditorStore;
+  readonly file: File;
+  readonly kind: 'bsp-package' | 'bsp-json';
+  readonly isCurrent: () => boolean;
+  readonly onProjectQuarantined: ((bytes: Uint8Array) => void) | undefined;
+}): Promise<string> {
+  const lastValidProject = input.editorStore.getState().project;
 
-  switch (kind) {
-    case 'svg':
-      return await formats.importSvgProjectV1({ svg: await readFileText(file), fileName: file.name, importedAt });
-    case 'pdf':
-      return await formats.importPdfProjectV1({ bytes: await readFileBytes(file), fileName: file.name, importedAt });
-    case 'psd':
-      return await formats.importPsdProjectV1({ bytes: await readFileBytes(file), fileName: file.name, importedAt });
-    case 'pptx':
-      return await formats.importPptxProjectV1({ bytes: await readFileBytes(file), fileName: file.name, importedAt });
+  if (input.kind === 'bsp-package') {
+    const formats = await loadFormats();
+
+    if (input.file.size > formats.BSP_PACKAGE_LIMITS_V1.maxInputBytes) {
+      return 'BSP project exceeds the 256 MiB file limit';
+    }
+
+    const result = await formats.loadBspPackageV1(await readFileBytes(input.file), { lastValidProject });
+
+    if (!input.isCurrent()) return '';
+
+    if (result.status === 'loaded') {
+      return replaceProject({ editorStore: input.editorStore, project: result.project, blobs: result.blobs });
+    }
+
+    input.onProjectQuarantined?.(result.originalBytes);
+
+    return result.diagnostics.map(({ message }) => message).join('; ');
   }
+
+  if (input.file.size > projectFormatV1.PROJECT_V1_LIMITS.maxJsonTextBytes) {
+    return 'Broadset JSON exceeds the 32 MiB file limit';
+  }
+
+  const result = await projectFormatV1.loadProjectV1Json(await readFileBytes(input.file), { lastValidProject });
+
+  if (!input.isCurrent()) return '';
+
+  if (result.status === 'loaded') {
+    return replaceProject({ editorStore: input.editorStore, project: result.project });
+  }
+
+  input.onProjectQuarantined?.(result.originalBytes);
+
+  return result.diagnostics.map(({ message }) => message).join('; ');
+}
+
+function browserBlobBuffer(bytes: Uint8Array): ArrayBuffer {
+  if (bytes.buffer instanceof ArrayBuffer) {
+    return bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength ?
+        bytes.buffer
+      : bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  }
+
+  return new Uint8Array(bytes).buffer;
 }
 
 interface V1ProjectFileControlsProps {
   readonly editorStore: ProjectEditorStore;
   readonly download?: ((blob: Blob, filename: string) => void) | undefined;
+  readonly onProjectQuarantined?: ((bytes: Uint8Array) => void) | undefined;
 }
 
 export function V1ProjectFileControls({
   editorStore,
   download = downloadBlob,
+  onProjectQuarantined,
 }: V1ProjectFileControlsProps): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const importGenerationRef = useRef(0);
   const [message, setMessage] = useState('');
+  const messageIsSuccess = message === 'Project loaded' || message === 'Project saved';
+
+  const showMessage = (nextMessage: string): void => {
+    if (nextMessage === '') return;
+
+    setMessage(nextMessage);
+
+    if (nextMessage === 'Project loaded' || nextMessage === 'Project saved') {
+      toast.success(nextMessage, { timeout: 3000 });
+    } else {
+      toast.danger(nextMessage, { timeout: 5000 });
+    }
+  };
+
+  useEffect(
+    () => () => {
+      importGenerationRef.current += 1;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (message === '') return undefined;
+
+    const timeoutId = window.setTimeout(
+      () => {
+        setMessage('');
+      },
+      messageIsSuccess ? 3000 : 5000,
+    );
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [message, messageIsSuccess]);
 
   const handleImport = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const generation = importGenerationRef.current + 1;
     const file = event.currentTarget.files?.[0];
 
+    importGenerationRef.current = generation;
     event.currentTarget.value = '';
     if (file === undefined) return;
+
+    const isCurrent = (): boolean => importGenerationRef.current === generation;
 
     try {
       const kind = projectFileKind(file.name);
 
       if (kind === 'unsupported') {
-        setMessage('Unsupported project file type');
+        showMessage('Unsupported project file type');
 
         return;
       }
 
-      if (kind !== 'bsp') {
-        const timestamp = projectFormatV1.utcTimestampSchema.safeParse(new Date().toISOString());
+      const nextMessage = await loadBroadsetProject({ editorStore, file, kind, isCurrent, onProjectQuarantined });
 
-        if (!timestamp.success) {
-          setMessage('Could not create an import timestamp');
-
-          return;
-        }
-
-        const imported = await importExternalFile(file, kind, timestamp.data);
-        const parsed = projectFormatV1.parseProjectV1Unknown(imported.project);
-
-        if (parsed.status === 'loaded') {
-          editorStore.getState().setProject(parsed.project, imported.blobs);
-          setMessage('Project loaded');
-        } else {
-          setMessage(parsed.diagnostics.map(({ message: diagnostic }) => diagnostic).join('; '));
-        }
-
-        return;
-      }
-
-      const result = await projectFormatV1.loadProjectV1Json(await readFileText(file), {
-        lastValidProject: editorStore.getState().project,
-      });
-
-      if (result.status === 'loaded') {
-        editorStore.getState().setProject(result.project);
-        setMessage('Project loaded');
-      } else {
-        setMessage(result.diagnostics.map(({ message: diagnostic }) => diagnostic).join('; '));
-      }
+      if (isCurrent()) showMessage(nextMessage);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Broadset project file could not be loaded');
+      if (isCurrent()) {
+        showMessage(error instanceof Error ? error.message : 'Broadset project file could not be loaded');
+      }
     }
   };
 
-  const handleSave = (): void => {
+  const handleSave = async (): Promise<void> => {
     try {
-      const text = projectFormatV1.canonicalizeProjectV1(editorStore.getState().project);
+      const state = editorStore.getState();
+      const formats = await loadFormats();
+      const result = await formats.exportBspPackageV1({ project: state.project, blobs: state.blobs });
 
-      download(new Blob([text], { type: PROJECT_MIME }), 'broadset-project.bsp');
-      setMessage('Project saved');
+      if (result.status !== 'exported') {
+        showMessage(result.diagnostics.map(({ message: diagnostic }) => diagnostic).join('; '));
+
+        return;
+      }
+
+      download(
+        new Blob([browserBlobBuffer(result.bytes)], { type: formats.BSP_PROJECT_MIME_V1 }),
+        'broadset-project.bsp',
+      );
+      showMessage('Project saved');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Broadset project file could not be saved');
+      showMessage(error instanceof Error ? error.message : 'Broadset project file could not be saved');
     }
   };
 
@@ -155,7 +194,7 @@ export function V1ProjectFileControls({
     <div style={{ alignItems: 'center', display: 'flex', gap: 8 }}>
       <input
         ref={inputRef}
-        accept=".bsp,.json,.svg,.pdf,.psd,.pptx,application/vnd.broadset.project+json,application/json,image/svg+xml,application/pdf"
+        accept={`.bsp,.broadset.json,.json,application/vnd.broadset.project,${PROJECT_JSON_MIME},application/json`}
         aria-label="Choose Broadset project file"
         style={{ display: 'none' }}
         type="file"
@@ -172,7 +211,13 @@ export function V1ProjectFileControls({
       >
         Open project
       </Button>
-      <Button size="sm" variant="ghost" onPress={handleSave}>
+      <Button
+        size="sm"
+        variant="ghost"
+        onPress={() => {
+          void handleSave();
+        }}
+      >
         Save .bsp
       </Button>
       {message === '' ? null : <span role="status">{message}</span>}

@@ -15,7 +15,7 @@ import { getWidgetRotation } from './helpers';
 test('dragging the NW handle resizes from the top-left corner', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  await page.locator(`[data-element-id="${FIXTURE_IDS.video}"]`).click({ force: true });
+  await page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`).click({ force: true });
 
   const widget = page.getByTestId('demo-transform-widget');
 
@@ -65,7 +65,7 @@ test('dragging the NW handle resizes from the top-left corner', async ({ mount, 
 test('dragging the SE handle resizes from the bottom-right corner', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  await page.locator(`[data-element-id="${FIXTURE_IDS.video}"]`).click({ force: true });
+  await page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`).click({ force: true });
 
   const widget = page.getByTestId('demo-transform-widget');
 
@@ -104,8 +104,8 @@ test('dragging the SE handle resizes from the bottom-right corner', async ({ mou
   expect(newBox.y).toBeCloseTo(initialBox.y, 0);
 
   // Size should not decrease when dragging SE outward.
-  expect(newBox.width).toBeGreaterThanOrEqual(initialBox.width);
-  expect(newBox.height).toBeGreaterThanOrEqual(initialBox.height);
+  expect(newBox.width).toBeGreaterThan(initialBox.width);
+  expect(newBox.height).toBeGreaterThan(initialBox.height);
 });
 
 /**
@@ -115,7 +115,7 @@ test('dragging the SE handle resizes from the bottom-right corner', async ({ mou
 test('dragging the N handle only changes top and height', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  await page.locator(`[data-element-id="${FIXTURE_IDS.video}"]`).click({ force: true });
+  await page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`).click({ force: true });
 
   const widget = page.getByTestId('demo-transform-widget');
 
@@ -154,8 +154,8 @@ test('dragging the N handle only changes top and height', async ({ mount, page }
   expect(newBox.width).toBeCloseTo(initialBox.width, 0);
 
   // Top should not move upward and height should decrease.
-  expect(newBox.y).toBeGreaterThanOrEqual(initialBox.y);
-  expect(newBox.height).toBeLessThanOrEqual(initialBox.height);
+  expect(newBox.y).toBeGreaterThan(initialBox.y);
+  expect(newBox.height).toBeLessThan(initialBox.height);
 });
 
 /**
@@ -165,7 +165,7 @@ test('dragging the N handle only changes top and height', async ({ mount, page }
 test('dragging the W handle only changes left and width', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  await page.locator(`[data-element-id="${FIXTURE_IDS.video}"]`).click({ force: true });
+  await page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`).click({ force: true });
 
   const widget = page.getByTestId('demo-transform-widget');
 
@@ -220,7 +220,7 @@ test('dragging the W handle only changes left and width', async ({ mount, page }
 test('dragging the rotation handle changes the widget rotation', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  await page.locator(`[data-element-id="${FIXTURE_IDS.video}"]`).click({ force: true });
+  await page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`).click({ force: true });
 
   const widget = page.getByTestId('demo-transform-widget');
 

@@ -1,10 +1,20 @@
 import { projectFormatV1 } from '@broadset/model';
+import { zlibSync } from 'fflate';
 import { jsPDF } from 'jspdf';
 import { degrees, PDFDocument, PDFName, PDFRawStream, rgb, StandardFonts } from 'pdf-lib';
 import PDFKit from 'pdfkit';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { importPdfProjectV1 } from '../../index';
+import { TestPdfImportWorkerV1 } from '../import/test-worker';
+import { importPdfProjectV1 } from './index';
+
+beforeAll((): void => {
+  vi.stubGlobal('Worker', TestPdfImportWorkerV1);
+});
+
+afterAll((): void => {
+  vi.unstubAllGlobals();
+});
 
 const IMPORTED_AT = projectFormatV1.utcTimestampSchema.parse('2026-07-12T00:00:00Z');
 const JPEG_1X1 = Uint8Array.from(
@@ -62,6 +72,59 @@ async function buildPngPdf(): Promise<Uint8Array> {
   page.drawImage(image, { x: 30, y: 60, width: 90, height: 70 });
 
   return pdf.save();
+}
+
+async function buildRepeatedImageUsePdf(repetitions: number): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([300, 200]);
+  const image = await pdf.embedJpg(JPEG_1X1);
+  const content = new TextEncoder().encode('/Im0 Do\n'.repeat(repetitions));
+  const stream = PDFRawStream.of(pdf.context.obj({ Length: content.byteLength }), content);
+
+  page.node.setXObject(PDFName.of('Im0'), image.ref);
+  page.node.set(PDFName.of('Contents'), pdf.context.register(stream));
+
+  return pdf.save({ useObjectStreams: false });
+}
+
+async function buildAscii85FlateFixture(): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([300, 200]);
+  const content = new TextEncoder().encode('BT /F1 12 Tf 1 0 0 1 20 150 Tm (Chained producer text) Tj ET');
+  const encoded = ascii85Encode(zlibSync(content));
+  const stream = PDFRawStream.of(
+    pdf.context.obj({
+      Length: encoded.byteLength,
+      Filter: [PDFName.of('ASCII85Decode'), PDFName.of('FlateDecode')],
+    }),
+    encoded,
+  );
+
+  page.node.set(PDFName.of('Contents'), pdf.context.register(stream));
+
+  return pdf.save({ useObjectStreams: false });
+}
+
+function ascii85Encode(bytes: Uint8Array): Uint8Array {
+  let encoded = '';
+
+  for (let offset = 0; offset < bytes.byteLength; offset += 4) {
+    const remaining = Math.min(4, bytes.byteLength - offset);
+    let value = 0;
+
+    for (let index = 0; index < 4; index += 1) value = value * 256 + (bytes[offset + index] ?? 0);
+
+    const digits = new Array<number>(5);
+
+    for (let index = 4; index >= 0; index -= 1) {
+      digits[index] = value % 85;
+      value = Math.floor(value / 85);
+    }
+
+    encoded += digits.slice(0, remaining + 1).map((digit) => String.fromCharCode(digit + 33)).join('');
+  }
+
+  return new TextEncoder().encode(`${encoded}~>`);
 }
 
 function contentElements(result: Awaited<ReturnType<typeof importPdfProjectV1>>): readonly projectFormatV1.Element[] {
@@ -327,6 +390,22 @@ describe('importPdfProjectV1', () => {
     expectValid(result);
   });
 
+  it('caps repeated image-use mapping before creating importer promises or elements', async () => {
+    const repetitions = 1_100;
+    const result = await importPdfProjectV1({
+      bytes: await buildRepeatedImageUsePdf(repetitions),
+      importedAt: IMPORTED_AT,
+    });
+    const images = contentElements(result).filter(({ kind }) => kind === 'image');
+
+    expect(images.length).toBeLessThan(repetitions);
+    expect(images.length).toBeGreaterThan(0);
+    expect(result.project.interop.records.flatMap(({ warnings }) => warnings)).toContainEqual(
+      expect.objectContaining({ code: 'pdf.mapped-item-limit', severity: 'warning' }),
+    );
+    expectValid(result);
+  });
+
   it('keeps text graphics state aligned after an empty Tj operator', async () => {
     const result = await importPdfProjectV1({ bytes: await buildEmptyTextPrefixFixture(), importedAt: IMPORTED_AT });
     const text = contentElements(result).find(({ kind }) => kind === 'text');
@@ -412,6 +491,7 @@ describe('importPdfProjectV1', () => {
     ['jspdf multipage', buildJsPdfMultipageFixture],
     ['Acrobat-style split contents', buildSplitContentFixture],
     ['Quartz-style object streams', buildObjectStreamFixture],
+    ['ASCII85 and Flate chained content', buildAscii85FlateFixture],
   ])('%s producer fixture reaches zero-error v1 validity', async (_producer, buildFixture) => {
     const result = await importPdfProjectV1({ bytes: await buildFixture(), importedAt: IMPORTED_AT });
 

@@ -2,7 +2,8 @@ import type { ProjectEditorStore } from '@broadset/editor';
 import { projectFormatV1 } from '@broadset/model';
 import { useCallback, useMemo } from 'react';
 
-import { SAMPLE_PROJECT_V1 } from '../sample-project-v1';
+import { DEMO_EDITOR_CONFIG } from '../demoConfig';
+import { SAMPLE_PROJECT_BLOBS_V1, SAMPLE_PROJECT_V1 } from '../sample-project-v1';
 import { V1DemoWorkspace } from './v1-demo-workspace';
 
 const PROJECT_STORAGE_KEY = 'broadset:project:v1';
@@ -32,6 +33,8 @@ export function V1DemoApp(): React.JSX.Element {
   return (
     <div data-testid="demo-shell" style={{ height: '100%', minHeight: 0, width: '100%' }}>
       <V1DemoWorkspace
+        blobs={SAMPLE_PROJECT_BLOBS_V1}
+        config={DEMO_EDITOR_CONFIG}
         initialElementId={INITIAL_ELEMENT_ID}
         persistence={persistence}
         project={SAMPLE_PROJECT_V1}

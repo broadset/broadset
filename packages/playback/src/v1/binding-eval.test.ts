@@ -64,7 +64,7 @@ describe('evaluateBindingV1', () => {
     const target: PropertyTarget = { ...TARGET, pointer: '/style/opacity' };
     const binding = createBinding({ expression: literal(value), target });
 
-    expect(evaluateBindingV1(binding, EMPTY_CONTEXT)).toEqual({ target, value });
+    expect(evaluateBindingV1(binding, EMPTY_CONTEXT)).toEqual({ target, value, source: 'expression' });
   });
 
   it('applies the formatter pipeline to a resolved expression', () => {
@@ -76,6 +76,7 @@ describe('evaluateBindingV1', () => {
     expect(evaluateBindingV1(binding, EMPTY_CONTEXT)).toEqual({
       target: TARGET,
       value: { type: 'string', value: 'Hello Broadset' },
+      source: 'expression',
     });
   });
 
@@ -87,7 +88,7 @@ describe('evaluateBindingV1', () => {
       fallback,
     });
 
-    expect(evaluateBindingV1(binding, EMPTY_CONTEXT)).toEqual({ target: TARGET, value: fallback });
+    expect(evaluateBindingV1(binding, EMPTY_CONTEXT)).toEqual({ target: TARGET, value: fallback, source: 'fallback' });
   });
 
   it('returns undefined when formatting fails without a fallback', () => {
@@ -106,7 +107,7 @@ describe('evaluateBindingV1', () => {
       fallback,
     });
 
-    expect(evaluateBindingV1(binding, EMPTY_CONTEXT)).toEqual({ target: TARGET, value: fallback });
+    expect(evaluateBindingV1(binding, EMPTY_CONTEXT)).toEqual({ target: TARGET, value: fallback, source: 'fallback' });
   });
 
   it('returns undefined when the expression is unresolved without a fallback', () => {
@@ -125,6 +126,6 @@ describe('evaluateBindingV1', () => {
       fallback,
     });
 
-    expect(evaluateBindingV1(binding, EMPTY_CONTEXT)).toEqual({ target: TARGET, value: fallback });
+    expect(evaluateBindingV1(binding, EMPTY_CONTEXT)).toEqual({ target: TARGET, value: fallback, source: 'fallback' });
   });
 });

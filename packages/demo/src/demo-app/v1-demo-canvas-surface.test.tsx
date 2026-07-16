@@ -40,8 +40,13 @@ describe('V1DemoCanvasSurface', () => {
       />,
     );
     const viewport = container.querySelector<HTMLElement>('[data-testid="v1-canvas-viewport"]');
+    const overlay = container.querySelector<HTMLElement>('[data-testid="v1-canvas-overlay"]');
 
     expect(container.querySelector('[data-element-id="el-scorebug"]')).not.toBeNull();
+    expect(container.querySelectorAll('[data-broadset-canvas-root]')).toHaveLength(1);
+    expect(viewport?.dataset['broadsetCanvasRoot']).toBeUndefined();
+    expect(viewport?.contains(overlay ?? null)).toBe(true);
+    expect(overlay?.style.zIndex).toBe('');
     expect(viewport?.style.transform).toBe('translate(0px, 0px) scale(1)');
 
     act(() => {
@@ -313,7 +318,7 @@ describe('V1DemoCanvasSurface', () => {
 
     fireEvent.pointerDown(getByTestId('v1-canvas-surface'));
 
-    expect(store.getState().activeElementIds).toEqual([]);
+    expect(store.getState().activeInstanceAddresses).toEqual([]);
   });
 
   it('opens a v1 element context menu, toggles locking, and uses a paste-only empty-canvas menu', () => {
@@ -379,7 +384,7 @@ describe('V1DemoCanvasSurface', () => {
     fireEvent.pointerDown(first, { button: 2 });
     fireEvent.contextMenu(first, { clientX: 40, clientY: 50 });
 
-    expect(store.getState().activeElementIds).toEqual([firstId, secondId]);
+    expect(store.getState().activeInstanceAddresses.map(({ elementId }) => elementId)).toEqual([firstId, secondId]);
     expect(getByText('Group')).toBeTruthy();
     expect(getByText('Ungroup')).toBeTruthy();
     expect(getByText('Bring forward')).toBeTruthy();

@@ -68,14 +68,17 @@ type XmlNode = XmlElement | XmlText;
  * comes back is the document element list (usually one element).
  */
 export function parseOoxml(input: string): readonly XmlNode[] {
-  const raw = parseXml(input);
+  const parsed: unknown = parseXml(input);
 
-  if (!Array.isArray(raw)) return [];
+  if (!Array.isArray(parsed)) return [];
+
+  const raw: readonly unknown[] = parsed;
 
   const initial: NamespaceBindings = { ...CANONICAL_PREFIX_TO_NS };
   const out: XmlNode[] = [];
 
-  for (const node of raw) {
+  for (let index = 0; index < raw.length; index += 1) {
+    const node: unknown = raw[index];
     const normalized = normaliseRaw(node, initial);
 
     if (normalized !== null) out.push(normalized);
@@ -114,10 +117,11 @@ function normaliseRaw(raw: unknown, parentBindings: NamespaceBindings): XmlNode 
   const { prefix, local } = splitQName(qname);
   const ns = bindings[prefix] ?? '';
   const attrs = collectAttributes(rawAttrs);
-  const childrenRaw = Array.isArray(value) ? value : [];
+  const childrenRaw: readonly unknown[] = Array.isArray(value) ? value : [];
   const children: XmlNode[] = [];
 
-  for (const child of childrenRaw) {
+  for (let index = 0; index < childrenRaw.length; index += 1) {
+    const child: unknown = childrenRaw[index];
     const c = normaliseRaw(child, bindings);
 
     if (c !== null) children.push(c);

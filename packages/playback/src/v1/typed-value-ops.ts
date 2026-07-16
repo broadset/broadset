@@ -1,7 +1,7 @@
 import type { projectFormatV1 } from '@broadset/model';
 
 type TypedValue = projectFormatV1.TypedValue;
-type NumericTypedValue = Extract<TypedValue, { readonly type: 'number' | 'integer' | 'length' | 'angle' }>;
+type NumericTypedValue = Extract<TypedValue, { readonly type: 'number' | 'integer' }>;
 type NumericOperator = 'add' | 'sub' | 'mul' | 'div';
 type ComparisonOperator = 'lt' | 'lte' | 'gt' | 'gte';
 
@@ -98,7 +98,7 @@ export function typedValuesEqual(left: TypedValue, right: TypedValue): boolean {
 export function isFiniteNumericValue(value: TypedValue | undefined): value is NumericTypedValue {
   return (
     value !== undefined &&
-    (value.type === 'number' || value.type === 'integer' || value.type === 'length' || value.type === 'angle') &&
+    (value.type === 'number' || value.type === 'integer') &&
     Number.isFinite(value.value) &&
     (value.type !== 'integer' || Number.isInteger(value.value))
   );
@@ -128,13 +128,15 @@ export function evaluateNumericArithmetic(
   left: TypedValue | undefined,
   right: TypedValue | undefined,
 ): TypedValue | undefined {
-  if (!isFiniteNumericValue(left) || !isFiniteNumericValue(right) || left.type !== right.type) return undefined;
+  if (!isFiniteNumericValue(left) || !isFiniteNumericValue(right)) return undefined;
 
   const calculated = calculateArithmetic(operator, left.value, right.value);
 
   if (calculated === undefined) return undefined;
 
-  return createNumericResult(left, left.type === 'integer' && operator === 'div' ? Math.trunc(calculated) : calculated);
+  const type = operator !== 'div' && left.type === 'integer' && right.type === 'integer' ? 'integer' : 'number';
+
+  return createNumericResult({ type, value: 0 }, calculated);
 }
 
 export function negateNumericValue(value: TypedValue | undefined): TypedValue | undefined {
@@ -146,7 +148,7 @@ export function evaluateNumericComparison(
   left: TypedValue | undefined,
   right: TypedValue | undefined,
 ): boolean | undefined {
-  if (!isFiniteNumericValue(left) || !isFiniteNumericValue(right) || left.type !== right.type) return undefined;
+  if (!isFiniteNumericValue(left) || !isFiniteNumericValue(right)) return undefined;
 
   switch (operator) {
     case 'lt':
@@ -166,19 +168,21 @@ export function findNumericExtreme(
 ): TypedValue | undefined {
   const first = values[0];
 
-  if (!isFiniteNumericValue(first)) return undefined;
+  if (values.length < 2 || !isFiniteNumericValue(first)) return undefined;
 
   const numericValues: number[] = [];
 
   for (const value of values) {
-    if (!isFiniteNumericValue(value) || value.type !== first.type) return undefined;
+    if (!isFiniteNumericValue(value)) return undefined;
 
     numericValues.push(value.value);
   }
 
   const result = mode === 'min' ? Math.min(...numericValues) : Math.max(...numericValues);
 
-  return createNumericResult(first, result);
+  const type = values.every((value) => value?.type === 'integer') ? 'integer' : 'number';
+
+  return createNumericResult({ type, value: 0 }, result);
 }
 
 export function clampNumericValues(values: readonly (TypedValue | undefined)[]): TypedValue | undefined {
@@ -190,12 +194,12 @@ export function clampNumericValues(values: readonly (TypedValue | undefined)[]):
     values.length !== 3 ||
     !isFiniteNumericValue(value) ||
     !isFiniteNumericValue(lowerBound) ||
-    !isFiniteNumericValue(upperBound) ||
-    value.type !== lowerBound.type ||
-    value.type !== upperBound.type
+    !isFiniteNumericValue(upperBound)
   ) {
     return undefined;
   }
 
-  return createNumericResult(value, Math.min(Math.max(value.value, lowerBound.value), upperBound.value));
+  const type = value.type === 'integer' && lowerBound.type === 'integer' && upperBound.type === 'integer' ? 'integer' : 'number';
+
+  return createNumericResult({ type, value: 0 }, Math.min(Math.max(value.value, lowerBound.value), upperBound.value));
 }

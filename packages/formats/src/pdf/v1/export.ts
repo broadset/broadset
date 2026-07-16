@@ -20,7 +20,7 @@ interface PdfExportResultV1 {
   readonly warnings: readonly string[];
 }
 
-export interface PdfExportInputV1 {
+interface PdfExportInputV1 {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly documentId?: projectFormatV1.Id;
   readonly pageId?: projectFormatV1.Id;

@@ -1,4 +1,5 @@
 import { projectFormatV1 } from '@broadset/model';
+import { sceneInstanceKeyV1 } from '@broadset/renderer';
 import type { LayerInfo, MediaAsset } from '@broadset/ui';
 
 function layerType(element: projectFormatV1.Element): string {
@@ -13,6 +14,50 @@ function layerType(element: projectFormatV1.Element): string {
     case 'boolean':
       return 'path';
   }
+}
+
+function instanceAddress(instance: projectFormatV1.ResolvedSceneInstance): projectFormatV1.InstanceAddress {
+  return {
+    rootInstanceId: instance.rootInstanceId,
+    componentInstancePath: instance.componentInstancePath,
+    elementId: instance.element.id,
+  };
+}
+
+export function layerInstanceIdV1(options: {
+  readonly pageId: projectFormatV1.Id;
+  readonly address: projectFormatV1.InstanceAddress;
+}): string {
+  return sceneInstanceKeyV1(options);
+}
+
+function toUnknownArray(value: unknown): readonly unknown[] | undefined {
+  return Array.isArray(value) ? value.map((entry: unknown): unknown => entry) : undefined;
+}
+
+export function parseLayerInstanceIdV1(
+  value: string,
+  pageId: projectFormatV1.Id,
+): projectFormatV1.InstanceAddress | undefined {
+  let decoded: unknown;
+
+  try {
+    decoded = JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+
+  const entries = toUnknownArray(decoded);
+
+  if (entries?.length !== 4 || entries[0] !== pageId) return undefined;
+
+  const parsed = projectFormatV1.instanceAddressSchema.safeParse({
+    rootInstanceId: entries[1],
+    componentInstancePath: entries[2],
+    elementId: entries[3],
+  });
+
+  return parsed.success ? parsed.data : undefined;
 }
 
 export function selectDocumentV1(
@@ -47,9 +92,10 @@ export function buildLayerInfoListV1(options: {
 
   return instances.map((instance) => {
     const parent = instance.parentElementId === null ? undefined : elementsById.get(instance.parentElementId);
+    const address = instanceAddress(instance);
 
     return {
-      id: instance.element.id,
+      id: layerInstanceIdV1({ pageId: options.pageId, address }),
       type: layerType(instance.element),
       name: instance.element.name,
       locked: instance.element.locked,

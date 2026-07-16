@@ -1,7 +1,7 @@
 import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
-import { gradientToCss } from './gradient-css';
+import { gradientToCss, gradientToDataAttributeV1 } from './gradient-css';
 
 const id = (value: string): projectFormatV1.Id => projectFormatV1.idSchema.parse(value);
 const noSwatches: ReadonlyMap<projectFormatV1.Id, projectFormatV1.Swatch> = new Map();
@@ -17,17 +17,28 @@ function stop(offset: number, color: projectFormatV1.ColorValue, opacity = 1): p
 
 const RED_TO_BLUE: readonly projectFormatV1.GradientStop[] = [stop(0, srgb(1, 0, 0)), stop(1, srgb(0, 0, 1))];
 
-function base(overrides: Partial<{ spread: projectFormatV1.Gradient['spread']; interpolation: projectFormatV1.Gradient['interpolation']; stops: readonly projectFormatV1.GradientStop[] }> = {}) {
+interface GradientBase {
+  readonly stops: readonly projectFormatV1.GradientStop[];
+  readonly coordinateSpace: projectFormatV1.Gradient['coordinateSpace'];
+  readonly transform: projectFormatV1.Gradient['transform'];
+  readonly spread: projectFormatV1.Gradient['spread'];
+  readonly interpolation: projectFormatV1.Gradient['interpolation'];
+}
+
+function base(overrides: Partial<Pick<GradientBase, 'spread' | 'interpolation' | 'stops'>> = {}): GradientBase {
   return {
     stops: overrides.stops ?? RED_TO_BLUE,
-    coordinateSpace: 'object-bounds' as const,
+    coordinateSpace: 'object-bounds',
     transform: IDENTITY,
-    spread: overrides.spread ?? ('pad' as const),
-    interpolation: overrides.interpolation ?? ('srgb' as const),
+    spread: overrides.spread ?? 'pad',
+    interpolation: overrides.interpolation ?? 'srgb',
   };
 }
 
-function css(gradient: projectFormatV1.Gradient, swatches: ReadonlyMap<projectFormatV1.Id, projectFormatV1.Swatch> = noSwatches): string {
+function css(
+  gradient: projectFormatV1.Gradient,
+  swatches: ReadonlyMap<projectFormatV1.Id, projectFormatV1.Swatch> = noSwatches,
+): string {
   return gradientToCss(gradient, swatches);
 }
 
@@ -55,7 +66,12 @@ describe('gradientToCss', () => {
   });
 
   it('folds per-stop opacity into the stop color alpha', () => {
-    const gradient: projectFormatV1.Gradient = { ...base({ stops: [stop(0, srgb(1, 0, 0), 0.5)] }), kind: 'linear', start: [0, 0], end: [1, 0] };
+    const gradient: projectFormatV1.Gradient = {
+      ...base({ stops: [stop(0, srgb(1, 0, 0), 0.5)] }),
+      kind: 'linear',
+      start: [0, 0],
+      end: [1, 0],
+    };
 
     expect(css(gradient)).toBe('linear-gradient(90deg, color(srgb 1 0 0 / 0.5) 0%)');
   });
@@ -69,25 +85,48 @@ describe('gradientToCss', () => {
   });
 
   it('maps a conic gradient with its start angle and center', () => {
-    expect(css({ ...base(), kind: 'conic', center: [0.5, 0.5], startAngle: 45 })).toBe(`conic-gradient(from 45deg at 50% 50%, ${STOPS})`);
+    expect(css({ ...base(), kind: 'conic', center: [0.5, 0.5], startAngle: 45 })).toBe(
+      `conic-gradient(from 45deg at 50% 50%, ${STOPS})`,
+    );
   });
 
   it('falls back to a horizontal gradient for producer-preserved kinds', () => {
-    expect(css({ ...base(), kind: 'producer-preserved', producer: 'pptx', typeName: 'gradFill' })).toBe(`linear-gradient(to right, ${STOPS})`);
+    expect(css({ ...base(), kind: 'producer-preserved', producer: 'pptx', typeName: 'gradFill' })).toBe(
+      `linear-gradient(to right, ${STOPS})`,
+    );
   });
 
   it('maps spread to repeating and interpolation to a color space clause', () => {
-    expect(css({ ...base({ spread: 'repeat' }), kind: 'linear', start: [0, 0], end: [1, 0] })).toBe(`repeating-linear-gradient(90deg, ${STOPS})`);
-    expect(css({ ...base({ spread: 'reflect' }), kind: 'linear', start: [0, 0], end: [1, 0] })).toBe(`repeating-linear-gradient(90deg, ${STOPS})`);
-    expect(css({ ...base({ interpolation: 'oklab' }), kind: 'linear', start: [0, 0], end: [1, 0] })).toBe(`linear-gradient(90deg in oklab, ${STOPS})`);
-    expect(css({ ...base({ interpolation: 'linear-srgb' }), kind: 'linear', start: [0, 0], end: [1, 0] })).toBe(`linear-gradient(90deg in srgb-linear, ${STOPS})`);
+    expect(css({ ...base({ spread: 'repeat' }), kind: 'linear', start: [0, 0], end: [1, 0] })).toBe(
+      `repeating-linear-gradient(90deg, ${STOPS})`,
+    );
+    expect(css({ ...base({ spread: 'reflect' }), kind: 'linear', start: [0, 0], end: [1, 0] })).toBe(
+      `repeating-linear-gradient(90deg, ${STOPS})`,
+    );
+    expect(css({ ...base({ interpolation: 'oklab' }), kind: 'linear', start: [0, 0], end: [1, 0] })).toBe(
+      `linear-gradient(90deg in oklab, ${STOPS})`,
+    );
+    expect(css({ ...base({ interpolation: 'linear-srgb' }), kind: 'linear', start: [0, 0], end: [1, 0] })).toBe(
+      `linear-gradient(90deg in srgb-linear, ${STOPS})`,
+    );
   });
 
   it('resolves swatch stop colors and fails closed to transparent for unresolved stops', () => {
-    const swatch: projectFormatV1.Swatch = { id: id('brand'), kind: 'process', name: 'Brand', color: srgb(0, 1, 0), producerAliases: [] };
+    const swatch: projectFormatV1.Swatch = {
+      id: id('brand'),
+      kind: 'process',
+      name: 'Brand',
+      color: srgb(0, 1, 0),
+      producerAliases: [],
+    };
     const swatches = new Map([[id('brand'), swatch]]);
     const gradient: projectFormatV1.Gradient = {
-      ...base({ stops: [stop(0, { kind: 'swatch', swatchId: id('brand') }), stop(1, { kind: 'swatch', swatchId: id('missing') })] }),
+      ...base({
+        stops: [
+          stop(0, { kind: 'swatch', swatchId: id('brand') }),
+          stop(1, { kind: 'swatch', swatchId: id('missing') }),
+        ],
+      }),
       kind: 'linear',
       start: [0, 0],
       end: [1, 0],
@@ -98,5 +137,19 @@ describe('gradientToCss', () => {
 
   it('fails closed to transparent for a gradient with no stops', () => {
     expect(css({ ...base({ stops: [] }), kind: 'linear', start: [0, 0], end: [1, 0] })).toBe('transparent');
+  });
+
+  it('preserves complete gradient geometry as inert renderer metadata', () => {
+    const gradient: projectFormatV1.Gradient = {
+      ...base({ spread: 'reflect', interpolation: 'oklab' }),
+      kind: 'radial',
+      center: [0.4, 0.6],
+      radius: [0.7, 0.3],
+      focalPoint: [0.2, 0.8],
+      coordinateSpace: 'user-space',
+      transform: { kind: 'affine2d', matrix: [1, 0.2, 0.3, 1, 12, 34] },
+    };
+
+    expect(JSON.parse(gradientToDataAttributeV1(gradient))).toEqual(gradient);
   });
 });

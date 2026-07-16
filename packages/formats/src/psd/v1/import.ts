@@ -1,5 +1,4 @@
 import { projectFormatV1 } from '@broadset/model';
-import { readPsd } from 'ag-psd';
 
 import {
   assembleImportedProjectV1,
@@ -7,7 +6,9 @@ import {
   createResourceCollectorV1,
   type ProjectImportResultV1,
 } from '../../v1';
-import { ensureCanvasInitialized } from '../runtime-canvas';
+import { parsePsdInIsolationV1 } from '../import-isolation';
+import type { ParsedPsdV1 } from '../import-parse';
+import { preflightPsdV1 } from '../import-preflight';
 import { createPsdFontRegistryV1 } from './font-registry';
 import { type MappedPsdElementV1, mapPsdLayerTreeV1, type PsdLayerTreeResultV1 } from './map-layer-tree';
 import { psdLayerName } from './names';
@@ -26,20 +27,51 @@ const FALLBACK_ROOT_HASH = projectFormatV1.sha256DigestSchema.parse(
 const MINIMUM_SURFACE_SIZE = 1;
 const PSD_DPI = 72;
 const DEFAULT_MAX_BYTES = 256 * 1024 * 1024;
-const DEFAULT_MAX_DEPTH = 32;
+const DEFAULT_MAX_DEPTH = 100;
 const DEFAULT_MAX_TOTAL_PIXELS = 256 * 1024 * 1024;
+const DEFAULT_MAX_WIDTH = 100_000;
+const DEFAULT_MAX_HEIGHT = 100_000;
+const DEFAULT_MAX_CHANNELS = 56;
+const DEFAULT_MAX_DECODED_BYTES = 128 * 1024 * 1024;
+const DEFAULT_MAX_LAYERS = 4096;
+const DEFAULT_MAX_SECTION_BYTES = 128 * 1024 * 1024;
+const DEFAULT_MAX_CHANNEL_BYTES = 64 * 1024 * 1024;
 const FALLBACK_DIGEST = projectFormatV1.sha256DigestSchema.parse(
   'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
 );
 
-type ParsedPsdV1 = ReturnType<typeof readPsd>;
+function validPositiveInteger(value: number | undefined, fallback: number): number {
+  return value !== undefined && Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
 
-function ownedArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const copy = new Uint8Array(bytes.byteLength);
+type PsdPreflightCodeV1 = Extract<ReturnType<typeof preflightPsdV1>, { readonly status: 'rejected' }>['code'];
 
-  copy.set(bytes);
+function preflightDiagnosticCode(code: PsdPreflightCodeV1): string {
+  if (code === 'input-size-limit') return 'psd.input-too-large';
+  if (code === 'malformed-header') return 'psd.malformed';
 
-  return copy.buffer;
+  return `psd.${code}`;
+}
+
+function psdPreflightMessage(code: PsdPreflightCodeV1, maxBytes: number): string {
+  switch (code) {
+    case 'input-size-limit':
+      return `PSD input exceeded the ${String(maxBytes)} byte limit.`;
+    case 'malformed-header':
+      return 'PSD import could not parse the malformed byte stream.';
+    case 'dimension-limit':
+      return 'PSD header dimensions exceeded the configured pre-decode limit.';
+    case 'channel-limit':
+      return 'PSD header channel count exceeded the configured pre-decode limit.';
+    case 'decoded-size-limit':
+      return 'PSD decoder output exceeded the configured decoded-byte limit.';
+    case 'section-size-limit':
+      return 'PSD metadata section exceeded the configured pre-decode byte limit.';
+    case 'layer-count-limit':
+      return 'PSD layer count exceeded the configured pre-decode limit.';
+    case 'layer-channel-limit':
+      return 'PSD layer channel payload exceeded the configured pre-decode limit.';
+  }
 }
 
 function projectName(fileName: string | undefined): string {
@@ -344,11 +376,15 @@ export async function importPsdProjectV1(input: {
   readonly maxBytes?: number;
   readonly maxDepth?: number;
   readonly maxTotalPixels?: number;
+  readonly maxWidth?: number;
+  readonly maxHeight?: number;
+  readonly maxChannels?: number;
+  readonly maxDecodedBytes?: number;
+  readonly maxLayers?: number;
+  readonly maxSectionBytes?: number;
+  readonly maxChannelBytes?: number;
 }): Promise<ProjectImportResultV1> {
-  const maxBytes =
-    input.maxBytes !== undefined && Number.isSafeInteger(input.maxBytes) && input.maxBytes > 0 ?
-      input.maxBytes
-    : DEFAULT_MAX_BYTES;
+  const maxBytes = validPositiveInteger(input.maxBytes, DEFAULT_MAX_BYTES);
   const maxDepth =
     input.maxDepth !== undefined && Number.isSafeInteger(input.maxDepth) && input.maxDepth >= 0 ?
       input.maxDepth
@@ -357,35 +393,51 @@ export async function importPsdProjectV1(input: {
     input.maxTotalPixels !== undefined && Number.isSafeInteger(input.maxTotalPixels) && input.maxTotalPixels > 0 ?
       input.maxTotalPixels
     : DEFAULT_MAX_TOTAL_PIXELS;
+  const maxWidth = validPositiveInteger(input.maxWidth, DEFAULT_MAX_WIDTH);
+  const maxHeight = validPositiveInteger(input.maxHeight, DEFAULT_MAX_HEIGHT);
+  const maxChannels = validPositiveInteger(input.maxChannels, DEFAULT_MAX_CHANNELS);
+  const maxDecodedBytes = validPositiveInteger(input.maxDecodedBytes, DEFAULT_MAX_DECODED_BYTES);
+  const maxLayers = validPositiveInteger(input.maxLayers, DEFAULT_MAX_LAYERS);
+  const maxSectionBytes = validPositiveInteger(input.maxSectionBytes, DEFAULT_MAX_SECTION_BYTES);
+  const maxChannelBytes = validPositiveInteger(input.maxChannelBytes, DEFAULT_MAX_CHANNEL_BYTES);
+  const preflight = preflightPsdV1({
+    bytes: input.bytes,
+    limits: {
+      maxInputBytes: maxBytes,
+      maxWidth,
+      maxHeight,
+      maxChannels,
+      maxDecodedBytes,
+      maxLayers,
+      maxSectionBytes,
+      maxChannelBytes,
+    },
+  });
 
-  if (input.bytes.byteLength > maxBytes) {
+  if (preflight.status === 'rejected') {
     // Oversized bytes are intentionally not hashed or copied after the trust-boundary cap.
     return fallbackResult({
       fileName: input.fileName,
       importedAt: input.importedAt,
       diagnostic: errorDiagnostic({
-        code: 'psd.input-too-large',
-        message: `PSD input exceeded the ${String(maxBytes)} byte limit.`,
+        code: preflightDiagnosticCode(preflight.code),
+        message: psdPreflightMessage(preflight.code, maxBytes),
       }),
     });
   }
 
-  let psd: ParsedPsdV1;
+  const parsed = await parsePsdInIsolationV1({ bytes: input.bytes, maxResultBytes: maxDecodedBytes });
 
-  try {
-    ensureCanvasInitialized();
-    psd = readPsd(ownedArrayBuffer(input.bytes), {
-      skipCompositeImageData: true,
-      skipThumbnail: true,
-      useImageData: true,
-    });
-  } catch (error: unknown) {
+  if (parsed.kind !== 'ok') {
     return fallbackResult({
       fileName: input.fileName,
       importedAt: input.importedAt,
       diagnostic: errorDiagnostic({
         code: 'psd.malformed',
-        message: error instanceof Error ? error.message : 'PSD import could not parse the malformed byte stream.',
+        message:
+          parsed.kind === 'timeout' ?
+            'PSD worker exceeded the parser timeout.'
+          : parsed.message,
       }),
     });
   }
@@ -395,7 +447,7 @@ export async function importPsdProjectV1(input: {
       bytes: input.bytes,
       fileName: input.fileName,
       importedAt: input.importedAt,
-      psd,
+      psd: parsed.psd,
       maxDepth,
       maxTotalPixels,
     });

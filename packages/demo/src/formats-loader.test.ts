@@ -12,6 +12,6 @@ describe('formats loader', () => {
     const second = await loadFormats();
 
     expect(first).toBe(second);
-    expect(first.importPptxProjectV1).toBeTypeOf('function');
+    expect(first.exportBspPackageV1).toBeTypeOf('function');
   });
 });

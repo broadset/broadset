@@ -1,13 +1,6 @@
-import {
-  decodePDFRawStream,
-  PDFArray,
-  type PDFDocument,
-  PDFName,
-  type PDFPage,
-  PDFRawStream,
-  PDFRef,
-  PDFStream,
-} from 'pdf-lib';
+import { PDFArray, type PDFDocument, PDFName, type PDFPage, PDFRawStream, PDFRef, PDFStream } from 'pdf-lib';
+
+import { decodePdfRawStreamBoundedV1 } from './bounded-stream';
 
 /**
  * A single text-showing instance extracted from a page's content stream.
@@ -37,12 +30,13 @@ interface PageContentChunksResult {
   readonly warnings: readonly string[];
 }
 
-export function readPageContentChunks(
-  pdf: PDFDocument,
-  page: PDFPage,
-  pageIndex: number,
-): PageContentChunksResult {
-  const contents = page.node.Contents();
+export function readPageContentChunks(input: {
+  readonly pdf: PDFDocument;
+  readonly page: PDFPage;
+  readonly pageIndex: number;
+  readonly maxTotalBytes: number;
+}): PageContentChunksResult {
+  const contents = input.page.node.Contents();
 
   if (contents === undefined) return { chunks: [], warnings: [] };
 
@@ -53,20 +47,36 @@ export function readPageContentChunks(
     // document context.
     const chunks: Uint8Array[] = [];
     const warnings: string[] = [];
+    let remainingBytes = input.maxTotalBytes;
 
     for (let i = 0; i < contents.size(); i++) {
-      const resolved = resolveContentEntry(pdf, contents.get(i), pageIndex, i);
+      const resolved = resolveContentEntry({
+        pdf: input.pdf,
+        entry: contents.get(i),
+        pageIndex: input.pageIndex,
+        streamIndex: i,
+        maxBytes: remainingBytes,
+      });
 
       warnings.push(...resolved.warnings);
 
-      if (resolved.bytes !== undefined) chunks.push(resolved.bytes);
+      if (resolved.bytes !== undefined) {
+        chunks.push(resolved.bytes);
+        remainingBytes -= resolved.bytes.byteLength;
+      }
     }
 
     return { chunks, warnings };
   }
 
   if (contents instanceof PDFRef) {
-    const resolved = resolveContentEntry(pdf, contents, pageIndex, 0);
+    const resolved = resolveContentEntry({
+      pdf: input.pdf,
+      entry: contents,
+      pageIndex: input.pageIndex,
+      streamIndex: 0,
+      maxBytes: input.maxTotalBytes,
+    });
 
     return {
       chunks: resolved.bytes === undefined ? [] : [resolved.bytes],
@@ -75,7 +85,11 @@ export function readPageContentChunks(
   }
 
   if (contents instanceof PDFStream) {
-    const resolved = tryDecodeStream(contents, pageIndex);
+    const resolved = tryDecodeStream({
+      stream: contents,
+      pageIndex: input.pageIndex,
+      maxBytes: input.maxTotalBytes,
+    });
 
     return {
       chunks: resolved.bytes === undefined ? [] : [resolved.bytes],
@@ -86,62 +100,75 @@ export function readPageContentChunks(
   return {
     chunks: [],
     warnings: [
-      `PDF import: page ${String(pageIndex + 1)} content entry is not a stream; text extraction skipped for that entry.`,
+      `PDF import: page ${String(input.pageIndex + 1)} content entry is not a stream; text extraction skipped for that entry.`,
     ],
   };
 }
 
-function resolveContentEntry(
-  pdf: PDFDocument,
-  entry: unknown,
-  pageIndex: number,
-  streamIndex: number,
-): ContentReadResult {
-  if (entry instanceof PDFRef) {
-    const resolved = pdf.context.lookup(entry);
+function resolveContentEntry(input: {
+  readonly pdf: PDFDocument;
+  readonly entry: unknown;
+  readonly pageIndex: number;
+  readonly streamIndex: number;
+  readonly maxBytes: number;
+}): ContentReadResult {
+  if (input.entry instanceof PDFRef) {
+    const resolved = input.pdf.context.lookup(input.entry);
 
     if (resolved instanceof PDFStream) {
-      return tryDecodeStream(resolved, pageIndex, streamIndex);
+      return tryDecodeStream({
+        stream: resolved,
+        pageIndex: input.pageIndex,
+        maxBytes: input.maxBytes,
+        streamIndex: input.streamIndex,
+      });
     }
 
     return {
       bytes: undefined,
       warnings: [
-        `PDF import: page ${String(pageIndex + 1)} content stream ${String(streamIndex + 1)} reference did not resolve to a stream; text extraction skipped for that entry.`,
+        `PDF import: page ${String(input.pageIndex + 1)} content stream ${String(input.streamIndex + 1)} reference did not resolve to a stream; text extraction skipped for that entry.`,
       ],
     };
   }
 
-  if (entry instanceof PDFStream) {
-    return tryDecodeStream(entry, pageIndex, streamIndex);
+  if (input.entry instanceof PDFStream) {
+    return tryDecodeStream({
+      stream: input.entry,
+      pageIndex: input.pageIndex,
+      maxBytes: input.maxBytes,
+      streamIndex: input.streamIndex,
+    });
   }
 
   return {
     bytes: undefined,
     warnings: [
-      `PDF import: page ${String(pageIndex + 1)} content entry ${String(streamIndex + 1)} is not a stream; text extraction skipped for that entry.`,
+      `PDF import: page ${String(input.pageIndex + 1)} content entry ${String(input.streamIndex + 1)} is not a stream; text extraction skipped for that entry.`,
     ],
   };
 }
 
-function tryDecodeStream(stream: PDFStream, pageIndex: number, streamIndex?: number): ContentReadResult {
-  if (stream instanceof PDFRawStream) {
-    try {
-      // `decodePDFRawStream` returns a `StreamType` (pdf-lib's internal
-      // decode-stream abstraction). Call `.decode()` to pull the
-      // decompressed bytes into a Uint8Array.
-      return { bytes: decodePDFRawStream(stream).decode(), warnings: [] };
-    } catch (error: unknown) {
-      return {
-        bytes: undefined,
-        warnings: [buildDecodeWarning(stream, pageIndex, streamIndex, error)],
-      };
-    }
+function tryDecodeStream(input: {
+  readonly stream: PDFStream;
+  readonly pageIndex: number;
+  readonly maxBytes: number;
+  readonly streamIndex?: number;
+}): ContentReadResult {
+  if (input.stream instanceof PDFRawStream) {
+    const decoded = decodePdfRawStreamBoundedV1({ stream: input.stream, maxOutputBytes: input.maxBytes });
+
+    if (decoded.status === 'decoded') return { bytes: decoded.bytes, warnings: [] };
+
+    return {
+      bytes: undefined,
+      warnings: [buildDecodeWarning(input.stream, input.pageIndex, input.streamIndex, new Error(decoded.reason))],
+    };
   }
 
   return {
     bytes: undefined,
-    warnings: [buildDecodeWarning(stream, pageIndex, streamIndex)],
+    warnings: [buildDecodeWarning(input.stream, input.pageIndex, input.streamIndex)],
   };
 }
 
@@ -210,19 +237,30 @@ const TJ_HEX_RE = /<([0-9A-Fa-f\s]*)>\s+Tj/g;
 const TJ_ARRAY_RE = /\[([^\]]*)\]\s+TJ/g;
 const TJ_ARRAY_ITEM_RE = /\(((?:\\.|[^\\()])*)\)|<([0-9A-Fa-f\s]*)>/g;
 
-export function scanContentStreamForText(content: string): readonly ExtractedTextItem[] {
+export function scanContentStreamForText(input: {
+  readonly content: string;
+  readonly maxItems: number;
+}): readonly ExtractedTextItem[] {
   const items: ExtractedTextItem[] = [];
 
-  for (const block of collectTextBlocks(content)) {
-    items.push(...extractItemsFromBlock(block));
+  if (input.maxItems <= 0) return items;
+
+  const blocks: Generator<string, void, undefined> = collectTextBlocks(input.content);
+  let nextBlock: IteratorResult<string, void> = blocks.next();
+
+  while (!nextBlock.done) {
+    const block: string = nextBlock.value;
+    const remaining = Math.max(0, input.maxItems - items.length);
+
+    if (remaining === 0) break;
+    items.push(...extractItemsFromBlock(block, remaining));
+    nextBlock = blocks.next();
   }
 
   return items;
 }
 
-function collectTextBlocks(content: string): readonly string[] {
-  const blocks: string[] = [];
-
+function* collectTextBlocks(content: string): Generator<string, void, undefined> {
   BT_RE.lastIndex = 0;
 
   let startMatch: RegExpExecArray | null;
@@ -236,12 +274,10 @@ function collectTextBlocks(content: string): readonly string[] {
 
     if (endMatch === null) break;
 
-    blocks.push(content.slice(startIndex, endMatch.index));
+    yield content.slice(startIndex, endMatch.index);
 
     BT_RE.lastIndex = endMatch.index + endMatch[0].length;
   }
-
-  return blocks;
 }
 
 interface RegexMatch {
@@ -253,7 +289,7 @@ function capture(match: RegexMatch, index: number): string | undefined {
   return match.captures[index];
 }
 
-function execAll(regex: RegExp, text: string): readonly RegexMatch[] {
+function execAll(regex: RegExp, text: string, maxMatches: number = Number.MAX_SAFE_INTEGER): readonly RegexMatch[] {
   const matches: RegexMatch[] = [];
 
   regex.lastIndex = 0;
@@ -269,13 +305,15 @@ function execAll(regex: RegExp, text: string): readonly RegexMatch[] {
 
     matches.push({ index: rawMatch.index, captures });
 
+    if (matches.length >= maxMatches) break;
+
     if (rawMatch[0] === '') regex.lastIndex += 1;
   }
 
   return matches;
 }
 
-function extractItemsFromBlock(block: string): readonly ExtractedTextItem[] {
+function extractItemsFromBlock(block: string, maxItems: number): readonly ExtractedTextItem[] {
   const items: ExtractedTextItem[] = [];
 
   let cursorX = 0;
@@ -283,7 +321,7 @@ function extractItemsFromBlock(block: string): readonly ExtractedTextItem[] {
   let fontSize = 12;
   let fontName = 'Helvetica';
 
-  const events = collectEvents(block);
+  const events = collectEvents(block, maxItems);
 
   for (const event of events) {
     switch (event.kind) {
@@ -300,6 +338,7 @@ function extractItemsFromBlock(block: string): readonly ExtractedTextItem[] {
         fontName = event.fontName;
         break;
       case 'tj':
+        if (items.length >= maxItems) return items;
         items.push({
           text: event.text,
           xPt: cursorX,
@@ -320,14 +359,14 @@ type ContentEvent =
   | { readonly kind: 'tf'; readonly index: number; readonly size: number; readonly fontName: string }
   | { readonly kind: 'tj'; readonly index: number; readonly text: string };
 
-function collectEvents(block: string): readonly ContentEvent[] {
+function collectEvents(block: string, maxEventsPerKind: number): readonly ContentEvent[] {
   const events: ContentEvent[] = [
-    ...collectTmEvents(block),
-    ...collectTdEvents(block),
-    ...collectTfEvents(block),
-    ...collectTjLiteralEvents(block),
-    ...collectTjHexEvents(block),
-    ...collectTjArrayEvents(block),
+    ...collectTmEvents(block, maxEventsPerKind),
+    ...collectTdEvents(block, maxEventsPerKind),
+    ...collectTfEvents(block, maxEventsPerKind),
+    ...collectTjLiteralEvents(block, maxEventsPerKind),
+    ...collectTjHexEvents(block, maxEventsPerKind),
+    ...collectTjArrayEvents(block, maxEventsPerKind),
   ];
 
   events.sort((a, b) => a.index - b.index);
@@ -335,10 +374,10 @@ function collectEvents(block: string): readonly ContentEvent[] {
   return events;
 }
 
-function collectTmEvents(block: string): readonly ContentEvent[] {
+function collectTmEvents(block: string, maxEvents: number): readonly ContentEvent[] {
   const events: ContentEvent[] = [];
 
-  for (const match of execAll(TM_RE, block)) {
+  for (const match of execAll(TM_RE, block, maxEvents)) {
     const e = parseFloatSafe(capture(match, 5));
     const f = parseFloatSafe(capture(match, 6));
 
@@ -350,10 +389,10 @@ function collectTmEvents(block: string): readonly ContentEvent[] {
   return events;
 }
 
-function collectTdEvents(block: string): readonly ContentEvent[] {
+function collectTdEvents(block: string, maxEvents: number): readonly ContentEvent[] {
   const events: ContentEvent[] = [];
 
-  for (const match of execAll(TD_RE, block)) {
+  for (const match of execAll(TD_RE, block, maxEvents)) {
     const x = parseFloatSafe(capture(match, 1));
     const y = parseFloatSafe(capture(match, 2));
 
@@ -365,10 +404,10 @@ function collectTdEvents(block: string): readonly ContentEvent[] {
   return events;
 }
 
-function collectTfEvents(block: string): readonly ContentEvent[] {
+function collectTfEvents(block: string, maxEvents: number): readonly ContentEvent[] {
   const events: ContentEvent[] = [];
 
-  for (const match of execAll(TF_RE, block)) {
+  for (const match of execAll(TF_RE, block, maxEvents)) {
     const fontName = capture(match, 1);
     const size = parseFloatSafe(capture(match, 2));
 
@@ -380,10 +419,10 @@ function collectTfEvents(block: string): readonly ContentEvent[] {
   return events;
 }
 
-function collectTjLiteralEvents(block: string): readonly ContentEvent[] {
+function collectTjLiteralEvents(block: string, maxEvents: number): readonly ContentEvent[] {
   const events: ContentEvent[] = [];
 
-  for (const match of execAll(TJ_LITERAL_RE, block)) {
+  for (const match of execAll(TJ_LITERAL_RE, block, maxEvents)) {
     const literal = capture(match, 1) ?? '';
 
     events.push({ kind: 'tj', index: match.index, text: decodePdfStringLiteral(literal) });
@@ -392,10 +431,10 @@ function collectTjLiteralEvents(block: string): readonly ContentEvent[] {
   return events;
 }
 
-function collectTjHexEvents(block: string): readonly ContentEvent[] {
+function collectTjHexEvents(block: string, maxEvents: number): readonly ContentEvent[] {
   const events: ContentEvent[] = [];
 
-  for (const match of execAll(TJ_HEX_RE, block)) {
+  for (const match of execAll(TJ_HEX_RE, block, maxEvents)) {
     const hex = capture(match, 1) ?? '';
     const decoded = decodePdfHexLiteral(hex);
 
@@ -411,10 +450,10 @@ function collectTjHexEvents(block: string): readonly ContentEvent[] {
  * ignoring the kerning deltas. The result is a single event per TJ
  * array at the array's position in the block.
  */
-function collectTjArrayEvents(block: string): readonly ContentEvent[] {
+function collectTjArrayEvents(block: string, maxEvents: number): readonly ContentEvent[] {
   const events: ContentEvent[] = [];
 
-  for (const match of execAll(TJ_ARRAY_RE, block)) {
+  for (const match of execAll(TJ_ARRAY_RE, block, maxEvents)) {
     const text = decodeTjArrayBody(capture(match, 1) ?? '');
 
     events.push({ kind: 'tj', index: match.index, text });

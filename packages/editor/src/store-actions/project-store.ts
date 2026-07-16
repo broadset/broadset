@@ -5,41 +5,61 @@ import { createStore, type StoreApi } from 'zustand/vanilla';
 import type { EditingMode, PlacementPoint, PlacementState } from '../editing-state';
 import { removeDocumentElementsV1 } from '../project-v1-mutations';
 import { updateElementRectV1 } from '../v1-element-geometry';
+import {
+  createProjectEditorClipboardState,
+  type ProjectClipboardPortV1,
+  type ProjectEditorClipboardState,
+} from './project-store-clipboard';
 import { createProjectEditorEditingActions } from './project-store-editing';
+import {
+  applyProjectElementUpdate,
+  type ProjectElementUpdateV1,
+} from './project-store-element-update';
 import type { ProjectReorderDirection } from './project-store-mutations';
 import {
   insertElementIntoProject,
-  insertPageIntoProject,
-  removePageFromProject,
+  isValidProject,
+  movePageRootInstanceInProject,
   reorderElementInProject,
+  reorderPageRootInstanceInProject,
   reparentElementInProject,
-  setPageRootVisibilityInProject,
-  updateDocumentInProject,
   updateElementInProject,
   updateElementsInProject,
 } from './project-store-mutations';
+import { createProjectEditorNavigationActions } from './project-store-navigation';
+import {
+  createProjectEditorPlaybackState,
+  type ProjectEditorPlaybackState,
+  resolvePreviewSequenceId,
+} from './project-store-playback';
+import { resolveRequiredElementIds } from './project-store-required';
+import {
+  createProjectEditorSelectionActions,
+  filterInstanceAddresses,
+  firstInstanceAddressForElement,
+} from './project-store-selection';
+import {
+  createProjectEditorSnapshotState,
+  type ProjectEditorSnapshotState,
+} from './project-store-snapshots';
 import { createProjectEditorUiState, type ProjectEditorUiState } from './project-store-ui';
 
+export type { ProjectClipboardPortV1 } from './project-store-clipboard';
+export type { ProjectElementUpdateV1 } from './project-store-element-update';
 export type { ProjectReorderDirection } from './project-store-mutations';
 
-export interface ProjectElementUpdateV1 {
-  readonly position?: { readonly x: number; readonly y: number };
-  readonly width?: number;
-  readonly height?: number;
-  readonly rotation?: number;
-  readonly name?: string;
-}
+type ProjectHistoryState = Pick<ProjectEditorState, 'blobs' | 'project'>;
 
-interface ProjectHistoryState {
-  readonly project: projectFormatV1.BroadsetProjectV1;
-}
-
-export interface ProjectEditorState extends ProjectEditorUiState {
+export interface ProjectEditorState
+  extends ProjectEditorUiState,
+    ProjectEditorClipboardState,
+    ProjectEditorPlaybackState,
+    ProjectEditorSnapshotState {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>;
   readonly activeDocumentId: projectFormatV1.Id;
   readonly activePageId: projectFormatV1.Id;
-  readonly activeElementIds: readonly projectFormatV1.Id[];
+  readonly activeInstanceAddresses: readonly projectFormatV1.InstanceAddress[];
   readonly placement: PlacementState | null;
   readonly placementPreview: PlacementPoint | null;
   readonly pathEditingElementId: projectFormatV1.Id | null;
@@ -51,20 +71,23 @@ export interface ProjectEditorState extends ProjectEditorUiState {
   readonly setProject: (
     project: projectFormatV1.BroadsetProjectV1,
     blobs?: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>,
-  ) => void;
+  ) => boolean;
   readonly getProject: () => projectFormatV1.BroadsetProjectV1;
   readonly setActiveDocument: (documentId: projectFormatV1.Id) => boolean;
   readonly setActivePage: (pageId: projectFormatV1.Id) => boolean;
   readonly switchPage: (index: number) => boolean;
   readonly addPage: (page: projectFormatV1.PageDefinition) => boolean;
   readonly removePage: (pageId: projectFormatV1.Id) => boolean;
-  readonly setPageRootVisibility: (elementId: projectFormatV1.Id, visible: boolean) => boolean;
+  readonly setPageRootVisibility: (rootInstanceId: projectFormatV1.Id, visible: boolean) => boolean;
   readonly updateActiveDocument: (
     updater: (document: projectFormatV1.BroadsetDocumentV1) => projectFormatV1.BroadsetDocumentV1,
   ) => boolean;
   readonly setActiveElements: (elementIds: readonly projectFormatV1.Id[]) => void;
   readonly selectElement: (elementId: projectFormatV1.Id | null) => void;
   readonly toggleSelectElement: (elementId: projectFormatV1.Id) => void;
+  readonly setActiveInstances: (addresses: readonly projectFormatV1.InstanceAddress[]) => void;
+  readonly selectInstance: (address: projectFormatV1.InstanceAddress | null) => void;
+  readonly toggleSelectInstance: (address: projectFormatV1.InstanceAddress) => void;
   readonly beginPlacement: (elementType: string) => void;
   readonly updatePlacement: (placement: PlacementState, preview?: PlacementPoint | null) => void;
   readonly cancelPlacement: () => void;
@@ -79,6 +102,15 @@ export interface ProjectEditorState extends ProjectEditorUiState {
   ) => boolean;
   readonly reparentElement: (elementId: projectFormatV1.Id, parentId: projectFormatV1.Id | null) => boolean;
   readonly reorderElement: (elementId: projectFormatV1.Id, direction: ProjectReorderDirection) => boolean;
+  readonly reorderRootInstance: (
+    rootInstanceId: projectFormatV1.Id,
+    direction: ProjectReorderDirection,
+  ) => boolean;
+  readonly moveRootInstance: (
+    rootInstanceId: projectFormatV1.Id,
+    targetRootInstanceId: projectFormatV1.Id,
+    position: 'before' | 'after',
+  ) => boolean;
   readonly updateElementEphemeral: (elementId: projectFormatV1.Id, update: ProjectElementUpdateV1) => boolean;
   readonly commitElementUpdate: (elementId: projectFormatV1.Id, update: ProjectElementUpdateV1) => boolean;
   readonly commitGroupMove: (
@@ -91,6 +123,7 @@ export interface ProjectEditorState extends ProjectEditorUiState {
   readonly removeElement: (elementId: projectFormatV1.Id) => void;
   readonly toggleLock: (elementId: projectFormatV1.Id) => boolean;
   readonly toggleVisibility: (elementId: projectFormatV1.Id) => boolean;
+  readonly toggleInstanceVisibility: (address: projectFormatV1.InstanceAddress) => boolean;
   readonly undo: () => void;
   readonly redo: () => void;
 }
@@ -104,6 +137,9 @@ export interface CreateProjectEditorStoreOptions {
   readonly blobs?: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>;
   readonly maxUndoSteps?: number;
   readonly config?: Partial<EditorConfig>;
+  readonly createId?: (() => projectFormatV1.Id) | undefined;
+  readonly now?: (() => string) | undefined;
+  readonly clipboard?: ProjectClipboardPortV1 | undefined;
 }
 
 const DEFAULT_MAX_UNDO_STEPS = 50;
@@ -123,66 +159,17 @@ function resolveInitialLocation(project: projectFormatV1.BroadsetProjectV1): {
   return { activeDocumentId: document.id, activePageId: page.id };
 }
 
-function filterElementIds(
-  project: projectFormatV1.BroadsetProjectV1,
-  documentId: projectFormatV1.Id,
-  elementIds: readonly projectFormatV1.Id[],
-): readonly projectFormatV1.Id[] {
-  const document = project.documents.find((candidate) => candidate.id === documentId);
-
-  if (document === undefined) return [];
-
-  const existingIds = new Set(document.elements.map((element) => element.id));
-
-  return elementIds.filter((elementId) => existingIds.has(elementId));
-}
-
-function applyProjectElementUpdate(
-  element: projectFormatV1.Element,
-  update: ProjectElementUpdateV1,
-): projectFormatV1.Element {
-  const geometryUpdated = updateElementRectV1(element, {
-    ...(update.position === undefined ? {} : { x: update.position.x, y: update.position.y }),
-    ...(update.width === undefined ? {} : { width: update.width }),
-    ...(update.height === undefined ? {} : { height: update.height }),
-    ...(update.rotation === undefined ? {} : { rotation: update.rotation }),
-  });
-
-  return update.name === undefined || update.name === geometryUpdated.name ?
-      geometryUpdated
-    : { ...geometryUpdated, name: update.name };
-}
-
-function createSelectionUpdate(
-  state: ProjectEditorState,
-  elementIds: readonly projectFormatV1.Id[],
-): Partial<ProjectEditorState> {
-  const activeElementIds = filterElementIds(state.project, state.activeDocumentId, elementIds);
-  const editingElementId =
-    state.pathEditingElementId ??
-    state.pathDrawingElementId ??
-    state.clipPathEditingElementId ??
-    state.motionPathEditingElementId ??
-    state.inlineTextEditingElementId;
-  const preservesEditing =
-    editingElementId !== null && activeElementIds.length === 1 && activeElementIds[0] === editingElementId;
-
-  return preservesEditing ?
-      { activeElementIds }
-    : {
-        activeElementIds,
-        pathEditingElementId: null,
-        pathDrawingElementId: null,
-        clipPathEditingElementId: null,
-        motionPathEditingElementId: null,
-        inlineTextEditingElementId: null,
-        editingMode: { type: 'none' },
-      };
-}
-
 export function createProjectEditorStore(options: CreateProjectEditorStoreOptions = {}): ProjectEditorStore {
   const initialProject = options.project ?? projectFormatV1.createProjectV1();
   const initialLocation = resolveInitialLocation(initialProject);
+  const requiredElementIds = resolveRequiredElementIds(options.config);
+  const createId = options.createId ?? (() => projectFormatV1.idSchema.parse(crypto.randomUUID()));
+  const now = options.now ?? (() => new Date().toISOString());
+  const initialSequenceId = resolvePreviewSequenceId({
+    project: initialProject,
+    documentId: initialLocation.activeDocumentId,
+    pageId: initialLocation.activePageId,
+  });
   const temporalReference: { current: StoreApi<TemporalState<ProjectHistoryState>> | null } = { current: null };
   const store: ProjectEditorStore = createStore<ProjectEditorState>()(
     temporal(
@@ -190,7 +177,7 @@ export function createProjectEditorStore(options: CreateProjectEditorStoreOption
         project: initialProject,
         blobs: options.blobs ?? new Map<projectFormatV1.Sha256Digest, Uint8Array>(),
         ...initialLocation,
-        activeElementIds: [],
+        activeInstanceAddresses: [],
         placement: null,
         placementPreview: null,
         pathEditingElementId: null,
@@ -202,161 +189,51 @@ export function createProjectEditorStore(options: CreateProjectEditorStoreOption
         ...createProjectEditorUiState((updater) => {
           set((state) => updater(state));
         }, options.config),
+        ...createProjectEditorSnapshotState(set, { createId, now }),
+        ...createProjectEditorClipboardState({ getState: get, setState: set }, { createId, port: options.clipboard }),
+        ...createProjectEditorPlaybackState({ getState: get, setState: set }, initialSequenceId),
         setProject(
           project: projectFormatV1.BroadsetProjectV1,
           blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array> = new Map(),
-        ): void {
-          const location = resolveInitialLocation(project);
+        ): boolean {
+          if (!isValidProject(project)) return false;
 
-          set({ project, blobs, ...location, activeElementIds: [] });
+          const location = resolveInitialLocation(project);
+          const playbackSequenceId = resolvePreviewSequenceId({
+            project,
+            documentId: location.activeDocumentId,
+            pageId: location.activePageId,
+          });
+
+          set({
+            project,
+            blobs,
+            ...location,
+            activeInstanceAddresses: [],
+            placement: null,
+            placementPreview: null,
+            pathEditingElementId: null,
+            pathDrawingElementId: null,
+            clipPathEditingElementId: null,
+            motionPathEditingElementId: null,
+            inlineTextEditingElementId: null,
+            editingMode: { type: 'none' },
+            editingGuideId: null,
+            snapshots: [],
+            playbackSequenceId,
+            playbackTick: 0,
+            playbackPlaying: false,
+          });
           temporalReference.current?.getState().clear();
+
+          return true;
         },
         getProject(): projectFormatV1.BroadsetProjectV1 {
           return get().project;
         },
-        setActiveDocument(documentId: projectFormatV1.Id): boolean {
-          let activated = false;
-
-          set((state) => {
-            const document = state.project.documents.find((candidate) => candidate.id === documentId);
-            const page = document?.pages[0];
-
-            if (document === undefined || page === undefined) return {};
-
-            activated = true;
-
-            return {
-              activeDocumentId: document.id,
-              activePageId: page.id,
-              activeElementIds: [],
-            };
-          });
-
-          return activated;
-        },
-        setActivePage(pageId: projectFormatV1.Id): boolean {
-          let activated = false;
-
-          set((state) => {
-            const document = state.project.documents.find((candidate) => candidate.id === state.activeDocumentId);
-
-            if (document?.pages.some((page) => page.id === pageId) !== true) return {};
-
-            activated = true;
-
-            return { activePageId: pageId, activeElementIds: [] };
-          });
-
-          return activated;
-        },
-        switchPage(index: number): boolean {
-          const document = get().project.documents.find((candidate) => candidate.id === get().activeDocumentId);
-          const page = document?.pages[index];
-
-          return page !== undefined && get().setActivePage(page.id);
-        },
-        addPage(page: projectFormatV1.PageDefinition): boolean {
-          let added = false;
-
-          set((state) => {
-            const project = insertPageIntoProject({
-              project: state.project,
-              documentId: state.activeDocumentId,
-              page,
-            });
-
-            if (project === state.project) return {};
-
-            added = true;
-
-            return { project };
-          });
-
-          return added;
-        },
-        removePage(pageId: projectFormatV1.Id): boolean {
-          let removed = false;
-
-          set((state) => {
-            const project = removePageFromProject({
-              project: state.project,
-              documentId: state.activeDocumentId,
-              pageId,
-            });
-
-            if (project === state.project) return {};
-
-            const document = project.documents.find((candidate) => candidate.id === state.activeDocumentId);
-            const activePageId = state.activePageId === pageId ? document?.pages[0]?.id : state.activePageId;
-
-            if (activePageId === undefined) return {};
-
-            removed = true;
-
-            return { project, activePageId, activeElementIds: [] };
-          });
-
-          return removed;
-        },
-        setPageRootVisibility(elementId: projectFormatV1.Id, visible: boolean): boolean {
-          let updated = false;
-
-          set((state) => {
-            const project = setPageRootVisibilityInProject({
-              project: state.project,
-              documentId: state.activeDocumentId,
-              pageId: state.activePageId,
-              elementId,
-              visible,
-            });
-
-            if (project === state.project) return {};
-
-            updated = true;
-
-            return { project };
-          });
-
-          return updated;
-        },
-        updateActiveDocument(
-          updater: (document: projectFormatV1.BroadsetDocumentV1) => projectFormatV1.BroadsetDocumentV1,
-        ): boolean {
-          let updated = false;
-
-          set((state) => {
-            const project = updateDocumentInProject({
-              project: state.project,
-              documentId: state.activeDocumentId,
-              updater,
-            });
-
-            if (project === state.project) return {};
-
-            updated = true;
-
-            return { project };
-          });
-
-          return updated;
-        },
-        setActiveElements(elementIds: readonly projectFormatV1.Id[]): void {
-          set((state) => createSelectionUpdate(state, elementIds));
-        },
-        selectElement(elementId: projectFormatV1.Id | null): void {
-          set((state) => createSelectionUpdate(state, elementId === null ? [] : [elementId]));
-        },
-        toggleSelectElement(elementId: projectFormatV1.Id): void {
-          set((state) => {
-            const elementIds =
-              state.activeElementIds.includes(elementId) ?
-                state.activeElementIds.filter((activeId) => activeId !== elementId)
-              : [...state.activeElementIds, elementId];
-
-            return createSelectionUpdate(state, elementIds);
-          });
-        },
-        ...createProjectEditorEditingActions(set),
+        ...createProjectEditorNavigationActions({ getState: get, setState: set }),
+        ...createProjectEditorSelectionActions(set),
+        ...createProjectEditorEditingActions(set, firstInstanceAddressForElement),
         addElement(element: projectFormatV1.Element): projectFormatV1.Id | null {
           let addedElementId: projectFormatV1.Id | null = null;
 
@@ -372,7 +249,12 @@ export function createProjectEditorStore(options: CreateProjectEditorStoreOption
 
             addedElementId = element.id;
 
-            return { project, activeElementIds: [element.id] };
+            const address = firstInstanceAddressForElement({ ...state, project }, element.id);
+
+            return {
+              project,
+              activeInstanceAddresses: address === undefined ? [] : [address],
+            };
           });
 
           return addedElementId;
@@ -441,6 +323,53 @@ export function createProjectEditorStore(options: CreateProjectEditorStoreOption
 
           return reordered;
         },
+        reorderRootInstance(rootInstanceId: projectFormatV1.Id, direction: ProjectReorderDirection): boolean {
+          let reordered = false;
+
+          set((state) => {
+            const project = reorderPageRootInstanceInProject({
+              project: state.project,
+              documentId: state.activeDocumentId,
+              pageId: state.activePageId,
+              rootInstanceId,
+              direction,
+            });
+
+            if (project === state.project) return {};
+
+            reordered = true;
+
+            return { project };
+          });
+
+          return reordered;
+        },
+        moveRootInstance(
+          rootInstanceId: projectFormatV1.Id,
+          targetRootInstanceId: projectFormatV1.Id,
+          position: 'before' | 'after',
+        ): boolean {
+          let moved = false;
+
+          set((state) => {
+            const project = movePageRootInstanceInProject({
+              project: state.project,
+              documentId: state.activeDocumentId,
+              pageId: state.activePageId,
+              rootInstanceId,
+              targetRootInstanceId,
+              position,
+            });
+
+            if (project === state.project) return {};
+
+            moved = true;
+
+            return { project };
+          });
+
+          return moved;
+        },
         updateElementEphemeral(elementId: projectFormatV1.Id, update: ProjectElementUpdateV1): boolean {
           let updated = false;
 
@@ -506,13 +435,17 @@ export function createProjectEditorStore(options: CreateProjectEditorStoreOption
               project: state.project,
               documentId: state.activeDocumentId,
               elementIds,
+              requiredElementIds,
             });
 
             return project === state.project ?
                 {}
               : {
                   project,
-                  activeElementIds: filterElementIds(project, state.activeDocumentId, state.activeElementIds),
+                  activeInstanceAddresses: filterInstanceAddresses(
+                    { ...state, project },
+                    state.activeInstanceAddresses,
+                  ),
                 };
           });
         },
@@ -524,18 +457,20 @@ export function createProjectEditorStore(options: CreateProjectEditorStoreOption
         },
         toggleVisibility(elementId: projectFormatV1.Id): boolean {
           const state = get();
-          const document = state.project.documents.find((candidate) => candidate.id === state.activeDocumentId);
-          const elementsById = new Map(document?.elements.map((element) => [element.id, element]) ?? []);
-          let root = elementsById.get(elementId);
+          const address = firstInstanceAddressForElement(state, elementId);
 
-          while (root?.parentId !== null && root !== undefined) root = elementsById.get(root.parentId);
+          return address !== undefined && get().toggleInstanceVisibility(address);
+        },
+        toggleInstanceVisibility(address: projectFormatV1.InstanceAddress): boolean {
+          const state = get();
+          const page = state.project.documents
+            .find((candidate) => candidate.id === state.activeDocumentId)
+            ?.pages.find((candidate) => candidate.id === state.activePageId);
+          const instance = page?.rootInstances.find((candidate) => candidate.id === address.rootInstanceId);
 
-          if (root === undefined) return false;
+          if (instance === undefined || filterInstanceAddresses(state, [address]).length === 0) return false;
 
-          const page = document?.pages.find((candidate) => candidate.id === state.activePageId);
-          const instance = page?.rootInstances.find((candidate) => candidate.elementId === root.id);
-
-          return instance !== undefined && get().setPageRootVisibility(root.id, instance.visible === false);
+          return get().setPageRootVisibility(instance.id, instance.visible === false);
         },
         undo(): void {
           temporalReference.current?.getState().undo();
@@ -545,9 +480,9 @@ export function createProjectEditorStore(options: CreateProjectEditorStoreOption
         },
       }),
       {
-        partialize: (state) => ({ project: state.project }),
+        partialize: (state) => ({ project: state.project, blobs: state.blobs }),
         limit: options.maxUndoSteps ?? DEFAULT_MAX_UNDO_STEPS,
-        equality: (previous, current) => previous.project === current.project,
+        equality: (previous, current) => previous.project === current.project && previous.blobs === current.blobs,
       },
     ),
   );

@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it, vi } from 'vitest';
 
-import { exportPptxBytesV1, importPptxProjectV1, reconcilePptxProjectV1 } from '../../index';
 import {
   canvaCroppedFixture,
   canvaFixture,
@@ -15,6 +14,7 @@ import {
   powerpointFixture,
 } from '../fixtures/external-tools';
 import { encodeText, writeOoxmlPackage } from '../ooxml/zip';
+import { exportPptxBytesV1, importPptxProjectV1, reconcilePptxProjectV1 } from './index';
 
 const IMPORTED_AT = projectFormatV1.utcTimestampSchema.parse('2026-07-12T00:00:00Z');
 
@@ -27,6 +27,61 @@ function expectValid(result: Awaited<ReturnType<typeof importPptxProjectV1>>): v
 
   expect(structural.filter(({ code }) => code === 'structural-invalid')).toEqual([]);
   expect(projectFormatV1.validateBroadsetProjectV1Semantics(result.project)).toEqual([]);
+}
+
+function picturePackage(input: { readonly count: number; readonly mediaBytes: Uint8Array }): Uint8Array {
+  const pictures = Array.from({ length: input.count }, (_, index) => {
+    const shapeId = String(index + 1);
+
+    return `<p:pic><p:nvPicPr><p:cNvPr id="${shapeId}" name="Picture ${shapeId}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId1"/></p:blipFill><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm></p:spPr></p:pic>`;
+  }).join('');
+  const presentation =
+    '<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>';
+  const slide = `<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree>${pictures}</p:spTree></p:cSld></p:sld>`;
+
+  return writeOoxmlPackage(
+    new Map([
+      ['[Content_Types].xml', encodeText('<Types/>')],
+      ['ppt/presentation.xml', encodeText(presentation)],
+      [
+        'ppt/_rels/presentation.xml.rels',
+        encodeText(
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>',
+        ),
+      ],
+      ['ppt/slides/slide1.xml', encodeText(slide)],
+      [
+        'ppt/slides/_rels/slide1.xml.rels',
+        encodeText(
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>',
+        ),
+      ],
+      ['ppt/media/image1.png', input.mediaBytes],
+    ]),
+  );
+}
+
+function xmlBoundaryPackage(xml: string): Uint8Array {
+  return writeOoxmlPackage(
+    new Map([
+      ['[Content_Types].xml', encodeText('<Types/>')],
+      ['ppt/presentation.xml', encodeText(xml)],
+      [
+        'ppt/_rels/presentation.xml.rels',
+        encodeText(
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>',
+        ),
+      ],
+    ]),
+  );
+}
+
+function bytesOf(value: BufferSource): Uint8Array {
+  return value instanceof ArrayBuffer ? new Uint8Array(value) : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+}
+
+function equalBytes(left: Uint8Array, right: Uint8Array): boolean {
+  return left.byteLength === right.byteLength && left.every((value, index) => value === right[index]);
 }
 
 describe('importPptxProjectV1', () => {
@@ -91,6 +146,26 @@ describe('importPptxProjectV1', () => {
 
     expect(asset).toMatchObject({ kind: 'image', blob: { mediaType: 'image/png' } });
     expectValid(result);
+  });
+
+  it('registers one shared media payload once across 1000 picture references', async () => {
+    const mediaBytes = Uint8Array.from({ length: 257 }, (_, index) => (index * 31 + 17) % 256);
+    const digest = vi.spyOn(globalThis.crypto.subtle, 'digest');
+
+    try {
+      const result = await importPptxProjectV1({
+        bytes: picturePackage({ count: 1000, mediaBytes }),
+        importedAt: IMPORTED_AT,
+      });
+      const matchingDigestCalls = digest.mock.calls.filter((call) => equalBytes(bytesOf(call[1]), mediaBytes));
+
+      expect(result.project.documents[0]?.elements.filter(({ kind }) => kind === 'image')).toHaveLength(1000);
+      expect(result.project.resources.assets.filter(({ kind }) => kind === 'image')).toHaveLength(1);
+      expect(matchingDigestCalls).toHaveLength(1);
+      expectValid(result);
+    } finally {
+      digest.mockRestore();
+    }
   });
 
   it('preserves PowerPoint paragraph and run-level rich text', async () => {
@@ -311,6 +386,40 @@ describe('importPptxProjectV1', () => {
     expectValid(result);
   });
 
+  it.each([
+    [
+      'DTD declaration',
+      '<?xml version="1.0"?><!DOCTYPE root [<!ENTITY payload "expanded">]><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>',
+    ],
+    [
+      'node limit',
+      `<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">${'<n/>'.repeat(250_001)}</p:presentation>`,
+    ],
+    [
+      'depth limit',
+      `<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">${'<n>'.repeat(101)}${'</n>'.repeat(101)}</p:presentation>`,
+    ],
+  ])('quarantines source bytes after terminal XML %s rejection', async (_boundary, xml) => {
+    const digest = vi.spyOn(globalThis.crypto.subtle, 'digest');
+
+    try {
+      const result = await importPptxProjectV1({
+        bytes: xmlBoundaryPackage(xml),
+        importedAt: IMPORTED_AT,
+        maxExpansionRatio: Number.MAX_SAFE_INTEGER,
+      });
+
+      expect(digest).not.toHaveBeenCalled();
+      expect([...result.blobs.values()]).toEqual([new Uint8Array()]);
+      expect(result.project.interop.records.flatMap(({ warnings }) => warnings)).toContainEqual(
+        expect.objectContaining({ code: 'pptx.malformed-xml', severity: 'error' }),
+      );
+      expectValid(result);
+    } finally {
+      digest.mockRestore();
+    }
+  });
+
   it('diagnoses and strips macro payloads', async () => {
     const presentation = `<?xml version="1.0"?><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst/></p:presentation>`;
     const result = await importPptxProjectV1({
@@ -348,7 +457,7 @@ describe('importPptxProjectV1', () => {
 
       expectValid(result);
       expect(digest).not.toHaveBeenCalled();
-      expect([...result.blobs.values()].every(({ byteLength }) => byteLength === 0)).toBe(true);
+      expect([...result.blobs.values()].every((bytes: Uint8Array): boolean => bytes.byteLength === 0)).toBe(true);
     } finally {
       digest.mockRestore();
     }

@@ -1,6 +1,5 @@
 import type { projectFormatV1 } from '@broadset/model';
 
-import type { ResourceCollectorV1 } from '../../v1';
 import type { ImportedElement } from '../import-types';
 
 export interface SvgSourceDetailsV1 {
@@ -19,8 +18,20 @@ export interface ElementMappingContextV1 {
   readonly source: SvgSourceDetailsV1;
   readonly elementId: projectFormatV1.Id;
   readonly parentId: projectFormatV1.Id;
-  readonly resourceCollector: ResourceCollectorV1;
+  readonly imageAssetRegistry: SvgImageAssetRegistryV1;
   readonly fontRegistry: FontRegistryV1;
+}
+
+export interface SvgImageAssetResolutionV1 {
+  readonly assetId: projectFormatV1.Id;
+  readonly limitExceeded: boolean;
+}
+
+export interface SvgImageAssetRegistryV1 {
+  resolve(
+    reference: string,
+    pixelSize: readonly [number, number],
+  ): Promise<SvgImageAssetResolutionV1>;
 }
 
 export interface FontReferenceV1 {

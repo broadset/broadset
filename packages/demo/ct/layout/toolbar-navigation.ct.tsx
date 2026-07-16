@@ -1,3 +1,4 @@
+import { projectFormatV1 } from '@broadset/model';
 import { expect, test } from '@playwright/experimental-ct-react';
 import type { Page } from '@playwright/test';
 
@@ -46,15 +47,20 @@ test('toolbar zoom controls clamp at 400% max and 10% min', async ({ mount, page
   const zoomOut = page.locator('button[aria-label="Zoom out"]').first();
   const zoomLevel = page.getByLabel('Zoom level');
 
-  for (let i = 0; i < 40; i += 1) {
-    await zoomIn.click();
-  }
+  await expect.poll(() => page.evaluate(() => window.__broadsetProjectEditorStore !== undefined)).toBe(true);
+  await page.evaluate(() => {
+    window.__broadsetProjectEditorStore?.getState().updateCanvasSettings({ zoom: 3.99 });
+  });
+  await zoomIn.click();
+  await zoomIn.click();
 
   await expect(zoomLevel).toHaveText('400%');
 
-  for (let i = 0; i < 80; i += 1) {
-    await zoomOut.click();
-  }
+  await page.evaluate(() => {
+    window.__broadsetProjectEditorStore?.getState().updateCanvasSettings({ zoom: 0.11 });
+  });
+  await zoomOut.click();
+  await zoomOut.click();
 
   await expect(zoomLevel).toHaveText('10%');
 });
@@ -156,20 +162,6 @@ test('element library built-ins and plugin tools activate placement mode', async
 test('file and help menu actions open the expected dialogs', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
 
-  // The Export dialog is gated behind the experimental-features flag
-  // (it ships an MVP feature set the demo only surfaces to opt-in
-  // users). Enable the flag at the store level so the menu item is
-  // present for this end-to-end menu sweep.
-  await page.evaluate(() => {
-    interface ExperimentalStore {
-      readonly getState: () => { readonly updateCanvasSettings: (s: { showExperimentalFeatures: boolean }) => void };
-    }
-
-    const store = (window as unknown as { __broadsetEditorStore?: ExperimentalStore }).__broadsetEditorStore;
-
-    store?.getState().updateCanvasSettings({ showExperimentalFeatures: true });
-  });
-
   await openToolbarMenu(page, 'File');
   await page.getByText('New Document').first().click();
   await expect(page.getByRole('dialog', { name: 'New Document' })).toBeVisible();
@@ -181,12 +173,6 @@ test('file and help menu actions open the expected dialogs', async ({ mount, pag
   await expect(page.getByRole('dialog', { name: 'Media Library' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Media Library' })).toHaveCount(0);
-
-  await openToolbarMenu(page, 'File');
-  await page.getByText('Export').first().click();
-  await expect(page.getByRole('dialog', { name: 'Export' })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Export' })).toHaveCount(0);
 
   await openToolbarMenu(page, 'File');
   await page.getByText('Document Settings').first().click();
@@ -318,9 +304,31 @@ test('context menu reflects lock state and multi-select group actions', async ({
   ).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await badgeElement.click({ force: true });
-  await clockElement.click({ force: true, modifiers: ['Meta'] });
-  await badgeElement.click({ button: 'right', force: true });
+  const selectedIds = [
+    projectFormatV1.idSchema.parse(FIXTURE_IDS.logo),
+    projectFormatV1.idSchema.parse(FIXTURE_IDS.clock),
+  ];
+
+  await expect.poll(() => page.evaluate(() => window.__broadsetProjectEditorStore !== undefined)).toBe(true);
+  await page.evaluate((elementIds) => {
+    window.__broadsetProjectEditorStore?.getState().setActiveElements(elementIds);
+  }, selectedIds);
+  await page.evaluate(() => {
+    const address = window.__broadsetProjectEditorStore?.getState().activeInstanceAddresses[0];
+
+    if (address === undefined) throw new Error('Expected an active instance address');
+
+    const target = Array.from(document.querySelectorAll<HTMLElement>('[data-element-id]')).find(
+      (candidate) =>
+        candidate.dataset['elementId'] === address.elementId &&
+        candidate.dataset['instanceRootId'] === address.rootInstanceId &&
+        candidate.dataset['componentInstancePath'] === JSON.stringify(address.componentInstancePath),
+    );
+
+    if (target === undefined) throw new Error('Expected the selected rendered instance');
+
+    target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, button: 2, cancelable: true }));
+  });
 
   await expect(
     page

@@ -8,7 +8,7 @@ import { getHandleCenter, getWidgetRotation, rotateSelectedElement } from './hel
 async function readSelectedWestAnchor(page: Page): Promise<{ readonly x: number; readonly y: number }> {
   return page.evaluate(() => {
     const state = window.__broadsetProjectEditorStore?.getState();
-    const selectedId = state?.activeElementIds[0];
+    const selectedId = state?.activeInstanceAddresses[0]?.elementId;
     const element = state?.project.documents[0]?.elements.find(({ id }) => id === selectedId);
 
     if (element?.geometry.transform.kind !== 'affine2d') {

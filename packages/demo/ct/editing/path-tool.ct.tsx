@@ -249,34 +249,39 @@ test('a completed path can be re-selected by clicking it', async ({ mount, page 
 
   await expect(pathHost).toBeAttached();
 
-  const pathStrokePoint = await pathHost.locator('svg path').evaluate((pathElement): { x: number; y: number } => {
-    const path = pathElement as SVGPathElement;
-    const host = path.closest<HTMLElement>('[data-element-id]');
-    const elementId = host?.dataset['elementId'] ?? null;
-    const matrix = path.getScreenCTM();
-
-    if (elementId === null) {
-      throw new Error('Rendered path host does not expose data-element-id');
-    }
-
-    if (matrix === null) {
-      throw new Error('Rendered path does not expose a screen transform');
-    }
-
-    const totalLength = path.getTotalLength();
-
-    for (const ratio of [0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.9]) {
-      const localPoint = path.getPointAtLength(totalLength * ratio);
-      const screenPoint = new DOMPoint(localPoint.x, localPoint.y).matrixTransform(matrix);
-      const hit = document.elementFromPoint(screenPoint.x, screenPoint.y)?.closest('[data-element-id]');
-
-      if (hit instanceof HTMLElement && hit.dataset['elementId'] === elementId) {
-        return { x: screenPoint.x, y: screenPoint.y };
+  const pathStrokePoint = await pathHost
+    .locator('[data-vector-path="true"]')
+    .evaluate((pathElement): { x: number; y: number } => {
+      if (!(pathElement instanceof SVGPathElement)) {
+        throw new Error('Rendered vector path is not an SVG path element');
       }
-    }
 
-    throw new Error('Rendered path has no painted hit-test point');
-  });
+      const host = pathElement.closest<HTMLElement>('[data-element-id]');
+      const elementId = host?.dataset['elementId'] ?? null;
+      const matrix = pathElement.getScreenCTM();
+
+      if (elementId === null) {
+        throw new Error('Rendered path host does not expose data-element-id');
+      }
+
+      if (matrix === null) {
+        throw new Error('Rendered path does not expose a screen transform');
+      }
+
+      const totalLength = pathElement.getTotalLength();
+
+      for (const ratio of [0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.9]) {
+        const localPoint = pathElement.getPointAtLength(totalLength * ratio);
+        const screenPoint = new DOMPoint(localPoint.x, localPoint.y).matrixTransform(matrix);
+        const hit = document.elementFromPoint(screenPoint.x, screenPoint.y)?.closest('[data-element-id]');
+
+        if (hit instanceof HTMLElement && hit.dataset['elementId'] === elementId) {
+          return { x: screenPoint.x, y: screenPoint.y };
+        }
+      }
+
+      throw new Error('Rendered path has no painted hit-test point');
+    });
 
   await page.mouse.click(pathStrokePoint.x, pathStrokePoint.y);
 

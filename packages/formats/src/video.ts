@@ -1,7 +1,7 @@
 import type { VideoEncodingConfig } from 'mediabunny';
 import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, WebMOutputFormat } from 'mediabunny';
 
-export interface VideoExportOptions {
+interface VideoExportOptions {
   readonly canvas: HTMLCanvasElement;
   readonly renderFrame: (timeMs: number) => void | Promise<void>;
   readonly durationMs: number;

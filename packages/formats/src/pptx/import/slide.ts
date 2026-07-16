@@ -33,6 +33,7 @@ interface SlidePage {
 interface ResolvedPackageInfo {
   readonly canvas: PptxSourceDocument['canvas'];
   readonly slideRelsByPath: ReadonlyMap<string, string>;
+  readonly dataUriByMediaPath: Map<string, string>;
 }
 
 export function importSingleSlide(
@@ -63,6 +64,7 @@ export function importSingleSlide(
     theme,
     layoutPlaceholders,
     mediaByRelId,
+    dataUriByMediaPath: resolved.dataUriByMediaPath,
     hyperlinkByRelId,
     warnings: ctxWarnings,
     nextElementIndex: elementCounter,

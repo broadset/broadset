@@ -3,6 +3,11 @@ import type { projectFormatV1 } from '@broadset/model';
 import { useRef, useState } from 'react';
 
 import { useEditorSelector } from '../demo-app/helpers';
+import {
+  cssPixelsToDocumentValueV1,
+  documentValueToCssPixelsV1,
+  surfaceUnitContextV1,
+} from '../demo-app/v1-canvas-units';
 
 interface V1MultiSelectionTransformWidgetProps {
   readonly editorStore: ProjectEditorStore;
@@ -55,7 +60,8 @@ export function V1MultiSelectionTransformWidget({
 }: V1MultiSelectionTransformWidgetProps): React.JSX.Element | null {
   const state = useEditorSelector(editorStore, (current) => current);
   const document = selectActiveDocumentV1(state);
-  const selectedIds = new Set(state.activeElementIds);
+  const units = surfaceUnitContextV1(document);
+  const selectedIds = new Set(state.activeInstanceAddresses.map(({ elementId }) => elementId));
   const elements = document?.elements.filter((element) => selectedIds.has(element.id)) ?? [];
   const bounds = getSelectionBounds(elements);
   const gestureRef = useRef<MultiSelectionDragGestureV1 | null>(null);
@@ -95,8 +101,8 @@ export function V1MultiSelectionTransformWidget({
 
     const scale = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
     const latestDelta = {
-      x: (event.clientX - gesture.startPointer.x) / scale,
-      y: (event.clientY - gesture.startPointer.y) / scale,
+      x: cssPixelsToDocumentValueV1((event.clientX - gesture.startPointer.x) / scale, units),
+      y: cssPixelsToDocumentValueV1((event.clientY - gesture.startPointer.y) / scale, units),
     };
 
     gestureRef.current = { ...gesture, latestDelta };
@@ -136,14 +142,14 @@ export function V1MultiSelectionTransformWidget({
       style={{
         border: '1px solid rgba(59, 130, 246, 0.95)',
         boxSizing: 'border-box',
-        height: bounds.height,
+        height: documentValueToCssPixelsV1(bounds.height, units),
         left: 0,
         pointerEvents: 'none',
         position: 'absolute',
         top: 0,
-        transform: `matrix(1, 0, 0, 1, ${String(bounds.x + previewDelta.x)}, ${String(bounds.y + previewDelta.y)})`,
+        transform: `matrix(1, 0, 0, 1, ${String(documentValueToCssPixelsV1(bounds.x + previewDelta.x, units))}, ${String(documentValueToCssPixelsV1(bounds.y + previewDelta.y, units))})`,
         transformOrigin: '0 0 0',
-        width: bounds.width,
+        width: documentValueToCssPixelsV1(bounds.width, units),
         zIndex: 1,
       }}
     >

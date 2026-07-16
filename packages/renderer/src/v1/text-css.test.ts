@@ -1,7 +1,7 @@
 import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
-import { paragraphToStyle, runToStyle } from './text-css';
+import { paragraphToStyle, runToStyle, runToStyleV1 } from './text-css';
 
 const id = (value: string): projectFormatV1.Id => projectFormatV1.idSchema.parse(value);
 const FONT_FAMILY_ID = id('font-family');
@@ -13,12 +13,7 @@ const SWATCHES: ReadonlyMap<projectFormatV1.Id, projectFormatV1.Swatch> = new Ma
   [SWATCH_ID, { id: SWATCH_ID, kind: 'process', name: 'Swatch', color: srgb(0.25, 0.5, 0.75), producerAliases: [] }],
 ]);
 
-function srgb(
-  red: number,
-  green: number,
-  blue: number,
-  alpha = 1,
-): projectFormatV1.ConcreteColorValue {
+function srgb(red: number, green: number, blue: number, alpha = 1): projectFormatV1.ConcreteColorValue {
   return { kind: 'color', space: 'srgb', channels: [red, green, blue], alpha };
 }
 
@@ -42,9 +37,7 @@ function run(overrides: Partial<projectFormatV1.RunProperties> = {}): projectFor
   };
 }
 
-function paragraph(
-  overrides: Partial<projectFormatV1.ParagraphProperties> = {},
-): projectFormatV1.ParagraphProperties {
+function paragraph(overrides: Partial<projectFormatV1.ParagraphProperties> = {}): projectFormatV1.ParagraphProperties {
   return {
     alignment: 'start',
     direction: 'auto',
@@ -65,14 +58,25 @@ function paragraph(
 }
 
 describe('runToStyle', () => {
+  it('converts run size, tracking, and baseline shift from physical units', () => {
+    const style = runToStyleV1({
+      run: run({ size: 2.54, tracking: 0.254, baselineShift: -0.127 }),
+      fonts: NO_FONTS,
+      swatches: NO_SWATCHES,
+      units: { unit: 'mm', dpi: 254 },
+    });
+
+    expect(style.fontSize).toBe('25.4px');
+    expect(style.letterSpacing).toBe('2.54px');
+    expect(style.verticalAlign).toBe('-1.27px');
+  });
+
   it('maps size to fontSize in pixels', () => {
     expect(runToStyle(run({ size: 12.5 }), NO_FONTS, NO_SWATCHES).fontSize).toBe('12.5px');
   });
 
   it('maps color through the v1 color CSS resolver', () => {
-    expect(runToStyle(run({ color: srgb(1, 0.5, 0) }), NO_FONTS, NO_SWATCHES).color).toBe(
-      'color(srgb 1 0.5 0)',
-    );
+    expect(runToStyle(run({ color: srgb(1, 0.5, 0) }), NO_FONTS, NO_SWATCHES).color).toBe('color(srgb 1 0.5 0)');
   });
 
   it('resolves a swatch-backed run color from a map keyed by a parsed v1 id', () => {
@@ -144,7 +148,12 @@ describe('runToStyle', () => {
 
   it('maps variation axes to fontVariationSettings', () => {
     const style = runToStyle(
-      run({ variationAxes: [{ tag: 'wght', value: 600 }, { tag: 'wdth', value: 100 }] }),
+      run({
+        variationAxes: [
+          { tag: 'wght', value: 600 },
+          { tag: 'wdth', value: 100 },
+        ],
+      }),
       NO_FONTS,
       NO_SWATCHES,
     );
@@ -158,7 +167,12 @@ describe('runToStyle', () => {
 
   it('maps OpenType features to fontFeatureSettings', () => {
     const style = runToStyle(
-      run({ openTypeFeatures: [{ tag: 'liga', value: 1 }, { tag: 'kern', value: 0 }] }),
+      run({
+        openTypeFeatures: [
+          { tag: 'liga', value: 1 },
+          { tag: 'kern', value: 0 },
+        ],
+      }),
       NO_FONTS,
       NO_SWATCHES,
     );
@@ -224,6 +238,17 @@ describe('runToStyle', () => {
 });
 
 describe('paragraphToStyle', () => {
+  it('maps absolute line spacing and paragraph distances through physical units', () => {
+    const style = paragraphToStyle(
+      paragraph({ lineSpacing: { kind: 'absolute', value: 2.54 }, spaceBefore: 1.27, startIndent: 0.254 }),
+      { unit: 'mm', dpi: 254 },
+    );
+
+    expect(style.lineHeight).toBe('25.4px');
+    expect(style.marginTop).toBe('12.7px');
+    expect(style.paddingInlineStart).toBe('2.54px');
+  });
+
   it('maps start alignment', () => {
     expect(paragraphToStyle(paragraph({ alignment: 'start' })).textAlign).toBe('start');
   });

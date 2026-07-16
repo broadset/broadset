@@ -2,7 +2,10 @@ import { applyStyleBlocks } from '../import-css';
 import { dereferenceUseElements, sanitizeDomInPlace, warnToolNamespaces } from '../import-security';
 import type { ImportedElement } from '../import-types';
 import { walkSvgDocument } from '../import-walk';
+import { serializeSvgElementUpTo } from './bounded-serialization';
 import type { SvgSourceDetailsV1 } from './types';
+
+const DEFAULT_MAX_PROVENANCE_BYTES = 32 * 1024 * 1024;
 
 const SUPPORTED_TAG_TYPES = new Map<string, string>([
   ['rect', 'rectangle'],
@@ -58,15 +61,77 @@ function sourceElements(document: Document): readonly Element[] {
   return Array.from(document.querySelectorAll('rect,circle,ellipse,line,polyline,polygon,path,text,image,g'));
 }
 
+interface SourceElementIndexV1 {
+  readonly bySourceId: ReadonlyMap<string, Element>;
+  readonly byImportedType: ReadonlyMap<string, readonly Element[]>;
+}
+
+function indexSourceElements(candidates: readonly Element[]): SourceElementIndexV1 {
+  const bySourceId = new Map<string, Element>();
+  const byImportedType = new Map<string, Element[]>();
+
+  for (const candidate of candidates) {
+    const sourceId = candidate.getAttribute('data-bs-id') ?? candidate.getAttribute('id');
+    const importedType = SUPPORTED_TAG_TYPES.get(candidate.tagName.toLowerCase());
+
+    if (sourceId !== null && !bySourceId.has(sourceId)) bySourceId.set(sourceId, candidate);
+    if (importedType === undefined) continue;
+
+    const matches = byImportedType.get(importedType) ?? [];
+
+    matches.push(candidate);
+    byImportedType.set(importedType, matches);
+  }
+
+  return { bySourceId, byImportedType };
+}
+
+function matchSourceElements(
+  importedElements: readonly ImportedElement[],
+  candidates: readonly Element[],
+): readonly SvgSourceDetailsV1[] {
+  const index = indexSourceElements(candidates);
+  const used = new Set<Element>();
+  const nextByImportedType = new Map<string, number>();
+
+  return importedElements.map((imported) => {
+    const identified = imported.dataBsId === undefined ? undefined : index.bySourceId.get(imported.dataBsId);
+    const matchingType = index.byImportedType.get(imported.type) ?? [];
+    let nextIndex = nextByImportedType.get(imported.type) ?? 0;
+
+    while (nextIndex < matchingType.length) {
+      const candidate = matchingType[nextIndex];
+
+      if (candidate === undefined || !used.has(candidate)) break;
+
+      nextIndex += 1;
+    }
+
+    const matched = identified ?? matchingType[nextIndex];
+
+    if (matched !== undefined) {
+      used.add(matched);
+      if (identified === undefined) nextByImportedType.set(imported.type, nextIndex + 1);
+    }
+
+    return details(matched);
+  });
+}
+
 export interface ParsedSvgSourceV1 {
   readonly imported: readonly ImportedElement[];
   readonly sources: readonly SvgSourceDetailsV1[];
   readonly canvasWidth: number;
   readonly canvasHeight: number;
   readonly warnings: readonly string[];
+  readonly sanitizedSvg: string | undefined;
+  readonly provenanceLimitExceeded: boolean;
 }
 
-export function parseSvgSourceV1(svg: string): ParsedSvgSourceV1 {
+export function parseSvgSourceV1(
+  svg: string,
+  options: { readonly maxDepth?: number; readonly maxProvenanceBytes?: number } = {},
+): ParsedSvgSourceV1 {
   const warnings: string[] = [];
   const xmlDocument = new DOMParser().parseFromString(svg, 'image/svg+xml');
   const parseError = xmlDocument.querySelector('parsererror');
@@ -82,25 +147,13 @@ export function parseSvgSourceV1(svg: string): ParsedSvgSourceV1 {
     warnToolNamespaces(xmlDocument, warnings);
   }
 
-  const walked = walkSvgDocument(xmlDocument);
+  const provenance = serializeSvgElementUpTo(
+    xmlDocument.documentElement,
+    options.maxProvenanceBytes ?? DEFAULT_MAX_PROVENANCE_BYTES,
+  );
+  const walked = walkSvgDocument(xmlDocument, options);
   const candidates = sourceElements(xmlDocument);
-  const used = new Set<Element>();
-  const sources = walked.elements.map((imported) => {
-    const identified = candidates.find((candidate) => {
-      const sourceId = candidate.getAttribute('data-bs-id') ?? candidate.getAttribute('id');
-
-      return sourceId !== null && sourceId === imported.dataBsId;
-    });
-    const matched = identified ?? candidates.find((candidate) => {
-      if (used.has(candidate)) return false;
-
-      return SUPPORTED_TAG_TYPES.get(candidate.tagName.toLowerCase()) === imported.type;
-    });
-
-    if (matched !== undefined) used.add(matched);
-
-    return details(matched);
-  });
+  const sources = matchSourceElements(walked.elements, candidates);
 
   return {
     imported: walked.elements,
@@ -108,5 +161,7 @@ export function parseSvgSourceV1(svg: string): ParsedSvgSourceV1 {
     canvasWidth: walked.canvasWidth,
     canvasHeight: walked.canvasHeight,
     warnings: [...warnings, ...walked.warnings],
+    sanitizedSvg: provenance.value,
+    provenanceLimitExceeded: provenance.status === 'exceeded',
   };
 }

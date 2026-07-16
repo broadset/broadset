@@ -18,7 +18,7 @@ interface PsdExportResult {
   readonly warnings: readonly string[];
 }
 
-export interface PsdExportInputV1 {
+interface PsdExportInputV1 {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly documentId?: projectFormatV1.Id;
   readonly pageId?: projectFormatV1.Id;

@@ -143,6 +143,10 @@ export const V1_RUNTIME_EXPORT_NAMES = [
   'createSemanticIndexes',
   'createElementNestedIndexes',
   'resolvePageInstanceTree',
+  'applyResolvedOverrideV1',
+  'composeElementTransformsV1',
+  'resolveCanonicalSceneV1',
+  'resolveWorldGeometryV1',
 ] as const;
 
 export const V1_TYPE_EXPORT_NAMES = [
@@ -254,6 +258,7 @@ export const V1_TYPE_EXPORT_NAMES = [
   'ProjectMetadata',
   'ProjectParseResult',
   'ProjectResources',
+  'ProjectSourceV1',
   'ProjectV1LimitCode',
   'ProjectV1LimitError',
   'ProjectV1LimitViolation',
@@ -318,6 +323,18 @@ export const V1_TYPE_EXPORT_NAMES = [
   'ComponentSemanticIndex',
   'ElementNestedIndexes',
   'ResolvedSceneInstance',
+  'ResolveCanonicalSceneOptionsV1',
+  'ResolvedCanonicalSceneResultV1',
+  'ResolvedCanonicalSceneV1',
+  'ResolvedPropertyContributionV1',
+  'ResolvedSceneAddressV1',
+  'ResolvedSceneDataV1',
+  'ResolvedSceneFallbackV1',
+  'ResolvedSceneNodeV1',
+  'ResolvedScenePropertyV1',
+  'ResolvedSceneSnapshotV1',
+  'ResolvedWorldGeometryV1',
+  'SceneProvenanceSourceV1',
 ] as const;
 
 export const V1_RUNTIME_COLLISION_NAMES = [

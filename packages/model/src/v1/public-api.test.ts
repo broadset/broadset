@@ -114,6 +114,7 @@ type PackageRootV1TypeInventory = readonly [
   PublicTypes.ProjectMetadata,
   PublicTypes.ProjectParseResult,
   PublicTypes.ProjectResources,
+  PublicTypes.ProjectSourceV1,
   PublicTypes.ProjectV1LimitError,
   PublicTypes.ProjectV1LimitCode,
   PublicTypes.ProjectV1LimitViolation,
@@ -122,6 +123,18 @@ type PackageRootV1TypeInventory = readonly [
   PublicTypes.QrCodeElement,
   PublicTypes.Rational,
   PublicTypes.ResolvedTargetEntity,
+  PublicTypes.ResolveCanonicalSceneOptionsV1,
+  PublicTypes.ResolvedCanonicalSceneResultV1,
+  PublicTypes.ResolvedCanonicalSceneV1,
+  PublicTypes.ResolvedPropertyContributionV1,
+  PublicTypes.ResolvedSceneAddressV1,
+  PublicTypes.ResolvedSceneDataV1,
+  PublicTypes.ResolvedSceneFallbackV1,
+  PublicTypes.ResolvedSceneNodeV1,
+  PublicTypes.ResolvedScenePropertyV1,
+  PublicTypes.ResolvedSceneSnapshotV1,
+  PublicTypes.ResolvedWorldGeometryV1,
+  PublicTypes.SceneProvenanceSourceV1,
   PublicTypes.RunProperties,
   PublicTypes.SafeFunctionId,
   PublicTypes.SampleDataSet,
@@ -325,6 +338,10 @@ describe('v1 package public API', () => {
       project,
       diagnostics: [],
     });
+
+    const byteSource: PublicTypes.ProjectSourceV1 = new TextEncoder().encode(JSON.stringify(project));
+
+    await expect(loadProjectV1Json(byteSource)).resolves.toEqual({ status: 'loaded', project, diagnostics: [] });
 
     expect(broadsetProjectV1Schema).toBe(projectFormatV1.broadsetProjectV1Schema);
     expect(validateBroadsetProjectV1Semantics).toBe(projectFormatV1.validateBroadsetProjectV1Semantics);

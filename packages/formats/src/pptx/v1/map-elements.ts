@@ -14,6 +14,11 @@ export interface MappedPptxElementV1 {
   readonly warnings: readonly projectFormatV1.InteropDiagnostic[];
 }
 
+interface ImageAssetRegistrationV1 {
+  readonly assetId: projectFormatV1.Id;
+  readonly bytesMissing: boolean;
+}
+
 function warning(code: string, message: string): projectFormatV1.InteropDiagnostic {
   return { code, severity: 'warning', message, dimension: 'appearance', pointer: '/' };
 }
@@ -41,24 +46,57 @@ function base(input: {
   };
 }
 
+async function createImageAssetRegistration(input: {
+  readonly source: PptxSourceElement;
+  readonly resources: ResourceCollectorV1;
+}): Promise<ImageAssetRegistrationV1> {
+  const decoded = typeof input.source.content === 'string' ? decodeDataUri(input.source.content) : undefined;
+
+  if (decoded === undefined) {
+    return {
+      assetId: await input.resources.addMissingImageAsset({ reference: 'pptx:image', name: input.source.name }),
+      bytesMissing: true,
+    };
+  }
+
+  return {
+    assetId: await input.resources.addImageAsset({
+      bytes: decoded.bytes,
+      mediaType: decoded.mime,
+      name: input.source.name,
+      pixelSize: [Math.max(1, Math.round(input.source.width)), Math.max(1, Math.round(input.source.height))],
+    }),
+    bytesMissing: false,
+  };
+}
+
+function registerImageAsset(input: {
+  readonly source: PptxSourceElement;
+  readonly resources: ResourceCollectorV1;
+  readonly registrationBySource: Map<string, Promise<ImageAssetRegistrationV1>>;
+}): Promise<ImageAssetRegistrationV1> {
+  const sourceIdentity = typeof input.source.content === 'string' ? input.source.content : 'pptx:image:missing';
+  const existing = input.registrationBySource.get(sourceIdentity);
+
+  if (existing !== undefined) return existing;
+
+  const registration = createImageAssetRegistration(input);
+
+  input.registrationBySource.set(sourceIdentity, registration);
+
+  return registration;
+}
+
 async function mapImage(input: {
   readonly source: PptxSourceElement;
   readonly elementId: projectFormatV1.Id;
   readonly parentId: projectFormatV1.Id | null;
   readonly resources: ResourceCollectorV1;
+  readonly registrationBySource: Map<string, Promise<ImageAssetRegistrationV1>>;
 }): Promise<MappedPptxElementV1> {
-  const decoded = typeof input.source.content === 'string' ? decodeDataUri(input.source.content) : undefined;
-  const assetId =
-    decoded === undefined ?
-      await input.resources.addMissingImageAsset({ reference: 'pptx:image', name: input.source.name })
-    : await input.resources.addImageAsset({
-        bytes: decoded.bytes,
-        mediaType: decoded.mime,
-        name: input.source.name,
-        pixelSize: [Math.max(1, Math.round(input.source.width)), Math.max(1, Math.round(input.source.height))],
-      });
+  const registration = await registerImageAsset(input);
   const imageWarnings =
-    decoded === undefined ?
+    registration.bytesMissing ?
       [warning('pptx.image-bytes-missing', 'The PPTX image reference had no decodable embedded bytes.')]
     : [];
 
@@ -66,7 +104,7 @@ async function mapImage(input: {
     element: projectFormatV1.createElementV1({
       ...base(input),
       kind: 'image',
-      image: { assetId, fit: input.source.style.objectFit ?? 'fill' },
+      image: { assetId: registration.assetId, fit: input.source.style.objectFit ?? 'fill' },
     }),
     sourceId: input.source.id,
     warnings: [...imageWarnings, ...pptxAppearanceWarningsV1(input.source.style)],
@@ -158,6 +196,7 @@ export async function mapPptxElementsV1(input: {
 }): Promise<readonly MappedPptxElementV1[]> {
   const ids = new Map<string, projectFormatV1.Id>();
   const usedIds = new Set<projectFormatV1.Id>();
+  const imageRegistrationBySource = new Map<string, Promise<ImageAssetRegistrationV1>>();
 
   input.document.elements.forEach((element, index) => {
     const parsed = projectFormatV1.idSchema.safeParse(element.id);
@@ -186,7 +225,13 @@ export async function mapPptxElementsV1(input: {
 
     mapped.push(
       source.type === 'image' ?
-        await mapImage({ source, elementId, parentId, resources: input.resources })
+        await mapImage({
+          source,
+          elementId,
+          parentId,
+          resources: input.resources,
+          registrationBySource: imageRegistrationBySource,
+        })
       : mapNative({ source, elementId, parentId, fontRegistry: input.fontRegistry }),
     );
   }

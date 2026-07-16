@@ -43,6 +43,8 @@ async function getBoxes(
 async function selectElementInStore(page: Page, elementId: string): Promise<void> {
   const selectedElementId = projectFormatV1.idSchema.parse(elementId);
 
+  await expect.poll(() => page.evaluate(() => window.__broadsetProjectEditorStore !== undefined)).toBe(true);
+
   await page.evaluate((selectedElementId) => {
     const store = window.__broadsetProjectEditorStore;
 

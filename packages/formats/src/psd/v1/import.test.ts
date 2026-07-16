@@ -1,11 +1,20 @@
 import { projectFormatV1 } from '@broadset/model';
 import type { Layer, Psd } from 'ag-psd';
 import { writePsdUint8Array } from 'ag-psd';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { importPsdProjectV1 } from '../../index';
 import { buildProducerQuirksFixtures } from '../__fixtures__/producer-quirks.fixture';
+import { TestPsdImportWorkerV1 } from '../test-worker';
 import { buildRectangleMask } from '../vector-mask';
+import { importPsdProjectV1 } from './index';
+
+beforeAll((): void => {
+  vi.stubGlobal('Worker', TestPsdImportWorkerV1);
+});
+
+afterAll((): void => {
+  vi.unstubAllGlobals();
+});
 
 const IMPORTED_AT = projectFormatV1.utcTimestampSchema.parse('2026-07-12T00:00:00Z');
 
@@ -58,6 +67,26 @@ function expectValid(result: Awaited<ReturnType<typeof importPsdProjectV1>>): vo
 }
 
 describe('importPsdProjectV1', () => {
+  it('rejects decoded allocations above the browser-safe default before worker parsing', async () => {
+    const bytes = new Uint8Array(38);
+    const view = new DataView(bytes.buffer);
+
+    bytes.set(new TextEncoder().encode('8BPS'));
+    view.setUint16(4, 1);
+    view.setUint16(12, 1);
+    view.setUint32(14, 6_000);
+    view.setUint32(18, 6_000);
+    view.setUint16(22, 8);
+    view.setUint16(24, 3);
+
+    const result = await importPsdProjectV1({ bytes, importedAt: IMPORTED_AT });
+
+    expect(result.project.interop.records.flatMap(({ warnings }) => warnings)).toContainEqual(
+      expect.objectContaining({ code: 'psd.decoded-size-limit', severity: 'error' }),
+    );
+    expectValid(result);
+  });
+
   it('maps a raster layer to a content-addressed v1 image element', async () => {
     const bytes = buildPsd([buildSolidLayer()]);
     const result = await importPsdProjectV1({ bytes, fileName: 'raster.psd', importedAt: IMPORTED_AT });

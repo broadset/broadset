@@ -23,6 +23,10 @@ function hasElement(state: ProjectEditorState, elementId: projectFormatV1.Id): b
 
 export function createProjectEditorEditingActions(
   set: StoreApi<ProjectEditorState>['setState'],
+  resolveAddress: (
+    state: Pick<ProjectEditorState, 'project' | 'activeDocumentId' | 'activePageId'>,
+    elementId: projectFormatV1.Id,
+  ) => projectFormatV1.InstanceAddress | undefined,
 ): ProjectEditorEditingActions {
   return {
     beginPlacement(elementType: string): void {
@@ -58,7 +62,7 @@ export function createProjectEditorEditingActions(
       set((state) =>
         hasElement(state, elementId) ?
           {
-            activeElementIds: [elementId],
+            activeInstanceAddresses: [resolveAddress(state, elementId)].filter((address) => address !== undefined),
             pathEditingElementId: elementId,
             pathDrawingElementId: null,
             clipPathEditingElementId: null,
@@ -73,7 +77,7 @@ export function createProjectEditorEditingActions(
       set((state) =>
         hasElement(state, elementId) ?
           {
-            activeElementIds: [elementId],
+            activeInstanceAddresses: [resolveAddress(state, elementId)].filter((address) => address !== undefined),
             pathEditingElementId: null,
             pathDrawingElementId: null,
             clipPathEditingElementId: elementId,
@@ -85,8 +89,8 @@ export function createProjectEditorEditingActions(
       );
     },
     startPathDrawing(elementId: projectFormatV1.Id): void {
-      set({
-        activeElementIds: [elementId],
+      set((state) => ({
+        activeInstanceAddresses: [resolveAddress(state, elementId)].filter((address) => address !== undefined),
         placement: null,
         placementPreview: null,
         pathEditingElementId: null,
@@ -95,7 +99,7 @@ export function createProjectEditorEditingActions(
         motionPathEditingElementId: null,
         inlineTextEditingElementId: null,
         editingMode: { type: 'path-drawing', elementId },
-      });
+      }));
     },
     finishPathDrawing(): void {
       set({

@@ -25,7 +25,7 @@ async function placeRectangle(page: Page): Promise<void> {
 async function readActiveElementSnapshot(page: Page): Promise<ActiveElementSnapshot> {
   return page.evaluate(() => {
     const state = window.__broadsetProjectEditorStore?.getState();
-    const activeElementId = state?.activeElementIds[0];
+    const activeElementId = state?.activeInstanceAddresses[0]?.elementId;
     const activeElement = state?.project.documents[0]?.elements.find(({ id }) => id === activeElementId);
 
     if (activeElement === undefined) throw new Error('Expected selected element after placement');

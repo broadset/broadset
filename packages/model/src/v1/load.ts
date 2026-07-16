@@ -1,7 +1,12 @@
 import { z } from 'zod';
 
 import type { Diagnostic } from './diagnostics';
-import { inspectProjectV1JsonText, inspectProjectV1Unknown, type ProjectV1LimitViolation } from './limits';
+import {
+  inspectProjectV1JsonText,
+  inspectProjectV1Unknown,
+  PROJECT_V1_LIMITS,
+  type ProjectV1LimitViolation,
+} from './limits';
 import type { BroadsetProjectV1 } from './project';
 import { broadsetProjectV1Schema } from './project';
 import { validateBroadsetProjectV1Semantics } from './semantic-validation';
@@ -14,12 +19,14 @@ export type ProjectParseResult =
     }
   | { readonly status: 'quarantined'; readonly diagnostics: readonly Diagnostic[] };
 
+export type ProjectSourceV1 = string | Uint8Array;
+
 export type ProjectLoadResult =
   | Extract<ProjectParseResult, { readonly status: 'loaded' }>
   | {
       readonly status: 'quarantined';
       readonly diagnostics: readonly Diagnostic[];
-      readonly originalText: string;
+      readonly originalBytes: Uint8Array;
       readonly lastValidProject?: BroadsetProjectV1 | undefined;
     };
 
@@ -30,6 +37,8 @@ export interface ProjectLoadOptions {
 const PROJECT_SCHEMA = 'https://schema.broadset.dev/v1/project.schema.json';
 const PROJECT_FORMAT = 'broadset-project';
 const PROJECT_SCHEMA_VERSION = 1;
+const PROJECT_TEXT_ENCODER = new TextEncoder();
+const PROJECT_TEXT_DECODER = new TextDecoder('utf-8', { fatal: true });
 const projectIdentitySchema = z.object({
   $schema: z.literal(PROJECT_SCHEMA),
   format: z.literal(PROJECT_FORMAT),
@@ -55,6 +64,19 @@ function issuePointer(issue: z.core.$ZodIssue): string {
 
 function createLimitResult(violation: ProjectV1LimitViolation): ProjectParseResult {
   return { status: 'quarantined', diagnostics: [createDiagnostic(violation.code, violation.message)] };
+}
+
+function createLoadQuarantine(
+  originalBytes: Uint8Array,
+  diagnostics: readonly Diagnostic[],
+  lastValidProject: BroadsetProjectV1 | undefined,
+): Extract<ProjectLoadResult, { readonly status: 'quarantined' }> {
+  return {
+    status: 'quarantined',
+    diagnostics,
+    originalBytes,
+    ...(lastValidProject === undefined ? {} : { lastValidProject }),
+  };
 }
 
 function hasSupportedIdentity(input: unknown): boolean {
@@ -133,16 +155,42 @@ export function parseProjectV1Unknown(input: unknown): ProjectParseResult {
   return { status: 'loaded', project: structural.data, diagnostics: semanticDiagnostics };
 }
 
-export function loadProjectV1Json(originalText: string, options: ProjectLoadOptions = {}): Promise<ProjectLoadResult> {
+export function loadProjectV1Json(
+  source: ProjectSourceV1,
+  options: ProjectLoadOptions = {},
+): Promise<ProjectLoadResult> {
+  const originalBytes = typeof source === 'string' ? PROJECT_TEXT_ENCODER.encode(source) : source.slice();
+
+  if (originalBytes.byteLength > PROJECT_V1_LIMITS.maxJsonTextBytes) {
+    return Promise.resolve(
+      createLoadQuarantine(
+        originalBytes,
+        [createDiagnostic('input-too-large', 'Project JSON exceeds the maximum UTF-8 byte length')],
+        options.lastValidProject,
+      ),
+    );
+  }
+
+  let originalText: string;
+
+  try {
+    originalText = PROJECT_TEXT_DECODER.decode(originalBytes);
+  } catch {
+    return Promise.resolve(
+      createLoadQuarantine(
+        originalBytes,
+        [createDiagnostic('invalid-utf8', 'Project source is not valid UTF-8')],
+        options.lastValidProject,
+      ),
+    );
+  }
+
   const violation = inspectProjectV1JsonText(originalText);
 
   if (violation !== undefined) {
-    return Promise.resolve({
-      ...createLimitResult(violation),
-      status: 'quarantined',
-      originalText,
-      ...(options.lastValidProject === undefined ? {} : { lastValidProject: options.lastValidProject }),
-    });
+    return Promise.resolve(
+      createLoadQuarantine(originalBytes, createLimitResult(violation).diagnostics, options.lastValidProject),
+    );
   }
 
   let input: unknown;
@@ -150,23 +198,18 @@ export function loadProjectV1Json(originalText: string, options: ProjectLoadOpti
   try {
     input = JSON.parse(originalText) as unknown;
   } catch (error: unknown) {
-    return Promise.resolve({
-      status: 'quarantined',
-      originalText,
-      diagnostics: [
-        createDiagnostic('invalid-json', error instanceof Error ? error.message : 'Input is not valid JSON'),
-      ],
-      ...(options.lastValidProject === undefined ? {} : { lastValidProject: options.lastValidProject }),
-    });
+    return Promise.resolve(
+      createLoadQuarantine(
+        originalBytes,
+        [createDiagnostic('invalid-json', error instanceof Error ? error.message : 'Input is not valid JSON')],
+        options.lastValidProject,
+      ),
+    );
   }
 
   const result = parseProjectV1Unknown(input);
 
   if (result.status === 'loaded') return Promise.resolve(result);
 
-  return Promise.resolve({
-    ...result,
-    originalText,
-    ...(options.lastValidProject === undefined ? {} : { lastValidProject: options.lastValidProject }),
-  });
+  return Promise.resolve(createLoadQuarantine(originalBytes, result.diagnostics, options.lastValidProject));
 }

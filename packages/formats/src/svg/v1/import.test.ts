@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { projectFormatV1 } from '@broadset/model';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { importSvgProjectV1 } from './import';
 
@@ -138,6 +138,25 @@ describe('importSvgProjectV1', () => {
     expect([...result.blobs.values()]).toContainEqual(new Uint8Array([1, 2, 3]));
   });
 
+  it('falls back without retaining decoded images beyond the cumulative resource budget', async () => {
+    const result = await importSvgProjectV1({
+      svg: '<svg xmlns="http://www.w3.org/2000/svg"><image href="data:image/png;base64,AQID"/><image href="data:image/png;base64,BAUG"/></svg>',
+      importedAt,
+      fileName: 'budget.svg',
+      maxRetainedResourceBytes: 3,
+    });
+
+    expect([...result.blobs.values()]).toContainEqual(new Uint8Array([1, 2, 3]));
+    expect([...result.blobs.values()]).not.toContainEqual(new Uint8Array([4, 5, 6]));
+    expect(result.project.interop.records.flatMap(({ warnings }) => warnings)).toContainEqual(
+      expect.objectContaining({ code: 'svg.image-resource-limit', dimension: 'appearance' }),
+    );
+    expect(projectFormatV1.parseProjectV1Unknown(result.project).diagnostics).not.toContainEqual(
+      expect.objectContaining({ code: 'structural-invalid' }),
+    );
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(result.project)).toEqual([]);
+  });
+
   it('registers remote image references as missing assets without fetching', async () => {
     const result = await importSvg(
       '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10"><image width="2" height="1" href="https://example.com/image.png"/></svg>',
@@ -201,13 +220,173 @@ describe('importSvgProjectV1', () => {
     }
   });
 
+  it('keeps the terminal fallback schema-valid and semantically valid when hashing fails', async () => {
+    const digest = vi.spyOn(globalThis.crypto.subtle, 'digest').mockRejectedValue(new Error('hash unavailable'));
+
+    try {
+      const result = await importSvg('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>');
+
+      expect(projectFormatV1.broadsetProjectV1Schema.safeParse(result.project).success).toBe(true);
+      expect(projectFormatV1.validateBroadsetProjectV1Semantics(result.project)).toEqual([]);
+      expect(result.project.interop.records.flatMap(({ warnings }) => warnings)).toContainEqual(
+        expect.objectContaining({ code: 'svg.import-failed', severity: 'error' }),
+      );
+    } finally {
+      digest.mockRestore();
+    }
+  });
+
   it('does not retain scripts, handlers, or foreignObject javascript', async () => {
     const result = await importSvg(
       '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10" onload="alert(1)"><script>alert(2)</script><foreignObject><div>javascript:alert(3)</div></foreignObject><text>safe</text></svg>',
     );
-    const serialized = JSON.stringify(result.project);
+    const serialized = JSON.stringify(result.project.documents);
+    const retainedSource = [...result.blobs.values()].map((bytes: Uint8Array): string => new TextDecoder().decode(bytes)).join('');
 
     expect(serialized).not.toMatch(/<script|onload=|javascript:/iu);
+    expect(retainedSource).not.toMatch(/<script|onload=|javascript:/iu);
     expect(serialized).toContain('safe');
+  });
+
+  it('rejects DTD and entity declarations before DOM parsing or expansion', async () => {
+    const result = await importSvg(
+      '<!DOCTYPE svg [<!ENTITY expanded "EXPANDED-CONTENT">]><svg xmlns="http://www.w3.org/2000/svg"><text>&expanded;</text></svg>',
+    );
+    const retained = [...result.blobs.values()].map((bytes: Uint8Array): string => new TextDecoder().decode(bytes)).join('');
+
+    expect(retained).not.toContain('EXPANDED-CONTENT');
+    expect(result.project.interop.records.flatMap(({ warnings }) => warnings)).toContainEqual(
+      expect.objectContaining({ code: 'svg.dtd-rejected', severity: 'error' }),
+    );
+  });
+
+  it('does not encode, hash, or retain an SVG rejected by the byte cap', async () => {
+    const hostile = `<svg>${'x'.repeat(4096)}</svg>`;
+    const result = await importSvgProjectV1({ svg: hostile, importedAt, maxBytes: 64 });
+    const retained = [...result.blobs.values()].some(
+      (bytes: Uint8Array): boolean => new TextDecoder().decode(bytes).includes('xxxx'),
+    );
+
+    expect(retained).toBe(false);
+    expect(result.project.resources.assets[0]?.blob.byteLength).toBe(0);
+  });
+
+  it('omits sanitized provenance when CSS expansion exceeds the derived-byte cap', async () => {
+    const rectangles = Array.from(
+      { length: 30 },
+      (_unused, index): string => `<rect id="r${String(index)}" class="painted" width="1" height="1"/>`,
+    ).join('');
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg"><style>.painted{fill:#123456;stroke:#654321;stroke-width:12;opacity:.5}</style>${rectangles}</svg>`;
+    const maxBytes = new TextEncoder().encode(svg).byteLength + 16;
+    const result = await importSvgProjectV1({ svg, importedAt, maxBytes });
+    const provenance = result.project.resources.assets.find(({ kind }) => kind === 'foreign');
+
+    expect(provenance?.blob.byteLength).toBe(0);
+    expect([...result.blobs.values()].every((bytes: Uint8Array): boolean => bytes.byteLength === 0)).toBe(true);
+    expect(result.project.interop.records.flatMap(({ warnings }) => warnings)).toContainEqual(
+      expect.objectContaining({ code: 'svg.provenance-too-large', severity: 'warning' }),
+    );
+    expect(projectFormatV1.parseProjectV1Unknown(result.project).diagnostics).not.toContainEqual(
+      expect.objectContaining({ code: 'structural-invalid' }),
+    );
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(result.project)).toEqual([]);
+  });
+
+  it('charges expanded nodes before cloning repeated large symbol subtrees', async () => {
+    const symbolChildren = Array.from(
+      { length: 5_001 },
+      (): string => '<!--cloned-node-->',
+    ).join('');
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg"><defs><symbol id="parts">${symbolChildren}</symbol></defs><use href="#parts"/></svg>`;
+    const cloneNode = vi.spyOn(Node.prototype, 'cloneNode');
+
+    try {
+      const result = await importSvg(svg);
+      const hasExpandedNodeWarning = result.project.interop.records
+        .flatMap(({ warnings }) => warnings)
+        .some(({ code, message }) => code === 'svg.sanitized' && /expanded-node budget/iu.test(message));
+
+      expect(cloneNode.mock.calls.length).toBeLessThanOrEqual(5_000);
+      expect(hasExpandedNodeWarning).toBe(true);
+      expect(projectFormatV1.validateBroadsetProjectV1Semantics(result.project)).toEqual([]);
+    } finally {
+      cloneNode.mockRestore();
+    }
+  });
+
+  it('indexes source elements without quadratic attribute lookups', async () => {
+    const rectangles = Array.from(
+      { length: 500 },
+      (_unused, index): string => `<rect id="source-${String(index)}" width="1" height="1"/>`,
+    ).join('');
+    const getAttribute = vi.spyOn(Element.prototype, 'getAttribute');
+    let attributeReads = 0;
+
+    try {
+      await importSvg(`<svg xmlns="http://www.w3.org/2000/svg">${rectangles}</svg>`);
+      attributeReads = getAttribute.mock.calls.length;
+    } finally {
+      getAttribute.mockRestore();
+    }
+
+    expect(attributeReads).toBeLessThan(100_000);
+  });
+
+  it('aggregates top-level warnings with a bounded number of parent lookups', async () => {
+    const groups = Array.from({ length: 50 }, (_unused, groupIndex): string => {
+      const children = Array.from(
+        { length: 10 },
+        (_child, childIndex): string =>
+          `<rect id="child-${String(groupIndex)}-${String(childIndex)}" width="1" height="1"/>`,
+      ).join('');
+
+      return `<g id="group-${String(groupIndex)}">${children}</g>`;
+    }).join('');
+    const mapGet = vi.spyOn(Map.prototype, 'get');
+    let mapReads = 0;
+
+    try {
+      await importSvg(`<svg xmlns="http://www.w3.org/2000/svg">${groups}</svg>`);
+      mapReads = mapGet.mock.calls.length;
+    } finally {
+      mapGet.mockRestore();
+    }
+
+    expect(mapReads).toBeLessThan(60_000);
+  });
+
+  it('rejects node and markup-depth excess before DOM walking and surfaces the cap', async () => {
+    const nodes = await importSvgProjectV1({
+      svg: '<svg><rect/><rect/></svg>',
+      importedAt,
+      maxNodes: 2,
+    });
+    const depth = await importSvgProjectV1({
+      svg: '<svg><g><g><rect/></g></g></svg>',
+      importedAt,
+      maxDepth: 2,
+    });
+
+    expect(nodes.project.interop.records.flatMap(({ warnings }) => warnings)).toContainEqual(
+      expect.objectContaining({ code: 'svg.node-limit' }),
+    );
+    expect(depth.project.interop.records.flatMap(({ warnings }) => warnings)).toContainEqual(
+      expect.objectContaining({ code: 'svg.depth-limit' }),
+    );
+  });
+
+  it('surfaces every sanitizer action as a public import diagnostic', async () => {
+    const result = await importSvg(
+      '<svg xmlns="http://www.w3.org/2000/svg"><g onclick="run()"><script>run()</script><image href="javascript:run()"/></g></svg>',
+    );
+    const messages = result.project.interop.records.flatMap(({ warnings }) => warnings.map(({ message }) => message));
+
+    expect(result.project.resources.assets[0]?.kind).toBe('foreign');
+
+    expect(messages).toEqual(expect.arrayContaining([
+      expect.stringMatching(/stripped <script>/iu),
+      expect.stringMatching(/event-handler attribute onclick/iu),
+      expect.stringMatching(/javascript:/iu),
+    ]));
   });
 });

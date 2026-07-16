@@ -1,13 +1,83 @@
 import { projectFormatV1 } from '@broadset/model';
 
 import { decodeDataUri } from '../../pdf/data-uri';
+import type { ResourceCollectorV1 } from '../../v1';
 import { mapAppearanceV1 } from './map-paint';
 import { mapSvgPathV1 } from './map-path';
 import { mapTextBodyV1 } from './map-text';
-import type { ElementMappingContextV1, MappedElementV1 } from './types';
+import type {
+  ElementMappingContextV1,
+  MappedElementV1,
+  SvgImageAssetRegistryV1,
+  SvgImageAssetResolutionV1,
+} from './types';
 
 const MINIMUM_BOUND = 1;
 const DEG_TO_RAD = Math.PI / 180;
+
+export function createSvgImageAssetRegistryV1(
+  resourceCollector: ResourceCollectorV1,
+  maxRetainedBytes: number,
+): SvgImageAssetRegistryV1 {
+  const byReference = new Map<string, Promise<SvgImageAssetResolutionV1>>();
+  const budget = Number.isSafeInteger(maxRetainedBytes) && maxRetainedBytes >= 0 ? maxRetainedBytes : 0;
+  let retainedBytes = 0;
+  let resourceLimitFallback: Promise<projectFormatV1.Id> | undefined;
+
+  async function register(
+    reference: string,
+    pixelSize: readonly [number, number],
+  ): Promise<SvgImageAssetResolutionV1> {
+    let decoded: ReturnType<typeof decodeDataUri>;
+
+    try {
+      decoded = decodeDataUri(reference);
+    } catch {
+      decoded = undefined;
+    }
+
+    if (decoded === undefined) {
+      const assetId = await resourceCollector.addMissingImageAsset({ reference, pixelSize });
+
+      return { assetId, limitExceeded: false };
+    }
+
+    if (decoded.bytes.byteLength > budget - retainedBytes) {
+      resourceLimitFallback ??= resourceCollector.addImageAsset({
+        bytes: new Uint8Array(),
+        mediaType: 'image/png',
+        name: 'SVG image resource-limit fallback',
+        pixelSize: [1, 1],
+      });
+
+      return { assetId: await resourceLimitFallback, limitExceeded: true };
+    }
+
+    // Reserve synchronously before hashing so concurrent unique sources share one cumulative budget.
+    retainedBytes += decoded.bytes.byteLength;
+
+    const assetId = await resourceCollector.addImageAsset({
+      bytes: decoded.bytes,
+      mediaType: decoded.mime,
+      pixelSize,
+    });
+
+    return { assetId, limitExceeded: false };
+  }
+
+  return {
+    resolve(reference: string, pixelSize: readonly [number, number]): Promise<SvgImageAssetResolutionV1> {
+      let resolved = byReference.get(reference);
+
+      if (resolved === undefined) {
+        resolved = register(reference, pixelSize);
+        byReference.set(reference, resolved);
+      }
+
+      return resolved;
+    },
+  };
+}
 
 function positiveBound(value: number): number {
   return Number.isFinite(value) && value > 0 ? value : MINIMUM_BOUND;
@@ -103,37 +173,46 @@ function mapVector(context: ElementMappingContextV1): projectFormatV1.Element | 
   });
 }
 
-async function mapImage(context: ElementMappingContextV1): Promise<projectFormatV1.Element> {
+async function mapImage(context: ElementMappingContextV1): Promise<{
+  readonly element: projectFormatV1.Element;
+  readonly warnings: readonly projectFormatV1.InteropDiagnostic[];
+}> {
   const reference = typeof context.imported.content === 'string' ? context.imported.content : '';
-  const decoded = decodeDataUri(reference);
   const pixelSize: readonly [number, number] = [
     positiveBound(context.imported.width),
     positiveBound(context.imported.height),
   ];
-  const assetId =
-    decoded === undefined
-      ? await context.resourceCollector.addMissingImageAsset({ reference, pixelSize })
-      : await context.resourceCollector.addImageAsset({ bytes: decoded.bytes, mediaType: decoded.mime, pixelSize });
+  const resolution = await context.imageAssetRegistry.resolve(reference, pixelSize);
   const mappedAppearance = mapAppearanceV1({
     style: context.imported.style,
     source: context.source,
     elementId: context.elementId,
   });
 
-  return projectFormatV1.createElementV1({
+  const element = projectFormatV1.createElementV1({
     id: context.elementId,
     name: context.imported.dataBsId ?? 'image',
     parentId: context.parentId,
     geometry: geometry(context),
     appearance: mappedAppearance.appearance,
     kind: 'image',
-    image: { assetId, fit: context.imported.style.objectFit ?? 'fill' },
+    image: { assetId: resolution.assetId, fit: context.imported.style.objectFit ?? 'fill' },
   });
+
+  return {
+    element,
+    warnings: resolution.limitExceeded ? [{
+      code: 'svg.image-resource-limit',
+      severity: 'warning',
+      message: 'SVG embedded image exceeded the cumulative retained-resource limit and was replaced by a fallback asset.',
+      dimension: 'appearance',
+      pointer: '/image/assetId',
+    }] : [],
+  };
 }
 
 export async function mapSvgElementV1(context: ElementMappingContextV1): Promise<MappedElementV1> {
-  const warnings = appearanceWarnings(context);
-  const fallback = warnings.length > 0;
+  let warnings = appearanceWarnings(context);
   let element = mapVector(context);
 
   if (context.imported.type === 'group') {
@@ -175,8 +254,13 @@ export async function mapSvgElementV1(context: ElementMappingContextV1): Promise
       }),
     });
   } else if (context.imported.type === 'image') {
-    element = await mapImage(context);
+    const mappedImage = await mapImage(context);
+
+    element = mappedImage.element;
+    warnings = [...warnings, ...mappedImage.warnings];
   }
+
+  const fallback = warnings.length > 0;
 
   return {
     element,

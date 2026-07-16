@@ -1,7 +1,7 @@
 import type { ProjectEditorStore } from '@broadset/editor';
 import { projectFormatV1 } from '@broadset/model';
 import { CanvasSettingsModal } from '@broadset/ui';
-import { Dropdown, Separator, Toolbar } from '@heroui/react';
+import { Dropdown, Separator, toast, Toolbar } from '@heroui/react';
 import { FolderOpen, Grid3X3, Layers, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -11,13 +11,6 @@ import { type V1HostDialog, V1HostDialogs } from './v1-host-dialogs';
 
 interface V1ViewportToolbarProps {
   readonly editorStore: ProjectEditorStore;
-}
-
-interface NamedProjectSnapshotV1 {
-  readonly id: string;
-  readonly name: string;
-  readonly project: projectFormatV1.BroadsetProjectV1;
-  readonly blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>;
 }
 
 const EMPTY_PAGES: readonly projectFormatV1.PageDefinition[] = [];
@@ -73,7 +66,7 @@ function V1FileMenu({
   readonly onDialogOpen: (dialog: Exclude<V1HostDialog, null>) => void;
   readonly onSettingsOpen: () => void;
 }): React.JSX.Element {
-  const [snapshots, setSnapshots] = useState<readonly NamedProjectSnapshotV1[]>([]);
+  const snapshots = useEditorSelector(editorStore, (state) => state.snapshots);
 
   return (
     <ToolbarMenu icon={<FolderOpen aria-hidden="true" size={16} />} label="File">
@@ -93,14 +86,6 @@ function V1FileMenu({
       >
         Media Library
       </Dropdown.Item>
-      <Dropdown.Item
-        key="export"
-        onAction={() => {
-          onDialogOpen('export');
-        }}
-      >
-        Export
-      </Dropdown.Item>
       <Dropdown.Item key="document-settings" onAction={onSettingsOpen}>
         Document Settings
       </Dropdown.Item>
@@ -111,15 +96,13 @@ function V1FileMenu({
 
           if (name === undefined || name === '') return;
 
-          const state = editorStore.getState();
-          const snapshot: NamedProjectSnapshotV1 = {
-            id: crypto.randomUUID(),
-            name,
-            project: state.project,
-            blobs: state.blobs,
-          };
-
-          setSnapshots((current) => [...current.filter((entry) => entry.name !== name), snapshot]);
+          if (editorStore.getState().createSnapshot(name) === null) {
+            toast.danger('Snapshot name must be unique and the 20-snapshot limit cannot be exceeded.', {
+              timeout: 5000,
+            });
+          } else {
+            toast.success(`Snapshot ${name} saved.`, { timeout: 3000 });
+          }
         }}
       >
         <span>Save Snapshot</span>
@@ -129,10 +112,42 @@ function V1FileMenu({
         <Dropdown.Item
           key={`restore-${snapshot.id}`}
           onAction={() => {
-            editorStore.getState().setProject(snapshot.project, snapshot.blobs);
+            if (editorStore.getState().restoreSnapshot(snapshot.id)) {
+              toast.success(`Snapshot ${snapshot.name} restored.`, { timeout: 3000 });
+            }
           }}
         >
           {snapshot.name}
+        </Dropdown.Item>
+      ))}
+      {snapshots.map((snapshot) => (
+        <Dropdown.Item
+          key={`rename-${snapshot.id}`}
+          onAction={() => {
+            const name = window.prompt('Rename snapshot:', snapshot.name)?.trim();
+
+            if (name !== undefined && name !== '') {
+              if (editorStore.getState().renameSnapshot(snapshot.id, name)) {
+                toast.success(`Snapshot renamed to ${name}.`, { timeout: 3000 });
+              } else {
+                toast.danger('Snapshot names must be non-empty and unique.', { timeout: 5000 });
+              }
+            }
+          }}
+        >
+          Rename {snapshot.name}
+        </Dropdown.Item>
+      ))}
+      {snapshots.map((snapshot) => (
+        <Dropdown.Item
+          key={`delete-${snapshot.id}`}
+          onAction={() => {
+            if (editorStore.getState().deleteSnapshot(snapshot.id)) {
+              toast.info(`Snapshot ${snapshot.name} deleted.`, { timeout: 3000 });
+            }
+          }}
+        >
+          Delete {snapshot.name}
         </Dropdown.Item>
       ))}
     </ToolbarMenu>

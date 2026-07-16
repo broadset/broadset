@@ -22,8 +22,8 @@ function updateSequence(
 export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): React.JSX.Element {
   const state = useEditorSelector(editorStore, (current) => current);
   const document = selectActiveDocumentV1(state);
-  const selectedSequenceId = document?.pages.find(({ id }) => id === state.activePageId)?.sequenceId;
-  const selectedSequence = document?.sequences.find(({ id }) => id === selectedSequenceId) ?? document?.sequences[0];
+  const selectedSequence =
+    document?.sequences.find(({ id }) => id === state.playbackSequenceId) ?? document?.sequences[0];
 
   if (document === undefined || selectedSequence === undefined) {
     return <div style={{ padding: 12 }}>This document has no animation sequences.</div>;
@@ -45,6 +45,7 @@ export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): Reac
 
           if (!sequenceId.success) return;
 
+          state.setPlaybackSequence(sequenceId.data);
           state.updateActiveDocument((current) => ({
             ...current,
             pages: current.pages.map((page) =>
