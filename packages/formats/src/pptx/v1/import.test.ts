@@ -96,6 +96,29 @@ describe('importPptxProjectV1', () => {
     expectValid(result);
   });
 
+  it.each(['#_ftn1', ['http:', '//broadset.dev/'].join('')])(
+    'omits unsupported hyperlink %s with an interop diagnostic',
+    async (hyperlinkTarget) => {
+      const result = await importPptxProjectV1({
+        bytes: powerpointComplexTextFixture({ hyperlinkTarget }),
+        importedAt: IMPORTED_AT,
+      });
+      const text = result.project.documents[0]?.elements.find(({ kind }) => kind === 'text');
+      const hyperlinks =
+        text?.kind === 'text' ?
+          text.text.paragraphs.flatMap((paragraph) =>
+            paragraph.runs.flatMap((run) => (run.properties.hyperlink === undefined ? [] : [run.properties.hyperlink])),
+          )
+        : [];
+
+      expect(hyperlinks).toEqual([]);
+      expect(result.project.interop.records.flatMap(({ warnings }) => warnings)).toContainEqual(
+        expect.objectContaining({ code: 'pptx.hyperlink-unsupported', severity: 'warning' }),
+      );
+      expectValid(result);
+    },
+  );
+
   it('recovers embedded PPTX font bytes into v1 font resources', async () => {
     const bytes = new Uint8Array(readFileSync('src/_shared/fonts/__fixtures__/codicon.ttf'));
     const digest = projectFormatV1.sha256DigestSchema.parse(`sha256:${'f'.repeat(64)}`);

@@ -173,9 +173,10 @@ export function canvaFixture(): Uint8Array {
  * paragraph alignment, bullets, and a hyperlink. Exercises the full
  * text-body round-trip end-to-end.
  */
-export function powerpointComplexTextFixture(): Uint8Array {
+export function powerpointComplexTextFixture(options?: { readonly hyperlinkTarget?: string }): Uint8Array {
   const slideXml = `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="RichText"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="914400" y="914400"/><a:ext cx="6000000" cy="3000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:pPr algn="ctr"><a:lnSpc><a:spcPct val="120000"/></a:lnSpc></a:pPr><a:r><a:rPr lang="en-US" b="1" sz="3200"><a:solidFill><a:srgbClr val="C00000"/></a:solidFill><a:latin typeface="Calibri"/></a:rPr><a:t>Bold red</a:t></a:r><a:r><a:rPr lang="en-US" sz="2400"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:rPr><a:t> and </a:t></a:r><a:r><a:rPr lang="en-US" i="1" sz="2400"><a:solidFill><a:srgbClr val="0000C0"/></a:solidFill></a:rPr><a:t>italic blue</a:t></a:r></a:p><a:p><a:pPr><a:buChar char="•"/></a:pPr><a:r><a:rPr lang="en-US" sz="2000" u="sng"><a:solidFill><a:srgbClr val="2F6F2F"/></a:solidFill><a:hlinkClick r:id="rId7"/></a:rPr><a:t>Linked underlined item</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
-  const slideRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://broadset.dev/" TargetMode="External"/></Relationships>`;
+  const hyperlinkTarget = options?.hyperlinkTarget ?? 'https://broadset.dev/';
+  const slideRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${hyperlinkTarget}" TargetMode="External"/></Relationships>`;
 
   return writeOoxmlPackage(
     new Map([

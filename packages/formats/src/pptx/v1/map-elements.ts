@@ -6,7 +6,7 @@ import type { ResourceCollectorV1 } from '../../v1';
 import type { PptxSourceDocument, PptxSourceElement } from '../project-model';
 import { mapPptxAppearanceV1, pptxAppearanceWarningsV1 } from './appearance';
 import type { PptxFontRegistryV1 } from './font-registry';
-import { mapPptxTextElementV1, pptxTransform } from './map-text';
+import { mapPptxTextElementV1, pptxTextWarningsV1, pptxTransform } from './map-text';
 
 export interface MappedPptxElementV1 {
   readonly element: projectFormatV1.Element;
@@ -85,7 +85,7 @@ function mapNative(input: {
     return {
       element: mapPptxTextElementV1(input),
       sourceId: input.source.id,
-      warnings: appearanceWarnings,
+      warnings: [...appearanceWarnings, ...pptxTextWarningsV1(input.source)],
     };
   }
 

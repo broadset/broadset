@@ -15,6 +15,7 @@ const DEFAULT_FONT_SIZE = 16;
 const DEFAULT_FONT_WEIGHT = 400;
 const BOLD_FONT_WEIGHT = 700;
 const MAX_CHANNEL = 255;
+const URI_PUNCTUATION = "-._~:/?#[]@!$&'()*+,;=%";
 
 function elementName(source: PptxSourceElement): string {
   return source.name.trim() === '' ? 'PPTX text' : source.name;
@@ -36,6 +37,131 @@ function booleanValue(values: Readonly<Record<string, unknown>> | undefined, key
   const value = values?.[key];
 
   return typeof value === 'boolean' ? value : undefined;
+}
+
+function isAsciiLetterOrDigit(character: string): boolean {
+  const code = character.charCodeAt(0);
+
+  return isAsciiDigit(character) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+}
+
+function isAsciiDigit(character: string): boolean {
+  const code = character.charCodeAt(0);
+
+  return code >= 48 && code <= 57;
+}
+
+function hasValidUriCharacters(value: string): boolean {
+  for (const character of value) {
+    if (!isAsciiLetterOrDigit(character) && !URI_PUNCTUATION.includes(character)) return false;
+  }
+
+  for (let index = value.indexOf('%'); index >= 0; index = value.indexOf('%', index + 1)) {
+    const first = value[index + 1];
+    const second = value[index + 2];
+
+    if (first === undefined || second === undefined || !isHexDigit(first) || !isHexDigit(second)) return false;
+  }
+
+  return true;
+}
+
+function isHexDigit(character: string): boolean {
+  const code = character.charCodeAt(0);
+
+  return (code >= 48 && code <= 57) || (code >= 65 && code <= 70) || (code >= 97 && code <= 102);
+}
+
+function authority(value: string): string | undefined {
+  const start = value.indexOf('://');
+
+  if (start < 0) return undefined;
+
+  const authorityStart = start + 3;
+  const separators = ['/', '?', '#']
+    .map((separator) => value.indexOf(separator, authorityStart))
+    .filter((index) => index >= 0);
+  const end = separators.length === 0 ? value.length : Math.min(...separators);
+
+  return value.slice(authorityStart, end);
+}
+
+function hasInvalidExplicitPort(rawAuthority: string): boolean {
+  const closingBracket = rawAuthority.startsWith('[') ? rawAuthority.indexOf(']') : -1;
+  const portSeparator = closingBracket >= 0 ? closingBracket + 1 : rawAuthority.lastIndexOf(':');
+
+  if (portSeparator < 0 || rawAuthority[portSeparator] !== ':') return false;
+
+  const port = rawAuthority.slice(portSeparator + 1);
+
+  return port.length === 0 || !Array.from(port).every(isAsciiDigit) || Number(port) < 1 || Number(port) > 65_535;
+}
+
+function hasValidHostname(hostname: string): boolean {
+  if (hostname.startsWith('[')) return true;
+
+  const normalized = hostname.endsWith('.') ? hostname.slice(0, -1) : hostname;
+
+  if (normalized.length === 0 || normalized.length > 253) return false;
+
+  return normalized.split('.').every((label) => {
+    if (label.length === 0 || label.length > 63 || label.startsWith('-') || label.endsWith('-')) return false;
+
+    return Array.from(label).every((character) => isAsciiLetterOrDigit(character) || character === '-');
+  });
+}
+
+function supportedHyperlink(value: string | undefined): string | undefined {
+  if (value === undefined || !hasValidUriCharacters(value)) return undefined;
+
+  let parsed: URL;
+
+  try {
+    parsed = new URL(value);
+  } catch {
+    return undefined;
+  }
+
+  const rawAuthority = authority(value);
+
+  if (
+    parsed.protocol.toLowerCase() !== 'https:' ||
+    parsed.hostname.length === 0 ||
+    parsed.username !== '' ||
+    parsed.password !== '' ||
+    rawAuthority === undefined ||
+    rawAuthority.includes('@') ||
+    hasInvalidExplicitPort(rawAuthority) ||
+    !hasValidHostname(parsed.hostname)
+  ) {
+    return undefined;
+  }
+
+  return value;
+}
+
+export function pptxTextWarningsV1(source: PptxSourceElement): readonly projectFormatV1.InteropDiagnostic[] {
+  if (!isPptxSourceTextBody(source.content)) return [];
+
+  const hasUnsupportedHyperlink = source.content.paragraphs.some((paragraph) =>
+    paragraph.runs.some((run) => {
+      const hyperlink = run.props?.hyperlink?.url;
+
+      return hyperlink !== undefined && supportedHyperlink(hyperlink) === undefined;
+    }),
+  );
+
+  return hasUnsupportedHyperlink ?
+      [
+        {
+          code: 'pptx.hyperlink-unsupported',
+          severity: 'warning',
+          message: 'PPTX text hyperlinks that are not absolute HTTPS URLs were omitted.',
+          dimension: 'semantics',
+          pointer: '/text',
+        },
+      ]
+    : [];
 }
 
 function semanticRole(input: {
@@ -104,6 +230,7 @@ function runProperties(input: {
     size: numberValue(input.runStyle, 'fontSize') ?? input.style.fontSize ?? DEFAULT_FONT_SIZE,
     weight,
   });
+  const hyperlink = supportedHyperlink(input.hyperlink);
 
   return {
     ...properties,
@@ -114,7 +241,7 @@ function runProperties(input: {
       underline: booleanValue(input.runStyle, 'underline') ?? false,
       strikeThrough: booleanValue(input.runStyle, 'strikeThrough') ?? false,
     },
-    ...(input.hyperlink === undefined ? {} : { hyperlink: input.hyperlink }),
+    ...(hyperlink === undefined ? {} : { hyperlink }),
   };
 }
 
