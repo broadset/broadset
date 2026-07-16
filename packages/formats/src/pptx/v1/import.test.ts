@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 
-import { createDefaultElement, createEmptyBroadsetDocument, fontAsset, projectFormatV1 } from '@broadset/model';
+import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it, vi } from 'vitest';
 
-import { exportPptxBytes, importPptxProjectV1, reconcilePptxProjectV1 } from '../../index';
+import { exportPptxBytesV1, importPptxProjectV1, reconcilePptxProjectV1 } from '../../index';
 import {
   canvaCroppedFixture,
   canvaFixture,
@@ -14,15 +14,12 @@ import {
   powerpointComplexTextFixture,
   powerpointFixture,
 } from '../fixtures/external-tools';
+import { encodeText, writeOoxmlPackage } from '../ooxml/zip';
 
 const IMPORTED_AT = projectFormatV1.utcTimestampSchema.parse('2026-07-12T00:00:00Z');
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = '';
-
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-
-  return btoa(binary);
+function id(value: string): projectFormatV1.Id {
+  return projectFormatV1.idSchema.parse(value);
 }
 
 function expectValid(result: Awaited<ReturnType<typeof importPptxProjectV1>>): void {
@@ -100,30 +97,101 @@ describe('importPptxProjectV1', () => {
   });
 
   it('recovers embedded PPTX font bytes into v1 font resources', async () => {
-    const document = createEmptyBroadsetDocument();
     const bytes = new Uint8Array(readFileSync('src/_shared/fonts/__fixtures__/codicon.ttf'));
-    const embedded = fontAsset({
-      id: 'codicon-asset',
-      name: 'Codicon',
-      mimeType: 'font/ttf',
-      source: { type: 'embedded', dataUri: `data:font/ttf;base64,${bytesToBase64(bytes)}` },
-      format: 'ttf',
-      postScriptName: 'codicon',
-      familyName: 'codicon',
+    const digest = projectFormatV1.sha256DigestSchema.parse(`sha256:${'f'.repeat(64)}`);
+    const fontAssetId = id('codicon-asset');
+    const familyId = id('codicon-family');
+    const faceId = id('codicon-face');
+    const rootId = id('font-root');
+    const text = projectFormatV1.createEmptyTextBody({
+      paragraphId: id('font-paragraph'),
+      runId: id('font-run'),
+      fontFamilyId: familyId,
+      fontFaceId: faceId,
+      text: '\uea60',
     });
-    const source = {
-      ...document,
+    const document = projectFormatV1.createDocumentV1({
+      id: id('font-document'),
       elements: [
-        createDefaultElement('text', {
-          id: 'font-text',
+        projectFormatV1.createElementV1({
+          id: rootId,
+          name: 'Font root',
+          geometry: projectFormatV1.createElementGeometry({ width: 320, height: 180 }),
+          kind: 'group',
+        }),
+        projectFormatV1.createElementV1({
+          id: id('font-text'),
           name: 'Embedded font text',
-          content: '\uea60',
-          style: { fontFamily: 'codicon' },
+          parentId: rootId,
+          geometry: projectFormatV1.createElementGeometry({ width: 100, height: 30 }),
+          kind: 'text',
+          text,
         }),
       ],
+      pages: [
+        projectFormatV1.createPageV1({
+          id: id('font-page'),
+          rootInstances: [
+            {
+              id: id('font-root-instance'),
+              elementId: rootId,
+              overrides: [],
+              componentPropertyValues: [],
+            },
+          ],
+        }),
+      ],
+    });
+    const embedded: projectFormatV1.FontAsset = {
+      id: fontAssetId,
+      kind: 'font',
+      name: 'Codicon',
+      blob: {
+        digest,
+        byteLength: bytes.byteLength,
+        mediaType: 'font/ttf',
+        source: { kind: 'package', path: `blobs/sha256/${digest.slice('sha256:'.length)}` },
+      },
+      metadata: {
+        format: 'truetype',
+        postScriptName: 'codicon',
+        family: 'codicon',
+        weight: 400,
+        style: 'normal',
+        stretch: 1,
+        variableAxes: [],
+        unicodeCoverage: [],
+        embeddingPermissions: 'installable',
+      },
     };
+    const project = projectFormatV1.createProjectV1({
+      documents: [document],
+      resources: {
+        assets: [embedded],
+        fonts: [
+          {
+            id: familyId,
+            familyName: 'codicon',
+            fallbackFontIds: [],
+            faces: [
+              {
+                id: faceId,
+                source: { kind: 'asset', assetId: fontAssetId },
+                weight: 400,
+                style: 'normal',
+                stretch: 1,
+              },
+            ],
+          },
+        ],
+        swatches: [],
+        variables: [],
+        styles: [],
+        outputProfiles: [],
+      },
+    });
     const result = await importPptxProjectV1({
-      bytes: exportPptxBytes(source, { fontAssets: [embedded] }),
+      bytes: await exportPptxBytesV1({ project, blobs: new Map([[digest, bytes]]) }),
       importedAt: IMPORTED_AT,
     });
     const font = result.project.resources.fonts.find(({ familyName }) => familyName === 'codicon');
@@ -173,6 +241,55 @@ describe('importPptxProjectV1', () => {
     expect(oversized.project.interop.records.flatMap(({ warnings }) => warnings)).toContainEqual(
       expect.objectContaining({ code: 'pptx.size-cap', severity: 'error' }),
     );
+  });
+
+  it('rejects DTD-bearing XML without exposing the parser to entity expansion', async () => {
+    const presentation = `<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY lol "lol">]><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:tag>&lol;</p:tag></p:presentation>`;
+    const result = await importPptxProjectV1({
+      bytes: writeOoxmlPackage(
+        new Map([
+          ['[Content_Types].xml', encodeText('<Types/>')],
+          ['ppt/presentation.xml', encodeText(presentation)],
+          [
+            'ppt/_rels/presentation.xml.rels',
+            encodeText(
+              '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>',
+            ),
+          ],
+        ]),
+      ),
+      importedAt: IMPORTED_AT,
+    });
+
+    expect(result.project.interop.records.flatMap(({ warnings }) => warnings)).toContainEqual(
+      expect.objectContaining({ code: 'pptx.malformed-xml', severity: 'error' }),
+    );
+    expectValid(result);
+  });
+
+  it('diagnoses and strips macro payloads', async () => {
+    const presentation = `<?xml version="1.0"?><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst/></p:presentation>`;
+    const result = await importPptxProjectV1({
+      bytes: writeOoxmlPackage(
+        new Map([
+          ['[Content_Types].xml', encodeText('<Types/>')],
+          ['ppt/presentation.xml', encodeText(presentation)],
+          [
+            'ppt/_rels/presentation.xml.rels',
+            encodeText(
+              '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>',
+            ),
+          ],
+          ['ppt/vbaProject.bin', new Uint8Array([0, 0, 0, 0])],
+        ]),
+      ),
+      importedAt: IMPORTED_AT,
+    });
+
+    expect(result.project.interop.records.flatMap(({ warnings }) => warnings)).toContainEqual(
+      expect.objectContaining({ code: 'pptx.macro-rejected' }),
+    );
+    expectValid(result);
   });
 
   it('does not hash or retain oversized source bytes', async () => {

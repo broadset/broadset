@@ -31,7 +31,7 @@ const RTL_RANGES_RE = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/u;
  */
 const CJK_RANGES_RE = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]/u;
 
-export interface TextUnicodeProfile {
+interface TextUnicodeProfile {
   readonly hasRtl: boolean;
   readonly hasCjk: boolean;
 }

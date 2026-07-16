@@ -1,6 +1,5 @@
-import { type BroadsetElement } from '@broadset/model';
-
 import { findDescendant, getAttr, type XmlElement } from '../ooxml/ast';
+import type { PptxSourceElement } from '../project-model';
 
 export interface PictureSourceRef {
   readonly path: string;
@@ -26,12 +25,12 @@ interface BuildPictureElementOptions {
   readonly name: string;
   readonly id: string;
   readonly mediaByRelId: ReadonlyMap<string, PictureSourceRef>;
-  readonly createFallback: () => BroadsetElement;
-  readonly createImageBase: () => BroadsetElement;
+  readonly createFallback: () => PptxSourceElement;
+  readonly createImageBase: () => PptxSourceElement;
   readonly pushWarning: (warning: PictureImportWarning) => void;
 }
 
-export function buildPictureElement(options: BuildPictureElementOptions): BroadsetElement {
+export function buildPictureElement(options: BuildPictureElementOptions): PptxSourceElement {
   const blip = findDescendant(options.shape, 'a:blip');
 
   if (blip === null) {

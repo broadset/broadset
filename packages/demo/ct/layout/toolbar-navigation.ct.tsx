@@ -280,7 +280,7 @@ test('canvas context menu differs between selected-element and empty-canvas stat
   await expect(page.getByText('Cut')).toBeVisible();
   await expect(page.getByText('Delete')).toBeVisible();
 
-  await preview.dispatchEvent('click');
+  await preview.dispatchEvent('pointerdown', { button: 0, pointerId: 1 });
   await expect(page.getByTestId('transform-bounds')).toHaveCount(0);
   await preview.dispatchEvent('contextmenu', { button: 2 });
 

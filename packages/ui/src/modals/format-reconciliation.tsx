@@ -24,7 +24,7 @@ import { ModalShell } from './modal-shell';
  * formats package's runtime types — the demo (which has formats as a
  * direct dep) wires the modal up via the live `ReconcileResult`. The
  * choice state is keyed by element id; the demo resolves the actual
- * `BroadsetElement` references in `onAcknowledgeWithChoices`.
+ * v1 element references in `onAcknowledgeWithChoices`.
  */
 
 /** Per-modification user choice. Default is `'visual'` — keep the externally-edited element. */

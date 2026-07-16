@@ -1,11 +1,13 @@
 import {
-  broadsetColorSchema,
-  type BroadsetElement,
-  type BroadsetElementStyle,
-  isTextBody,
   projectFormatV1,
 } from '@broadset/model';
 
+import {
+  isPptxSourceTextBody,
+  pptxSourceColorSchema,
+  type PptxSourceElement,
+  type PptxSourceStyle,
+} from '../project-model';
 import { mapPptxAppearanceV1 } from './appearance';
 import type { PptxFontRegistryV1 } from './font-registry';
 
@@ -14,7 +16,7 @@ const DEFAULT_FONT_WEIGHT = 400;
 const BOLD_FONT_WEIGHT = 700;
 const MAX_CHANNEL = 255;
 
-function elementName(source: BroadsetElement): string {
+function elementName(source: PptxSourceElement): string {
   return source.name.trim() === '' ? 'PPTX text' : source.name;
 }
 
@@ -54,10 +56,10 @@ function textList(bulletKind: 'none' | 'char' | 'auto' | undefined): projectForm
 }
 
 function textColor(input: {
-  readonly style: BroadsetElementStyle;
+  readonly style: PptxSourceStyle;
   readonly runStyle: Readonly<Record<string, unknown>> | undefined;
 }): projectFormatV1.ColorValue {
-  const parsed = broadsetColorSchema.safeParse(input.runStyle?.['color']);
+  const parsed = pptxSourceColorSchema.safeParse(input.runStyle?.['color']);
   const color = parsed.success ? parsed.data : input.style.fontColor;
 
   if (color?.kind !== 'rgb') return projectFormatV1.createBlackColorValue();
@@ -79,7 +81,7 @@ function textColor(input: {
 }
 
 function runProperties(input: {
-  readonly style: BroadsetElementStyle;
+  readonly style: PptxSourceStyle;
   readonly runStyle: Readonly<Record<string, unknown>> | undefined;
   readonly language: string | undefined;
   readonly hyperlink: string | undefined;
@@ -136,12 +138,12 @@ function paragraphProperties(input: {
 }
 
 function textBody(input: {
-  readonly element: BroadsetElement;
+  readonly element: PptxSourceElement;
   readonly elementId: projectFormatV1.Id;
   readonly fontRegistry: PptxFontRegistryV1;
 }): projectFormatV1.TextBody {
   const sourceParagraphs =
-    isTextBody(input.element.content) ?
+    isPptxSourceTextBody(input.element.content) ?
       input.element.content.paragraphs
     : [{ runs: [{ text: input.element.content }] }];
 
@@ -171,7 +173,7 @@ function textBody(input: {
 }
 
 export function mapPptxTextElementV1(input: {
-  readonly source: BroadsetElement;
+  readonly source: PptxSourceElement;
   readonly elementId: projectFormatV1.Id;
   readonly parentId: projectFormatV1.Id | null;
   readonly fontRegistry: PptxFontRegistryV1;
@@ -194,7 +196,7 @@ export function mapPptxTextElementV1(input: {
   });
 }
 
-export function pptxTransform(source: BroadsetElement): projectFormatV1.ElementTransform {
+export function pptxTransform(source: PptxSourceElement): projectFormatV1.ElementTransform {
   const radians = (source.rotation * Math.PI) / 180;
   const cosine = Math.cos(radians);
   const sine = Math.sin(radians);

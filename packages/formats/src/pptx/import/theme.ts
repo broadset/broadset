@@ -1,6 +1,13 @@
-import type { ThemeSlot } from '@broadset/model';
-
-import { findChild, findDescendant, findDescendants, getAttr, parseOoxml, rootElement, type XmlElement } from '../ooxml/ast';
+import {
+  findChild,
+  findDescendant,
+  findDescendants,
+  getAttr,
+  parseOoxml,
+  rootElement,
+  type XmlElement,
+} from '../ooxml/ast';
+import type { PptxThemeSlot } from '../project-model';
 import type { ResolvedTheme } from '../types';
 
 /**
@@ -15,7 +22,7 @@ import type { ResolvedTheme } from '../types';
  * to work with.
  */
 
-const DEFAULT_PALETTE: Readonly<Record<ThemeSlot, string>> = {
+const DEFAULT_PALETTE: Readonly<Record<PptxThemeSlot, string>> = {
   dk1: '#000000',
   lt1: '#FFFFFF',
   dk2: '#1F1F1F',
@@ -30,14 +37,23 @@ const DEFAULT_PALETTE: Readonly<Record<ThemeSlot, string>> = {
   folHlink: '#954F72',
 };
 
-const THEME_SLOTS: readonly ThemeSlot[] = [
-  'dk1', 'lt1', 'dk2', 'lt2',
-  'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6',
-  'hlink', 'folHlink',
+const THEME_SLOTS: readonly PptxThemeSlot[] = [
+  'dk1',
+  'lt1',
+  'dk2',
+  'lt2',
+  'accent1',
+  'accent2',
+  'accent3',
+  'accent4',
+  'accent5',
+  'accent6',
+  'hlink',
+  'folHlink',
 ];
 
 export function parseTheme(xml: string | null): ResolvedTheme {
-  const palette: Record<ThemeSlot, string> = { ...DEFAULT_PALETTE };
+  const palette: Record<PptxThemeSlot, string> = { ...DEFAULT_PALETTE };
 
   if (xml === null || xml.length === 0) return { palette };
 

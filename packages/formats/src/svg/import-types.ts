@@ -5,27 +5,34 @@
  * pulling the whole orchestrator file. Split out in P7.7m to keep
  * the orchestrator under the soft size limit.
  */
-import { type BroadsetElementStyleInput, type TextBody } from '@broadset/model';
 import svgpath from 'svgpath';
 import { type Matrix } from 'transformation-matrix';
 
+import type { SvgSourceStyle, SvgSourceTextBody } from './source-model';
 import { type DecomposedTransform } from './transform';
+
+export interface SvgFontSource {
+  readonly bytes?: Uint8Array | undefined;
+  readonly url?: string | undefined;
+  readonly format: 'woff2' | 'ttf' | 'otf';
+  readonly __testPermissionOverride?: 'installable' | 'editable' | 'preview-print' | 'restricted' | undefined;
+}
 
 export interface ImportedElement {
   readonly type: string;
   /**
    * Text-element content can be either a plain `string` (single
-   * `<text>` body, no `<tspan>`s) or a structured `TextBody`
+   * `<text>` body, no `<tspan>`s) or a structured source text body
    * carrying paragraphs / runs with per-run style overrides
    * (built from `<tspan>` children). Other element kinds
    * (`path`, `image`, etc.) always carry a string.
    */
-  readonly content: string | TextBody;
+  readonly content: string | SvgSourceTextBody;
   readonly position: { readonly x: number; readonly y: number };
   readonly width: number;
   readonly height: number;
   readonly rotation: number;
-  readonly style: Partial<BroadsetElementStyleInput>;
+  readonly style: SvgSourceStyle;
   readonly dataBsId?: string | undefined;
   readonly dataBsKind?: string | undefined;
   readonly parentDataBsId?: string | null | undefined;
@@ -56,7 +63,7 @@ export interface TransformState {
 
 export interface ShapeBakeContext {
   readonly transform: TransformState;
-  readonly baseStyle: Partial<BroadsetElementStyleInput>;
+  readonly baseStyle: SvgSourceStyle;
   readonly tagMeta: Readonly<{
     readonly dataBsId?: string;
     readonly dataBsKind?: string;

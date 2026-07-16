@@ -1,8 +1,8 @@
-import type { FontAsset } from '@broadset/model';
 import { projectFormatV1 } from '@broadset/model';
 
 import { decodeDataUri } from '../../psd/data-uri';
 import type { ResourceCollectorV1 } from '../../v1';
+import type { PptxEmbeddedFontAsset } from '../project-model';
 
 interface PptxFontReferenceV1 {
   readonly familyId: projectFormatV1.Id;
@@ -19,7 +19,7 @@ export interface PptxFontRegistryV1 {
 
 export async function createPptxFontRegistryV1(options: {
   readonly resourceCollector: ResourceCollectorV1;
-  readonly embeddedFonts: readonly FontAsset[];
+  readonly embeddedFonts: readonly PptxEmbeddedFontAsset[];
 }): Promise<PptxFontRegistryV1> {
   const fonts = new Map<string, PptxFontReferenceV1>();
   let sequence = 0;

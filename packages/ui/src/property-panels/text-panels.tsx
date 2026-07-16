@@ -1,4 +1,3 @@
-import type { VerticalAlignment } from '@broadset/model';
 import { Button } from '@heroui/react';
 import { Bold, Italic, Strikethrough, Underline } from 'lucide-react';
 import type { JSX } from 'react';
@@ -14,6 +13,7 @@ import {
   TextStrokeInput,
   ToggleRow,
 } from '../inputs';
+import type { VerticalAlignment } from '../panel-types';
 import { ICON_SIZE, SelectField, TEXT_TRANSFORM_OPTIONS, VERTICAL_ALIGNMENT_OPTIONS } from '../panel-types';
 import { color, font, sp } from '../tokens';
 import { PropertyField } from './property-editing-context';

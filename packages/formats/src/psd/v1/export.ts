@@ -1,8 +1,22 @@
 import type { projectFormatV1 } from '@broadset/model';
 
-import { exportPsdBytesAsyncWithPreflight, type PsdExportResult } from '../export';
-import type { PsdExportOptions } from '../types';
-import { toLegacyPsdDocumentV1 } from './to-legacy-document';
+import { serializePsdProjectV1 } from './serialize';
+
+interface PsdExportOptions {
+  readonly colorSpace?: 'rgb' | 'cmyk' | 'lab' | 'grayscale';
+  readonly bitDepth?: 8 | 16;
+  readonly embedIccProfile?: boolean;
+  readonly linkSmartObjects?: boolean;
+  readonly preserveVisibility?: boolean;
+  readonly imageFetchTimeoutMs?: number;
+  readonly maxImageBytes?: number;
+  readonly allowedImageHosts?: ReadonlySet<string>;
+}
+
+interface PsdExportResult {
+  readonly bytes: Uint8Array;
+  readonly warnings: readonly string[];
+}
 
 export interface PsdExportInputV1 {
   readonly project: projectFormatV1.BroadsetProjectV1;
@@ -57,16 +71,14 @@ export async function exportPsdWithPreflightV1(input: PsdExportInputV1): Promise
 
     if (pages.length === 0) return fallback(`PSD v1 export: page ${input.pageId ?? '(default)'} was not found.`);
 
-    const mapped = await toLegacyPsdDocumentV1({
+    const exported = await serializePsdProjectV1({
       project: input.project,
       document,
       pages,
-      blobs: input.blobs ?? new Map(),
       resolveBlob: async (digest): Promise<Uint8Array | undefined> => resolvedBlob(input, digest),
     });
-    const exported = await exportPsdBytesAsyncWithPreflight(mapped.document, input.options);
 
-    return { bytes: exported.bytes, warnings: [...mapped.warnings, ...exported.warnings] };
+    return exported;
   } catch (error: unknown) {
     return fallback(`PSD v1 export failed soft: ${error instanceof Error ? error.message : 'unknown export failure'}`);
   }

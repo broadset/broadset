@@ -1,21 +1,15 @@
 import { expect, test } from '@playwright/experimental-ct-react';
-import type { Page } from '@playwright/test';
 
-import { clickCanvasPoint, getCanvasRootRect, waitForPlacementType } from '../canvas-transform/helpers';
+import { getCanvasRootRect } from '../canvas-transform/helpers';
 import { DemoAppFresh } from '../helpers/demo-app-fresh.helper';
-
-async function activatePathTool(page: Page): Promise<void> {
-  await page.locator('button[aria-label="Path"]').first().click();
-  // Banner must not appear — the crosshair cursor communicates placement state.
-  await expect(page.getByTestId('placement-mode-banner')).toHaveCount(0);
-  await waitForPlacementType(page, 'placement-anchor');
-}
-
-async function clickCanvasAt(page: Page, offsetX: number, offsetY: number): Promise<void> {
-  const canvasRect = await getCanvasRootRect(page);
-
-  await clickCanvasPoint(page, canvasRect.x + offsetX, canvasRect.y + offsetY);
-}
+import {
+  activatePathTool,
+  assertPathVerticesMatchClicks,
+  clickAbsolute,
+  clickAndWaitForVertex,
+  clickCanvasAt,
+  isPathDrawingActive,
+} from './path-tool.helpers';
 
 /**
  * @description Validates `project/spec/editor/editing.md` § Path Drawing
@@ -73,7 +67,7 @@ test('three canvas clicks plus Enter produces a closed path and restores the def
     window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
   });
 
-  const rendererHost = page.getByTestId('screen-renderer-host');
+  const rendererHost = page.getByTestId('v1-page-preview');
   const closedPath = rendererHost.locator('svg path[d*="Z"]');
 
   await expect(closedPath.first()).toBeAttached({ timeout: 2000 });
@@ -134,164 +128,10 @@ test('transform widget is hidden during placement and path drawing', async ({ mo
 });
 
 /**
- * @description Regression guard: canvas → document coordinate conversion must
- * account for pan + zoom. Before this fix, `toDocumentCoordinates` treated the
- * full preview container as the canvas, so panning or zooming the view put
- * clicks way off their intended doc positions and subsequent path points were
- * placed in the wrong spot.
- */
-/**
- * Read the rendered path's vertex positions in viewport (screen-pixel) coords
- * and compare them to the click positions. Every click must land on its
- * corresponding vertex within a small tolerance; otherwise the canvas
- * click-to-document conversion is broken.
- */
-async function assertPathVerticesMatchClicks(
-  page: Page,
-  clicksAbsolute: ReadonlyArray<{ readonly x: number; readonly y: number }>,
-  tolerance: number,
-): Promise<void> {
-  const readVertices = await page.evaluate((): ReadonlyArray<{ readonly x: number; readonly y: number }> | null => {
-    const hosts = document.querySelectorAll<HTMLElement>('[data-testid="screen-renderer-host"] [data-element-id]');
-
-    if (hosts.length === 0) return null;
-
-    let pathElement: SVGPathElement | null = null;
-    let elementHost: HTMLElement | null = null;
-
-    for (let index = hosts.length - 1; index >= 0; index -= 1) {
-      const host = hosts[index];
-
-      if (host === undefined) continue;
-
-      const candidatePath = host.querySelector<SVGPathElement>('svg path[d]');
-
-      if (candidatePath !== null) {
-        pathElement = candidatePath;
-        elementHost = host;
-        break;
-      }
-    }
-
-    if (pathElement === null || elementHost === null) return null;
-
-    const pathData = pathElement.getAttribute('d') ?? '';
-    const pointExpression = /([ML])\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/g;
-    const hostRect = elementHost.getBoundingClientRect();
-    const bboxX = elementHost.offsetWidth;
-    const bboxY = elementHost.offsetHeight;
-    const scaleX = bboxX > 0 ? hostRect.width / bboxX : 1;
-    const scaleY = bboxY > 0 ? hostRect.height / bboxY : 1;
-    const vertices: { readonly x: number; readonly y: number }[] = [];
-
-    for (const match of pathData.matchAll(pointExpression)) {
-      const relativeX = Number.parseFloat(match[2] ?? '0');
-      const relativeY = Number.parseFloat(match[3] ?? '0');
-
-      vertices.push({
-        x: hostRect.left + relativeX * scaleX,
-        y: hostRect.top + relativeY * scaleY,
-      });
-    }
-
-    return vertices;
-  });
-
-  expect(readVertices).not.toBeNull();
-  expect(readVertices).toHaveLength(clicksAbsolute.length);
-
-  for (let index = 0; index < clicksAbsolute.length; index += 1) {
-    const expectedClick = clicksAbsolute[index];
-    const actualVertex = (readVertices ?? [])[index];
-
-    if (expectedClick === undefined || actualVertex === undefined) {
-      throw new Error(`Missing click or vertex at index ${String(index)}`);
-    }
-
-    expect(Math.abs(actualVertex.x - expectedClick.x)).toBeLessThanOrEqual(tolerance);
-    expect(Math.abs(actualVertex.y - expectedClick.y)).toBeLessThanOrEqual(tolerance);
-  }
-}
-
-async function getLatestPathVertexCount(page: Page): Promise<number> {
-  return page.evaluate(() => {
-    const hosts = document.querySelectorAll<HTMLElement>('[data-testid="screen-renderer-host"] [data-element-id]');
-
-    for (let index = hosts.length - 1; index >= 0; index -= 1) {
-      const host = hosts[index];
-
-      if (host === undefined) continue;
-
-      const path = host.querySelector<SVGPathElement>('svg path[d]');
-
-      if (path !== null) {
-        return (path.getAttribute('d') ?? '').match(/[ML]/g)?.length ?? 0;
-      }
-    }
-
-    return 0;
-  });
-}
-
-async function isPathDrawingActive(page: Page): Promise<boolean> {
-  return page.evaluate(() => {
-    const store = (
-      window as unknown as {
-        __broadsetEditorStore?: {
-          getState: () => { readonly pathDrawingElementId: string | null };
-        };
-      }
-    ).__broadsetEditorStore;
-
-    return (store?.getState().pathDrawingElementId ?? null) !== null;
-  });
-}
-
-/**
  * @description Full path-drawing round-trip at default zoom/pan. Every single
  * appended point must render on screen exactly where the user clicked — not
  * just "somewhere inside the path's bounding box."
  */
-async function clickAbsolute(page: Page, x: number, y: number): Promise<void> {
-  await clickCanvasPoint(page, x, y);
-}
-
-/**
- * Place a path vertex by clicking at the absolute coordinates and
- * then synchronously polling the rendered `<path>` until the `d`
- * attribute carries at least `expectedVertexCount` `M`/`L` commands.
- *
- * Closes the 2026-04-28 production-readiness audit's CT-flakiness
- * finding: without a per-click sync the next click can fire before
- * React has re-rendered the path, occasionally swallowing the
- * append. The previous helper relied on Playwright's auto-wait for
- * the click target — which is satisfied by the preview element's
- * mere presence — leaving the store/DOM update racy.
- */
-async function clickAndWaitForVertex(page: Page, x: number, y: number, expectedVertexCount: number): Promise<void> {
-  await clickAbsolute(page, x, y);
-
-  await expect
-    .poll(
-      async () => {
-        const [vertexCount, drawingActive, widgetCount] = await Promise.all([
-          getLatestPathVertexCount(page),
-          isPathDrawingActive(page),
-          page.getByTestId('demo-transform-widget').count(),
-        ]);
-
-        return {
-          ready:
-            vertexCount >= expectedVertexCount &&
-            (expectedVertexCount === 1 ? drawingActive && widgetCount === 0 : true),
-          vertexCount,
-        };
-      },
-      { timeout: 4_000 },
-    )
-    .toMatchObject({ ready: true });
-}
-
 test('path vertices land on their click positions at default zoom', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
   await activatePathTool(page);
@@ -376,13 +216,7 @@ test('a completed path can be re-selected by clicking it', async ({ mount, page 
     window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
   });
   await page.evaluate(() => {
-    const store = (
-      window as unknown as {
-        __broadsetEditorStore?: {
-          getState: () => { readonly selectElement: (id: string | null) => void };
-        };
-      }
-    ).__broadsetEditorStore;
+    const store = window.__broadsetProjectEditorStore;
 
     store?.getState().selectElement(null);
   });
@@ -391,27 +225,17 @@ test('a completed path can be re-selected by clicking it', async ({ mount, page 
 
   // Now click directly on the path element host. Selection must take.
   const pathId = await page.evaluate((): string | null => {
-    const store = (
-      window as unknown as {
-        __broadsetEditorStore?: {
-          getState: () => {
-            readonly document: {
-              readonly elements: ReadonlyArray<{ readonly id: string; readonly type: string }>;
-            };
-          };
-        };
-      }
-    ).__broadsetEditorStore;
+    const store = window.__broadsetProjectEditorStore;
 
     if (store === undefined) return null;
 
-    const elements = store.getState().document.elements;
+    const elements = store.getState().project.documents[0]?.elements ?? [];
 
     // Iterate in reverse so we find the most recently created path element.
     for (let index = elements.length - 1; index >= 0; index -= 1) {
       const element = elements[index];
 
-      if (element?.type === 'path') {
+      if (element?.kind === 'vector' && element.geometryData.kind === 'path') {
         return element.id;
       }
     }
@@ -421,7 +245,7 @@ test('a completed path can be re-selected by clicking it', async ({ mount, page 
 
   expect(pathId).not.toBeNull();
 
-  const pathHost = page.locator(`[data-testid="screen-renderer-host"] [data-element-id="${String(pathId)}"]`);
+  const pathHost = page.locator(`[data-testid="v1-page-preview"] [data-element-id="${String(pathId)}"]`);
 
   await expect(pathHost).toBeAttached();
 
@@ -502,7 +326,7 @@ test('clicking the last vertex again ends path drawing', async ({ mount, page })
 
   // No extra vertex was appended — the committed path has the same three points.
   const pathD = await page
-    .locator('[data-testid="screen-renderer-host"] [data-element-id] svg path[d]')
+    .locator('[data-testid="v1-page-preview"] [data-element-id] svg path[d]')
     .last()
     .getAttribute('d');
   const matches = (pathD ?? '').match(/[ML]/g) ?? [];
@@ -794,7 +618,7 @@ test('appending path points keeps growing the path instead of dragging it', asyn
     window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
   });
 
-  const rendererHost = page.getByTestId('screen-renderer-host');
+  const rendererHost = page.getByTestId('v1-page-preview');
   const closedPath = rendererHost.locator('svg path[d*="Z"]').last();
   const pathData = await closedPath.getAttribute('d');
 

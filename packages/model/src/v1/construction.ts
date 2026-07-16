@@ -116,6 +116,7 @@ const DEFAULT_TEXT_LAYOUT: TextLayoutOptions = {
   autoSize: 'none',
   columns: 1,
   columnGap: 0,
+  padding: [0, 0, 0, 0],
 };
 
 Object.freeze(DEFAULT_TEXT_LAYOUT);

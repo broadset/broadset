@@ -1,4 +1,3 @@
-import { colorToCss, migrateLegacyColor } from '@broadset/model';
 import { Button } from '@heroui/react';
 import type { JSX } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -6,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { color, radius, sp } from '../tokens';
 import { AngleDial } from './angle-dial';
 import { ColorInput } from './color-input';
+import { normalizeCssColor } from './css-color';
 import { NumField } from './number-inputs';
 
 interface GradientStop {
@@ -123,13 +123,7 @@ function findFunctionEnd(value: string, openParenIndex: number): number {
 }
 
 function parseColorToken(colorText: string): string | null {
-  try {
-    const colorValue = migrateLegacyColor(colorText);
-
-    return colorValue === undefined ? null : colorToCss(colorValue);
-  } catch {
-    return null;
-  }
+  return normalizeCssColor(colorText);
 }
 
 function extractColorToken(value: string): { readonly color: string; readonly rest: string } | null {

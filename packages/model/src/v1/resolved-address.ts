@@ -130,7 +130,7 @@ function createOrdinaryRootScopes(
 ): ReadonlyMap<Id, ElementScope> {
   const owners = new Map<Id, Id | undefined>();
   const partitions = new Map<Id, Map<Id, Element>>(
-    [...selectedRootIds].map((rootId) => [rootId, new Map<Id, Element>()]),
+    [...selectedRootIds].map((rootId: Id): readonly [Id, Map<Id, Element>] => [rootId, new Map<Id, Element>()]),
   );
 
   elements.forEach((element) => {
@@ -139,10 +139,14 @@ function createOrdinaryRootScopes(
     if (rootId !== undefined) partitions.get(rootId)?.set(element.id, element);
   });
 
-  return new Map([...partitions].map(([rootId, rootElements]) => [
-    rootId,
-    { elements: rootElements, nestedEntities: createElementNestedIndexes([...rootElements.values()]) },
-  ]));
+  return new Map(
+    [...partitions].map(
+      ([rootId, rootElements]: [Id, Map<Id, Element>]): readonly [Id, ElementScope] => [
+        rootId,
+        { elements: rootElements, nestedEntities: createElementNestedIndexes([...rootElements.values()]) },
+      ],
+    ),
+  );
 }
 
 function descendComponentPath(

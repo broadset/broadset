@@ -1,5 +1,3 @@
-import { type BroadsetElementStyleInput } from '@broadset/model';
-
 import { sanitizeStyleAttribute } from '../_shared/sanitize';
 import {
   buildDefsBundle,
@@ -30,8 +28,8 @@ import {
   readInheritedStrokeStyle,
 } from './import-style';
 import { importTextElement } from './import-text';
-import { type ImportedElement, type ShapeBakeContext, type TransformState } from './import-types';
-import type { SvgFontSource } from './types';
+import { type ImportedElement, type ShapeBakeContext, type SvgFontSource, type TransformState } from './import-types';
+import type { SvgSourceStyle } from './source-model';
 
 /**
  * Group-depth cap per the importer security contract. Bounds the
@@ -47,7 +45,7 @@ interface SvgWalkOptions {
   readonly warnOnPreservation?: boolean | undefined;
 }
 
-export interface SvgImportResult {
+interface SvgImportResult {
   readonly elements: readonly ImportedElement[];
   readonly canvasWidth: number;
   readonly canvasHeight: number;
@@ -73,7 +71,7 @@ function importUnsupportedElement(el: Element, transform: TransformState, warnin
 interface GroupImportContext {
   readonly transformStr: string;
   readonly transform: TransformState;
-  readonly baseStyle: Partial<BroadsetElementStyleInput>;
+  readonly baseStyle: SvgSourceStyle;
   readonly ownDataBsId: string | undefined;
   readonly ownDataBsKind: string | undefined;
   readonly tagMeta: Readonly<{
@@ -190,13 +188,6 @@ function synthesiseGroupId(el: Element): string {
 }
 
 /**
- * `true` when an id was produced by `synthesiseGroupId`.
- */
-export function isSyntheticGroupId(id: string): boolean {
-  return /^__bs-g-\d+(-\d+)*$/.test(id);
-}
-
-/**
  * Snapshot `el.outerHTML` after sanitising every nested `style=""`
  * declaration through the CSS URL allowlist (M2 closure). The
  * preserved blob is opaque on re-export, so we cannot rely on the
@@ -256,7 +247,7 @@ function importElement(
   const strokeStyle = readInheritedStrokeStyle(el);
   const effectiveClipPath = maskPath ?? clipPath;
   const isFillFromGradientOrPattern = gradient !== undefined || pattern !== undefined;
-  const baseStyle: Partial<BroadsetElementStyleInput> = {
+  const baseStyle: SvgSourceStyle = {
     ...(effectiveClipPath !== undefined ? { customClipPath: effectiveClipPath } : undefined),
     ...(maskPath !== undefined ? { maskType: 'alpha' } : undefined),
     ...(pattern !== undefined ? { fill: pattern } : undefined),
@@ -419,19 +410,6 @@ function importSwitchElement(
   return [];
 }
 
-export function importSvg(input: string): SvgImportResult {
-  const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(input, 'image/svg+xml');
-
-  const parseError = xmlDoc.querySelector('parsererror');
-
-  if (parseError) {
-    throw new Error(`SVG import failed: invalid XML - ${parseError.textContent}`);
-  }
-
-  return walkSvgDocument(xmlDoc);
-}
-
 export function walkSvgDocument(xmlDoc: Document, options: SvgWalkOptions = {}): SvgImportResult {
   const svgRoot = xmlDoc.documentElement;
 
@@ -466,64 +444,6 @@ export function walkSvgDocument(xmlDoc: Document, options: SvgWalkOptions = {}):
     const child = children[i];
 
     if (!child || child.tagName.toLowerCase() === 'defs') {
-      continue;
-    }
-
-    elements.push(...importElement(child, defs, warnings, rootTransform, null, 0, options));
-  }
-
-  return { elements, canvasWidth, canvasHeight, warnings };
-}
-
-interface VisualImportResult {
-  readonly elements: readonly ImportedElement[];
-  readonly canvasWidth: number;
-  readonly canvasHeight: number;
-  readonly warnings: readonly string[];
-}
-
-/**
- * Alternate entry point used by the fast-path importer: walks an
- * already-parsed DOM tree (so callers that did their own
- * `parseMetadataPacket(xmlDoc)` don't re-parse).
- */
-export function importSvgFromXmlDoc(xmlDoc: Document, options: SvgWalkOptions = {}): VisualImportResult {
-  const svgRoot = xmlDoc.documentElement;
-  let canvasWidth = 800;
-  let canvasHeight = 600;
-  const widthAttr = svgRoot.getAttribute('width');
-  const heightAttr = svgRoot.getAttribute('height');
-
-  if (widthAttr && heightAttr) {
-    canvasWidth = parseFloat(widthAttr);
-    canvasHeight = parseFloat(heightAttr);
-  } else {
-    const viewBox = svgRoot.getAttribute('viewBox');
-
-    if (viewBox) {
-      const parts = viewBox.split(/[\s,]+/);
-
-      canvasWidth = parseFloat(parts[2] ?? '800');
-      canvasHeight = parseFloat(parts[3] ?? '600');
-    }
-  }
-
-  const defs = buildDefsBundle(xmlDoc);
-  const warnings: string[] = [];
-  const elements: ImportedElement[] = [];
-  const children = svgRoot.children;
-  const rootTransform: TransformState = { x: 0, y: 0, rotation: 0, matrix: IDENTITY_MATRIX, requiresBake: false };
-
-  for (let i = 0; i < children.length; i++) {
-    const child = children[i];
-
-    if (!child) {
-      continue;
-    }
-
-    const tag = child.tagName.toLowerCase();
-
-    if (tag === 'defs' || tag === 'metadata') {
       continue;
     }
 

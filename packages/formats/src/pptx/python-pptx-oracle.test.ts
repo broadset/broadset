@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { importPptx } from './import';
+import { importPptxSource as importPptx } from './source-import';
 
 /**
  * @description python-pptx oracle fixture gate. This optional dev-only

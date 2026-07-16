@@ -1,8 +1,2 @@
-export { createDemoAppChromeTestDocument } from './fixture-chrome';
-export {
-  createPlaybackAndParentingComboDocument,
-  createVisibilityAndDataBindingComboDocument,
-} from './fixture-combinations';
-export { createParentingTransformTestDocument } from './fixture-parenting';
-export { createDemoAppPlaybackTestDocument } from './fixture-playback';
+export { createParentingTransformTestProjectV1 } from './fixture-parenting-v1';
 export { createSidebarPanelFixtureElements } from './panel-elements';

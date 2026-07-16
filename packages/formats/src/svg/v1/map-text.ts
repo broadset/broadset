@@ -1,7 +1,7 @@
-import { isTextBody, projectFormatV1, type TextBody } from '@broadset/model';
+import { projectFormatV1 } from '@broadset/model';
 
 import { mapCssColorV1 } from './paint-color';
-import type { FontRegistryV1, LegacyStyle } from './types';
+import type { FontRegistryV1, SvgImportedStyle, SvgImportedTextBody } from './types';
 
 const DEFAULT_FONT_FAMILY = 'sans-serif';
 const DEFAULT_FONT_SIZE = 16;
@@ -56,7 +56,7 @@ function fontStyle(value: unknown): 'normal' | 'italic' | 'oblique' {
 function mapRun(input: {
   readonly text: string;
   readonly style: unknown;
-  readonly baseStyle: LegacyStyle;
+  readonly baseStyle: SvgImportedStyle;
   readonly source: Element | undefined;
   readonly id: projectFormatV1.Id;
   readonly fontRegistry: FontRegistryV1;
@@ -84,18 +84,18 @@ function mapRun(input: {
 }
 
 export function mapTextBodyV1(input: {
-  readonly content: string | TextBody;
-  readonly style: LegacyStyle;
+  readonly content: string | SvgImportedTextBody;
+  readonly style: SvgImportedStyle;
   readonly source: Element | undefined;
   readonly elementId: projectFormatV1.Id;
   readonly fontRegistry: FontRegistryV1;
 }): projectFormatV1.TextBody {
-  const legacyParagraphs: readonly TextBody['paragraphs'][number][] = isTextBody(input.content)
-    ? input.content.paragraphs
-    : input.content.split('\n').map((text) => ({ runs: [{ text }] }));
+  const importedParagraphs: readonly SvgImportedTextBody['paragraphs'][number][] = typeof input.content === 'string'
+    ? input.content.split('\n').map((text) => ({ runs: [{ text }] }))
+    : input.content.paragraphs;
 
   return {
-    paragraphs: legacyParagraphs.map((paragraph, paragraphIndex) => {
+    paragraphs: importedParagraphs.map((paragraph, paragraphIndex) => {
       const properties = projectFormatV1.createParagraphProperties();
       const paragraphAlignment = alignment(
         sourceAttribute(input.source, 'text-anchor') ?? sourceAttribute(input.source, 'text-align') ?? input.style.textAlignment,

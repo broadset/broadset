@@ -1,13 +1,4 @@
 import {
-  type BroadsetDocument,
-  type BroadsetElement,
-  createPageElementInstanceForElement,
-  type Hyperlink,
-  normalizeElementContent,
-  type TextBody,
-} from '@broadset/model';
-
-import {
   findChildren,
   findDescendant,
   getAttr,
@@ -19,11 +10,19 @@ import {
 import { OOXML_REL_TYPES } from '../ooxml/namespaces';
 import { parseRelationshipsXml } from '../ooxml/relationships';
 import { type OoxmlPackage, readTextPart } from '../ooxml/zip';
+import {
+  createPptxPageElement,
+  normalizePptxElementContent,
+  type PptxSourceDocument,
+  type PptxSourceElement,
+  type PptxSourceHyperlink,
+  type PptxSourceTextBody,
+} from '../project-model';
 import type { LayoutPlaceholder, PptxImportWarning } from '../types';
 import { extractSlideNotes } from './notes';
 import { parseSlideShapes, type SlideImportContext } from './shape';
 import { parseGradient } from './style';
-import { extractTextBody } from './text';
+import { extractPptxSourceTextBody } from './text';
 
 interface SlidePage {
   readonly id: string;
@@ -32,7 +31,7 @@ interface SlidePage {
 }
 
 interface ResolvedPackageInfo {
-  readonly canvas: BroadsetDocument['canvas'];
+  readonly canvas: PptxSourceDocument['canvas'];
   readonly slideRelsByPath: ReadonlyMap<string, string>;
 }
 
@@ -56,7 +55,7 @@ export function importSingleSlide(
   const slideRelsPath = resolved.slideRelsByPath.get(slidePath);
   const slideRels = slideRelsPath !== undefined ? parseRelationshipsXml(readTextPart(pkg, slideRelsPath) ?? '') : [];
   const mediaByRelId = collectSlideMedia(pkg, slidePath, slideRels);
-  const hyperlinkByRelId = collectHyperlinkRels(slideRels);
+  const hyperlinkByRelId = collectPptxSourceHyperlinkRels(slideRels);
   const notes = extractSlideNotes(pkg, slidePath, slideRels);
   const ctxWarnings: SlideImportContext['warnings'] = [];
   const ctx: SlideImportContext = {
@@ -115,17 +114,17 @@ function escapePlainTextForHtml(text: string): string {
  * and apply layout-placeholder inheritance for font / size / colour.
  */
 function promoteShapeText(
-  canvas: BroadsetDocument['canvas'],
+  canvas: PptxSourceDocument['canvas'],
   shape: ReturnType<typeof parseSlideShapes>[number],
   body: string | null,
   layoutPlaceholders: ReadonlyMap<number, LayoutPlaceholder>,
-  hyperlinks: ReadonlyMap<string, Hyperlink>,
+  hyperlinks: ReadonlyMap<string, PptxSourceHyperlink>,
 ): ReturnType<typeof parseSlideShapes>[number] {
   if (shape.type !== 'rectangle' && shape.type !== 'ellipse') return shape;
 
   if (body === null) return shape;
 
-  const textBody = extractTextBody(canvas, body, hyperlinks);
+  const textBody = extractPptxSourceTextBody(canvas, body, hyperlinks);
 
   if (textBody === null) return shape;
 
@@ -136,33 +135,31 @@ function promoteShapeText(
       p.runs.length > 1 ||
       p.runs.some(
         (r) =>
-          (r.props?.style !== undefined && Object.keys(r.props.style).length > 0) ||
-          r.props?.hyperlink !== undefined,
+          (r.props?.style !== undefined && Object.keys(r.props.style).length > 0) || r.props?.hyperlink !== undefined,
       ) ||
       p.props !== undefined,
   );
   // PPTX text runs carry plain text (XML entities are already decoded
   // by the AST). Element `content` is HTML-shaped, so plain text with
   // bracket-shaped runs (e.g. `A & B <C>`) MUST be HTML-escaped before
-  // passing through `normalizeElementContent` — otherwise the
+  // passing through `normalizePptxElementContent` — otherwise the
   // sanitizer treats `<C>` as an unknown tag and drops it. Structured
-  // `TextBody` paths bypass the HTML rendering surface.
-  const rawContent: string | TextBody = hasStructure
-    ? textBody
-    : escapePlainTextForHtml(
-        textBody.paragraphs.map((p) => p.runs.map((r) => r.text).join('')).join('\n'),
-      );
-  const content = normalizeElementContent('text', rawContent);
+  // `PptxSourceTextBody` paths bypass the HTML rendering surface.
+  const rawContent: string | PptxSourceTextBody =
+    hasStructure ? textBody : (
+      escapePlainTextForHtml(textBody.paragraphs.map((p) => p.runs.map((r) => r.text).join('')).join('\n'))
+    );
+  const content = normalizePptxElementContent('text', rawContent);
 
   const placeholder = resolvePlaceholderFromBody(body, layoutPlaceholders);
   const inherited =
-    placeholder === undefined
-      ? {}
-      : {
-          ...(placeholder.fontFamily !== undefined ? { fontFamily: placeholder.fontFamily } : {}),
-          ...(placeholder.fontSize !== undefined ? { fontSize: placeholder.fontSize } : {}),
-          ...(placeholder.color !== undefined ? { fontColor: placeholder.color } : {}),
-        };
+    placeholder === undefined ?
+      {}
+    : {
+        ...(placeholder.fontFamily !== undefined ? { fontFamily: placeholder.fontFamily } : {}),
+        ...(placeholder.fontSize !== undefined ? { fontSize: placeholder.fontSize } : {}),
+        ...(placeholder.color !== undefined ? { fontColor: placeholder.color } : {}),
+      };
 
   return {
     ...shape,
@@ -173,9 +170,9 @@ function promoteShapeText(
 }
 
 export function applyFirstSlideBackground(
-  canvas: BroadsetDocument['canvas'],
+  canvas: PptxSourceDocument['canvas'],
   slideXml: string | null,
-): BroadsetDocument['canvas'] {
+): PptxSourceDocument['canvas'] {
   if (slideXml === null) return canvas;
 
   const root = rootElement(parseOoxml(slideXml));
@@ -227,10 +224,10 @@ function readSrgbHex(node: XmlElement | null): string | null {
   return `#${val.toUpperCase()}`;
 }
 
-function collectHyperlinkRels(
+function collectPptxSourceHyperlinkRels(
   slideRels: ReturnType<typeof parseRelationshipsXml>,
-): ReadonlyMap<string, Hyperlink> {
-  const map = new Map<string, Hyperlink>();
+): ReadonlyMap<string, PptxSourceHyperlink> {
+  const map = new Map<string, PptxSourceHyperlink>();
 
   for (const rel of slideRels) {
     if (rel.type !== OOXML_REL_TYPES.hyperlink) continue;
@@ -348,19 +345,19 @@ function collectShapeBodies(slideXml: string): readonly (string | null)[] {
 }
 
 /**
- * Compose a BroadsetDocument from per-slide element lists. Used by
+ * Compose a PptxSourceDocument from per-slide element lists. Used by
  * the operator-level importer once parseSlideShapes has populated
  * each page.
  */
 export function composeDocumentFromSlides(
-  canvas: BroadsetDocument['canvas'],
+  canvas: PptxSourceDocument['canvas'],
   slides: readonly {
     readonly id: string;
     readonly notes?: string;
-    readonly elements: readonly BroadsetElement[];
+    readonly elements: readonly PptxSourceElement[];
   }[],
-): BroadsetDocument {
-  const allElements: BroadsetElement[] = [];
+): PptxSourceDocument {
+  const allElements: PptxSourceElement[] = [];
   const seenIds = new Map<string, number>();
   // Track which root elements live on which slide so each slide gets
   // matching page-instance entries — without this the canvas renders
@@ -375,8 +372,7 @@ export function composeDocumentFromSlides(
 
       seenIds.set(el.id, seenCount + 1);
 
-      const finalElement: BroadsetElement =
-        seenCount === 0 ? el : { ...el, id: `${el.id}__dup-${slide.id}` };
+      const finalElement: PptxSourceElement = seenCount === 0 ? el : { ...el, id: `${el.id}__dup-${slide.id}` };
 
       allElements.push(finalElement);
 
@@ -397,8 +393,8 @@ export function composeDocumentFromSlides(
       name: slide.id,
       elements: rootIds
         .map((id) => elementsById.get(id))
-        .filter((el): el is BroadsetElement => el !== undefined)
-        .map(createPageElementInstanceForElement),
+        .filter((el): el is PptxSourceElement => el !== undefined)
+        .map(createPptxPageElement),
       locale: null,
       extensions: {},
       ...(slide.notes !== undefined && slide.notes.length > 0 ? { notes: slide.notes } : {}),

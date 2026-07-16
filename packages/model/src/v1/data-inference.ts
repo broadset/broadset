@@ -497,7 +497,11 @@ export function inferExpressionValueType({ expression, context }: ExpressionInfe
 export function inferFormatterPipelineValueType({ inputType, pipeline }: FormatterInferenceOptions): ValueTypeInferenceResult {
   let valueType: ValueType = inputType;
 
-  for (const [index, step] of pipeline.steps.entries()) {
+  for (let index = 0; index < pipeline.steps.length; index += 1) {
+    const step: FormatterPipeline['steps'][number] | undefined = pipeline.steps[index];
+
+    if (step === undefined) continue;
+
     if (!formatterAcceptsInput(step.formatterId, valueType)) {
       return {
         diagnostics: [

@@ -1,6 +1,6 @@
 import { projectFormatV1 } from '@broadset/model';
 
-import { type RenderContextV1,renderElementV1 } from './element-dom';
+import { type RenderContextV1, renderElementV1 } from './element-dom';
 
 type BroadsetProjectV1 = projectFormatV1.BroadsetProjectV1;
 type ResolvedSceneInstance = projectFormatV1.ResolvedSceneInstance;
@@ -22,6 +22,7 @@ export function renderResolvedSceneV1(
 
   sceneRoot.dataset['sceneRoot'] = 'true';
   sceneRoot.style.setProperty('position', 'relative');
+  sceneRoot.style.setProperty('transform-style', 'preserve-3d');
 
   for (const instance of instances) {
     let parentEntry = stack.at(-1);

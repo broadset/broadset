@@ -9,26 +9,16 @@
  * Split out of `import.ts` in P7.7m to bring the orchestrator
  * back under the 500-line soft limit.
  */
+import { buildClipPathsMap, buildMasksMap, buildPatternsMap } from './import-defs-geometry';
 import {
-  type AffineMatrix,
-  type BroadsetColor,
-  type BroadsetGradient,
-  type BroadsetGradientStop,
-  type FilterPrimitive,
-  type FilterStack,
-  isValidSvgPathData,
-  type PatternFill,
-  rgbColor,
-} from '@broadset/model';
-import {
-  compose as composeMatrix,
-  fromDefinition as matrixFromDefinition,
-  fromTransformAttribute as matrixFromTransformAttribute,
-  type Matrix,
-  type MatrixDescriptor,
-} from 'transformation-matrix';
-
-import { ellipseAsPathD, polygonAsPathD, rectAsPathD } from './transform';
+  createSvgSourceColor,
+  type SvgSourceColor,
+  type SvgSourceFilterPrimitive,
+  type SvgSourceFilterStack,
+  type SvgSourceGradient,
+  type SvgSourceGradientStop,
+  type SvgSourcePatternFill,
+} from './source-model';
 
 /**
  * The collection of `<defs>` resolutions a single import pass
@@ -38,10 +28,10 @@ import { ellipseAsPathD, polygonAsPathD, rectAsPathD } from './transform';
  */
 export interface DefsBundle {
   readonly clipPaths: ReadonlyMap<string, string>;
-  readonly gradients: ReadonlyMap<string, BroadsetGradient>;
-  readonly filters: ReadonlyMap<string, FilterStack>;
+  readonly gradients: ReadonlyMap<string, SvgSourceGradient>;
+  readonly filters: ReadonlyMap<string, SvgSourceFilterStack>;
   readonly masks: ReadonlyMap<string, string>;
-  readonly patterns: ReadonlyMap<string, PatternFill>;
+  readonly patterns: ReadonlyMap<string, SvgSourcePatternFill>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -75,8 +65,8 @@ export function resolveClipPath(el: Element, clipPaths: ReadonlyMap<string, stri
 
 export function resolveGradientFill(
   fillAttr: string | null,
-  gradients: ReadonlyMap<string, BroadsetGradient>,
-): BroadsetGradient | undefined {
+  gradients: ReadonlyMap<string, SvgSourceGradient>,
+): SvgSourceGradient | undefined {
   const id = parseUrlRef(fillAttr);
 
   if (id === undefined) return undefined;
@@ -86,8 +76,8 @@ export function resolveGradientFill(
 
 export function resolveFilterStack(
   filterAttr: string | null,
-  filters: ReadonlyMap<string, FilterStack>,
-): FilterStack | undefined {
+  filters: ReadonlyMap<string, SvgSourceFilterStack>,
+): SvgSourceFilterStack | undefined {
   const id = parseUrlRef(filterAttr);
 
   if (id === undefined) return undefined;
@@ -105,8 +95,8 @@ export function resolveMaskPath(maskAttr: string | null, masks: ReadonlyMap<stri
 
 export function resolvePatternFill(
   fillAttr: string | null,
-  patterns: ReadonlyMap<string, PatternFill>,
-): PatternFill | undefined {
+  patterns: ReadonlyMap<string, SvgSourcePatternFill>,
+): SvgSourcePatternFill | undefined {
   const id = parseUrlRef(fillAttr);
 
   if (id === undefined) return undefined;
@@ -133,51 +123,17 @@ function parseUrlRef(attr: string | null): string | undefined {
 }
 
 /* ------------------------------------------------------------------ */
-/*  ClipPath defs                                                     */
-/* ------------------------------------------------------------------ */
-
-function buildClipPathsMap(doc: Document): ReadonlyMap<string, string> {
-  const map = new Map<string, string>();
-  // P7.7n: walk `<clipPath>` from anywhere in the document — Figma
-  // (and other modern tools) place `<defs>` after the geometry,
-  // and Illustrator nests `<clipPath>` inside `<defs>` deeper than
-  // direct-child. The model's `customClipPath` validator accepts
-  // path-data only, so we convert each clipPath body's shape
-  // children into a compound `d` string via the same compounder
-  // used for masks. Storing `innerHTML` (the previous behaviour)
-  // tripped the validator on tools that emit a `<rect>` or
-  // `<circle>` clipPath body instead of `<path>`.
-  const clipPaths = doc.getElementsByTagName('clipPath');
-
-  for (let i = 0; i < clipPaths.length; i++) {
-    const clipPath = clipPaths[i];
-
-    if (clipPath === undefined) continue;
-
-    const id = clipPath.getAttribute('id');
-
-    if (id === null || id === '') continue;
-
-    const compoundD = compoundPathFromShapeChildren(clipPath);
-
-    if (compoundD !== '') map.set(id, compoundD);
-  }
-
-  return map;
-}
-
-/* ------------------------------------------------------------------ */
 /*  Gradient defs                                                     */
 /* ------------------------------------------------------------------ */
 
 /**
- * Build a map of gradient id → `BroadsetGradient` from every
+ * Build a map of gradient id to source gradient data from every
  * `<linearGradient>` and `<radialGradient>` in the source. Both
  * top-level and `<defs>`-nested gradients are collected so inherited
  * `xlink:href` chains resolve correctly.
  */
-function buildGradientsMap(doc: Document): ReadonlyMap<string, BroadsetGradient> {
-  const gradients = new Map<string, BroadsetGradient>();
+function buildGradientsMap(doc: Document): ReadonlyMap<string, SvgSourceGradient> {
+  const gradients = new Map<string, SvgSourceGradient>();
 
   collectLinearGradients(doc, gradients);
   collectRadialGradients(doc, gradients);
@@ -185,7 +141,7 @@ function buildGradientsMap(doc: Document): ReadonlyMap<string, BroadsetGradient>
   return gradients;
 }
 
-function collectLinearGradients(doc: Document, out: Map<string, BroadsetGradient>): void {
+function collectLinearGradients(doc: Document, out: Map<string, SvgSourceGradient>): void {
   const linears = doc.getElementsByTagName('linearGradient');
 
   for (let i = 0; i < linears.length; i++) {
@@ -205,7 +161,7 @@ function collectLinearGradients(doc: Document, out: Map<string, BroadsetGradient
   }
 }
 
-function collectRadialGradients(doc: Document, out: Map<string, BroadsetGradient>): void {
+function collectRadialGradients(doc: Document, out: Map<string, SvgSourceGradient>): void {
   const radials = doc.getElementsByTagName('radialGradient');
 
   for (let i = 0; i < radials.length; i++) {
@@ -234,8 +190,8 @@ function collectRadialGradients(doc: Document, out: Map<string, BroadsetGradient
  * colour; unparsable values default to opaque black so the stop is
  * never silently dropped per IO-D-18.
  */
-function parseGradientStops(gradientEl: Element): readonly BroadsetGradientStop[] {
-  const stops: BroadsetGradientStop[] = [];
+function parseGradientStops(gradientEl: Element): readonly SvgSourceGradientStop[] {
+  const stops: SvgSourceGradientStop[] = [];
   const children = gradientEl.getElementsByTagName('stop');
 
   for (let i = 0; i < children.length; i++) {
@@ -246,7 +202,7 @@ function parseGradientStops(gradientEl: Element): readonly BroadsetGradientStop[
     const offset = parseGradientOffset(stop.getAttribute('offset'));
     const colorRaw = stop.getAttribute('stop-color') ?? '#000000';
 
-    stops.push({ color: rgbColor(colorRaw), position: offset });
+    stops.push({ color: createSvgSourceColor(colorRaw), position: offset });
   }
 
   return stops;
@@ -301,17 +257,17 @@ function deriveLinearAngle(gradientEl: Element): number {
 const FILTER_RECOVERY_EPS = 1e-3;
 
 /**
- * Build a map of filter id → `FilterStack` from every `<filter>`
+ * Build a map of filter id to source filter data from every `<filter>`
  * def. Each filter primitive (`<feGaussianBlur>`, `<feColorMatrix>`,
  * `<feDropShadow>`, `<feComponentTransfer>`) hydrates to its
- * corresponding `FilterPrimitive` shape; the recovery path tries
+ * corresponding source primitive shape; the recovery path tries
  * to identify the named CSS Filter Effects 1 primitives the
  * exporter emits before falling back to opaque `color-matrix` /
  * `custom-svg`. Closes the P7.7l review #4 blocker and the
  * P7.7m production-grade gap #1.
  */
-function buildFiltersMap(doc: Document): ReadonlyMap<string, FilterStack> {
-  const map = new Map<string, FilterStack>();
+function buildFiltersMap(doc: Document): ReadonlyMap<string, SvgSourceFilterStack> {
+  const map = new Map<string, SvgSourceFilterStack>();
   const filters = doc.getElementsByTagName('filter');
 
   for (let i = 0; i < filters.length; i++) {
@@ -333,8 +289,8 @@ function buildFiltersMap(doc: Document): ReadonlyMap<string, FilterStack> {
   return map;
 }
 
-function readFilterStack(filter: Element): FilterStack {
-  const stack: FilterPrimitive[] = [];
+function readFilterStack(filter: Element): SvgSourceFilterStack {
+  const stack: SvgSourceFilterPrimitive[] = [];
   const children = filter.children;
 
   for (let i = 0; i < children.length; i++) {
@@ -350,7 +306,7 @@ function readFilterStack(filter: Element): FilterStack {
   return stack;
 }
 
-function readFilterPrimitive(el: Element): FilterPrimitive | undefined {
+function readFilterPrimitive(el: Element): SvgSourceFilterPrimitive | undefined {
   const tag = el.tagName.toLowerCase();
 
   if (tag === 'fegaussianblur') return readBlurPrimitive(el);
@@ -360,12 +316,12 @@ function readFilterPrimitive(el: Element): FilterPrimitive | undefined {
 
   // Every other primitive (`<feTurbulence>`, `<feMorphology>`,
   // `<feConvolveMatrix>`, etc.) preserves verbatim as `custom-svg`.
-  // The exporter sanitises before emission per the FilterStack
+  // The exporter sanitises before emission per the filter-stack
   // docs, so the re-import → re-export pass stays safe.
   return { kind: 'custom-svg', svg: el.outerHTML };
 }
 
-function readBlurPrimitive(el: Element): FilterPrimitive | undefined {
+function readBlurPrimitive(el: Element): SvgSourceFilterPrimitive | undefined {
   const sd = parseFloat(el.getAttribute('stdDeviation') ?? '0');
 
   if (!Number.isFinite(sd) || sd < 0) return undefined;
@@ -373,7 +329,7 @@ function readBlurPrimitive(el: Element): FilterPrimitive | undefined {
   return { kind: 'blur', stdDeviation: sd };
 }
 
-function readDropShadowPrimitive(el: Element): FilterPrimitive | undefined {
+function readDropShadowPrimitive(el: Element): SvgSourceFilterPrimitive | undefined {
   const dx = parseFloat(el.getAttribute('dx') ?? '0');
   const dy = parseFloat(el.getAttribute('dy') ?? '0');
   // Export halves the blur via `stdDeviation = blur / 2`; double
@@ -388,7 +344,7 @@ function readDropShadowPrimitive(el: Element): FilterPrimitive | undefined {
   return { kind: 'drop-shadow', offsetX: dx, offsetY: dy, blur: sd * 2, color };
 }
 
-function readColorMatrixPrimitive(el: Element): FilterPrimitive | undefined {
+function readColorMatrixPrimitive(el: Element): SvgSourceFilterPrimitive | undefined {
   const type = (el.getAttribute('type') ?? 'matrix').toLowerCase();
   const valuesStr = el.getAttribute('values') ?? '';
 
@@ -423,7 +379,7 @@ function readColorMatrixPrimitive(el: Element): FilterPrimitive | undefined {
   return { kind: 'color-matrix', matrix };
 }
 
-function recoverGrayscale(matrix: readonly number[]): FilterPrimitive | undefined {
+function recoverGrayscale(matrix: readonly number[]): SvgSourceFilterPrimitive | undefined {
   if (matrix.length !== 20) return undefined;
 
   // Recover `a` from matrix[0]: m0 = 0.2126 + 0.7874 * (1 - a).
@@ -438,7 +394,7 @@ function recoverGrayscale(matrix: readonly number[]): FilterPrimitive | undefine
   return { kind: 'grayscale', amount: clamp01(amount) };
 }
 
-function recoverSepia(matrix: readonly number[]): FilterPrimitive | undefined {
+function recoverSepia(matrix: readonly number[]): SvgSourceFilterPrimitive | undefined {
   if (matrix.length !== 20) return undefined;
 
   const m0 = matrix[0] ?? 0;
@@ -533,7 +489,7 @@ function clamp01(n: number): number {
  * - invert(a):     slope=1-2a, intercept=a
  * - contrast(a):   slope=a, intercept=(1-a)/2
  */
-function readComponentTransferPrimitive(el: Element): FilterPrimitive | undefined {
+function readComponentTransferPrimitive(el: Element): SvgSourceFilterPrimitive | undefined {
   const funcs = ['feFuncR', 'feFuncG', 'feFuncB'].map((name) => el.getElementsByTagName(name)[0]);
 
   if (funcs.some((f) => f === undefined)) {
@@ -583,7 +539,11 @@ function readComponentTransferHint(el: Element): ComponentTransferHint | undefin
   return undefined;
 }
 
-function recoverHintedLinearTransfer(el: Element, slope: number, intercept: number): FilterPrimitive | undefined {
+function recoverHintedLinearTransfer(
+  el: Element,
+  slope: number,
+  intercept: number,
+): SvgSourceFilterPrimitive | undefined {
   const hint = readComponentTransferHint(el);
 
   if (hint === undefined) {
@@ -627,7 +587,7 @@ function readLinearTransferParams(func: Element | undefined): LinearTransferPara
   return { slope, intercept };
 }
 
-function classifyLinearTransfer(slope: number, intercept: number): FilterPrimitive | undefined {
+function classifyLinearTransfer(slope: number, intercept: number): SvgSourceFilterPrimitive | undefined {
   if (Math.abs(intercept) < FILTER_RECOVERY_EPS) {
     return { kind: 'brightness', amount: slope };
   }
@@ -652,223 +612,10 @@ function classifyLinearTransfer(slope: number, intercept: number): FilterPrimiti
 }
 
 /**
- * Parse a CSS color string into a `BroadsetColor`. Hands the raw
- * input to `rgbColor`, which normalizes named colors, `rgb()`,
- * `hsl()`, 3/4/6/8-digit hex through the model's `normalizeColor`.
- * Falls back to opaque black for unparseable input so the importer
- * never throws on an unusual flood-color.
+ * Preserve a CSS color string in the source-color envelope. Hex
+ * values remain canonical while other CSS syntaxes are retained as
+ * `originalColor` for the v1 color mapper.
  */
-function parseHexColor(input: string): BroadsetColor {
-  try {
-    return rgbColor(input);
-  } catch {
-    return rgbColor('#000000');
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Mask defs                                                         */
-/* ------------------------------------------------------------------ */
-
-/**
- * Build a map of mask id → mask path `d` string from every
- * `<mask>` def. The exporter emits masks as a single `<path d>`
- * (see `renderMaskDef`); real-world tools (Figma, Illustrator,
- * Inkscape) emit composite masks containing `<rect>`, `<circle>`,
- * `<ellipse>`, `<polygon>`, `<polyline>`, and/or multiple
- * `<path>`s. The importer concatenates every shape into a
- * compound `d` so the visual mask survives.
- */
-function buildMasksMap(doc: Document): ReadonlyMap<string, string> {
-  const map = new Map<string, string>();
-  const masks = doc.getElementsByTagName('mask');
-
-  for (let i = 0; i < masks.length; i++) {
-    const mask = masks[i];
-
-    if (mask === undefined) continue;
-
-    const id = mask.getAttribute('id');
-
-    if (id === null || id === '') continue;
-
-    const compoundD = compoundPathFromShapeChildren(mask);
-
-    if (compoundD !== '') map.set(id, compoundD);
-  }
-
-  return map;
-}
-
-/**
- * Walk every shape descendant of `parent` (`<rect>`, `<circle>`,
- * `<ellipse>`, `<polygon>`, `<polyline>`, `<path>`) and
- * concatenate their geometry into one compound `d` string. SVG's
- * `d` grammar treats space-separated subpaths additively, so the
- * concatenation reproduces the union shape consumers expect from
- * a multi-shape mask body.
- */
-function compoundPathFromShapeChildren(parent: Element): string {
-  const segments: string[] = [];
-  const children = parent.getElementsByTagName('*');
-
-  for (let i = 0; i < children.length; i++) {
-    const child = children[i];
-
-    if (child === undefined) continue;
-
-    const d = shapeElementToPathD(child);
-
-    // P7.7n security audit M1: validate each segment as canonical
-    // SVG path data before concatenating. The compound `d` lands in
-    // `style.customClipPath`, which the consumer feeds to CSS
-    // `clip-path`. An attacker `<path d="not-actually-a-path"/>`
-    // inside a hostile `<clipPath>` body otherwise propagates raw
-    // bytes (newlines, CSS comments, etc.) into the persisted
-    // document. Invalid segments are dropped silently — the
-    // segment-level safe drop is preferable to a hard reject that
-    // would lose the rest of the compound shape.
-    if (d !== '' && isValidSvgPathData(d)) segments.push(d);
-  }
-
-  return segments.join(' ');
-}
-
-function shapeElementToPathD(el: Element): string {
-  const tag = el.tagName.toLowerCase();
-
-  if (tag === 'path') {
-    const d = el.getAttribute('d');
-
-    return typeof d === 'string' ? d : '';
-  }
-
-  if (tag === 'rect') {
-    return rectAsPathD(
-      readNumAttr(el, 'x', 0),
-      readNumAttr(el, 'y', 0),
-      readNumAttr(el, 'width', 0),
-      readNumAttr(el, 'height', 0),
-    );
-  }
-
-  if (tag === 'circle') {
-    const cx = readNumAttr(el, 'cx', 0);
-    const cy = readNumAttr(el, 'cy', 0);
-    const r = readNumAttr(el, 'r', 0);
-
-    return r > 0 ? ellipseAsPathD(cx, cy, r, r) : '';
-  }
-
-  if (tag === 'ellipse') {
-    return ellipseAsPathD(
-      readNumAttr(el, 'cx', 0),
-      readNumAttr(el, 'cy', 0),
-      readNumAttr(el, 'rx', 0),
-      readNumAttr(el, 'ry', 0),
-    );
-  }
-
-  if (tag === 'polygon' || tag === 'polyline') {
-    const pts = el.getAttribute('points') ?? '';
-
-    return pts === '' ? '' : polygonAsPathD(pts, tag === 'polygon');
-  }
-
-  return '';
-}
-
-function readNumAttr(el: Element, name: string, defaultVal: number): number {
-  const val = el.getAttribute(name);
-
-  return val !== null ? parseFloat(val) : defaultVal;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Pattern defs                                                      */
-/* ------------------------------------------------------------------ */
-
-/**
- * Build a map of pattern id → `PatternFill` from every `<pattern>`
- * def. The pattern's inner `<image href>` becomes the assetId on
- * the resulting `PatternFill`; `patternTransform` parses into the
- * 6-tuple `AffineMatrix` so re-export round-trips scale/rotation/
- * translate. Patterns lacking an `<image>` body are skipped — a
- * `<pattern>` holding raw shapes has no Broadset equivalent and
- * degrades to the raw paint-server string fallback.
- */
-function buildPatternsMap(doc: Document): ReadonlyMap<string, PatternFill> {
-  const map = new Map<string, PatternFill>();
-  const patterns = doc.getElementsByTagName('pattern');
-
-  for (let i = 0; i < patterns.length; i++) {
-    const pattern = patterns[i];
-
-    if (pattern === undefined) continue;
-
-    const id = pattern.getAttribute('id');
-
-    if (id === null || id === '') continue;
-
-    const image = pattern.getElementsByTagName('image')[0];
-
-    if (image === undefined) continue;
-
-    const href = image.getAttribute('href') ?? image.getAttribute('xlink:href') ?? '';
-
-    if (href === '') continue;
-
-    const transform = parseSvgTransformToAffine(pattern.getAttribute('patternTransform'));
-
-    map.set(id, {
-      kind: 'pattern',
-      assetId: href,
-      repeat: 'repeat',
-      ...(transform !== undefined ? { transform } : {}),
-    });
-  }
-
-  return map;
-}
-
-/**
- * Parse an SVG `transform=` / `patternTransform=` attribute into
- * the Broadset 6-tuple `AffineMatrix` (a, b, c, d, e, f). Returns
- * `undefined` for null / empty / malformed input so callers can
- * spread the result conditionally without polluting the output
- * with identity matrices.
- */
-function parseSvgTransformToAffine(transformStr: string | null): AffineMatrix | undefined {
-  if (transformStr === null || transformStr.trim() === '') return undefined;
-
-  let descriptors: MatrixDescriptor[];
-
-  try {
-    descriptors = matrixFromTransformAttribute(transformStr);
-  } catch {
-    return undefined;
-  }
-
-  if (descriptors.length === 0) return undefined;
-
-  const matrices: Matrix[] = [];
-
-  for (const descriptor of descriptors) {
-    matrices.push(matrixFromDefinition(descriptor));
-  }
-
-  const composed = composeMatrix(...matrices);
-
-  if (
-    !Number.isFinite(composed.a) ||
-    !Number.isFinite(composed.b) ||
-    !Number.isFinite(composed.c) ||
-    !Number.isFinite(composed.d) ||
-    !Number.isFinite(composed.e) ||
-    !Number.isFinite(composed.f)
-  ) {
-    return undefined;
-  }
-
-  return [composed.a, composed.b, composed.c, composed.d, composed.e, composed.f];
+function parseHexColor(input: string): SvgSourceColor {
+  return createSvgSourceColor(input);
 }

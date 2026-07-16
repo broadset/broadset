@@ -1,8 +1,9 @@
-import { type BroadsetDocument, type BroadsetElement, projectFormatV1 } from '@broadset/model';
+import { projectFormatV1 } from '@broadset/model';
 
 import { decodeDataUri } from '../../psd/data-uri';
 import { mapSvgPathV1 } from '../../svg/v1/map-path';
 import type { ResourceCollectorV1 } from '../../v1';
+import type { PptxSourceDocument, PptxSourceElement } from '../project-model';
 import { mapPptxAppearanceV1, pptxAppearanceWarningsV1 } from './appearance';
 import type { PptxFontRegistryV1 } from './font-registry';
 import { mapPptxTextElementV1, pptxTransform } from './map-text';
@@ -17,12 +18,12 @@ function warning(code: string, message: string): projectFormatV1.InteropDiagnost
   return { code, severity: 'warning', message, dimension: 'appearance', pointer: '/' };
 }
 
-function elementName(source: BroadsetElement): string {
+function elementName(source: PptxSourceElement): string {
   return source.name.trim() === '' ? `PPTX ${source.type}` : source.name;
 }
 
 function base(input: {
-  readonly source: BroadsetElement;
+  readonly source: PptxSourceElement;
   readonly elementId: projectFormatV1.Id;
   readonly parentId: projectFormatV1.Id | null;
 }): projectFormatV1.ElementBaseOptions {
@@ -41,7 +42,7 @@ function base(input: {
 }
 
 async function mapImage(input: {
-  readonly source: BroadsetElement;
+  readonly source: PptxSourceElement;
   readonly elementId: projectFormatV1.Id;
   readonly parentId: projectFormatV1.Id | null;
   readonly resources: ResourceCollectorV1;
@@ -73,7 +74,7 @@ async function mapImage(input: {
 }
 
 function mapNative(input: {
-  readonly source: BroadsetElement;
+  readonly source: PptxSourceElement;
   readonly elementId: projectFormatV1.Id;
   readonly parentId: projectFormatV1.Id | null;
   readonly fontRegistry: PptxFontRegistryV1;
@@ -105,7 +106,7 @@ function mapNative(input: {
   };
 }
 
-function mapVectorGeometry(input: { readonly source: BroadsetElement; readonly elementId: projectFormatV1.Id }): {
+function mapVectorGeometry(input: { readonly source: PptxSourceElement; readonly elementId: projectFormatV1.Id }): {
   readonly geometryData: projectFormatV1.VectorGeometryData;
   readonly warnings: readonly projectFormatV1.InteropDiagnostic[];
 } {
@@ -151,14 +152,27 @@ function mapVectorGeometry(input: { readonly source: BroadsetElement; readonly e
 }
 
 export async function mapPptxElementsV1(input: {
-  readonly document: BroadsetDocument;
+  readonly document: PptxSourceDocument;
   readonly resources: ResourceCollectorV1;
   readonly fontRegistry: PptxFontRegistryV1;
 }): Promise<readonly MappedPptxElementV1[]> {
   const ids = new Map<string, projectFormatV1.Id>();
+  const usedIds = new Set<projectFormatV1.Id>();
 
   input.document.elements.forEach((element, index) => {
-    ids.set(element.id, projectFormatV1.idSchema.parse(`pptx-element-${String(index + 1)}`));
+    const parsed = projectFormatV1.idSchema.safeParse(element.id);
+    let candidate = projectFormatV1.idSchema.parse(`pptx-element-${String(index + 1)}`);
+    let suffix = 1;
+
+    if (parsed.success && !usedIds.has(parsed.data)) candidate = parsed.data;
+
+    while (usedIds.has(candidate)) {
+      candidate = projectFormatV1.idSchema.parse(`pptx-element-${String(index + 1)}-${String(suffix)}`);
+      suffix += 1;
+    }
+
+    ids.set(element.id, candidate);
+    usedIds.add(candidate);
   });
 
   const mapped: MappedPptxElementV1[] = [];

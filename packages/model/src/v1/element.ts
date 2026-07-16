@@ -78,6 +78,7 @@ export interface TextLayoutOptions {
   readonly autoSize: 'none' | 'width' | 'height' | 'both';
   readonly columns: number;
   readonly columnGap: number;
+  readonly padding?: readonly [number, number, number, number] | undefined;
 }
 
 export interface TextElement extends ElementBase {
@@ -301,6 +302,7 @@ const textElementSchema = z.strictObject({
     autoSize: z.enum(['none', 'width', 'height', 'both']),
     columns: z.number().int().positive(),
     columnGap: z.number().nonnegative(),
+    padding: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
   }),
   textPath: z
     .strictObject({ vectorElementId: idSchema, startOffset: z.number(), side: z.enum(['left', 'right']) })

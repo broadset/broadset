@@ -1,9 +1,9 @@
-import type { BroadsetDocument } from '@broadset/model';
+import { projectFormatV1 } from '@broadset/model';
 import { expect, test } from '@playwright/experimental-ct-react';
 import type { Page } from '@playwright/test';
 
 import { DemoApp } from '../../src/DemoApp';
-import { createParentingTransformTestDocument } from '../../src/test-fixtures';
+import { createParentingTransformTestProjectV1 } from '../../src/test-fixtures';
 import { FIXTURE_IDS as PARENTING_FIXTURE_IDS } from '../../src/test-fixtures/ids';
 import { FIXTURE_IDS } from '../fixture-selectors';
 import { DemoAppStored } from '../helpers/demo-app-stored.helper';
@@ -41,85 +41,84 @@ async function getBoxes(
 }
 
 async function selectElementInStore(page: Page, elementId: string): Promise<void> {
-  await page.evaluate((selectedElementId) => {
-    const store = (
-      window as unknown as {
-        __broadsetEditorStore?: {
-          getState: () => { readonly selectElement: (elementId: string) => void };
-        };
-      }
-    ).__broadsetEditorStore;
+  const selectedElementId = projectFormatV1.idSchema.parse(elementId);
 
-    store?.getState().selectElement(selectedElementId);
-  }, elementId);
+  await page.evaluate((selectedElementId) => {
+    const store = window.__broadsetProjectEditorStore;
+
+    if (store === undefined) throw new Error('Expected the v1 project editor store');
+
+    store.getState().selectElement(selectedElementId);
+  }, selectedElementId);
 }
 
-function createRotatedParentFixture(): BroadsetDocument {
-  const fixture = createParentingTransformTestDocument();
-
+function updateParentTransform(
+  project: projectFormatV1.BroadsetProjectV1,
+  transform: projectFormatV1.ElementTransform,
+): projectFormatV1.BroadsetProjectV1 {
   return {
-    ...fixture,
-    elements: fixture.elements.map((element) =>
-      element.id === PARENTING_FIXTURE_IDS.promoGroup ?
-        {
-          ...element,
-          position: { x: 650, y: 320 },
-          rotation: 30,
-          style: { ...element.style, clipChildren: false },
-        }
-      : element,
-    ),
-    pages: fixture.pages.map((page) => ({
-      ...page,
-      elements: page.elements.map((instance) =>
-        instance.elementId === PARENTING_FIXTURE_IDS.promoGroup ?
-          {
-            ...instance,
-            transform: {
-              ...instance.transform,
-              position: { ...instance.transform.position, x: 650, y: 320 },
-              rotation: { ...instance.transform.rotation, z: 30 },
-            },
-          }
-        : instance,
+    ...project,
+    documents: project.documents.map((document) => ({
+      ...document,
+      elements: document.elements.map(
+        (element): projectFormatV1.Element =>
+          element.id === PARENTING_FIXTURE_IDS.promoGroup && element.kind === 'group' ?
+            {
+              ...element,
+              geometry: { ...element.geometry, transform },
+              group: { clipChildren: false },
+            }
+          : element,
       ),
     })),
   };
+}
+
+function createRotatedParentFixture(): projectFormatV1.BroadsetProjectV1 {
+  const fixture = createParentingTransformTestProjectV1();
+  const radians = Math.PI / 6;
+
+  return updateParentTransform(fixture, {
+    kind: 'affine2d',
+    matrix: [Math.cos(radians), Math.sin(radians), -Math.sin(radians), Math.cos(radians), 650, 320],
+  });
 }
 
 function createParent3dFixture(stylePatch: {
   readonly rotateX?: number | undefined;
   readonly rotateY?: number | undefined;
   readonly translateZ?: number | undefined;
-}): BroadsetDocument {
-  const fixture = createParentingTransformTestDocument();
-
-  return {
-    ...fixture,
-    elements: fixture.elements.map((element) =>
-      element.id === PARENTING_FIXTURE_IDS.promoGroup ?
-        {
-          ...element,
-          position: { x: 650, y: 320 },
-          style: { ...element.style, ...stylePatch, clipChildren: false },
-        }
-      : element,
-    ),
-    pages: fixture.pages.map((page) => ({
-      ...page,
-      elements: page.elements.map((instance) =>
-        instance.elementId === PARENTING_FIXTURE_IDS.promoGroup ?
-          {
-            ...instance,
-            transform: {
-              ...instance.transform,
-              position: { ...instance.transform.position, x: 650, y: 320 },
-            },
-          }
-        : instance,
-      ),
-    })),
+}): projectFormatV1.BroadsetProjectV1 {
+  const fixture = createParentingTransformTestProjectV1();
+  const rotateX = ((stylePatch.rotateX ?? 0) * Math.PI) / 180;
+  const rotateY = ((stylePatch.rotateY ?? 0) * Math.PI) / 180;
+  const cosineX = Math.cos(rotateX);
+  const sineX = Math.sin(rotateX);
+  const cosineY = Math.cos(rotateY);
+  const sineY = Math.sin(rotateY);
+  const transform: projectFormatV1.ElementTransform = {
+    kind: 'matrix3d',
+    matrix: [
+      cosineY,
+      sineX * sineY,
+      -cosineX * sineY,
+      0,
+      0,
+      cosineX,
+      sineX,
+      0,
+      sineY,
+      -sineX * cosineY,
+      cosineX * cosineY,
+      0,
+      650,
+      320,
+      stylePatch.translateZ ?? 0,
+      1,
+    ],
   };
+
+  return updateParentTransform(fixture, transform);
 }
 
 /**
@@ -133,7 +132,7 @@ test('widget pixel-aligns with the selected element at default viewport', async 
 
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
 
-  const { widget, element } = await getBoxes(page, FIXTURE_IDS.title);
+  const { widget, element } = await getBoxes(page, FIXTURE_IDS.initialSelection);
 
   closeTo(widget.x, element.x);
   closeTo(widget.y, element.y);
@@ -153,7 +152,7 @@ test('widget pixel-aligns after horizontal letterbox (wide viewport)', async ({ 
 
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
 
-  const { widget, element } = await getBoxes(page, FIXTURE_IDS.title);
+  const { widget, element } = await getBoxes(page, FIXTURE_IDS.initialSelection);
 
   closeTo(widget.x, element.x);
   closeTo(widget.y, element.y);
@@ -171,7 +170,7 @@ test('widget pixel-aligns after vertical letterbox (tall viewport)', async ({ mo
 
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
 
-  const { widget, element } = await getBoxes(page, FIXTURE_IDS.title);
+  const { widget, element } = await getBoxes(page, FIXTURE_IDS.initialSelection);
 
   closeTo(widget.x, element.x);
   closeTo(widget.y, element.y);
@@ -185,7 +184,7 @@ test('widget pixel-aligns after vertical letterbox (tall viewport)', async ({ mo
  * bounds, including the transform inherited from its parent chain.
  */
 test('widget pixel-aligns with a child inside a rotated parent group', async ({ mount, page }) => {
-  await mount(<DemoAppStored document={createRotatedParentFixture()} />);
+  await mount(<DemoAppStored project={createRotatedParentFixture()} />);
 
   const child = page.locator(`[data-element-id="${PARENTING_FIXTURE_IDS.promoQr}"]`);
 
@@ -208,7 +207,7 @@ test('widget pixel-aligns with a child inside a rotated parent group', async ({ 
  * inverse parent transform to the child's local position.
  */
 test('dragging a child inside a rotated parent follows the screen-space pointer', async ({ mount, page }) => {
-  await mount(<DemoAppStored document={createRotatedParentFixture()} />);
+  await mount(<DemoAppStored project={createRotatedParentFixture()} />);
   await selectElementInStore(page, PARENTING_FIXTURE_IDS.promoQr);
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
 
@@ -407,20 +406,13 @@ async function dragSelectedChildHandleByScreenDelta(
 
 async function getElementRotationInStore(page: Page, elementId: string): Promise<number> {
   return page.evaluate((targetElementId) => {
-    const store = (
-      window as unknown as {
-        __broadsetEditorStore?: {
-          getState: () => {
-            readonly document: {
-              readonly elements: ReadonlyArray<{ readonly id: string; readonly rotation: number }>;
-            };
-          };
-        };
-      }
-    ).__broadsetEditorStore;
-    const element = store?.getState().document.elements.find((entry) => entry.id === targetElementId);
+    const state = window.__broadsetProjectEditorStore?.getState();
+    const element = state?.project.documents
+      .find((document) => document.id === state.activeDocumentId)
+      ?.elements.find((entry) => entry.id === targetElementId);
+    const matrix = element?.geometry.transform.matrix;
 
-    return element?.rotation ?? Number.NaN;
+    return matrix === undefined ? Number.NaN : (Math.atan2(matrix[1], matrix[0]) * 180) / Math.PI;
   }, elementId);
 }
 
@@ -472,7 +464,7 @@ async function rotateSelectedChildFromHandleToLocalRightEdge(page: Page): Promis
  * foreshortened local delta.
  */
 test('dragging a child inside a rotateY parent follows the screen-space pointer', async ({ mount, page }) => {
-  await mount(<DemoAppStored document={createParent3dFixture({ rotateY: 60 })} />);
+  await mount(<DemoAppStored project={createParent3dFixture({ rotateY: 60 })} />);
   await selectElementInStore(page, PARENTING_FIXTURE_IDS.promoQr);
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
 
@@ -488,7 +480,7 @@ test('dragging a child inside a rotateY parent follows the screen-space pointer'
  */
 test('dragging a child inside a rotateX parent follows the screen-space pointer', async ({ mount, page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await mount(<DemoAppStored document={createParent3dFixture({ rotateX: 60 })} />);
+  await mount(<DemoAppStored project={createParent3dFixture({ rotateX: 60 })} />);
   await selectElementInStore(page, PARENTING_FIXTURE_IDS.promoQr);
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
 
@@ -504,7 +496,8 @@ test('dragging a child inside a rotateX parent follows the screen-space pointer'
  * pointer instead of over-shooting by the perspective scale.
  */
 test('dragging a child inside a translateZ parent follows the screen-space pointer', async ({ mount, page }) => {
-  await mount(<DemoAppStored document={createParent3dFixture({ translateZ: 500 })} />);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await mount(<DemoAppStored project={createParent3dFixture({ translateZ: 500 })} />);
   await selectElementInStore(page, PARENTING_FIXTURE_IDS.promoQr);
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
 
@@ -524,7 +517,7 @@ test('resizing a child east handle inside a rotateY parent follows the projected
   mount,
   page,
 }) => {
-  await mount(<DemoAppStored document={createParent3dFixture({ rotateY: 60 })} />);
+  await mount(<DemoAppStored project={createParent3dFixture({ rotateY: 60 })} />);
   await selectElementInStore(page, PARENTING_FIXTURE_IDS.promoQr);
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
 
@@ -546,7 +539,7 @@ test('resizing a child south handle inside a rotateX parent follows the projecte
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await mount(<DemoAppStored document={createParent3dFixture({ rotateX: 60 })} />);
+  await mount(<DemoAppStored project={createParent3dFixture({ rotateX: 60 })} />);
   await selectElementInStore(page, PARENTING_FIXTURE_IDS.promoQr);
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
 
@@ -565,7 +558,7 @@ test('resizing a child south handle inside a rotateX parent follows the projecte
  * approximation.
  */
 test('rotating a child inside a rotateY parent follows projected local-plane angles', async ({ mount, page }) => {
-  await mount(<DemoAppStored document={createParent3dFixture({ rotateY: 60 })} />);
+  await mount(<DemoAppStored project={createParent3dFixture({ rotateY: 60 })} />);
   await selectElementInStore(page, PARENTING_FIXTURE_IDS.promoQr);
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
 
@@ -602,7 +595,7 @@ test('widget stays aligned with the element after a pan gesture', async ({ mount
   await page.mouse.up();
   await page.keyboard.up('Shift');
 
-  const { widget, element } = await getBoxes(page, FIXTURE_IDS.title);
+  const { widget, element } = await getBoxes(page, FIXTURE_IDS.initialSelection);
 
   closeTo(widget.x, element.x);
   closeTo(widget.y, element.y);
@@ -624,6 +617,7 @@ test('widget applies element rotateX and follows the 3D-projected element', asyn
   await mount(<DemoApp />);
 
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
+  await selectElementInStore(page, FIXTURE_IDS.logo);
 
   const rotationXField = page.getByRole('textbox', { name: 'Rotation X' });
 
@@ -635,17 +629,17 @@ test('widget applies element rotateX and follows the 3D-projected element', asyn
     .getByTestId('demo-transform-widget')
     .evaluate((el) => (el as HTMLElement).style.transform);
   const elementTransform = await page
-    .locator(`[data-element-id="${FIXTURE_IDS.title}"]`)
+    .locator(`[data-element-id="${FIXTURE_IDS.logo}"]`)
     .evaluate((el) => (el as HTMLElement).style.transform);
 
   expect(widgetTransform).toBe(elementTransform);
-  expect(widgetTransform).toContain('rotateX(35deg)');
+  expect(widgetTransform).toContain('matrix3d(');
 
   // Bounding boxes should still track (3D projection is identical because
   // both share the same perspective context inside canvasRoot). Use a small
   // tolerance to absorb sub-pixel rounding from the 3D rasterizer.
   const threeDTolerance = 2;
-  const { widget, element } = await getBoxes(page, FIXTURE_IDS.title);
+  const { widget, element } = await getBoxes(page, FIXTURE_IDS.logo);
 
   closeTo(widget.x, element.x, threeDTolerance);
   closeTo(widget.y, element.y, threeDTolerance);
@@ -660,6 +654,7 @@ test('widget applies element rotateY and follows the 3D-projected element', asyn
   await mount(<DemoApp />);
 
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
+  await selectElementInStore(page, FIXTURE_IDS.logo);
 
   const rotationYField = page.getByRole('textbox', { name: 'Rotation Y' });
 
@@ -671,11 +666,11 @@ test('widget applies element rotateY and follows the 3D-projected element', asyn
     .getByTestId('demo-transform-widget')
     .evaluate((el) => (el as HTMLElement).style.transform);
   const elementTransform = await page
-    .locator(`[data-element-id="${FIXTURE_IDS.title}"]`)
+    .locator(`[data-element-id="${FIXTURE_IDS.logo}"]`)
     .evaluate((el) => (el as HTMLElement).style.transform);
 
   expect(widgetTransform).toBe(elementTransform);
-  expect(widgetTransform).toContain('rotateY(25deg)');
+  expect(widgetTransform).toContain('matrix3d(');
 });
 
 /* ------------------------------------------------------------------ */
@@ -726,7 +721,7 @@ test('3D chain from selected element up to perspective ancestor has no flat-forc
 
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
 
-  await page.locator(`[data-element-id="${FIXTURE_IDS.logo}"]`).click({ force: true });
+  await selectElementInStore(page, FIXTURE_IDS.logo);
 
   const violations = await page.evaluate(
     ({ elementId }) => {
@@ -837,38 +832,70 @@ test('canvas background lives outside the 3D rendering context', async ({ mount,
 
 /**
  * @description Empirical check that perspective is actually projecting, not
- * merely declared. A flat (orthographic) rotateX leaves an element's rendered
- * WIDTH unchanged — only the vertical dimension foreshortens. With
- * perspective, the near edge (top, after rotateX(60)) projects WIDER than
- * the far edge, so the 2D bounding box width GROWS above the unrotated
- * width. This exploits the asymmetry that orthographic projection cannot
- * reproduce.
+ * merely declared. Orthographic rotateX keeps both horizontal edge widths
+ * equal, while perspective makes the near and far edges project differently.
  */
-test('perspective actually projects elements: rotateX widens the rendered bounding box', async ({ mount, page }) => {
+test('perspective actually projects elements with depth-dependent edge widths', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
   await expect(page.getByTestId('demo-transform-widget')).toBeVisible();
 
-  await page.locator(`[data-element-id="${FIXTURE_IDS.logo}"]`).click({ force: true });
+  await selectElementInStore(page, FIXTURE_IDS.logo);
 
   const elementLocator = page.locator(`[data-element-id="${FIXTURE_IDS.logo}"]`);
-  const beforeBox = await elementLocator.boundingBox();
-
-  if (beforeBox === null) throw new Error('element box missing before rotation');
-
   const rotationXField = page.getByRole('textbox', { name: 'Rotation X' });
 
   await expect(rotationXField).toBeVisible();
   await rotationXField.fill('70');
   await rotationXField.press('Enter');
 
-  const afterBox = await elementLocator.boundingBox();
+  const edgeWidths = await elementLocator.evaluate((element) => {
+    if (!(element instanceof HTMLElement)) throw new Error('Expected a rendered v1 element');
 
-  if (afterBox === null) throw new Error('element box missing after rotation');
+    const points = [
+      { x: 0, y: 0 },
+      { x: element.offsetWidth, y: 0 },
+      { x: 0, y: element.offsetHeight },
+      { x: element.offsetWidth, y: element.offsetHeight },
+    ];
+    const probes = points.map((point) => {
+      const probe = document.createElement('div');
 
-  // Orthographic rotateX(70) leaves width unchanged; perspective(1000)
-  // makes the top edge project noticeably wider than the bottom, so the
-  // 2D bounding box grows. Demand a measurable increase — 1% is below
-  // pixel noise but clearly impossible under orthographic projection.
-  expect(afterBox.width).toBeGreaterThan(beforeBox.width * 1.01);
+      probe.style.height = '0px';
+      probe.style.left = `${String(point.x)}px`;
+      probe.style.position = 'absolute';
+      probe.style.top = `${String(point.y)}px`;
+      probe.style.width = '0px';
+      element.appendChild(probe);
+
+      return probe;
+    });
+
+    try {
+      const screen = probes.map((probe) => {
+        const bounds = probe.getBoundingClientRect();
+
+        return { x: bounds.left, y: bounds.top };
+      });
+      const topLeft = screen[0];
+      const topRight = screen[1];
+      const bottomLeft = screen[2];
+      const bottomRight = screen[3];
+
+      if (topLeft === undefined || topRight === undefined || bottomLeft === undefined || bottomRight === undefined) {
+        throw new Error('Expected all projected edge probes');
+      }
+
+      return {
+        top: Math.hypot(topRight.x - topLeft.x, topRight.y - topLeft.y),
+        bottom: Math.hypot(bottomRight.x - bottomLeft.x, bottomRight.y - bottomLeft.y),
+      };
+    } finally {
+      probes.forEach((probe) => {
+        probe.remove();
+      });
+    }
+  });
+
+  expect(Math.abs(edgeWidths.top - edgeWidths.bottom)).toBeGreaterThan(edgeWidths.top * 0.01);
 });

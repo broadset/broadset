@@ -51,8 +51,8 @@ describe('permissive PPTX corpus', () => {
       expect(fixture.actualBytes).toBe(fixture.entry.bytes);
     });
 
-    it(`survives import + re-export: ${fixture.entry.name}`, () => {
-      const result = importAndAssert(fixture.entry.name, fixture.bytes);
+    it(`survives import + re-export: ${fixture.entry.name}`, async () => {
+      const result = await importAndAssert(fixture.entry.name, fixture.bytes);
 
       expect(result.reExportedBytes).toBeGreaterThan(0);
     });

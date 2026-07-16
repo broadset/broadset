@@ -116,9 +116,13 @@ describe('renderElementV1', () => {
     });
 
     const node = renderElementV1(element, context());
-    const paragraphs = node.querySelectorAll<HTMLDivElement>(':scope > div');
+    const content = node.querySelector<HTMLElement>('[data-element-content]');
     const spans = node.querySelectorAll<HTMLSpanElement>('span');
     const hostileSpan = spans.item(1);
+
+    if (content === null) throw new Error('Expected text content wrapper');
+
+    const paragraphs = content.querySelectorAll<HTMLDivElement>(':scope > div');
 
     expect(paragraphs).toHaveLength(2);
     expect(spans).toHaveLength(3);
@@ -126,6 +130,28 @@ describe('renderElementV1', () => {
     expect(spans.item(0).style.fontSize).toBe('18px');
     expect(hostileSpan.textContent).toBe(HOSTILE_TEXT);
     expect(hostileSpan.children).toHaveLength(0);
+  });
+
+  it('renders text layout padding on the marked content wrapper', () => {
+    const element = projectFormatV1.createElementV1({
+      id: ELEMENT_ID,
+      name: 'Padded text',
+      geometry: geometry(),
+      kind: 'text',
+      text: { paragraphs: [] },
+      layout: {
+        verticalAlignment: 'top',
+        overflow: 'visible',
+        autoSize: 'none',
+        columns: 1,
+        columnGap: 0,
+        padding: [1, 2, 3, 4],
+      },
+    });
+
+    const content = renderElementV1(element, context()).querySelector<HTMLElement>('[data-element-content]');
+
+    expect(content?.style.padding).toBe('1px 2px 3px 4px');
   });
 
   it('renders rectangle corner radii in clockwise order', () => {
@@ -251,6 +277,28 @@ describe('renderElementV1', () => {
     });
 
     expect(renderElementV1(element, context()).querySelector('span')?.textContent).toBe('HH:mm:ss');
+  });
+
+  it('renders ticker items as readable content', () => {
+    const element = projectFormatV1.createElementV1({
+      id: ELEMENT_ID,
+      name: 'Ticker',
+      geometry: geometry(),
+      kind: 'ticker',
+      ticker: {
+        items: [
+          { id: projectFormatV1.idSchema.parse('ticker-item-1'), text: 'First headline' },
+          { id: projectFormatV1.idSchema.parse('ticker-item-2'), text: 'Second headline' },
+        ],
+        direction: 'left',
+        speed: 70,
+        gap: 80,
+        repeat: true,
+      },
+    });
+
+    expect(renderElementV1(element, context()).textContent).toContain('First headline');
+    expect(renderElementV1(element, context()).textContent).toContain('Second headline');
   });
 
   it('maps accessibility role, label, and decorative state', () => {

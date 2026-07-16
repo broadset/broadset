@@ -146,38 +146,3 @@ export const OOXML_PRESET_COLOR_HEX: Readonly<Record<string, string>> = {
   whitesmoke: 'F5F5F5',
   yellowgreen: '9ACD32',
 };
-
-/**
- * The basic 21 CSS named colours that the model's `normalizeColor`
- * already understands. Listed here so callers (e.g. the export-side
- * `<a:prstClr>` allowlist) can validate without round-tripping through
- * `normalizeColor` first.
- */
-const CSS_BASIC_NAMED_COLORS: ReadonlySet<string> = new Set([
-  'black',
-  'blue',
-  'brown',
-  'cyan',
-  'fuchsia',
-  'gold',
-  'gray',
-  'green',
-  'grey',
-  'lime',
-  'magenta',
-  'navy',
-  'orange',
-  'pink',
-  'purple',
-  'red',
-  'silver',
-  'teal',
-  'transparent',
-  'white',
-  'yellow',
-]);
-
-/** True when the given lowercase name is a valid OOXML preset colour. */
-export function isOoxmlPresetColorName(name: string): boolean {
-  return CSS_BASIC_NAMED_COLORS.has(name) || name in OOXML_PRESET_COLOR_HEX;
-}

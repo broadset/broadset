@@ -1,8 +1,5 @@
-import { type BroadsetElement } from '@broadset/model';
+import type { PptxSourceElement } from '../project-model';
 
-export function attachParentGroup(
-  element: BroadsetElement,
-  parentGroupId: string | null,
-): BroadsetElement {
+export function attachParentGroup(element: PptxSourceElement, parentGroupId: string | null): PptxSourceElement {
   return parentGroupId === null ? element : { ...element, groupId: parentGroupId };
 }

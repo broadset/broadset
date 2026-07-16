@@ -9,41 +9,14 @@ async function openToolbarMenu(page: Page, menuLabel: string): Promise<void> {
 
 async function seedPaddingAndExperimentalFlag(page: Page): Promise<void> {
   await page.evaluate(() => {
-    type ViewMode = 'broadcast' | 'none' | 'print';
+    const state = window.__broadsetProjectEditorStore?.getState();
 
-    interface BrowserStoreState {
-      readonly document: {
-        readonly canvas: {
-          readonly padding: readonly [number, number, number, number];
-          readonly [key: string]: unknown;
-        };
-        readonly [key: string]: unknown;
-      };
-      readonly loadTemplate: (document: BrowserStoreState['document']) => void;
-      readonly updateCanvasSettings: (settings: {
-        readonly showExperimentalFeatures?: boolean;
-        readonly viewMode?: ViewMode;
-      }) => void;
-    }
+    if (state === undefined) throw new Error('Expected demo editor store');
 
-    interface BrowserStore {
-      readonly getState: () => BrowserStoreState;
-    }
-
-    const store = (window as unknown as { __broadsetEditorStore?: BrowserStore }).__broadsetEditorStore;
-    const state = store?.getState();
-
-    if (state === undefined) {
-      throw new Error('Expected demo editor store');
-    }
-
-    state.loadTemplate({
-      ...state.document,
-      canvas: {
-        ...state.document.canvas,
-        padding: [10, 10, 10, 10],
-      },
-    });
+    state.updateActiveDocument((document) => ({
+      ...document,
+      surface: { ...document.surface, padding: { top: 10, right: 10, bottom: 10, left: 10 } },
+    }));
     state.updateCanvasSettings({ showExperimentalFeatures: true });
   });
 }

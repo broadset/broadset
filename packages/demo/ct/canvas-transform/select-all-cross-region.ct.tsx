@@ -21,9 +21,9 @@ test('Ctrl+A selects every element and updates canvas widget plus layers panel h
   await mount(<DemoApp />);
 
   // Open the layers panel so we can observe the layer-row highlight state.
-  await page.locator('button[aria-label="Layers"]').first().click();
+  await page.getByRole('tab', { name: 'Layers' }).click();
 
-  const sidebar = page.getByTestId('demo-properties-sidebar');
+  const sidebar = page;
   const layerRows = sidebar.locator('[role="button"][aria-label^="Select "]');
   const totalLayers = await layerRows.count();
 

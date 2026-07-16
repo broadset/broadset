@@ -1,9 +1,9 @@
-import type { BroadsetColor, BroadsetElementStyle } from '@broadset/model';
 import { projectFormatV1 } from '@broadset/model';
 
 import { parseCssColor } from '../../pdf/color';
+import type { PptxSourceColor, PptxSourceStyle } from '../project-model';
 
-function colorValue(color: BroadsetColor | undefined): projectFormatV1.ColorValue | undefined {
+function colorValue(color: PptxSourceColor | undefined): projectFormatV1.ColorValue | undefined {
   if (color?.kind !== 'rgb') return undefined;
 
   const parsed = parseCssColor(color.originalColor ?? color.hex);
@@ -18,7 +18,7 @@ function opacity(value: number | undefined, fallback = 1): number {
 }
 
 function gradientPaint(input: {
-  readonly style: BroadsetElementStyle;
+  readonly style: PptxSourceStyle;
   readonly elementId: projectFormatV1.Id;
 }): projectFormatV1.Paint | undefined {
   if (input.style.fill.kind !== 'gradient') return undefined;
@@ -78,7 +78,7 @@ function gradientPaint(input: {
 }
 
 function fillPaint(input: {
-  readonly style: BroadsetElementStyle;
+  readonly style: PptxSourceStyle;
   readonly elementId: projectFormatV1.Id;
 }): projectFormatV1.Paint | undefined {
   if (input.style.fill.kind === 'solid') {
@@ -90,7 +90,7 @@ function fillPaint(input: {
   return gradientPaint(input);
 }
 
-function arrow(source: BroadsetElementStyle['strokeHeadEnd']): projectFormatV1.ArrowEnding | undefined {
+function arrow(source: PptxSourceStyle['strokeHeadEnd']): projectFormatV1.ArrowEnding | undefined {
   if (source === undefined || source.shape === 'none') return undefined;
 
   const kind = source.shape === 'oval' ? 'circle' : source.shape;
@@ -112,7 +112,7 @@ function dash(value: string | undefined): readonly number[] {
     .filter((part) => Number.isFinite(part) && part >= 0);
 }
 
-export function pptxAppearanceWarningsV1(style: BroadsetElementStyle): readonly projectFormatV1.InteropDiagnostic[] {
+export function pptxAppearanceWarningsV1(style: PptxSourceStyle): readonly projectFormatV1.InteropDiagnostic[] {
   const warnings: projectFormatV1.InteropDiagnostic[] = [];
   const colors = [
     style.fontColor,
@@ -146,7 +146,7 @@ export function pptxAppearanceWarningsV1(style: BroadsetElementStyle): readonly 
 }
 
 export function mapPptxAppearanceV1(input: {
-  readonly style: BroadsetElementStyle;
+  readonly style: PptxSourceStyle;
   readonly elementId: projectFormatV1.Id;
 }): projectFormatV1.Appearance {
   const fill = fillPaint(input);

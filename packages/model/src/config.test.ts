@@ -56,7 +56,9 @@ describe('Feature configuration gating', () => {
   it('has boolean values for all flags', () => {
     const config = createDefaultFeatureConfig('screen');
 
-    for (const [, value] of Object.entries(config)) {
+    const values: readonly boolean[] = Object.values(config);
+
+    for (const value of values) {
       expect(typeof value).toBe('boolean');
     }
   });

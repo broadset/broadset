@@ -77,8 +77,8 @@ describe('real-world PPTX corpus (user-dropped)', () => {
   }
 
   for (const fixture of fixtures) {
-    it(`survives import + re-export: ${fixture.name}`, () => {
-      const result = importAndAssert(fixture.name, fixture.bytes);
+    it(`survives import + re-export: ${fixture.name}`, async () => {
+      const result = await importAndAssert(fixture.name, fixture.bytes);
 
       expect(result.reExportedBytes).toBeGreaterThan(0);
     });

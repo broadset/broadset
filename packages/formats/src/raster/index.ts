@@ -15,7 +15,7 @@ const DEFAULT_WEBM_FRAME_RATE = 50;
 /*  Types                                                            */
 /* ------------------------------------------------------------------ */
 
-export interface RasterExportOptions {
+interface RasterExportOptions {
   readonly pixelRatio: number;
   readonly quality?: number;
 }
@@ -31,7 +31,7 @@ export interface WebMExportOptions {
  * Callback that renders the scene at a given time (in milliseconds).
  * Called once per frame during WebM export to advance the animation.
  */
-export type FrameRenderer = (timeMs: number) => void;
+type FrameRenderer = (timeMs: number) => void;
 
 /* ------------------------------------------------------------------ */
 /*  Canvas & Renderer Element Discovery                              */
@@ -57,17 +57,12 @@ export function discoverRendererRoot(): HTMLElement | null {
 // Cache the modern-screenshot module to avoid repeated dynamic import() calls
 // which can hang in some bundler/browser contexts.
 let domToCanvasFn: ((node: Node, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>) | null = null;
-let createContextFn: ((node: Node, options?: Record<string, unknown>) => Promise<Record<string, unknown>>) | null =
-  null;
-let destroyContextFn: ((context: Record<string, unknown>) => void) | null = null;
 
 async function ensureScreenshotModule(): Promise<void> {
   if (domToCanvasFn === null) {
     const mod = await import('modern-screenshot');
 
     domToCanvasFn = mod.domToCanvas;
-    createContextFn = mod.createContext as unknown as NonNullable<typeof createContextFn>;
-    destroyContextFn = mod.destroyContext as unknown as NonNullable<typeof destroyContextFn>;
   }
 }
 
@@ -109,84 +104,6 @@ export async function captureElementToCanvas(
       cause: error,
     });
   }
-}
-
-/** Handle to a batch capture session. Call `capture()` per frame, then `destroy()` when done. */
-export interface BatchCaptureSession {
-  /** Capture the element to a canvas. Uses pre-cached fonts/images from context creation. */
-  readonly capture: () => Promise<HTMLCanvasElement>;
-  /** Destroy the batch capture context and free resources. */
-  readonly destroy: () => void;
-}
-
-/**
- * Creates a batch capture session for efficient multi-frame capture.
- *
- * Uses modern-screenshot's `createContext` to pre-embed fonts and images ONCE,
- * then reuses that cached data for every subsequent frame capture. This is
- * orders of magnitude faster than calling `captureElementToCanvas` per frame,
- * which re-embeds all resources from scratch each time.
- *
- * Usage:
- * ```ts
- * const session = await createBatchCapture(element, width, height);
- * for (const frame of frames) {
- *   seekToFrame(frame);
- *   const canvas = await session.capture();
- *   // process canvas...
- * }
- * session.destroy();
- * ```
- */
-export async function createBatchCapture(
-  element: HTMLElement,
-  width: number,
-  height: number,
-): Promise<BatchCaptureSession> {
-  await ensureScreenshotModule();
-
-  if (domToCanvasFn === null || createContextFn === null || destroyContextFn === null) {
-    throw new Error('modern-screenshot module failed to load');
-  }
-
-  const capture = domToCanvasFn;
-  const createCtx = createContextFn;
-  const destroyCtx = destroyContextFn;
-
-  // Create a context that pre-embeds all fonts and images. This is the
-  // expensive step (~seconds), but it only runs once. The context stores
-  // the node reference, so subsequent captures will re-read the DOM
-  // (picking up CSS changes from seek()) while reusing cached fonts.
-  //
-  // `drawImageInterval: 0` disables modern-screenshot's default 100ms
-  // per-image Safari/Firefox throttle — on a video encoding loop that
-  // throttle translates into seconds of wall-clock delay per frame.
-  const context = await createCtx(element, {
-    width,
-    height,
-    scale: 1,
-    autoDestruct: false,
-    drawImageInterval: 0,
-  });
-
-  return {
-    capture: async (): Promise<HTMLCanvasElement> => {
-      try {
-        // Pass the pre-built context directly. modern-screenshot will
-        // re-read the live DOM (reflecting seek changes) but skip the
-        // expensive font/image embedding because that data is cached.
-        return await capture(context as unknown as Node);
-      } catch (error: unknown) {
-        throw new Error(
-          `Batch DOM-to-canvas capture failed: ${error instanceof Error ? error.message : String(error)}`,
-          { cause: error },
-        );
-      }
-    },
-    destroy: (): void => {
-      destroyCtx(context);
-    },
-  };
 }
 
 /* ------------------------------------------------------------------ */

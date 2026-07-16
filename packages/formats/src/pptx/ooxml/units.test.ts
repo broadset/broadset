@@ -1,6 +1,6 @@
-import type { Canvas } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
+import type { PptxSourceCanvas } from '../project-model';
 import {
   alphaToOoxml,
   canvasLengthToEmu,
@@ -8,14 +8,14 @@ import {
   EMU_PER_CM,
   EMU_PER_INCH,
   EMU_PER_MM,
-  emuToCanvasLength,
   emuToMm,
+  emuToPptxSourceCanvasLength,
   hexToOoxmlColor,
   mmToEmu,
   rotationUnitsToDegrees,
 } from './units';
 
-function mmCanvas(overrides: Partial<Canvas> = {}): Canvas {
+function mmPptxSourceCanvas(overrides: Partial<PptxSourceCanvas> = {}): PptxSourceCanvas {
   return {
     width: 100,
     height: 100,
@@ -68,28 +68,28 @@ describe('mmToEmu / emuToMm', () => {
  * unit the user authored with; the exporter must convert through a
  * common EMU basis.
  */
-describe('canvasLengthToEmu / emuToCanvasLength', () => {
+describe('canvasLengthToEmu / emuToPptxSourceCanvasLength', () => {
   it('converts from a mm canvas directly', () => {
-    const canvas = mmCanvas({ unit: 'mm' });
+    const canvas = mmPptxSourceCanvas({ unit: 'mm' });
 
     expect(canvasLengthToEmu(canvas, 10)).toBe(360000);
-    expect(emuToCanvasLength(canvas, 360000)).toBe(10);
+    expect(emuToPptxSourceCanvasLength(canvas, 360000)).toBe(10);
   });
 
   it('converts from an in canvas via millimetres', () => {
-    const canvas = mmCanvas({ unit: 'in' });
+    const canvas = mmPptxSourceCanvas({ unit: 'in' });
 
     expect(canvasLengthToEmu(canvas, 1)).toBe(EMU_PER_INCH);
-    expect(emuToCanvasLength(canvas, EMU_PER_INCH)).toBeCloseTo(1, 6);
+    expect(emuToPptxSourceCanvasLength(canvas, EMU_PER_INCH)).toBeCloseTo(1, 6);
   });
 
   it('converts from a px canvas via the canvas DPI', () => {
-    const canvas = mmCanvas({ unit: 'px', dpi: 96 });
+    const canvas = mmPptxSourceCanvas({ unit: 'px', dpi: 96 });
     const emu = canvasLengthToEmu(canvas, 96);
 
     // 96 px @ 96 dpi = 1 inch → EMU_PER_INCH.
     expect(emu).toBeCloseTo(EMU_PER_INCH, -2);
-    expect(emuToCanvasLength(canvas, emu)).toBeCloseTo(96, 4);
+    expect(emuToPptxSourceCanvasLength(canvas, emu)).toBeCloseTo(96, 4);
   });
 });
 

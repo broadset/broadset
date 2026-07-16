@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import * as formats from '../index';
 import {
   assembleImportedProjectV1,
   computeSha256DigestV1,
@@ -15,5 +16,12 @@ describe('v1 formats public API', () => {
     expect(typeof createResourceCollectorV1).toBe('function');
     expect(typeof createInteropCollectorV1).toBe('function');
     expect(typeof assembleImportedProjectV1).toBe('function');
+  });
+
+  it('does not expose the retired legacy project-format API', () => {
+    expect('exportPptxBytes' in formats).toBe(false);
+    expect('exportProjectJson' in formats).toBe(false);
+    expect('importSvgDocument' in formats).toBe(false);
+    expect('reconcilePptx' in formats).toBe(false);
   });
 });

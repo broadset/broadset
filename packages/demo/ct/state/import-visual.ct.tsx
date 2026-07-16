@@ -1,80 +1,93 @@
-import { exportPptxBytes } from '@broadset/formats';
-import { createDefaultElement, createEmptyBroadsetDocument } from '@broadset/model';
+import { exportPptxBytesV1 } from '@broadset/formats';
+import { projectFormatV1 } from '@broadset/model';
 import { expect, test } from '@playwright/experimental-ct-react';
 
 import { DemoApp } from '../../src/DemoApp';
 
-/**
- * @description Visual import CT — closes the 2026-04-28 production-
- * readiness audit finding "Imported format documents can be invisible
- * because page instances are empty". The earlier `pptx-chain.ct.tsx`
- * polled only the editor store; it would have happily passed even when
- * the imported document had no `PageElementInstance` entries and the
- * canvas / layer panel rendered empty.
- *
- * This CT asserts the *visual* surfaces a user sees after import:
- *
- *   - The layer panel enumerates the imported element.
- *   - The renderer host emits a DOM node carrying the imported
- *     element's `data-element-id`.
- *
- * If either assertion fails, the importer dropped the page-instance
- * step and an end-user would see an empty canvas despite a green
- * "import complete" toast.
- */
+const VISUAL_RECT_ID = projectFormatV1.idSchema.parse('visual-rect');
 
-const VISUAL_RECT_ID = 'visual-rect';
+function buildVisualProject(): projectFormatV1.BroadsetProjectV1 {
+  const rootId = projectFormatV1.idSchema.parse('visual-root');
+  const pageId = projectFormatV1.idSchema.parse('visual-page');
 
-function buildVisualPptxBytes(): Buffer {
-  const baseDoc = {
-    ...createEmptyBroadsetDocument(),
-    elements: [
-      createDefaultElement('rectangle', {
-        id: VISUAL_RECT_ID,
-        name: 'Visual rectangle',
-        position: { x: 25, y: 30 },
-        width: 50,
-        height: 30,
+  return projectFormatV1.createProjectV1({
+    documents: [
+      projectFormatV1.createDocumentV1({
+        id: projectFormatV1.idSchema.parse('visual-document'),
+        elements: [
+          projectFormatV1.createElementV1({
+            id: rootId,
+            kind: 'group',
+            name: 'Visual root',
+            geometry: projectFormatV1.createElementGeometry({ width: 320, height: 180 }),
+          }),
+          projectFormatV1.createElementV1({
+            id: VISUAL_RECT_ID,
+            kind: 'vector',
+            name: 'Visual rectangle',
+            parentId: rootId,
+            geometry: projectFormatV1.createElementGeometry({
+              width: 50,
+              height: 30,
+              transform: { kind: 'affine2d', matrix: [1, 0, 0, 1, 25, 30] },
+            }),
+            geometryData: projectFormatV1.createRectangleGeometry(),
+          }),
+        ],
+        pages: [
+          projectFormatV1.createPageV1({
+            id: pageId,
+            name: 'Visual slide',
+            rootInstances: [
+              {
+                id: projectFormatV1.idSchema.parse('visual-root-instance'),
+                elementId: rootId,
+                visible: true,
+                overrides: [],
+                componentPropertyValues: [],
+              },
+            ],
+          }),
+        ],
+        surface: { ...projectFormatV1.createDefaultSurface(), size: [320, 180], unit: 'px', dpi: 72 },
       }),
     ],
-  };
-
-  return Buffer.from(exportPptxBytes(baseDoc));
+  });
 }
 
 test('imported PPTX rectangle shows up in the canvas and the layers panel', async ({ mount, page }) => {
   test.setTimeout(60_000);
-
   await mount(<DemoApp />);
 
-  await expect(page.getByTestId('demo-shell')).toBeVisible();
+  const bytes = await exportPptxBytesV1({ project: buildVisualProject(), blobs: new Map() });
 
-  const fileInput = page.locator('input[type="file"]');
-
-  await fileInput.setInputFiles({
+  await page.getByLabel('Choose Broadset project file').setInputFiles({
     name: 'visual.pptx',
     mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    buffer: buildVisualPptxBytes(),
+    buffer: Buffer.from(bytes),
   });
 
-  await expect(page.getByText(/import complete/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('status')).toHaveText('Project loaded', { timeout: 30_000 });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__broadsetProjectEditorStore
+            ?.getState()
+            .project.documents[0]?.elements.find(({ name }) => name === 'Visual rectangle')?.id ?? null,
+      ),
+    )
+    .not.toBeNull();
 
-  // Canvas surface — the renderer host MUST emit a DOM node carrying
-  // the imported element's data-element-id. This is the definitive
-  // "is the user actually seeing the import?" check.
-  const canvasNode = page.locator(`[data-testid="screen-renderer-host"] [data-element-id="${VISUAL_RECT_ID}"]`);
+  const importedId = await page.evaluate(
+    () =>
+      window.__broadsetProjectEditorStore
+        ?.getState()
+        .project.documents[0]?.elements.find(({ name }) => name === 'Visual rectangle')?.id ?? null,
+  );
 
-  await expect(canvasNode).toBeAttached({ timeout: 10_000 });
+  await expect(page.locator(`[data-element-id="${String(importedId)}"]`)).toBeAttached();
 
-  // Layers panel surface — every imported root MUST be enumerated so
-  // the user can find/select it. The PPTX importer may fall back to
-  // the stable element id when shape names are not available, so assert
-  // the selectable layer row rather than a source-format display name.
-  const layersTab = page.getByRole('tab', { name: /layers/i });
-
-  if ((await layersTab.count()) > 0) {
-    await layersTab.first().click();
-  }
-
-  await expect(page.getByRole('button', { name: `Select ${VISUAL_RECT_ID}` })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('tab', { name: 'Layers' }).click();
+  await expect(page.getByRole('button', { name: 'Select Visual rectangle' })).toBeVisible();
 });

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
-import { exportSvgStringV1 } from '../index';
+import { exportSvgStringV1 } from './export';
 import { importSvgProjectV1 } from './import';
 
 const DIGEST_HEX = 'a'.repeat(64);

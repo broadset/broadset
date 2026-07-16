@@ -117,6 +117,16 @@ function appendText(options: {
   readonly document: Document;
 }): void {
   const { container, element, context, document: domDocument } = options;
+  const content = domDocument.createElement('div');
+  const padding = element.layout.padding ?? [0, 0, 0, 0];
+
+  content.dataset['elementContent'] = '';
+  applyStyle(content, {
+    boxSizing: 'border-box',
+    height: FULL_SIZE,
+    padding: padding.map((value) => `${formatCssNumber(value)}${PIXEL_UNIT}`).join(' '),
+    width: FULL_SIZE,
+  });
 
   for (const paragraph of element.text.paragraphs) {
     const paragraphNode = domDocument.createElement('div');
@@ -131,8 +141,10 @@ function appendText(options: {
       paragraphNode.append(span);
     }
 
-    container.append(paragraphNode);
+    content.append(paragraphNode);
   }
+
+  container.append(content);
 }
 
 function appendImage(options: {
@@ -162,6 +174,32 @@ function appendClock(container: HTMLElement, element: projectFormatV1.ClockEleme
   container.append(span);
 }
 
+function appendTicker(options: {
+  readonly container: HTMLElement;
+  readonly element: projectFormatV1.TickerElement;
+  readonly document: Document;
+}): void {
+  const { container, element, document: domDocument } = options;
+  const track = domDocument.createElement('div');
+
+  applyStyle(track, {
+    display: 'flex',
+    gap: `${String(element.ticker.gap)}px`,
+    whiteSpace: 'nowrap',
+  });
+  track.dataset['tickerDirection'] = element.ticker.direction;
+  track.dataset['tickerSpeed'] = String(element.ticker.speed);
+
+  element.ticker.items.forEach((item) => {
+    const span = domDocument.createElement('span');
+
+    span.dataset['tickerItemId'] = item.id;
+    span.textContent = item.text;
+    track.append(span);
+  });
+  container.append(track);
+}
+
 function appendElementContent(options: {
   readonly container: HTMLElement;
   readonly element: Element;
@@ -187,11 +225,14 @@ function appendElementContent(options: {
       appendClock(container, element, domDocument);
 
       return;
+    case 'ticker':
+      appendTicker({ container, element, document: domDocument });
+
+      return;
     case 'group':
     case 'component-instance':
       return;
     case 'qrcode':
-    case 'ticker':
     case 'video':
     case 'audio':
     case 'foreign':
@@ -212,6 +253,8 @@ export function renderElementV1(element: Element, context: RenderContextV1): HTM
   applyStyle(container, {
     position: 'absolute',
     boxSizing: 'border-box',
+    pointerEvents: 'auto',
+    transformStyle: 'preserve-3d',
     ...geometryToBoxStyle(element.geometry),
     ...appearanceToStyle(element.appearance, context.swatches),
   });
