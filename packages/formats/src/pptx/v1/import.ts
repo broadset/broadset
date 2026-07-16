@@ -2,7 +2,6 @@ import { projectFormatV1 } from '@broadset/model';
 
 import {
   assembleImportedProjectV1,
-  computeSha256DigestV1,
   createInteropCollectorV1,
   createResourceCollectorV1,
   type ProjectImportResultV1,
@@ -21,11 +20,11 @@ const PPTX_MEDIA_TYPE = 'application/vnd.openxmlformats-officedocument.presentat
 const FALLBACK_ASSET_ID = projectFormatV1.idSchema.parse('pptx-fallback-source');
 const FALLBACK_SOURCE_ID = projectFormatV1.idSchema.parse('pptx-fallback-interop-source');
 const FALLBACK_RECORD_ID = projectFormatV1.idSchema.parse('pptx-fallback-interop-record');
+const FALLBACK_HASH = projectFormatV1.sha256DigestSchema.parse(
+  'sha256:a656d6a0cfe01994e28993fba7cbffd197a2f51e072ff52913559a7ae7f000f4',
+);
 const EMPTY_DIGEST = projectFormatV1.sha256DigestSchema.parse(
   'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-);
-const FALLBACK_HASH = projectFormatV1.sha256DigestSchema.parse(
-  'sha256:100eb133820a2f9acb46a0eb9bff8c85fef83da668d7c2110d47d819b34a38da',
 );
 
 function projectName(fileName: string | undefined): string {
@@ -243,7 +242,7 @@ async function buildResult(input: {
     interop.addRecord({
       sourceId,
       target: entityAddress(entry.element.id),
-      baselineSemanticHash: await computeSha256DigestV1(new TextEncoder().encode(JSON.stringify(entry.element))),
+      baselineSemanticHash: await projectFormatV1.computeCanonicalJsonHashV1(entry.element),
       mappingConfidence: entry.warnings.length === 0 ? 1 : 0.75,
       editability: entry.warnings.length === 0 ? 'native' : 'partial',
       warnings: [...entry.warnings, ...(index === 0 ? reportWarnings : [])],

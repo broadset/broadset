@@ -2,7 +2,6 @@ import { projectFormatV1 } from '@broadset/model';
 
 import {
   assembleImportedProjectV1,
-  computeSha256DigestV1,
   createInteropCollectorV1,
   createResourceCollectorV1,
   type ProjectImportResultV1,
@@ -26,11 +25,11 @@ const ROOT_ID = projectFormatV1.idSchema.parse('pdf-root');
 const FALLBACK_SOURCE_ASSET_ID = projectFormatV1.idSchema.parse('pdf-fallback-source');
 const FALLBACK_SOURCE_ID = projectFormatV1.idSchema.parse('pdf-fallback-interop-source');
 const FALLBACK_RECORD_ID = projectFormatV1.idSchema.parse('pdf-fallback-interop-record');
+const FALLBACK_ROOT_HASH = projectFormatV1.sha256DigestSchema.parse(
+  'sha256:054fcbd2a39a8c63a8dd6bb4153aaeaeabb0e1ed80b6137d4ef667b8e993f123',
+);
 const FALLBACK_DIGEST = projectFormatV1.sha256DigestSchema.parse(
   'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-);
-const FALLBACK_ROOT_HASH = projectFormatV1.sha256DigestSchema.parse(
-  'sha256:100eb133820a2f9acb46a0eb9bff8c85fef83da668d7c2110d47d819b34a38da',
 );
 
 function projectName(fileName: string | undefined): string {
@@ -91,13 +90,18 @@ function errorDiagnostic(input: {
 function globalWarnings(parsed: ParsedPdfDocumentV1 | undefined): readonly projectFormatV1.InteropDiagnostic[] {
   if (parsed === undefined) return [];
 
-  const pageWarning: readonly projectFormatV1.InteropDiagnostic[] = parsed.pageCount > 1 ? [{
-    code: 'pdf.additional-pages-omitted',
-    severity: 'warning',
-    message: `PDF import mapped the first page and omitted ${String(parsed.pageCount - 1)} additional page(s).`,
-    dimension: 'semantics',
-    pointer: '/documents/0/pages',
-  }] : [];
+  const pageWarning: readonly projectFormatV1.InteropDiagnostic[] =
+    parsed.pageCount > 1 ?
+      [
+        {
+          code: 'pdf.additional-pages-omitted',
+          severity: 'warning',
+          message: `PDF import mapped the first page and omitted ${String(parsed.pageCount - 1)} additional page(s).`,
+          dimension: 'semantics',
+          pointer: '/documents/0/pages',
+        },
+      ]
+    : [];
 
   return [...parsed.page.warnings, ...pageWarning];
 }
@@ -113,28 +117,34 @@ async function mapElements(input: {
   const fontRegistry = createPdfFontRegistryV1(input.resourceCollector);
   const mappedText = page.textItems
     .filter(({ text }) => text.trim() !== '')
-    .map((item, index) => mapPdfTextV1({
-      item,
+    .map((item, index) =>
+      mapPdfTextV1({
+        item,
+        page,
+        elementId: projectFormatV1.idSchema.parse(`pdf-text-${String(index + 1)}`),
+        parentId: ROOT_ID,
+        fontRegistry,
+      }),
+    );
+  const mappedPaths = page.paths.map((path, index) =>
+    mapPdfPathV1({
+      path,
       page,
-      elementId: projectFormatV1.idSchema.parse(`pdf-text-${String(index + 1)}`),
+      elementId: projectFormatV1.idSchema.parse(`pdf-path-${String(index + 1)}`),
       parentId: ROOT_ID,
-      fontRegistry,
-    }));
-  const mappedPaths = page.paths.map((path, index) => mapPdfPathV1({
-    path,
-    page,
-    elementId: projectFormatV1.idSchema.parse(`pdf-path-${String(index + 1)}`),
-    parentId: ROOT_ID,
-  }));
-  const mappedImages = await Promise.all(page.imageUses.map(async (use, index) =>
-    mapPdfImageV1({
-      use,
-      page,
-      elementId: projectFormatV1.idSchema.parse(`pdf-image-${String(index + 1)}`),
-      parentId: ROOT_ID,
-      resourceCollector: input.resourceCollector,
     }),
-  ));
+  );
+  const mappedImages = await Promise.all(
+    page.imageUses.map(async (use, index) =>
+      mapPdfImageV1({
+        use,
+        page,
+        elementId: projectFormatV1.idSchema.parse(`pdf-image-${String(index + 1)}`),
+        parentId: ROOT_ID,
+        resourceCollector: input.resourceCollector,
+      }),
+    ),
+  );
 
   return [...mappedText, ...mappedPaths, ...mappedImages];
 }
@@ -145,9 +155,7 @@ async function addInteropRecord(input: {
   readonly mapped: PdfMappedElementV1;
   readonly extraWarnings?: readonly projectFormatV1.InteropDiagnostic[];
 }): Promise<void> {
-  const baselineSemanticHash = await computeSha256DigestV1(
-    new TextEncoder().encode(JSON.stringify(input.mapped.element)),
-  );
+  const baselineSemanticHash = await projectFormatV1.computeCanonicalJsonHashV1(input.mapped.element);
 
   input.collector.addRecord({
     sourceId: input.sourceId,
@@ -183,10 +191,7 @@ async function buildResult(input: {
   });
   const mapped = await mapElements({ parsed: input.parsed, resourceCollector });
   const root = rootElement(input.parsed);
-  const warnings = [
-    ...globalWarnings(input.parsed),
-    ...(input.failure === undefined ? [] : [input.failure]),
-  ];
+  const warnings = [...globalWarnings(input.parsed), ...(input.failure === undefined ? [] : [input.failure])];
 
   for (let index = 0; index < mapped.length; index += 1) {
     const item = mapped[index];
@@ -220,15 +225,19 @@ async function buildResult(input: {
     name: projectName(input.fileName),
     surface: surface(input.parsed),
     elements: [root, ...mapped.map(({ element }) => element)],
-    pages: [projectFormatV1.createPageV1({
-      id: PAGE_ID,
-      rootInstances: [{
-        id: projectFormatV1.idSchema.parse('pdf-root-instance'),
-        elementId: ROOT_ID,
-        overrides: [],
-        componentPropertyValues: [],
-      }],
-    })],
+    pages: [
+      projectFormatV1.createPageV1({
+        id: PAGE_ID,
+        rootInstances: [
+          {
+            id: projectFormatV1.idSchema.parse('pdf-root-instance'),
+            elementId: ROOT_ID,
+            overrides: [],
+            componentPropertyValues: [],
+          },
+        ],
+      }),
+    ],
   });
 
   return assembleImportedProjectV1({
@@ -251,15 +260,19 @@ function absoluteFallbackResult(input: {
     name: projectName(input.fileName),
     surface: surface(undefined),
     elements: [root],
-    pages: [projectFormatV1.createPageV1({
-      id: PAGE_ID,
-      rootInstances: [{
-        id: projectFormatV1.idSchema.parse('pdf-root-instance'),
-        elementId: ROOT_ID,
-        overrides: [],
-        componentPropertyValues: [],
-      }],
-    })],
+    pages: [
+      projectFormatV1.createPageV1({
+        id: PAGE_ID,
+        rootInstances: [
+          {
+            id: projectFormatV1.idSchema.parse('pdf-root-instance'),
+            elementId: ROOT_ID,
+            overrides: [],
+            componentPropertyValues: [],
+          },
+        ],
+      }),
+    ],
   });
   const sourceAsset: projectFormatV1.ForeignAsset = {
     id: FALLBACK_SOURCE_ASSET_ID,
@@ -294,22 +307,26 @@ function absoluteFallbackResult(input: {
     project: {
       ...project,
       interop: {
-        sources: [{
-          id: FALLBACK_SOURCE_ID,
-          format: 'pdf',
-          sourceAssetId: FALLBACK_SOURCE_ASSET_ID,
-          importerVersion: IMPORTER_VERSION,
-          importedAt: input.importedAt,
-        }],
-        records: [{
-          id: FALLBACK_RECORD_ID,
-          sourceId: FALLBACK_SOURCE_ID,
-          target: entityAddress(ROOT_ID),
-          baselineSemanticHash: FALLBACK_ROOT_HASH,
-          mappingConfidence: 0,
-          editability: 'appearance-only',
-          warnings: [input.diagnostic],
-        }],
+        sources: [
+          {
+            id: FALLBACK_SOURCE_ID,
+            format: 'pdf',
+            sourceAssetId: FALLBACK_SOURCE_ASSET_ID,
+            importerVersion: IMPORTER_VERSION,
+            importedAt: input.importedAt,
+          },
+        ],
+        records: [
+          {
+            id: FALLBACK_RECORD_ID,
+            sourceId: FALLBACK_SOURCE_ID,
+            target: entityAddress(ROOT_ID),
+            baselineSemanticHash: FALLBACK_ROOT_HASH,
+            mappingConfidence: 0,
+            editability: 'appearance-only',
+            warnings: [input.diagnostic],
+          },
+        ],
       },
     },
     blobs: new Map([[FALLBACK_DIGEST, new Uint8Array()]]),
@@ -319,8 +336,9 @@ function absoluteFallbackResult(input: {
 function loadFailureDiagnostic(kind: 'encrypted' | 'malformed'): projectFormatV1.InteropDiagnostic {
   return errorDiagnostic({
     code: kind === 'encrypted' ? 'pdf.encrypted' : 'pdf.malformed',
-    message: kind === 'encrypted'
-      ? 'PDF import rejected an encrypted document.'
+    message:
+      kind === 'encrypted' ?
+        'PDF import rejected an encrypted document.'
       : 'PDF import could not parse the malformed byte stream.',
   });
 }
@@ -332,8 +350,9 @@ export async function importPdfProjectV1(input: {
   readonly maxBytes?: number;
 }): Promise<ProjectImportResultV1> {
   try {
-    const maxBytes = input.maxBytes !== undefined && Number.isSafeInteger(input.maxBytes) && input.maxBytes > 0
-      ? input.maxBytes
+    const maxBytes =
+      input.maxBytes !== undefined && Number.isSafeInteger(input.maxBytes) && input.maxBytes > 0 ?
+        input.maxBytes
       : DEFAULT_MAX_BYTES;
 
     if (input.bytes.byteLength > maxBytes) {
@@ -365,9 +384,11 @@ export async function importPdfProjectV1(input: {
       bytes: input.bytes,
       fileName: input.fileName,
       importedAt: input.importedAt,
-      ...(parsed === undefined ? {
-        failure: errorDiagnostic({ code: 'pdf.no-pages', message: 'PDF import found no readable pages.' }),
-      } : { parsed }),
+      ...(parsed === undefined ?
+        {
+          failure: errorDiagnostic({ code: 'pdf.no-pages', message: 'PDF import found no readable pages.' }),
+        }
+      : { parsed }),
     });
   } catch (error: unknown) {
     try {

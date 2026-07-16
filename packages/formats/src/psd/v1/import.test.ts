@@ -47,9 +47,7 @@ function buildSolidLayer(): Layer {
 }
 
 function buildNestedGroup(depth: number): Layer {
-  return depth <= 0
-    ? buildSolidLayer()
-    : { name: `Group ${String(depth)}`, children: [buildNestedGroup(depth - 1)] };
+  return depth <= 0 ? buildSolidLayer() : { name: `Group ${String(depth)}`, children: [buildNestedGroup(depth - 1)] };
 }
 
 function expectValid(result: Awaited<ReturnType<typeof importPsdProjectV1>>): void {
@@ -67,6 +65,7 @@ describe('importPsdProjectV1', () => {
     const asset = result.project.resources.assets.find(
       ({ id }) => image?.kind === 'image' && image.image.assetId === id,
     );
+    const baseline = result.project.interop.records.find(({ target }) => target.entityId === image?.id);
 
     expect(image).toMatchObject({
       kind: 'image',
@@ -74,6 +73,7 @@ describe('importPsdProjectV1', () => {
       geometry: { bounds: { width: 20, height: 10 } },
     });
     expect(asset).toMatchObject({ kind: 'image', blob: { mediaType: 'image/png' } });
+    expect(baseline?.baselineSemanticHash).toBe(await projectFormatV1.computeCanonicalJsonHashV1(image));
     expect(result.project.interop.sources[0]).toMatchObject({ format: 'psd', importedAt: IMPORTED_AT });
     expectValid(result);
   });
@@ -89,10 +89,12 @@ describe('importPsdProjectV1', () => {
   });
 
   it('preserves nested PSD groups as a v1 parent tree', async () => {
-    const bytes = buildPsd([{
-      name: 'Folder',
-      children: [{ ...buildSolidLayer(), name: 'Nested raster' }],
-    }]);
+    const bytes = buildPsd([
+      {
+        name: 'Folder',
+        children: [{ ...buildSolidLayer(), name: 'Nested raster' }],
+      },
+    ]);
     const result = await importPsdProjectV1({ bytes, importedAt: IMPORTED_AT });
     const group = result.project.documents[0]?.elements.find(({ name }) => name === 'Folder');
     const child = result.project.documents[0]?.elements.find(({ name }) => name === 'Nested raster');
@@ -168,7 +170,7 @@ describe('importPsdProjectV1', () => {
     };
     const result = await importPsdProjectV1({ bytes: buildPsd([layer]), importedAt: IMPORTED_AT });
     const text = result.project.documents[0]?.elements.find(({ name }) => name === 'Styled text');
-    const runs = text?.kind === 'text' ? text.text.paragraphs[0]?.runs ?? [] : [];
+    const runs = text?.kind === 'text' ? (text.text.paragraphs[0]?.runs ?? []) : [];
 
     expect(runs).toHaveLength(2);
     expect(runs.map(({ text: value }) => value)).toEqual(['Red', 'Blue']);

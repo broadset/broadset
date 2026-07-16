@@ -104,7 +104,9 @@ function buildPdfKitDocument(
     const document = new PDFKit({ size: [300, 200], margin: 0, ...options });
 
     document.on('data', (chunk: Buffer) => chunks.push(chunk));
-    document.on('end', () => { resolve(Uint8Array.from(Buffer.concat(chunks))); });
+    document.on('end', () => {
+      resolve(Uint8Array.from(Buffer.concat(chunks)));
+    });
     document.on('error', reject);
     setup(document);
     document.end();
@@ -128,9 +130,12 @@ function buildPdfKitMetadataFixture(): Promise<Uint8Array> {
 }
 
 function buildPdfKitUncompressedFixture(): Promise<Uint8Array> {
-  return buildPdfKitDocument((document) => {
-    document.text('Uncompressed body', 30, 100);
-  }, { compress: false });
+  return buildPdfKitDocument(
+    (document) => {
+      document.text('Uncompressed body', 30, 100);
+    },
+    { compress: false },
+  );
 }
 
 function buildPdfKitMultipageFixture(): Promise<Uint8Array> {
@@ -250,8 +255,10 @@ describe('importPdfProjectV1', () => {
   it('maps PDF text runs to native v1 text with y-down geometry', async () => {
     const result = await importPdfProjectV1({ bytes: await buildTextPdf(), importedAt: IMPORTED_AT });
     const text = contentElements(result).find(({ kind }) => kind === 'text');
+    const baseline = result.project.interop.records.find(({ target }) => target.entityId === text?.id);
 
     expect(text).toMatchObject({ kind: 'text' });
+    expect(baseline?.baselineSemanticHash).toBe(await projectFormatV1.computeCanonicalJsonHashV1(text));
     expect(text?.geometry.transform).toMatchObject({ kind: 'affine2d' });
     expect(text?.kind === 'text' ? text.text.paragraphs[0]?.runs[0]?.text : undefined).toBe('Native PDF text');
     expect(text?.kind === 'text' ? text.text.paragraphs[0]?.runs[0]?.properties.color : undefined).toMatchObject({
@@ -345,7 +352,8 @@ describe('importPdfProjectV1', () => {
     const text = contentElements(result).find(({ kind }) => kind === 'text');
     const mappedImage = contentElements(result).find(({ kind }) => kind === 'image');
     const textMatrix = text?.geometry.transform.kind === 'affine2d' ? text.geometry.transform.matrix : [];
-    const imageMatrix = mappedImage?.geometry.transform.kind === 'affine2d' ? mappedImage.geometry.transform.matrix : [];
+    const imageMatrix =
+      mappedImage?.geometry.transform.kind === 'affine2d' ? mappedImage.geometry.transform.matrix : [];
 
     expect(Math.abs(textMatrix[1]) + Math.abs(textMatrix[2])).toBeGreaterThan(0);
     expect(Math.abs(imageMatrix[1]) + Math.abs(imageMatrix[2])).toBeGreaterThan(0);
@@ -378,7 +386,11 @@ describe('importPdfProjectV1', () => {
     const result = await importPdfProjectV1({ bytes: await pdf.save(), importedAt: IMPORTED_AT });
     const text = contentElements(result)
       .filter(({ kind }) => kind === 'text')
-      .flatMap((element) => element.kind === 'text' ? element.text.paragraphs.flatMap(({ runs }) => runs.map(({ text: value }) => value)) : []);
+      .flatMap((element) =>
+        element.kind === 'text' ?
+          element.text.paragraphs.flatMap(({ runs }) => runs.map(({ text: value }) => value))
+        : [],
+      );
 
     expect(text).toContain('First page');
     expect(text).not.toContain('Second page');

@@ -20,6 +20,7 @@ export const V1_RUNTIME_EXPORT_NAMES = [
   'broadsetDocumentV1Schema',
   'broadsetProjectV1Schema',
   'canonicalizeProjectV1',
+  'computeCanonicalJsonHashV1',
   'clipRemapSchema',
   'colorAdjustmentSchema',
   'colorValueSchema',

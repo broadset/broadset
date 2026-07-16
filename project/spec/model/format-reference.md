@@ -16,6 +16,7 @@ Defines the authoritative persisted names, shapes, ownership scopes, validation 
 | `parseProjectV1Unknown`                    | Bounded validation for an already decoded unknown value                           |
 | `loadProjectV1Json`                        | Bounded JSON-text loading with typed quarantine and source-text preservation      |
 | `canonicalizeProjectV1`                    | Lossless canonical JSON serialization of the complete project                     |
+| `computeCanonicalJsonHashV1`               | SHA-256 over any bounded canonical JSON semantic value, including interop targets  |
 | `computeProjectSemanticHashV1`             | SHA-256 over the canonical semantic projection defined by this specification      |
 
 This published foundation is the greenfield application cutover target. It does not make v1 the active editor, renderer, player, persistence, or format-adapter representation by itself. Those consumers migrate in the remaining cutover programs, and the final program deletes the unversioned legacy model. No v1 loader accepts legacy Broadset-owned records, and no compatibility alias changes persisted field names.
@@ -715,12 +716,13 @@ The immutable DOM-free `ResolvedSceneSnapshot` contains expanded identity, prove
 
 ### Requirement: Canonical JSON Serialization
 
-Raw canonical JSON is UTF-8 without BOM and contains no `undefined`, functions, non-finite numbers, bigint values, lone UTF-16 surrogates, or cycles. Arrays retain semantic order; object-member order is not semantic. Human-facing JSON is pretty printed. Semantic hashes use RFC 8785 JSON Canonicalization Scheme over a defined projection excluding `metadata.updatedAt` and `metadata.generator.build`; all other project fields, including generator name and version, remain semantic. Object keys sort by UTF-16 code units and accepted numbers use ECMAScript shortest-round-trip serialization.
+Raw canonical JSON is UTF-8 without BOM and contains no `undefined`, functions, non-finite numbers, bigint values, lone UTF-16 surrogates, or cycles. Arrays retain semantic order; object-member order is not semantic. Human-facing JSON is pretty printed. Semantic hashes use RFC 8785 JSON Canonicalization Scheme. Whole-project hashes use a defined projection excluding `metadata.updatedAt` and `metadata.generator.build`; all other project fields, including generator name and version, remain semantic. Interop `baselineSemanticHash` values hash the targeted entity's canonical JSON value through `computeCanonicalJsonHashV1`. Object keys sort by UTF-16 code units and accepted numbers use ECMAScript shortest-round-trip serialization.
 
 #### Acceptance Criteria
 
 - [ ] Given repeated serialization of one project, semantic content and ordered arrays are stable
 - [ ] Given different object-member order, canonical semantic hashing returns the same digest
+- [ ] Given an interop target entity, its baseline hash is the SHA-256 digest of its canonical JSON value and is independent of object-member insertion order
 - [ ] Given edge numbers, escapes, multilingual keys and values, and the published known digest vector, canonicalization matches RFC 8785 behavior
 - [ ] Given a lone surrogate, non-finite number, excessive output, or cycle, canonicalization fails deterministically
 - [ ] Given runtime indexes or materialized defaults, they do not enter canonical serialization

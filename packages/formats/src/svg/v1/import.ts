@@ -2,14 +2,13 @@ import { projectFormatV1 } from '@broadset/model';
 
 import {
   assembleImportedProjectV1,
-  computeSha256DigestV1,
   createInteropCollectorV1,
   createResourceCollectorV1,
   type ProjectImportResultV1,
 } from '../../v1';
 import { createSvgFontRegistryV1 } from './font-registry';
 import { mapSvgElementV1 } from './map-element';
-import { type ParsedSvgSourceV1,parseSvgSourceV1 } from './source-details';
+import { type ParsedSvgSourceV1, parseSvgSourceV1 } from './source-details';
 import type { MappedElementV1 } from './types';
 
 const IMPORTER_VERSION = 'broadset-svg-v1/1';
@@ -50,7 +49,12 @@ function surface(parsed: ParsedSvgSourceV1): projectFormatV1.SurfaceDefinition {
 }
 
 function rootInstance(): projectFormatV1.PageRootInstance {
-  return { id: projectFormatV1.idSchema.parse('svg-root-instance'), elementId: ROOT_ID, overrides: [], componentPropertyValues: [] };
+  return {
+    id: projectFormatV1.idSchema.parse('svg-root-instance'),
+    elementId: ROOT_ID,
+    overrides: [],
+    componentPropertyValues: [],
+  };
 }
 
 function entityAddress(elementId: projectFormatV1.Id): projectFormatV1.EntityAddress {
@@ -71,10 +75,7 @@ async function addInteropRecord(input: {
 
   if (element === undefined) return;
 
-  // D2 hashes the factory-produced element directly; canonical JSON ordering is deferred.
-  const baselineSemanticHash = await computeSha256DigestV1(
-    new TextEncoder().encode(JSON.stringify(element)),
-  );
+  const baselineSemanticHash = await projectFormatV1.computeCanonicalJsonHashV1(element);
 
   input.collector.addRecord({
     sourceId: input.sourceId,
@@ -164,32 +165,38 @@ async function buildImportedResult(input: {
 
     return elementId;
   });
-  const mapped = await Promise.all(input.parsed.imported.map(async (imported, index) => {
-    const elementId = elementIds[index] ?? projectFormatV1.idSchema.parse(`svg-element-${String(index + 1)}`);
-    const sourceParentId = imported.parentDataBsId;
-    const parentId = sourceParentId === null || sourceParentId === undefined
-      ? ROOT_ID
-      : idBySourceId.get(sourceParentId) ?? ROOT_ID;
+  const mapped = await Promise.all(
+    input.parsed.imported.map(async (imported, index) => {
+      const elementId = elementIds[index] ?? projectFormatV1.idSchema.parse(`svg-element-${String(index + 1)}`);
+      const sourceParentId = imported.parentDataBsId;
+      const parentId =
+        sourceParentId === null || sourceParentId === undefined ?
+          ROOT_ID
+        : (idBySourceId.get(sourceParentId) ?? ROOT_ID);
 
-    return mapSvgElementV1({
-      imported,
-      source: input.parsed.sources[index] ?? {
-        element: undefined,
-        opacity: undefined,
-        fillOpacity: undefined,
-        strokeOpacity: undefined,
-        hasPaintServer: false,
-        hasFilter: false,
-        hasClipPath: false,
-        hasMask: false,
-      },
-      elementId,
-      parentId,
-      resourceCollector,
-      fontRegistry,
-    });
-  }));
-  const elements = [rootElement(input.parsed), ...mapped.flatMap(({ element }) => element === undefined ? [] : [element])];
+      return mapSvgElementV1({
+        imported,
+        source: input.parsed.sources[index] ?? {
+          element: undefined,
+          opacity: undefined,
+          fillOpacity: undefined,
+          strokeOpacity: undefined,
+          hasPaintServer: false,
+          hasFilter: false,
+          hasClipPath: false,
+          hasMask: false,
+        },
+        elementId,
+        parentId,
+        resourceCollector,
+        fontRegistry,
+      });
+    }),
+  );
+  const elements = [
+    rootElement(input.parsed),
+    ...mapped.flatMap(({ element }) => (element === undefined ? [] : [element])),
+  ];
   const topLevelMapped = mapped.filter(({ element }) => element?.parentId === ROOT_ID);
   const elementsById = new Map(elements.map((element) => [element.id, element]));
 
@@ -212,13 +219,15 @@ async function buildImportedResult(input: {
           element: root,
           mappingConfidence: 0,
           editability: 'appearance-only',
-          warnings: [{
-            code: 'svg.import-failed',
-            severity: 'error',
-            message: input.errorMessage,
-            dimension: 'semantics',
-            pointer: '/',
-          }],
+          warnings: [
+            {
+              code: 'svg.import-failed',
+              severity: 'error',
+              message: input.errorMessage,
+              dimension: 'semantics',
+              pointer: '/',
+            },
+          ],
         },
       });
     }
@@ -281,7 +290,10 @@ export async function importSvgProjectV1(input: {
         errorMessage: error instanceof Error ? error.message : 'SVG import failed.',
       });
     } catch {
-      return { project: projectFormatV1.createProjectV1({ id: PROJECT_ID, name: projectName(input.fileName) }), blobs: new Map() };
+      return {
+        project: projectFormatV1.createProjectV1({ id: PROJECT_ID, name: projectName(input.fileName) }),
+        blobs: new Map(),
+      };
     }
   }
 }

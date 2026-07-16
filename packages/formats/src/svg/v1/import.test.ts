@@ -24,8 +24,10 @@ describe('importSvgProjectV1', () => {
   ])('maps <%s> to v1 vector %s geometry', async (_tag, markup, geometryKind) => {
     const result = await importSvg(`<svg xmlns="http://www.w3.org/2000/svg" width="100" height="80">${markup}</svg>`);
     const element = childElements(result)[0];
+    const baseline = result.project.interop.records.find(({ target }) => target.entityId === element?.id);
 
     expect(element).toMatchObject({ kind: 'vector', geometryData: { kind: geometryKind } });
+    expect(baseline?.baselineSemanticHash).toBe(await projectFormatV1.computeCanonicalJsonHashV1(element));
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(result.project)).toEqual([]);
   });
 
@@ -35,9 +37,11 @@ describe('importSvgProjectV1', () => {
     );
     const element = childElements(result)[0];
 
-    expect(element?.kind === 'vector' && element.geometryData.kind === 'path'
-      ? element.geometryData.path.segments.map(({ kind }) => kind)
-      : []).toEqual(['move', 'line', 'line', 'cubic', 'close']);
+    expect(
+      element?.kind === 'vector' && element.geometryData.kind === 'path' ?
+        element.geometryData.path.segments.map(({ kind }) => kind)
+      : [],
+    ).toEqual(['move', 'line', 'line', 'cubic', 'close']);
   });
 
   it('maps fill and stroke paint into ordered v1 appearance layers', async () => {
@@ -107,9 +111,9 @@ describe('importSvgProjectV1', () => {
     const image = childElements(result)[0];
 
     expect(image).toMatchObject({ kind: 'image', image: { fit: 'fill' } });
-    expect(result.project.resources.assets.some(({ id }) => image?.kind === 'image' && id === image.image.assetId)).toBe(
-      true,
-    );
+    expect(
+      result.project.resources.assets.some(({ id }) => image?.kind === 'image' && id === image.image.assetId),
+    ).toBe(true);
     expect([...result.blobs.values()]).toContainEqual(new Uint8Array([1, 2, 3]));
   });
 

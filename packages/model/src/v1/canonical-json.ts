@@ -38,7 +38,16 @@ function canonicalStringByteLength(value: string): number {
   for (let index = 0; index < value.length; index += 1) {
     const codeUnit = value.charCodeAt(index);
 
-    if (codeUnit === 0x22 || codeUnit === 0x5c || codeUnit === 0x08 || codeUnit === 0x09 || codeUnit === 0x0a || codeUnit === 0x0c || codeUnit === 0x0d) bytes += 2;
+    if (
+      codeUnit === 0x22 ||
+      codeUnit === 0x5c ||
+      codeUnit === 0x08 ||
+      codeUnit === 0x09 ||
+      codeUnit === 0x0a ||
+      codeUnit === 0x0c ||
+      codeUnit === 0x0d
+    )
+      bytes += 2;
     else if (codeUnit <= 0x1f) bytes += 6;
     else if (codeUnit <= 0x7f) bytes += 1;
     else if (codeUnit <= 0x7ff) bytes += 2;
@@ -233,11 +242,18 @@ export function canonicalizeProjectV1(project: BroadsetProjectV1): string {
   return canonicalizeJsonValue(project);
 }
 
-export async function computeProjectSemanticHashV1(project: BroadsetProjectV1): Promise<Sha256Digest> {
-  const canonical = canonicalizeJsonValue(createSemanticProjection(project));
+async function hashCanonicalJson(canonical: string): Promise<Sha256Digest> {
   const bytes = new TextEncoder().encode(canonical);
   const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
   const hexadecimal = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 
   return `sha256:${hexadecimal}`;
+}
+
+export async function computeCanonicalJsonHashV1(value: unknown): Promise<Sha256Digest> {
+  return hashCanonicalJson(canonicalizeJsonValue(value));
+}
+
+export async function computeProjectSemanticHashV1(project: BroadsetProjectV1): Promise<Sha256Digest> {
+  return computeCanonicalJsonHashV1(createSemanticProjection(project));
 }
