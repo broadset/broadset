@@ -121,7 +121,7 @@ describe('v1 package-root format round trip', () => {
   });
 
   it('quarantines an invalid round trip without inserting defaults or discarding the source text', async () => {
-    const invalidText = JSON.stringify({ ...createRoundTripProject(), legacySettings: {} });
+    const invalidText = JSON.stringify({ ...createRoundTripProject(), unknownSettings: {} });
     const result = await loadProjectV1Json(invalidText, { lastValidProject: createMinimalProject() });
 
     expect(result.status).toBe('quarantined');

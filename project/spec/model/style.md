@@ -106,5 +106,5 @@ All colors MUST use the typed color contract. Compositing MUST be performed in t
 ## Non-Goals
 
 - CSS generation or renderer implementation
-- Legacy style-string migration
+- Pre-v1 style-string migration
 - Producer-specific effect execution

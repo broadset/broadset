@@ -266,7 +266,7 @@ Every change to an importer MUST go through the `security-reviewer` agent before
 
 Every layer/container format that Broadset round-trips MUST preserve project/entity source identity through canonical v1 interop records while using documented format-native metadata carriers. No sidecars, undocumented app-private streams, or unreported drops are permitted.
 
-1. **Document metadata carrier.** A format MAY carry a defined canonical v1 semantic projection through XMP or another documented native mechanism. The projection and hash are explicit and never substitute a legacy project shape.
+1. **Document metadata carrier.** A format MAY carry a defined canonical v1 semantic projection through XMP or another documented native mechanism. The projection and hash are explicit and never substitute a pre-v1 project shape.
 2. **Per-entity source identity.** Format-native tags MAY carry stable entity address, source identity, and baseline semantic hash. Preserved fragments live in content-addressed blobs referenced by interop records.
 3. **Semantic-hash fallback.** When tags are stripped, reconciliation compares stable producer identity and defined RFC 8785/SHA-256 semantic hashes. Unmatched stream entities become additions; missing baselines become deletions requiring confirmation.
 

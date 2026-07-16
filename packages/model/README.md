@@ -7,14 +7,12 @@ DOM-free project contracts, runtime schemas, semantic validation, and model util
 - Define the strict Broadset Project Format v1 contract.
 - Separate structural parsing from whole-project semantic validation.
 - Provide bounded JSON loading, canonical JSON, and semantic hashing.
-- Provide legacy model utilities while the application cutover is still in progress.
+- Provide construction and evaluation contracts used by every application package.
 
-## Project Format v1 foundation
+## Project Format v1
 
-The v1 model foundation is the ratified cutover target. It is available from the package root, but it
-is not yet the active editor, renderer, playback, persistence, or format-adapter model. Those consumers
-move to v1 in the remaining cutover programs; the final application program deletes the unversioned
-legacy model rather than retaining migrations, aliases, or runtime defaults.
+Project Format v1 is the active editor, renderer, playback, persistence, and format-adapter model.
+The package root exports the complete v1 API directly and through the `projectFormatV1` namespace.
 
 Production consumers import v1 APIs from the package root:
 
@@ -45,28 +43,15 @@ if (parsed.status === 'loaded') {
 ```
 
 `parseProjectV1Unknown` accepts an already decoded unknown value. `loadProjectV1Json` accepts source
-text and preserves invalid text in a quarantined result. Neither API migrates legacy Broadset data,
+text and preserves invalid text in a quarantined result. Neither API migrates pre-v1 Broadset data,
 repairs invalid records, or creates a default project. Canonicalization preserves the full project;
 semantic hashing excludes only the non-semantic metadata fields defined by the format reference.
 
-During staging, v1 names that collide with still-active unversioned names are available through the
-`projectFormatV1` namespace. This is a temporary source-level disambiguation, not a persisted-format
-compatibility layer. Unique v1 names and the complete foundation entry points are direct package-root
-exports.
-
-## Legacy application usage
-
-```ts
-import { broadsetDocumentSchema, createEmptyBroadsetDocument } from '@broadset/model';
-
-const doc = createEmptyBroadsetDocument();
-const parsed = broadsetDocumentSchema.parse(doc);
-```
-
-This example describes the current application runtime only. New project-format work targets v1 and
-must not introduce another legacy parser, alias, or migration.
+The `projectFormatV1` namespace remains a convenient explicit boundary for code that groups model APIs.
+It resolves to the same v1 symbols as direct package-root imports; there is no unversioned project model.
 
 ## Notes
 
 - `@broadset/model` is dependency-root and must not import other workspace packages.
 - Consumers import public APIs from `@broadset/model`, never `src/v1` or another internal path.
+- Broadset-owned pre-v1 project records are quarantined rather than migrated or aliased.

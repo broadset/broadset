@@ -145,7 +145,7 @@ function fallbackResult(input: {
             mappingConfidence: 0,
             editability: 'appearance-only',
             warnings: [input.diagnostic],
-            sourceIdentity: { legacyElementId: 'fallback' },
+            sourceIdentity: { externalElementId: 'fallback' },
           },
         ],
       },
@@ -297,7 +297,7 @@ async function buildResult(input: {
       mappingConfidence: entry.warnings.length === 0 ? 1 : 0.75,
       editability: entry.warnings.length === 0 ? 'native' : 'partial',
       warnings: [...entry.warnings, ...(index === 0 ? reportWarnings : [])],
-      sourceIdentity: { legacyElementId: entry.sourceId },
+      sourceIdentity: { externalElementId: entry.sourceId },
     });
   }
 

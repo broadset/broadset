@@ -237,4 +237,4 @@ The load boundary preserves original bytes and typed diagnostics for invalid inp
 - Rendering implementation details
 - Editor mutation UX
 - Persistence-adapter implementation
-- Compatibility parsing of legacy Broadset-owned draft formats
+- Compatibility parsing of pre-v1 Broadset-owned draft formats

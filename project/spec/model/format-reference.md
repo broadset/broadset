@@ -19,14 +19,14 @@ Defines the authoritative persisted names, shapes, ownership scopes, validation 
 | `computeCanonicalJsonHashV1`               | SHA-256 over any bounded canonical JSON semantic value, including interop targets  |
 | `computeProjectSemanticHashV1`             | SHA-256 over the canonical semantic projection defined by this specification      |
 
-This published foundation is the greenfield application cutover target. It does not make v1 the active editor, renderer, player, persistence, or format-adapter representation by itself. Those consumers migrate in the remaining cutover programs, and the final program deletes the unversioned legacy model. No v1 loader accepts legacy Broadset-owned records, and no compatibility alias changes persisted field names.
+This published contract is the active editor, renderer, player, persistence, and format-adapter representation. The unversioned project model and its migrations have been removed. No v1 loader accepts pre-v1 Broadset-owned records, and no compatibility alias changes persisted field names.
 
 #### Acceptance Criteria
 
 - [ ] Given a package-root-only consumer, it can structurally parse, semantically validate, canonicalize, hash, and reload a valid v1 project
 - [ ] Given canonical project JSON containing nested extension JSON values, a complete load and canonicalize round trip preserves the decoded JSON value
 - [ ] Given structurally or semantically invalid JSON text, loading returns typed diagnostics and the exact original text without inserting defaults
-- [ ] Given a legacy Broadset-owned project shape, the v1 load boundary quarantines it rather than migrating or aliasing it
+- [ ] Given a pre-v1 Broadset-owned project shape, the v1 load boundary quarantines it rather than migrating or aliasing it
 
 ## Requirements
 
@@ -803,7 +803,7 @@ A valid project replaces `documents` with at least one complete document contain
 
 ## Non-Goals
 
-- Compatibility parsing of legacy Broadset-owned draft shapes
+- Compatibility parsing of pre-v1 Broadset-owned draft shapes
 - Runtime/editor state serialization
 - Producer-specific source schemas
 - Renderer or exporter implementation details

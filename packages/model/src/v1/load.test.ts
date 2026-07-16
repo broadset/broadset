@@ -23,7 +23,7 @@ describe('v1 project loading', () => {
   });
 
   it('quarantines unsupported identity without rewriting it', async () => {
-    const source = '{"schemaVersion":1,"id":"legacy"}';
+    const source = '{"schemaVersion":1,"id":"incomplete"}';
     const result = await loadProjectV1Json(source);
 
     expect(result.status).toBe('quarantined');

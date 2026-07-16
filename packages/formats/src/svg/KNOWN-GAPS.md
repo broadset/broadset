@@ -24,7 +24,7 @@ fidelity description, and the deferred fix).
 
 **Why deferred:** each is internally cohesive (single concern per
 module). Further splitting would mostly move types around without
-reducing real complexity. The legacy import/export orchestrators have
+reducing real complexity. The retired import/export orchestrators have
 been retired; these parser modules remain behind the native v1 importer.
 
 **Trigger to close:** when adding a substantial new feature to one

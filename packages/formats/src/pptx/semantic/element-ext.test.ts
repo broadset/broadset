@@ -79,15 +79,15 @@ describe('buildElementExt / parseElementExt', () => {
     expect(parseElementExt('')).toBeNull();
   });
 
-  it('parses dirty="1" as true and dirty="0" as false (also accepts legacy "true"/"false")', () => {
+  it('parses dirty="1" as true and dirty="0" as false (also accepts word-form booleans)', () => {
     const ns = ' xmlns:bset="https://broadset.io/ns/pptx/1.0/"';
     const xmlDirty = `<a:ext uri="{broadset-element-ext}"><bset:elementMeta${ns} id="x" kind="y" dirty="1"/></a:ext>`;
     const xmlClean = `<a:ext uri="{broadset-element-ext}"><bset:elementMeta${ns} id="x" kind="y" dirty="0"/></a:ext>`;
-    const xmlLegacy = `<a:ext uri="{broadset-element-ext}"><bset:elementMeta${ns} id="x" kind="y" dirty="true"/></a:ext>`;
+    const xmlWordBoolean = `<a:ext uri="{broadset-element-ext}"><bset:elementMeta${ns} id="x" kind="y" dirty="true"/></a:ext>`;
 
     expect(parseElementExt(xmlDirty)?.dirty).toBe(true);
     expect(parseElementExt(xmlClean)?.dirty).toBe(false);
-    expect(parseElementExt(xmlLegacy)?.dirty).toBe(true);
+    expect(parseElementExt(xmlWordBoolean)?.dirty).toBe(true);
   });
 
   it('omits optional fields from the XML when they are absent', () => {

@@ -141,7 +141,7 @@ The panel MUST use HeroUI `Accordion` sections to group shadow, filter, backdrop
 
 ### Requirement: Clip-Path Panel
 
-The Clip Path accordion section MUST only appear when the selected element has the derived `clipPath` capability. Eligible canonical variants include vector rectangle/ellipse, image, sanitized-vector foreign, and group. The historical UI label authors typed `appearance.clip`; it MUST NOT write CSS strings or legacy screen/style fields.
+The Clip Path accordion section MUST only appear when the selected element has the derived `clipPath` capability. Eligible canonical variants include vector rectangle/ellipse, image, sanitized-vector foreign, and group. The historical UI label authors typed `appearance.clip`; it MUST NOT write CSS strings or retired unversioned screen/style fields.
 
 The panel MUST show the current typed clip/mask kind and provide controls for selecting or creating compatible vector clip sources.
 
@@ -303,7 +303,7 @@ The animation builder MUST be organized as a HeroUI `Accordion` with these secti
 
 ### Requirement: Sequence Builder Resilience
 
-The system MUST NOT crash when its selected sequence/track/state-machine reference becomes stale between renders. Invalid canonical project data is rejected before UI hydration; the builder shows a diagnostic/empty state rather than attempting to edit a partial legacy configuration.
+The system MUST NOT crash when its selected sequence/track/state-machine reference becomes stale between renders. Invalid canonical project data is rejected before UI hydration; the builder shows a diagnostic/empty state rather than attempting to edit a partial pre-v1 configuration.
 
 #### Scenario: Partial config does not crash
 

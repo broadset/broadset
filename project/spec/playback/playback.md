@@ -348,7 +348,7 @@ State-machine and lifecycle sequence-action dependency graphs MUST be determinis
 
 ### Requirement: DOM State Signal Boundary
 
-When host integration uses DOM classes or data attributes as controls, the adapter MUST parse them into typed runtime lifecycle/state-machine events and effective page-instance visibility inputs. Parsed tokens are boundary signals only: they MUST NOT become canonical keyframe actions, modifier sets, or element visibility fields. Explicit `data-visibility` takes precedence over legacy-compatible class signals at this boundary.
+When host integration uses DOM classes or data attributes as controls, the adapter MUST parse them into typed runtime lifecycle/state-machine events and effective page-instance visibility inputs. Parsed tokens are boundary signals only: they MUST NOT become canonical keyframe actions, modifier sets, or element visibility fields. Explicit `data-visibility` takes precedence over compatibility class signals at this boundary.
 
 #### Scenario: Data-attribute visibility
 

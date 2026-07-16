@@ -18,7 +18,7 @@ describe('v1 formats public API', () => {
     expect(typeof assembleImportedProjectV1).toBe('function');
   });
 
-  it('does not expose the retired legacy project-format API', () => {
+  it('does not expose the retired unversioned project-format API', () => {
     expect('exportPptxBytes' in formats).toBe(false);
     expect('exportProjectJson' in formats).toBe(false);
     expect('importSvgDocument' in formats).toBe(false);

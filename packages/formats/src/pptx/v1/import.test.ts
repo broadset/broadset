@@ -39,6 +39,27 @@ describe('importPptxProjectV1', () => {
     expect(elements.some(({ kind }) => kind === 'text')).toBe(true);
     expect(elements.filter(({ kind }) => kind === 'vector').length).toBeGreaterThanOrEqual(2);
     expect(baseline?.baselineSemanticHash).toBe(await projectFormatV1.computeCanonicalJsonHashV1(firstMapped));
+
+    const sourceIdentity = baseline?.sourceIdentity;
+
+    expect(sourceIdentity).toBeTypeOf('object');
+    expect(sourceIdentity).not.toBeNull();
+    expect(Array.isArray(sourceIdentity)).toBe(false);
+
+    if (
+      sourceIdentity === undefined ||
+      sourceIdentity === null ||
+      typeof sourceIdentity !== 'object' ||
+      Array.isArray(sourceIdentity)
+    ) {
+      throw new Error('PPTX source identity must be a JSON object');
+    }
+
+    const sourceIdentityEntries = Object.entries(sourceIdentity);
+
+    expect(sourceIdentityEntries).toHaveLength(1);
+    expect(sourceIdentityEntries[0]?.[0]).toBe('externalElementId');
+    expect(sourceIdentityEntries[0]?.[1]).toBeTypeOf('string');
     expectValid(result);
   });
 
