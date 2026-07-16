@@ -2,7 +2,14 @@ export { exportPptxBytes, exportPptxBytesAsync, exportPptxWithReport, exportPptx
 export { defaultUrlFontResolver } from './export/fonts';
 export { importPptx, importPptxWithMerge } from './import';
 export { readPreservedPptxDocument, reconcilePptx } from './reconcile';
-export { importPptxProjectV1, type PptxReconcileResultV1, reconcilePptxProjectV1 } from './v1';
+export {
+  exportPptxBytesV1,
+  exportPptxWithReportV1,
+  importPptxProjectV1,
+  type PptxExportInputV1,
+  type PptxReconcileResultV1,
+  reconcilePptxProjectV1,
+} from './v1';
 // P8.1 — typed infrastructure and shared OOXML helpers.
 export type {
   AsyncFontResolver,

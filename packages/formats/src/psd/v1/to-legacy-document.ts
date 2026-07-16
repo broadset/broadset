@@ -57,6 +57,29 @@ function textDecoration(properties: projectFormatV1.RunProperties): string | und
   return undefined;
 }
 
+function legacyBullet(
+  list: projectFormatV1.TextList,
+):
+  | { readonly kind: 'none' }
+  | { readonly kind: 'char'; readonly char: string }
+  | { readonly kind: 'auto'; readonly format: string; readonly startAt?: number } {
+  if (list.kind === 'none') return { kind: 'none' };
+  if (list.kind === 'unordered') return { kind: 'char', char: list.marker === 'dash' ? '–' : '•' };
+
+  let format = 'arabicPeriod';
+
+  if (list.style === 'lower-alpha') format = 'alphaLcPeriod';
+  else if (list.style === 'upper-alpha') format = 'alphaUcPeriod';
+  else if (list.style === 'lower-roman') format = 'romanLcPeriod';
+  else if (list.style === 'upper-roman') format = 'romanUcPeriod';
+
+  return { kind: 'auto', format, startAt: list.startAt };
+}
+
+function legacyLineSpacing(value: projectFormatV1.LineSpacing): number | undefined {
+  return value.kind === 'multiple' ? value.value : undefined;
+}
+
 function legacyTextContent(input: {
   readonly element: projectFormatV1.Element;
   readonly project: projectFormatV1.BroadsetProjectV1;
@@ -69,6 +92,7 @@ function legacyTextContent(input: {
         const family = input.project.resources.fonts.find(({ id }) => id === run.properties.fontFamilyId);
         const fontColor = colorHex({ color: run.properties.color, project: input.project });
         const decoration = textDecoration(run.properties);
+        const italic = run.properties.semanticRole === 'emphasis';
 
         return {
           text: run.text,
@@ -76,10 +100,13 @@ function legacyTextContent(input: {
             style: {
               fontSize: run.properties.size,
               fontWeight: run.properties.weight,
-              fontStyle: run.properties.semanticRole === 'emphasis' ? 'italic' : 'normal',
+              fontStyle: italic ? 'italic' : 'normal',
+              bold: run.properties.weight >= 600,
+              italic,
+              underline: run.properties.decoration.underline,
               letterSpacing: run.properties.tracking,
               ...(family === undefined ? {} : { fontFamily: family.familyName }),
-              ...(fontColor === undefined ? {} : { fontColor }),
+              ...(fontColor === undefined ? {} : { fontColor, color: fontColor }),
               ...(decoration === undefined ? {} : { textDecoration: decoration }),
             },
             lang: run.properties.language,
@@ -90,6 +117,10 @@ function legacyTextContent(input: {
       props: {
         align: paragraph.properties.alignment,
         indent: paragraph.properties.startIndent,
+        bullet: legacyBullet(paragraph.properties.list),
+        ...(legacyLineSpacing(paragraph.properties.lineSpacing) === undefined ?
+          {}
+        : { lineSpacing: legacyLineSpacing(paragraph.properties.lineSpacing) }),
         spaceBefore: paragraph.properties.spaceBefore,
         spaceAfter: paragraph.properties.spaceAfter,
       },
@@ -177,7 +208,7 @@ export async function toLegacyPsdDocumentV1(input: {
         visible: true,
       })),
     });
-    warnings.push(...mapped.warnings.map(psdWarning));
+    warnings.push(...mapped.warnings.filter((warning) => !warning.includes('mixed text runs')).map(psdWarning));
   }
 
   if (template === undefined) throw new Error('selected PSD export pages could not be resolved');
