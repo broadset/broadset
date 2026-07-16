@@ -20,7 +20,7 @@ describe('createResourceCollectorV1', () => {
     expect(secondId).toBe(firstId);
     expect(collection.resources.assets).toHaveLength(1);
     expect(collection.blobs).toHaveLength(1);
-    expect(collection.blobs.get(digest)).toEqual(bytes);
+    expect(Array.from(collection.blobs.get(digest) ?? [])).toEqual(Array.from(bytes));
     expect(projectFormatV1.assetSchema.safeParse(collection.resources.assets[0]).success).toBe(true);
   });
 
@@ -95,6 +95,28 @@ describe('createResourceCollectorV1', () => {
         metadata: { intrinsicBounds: { x: 0, y: 0, width: 20, height: 10 } },
       }),
     );
+    expect(Array.from(collection.blobs.get(digest) ?? [])).toEqual(Array.from(bytes));
+  });
+
+  it('registers content-addressed foreign assets with intrinsic bounds', async () => {
+    const collector = createResourceCollectorV1();
+    const bytes = new TextEncoder().encode('%PDF-1.7');
+    const digest = await computeSha256DigestV1(bytes);
+
+    const assetId = await collector.addForeignAsset({
+      bytes,
+      mediaType: 'application/pdf',
+      name: 'source.pdf',
+      intrinsicBounds: { x: 0, y: 0, width: 200, height: 100 },
+    });
+    const collection = collector.collect();
+
+    expect(assetId).toBe(id(`foreign-${digest.slice('sha256:'.length)}`));
+    expect(collection.resources.assets).toContainEqual(expect.objectContaining({
+      id: assetId,
+      kind: 'foreign',
+      metadata: { intrinsicBounds: { x: 0, y: 0, width: 200, height: 100 } },
+    }));
     expect(Array.from(collection.blobs.get(digest) ?? [])).toEqual(Array.from(bytes));
   });
 

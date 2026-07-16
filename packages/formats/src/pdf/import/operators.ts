@@ -24,6 +24,7 @@ export interface ExtractedTextItem {
   readonly xPt: number;
   readonly yPt: number;
   readonly fontSizePt: number;
+  readonly fontName: string;
 }
 
 /**
@@ -120,7 +121,11 @@ interface PageContentChunksResult {
   readonly warnings: readonly string[];
 }
 
-function readPageContentChunks(pdf: PDFDocument, page: PDFPage, pageIndex: number): PageContentChunksResult {
+export function readPageContentChunks(
+  pdf: PDFDocument,
+  page: PDFPage,
+  pageIndex: number,
+): PageContentChunksResult {
   const contents = page.node.Contents();
 
   if (contents === undefined) return { chunks: [], warnings: [] };
@@ -276,7 +281,7 @@ const TD_RE = new RegExp(`(${FLOAT})\\s+(${FLOAT})\\s+T[dD]`, 'g');
 // translation components) for positioning.
 const TM_RE = new RegExp(`(${FLOAT})\\s+(${FLOAT})\\s+(${FLOAT})\\s+(${FLOAT})\\s+(${FLOAT})\\s+(${FLOAT})\\s+Tm`, 'g');
 // `/Font size Tf`
-const TF_RE = new RegExp(`/\\w+\\s+(${FLOAT})\\s+Tf`, 'g');
+const TF_RE = new RegExp(`/([^\\s]+)\\s+(${FLOAT})\\s+Tf`, 'g');
 // `(text) Tj` — parenthesised literal string, backslash-escaped. We
 // require non-empty content to avoid matching `() Tj`.
 const TJ_LITERAL_RE = /\(((?:\\.|[^\\()])*)\)\s+Tj/g;
@@ -293,7 +298,7 @@ const TJ_HEX_RE = /<([0-9A-Fa-f\s]*)>\s+Tj/g;
 const TJ_ARRAY_RE = /\[([^\]]*)\]\s+TJ/g;
 const TJ_ARRAY_ITEM_RE = /\(((?:\\.|[^\\()])*)\)|<([0-9A-Fa-f\s]*)>/g;
 
-function scanContentStreamForText(content: string): readonly ExtractedTextItem[] {
+export function scanContentStreamForText(content: string): readonly ExtractedTextItem[] {
   const items: ExtractedTextItem[] = [];
 
   for (const block of collectTextBlocks(content)) {
@@ -364,6 +369,7 @@ function extractItemsFromBlock(block: string): readonly ExtractedTextItem[] {
   let cursorX = 0;
   let cursorY = 0;
   let fontSize = 12;
+  let fontName = 'Helvetica';
 
   const events = collectEvents(block);
 
@@ -379,6 +385,7 @@ function extractItemsFromBlock(block: string): readonly ExtractedTextItem[] {
         break;
       case 'tf':
         fontSize = event.size;
+        fontName = event.fontName;
         break;
       case 'tj':
         items.push({
@@ -386,6 +393,7 @@ function extractItemsFromBlock(block: string): readonly ExtractedTextItem[] {
           xPt: cursorX,
           yPt: cursorY,
           fontSizePt: fontSize,
+          fontName,
         });
         break;
     }
@@ -397,7 +405,7 @@ function extractItemsFromBlock(block: string): readonly ExtractedTextItem[] {
 type ContentEvent =
   | { readonly kind: 'tm'; readonly index: number; readonly x: number; readonly y: number }
   | { readonly kind: 'td'; readonly index: number; readonly x: number; readonly y: number }
-  | { readonly kind: 'tf'; readonly index: number; readonly size: number }
+  | { readonly kind: 'tf'; readonly index: number; readonly size: number; readonly fontName: string }
   | { readonly kind: 'tj'; readonly index: number; readonly text: string };
 
 function collectEvents(block: string): readonly ContentEvent[] {
@@ -449,11 +457,12 @@ function collectTfEvents(block: string): readonly ContentEvent[] {
   const events: ContentEvent[] = [];
 
   for (const match of execAll(TF_RE, block)) {
-    const size = parseFloatSafe(capture(match, 1));
+    const fontName = capture(match, 1);
+    const size = parseFloatSafe(capture(match, 2));
 
-    if (size === null) continue;
+    if (fontName === undefined || size === null) continue;
 
-    events.push({ kind: 'tf', index: match.index, size });
+    events.push({ kind: 'tf', index: match.index, size, fontName });
   }
 
   return events;
@@ -478,8 +487,6 @@ function collectTjHexEvents(block: string): readonly ContentEvent[] {
     const hex = capture(match, 1) ?? '';
     const decoded = decodePdfHexLiteral(hex);
 
-    if (decoded.length === 0) continue;
-
     events.push({ kind: 'tj', index: match.index, text: decoded });
   }
 
@@ -497,8 +504,6 @@ function collectTjArrayEvents(block: string): readonly ContentEvent[] {
 
   for (const match of execAll(TJ_ARRAY_RE, block)) {
     const text = decodeTjArrayBody(capture(match, 1) ?? '');
-
-    if (text.length === 0) continue;
 
     events.push({ kind: 'tj', index: match.index, text });
   }

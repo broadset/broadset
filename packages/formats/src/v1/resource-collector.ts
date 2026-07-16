@@ -42,6 +42,13 @@ export interface ResourceCollectorV1 {
     readonly id?: ProjectFormatV1.Id;
     readonly intrinsicBounds: ProjectFormatV1.AssetIntrinsicMetadata['intrinsicBounds'];
   }): Promise<ProjectFormatV1.Id>;
+  addForeignAsset(input: {
+    readonly bytes: Uint8Array;
+    readonly mediaType: string;
+    readonly name?: string;
+    readonly id?: ProjectFormatV1.Id;
+    readonly intrinsicBounds: ProjectFormatV1.AssetIntrinsicMetadata['intrinsicBounds'];
+  }): Promise<ProjectFormatV1.Id>;
   addFontFamily(input: {
     readonly familyName: string;
     readonly faces: readonly ProjectFormatV1.FontFaceResource[];
@@ -206,6 +213,31 @@ export function createResourceCollectorV1(): ResourceCollectorV1 {
     return assetId;
   }
 
+  async function addForeignAsset(input: {
+    readonly bytes: Uint8Array;
+    readonly mediaType: string;
+    readonly name?: string;
+    readonly id?: ProjectFormatV1.Id;
+    readonly intrinsicBounds: ProjectFormatV1.AssetIntrinsicMetadata['intrinsicBounds'];
+  }): Promise<ProjectFormatV1.Id> {
+    const bytes = Uint8Array.from(input.bytes);
+    const blob = await packageBlobReferenceV1(bytes, input.mediaType);
+    const assetId = input.id ?? contentAddressedId('foreign', blob.digest);
+    const asset: ProjectFormatV1.ForeignAsset = {
+      id: assetId,
+      kind: 'foreign',
+      name: validName(input.name, 'Imported foreign asset'),
+      blob,
+      metadata: { intrinsicBounds: input.intrinsicBounds },
+    };
+
+    blobs.set(blob.digest, bytes);
+    if (!assets.has(assetId)) assets.set(assetId, asset);
+
+    return assetId;
+  }
+
+
   function addFontFamily(input: {
     readonly familyName: string;
     readonly faces: readonly ProjectFormatV1.FontFaceResource[];
@@ -241,5 +273,13 @@ export function createResourceCollectorV1(): ResourceCollectorV1 {
     };
   }
 
-  return { addImageAsset, addMissingImageAsset, addFontAsset, addVectorAsset, addFontFamily, collect };
+  return {
+    addImageAsset,
+    addMissingImageAsset,
+    addFontAsset,
+    addVectorAsset,
+    addForeignAsset,
+    addFontFamily,
+    collect,
+  };
 }

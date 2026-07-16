@@ -25,6 +25,7 @@ export {
   drawQrOnPage,
   exportPdfBytes,
   exportPdfWithPreflight,
+  importPdfProjectV1,
   normalizeFontFamily,
   parseCssColor,
   type PdfExportOptions,
