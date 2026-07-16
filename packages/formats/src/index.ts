@@ -47,8 +47,11 @@ export {
   exportPptxWithReport,
   exportPptxWithReportAsync,
   importPptx,
+  importPptxProjectV1,
+  type PptxReconcileResultV1,
   readPreservedPptxDocument,
   reconcilePptx,
+  reconcilePptxProjectV1,
 } from './pptx';
 export {
   exportPsdBytes,
