@@ -14,14 +14,14 @@ const CSS_NUMBER_PRECISION = 5;
 const OPAQUE_ALPHA = 1;
 
 /** Render a number for CSS: fixed precision with trailing zeros stripped, never `NaN`/`Infinity`. */
-function formatNumber(value: number): string {
+export function formatCssNumber(value: number): string {
   if (!Number.isFinite(value)) return '0';
 
   return Number(value.toFixed(CSS_NUMBER_PRECISION)).toString();
 }
 
 function alphaSuffix(alpha: number): string {
-  return alpha < OPAQUE_ALPHA ? ` / ${formatNumber(alpha)}` : '';
+  return alpha < OPAQUE_ALPHA ? ` / ${formatCssNumber(alpha)}` : '';
 }
 
 /** Emit a `color(<space> r g b[ / a])` string, defaulting missing channels so a wrong-length input never
@@ -29,7 +29,7 @@ function alphaSuffix(alpha: number): string {
 function colorFunction(space: 'srgb' | 'display-p3' | 'rec2020', channels: readonly number[], alpha: number): string {
   const [red = 0, green = 0, blue = 0] = channels;
 
-  return `color(${space} ${formatNumber(red)} ${formatNumber(green)} ${formatNumber(blue)}${alphaSuffix(alpha)})`;
+  return `color(${space} ${formatCssNumber(red)} ${formatCssNumber(green)} ${formatCssNumber(blue)}${alphaSuffix(alpha)})`;
 }
 
 /** Naive CMYK → sRGB used for browser rendering; `device-cmyk()` is not broadly supported. */
@@ -40,7 +40,7 @@ function cmykToSrgbChannels(cyan: number, magenta: number, yellow: number, key: 
 }
 
 /** Map a concrete v1 color to a modern CSS color string, keeping wide-gamut spaces in their own space. */
-function concreteToCss(color: ConcreteColorValue): string {
+export function concreteColorToCss(color: ConcreteColorValue): string {
   const { channels, alpha } = color;
 
   switch (color.space) {
@@ -64,19 +64,19 @@ function concreteToCss(color: ConcreteColorValue): string {
     case 'lab': {
       const [lightness = 0, a = 0, b = 0] = channels;
 
-      return `lab(${formatNumber(lightness)} ${formatNumber(a)} ${formatNumber(b)}${alphaSuffix(alpha)})`;
+      return `lab(${formatCssNumber(lightness)} ${formatCssNumber(a)} ${formatCssNumber(b)}${alphaSuffix(alpha)})`;
     }
 
     case 'oklab': {
       const [lightness = 0, a = 0, b = 0] = channels;
 
-      return `oklab(${formatNumber(lightness)} ${formatNumber(a)} ${formatNumber(b)}${alphaSuffix(alpha)})`;
+      return `oklab(${formatCssNumber(lightness)} ${formatCssNumber(a)} ${formatCssNumber(b)}${alphaSuffix(alpha)})`;
     }
 
     case 'oklch': {
       const [lightness = 0, chroma = 0, hue = 0] = channels;
 
-      return `oklch(${formatNumber(lightness)} ${formatNumber(chroma)} ${formatNumber(hue)}${alphaSuffix(alpha)})`;
+      return `oklch(${formatCssNumber(lightness)} ${formatCssNumber(chroma)} ${formatCssNumber(hue)}${alphaSuffix(alpha)})`;
     }
   }
 }
@@ -131,15 +131,24 @@ function swatchConcreteColor(swatch: Swatch): ConcreteColorValue {
 }
 
 /**
- * Convert a v1 `ColorValue` to a CSS color string. Swatch references resolve against `swatches` and
- * apply their tint adjustments; an unresolved swatch fails closed to `'transparent'`.
+ * Resolve a v1 `ColorValue` to a concrete color: literal colors pass through; swatch references resolve
+ * against `swatches` and apply their tint adjustments. Returns `undefined` for an unresolved swatch.
  */
-export function colorValueToCss(color: ColorValue, swatches: ReadonlyMap<Id, Swatch>): string {
-  if (color.kind === 'color') return concreteToCss(color);
+export function resolveConcreteColor(color: ColorValue, swatches: ReadonlyMap<Id, Swatch>): ConcreteColorValue | undefined {
+  if (color.kind === 'color') return color;
 
   const swatch = swatches.get(color.swatchId);
 
-  if (swatch === undefined) return 'transparent';
+  if (swatch === undefined) return undefined;
 
-  return concreteToCss(applyAdjustments(swatchConcreteColor(swatch), color.adjustments ?? []));
+  return applyAdjustments(swatchConcreteColor(swatch), color.adjustments ?? []);
+}
+
+/**
+ * Convert a v1 `ColorValue` to a CSS color string. An unresolved swatch fails closed to `'transparent'`.
+ */
+export function colorValueToCss(color: ColorValue, swatches: ReadonlyMap<Id, Swatch>): string {
+  const concrete = resolveConcreteColor(color, swatches);
+
+  return concrete === undefined ? 'transparent' : concreteColorToCss(concrete);
 }
