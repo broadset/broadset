@@ -7,3 +7,4 @@ export * from './core/scene-graph';
 export { createSemanticTextRenderer } from './elements/text-semantic';
 export * from './scene-tree';
 export * from './screen-renderer';
+export * from './v1/paint-css';
