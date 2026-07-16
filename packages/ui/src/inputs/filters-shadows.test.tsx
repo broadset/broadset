@@ -123,7 +123,7 @@ describe('ShadowEditor', () => {
     expect(layers.length).toBe(2);
   });
 
-  /** @description When an element already has a shadow defined (e.g. loaded from a saved document), the editor inputs MUST reflect the parsed values — not the all-zero defaults. Regression for a bug where `parseShadow` required a `px` suffix on every component and therefore failed on real-world CSS like `0 2px 32px rgba(...)` (bare `0`), silently returning default layers that hid the actual document state. This uses a fixture shadow literally pulled from sampleDocument.json so any future regex regression reproduces the exact production failure. */
+  /** @description When an element already has a shadow defined (e.g. loaded from a saved document), the editor inputs MUST reflect the parsed values — not the all-zero defaults. Regression for a bug where `parseShadow` required a `px` suffix on every component and therefore failed on real-world CSS like `0 2px 32px rgba(...)` (bare `0`), silently returning default layers that hid the actual document state. This uses a fixture shadow literally pulled from sampleDocument.v1.json so any future regex regression reproduces the exact production failure. */
   it('populates inputs from the document-provided shadow instead of defaults', () => {
     const documentShadow = '0 2px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04)';
 
