@@ -2,13 +2,21 @@ import type { projectFormatV1 as ProjectFormatV1 } from '@broadset/model';
 import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
-import { sampleSequenceV1 } from './sequence-sampler';
+import { sampleSequenceV1 as sampleSequenceResultV1 } from './sequence-sampler';
 
 type Interpolation = ProjectFormatV1.Interpolation;
 type LoopDefinition = ProjectFormatV1.LoopDefinition;
 type Track = ProjectFormatV1.Track;
 type TypedValue = ProjectFormatV1.TypedValue;
 type ValueType = ProjectFormatV1.ValueType;
+
+function sampleSequenceV1(sequence: ProjectFormatV1.Sequence, tick: number) {
+  const result = sampleSequenceResultV1({ sequence, transportTick: tick, sequences: new Map([[sequence.id, sequence]]) });
+
+  if (result.status === 'invalid' || result.value.kind === 'time-out-of-range') return [];
+
+  return result.value.values.map(({ target, valueType, value }) => ({ target, valueType, value }));
+}
 
 const START_TICK = 10;
 const END_TICK = 30;
@@ -97,7 +105,7 @@ function sampleValue(options: {
 }
 
 describe('sampleSequenceV1 keyframe lookup', () => {
-  it('returns a single keyframe value at any tick', () => {
+  it('returns a single keyframe only once its tick is reached', () => {
     const value = { type: 'number', value: 7 } as const;
     const track = createTrack({
       valueType: 'number',
@@ -105,11 +113,11 @@ describe('sampleSequenceV1 keyframe lookup', () => {
     });
     const sequence = createSequence({ tracks: [track] });
 
-    expect(sampleSequenceV1(sequence, -100)[0]?.value).toEqual(value);
-    expect(sampleSequenceV1(sequence, 100)[0]?.value).toEqual(value);
+    expect(sampleSequenceV1(sequence, 0)).toEqual([]);
+    expect(sampleSequenceV1(sequence, MIDPOINT_TICK)[0]?.value).toEqual(value);
   });
 
-  it('clamps to first and last values and sorts keyframes defensively', () => {
+  it('contributes nothing before the first value, preserves the last value, and sorts defensively', () => {
     const first = { type: 'number', value: 10 } as const;
     const last = { type: 'number', value: 30 } as const;
     const track = createTrack({
@@ -121,7 +129,7 @@ describe('sampleSequenceV1 keyframe lookup', () => {
     });
     const sequence = createSequence({ tracks: [track] });
 
-    expect(sampleSequenceV1(sequence, 0)[0]?.value).toEqual(first);
+    expect(sampleSequenceV1(sequence, 0)).toEqual([]);
     expect(sampleSequenceV1(sequence, DURATION_TICKS)[0]?.value).toEqual(last);
   });
 
@@ -175,6 +183,7 @@ describe('sampleSequenceV1 typed values', () => {
       valueType: 'color',
       from: { type: 'color', value: { kind: 'color', space: 'srgb', channels: [0, 0.2, 0.4], alpha: 0.5 } },
       to: { type: 'color', value: { kind: 'color', space: 'srgb', channels: [1, 0.6, 0.8], alpha: 1 } },
+      interpolation: { kind: 'color', space: 'srgb' },
     });
 
     expect(sampled?.type).toBe('color');
@@ -187,13 +196,13 @@ describe('sampleSequenceV1 typed values', () => {
     expect(sampled.value.alpha).toBeCloseTo(0.75);
   });
 
-  it('holds concrete cross-space colors and swatch colors', () => {
+  it('rejects concrete cross-space colors and swatch colors', () => {
     const srgb = { type: 'color', value: { kind: 'color', space: 'srgb', channels: [0, 0, 0], alpha: 1 } } as const;
     const p3 = { type: 'color', value: { kind: 'color', space: 'display-p3', channels: [1, 1, 1], alpha: 1 } } as const;
     const swatch = { type: 'color', value: { kind: 'swatch', swatchId: createId('swatch') } } as const;
 
-    expect(sampleValue({ valueType: 'color', from: srgb, to: p3 })).toBe(srgb);
-    expect(sampleValue({ valueType: 'color', from: swatch, to: p3 })).toBe(swatch);
+    expect(sampleValue({ valueType: 'color', from: srgb, to: p3, interpolation: { kind: 'color', space: 'srgb' } })).toBeUndefined();
+    expect(sampleValue({ valueType: 'color', from: swatch, to: p3, interpolation: { kind: 'color', space: 'srgb' } })).toBeUndefined();
   });
 
   it('steps discrete and mismatched values only at the segment end', () => {
@@ -206,10 +215,7 @@ describe('sampleSequenceV1 typed values', () => {
     expect(sampleValue({ valueType: 'boolean', from: fromBoolean, to: toBoolean, tick: END_TICK })).toBe(toBoolean);
     expect(sampleValue({ valueType: 'string', from: fromString, to: toString })).toBe(fromString);
     expect(sampleValue({ valueType: 'string', from: fromString, to: toString, tick: END_TICK })).toBe(toString);
-    expect(sampleValue({ valueType: 'number', from: { type: 'number', value: 1 }, to: toString })).toEqual({
-      type: 'number',
-      value: 1,
-    });
+    expect(sampleValue({ valueType: 'number', from: { type: 'number', value: 1 }, to: toString })).toBeUndefined();
   });
 });
 
@@ -222,8 +228,8 @@ describe('sampleSequenceV1 interpolation modes', () => {
   });
 
   it('applies start and end step positions', () => {
-    expect(sampleValue({ valueType: 'number', from, to, interpolation: { kind: 'step', position: 'start' } })).toBe(from);
-    expect(sampleValue({ valueType: 'number', from, to, interpolation: { kind: 'step', position: 'end' } })).toBe(to);
+    expect(sampleValue({ valueType: 'number', from, to, interpolation: { kind: 'step', position: 'start' } })).toBe(to);
+    expect(sampleValue({ valueType: 'number', from, to, interpolation: { kind: 'step', position: 'end' } })).toBe(from);
   });
 
   it('applies cubic-bezier easing from the first keyframe', () => {
@@ -248,11 +254,11 @@ describe('sampleSequenceV1 loop mapping', () => {
     ],
   });
 
-  it('clamps non-looping sequences to the sequence bounds', () => {
+  it('reports non-looping time outside the sequence bounds', () => {
     const sequence = createSequence({ tracks: [track] });
 
-    expect(sampleSequenceV1(sequence, -1)[0]?.value).toEqual({ type: 'number', value: 0 });
-    expect(sampleSequenceV1(sequence, 100)[0]?.value).toEqual({ type: 'number', value: DURATION_TICKS });
+    expect(sampleSequenceV1(sequence, -1)).toEqual([]);
+    expect(sampleSequenceV1(sequence, 100)).toEqual([]);
   });
 
   it('wraps repeat loops within a period and holds during the gap', () => {
@@ -268,15 +274,12 @@ describe('sampleSequenceV1 loop mapping', () => {
     });
   });
 
-  it('holds the last frame after the repeat count is exhausted', () => {
+  it('reports time out after the repeat count is exhausted', () => {
     const sequence = createSequence({
       tracks: [track],
       loop: { kind: 'repeat', count: 2, gapTicks: GAP_TICKS },
     });
 
-    expect(sampleSequenceV1(sequence, FIRST_ITERATION_OFFSET * 2)[0]?.value).toEqual({
-      type: 'number',
-      value: DURATION_TICKS,
-    });
+    expect(sampleSequenceV1(sequence, FIRST_ITERATION_OFFSET * 2)).toEqual([]);
   });
 });

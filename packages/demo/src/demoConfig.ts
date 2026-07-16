@@ -94,7 +94,7 @@ export const DEMO_PALETTE: readonly string[] = [
 /* ── Required Elements ──────────────────────────────────────────── */
 
 /** Element IDs that cannot be deleted by the user. */
-export const DEMO_REQUIRED_ELEMENTS: readonly string[] = ['el-stage-bg'] as const;
+export const DEMO_REQUIRED_ELEMENTS: readonly string[] = ['el-top-gradient'] as const;
 
 /* ── Media Source ───────────────────────────────────────────────── */
 

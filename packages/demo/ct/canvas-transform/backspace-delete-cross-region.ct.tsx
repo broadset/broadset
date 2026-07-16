@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/experimental-ct-react';
 
-import { DemoApp } from '../../src/DemoApp';
 import { FIXTURE_IDS, FIXTURE_LAYER_LABELS } from '../fixture-selectors';
+import { DemoAppFresh } from '../helpers/demo-app-fresh.helper';
 
 /* ------------------------------------------------------------------ */
 /*  Backspace deletes the selected element across canvas + widget +    */
@@ -20,7 +20,7 @@ test('Backspace removes the selected element across canvas, widget, properties, 
   mount,
   page,
 }) => {
-  await mount(<DemoApp />);
+  await mount(<DemoAppFresh />);
 
   // Select the Goal Icon via the layers panel — avoids any transform-widget
   // intercept that the canvas-click path could otherwise hit.
@@ -58,4 +58,24 @@ test('Backspace removes the selected element across canvas, widget, properties, 
   //    selection is mirrored in the toolbar tab state.
   await expect(propertiesTab).toBeDisabled();
   await expect(page.getByRole('textbox', { name: 'Element name' })).toHaveCount(0);
+});
+
+test('Delete preserves a required native project element', async ({ mount, page }) => {
+  await mount(<DemoAppFresh />);
+
+  const requiredElement = page.locator(`[data-element-id="${FIXTURE_IDS.background}"]`).first();
+
+  await requiredElement.dispatchEvent('pointerdown', { button: 0, buttons: 1 });
+  await page.keyboard.press('Delete');
+
+  await expect(requiredElement).toBeAttached();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__broadsetProjectEditorStore
+          ?.getState()
+          .project.documents[0]?.elements.some(({ id }) => id === 'el-top-gradient'),
+      ),
+    )
+    .toBe(true);
 });

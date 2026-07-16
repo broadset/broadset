@@ -4,8 +4,8 @@ import { resolve } from 'node:path';
 import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
-import { exportPptxBytesV1, exportPptxWithReportV1, importPptxProjectV1 } from '../../index';
 import { encodeText, readOoxmlPackage, readTextPart, writeOoxmlPackage } from '../ooxml/zip';
+import { exportPptxBytesV1, exportPptxWithReportV1, importPptxProjectV1 } from './index';
 
 const IMPORTED_AT = projectFormatV1.utcTimestampSchema.parse('2026-07-12T00:00:00Z');
 const PNG_BYTES = Uint8Array.from(

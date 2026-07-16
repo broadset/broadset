@@ -15,25 +15,28 @@ A web-native broadcast graphics suite for authoring and rendering motion graphic
 
 | Package              | Description                                                                      |
 | -------------------- | -------------------------------------------------------------------------------- |
-| `@broadset/formats`  | Format adapters: PDF/PSD/PPTX/raster/SVG import-export                           |
-| `@broadset/model`    | Document model, store, validation, conversion, and math utilities                |
-| `@broadset/playback` | Animation engine, animation types, and CSS generation                            |
-| `@broadset/renderer` | React rendering components: scene tree, element/screen renderers, font injection |
-| `@broadset/editor`   | Interactive editor runtime: store, provider, canvas, transforms, and shortcuts   |
+| `@broadset/formats`  | Native checksummed `.bsp` project load/save                                      |
+| `@broadset/model`    | Canonical v1 project model, validation, resolution, and editing primitives       |
+| `@broadset/playback` | Deterministic v1 animation evaluation                                            |
+| `@broadset/renderer` | Resolved v1 scene DOM rendering and physical-unit conversion                    |
+| `@broadset/editor`   | V1 project editor store, provider, mutations, selection, history, and clipboard |
 | `@broadset/ui`       | HeroUI v3 UI host — sidebars, toolbars, property panels, animation controls      |
 | `@broadset/demo`     | Private demo app wiring all `@broadset/*` packages together                      |
 
 ## Usage
 
-```tsx
-// Editor runtime imports:
-import { EditorProvider, useEditorStore, EditorCanvas } from '@broadset/editor';
+```ts
+import { createProjectEditorStore } from '@broadset/editor';
+import { exportBspPackageV1, loadBspPackageV1 } from '@broadset/formats';
+import { projectFormatV1 } from '@broadset/model';
 
-// Rendering-only imports:
-import { ScreenRenderer, DynamicStyleSheet } from '@broadset/renderer';
-import { createEditorStore, type BroadsetDocument } from '@broadset/model';
-import { generatePdf, exportPsd } from '@broadset/formats';
-import { DEFAULT_ANIMATION_CONFIG } from '@broadset/model';
+const project = projectFormatV1.createProjectV1({ name: 'Broadcast graphics' });
+const editorStore = createProjectEditorStore({ project });
+const saved = await exportBspPackageV1({ project: editorStore.getState().project, blobs: new Map() });
 
-import { Toolbar, LayersSidebar, PropertiesSidebar, PreflightPanel } from '@broadset/ui';
+if (saved.status === 'exported') {
+  const loaded = await loadBspPackageV1(saved.bytes);
+
+  if (loaded.status === 'loaded') editorStore.getState().setProject(loaded.project, loaded.blobs);
+}
 ```

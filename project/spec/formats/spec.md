@@ -173,6 +173,13 @@ Every importer MUST cap total input size, per-part size (ZIP entries for PPTX, O
 - [ ] Per-part size cap enforced for archive entries in PPTX and for PSD layer channels
 - [ ] Decoded-output size cap enforced so compressed-to-decoded expansion cannot exhaust memory
 - [ ] Archive entry-count cap enforced for ZIP-based formats (PPTX)
+- [ ] ZIP entry paths are canonical, relative, unique after Unicode normalization, and bounded in depth before decompression
+- [ ] ZIP entries whose declared compression expansion ratio exceeds the configured cap are skipped before decompression
+- [ ] Recovered package blobs are hydrated only after both declared byte length and content digest verification succeed
+- [ ] PSD signature, version, dimensions, channel count, bit depth, compressed input bytes, and decoded channel-byte budget are checked before the third-party decoder receives an owned copy
+- [ ] Inputs rejected by a pre-parse byte, node, or depth cap are not encoded, hashed, or retained as source blobs
+- [ ] XML-based imports reject DTD/entity declarations and enforce iterative node/depth bounds before parser entry
+- [ ] Retained SVG provenance is stored as non-renderable foreign data after sanitization
 - [ ] Parser recursion depth cap enforced with a default of 100
 - [ ] Element-tree depth cap enforced with the same default
 
@@ -248,6 +255,9 @@ Importers MUST use the sandboxing that the underlying parser offers. PDF parsing
 #### Acceptance Criteria
 
 - [ ] PDF parsing runs in a dedicated worker
+- [ ] PDF parser workers are terminated on success, parser failure, worker error, and timeout
+- [ ] Compressed PDF content and raster streams enforce decoded-output limits while decompression is in progress
+- [ ] PSD third-party decoding runs in a dedicated browser worker and skips unused embedded linked-file bytes
 - [ ] No importer evaluates imported content as JavaScript
 
 ---

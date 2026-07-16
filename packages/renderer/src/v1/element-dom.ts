@@ -1,265 +1,236 @@
 import type { projectFormatV1 } from '@broadset/model';
 
-import { appearanceToStyle } from './appearance-css';
-import { colorValueToCss, formatCssNumber } from './paint-css';
-import { pathToSvgD } from './path-to-svg-d';
-import { paragraphToStyle, runToStyle } from './text-css';
+import { appearanceToStyle, appearanceWithinOutputBudgetV1 } from './appearance-css';
+import { syncAssetPaintLayersV1 } from './asset-paint-dom';
+import { appendElementContentV1, createContentTargetV1, disposeContentTargetV1 } from './element-content-dom';
+import { gradientToDataAttributeV1 } from './gradient-css';
+import type { PhysicalUnitContextV1 } from './physical-units';
 import { geometryToBoxStyle } from './transform-css';
 
-type Element = projectFormatV1.Element;
 type Id = projectFormatV1.Id;
 type Swatch = projectFormatV1.Swatch;
 type FontFamilyResource = projectFormatV1.FontFamilyResource;
-type VectorElement = projectFormatV1.VectorElement;
 
-const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
-const FULL_SIZE = '100%';
-const ELLIPSE_BORDER_RADIUS = '50%';
-const PIXEL_UNIT = 'px';
+export type ResolvedRenderAssetV1 =
+  | { readonly status: 'ready'; readonly url: string }
+  | { readonly status: 'missing'; readonly diagnostic: string };
+
+export interface PluginRendererV1 {
+  readonly render: (options: {
+    readonly element: projectFormatV1.PluginElement;
+    readonly document: Document;
+  }) => HTMLElement | undefined;
+}
+
+export interface PluginRendererIdentityV1 {
+  readonly pluginId: string;
+  readonly elementType: string;
+  readonly schemaVersion: number;
+}
+
+export interface RenderClockV1 {
+  readonly now: () => Date;
+  readonly subscribe?: ((listener: () => void) => () => void) | undefined;
+}
+
+/** Collision-safe authorization identity for one exact plugin element schema. */
+export function pluginRendererKeyV1(identity: PluginRendererIdentityV1): string {
+  return JSON.stringify([identity.pluginId, identity.elementType, identity.schemaVersion]);
+}
 
 export interface RenderContextV1 {
   readonly swatches: ReadonlyMap<Id, Swatch>;
   readonly fonts: ReadonlyMap<Id, FontFamilyResource>;
-  readonly resolveAssetUrl: (assetId: Id) => string | undefined;
-  readonly document?: Document;
+  readonly resolveAsset: (assetId: Id) => ResolvedRenderAssetV1;
+  readonly pluginRenderers?: ReadonlyMap<string, PluginRendererV1> | undefined;
+  /** Deterministic runtime clock. Realtime clock elements fail soft when it is unavailable. */
+  readonly clock?: RenderClockV1 | undefined;
+  readonly document?: Document | undefined;
 }
+
+export interface ResolvedElementDomOptionsV1 {
+  readonly node: projectFormatV1.ResolvedSceneNodeV1;
+  readonly context: RenderContextV1;
+  readonly units: PhysicalUnitContextV1;
+  readonly vectorOperands?: ReadonlyMap<Id, projectFormatV1.VectorElement> | undefined;
+  readonly vectorOperandDiagnostic?: string | undefined;
+}
+
+const STYLE_PROPERTIES: readonly string[] = [
+  'position',
+  'left',
+  'top',
+  'box-sizing',
+  'pointer-events',
+  'transform-style',
+  'width',
+  'height',
+  'transform',
+  'transform-origin',
+  'opacity',
+  'mix-blend-mode',
+  'isolation',
+  'filter',
+  'backdrop-filter',
+  '--broadset-deferred-effects',
+  'visibility',
+];
 
 function kebab(property: string): string {
   return property.replace(/[A-Z]/gu, (letter) => `-${letter.toLowerCase()}`);
 }
 
-function applyStyle(element: HTMLElement, style: Readonly<Record<string, string | undefined>>): void {
+export function applyStyleV1(element: HTMLElement, style: Readonly<Record<string, string | undefined>>): void {
   for (const [property, value] of Object.entries(style)) {
     if (value !== undefined) element.style.setProperty(kebab(property), value);
   }
 }
 
-function applyAccessibility(
+function applyAccessibilityV1(
   element: HTMLElement,
   accessibility: projectFormatV1.ElementAccessibility | undefined,
 ): void {
+  element.removeAttribute('role');
+  element.removeAttribute('aria-label');
+  element.removeAttribute('aria-hidden');
+  element.removeAttribute('aria-description');
   if (accessibility === undefined) return;
 
   if (accessibility.role !== undefined) element.setAttribute('role', accessibility.role);
   if (accessibility.label !== undefined) element.setAttribute('aria-label', accessibility.label);
+  if (accessibility.description !== undefined) element.setAttribute('aria-description', accessibility.description);
   if (accessibility.decorative) element.setAttribute('aria-hidden', 'true');
 }
 
-function rectangleBorderRadius(radii: readonly [number, number, number, number]): string {
-  return radii.map((radius) => `${formatCssNumber(radius)}${PIXEL_UNIT}`).join(' ');
+function clearHostStyleV1(host: HTMLElement): void {
+  STYLE_PROPERTIES.forEach((property) => host.style.removeProperty(property));
 }
 
-function firstSolidFillColor(element: VectorElement, swatches: ReadonlyMap<Id, Swatch>): string {
-  const fill = element.appearance.fills.find((candidate) => candidate.enabled && candidate.paint.kind === 'solid');
-
-  return fill?.paint.kind === 'solid' ? colorValueToCss(fill.paint.color, swatches) : 'currentColor';
-}
-
-function appendPath(options: {
-  readonly container: HTMLElement;
-  readonly element: VectorElement;
-  readonly context: RenderContextV1;
-  readonly document: Document;
-}): void {
-  const { container, element, context, document: domDocument } = options;
-
-  if (element.geometryData.kind !== 'path') return;
-
-  const svg = domDocument.createElementNS(SVG_NAMESPACE, 'svg');
-  const path = domDocument.createElementNS(SVG_NAMESPACE, 'path');
-
-  svg.style.setProperty('width', FULL_SIZE);
-  svg.style.setProperty('height', FULL_SIZE);
-  path.setAttribute('d', pathToSvgD(element.geometryData.path));
-  path.setAttribute('fill', firstSolidFillColor(element, context.swatches));
-  path.setAttribute('fill-rule', element.geometryData.fillRule);
-  svg.append(path);
-  container.append(svg);
-}
-
-function appendVector(options: {
-  readonly container: HTMLElement;
-  readonly element: VectorElement;
-  readonly context: RenderContextV1;
-  readonly document: Document;
-}): void {
-  const { container, element } = options;
-
-  switch (element.geometryData.kind) {
-    case 'rectangle':
-      container.style.setProperty('border-radius', rectangleBorderRadius(element.geometryData.cornerRadii));
-
-      return;
-    case 'ellipse':
-      container.style.setProperty('border-radius', ELLIPSE_BORDER_RADIUS);
-
-      return;
-    case 'path':
-      // The shape carries the fill on the SVG path, so the box must not also paint the fill as a
-      // rectangular background (appearance fills applied a background-image to the container).
-      container.style.removeProperty('background-image');
-      appendPath(options);
-
-      return;
-    case 'boolean':
-      // Boolean geometry composition is added by a later renderer slice; the sized container is inert for
-      // now, and the fill belongs to the (future) composed shape rather than the rectangular box.
-      container.style.removeProperty('background-image');
-
-      return;
-  }
-}
-
-function appendText(options: {
-  readonly container: HTMLElement;
-  readonly element: projectFormatV1.TextElement;
-  readonly context: RenderContextV1;
-  readonly document: Document;
-}): void {
-  const { container, element, context, document: domDocument } = options;
-  const content = domDocument.createElement('div');
-  const padding = element.layout.padding ?? [0, 0, 0, 0];
-
-  content.dataset['elementContent'] = '';
-  applyStyle(content, {
-    boxSizing: 'border-box',
-    height: FULL_SIZE,
-    padding: padding.map((value) => `${formatCssNumber(value)}${PIXEL_UNIT}`).join(' '),
-    width: FULL_SIZE,
-  });
-
-  for (const paragraph of element.text.paragraphs) {
-    const paragraphNode = domDocument.createElement('div');
-
-    applyStyle(paragraphNode, { ...paragraphToStyle(paragraph.properties) });
-
-    for (const run of paragraph.runs) {
-      const span = domDocument.createElement('span');
-
-      applyStyle(span, { ...runToStyle(run.properties, context.fonts, context.swatches) });
-      span.textContent = run.text;
-      paragraphNode.append(span);
-    }
-
-    content.append(paragraphNode);
+function firstGradient(element: projectFormatV1.Element): projectFormatV1.Gradient | undefined {
+  for (const fill of element.appearance.fills) {
+    if (fill.enabled && fill.paint.kind === 'gradient') return fill.paint.gradient;
   }
 
-  container.append(content);
+  return undefined;
 }
 
-function appendImage(options: {
-  readonly container: HTMLElement;
-  readonly element: projectFormatV1.ImageElement;
-  readonly context: RenderContextV1;
-  readonly document: Document;
-}): void {
-  const { container, element, context, document: domDocument } = options;
-  const image = domDocument.createElement('img');
-  const assetUrl = context.resolveAssetUrl(element.image.assetId);
+function applyHostV1(options: ResolvedElementDomOptionsV1, host: HTMLElement): void {
+  const { node, context, units } = options;
+  const appearance = appearanceToStyle(node.element.appearance, context.swatches, units);
 
-  if (assetUrl !== undefined) image.src = assetUrl;
-
-  image.alt = element.accessibility?.label ?? '';
-  image.style.setProperty('object-fit', element.image.fit);
-  image.style.setProperty('width', FULL_SIZE);
-  image.style.setProperty('height', FULL_SIZE);
-  container.append(image);
-}
-
-function appendClock(container: HTMLElement, element: projectFormatV1.ClockElement, domDocument: Document): void {
-  const span = domDocument.createElement('span');
-
-  // This renderer is static; playback owns replacing the format token with live clock values.
-  span.textContent = element.clock.format;
-  container.append(span);
-}
-
-function appendTicker(options: {
-  readonly container: HTMLElement;
-  readonly element: projectFormatV1.TickerElement;
-  readonly document: Document;
-}): void {
-  const { container, element, document: domDocument } = options;
-  const track = domDocument.createElement('div');
-
-  applyStyle(track, {
-    display: 'flex',
-    gap: `${String(element.ticker.gap)}px`,
-    whiteSpace: 'nowrap',
-  });
-  track.dataset['tickerDirection'] = element.ticker.direction;
-  track.dataset['tickerSpeed'] = String(element.ticker.speed);
-
-  element.ticker.items.forEach((item) => {
-    const span = domDocument.createElement('span');
-
-    span.dataset['tickerItemId'] = item.id;
-    span.textContent = item.text;
-    track.append(span);
-  });
-  container.append(track);
-}
-
-function appendElementContent(options: {
-  readonly container: HTMLElement;
-  readonly element: Element;
-  readonly context: RenderContextV1;
-  readonly document: Document;
-}): void {
-  const { container, element, document: domDocument } = options;
-
-  switch (element.kind) {
-    case 'text':
-      appendText({ ...options, element });
-
-      return;
-    case 'image':
-      appendImage({ ...options, element });
-
-      return;
-    case 'vector':
-      appendVector({ ...options, element });
-
-      return;
-    case 'clock':
-      appendClock(container, element, domDocument);
-
-      return;
-    case 'ticker':
-      appendTicker({ container, element, document: domDocument });
-
-      return;
-    case 'group':
-    case 'component-instance':
-      return;
-    case 'qrcode':
-    case 'video':
-    case 'audio':
-    case 'foreign':
-    case 'plugin':
-      // Full content renderers for these kinds are intentionally deferred to later slice-C work.
-      container.dataset['elementKind'] = element.kind;
-
-      return;
-  }
-}
-
-/** Render one v1 element to a detached DOM node; scene hierarchy and live playback are resolved elsewhere. */
-export function renderElementV1(element: Element, context: RenderContextV1): HTMLElement {
-  const domDocument = context.document ?? globalThis.document;
-  const container = domDocument.createElement('div');
-
-  container.dataset['elementId'] = element.id;
-  applyStyle(container, {
+  clearHostStyleV1(host);
+  host.dataset['elementId'] = node.element.id;
+  host.dataset['instanceRootId'] = node.address.rootInstanceId;
+  host.dataset['componentInstancePath'] = JSON.stringify(node.address.componentInstancePath);
+  host.dataset['visibility'] = node.visible ? 'onscreen' : 'offscreen';
+  host.toggleAttribute('data-opacity-target', true);
+  host.classList.toggle('offscreen', !node.visible);
+  applyStyleV1(host, {
     position: 'absolute',
+    left: '0',
+    top: '0',
     boxSizing: 'border-box',
     pointerEvents: 'auto',
     transformStyle: 'preserve-3d',
-    ...geometryToBoxStyle(element.geometry),
-    ...appearanceToStyle(element.appearance, context.swatches),
+    ...geometryToBoxStyle(node.localGeometry, units),
+    opacity: appearance.opacity,
+    mixBlendMode: appearance.mixBlendMode,
+    isolation: appearance.isolation,
+    filter: appearance.filter,
+    backdropFilter: appearance.backdropFilter,
+    '--broadset-deferred-effects': appearance.deferredEffects,
+    visibility: node.visible ? 'visible' : 'hidden',
   });
-  applyAccessibility(container, element.accessibility);
-  appendElementContent({ container, element, context, document: domDocument });
+  applyAccessibilityV1(host, node.element.accessibility);
+}
 
-  return container;
+/** Refresh only geometry, visibility, accessibility, and host-level appearance. */
+export function updateResolvedElementHostV1(options: ResolvedElementDomOptionsV1, host: HTMLElement): void {
+  applyHostV1(options, host);
+}
+
+/** Refresh only semantic content and content-level fills. Structural children remain mounted. */
+export function updateResolvedElementContentV1(options: ResolvedElementDomOptionsV1, host: HTMLElement): void {
+  const content = createContentTargetV1(host, options.node.element, options.context.document ?? globalThis.document);
+  const appearance = appearanceToStyle(options.node.element.appearance, options.context.swatches, options.units);
+  const gradient = firstGradient(options.node.element);
+
+  host.querySelector(':scope > [data-appearance-budget-fallback]')?.remove();
+
+  if (!appearanceWithinOutputBudgetV1(options.node.element.appearance)) {
+    if (content !== host) {
+      disposeContentTargetV1(content);
+      content.replaceChildren();
+    }
+
+    const fallback = (options.context.document ?? globalThis.document).createElement('div');
+
+    fallback.dataset['appearanceBudgetFallback'] = 'true';
+    fallback.className = 'broadset-render-fallback';
+    fallback.setAttribute('role', 'img');
+    fallback.textContent = 'Appearance output budget exceeded';
+    content.prepend(fallback);
+
+    return;
+  }
+
+  content.style.removeProperty('background-image');
+  content.style.removeProperty('background-blend-mode');
+
+  if (appearance.backgroundImage !== undefined)
+    content.style.setProperty('background-image', appearance.backgroundImage);
+
+  if (appearance.backgroundBlendMode !== undefined) {
+    content.style.setProperty('background-blend-mode', appearance.backgroundBlendMode);
+  }
+
+  if (gradient === undefined) content.removeAttribute('data-gradient');
+  else content.dataset['gradient'] = gradientToDataAttributeV1(gradient);
+
+  if (content !== host) {
+    disposeContentTargetV1(content);
+    content.replaceChildren();
+    appendElementContentV1({ ...options, content });
+  }
+
+  syncAssetPaintLayersV1({
+    content,
+    appearance: options.node.element.appearance,
+    context: options.context,
+    units: options.units,
+    clipToVector: options.node.element.kind === 'vector',
+  });
+}
+
+/** Refresh one stable element host from a resolved scene node. Structural children remain mounted. */
+function updateResolvedElementV1(options: ResolvedElementDomOptionsV1, host: HTMLElement): void {
+  updateResolvedElementHostV1(options, host);
+  updateResolvedElementContentV1(options, host);
+}
+
+/** Render one resolved v1 scene node to a detached, fail-soft DOM host. */
+export function renderResolvedElementV1(options: ResolvedElementDomOptionsV1): HTMLElement {
+  const domDocument = options.context.document ?? globalThis.document;
+  const host = domDocument.createElement('div');
+
+  try {
+    updateResolvedElementV1(options, host);
+  } catch {
+    applyHostV1(options, host);
+
+    const content = createContentTargetV1(host, options.node.element, domDocument);
+
+    if (content !== host) {
+      disposeContentTargetV1(content);
+      content.replaceChildren();
+
+      const fallback = domDocument.createElement('div');
+
+      fallback.className = 'broadset-render-fallback';
+      fallback.textContent = 'Element preview unavailable';
+      content.append(fallback);
+    }
+  }
+
+  return host;
 }

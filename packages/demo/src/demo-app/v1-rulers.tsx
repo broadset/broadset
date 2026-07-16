@@ -1,12 +1,15 @@
 import type { ProjectEditorStore } from '@broadset/editor';
+import type { PhysicalUnitContextV1 } from '@broadset/renderer';
 import { useMemo } from 'react';
 
 import { RulerStrip } from '../demo-components';
 import { useCanvasViewport, useEditorSelector } from './helpers';
+import { documentValueToCssPixelsV1 } from './v1-canvas-units';
 
 interface V1RulersProps {
   readonly editorStore: ProjectEditorStore;
   readonly surfaceSize: readonly [number, number];
+  readonly units: PhysicalUnitContextV1;
 }
 
 const RULER_SIZE = 20;
@@ -16,18 +19,19 @@ function createTicks(options: {
   readonly offset: number;
   readonly scale: number;
   readonly surfaceLength: number;
+  readonly units: PhysicalUnitContextV1;
 }): readonly { readonly label: string; readonly position: number }[] {
   return Array.from({ length: options.count }, (_, index) => {
     const value = Math.round((options.surfaceLength / options.count) * index);
 
     return {
       label: String(value),
-      position: value * options.scale + options.offset,
+      position: documentValueToCssPixelsV1(value, options.units) * options.scale + options.offset,
     };
   });
 }
 
-export function V1Rulers({ editorStore, surfaceSize }: V1RulersProps): React.JSX.Element | null {
+export function V1Rulers({ editorStore, surfaceSize, units }: V1RulersProps): React.JSX.Element | null {
   const visible = useEditorSelector(editorStore, (state) => state.canvasSettings.showRulers);
   const viewport = useCanvasViewport(editorStore);
   const horizontalTicks = useMemo(
@@ -37,8 +41,9 @@ export function V1Rulers({ editorStore, surfaceSize }: V1RulersProps): React.JSX
         offset: viewport.panX,
         scale: viewport.zoom,
         surfaceLength: surfaceSize[0],
+        units,
       }),
-    [surfaceSize, viewport.panX, viewport.zoom],
+    [surfaceSize, units, viewport.panX, viewport.zoom],
   );
   const verticalTicks = useMemo(
     () =>
@@ -47,8 +52,9 @@ export function V1Rulers({ editorStore, surfaceSize }: V1RulersProps): React.JSX
         offset: viewport.panY,
         scale: viewport.zoom,
         surfaceLength: surfaceSize[1],
+        units,
       }),
-    [surfaceSize, viewport.panY, viewport.zoom],
+    [surfaceSize, units, viewport.panY, viewport.zoom],
   );
 
   if (!visible) return null;

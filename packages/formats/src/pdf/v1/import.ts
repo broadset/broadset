@@ -6,12 +6,11 @@ import {
   createResourceCollectorV1,
   type ProjectImportResultV1,
 } from '../../v1';
-import { probeLoadPdf } from '../import/parse';
+import { parsePdfInIsolationV1 } from '../import/isolation';
 import { createPdfFontRegistryV1 } from './font-registry';
-import { mapPdfImageV1 } from './map-image';
+import { createPdfImageAssetRegistryV1, mapPdfImageV1 } from './map-image';
 import { mapPdfPathV1 } from './map-path';
 import { mapPdfTextV1 } from './map-text';
-import { parsePdfDocumentV1 } from './source-details';
 import type { ParsedPdfDocumentV1, PdfMappedElementV1 } from './types';
 
 const IMPORTER_VERSION = 'broadset-pdf-v1/1';
@@ -115,6 +114,7 @@ async function mapElements(input: {
   const parsed = input.parsed;
   const page = parsed.page;
   const fontRegistry = createPdfFontRegistryV1(input.resourceCollector);
+  const imageAssetRegistry = createPdfImageAssetRegistryV1(page, input.resourceCollector);
   const mappedText = page.textItems
     .filter(({ text }) => text.trim() !== '')
     .map((item, index) =>
@@ -141,7 +141,7 @@ async function mapElements(input: {
         page,
         elementId: projectFormatV1.idSchema.parse(`pdf-image-${String(index + 1)}`),
         parentId: ROOT_ID,
-        resourceCollector: input.resourceCollector,
+        assetRegistry: imageAssetRegistry,
       }),
     ),
   );
@@ -333,14 +333,33 @@ function absoluteFallbackResult(input: {
   };
 }
 
-function loadFailureDiagnostic(kind: 'encrypted' | 'malformed'): projectFormatV1.InteropDiagnostic {
+type PdfLoadFailureKind = 'encrypted' | 'malformed' | 'isolation-failed' | 'timeout';
+
+function loadFailureDiagnostic(kind: PdfLoadFailureKind): projectFormatV1.InteropDiagnostic {
   return errorDiagnostic({
-    code: kind === 'encrypted' ? 'pdf.encrypted' : 'pdf.malformed',
-    message:
-      kind === 'encrypted' ?
-        'PDF import rejected an encrypted document.'
-      : 'PDF import could not parse the malformed byte stream.',
+    code: loadFailureCode(kind),
+    message: loadFailureMessage(kind),
   });
+}
+
+function loadFailureCode(kind: PdfLoadFailureKind): string {
+  if (kind === 'encrypted') return 'pdf.encrypted';
+  if (kind === 'malformed') return 'pdf.malformed';
+
+  return 'pdf.isolation-failed';
+}
+
+function loadFailureMessage(kind: PdfLoadFailureKind): string {
+  switch (kind) {
+    case 'encrypted':
+      return 'PDF import rejected an encrypted document.';
+    case 'malformed':
+      return 'PDF import could not parse the malformed byte stream.';
+    case 'timeout':
+      return 'PDF import worker exceeded its time limit.';
+    case 'isolation-failed':
+      return 'PDF import worker failed in isolation.';
+  }
 }
 
 export async function importPdfProjectV1(input: {
@@ -367,7 +386,7 @@ export async function importPdfProjectV1(input: {
       });
     }
 
-    const loaded = await probeLoadPdf(input.bytes);
+    const loaded = await parsePdfInIsolationV1({ bytes: input.bytes });
 
     if (loaded.kind !== 'ok') {
       return await buildResult({
@@ -378,7 +397,7 @@ export async function importPdfProjectV1(input: {
       });
     }
 
-    const parsed = parsePdfDocumentV1(loaded.pdf);
+    const parsed = loaded.parsed;
 
     return await buildResult({
       bytes: input.bytes,

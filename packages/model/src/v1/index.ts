@@ -30,7 +30,10 @@ export {
   resolveProjectEntityAddress,
   resolveTargetEntityAddress,
 } from './resolved-address';
+export { composeElementTransformsV1, resolveWorldGeometryV1 } from './resolved-geometry';
+export { applyResolvedOverrideV1 } from './resolved-overrides';
 export * from './resolved-scene';
+export type * from './resolved-scene-types';
 export * from './resources';
 export * from './semantic-index';
 export * from './semantic-validation';

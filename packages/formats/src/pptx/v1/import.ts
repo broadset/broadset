@@ -6,8 +6,9 @@ import {
   createResourceCollectorV1,
   type ProjectImportResultV1,
 } from '../../v1';
+import { resolvePptxImportCaps, warningForSkippedOoxmlEntry } from '../import-caps';
 import { readOoxmlPackageWithCaps } from '../ooxml/zip';
-import { importPptxSourceWithReport } from '../source-import';
+import { importPptxPackageWithReport, type PptxSourceImportReport } from '../source-import';
 import type { PptxImportOptions, PptxImportWarning } from '../types';
 import { createPptxFontRegistryV1 } from './font-registry';
 import { type MappedPptxElementV1, mapPptxElementsV1 } from './map-elements';
@@ -70,6 +71,62 @@ function fallbackRoot(width: number, height: number): MappedPptxElementV1 {
     sourceId: 'fallback',
     warnings: [],
   };
+}
+
+function appendImportDiagnostics(
+  result: ProjectImportResultV1,
+  diagnostics: readonly projectFormatV1.InteropDiagnostic[],
+): ProjectImportResultV1 | undefined {
+  if (diagnostics.length === 0) return result;
+
+  const firstRecord = result.project.interop.records[0];
+
+  if (firstRecord === undefined) return undefined;
+
+  const project: projectFormatV1.BroadsetProjectV1 = {
+    ...result.project,
+    interop: {
+      ...result.project.interop,
+      records: result.project.interop.records.map((record, index) =>
+        index === 0 ? { ...record, warnings: [...record.warnings, ...diagnostics] } : record,
+      ),
+    },
+  };
+  const parsed = projectFormatV1.parseProjectV1Unknown(project);
+
+  if (parsed.status !== 'loaded') return undefined;
+
+  if (projectFormatV1.validateBroadsetProjectV1Semantics(project).some(({ severity }) => severity === 'error')) {
+    return undefined;
+  }
+
+  return { project, blobs: result.blobs };
+}
+
+async function reconcileEmbeddedProject(input: {
+  readonly metadataProject: projectFormatV1.BroadsetProjectV1 | undefined;
+  readonly pkg: ReturnType<typeof readOoxmlPackageWithCaps>['pkg'];
+  readonly currentDocument: projectFormatV1.BroadsetDocumentV1;
+  readonly resources: ReturnType<typeof createResourceCollectorV1>;
+  readonly reportDiagnostics: readonly projectFormatV1.InteropDiagnostic[];
+}): Promise<{
+  readonly result: ProjectImportResultV1 | undefined;
+  readonly metadataDiagnostics: readonly projectFormatV1.InteropDiagnostic[];
+}> {
+  if (input.metadataProject === undefined) return { result: undefined, metadataDiagnostics: [] };
+
+  const metadataBlobs = await collectMetadataBlobs(input.pkg, input.metadataProject);
+  const reconciled = reconcileMetadataProjectV1({
+    preservedProject: input.metadataProject,
+    currentDocument: input.currentDocument,
+    currentResources: input.resources.collect(),
+    preservedBlobs: metadataBlobs.blobs,
+  });
+  const result =
+    reconciled === undefined ? undefined :
+      appendImportDiagnostics(reconciled, [...input.reportDiagnostics, ...metadataBlobs.diagnostics]);
+
+  return { result, metadataDiagnostics: metadataBlobs.diagnostics };
 }
 
 function fallbackResult(input: {
@@ -155,8 +212,8 @@ function fallbackResult(input: {
 }
 
 function pages(input: {
-  readonly sourcePages: ReturnType<typeof importPptxSourceWithReport>['document']['pages'];
-  readonly sourceElements: ReturnType<typeof importPptxSourceWithReport>['document']['elements'];
+  readonly sourcePages: PptxSourceImportReport['document']['pages'];
+  readonly sourceElements: PptxSourceImportReport['document']['elements'];
   readonly mapped: readonly MappedPptxElementV1[];
 }): readonly projectFormatV1.PageDefinition[] {
   const mappedIdBySource = new Map(input.mapped.map(({ sourceId, element }) => [sourceId, element.id]));
@@ -206,37 +263,31 @@ function pages(input: {
   });
 }
 
-interface PptxMetadataContextV1 {
-  readonly pkg: ReturnType<typeof readOoxmlPackageWithCaps>['pkg'];
-  readonly project: projectFormatV1.BroadsetProjectV1;
-}
-
-async function readMetadataContextV1(
-  bytes: Uint8Array,
-  options: PptxImportOptions,
-): Promise<PptxMetadataContextV1 | undefined> {
-  try {
-    const pkg = readOoxmlPackageWithCaps(bytes, options).pkg;
-    const project = await readProjectMetadataV1(pkg);
-
-    return project === undefined ? undefined : { pkg, project };
-  } catch {
-    return undefined;
-  }
-}
-
 async function buildResult(input: {
   readonly bytes: Uint8Array;
   readonly fileName: string | undefined;
   readonly importedAt: projectFormatV1.UtcTimestamp;
   readonly options: PptxImportOptions;
 }): Promise<ProjectImportResultV1> {
-  const metadata = await readMetadataContextV1(input.bytes, input.options);
-  const authoredSurface = metadata?.project.documents[0]?.surface;
-  const report = importPptxSourceWithReport(input.bytes, {
+  const caps = resolvePptxImportCaps(input.options);
+  const archive = readOoxmlPackageWithCaps(input.bytes, caps);
+  const archiveWarnings = archive.skippedEntries.map((entry) => warningForSkippedOoxmlEntry(entry, caps));
+  const metadataProject = await readProjectMetadataV1(archive.pkg);
+  const authoredSurface = metadataProject?.documents[0]?.surface;
+  const sourceOptions: PptxImportOptions = {
     ...input.options,
     ...(authoredSurface === undefined ? {} : { authoredSurface: { unit: authoredSurface.unit, dpi: authoredSurface.dpi } }),
-  });
+  };
+  const report = importPptxPackageWithReport({ pkg: archive.pkg, options: sourceOptions, archiveWarnings });
+
+  if (report.terminalTrustBoundaryWarning !== undefined) {
+    return fallbackResult({
+      fileName: input.fileName,
+      importedAt: input.importedAt,
+      diagnostic: diagnostic(report.terminalTrustBoundaryWarning),
+    });
+  }
+
   const width = Math.max(1, report.document.canvas.width);
   const height = Math.max(1, report.document.canvas.height);
   const resources = createResourceCollectorV1();
@@ -258,17 +309,15 @@ async function buildResult(input: {
     elements: mapped.map(({ element }) => element),
     pages: pages({ sourcePages: report.document.pages, sourceElements: report.document.elements, mapped }),
   });
+  const metadata = await reconcileEmbeddedProject({
+    metadataProject,
+    pkg: archive.pkg,
+    currentDocument,
+    resources,
+    reportDiagnostics: report.warnings.map(diagnostic),
+  });
 
-  if (metadata !== undefined) {
-    const reconciled = reconcileMetadataProjectV1({
-      preservedProject: metadata.project,
-      currentDocument,
-      currentResources: resources.collect(),
-      preservedBlobs: collectMetadataBlobs(metadata.pkg, metadata.project),
-    });
-
-    if (reconciled !== undefined) return reconciled;
-  }
+  if (metadata.result !== undefined) return metadata.result;
 
   const sourceAssetId = await resources.addForeignAsset({
     bytes: input.bytes,
@@ -283,7 +332,7 @@ async function buildResult(input: {
     importerVersion: IMPORTER_VERSION,
     importedAt: input.importedAt,
   });
-  const reportWarnings = report.warnings.map(diagnostic);
+  const reportWarnings = [...report.warnings.map(diagnostic), ...metadata.metadataDiagnostics];
 
   for (let index = 0; index < mapped.length; index += 1) {
     const entry = mapped[index];
@@ -318,6 +367,7 @@ export async function importPptxProjectV1(input: {
   readonly maxPartBytes?: number;
   readonly maxEntries?: number;
   readonly maxTotalUncompressedBytes?: number;
+  readonly maxExpansionRatio?: number;
   readonly maxDepth?: number;
 }): Promise<ProjectImportResultV1> {
   const maxInputBytes =
@@ -331,6 +381,7 @@ export async function importPptxProjectV1(input: {
     ...(input.maxTotalUncompressedBytes === undefined ?
       {}
     : { maxTotalUncompressedBytes: input.maxTotalUncompressedBytes }),
+    ...(input.maxExpansionRatio === undefined ? {} : { maxExpansionRatio: input.maxExpansionRatio }),
     ...(input.maxDepth === undefined ? {} : { maxDepth: input.maxDepth }),
   };
 

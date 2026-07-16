@@ -23,6 +23,8 @@ export interface SlideImportContext {
   readonly layoutPlaceholders: ReadonlyMap<number, LayoutPlaceholder>;
   /** `rId` → media-file path (inside the ZIP) for picture resolution. */
   readonly mediaByRelId: ReadonlyMap<string, PictureSourceRef>;
+  /** Package media path to encoded data URI, shared across every picture use. */
+  readonly dataUriByMediaPath: Map<string, string>;
   /** `rId` → hyperlink target for `<a:hlinkClick>` resolution on text runs. */
   readonly hyperlinkByRelId: ReadonlyMap<string, PptxSourceHyperlink>;
   /**
@@ -217,6 +219,7 @@ function buildElementByTag(
       name,
       id,
       mediaByRelId: ctx.mediaByRelId,
+      dataUriByMediaPath: ctx.dataUriByMediaPath,
       createFallback: () => buildBase(id, name, 'rectangle', transform, parentGroupId),
       createImageBase: () => buildBase(id, name, 'image', transform, parentGroupId),
       pushWarning: (warning) => {

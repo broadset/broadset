@@ -1,9 +1,10 @@
 import type { ProjectEditorStore } from '@broadset/editor';
 import { projectFormatV1 } from '@broadset/model';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { SAMPLE_PROJECT_V1 } from '../sample-project-v1';
+import { SAMPLE_PROJECT_BLOBS_V1, SAMPLE_PROJECT_V1 } from '../sample-project-v1';
+import { loadStoredProjectV1, saveStoredProjectV1 } from '../v1-project-persistence';
 import { V1DemoWorkspace } from './v1-demo-workspace';
 
 describe('V1DemoWorkspace', () => {
@@ -24,8 +25,24 @@ describe('V1DemoWorkspace', () => {
 
     fireEvent.pointerDown(element);
 
+    const expectedInstance = projectFormatV1
+      .resolvePageInstanceTree({
+        project: SAMPLE_PROJECT_V1,
+        documentId: SAMPLE_PROJECT_V1.documents[0]?.id ?? projectFormatV1.idSchema.parse('missing-document'),
+        pageId: SAMPLE_PROJECT_V1.documents[0]?.pages[0]?.id ?? projectFormatV1.idSchema.parse('missing-page'),
+      })
+      .find(({ element: resolvedElement }) => resolvedElement.id === elementId);
+
+    if (expectedInstance === undefined) throw new Error('Expected the resolved v1 fixture instance');
+
     await waitFor(() => {
-      expect(editorStore?.getState().activeElementIds).toEqual([elementId]);
+      expect(editorStore?.getState().activeInstanceAddresses).toEqual([
+        {
+          rootInstanceId: expectedInstance.rootInstanceId,
+          componentInstancePath: expectedInstance.componentInstancePath,
+          elementId,
+        },
+      ]);
     });
 
     fireEvent.keyDown(window, { key: 'Delete' });
@@ -45,18 +62,27 @@ describe('V1DemoWorkspace', () => {
       ...SAMPLE_PROJECT_V1,
       metadata: { ...SAMPLE_PROJECT_V1.metadata, name: 'Stored v1 project' },
     };
-    let storedText: string | null = projectFormatV1.canonicalizeProjectV1(storedProject);
+    let storedText: string | null = null;
     const storage = {
       getItem: (): string | null => storedText,
       setItem: (_key: string, value: string): void => {
         storedText = value;
       },
     };
+
+    await saveStoredProjectV1({
+      storage,
+      storageKey: 'project',
+      project: storedProject,
+      blobs: SAMPLE_PROJECT_BLOBS_V1,
+    });
+
     let editorStore: ProjectEditorStore | undefined;
     const { container } = render(
       <V1DemoWorkspace
         initialElementId={elementId}
         persistence={{ storage, storageKey: 'project' }}
+        blobs={SAMPLE_PROJECT_BLOBS_V1}
         project={SAMPLE_PROJECT_V1}
         onStoreReady={(store) => {
           editorStore = store;
@@ -87,9 +113,66 @@ describe('V1DemoWorkspace', () => {
     });
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(editorStore.getState().project)).toEqual([]);
 
-    const persisted = await projectFormatV1.loadProjectV1Json(storedText);
+    const persisted = await loadStoredProjectV1({
+      storage,
+      storageKey: 'project',
+      fallbackProject: SAMPLE_PROJECT_V1,
+      fallbackBlobs: SAMPLE_PROJECT_BLOBS_V1,
+    });
 
-    expect(persisted.status).toBe('loaded');
+    expect(persisted.project.documents[0]?.pages.length).toBe(SAMPLE_PROJECT_V1.documents[0]?.pages.length);
+  });
+
+  it('retains exact recovery bytes from persisted and imported quarantines without replacing the project', async () => {
+    const persistedText = '{bad persisted json';
+    const persistedBytes = new TextEncoder().encode(persistedText);
+    const importedBytes = Uint8Array.of(0x80, 0xc0, 0xaf);
+    const onProjectRecoveryRetained = vi.fn<(bytes: Uint8Array) => void>();
+    const persistence = {
+      storage: {
+        getItem: (): string => persistedText,
+        setItem: (): void => undefined,
+      },
+      storageKey: 'project',
+    };
+    let editorStore: ProjectEditorStore | undefined;
+
+    render(
+      <V1DemoWorkspace
+        persistence={persistence}
+        blobs={SAMPLE_PROJECT_BLOBS_V1}
+        project={SAMPLE_PROJECT_V1}
+        onProjectRecoveryRetained={onProjectRecoveryRetained}
+        onStoreReady={(store) => {
+          editorStore = store;
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onProjectRecoveryRetained).toHaveBeenCalledExactlyOnceWith(persistedBytes);
+    });
+
+    expect(screen.getByText(`Recovery source retained (${String(persistedBytes.byteLength)} bytes)`)).toBeTruthy();
+    expect(editorStore?.getState().project).toEqual(SAMPLE_PROJECT_V1);
+
+    fireEvent.change(screen.getByLabelText('Choose Broadset project file'), {
+      target: {
+        files: [
+          new File([importedBytes], 'invalid-utf8.broadset.json', {
+            type: 'application/vnd.broadset.project+json',
+          }),
+        ],
+      },
+    });
+
+    await waitFor(() => {
+      expect(onProjectRecoveryRetained).toHaveBeenCalledTimes(2);
+    });
+
+    expect(onProjectRecoveryRetained.mock.calls[1]?.[0]).toEqual(importedBytes);
+    expect(screen.getByText(`Recovery source retained (${String(importedBytes.byteLength)} bytes)`)).toBeTruthy();
+    expect(editorStore?.getState().project).toEqual(SAMPLE_PROJECT_V1);
   });
 
   it('drives the rendered v1 viewport from the workspace toolbar', () => {

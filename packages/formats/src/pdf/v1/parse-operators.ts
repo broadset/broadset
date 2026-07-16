@@ -22,6 +22,7 @@ interface ParsedPdfOperatorsV1 {
     readonly color: PdfColorV1;
     readonly transform: PdfMatrixV1;
   }[];
+  readonly truncated: boolean;
 }
 
 const IDENTITY_MATRIX: PdfMatrixV1 = [1, 0, 0, 1, 0, 0];
@@ -145,18 +146,15 @@ function readToken(content: string, start: number): PdfTokenReadV1 {
     : { token: { kind: 'word', value }, next: end };
 }
 
-function tokenize(content: string): readonly PdfTokenV1[] {
-  const tokens: PdfTokenV1[] = [];
+function* tokenize(content: string): Generator<PdfTokenV1, void, undefined> {
   let cursor = 0;
 
   while (cursor < content.length) {
     const read = readToken(content, cursor);
 
-    if (read.token !== undefined) tokens.push(read.token);
+    if (read.token !== undefined) yield read.token;
     cursor = read.next > cursor ? read.next : cursor + 1;
   }
-
-  return tokens;
 }
 
 function multiply(left: PdfMatrixV1, right: PdfMatrixV1): PdfMatrixV1 {
@@ -224,6 +222,11 @@ class PdfOperatorInterpreterV1 {
   private readonly imageUses: PdfImageUseV1[] = [];
   private readonly stack: PdfGraphicsStateV1[] = [];
   private readonly textStates: ParsedPdfOperatorsV1['textStates'][number][] = [];
+  private readonly maxMappedItems: number;
+  private readonly maxPathCommands: number;
+  private mappedItems = 0;
+  private pathCommands = 0;
+  private wasTruncated = false;
   private state: PdfGraphicsStateV1 = {
     transform: IDENTITY_MATRIX,
     fill: DEFAULT_COLOR,
@@ -235,11 +238,31 @@ class PdfOperatorInterpreterV1 {
   private fontName = 'Helvetica';
   private fontSize = 12;
 
+  constructor(input: { readonly maxMappedItems: number; readonly maxPathCommands: number }) {
+    this.maxMappedItems = input.maxMappedItems;
+    this.maxPathCommands = input.maxPathCommands;
+  }
+
   read(): ParsedPdfOperatorsV1 {
-    return { paths: this.paths, imageUses: this.imageUses, textStates: this.textStates };
+    return {
+      paths: this.paths,
+      imageUses: this.imageUses,
+      textStates: this.textStates,
+      truncated: this.wasTruncated,
+    };
+  }
+
+  truncate(): void {
+    this.wasTruncated = true;
+  }
+
+  isTruncated(): boolean {
+    return this.wasTruncated;
   }
 
   apply(operator: string, operands: readonly PdfTokenV1[]): void {
+    if (this.wasTruncated) return;
+
     const values = numericOperands(operands);
 
     if (this.applyPathOperator(operator, values)) return;
@@ -250,7 +273,9 @@ class PdfOperatorInterpreterV1 {
     if (operator === 'Do') {
       const resourceName = lastName(operands);
 
-      if (resourceName !== undefined) this.imageUses.push({ resourceName, transform: this.state.transform });
+      if (resourceName !== undefined && this.reserveMappedItem()) {
+        this.imageUses.push({ resourceName, transform: this.state.transform });
+      }
 
       return;
     }
@@ -259,11 +284,11 @@ class PdfOperatorInterpreterV1 {
   }
 
   private closePath(): void {
-    if (this.commands.at(-1)?.kind !== 'close') this.commands.push({ kind: 'close' });
+    if (this.commands.at(-1)?.kind !== 'close') this.appendPathCommands([{ kind: 'close' }]);
   }
 
   private paintPath(input: { readonly fill: boolean; readonly stroke: boolean; readonly evenodd: boolean }): void {
-    if (this.commands.length > 0) {
+    if (this.commands.length > 0 && this.reserveMappedItem()) {
       this.paths.push({
         commands: this.commands,
         fillRule: input.evenodd ? 'evenodd' : 'nonzero',
@@ -278,30 +303,30 @@ class PdfOperatorInterpreterV1 {
 
   private applyPathOperator(operator: string, values: readonly number[]): boolean {
     if (operator === 'm' && values.length >= 2) {
-      this.commands.push({
+      this.appendPathCommands([{
         kind: 'move',
         point: transformPoint(this.state.transform, values.at(-2) ?? 0, values.at(-1) ?? 0),
-      });
+      }]);
 
       return true;
     }
 
     if (operator === 'l' && values.length >= 2) {
-      this.commands.push({
+      this.appendPathCommands([{
         kind: 'line',
         point: transformPoint(this.state.transform, values.at(-2) ?? 0, values.at(-1) ?? 0),
-      });
+      }]);
 
       return true;
     }
 
     if (operator === 'c' && values.length >= 6) {
-      this.commands.push({
+      this.appendPathCommands([{
         kind: 'cubic',
         control1: transformPoint(this.state.transform, values.at(-6) ?? 0, values.at(-5) ?? 0),
         control2: transformPoint(this.state.transform, values.at(-4) ?? 0, values.at(-3) ?? 0),
         point: transformPoint(this.state.transform, values.at(-2) ?? 0, values.at(-1) ?? 0),
-      });
+      }]);
 
       return true;
     }
@@ -312,13 +337,13 @@ class PdfOperatorInterpreterV1 {
       const width = values.at(-2) ?? 0;
       const height = values.at(-1) ?? 0;
 
-      this.commands.push(
+      this.appendPathCommands([
         { kind: 'move', point: transformPoint(this.state.transform, x, y) },
         { kind: 'line', point: transformPoint(this.state.transform, x + width, y) },
         { kind: 'line', point: transformPoint(this.state.transform, x + width, y + height) },
         { kind: 'line', point: transformPoint(this.state.transform, x, y + height) },
         { kind: 'close' },
-      );
+      ]);
 
       return true;
     }
@@ -334,7 +359,8 @@ class PdfOperatorInterpreterV1 {
 
   private applyGraphicsOperator(operator: string, values: readonly number[]): boolean {
     if (operator === 'q') {
-      this.stack.push(this.state);
+      if (this.stack.length >= 1024) this.wasTruncated = true;
+      else this.stack.push(this.state);
 
       return true;
     }
@@ -426,12 +452,14 @@ class PdfOperatorInterpreterV1 {
 
     if (operator !== 'Tj' && operator !== 'TJ') return false;
 
-    this.textStates.push({
-      fontName: this.fontName,
-      fontSize: this.fontSize,
-      color: this.state.fill,
-      transform: multiply(this.state.transform, this.textMatrix),
-    });
+    if (this.reserveMappedItem()) {
+      this.textStates.push({
+        fontName: this.fontName,
+        fontSize: this.fontSize,
+        color: this.state.fill,
+        transform: multiply(this.state.transform, this.textMatrix),
+      });
+    }
 
     return true;
   }
@@ -451,20 +479,62 @@ class PdfOperatorInterpreterV1 {
       this.paintPath({ fill: true, stroke: true, evenodd: true });
     } else if (operator === 'n') this.commands = [];
   }
+
+  private reserveMappedItem(): boolean {
+    if (this.mappedItems >= this.maxMappedItems) {
+      this.wasTruncated = true;
+
+      return false;
+    }
+
+    this.mappedItems += 1;
+
+    return true;
+  }
+
+  private appendPathCommands(commands: readonly PdfPathCommandV1[]): void {
+    if (commands.length > this.maxPathCommands - this.pathCommands) {
+      this.wasTruncated = true;
+
+      return;
+    }
+
+    this.commands.push(...commands);
+    this.pathCommands += commands.length;
+  }
 }
 
-export function parsePdfOperatorsV1(content: string): ParsedPdfOperatorsV1 {
-  const interpreter = new PdfOperatorInterpreterV1();
+export function parsePdfOperatorsV1(input: {
+  readonly content: string;
+  readonly maxMappedItems: number;
+  readonly maxPathCommands: number;
+}): ParsedPdfOperatorsV1 {
+  const interpreter = new PdfOperatorInterpreterV1(input);
   let operands: PdfTokenV1[] = [];
 
-  for (const token of tokenize(content)) {
+  const tokens: Generator<PdfTokenV1, void, undefined> = tokenize(input.content);
+  let nextToken: IteratorResult<PdfTokenV1, void> = tokens.next();
+
+  while (!nextToken.done) {
+    const token: PdfTokenV1 = nextToken.value;
+
     if (token.kind !== 'word') {
+      if (operands.length >= 256) {
+        interpreter.truncate();
+        break;
+      }
+
       operands.push(token);
+      nextToken = tokens.next();
       continue;
     }
 
     interpreter.apply(token.value, operands);
     operands = [];
+
+    if (interpreter.isTruncated()) break;
+
+    nextToken = tokens.next();
   }
 
   return interpreter.read();

@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/experimental-ct-react';
 import type { Page } from '@playwright/test';
 
-import { DemoApp } from '../../src/DemoApp';
 import { FIXTURE_IDS, FIXTURE_LAYER_LABELS } from '../fixture-selectors';
+import { DemoAppFresh } from '../helpers/demo-app-fresh.helper';
 
 async function openFileMenu(page: Page): Promise<void> {
   await page.locator('button[aria-label="File"]').first().click();
@@ -24,7 +24,7 @@ async function saveSnapshotWithName(page: Page, name: string): Promise<void> {
  * `project/spec/demo/state.md` snapshot behavior.
  */
 test('save captures state, mutation diverges, restore reverts canvas and layers together', async ({ mount, page }) => {
-  await mount(<DemoApp />);
+  await mount(<DemoAppFresh />);
 
   const liveDotNode = page.locator(`[data-element-id="${FIXTURE_IDS.liveOrb}"]`);
 

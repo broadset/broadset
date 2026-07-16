@@ -270,11 +270,44 @@ function buildSymbolReplacement(xmlDoc: Document, symbol: Element): Element {
  * Closes the P7.7n security audit C1 finding.
  */
 const USE_DEREFERENCE_INVOCATION_CAP = 5_000;
+const USE_EXPANDED_NODE_CAP = 5_000;
+
+function countCloneNodesUpTo(symbol: Element, limit: number): number {
+  const pending: Node[] = [];
+  let count = 0;
+
+  for (let index = 0; index < symbol.childNodes.length; index += 1) {
+    const child = symbol.childNodes[index];
+
+    if (child !== undefined) pending.push(child);
+  }
+
+  while (pending.length > 0) {
+    const node = pending.pop();
+
+    if (node === undefined) continue;
+
+    count += 1;
+
+    if (count > limit) return count;
+
+    for (let index = 0; index < node.childNodes.length; index += 1) {
+      const child = node.childNodes[index];
+
+      if (child !== undefined) pending.push(child);
+    }
+  }
+
+  return count;
+}
 
 export function dereferenceUseElements(xmlDoc: Document, warnings: string[]): void {
   const symbolById = collectSymbolsById(xmlDoc);
+  const cloneCostBySymbol = new Map<Element, number>();
   let invocationCount = 0;
+  let expandedNodeCount = 0;
   let budgetExhausted = false;
+  let expandedBudgetWarningEmitted = false;
 
   function replaceUse(useEl: Element, seen: ReadonlySet<string>, depth: number): void {
     if (budgetExhausted) {
@@ -322,6 +355,26 @@ export function dereferenceUseElements(xmlDoc: Document, warnings: string[]): vo
     if (symbol === undefined || parent === null) {
       return;
     }
+
+    const cloneCost =
+      cloneCostBySymbol.get(symbol) ?? countCloneNodesUpTo(symbol, USE_EXPANDED_NODE_CAP);
+
+    cloneCostBySymbol.set(symbol, cloneCost);
+
+    if (cloneCost > USE_EXPANDED_NODE_CAP - expandedNodeCount) {
+      if (!expandedBudgetWarningEmitted) {
+        warnings.push(
+          `<use> expanded-node budget of ${String(USE_EXPANDED_NODE_CAP)} reached; oversized referenced subtrees were skipped before cloning.`,
+        );
+        expandedBudgetWarningEmitted = true;
+      }
+
+      useEl.remove();
+
+      return;
+    }
+
+    expandedNodeCount += cloneCost;
 
     const nextSeen = new Set(seen).add(id);
     const replacement = buildSymbolReplacement(xmlDoc, symbol);

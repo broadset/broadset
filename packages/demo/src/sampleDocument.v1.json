@@ -15,13 +15,12 @@
           "id": "asset-home-crest",
           "name": "Home Team Crest",
           "blob": {
-            "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-            "byteLength": 0,
-            "mediaType": "image/jpeg",
+            "digest": "sha256:fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c",
+            "byteLength": 70,
+            "mediaType": "image/png",
             "source": {
-              "kind": "external",
-              "url": "https://picsum.photos/id/102/150/150",
-              "integrity": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+              "kind": "package",
+              "path": "blobs/sha256/fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c"
             }
           },
           "kind": "image",
@@ -38,13 +37,12 @@
           "id": "asset-away-crest",
           "name": "Away Team Crest",
           "blob": {
-            "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-            "byteLength": 0,
-            "mediaType": "image/jpeg",
+            "digest": "sha256:fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c",
+            "byteLength": 70,
+            "mediaType": "image/png",
             "source": {
-              "kind": "external",
-              "url": "https://picsum.photos/id/103/150/150",
-              "integrity": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+              "kind": "package",
+              "path": "blobs/sha256/fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c"
             }
           },
           "kind": "image",
@@ -61,13 +59,12 @@
           "id": "asset-network-bug",
           "name": "Network Bug",
           "blob": {
-            "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-            "byteLength": 0,
-            "mediaType": "image/jpeg",
+            "digest": "sha256:fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c",
+            "byteLength": 70,
+            "mediaType": "image/png",
             "source": {
-              "kind": "external",
-              "url": "https://picsum.photos/id/104/150/150",
-              "integrity": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+              "kind": "package",
+              "path": "blobs/sha256/fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c"
             }
           },
           "kind": "image",
@@ -84,13 +81,12 @@
           "id": "asset-player-headshot",
           "name": "Player Headshot",
           "blob": {
-            "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-            "byteLength": 0,
-            "mediaType": "image/jpeg",
+            "digest": "sha256:fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c",
+            "byteLength": 70,
+            "mediaType": "image/png",
             "source": {
-              "kind": "external",
-              "url": "https://picsum.photos/id/192/150/150",
-              "integrity": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+              "kind": "package",
+              "path": "blobs/sha256/fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c"
             }
           },
           "kind": "image",
@@ -107,12 +103,12 @@
           "id": "asset-replay-clip",
           "name": "Replay Clip",
           "blob": {
-            "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-            "byteLength": 0,
+            "digest": "sha256:754ed2f212d495ae30ef2f68f8ab18b0ab162ce669f768373d79f72f1ba3c3bd",
+            "byteLength": 24,
             "mediaType": "video/mp4",
             "source": {
               "kind": "package",
-              "path": "blobs/sha256/0000000000000000000000000000000000000000000000000000000000000000"
+              "path": "blobs/sha256/754ed2f212d495ae30ef2f68f8ab18b0ab162ce669f768373d79f72f1ba3c3bd"
             }
           },
           "kind": "video",

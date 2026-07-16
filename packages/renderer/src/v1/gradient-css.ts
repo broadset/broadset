@@ -14,19 +14,21 @@ const RADIANS_TO_DEGREES = 180 / Math.PI;
 type Swatches = ReadonlyMap<Id, Swatch>;
 
 /** A single CSS color stop: the stop's color (with its per-stop opacity folded into alpha) at `offset`. */
-function stopToCss(stop: GradientStop, swatches: Swatches): string {
+function stopToCss(stop: GradientStop, swatches: Swatches, layerOpacity: number): string {
   const concrete = resolveConcreteColor(stop.color, swatches);
   const color =
-    concrete === undefined ? 'transparent' : concreteColorToCss({ ...concrete, alpha: concrete.alpha * stop.opacity });
+    concrete === undefined ? 'transparent' : (
+      concreteColorToCss({ ...concrete, alpha: concrete.alpha * stop.opacity * layerOpacity })
+    );
 
   return `${color} ${formatCssNumber(stop.offset * PERCENT)}%`;
 }
 
 /** Stops in ascending `offset` order — CSS clamps out-of-order stop positions, so ordering is required. */
-function stopsToCss(stops: readonly GradientStop[], swatches: Swatches): string {
+function stopsToCss(stops: readonly GradientStop[], swatches: Swatches, layerOpacity: number): string {
   return [...stops]
     .sort((left, right) => left.offset - right.offset)
-    .map((stop) => stopToCss(stop, swatches))
+    .map((stop) => stopToCss(stop, swatches, layerOpacity))
     .join(', ');
 }
 
@@ -74,10 +76,10 @@ function repeatingPrefix(spread: Gradient['spread']): string {
  * `diamond` (no CSS equivalent) approximates as a radial gradient; `producer-preserved` falls back to a
  * left-to-right linear gradient of its stops. A gradient with no stops fails closed to `'transparent'`.
  */
-export function gradientToCss(gradient: Gradient, swatches: Swatches): string {
+export function gradientToCss(gradient: Gradient, swatches: Swatches, layerOpacity = 1): string {
   if (gradient.stops.length === 0) return 'transparent';
 
-  const stops = stopsToCss(gradient.stops, swatches);
+  const stops = stopsToCss(gradient.stops, swatches, layerOpacity);
   const prefix = repeatingPrefix(gradient.spread);
   const interpolation = interpolationClause(gradient.interpolation);
 
@@ -96,4 +98,9 @@ export function gradientToCss(gradient: Gradient, swatches: Swatches): string {
     case 'producer-preserved':
       return `linear-gradient(to right${interpolation}, ${stops})`;
   }
+}
+
+/** Preserve validated gradient geometry for renderer adapters without interpreting producer content. */
+export function gradientToDataAttributeV1(gradient: Gradient): string {
+  return JSON.stringify(gradient);
 }

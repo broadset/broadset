@@ -1,3 +1,4 @@
+import { containsForbiddenXmlDeclaration } from '../_shared/import-limits';
 import { extractEmbeddedFonts } from './import/fonts';
 import { aggregateLayoutPlaceholders } from './import/layout';
 import { resolvePackage } from './import/package';
@@ -14,10 +15,11 @@ import {
 } from './project-model';
 import type { PptxImportOptions, PptxImportWarning } from './types';
 
-interface PptxSourceImportReport {
+export interface PptxSourceImportReport {
   readonly document: PptxSourceDocument;
   readonly warnings: readonly PptxImportWarning[];
   readonly fontAssets: readonly PptxEmbeddedFontAsset[];
+  readonly terminalTrustBoundaryWarning?: PptxImportWarning;
 }
 
 export function importPptxSource(data: Uint8Array, options?: PptxImportOptions): PptxSourceDocument {
@@ -37,17 +39,19 @@ export function importPptxSourceWithReport(data: Uint8Array, options?: PptxImpor
     return { document: createEmptyPptxSourceDocument(), warnings, fontAssets: [] };
   }
 
-  let pkg: OoxmlPackage;
-
   try {
     const result = readOoxmlPackageWithCaps(data, {
+      maxInputBytes: caps.maxInputBytes,
       maxEntries: caps.maxEntries,
       maxPartBytes: caps.maxPartBytes,
       maxTotalUncompressedBytes: caps.maxTotalUncompressedBytes,
+      maxExpansionRatio: caps.maxExpansionRatio,
+      maxDepth: caps.maxDepth,
     });
 
-    pkg = result.pkg;
     warnings.push(...result.skippedEntries.map((entry) => warningForSkippedOoxmlEntry(entry, caps)));
+
+    return importPptxPackageWithReport({ pkg: result.pkg, options, archiveWarnings: warnings });
   } catch (error: unknown) {
     warnings.push({
       code: 'malformed-xml',
@@ -57,32 +61,47 @@ export function importPptxSourceWithReport(data: Uint8Array, options?: PptxImpor
 
     return { document: createEmptyPptxSourceDocument(), warnings, fontAssets: [] };
   }
+}
 
-  rejectExecutionSurface(pkg, warnings);
+export function importPptxPackageWithReport(input: {
+  readonly pkg: OoxmlPackage;
+  readonly options: PptxImportOptions | undefined;
+  readonly archiveWarnings: readonly PptxImportWarning[];
+}): PptxSourceImportReport {
+  const warnings = [...input.archiveWarnings];
 
-  const xmlIssue = validateXmlSafety(pkg);
+  rejectExecutionSurface(input.pkg, warnings);
+
+  const xmlIssue = validateXmlSafety(input.pkg);
 
   if (xmlIssue !== null) {
     warnings.push(xmlIssue);
 
-    return { document: createEmptyPptxSourceDocument(), warnings, fontAssets: [] };
+    return {
+      document: createEmptyPptxSourceDocument(),
+      warnings,
+      fontAssets: [],
+      terminalTrustBoundaryWarning: xmlIssue,
+    };
   }
 
-  const fontAssets = extractEmbeddedFonts(pkg);
-  const operatorLevel = importOperatorLevel(pkg, options?.authoredSurface);
+  const fontAssets = extractEmbeddedFonts(input.pkg);
+  const operatorLevel = importOperatorLevel(input.pkg, input.options?.authoredSurface);
 
   return { document: operatorLevel.document, warnings: [...warnings, ...operatorLevel.warnings], fontAssets };
 }
 
 function validateXmlSafety(pkg: OoxmlPackage): PptxImportWarning | null {
-  for (const path of pkg.keys()) {
+  const paths: readonly string[] = [...pkg.keys()];
+
+  for (const path of paths) {
     if (!path.endsWith('.xml') && !path.endsWith('.rels')) continue;
 
     const source = readTextPart(pkg, path);
 
     if (source === null || source.trim().length === 0) continue;
 
-    if (/<!\s*DOCTYPE\b/iu.test(source) || /<!\s*(?:ENTITY|ELEMENT|ATTLIST|NOTATION)\b/iu.test(source)) {
+    if (containsForbiddenXmlDeclaration(source)) {
       return {
         code: 'malformed-xml',
         message: `XML part "${path}" contains a DTD construct and was rejected.`,
@@ -105,7 +124,9 @@ function validateXmlSafety(pkg: OoxmlPackage): PptxImportWarning | null {
 }
 
 function rejectExecutionSurface(pkg: OoxmlPackage, warnings: PptxImportWarning[]): void {
-  for (const path of pkg.keys()) {
+  const paths: readonly string[] = [...pkg.keys()];
+
+  for (const path of paths) {
     if (path === 'ppt/vbaProject.bin') {
       warnings.push({
         code: 'macro-rejected',
@@ -135,8 +156,14 @@ interface OperatorSlide {
   readonly elements: readonly PptxSourceElement[];
 }
 
-function importOperatorLevel(pkg: OoxmlPackage, authoredSurface?: PptxImportOptions['authoredSurface']): OperatorLevelResult {
-  const resolved = resolvePackage(pkg, authoredSurface);
+function importOperatorLevel(
+  pkg: OoxmlPackage,
+  authoredSurface?: PptxImportOptions['authoredSurface'],
+): OperatorLevelResult {
+  const resolved = {
+    ...resolvePackage(pkg, authoredSurface),
+    dataUriByMediaPath: new Map<string, string>(),
+  };
   const warnings: PptxImportWarning[] = [];
 
   if (resolved.slidePaths.length === 0) {

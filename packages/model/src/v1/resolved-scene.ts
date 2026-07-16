@@ -3,6 +3,8 @@ import type { Id } from './identity';
 import type { BroadsetProjectV1 } from './project';
 import { type ComponentSemanticIndex, createSemanticIndexes, type DocumentSemanticIndex } from './semantic-index';
 
+export { resolveCanonicalSceneV1 } from './resolved-scene-canonical';
+
 /**
  * A single placed element in a page's resolved instance tree. The address mirrors the v1
  * {@link import('./page').InstanceAddress} contract exactly, so it round-trips through

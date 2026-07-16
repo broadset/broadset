@@ -1,5 +1,7 @@
 import { projectFormatV1 } from '@broadset/model';
 
+import { containsForbiddenXmlDeclaration } from '../../_shared/import-limits';
+import { verifyBlobBytesV1 } from '../../v1';
 import { findChildByNs, getText, parseOoxml, rootElement } from '../ooxml/ast';
 import { escapeXmlAttribute, escapeXmlText, XML_DECLARATION } from '../ooxml/xml';
 import type { OoxmlPackage } from '../ooxml/zip';
@@ -45,7 +47,7 @@ function projectJsonFromXml(xml: string): string | undefined {
 export async function readProjectMetadataV1(pkg: OoxmlPackage): Promise<projectFormatV1.BroadsetProjectV1 | undefined> {
   const xml = readTextPart(pkg, BROADSET_PROJECT_PART);
 
-  if (xml === null || /<!\s*(?:DOCTYPE|ENTITY)\b/iu.test(xml)) return undefined;
+  if (xml === null || containsForbiddenXmlDeclaration(xml)) return undefined;
 
   try {
     const json = projectJsonFromXml(xml);
@@ -60,12 +62,20 @@ export async function readProjectMetadataV1(pkg: OoxmlPackage): Promise<projectF
   }
 }
 
-export function collectMetadataBlobs(
+interface MetadataBlobCollectionV1 {
+  readonly blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>;
+  readonly diagnostics: readonly projectFormatV1.InteropDiagnostic[];
+}
+
+export async function collectMetadataBlobs(
   pkg: OoxmlPackage,
   project: projectFormatV1.BroadsetProjectV1,
-): ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array> {
+): Promise<MetadataBlobCollectionV1> {
   const blobs = new Map<projectFormatV1.Sha256Digest, Uint8Array>();
+  const diagnostics: projectFormatV1.InteropDiagnostic[] = [];
   const packagedByDigest = new Map<projectFormatV1.Sha256Digest, Uint8Array>();
+  const rejectedDigests = new Set<projectFormatV1.Sha256Digest>();
+  const verificationCache = new Map<string, Awaited<ReturnType<typeof verifyBlobBytesV1>>>();
   const entries: readonly (readonly [string, Uint8Array])[] = [...pkg.entries()];
 
   for (const entry of entries) {
@@ -84,8 +94,30 @@ export function collectMetadataBlobs(
   for (const asset of project.resources.assets) {
     const bytes = packagedByDigest.get(asset.blob.digest);
 
-    if (bytes !== undefined) blobs.set(asset.blob.digest, bytes);
+    if (bytes === undefined) continue;
+
+    const cacheKey = `${asset.blob.digest}:${String(asset.blob.byteLength)}`;
+    let integrity = verificationCache.get(cacheKey);
+
+    if (integrity === undefined) {
+      integrity = await verifyBlobBytesV1({ reference: asset.blob, bytes });
+      verificationCache.set(cacheKey, integrity);
+    }
+
+    if (integrity.status === 'verified' && !rejectedDigests.has(asset.blob.digest)) {
+      blobs.set(asset.blob.digest, integrity.bytes);
+    } else if (integrity.status === 'rejected') {
+      rejectedDigests.add(asset.blob.digest);
+      blobs.delete(asset.blob.digest);
+      diagnostics.push({
+        code: `pptx.blob-${integrity.failure.code}`,
+        severity: 'error',
+        message: integrity.failure.message,
+        dimension: 'semantics',
+        pointer: `/resources/assets/${asset.id}/blob`,
+      });
+    }
   }
 
-  return blobs;
+  return { blobs, diagnostics };
 }

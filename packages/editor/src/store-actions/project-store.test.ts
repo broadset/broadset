@@ -52,7 +52,83 @@ function createProject(): projectFormatV1.BroadsetProjectV1 {
   return projectFormatV1.createProjectV1({ documents: [document] });
 }
 
+function createRepeatedRootProject(): projectFormatV1.BroadsetProjectV1 {
+  const parent = createElement({ id: 'repeated-parent', kind: 'group' });
+  const child = createElement({ id: 'repeated-child', parentId: parent.id });
+  const page = projectFormatV1.createPageV1({
+    id: id('repeated-page'),
+    rootInstances: [
+      {
+        id: id('repeated-root-a'),
+        elementId: parent.id,
+        overrides: [],
+        componentPropertyValues: [],
+      },
+      {
+        id: id('repeated-root-b'),
+        elementId: parent.id,
+        overrides: [],
+        componentPropertyValues: [],
+      },
+    ],
+  });
+  const document = projectFormatV1.createDocumentV1({
+    id: id('repeated-document'),
+    elements: [parent, child],
+    pages: [page],
+  });
+
+  return projectFormatV1.createProjectV1({ documents: [document] });
+}
+
 describe('createProjectEditorStore', () => {
+  it('selects repeated placements through collision-free instance addresses', () => {
+    const store = createProjectEditorStore({ project: createRepeatedRootProject() });
+    const first: projectFormatV1.InstanceAddress = {
+      rootInstanceId: id('repeated-root-a'),
+      componentInstancePath: [],
+      elementId: id('repeated-child'),
+    };
+    const second: projectFormatV1.InstanceAddress = { ...first, rootInstanceId: id('repeated-root-b') };
+
+    store.getState().selectInstance(first);
+    store.getState().toggleSelectInstance(second);
+
+    expect(store.getState().activeInstanceAddresses).toEqual([first, second]);
+
+    store.getState().toggleSelectInstance(first);
+    expect(store.getState().activeInstanceAddresses).toEqual([second]);
+  });
+
+  it('changes visibility and z-order on the addressed root instance only', () => {
+    const project = createRepeatedRootProject();
+    const store = createProjectEditorStore({ project });
+    const address: projectFormatV1.InstanceAddress = {
+      rootInstanceId: id('repeated-root-b'),
+      componentInstancePath: [],
+      elementId: id('repeated-child'),
+    };
+
+    expect(store.getState().toggleInstanceVisibility(address)).toBe(true);
+    expect(store.getState().project.documents[0]?.pages[0]?.rootInstances).toMatchObject([
+      { id: id('repeated-root-a') },
+      { id: id('repeated-root-b'), visible: false },
+    ]);
+
+    expect(store.getState().reorderRootInstance(id('repeated-root-a'), 'front')).toBe(true);
+    expect(store.getState().project.documents[0]?.pages[0]?.rootInstances.map(({ id: rootId }) => rootId)).toEqual([
+      id('repeated-root-b'),
+      id('repeated-root-a'),
+    ]);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+
+    store.getState().undo();
+    expect(store.getState().project.documents[0]?.pages[0]?.rootInstances.map(({ id: rootId }) => rootId)).toEqual([
+      id('repeated-root-a'),
+      id('repeated-root-b'),
+    ]);
+  });
+
   it('uses a BroadsetProjectV1 as its only persisted document source of truth', () => {
     const project = createProject();
     const store = createProjectEditorStore({ project });
@@ -73,7 +149,7 @@ describe('createProjectEditorStore', () => {
     store.getState().removeElements([parentId]);
 
     expect(store.getState().project.documents[0]?.elements).toEqual([]);
-    expect(store.getState().activeElementIds).toEqual([]);
+    expect(store.getState().activeInstanceAddresses).toEqual([]);
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
 
     store.getState().undo();
@@ -85,7 +161,64 @@ describe('createProjectEditorStore', () => {
     expect(store.getState().project.documents[0]?.elements).toEqual([]);
   });
 
-  it('loads a project atomically and resets selection plus undo history', () => {
+  it('enforces configured required element ids during direct and parent deletion', () => {
+    const project = createProject();
+    const parentId = project.documents[0]?.elements[0]?.id ?? id('parent');
+    const childId = project.documents[0]?.elements[1]?.id ?? id('child');
+    const store = createProjectEditorStore({ project, config: { requiredElements: [childId] } });
+
+    store.getState().removeElement(childId);
+    expect(store.getState().project).toBe(project);
+
+    store.getState().removeElement(parentId);
+
+    expect(store.getState().project.documents[0]?.elements.map(({ id: elementId }) => elementId)).toEqual([childId]);
+    expect(store.getState().project.documents[0]?.elements[0]?.parentId).toBeNull();
+    expect(store.getState().project.documents[0]?.pages[0]?.rootInstances[0]?.elementId).toBe(childId);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
+
+  it('rejects a semantically invalid project without changing state or history', () => {
+    const initialProject = createProject();
+    const document = initialProject.documents[0];
+    const parent = document?.elements[0];
+
+    if (document === undefined || parent === undefined) throw new Error('Expected the project fixture');
+
+    const invalidProject: projectFormatV1.BroadsetProjectV1 = {
+      ...initialProject,
+      documents: [
+        {
+          ...document,
+          elements: document.elements.map((element) =>
+            element.id === parent.id ? { ...element, parentId: parent.id } : element,
+          ),
+        },
+      ],
+    };
+    const digest = projectFormatV1.sha256DigestSchema.parse(`sha256:${'a'.repeat(64)}`);
+    const blobs = new Map([[digest, new Uint8Array([1, 2, 3])]]);
+    const store = createProjectEditorStore({ project: initialProject, blobs });
+
+    expect(
+      projectFormatV1
+        .parseProjectV1Unknown(invalidProject)
+        .diagnostics.some((diagnostic) => diagnostic.code === 'structural-invalid'),
+    ).toBe(false);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(invalidProject)).not.toEqual([]);
+
+    expect(store.getState().updateElement(parent.id, (element) => ({ ...element, name: 'Changed' }))).toBe(true);
+    store.getState().beginPlacement('rectangle');
+
+    const beforeState = store.getState();
+    const beforeTemporalState = store.temporal.getState();
+
+    expect(store.getState().setProject(invalidProject, new Map())).toBe(false);
+    expect(store.getState()).toBe(beforeState);
+    expect(store.temporal.getState()).toBe(beforeTemporalState);
+  });
+
+  it('loads a project atomically, resets project editing state, and preserves host preferences', () => {
     const initialProject = createProject();
     const replacement = projectFormatV1.createProjectV1({
       id: id('replacement-project'),
@@ -94,14 +227,58 @@ describe('createProjectEditorStore', () => {
     const store = createProjectEditorStore({ project: initialProject });
     const digest = projectFormatV1.sha256DigestSchema.parse(`sha256:${'a'.repeat(64)}`);
     const blobs = new Map([[digest, new Uint8Array([1, 2, 3])]]);
+    const parentId = initialProject.documents[0]?.elements[0]?.id ?? id('parent');
+    const mediaSource = { assets: [{ id: 'media', name: 'Media', url: 'https://example.com/media.png' }] };
 
-    store.getState().setActiveElements([initialProject.documents[0]?.elements[0]?.id ?? id('parent')]);
-    store.getState().setProject(replacement, blobs);
+    expect(store.getState().updateElement(parentId, (element) => ({ ...element, name: 'Changed' }))).toBe(true);
+    store.getState().updateCanvasSettings({ zoom: 1.5, panX: 40 });
+    store.getState().updateGridSettings({ showGrid: true, gridSize: 24 });
+    store.getState().addPaletteColor('#123456');
+    store.getState().setAvailableFonts(['Inter']);
+    store.getState().setMediaSource(mediaSource);
+    store.setState({
+      activeInstanceAddresses: [
+        { rootInstanceId: id('parent-instance'), componentInstancePath: [], elementId: parentId },
+      ],
+      placement: { type: 'placement-anchor', elementType: 'rectangle' },
+      placementPreview: { x: 10, y: 20 },
+      pathEditingElementId: parentId,
+      pathDrawingElementId: parentId,
+      clipPathEditingElementId: parentId,
+      motionPathEditingElementId: parentId,
+      inlineTextEditingElementId: parentId,
+      editingMode: { type: 'motion-path-editing', elementId: parentId },
+      editingGuideId: 'guide',
+    });
+
+    const canvasSettings = store.getState().canvasSettings;
+    const gridSettings = store.getState().gridSettings;
+    const savedPalette = store.getState().savedPalette;
+    const availableFonts = store.getState().availableFonts;
+
+    expect(store.getState().setProject(replacement, blobs)).toBe(true);
 
     expect(store.getState().project).toBe(replacement);
     expect(store.getState().blobs).toBe(blobs);
-    expect(store.getState().activeElementIds).toEqual([]);
+    expect(store.getState().activeInstanceAddresses).toEqual([]);
     expect(store.getState().activeDocumentId).toBe(replacement.documents[0]?.id);
+    expect(store.getState().activePageId).toBe(replacement.documents[0]?.pages[0]?.id);
+    expect(store.getState().placement).toBeNull();
+    expect(store.getState().placementPreview).toBeNull();
+    expect(store.getState().pathEditingElementId).toBeNull();
+    expect(store.getState().pathDrawingElementId).toBeNull();
+    expect(store.getState().clipPathEditingElementId).toBeNull();
+    expect(store.getState().motionPathEditingElementId).toBeNull();
+    expect(store.getState().inlineTextEditingElementId).toBeNull();
+    expect(store.getState().editingMode).toEqual({ type: 'none' });
+    expect(store.getState().editingGuideId).toBeNull();
+    expect(store.getState().canvasSettings).toBe(canvasSettings);
+    expect(store.getState().gridSettings).toBe(gridSettings);
+    expect(store.getState().savedPalette).toBe(savedPalette);
+    expect(store.getState().availableFonts).toBe(availableFonts);
+    expect(store.getState().mediaSource).toBe(mediaSource);
+    expect(store.temporal.getState().pastStates).toEqual([]);
+    expect(store.temporal.getState().futureStates).toEqual([]);
 
     store.getState().undo();
     expect(store.getState().project).toBe(replacement);
@@ -118,7 +295,7 @@ describe('createProjectEditorStore', () => {
 
     expect(document?.elements.at(-1)).toBe(element);
     expect(document?.pages[0]?.rootInstances.at(-1)?.elementId).toBe(element.id);
-    expect(store.getState().activeElementIds).toEqual([element.id]);
+    expect(store.getState().activeInstanceAddresses.map(({ elementId }) => elementId)).toEqual([element.id]);
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
 
     store.getState().undo();
@@ -273,7 +450,7 @@ describe('createProjectEditorStore', () => {
     expect(store.getState().setActiveDocument(secondDocument.id)).toBe(true);
     expect(store.getState().activeDocumentId).toBe(secondDocument.id);
     expect(store.getState().activePageId).toBe(secondDocument.pages[0]?.id);
-    expect(store.getState().activeElementIds).toEqual([]);
+    expect(store.getState().activeInstanceAddresses).toEqual([]);
     expect(store.getState().setActivePage(id('missing-page'))).toBe(false);
     expect(store.getState().project).toBe(project);
   });
@@ -298,7 +475,7 @@ describe('createProjectEditorStore', () => {
 
     expect(store.getState().addPage(secondPage)).toBe(true);
     expect(store.getState().setActivePage(secondPage.id)).toBe(true);
-    expect(store.getState().setPageRootVisibility(rootElementId, false)).toBe(true);
+    expect(store.getState().setPageRootVisibility(id('second-parent-instance'), false)).toBe(true);
     expect(selectActivePageV1(store.getState())?.rootInstances[0]?.visible).toBe(false);
 
     expect(store.getState().removePage(secondPage.id)).toBe(true);
@@ -362,7 +539,7 @@ describe('createProjectEditorStore', () => {
     store.getState().selectElement(parentId);
     store.getState().toggleSelectElement(childId);
 
-    expect(store.getState().activeElementIds).toEqual([parentId, childId]);
+    expect(store.getState().activeInstanceAddresses.map(({ elementId }) => elementId)).toEqual([parentId, childId]);
 
     store.getState().enterPathEditing(childId);
     expect(store.getState().editingMode).toEqual({ type: 'path-editing', elementId: childId });

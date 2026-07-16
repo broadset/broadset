@@ -3,9 +3,7 @@ import { projectFormatV1 } from '@broadset/model';
 import { AboutModal, ShortcutHelpModal } from '@broadset/ui';
 import { Button, Modal } from '@heroui/react';
 
-import { V1ProjectExportControls } from './v1-project-export-controls';
-
-export type V1HostDialog = 'about' | 'export' | 'media-library' | 'new-document' | 'shortcuts' | null;
+export type V1HostDialog = 'about' | 'media-library' | 'new-document' | 'shortcuts' | null;
 type SimpleV1HostDialog = Exclude<V1HostDialog, 'about' | 'shortcuts' | null>;
 
 interface V1HostDialogsProps {
@@ -16,8 +14,6 @@ interface V1HostDialogsProps {
 
 function dialogTitle(activeDialog: SimpleV1HostDialog): string {
   switch (activeDialog) {
-    case 'export':
-      return 'Export';
     case 'media-library':
       return 'Media Library';
     case 'new-document':
@@ -60,9 +56,6 @@ function renderDialogBody(
         </ul>
       );
     }
-
-    case 'export':
-      return <V1ProjectExportControls editorStore={editorStore} />;
   }
 }
 

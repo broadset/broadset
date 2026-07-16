@@ -2,7 +2,7 @@ import { projectFormatV1 } from '@broadset/model';
 
 export type ProjectReorderDirection = 'forward' | 'backward' | 'front' | 'back';
 
-function isValidProject(project: projectFormatV1.BroadsetProjectV1): boolean {
+export function isValidProject(project: projectFormatV1.BroadsetProjectV1): boolean {
   const hasStructuralFailure = projectFormatV1
     .parseProjectV1Unknown(project)
     .diagnostics.some((diagnostic) => diagnostic.code === 'structural-invalid');
@@ -276,6 +276,85 @@ export function reorderElementInProject(options: {
   return isValidProject(candidate) ? candidate : options.project;
 }
 
+export function reorderPageRootInstanceInProject(options: {
+  readonly project: projectFormatV1.BroadsetProjectV1;
+  readonly documentId: projectFormatV1.Id;
+  readonly pageId: projectFormatV1.Id;
+  readonly rootInstanceId: projectFormatV1.Id;
+  readonly direction: ProjectReorderDirection;
+}): projectFormatV1.BroadsetProjectV1 {
+  const document = options.project.documents.find((candidate) => candidate.id === options.documentId);
+  const page = document?.pages.find((candidate) => candidate.id === options.pageId);
+  const currentIndex = page?.rootInstances.findIndex((root) => root.id === options.rootInstanceId) ?? -1;
+
+  if (document === undefined || page === undefined || currentIndex < 0) return options.project;
+
+  const destinationIndex = resolveReorderDestination({
+    currentIndex,
+    lastIndex: page.rootInstances.length - 1,
+    direction: options.direction,
+  });
+
+  if (destinationIndex === currentIndex) return options.project;
+
+  const rootInstances = [...page.rootInstances];
+  const removed = rootInstances.splice(currentIndex, 1)[0];
+
+  if (removed === undefined) return options.project;
+
+  rootInstances.splice(destinationIndex, 0, removed);
+
+  const nextDocument: projectFormatV1.BroadsetDocumentV1 = {
+    ...document,
+    pages: document.pages.map((candidate) => (candidate.id === page.id ? { ...candidate, rootInstances } : candidate)),
+  };
+  const candidate: projectFormatV1.BroadsetProjectV1 = {
+    ...options.project,
+    documents: options.project.documents.map((entry) => (entry.id === document.id ? nextDocument : entry)),
+  };
+
+  return isValidProject(candidate) ? candidate : options.project;
+}
+
+export function movePageRootInstanceInProject(options: {
+  readonly project: projectFormatV1.BroadsetProjectV1;
+  readonly documentId: projectFormatV1.Id;
+  readonly pageId: projectFormatV1.Id;
+  readonly rootInstanceId: projectFormatV1.Id;
+  readonly targetRootInstanceId: projectFormatV1.Id;
+  readonly position: 'before' | 'after';
+}): projectFormatV1.BroadsetProjectV1 {
+  const document = options.project.documents.find((candidate) => candidate.id === options.documentId);
+  const page = document?.pages.find((candidate) => candidate.id === options.pageId);
+
+  if (document === undefined || page === undefined || options.rootInstanceId === options.targetRootInstanceId) {
+    return options.project;
+  }
+
+  const root = page.rootInstances.find((candidate) => candidate.id === options.rootInstanceId);
+  const withoutRoot = page.rootInstances.filter((candidate) => candidate.id !== options.rootInstanceId);
+  const targetIndex = withoutRoot.findIndex((candidate) => candidate.id === options.targetRootInstanceId);
+
+  if (root === undefined || targetIndex < 0) return options.project;
+
+  const rootInstances = [...withoutRoot];
+
+  rootInstances.splice(options.position === 'before' ? targetIndex : targetIndex + 1, 0, root);
+
+  if (rootInstances.every((candidate, index) => candidate === page.rootInstances[index])) return options.project;
+
+  const nextDocument: projectFormatV1.BroadsetDocumentV1 = {
+    ...document,
+    pages: document.pages.map((candidate) => (candidate.id === page.id ? { ...candidate, rootInstances } : candidate)),
+  };
+  const candidate: projectFormatV1.BroadsetProjectV1 = {
+    ...options.project,
+    documents: options.project.documents.map((entry) => (entry.id === document.id ? nextDocument : entry)),
+  };
+
+  return isValidProject(candidate) ? candidate : options.project;
+}
+
 export function insertPageIntoProject(options: {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly documentId: projectFormatV1.Id;
@@ -324,12 +403,12 @@ export function setPageRootVisibilityInProject(options: {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly documentId: projectFormatV1.Id;
   readonly pageId: projectFormatV1.Id;
-  readonly elementId: projectFormatV1.Id;
+  readonly rootInstanceId: projectFormatV1.Id;
   readonly visible: boolean;
 }): projectFormatV1.BroadsetProjectV1 {
   const document = options.project.documents.find((candidate) => candidate.id === options.documentId);
   const page = document?.pages.find((candidate) => candidate.id === options.pageId);
-  const instance = page?.rootInstances.find((candidate) => candidate.elementId === options.elementId);
+  const instance = page?.rootInstances.find((candidate) => candidate.id === options.rootInstanceId);
 
   if (document === undefined || page === undefined || instance === undefined || instance.visible === options.visible) {
     return options.project;

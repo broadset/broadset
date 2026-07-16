@@ -65,40 +65,77 @@ function resolveCommonElementPointer(element: Element, pointer: string): ValueTy
   return undefined;
 }
 
+function resolveImagePointer(
+  element: Extract<Element, { readonly kind: 'image' }>,
+  pointer: string,
+): ValueType | undefined {
+  if (pointer === '/image/focalPoint' && element.image.focalPoint === undefined) return undefined;
+
+  return lookupType(pointer, { '/image/assetId': 'asset', '/image/focalPoint': 'point2d' });
+}
+
+function resolveClockPointer(
+  element: Extract<Element, { readonly kind: 'clock' }>,
+  pointer: string,
+): ValueType | undefined {
+  if (pointer === '/clock/locale' && element.clock.locale === undefined) return undefined;
+
+  return lookupType(pointer, { '/clock/format': 'string', '/clock/timeZone': 'string', '/clock/locale': 'string' });
+}
+
+function resolveTextPointer(
+  element: Extract<Element, { readonly kind: 'text' }>,
+  pointer: string,
+): ValueType | undefined {
+  if (pointer === '/textPath/startOffset' && element.textPath === undefined) return undefined;
+  if (/^\/layout\/padding\/[0-3]$/u.test(pointer)) return element.layout.padding === undefined ? undefined : 'length';
+
+  return lookupType(pointer, {
+    '/layout/columns': 'integer',
+    '/layout/columnGap': 'length',
+    '/layout/verticalAlignment': 'string',
+    '/layout/overflow': 'string',
+    '/layout/autoSize': 'string',
+    '/textPath/startOffset': 'length',
+  });
+}
+
 function resolveElementVariantPointer(element: Element, pointer: string): ValueType | undefined {
   switch (element.kind) {
     case 'image':
-      if (pointer === '/image/focalPoint' && element.image.focalPoint === undefined) return undefined;
-
-      return lookupType(pointer, { '/image/assetId': 'asset', '/image/focalPoint': 'point2d' });
+      return resolveImagePointer(element, pointer);
     case 'video':
       return lookupType(pointer, {
-        '/video/assetId': 'asset', '/video/autoplay': 'boolean', '/video/loop': 'boolean',
-        '/video/muted': 'boolean', '/video/controls': 'boolean',
+        '/video/assetId': 'asset',
+        '/video/autoplay': 'boolean',
+        '/video/loop': 'boolean',
+        '/video/muted': 'boolean',
+        '/video/controls': 'boolean',
       });
     case 'audio':
       return lookupType(pointer, {
-        '/audio/assetId': 'asset', '/audio/autoplay': 'boolean', '/audio/loop': 'boolean', '/audio/volume': 'number',
+        '/audio/assetId': 'asset',
+        '/audio/autoplay': 'boolean',
+        '/audio/loop': 'boolean',
+        '/audio/volume': 'number',
       });
     case 'clock':
-      if (pointer === '/clock/locale' && element.clock.locale === undefined) return undefined;
-
-      return lookupType(pointer, { '/clock/format': 'string', '/clock/timeZone': 'string', '/clock/locale': 'string' });
+      return resolveClockPointer(element, pointer);
     case 'ticker':
       return lookupType(pointer, {
-        '/ticker/direction': 'string', '/ticker/speed': 'number', '/ticker/gap': 'number', '/ticker/repeat': 'boolean',
+        '/ticker/direction': 'string',
+        '/ticker/speed': 'number',
+        '/ticker/gap': 'number',
+        '/ticker/repeat': 'boolean',
       });
     case 'qrcode':
       return lookupType(pointer, {
-        '/qrcode/value': 'string', '/qrcode/errorCorrection': 'string', '/qrcode/quietZone': 'length',
+        '/qrcode/value': 'string',
+        '/qrcode/errorCorrection': 'string',
+        '/qrcode/quietZone': 'length',
       });
     case 'text':
-      if (pointer === '/textPath/startOffset' && element.textPath === undefined) return undefined;
-
-      return lookupType(pointer, {
-        '/layout/columns': 'integer', '/layout/columnGap': 'length', '/layout/verticalAlignment': 'string',
-        '/layout/overflow': 'string', '/layout/autoSize': 'string', '/textPath/startOffset': 'length',
-      });
+      return resolveTextPointer(element, pointer);
     case 'group':
       return pointer === '/group/clipChildren' ? 'boolean' : undefined;
     case 'foreign':
@@ -116,7 +153,8 @@ function resolvePaintPointer(layer: FillLayer, pointer: string): ValueType | und
   if (pointer === '/enabled') return 'boolean';
   if (pointer === '/opacity') return 'number';
   if (pointer === '/paint/color' && layer.paint.kind === 'solid') return 'color';
-  if (pointer === '/paint/assetId' && (layer.paint.kind === 'picture' || layer.paint.kind === 'pattern')) return 'asset';
+  if (pointer === '/paint/assetId' && (layer.paint.kind === 'picture' || layer.paint.kind === 'pattern'))
+    return 'asset';
 
   return undefined;
 }
@@ -133,7 +171,10 @@ function resolveEffectPointer(effect: Effect, pointer: string): ValueType | unde
   return pointer === '/assetId' && 'assetId' in effect ? 'asset' : undefined;
 }
 
-function resolvePageRootPointer(entity: Extract<ResolvedTargetEntity, { readonly kind: 'page-root' }>, pointer: string): ValueType | undefined {
+function resolvePageRootPointer(
+  entity: Extract<ResolvedTargetEntity, { readonly kind: 'page-root' }>,
+  pointer: string,
+): ValueType | undefined {
   if (pointer === '/visible') return entity.value.visible === undefined ? undefined : 'boolean';
   if (entity.value.transform === undefined) return undefined;
 
@@ -150,16 +191,27 @@ function resolveEntityPointer(entity: ResolvedTargetEntity, pointer: string): Va
       if (pointer === '/properties/hyperlink' && entity.value.properties.hyperlink === undefined) return undefined;
 
       return lookupType(pointer, {
-        '/text': 'string', '/properties/size': 'length', '/properties/color': 'color',
-        '/properties/weight': 'integer', '/properties/baselineShift': 'length',
-        '/properties/tracking': 'number', '/properties/hyperlink': 'string',
+        '/text': 'string',
+        '/properties/size': 'length',
+        '/properties/color': 'color',
+        '/properties/weight': 'integer',
+        '/properties/baselineShift': 'length',
+        '/properties/tracking': 'number',
+        '/properties/hyperlink': 'string',
       });
     case 'paragraph':
       return lookupType(pointer, {
-        '/properties/alignment': 'string', '/properties/direction': 'string', '/properties/hyphenation': 'string',
-        '/properties/spaceBefore': 'length', '/properties/spaceAfter': 'length',
-        '/properties/firstLineIndent': 'length', '/properties/startIndent': 'length', '/properties/endIndent': 'length',
-        '/properties/keepTogether': 'boolean', '/properties/keepWithNext': 'boolean', '/properties/widowControl': 'boolean',
+        '/properties/alignment': 'string',
+        '/properties/direction': 'string',
+        '/properties/hyphenation': 'string',
+        '/properties/spaceBefore': 'length',
+        '/properties/spaceAfter': 'length',
+        '/properties/firstLineIndent': 'length',
+        '/properties/startIndent': 'length',
+        '/properties/endIndent': 'length',
+        '/properties/keepTogether': 'boolean',
+        '/properties/keepWithNext': 'boolean',
+        '/properties/widowControl': 'boolean',
       });
     case 'fill':
       return resolvePaintPointer(entity.value, pointer);
@@ -170,7 +222,12 @@ function resolveEntityPointer(entity: ResolvedTargetEntity, pointer: string): Va
     case 'gradient-stop':
       if (pointer === '/midpoint' && entity.value.midpoint === undefined) return undefined;
 
-      return lookupType(pointer, { '/color': 'color', '/opacity': 'number', '/offset': 'number', '/midpoint': 'number' });
+      return lookupType(pointer, {
+        '/color': 'color',
+        '/opacity': 'number',
+        '/offset': 'number',
+        '/midpoint': 'number',
+      });
     case 'path-point':
       return pointer === '/x' || pointer === '/y' ? 'length' : undefined;
     case 'guide':
@@ -202,8 +259,8 @@ export function resolvePropertyTargetContractInScope(
   const entity = resolveTargetEntityAddress(scope, target.entity);
   const valueType = entity === undefined ? undefined : resolveEntityPointer(entity, target.pointer);
 
-  return entity === undefined || valueType === undefined
-    ? undefined
+  return entity === undefined || valueType === undefined ?
+      undefined
     : { valueType, assetKinds: resolveAssetKinds(entity, target.pointer) };
 }
 
@@ -231,8 +288,8 @@ export function resolvePropertyTargetContractFromIndexes(
     const page = document.pages.get(target.entity.pageId);
     const root = document.pageRoots.get(target.entity.pageId)?.get(target.entity.entityId);
 
-    return page === undefined || root === undefined
-      ? undefined
+    return page === undefined || root === undefined ?
+        undefined
       : resolvePropertyTargetContractInScope(createPageAddressScope(document, page, root), target);
   }
 
@@ -245,7 +302,8 @@ export function resolvePropertyTargetContractFromIndexes(
 
     const root = document.pageRoots.get(page.id)?.get(rootId);
 
-    if (root !== undefined) return resolvePropertyTargetContractInScope(createPageAddressScope(document, page, root), target);
+    if (root !== undefined)
+      return resolvePropertyTargetContractInScope(createPageAddressScope(document, page, root), target);
 
     return undefined;
   }
@@ -260,7 +318,10 @@ export function resolvePropertyTargetValueTypeFromIndexes(
   return resolvePropertyTargetContractFromIndexes(indexes, target)?.valueType;
 }
 
-export function resolvePropertyTargetValueType(project: BroadsetProjectV1, target: PropertyTarget): ValueType | undefined {
+export function resolvePropertyTargetValueType(
+  project: BroadsetProjectV1,
+  target: PropertyTarget,
+): ValueType | undefined {
   return resolvePropertyTargetValueTypeFromIndexes(createSemanticIndexes(project), target);
 }
 

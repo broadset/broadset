@@ -1,6 +1,6 @@
 import { PropertiesSidebar } from '@broadset/ui';
 import { expect, test } from '@playwright/experimental-ct-react';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 import { createSidebarPanelFixtureElements } from '../../src/test-fixtures';
 import { FIXTURE_IDS as PANEL_FIXTURE_IDS } from '../../src/test-fixtures/ids';
@@ -26,6 +26,15 @@ async function readFillKind(page: Page, elementId: string): Promise<string | und
 
     return element?.appearance.fills[0]?.paint.kind;
   }, elementId);
+}
+
+function renderedFill(page: Page, elementId: string): Locator {
+  return page
+    .locator(`[data-element-id="${elementId}"]`)
+    .locator(
+      ':scope > [data-paint-layer], :scope > [data-element-content] > [data-paint-layer], :scope > [data-element-content] foreignObject > div > [data-paint-layer]',
+    )
+    .first();
 }
 
 async function readScoreBugOpacity(page: Page): Promise<number | undefined> {
@@ -136,7 +145,7 @@ test('editing Appearance fill color updates the selected canvas element backgrou
   await fillInput.fill('#ff0000');
   await page.keyboard.press('Enter');
 
-  const scoreBugContent = page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`);
+  const scoreBugContent = renderedFill(page, FIXTURE_IDS.title);
 
   await expect
     .poll(async () => scoreBugContent.evaluate((node) => getComputedStyle(node).backgroundImage))
@@ -290,7 +299,7 @@ test('editing Appearance gradient updates the selected canvas element gradient f
   await page.getByRole('button', { name: 'Solid', exact: true }).click();
   await page.getByRole('button', { name: 'Gradient', exact: true }).click();
 
-  const scoreBugContent = page.locator(`[data-element-id="${FIXTURE_IDS.background}"]`);
+  const scoreBugContent = renderedFill(page, FIXTURE_IDS.background);
 
   await expect
     .poll(async () => scoreBugContent.evaluate((node) => getComputedStyle(node).backgroundImage))
@@ -317,7 +326,7 @@ test('editing Appearance gradient stays stable after a v1 sequence edit', async 
   await page.getByRole('button', { name: 'Solid', exact: true }).click();
   await page.getByRole('button', { name: 'Gradient', exact: true }).click();
 
-  const scoreBugContent = page.locator(`[data-element-id="${FIXTURE_IDS.background}"]`);
+  const scoreBugContent = renderedFill(page, FIXTURE_IDS.background);
 
   await expect.poll(async () => readFillKind(page, FIXTURE_IDS.background)).toBe('gradient');
   await expect
@@ -344,7 +353,7 @@ test('switching Appearance fill from gradient back to solid clears the canvas gr
   await page.getByRole('button', { name: 'Gradient', exact: true }).click();
   await page.getByRole('button', { name: 'Solid', exact: true }).click();
 
-  const scoreBugContent = page.locator(`[data-element-id="${FIXTURE_IDS.background}"]`);
+  const scoreBugContent = renderedFill(page, FIXTURE_IDS.background);
 
   await expect
     .poll(async () => scoreBugContent.evaluate((node) => getComputedStyle(node).backgroundImage))

@@ -110,6 +110,7 @@ describe('V1ViewportToolbar', () => {
     render(<V1ViewportToolbar editorStore={store} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    expect(screen.queryByText('Export')).toBeNull();
     fireEvent.click(screen.getByText('New Document'));
     expect(screen.getByRole('dialog', { name: 'New Document' })).toBeTruthy();
 

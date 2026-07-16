@@ -13,6 +13,7 @@ import { geometryToBoxStyle } from '@broadset/renderer';
 import { useRef, useState } from 'react';
 
 import { useEditorSelector } from '../demo-app/helpers';
+import { cssPixelsToDocumentValueV1, surfaceUnitContextV1 } from '../demo-app/v1-canvas-units';
 import {
   createV1GesturePlaneProjection,
   projectV1GestureDelta,
@@ -103,14 +104,17 @@ export function V1SelectionTransformWidget({
   zoom,
 }: V1SelectionTransformWidgetProps): React.JSX.Element | null {
   const state = useEditorSelector(editorStore, (current) => current);
-  const elementId = state.activeElementIds.length === 1 ? state.activeElementIds[0] : undefined;
+  const elementId =
+    state.activeInstanceAddresses.length === 1 ? state.activeInstanceAddresses[0]?.elementId : undefined;
   const element = elementId === undefined ? undefined : selectElementByIdV1(state, elementId);
+  const document = selectActiveDocumentV1(state);
+  const units = surfaceUnitContextV1(document);
   const gestureRef = useRef<TransformGestureV1 | null>(null);
   const projectionRef = useRef<V1GesturePlaneProjection | null>(null);
   const widgetRef = useRef<HTMLDivElement | null>(null);
   const [preview, setPreview] = useState<TransformPreviewV1 | null>(null);
 
-  if (state.activeElementIds.length > 1) {
+  if (state.activeInstanceAddresses.length > 1) {
     return <V1MultiSelectionTransformWidget editorStore={editorStore} zoom={zoom} />;
   }
 
@@ -181,7 +185,14 @@ export function V1SelectionTransformWidget({
       widgetRef.current === null ?
         null
       : createV1GesturePlaneProjection(widgetRef.current, { x: event.clientX, y: event.clientY });
-    const projectedPoint = projectV1GesturePoint(projection, { x: event.clientX, y: event.clientY });
+    const projectedCssPoint = projectV1GesturePoint(projection, { x: event.clientX, y: event.clientY });
+    const projectedPoint =
+      projectedCssPoint === null ? null : (
+        {
+          x: cssPixelsToDocumentValueV1(projectedCssPoint.x, units),
+          y: cssPixelsToDocumentValueV1(projectedCssPoint.y, units),
+        }
+      );
     const rotationCenter =
       hasMeasuredBounds ?
         { x: widgetBounds.left + widgetBounds.width / 2, y: widgetBounds.top + widgetBounds.height / 2 }
@@ -219,8 +230,14 @@ export function V1SelectionTransformWidget({
     event.stopPropagation();
 
     const scale = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
-    const projectedPoint = projectV1GesturePoint(projectionRef.current, { x: event.clientX, y: event.clientY });
-    const projectedDelta = projectV1GestureDelta(projectionRef.current, { x: event.clientX, y: event.clientY });
+    const projectedCssPoint = projectV1GesturePoint(projectionRef.current, { x: event.clientX, y: event.clientY });
+    const projectedPoint =
+      projectedCssPoint === null ? null : (
+        {
+          x: cssPixelsToDocumentValueV1(projectedCssPoint.x, units),
+          y: cssPixelsToDocumentValueV1(projectedCssPoint.y, units),
+        }
+      );
 
     if (gesture.kind === 'rotate') {
       const localCenter = {
@@ -240,13 +257,23 @@ export function V1SelectionTransformWidget({
       return;
     }
 
+    const projectedCssDelta = projectV1GestureDelta(projectionRef.current, { x: event.clientX, y: event.clientY });
+    const cssDelta = projectedCssDelta ?? {
+      x: (event.clientX - gesture.startPointer.x) / scale,
+      y: (event.clientY - gesture.startPointer.y) / scale,
+    };
+    const documentDelta = {
+      x: cssPixelsToDocumentValueV1(cssDelta.x, units),
+      y: cssPixelsToDocumentValueV1(cssDelta.y, units),
+    };
+
     if (gesture.kind === 'resize') {
       const latestRect: EditorElementRectV1 = resizeElementRectV1({
         rect: gesture.initialRect,
         handle: gesture.handle,
-        dx: projectedDelta?.x ?? event.clientX - gesture.startPointer.x,
-        dy: projectedDelta?.y ?? event.clientY - gesture.startPointer.y,
-        zoom: projectedDelta === null ? scale : 1,
+        dx: documentDelta.x,
+        dy: documentDelta.y,
+        zoom: 1,
         minSize: 1,
       });
 
@@ -257,8 +284,8 @@ export function V1SelectionTransformWidget({
     }
 
     const latestPosition = {
-      x: gesture.initialPosition.x + (projectedDelta?.x ?? (event.clientX - gesture.startPointer.x) / scale),
-      y: gesture.initialPosition.y + (projectedDelta?.y ?? (event.clientY - gesture.startPointer.y) / scale),
+      x: gesture.initialPosition.x + documentDelta.x,
+      y: gesture.initialPosition.y + documentDelta.y,
     };
 
     gestureRef.current = { ...gesture, latestPosition };
@@ -313,7 +340,7 @@ export function V1SelectionTransformWidget({
       data-broadset-transform-overlay="true"
       data-testid="demo-transform-widget"
       style={{
-        ...geometryToBoxStyle(displayedElement.geometry),
+        ...geometryToBoxStyle(displayedElement.geometry, units),
         border: '1px solid rgba(59, 130, 246, 0.95)',
         boxSizing: 'border-box',
         left: 0,
@@ -379,7 +406,6 @@ export function V1SelectionTransformWidget({
     </div>
   );
 
-  const document = selectActiveDocumentV1(state);
   const ancestors: projectFormatV1.Element[] = [];
   let parentId = element.parentId;
 
@@ -398,7 +424,7 @@ export function V1SelectionTransformWidget({
         key={ancestor.id}
         data-testid={`v1-transform-ancestor-${ancestor.id}`}
         style={{
-          ...geometryToBoxStyle(ancestor.geometry),
+          ...geometryToBoxStyle(ancestor.geometry, units),
           left: 0,
           pointerEvents: 'none',
           position: 'absolute',

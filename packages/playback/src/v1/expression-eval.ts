@@ -1,5 +1,6 @@
 import type { projectFormatV1 } from '@broadset/model';
 
+import { formatDateTimePatternV1 } from './date-time-pattern';
 import {
   clampNumericValues,
   evaluateNumericArithmetic,
@@ -48,9 +49,35 @@ function evaluateComparisonBinary(
   left: TypedValue | undefined,
   right: TypedValue | undefined,
 ): TypedValue | undefined {
+  if (left?.type === 'string' && right?.type === 'string') {
+    let comparison = 0;
+
+    if (left.value < right.value) comparison = -1;
+    else if (left.value > right.value) comparison = 1;
+
+    const matches = compareOrdered(operator, comparison);
+
+    return { type: 'boolean', value: matches };
+  }
+
+  if (left?.type === 'date-time' && right?.type === 'date-time') {
+    const comparison = Date.parse(left.value) - Date.parse(right.value);
+    const matches = compareOrdered(operator, comparison);
+
+    return { type: 'boolean', value: matches };
+  }
+
   const comparison = evaluateNumericComparison(operator, left, right);
 
   return comparison === undefined ? undefined : { type: 'boolean', value: comparison };
+}
+
+function compareOrdered(operator: 'lt' | 'lte' | 'gt' | 'gte', comparison: number): boolean {
+  if (operator === 'lt') return comparison < 0;
+  if (operator === 'lte') return comparison <= 0;
+  if (operator === 'gt') return comparison > 0;
+
+  return comparison >= 0;
 }
 
 function evaluateBinary(
@@ -73,6 +100,9 @@ function evaluateBinary(
     case 'gte':
       return evaluateComparisonBinary(expression.operator, left, right);
     case 'add':
+      if (left?.type === 'string' && right?.type === 'string') return { type: 'string', value: left.value + right.value };
+
+      return evaluateNumericArithmetic(expression.operator, left, right);
     case 'sub':
     case 'mul':
     case 'div':
@@ -152,30 +182,54 @@ function evaluateStringCase(
 
 function evaluateRound(values: readonly (TypedValue | undefined)[]): TypedValue | undefined {
   const value = values[0];
+  const precision = values[1];
 
-  if (!hasSingleArgument(values) || !isFiniteNumericValue(value)) return undefined;
+  if ((values.length !== 1 && values.length !== 2) || !isFiniteNumericValue(value)) return undefined;
+  if (precision !== undefined && (precision.type !== 'integer' || !Number.isSafeInteger(precision.value))) return undefined;
 
-  const rounded = Math.round(value.value);
+  const digits = precision?.value ?? 0;
 
-  return Number.isFinite(rounded) ? { type: 'integer', value: rounded } : undefined;
+  if (digits < -100 || digits > 100) return undefined;
+
+  const factor = 10 ** digits;
+  const rounded = Math.round((value.value + Number.EPSILON) * factor) / factor;
+
+  return Number.isFinite(rounded) ? { type: 'number', value: rounded } : undefined;
 }
 
 function evaluateFormatDate(values: readonly (TypedValue | undefined)[]): TypedValue | undefined {
   const value = values[0];
+  const pattern = values[1];
+  const locale = values[2];
+  const timeZone = values[3];
 
-  return hasSingleArgument(values) && value?.type === 'date-time'
-    ? { type: 'string', value: value.value }
-    : undefined;
+  if (values.length !== 4 || value?.type !== 'date-time' || pattern?.type !== 'string' || locale?.type !== 'string' || timeZone?.type !== 'string') return undefined;
+
+  const timestamp = Date.parse(value.value);
+
+  if (Number.isNaN(timestamp)) return undefined;
+
+  const formatted = formatDateTimePatternV1(new Date(timestamp), pattern.value, { locale: locale.value, timeZone: timeZone.value });
+
+  return formatted === undefined ? undefined : { type: 'string', value: formatted };
 }
 
 function evaluateCoalesce(values: readonly (TypedValue | undefined)[]): TypedValue | undefined {
-  return values.find((value) => value !== undefined && value.type !== 'null');
+  const resolved = values.find((value) => value !== undefined && value.type !== 'null');
+
+  if (resolved !== undefined) return resolved;
+
+  return values.some((value) => value?.type === 'null') ? { type: 'null', value: null } : undefined;
 }
 
 function evaluateSafeFunction(
   expression: SafeFunctionExpression,
   context: ExpressionContextV1,
 ): TypedValue | undefined {
+  const validArity = hasValidSafeFunctionArity(expression);
+
+  if (!validArity) return undefined;
+
   const values = expression.arguments.map((argument) => evaluateExpressionInternal(argument, context));
 
   switch (expression.functionId) {
@@ -195,6 +249,25 @@ function evaluateSafeFunction(
       return clampNumericValues(values);
     case 'format-date':
       return evaluateFormatDate(values);
+  }
+}
+
+function hasValidSafeFunctionArity(expression: SafeFunctionExpression): boolean {
+  const count = expression.arguments.length;
+
+  switch (expression.functionId) {
+    case 'coalesce':
+    case 'min':
+    case 'max':
+      return count >= 2;
+    case 'round':
+      return count === 1 || count === 2;
+    case 'clamp':
+      return count === 3;
+    case 'format-date':
+      return count === 4;
+    default:
+      return count === 1;
   }
 }
 

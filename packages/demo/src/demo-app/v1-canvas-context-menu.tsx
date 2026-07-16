@@ -21,7 +21,7 @@ interface V1CanvasContextMenuProps {
 function groupSelection(editorStore: ProjectEditorStore): void {
   const state = editorStore.getState();
   const document = selectActiveDocumentV1(state);
-  const selectedIds = new Set(state.activeElementIds);
+  const selectedIds = new Set(state.activeInstanceAddresses.map(({ elementId }) => elementId));
   const selected = document?.elements.filter((element) => selectedIds.has(element.id)) ?? [];
   const first = selected[0];
 
@@ -53,7 +53,7 @@ function ungroupSelection(editorStore: ProjectEditorStore): void {
 
   if (document === undefined) return;
 
-  const selectedIds = new Set(state.activeElementIds);
+  const selectedIds = new Set(state.activeInstanceAddresses.map(({ elementId }) => elementId));
   const selected = document.elements.filter((element) => selectedIds.has(element.id));
   const selectedGroupIds = new Set(
     selected.flatMap((element) => {
@@ -255,7 +255,7 @@ export function V1CanvasContextMenu({
                   Edit clip path
                 </Dropdown.Item>
               : null}
-              {state.activeElementIds.length > 1 ?
+              {state.activeInstanceAddresses.length > 1 ?
                 <>
                   <Dropdown.Item
                     key="group-selection"
@@ -291,7 +291,7 @@ export function V1CanvasContextMenu({
                 isDisabled={destructiveDisabled}
                 style={{ color: color('danger') }}
                 onAction={() => {
-                  state.removeElements(state.activeElementIds);
+                  state.removeElements(state.activeInstanceAddresses.map(({ elementId: selectedId }) => selectedId));
                   onClose();
                 }}
               >

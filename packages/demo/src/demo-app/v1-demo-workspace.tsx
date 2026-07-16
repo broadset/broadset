@@ -4,13 +4,14 @@ import {
   type ProjectEditorStore,
   selectActiveDocumentV1,
 } from '@broadset/editor';
-import { projectFormatV1 } from '@broadset/model';
+import { type EditorConfig, projectFormatV1 } from '@broadset/model';
 import { PageSorter } from '@broadset/ui';
-import { Tabs } from '@heroui/react';
-import { useEffect, useState } from 'react';
+import { Tabs, Toast, toast } from '@heroui/react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { loadStoredProjectV1, saveStoredProjectV1 } from '../v1-project-persistence';
 import { useEditorSelector } from './helpers';
+import { V1AnimationToolbar } from './v1-animation-toolbar';
 import { V1DataSidebar } from './v1-data-sidebar';
 import { V1DemoCanvasSurface } from './v1-demo-canvas-surface';
 import { V1ElementSidebar } from './v1-element-sidebar';
@@ -21,7 +22,10 @@ import { V1ViewportToolbar } from './v1-viewport-toolbar';
 
 interface V1DemoWorkspaceProps {
   readonly project: projectFormatV1.BroadsetProjectV1;
+  readonly blobs?: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array> | undefined;
+  readonly config?: Partial<EditorConfig> | undefined;
   readonly initialElementId?: projectFormatV1.Id | undefined;
+  readonly onProjectRecoveryRetained?: ((bytes: Uint8Array) => void) | undefined;
   readonly onStoreReady?: ((store: ProjectEditorStore) => void) | undefined;
   readonly persistence?:
     | {
@@ -113,14 +117,45 @@ function exitEditingFromEscape(store: ProjectEditorStore, event: KeyboardEvent):
   return true;
 }
 
+function handleClipboardWorkspaceShortcut(store: ProjectEditorStore, event: KeyboardEvent): boolean {
+  if (!(event.ctrlKey || event.metaKey)) return false;
+
+  const state = store.getState();
+
+  switch (event.key.toLowerCase()) {
+    case 'c':
+      event.preventDefault();
+      void state.copySelection();
+
+      return true;
+    case 'd':
+      event.preventDefault();
+      void state.duplicateSelection();
+
+      return true;
+    case 'v':
+      event.preventDefault();
+      void state.pasteClipboard();
+
+      return true;
+    case 'x':
+      event.preventDefault();
+      void state.cutSelection();
+
+      return true;
+    default:
+      return false;
+  }
+}
+
 function handleGeneralWorkspaceShortcut(store: ProjectEditorStore, event: KeyboardEvent): void {
   const state = store.getState();
   const modifier = event.ctrlKey || event.metaKey;
   const key = event.key.toLowerCase();
 
-  if ((event.key === 'Delete' || event.key === 'Backspace') && state.activeElementIds.length > 0) {
+  if ((event.key === 'Delete' || event.key === 'Backspace') && state.activeInstanceAddresses.length > 0) {
     event.preventDefault();
-    state.removeElements(state.activeElementIds);
+    state.removeElements(state.activeInstanceAddresses.map(({ elementId }) => elementId));
 
     return;
   }
@@ -135,6 +170,8 @@ function handleGeneralWorkspaceShortcut(store: ProjectEditorStore, event: Keyboa
 
     return;
   }
+
+  if (handleClipboardWorkspaceShortcut(store, event)) return;
 
   if (modifier && key === 'z') {
     event.preventDefault();
@@ -161,25 +198,40 @@ function handleWorkspaceKeyDown(store: ProjectEditorStore, event: KeyboardEvent)
 
 export function V1DemoWorkspace({
   project,
+  blobs,
+  config,
   initialElementId,
+  onProjectRecoveryRetained,
   onStoreReady,
   persistence,
 }: V1DemoWorkspaceProps): React.JSX.Element {
   const [editorStore] = useState<ProjectEditorStore>(() => {
-    const store = createProjectEditorStore({ project });
+    const store = createProjectEditorStore({
+      project,
+      ...(blobs === undefined ? {} : { blobs }),
+      ...(config === undefined ? {} : { config }),
+    });
 
     if (initialElementId !== undefined) store.getState().selectElement(initialElementId);
 
     return store;
   });
+  const [quarantinedProjectBytes, setQuarantinedProjectBytes] = useState<Uint8Array | null>(null);
   const [tab, setTab] = useState<WorkspaceTab>('properties');
   const state = useEditorSelector(editorStore, (current) => current);
   const document = selectActiveDocumentV1(state);
   const activePageIndex = document?.pages.findIndex((page) => page.id === state.activePageId) ?? 0;
+  const retainProjectRecovery = useCallback(
+    (bytes: Uint8Array): void => {
+      setQuarantinedProjectBytes(bytes);
+      onProjectRecoveryRetained?.(bytes.slice());
+    },
+    [onProjectRecoveryRetained],
+  );
 
   useEffect(() => {
-    if (state.activeElementIds.length === 0 && (tab === 'properties' || tab === 'animation')) setTab('layers');
-  }, [state.activeElementIds.length, tab]);
+    if (state.activeInstanceAddresses.length === 0 && (tab === 'properties' || tab === 'animation')) setTab('layers');
+  }, [state.activeInstanceAddresses.length, tab]);
 
   useEffect(() => {
     onStoreReady?.(editorStore);
@@ -194,6 +246,7 @@ export function V1DemoWorkspace({
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      editorStore.getState().clearClipboard();
     };
   }, [editorStore]);
 
@@ -207,22 +260,44 @@ export function V1DemoWorkspace({
       storage: persistence.storage,
       storageKey: persistence.storageKey,
       fallbackProject: project,
+      fallbackBlobs: blobs ?? new Map(),
     }).then((result) => {
       if (!active) return;
 
-      editorStore.getState().setProject(result.project);
+      editorStore.getState().setProject(result.project, result.blobs);
       if (initialElementId !== undefined) editorStore.getState().selectElement(initialElementId);
+      if (result.quarantinedBytes !== undefined) retainProjectRecovery(result.quarantinedBytes);
+
+      if (result.diagnostics.length > 0) {
+        toast.danger(result.diagnostics.map(({ message }) => message).join('; '), { timeout: 5000 });
+      }
 
       let previousProject = editorStore.getState().project;
+      let previousBlobs = editorStore.getState().blobs;
+      let pendingSave = Promise.resolve(true);
+      let saveFailureNotified = false;
 
       unsubscribe = editorStore.subscribe((nextState) => {
-        if (nextState.project === previousProject) return;
+        if (nextState.project === previousProject && nextState.blobs === previousBlobs) return;
 
         previousProject = nextState.project;
-        saveStoredProjectV1({
-          storage: persistence.storage,
-          storageKey: persistence.storageKey,
-          project: nextState.project,
+        previousBlobs = nextState.blobs;
+        pendingSave = pendingSave.then(async () => {
+          const saved = await saveStoredProjectV1({
+            storage: persistence.storage,
+            storageKey: persistence.storageKey,
+            project: nextState.project,
+            blobs: nextState.blobs,
+          });
+
+          if (!saved && !saveFailureNotified) {
+            saveFailureNotified = true;
+            toast.danger('Automatic project save failed.', { timeout: 5000 });
+          }
+
+          if (saved) saveFailureNotified = false;
+
+          return saved;
         });
       });
     });
@@ -231,7 +306,7 @@ export function V1DemoWorkspace({
       active = false;
       unsubscribe?.();
     };
-  }, [editorStore, initialElementId, persistence, project]);
+  }, [blobs, editorStore, initialElementId, persistence, project, retainProjectRecovery]);
 
   return (
     <ProjectEditorProvider store={editorStore}>
@@ -239,7 +314,11 @@ export function V1DemoWorkspace({
         data-testid="v1-demo-workspace"
         style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%' }}
       >
-        <V1ProjectFileControls editorStore={editorStore} />
+        <Toast.Provider maxVisibleToasts={4} placement="bottom end" />
+        <V1ProjectFileControls editorStore={editorStore} onProjectQuarantined={retainProjectRecovery} />
+        {quarantinedProjectBytes === null ? null : (
+          <span role="status">Recovery source retained ({String(quarantinedProjectBytes.byteLength)} bytes)</span>
+        )}
         <V1ViewportToolbar editorStore={editorStore} />
         <V1ElementToolbar editorStore={editorStore} />
         <PageSorter
@@ -277,10 +356,10 @@ export function V1DemoWorkspace({
             >
               <Tabs.List>
                 <Tabs.Tab id="layers">Layers</Tabs.Tab>
-                <Tabs.Tab id="properties" isDisabled={state.activeElementIds.length === 0}>
+                <Tabs.Tab id="properties" isDisabled={state.activeInstanceAddresses.length === 0}>
                   Properties
                 </Tabs.Tab>
-                <Tabs.Tab id="animation" isDisabled={state.activeElementIds.length === 0}>
+                <Tabs.Tab id="animation" isDisabled={state.activeInstanceAddresses.length === 0}>
                   Animation
                 </Tabs.Tab>
                 <Tabs.Tab id="data">Data</Tabs.Tab>
@@ -295,6 +374,12 @@ export function V1DemoWorkspace({
               editorStore={editorStore}
               pageId={state.activePageId}
               project={state.project}
+            />
+            <V1AnimationToolbar
+              editorStore={editorStore}
+              onTimelineOpen={() => {
+                setTab('animation');
+              }}
             />
           </main>
         </div>

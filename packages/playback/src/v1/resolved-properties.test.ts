@@ -27,6 +27,9 @@ const MACHINE_ID = createId('machine');
 const STATE_ID = createId('state');
 const SEQUENCE_ID = createId('sequence');
 const BINDING_ID = createId('binding');
+const STATE_VALUE_ID = createId('state-value');
+const TRACK_ID = createId('track');
+const KEYFRAME_ID = createId('keyframe');
 const TARGET: PropertyTarget = {
   entity: {
     projectId: PROJECT_ID,
@@ -52,10 +55,13 @@ function createContribution(options: {
   readonly target?: PropertyTarget | undefined;
   readonly value: TypedValue;
   readonly provenance: PropertyContributionV1['provenance'];
+  readonly canonicalOrder?: readonly number[] | undefined;
 }): PropertyContributionV1 {
   return {
     target: options.target ?? TARGET,
     value: options.value,
+    tier: options.provenance.kind,
+    canonicalOrder: options.canonicalOrder ?? [0],
     provenance: options.provenance,
   };
 }
@@ -164,69 +170,74 @@ describe('resolvePropertyMapV1', () => {
   it('resolves binding, state, and sequence precedence with ordered provenance', () => {
     const binding = createContribution({
       value: { type: 'number', value: 1 },
-      provenance: { kind: 'binding', bindingId: BINDING_ID },
+      provenance: { kind: 'binding', bindingId: BINDING_ID, source: 'expression' },
     });
     const state = createContribution({
       value: { type: 'number', value: 2 },
-      provenance: { kind: 'state', stateMachineId: MACHINE_ID, stateId: STATE_ID },
+      provenance: { kind: 'state', stateMachineId: MACHINE_ID, stateId: STATE_ID, stateValueId: STATE_VALUE_ID },
     });
     const sequence = createContribution({
       value: { type: 'number', value: 3 },
-      provenance: { kind: 'sequence', sequenceId: SEQUENCE_ID },
+      provenance: { kind: 'sequence', sequenceId: SEQUENCE_ID, trackId: TRACK_ID, fromKeyframeId: KEYFRAME_ID, childClipPath: [] },
     });
     const key = propertyTargetKeyV1(TARGET);
 
-    expect(resolvePropertyMapV1([binding]).get(key)).toEqual({ ...binding, overridden: [] });
+    expect(resolvePropertyMapV1([binding]).get(key)).toEqual({ target: TARGET, value: binding.value, provenance: binding.provenance, overridden: [] });
     expect(resolvePropertyMapV1([binding, state]).get(key)).toEqual({
       target: TARGET,
       value: state.value,
       provenance: state.provenance,
-      overridden: [binding.provenance],
+      overridden: [{ value: binding.value, provenance: binding.provenance }],
     });
 
     expect(resolvePropertyMapV1([binding, state, sequence]).get(key)).toEqual({
       target: TARGET,
       value: sequence.value,
       provenance: sequence.provenance,
-      overridden: [binding.provenance, state.provenance],
+      overridden: [{ value: binding.value, provenance: binding.provenance }, { value: state.value, provenance: state.provenance }],
     });
   });
 
   it('keeps independent targets and contributions without competitors', () => {
     const binding = createContribution({
       value: { type: 'boolean', value: true },
-      provenance: { kind: 'binding', bindingId: BINDING_ID },
+      provenance: { kind: 'binding', bindingId: BINDING_ID, source: 'expression' },
     });
     const sequence = createContribution({
       target: OTHER_TARGET,
       value: { type: 'boolean', value: false },
-      provenance: { kind: 'sequence', sequenceId: SEQUENCE_ID },
+      provenance: { kind: 'sequence', sequenceId: SEQUENCE_ID, trackId: TRACK_ID, fromKeyframeId: KEYFRAME_ID, childClipPath: [] },
     });
     const resolved = resolvePropertyMapV1([binding, sequence]);
 
     expect(resolved).toHaveLength(2);
-    expect(resolved.get(propertyTargetKeyV1(TARGET))).toEqual({ ...binding, overridden: [] });
-    expect(resolved.get(propertyTargetKeyV1(OTHER_TARGET))).toEqual({ ...sequence, overridden: [] });
+    expect(resolved.get(propertyTargetKeyV1(TARGET))).toEqual({ target: TARGET, value: binding.value, provenance: binding.provenance, overridden: [] });
+    expect(resolved.get(propertyTargetKeyV1(OTHER_TARGET))).toEqual({ target: OTHER_TARGET, value: sequence.value, provenance: sequence.provenance, overridden: [] });
   });
 
-  it('uses input order for conflicts within one tier', () => {
+  it('uses canonical order rather than caller order for conflicts within one tier', () => {
     const firstSequenceId = createId('first-sequence');
     const secondSequenceId = createId('second-sequence');
     const first = createContribution({
       value: { type: 'string', value: 'first' },
-      provenance: { kind: 'sequence', sequenceId: firstSequenceId },
+      provenance: { kind: 'sequence', sequenceId: firstSequenceId, trackId: TRACK_ID, fromKeyframeId: KEYFRAME_ID, childClipPath: [] },
+      canonicalOrder: [0],
     });
     const second = createContribution({
       value: { type: 'string', value: 'second' },
-      provenance: { kind: 'sequence', sequenceId: secondSequenceId },
+      provenance: { kind: 'sequence', sequenceId: secondSequenceId, trackId: TRACK_ID, fromKeyframeId: KEYFRAME_ID, childClipPath: [] },
+      canonicalOrder: [1],
     });
 
-    expect(resolvePropertyMapV1([first, second]).get(propertyTargetKeyV1(TARGET))).toEqual({
+    const expected = {
       target: TARGET,
       value: second.value,
       provenance: second.provenance,
-      overridden: [first.provenance],
-    });
+      overridden: [{ value: first.value, provenance: first.provenance }],
+    };
+
+    expect(resolvePropertyMapV1([first, second]).get(propertyTargetKeyV1(TARGET))).toEqual(expected);
+    expect(resolvePropertyMapV1([second, first]).get(propertyTargetKeyV1(TARGET))).toEqual(expected);
   });
 });
 
@@ -239,7 +250,9 @@ describe('resolved property contribution gatherers', () => {
       {
         target: TARGET,
         value: { type: 'string', value: 'resolved' },
-        provenance: { kind: 'binding', bindingId: BINDING_ID },
+        tier: 'binding',
+        canonicalOrder: [0],
+        provenance: { kind: 'binding', bindingId: BINDING_ID, source: 'expression' },
       },
     ]);
   });
@@ -261,12 +274,16 @@ describe('resolved property contribution gatherers', () => {
       {
         target: TARGET,
         value: firstValue.value,
-        provenance: { kind: 'state', stateMachineId: MACHINE_ID, stateId: STATE_ID },
+        tier: 'state',
+        canonicalOrder: [0, 0],
+        provenance: { kind: 'state', stateMachineId: MACHINE_ID, stateId: STATE_ID, stateValueId: firstValue.id },
       },
       {
         target: OTHER_TARGET,
         value: secondValue.value,
-        provenance: { kind: 'state', stateMachineId: MACHINE_ID, stateId: STATE_ID },
+        tier: 'state',
+        canonicalOrder: [0, 1],
+        provenance: { kind: 'state', stateMachineId: MACHINE_ID, stateId: STATE_ID, stateValueId: secondValue.id },
       },
     ]);
   });
@@ -289,12 +306,16 @@ describe('resolved property contribution gatherers', () => {
       {
         target: TARGET,
         value: { type: 'number', value: 7 },
-        provenance: { kind: 'sequence', sequenceId: SEQUENCE_ID },
+        tier: 'sequence',
+        canonicalOrder: [0, 0],
+        provenance: { kind: 'sequence', sequenceId: SEQUENCE_ID, trackId: createId('track-sequence'), fromKeyframeId: createId('keyframe-sequence'), childClipPath: [] },
       },
       {
         target: OTHER_TARGET,
         value: { type: 'boolean', value: true },
-        provenance: { kind: 'sequence', sequenceId: secondSequenceId },
+        tier: 'sequence',
+        canonicalOrder: [1, 0],
+        provenance: { kind: 'sequence', sequenceId: secondSequenceId, trackId: createId('track-other-sequence'), fromKeyframeId: createId('keyframe-other-sequence'), childClipPath: [] },
       },
     ]);
   });
@@ -320,10 +341,10 @@ describe('resolved property evaluation', () => {
     expect(resolvePropertyMapV1(contributions).get(propertyTargetKeyV1(TARGET))).toEqual({
       target: TARGET,
       value: { type: 'number', value: 3 },
-      provenance: { kind: 'sequence', sequenceId: SEQUENCE_ID },
+      provenance: { kind: 'sequence', sequenceId: SEQUENCE_ID, trackId: createId('track-sequence'), fromKeyframeId: createId('keyframe-sequence'), childClipPath: [] },
       overridden: [
-        { kind: 'binding', bindingId: BINDING_ID },
-        { kind: 'state', stateMachineId: MACHINE_ID, stateId: STATE_ID },
+        { value: { type: 'number', value: 1 }, provenance: { kind: 'binding', bindingId: BINDING_ID, source: 'expression' } },
+        { value: { type: 'number', value: 2 }, provenance: { kind: 'state', stateMachineId: MACHINE_ID, stateId: STATE_ID, stateValueId: createId('state-value') } },
       ],
     });
   });

@@ -69,6 +69,7 @@ export function cubicBezierEase(
   const clampedProgress = clampProgress(progress);
 
   if (clampedProgress === 0 || clampedProgress === 1) return clampedProgress;
+  if (controlPoints[0] === controlPoints[1] && controlPoints[2] === controlPoints[3]) return clampedProgress;
 
   const parameter = solveCurveParameter(controlPoints[0], controlPoints[2], clampedProgress);
   const output = sampleCurve(controlPoints[1], controlPoints[3], parameter);

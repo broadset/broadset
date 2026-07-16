@@ -120,15 +120,16 @@ describe('v1 package-root format round trip', () => {
     );
   });
 
-  it('quarantines an invalid round trip without inserting defaults or discarding the source text', async () => {
+  it('quarantines an invalid round trip without inserting defaults or discarding the source bytes', async () => {
     const invalidText = JSON.stringify({ ...createRoundTripProject(), unknownSettings: {} });
+    const invalidBytes = new TextEncoder().encode(invalidText);
     const result = await loadProjectV1Json(invalidText, { lastValidProject: createMinimalProject() });
 
     expect(result.status).toBe('quarantined');
 
     if (result.status !== 'quarantined') throw new Error('Expected invalid input to be quarantined');
 
-    expect(result.originalText).toBe(invalidText);
+    expect(result.originalBytes).toEqual(invalidBytes);
     expect(result.lastValidProject).toEqual(createMinimalProject());
     expect(result.diagnostics).toContainEqual(
       expect.objectContaining({ code: 'structural-invalid', pointer: '', severity: 'error' }),

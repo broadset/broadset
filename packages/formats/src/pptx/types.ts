@@ -15,6 +15,7 @@ export interface PptxImportOptions {
   readonly maxPartBytes?: number;
   readonly maxEntries?: number;
   readonly maxTotalUncompressedBytes?: number;
+  readonly maxExpansionRatio?: number;
   readonly maxDepth?: number;
   readonly authoredSurface?: {
     readonly unit: 'px' | 'mm' | 'in';

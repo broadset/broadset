@@ -95,10 +95,19 @@ function tryRead(bytes: Uint8Array, issues: ValidationIssue[], options?: PptxVal
 
   try {
     const result = readOoxmlPackageWithCaps(bytes, {
+      maxInputBytes: caps.maxInputBytes,
       maxEntries: caps.maxEntries,
       maxPartBytes: caps.maxPartBytes,
       maxTotalUncompressedBytes: caps.maxTotalUncompressedBytes,
+      maxExpansionRatio: caps.maxExpansionRatio,
+      maxDepth: caps.maxDepth,
     });
+
+    if (result.skippedEntries.some(({ reason }) => reason === 'malformed-archive')) {
+      issues.push({ level: 'error', code: 'zip-invalid', message: 'Package is not a valid ZIP archive.' });
+
+      return null;
+    }
 
     for (const skipped of result.skippedEntries) {
       const warning = warningForSkippedOoxmlEntry(skipped, caps);

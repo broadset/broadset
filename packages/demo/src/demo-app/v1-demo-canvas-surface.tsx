@@ -1,5 +1,6 @@
 import type { ProjectEditorStore } from '@broadset/editor';
 import { projectFormatV1 } from '@broadset/model';
+import type { PhysicalUnitContextV1 } from '@broadset/renderer';
 import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -15,6 +16,7 @@ import { V1PathEditingOverlay } from '../demo-components/v1-path-editing-overlay
 import { V1SelectionTransformWidget } from '../demo-components/v1-selection-transform-widget';
 import { useCanvasViewport, useEditorSelector } from './helpers';
 import { V1CanvasContextMenu } from './v1-canvas-context-menu';
+import { cssPixelsToDocumentValueV1, documentValueToCssPixelsV1, surfaceUnitContextV1 } from './v1-canvas-units';
 import {
   handlePathDrawingPoint,
   handlePlacementPoint,
@@ -45,16 +47,40 @@ interface CanvasContextMenuV1 {
   readonly y: number;
 }
 
-function readElementId(target: EventTarget | null): projectFormatV1.Id | undefined {
+function readInstanceAddress(target: EventTarget | null): projectFormatV1.InstanceAddress | undefined {
   if (!(target instanceof Element)) return undefined;
 
-  const value = target.closest<HTMLElement>('[data-element-id]')?.dataset['elementId'];
+  const host = target.closest<HTMLElement>('[data-element-id][data-instance-root-id][data-component-instance-path]');
+  const elementId = host?.dataset['elementId'];
+  const rootInstanceId = host?.dataset['instanceRootId'];
+  const encodedPath = host?.dataset['componentInstancePath'];
 
-  if (value === undefined) return undefined;
+  if (elementId === undefined || rootInstanceId === undefined || encodedPath === undefined) return undefined;
 
-  const result = projectFormatV1.idSchema.safeParse(value);
+  let componentInstancePath: unknown;
+
+  try {
+    componentInstancePath = JSON.parse(encodedPath);
+  } catch {
+    return undefined;
+  }
+
+  const result = projectFormatV1.instanceAddressSchema.safeParse({
+    rootInstanceId,
+    componentInstancePath,
+    elementId,
+  });
 
   return result.success ? result.data : undefined;
+}
+
+function sameInstanceAddress(left: projectFormatV1.InstanceAddress, right: projectFormatV1.InstanceAddress): boolean {
+  return (
+    left.rootInstanceId === right.rootInstanceId &&
+    left.elementId === right.elementId &&
+    left.componentInstancePath.length === right.componentInstancePath.length &&
+    left.componentInstancePath.every((id, index) => id === right.componentInstancePath[index])
+  );
 }
 
 function isTransformOverlayTarget(target: EventTarget | null): boolean {
@@ -111,34 +137,43 @@ function V1SafetyBoundaries({
 
   const [width, height] = document.surface.size;
   const padding = document.surface.padding;
+  const units = surfaceUnitContextV1(document);
+  const cssWidth = documentValueToCssPixelsV1(width, units);
+  const cssHeight = documentValueToCssPixelsV1(height, units);
+  const cssPadding = {
+    top: documentValueToCssPixelsV1(padding.top, units),
+    right: documentValueToCssPixelsV1(padding.right, units),
+    bottom: documentValueToCssPixelsV1(padding.bottom, units),
+    left: documentValueToCssPixelsV1(padding.left, units),
+  };
   const fill = viewMode === 'broadcast' ? 'rgba(220, 38, 38, 0.2)' : 'rgba(37, 99, 235, 0.2)';
 
   return (
     <svg
       aria-hidden="true"
       data-testid="safety-boundaries-overlay"
-      height={height}
-      width={width}
+      height={cssHeight}
+      width={cssWidth}
       style={{ inset: 0, pointerEvents: 'none', position: 'absolute', zIndex: 2 }}
     >
-      <rect data-testid="safety-boundary-top" fill={fill} height={padding.top} width={width} x={0} y={0} />
+      <rect data-testid="safety-boundary-top" fill={fill} height={cssPadding.top} width={cssWidth} x={0} y={0} />
       <rect
         data-testid="safety-boundary-right"
         fill={fill}
-        height={height}
-        width={padding.right}
-        x={width - padding.right}
+        height={cssHeight}
+        width={cssPadding.right}
+        x={cssWidth - cssPadding.right}
         y={0}
       />
       <rect
         data-testid="safety-boundary-bottom"
         fill={fill}
-        height={padding.bottom}
-        width={width}
+        height={cssPadding.bottom}
+        width={cssWidth}
         x={0}
-        y={height - padding.bottom}
+        y={cssHeight - cssPadding.bottom}
       />
-      <rect data-testid="safety-boundary-left" fill={fill} height={height} width={padding.left} x={0} y={0} />
+      <rect data-testid="safety-boundary-left" fill={fill} height={cssHeight} width={cssPadding.left} x={0} y={0} />
     </svg>
   );
 }
@@ -146,12 +181,13 @@ function V1SafetyBoundaries({
 function canvasPointFromEvent(
   event: ReactPointerEvent<HTMLDivElement>,
   viewport: { readonly panX: number; readonly panY: number; readonly zoom: number },
+  units: PhysicalUnitContextV1,
 ): PlacementAnchorV1 {
   const bounds = event.currentTarget.getBoundingClientRect();
 
   return {
-    x: (event.clientX - bounds.left - viewport.panX) / viewport.zoom,
-    y: (event.clientY - bounds.top - viewport.panY) / viewport.zoom,
+    x: cssPixelsToDocumentValueV1((event.clientX - bounds.left - viewport.panX) / viewport.zoom, units),
+    y: cssPixelsToDocumentValueV1((event.clientY - bounds.top - viewport.panY) / viewport.zoom, units),
   };
 }
 
@@ -169,12 +205,14 @@ export function V1DemoCanvasSurface({
   const pathEditingElementId = useEditorSelector(editorStore, (state) => state.pathEditingElementId);
   const clipPathEditingElementId = useEditorSelector(editorStore, (state) => state.clipPathEditingElementId);
   const viewMode = useEditorSelector(editorStore, (state) => state.canvasSettings.viewMode);
+  const hasClipboardContents = useEditorSelector(editorStore, (state) => state.hasInternalClipboard);
+  const playbackSequenceId = useEditorSelector(editorStore, (state) => state.playbackSequenceId);
+  const playbackTick = useEditorSelector(editorStore, (state) => state.playbackTick);
   const placementActive = placement !== null;
   const document = project.documents.find((candidate) => candidate.id === documentId);
+  const units = surfaceUnitContextV1(document);
   const panGestureRef = useRef<CanvasPanGestureV1 | null>(null);
-  const clipboardRef = useRef<readonly projectFormatV1.Element[]>([]);
   const [contextMenu, setContextMenu] = useState<CanvasContextMenuV1 | null>(null);
-  const [hasClipboardContents, setHasClipboardContents] = useState(false);
   const [pathPreview, setPathPreview] = useState<PlacementAnchorV1 | null>(null);
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (event.button === 1 || (event.button === 0 && event.shiftKey)) {
@@ -205,7 +243,7 @@ export function V1DemoCanvasSurface({
       handlePlacementPoint({
         editorStore,
         placement,
-        point: canvasPointFromEvent(event, viewport),
+        point: canvasPointFromEvent(event, viewport, units),
         setPathPreview,
       });
 
@@ -220,8 +258,9 @@ export function V1DemoCanvasSurface({
       handlePathDrawingPoint({
         editorStore,
         elementId: drawingElementId,
-        point: canvasPointFromEvent(event, viewport),
+        point: canvasPointFromEvent(event, viewport, units),
         setPathPreview,
+        units,
         zoom: viewport.zoom,
       });
 
@@ -238,18 +277,18 @@ export function V1DemoCanvasSurface({
 
     if (isTransformOverlayTarget(event.target)) return;
 
-    const elementId = readElementId(event.target);
+    const address = readInstanceAddress(event.target);
 
     const state = editorStore.getState();
 
-    if (elementId === undefined) {
-      state.selectElement(null);
+    if (address === undefined) {
+      state.selectInstance(null);
 
       return;
     }
 
-    if (event.ctrlKey || event.metaKey || event.shiftKey) state.toggleSelectElement(elementId);
-    else state.selectElement(elementId);
+    if (event.ctrlKey || event.metaKey || event.shiftKey) state.toggleSelectInstance(address);
+    else state.selectInstance(address);
   };
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
     const gesture = panGestureRef.current;
@@ -259,8 +298,8 @@ export function V1DemoCanvasSurface({
       const bounds = event.currentTarget.getBoundingClientRect();
 
       editorStore.getState().updatePlacement(currentPlacement, {
-        x: (event.clientX - bounds.left - viewport.panX) / viewport.zoom,
-        y: (event.clientY - bounds.top - viewport.panY) / viewport.zoom,
+        x: cssPixelsToDocumentValueV1((event.clientX - bounds.left - viewport.panX) / viewport.zoom, units),
+        y: cssPixelsToDocumentValueV1((event.clientY - bounds.top - viewport.panY) / viewport.zoom, units),
       });
 
       return;
@@ -270,8 +309,8 @@ export function V1DemoCanvasSurface({
       const bounds = event.currentTarget.getBoundingClientRect();
 
       setPathPreview({
-        x: (event.clientX - bounds.left - viewport.panX) / viewport.zoom,
-        y: (event.clientY - bounds.top - viewport.panY) / viewport.zoom,
+        x: cssPixelsToDocumentValueV1((event.clientX - bounds.left - viewport.panX) / viewport.zoom, units),
+        y: cssPixelsToDocumentValueV1((event.clientY - bounds.top - viewport.panY) / viewport.zoom, units),
       });
 
       return;
@@ -324,46 +363,31 @@ export function V1DemoCanvasSurface({
     setContextMenu(null);
   };
   const copySelection = (): void => {
-    const state = editorStore.getState();
-    const activeDocument = state.project.documents.find((candidate) => candidate.id === state.activeDocumentId);
-    const selectedIds = new Set(state.activeElementIds);
-
-    clipboardRef.current = activeDocument?.elements.filter((element) => selectedIds.has(element.id)) ?? [];
-    setHasClipboardContents(clipboardRef.current.length > 0);
     closeContextMenu();
+    void editorStore.getState().copySelection();
   };
   const cutSelection = (): void => {
-    const selectedIds = [...editorStore.getState().activeElementIds];
-
-    copySelection();
-    editorStore.getState().removeElements(selectedIds);
+    closeContextMenu();
+    void editorStore.getState().cutSelection();
   };
   const pasteSelection = (): void => {
-    const nextIds: projectFormatV1.Id[] = [];
-
-    clipboardRef.current.forEach((element) => {
-      const clone: projectFormatV1.Element = {
-        ...element,
-        id: projectFormatV1.idSchema.parse(crypto.randomUUID()),
-        name: `${element.name} copy`,
-        parentId: null,
-      };
-      const nextId = editorStore.getState().addElement(clone);
-
-      if (nextId !== null) nextIds.push(nextId);
-    });
-    editorStore.getState().setActiveElements(nextIds);
     closeContextMenu();
+    void editorStore.getState().pasteClipboard();
   };
   const handleContextMenu = (event: ReactMouseEvent<HTMLDivElement>): void => {
     event.preventDefault();
 
     const state = editorStore.getState();
-    const hitElementId = readElementId(event.target);
-    const elementId = hitElementId ?? state.activeElementIds[0] ?? null;
+    const hitAddress = readInstanceAddress(event.target);
+    const elementId = hitAddress?.elementId ?? state.activeInstanceAddresses[0]?.elementId ?? null;
+    const preservesMultiSelection =
+      hitAddress !== undefined &&
+      state.activeInstanceAddresses.length > 1 &&
+      state.activeInstanceAddresses.some((active) => sameInstanceAddress(active, hitAddress));
 
-    if (elementId !== null && !(state.activeElementIds.length > 1 && state.activeElementIds.includes(elementId))) {
-      state.selectElement(elementId);
+    if (elementId !== null && !preservesMultiSelection) {
+      if (hitAddress === undefined) state.selectElement(elementId);
+      else state.selectInstance(hitAddress);
     }
 
     setContextMenu({ elementId, x: event.clientX, y: event.clientY });
@@ -424,7 +448,6 @@ export function V1DemoCanvasSurface({
         }}
       >
         <div
-          data-broadset-canvas-root="true"
           data-testid="v1-canvas-viewport"
           style={{
             position: 'relative',
@@ -434,24 +457,21 @@ export function V1DemoCanvasSurface({
             zIndex: 0,
           }}
         >
-          <V1PagePreview blobs={blobs} documentId={documentId} pageId={pageId} project={project} />
+          <V1PagePreview
+            blobs={blobs}
+            documentId={documentId}
+            pageId={pageId}
+            project={project}
+            sequenceId={playbackSequenceId}
+            tick={playbackTick}
+          />
           {document === undefined ? null : <V1SafetyBoundaries document={document} viewMode={viewMode} />}
-        </div>
-        <div
-          data-testid="v1-canvas-overlay"
-          style={{
-            inset: 0,
-            pointerEvents: 'none',
-            position: 'absolute',
-            transformStyle: 'preserve-3d',
-            zIndex: 1,
-          }}
-        >
           <div
+            data-testid="v1-canvas-overlay"
             style={{
+              inset: 0,
               pointerEvents: 'none',
-              transform: `translate(${String(viewport.panX)}px, ${String(viewport.panY)}px) scale(${String(viewport.zoom)})`,
-              transformOrigin: '0 0',
+              position: 'absolute',
               transformStyle: 'preserve-3d',
             }}
           >
@@ -461,17 +481,19 @@ export function V1DemoCanvasSurface({
           </div>
         </div>
       </div>
-      {document === undefined ? null : <V1Rulers editorStore={editorStore} surfaceSize={document.surface.size} />}
+      {document === undefined ? null : (
+        <V1Rulers editorStore={editorStore} surfaceSize={document.surface.size} units={units} />
+      )}
       {placement === null || placementPreview === null ? null : (
         <div
           data-testid="placement-preview-overlay"
           style={{
             border: '1px dashed rgba(59, 130, 246, 0.9)',
             height: 12,
-            left: placementPreview.x * viewport.zoom + viewport.panX - 6,
+            left: documentValueToCssPixelsV1(placementPreview.x, units) * viewport.zoom + viewport.panX - 6,
             pointerEvents: 'none',
             position: 'absolute',
-            top: placementPreview.y * viewport.zoom + viewport.panY - 6,
+            top: documentValueToCssPixelsV1(placementPreview.y, units) * viewport.zoom + viewport.panY - 6,
             width: 12,
           }}
         />
@@ -482,10 +504,10 @@ export function V1DemoCanvasSurface({
             data-testid="placement-preview-path-line"
             stroke="rgba(59, 130, 246, 0.9)"
             strokeDasharray="4 3"
-            x1={drawingLastPoint.x * viewport.zoom + viewport.panX}
-            x2={pathPreview.x * viewport.zoom + viewport.panX}
-            y1={drawingLastPoint.y * viewport.zoom + viewport.panY}
-            y2={pathPreview.y * viewport.zoom + viewport.panY}
+            x1={documentValueToCssPixelsV1(drawingLastPoint.x, units) * viewport.zoom + viewport.panX}
+            x2={documentValueToCssPixelsV1(pathPreview.x, units) * viewport.zoom + viewport.panX}
+            y1={documentValueToCssPixelsV1(drawingLastPoint.y, units) * viewport.zoom + viewport.panY}
+            y2={documentValueToCssPixelsV1(pathPreview.y, units) * viewport.zoom + viewport.panY}
           />
         </svg>
       )}
@@ -495,6 +517,7 @@ export function V1DemoCanvasSurface({
           element={pathEditingElement}
           panX={viewport.panX}
           panY={viewport.panY}
+          units={units}
           zoom={viewport.zoom}
         />
       )}
@@ -503,6 +526,7 @@ export function V1DemoCanvasSurface({
           clipElement={clipElement}
           panX={viewport.panX}
           panY={viewport.panY}
+          units={units}
           zoom={viewport.zoom}
         />
       )}

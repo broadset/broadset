@@ -6,23 +6,66 @@ export interface RemoveDocumentElementsV1Options {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly documentId: projectFormatV1.Id;
   readonly elementIds: readonly projectFormatV1.Id[];
+  readonly requiredElementIds?: ReadonlySet<projectFormatV1.Id> | undefined;
 }
 
-function collectDeletedElementIds(
+function collectSubtreeElementIds(
   elements: readonly projectFormatV1.Element[],
   requestedIds: readonly projectFormatV1.Id[],
 ): ReadonlySet<projectFormatV1.Id> {
-  const deletedIds = new Set<projectFormatV1.Id>(requestedIds);
+  const subtreeIds = new Set<projectFormatV1.Id>(requestedIds);
   let previousSize = -1;
 
-  while (previousSize !== deletedIds.size) {
-    previousSize = deletedIds.size;
+  while (previousSize !== subtreeIds.size) {
+    previousSize = subtreeIds.size;
     elements.forEach((element) => {
-      if (element.parentId !== null && deletedIds.has(element.parentId)) deletedIds.add(element.id);
+      if (element.parentId !== null && subtreeIds.has(element.parentId)) subtreeIds.add(element.id);
     });
   }
 
-  return deletedIds;
+  return subtreeIds;
+}
+
+function rootElementId(
+  element: projectFormatV1.Element,
+  elementsById: ReadonlyMap<projectFormatV1.Id, projectFormatV1.Element>,
+): projectFormatV1.Id {
+  let root = element;
+  const visited = new Set<projectFormatV1.Id>();
+
+  while (root.parentId !== null && !visited.has(root.id)) {
+    visited.add(root.id);
+
+    const parent = elementsById.get(root.parentId);
+
+    if (parent === undefined) break;
+
+    root = parent;
+  }
+
+  return root.id;
+}
+
+function promotedGeometry(
+  element: projectFormatV1.Element,
+  elementsById: ReadonlyMap<projectFormatV1.Id, projectFormatV1.Element>,
+): projectFormatV1.ElementGeometry {
+  let transform = element.geometry.transform;
+  let parentId = element.parentId;
+  const visited = new Set<projectFormatV1.Id>([element.id]);
+
+  while (parentId !== null && !visited.has(parentId)) {
+    visited.add(parentId);
+
+    const parent = elementsById.get(parentId);
+
+    if (parent === undefined) break;
+
+    transform = projectFormatV1.composeElementTransformsV1(parent.geometry.transform, transform);
+    parentId = parent.parentId;
+  }
+
+  return { ...element.geometry, transform };
 }
 
 function addPaintEntityIds(
@@ -140,23 +183,69 @@ function targetReferencesDeletedEntity(
 function removeElementsFromDocument(
   document: projectFormatV1.BroadsetDocumentV1,
   requestedIds: readonly projectFormatV1.Id[],
+  requiredElementIds: ReadonlySet<projectFormatV1.Id>,
 ): projectFormatV1.BroadsetDocumentV1 {
   const existingIds = new Set(document.elements.map((element) => element.id));
-  const requestedExistingIds = requestedIds.filter((elementId) => existingIds.has(elementId));
+  const requestedExistingIds = requestedIds.filter(
+    (elementId) => existingIds.has(elementId) && !requiredElementIds.has(elementId),
+  );
 
   if (requestedExistingIds.length === 0) return document;
 
-  const deletedIds = collectDeletedElementIds(document.elements, requestedExistingIds);
+  const subtreeIds = collectSubtreeElementIds(document.elements, requestedExistingIds);
+  const promotedIds = new Set(
+    document.elements
+      .filter((element) => subtreeIds.has(element.id) && requiredElementIds.has(element.id))
+      .map(({ id }) => id),
+  );
+  const deletedIds = new Set([...subtreeIds].filter((elementId) => !promotedIds.has(elementId)));
   const deletedEntityIds = collectDeletedEntityIds(document.elements, deletedIds);
+  const elementsById = new Map(document.elements.map((element) => [element.id, element]));
+  const promotedByRoot = new Map<projectFormatV1.Id, projectFormatV1.Element[]>();
+
+  for (const promotedId of promotedIds) {
+    const element = elementsById.get(promotedId);
+
+    if (element === undefined) continue;
+
+    const rootId = rootElementId(element, elementsById);
+    const promoted: projectFormatV1.Element = {
+      ...element,
+      parentId: null,
+      geometry: promotedGeometry(element, elementsById),
+    };
+
+    promotedByRoot.set(rootId, [...(promotedByRoot.get(rootId) ?? []), promoted]);
+  }
+
+  const promotedElements = new Map(
+    [...promotedByRoot.values()].flatMap((elements) => elements).map((element) => [element.id, element]),
+  );
 
   return {
     ...document,
     elements: document.elements
       .filter((element) => !deletedIds.has(element.id))
-      .map((element) => repairSurvivingElementReferences(element, deletedIds)),
+      .map((element) => repairSurvivingElementReferences(promotedElements.get(element.id) ?? element, deletedIds)),
     pages: document.pages.map((page) => ({
       ...page,
-      rootInstances: page.rootInstances.filter((instance) => !deletedIds.has(instance.elementId)),
+      rootInstances: page.rootInstances.flatMap((instance) => {
+        const promoted = promotedByRoot.get(instance.elementId) ?? [];
+        const keepOriginal = !deletedIds.has(instance.elementId);
+
+        return [
+          ...(keepOriginal ? [instance] : []),
+          ...promoted.map((element, index): projectFormatV1.PageRootInstance => ({
+            id:
+              !keepOriginal && index === 0 ? instance.id : projectFormatV1.idSchema.parse(crypto.randomUUID()),
+            elementId: element.id,
+            ...(instance.visible === undefined ? {} : { visible: instance.visible }),
+            ...(instance.transform === undefined ? {} : { transform: instance.transform }),
+            overrides: [],
+            componentPropertyValues: [],
+          })),
+        ];
+      }),
       descendantOverrides: page.descendantOverrides.filter((entry) => !deletedIds.has(entry.address.elementId)),
     })),
     sequences: document.sequences.map((sequence) => ({
@@ -188,7 +277,11 @@ export function removeDocumentElementsV1(
 
   if (currentDocument === undefined) return options.project;
 
-  const nextDocument = removeElementsFromDocument(currentDocument, options.elementIds);
+  const nextDocument = removeElementsFromDocument(
+    currentDocument,
+    options.elementIds,
+    options.requiredElementIds ?? new Set(),
+  );
 
   if (nextDocument === currentDocument) return options.project;
 

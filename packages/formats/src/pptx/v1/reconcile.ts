@@ -2,7 +2,7 @@ import { projectFormatV1 } from '@broadset/model';
 
 import { importPptxProjectV1 } from './import';
 
-export interface PptxReconcileResultV1 {
+interface PptxReconcileResultV1 {
   readonly modifications: readonly projectFormatV1.Id[];
   readonly additions: readonly projectFormatV1.Id[];
   readonly deletions: readonly projectFormatV1.Id[];

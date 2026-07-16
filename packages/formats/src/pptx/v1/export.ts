@@ -7,7 +7,7 @@ interface PptxExportOptionsV1 {
   readonly exportedAt?: number;
 }
 
-export interface PptxExportInputV1 {
+interface PptxExportInputV1 {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly documentId?: projectFormatV1.Id;
   readonly pageId?: projectFormatV1.Id;

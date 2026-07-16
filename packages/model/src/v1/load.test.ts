@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { createMinimalProjectV1 } from './fixtures/minimal-project';
 import { loadProjectV1Json, parseProjectV1Unknown, PROJECT_V1_LIMITS } from './index';
 
+const TEXT_ENCODER = new TextEncoder();
+
 describe('v1 project loading', () => {
   it('loads structurally and semantically valid JSON without applying defaults', async () => {
     const project = createMinimalProjectV1();
@@ -11,25 +13,131 @@ describe('v1 project loading', () => {
     expect(result).toEqual({ status: 'loaded', project, diagnostics: [] });
   });
 
-  it('quarantines invalid JSON with exact original text', async () => {
+  it('quarantines invalid JSON with exact UTF-8 source bytes', async () => {
     const source = '{"schemaVersion":1';
     const result = await loadProjectV1Json(source);
 
     expect(result).toEqual({
       status: 'quarantined',
-      originalText: source,
+      originalBytes: TEXT_ENCODER.encode(source),
       diagnostics: [expect.objectContaining({ code: 'invalid-json', severity: 'error' })],
     });
   });
 
-  it('quarantines unsupported identity without rewriting it', async () => {
+  it('quarantines unsupported identity without rewriting its source bytes', async () => {
     const source = '{"schemaVersion":1,"id":"incomplete"}';
     const result = await loadProjectV1Json(source);
 
     expect(result.status).toBe('quarantined');
     if (result.status !== 'quarantined') throw new Error('Expected quarantined project');
-    expect(result.originalText).toBe(source);
+    expect(result.originalBytes).toEqual(TEXT_ENCODER.encode(source));
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'unsupported-version' }));
+  });
+
+  it.each([
+    ['continuation byte', Uint8Array.of(0x80)],
+    ['overlong slash', Uint8Array.of(0xc0, 0xaf)],
+  ])('quarantines distinct invalid UTF-8 %s sequences with exact bytes', async (_label, source) => {
+    const result = await loadProjectV1Json(source);
+
+    expect(result).toEqual({
+      status: 'quarantined',
+      originalBytes: source,
+      diagnostics: [expect.objectContaining({ code: 'invalid-utf8', severity: 'error' })],
+    });
+  });
+
+  it('owns caller-provided bytes before asynchronous observation', async () => {
+    const source = Uint8Array.of(0x80);
+    const pendingResult = loadProjectV1Json(source);
+
+    source[0] = 0x81;
+
+    const result = await pendingResult;
+
+    expect(result.status).toBe('quarantined');
+    if (result.status !== 'quarantined') throw new Error('Expected quarantined project');
+    expect(result.originalBytes).toEqual(Uint8Array.of(0x80));
+  });
+
+  it('rejects oversized byte input before UTF-8 decoding or JSON parsing', async () => {
+    const source = new Uint8Array(PROJECT_V1_LIMITS.maxJsonTextBytes + 1);
+
+    source[0] = 0x80;
+
+    const result = await loadProjectV1Json(source);
+
+    expect(result.status).toBe('quarantined');
+    if (result.status !== 'quarantined') throw new Error('Expected quarantined project');
+    expect(result.originalBytes === source).toBe(false);
+    expect(result.originalBytes.byteLength).toBe(source.byteLength);
+    expect(result.originalBytes[0]).toBe(0x80);
+    expect(result.originalBytes.at(-1)).toBe(0);
+    expect(result.diagnostics.map(({ code }) => code)).toEqual(['input-too-large']);
+  });
+
+  it('quarantines invalid JSON byte input with its exact bytes', async () => {
+    const source = TEXT_ENCODER.encode('{"schemaVersion":1');
+    const result = await loadProjectV1Json(source);
+
+    expect(result.status).toBe('quarantined');
+    if (result.status !== 'quarantined') throw new Error('Expected quarantined project');
+    expect(result.originalBytes).toEqual(source);
+    expect(result.diagnostics.map(({ code }) => code)).toEqual(['invalid-json']);
+  });
+
+  it.each([
+    ['unsupported', { schemaVersion: 1, id: 'incomplete' }, 'unsupported-version'],
+    ['structural', { ...createMinimalProjectV1(), unexpected: true }, 'structural-invalid'],
+    [
+      'semantic',
+      {
+        ...createMinimalProjectV1(),
+        documents: [
+          {
+            ...createMinimalProjectV1().documents[0],
+            outputProfileIds: ['missing-profile'],
+          },
+        ],
+      },
+      'semantic-invalid',
+    ],
+  ])('preserves exact bytes and last-valid recovery for %s input', async (_label, input, diagnosticCode) => {
+    const lastValidProject = createMinimalProjectV1();
+    const source = TEXT_ENCODER.encode(JSON.stringify(input));
+    const result = await loadProjectV1Json(source, { lastValidProject });
+
+    expect(result.status).toBe('quarantined');
+    if (result.status !== 'quarantined') throw new Error('Expected quarantined project');
+    expect(result.originalBytes).toEqual(source);
+    expect(result.lastValidProject).toBe(lastValidProject);
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: diagnosticCode }));
+    expect('project' in result).toBe(false);
+  });
+
+  it('loads valid UTF-8 bytes identically to their string form', async () => {
+    const source = JSON.stringify(createMinimalProjectV1());
+
+    await expect(loadProjectV1Json(TEXT_ENCODER.encode(source))).resolves.toEqual(await loadProjectV1Json(source));
+  });
+
+  it('encodes quarantined Unicode strings once as the recoverable bytes', async () => {
+    const source = '{"message":"Grüße 世界 \ud800"}';
+    const result = await loadProjectV1Json(source);
+
+    expect(result.status).toBe('quarantined');
+    if (result.status !== 'quarantined') throw new Error('Expected quarantined project');
+    expect(result.originalBytes).toEqual(TEXT_ENCODER.encode(source));
+  });
+
+  it('preserves a BOM in quarantined source bytes', async () => {
+    const source = Uint8Array.from([0xef, 0xbb, 0xbf, ...TEXT_ENCODER.encode('{bad json')]);
+    const result = await loadProjectV1Json(source);
+
+    expect(result.status).toBe('quarantined');
+    if (result.status !== 'quarantined') throw new Error('Expected quarantined project');
+    expect(result.originalBytes).toEqual(source);
+    expect(result.diagnostics.map(({ code }) => code)).toEqual(['invalid-json']);
   });
 
   it('distinguishes structural and semantic invalidity', () => {
@@ -57,13 +165,10 @@ describe('v1 project loading', () => {
     const source = ' '.repeat(PROJECT_V1_LIMITS.maxJsonTextBytes + 1);
     const result = await loadProjectV1Json(source);
 
-    expect(result).toEqual(
-      expect.objectContaining({
-        status: 'quarantined',
-        originalText: source,
-        diagnostics: [expect.objectContaining({ code: 'input-too-large' })],
-      }),
-    );
+    expect(result.status).toBe('quarantined');
+    if (result.status !== 'quarantined') throw new Error('Expected quarantined project');
+    expect(result.originalBytes.byteLength).toBe(PROJECT_V1_LIMITS.maxJsonTextBytes + 1);
+    expect(result.diagnostics).toEqual([expect.objectContaining({ code: 'input-too-large' })]);
   });
 
   it('quarantines 5k-depth JSON and unknown values without throwing', async () => {

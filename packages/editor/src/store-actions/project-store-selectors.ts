@@ -19,6 +19,10 @@ export function selectElementByIdV1(
   return selectActiveDocumentV1(state)?.elements.find((element) => element.id === elementId);
 }
 
+export function selectActiveElementIdsV1(state: ProjectEditorState): readonly projectFormatV1.Id[] {
+  return state.activeInstanceAddresses.map(({ elementId }) => elementId);
+}
+
 export function selectActiveElementsV1(state: ProjectEditorState): readonly projectFormatV1.Element[] {
   const document = selectActiveDocumentV1(state);
 
@@ -26,7 +30,7 @@ export function selectActiveElementsV1(state: ProjectEditorState): readonly proj
 
   const elementsById = new Map(document.elements.map((element) => [element.id, element]));
 
-  return state.activeElementIds
-    .map((elementId) => elementsById.get(elementId))
+  return state.activeInstanceAddresses
+    .map(({ elementId }) => elementsById.get(elementId))
     .filter((element) => element !== undefined);
 }

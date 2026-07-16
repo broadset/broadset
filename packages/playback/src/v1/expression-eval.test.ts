@@ -93,8 +93,6 @@ describe('evaluateExpressionV1 references and unary expressions', () => {
   it.each([
     ['number', 1.5],
     ['integer', 4],
-    ['length', 8],
-    ['angle', 90],
   ] as const)('negates %s operands while retaining their type', (type, value) => {
     expect(
       evaluate(
@@ -127,29 +125,20 @@ describe('evaluateExpressionV1 binary expressions', () => {
     ['integer', 'add', 7, 2, 9],
     ['integer', 'sub', 7, 2, 5],
     ['integer', 'mul', 7, 2, 14],
-    ['integer', 'div', 7, 2, 3],
-    ['length', 'add', 7, 2, 9],
-    ['length', 'sub', 7, 2, 5],
-    ['length', 'mul', 7, 2, 14],
-    ['length', 'div', 7, 2, 3.5],
-    ['angle', 'add', 7, 2, 9],
-    ['angle', 'sub', 7, 2, 5],
-    ['angle', 'mul', 7, 2, 14],
-    ['angle', 'div', 7, 2, 3.5],
   ] as const)('retains the %s type for %s arithmetic', (type, operator, left, right, expected) => {
     expect(
       evaluate(binary(operator, { type, value: left }, { type, value: right })),
     ).toEqual({ type, value: expected });
   });
 
-  it('truncates integer division and rejects division by zero', () => {
+  it('promotes integer division to number and rejects division by zero', () => {
     expect(
       evaluate(
         binary('div', { type: 'integer', value: 7 }, { type: 'integer', value: 2 })),
-    ).toEqual({ type: 'integer', value: 3 });
+    ).toEqual({ type: 'number', value: 3.5 });
     expect(
       evaluate(
-        binary('div', { type: 'length', value: 7 }, { type: 'length', value: 0 })),
+        binary('div', { type: 'number', value: 7 }, { type: 'number', value: 0 })),
     ).toBeUndefined();
   });
 
@@ -176,15 +165,15 @@ describe('evaluateExpressionV1 binary expressions', () => {
   ] as const)('applies %s comparisons to same-type numeric operands', (operator, expected) => {
     expect(
       evaluate(
-        binary(operator, { type: 'angle', value: 45 }, { type: 'angle', value: 45 })),
+        binary(operator, { type: 'number', value: 45 }, { type: 'number', value: 45 })),
     ).toEqual({ type: 'boolean', value: expected });
   });
 
-  it('rejects ordered comparisons across numeric types', () => {
+  it('supports ordered comparisons across integer and number', () => {
     expect(
       evaluate(
         binary('lt', { type: 'number', value: 1 }, { type: 'integer', value: 2 })),
-    ).toBeUndefined();
+    ).toEqual({ type: 'boolean', value: true });
   });
 
   it('evaluates boolean and/or and rejects wrong types', () => {
@@ -364,25 +353,25 @@ describe('evaluateExpressionV1 safe functions', () => {
     ).toEqual({ type: 'string', value: 'MIXED' });
   });
 
-  it('rounds each numeric type to an integer', () => {
+  it('rounds numeric values and returns number', () => {
     expect(
-      evaluate(safeFunction('round', [{ type: 'length', value: 4.6 }])),
-    ).toEqual({ type: 'integer', value: 5 });
+      evaluate(safeFunction('round', [{ type: 'number', value: 4.6 }])),
+    ).toEqual({ type: 'number', value: 5 });
   });
 
-  it('calculates same-type numeric minimum and maximum', () => {
+  it('calculates mixed numeric minimum and maximum', () => {
     const values: readonly TypedValue[] = [
-      { type: 'angle', value: 30 },
-      { type: 'angle', value: 10 },
-      { type: 'angle', value: 20 },
+      { type: 'integer', value: 30 },
+      { type: 'number', value: 10 },
+      { type: 'integer', value: 20 },
     ];
 
     expect(evaluate(safeFunction('min', values))).toEqual({
-      type: 'angle',
+      type: 'number',
       value: 10,
     });
     expect(evaluate(safeFunction('max', values))).toEqual({
-      type: 'angle',
+      type: 'number',
       value: 30,
     });
   });
@@ -398,13 +387,18 @@ describe('evaluateExpressionV1 safe functions', () => {
     ).toEqual({ type: 'number', value: 10 });
   });
 
-  it('passes date-time ISO strings through format-date', () => {
+  it('formats date-time with explicit arguments', () => {
     const isoInstant = '2026-07-12T10:30:00.000Z';
 
     expect(
       evaluate(
-        safeFunction('format-date', [{ type: 'date-time', value: isoInstant }])),
-    ).toEqual({ type: 'string', value: isoInstant });
+        safeFunction('format-date', [
+          { type: 'date-time', value: isoInstant },
+          { type: 'string', value: 'yyyy-MM-dd HH:mm' },
+          { type: 'string', value: 'en-US' },
+          { type: 'string', value: 'UTC' },
+        ])),
+    ).toEqual({ type: 'string', value: '2026-07-12 10:30' });
   });
 
   it('rejects wrong argument types, unresolved required arguments, and invalid arity', () => {
@@ -417,7 +411,7 @@ describe('evaluateExpressionV1 safe functions', () => {
       safeFunction('max', [{ type: 'number', value: 1 }, { type: 'string', value: '2' }]),
       safeFunction('clamp', [
         { type: 'number', value: 1 },
-        { type: 'integer', value: 0 },
+        { type: 'length', value: 0 },
         { type: 'number', value: 2 },
       ]),
       safeFunction('format-date', [{ type: 'string', value: '2026-07-12T10:30:00.000Z' }]),
@@ -481,7 +475,7 @@ describe('evaluateExpressionV1 nested fail-soft evaluation', () => {
       whenFalse: literal({ type: 'integer', value: 0 }),
     };
 
-    expect(evaluate(expression, context)).toEqual({ type: 'integer', value: 10 });
+    expect(evaluate(expression, context)).toEqual({ type: 'number', value: 10 });
   });
 
   it('never returns NaN or Infinity from numeric operations', () => {

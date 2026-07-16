@@ -1,16 +1,7 @@
 import type { projectFormatV1 } from '@broadset/model';
-import {
-  decodePDFRawStream,
-  PDFArray,
-  PDFDict,
-  type PDFDocument,
-  PDFName,
-  PDFNumber,
-  type PDFPage,
-  PDFRawStream,
-  PDFRef,
-} from 'pdf-lib';
+import { PDFArray, PDFDict, type PDFDocument, PDFName, PDFNumber, type PDFPage, PDFRawStream, PDFRef } from 'pdf-lib';
 
+import { decodePdfRawStreamBoundedV1 } from '../import/bounded-stream';
 import { readPageContentChunks, scanContentStreamForText } from '../import/operators';
 import { encodeRgbPngV1 } from './encode-png';
 import { parsePdfOperatorsV1 } from './parse-operators';
@@ -18,9 +9,17 @@ import type { ParsedPdfDocumentV1, PdfImageResourceV1, PdfTextItemV1 } from './t
 
 const MAX_OPERATOR_BYTES = 16 * 1024 * 1024;
 const MAX_DECODED_IMAGE_PIXELS = 16 * 1024 * 1024;
+const MAX_IMAGE_RESOURCE_BYTES = 32 * 1024 * 1024;
+const MAX_TOTAL_IMAGE_RESOURCE_BYTES = 64 * 1024 * 1024;
+const MAX_MAPPED_ITEMS = 1024;
+const MAX_PATH_COMMANDS = 32_768;
 const DEFAULT_PAGE_SIZE = 1;
 
-function diagnostic(code: string, message: string, dimension: 'appearance' | 'semantics'): projectFormatV1.InteropDiagnostic {
+function diagnostic(
+  code: string,
+  message: string,
+  dimension: 'appearance' | 'semantics',
+): projectFormatV1.InteropDiagnostic {
   return { code, severity: 'warning', message, dimension, pointer: '/' };
 }
 
@@ -66,15 +65,26 @@ function decodedRgb(input: {
     return undefined;
   }
 
-  let decoded: Uint8Array;
-
-  try {
-    decoded = decodePDFRawStream(input.stream).decode();
-  } catch {
-    return undefined;
-  }
-
   const pixelCount = input.width * input.height;
+  const sourceChannels = pdfSourceChannelCount(colorSpace);
+  const decodedResult = decodePdfRawStreamBoundedV1({
+    stream: input.stream,
+    maxOutputBytes: pixelCount * sourceChannels,
+  });
+
+  if (decodedResult.status === 'rejected') return undefined;
+
+  return convertDecodedRgb(colorSpace, decodedResult.bytes, pixelCount);
+}
+
+function pdfSourceChannelCount(colorSpace: string): number {
+  if (colorSpace === 'DeviceCMYK') return 4;
+  if (colorSpace === 'DeviceRGB') return 3;
+
+  return 1;
+}
+
+function convertDecodedRgb(colorSpace: string, decoded: Uint8Array, pixelCount: number): Uint8Array | undefined {
   const rgb = new Uint8Array(pixelCount * 3);
 
   if (colorSpace === 'DeviceRGB' && decoded.byteLength >= rgb.byteLength) {
@@ -126,11 +136,18 @@ function extractedImageBytes(input: {
   readonly rgb: Uint8Array | undefined;
   readonly width: number;
   readonly height: number;
+  readonly maxBytes: number;
 }): Uint8Array | undefined {
-  if (input.mediaType !== undefined) return Uint8Array.from(input.stream.contents);
-  if (input.rgb === undefined) return undefined;
+  if (input.mediaType !== undefined) {
+    return input.stream.contents.byteLength <= input.maxBytes ? Uint8Array.from(input.stream.contents) : undefined;
+  }
 
-  return encodeRgbPngV1({ rgb: input.rgb, width: input.width, height: input.height });
+  if (input.rgb === undefined) return undefined;
+  if (input.rgb.byteLength > input.maxBytes) return undefined;
+
+  const encoded = encodeRgbPngV1({ rgb: input.rgb, width: input.width, height: input.height });
+
+  return encoded.byteLength <= input.maxBytes ? encoded : undefined;
 }
 
 function finiteDimension(value: number): number {
@@ -141,7 +158,7 @@ function finiteCoordinate(value: number): number {
   return Number.isFinite(value) ? value : 0;
 }
 
-function imageResource(stream: PDFRawStream): PdfImageResourceV1 | undefined {
+function imageResource(stream: PDFRawStream, maxBytes: number): PdfImageResourceV1 | undefined {
   const subtype = stream.dict.lookupMaybe(PDFName.of('Subtype'), PDFName);
 
   if (subtype?.decodeText() !== 'Image') return undefined;
@@ -155,23 +172,39 @@ function imageResource(stream: PDFRawStream): PdfImageResourceV1 | undefined {
   const warnings: projectFormatV1.InteropDiagnostic[] = [];
 
   if (stream.dict.has(PDFName.of('SMask')) || stream.dict.has(PDFName.of('Mask'))) {
-    warnings.push(diagnostic(
-      'pdf.image-transparency-omitted',
-      'PDF image transparency could not be represented in the decoded raster fallback.',
-      'appearance',
-    ));
+    warnings.push(
+      diagnostic(
+        'pdf.image-transparency-omitted',
+        'PDF image transparency could not be represented in the decoded raster fallback.',
+        'appearance',
+      ),
+    );
   }
 
   if (stream.dict.has(PDFName.of('Decode'))) {
-    warnings.push(diagnostic(
-      'pdf.image-decode-range-omitted',
-      'PDF image decode ranges could not be applied to the decoded raster fallback.',
-      'appearance',
-    ));
+    warnings.push(
+      diagnostic(
+        'pdf.image-decode-range-omitted',
+        'PDF image decode ranges could not be applied to the decoded raster fallback.',
+        'appearance',
+      ),
+    );
+  }
+
+  const bytes = extractedImageBytes({ stream, mediaType, rgb, width: pixelWidth, height: pixelHeight, maxBytes });
+
+  if (bytes === undefined && (mediaType !== undefined || rgb !== undefined)) {
+    warnings.push(
+      diagnostic(
+        'pdf.image-size-limit',
+        `PDF image resource exceeded the ${String(maxBytes)} byte retained-resource limit.`,
+        'semantics',
+      ),
+    );
   }
 
   return {
-    bytes: extractedImageBytes({ stream, mediaType, rgb, width: pixelWidth, height: pixelHeight }),
+    bytes,
     mediaType: mediaType ?? (rgb === undefined ? 'application/octet-stream' : 'image/png'),
     pixelSize: [pixelWidth, pixelHeight],
     warnings,
@@ -197,12 +230,22 @@ function collectImageResources(pdf: PDFDocument, page: PDFPage): PdfXObjectResou
   const nonImageNames = new Set<string>();
   const resources = page.node.Resources();
   const xObjects = resources?.lookupMaybe(PDFName.of('XObject'), PDFDict);
+  const byStream = new WeakMap<PDFRawStream, PdfImageResourceV1 | undefined>();
+  let retainedBytes = 0;
 
   if (xObjects === undefined) return { images, nonImageNames };
 
   for (const [name, value] of xObjects.entries()) {
     const stream = resolveStream(pdf, value);
-    const image = stream === undefined ? undefined : imageResource(stream);
+    let image = stream === undefined ? undefined : byStream.get(stream);
+
+    if (stream !== undefined && !byStream.has(stream)) {
+      const remainingBytes = Math.max(0, MAX_TOTAL_IMAGE_RESOURCE_BYTES - retainedBytes);
+
+      image = imageResource(stream, Math.min(MAX_IMAGE_RESOURCE_BYTES, remainingBytes));
+      byStream.set(stream, image);
+      retainedBytes += image?.bytes?.byteLength ?? 0;
+    }
 
     if (image === undefined) nonImageNames.add(name.decodeText());
     else images.set(name.decodeText(), image);
@@ -223,7 +266,8 @@ function resolveDictionary(pdf: PDFDocument, value: unknown): PDFDict | undefine
 function removeSubsetPrefix(name: string): string {
   const plus = name.indexOf('+');
   const prefix = plus < 0 ? '' : name.slice(0, plus);
-  const subsetPrefix = prefix.length === 6 && Array.from(prefix).every((character) => character >= 'A' && character <= 'Z');
+  const subsetPrefix =
+    prefix.length === 6 && Array.from(prefix).every((character) => character >= 'A' && character <= 'Z');
 
   return subsetPrefix ? name.slice(plus + 1) : name;
 }
@@ -259,7 +303,7 @@ export function parsePdfDocumentV1(pdf: PDFDocument): ParsedPdfDocumentV1 | unde
   if (page === undefined) return undefined;
 
   const mediaBox = page.getMediaBox();
-  const read = readPageContentChunks(pdf, page, 0);
+  const read = readPageContentChunks({ pdf, page, pageIndex: 0, maxTotalBytes: MAX_OPERATOR_BYTES });
   const acceptedChunks: Uint8Array[] = [];
   const warnings: projectFormatV1.InteropDiagnostic[] = read.warnings.map((message) =>
     diagnostic('pdf.content-stream-warning', message, 'semantics'),
@@ -268,11 +312,13 @@ export function parsePdfDocumentV1(pdf: PDFDocument): ParsedPdfDocumentV1 | unde
 
   for (const chunk of read.chunks) {
     if (byteLength + chunk.byteLength > MAX_OPERATOR_BYTES) {
-      warnings.push(diagnostic(
-        'pdf.operator-limit',
-        `PDF content exceeded the ${String(MAX_OPERATOR_BYTES)} byte operator limit; page content is partial.`,
-        'semantics',
-      ));
+      warnings.push(
+        diagnostic(
+          'pdf.operator-limit',
+          `PDF content exceeded the ${String(MAX_OPERATOR_BYTES)} byte operator limit; page content is partial.`,
+          'semantics',
+        ),
+      );
       break;
     }
 
@@ -281,13 +327,28 @@ export function parsePdfDocumentV1(pdf: PDFDocument): ParsedPdfDocumentV1 | unde
   }
 
   const content = acceptedChunks.map((chunk) => new TextDecoder('latin1').decode(chunk)).join('\n');
-  const parsed = parsePdfOperatorsV1(content);
-  const extractedText = scanContentStreamForText(content);
+  const parsed = parsePdfOperatorsV1({
+    content,
+    maxMappedItems: MAX_MAPPED_ITEMS,
+    maxPathCommands: MAX_PATH_COMMANDS,
+  });
+  const extractedText = scanContentStreamForText({ content, maxItems: parsed.textStates.length });
+
+  if (parsed.truncated) {
+    warnings.push(
+      diagnostic(
+        'pdf.mapped-item-limit',
+        `PDF operator-derived content exceeded the ${String(MAX_MAPPED_ITEMS)} mapped-item limit; page content is partial.`,
+        'semantics',
+      ),
+    );
+  }
+
   const textItems: PdfTextItemV1[] = extractedText.map((item, index) => {
     const state = parsed.textStates[index];
 
-    return state === undefined
-      ? {
+    return state === undefined ?
+        {
           text: item.text,
           fontName: item.fontName,
           fontSize: item.fontSizePt,
@@ -300,11 +361,13 @@ export function parsePdfDocumentV1(pdf: PDFDocument): ParsedPdfDocumentV1 | unde
 
   xObjects.nonImageNames.forEach((resourceName: string): void => {
     if (parsed.imageUses.some((use) => use.resourceName === resourceName)) {
-      warnings.push(diagnostic(
-        'pdf.form-xobject-omitted',
-        `PDF Form XObject ${resourceName} could not be mapped as a native image and was omitted.`,
-        'semantics',
-      ));
+      warnings.push(
+        diagnostic(
+          'pdf.form-xobject-omitted',
+          `PDF Form XObject ${resourceName} could not be mapped as a native image and was omitted.`,
+          'semantics',
+        ),
+      );
     }
   });
 

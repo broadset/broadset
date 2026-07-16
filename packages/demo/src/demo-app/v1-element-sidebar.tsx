@@ -4,10 +4,14 @@ import {
   selectActivePageV1,
   selectElementByIdV1,
 } from '@broadset/editor';
-import { projectFormatV1 } from '@broadset/model';
 import { LayersSidebar, PropertiesSidebar } from '@broadset/ui';
 
-import { buildLayerInfoListV1, buildMediaAssetsV1 } from '../v1-demo-project';
+import {
+  buildLayerInfoListV1,
+  buildMediaAssetsV1,
+  layerInstanceIdV1,
+  parseLayerInstanceIdV1,
+} from '../v1-demo-project';
 import { toPanelElementV1 } from '../v1-panel-adapter';
 import { updateElementFromPanelV1 } from '../v1-panel-mutations';
 import { useEditorSelector } from './helpers';
@@ -17,12 +21,6 @@ interface V1ElementSidebarProps {
   readonly tab: 'layers' | 'properties';
 }
 
-function parseId(value: string): projectFormatV1.Id | undefined {
-  const result = projectFormatV1.idSchema.safeParse(value);
-
-  return result.success ? result.data : undefined;
-}
-
 function reorderRelative(options: {
   readonly store: ProjectEditorStore;
   readonly dragId: string;
@@ -30,16 +28,31 @@ function reorderRelative(options: {
   readonly position: 'before' | 'inside' | 'after';
 }): void {
   const state = options.store.getState();
-  const dragId = parseId(options.dragId);
-  const targetId = parseId(options.targetId);
+  const dragAddress = parseLayerInstanceIdV1(options.dragId, state.activePageId);
+  const targetAddress = parseLayerInstanceIdV1(options.targetId, state.activePageId);
   const document = selectActiveDocumentV1(state);
-  const drag = document?.elements.find(({ id }) => id === dragId);
-  const target = document?.elements.find(({ id }) => id === targetId);
+  const page = selectActivePageV1(state);
+  const drag = document?.elements.find(({ id }) => id === dragAddress?.elementId);
+  const target = document?.elements.find(({ id }) => id === targetAddress?.elementId);
 
-  if (drag === undefined || target === undefined) return;
+  if (dragAddress === undefined || targetAddress === undefined || drag === undefined || target === undefined) return;
 
   if (options.position === 'inside') {
     state.reparentElement(drag.id, target.id);
+
+    return;
+  }
+
+  const dragRoot = page?.rootInstances.find(({ id }) => id === dragAddress.rootInstanceId);
+  const targetRoot = page?.rootInstances.find(({ id }) => id === targetAddress.rootInstanceId);
+  const addressesRootRows =
+    dragRoot?.elementId === drag.id &&
+    targetRoot?.elementId === target.id &&
+    dragAddress.componentInstancePath.length === 0 &&
+    targetAddress.componentInstancePath.length === 0;
+
+  if (addressesRootRows) {
+    state.moveRootInstance(dragRoot.id, targetRoot.id, options.position);
 
     return;
   }
@@ -59,7 +72,8 @@ export function V1ElementSidebar({ editorStore, tab }: V1ElementSidebarProps): R
   const state = useEditorSelector(editorStore, (current) => current);
   const document = selectActiveDocumentV1(state);
   const page = selectActivePageV1(state);
-  const selectedId = state.activeElementIds[0];
+  const selectedAddress = state.activeInstanceAddresses[0];
+  const selectedId = selectedAddress?.elementId;
   const selectedElement = selectedId === undefined ? undefined : selectElementByIdV1(state, selectedId);
   const layers =
     document === undefined || page === undefined ?
@@ -70,36 +84,38 @@ export function V1ElementSidebar({ editorStore, tab }: V1ElementSidebarProps): R
     return (
       <LayersSidebar
         layers={layers}
-        selectedIds={state.activeElementIds}
+        selectedIds={state.activeInstanceAddresses.map((address) =>
+          layerInstanceIdV1({ pageId: state.activePageId, address }),
+        )}
         onDelete={(elementId) => {
-          const id = parseId(elementId);
+          const address = parseLayerInstanceIdV1(elementId, state.activePageId);
 
-          if (id !== undefined) state.removeElement(id);
+          if (address !== undefined) state.removeElement(address.elementId);
         }}
         onRename={(elementId, name) => {
-          const id = parseId(elementId);
+          const address = parseLayerInstanceIdV1(elementId, state.activePageId);
 
-          if (id !== undefined) state.updateElement(id, (element) => ({ ...element, name }));
+          if (address !== undefined) state.updateElement(address.elementId, (element) => ({ ...element, name }));
         }}
         onReorder={(dragId, targetId, position) => {
           reorderRelative({ store: editorStore, dragId, targetId, position });
         }}
         onSelect={(elementId, mode) => {
-          const id = parseId(elementId);
+          const address = parseLayerInstanceIdV1(elementId, state.activePageId);
 
-          if (id === undefined) return;
-          if (mode === 'toggle') state.toggleSelectElement(id);
-          else state.selectElement(id);
+          if (address === undefined) return;
+          if (mode === 'toggle') state.toggleSelectInstance(address);
+          else state.selectInstance(address);
         }}
         onToggleLock={(elementId) => {
-          const id = parseId(elementId);
+          const address = parseLayerInstanceIdV1(elementId, state.activePageId);
 
-          if (id !== undefined) state.toggleLock(id);
+          if (address !== undefined) state.toggleLock(address.elementId);
         }}
         onToggleVisibility={(elementId) => {
-          const id = parseId(elementId);
+          const address = parseLayerInstanceIdV1(elementId, state.activePageId);
 
-          if (id !== undefined) state.toggleVisibility(id);
+          if (address !== undefined) state.toggleInstanceVisibility(address);
         }}
       />
     );

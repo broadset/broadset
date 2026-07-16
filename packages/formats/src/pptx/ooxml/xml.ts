@@ -1,5 +1,7 @@
 import { XMLParser } from 'fast-xml-parser';
 
+import { containsForbiddenXmlDeclaration, inspectMarkupBounds } from '../../_shared/import-limits';
+
 /**
  * Namespace-aware OOXML XML read / write wrappers. Replaces the regex
  * parsing the old implementation used. Every PPTX XML part (slide,
@@ -45,6 +47,8 @@ const PARSER_OPTIONS = {
 } as const;
 
 const parser = new XMLParser(PARSER_OPTIONS);
+const MAX_XML_NODES = 250_000;
+const MAX_XML_DEPTH = 100;
 
 /**
  * Parse an OOXML XML string into fast-xml-parser's `preserveOrder` node
@@ -53,6 +57,12 @@ const parser = new XMLParser(PARSER_OPTIONS);
  */
 export function parseXml(input: string): unknown {
   if (input.trim().length === 0) return null;
+
+  if (containsForbiddenXmlDeclaration(input)) throw new Error('OOXML DTD and entity declarations are forbidden.');
+
+  const bounds = inspectMarkupBounds(input, { maxNodes: MAX_XML_NODES, maxDepth: MAX_XML_DEPTH });
+
+  if (bounds.status === 'rejected') throw new Error(`OOXML ${bounds.reason} exceeded the parser boundary.`);
 
   return parser.parse(input) as unknown;
 }
@@ -63,10 +73,7 @@ export function parseXml(input: string): unknown {
  * inside attribute quotes.
  */
 export function escapeXmlText(input: string): string {
-  return input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return input.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /** Escape a string for safe use as an XML attribute value. */

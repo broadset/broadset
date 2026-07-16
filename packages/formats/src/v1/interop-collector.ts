@@ -11,7 +11,7 @@ function normalizedConfidence(value: number): number {
   return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
 }
 
-export interface InteropCollectorV1 {
+interface InteropCollectorV1 {
   addSource(input: {
     readonly format: string;
     readonly sourceAssetId: ProjectFormatV1.Id;

@@ -1,8 +1,17 @@
 import { projectFormatV1 } from '@broadset/model';
 import { readPsd } from 'ag-psd';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { exportPsdBytesV1, exportPsdWithPreflightV1, importPsdProjectV1 } from '../../index';
+import { TestPsdImportWorkerV1 } from '../test-worker';
+import { exportPsdBytesV1, exportPsdWithPreflightV1, importPsdProjectV1 } from './index';
+
+beforeAll((): void => {
+  vi.stubGlobal('Worker', TestPsdImportWorkerV1);
+});
+
+afterAll((): void => {
+  vi.unstubAllGlobals();
+});
 
 const IMPORTED_AT = projectFormatV1.utcTimestampSchema.parse('2026-07-12T00:00:00Z');
 const PNG_BYTES = Uint8Array.from(

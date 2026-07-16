@@ -10,6 +10,7 @@ type TypedValue = projectFormatV1.TypedValue;
 export interface ResolvedBindingV1 {
   readonly target: PropertyTarget;
   readonly value: TypedValue;
+  readonly source: 'expression' | 'fallback';
 }
 
 export function evaluateBindingV1(binding: Binding, context: ExpressionContextV1): ResolvedBindingV1 | undefined {
@@ -20,8 +21,8 @@ export function evaluateBindingV1(binding: Binding, context: ExpressionContextV1
     formatted = applyFormatterPipelineV1(formatted, binding.formatter);
   }
 
-  if (formatted !== undefined) return { target: binding.target, value: formatted };
-  if (binding.fallback !== undefined) return { target: binding.target, value: binding.fallback };
+  if (formatted !== undefined) return { target: binding.target, value: formatted, source: 'expression' };
+  if (binding.fallback !== undefined) return { target: binding.target, value: binding.fallback, source: 'fallback' };
 
   return undefined;
 }

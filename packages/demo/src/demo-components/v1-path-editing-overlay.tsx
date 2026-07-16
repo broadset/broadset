@@ -1,11 +1,15 @@
 import { getEditorElementRectV1, type ProjectEditorStore } from '@broadset/editor';
 import type { projectFormatV1 } from '@broadset/model';
+import type { PhysicalUnitContextV1 } from '@broadset/renderer';
+
+import { documentValueToCssPixelsV1 } from '../demo-app/v1-canvas-units';
 
 interface V1PathEditingOverlayProps {
   readonly editorStore: ProjectEditorStore;
   readonly element: projectFormatV1.Element;
   readonly panX: number;
   readonly panY: number;
+  readonly units: PhysicalUnitContextV1;
   readonly zoom: number;
 }
 
@@ -13,6 +17,7 @@ export function V1PathEditingOverlay({
   element,
   panX,
   panY,
+  units,
   zoom,
 }: V1PathEditingOverlayProps): React.JSX.Element | null {
   if (element.kind !== 'vector' || element.geometryData.kind !== 'path') return null;
@@ -31,8 +36,8 @@ export function V1PathEditingOverlay({
         <circle
           key={point.id}
           data-testid={`path-handle-anchor-${point.id}`}
-          cx={(rect.x + point.x) * zoom + panX}
-          cy={(rect.y + point.y) * zoom + panY}
+          cx={documentValueToCssPixelsV1(rect.x + point.x, units) * zoom + panX}
+          cy={documentValueToCssPixelsV1(rect.y + point.y, units) * zoom + panY}
           fill="#ffffff"
           r={5}
           stroke="#2563eb"

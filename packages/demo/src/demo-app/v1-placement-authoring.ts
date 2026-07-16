@@ -1,5 +1,8 @@
 import { getEditorElementRectV1, type ProjectEditorStore } from '@broadset/editor';
 import { projectFormatV1 } from '@broadset/model';
+import type { PhysicalUnitContextV1 } from '@broadset/renderer';
+
+import { cssPixelsToDocumentValueV1 } from './v1-canvas-units';
 
 export interface PlacementAnchorV1 {
   readonly x: number;
@@ -216,15 +219,19 @@ export function handlePathDrawingPoint(options: {
   readonly elementId: projectFormatV1.Id;
   readonly point: PlacementAnchorV1;
   readonly setPathPreview: (point: PlacementAnchorV1 | null) => void;
+  readonly units: PhysicalUnitContextV1;
   readonly zoom: number;
 }): void {
-  const { editorStore, elementId, point, setPathPreview, zoom } = options;
+  const { editorStore, elementId, point, setPathPreview, units, zoom } = options;
   const state = editorStore.getState();
   const activeDocument = state.project.documents.find((candidate) => candidate.id === state.activeDocumentId);
   const element = activeDocument?.elements.find((candidate) => candidate.id === elementId);
   const last = lastPathPoint(element);
 
-  if (last !== undefined && Math.hypot(last.x - point.x, last.y - point.y) <= 5 / zoom) {
+  if (
+    last !== undefined &&
+    Math.hypot(last.x - point.x, last.y - point.y) <= cssPixelsToDocumentValueV1(5 / zoom, units)
+  ) {
     state.finishPathDrawing();
     setPathPreview(null);
 

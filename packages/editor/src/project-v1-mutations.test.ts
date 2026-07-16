@@ -34,6 +34,72 @@ function createGroupElement(elementId: string): projectFormatV1.Element {
 }
 
 describe('removeDocumentElementsV1', () => {
+  it('promotes required descendants while preserving their world transform', () => {
+    const parent = projectFormatV1.createElementV1({
+      id: id('required-parent'),
+      name: 'Parent',
+      kind: 'group',
+      geometry: projectFormatV1.createElementGeometry({
+        width: 100,
+        height: 100,
+        transform: { kind: 'affine2d', matrix: [1, 0, 0, 1, 10, 20] },
+      }),
+    });
+    const required = projectFormatV1.createElementV1({
+      id: id('required-child'),
+      name: 'Required',
+      kind: 'vector',
+      parentId: parent.id,
+      geometry: projectFormatV1.createElementGeometry({
+        width: 20,
+        height: 20,
+        transform: { kind: 'affine2d', matrix: [1, 0, 0, 1, 5, 7] },
+      }),
+      geometryData: projectFormatV1.createRectangleGeometry(),
+    });
+    const disposable = createVectorElement({ id: 'disposable-child', parentId: parent.id });
+    const document = projectFormatV1.createDocumentV1({
+      id: id('required-document'),
+      elements: [parent, required, disposable],
+      pages: [
+        projectFormatV1.createPageV1({
+          id: id('required-page'),
+          rootInstances: [
+            {
+              id: id('required-root-instance'),
+              elementId: parent.id,
+              transform: { kind: 'affine2d', matrix: [1, 0, 0, 1, 100, 0] },
+              overrides: [],
+              componentPropertyValues: [],
+            },
+          ],
+        }),
+      ],
+    });
+    const project = projectFormatV1.createProjectV1({ documents: [document] });
+
+    const result = removeDocumentElementsV1({
+      project,
+      documentId: document.id,
+      elementIds: [parent.id],
+      requiredElementIds: new Set([required.id]),
+    });
+    const actualDocument = result.documents[0];
+    const actualRequired = actualDocument?.elements.find(({ id: elementId }) => elementId === required.id);
+
+    expect(actualDocument?.elements.map(({ id: elementId }) => elementId)).toEqual([required.id]);
+    expect(actualRequired?.parentId).toBeNull();
+    expect(actualRequired?.geometry.transform).toEqual({ kind: 'affine2d', matrix: [1, 0, 0, 1, 15, 27] });
+    expect(actualDocument?.pages[0]?.rootInstances).toMatchObject([
+      {
+        id: id('required-root-instance'),
+        elementId: required.id,
+        transform: { kind: 'affine2d', matrix: [1, 0, 0, 1, 100, 0] },
+      },
+    ]);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(result)).toEqual([]);
+  });
+
   it('purges a deleted subtree and every target that would dangle', () => {
     const parent = createVectorElement({ id: 'parent' });
     const child = createVectorElement({ id: 'child', parentId: parent.id });

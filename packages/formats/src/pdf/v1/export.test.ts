@@ -2,9 +2,18 @@ import { readFileSync } from 'node:fs';
 
 import { projectFormatV1 } from '@broadset/model';
 import { PDFDocument } from 'pdf-lib';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { exportPdfBytesV1, exportPdfWithPreflightV1, importPdfProjectV1 } from '../../index';
+import { TestPdfImportWorkerV1 } from '../import/test-worker';
+import { exportPdfBytesV1, exportPdfWithPreflightV1, importPdfProjectV1 } from './index';
+
+beforeAll((): void => {
+  vi.stubGlobal('Worker', TestPdfImportWorkerV1);
+});
+
+afterAll((): void => {
+  vi.unstubAllGlobals();
+});
 
 const IMPORTED_AT = projectFormatV1.utcTimestampSchema.parse('2026-07-12T00:00:00Z');
 const PNG_BYTES = Uint8Array.from(

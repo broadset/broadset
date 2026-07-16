@@ -1,32 +1,16 @@
 import type { Diagnostic } from './diagnostics';
 import { isOutputIccProfileCompatible } from './icc-profile-compatibility';
 import { type Id, idSchema } from './identity';
-import type { BroadsetProjectV1 } from './project';
 import { resolveProjectEntityAddress } from './resolved-address';
 import type { SharedStyle } from './resources';
 import type { SemanticIndexes } from './semantic-index';
+import { createSemanticError, findDuplicateIdDiagnostics, typedValueMatchesType } from './semantic-validation-helpers';
 import {
-  createSemanticError,
-  findDuplicateIdDiagnostics,
-  typedValueMatchesType,
-} from './semantic-validation-helpers';
+  validateAssetReference,
+  validateForeignElementSource,
+  validateMissingBlobSource,
+} from './semantic-validation-resource-reference';
 import type { ValueType } from './typed-value';
-
-function validateAssetReference(
-  indexes: SemanticIndexes,
-  assetId: Id,
-  kinds: readonly BroadsetProjectV1['resources']['assets'][number]['kind'][],
-  pointer: string,
-  diagnostics: Diagnostic[],
-): void {
-  const asset = indexes.assets.get(assetId);
-
-  if (asset === undefined) {
-    diagnostics.push(createSemanticError('resource.missing-reference', 'Asset does not resolve', pointer));
-  } else if (!kinds.includes(asset.kind)) {
-    diagnostics.push(createSemanticError('resource.wrong-kind', `Expected ${kinds.join(' or ')} asset`, pointer));
-  }
-}
 
 export function validateOutputProfiles(indexes: SemanticIndexes, diagnostics: Diagnostic[]): void {
   indexes.documentList.forEach(({ document }, documentPosition) => {
@@ -66,27 +50,30 @@ export function validateOutputProfiles(indexes: SemanticIndexes, diagnostics: Di
   });
   indexes.project.resources.outputProfiles.forEach((profile, profilePosition) => {
     if (profile.kind === 'print') {
-      validateAssetReference(
+      validateAssetReference({
         indexes,
-        profile.outputIntent.iccAssetId,
-        ['icc-profile'],
-        `/resources/outputProfiles/${String(profilePosition)}/outputIntent/iccAssetId`,
+        assetId: profile.outputIntent.iccAssetId,
+        kinds: ['icc-profile'],
+        pointer: `/resources/outputProfiles/${String(profilePosition)}/outputIntent/iccAssetId`,
         diagnostics,
-      );
+      });
 
       const iccProfile = indexes.assets.get(profile.outputIntent.iccAssetId);
 
       if (iccProfile?.kind === 'icc-profile' && !isOutputIccProfileCompatible(iccProfile, 'cmyk')) {
-        diagnostics.push(createSemanticError('output.incompatible-icc-profile', 'Print output intent requires an output-class CMYK ICC profile', `/resources/outputProfiles/${String(profilePosition)}/outputIntent/iccAssetId`));
+        diagnostics.push(
+          createSemanticError(
+            'output.incompatible-icc-profile',
+            'Print output intent requires an output-class CMYK ICC profile',
+            `/resources/outputProfiles/${String(profilePosition)}/outputIntent/iccAssetId`,
+          ),
+        );
       }
     }
   });
 }
 
-type StyleEntry = Extract<
-  SharedStyle['source'],
-  { readonly kind: 'properties' }
->['entries'][number];
+type StyleEntry = Extract<SharedStyle['source'], { readonly kind: 'properties' }>['entries'][number];
 
 function findStyleStringValue(entries: readonly StyleEntry[], pointer: string): string | undefined {
   const value = entries.find((entry) => entry.pointer === pointer)?.value;
@@ -174,14 +161,23 @@ function resolveStylePointerType(
   return text[pointer] ?? resolveConditionalParagraphPointer(entries, pointer);
 }
 
-function validateStyleFontReferences(
-  indexes: SemanticIndexes,
-  style: SharedStyle,
-  entries: readonly StyleEntry[],
-  pointer: string,
-  effectiveFontFamilyIds: ReadonlyMap<Id, Id | undefined>,
-  diagnostics: Diagnostic[],
-): void {
+interface ValidateStyleFontReferencesOptions {
+  readonly indexes: SemanticIndexes;
+  readonly style: SharedStyle;
+  readonly entries: readonly StyleEntry[];
+  readonly pointer: string;
+  readonly effectiveFontFamilyIds: ReadonlyMap<Id, Id | undefined>;
+  readonly diagnostics: Diagnostic[];
+}
+
+function validateStyleFontReferences({
+  indexes,
+  style,
+  entries,
+  pointer,
+  effectiveFontFamilyIds,
+  diagnostics,
+}: ValidateStyleFontReferencesOptions): void {
   const familyPosition = entries.findIndex((entry) => entry.pointer === '/fontFamilyId');
   const facePosition = entries.findIndex((entry) => entry.pointer === '/fontFaceId');
   const familyValue = entries[familyPosition]?.value;
@@ -262,20 +258,11 @@ function buildEffectiveFontFamilyIds(indexes: SemanticIndexes): ReadonlyMap<Id, 
 
 function styleEnumValueIsValid(entry: StyleEntry): boolean {
   if (entry.value.type !== 'string') return true;
-  if (entry.pointer === '/paragraph/lineSpacing/kind') return ['normal', 'multiple', 'absolute'].includes(entry.value.value);
+  if (entry.pointer === '/paragraph/lineSpacing/kind')
+    return ['normal', 'multiple', 'absolute'].includes(entry.value.value);
   if (entry.pointer === '/paragraph/list/kind') return ['none', 'unordered', 'ordered'].includes(entry.value.value);
 
   return true;
-}
-
-function validateMissingBlobSource(
-  source: BroadsetProjectV1['resources']['assets'][number]['blob']['source'],
-  pointer: string,
-  diagnostics: Diagnostic[],
-): void {
-  if (source.kind === 'missing') {
-    diagnostics.push(createSemanticError('resource.missing-source', 'Blob source is explicitly missing', pointer));
-  }
 }
 
 function validateSurfaceBackground(indexes: SemanticIndexes, diagnostics: Diagnostic[]): void {
@@ -284,7 +271,9 @@ function validateSurfaceBackground(indexes: SemanticIndexes, diagnostics: Diagno
     const pointer = `/documents/${String(documentPosition)}/surface/background`;
 
     if (paint.kind === 'solid' && paint.color.kind === 'swatch' && !indexes.swatches.has(paint.color.swatchId)) {
-      diagnostics.push(createSemanticError('resource.missing-reference', 'Swatch does not resolve', `${pointer}/color/swatchId`));
+      diagnostics.push(
+        createSemanticError('resource.missing-reference', 'Swatch does not resolve', `${pointer}/color/swatchId`),
+      );
     }
 
     if (paint.kind === 'gradient') {
@@ -302,29 +291,34 @@ function validateSurfaceBackground(indexes: SemanticIndexes, diagnostics: Diagno
     }
 
     if (paint.kind === 'picture' || paint.kind === 'pattern') {
-      validateAssetReference(indexes, paint.assetId, ['image', 'vector'], `${pointer}/assetId`, diagnostics);
+      validateAssetReference({
+        indexes,
+        assetId: paint.assetId,
+        kinds: ['image', 'vector'],
+        pointer: `${pointer}/assetId`,
+        diagnostics,
+      });
     }
   });
 }
 
-function validateForeignElementSource(
-  element: BroadsetProjectV1['documents'][number]['elements'][number],
-  pointer: string,
-  diagnostics: Diagnostic[],
-): void {
-  if (element.kind === 'foreign') {
-    validateMissingBlobSource(element.foreign.sourceBlob.source, `${pointer}/foreign/sourceBlob/source`, diagnostics);
-  }
+interface ValidateSharedStyleOptions {
+  readonly indexes: SemanticIndexes;
+  readonly style: SharedStyle;
+  readonly stylePosition: number;
+  readonly cyclicStyleIds: ReadonlySet<Id>;
+  readonly effectiveFontFamilyIds: ReadonlyMap<Id, Id | undefined>;
+  readonly diagnostics: Diagnostic[];
 }
 
-function validateSharedStyle(
-  indexes: SemanticIndexes,
-  style: SharedStyle,
-  stylePosition: number,
-  cyclicStyleIds: ReadonlySet<Id>,
-  effectiveFontFamilyIds: ReadonlyMap<Id, Id | undefined>,
-  diagnostics: Diagnostic[],
-): void {
+function validateSharedStyle({
+  indexes,
+  style,
+  stylePosition,
+  cyclicStyleIds,
+  effectiveFontFamilyIds,
+  diagnostics,
+}: ValidateSharedStyleOptions): void {
   const targetId = style.source.kind === 'alias' ? style.source.styleId : style.source.inheritedStyleId;
   const pointer = `/resources/styles/${String(stylePosition)}/source`;
 
@@ -332,10 +326,21 @@ function validateSharedStyle(
     const target = indexes.styles.get(targetId);
     const referencePointer = style.source.kind === 'alias' ? `${pointer}/styleId` : `${pointer}/inheritedStyleId`;
 
-    if (target === undefined) diagnostics.push(createSemanticError('resource.missing-reference', 'Shared style does not resolve', referencePointer));
+    if (target === undefined)
+      diagnostics.push(
+        createSemanticError('resource.missing-reference', 'Shared style does not resolve', referencePointer),
+      );
     else {
-      if (target.kind !== style.kind) diagnostics.push(createSemanticError('style.incompatible-inheritance', 'Shared-style kinds are incompatible', referencePointer));
-      if (cyclicStyleIds.has(style.id)) diagnostics.push(createSemanticError('style.cycle', 'Shared-style dependency cycle', referencePointer));
+      if (target.kind !== style.kind)
+        diagnostics.push(
+          createSemanticError(
+            'style.incompatible-inheritance',
+            'Shared-style kinds are incompatible',
+            referencePointer,
+          ),
+        );
+      if (cyclicStyleIds.has(style.id))
+        diagnostics.push(createSemanticError('style.cycle', 'Shared-style dependency cycle', referencePointer));
     }
   }
 
@@ -347,12 +352,25 @@ function validateSharedStyle(
     const entryPointer = `${pointer}/entries/${String(entryPosition)}`;
     const expected = resolveStylePointerType(style.kind, entries, entry.pointer);
 
-    if (expected === undefined) diagnostics.push(createSemanticError('style.invalid-pointer', 'Shared-style pointer is not approved', `${entryPointer}/pointer`));
-    else if (!typedValueMatchesType(entry.value, expected)) diagnostics.push(createSemanticError('style.incompatible-value', 'Shared-style value is incompatible', `${entryPointer}/value`));
-    else if (!styleEnumValueIsValid(entry)) diagnostics.push(createSemanticError('style.incompatible-value', 'Shared-style enum value is not approved', `${entryPointer}/value`));
+    if (expected === undefined)
+      diagnostics.push(
+        createSemanticError('style.invalid-pointer', 'Shared-style pointer is not approved', `${entryPointer}/pointer`),
+      );
+    else if (!typedValueMatchesType(entry.value, expected))
+      diagnostics.push(
+        createSemanticError('style.incompatible-value', 'Shared-style value is incompatible', `${entryPointer}/value`),
+      );
+    else if (!styleEnumValueIsValid(entry))
+      diagnostics.push(
+        createSemanticError(
+          'style.incompatible-value',
+          'Shared-style enum value is not approved',
+          `${entryPointer}/value`,
+        ),
+      );
   });
   if (style.kind === 'text')
-    validateStyleFontReferences(indexes, style, entries, pointer, effectiveFontFamilyIds, diagnostics);
+    validateStyleFontReferences({ indexes, style, entries, pointer, effectiveFontFamilyIds, diagnostics });
 }
 
 function findCyclicStyleIds(indexes: SemanticIndexes): ReadonlySet<Id> {
@@ -405,10 +423,24 @@ export function validateAdditionalResources(indexes: SemanticIndexes, diagnostic
   validateSurfaceBackground(indexes, diagnostics);
   indexes.project.resources.fonts.forEach((font, fontPosition) => {
     font.fallbackFontIds.forEach((fontId, index) => {
-      if (!indexes.fonts.has(fontId)) diagnostics.push(createSemanticError('resource.missing-reference', 'Fallback font does not resolve', `/resources/fonts/${String(fontPosition)}/fallbackFontIds/${String(index)}`));
+      if (!indexes.fonts.has(fontId))
+        diagnostics.push(
+          createSemanticError(
+            'resource.missing-reference',
+            'Fallback font does not resolve',
+            `/resources/fonts/${String(fontPosition)}/fallbackFontIds/${String(index)}`,
+          ),
+        );
     });
     font.faces.forEach((face, index) => {
-      if (face.source.kind === 'asset') validateAssetReference(indexes, face.source.assetId, ['font'], `/resources/fonts/${String(fontPosition)}/faces/${String(index)}/source/assetId`, diagnostics);
+      if (face.source.kind === 'asset')
+        validateAssetReference({
+          indexes,
+          assetId: face.source.assetId,
+          kinds: ['font'],
+          pointer: `/resources/fonts/${String(fontPosition)}/faces/${String(index)}/source/assetId`,
+          diagnostics,
+        });
     });
   });
 
@@ -416,11 +448,15 @@ export function validateAdditionalResources(indexes: SemanticIndexes, diagnostic
   const effectiveFontFamilyIds = buildEffectiveFontFamilyIds(indexes);
 
   indexes.project.resources.styles.forEach((style, stylePosition) => {
-    validateSharedStyle(indexes, style, stylePosition, cyclicStyleIds, effectiveFontFamilyIds, diagnostics);
+    validateSharedStyle({ indexes, style, stylePosition, cyclicStyleIds, effectiveFontFamilyIds, diagnostics });
   });
   indexes.documentList.forEach(({ document }, documentPosition) => {
     document.elements.forEach((element, elementPosition) => {
-      validateForeignElementSource(element, `/documents/${String(documentPosition)}/elements/${String(elementPosition)}`, diagnostics);
+      validateForeignElementSource(
+        element,
+        `/documents/${String(documentPosition)}/elements/${String(elementPosition)}`,
+        diagnostics,
+      );
     });
     document.components.forEach((component, componentPosition) => {
       component.elements.forEach((element, elementPosition) => {
@@ -457,18 +493,16 @@ export function validateTemplateGroups(indexes: SemanticIndexes, diagnostics: Di
         const pointer = `${base}/outputProfileIds/${String(index)}`;
 
         if (seenProfiles.has(id)) {
-          diagnostics.push(createSemanticError('template-group.duplicate-profile', 'Duplicate member output profile', pointer));
+          diagnostics.push(
+            createSemanticError('template-group.duplicate-profile', 'Duplicate member output profile', pointer),
+          );
         }
 
         seenProfiles.add(id);
 
         if (profile === undefined) {
           diagnostics.push(
-            createSemanticError(
-              'template-group.invalid-profile',
-              'Template member profile does not resolve',
-              pointer,
-            ),
+            createSemanticError('template-group.invalid-profile', 'Template member profile does not resolve', pointer),
           );
         } else if (
           document !== undefined &&
@@ -491,13 +525,13 @@ export function validateTemplateGroups(indexes: SemanticIndexes, diagnostics: Di
 
 export function validateInterop(indexes: SemanticIndexes, diagnostics: Diagnostic[]): void {
   indexes.project.interop.sources.forEach((source, sourcePosition) => {
-    validateAssetReference(
+    validateAssetReference({
       indexes,
-      source.sourceAssetId,
-      ['image', 'video', 'audio', 'font', 'icc-profile', 'data', 'vector', 'foreign'],
-      `/interop/sources/${String(sourcePosition)}/sourceAssetId`,
+      assetId: source.sourceAssetId,
+      kinds: ['image', 'video', 'audio', 'font', 'icc-profile', 'data', 'vector', 'foreign'],
+      pointer: `/interop/sources/${String(sourcePosition)}/sourceAssetId`,
       diagnostics,
-    );
+    });
   });
   indexes.project.interop.records.forEach((record, recordPosition) => {
     const base = `/interop/records/${String(recordPosition)}`;
@@ -515,13 +549,13 @@ export function validateInterop(indexes: SemanticIndexes, diagnostics: Diagnosti
     }
 
     if (record.previewAssetId !== undefined) {
-      validateAssetReference(
+      validateAssetReference({
         indexes,
-        record.previewAssetId,
-        ['image', 'vector'],
-        `${base}/previewAssetId`,
+        assetId: record.previewAssetId,
+        kinds: ['image', 'vector'],
+        pointer: `${base}/previewAssetId`,
         diagnostics,
-      );
+      });
     }
 
     if (record.preservedBlob !== undefined) {
