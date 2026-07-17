@@ -75,6 +75,7 @@ export function TimelineLanes(props: TimelineLanesProps): JSX.Element {
             <div
               ref={(node) => {
                 if (node !== null) laneRefs.current.set(track.id, node);
+                else laneRefs.current.delete(track.id);
               }}
               data-testid={`timeline-lane-rail-${track.id}`}
               style={{
@@ -124,6 +125,8 @@ export function TimelineLanes(props: TimelineLanesProps): JSX.Element {
                       props.onSelectKeyframe(track.id, keyframe.id);
                     }}
                     onKeyDown={(event) => {
+                      if (!selected) return;
+
                       if (event.key === 'Delete' || event.key === 'Backspace') {
                         event.preventDefault();
                         props.onDeleteKeyframe(track.id, keyframe.id);
@@ -131,6 +134,15 @@ export function TimelineLanes(props: TimelineLanesProps): JSX.Element {
                     }}
                     onPointerDown={(event) => {
                       if (event.button !== 0) return;
+
+                      if (typeof event.currentTarget.setPointerCapture === 'function') {
+                        try {
+                          event.currentTarget.setPointerCapture(event.pointerId);
+                        } catch {
+                          /* jsdom */
+                        }
+                      }
+
                       event.stopPropagation();
                       setDrag({ trackId: track.id, keyframeId: keyframe.id, candidateTick: keyframe.tick });
                     }}

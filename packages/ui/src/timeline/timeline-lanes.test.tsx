@@ -95,4 +95,11 @@ describe('TimelineLanes', () => {
     fireEvent.keyDown(screen.getByTestId('timeline-marker-kf-a'), { key: 'Backspace' });
     expect(props.onDeleteKeyframe).toHaveBeenCalledTimes(2);
   });
+
+  it('ignores Delete on a marker that is not the selected keyframe', () => {
+    const props = setup({ selectedKeyframe: { trackId: 'track-1', keyframeId: 'kf-b' } });
+
+    fireEvent.keyDown(screen.getByTestId('timeline-marker-kf-a'), { key: 'Delete' });
+    expect(props.onDeleteKeyframe).not.toHaveBeenCalled();
+  });
 });
