@@ -54,85 +54,98 @@ export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): JSX.
   };
 
   return (
-    <KeyframeAuthoringPanel
-      canAddTrack={selectedElement !== undefined}
-      currentTick={state.playbackTick}
-      selectedSequenceId={state.playbackSequenceId}
-      sequences={toPanelSequences(document)}
-      onAddKeyframe={(sequenceId, trackId) => {
-        const track = trackById(sequenceId, trackId);
+    <aside aria-label="Sequence editor">
+      <KeyframeAuthoringPanel
+        canAddTrack={selectedElement !== undefined}
+        currentTick={state.playbackTick}
+        selectedSequenceId={state.playbackSequenceId}
+        sequences={toPanelSequences(document)}
+        onAddKeyframe={(sequenceId, trackId) => {
+          const track = trackById(sequenceId, trackId);
 
-        if (track === undefined) return;
+          if (track === undefined) return;
 
-        const seededElement = document.elements.find(({ id }) => id === track.target.entity.entityId);
-        const value: projectFormatV1.TypedValue = { type: 'number', value: seededElement?.appearance.opacity ?? 1 };
+          const seededElement = document.elements.find(({ id }) => id === track.target.entity.entityId);
+          const value: projectFormatV1.TypedValue = { type: 'number', value: seededElement?.appearance.opacity ?? 1 };
 
-        state.addKeyframe({
-          sequenceId: projectFormatV1.idSchema.parse(sequenceId),
-          trackId: projectFormatV1.idSchema.parse(trackId),
-          tick: state.playbackTick,
-          value,
-        });
-      }}
-      onAddOpacityTrack={(sequenceId) => {
-        if (selectedElement === undefined) return;
+          state.addKeyframe({
+            sequenceId: projectFormatV1.idSchema.parse(sequenceId),
+            trackId: projectFormatV1.idSchema.parse(trackId),
+            tick: state.playbackTick,
+            value,
+          });
+        }}
+        onAddOpacityTrack={(sequenceId) => {
+          if (selectedElement === undefined) return;
 
-        state.createTrack({
-          sequenceId: projectFormatV1.idSchema.parse(sequenceId),
-          name: 'Opacity',
-          target: {
-            entity: {
-              projectId: state.project.id,
-              documentId: document.id,
-              entityKind: 'element',
-              entityId: selectedElement.id,
+          state.createTrack({
+            sequenceId: projectFormatV1.idSchema.parse(sequenceId),
+            name: 'Opacity',
+            target: {
+              entity: {
+                projectId: state.project.id,
+                documentId: document.id,
+                entityKind: 'element',
+                entityId: selectedElement.id,
+              },
+              pointer: OPACITY_POINTER,
             },
-            pointer: OPACITY_POINTER,
-          },
-          valueType: 'number',
-          tick: state.playbackTick,
-          value: { type: 'number', value: selectedElement.appearance.opacity },
-        });
-      }}
-      onAddSequence={() => {
-        const sequenceId = state.addSequence({
-          name: `Sequence ${String(document.sequences.length + 1)}`,
-          durationTicks: DEFAULT_DISPLAY_SECONDS * ticksPerSecond,
-        });
+            valueType: 'number',
+            tick: state.playbackTick,
+            value: { type: 'number', value: selectedElement.appearance.opacity },
+          });
+        }}
+        onAddSequence={() => {
+          const sequenceId = state.addSequence({
+            name: `Sequence ${String(document.sequences.length + 1)}`,
+            durationTicks: DEFAULT_DISPLAY_SECONDS * ticksPerSecond,
+          });
 
-        if (sequenceId !== null) setPageSequence(sequenceId);
-      }}
-      onRemoveKeyframe={(sequenceId, trackId, keyframeId) => {
-        state.removeKeyframe({
-          sequenceId: projectFormatV1.idSchema.parse(sequenceId),
-          trackId: projectFormatV1.idSchema.parse(trackId),
-          keyframeId: projectFormatV1.idSchema.parse(keyframeId),
-        });
-      }}
-      onRemoveSequence={(sequenceId) => {
-        state.removeSequence(projectFormatV1.idSchema.parse(sequenceId));
-      }}
-      onSelectSequence={(sequenceId) => {
-        const parsed = projectFormatV1.idSchema.safeParse(sequenceId);
+          if (sequenceId !== null) setPageSequence(sequenceId);
+        }}
+        onRemoveKeyframe={(sequenceId, trackId, keyframeId) => {
+          state.removeKeyframe({
+            sequenceId: projectFormatV1.idSchema.parse(sequenceId),
+            trackId: projectFormatV1.idSchema.parse(trackId),
+            keyframeId: projectFormatV1.idSchema.parse(keyframeId),
+          });
+        }}
+        onRemoveSequence={(sequenceId) => {
+          state.removeSequence(projectFormatV1.idSchema.parse(sequenceId));
+        }}
+        onSelectSequence={(sequenceId) => {
+          const parsed = projectFormatV1.idSchema.safeParse(sequenceId);
 
-        if (parsed.success) setPageSequence(parsed.data);
-      }}
-      onSetKeyframeInterpolation={(sequenceId, trackId, keyframeId, preset: KeyframeInterpolationPreset) => {
-        state.updateKeyframe({
-          sequenceId: projectFormatV1.idSchema.parse(sequenceId),
-          trackId: projectFormatV1.idSchema.parse(trackId),
-          keyframeId: projectFormatV1.idSchema.parse(keyframeId),
-          interpolation: presetToInterpolation(preset),
-        });
-      }}
-      onUpdateKeyframeValue={(sequenceId, trackId, keyframeId, value) => {
-        state.updateKeyframe({
-          sequenceId: projectFormatV1.idSchema.parse(sequenceId),
-          trackId: projectFormatV1.idSchema.parse(trackId),
-          keyframeId: projectFormatV1.idSchema.parse(keyframeId),
-          value: { type: 'number', value },
-        });
-      }}
-    />
+          if (parsed.success) setPageSequence(parsed.data);
+        }}
+        onSetDuration={(sequenceId, durationTicks) => {
+          state.setSequenceDuration(projectFormatV1.idSchema.parse(sequenceId), durationTicks);
+        }}
+        onSetKeyframeInterpolation={(sequenceId, trackId, keyframeId, preset: KeyframeInterpolationPreset) => {
+          state.updateKeyframe({
+            sequenceId: projectFormatV1.idSchema.parse(sequenceId),
+            trackId: projectFormatV1.idSchema.parse(trackId),
+            keyframeId: projectFormatV1.idSchema.parse(keyframeId),
+            interpolation: presetToInterpolation(preset),
+          });
+        }}
+        onUpdateKeyframeTick={(sequenceId, trackId, keyframeId, tick) => {
+          state.updateKeyframe({
+            sequenceId: projectFormatV1.idSchema.parse(sequenceId),
+            trackId: projectFormatV1.idSchema.parse(trackId),
+            keyframeId: projectFormatV1.idSchema.parse(keyframeId),
+            tick,
+          });
+        }}
+        onUpdateKeyframeValue={(sequenceId, trackId, keyframeId, value) => {
+          state.updateKeyframe({
+            sequenceId: projectFormatV1.idSchema.parse(sequenceId),
+            trackId: projectFormatV1.idSchema.parse(trackId),
+            keyframeId: projectFormatV1.idSchema.parse(keyframeId),
+            value: { type: 'number', value },
+          });
+        }}
+      />
+    </aside>
   );
 }

@@ -10,6 +10,7 @@ import {
   createTrackV1,
   removeKeyframeInProject,
   removeSequenceInProject,
+  setSequenceDurationInProject,
   updateKeyframeInProject,
 } from '../project-v1-sequence-mutations';
 import type { ProjectEditorState } from './project-store';
@@ -19,6 +20,7 @@ type Id = projectFormatV1.Id;
 export interface ProjectEditorSequenceState {
   readonly addSequence: (options: { readonly name: string; readonly durationTicks: number }) => Id | null;
   readonly removeSequence: (sequenceId: Id) => boolean;
+  readonly setSequenceDuration: (sequenceId: Id, durationTicks: number) => boolean;
   readonly createTrack: (options: {
     readonly sequenceId: Id;
     readonly name: string;
@@ -38,6 +40,7 @@ export interface ProjectEditorSequenceState {
     readonly sequenceId: Id;
     readonly trackId: Id;
     readonly keyframeId: Id;
+    readonly tick?: number | undefined;
     readonly value?: projectFormatV1.TypedValue | undefined;
     readonly interpolation?: projectFormatV1.Interpolation | undefined;
   }) => boolean;
@@ -80,6 +83,11 @@ export function createProjectEditorSequenceActions(
     removeSequence(sequenceId): boolean {
       return commit((project, documentId) => removeSequenceInProject({ project, documentId, sequenceId }));
     },
+    setSequenceDuration(sequenceId, durationTicks): boolean {
+      return commit((project, documentId) =>
+        setSequenceDurationInProject({ project, documentId, sequenceId, durationTicks }),
+      );
+    },
     createTrack(options): boolean {
       const track = createTrackV1({
         id: createId(),
@@ -113,7 +121,7 @@ export function createProjectEditorSequenceActions(
           sequenceId: options.sequenceId,
           trackId: options.trackId,
           keyframeId: options.keyframeId,
-          update: { value: options.value, interpolation: options.interpolation },
+          update: { tick: options.tick, value: options.value, interpolation: options.interpolation },
         }),
       );
     },

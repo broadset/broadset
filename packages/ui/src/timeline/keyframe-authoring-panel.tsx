@@ -5,7 +5,15 @@ import type { JSX } from 'react';
 import { color, font, sp } from '../tokens';
 
 /** Friendly interpolation presets a number track keyframe can carry; the host maps them to typed records. */
-export const KEYFRAME_INTERPOLATION_PRESETS = ['hold', 'step', 'linear', 'ease-in', 'ease-out', 'ease-in-out', 'spring'] as const;
+export const KEYFRAME_INTERPOLATION_PRESETS = [
+  'hold',
+  'step',
+  'linear',
+  'ease-in',
+  'ease-out',
+  'ease-in-out',
+  'spring',
+] as const;
 
 export type KeyframeInterpolationPreset = (typeof KEYFRAME_INTERPOLATION_PRESETS)[number];
 
@@ -40,8 +48,10 @@ export interface KeyframeAuthoringPanelProps {
   readonly onSelectSequence: (sequenceId: string) => void;
   readonly onAddSequence: () => void;
   readonly onRemoveSequence: (sequenceId: string) => void;
+  readonly onSetDuration: (sequenceId: string, durationTicks: number) => void;
   readonly onAddOpacityTrack: (sequenceId: string) => void;
   readonly onAddKeyframe: (sequenceId: string, trackId: string) => void;
+  readonly onUpdateKeyframeTick: (sequenceId: string, trackId: string, keyframeId: string, tick: number) => void;
   readonly onUpdateKeyframeValue: (sequenceId: string, trackId: string, keyframeId: string, value: number) => void;
   readonly onSetKeyframeInterpolation: (
     sequenceId: string,
@@ -70,11 +80,23 @@ export function KeyframeAuthoringPanel(props: KeyframeAuthoringPanelProps): JSX.
     <section
       aria-label="Keyframe authoring"
       data-testid="keyframe-authoring-panel"
-      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-03'), padding: sp('sp-03'), font: font('body-compact') }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: sp('sp-03'),
+        padding: sp('sp-03'),
+        font: font('body-compact'),
+      }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: sp('sp-03') }}>
         <span style={{ font: font('label') }}>Sequences</span>
-        <Button aria-label="Add sequence" data-testid="add-sequence" size="sm" variant="secondary" onPress={props.onAddSequence}>
+        <Button
+          aria-label="Add sequence"
+          data-testid="add-sequence"
+          size="sm"
+          variant="secondary"
+          onPress={props.onAddSequence}
+        >
           <Plus size={14} />
           Sequence
         </Button>
@@ -108,7 +130,23 @@ export function KeyframeAuthoringPanel(props: KeyframeAuthoringPanelProps): JSX.
           </Select>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: sp('sp-03') }}>
-            <span style={{ color: color('muted') }}>{`${String(selected.durationTicks)} ticks · ${String(selected.tracks.length)} tracks`}</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: sp('sp-02'), color: color('muted') }}>
+              Duration
+              <Input
+                aria-label="Duration ticks"
+                data-testid="sequence-duration"
+                type="number"
+                value={String(selected.durationTicks)}
+                onChange={(event) => {
+                  const durationTicks = Number(event.currentTarget.value);
+
+                  if (Number.isSafeInteger(durationTicks) && durationTicks >= 0) {
+                    props.onSetDuration(selected.id, durationTicks);
+                  }
+                }}
+              />
+              {`ticks · ${String(selected.tracks.length)} tracks`}
+            </label>
             <div style={{ display: 'flex', gap: sp('sp-02') }}>
               <Button
                 aria-label="Add opacity track"
@@ -116,7 +154,9 @@ export function KeyframeAuthoringPanel(props: KeyframeAuthoringPanelProps): JSX.
                 isDisabled={!props.canAddTrack}
                 size="sm"
                 variant="secondary"
-                onPress={() => { props.onAddOpacityTrack(selected.id); }}
+                onPress={() => {
+                  props.onAddOpacityTrack(selected.id);
+                }}
               >
                 <Plus size={14} />
                 Opacity track
@@ -126,7 +166,9 @@ export function KeyframeAuthoringPanel(props: KeyframeAuthoringPanelProps): JSX.
                 data-testid="remove-sequence"
                 size="sm"
                 variant="danger"
-                onPress={() => { props.onRemoveSequence(selected.id); }}
+                onPress={() => {
+                  props.onRemoveSequence(selected.id);
+                }}
               >
                 <Trash2 size={14} />
               </Button>
@@ -138,7 +180,13 @@ export function KeyframeAuthoringPanel(props: KeyframeAuthoringPanelProps): JSX.
               key={track.id}
               aria-label={`${track.name} track`}
               data-testid={`track-${track.id}`}
-              style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02'), borderTop: `1px solid ${color('border')}`, paddingTop: sp('sp-02') }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: sp('sp-02'),
+                borderTop: `1px solid ${color('border')}`,
+                paddingTop: sp('sp-02'),
+              }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ font: font('label') }}>{track.name}</span>
@@ -147,20 +195,34 @@ export function KeyframeAuthoringPanel(props: KeyframeAuthoringPanelProps): JSX.
                   data-testid={`add-keyframe-${track.id}`}
                   size="sm"
                   variant="secondary"
-                  onPress={() => { props.onAddKeyframe(selected.id, track.id); }}
+                  onPress={() => {
+                    props.onAddKeyframe(selected.id, track.id);
+                  }}
                 >
                   <Plus size={14} />
                   {`Keyframe @ ${String(props.currentTick)}`}
                 </Button>
               </div>
 
-              {track.keyframes.map((keyframe) => (
+              {track.keyframes.map((keyframe, keyframeIndex) => (
                 <div
                   key={keyframe.id}
                   data-testid={`keyframe-${keyframe.id}`}
                   style={{ display: 'flex', alignItems: 'center', gap: sp('sp-02') }}
                 >
-                  <span style={{ color: color('muted'), minWidth: sp('sp-07') }}>{`t${String(keyframe.tick)}`}</span>
+                  <Input
+                    aria-label={`${track.name} keyframe ${String(keyframeIndex + 1)} tick`}
+                    data-testid={`keyframe-tick-${keyframe.id}`}
+                    type="number"
+                    value={String(keyframe.tick)}
+                    onChange={(event) => {
+                      const tick = Number(event.currentTarget.value);
+
+                      if (Number.isSafeInteger(tick) && tick >= 0) {
+                        props.onUpdateKeyframeTick(selected.id, track.id, keyframe.id, tick);
+                      }
+                    }}
+                  />
                   {keyframe.numberValue === null ?
                     <span data-testid={`keyframe-value-${keyframe.id}`} style={{ color: color('muted') }}>
                       typed value
@@ -173,7 +235,8 @@ export function KeyframeAuthoringPanel(props: KeyframeAuthoringPanelProps): JSX.
                       onChange={(event) => {
                         const value = Number(event.currentTarget.value);
 
-                        if (Number.isFinite(value)) props.onUpdateKeyframeValue(selected.id, track.id, keyframe.id, value);
+                        if (Number.isFinite(value))
+                          props.onUpdateKeyframeValue(selected.id, track.id, keyframe.id, value);
                       }}
                     />
                   }
@@ -212,7 +275,9 @@ export function KeyframeAuthoringPanel(props: KeyframeAuthoringPanelProps): JSX.
                     data-testid={`remove-keyframe-${keyframe.id}`}
                     size="sm"
                     variant="danger"
-                    onPress={() => { props.onRemoveKeyframe(selected.id, track.id, keyframe.id); }}
+                    onPress={() => {
+                      props.onRemoveKeyframe(selected.id, track.id, keyframe.id);
+                    }}
                   >
                     <Trash2 size={14} />
                   </Button>

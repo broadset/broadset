@@ -10,6 +10,7 @@ import {
   createTrackV1,
   removeKeyframeInProject,
   removeSequenceInProject,
+  setSequenceDurationInProject,
   updateKeyframeInProject,
 } from './project-v1-sequence-mutations';
 
@@ -176,6 +177,59 @@ describe('v1 sequence authoring transforms', () => {
     });
 
     expect(firstTrack(next).keyframes[0]?.value).toEqual(numberValue(0.5));
+    expect(isValid(next)).toBe(true);
+  });
+
+  it('repositions a keyframe by tick and keeps the track ordered and valid', () => {
+    const createId = idFactory();
+    const base = addSequenceInProject({
+      project: createMotionProject(),
+      documentId: id('doc-1'),
+      sequence: createSequenceV1({ id: id('seq-1'), name: 'Intro', durationTicks: 60 }),
+    });
+    const movingId = createId();
+    const track = createTrackV1({
+      id: createId(),
+      name: 'Opacity',
+      target: OPACITY_TARGET,
+      valueType: 'number',
+      keyframes: [
+        createKeyframeV1({ id: movingId, tick: 10, value: numberValue(0) }),
+        createKeyframeV1({ id: createId(), tick: 50, value: numberValue(1) }),
+      ],
+    });
+    const withTrack = createTrackInProject({ project: base, documentId: id('doc-1'), sequenceId: id('seq-1'), track });
+    const next = updateKeyframeInProject({
+      project: withTrack,
+      documentId: id('doc-1'),
+      sequenceId: id('seq-1'),
+      trackId: track.id,
+      keyframeId: movingId,
+      update: { tick: 55 },
+    });
+
+    const keyframes = firstTrack(next).keyframes;
+
+    expect(keyframes.map(({ tick }) => tick)).toEqual([50, 55]);
+    expect(keyframes[keyframes.length - 1]?.id).toBe(movingId);
+    expect(keyframes[keyframes.length - 1]?.interpolation).toBeUndefined();
+    expect(isValid(next)).toBe(true);
+  });
+
+  it('sets a sequence duration in place', () => {
+    const base = addSequenceInProject({
+      project: createMotionProject(),
+      documentId: id('doc-1'),
+      sequence: createSequenceV1({ id: id('seq-1'), name: 'Intro', durationTicks: 60 }),
+    });
+    const next = setSequenceDurationInProject({
+      project: base,
+      documentId: id('doc-1'),
+      sequenceId: id('seq-1'),
+      durationTicks: 120,
+    });
+
+    expect(activeDocument(next).sequences[0]?.durationTicks).toBe(120);
     expect(isValid(next)).toBe(true);
   });
 

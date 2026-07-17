@@ -211,6 +211,7 @@ export function updateKeyframeInProject(options: {
   readonly trackId: Id;
   readonly keyframeId: Id;
   readonly update: {
+    readonly tick?: number | undefined;
     readonly value?: projectFormatV1.TypedValue | undefined;
     readonly interpolation?: projectFormatV1.Interpolation | undefined;
   };
@@ -224,6 +225,7 @@ export function updateKeyframeInProject(options: {
             keyframe.id === options.keyframeId ?
               {
                 ...keyframe,
+                ...(options.update.tick === undefined ? {} : { tick: options.update.tick }),
                 ...(options.update.value === undefined ? {} : { value: options.update.value }),
                 ...(options.update.interpolation === undefined ? {} : { interpolation: options.update.interpolation }),
               }
@@ -231,6 +233,19 @@ export function updateKeyframeInProject(options: {
           ),
         ),
       })),
+    ),
+  );
+}
+
+export function setSequenceDurationInProject(options: {
+  readonly project: Project;
+  readonly documentId: Id;
+  readonly sequenceId: Id;
+  readonly durationTicks: number;
+}): Project {
+  return commitDocument(options.project, options.documentId, (document) =>
+    withSequence(document, options.sequenceId, (sequence) =>
+      sequence.durationTicks === options.durationTicks ? sequence : { ...sequence, durationTicks: options.durationTicks },
     ),
   );
 }
