@@ -39,6 +39,10 @@ import {
   firstInstanceAddressForElement,
 } from './project-store-selection';
 import {
+  createProjectEditorSequenceActions,
+  type ProjectEditorSequenceState,
+} from './project-store-sequences';
+import {
   createProjectEditorSnapshotState,
   type ProjectEditorSnapshotState,
 } from './project-store-snapshots';
@@ -54,6 +58,7 @@ export interface ProjectEditorState
   extends ProjectEditorUiState,
     ProjectEditorClipboardState,
     ProjectEditorPlaybackState,
+    ProjectEditorSequenceState,
     ProjectEditorSnapshotState {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array>;
@@ -192,6 +197,7 @@ export function createProjectEditorStore(options: CreateProjectEditorStoreOption
         ...createProjectEditorSnapshotState(set, { createId, now }),
         ...createProjectEditorClipboardState({ getState: get, setState: set }, { createId, port: options.clipboard }),
         ...createProjectEditorPlaybackState({ getState: get, setState: set }, initialSequenceId),
+        ...createProjectEditorSequenceActions({ getState: get, setState: set }, createId),
         setProject(
           project: projectFormatV1.BroadsetProjectV1,
           blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array> = new Map(),
