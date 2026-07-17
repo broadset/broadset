@@ -1,11 +1,22 @@
 import type { ProjectEditorStore } from '@broadset/editor';
 import { projectFormatV1 } from '@broadset/model';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SAMPLE_PROJECT_BLOBS_V1, SAMPLE_PROJECT_V1 } from '../sample-project-v1';
 import { loadStoredProjectV1, saveStoredProjectV1 } from '../v1-project-persistence';
 import { V1DemoWorkspace } from './v1-demo-workspace';
+
+function countKeyframes(store: ProjectEditorStore): number {
+  const document = store.getState().project.documents[0];
+
+  if (document === undefined) return 0;
+
+  return document.sequences.reduce(
+    (total, sequence) => total + sequence.tracks.reduce((trackTotal, track) => trackTotal + track.keyframes.length, 0),
+    0,
+  );
+}
 
 describe('V1DemoWorkspace', () => {
   it('selects rendered v1 elements through the project store', async () => {
@@ -203,5 +214,48 @@ describe('V1DemoWorkspace', () => {
 
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(preview.style.cursor).toBe('default');
+  });
+
+  it('opens the timeline bottom panel from the animation toolbar and adds a keyframe at the playhead', async () => {
+    const elementId = projectFormatV1.idSchema.parse('el-live-dot');
+    let editorStore: ProjectEditorStore | undefined;
+
+    render(
+      <V1DemoWorkspace
+        project={SAMPLE_PROJECT_V1}
+        onStoreReady={(store) => {
+          editorStore = store;
+        }}
+      />,
+    );
+
+    if (editorStore === undefined) throw new Error('Expected workspace store');
+
+    const store = editorStore;
+
+    act(() => {
+      store.getState().selectElement(elementId);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open timeline' }));
+
+    const panel = screen.getByTestId('timeline-bottom-panel');
+
+    expect(panel.getAttribute('aria-hidden')).toBeNull();
+
+    const before = countKeyframes(store);
+
+    act(() => {
+      store.getState().seekPlaybackTick(400);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add keyframe' }));
+
+    await waitFor(() => {
+      expect(countKeyframes(store)).toBe(before + 1);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close timeline' }));
+    expect(panel.getAttribute('aria-hidden')).toBe('true');
   });
 });

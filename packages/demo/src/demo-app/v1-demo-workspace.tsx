@@ -1,11 +1,14 @@
 import {
   createProjectEditorStore,
   ProjectEditorProvider,
+  type ProjectEditorState,
   type ProjectEditorStore,
+  resolvePreviewSequenceId,
   selectActiveDocumentV1,
+  selectActiveElementIdsV1,
 } from '@broadset/editor';
 import { type EditorConfig, projectFormatV1 } from '@broadset/model';
-import { PageSorter } from '@broadset/ui';
+import { PageSorter, resolveSnapIntervalTicks, TimelineBottomPanel, TimelineEditor } from '@broadset/ui';
 import { Tabs, Toast, toast } from '@heroui/react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -18,7 +21,11 @@ import { V1ElementSidebar } from './v1-element-sidebar';
 import { V1ElementToolbar } from './v1-element-toolbar';
 import { V1ProjectFileControls } from './v1-project-file-controls';
 import { V1SequenceSidebar } from './v1-sequence-sidebar';
+import { buildTimelineViewSequence } from './v1-timeline-adapter';
 import { V1ViewportToolbar } from './v1-viewport-toolbar';
+
+/** timeline.md's 100 ms grid preference, converted once per render to an integer tick interval. */
+const SNAP_PREFERENCE_MS = 100;
 
 interface V1DemoWorkspaceProps {
   readonly project: projectFormatV1.BroadsetProjectV1;
@@ -40,6 +47,11 @@ interface V1DemoWorkspaceProps {
 
 type WorkspaceTab = 'layers' | 'properties' | 'animation' | 'data';
 
+interface TimelineKeyframeSelection {
+  readonly trackId: string;
+  readonly keyframeId: string;
+}
+
 function renderWorkspaceSidebar(editorStore: ProjectEditorStore, tab: WorkspaceTab): React.JSX.Element {
   switch (tab) {
     case 'animation':
@@ -50,6 +62,94 @@ function renderWorkspaceSidebar(editorStore: ProjectEditorStore, tab: WorkspaceT
     case 'properties':
       return <V1ElementSidebar editorStore={editorStore} tab={tab} />;
   }
+}
+
+function parseTimelineId(value: string): projectFormatV1.Id {
+  return projectFormatV1.idSchema.parse(value);
+}
+
+/** Hosts the shipped TimelineEditor for the sequence currently previewed by playback, or renders nothing. */
+function renderTimelinePanel(options: {
+  readonly state: ProjectEditorState;
+  readonly timelineOpen: boolean;
+  readonly selectedTimelineKeyframe: TimelineKeyframeSelection | null;
+  readonly onCloseTimeline: () => void;
+  readonly onClearSelectedTimelineKeyframe: () => void;
+  readonly onSelectTimelineKeyframe: (selection: TimelineKeyframeSelection) => void;
+}): React.JSX.Element | null {
+  const {
+    state,
+    timelineOpen,
+    selectedTimelineKeyframe,
+    onCloseTimeline,
+    onClearSelectedTimelineKeyframe,
+    onSelectTimelineKeyframe,
+  } = options;
+  const document = selectActiveDocumentV1(state);
+  const sequenceId =
+    state.playbackSequenceId ??
+    (document === undefined ? null : (
+      resolvePreviewSequenceId({
+        project: state.project,
+        documentId: state.activeDocumentId,
+        pageId: state.activePageId,
+      })
+    ));
+  const sequence = document?.sequences.find(({ id }) => id === sequenceId);
+
+  if (document === undefined || sequence === undefined) return null;
+
+  const view = buildTimelineViewSequence({
+    document,
+    sequence,
+    selectedElementIds: new Set(selectActiveElementIdsV1(state)),
+  });
+  const snapIntervalTicks = resolveSnapIntervalTicks(SNAP_PREFERENCE_MS, view.ticksPerSecond);
+
+  return (
+    <TimelineBottomPanel isOpen={timelineOpen} subtitle={document.name} title={sequence.name} onClose={onCloseTimeline}>
+      <TimelineEditor
+        currentTick={state.playbackTick}
+        previewState={state.playbackPlaying ? 'playing' : 'paused'}
+        selectedKeyframe={selectedTimelineKeyframe}
+        sequence={view}
+        snapIntervalTicks={snapIntervalTicks}
+        onAddKeyframe={(seqId, trackId, tick) => {
+          const track = sequence.tracks.find(({ id }) => id === trackId);
+          const seeded = document.elements.find(({ id }) => id === track?.target.entity.entityId);
+
+          state.addKeyframe({
+            sequenceId: parseTimelineId(seqId),
+            trackId: parseTimelineId(trackId),
+            tick,
+            value: { type: 'number', value: seeded?.appearance.opacity ?? 1 },
+          });
+        }}
+        onDeleteKeyframe={(trackId, keyframeId) => {
+          state.removeKeyframe({
+            sequenceId: parseTimelineId(sequence.id),
+            trackId: parseTimelineId(trackId),
+            keyframeId: parseTimelineId(keyframeId),
+          });
+          onClearSelectedTimelineKeyframe();
+        }}
+        onMoveKeyframe={(trackId, keyframeId, tick) => {
+          state.updateKeyframe({
+            sequenceId: parseTimelineId(sequence.id),
+            trackId: parseTimelineId(trackId),
+            keyframeId: parseTimelineId(keyframeId),
+            tick,
+          });
+        }}
+        onSeekTick={(tick) => {
+          state.seekPlaybackTick(tick);
+        }}
+        onSelectKeyframe={(trackId, keyframeId) => {
+          onSelectTimelineKeyframe({ trackId, keyframeId });
+        }}
+      />
+    </TimelineBottomPanel>
+  );
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -218,6 +318,11 @@ export function V1DemoWorkspace({
   });
   const [quarantinedProjectBytes, setQuarantinedProjectBytes] = useState<Uint8Array | null>(null);
   const [tab, setTab] = useState<WorkspaceTab>('properties');
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [selectedTimelineKeyframe, setSelectedTimelineKeyframe] = useState<{
+    readonly trackId: string;
+    readonly keyframeId: string;
+  } | null>(null);
   const state = useEditorSelector(editorStore, (current) => current);
   const document = selectActiveDocumentV1(state);
   const activePageIndex = document?.pages.findIndex((page) => page.id === state.activePageId) ?? 0;
@@ -379,10 +484,26 @@ export function V1DemoWorkspace({
               editorStore={editorStore}
               onTimelineOpen={() => {
                 setTab('animation');
+                setTimelineOpen(true);
               }}
             />
           </main>
         </div>
+        {renderTimelinePanel({
+          state,
+          timelineOpen,
+          selectedTimelineKeyframe,
+          onCloseTimeline: () => {
+            setTimelineOpen(false);
+            setSelectedTimelineKeyframe(null);
+          },
+          onClearSelectedTimelineKeyframe: () => {
+            setSelectedTimelineKeyframe(null);
+          },
+          onSelectTimelineKeyframe: (selection) => {
+            setSelectedTimelineKeyframe(selection);
+          },
+        })}
       </div>
     </ProjectEditorProvider>
   );
