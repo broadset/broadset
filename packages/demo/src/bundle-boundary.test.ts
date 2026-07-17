@@ -26,7 +26,7 @@ import { describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FORMATS_MODULE = '@broadset/formats';
-const ALLOWED_DYNAMIC_IMPORTERS: ReadonlySet<string> = new Set(['formatBridge.ts', 'formats-loader.ts']);
+const ALLOWED_DYNAMIC_IMPORTERS: ReadonlySet<string> = new Set(['formats-loader.ts']);
 
 interface Offender {
   readonly file: string;
