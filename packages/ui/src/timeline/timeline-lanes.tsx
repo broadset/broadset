@@ -98,8 +98,7 @@ export function TimelineLanes(props: TimelineLanesProps): JSX.Element {
               )}
               {track.keyframes.map((keyframe) => {
                 const selected =
-                  props.selectedKeyframe?.trackId === track.id &&
-                  props.selectedKeyframe.keyframeId === keyframe.id;
+                  props.selectedKeyframe?.trackId === track.id && props.selectedKeyframe.keyframeId === keyframe.id;
 
                 return (
                   <button
@@ -129,6 +128,7 @@ export function TimelineLanes(props: TimelineLanesProps): JSX.Element {
 
                       if (event.key === 'Delete' || event.key === 'Backspace') {
                         event.preventDefault();
+                        event.stopPropagation();
                         props.onDeleteKeyframe(track.id, keyframe.id);
                       }
                     }}

@@ -38,7 +38,15 @@ function mockLaneRect(): void {
   const lane = screen.getByTestId('timeline-lane-rail-track-1');
 
   vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue({
-    x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 28, width: 400, height: 28, toJSON: () => ({}),
+    x: 0,
+    y: 0,
+    left: 0,
+    top: 0,
+    right: 400,
+    bottom: 28,
+    width: 400,
+    height: 28,
+    toJSON: () => ({}),
   });
 }
 
@@ -65,7 +73,9 @@ describe('TimelineLanes', () => {
 
     mockLaneRect();
     fireEvent.pointerDown(screen.getByTestId('timeline-lane-rail-track-1'), {
-      button: 0, pointerId: 1, clientX: 300,
+      button: 0,
+      pointerId: 1,
+      clientX: 300,
     });
     expect(props.onSeekTick).toHaveBeenCalledWith(750);
   });
@@ -101,5 +111,31 @@ describe('TimelineLanes', () => {
 
     fireEvent.keyDown(screen.getByTestId('timeline-marker-kf-a'), { key: 'Delete' });
     expect(props.onDeleteKeyframe).not.toHaveBeenCalled();
+  });
+
+  it('stops the Delete keydown from bubbling past the marker so ancestor shortcuts do not also fire', () => {
+    const onDeleteKeyframe = vi.fn();
+    const parentSpy = vi.fn();
+
+    render(
+      <div onKeyDown={parentSpy}>
+        <TimelineLanes
+          tracks={[TRACK]}
+          durationTicks={1000}
+          ticksPerSecond={1000}
+          snapIntervalTicks={100}
+          selectedKeyframe={{ trackId: 'track-1', keyframeId: 'kf-a' }}
+          onSelectKeyframe={vi.fn()}
+          onSeekTick={vi.fn()}
+          onMoveKeyframe={vi.fn()}
+          onDeleteKeyframe={onDeleteKeyframe}
+        />
+      </div>,
+    );
+
+    fireEvent.keyDown(screen.getByTestId('timeline-marker-kf-a'), { key: 'Delete' });
+
+    expect(onDeleteKeyframe).toHaveBeenCalledWith('track-1', 'kf-a');
+    expect(parentSpy).not.toHaveBeenCalled();
   });
 });

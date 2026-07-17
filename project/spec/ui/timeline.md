@@ -405,6 +405,9 @@ Double-clicking a lane creates/updates a keyframe on that track at the resolved 
 - [ ] Keyframe deletion interaction requires component tests.
 - [ ] Easing graph interactions require component tests.
 - [ ] Per-property lane expansion and exact-tick drag require component tests.
+- [ ] Frame-number and timecode ruler label modes (spec MAY) are not yet implemented; labels render seconds only.
+- [ ] Marker pointer-drag repositioning is unit-tested at the widget level; a Playwright CT for the drag gesture remains open.
+- [ ] Per-property lane grouping (Geometry/Appearance/Typography accordion, double-click-to-add on a lane, one-group-expands) is not yet implemented; lanes render flat (one lane per track, deterministic order) and keyframe creation goes through the add button.
 
 ---
 
