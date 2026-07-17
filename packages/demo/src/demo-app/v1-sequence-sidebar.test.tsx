@@ -1,4 +1,4 @@
-import { createProjectEditorStore } from '@broadset/editor';
+import { createProjectEditorStore, type ProjectEditorStore } from '@broadset/editor';
 import { projectFormatV1 } from '@broadset/model';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
@@ -6,30 +6,74 @@ import { describe, expect, it } from 'vitest';
 import { SAMPLE_PROJECT_V1 } from '../sample-project-v1';
 import { V1SequenceSidebar } from './v1-sequence-sidebar';
 
+function firstTrack(store: ProjectEditorStore): projectFormatV1.Track {
+  const track = store.getState().project.documents[0]?.sequences[0]?.tracks[0];
+
+  if (track === undefined) throw new Error('Expected a seeded track');
+
+  return track;
+}
+
+function firstSequenceId(store: ProjectEditorStore): projectFormatV1.Id {
+  const sequenceId = store.getState().project.documents[0]?.sequences[0]?.id;
+
+  if (sequenceId === undefined) throw new Error('Expected a seeded sequence');
+
+  return sequenceId;
+}
+
 describe('V1SequenceSidebar', () => {
-  it('writes sequence metadata through the invariant-safe v1 document mutation', async () => {
+  it('edits a keyframe value through the invariant-safe sequence command', async () => {
     const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+    const keyframe = firstTrack(store).keyframes[0];
+
+    if (keyframe?.value.type !== 'number') throw new Error('Expected a number keyframe');
 
     render(<V1SequenceSidebar editorStore={store} />);
 
-    const nameInput = screen.getByRole('textbox', { name: 'Sequence name' });
-    const durationInput = screen.getByRole('spinbutton', { name: 'Duration ticks' });
-    const secondKeyframeInput = screen.getByRole('spinbutton', {
-      name: 'Live Pulse opacity keyframe 2 tick',
-    });
-
-    fireEvent.change(nameInput, { target: { value: 'Renamed live pulse' } });
-    fireEvent.change(durationInput, { target: { value: '900' } });
-    fireEvent.change(secondKeyframeInput, { target: { value: '850' } });
+    fireEvent.change(screen.getByTestId(`keyframe-value-${keyframe.id}`), { target: { value: '0.25' } });
 
     await waitFor(() => {
-      const sequence = store.getState().project.documents[0]?.sequences[0];
+      const updated = firstTrack(store).keyframes.find(({ id }) => id === keyframe.id);
 
-      expect(sequence?.name).toBe('Renamed live pulse');
-      expect(sequence?.durationTicks).toBe(900);
-      expect(sequence?.tracks[0]?.keyframes[1]?.tick).toBe(850);
+      expect(updated?.value).toEqual({ type: 'number', value: 0.25 });
     });
 
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
+
+  it('adds and removes a keyframe on an existing track', async () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+    const track = firstTrack(store);
+    const sequenceId = firstSequenceId(store);
+    const usedTicks = new Set(track.keyframes.map(({ tick }) => tick));
+
+    let freeTick = 1;
+
+    while (usedTicks.has(freeTick)) freeTick += 1;
+
+    store.getState().seekPlaybackTick(freeTick);
+    render(<V1SequenceSidebar editorStore={store} />);
+
+    fireEvent.click(screen.getByTestId(`add-keyframe-${track.id}`));
+
+    await waitFor(() => {
+      const ticks = firstTrack(store).keyframes.map(({ tick }) => tick);
+
+      expect(ticks).toContain(freeTick);
+    });
+
+    const added = firstTrack(store).keyframes.find(({ tick }) => tick === freeTick);
+
+    if (added === undefined) throw new Error('Expected the added keyframe');
+
+    fireEvent.click(screen.getByTestId(`remove-keyframe-${added.id}`));
+
+    await waitFor(() => {
+      expect(firstTrack(store).keyframes.map(({ id }) => id)).not.toContain(added.id);
+    });
+
+    expect(store.getState().playbackSequenceId).toBe(sequenceId);
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
   });
 });

@@ -1,132 +1,138 @@
-import { type ProjectEditorStore, selectActiveDocumentV1 } from '@broadset/editor';
+import { type ProjectEditorStore, selectActiveDocumentV1, selectActiveElementsV1 } from '@broadset/editor';
 import { projectFormatV1 } from '@broadset/model';
-import { Input, ListBox, Select } from '@heroui/react';
+import { KeyframeAuthoringPanel, type KeyframeAuthoringSequence, type KeyframeInterpolationPreset } from '@broadset/ui';
+import type { JSX } from 'react';
 
 import { useEditorSelector } from './helpers';
+import { interpolationToPreset, presetToInterpolation } from './keyframe-interpolation-presets';
 
 interface V1SequenceSidebarProps {
   readonly editorStore: ProjectEditorStore;
 }
 
-function updateSequence(
-  document: projectFormatV1.BroadsetDocumentV1,
-  sequenceId: projectFormatV1.Id,
-  updater: (sequence: projectFormatV1.Sequence) => projectFormatV1.Sequence,
-): projectFormatV1.BroadsetDocumentV1 {
-  return {
-    ...document,
-    sequences: document.sequences.map((sequence) => (sequence.id === sequenceId ? updater(sequence) : sequence)),
-  };
+const DEFAULT_DISPLAY_SECONDS = 3;
+const OPACITY_POINTER = '/appearance/opacity';
+
+function toPanelSequences(document: projectFormatV1.BroadsetDocumentV1): readonly KeyframeAuthoringSequence[] {
+  return document.sequences.map((sequence) => ({
+    id: sequence.id,
+    name: sequence.name,
+    durationTicks: sequence.durationTicks,
+    tracks: sequence.tracks.map((track) => ({
+      id: track.id,
+      name: track.name,
+      keyframes: track.keyframes.map((keyframe) => ({
+        id: keyframe.id,
+        tick: keyframe.tick,
+        numberValue: keyframe.value.type === 'number' ? keyframe.value.value : null,
+        interpolation: interpolationToPreset(keyframe.interpolation),
+      })),
+    })),
+  }));
 }
 
-export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): React.JSX.Element {
+export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): JSX.Element {
   const state = useEditorSelector(editorStore, (current) => current);
   const document = selectActiveDocumentV1(state);
-  const selectedSequence =
-    document?.sequences.find(({ id }) => id === state.playbackSequenceId) ?? document?.sequences[0];
 
-  if (document === undefined || selectedSequence === undefined) {
-    return <div style={{ padding: 12 }}>This document has no animation sequences.</div>;
+  if (document === undefined) {
+    return <div style={{ padding: 12 }}>No active document.</div>;
   }
 
-  const updateSelected = (updater: (sequence: projectFormatV1.Sequence) => projectFormatV1.Sequence): void => {
-    state.updateActiveDocument((current) => updateSequence(current, selectedSequence.id, updater));
+  const selectedElement = selectActiveElementsV1(state)[0];
+  const ticksPerSecond = document.timebase?.ticksPerSecond ?? 1000;
+
+  const trackById = (sequenceId: string, trackId: string): projectFormatV1.Track | undefined =>
+    document.sequences.find(({ id }) => id === sequenceId)?.tracks.find(({ id }) => id === trackId);
+
+  const setPageSequence = (sequenceId: projectFormatV1.Id): void => {
+    state.setPlaybackSequence(sequenceId);
+    state.updateActiveDocument((current) => ({
+      ...current,
+      pages: current.pages.map((page) => (page.id === state.activePageId ? { ...page, sequenceId } : page)),
+    }));
   };
 
   return (
-    <aside aria-label="Sequence editor" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12 }}>
-      <Select
-        aria-label="Sequence"
-        value={selectedSequence.id}
-        onChange={(key) => {
-          if (key === null) return;
+    <KeyframeAuthoringPanel
+      canAddTrack={selectedElement !== undefined}
+      currentTick={state.playbackTick}
+      selectedSequenceId={state.playbackSequenceId}
+      sequences={toPanelSequences(document)}
+      onAddKeyframe={(sequenceId, trackId) => {
+        const track = trackById(sequenceId, trackId);
 
-          const sequenceId = projectFormatV1.idSchema.safeParse(String(key));
+        if (track === undefined) return;
 
-          if (!sequenceId.success) return;
+        const seededElement = document.elements.find(({ id }) => id === track.target.entity.entityId);
+        const value: projectFormatV1.TypedValue = { type: 'number', value: seededElement?.appearance.opacity ?? 1 };
 
-          state.setPlaybackSequence(sequenceId.data);
-          state.updateActiveDocument((current) => ({
-            ...current,
-            pages: current.pages.map((page) =>
-              page.id === state.activePageId ? { ...page, sequenceId: sequenceId.data } : page,
-            ),
-          }));
-        }}
-      >
-        <Select.Trigger>
-          <Select.Value />
-          <Select.Indicator />
-        </Select.Trigger>
-        <Select.Popover>
-          <ListBox>
-            {document.sequences.map((sequence) => (
-              <ListBox.Item id={sequence.id} key={sequence.id} textValue={sequence.name}>
-                {sequence.name}
-              </ListBox.Item>
-            ))}
-          </ListBox>
-        </Select.Popover>
-      </Select>
-      <Input
-        aria-label="Sequence name"
-        value={selectedSequence.name}
-        onChange={(event) => {
-          const name = event.currentTarget.value;
+        state.addKeyframe({
+          sequenceId: projectFormatV1.idSchema.parse(sequenceId),
+          trackId: projectFormatV1.idSchema.parse(trackId),
+          tick: state.playbackTick,
+          value,
+        });
+      }}
+      onAddOpacityTrack={(sequenceId) => {
+        if (selectedElement === undefined) return;
 
-          updateSelected((sequence) => ({ ...sequence, name }));
-        }}
-      />
-      <Input
-        aria-label="Duration ticks"
-        min={0}
-        step={1}
-        type="number"
-        value={String(selectedSequence.durationTicks)}
-        onChange={(event) => {
-          const durationTicks = Number(event.currentTarget.value);
+        state.createTrack({
+          sequenceId: projectFormatV1.idSchema.parse(sequenceId),
+          name: 'Opacity',
+          target: {
+            entity: {
+              projectId: state.project.id,
+              documentId: document.id,
+              entityKind: 'element',
+              entityId: selectedElement.id,
+            },
+            pointer: OPACITY_POINTER,
+          },
+          valueType: 'number',
+          tick: state.playbackTick,
+          value: { type: 'number', value: selectedElement.appearance.opacity },
+        });
+      }}
+      onAddSequence={() => {
+        const sequenceId = state.addSequence({
+          name: `Sequence ${String(document.sequences.length + 1)}`,
+          durationTicks: DEFAULT_DISPLAY_SECONDS * ticksPerSecond,
+        });
 
-          if (!Number.isSafeInteger(durationTicks) || durationTicks < 0) return;
+        if (sequenceId !== null) setPageSequence(sequenceId);
+      }}
+      onRemoveKeyframe={(sequenceId, trackId, keyframeId) => {
+        state.removeKeyframe({
+          sequenceId: projectFormatV1.idSchema.parse(sequenceId),
+          trackId: projectFormatV1.idSchema.parse(trackId),
+          keyframeId: projectFormatV1.idSchema.parse(keyframeId),
+        });
+      }}
+      onRemoveSequence={(sequenceId) => {
+        state.removeSequence(projectFormatV1.idSchema.parse(sequenceId));
+      }}
+      onSelectSequence={(sequenceId) => {
+        const parsed = projectFormatV1.idSchema.safeParse(sequenceId);
 
-          updateSelected((sequence) => ({ ...sequence, durationTicks }));
-        }}
-      />
-      <div>{`${String(selectedSequence.tracks.length)} tracks`}</div>
-      {selectedSequence.tracks.map((track) => (
-        <section key={track.id} aria-label={track.name}>
-          <div>{track.name}</div>
-          <div>{`${String(track.keyframes.length)} keyframes`}</div>
-          {track.keyframes.map((keyframe, index) => (
-            <Input
-              key={keyframe.id}
-              aria-label={`${track.name} keyframe ${String(index + 1)} tick`}
-              min={0}
-              step={1}
-              type="number"
-              value={String(keyframe.tick)}
-              onChange={(event) => {
-                const tick = Number(event.currentTarget.value);
-
-                if (!Number.isSafeInteger(tick) || tick < 0) return;
-
-                updateSelected((sequence) => ({
-                  ...sequence,
-                  tracks: sequence.tracks.map((candidate) =>
-                    candidate.id === track.id ?
-                      {
-                        ...candidate,
-                        keyframes: candidate.keyframes.map((candidateKeyframe) =>
-                          candidateKeyframe.id === keyframe.id ? { ...candidateKeyframe, tick } : candidateKeyframe,
-                        ),
-                      }
-                    : candidate,
-                  ),
-                }));
-              }}
-            />
-          ))}
-        </section>
-      ))}
-    </aside>
+        if (parsed.success) setPageSequence(parsed.data);
+      }}
+      onSetKeyframeInterpolation={(sequenceId, trackId, keyframeId, preset: KeyframeInterpolationPreset) => {
+        state.updateKeyframe({
+          sequenceId: projectFormatV1.idSchema.parse(sequenceId),
+          trackId: projectFormatV1.idSchema.parse(trackId),
+          keyframeId: projectFormatV1.idSchema.parse(keyframeId),
+          interpolation: presetToInterpolation(preset),
+        });
+      }}
+      onUpdateKeyframeValue={(sequenceId, trackId, keyframeId, value) => {
+        state.updateKeyframe({
+          sequenceId: projectFormatV1.idSchema.parse(sequenceId),
+          trackId: projectFormatV1.idSchema.parse(trackId),
+          keyframeId: projectFormatV1.idSchema.parse(keyframeId),
+          value: { type: 'number', value },
+        });
+      }}
+    />
   );
 }
