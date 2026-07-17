@@ -401,7 +401,8 @@ function inferGet(expression: Extract<ExpressionAst, { readonly kind: 'get' }>, 
   const source = prefixStructuralResult(inferStructuralType(expression.source, context), '/source');
 
   if (expression.source.kind === 'literal' && expression.source.value.type === 'object') {
-    const value = expression.source.value.fields[expression.fieldId];
+    const fields = expression.source.value.fields;
+    const value = Object.hasOwn(fields, expression.fieldId) ? fields[expression.fieldId] : undefined;
 
     return value === undefined
       ? { diagnostics: [...source.diagnostics, createError('expression.object-field-not-found', 'Object field was not found', '/fieldId')] }

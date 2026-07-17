@@ -161,6 +161,29 @@ describe('createProjectEditorStore', () => {
     expect(store.getState().project.documents[0]?.elements).toEqual([]);
   });
 
+  it('reverts the active page together with the project on undo', () => {
+    const project = createProject();
+    const store = createProjectEditorStore({ project });
+    const firstPageId = project.documents[0]?.pages[0]?.id;
+    const parentId = project.documents[0]?.elements[0]?.id ?? id('parent');
+    const secondPage = projectFormatV1.createPageV1({
+      id: id('page-2'),
+      rootInstances: [{ id: id('page-2-instance'), elementId: parentId, overrides: [], componentPropertyValues: [] }],
+    });
+
+    expect(store.getState().addPage(secondPage)).toBe(true);
+    expect(store.getState().setActivePage(secondPage.id)).toBe(true);
+    expect(store.getState().activePageId).toBe(secondPage.id);
+
+    store.getState().undo();
+
+    const pageIds = store.getState().project.documents[0]?.pages.map((page) => page.id) ?? [];
+
+    expect(pageIds).not.toContain(secondPage.id);
+    expect(pageIds).toContain(store.getState().activePageId);
+    expect(store.getState().activePageId).toBe(firstPageId);
+  });
+
   it('enforces configured required element ids during direct and parent deletion', () => {
     const project = createProject();
     const parentId = project.documents[0]?.elements[0]?.id ?? id('parent');

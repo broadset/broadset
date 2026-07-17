@@ -113,6 +113,8 @@ has one outgoing interpolation and the final keyframe has none. Cubic-Bézier x 
 `[0,1]`; spring mass, stiffness, and settle threshold are positive and damping is non-negative.
 Counting is compatible only with string values, color only with color values, spatial path only
 with point values, and continuous numeric interpolation only with numeric scalar or point values.
+Counting `minimumDigits` is bounded (`PROJECT_V1_LIMITS.maxCountingMinimumDigits`) so a single
+interpolation record cannot force unbounded display formatting; values above the bound are rejected.
 Every non-close segment in a spatial-path interpolation MUST resolve to exactly one point within
 that interpolation path; duplicate points and orphan segment endpoints are semantic errors.
 

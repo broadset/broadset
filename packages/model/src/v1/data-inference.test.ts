@@ -7,6 +7,7 @@ import {
   expressionInferenceContextSchema,
   formatterPipelineSchema,
   inferBindingValueType,
+  inferExpressionStructuralValueType,
   inferExpressionValueType,
   inferFormatterPipelineValueType,
 } from './data';
@@ -141,6 +142,23 @@ describe('expression inference error evidence', () => {
 
     for (const { expression, codes } of cases) {
       expect(infer(expression).diagnostics.map(({ code }) => code)).toEqual(codes);
+    }
+  });
+
+  it('does not treat inherited Object prototype members as object fields', () => {
+    for (const inheritedKey of ['constructor', 'toString', 'hasOwnProperty', '__proto__', 'valueOf']) {
+      const expression = {
+        kind: 'get',
+        source: { kind: 'literal', value: { type: 'object', fields: {} } },
+        fieldId: inheritedKey,
+      };
+
+      expect(infer(expression).diagnostics.map(({ code }) => code)).toEqual([
+        'expression.object-field-not-found',
+      ]);
+      expect(
+        inferExpressionStructuralValueType(expressionAstSchema.parse(expression)).diagnostics.map(({ code }) => code),
+      ).toEqual(['expression.object-field-not-found']);
     }
   });
 

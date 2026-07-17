@@ -77,6 +77,47 @@ describe('project v1 clipboard actions', () => {
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(state.project)).toEqual([]);
   });
 
+  it('regenerates nested owned-entity ids when pasting into the source document', async () => {
+    const filled = projectFormatV1.createElementV1({
+      id: id('filled'),
+      name: 'Filled',
+      geometry: projectFormatV1.createElementGeometry({ width: 100, height: 100 }),
+      kind: 'vector',
+      geometryData: projectFormatV1.createRectangleGeometry(),
+      appearance: {
+        ...projectFormatV1.createDefaultAppearance(),
+        fills: [
+          {
+            id: id('the-fill'),
+            enabled: true,
+            opacity: 1,
+            blendMode: 'normal',
+            paint: { kind: 'solid', color: projectFormatV1.createBlackColorValue() },
+          },
+        ],
+      },
+    });
+    const page = projectFormatV1.createPageV1({
+      id: id('fill-page'),
+      rootInstances: [{ id: id('fill-instance'), elementId: filled.id, overrides: [], componentPropertyValues: [] }],
+    });
+    const document = projectFormatV1.createDocumentV1({ id: id('fill-document'), elements: [filled], pages: [page] });
+    const project = projectFormatV1.createProjectV1({ documents: [document] });
+    const store = createProjectEditorStore({ project, createId: createIdFactory() });
+
+    store.getState().selectElement(id('filled'));
+    expect(await store.getState().copySelection()).toBe(true);
+    expect(await store.getState().pasteClipboard()).toBe(true);
+
+    const pasted = store.getState().project.documents[0];
+    const fillIds = pasted?.elements.flatMap((element) => element.appearance.fills.map((fill) => fill.id)) ?? [];
+
+    expect(fillIds).toHaveLength(2);
+    expect(new Set(fillIds).size).toBe(2);
+    expect(fillIds).toContain(id('the-fill'));
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
+
   it('uses the system port when available, replaces the internal payload, and makes cut undoable', async () => {
     let systemPayload: string | null = null;
     const clipboard: ProjectClipboardPortV1 = {

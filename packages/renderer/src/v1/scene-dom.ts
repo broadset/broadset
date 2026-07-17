@@ -141,8 +141,24 @@ function contentContextChanged(
   );
 }
 
+/**
+ * Group and component-instance hosts hold their own fill layers (prepended by
+ * syncAssetPaintLayersV1) as direct children alongside their positioned child element hosts.
+ * Those fill layers must stay behind the children, so child positioning anchors after the
+ * paint-layer prefix rather than at the literal first child.
+ */
+function firstPositionedChild(parent: HTMLElement): Element | null {
+  let candidate = parent.firstElementChild;
+
+  while (candidate instanceof HTMLElement && candidate.dataset['paintLayer'] !== undefined) {
+    candidate = candidate.nextElementSibling;
+  }
+
+  return candidate;
+}
+
 function positionNode(host: HTMLElement, parent: HTMLElement, previousSibling: HTMLElement | null): void {
-  const expected = previousSibling === null ? parent.firstElementChild : previousSibling.nextElementSibling;
+  const expected = previousSibling === null ? firstPositionedChild(parent) : previousSibling.nextElementSibling;
 
   if (expected !== host) parent.insertBefore(host, expected);
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { PROJECT_V1_LIMITS } from './limits';
 import { interpolationSchema, loopDefinitionSchema, sequenceSchema } from './sequence';
 
 const target = {
@@ -60,6 +61,17 @@ function createOpacitySequenceFixture() {
     ],
   } as const;
 }
+
+describe('counting interpolation bounds', () => {
+  it('rejects a counting minimumDigits above the safe display bound and accepts the bound', () => {
+    const bound = PROJECT_V1_LIMITS.maxCountingMinimumDigits;
+    const atBound = { kind: 'counting', rounding: 'round', minimumDigits: bound, grouping: false };
+    const overBound = { ...atBound, minimumDigits: bound + 1 };
+
+    expect(interpolationSchema.safeParse(atBound).success).toBe(true);
+    expect(interpolationSchema.safeParse(overBound).success).toBe(false);
+  });
+});
 
 describe('sequenceSchema', () => {
   it('parses every closed loop and interpolation discriminant', () => {

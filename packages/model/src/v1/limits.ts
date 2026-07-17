@@ -2,6 +2,10 @@ export const PROJECT_V1_LIMITS = {
   maxJsonTextBytes: 32 * 1024 * 1024,
   maxDepth: 256,
   maxNodes: 250_000,
+  // Caps zero-padding on counting interpolation so a single interpolation record cannot force
+  // unbounded string allocation or formatting work at sample time. No broadcast counter needs
+  // more than this many display digits; the value is far below any allocation or timing concern.
+  maxCountingMinimumDigits: 64,
 } as const;
 
 export type ProjectV1LimitCode =

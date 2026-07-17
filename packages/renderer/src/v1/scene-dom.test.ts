@@ -199,6 +199,47 @@ describe('createResolvedSceneDomV1', () => {
     expect(backdrop?.textContent).toContain('Paint asset missing');
   });
 
+  it('paints group fills behind child element hosts, not on top of them', () => {
+    const rootAddress = address('root', 'filled-group');
+    const filledGroup = projectFormatV1.createElementV1({
+      id: id('filled-group'),
+      name: 'filled-group',
+      geometry: geometry(),
+      appearance: {
+        ...projectFormatV1.createDefaultAppearance(),
+        fills: [
+          {
+            id: id('group-fill'),
+            enabled: true,
+            opacity: 1,
+            blendMode: 'normal',
+            paint: { kind: 'solid', color: projectFormatV1.createBlackColorValue() },
+          },
+        ],
+      },
+      kind: 'group',
+    });
+    const nodes = [
+      sceneNode({ element: filledGroup, address: rootAddress }),
+      sceneNode({
+        element: vector('child', 'rectangle'),
+        address: address('root', 'child'),
+        parentAddress: rootAddress,
+        depth: 1,
+      }),
+    ];
+
+    const handle = createResolvedSceneDomV1({ snapshot: snapshot(nodes), context: context() });
+    const groupHost = handle.root.querySelector<HTMLElement>('[data-element-id="filled-group"]');
+    const children = Array.from(groupHost?.children ?? []);
+    const paintIndex = children.findIndex((child) => child instanceof HTMLElement && child.dataset['paintLayer'] !== undefined);
+    const childIndex = children.findIndex((child) => child instanceof HTMLElement && child.dataset['elementId'] === 'child');
+
+    expect(paintIndex).toBeGreaterThanOrEqual(0);
+    expect(childIndex).toBeGreaterThanOrEqual(0);
+    expect(paintIndex).toBeLessThan(childIndex);
+  });
+
   it('renders only resolved snapshot nodes with page-aware repeated-instance identity', () => {
     const rootA = address('root-a', 'group-a');
     const rootB = address('root-b', 'group-b');

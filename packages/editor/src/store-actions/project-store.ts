@@ -480,7 +480,16 @@ export function createProjectEditorStore(options: CreateProjectEditorStoreOption
         },
       }),
       {
-        partialize: (state) => ({ project: state.project, blobs: state.blobs }),
+        // Navigation context travels with each project snapshot so undo/redo cannot strand
+        // activePageId/activeDocumentId on a page or document the restored project no longer
+        // contains. Equality still keys on project + blobs only, so navigation-only changes
+        // never create undo entries.
+        partialize: (state) => ({
+          project: state.project,
+          blobs: state.blobs,
+          activeDocumentId: state.activeDocumentId,
+          activePageId: state.activePageId,
+        }),
         limit: options.maxUndoSteps ?? DEFAULT_MAX_UNDO_STEPS,
         equality: (previous, current) => previous.project === current.project && previous.blobs === current.blobs,
       },

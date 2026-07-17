@@ -49,9 +49,37 @@ function detachedGeometry(
   return { ...element.geometry, transform };
 }
 
+type CreateId = () => projectFormatV1.Id;
+
+/** Mint fresh ids for the gradient stops a paint owns so pasted paints never collide with the source. */
+function regenerateGradientStops(paint: projectFormatV1.Paint, createId: CreateId): projectFormatV1.Paint {
+  if (paint.kind !== 'gradient') return paint;
+
+  return {
+    ...paint,
+    gradient: { ...paint.gradient, stops: paint.gradient.stops.map((stop) => ({ ...stop, id: createId() })) },
+  };
+}
+
+/** Rewrite a structured path's point ids and keep every segment reference pointing at the new ids. */
+function regeneratePath(path: projectFormatV1.StructuredPath, createId: CreateId): projectFormatV1.StructuredPath {
+  const pointIds = new Map(path.points.map((point): [projectFormatV1.Id, projectFormatV1.Id] => [point.id, createId()]));
+  const regenerateSegment = (segment: projectFormatV1.PathSegment): projectFormatV1.PathSegment =>
+    segment.kind === 'close' ?
+      { ...segment, id: createId() }
+    : { ...segment, id: createId(), pointId: pointIds.get(segment.pointId) ?? segment.pointId };
+
+  return {
+    ...path,
+    points: path.points.map((point) => ({ ...point, id: pointIds.get(point.id) ?? point.id })),
+    segments: path.segments.map(regenerateSegment),
+  };
+}
+
 function remapAppearance(
   appearance: projectFormatV1.Appearance,
   ids: ReadonlyMap<projectFormatV1.Id, projectFormatV1.Id>,
+  createId: CreateId,
 ): projectFormatV1.Appearance {
   const clip = appearance.clip;
   const mask = appearance.mask;
@@ -84,9 +112,9 @@ function remapAppearance(
     opacity: appearance.opacity,
     blendMode: appearance.blendMode,
     isolation: appearance.isolation,
-    fills: appearance.fills,
-    strokes: appearance.strokes,
-    effects: appearance.effects,
+    fills: appearance.fills.map((fill) => ({ ...fill, id: createId(), paint: regenerateGradientStops(fill.paint, createId) })),
+    strokes: appearance.strokes.map((stroke) => ({ ...stroke, id: createId(), paint: regenerateGradientStops(stroke.paint, createId) })),
+    effects: appearance.effects.map((effect) => ({ ...effect, id: createId() })),
     ...(remappedClip === undefined ? {} : { clip: remappedClip }),
     ...(remappedMask === undefined ? {} : { mask: remappedMask }),
   };
@@ -95,6 +123,7 @@ function remapAppearance(
 function remapElement(
   element: projectFormatV1.Element,
   ids: ReadonlyMap<projectFormatV1.Id, projectFormatV1.Id>,
+  createId: CreateId,
 ): projectFormatV1.Element {
   const nextId = ids.get(element.id);
 
@@ -105,16 +134,32 @@ function remapElement(
     id: nextId,
     name: parentId === null ? `${element.name} copy` : element.name,
     parentId,
-    appearance: remapAppearance(element.appearance, ids),
+    appearance: remapAppearance(element.appearance, ids, createId),
   };
 
   if (element.kind === 'text') {
     const vectorElementId = element.textPath === undefined ? undefined : ids.get(element.textPath.vectorElementId);
     const { textPath: _textPath, ...withoutTextPath } = element;
+    const text: projectFormatV1.TextBody = {
+      ...element.text,
+      paragraphs: element.text.paragraphs.map((paragraph) => ({
+        ...paragraph,
+        id: createId(),
+        runs: paragraph.runs.map((run) => ({ ...run, id: createId() })),
+      })),
+    };
 
     return vectorElementId === undefined || element.textPath === undefined ?
-        { ...withoutTextPath, ...remappedBase }
-      : { ...withoutTextPath, ...remappedBase, textPath: { ...element.textPath, vectorElementId } };
+        { ...withoutTextPath, ...remappedBase, text }
+      : { ...withoutTextPath, ...remappedBase, text, textPath: { ...element.textPath, vectorElementId } };
+  }
+
+  if (element.kind === 'vector' && element.geometryData.kind === 'path') {
+    return {
+      ...element,
+      ...remappedBase,
+      geometryData: { ...element.geometryData, path: regeneratePath(element.geometryData.path, createId) },
+    };
   }
 
   if (element.kind !== 'vector' || element.geometryData.kind !== 'boolean') return { ...element, ...remappedBase };
@@ -197,7 +242,7 @@ export function pasteElementClipboardPayloadV1(options: {
   }
 
   const ids = new Map(sourceElements.map((element) => [element.id, options.createId()]));
-  const elements = sourceElements.map((element) => remapElement(element, ids));
+  const elements = sourceElements.map((element) => remapElement(element, ids, options.createId));
   const rootElementIds = elements.filter(({ parentId }) => parentId === null).map(({ id }) => id);
   const nextDocument: projectFormatV1.BroadsetDocumentV1 = {
     ...document,

@@ -8,6 +8,7 @@ import {
   broadsetProjectV1Schema,
   type ComponentDefinition,
   componentDefinitionSchema,
+  createBlackColorValue,
   type Element,
   elementSchema,
   sha256DigestSchema,
@@ -520,4 +521,33 @@ describe('validateBroadsetProjectV1Semantics', () => {
     expect(keys).toEqual([...keys].sort((left, right) => left.localeCompare(right)));
   });
 
+  it('rejects a nested owned-entity id reused across two elements in one document scope', () => {
+    const withFill = (elementId: string, fillId: string): Element =>
+      elementSchema.parse({
+        ...createGroupElement(elementId),
+        appearance: {
+          opacity: 1,
+          blendMode: 'normal',
+          isolation: false,
+          fills: [
+            {
+              id: fillId,
+              enabled: true,
+              opacity: 1,
+              blendMode: 'normal',
+              paint: { kind: 'solid', color: createBlackColorValue() },
+            },
+          ],
+          strokes: [],
+          effects: [],
+        },
+      });
+    const project = broadsetProjectV1Schema.parse(
+      withElements(createMinimalProjectV1(), [withFill('element-a', 'shared-fill'), withFill('element-b', 'shared-fill')]),
+    );
+
+    expect(validateBroadsetProjectV1Semantics(project)).toContainEqual(
+      expect.objectContaining({ code: 'identity.duplicate', severity: 'error' }),
+    );
+  });
 });

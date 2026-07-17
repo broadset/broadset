@@ -295,7 +295,8 @@ function inferGet(expression: Extract<ExpressionAst, { readonly kind: 'get' }>):
   const source = inferExpressionStructuralValueType(expression.source);
 
   if (source.literalValue?.type === 'object') {
-    const fieldValue = source.literalValue.fields[expression.fieldId];
+    const fields = source.literalValue.fields;
+    const fieldValue = Object.hasOwn(fields, expression.fieldId) ? fields[expression.fieldId] : undefined;
 
     return fieldValue === undefined ?
         {

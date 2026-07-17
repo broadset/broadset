@@ -290,6 +290,14 @@ describe('evaluateExpressionV1 conditional and collection access', () => {
     ).toBeUndefined();
   });
 
+  it('does not leak inherited Object prototype members as object fields', () => {
+    const source = literal({ type: 'object', fields: {} });
+
+    for (const inheritedKey of ['constructor', 'toString', 'hasOwnProperty', '__proto__', 'valueOf']) {
+      expect(evaluate({ kind: 'get', source, fieldId: createId(inheritedKey) })).toBeUndefined();
+    }
+  });
+
   it('indexes a list with an in-range integer and rejects invalid indexes', () => {
     const source = literal({
       type: 'list',

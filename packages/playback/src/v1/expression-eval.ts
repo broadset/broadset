@@ -139,7 +139,9 @@ function evaluateGet(
 ): TypedValue | undefined {
   const source = evaluateExpressionInternal(expression.source, context);
 
-  return source?.type === 'object' ? source.fields[expression.fieldId] : undefined;
+  if (source?.type !== 'object' || !Object.hasOwn(source.fields, expression.fieldId)) return undefined;
+
+  return source.fields[expression.fieldId];
 }
 
 function evaluateIndex(

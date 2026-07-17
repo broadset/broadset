@@ -4,6 +4,7 @@ import { type ColorValue, colorValueSchema } from './color';
 import { type ExpressionAst, expressionAstSchema } from './data';
 import { type StructuredPath, structuredPathSchema } from './element';
 import { type Id, idSchema, type PropertyTarget, propertyTargetSchema } from './identity';
+import { PROJECT_V1_LIMITS } from './limits';
 import { nonEmptyStringSchema, nonNegativeSafeIntegerSchema, positiveSafeIntegerSchema } from './schema-helpers';
 import { type TypedValue, typedValueSchema, type ValueType, valueTypeSchema } from './typed-value';
 
@@ -156,7 +157,7 @@ export const interpolationSchema: z.ZodType<Interpolation> = z.discriminatedUnio
   z.strictObject({
     kind: z.literal('counting'),
     rounding: z.enum(['floor', 'ceil', 'round', 'truncate']),
-    minimumDigits: nonNegativeSafeIntegerSchema,
+    minimumDigits: nonNegativeSafeIntegerSchema.max(PROJECT_V1_LIMITS.maxCountingMinimumDigits),
     grouping: z.boolean(),
   }),
   z.strictObject({
