@@ -74,4 +74,145 @@ describe('animation-state store actions', () => {
     expect(store.getState().createReverseExitSequence(id('missing'), 'x')).toBeNull();
     expect(store.getState().removeStateMachine(id('missing'))).toBe(false);
   });
+
+  it('authors state and transition CRUD through the store, undoably, and fails soft on unknown ids', () => {
+    const store = createProjectEditorStore({ project: createMotionProject(), createId: idFactory() });
+    const machineId = store.getState().addModifierStateMachine({ name: 'Highlight', activeValues: [] });
+
+    if (machineId === null) throw new Error('expected machine');
+
+    const machineBefore = store
+      .getState()
+      .project.documents[0]?.stateMachines.find(({ id: candidateId }) => candidateId === machineId);
+
+    if (machineBefore === undefined) throw new Error('expected machine in project');
+
+    const newState: projectFormatV1.State = {
+      id: id('idle'),
+      name: 'idle',
+      values: [],
+      entryActions: [],
+      exitActions: [],
+    };
+
+    expect(store.getState().upsertState(machineId, newState)).toBe(true);
+    expect(
+      store.getState().project.documents[0]?.stateMachines.find(({ id: candidateId }) => candidateId === machineId)
+        ?.states,
+    ).toHaveLength(3);
+
+    store.getState().undo();
+    expect(
+      store.getState().project.documents[0]?.stateMachines.find(({ id: candidateId }) => candidateId === machineId)
+        ?.states,
+    ).toHaveLength(2);
+
+    expect(store.getState().upsertState(machineId, newState)).toBe(true);
+    expect(store.getState().removeState(machineId, newState.id)).toBe(true);
+    expect(
+      store.getState().project.documents[0]?.stateMachines.find(({ id: candidateId }) => candidateId === machineId)
+        ?.states,
+    ).toHaveLength(2);
+
+    store.getState().undo(); // undoes removeState
+    expect(
+      store.getState().project.documents[0]?.stateMachines.find(({ id: candidateId }) => candidateId === machineId)
+        ?.states,
+    ).toHaveLength(3);
+
+    const newTransition: projectFormatV1.Transition = {
+      id: id('extra-transition'),
+      sourceStateId: machineBefore.initialStateId,
+      targetStateId: machineBefore.initialStateId,
+      trigger: { kind: 'event', eventId: id('extra-event') },
+      priority: 1,
+      actions: [],
+    };
+
+    expect(store.getState().upsertTransition(machineId, newTransition)).toBe(true);
+    expect(
+      store.getState().project.documents[0]?.stateMachines.find(({ id: candidateId }) => candidateId === machineId)
+        ?.transitions,
+    ).toHaveLength(3);
+
+    store.getState().undo();
+    expect(
+      store.getState().project.documents[0]?.stateMachines.find(({ id: candidateId }) => candidateId === machineId)
+        ?.transitions,
+    ).toHaveLength(2);
+
+    expect(store.getState().upsertTransition(machineId, newTransition)).toBe(true);
+    expect(store.getState().removeTransition(machineId, newTransition.id)).toBe(true);
+    expect(
+      store.getState().project.documents[0]?.stateMachines.find(({ id: candidateId }) => candidateId === machineId)
+        ?.transitions,
+    ).toHaveLength(2);
+
+    store.getState().undo(); // undoes removeTransition
+    expect(
+      store.getState().project.documents[0]?.stateMachines.find(({ id: candidateId }) => candidateId === machineId)
+        ?.transitions,
+    ).toHaveLength(3);
+
+    const before = store.getState().project;
+
+    expect(store.getState().upsertState(id('missing'), newState)).toBe(false);
+    expect(store.getState().project).toBe(before);
+    expect(store.getState().removeState(machineId, id('missing'))).toBe(false);
+    expect(store.getState().project).toBe(before);
+    expect(store.getState().upsertTransition(id('missing'), newTransition)).toBe(false);
+    expect(store.getState().project).toBe(before);
+    expect(store.getState().removeTransition(machineId, id('missing'))).toBe(false);
+    expect(store.getState().project).toBe(before);
+
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
+
+  it('wires a reverse-exit sequence onto the deactivation transition through the store, undoably', () => {
+    const store = createProjectEditorStore({ project: createMotionProject(), createId: idFactory() });
+    const sequenceId = store.getState().addSequence({ name: 'Intro', durationTicks: 60 });
+
+    if (sequenceId === null) throw new Error('expected sequence');
+
+    const machineId = store.getState().addModifierStateMachine({ name: 'Highlight', activeValues: [] });
+
+    if (machineId === null) throw new Error('expected machine');
+
+    const reversedId = store
+      .getState()
+      .setModifierReverseExit({ stateMachineId: machineId, sourceSequenceId: sequenceId, name: 'Intro (exit)' });
+
+    expect(reversedId).not.toBeNull();
+    expect(store.getState().project.documents[0]?.sequences).toHaveLength(2);
+
+    const machine = store
+      .getState()
+      .project.documents[0]?.stateMachines.find(({ id: candidateId }) => candidateId === machineId);
+
+    if (machine === undefined) throw new Error('expected machine in project');
+
+    const deactivationTransition = machine.transitions.find(
+      ({ targetStateId }) => targetStateId === machine.initialStateId,
+    );
+
+    expect(deactivationTransition?.actions).toEqual([
+      { kind: 'play-sequence', sequenceId: reversedId, behavior: 'restart' },
+    ]);
+
+    store.getState().undo();
+    expect(store.getState().project.documents[0]?.sequences).toHaveLength(1);
+
+    expect(
+      store
+        .getState()
+        .setModifierReverseExit({ stateMachineId: id('missing'), sourceSequenceId: sequenceId, name: 'x' }),
+    ).toBeNull();
+    expect(
+      store
+        .getState()
+        .setModifierReverseExit({ stateMachineId: machineId, sourceSequenceId: id('missing'), name: 'x' }),
+    ).toBeNull();
+
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
 });

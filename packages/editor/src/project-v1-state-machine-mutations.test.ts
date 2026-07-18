@@ -2,11 +2,17 @@ import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
 import { setLifecyclePhaseActionsInProject } from './project-v1-lifecycle-mutations';
+import { reverseSequenceV1 } from './project-v1-reverse-sequence';
 import { addSequenceInProject, createSequenceV1 } from './project-v1-sequence-mutations';
 import {
   createModifierStateMachine,
+  removeStateInProject,
   removeStateMachineInProject,
+  removeTransitionInProject,
+  setModifierReverseExitInProject,
+  upsertStateInProject,
   upsertStateMachineInProject,
+  upsertTransitionInProject,
 } from './project-v1-state-machine-mutations';
 
 function id(value: string): projectFormatV1.Id {
@@ -157,6 +163,299 @@ describe('state machine transforms', () => {
     });
 
     const next = removeStateMachineInProject({ project, documentId: id('doc-1'), stateMachineId: stateMachine.id });
+
+    expect(next).toBe(project);
+  });
+});
+
+describe('state CRUD transforms', () => {
+  it('upserts a new state by append and an existing state by replace, leaving other machines untouched', () => {
+    const createId = idFactory();
+    const first = createModifierStateMachine({ name: 'M1', createId, activeValues: [] });
+    const second = createModifierStateMachine({ name: 'M2', createId, activeValues: [] });
+    let project = upsertStateMachineInProject({
+      project: createMotionProject(),
+      documentId: id('doc-1'),
+      stateMachine: first.stateMachine,
+    });
+
+    project = upsertStateMachineInProject({ project, documentId: id('doc-1'), stateMachine: second.stateMachine });
+
+    const secondMachineBefore = project.documents[0]?.stateMachines.find(
+      ({ id: machineId }) => machineId === second.stateMachine.id,
+    );
+    const newState: projectFormatV1.State = {
+      id: createId(),
+      name: 'idle',
+      values: [],
+      entryActions: [],
+      exitActions: [],
+    };
+    const withNewState = upsertStateInProject({
+      project,
+      documentId: id('doc-1'),
+      stateMachineId: first.stateMachine.id,
+      state: newState,
+    });
+    const firstMachine = withNewState.documents[0]?.stateMachines.find(
+      ({ id: machineId }) => machineId === first.stateMachine.id,
+    );
+
+    expect(firstMachine?.states).toHaveLength(3);
+    expect(firstMachine?.states.at(-1)).toEqual(newState);
+    expect(
+      withNewState.documents[0]?.stateMachines.find(({ id: machineId }) => machineId === second.stateMachine.id),
+    ).toBe(secondMachineBefore);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(withNewState)).toEqual([]);
+
+    const renamedState: projectFormatV1.State = { ...newState, name: 'idle-renamed' };
+    const withRenamedState = upsertStateInProject({
+      project: withNewState,
+      documentId: id('doc-1'),
+      stateMachineId: first.stateMachine.id,
+      state: renamedState,
+    });
+    const firstMachineRenamed = withRenamedState.documents[0]?.stateMachines.find(
+      ({ id: machineId }) => machineId === first.stateMachine.id,
+    );
+
+    expect(firstMachineRenamed?.states).toHaveLength(3);
+    expect(firstMachineRenamed?.states.at(-1)?.name).toBe('idle-renamed');
+  });
+
+  it('removes a non-referenced, non-initial state', () => {
+    const createId = idFactory();
+    const { stateMachine } = createModifierStateMachine({ name: 'M', createId, activeValues: [] });
+    const idleState: projectFormatV1.State = {
+      id: createId(),
+      name: 'idle',
+      values: [],
+      entryActions: [],
+      exitActions: [],
+    };
+    let project = upsertStateMachineInProject({
+      project: createMotionProject(),
+      documentId: id('doc-1'),
+      stateMachine,
+    });
+
+    project = upsertStateInProject({
+      project,
+      documentId: id('doc-1'),
+      stateMachineId: stateMachine.id,
+      state: idleState,
+    });
+
+    const next = removeStateInProject({
+      project,
+      documentId: id('doc-1'),
+      stateMachineId: stateMachine.id,
+      stateId: idleState.id,
+    });
+    const machine = next.documents[0]?.stateMachines.find(({ id: machineId }) => machineId === stateMachine.id);
+
+    expect(machine?.states.map(({ id: stateId }) => stateId)).not.toContain(idleState.id);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(next)).toEqual([]);
+  });
+
+  it('rejects removal of the initial state', () => {
+    const createId = idFactory();
+    const { stateMachine } = createModifierStateMachine({ name: 'M', createId, activeValues: [] });
+    const project = upsertStateMachineInProject({
+      project: createMotionProject(),
+      documentId: id('doc-1'),
+      stateMachine,
+    });
+
+    const next = removeStateInProject({
+      project,
+      documentId: id('doc-1'),
+      stateMachineId: stateMachine.id,
+      stateId: stateMachine.initialStateId,
+    });
+
+    expect(next).toBe(project);
+  });
+
+  it('rejects removal of a state referenced by a transition', () => {
+    const createId = idFactory();
+    const { stateMachine } = createModifierStateMachine({ name: 'M', createId, activeValues: [] });
+    const activeState = stateMachine.states[1];
+
+    if (activeState === undefined) throw new Error('Expected the modifier active state');
+
+    const project = upsertStateMachineInProject({
+      project: createMotionProject(),
+      documentId: id('doc-1'),
+      stateMachine,
+    });
+
+    const next = removeStateInProject({
+      project,
+      documentId: id('doc-1'),
+      stateMachineId: stateMachine.id,
+      stateId: activeState.id,
+    });
+
+    expect(next).toBe(project);
+  });
+});
+
+describe('transition CRUD transforms', () => {
+  it('upserts a new transition by append and an existing transition by replace', () => {
+    const createId = idFactory();
+    const { stateMachine } = createModifierStateMachine({ name: 'M', createId, activeValues: [] });
+    const project = upsertStateMachineInProject({
+      project: createMotionProject(),
+      documentId: id('doc-1'),
+      stateMachine,
+    });
+    const newTransition: projectFormatV1.Transition = {
+      id: createId(),
+      sourceStateId: stateMachine.initialStateId,
+      targetStateId: stateMachine.initialStateId,
+      trigger: { kind: 'event', eventId: createId() },
+      priority: 1,
+      actions: [],
+    };
+    const withNewTransition = upsertTransitionInProject({
+      project,
+      documentId: id('doc-1'),
+      stateMachineId: stateMachine.id,
+      transition: newTransition,
+    });
+    const machine = withNewTransition.documents[0]?.stateMachines.find(
+      ({ id: machineId }) => machineId === stateMachine.id,
+    );
+
+    expect(machine?.transitions).toHaveLength(3);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(withNewTransition)).toEqual([]);
+
+    const replacedTransition: projectFormatV1.Transition = { ...newTransition, priority: 2 };
+    const withReplaced = upsertTransitionInProject({
+      project: withNewTransition,
+      documentId: id('doc-1'),
+      stateMachineId: stateMachine.id,
+      transition: replacedTransition,
+    });
+    const machineReplaced = withReplaced.documents[0]?.stateMachines.find(
+      ({ id: machineId }) => machineId === stateMachine.id,
+    );
+
+    expect(machineReplaced?.transitions).toHaveLength(3);
+    expect(
+      machineReplaced?.transitions.find(({ id: transitionId }) => transitionId === newTransition.id)?.priority,
+    ).toBe(2);
+  });
+
+  it('rejects a transition that duplicates an existing [source, trigger, priority] tuple', () => {
+    const createId = idFactory();
+    const { stateMachine } = createModifierStateMachine({ name: 'M', createId, activeValues: [] });
+    const [activateTransition] = stateMachine.transitions;
+
+    if (activateTransition === undefined) throw new Error('Expected the modifier activate transition');
+
+    const project = upsertStateMachineInProject({
+      project: createMotionProject(),
+      documentId: id('doc-1'),
+      stateMachine,
+    });
+    const duplicate: projectFormatV1.Transition = { ...activateTransition, id: createId() };
+
+    const next = upsertTransitionInProject({
+      project,
+      documentId: id('doc-1'),
+      stateMachineId: stateMachine.id,
+      transition: duplicate,
+    });
+
+    expect(next).toBe(project);
+  });
+
+  it('removes a transition', () => {
+    const createId = idFactory();
+    const { stateMachine } = createModifierStateMachine({ name: 'M', createId, activeValues: [] });
+    const [, deactivateTransition] = stateMachine.transitions;
+
+    if (deactivateTransition === undefined) throw new Error('Expected the modifier deactivate transition');
+
+    const project = upsertStateMachineInProject({
+      project: createMotionProject(),
+      documentId: id('doc-1'),
+      stateMachine,
+    });
+
+    const next = removeTransitionInProject({
+      project,
+      documentId: id('doc-1'),
+      stateMachineId: stateMachine.id,
+      transitionId: deactivateTransition.id,
+    });
+    const machine = next.documents[0]?.stateMachines.find(({ id: machineId }) => machineId === stateMachine.id);
+
+    expect(machine?.transitions).toHaveLength(1);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(next)).toEqual([]);
+  });
+});
+
+describe('setModifierReverseExitInProject', () => {
+  it('adds the reversed sequence and wires it as the sole action on the deactivation transition', () => {
+    const createId = idFactory();
+    const { stateMachine } = createModifierStateMachine({ name: 'M', createId, activeValues: [] });
+    let project = upsertStateMachineInProject({
+      project: createMotionProject(),
+      documentId: id('doc-1'),
+      stateMachine,
+    });
+    const source = createSequenceV1({ id: id('seq-1'), name: 'Intro', durationTicks: 60 });
+
+    project = addSequenceInProject({ project, documentId: id('doc-1'), sequence: source });
+
+    const reversed = reverseSequenceV1({ sequence: source, name: 'Intro (exit)', createId });
+    const next = setModifierReverseExitInProject({
+      project,
+      documentId: id('doc-1'),
+      stateMachineId: stateMachine.id,
+      reversedSequence: reversed,
+    });
+
+    expect(next.documents[0]?.sequences.map(({ id: sequenceId }) => sequenceId)).toContain(reversed.id);
+
+    const machine = next.documents[0]?.stateMachines.find(({ id: machineId }) => machineId === stateMachine.id);
+    const deactivationTransition = machine?.transitions.find(
+      ({ targetStateId }) => targetStateId === stateMachine.initialStateId,
+    );
+
+    expect(deactivationTransition?.actions).toEqual([
+      { kind: 'play-sequence', sequenceId: reversed.id, behavior: 'restart' },
+    ]);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(next)).toEqual([]);
+  });
+
+  it('no-ops when the machine has no unique deactivation transition', () => {
+    const createId = idFactory();
+    const { stateMachine } = createModifierStateMachine({ name: 'M', createId, activeValues: [] });
+    const [activateTransition] = stateMachine.transitions;
+
+    if (activateTransition === undefined) throw new Error('Expected the modifier activate transition');
+
+    const noDeactivation: projectFormatV1.StateMachine = { ...stateMachine, transitions: [activateTransition] };
+    let project = upsertStateMachineInProject({
+      project: createMotionProject(),
+      documentId: id('doc-1'),
+      stateMachine: noDeactivation,
+    });
+    const source = createSequenceV1({ id: id('seq-1'), name: 'Intro', durationTicks: 60 });
+
+    project = addSequenceInProject({ project, documentId: id('doc-1'), sequence: source });
+
+    const reversed = reverseSequenceV1({ sequence: source, name: 'Intro (exit)', createId });
+    const next = setModifierReverseExitInProject({
+      project,
+      documentId: id('doc-1'),
+      stateMachineId: noDeactivation.id,
+      reversedSequence: reversed,
+    });
 
     expect(next).toBe(project);
   });
