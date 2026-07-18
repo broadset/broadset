@@ -4,7 +4,7 @@ import {
   selectActivePageV1,
   selectElementByIdV1,
 } from '@broadset/editor';
-import { LayersSidebar, PropertiesSidebar } from '@broadset/ui';
+import { color, font, LayersSidebar, PropertiesSidebar, useKeyframePropertyAdapter } from '@broadset/ui';
 
 import {
   buildLayerInfoListV1,
@@ -20,6 +20,9 @@ interface V1ElementSidebarProps {
   readonly editorStore: ProjectEditorStore;
   readonly tab: 'layers' | 'properties';
 }
+
+/** panels.md "Animation Mode Properties": the RFC 6901 pointer the Opacity field addresses. */
+const OPACITY_PROPERTY_POINTER = '/appearance/opacity';
 
 function reorderRelative(options: {
   readonly store: ProjectEditorStore;
@@ -69,6 +72,7 @@ function reorderRelative(options: {
 }
 
 export function V1ElementSidebar({ editorStore, tab }: V1ElementSidebarProps): React.JSX.Element {
+  const keyframeAdapter = useKeyframePropertyAdapter();
   const state = useEditorSelector(editorStore, (current) => current);
   const document = selectActiveDocumentV1(state);
   const page = selectActivePageV1(state);
@@ -125,25 +129,48 @@ export function V1ElementSidebar({ editorStore, tab }: V1ElementSidebarProps): R
     selectedElement === undefined ? undefined : toPanelElementV1({ project: state.project, element: selectedElement });
 
   return (
-    <PropertiesSidebar
-      availableFonts={state.availableFonts}
-      canvasHeight={document?.surface.size[1]}
-      canvasWidth={document?.surface.size[0]}
-      documentMode={document?.kind === 'print' ? 'print' : 'screen'}
-      documentUnit={document?.surface.unit}
-      elements={panelElement === undefined ? [] : [panelElement]}
-      mediaAssets={buildMediaAssetsV1(state.project)}
-      onUpdate={(key, value) => {
-        if (selectedElement === undefined) return;
+    <>
+      {keyframeAdapter === null ? null : (
+        <span
+          data-testid="keyframe-mode-banner"
+          style={{ color: color('accent'), display: 'block', fontSize: font('label') }}
+        >
+          Editing keyframe
+        </span>
+      )}
+      <PropertiesSidebar
+        availableFonts={state.availableFonts}
+        canvasHeight={document?.surface.size[1]}
+        canvasWidth={document?.surface.size[0]}
+        documentMode={document?.kind === 'print' ? 'print' : 'screen'}
+        documentUnit={document?.surface.unit}
+        elements={panelElement === undefined ? [] : [panelElement]}
+        mediaAssets={buildMediaAssetsV1(state.project)}
+        onUpdate={(key, value) => {
+          if (selectedElement === undefined) return;
 
-        if (key === 'locked' && typeof value === 'boolean') {
-          state.toggleLock(selectedElement.id);
+          // panels.md "Animation Mode Properties": with a keyframe selected on its own property,
+          // route the edit to the keyframe's typed value instead of the element's base appearance.
+          if (
+            key === 'opacity' &&
+            typeof value === 'number' &&
+            keyframeAdapter !== null &&
+            keyframeAdapter.target.pointer === OPACITY_PROPERTY_POINTER
+          ) {
+            keyframeAdapter.updateValue(value);
 
-          return;
-        }
+            return;
+          }
 
-        state.updateElement(selectedElement.id, (element) => updateElementFromPanelV1({ element, key, value }));
-      }}
-    />
+          if (key === 'locked' && typeof value === 'boolean') {
+            state.toggleLock(selectedElement.id);
+
+            return;
+          }
+
+          state.updateElement(selectedElement.id, (element) => updateElementFromPanelV1({ element, key, value }));
+        }}
+      />
+    </>
   );
 }

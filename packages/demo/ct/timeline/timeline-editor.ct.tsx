@@ -127,3 +127,42 @@ test('Delete removes the selected keyframe and undo restores it without deleting
   await expect.poll(countKeyframes).toBe(keyframesBefore);
   await expect.poll(countElements).toBe(elementsBefore);
 });
+
+/**
+ * @description panels.md "Property Editing Context for Keyframes": with a keyframe selected,
+ * the Opacity field edits the keyframe's typed value and base appearance is unchanged.
+ * Regions: timeline → properties panel → store.
+ */
+test('opacity edits route to the selected keyframe, not the base element', async ({ mount, page }) => {
+  await mount(<DemoAppFresh />);
+  await selectLayer(page, 'Score Bug');
+  await page.getByRole('button', { name: /open timeline/i }).click();
+  await page.locator('[data-testid^="timeline-marker-"]').first().click();
+  await openTab(page, 'Properties');
+  await expect(page.getByTestId('keyframe-mode-banner')).toBeVisible();
+
+  const readBase = () =>
+    page.evaluate(() => {
+      const state = window.__broadsetProjectEditorStore?.getState();
+      const document = state?.project.documents[0];
+
+      return document?.elements.find((element) => element.name === 'Score Bug')?.appearance.opacity;
+    });
+  const baseBefore = await readBase();
+  // 'Score Bug' is a Group element, so its opacity slider is labeled 'Group opacity' rather than
+  // the plain 'Opacity' label used by non-group panels — both call onUpdate('opacity', ...).
+  const slider = page.getByRole('slider', { name: /opacity/i });
+
+  await slider.focus();
+  await page.keyboard.press('Home');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__broadsetProjectEditorStore?.getState().project.documents[0]?.sequences[0]?.tracks[0]?.keyframes[0]
+            ?.value,
+      ),
+    )
+    .toEqual({ type: 'number', value: 0 });
+  expect(await readBase()).toBe(baseBefore);
+});

@@ -1,5 +1,6 @@
 export * from './easing-graph-editor';
 export * from './keyframe-authoring-panel';
+export * from './keyframe-property-context';
 export * from './timeline-bottom-panel';
 export * from './timeline-context';
 export * from './timeline-editor';

@@ -11,6 +11,7 @@ import { type EditorConfig, projectFormatV1 } from '@broadset/model';
 import {
   isInterpolationPreset,
   KEYFRAME_INTERPOLATION_PRESETS,
+  KeyframePropertyProvider,
   PageSorter,
   resolveSnapIntervalTicks,
   TimelineBottomPanel,
@@ -27,6 +28,7 @@ import { V1DataSidebar } from './v1-data-sidebar';
 import { V1DemoCanvasSurface } from './v1-demo-canvas-surface';
 import { V1ElementSidebar } from './v1-element-sidebar';
 import { V1ElementToolbar } from './v1-element-toolbar';
+import { createKeyframePropertyAdapter } from './v1-keyframe-property-adapter';
 import { V1ProjectFileControls } from './v1-project-file-controls';
 import { V1SequenceSidebar } from './v1-sequence-sidebar';
 import { buildTimelineViewSequence } from './v1-timeline-adapter';
@@ -523,7 +525,22 @@ export function V1DemoWorkspace({
                 <Tabs.Tab id="data">Data</Tabs.Tab>
               </Tabs.List>
             </Tabs>
-            <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>{renderWorkspaceSidebar(editorStore, tab)}</div>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+              <KeyframePropertyProvider
+                adapter={
+                  selectedTimelineKeyframe === null || state.playbackSequenceId === null ?
+                    null
+                  : createKeyframePropertyAdapter({
+                      store: editorStore,
+                      sequenceId: state.playbackSequenceId,
+                      trackId: parseTimelineId(selectedTimelineKeyframe.trackId),
+                      keyframeId: parseTimelineId(selectedTimelineKeyframe.keyframeId),
+                    })
+                }
+              >
+                {renderWorkspaceSidebar(editorStore, tab)}
+              </KeyframePropertyProvider>
+            </div>
           </aside>
           <main style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
             <V1DemoCanvasSurface
