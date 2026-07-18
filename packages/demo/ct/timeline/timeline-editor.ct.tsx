@@ -128,41 +128,106 @@ test('Delete removes the selected keyframe and undo restores it without deleting
   await expect.poll(countElements).toBe(elementsBefore);
 });
 
+/** The 'Live Pulse' sequence's sole track ('Live Dot's opacity) has exactly these two keyframes. */
+const FIRST_KEYFRAME_INDEX = 0;
+const LAST_KEYFRAME_INDEX = 1;
+
 /**
- * @description panels.md "Property Editing Context for Keyframes": with a keyframe selected,
- * the Opacity field edits the keyframe's typed value and base appearance is unchanged.
- * Regions: timeline → properties panel → store.
+ * Reads an element's base (non-keyframe) opacity from the live store by its display name.
+ * The sample document's only sequence ('Live Pulse') has a single track, owned by 'Live Dot'
+ * (`sequences[0].tracks[0]`), so tests target that element to exercise the matching-entity path.
  */
-test('opacity edits route to the selected keyframe, not the base element', async ({ mount, page }) => {
+function readElementBaseOpacity(page: Page, elementName: string): Promise<number | undefined> {
+  return page.evaluate(
+    (name) =>
+      window.__broadsetProjectEditorStore
+        ?.getState()
+        .project.documents[0]?.elements.find((element) => element.name === name)?.appearance.opacity,
+    elementName,
+  );
+}
+
+function readTrackKeyframeValue(page: Page, keyframeIndex: number): Promise<unknown> {
+  return page.evaluate(
+    (index) =>
+      window.__broadsetProjectEditorStore?.getState().project.documents[0]?.sequences[0]?.tracks[0]?.keyframes[index]
+        ?.value,
+    keyframeIndex,
+  );
+}
+
+/**
+ * @description panels.md "Property Editing Context for Keyframes": with a keyframe selected on
+ * the SAME element as the current canvas selection, the Opacity field edits the keyframe's typed
+ * value and that element's base appearance is unchanged. 'Live Dot' owns the sole track on the
+ * default-previewed sequence ('Live Pulse'), so its canvas selection and the timeline's selected
+ * keyframe agree on entity. Regions: timeline → properties panel → store.
+ */
+test('opacity edits route to the selected keyframe when it belongs to the selected element', async ({
+  mount,
+  page,
+}) => {
   await mount(<DemoAppFresh />);
-  await selectLayer(page, 'Score Bug');
+  await selectLayer(page, 'Live Dot');
   await page.getByRole('button', { name: /open timeline/i }).click();
   await page.locator('[data-testid^="timeline-marker-"]').first().click();
   await openTab(page, 'Properties');
   await expect(page.getByTestId('keyframe-mode-banner')).toBeVisible();
 
-  const readBase = () =>
-    page.evaluate(() => {
-      const state = window.__broadsetProjectEditorStore?.getState();
-      const document = state?.project.documents[0];
+  const baseBefore = await readElementBaseOpacity(page, 'Live Dot');
+  const slider = page.getByRole('slider', { name: /opacity/i });
 
-      return document?.elements.find((element) => element.name === 'Score Bug')?.appearance.opacity;
-    });
-  const baseBefore = await readBase();
+  await slider.focus();
+  await page.keyboard.press('Home');
+  await expect.poll(() => readTrackKeyframeValue(page, FIRST_KEYFRAME_INDEX)).toEqual({ type: 'number', value: 0 });
+  expect(await readElementBaseOpacity(page, 'Live Dot')).toBe(baseBefore);
+});
+
+/**
+ * @description panels.md "Property Editing Context for Keyframes": timeline keyframe selection
+ * is independent of canvas selection, and the timeline shows all tracks regardless of which
+ * element is selected on canvas. Regression coverage for the C1 entity-identity bug: with the
+ * keyframe on 'Live Dot's track selected on the timeline, selecting the DIFFERENT layer
+ * 'Score Bug' and editing ITS Opacity must fall through to the normal element-update path — it
+ * must not silently write to 'Live Dot's keyframe, and the keyframe-mode banner must not lie
+ * about being in keyframe-editing mode for 'Score Bug'. Selects the track's LAST keyframe
+ * (tick 800) deliberately: it has no `interpolation`, so the easing graph never mounts — the
+ * easing graph's own outside-mousedown-closes-selection behavior would otherwise clear the
+ * timeline selection the moment the "Select Score Bug" layer button is clicked, masking the
+ * entity-identity bug this test exists to catch. Regions: timeline → layers panel → properties
+ * panel → store.
+ */
+test('opacity edits fall through to the base element when the selected keyframe belongs to a different element', async ({
+  mount,
+  page,
+}) => {
+  await mount(<DemoAppFresh />);
+  await selectLayer(page, 'Live Dot');
+  await page.getByRole('button', { name: /open timeline/i }).click();
+
+  const marker = page.locator('[data-testid^="timeline-marker-"]').last();
+
+  await marker.click();
+  await expect(marker).toHaveAttribute('aria-pressed', 'true');
+
+  // Select a DIFFERENT layer on canvas while 'Live Dot's keyframe stays selected on the timeline.
+  await selectLayer(page, 'Score Bug');
+  await expect(marker).toHaveAttribute('aria-pressed', 'true');
+  await openTab(page, 'Properties');
+  await expect(page.getByTestId('keyframe-mode-banner')).not.toBeVisible();
+
+  const scoreBugBaseBefore = await readElementBaseOpacity(page, 'Score Bug');
+  const liveDotKeyframeBefore = await readTrackKeyframeValue(page, LAST_KEYFRAME_INDEX);
+
+  expect(scoreBugBaseBefore).not.toBe(0);
+
   // 'Score Bug' is a Group element, so its opacity slider is labeled 'Group opacity' rather than
   // the plain 'Opacity' label used by non-group panels — both call onUpdate('opacity', ...).
   const slider = page.getByRole('slider', { name: /opacity/i });
 
   await slider.focus();
   await page.keyboard.press('Home');
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.__broadsetProjectEditorStore?.getState().project.documents[0]?.sequences[0]?.tracks[0]?.keyframes[0]
-            ?.value,
-      ),
-    )
-    .toEqual({ type: 'number', value: 0 });
-  expect(await readBase()).toBe(baseBefore);
+  await expect.poll(() => readElementBaseOpacity(page, 'Score Bug')).toBe(0);
+  expect(await readTrackKeyframeValue(page, LAST_KEYFRAME_INDEX)).toEqual(liveDotKeyframeBefore);
+  await expect(page.getByTestId('keyframe-mode-banner')).not.toBeVisible();
 });

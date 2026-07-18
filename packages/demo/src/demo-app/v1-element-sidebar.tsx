@@ -4,7 +4,14 @@ import {
   selectActivePageV1,
   selectElementByIdV1,
 } from '@broadset/editor';
-import { color, font, LayersSidebar, PropertiesSidebar, useKeyframePropertyAdapter } from '@broadset/ui';
+import {
+  color,
+  font,
+  type KeyframePropertyAdapter,
+  LayersSidebar,
+  PropertiesSidebar,
+  useKeyframePropertyAdapter,
+} from '@broadset/ui';
 
 import {
   buildLayerInfoListV1,
@@ -23,6 +30,22 @@ interface V1ElementSidebarProps {
 
 /** panels.md "Animation Mode Properties": the RFC 6901 pointer the Opacity field addresses. */
 const OPACITY_PROPERTY_POINTER = '/appearance/opacity';
+
+/**
+ * panels.md "Property Editing Context for Keyframes": true only when the timeline's selected
+ * keyframe adapter was actually resolved against `selectedElementId` — never merely because a
+ * keyframe happens to be selected while a different element is showing in the sidebar. Timeline
+ * keyframe selection is independent of canvas selection, so this identity check is required
+ * before routing an edit (or showing the keyframe-mode banner) to the adapter's typed value.
+ */
+function keyframeTargetsElement(
+  adapter: KeyframePropertyAdapter | null,
+  selectedElementId: string | undefined,
+): boolean {
+  if (adapter === null || selectedElementId === undefined) return false;
+
+  return adapter.target.entityId === selectedElementId;
+}
 
 function reorderRelative(options: {
   readonly store: ProjectEditorStore;
@@ -127,10 +150,11 @@ export function V1ElementSidebar({ editorStore, tab }: V1ElementSidebarProps): R
 
   const panelElement =
     selectedElement === undefined ? undefined : toPanelElementV1({ project: state.project, element: selectedElement });
+  const keyframeTargetsSelectedElement = keyframeTargetsElement(keyframeAdapter, selectedElement?.id);
 
   return (
     <>
-      {keyframeAdapter === null ? null : (
+      {!keyframeTargetsSelectedElement ? null : (
         <span
           data-testid="keyframe-mode-banner"
           style={{ color: color('accent'), display: 'block', fontSize: font('label') }}
@@ -151,11 +175,14 @@ export function V1ElementSidebar({ editorStore, tab }: V1ElementSidebarProps): R
 
           // panels.md "Animation Mode Properties": with a keyframe selected on its own property,
           // route the edit to the keyframe's typed value instead of the element's base appearance.
+          // Guarded by keyframeTargetsSelectedElement so an edit never lands on a keyframe that
+          // belongs to a different element than the one currently selected on canvas.
           if (
             key === 'opacity' &&
             typeof value === 'number' &&
             keyframeAdapter !== null &&
-            keyframeAdapter.target.pointer === OPACITY_PROPERTY_POINTER
+            keyframeAdapter.target.pointer === OPACITY_PROPERTY_POINTER &&
+            keyframeTargetsSelectedElement
           ) {
             keyframeAdapter.updateValue(value);
 
