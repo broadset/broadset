@@ -400,3 +400,86 @@ test('adding a modifier authors a canonical two-state machine', async ({ mount, 
     )
     .toContainEqual(['inactive', 'active']);
 });
+
+/** Reads the Flash modifier machine's stable id from the live store, or null if it hasn't landed yet. */
+function readFlashMachineId(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const machines = window.__broadsetProjectEditorStore?.getState().project.documents[0]?.stateMachines ?? [];
+
+    return machines.find((machine) => machine.name === 'Flash')?.id ?? null;
+  });
+}
+
+/** Reads the Flash modifier machine's transition count from the live store. */
+function readFlashTransitionCount(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const machines = window.__broadsetProjectEditorStore?.getState().project.documents[0]?.stateMachines ?? [];
+
+    return machines.find((machine) => machine.name === 'Flash')?.transitions.length ?? 0;
+  });
+}
+
+/**
+ * @description timeline.md "Lifecycle and State-Machine Authoring Sections": state-machine
+ * controls edit stable transitions with typed triggers — picking a target state in the
+ * add-transition row and clicking "Add transition" creates a new stable transition on that
+ * machine. Regions: animation panel (state-machine editor) → store.
+ */
+test('adding a transition through the state-machine editor updates the store machine', async ({ mount, page }) => {
+  await mount(<DemoAppFresh />);
+  await selectLayer(page, 'Score Bug');
+  await openTab(page, 'Animation');
+  await page.getByRole('textbox', { name: 'New modifier name' }).fill('Flash');
+  await page.getByRole('button', { name: 'Add modifier' }).click();
+
+  const machineId = await readFlashMachineId(page);
+
+  if (machineId === null) throw new Error('expected Flash machine id');
+
+  const editor = page.getByTestId(`state-machine-editor-${machineId}`);
+  const addRow = editor.getByTestId('sm-add-transition-row');
+
+  await addRow.getByRole('button', { name: /target state/i }).click();
+  await page.getByRole('option', { name: 'active', exact: true }).click();
+  await addRow.getByTestId('sm-add-transition').click();
+
+  await expect.poll(() => readFlashTransitionCount(page)).toBe(3);
+});
+
+/**
+ * @description timeline.md "Lifecycle and State-Machine Authoring Sections": wiring reverse exit
+ * both generates the reversed sequence AND assigns its id to the modifier's deactivation
+ * transition in one step, rather than leaving the generated sequence unassigned. Regions:
+ * animation panel (state-machine editor) → store.
+ */
+test('wiring reverse exit assigns the reversed sequence to the deactivation transition', async ({ mount, page }) => {
+  await mount(<DemoAppFresh />);
+  await selectLayer(page, 'Score Bug');
+  await openTab(page, 'Animation');
+  await page.getByRole('textbox', { name: 'New modifier name' }).fill('Flash');
+  await page.getByRole('button', { name: 'Add modifier' }).click();
+  await expect.poll(() => readFlashMachineId(page)).not.toBeNull();
+
+  const countSequences = () =>
+    page.evaluate(() => window.__broadsetProjectEditorStore?.getState().project.documents[0]?.sequences.length ?? 0);
+  const sequencesBefore = await countSequences();
+
+  await page.getByRole('button', { name: 'Wire reverse exit into Flash' }).click();
+  await expect.poll(countSequences).toBe(sequencesBefore + 1);
+
+  const deactivationActions = await page.evaluate(() => {
+    const document = window.__broadsetProjectEditorStore?.getState().project.documents[0];
+    const machine = document?.stateMachines.find((candidate) => candidate.name === 'Flash');
+    const newSequence = document?.sequences.at(-1);
+    const deactivation =
+      machine === undefined ? undefined : (
+        machine.transitions.find(({ targetStateId }) => targetStateId === machine.initialStateId)
+      );
+
+    return { actions: deactivation?.actions, newSequenceId: newSequence?.id };
+  });
+
+  expect(deactivationActions.actions).toEqual([
+    { kind: 'play-sequence', sequenceId: deactivationActions.newSequenceId, behavior: 'restart' },
+  ]);
+});

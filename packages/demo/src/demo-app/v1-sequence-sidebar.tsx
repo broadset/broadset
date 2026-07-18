@@ -2,15 +2,24 @@ import { type ProjectEditorStore, selectActiveDocumentV1, selectActiveElementsV1
 import { projectFormatV1 } from '@broadset/model';
 import {
   AnimationStateSections,
+  color,
+  type EventOptionView,
+  font,
   KeyframeAuthoringPanel,
   type KeyframeAuthoringSequence,
   type KeyframeInterpolationPreset,
   type LifecyclePhase,
   type LifecycleSlotView,
   type SequenceNameView,
+  sp,
+  StateMachineEditor,
+  type StateMachineEditorView,
   type StateMachineView,
+  type TransitionTriggerDraft,
 } from '@broadset/ui';
+import { Button, ListBox, Select } from '@heroui/react';
 import type { JSX } from 'react';
+import { useState } from 'react';
 
 import { useEditorSelector } from './helpers';
 import { interpolationToPreset, presetToInterpolation } from './keyframe-interpolation-presets';
@@ -23,6 +32,9 @@ const DEFAULT_DISPLAY_SECONDS = 3;
 const OPACITY_POINTER = '/appearance/opacity';
 const LIFECYCLE_PHASES: readonly LifecyclePhase[] = ['in', 'hold', 'update', 'out'];
 const REVERSE_EXIT_SUFFIX = ' (exit)';
+const EVENT_ID_LABEL_LENGTH = 8;
+const INITIAL_TRANSITION_PRIORITY = 0;
+const TRANSITION_PRIORITY_INCREMENT = 1;
 
 function toPanelSequences(document: projectFormatV1.BroadsetDocumentV1): readonly KeyframeAuthoringSequence[] {
   return document.sequences.map((sequence) => ({
@@ -91,6 +103,129 @@ function toStateMachineViews(document: projectFormatV1.BroadsetDocumentV1): read
 
 function toSequenceNameViews(document: projectFormatV1.BroadsetDocumentV1): readonly SequenceNameView[] {
   return document.sequences.map((sequence) => ({ id: sequence.id, name: sequence.name }));
+}
+
+/** Presentational, string-id-only editor views for every document state machine, host-sorted by name. */
+function toStateMachineEditorViews(document: projectFormatV1.BroadsetDocumentV1): readonly StateMachineEditorView[] {
+  return [...document.stateMachines]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((machine) => ({
+      id: machine.id,
+      name: machine.name,
+      initialStateId: machine.initialStateId,
+      states: machine.states.map((state) => ({ id: state.id, name: state.name })),
+      transitions: machine.transitions.map((transition) => ({
+        id: transition.id,
+        sourceStateId: transition.sourceStateId,
+        targetStateId: transition.targetStateId,
+        trigger: transition.trigger,
+        priority: transition.priority,
+      })),
+    }));
+}
+
+/** Collects the unique event-triggered transition event ids on one machine so they can be re-selected. */
+function toEventOptions(machine: StateMachineEditorView): readonly EventOptionView[] {
+  const eventIds = new Set<string>();
+
+  for (const transition of machine.transitions) {
+    if (transition.trigger.kind === 'event') eventIds.add(transition.trigger.eventId);
+  }
+
+  return [...eventIds].map((eventId) => ({ id: eventId, label: `Event ${eventId.slice(0, EVENT_ID_LABEL_LENGTH)}` }));
+}
+
+/** Brands a presentational trigger draft's event id back into the model's `TransitionTrigger`. */
+function toModelTransitionTrigger(draft: TransitionTriggerDraft): projectFormatV1.TransitionTrigger {
+  if (draft.kind === 'event') return { kind: 'event', eventId: projectFormatV1.idSchema.parse(draft.eventId) };
+
+  return draft;
+}
+
+function transitionTriggersMatch(a: projectFormatV1.TransitionTrigger, b: projectFormatV1.TransitionTrigger): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === 'event' && b.kind === 'event') return a.eventId === b.eventId;
+  if (a.kind === 'lifecycle' && b.kind === 'lifecycle') return a.phase === b.phase;
+  if (a.kind === 'after' && b.kind === 'after') return a.ticks === b.ticks;
+
+  return false;
+}
+
+/**
+ * A new transition must carry a priority unique among transitions sharing the same source state
+ * and an equivalent trigger (semantic validation rejects a duplicate [source, trigger, priority]
+ * tuple). Picking one past the current maximum for that (source, trigger) group keeps the add
+ * always valid without asking the author to manage priorities by hand.
+ */
+function nextTransitionPriority(
+  machine: projectFormatV1.StateMachine,
+  sourceStateId: projectFormatV1.Id,
+  trigger: projectFormatV1.TransitionTrigger,
+): number {
+  const priorities = machine.transitions
+    .filter(
+      (transition) =>
+        transition.sourceStateId === sourceStateId && transitionTriggersMatch(transition.trigger, trigger),
+    )
+    .map((transition) => transition.priority);
+
+  if (priorities.length === 0) return INITIAL_TRANSITION_PRIORITY;
+
+  return Math.max(...priorities) + TRANSITION_PRIORITY_INCREMENT;
+}
+
+interface ReverseExitWireControlProps {
+  readonly machineName: string;
+  readonly sequenceNames: readonly SequenceNameView[];
+  readonly onWire: (sequenceId: string) => void;
+}
+
+/**
+ * Separate from the standalone lifecycle-OUT "create reverse exit" generator: this control both
+ * generates the reversed sequence AND assigns its id to the modifier's deactivation transition in
+ * one step (spec timeline.md:229-235), rather than leaving the generated sequence unassigned.
+ */
+function ReverseExitWireControl({ machineName, sequenceNames, onWire }: ReverseExitWireControlProps): JSX.Element {
+  const [selectedSequenceId, setSelectedSequenceId] = useState<string>(sequenceNames[0]?.id ?? '');
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: sp('sp-02') }}>
+      <span style={{ color: color('muted'), fontSize: font('label') }}>Reverse exit into {machineName}</span>
+      <Select
+        aria-label={`Reverse exit source sequence for ${machineName}`}
+        isDisabled={sequenceNames.length === 0}
+        value={selectedSequenceId}
+        onChange={(key) => {
+          if (key !== null) setSelectedSequenceId(String(key));
+        }}
+      >
+        <Select.Trigger>
+          <Select.Value />
+          <Select.Indicator />
+        </Select.Trigger>
+        <Select.Popover>
+          <ListBox>
+            {sequenceNames.map((sequence) => (
+              <ListBox.Item id={sequence.id} key={sequence.id} textValue={sequence.name}>
+                {sequence.name}
+              </ListBox.Item>
+            ))}
+          </ListBox>
+        </Select.Popover>
+      </Select>
+      <Button
+        aria-label={`Wire reverse exit into ${machineName}`}
+        isDisabled={selectedSequenceId === ''}
+        size="sm"
+        variant="secondary"
+        onPress={() => {
+          if (selectedSequenceId !== '') onWire(selectedSequenceId);
+        }}
+      >
+        Wire reverse exit
+      </Button>
+    </div>
+  );
 }
 
 export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): JSX.Element {
@@ -235,6 +370,98 @@ export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): JSX.
           state.removeStateMachine(projectFormatV1.idSchema.parse(stateMachineId));
         }}
       />
+      <section
+        aria-label="State machine editors"
+        style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04') }}
+      >
+        {toStateMachineEditorViews(document).map((machineView) => {
+          const machineId = projectFormatV1.idSchema.parse(machineView.id);
+
+          return (
+            <div key={machineView.id} style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02') }}>
+              <StateMachineEditor
+                eventOptions={toEventOptions(machineView)}
+                machine={machineView}
+                onAddState={(name) => {
+                  state.upsertState(machineId, {
+                    id: projectFormatV1.idSchema.parse(crypto.randomUUID()),
+                    name,
+                    values: [],
+                    entryActions: [],
+                    exitActions: [],
+                  });
+                }}
+                onAddTransition={(draft) => {
+                  const machine = document.stateMachines.find(({ id }) => id === machineId);
+
+                  if (machine === undefined) return;
+
+                  const sourceStateId = projectFormatV1.idSchema.parse(draft.sourceStateId);
+                  const trigger = toModelTransitionTrigger(draft.trigger);
+
+                  state.upsertTransition(machineId, {
+                    id: projectFormatV1.idSchema.parse(crypto.randomUUID()),
+                    sourceStateId,
+                    targetStateId: projectFormatV1.idSchema.parse(draft.targetStateId),
+                    trigger,
+                    priority: nextTransitionPriority(machine, sourceStateId, trigger),
+                    actions: [],
+                  });
+                }}
+                onRemoveState={(stateId) => {
+                  state.removeState(machineId, projectFormatV1.idSchema.parse(stateId));
+                }}
+                onRemoveTransition={(transitionId) => {
+                  state.removeTransition(machineId, projectFormatV1.idSchema.parse(transitionId));
+                }}
+                onRenameState={(stateId, name) => {
+                  const machine = document.stateMachines.find(({ id }) => id === machineId);
+                  const found = machine?.states.find(({ id }) => id === stateId);
+
+                  if (found === undefined) return;
+
+                  state.upsertState(machineId, { ...found, name });
+                }}
+                onSetInitialState={(stateId) => {
+                  const machine = document.stateMachines.find(({ id }) => id === machineId);
+
+                  if (machine === undefined) return;
+
+                  state.upsertStateMachine({ ...machine, initialStateId: projectFormatV1.idSchema.parse(stateId) });
+                }}
+                onUpdateTransition={(transitionId, patch) => {
+                  const machine = document.stateMachines.find(({ id }) => id === machineId);
+                  const found = machine?.transitions.find(({ id }) => id === transitionId);
+
+                  if (found === undefined) return;
+
+                  state.upsertTransition(machineId, {
+                    ...found,
+                    ...(patch.targetStateId === undefined ?
+                      {}
+                    : { targetStateId: projectFormatV1.idSchema.parse(patch.targetStateId) }),
+                    ...(patch.trigger === undefined ? {} : { trigger: toModelTransitionTrigger(patch.trigger) }),
+                    ...(patch.priority === undefined ? {} : { priority: patch.priority }),
+                  });
+                }}
+              />
+              <ReverseExitWireControl
+                machineName={machineView.name}
+                sequenceNames={toSequenceNameViews(document)}
+                onWire={(sequenceId) => {
+                  const parsedSequenceId = projectFormatV1.idSchema.parse(sequenceId);
+
+                  state.setModifierReverseExit({
+                    stateMachineId: machineId,
+                    sourceSequenceId: parsedSequenceId,
+                    name: resolveSequenceName(document, parsedSequenceId) + REVERSE_EXIT_SUFFIX,
+                  });
+                }}
+              />
+            </div>
+          );
+        })}
+      </section>
     </aside>
   );
 }
