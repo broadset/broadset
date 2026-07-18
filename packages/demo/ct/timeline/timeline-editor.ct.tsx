@@ -233,6 +233,84 @@ test('opacity edits fall through to the base element when the selected keyframe 
 });
 
 /**
+ * @description timeline.md "Timeline Bottom Panel" / panels.md "Property Editing Context for
+ * Keyframes": a mousedown outside the easing graph editor closes ONLY the graph — it must not
+ * clear the timeline's selected keyframe. Regression coverage for the easing-graph
+ * selection-coupling bug: `onCloseEasing` used to be wired to the same handler that clears
+ * `selectedTimelineKeyframe`, so any native `mousedown` reaching `EasingGraphEditor`'s
+ * document-level outside-click listener would drop the keyframe-property routing mid-edit. The
+ * existing "opacity edits route to the selected keyframe" test above never exercises this path
+ * because it edits the slider via `.focus()` + keyboard alone, which never dispatches a
+ * `mousedown`. This test dispatches a genuine `mousedown` directly on the Opacity slider (react-
+ * aria's raw `useSlider` track handler does not `stopPropagation()` the way HeroUI's press-driven
+ * Button/Tab controls do — verified separately: switching sidebar tabs, which IS press-driven,
+ * leaves the graph open) at the slider's OWN current thumb position, so the mousedown's incidental
+ * track-click-to-value jump is a no-op and cannot itself account for a subsequent value change —
+ * only the deliberate `.focus()` + keyboard edit that follows can. Selects the FIRST 'Live Dot'
+ * opacity keyframe (tick 0) deliberately: it has an outgoing cubic-bezier interpolation, so the
+ * easing graph mounts — the LAST keyframe (used by the entity-identity test below) has no
+ * interpolation and never mounts the graph, so it cannot exercise this path. Regions: timeline →
+ * properties panel → store.
+ */
+test('a real mousedown on the Opacity slider while an eased keyframe is selected still routes the edit to the keyframe', async ({
+  mount,
+  page,
+}) => {
+  await mount(<DemoAppFresh />);
+  await selectLayer(page, 'Live Dot');
+  await page.getByRole('button', { name: /open timeline/i }).click();
+
+  const marker = page.locator('[data-testid^="timeline-marker-"]').first();
+
+  await marker.click();
+  await expect(marker).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('easing-graph-editor')).toBeVisible();
+
+  await openTab(page, 'Properties');
+  await expect(page.getByTestId('keyframe-mode-banner')).toBeVisible();
+  // Switching sidebar tabs is press-driven (HeroUI Tab -> react-aria usePress, which stops
+  // propagation of the underlying native mousedown), so it does not reach the graph's
+  // outside-click listener — the graph is still open here, ready for the real trigger below.
+  await expect(page.getByTestId('easing-graph-editor')).toBeVisible();
+
+  const baseBefore = await readElementBaseOpacity(page, 'Live Dot');
+  const keyframeBefore = await readTrackKeyframeValue(page, FIRST_KEYFRAME_INDEX);
+  const opacitySlider = page.getByRole('slider', { name: /opacity/i });
+  const opacityTrack = page.locator('[data-slot="slider-track"]').filter({ has: opacitySlider });
+  const trackBox = await opacityTrack.boundingBox();
+
+  if (trackBox === null) throw new Error('opacity slider track not visible');
+
+  // Genuine mousedown at the track's right edge — matching the keyframe's current 100% value —
+  // so this event cannot itself move the slider; it exists solely to reproduce a real `mousedown`
+  // landing on the Opacity slider while the graph is open.
+  await opacitySlider.dispatchEvent('mousedown', {
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+    clientX: trackBox.x + trackBox.width,
+    clientY: trackBox.y,
+  });
+
+  // The genuine mousedown above closed the graph (proving the listener fired)...
+  await expect(page.getByTestId('easing-graph-editor')).not.toBeVisible();
+  // ...and did not perturb the value on its own.
+  expect(await readTrackKeyframeValue(page, FIRST_KEYFRAME_INDEX)).toEqual(keyframeBefore);
+  expect(await readElementBaseOpacity(page, 'Live Dot')).toBe(baseBefore);
+
+  // The actual edit: focus + keyboard, exercising property-panel routing with the graph now
+  // closed but the keyframe selection (post-fix) still intact.
+  await opacitySlider.focus();
+  await page.keyboard.press('Home');
+
+  // The edit landed on the keyframe, not on 'Live Dot's base opacity — the selection, and
+  // therefore the property-panel routing, survived the graph-closing mousedown.
+  await expect.poll(() => readTrackKeyframeValue(page, FIRST_KEYFRAME_INDEX)).not.toEqual(keyframeBefore);
+  expect(await readElementBaseOpacity(page, 'Live Dot')).toBe(baseBefore);
+  await expect(page.getByTestId('keyframe-mode-banner')).toBeVisible();
+});
+
+/**
  * @description timeline.md "Lifecycle and State-Machine Authoring": the friendly modifier toggle
  * compiles to a canonical two-state machine. Regions: properties/animation panel → store.
  */

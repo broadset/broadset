@@ -83,16 +83,21 @@ function renderTimelinePanel(options: {
   readonly state: ProjectEditorState;
   readonly timelineOpen: boolean;
   readonly selectedTimelineKeyframe: TimelineKeyframeSelection | null;
+  /** True once the user has dismissed the easing graph for the current selection; hides the graph without touching the selection. */
+  readonly easingGraphDismissed: boolean;
   readonly onCloseTimeline: () => void;
   readonly onClearSelectedTimelineKeyframe: () => void;
+  readonly onDismissEasingGraph: () => void;
   readonly onSelectTimelineKeyframe: (selection: TimelineKeyframeSelection) => void;
 }): React.JSX.Element | null {
   const {
     state,
     timelineOpen,
     selectedTimelineKeyframe,
+    easingGraphDismissed,
     onCloseTimeline,
     onClearSelectedTimelineKeyframe,
+    onDismissEasingGraph,
     onSelectTimelineKeyframe,
   } = options;
   const document = selectActiveDocumentV1(state);
@@ -121,7 +126,7 @@ function renderTimelinePanel(options: {
   const selectedModelKeyframe = selectedIndex >= 0 ? selectedTrack?.keyframes[selectedIndex] : undefined;
   const nextModelKeyframe = selectedIndex >= 0 ? selectedTrack?.keyframes[selectedIndex + 1] : undefined;
   const easing =
-    selectedTrack !== undefined && selectedModelKeyframe?.interpolation !== undefined ?
+    !easingGraphDismissed && selectedTrack !== undefined && selectedModelKeyframe?.interpolation !== undefined ?
       {
         interpolation: selectedModelKeyframe.interpolation,
         presets: KEYFRAME_INTERPOLATION_PRESETS.filter((preset) =>
@@ -159,7 +164,7 @@ function renderTimelinePanel(options: {
             value: { type: 'number', value: seeded?.appearance.opacity ?? 1 },
           });
         }}
-        onCloseEasing={onClearSelectedTimelineKeyframe}
+        onCloseEasing={onDismissEasingGraph}
         onCommitEasing={(interpolation) => {
           if (selectedTimelineKeyframe === null) return;
 
@@ -378,6 +383,15 @@ export function V1DemoWorkspace({
     readonly trackId: string;
     readonly keyframeId: string;
   } | null>(null);
+  /**
+   * Whether the user has dismissed the easing graph (outside mousedown, Esc, etc.) for the
+   * currently selected keyframe. Deliberately independent of `selectedTimelineKeyframe`: a
+   * mousedown that closes the graph (e.g. on the Properties panel's Opacity slider, which does
+   * not stop propagation the way HeroUI's press-driven controls do) must not also drop the
+   * keyframe selection, or the property panel would silently misroute the edit to the base
+   * element instead of the keyframe.
+   */
+  const [easingGraphDismissed, setEasingGraphDismissed] = useState(false);
   const state = useEditorSelector(editorStore, (current) => current);
   const document = selectActiveDocumentV1(state);
   const activePageIndex = document?.pages.findIndex((page) => page.id === state.activePageId) ?? 0;
@@ -563,15 +577,22 @@ export function V1DemoWorkspace({
           state,
           timelineOpen,
           selectedTimelineKeyframe,
+          easingGraphDismissed,
           onCloseTimeline: () => {
             setTimelineOpen(false);
             setSelectedTimelineKeyframe(null);
+            setEasingGraphDismissed(false);
           },
           onClearSelectedTimelineKeyframe: () => {
             setSelectedTimelineKeyframe(null);
+            setEasingGraphDismissed(false);
+          },
+          onDismissEasingGraph: () => {
+            setEasingGraphDismissed(true);
           },
           onSelectTimelineKeyframe: (selection) => {
             setSelectedTimelineKeyframe(selection);
+            setEasingGraphDismissed(false);
           },
         })}
       </div>
