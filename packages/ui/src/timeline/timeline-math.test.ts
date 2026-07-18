@@ -1,4 +1,3 @@
-// packages/ui/src/timeline/timeline-math.test.ts
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -70,5 +69,23 @@ describe('timeline math', () => {
     expect(offsets.get('b')).toBe(8);
     expect(offsets.get('c')).toBe(16);
     expect(offsets.get('d')).toBe(0);
+  });
+});
+
+describe('degenerate ticksPerSecond', () => {
+  it('formats a safe zero-duration label instead of Infinity/NaN when ticksPerSecond <= 0', () => {
+    expect(formatTickSeconds(500, 0)).toBe('0.0s');
+    expect(formatTickSeconds(500, -10)).toBe('0.0s');
+  });
+
+  it('emits only the start and end ticks instead of an infinite loop when ticksPerSecond <= 0', () => {
+    expect(rulerLabelTicks(3000, 0)).toEqual([0, 3000]);
+    expect(rulerLabelTicks(3000, -10)).toEqual([0, 3000]);
+    expect(rulerLabelTicks(0, 0)).toEqual([0]);
+  });
+
+  it('falls back to a 1-tick snap interval instead of NaN when ticksPerSecond <= 0', () => {
+    expect(resolveSnapIntervalTicks(100, 0)).toBe(1);
+    expect(resolveSnapIntervalTicks(100, -10)).toBe(1);
   });
 });

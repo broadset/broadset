@@ -379,10 +379,7 @@ export function V1DemoWorkspace({
   const [quarantinedProjectBytes, setQuarantinedProjectBytes] = useState<Uint8Array | null>(null);
   const [tab, setTab] = useState<WorkspaceTab>('properties');
   const [timelineOpen, setTimelineOpen] = useState(false);
-  const [selectedTimelineKeyframe, setSelectedTimelineKeyframe] = useState<{
-    readonly trackId: string;
-    readonly keyframeId: string;
-  } | null>(null);
+  const [selectedTimelineKeyframe, setSelectedTimelineKeyframe] = useState<TimelineKeyframeSelection | null>(null);
   /**
    * Whether the user has dismissed the easing graph (outside mousedown, Esc, etc.) for the
    * currently selected keyframe. Deliberately independent of `selectedTimelineKeyframe`: a

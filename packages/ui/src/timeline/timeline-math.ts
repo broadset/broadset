@@ -1,4 +1,3 @@
-// packages/ui/src/timeline/timeline-math.ts
 const MS_PER_SECOND = 1000;
 const MAX_RULER_LABELS = 13;
 
@@ -21,6 +20,8 @@ export function railRatioFromTick(tick: number, durationTicks: number): number {
 
 /** A "100 ms" grid is a presentation preference converted ONCE to a positive integer tick interval. */
 export function resolveSnapIntervalTicks(preferenceMs: number, ticksPerSecond: number): number {
+  if (ticksPerSecond <= 0) return 1;
+
   return Math.max(1, Math.round((preferenceMs / MS_PER_SECOND) * ticksPerSecond));
 }
 
@@ -31,12 +32,15 @@ export function snapTick(tick: number, intervalTicks: number, durationTicks: num
 }
 
 export function formatTickSeconds(tick: number, ticksPerSecond: number): string {
+  if (ticksPerSecond <= 0) return '0.0s';
+
   return `${(tick / ticksPerSecond).toFixed(1)}s`;
 }
 
 /** Whole-second (or multiple-of-seconds) label positions, bounded, always including 0 and the end. */
 export function rulerLabelTicks(durationTicks: number, ticksPerSecond: number): readonly number[] {
   if (durationTicks <= 0) return [0];
+  if (ticksPerSecond <= 0) return [0, durationTicks];
 
   const totalSeconds = durationTicks / ticksPerSecond;
   const stepSeconds = Math.max(1, Math.ceil(totalSeconds / (MAX_RULER_LABELS - 1)));
