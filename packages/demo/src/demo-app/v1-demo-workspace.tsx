@@ -15,9 +15,13 @@ import {
   PageSorter,
   resolveSnapIntervalTicks,
   TimelineBottomPanel,
+  TimelineEditingProvider,
   TimelineEditor,
+  type TimelineOwnerAddress,
+  useTimelineEditing,
 } from '@broadset/ui';
 import { Tabs, Toast, toast } from '@heroui/react';
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { loadStoredProjectV1, saveStoredProjectV1 } from '../v1-project-persistence';
@@ -78,6 +82,25 @@ function parseTimelineId(value: string): projectFormatV1.Id {
   return projectFormatV1.idSchema.parse(value);
 }
 
+/**
+ * Seed a newly appended keyframe from the target track's own last keyframe value so the seed is
+ * always type-correct for that track's `valueType` (color/tuple/length/etc. tracks, not just
+ * opacity). Falls back to the element's opacity only for the degenerate case of a track with no
+ * keyframes yet, which should not occur in practice since every authored track carries at least one.
+ */
+function resolveAddedKeyframeSeedValue(options: {
+  readonly track: projectFormatV1.Track | undefined;
+  readonly document: projectFormatV1.BroadsetDocumentV1;
+}): projectFormatV1.TypedValue {
+  const lastTrackKeyframeValue = options.track?.keyframes[options.track.keyframes.length - 1]?.value;
+
+  if (lastTrackKeyframeValue !== undefined) return lastTrackKeyframeValue;
+
+  const seededElement = options.document.elements.find(({ id }) => id === options.track?.target.entity.entityId);
+
+  return { type: 'number', value: seededElement?.appearance.opacity ?? 1 };
+}
+
 /** Scrubbing the ruler takes precedence over the underlying playback-playing flag for the preview label. */
 function resolveTimelinePreviewState(options: {
   readonly scrubbing: boolean;
@@ -86,6 +109,21 @@ function resolveTimelinePreviewState(options: {
   if (options.scrubbing) return 'scrubbing';
 
   return options.playing ? 'playing' : 'paused';
+}
+
+/** The sequence currently being previewed: an explicit playback pin, else the active page's default. */
+function resolveActiveSequenceId(state: ProjectEditorState): projectFormatV1.Id | null {
+  if (state.playbackSequenceId !== null) return state.playbackSequenceId;
+
+  const document = selectActiveDocumentV1(state);
+
+  if (document === undefined) return null;
+
+  return resolvePreviewSequenceId({
+    project: state.project,
+    documentId: state.activeDocumentId,
+    pageId: state.activePageId,
+  });
 }
 
 /** Hosts the shipped TimelineEditor for the sequence currently previewed by playback, or renders nothing. */
@@ -115,15 +153,7 @@ function renderTimelinePanel(options: {
     onSelectTimelineKeyframe,
   } = options;
   const document = selectActiveDocumentV1(state);
-  const sequenceId =
-    state.playbackSequenceId ??
-    (document === undefined ? null : (
-      resolvePreviewSequenceId({
-        project: state.project,
-        documentId: state.activeDocumentId,
-        pageId: state.activePageId,
-      })
-    ));
+  const sequenceId = resolveActiveSequenceId(state);
   const sequence = document?.sequences.find(({ id }) => id === sequenceId);
 
   if (document === undefined || sequence === undefined) return null;
@@ -171,13 +201,12 @@ function renderTimelinePanel(options: {
         snapIntervalTicks={snapIntervalTicks}
         onAddKeyframe={(seqId, trackId, tick) => {
           const track = sequence.tracks.find(({ id }) => id === trackId);
-          const seeded = document.elements.find(({ id }) => id === track?.target.entity.entityId);
 
           state.addKeyframe({
             sequenceId: parseTimelineId(seqId),
             trackId: parseTimelineId(trackId),
             tick,
-            value: { type: 'number', value: seeded?.appearance.opacity ?? 1 },
+            value: resolveAddedKeyframeSeedValue({ track, document }),
           });
         }}
         onCloseEasing={onDismissEasingGraph}
@@ -227,6 +256,37 @@ function renderTimelinePanel(options: {
       />
     </TimelineBottomPanel>
   );
+}
+
+/** Timeline open/close API derived from the ambient `TimelineEditingProvider` target. */
+interface TimelineOpenBridgeApi {
+  readonly timelineOpen: boolean;
+  readonly openTimeline: (owner: TimelineOwnerAddress, sequenceId: string) => void;
+  readonly closeTimeline: () => void;
+}
+
+interface TimelineOpenBridgeProps {
+  readonly children: (api: TimelineOpenBridgeApi) => ReactNode;
+}
+
+/**
+ * Bridges `useTimelineEditing()` into a render-prop so the workspace body keeps deriving
+ * `timelineOpen` from the sequence/track editing target instead of a parallel ad-hoc boolean,
+ * without hoisting the entire workspace render tree's local state into a second component.
+ */
+function TimelineOpenBridge({ children }: TimelineOpenBridgeProps): React.JSX.Element {
+  const timelineEditing = useTimelineEditing();
+  const api: TimelineOpenBridgeApi = {
+    timelineOpen: (timelineEditing?.target ?? null) !== null,
+    openTimeline(owner, sequenceId) {
+      timelineEditing?.openSequence(owner, sequenceId, null);
+    },
+    closeTimeline() {
+      timelineEditing?.closeSequence();
+    },
+  };
+
+  return <>{children(api)}</>;
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -395,7 +455,6 @@ export function V1DemoWorkspace({
   });
   const [quarantinedProjectBytes, setQuarantinedProjectBytes] = useState<Uint8Array | null>(null);
   const [tab, setTab] = useState<WorkspaceTab>('properties');
-  const [timelineOpen, setTimelineOpen] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
   const [selectedTimelineKeyframe, setSelectedTimelineKeyframe] = useState<TimelineKeyframeSelection | null>(null);
   /**
@@ -499,120 +558,132 @@ export function V1DemoWorkspace({
 
   return (
     <ProjectEditorProvider store={editorStore}>
-      <div
-        data-testid="v1-demo-workspace"
-        style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%' }}
-      >
-        <Toast.Provider maxVisibleToasts={4} placement="bottom end" />
-        <V1ProjectFileControls editorStore={editorStore} onProjectQuarantined={retainProjectRecovery} />
-        {quarantinedProjectBytes === null ? null : (
-          <span role="status">Recovery source retained ({String(quarantinedProjectBytes.byteLength)} bytes)</span>
-        )}
-        <V1ViewportToolbar editorStore={editorStore} />
-        <V1ElementToolbar editorStore={editorStore} />
-        <PageSorter
-          activePageIndex={activePageIndex}
-          pages={document?.pages ?? []}
-          onPageAdd={() => {
-            if (document === undefined) return;
-
-            const page = projectFormatV1.createPageV1({
-              id: projectFormatV1.idSchema.parse(crypto.randomUUID()),
-              name: `Scene ${String(document.pages.length + 1)}`,
-            });
-
-            if (state.addPage(page)) state.setActivePage(page.id);
-          }}
-          onPageRemove={(index) => {
-            const page = document?.pages[index];
-
-            if (page !== undefined) state.removePage(page.id);
-          }}
-          onPageSelect={(index) => {
-            state.switchPage(index);
-          }}
-        />
-        <div style={{ display: 'flex', flex: 1, minHeight: 0, width: '100%' }}>
-          <aside style={{ display: 'flex', flexDirection: 'column', minHeight: 0, width: 360 }}>
-            <Tabs
-              aria-label="Inspector"
-              selectedKey={tab}
-              onSelectionChange={(key) => {
-                const next = String(key);
-
-                if (next === 'layers' || next === 'properties' || next === 'animation' || next === 'data') setTab(next);
-              }}
+      <TimelineEditingProvider>
+        <TimelineOpenBridge>
+          {(timeline) => (
+            <div
+              data-testid="v1-demo-workspace"
+              style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%' }}
             >
-              <Tabs.List>
-                <Tabs.Tab id="layers">Layers</Tabs.Tab>
-                <Tabs.Tab id="properties" isDisabled={state.activeInstanceAddresses.length === 0}>
-                  Properties
-                </Tabs.Tab>
-                <Tabs.Tab id="animation" isDisabled={state.activeInstanceAddresses.length === 0}>
-                  Animation
-                </Tabs.Tab>
-                <Tabs.Tab id="data">Data</Tabs.Tab>
-              </Tabs.List>
-            </Tabs>
-            <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-              <KeyframePropertyProvider
-                adapter={
-                  selectedTimelineKeyframe === null || state.playbackSequenceId === null ?
-                    null
-                  : createKeyframePropertyAdapter({
-                      store: editorStore,
-                      sequenceId: state.playbackSequenceId,
-                      trackId: parseTimelineId(selectedTimelineKeyframe.trackId),
-                      keyframeId: parseTimelineId(selectedTimelineKeyframe.keyframeId),
-                    })
-                }
-              >
-                {renderWorkspaceSidebar(editorStore, tab)}
-              </KeyframePropertyProvider>
+              <Toast.Provider maxVisibleToasts={4} placement="bottom end" />
+              <V1ProjectFileControls editorStore={editorStore} onProjectQuarantined={retainProjectRecovery} />
+              {quarantinedProjectBytes === null ? null : (
+                <span role="status">Recovery source retained ({String(quarantinedProjectBytes.byteLength)} bytes)</span>
+              )}
+              <V1ViewportToolbar editorStore={editorStore} />
+              <V1ElementToolbar editorStore={editorStore} />
+              <PageSorter
+                activePageIndex={activePageIndex}
+                pages={document?.pages ?? []}
+                onPageAdd={() => {
+                  if (document === undefined) return;
+
+                  const page = projectFormatV1.createPageV1({
+                    id: projectFormatV1.idSchema.parse(crypto.randomUUID()),
+                    name: `Scene ${String(document.pages.length + 1)}`,
+                  });
+
+                  if (state.addPage(page)) state.setActivePage(page.id);
+                }}
+                onPageRemove={(index) => {
+                  const page = document?.pages[index];
+
+                  if (page !== undefined) state.removePage(page.id);
+                }}
+                onPageSelect={(index) => {
+                  state.switchPage(index);
+                }}
+              />
+              <div style={{ display: 'flex', flex: 1, minHeight: 0, width: '100%' }}>
+                <aside style={{ display: 'flex', flexDirection: 'column', minHeight: 0, width: 360 }}>
+                  <Tabs
+                    aria-label="Inspector"
+                    selectedKey={tab}
+                    onSelectionChange={(key) => {
+                      const next = String(key);
+
+                      if (next === 'layers' || next === 'properties' || next === 'animation' || next === 'data')
+                        setTab(next);
+                    }}
+                  >
+                    <Tabs.List>
+                      <Tabs.Tab id="layers">Layers</Tabs.Tab>
+                      <Tabs.Tab id="properties" isDisabled={state.activeInstanceAddresses.length === 0}>
+                        Properties
+                      </Tabs.Tab>
+                      <Tabs.Tab id="animation" isDisabled={state.activeInstanceAddresses.length === 0}>
+                        Animation
+                      </Tabs.Tab>
+                      <Tabs.Tab id="data">Data</Tabs.Tab>
+                    </Tabs.List>
+                  </Tabs>
+                  <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                    <KeyframePropertyProvider
+                      adapter={
+                        selectedTimelineKeyframe === null || state.playbackSequenceId === null ?
+                          null
+                        : createKeyframePropertyAdapter({
+                            store: editorStore,
+                            sequenceId: state.playbackSequenceId,
+                            trackId: parseTimelineId(selectedTimelineKeyframe.trackId),
+                            keyframeId: parseTimelineId(selectedTimelineKeyframe.keyframeId),
+                          })
+                      }
+                    >
+                      {renderWorkspaceSidebar(editorStore, tab)}
+                    </KeyframePropertyProvider>
+                  </div>
+                </aside>
+                <main style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
+                  <V1DemoCanvasSurface
+                    blobs={state.blobs}
+                    documentId={state.activeDocumentId}
+                    editorStore={editorStore}
+                    pageId={state.activePageId}
+                    project={state.project}
+                  />
+                  <V1AnimationToolbar
+                    editorStore={editorStore}
+                    onTimelineOpen={() => {
+                      setTab('animation');
+
+                      const sequenceId = resolveActiveSequenceId(state);
+
+                      if (sequenceId === null) return;
+
+                      timeline.openTimeline({ documentId: state.activeDocumentId }, sequenceId);
+                    }}
+                  />
+                </main>
+              </div>
+              {renderTimelinePanel({
+                state,
+                timelineOpen: timeline.timelineOpen,
+                selectedTimelineKeyframe,
+                easingGraphDismissed,
+                scrubbing,
+                onCloseTimeline: () => {
+                  timeline.closeTimeline();
+                  setSelectedTimelineKeyframe(null);
+                  setEasingGraphDismissed(false);
+                },
+                onClearSelectedTimelineKeyframe: () => {
+                  setSelectedTimelineKeyframe(null);
+                  setEasingGraphDismissed(false);
+                },
+                onDismissEasingGraph: () => {
+                  setEasingGraphDismissed(true);
+                },
+                onScrubbingChange: setScrubbing,
+                onSelectTimelineKeyframe: (selection) => {
+                  setSelectedTimelineKeyframe(selection);
+                  setEasingGraphDismissed(false);
+                },
+              })}
             </div>
-          </aside>
-          <main style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
-            <V1DemoCanvasSurface
-              blobs={state.blobs}
-              documentId={state.activeDocumentId}
-              editorStore={editorStore}
-              pageId={state.activePageId}
-              project={state.project}
-            />
-            <V1AnimationToolbar
-              editorStore={editorStore}
-              onTimelineOpen={() => {
-                setTab('animation');
-                setTimelineOpen(true);
-              }}
-            />
-          </main>
-        </div>
-        {renderTimelinePanel({
-          state,
-          timelineOpen,
-          selectedTimelineKeyframe,
-          easingGraphDismissed,
-          scrubbing,
-          onCloseTimeline: () => {
-            setTimelineOpen(false);
-            setSelectedTimelineKeyframe(null);
-            setEasingGraphDismissed(false);
-          },
-          onClearSelectedTimelineKeyframe: () => {
-            setSelectedTimelineKeyframe(null);
-            setEasingGraphDismissed(false);
-          },
-          onDismissEasingGraph: () => {
-            setEasingGraphDismissed(true);
-          },
-          onScrubbingChange: setScrubbing,
-          onSelectTimelineKeyframe: (selection) => {
-            setSelectedTimelineKeyframe(selection);
-            setEasingGraphDismissed(false);
-          },
-        })}
-      </div>
+          )}
+        </TimelineOpenBridge>
+      </TimelineEditingProvider>
     </ProjectEditorProvider>
   );
 }

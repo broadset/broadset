@@ -258,4 +258,63 @@ describe('V1DemoWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close timeline' }));
     expect(panel.getAttribute('aria-hidden')).toBe('true');
   });
+
+  it('seeds an added keyframe from the target track own last keyframe value, not opacity', async () => {
+    let editorStore: ProjectEditorStore | undefined;
+
+    render(
+      <V1DemoWorkspace
+        project={SAMPLE_PROJECT_V1}
+        onStoreReady={(store) => {
+          editorStore = store;
+        }}
+      />,
+    );
+
+    if (editorStore === undefined) throw new Error('Expected workspace store');
+
+    const store = editorStore;
+    const sequenceId = projectFormatV1.idSchema.parse('tl-sb-in');
+    const trackId = projectFormatV1.idSchema.parse('tl-sb-in-el-scorebug-translateX');
+
+    act(() => {
+      store.getState().setPlaybackSequence(sequenceId);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open timeline' }));
+    fireEvent.click(screen.getByTestId(`timeline-marker-${trackId}-1`));
+
+    act(() => {
+      store.getState().seekPlaybackTick(300);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add keyframe' }));
+
+    await waitFor(() => {
+      const track = store
+        .getState()
+        .project.documents[0]?.sequences.find((sequence) => sequence.id === sequenceId)
+        ?.tracks.find((candidate) => candidate.id === trackId);
+      const added = track?.keyframes.find((keyframe) => keyframe.tick === 300);
+
+      expect(added?.value).toEqual({ type: 'length', value: 0 });
+    });
+  });
+
+  it('drives the timeline bottom panel open state through the TimelineEditingProvider target', () => {
+    render(<V1DemoWorkspace project={SAMPLE_PROJECT_V1} />);
+
+    const panel = screen.getByTestId('timeline-bottom-panel');
+
+    expect(panel.getAttribute('aria-hidden')).toBe('true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open timeline' }));
+    expect(panel.getAttribute('aria-hidden')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close timeline' }));
+    expect(panel.getAttribute('aria-hidden')).toBe('true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open timeline' }));
+    expect(panel.getAttribute('aria-hidden')).toBeNull();
+  });
 });
