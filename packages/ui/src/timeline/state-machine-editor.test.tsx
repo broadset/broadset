@@ -125,4 +125,34 @@ describe('StateMachineEditor', () => {
       trigger: { kind: 'after', ticks: 3 },
     });
   });
+
+  /**
+   * @description Regression for the empty-event-id ZodError crash: when a machine has no event
+   * options (every transition retargeted to lifecycle/after), the trigger-kind Select must not
+   * offer "Event" at all — on the existing row OR the add-transition row — so a user can never
+   * build a `{kind:'event', eventId:''}` draft through the UI.
+   */
+  it('does not offer the Event trigger kind on the existing row when eventOptions is empty', () => {
+    setup({ eventOptions: [] });
+
+    const row = screen.getByTestId('sm-transition-t-1');
+
+    fireEvent.click(within(row).getByRole('button', { name: /trigger kind/i }));
+
+    expect(screen.queryByRole('option', { name: 'Event' })).toBeNull();
+    expect(screen.getByRole('option', { name: 'Lifecycle' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'After' })).toBeTruthy();
+  });
+
+  it('does not offer the Event trigger kind on the add-transition row when eventOptions is empty', () => {
+    setup({ eventOptions: [] });
+
+    const addRow = screen.getByTestId('sm-add-transition-row');
+
+    fireEvent.click(within(addRow).getByRole('button', { name: /trigger kind/i }));
+
+    expect(screen.queryByRole('option', { name: 'Event' })).toBeNull();
+    expect(screen.getByRole('option', { name: 'Lifecycle' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'After' })).toBeTruthy();
+  });
 });

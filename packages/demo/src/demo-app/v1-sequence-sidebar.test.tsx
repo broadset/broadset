@@ -1,10 +1,35 @@
 import { createProjectEditorStore, type ProjectEditorStore } from '@broadset/editor';
 import { projectFormatV1 } from '@broadset/model';
+import type * as BroadsetUi from '@broadset/ui';
+import type { StateMachineEditorProps } from '@broadset/ui';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { SAMPLE_PROJECT_V1 } from '../sample-project-v1';
 import { V1SequenceSidebar } from './v1-sequence-sidebar';
+
+/**
+ * Captures the live props `V1SequenceSidebar` wires into `StateMachineEditor` so a test can drive
+ * `onAddTransition`/`onUpdateTransition` directly with drafts the real trigger-kind Select can no
+ * longer produce (the UI-level fix for the empty-event-id crash removes the "Event" option once
+ * `eventOptions` is empty). This is the only way to regression-test the demo's defense-in-depth
+ * `toModelTransitionTrigger` guard once the primary UI defense makes the bad draft unreachable
+ * through real interaction.
+ */
+let capturedStateMachineEditorProps: StateMachineEditorProps | null = null;
+
+vi.mock('@broadset/ui', async (importOriginal) => {
+  const actual = await importOriginal<typeof BroadsetUi>();
+
+  return {
+    ...actual,
+    StateMachineEditor: (props: StateMachineEditorProps) => {
+      capturedStateMachineEditorProps = props;
+
+      return <actual.StateMachineEditor {...props} />;
+    },
+  };
+});
 
 function firstTrack(store: ProjectEditorStore): projectFormatV1.Track {
   const track = store.getState().project.documents[0]?.sequences[0]?.tracks[0];
@@ -209,6 +234,49 @@ describe('V1SequenceSidebar', () => {
     expect(deactivationTransition?.actions).toEqual([
       { kind: 'play-sequence', sequenceId: newSequence.id, behavior: 'restart' },
     ]);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
+
+  /**
+   * @description Regression for the empty-event-id ZodError crash: even bypassing the UI-level
+   * fix (which stops the trigger-kind Select from ever offering "Event" with no event options),
+   * an `{kind:'event', eventId:''}` draft reaching `onAddTransition`/`onUpdateTransition` directly
+   * must no-op — never call `idSchema.parse` on the empty id and throw — leaving the store
+   * untouched and structurally valid.
+   */
+  it('no-ops instead of throwing when a trigger draft carries an empty event id', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+
+    render(<V1SequenceSidebar editorStore={store} />);
+
+    addModifier('Flash');
+
+    const flash = findMachineByName(store, 'Flash');
+
+    if (flash === undefined) throw new Error('Expected a Flash machine');
+
+    if (capturedStateMachineEditorProps === null) throw new Error('Expected StateMachineEditor to render');
+
+    const transitionsBefore = flash.transitions;
+    const existingTransitionId = transitionsBefore[0]?.id;
+
+    if (existingTransitionId === undefined) throw new Error('Expected a seeded transition');
+
+    expect(() => {
+      capturedStateMachineEditorProps?.onAddTransition({
+        sourceStateId: flash.initialStateId,
+        targetStateId: flash.initialStateId,
+        trigger: { kind: 'event', eventId: '' },
+      });
+    }).not.toThrow();
+    expect(findMachineByName(store, 'Flash')?.transitions).toEqual(transitionsBefore);
+
+    expect(() => {
+      capturedStateMachineEditorProps?.onUpdateTransition(existingTransitionId, {
+        trigger: { kind: 'event', eventId: '' },
+      });
+    }).not.toThrow();
+    expect(findMachineByName(store, 'Flash')?.transitions).toEqual(transitionsBefore);
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
   });
 });

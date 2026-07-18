@@ -135,11 +135,19 @@ function toEventOptions(machine: StateMachineEditorView): readonly EventOptionVi
   return [...eventIds].map((eventId) => ({ id: eventId, label: `Event ${eventId.slice(0, EVENT_ID_LABEL_LENGTH)}` }));
 }
 
-/** Brands a presentational trigger draft's event id back into the model's `TransitionTrigger`. */
-function toModelTransitionTrigger(draft: TransitionTriggerDraft): projectFormatV1.TransitionTrigger {
-  if (draft.kind === 'event') return { kind: 'event', eventId: projectFormatV1.idSchema.parse(draft.eventId) };
+/**
+ * Brands a presentational trigger draft's event id back into the model's `TransitionTrigger`.
+ * Returns `null` (never throws) for an unparseable event id — the `StateMachineEditor` should
+ * never build one now that it stops offering the "Event" kind while `eventOptions` is empty, but
+ * this stays a hard boundary check: a UI event handler must fail soft on user input, not `.parse`
+ * and crash the app on an empty/invalid id.
+ */
+function toModelTransitionTrigger(draft: TransitionTriggerDraft): projectFormatV1.TransitionTrigger | null {
+  if (draft.kind !== 'event') return draft;
 
-  return draft;
+  const eventId = projectFormatV1.idSchema.safeParse(draft.eventId);
+
+  return eventId.success ? { kind: 'event', eventId: eventId.data } : null;
 }
 
 function transitionTriggersMatch(a: projectFormatV1.TransitionTrigger, b: projectFormatV1.TransitionTrigger): boolean {
@@ -396,8 +404,11 @@ export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): JSX.
 
                   if (machine === undefined) return;
 
-                  const sourceStateId = projectFormatV1.idSchema.parse(draft.sourceStateId);
                   const trigger = toModelTransitionTrigger(draft.trigger);
+
+                  if (trigger === null) return;
+
+                  const sourceStateId = projectFormatV1.idSchema.parse(draft.sourceStateId);
 
                   state.upsertTransition(machineId, {
                     id: projectFormatV1.idSchema.parse(crypto.randomUUID()),
@@ -435,12 +446,16 @@ export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): JSX.
 
                   if (found === undefined) return;
 
+                  const trigger = patch.trigger === undefined ? found.trigger : toModelTransitionTrigger(patch.trigger);
+
+                  if (trigger === null) return;
+
                   state.upsertTransition(machineId, {
                     ...found,
                     ...(patch.targetStateId === undefined ?
                       {}
                     : { targetStateId: projectFormatV1.idSchema.parse(patch.targetStateId) }),
-                    ...(patch.trigger === undefined ? {} : { trigger: toModelTransitionTrigger(patch.trigger) }),
+                    trigger,
                     ...(patch.priority === undefined ? {} : { priority: patch.priority }),
                   });
                 }}

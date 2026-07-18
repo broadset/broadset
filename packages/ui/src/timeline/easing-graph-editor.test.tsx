@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { color } from '../tokens';
 import type { EasingGraphEditorProps } from './easing-graph-editor';
 import { EasingGraphEditor } from './easing-graph-editor';
 
@@ -186,6 +187,28 @@ describe('EasingGraphEditor', () => {
       expect(handle2.getAttribute('aria-valuemin')).toBe('0');
       expect(handle2.getAttribute('aria-valuemax')).toBe('1');
       expect(handle2.getAttribute('aria-valuenow')).toBe('0.58');
+    });
+  });
+
+  describe('focus-visible ring', () => {
+    /** @description WCAG 2.4.7: keyboard focus on a bezier handle must render a visible, non-UA-default indicator. */
+    it('shows a contrasting stroke ring on focus and removes it on blur, independently per handle', () => {
+      setup();
+
+      const handle1 = screen.getByTestId('easing-handle-1');
+      const handle2 = screen.getByTestId('easing-handle-2');
+
+      expect(handle1.getAttribute('stroke')).toBe('none');
+      expect(handle2.getAttribute('stroke')).toBe('none');
+
+      fireEvent.focus(handle1);
+      expect(handle1.getAttribute('stroke')).toBe(color('foreground'));
+      expect(Number(handle1.getAttribute('stroke-width'))).toBeGreaterThan(0);
+      expect(handle2.getAttribute('stroke')).toBe('none');
+
+      fireEvent.blur(handle1);
+      expect(handle1.getAttribute('stroke')).toBe('none');
+      expect(handle1.getAttribute('stroke-width')).toBe('0');
     });
   });
 });

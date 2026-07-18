@@ -3,9 +3,11 @@
  * the demo layer (PR-E T3) can import these types verbatim without pulling in component internals.
  */
 
+import type { LifecyclePhase } from './animation-state-sections';
+
 export type TransitionTriggerDraft =
   | { readonly kind: 'event'; readonly eventId: string }
-  | { readonly kind: 'lifecycle'; readonly phase: 'in' | 'hold' | 'update' | 'out' }
+  | { readonly kind: 'lifecycle'; readonly phase: LifecyclePhase }
   | { readonly kind: 'after'; readonly ticks: number };
 
 export interface StateOptionView {

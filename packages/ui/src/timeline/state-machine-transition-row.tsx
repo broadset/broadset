@@ -4,7 +4,9 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 
 import { NumField } from '../inputs';
-import { color, font, sp } from '../tokens';
+import { color, font } from '../tokens';
+import type { LifecyclePhase } from './animation-state-sections';
+import { rowStyle } from './state-machine-editor-styles';
 import type {
   EventOptionView,
   NewTransitionDraft,
@@ -22,7 +24,8 @@ const MIN_PRIORITY = 0;
 const NUMBER_STEP = 1;
 const ICON_SIZE = 14;
 
-const TRIGGER_KIND_OPTIONS: readonly TransitionTriggerDraft['kind'][] = ['event', 'lifecycle', 'after'];
+const TRIGGER_KIND_OPTIONS_WITH_EVENT: readonly TransitionTriggerDraft['kind'][] = ['event', 'lifecycle', 'after'];
+const TRIGGER_KIND_OPTIONS_WITHOUT_EVENT: readonly TransitionTriggerDraft['kind'][] = ['lifecycle', 'after'];
 
 const TRIGGER_KIND_LABELS: Readonly<Record<TransitionTriggerDraft['kind'], string>> = {
   event: 'Event',
@@ -30,25 +33,16 @@ const TRIGGER_KIND_LABELS: Readonly<Record<TransitionTriggerDraft['kind'], strin
   after: 'After',
 };
 
-const LIFECYCLE_PHASE_OPTIONS: readonly Extract<TransitionTriggerDraft, { readonly kind: 'lifecycle' }>['phase'][] = [
-  'in',
-  'hold',
-  'update',
-  'out',
-];
+const LIFECYCLE_PHASE_OPTIONS: readonly LifecyclePhase[] = ['in', 'hold', 'update', 'out'];
 
-const LIFECYCLE_PHASE_LABELS: Readonly<
-  Record<Extract<TransitionTriggerDraft, { readonly kind: 'lifecycle' }>['phase'], string>
-> = {
+const LIFECYCLE_PHASE_LABELS: Readonly<Record<LifecyclePhase, string>> = {
   in: 'In',
   hold: 'Hold',
   update: 'Update',
   out: 'Out',
 };
 
-function isLifecyclePhase(
-  value: string,
-): value is Extract<TransitionTriggerDraft, { readonly kind: 'lifecycle' }>['phase'] {
+function isLifecyclePhase(value: string): value is LifecyclePhase {
   return value === 'in' || value === 'hold' || value === 'update' || value === 'out';
 }
 
@@ -67,8 +61,20 @@ function defaultTriggerForKind(
   return { kind: 'after', ticks: DEFAULT_TICKS };
 }
 
-function rowStyle(): { display: 'flex'; alignItems: 'center'; gap: string; flexWrap: 'wrap' } {
-  return { display: 'flex', alignItems: 'center', gap: sp('sp-02'), flexWrap: 'wrap' };
+/**
+ * Never offers "Event" as a selectable trigger kind when there is no valid event to default to —
+ * selecting it would otherwise build an unparseable `{kind:'event', eventId:''}` draft (the
+ * empty-id crash this guard exists to prevent). The currently active kind is always kept in the
+ * list so an existing event-kind row (whose own event id keeps `eventOptions` non-empty in
+ * practice) still renders its current selection; only a kind change away from "Event" can drop it.
+ */
+function deriveTriggerKindOptions(
+  eventOptions: readonly EventOptionView[],
+  currentKind: TransitionTriggerDraft['kind'],
+): readonly TransitionTriggerDraft['kind'][] {
+  const eventKindIsSelectable = eventOptions.length > 0 || currentKind === 'event';
+
+  return eventKindIsSelectable ? TRIGGER_KIND_OPTIONS_WITH_EVENT : TRIGGER_KIND_OPTIONS_WITHOUT_EVENT;
 }
 
 /* ------------------------------------------------------------------ */
@@ -103,7 +109,7 @@ export function TriggerDraftEditor({ trigger, eventOptions, onChange }: TriggerD
         </Select.Trigger>
         <Select.Popover>
           <ListBox>
-            {TRIGGER_KIND_OPTIONS.map((kind) => (
+            {deriveTriggerKindOptions(eventOptions, trigger.kind).map((kind) => (
               <ListBox.Item id={kind} key={kind} textValue={TRIGGER_KIND_LABELS[kind]}>
                 {TRIGGER_KIND_LABELS[kind]}
               </ListBox.Item>

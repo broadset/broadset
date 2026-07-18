@@ -18,10 +18,13 @@ export function railRatioFromTick(tick: number, durationTicks: number): number {
   return clampRailRatio(tick / durationTicks);
 }
 
-/** A "100 ms" grid is a presentation preference converted ONCE to a positive integer tick interval. */
+/**
+ * A "100 ms" grid is a presentation preference converted ONCE to a positive integer tick interval.
+ * `Math.max(1, …)` already floors non-positive `ticksPerSecond` products to 1, so no separate
+ * `ticksPerSecond <= 0` guard is needed here (unlike `formatTickSeconds`/`rulerLabelTicks`, which
+ * divide by `ticksPerSecond` and DO need one to avoid `Infinity`/an infinite loop).
+ */
 export function resolveSnapIntervalTicks(preferenceMs: number, ticksPerSecond: number): number {
-  if (ticksPerSecond <= 0) return 1;
-
   return Math.max(1, Math.round((preferenceMs / MS_PER_SECOND) * ticksPerSecond));
 }
 

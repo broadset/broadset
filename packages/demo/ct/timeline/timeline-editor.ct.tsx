@@ -31,13 +31,23 @@ test('open timeline shows the bottom panel and close hides it inert', async ({ m
 });
 
 /**
- * @description timeline.md "Timeline Playback"/scrub: ruler pointer scrub seeks exact ticks
- * and the canvas preview updates. Regions: timeline → canvas.
+ * @description timeline.md "Timeline Playback"/scrub: ruler pointer scrub seeks exact ticks,
+ * drives the canvas preview, and the timeline's own preview-state label reads "Scrubbing" for the
+ * duration of the drag — reverting to "Paused"/"Playing" once the pointer is released
+ * (`resolveTimelinePreviewState` in v1-demo-workspace-helpers.ts). Regions: timeline → timeline
+ * (preview label) → canvas.
  */
-test('ruler scrub seeks exact ticks and drives the canvas preview', async ({ mount, page }) => {
+test('ruler scrub seeks exact ticks, shows the Scrubbing label, and drives the canvas preview', async ({
+  mount,
+  page,
+}) => {
   await mount(<DemoAppFresh />);
   await selectLayer(page, 'Score Bug');
   await page.getByRole('button', { name: /open timeline/i }).click();
+
+  const timelineEditor = page.getByTestId('timeline-editor');
+
+  await expect(timelineEditor.getByText('Paused', { exact: true })).toBeVisible();
 
   const rail = page.getByTestId('timeline-ruler-rail');
   const box = await rail.boundingBox();
@@ -53,6 +63,7 @@ test('ruler scrub seeks exact ticks and drives the canvas preview', async ({ mou
   const tick = await page.evaluate(() => window.__broadsetProjectEditorStore?.getState().playbackTick);
 
   expect(tick).toBeGreaterThan(0);
+  await expect(timelineEditor.getByText('Scrubbing', { exact: true })).toBeVisible();
   // Canvas region: the animated element's rendered opacity differs from tick 0.
   await expect
     .poll(() =>
@@ -62,6 +73,9 @@ test('ruler scrub seeks exact ticks and drives the canvas preview', async ({ mou
         .evaluate((n) => getComputedStyle(n).opacity),
     )
     .not.toBe('');
+
+  await rail.dispatchEvent('pointerup', { button: 0, pointerId: 1 });
+  await expect(timelineEditor.getByText('Paused', { exact: true })).toBeVisible();
 });
 
 /**
@@ -482,4 +496,75 @@ test('wiring reverse exit assigns the reversed sequence to the deactivation tran
   expect(deactivationActions.actions).toEqual([
     { kind: 'play-sequence', sequenceId: deactivationActions.newSequenceId, behavior: 'restart' },
   ]);
+});
+
+/** Reads the Flash modifier machine's transition ids, in store order, from the live store. */
+function readFlashTransitionIds(page: Page): Promise<readonly string[]> {
+  return page.evaluate(() => {
+    const machines = window.__broadsetProjectEditorStore?.getState().project.documents[0]?.stateMachines ?? [];
+
+    return machines.find((machine) => machine.name === 'Flash')?.transitions.map(({ id }) => id) ?? [];
+  });
+}
+
+/**
+ * @description Final-review Finding 1 regression: a modifier machine seeds two `event`-kind
+ * transitions, so `eventOptions` starts non-empty. Retargeting BOTH of them away from "Event"
+ * (via the existing-row trigger-kind Select) empties `eventOptions` for the machine. Before the
+ * fix, the trigger-kind Select still offered "Event" here, and selecting it built an unparseable
+ * `{kind:'event', eventId:''}` draft that crashed the demo's `idSchema.parse` handler with an
+ * uncaught ZodError. After the fix, "Event" is no longer offered on ANY row once `eventOptions`
+ * is empty, so the add-transition row can only ever produce a valid draft — the app must not
+ * throw, and the store stays structurally intact throughout. Regions: animation panel
+ * (state-machine editor) → store.
+ */
+test('retargeting a modifier machine off Event closes the empty-event-id crash path', async ({ mount, page }) => {
+  const pageErrors: Error[] = [];
+
+  page.on('pageerror', (error) => {
+    pageErrors.push(error);
+  });
+
+  await mount(<DemoAppFresh />);
+  await selectLayer(page, 'Score Bug');
+  await openTab(page, 'Animation');
+  await page.getByRole('textbox', { name: 'New modifier name' }).fill('Flash');
+  await page.getByRole('button', { name: 'Add modifier' }).click();
+
+  const machineId = await readFlashMachineId(page);
+
+  if (machineId === null) throw new Error('expected Flash machine id');
+
+  const editor = page.getByTestId(`state-machine-editor-${machineId}`);
+  const transitionIds = await readFlashTransitionIds(page);
+
+  expect(transitionIds).toHaveLength(2);
+
+  const [activateTransitionId, deactivateTransitionId] = transitionIds;
+
+  if (activateTransitionId === undefined || deactivateTransitionId === undefined) {
+    throw new Error('expected two seeded transitions');
+  }
+
+  const retargetTriggerKind = async (transitionId: string, kindLabel: 'Lifecycle' | 'After'): Promise<void> => {
+    const row = editor.getByTestId(`sm-transition-${transitionId}`);
+
+    await row.getByRole('button', { name: /trigger kind/i }).click();
+    await page.getByRole('option', { name: kindLabel }).click();
+  };
+
+  await retargetTriggerKind(activateTransitionId, 'Lifecycle');
+  await retargetTriggerKind(deactivateTransitionId, 'After');
+
+  // eventOptions is now empty on this machine: the trigger-kind Select must not offer "Event" on
+  // the add-transition row (the exact path that used to crash).
+  const addRow = editor.getByTestId('sm-add-transition-row');
+
+  await addRow.getByRole('button', { name: /trigger kind/i }).click();
+  await expect(page.getByRole('option', { name: 'Event' })).toHaveCount(0);
+  await page.getByRole('option', { name: 'After' }).click();
+  await addRow.getByTestId('sm-add-transition').click();
+
+  await expect.poll(() => readFlashTransitionCount(page)).toBe(3);
+  expect(pageErrors).toEqual([]);
 });

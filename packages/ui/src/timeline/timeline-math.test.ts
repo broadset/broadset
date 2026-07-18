@@ -84,7 +84,7 @@ describe('degenerate ticksPerSecond', () => {
     expect(rulerLabelTicks(0, 0)).toEqual([0]);
   });
 
-  it('falls back to a 1-tick snap interval instead of NaN when ticksPerSecond <= 0', () => {
+  it('floors the snap interval to 1 for non-positive ticksPerSecond', () => {
     expect(resolveSnapIntervalTicks(100, 0)).toBe(1);
     expect(resolveSnapIntervalTicks(100, -10)).toBe(1);
   });

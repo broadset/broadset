@@ -4,6 +4,7 @@ import type { ChangeEvent, JSX, KeyboardEvent } from 'react';
 import { useEffect, useState } from 'react';
 
 import { color, font, sp } from '../tokens';
+import { rowStyle } from './state-machine-editor-styles';
 import type { StateMachineEditorProps, StateOptionView } from './state-machine-editor-types';
 import { NewTransitionRow, StateMachineTransitionRow } from './state-machine-transition-row';
 
@@ -11,10 +12,6 @@ const ICON_SIZE = 14;
 
 function sectionStyle(): { display: 'flex'; flexDirection: 'column'; gap: string } {
   return { display: 'flex', flexDirection: 'column', gap: sp('sp-03') };
-}
-
-function rowStyle(): { display: 'flex'; alignItems: 'center'; gap: string; flexWrap: 'wrap' } {
-  return { display: 'flex', alignItems: 'center', gap: sp('sp-02'), flexWrap: 'wrap' };
 }
 
 function resolveStateName(states: readonly StateOptionView[], stateId: string): string {

@@ -1,7 +1,7 @@
 import type { projectFormatV1 } from '@broadset/model';
 import { Button } from '@heroui/react';
 import type { JSX, KeyboardEvent, PointerEvent } from 'react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { color, font, sp } from '../tokens';
 
@@ -23,6 +23,10 @@ const HANDLE_KEY_STEP = 0.02;
 const HANDLE_VALUE_MIN = 0;
 const HANDLE_VALUE_MAX = 1;
 const HANDLE_VALUE_DECIMALS = 2;
+/** Stroke width of the keyboard-focus ring drawn around a bezier handle (WCAG 2.4.7); 0 hides it. */
+const FOCUS_RING_WIDTH = 3;
+const NO_FOCUS_RING_STROKE = 'none';
+const NO_FOCUS_RING_WIDTH = 0;
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
@@ -54,6 +58,7 @@ export function EasingGraphEditor(props: EasingGraphEditorProps): JSX.Element {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const { onClose } = props;
+  const [focusedHandleIndex, setFocusedHandleIndex] = useState<1 | 2 | null>(null);
 
   useEffect(() => {
     const handleOutside = (event: MouseEvent): void => {
@@ -166,8 +171,16 @@ export function EasingGraphEditor(props: EasingGraphEditorProps): JSX.Element {
                   fill={color('focus')}
                   r={HANDLE_RADIUS}
                   role="slider"
+                  stroke={focusedHandleIndex === handleIndex ? color('foreground') : NO_FOCUS_RING_STROKE}
+                  strokeWidth={focusedHandleIndex === handleIndex ? FOCUS_RING_WIDTH : NO_FOCUS_RING_WIDTH}
                   style={{ cursor: 'grab', touchAction: 'none' }}
                   tabIndex={0}
+                  onBlur={() => {
+                    setFocusedHandleIndex((current) => (current === handleIndex ? null : current));
+                  }}
+                  onFocus={() => {
+                    setFocusedHandleIndex(handleIndex);
+                  }}
                   onKeyDown={(event) => {
                     nudgeHandle(handleIndex, event);
                   }}
