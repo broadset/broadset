@@ -6,6 +6,10 @@ import type { EditingMode, PlacementPoint, PlacementState } from '../editing-sta
 import { removeDocumentElementsV1 } from '../project-v1-mutations';
 import { updateElementRectV1 } from '../v1-element-geometry';
 import {
+  createProjectEditorAnimationStateActions,
+  type ProjectEditorAnimationStateActions,
+} from './project-store-animation-state';
+import {
   createProjectEditorClipboardState,
   type ProjectClipboardPortV1,
   type ProjectEditorClipboardState,
@@ -56,6 +60,7 @@ type ProjectHistoryState = Pick<ProjectEditorState, 'blobs' | 'project'>;
 
 export interface ProjectEditorState
   extends ProjectEditorUiState,
+    ProjectEditorAnimationStateActions,
     ProjectEditorClipboardState,
     ProjectEditorPlaybackState,
     ProjectEditorSequenceState,
@@ -198,6 +203,7 @@ export function createProjectEditorStore(options: CreateProjectEditorStoreOption
         ...createProjectEditorClipboardState({ getState: get, setState: set }, { createId, port: options.clipboard }),
         ...createProjectEditorPlaybackState({ getState: get, setState: set }, initialSequenceId),
         ...createProjectEditorSequenceActions({ getState: get, setState: set }, createId),
+        ...createProjectEditorAnimationStateActions({ getState: get, setState: set }, createId),
         setProject(
           project: projectFormatV1.BroadsetProjectV1,
           blobs: ReadonlyMap<projectFormatV1.Sha256Digest, Uint8Array> = new Map(),
