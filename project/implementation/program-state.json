@@ -268,9 +268,9 @@
     },
     "W2-TIMELINE-01": {
       "phase": "W2",
-      "status": "discovery",
-      "pr": null,
-      "evidence": null
+      "status": "implementing",
+      "pr": "#7",
+      "evidence": "PR #7 — v1 visual timeline authoring (widget, easing graph, keyframe property adapter, lifecycle/state-machine sections) delivered across the timeline-rebuild commit series"
     },
     "W2-GRAPH-01": {
       "phase": "W2",

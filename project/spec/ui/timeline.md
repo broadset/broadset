@@ -408,6 +408,7 @@ Double-clicking a lane creates/updates a keyframe on that track at the resolved 
 - [ ] Frame-number and timecode ruler label modes (spec MAY) are not yet implemented; labels render seconds only.
 - [ ] Marker pointer-drag repositioning is unit-tested at the widget level; a Playwright CT for the drag gesture remains open.
 - [ ] Per-property lane grouping (Geometry/Appearance/Typography accordion, double-click-to-add on a lane, one-group-expands) is not yet implemented; lanes render flat (one lane per track, deterministic order) and keyframe creation goes through the add button.
+- [ ] State-machine transition editing (custom triggers, guards, priorities) has command-layer support but no dedicated editing UI yet; the sections expose lifecycle slots, modifier creation, and reverse-exit generation.
 
 ---
 

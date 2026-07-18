@@ -76,4 +76,20 @@ describe('V1SequenceSidebar', () => {
     expect(store.getState().playbackSequenceId).toBe(sequenceId);
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
   });
+
+  it('adds a canonical two-state modifier state machine from the animation state sections', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+
+    render(<V1SequenceSidebar editorStore={store} />);
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'New modifier name' }), { target: { value: 'Flash' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add modifier' }));
+
+    const machines = store.getState().project.documents[0]?.stateMachines ?? [];
+    const added = machines.find((machine) => machine.name === 'Flash');
+
+    expect(added?.states.map(({ name }) => name)).toEqual(['inactive', 'active']);
+    expect(added?.states.flatMap(({ values }) => values)).toEqual([]);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
 });

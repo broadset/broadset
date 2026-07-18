@@ -1,6 +1,15 @@
 import { type ProjectEditorStore, selectActiveDocumentV1, selectActiveElementsV1 } from '@broadset/editor';
 import { projectFormatV1 } from '@broadset/model';
-import { KeyframeAuthoringPanel, type KeyframeAuthoringSequence, type KeyframeInterpolationPreset } from '@broadset/ui';
+import {
+  AnimationStateSections,
+  KeyframeAuthoringPanel,
+  type KeyframeAuthoringSequence,
+  type KeyframeInterpolationPreset,
+  type LifecyclePhase,
+  type LifecycleSlotView,
+  type SequenceNameView,
+  type StateMachineView,
+} from '@broadset/ui';
 import type { JSX } from 'react';
 
 import { useEditorSelector } from './helpers';
@@ -12,6 +21,8 @@ interface V1SequenceSidebarProps {
 
 const DEFAULT_DISPLAY_SECONDS = 3;
 const OPACITY_POINTER = '/appearance/opacity';
+const LIFECYCLE_PHASES: readonly LifecyclePhase[] = ['in', 'hold', 'update', 'out'];
+const REVERSE_EXIT_SUFFIX = ' (exit)';
 
 function toPanelSequences(document: projectFormatV1.BroadsetDocumentV1): readonly KeyframeAuthoringSequence[] {
   return document.sequences.map((sequence) => ({
@@ -29,6 +40,57 @@ function toPanelSequences(document: projectFormatV1.BroadsetDocumentV1): readonl
       })),
     })),
   }));
+}
+
+function resolveSequenceName(document: projectFormatV1.BroadsetDocumentV1, sequenceId: projectFormatV1.Id): string {
+  return document.sequences.find(({ id }) => id === sequenceId)?.name ?? sequenceId;
+}
+
+function resolveStateMachineName(
+  document: projectFormatV1.BroadsetDocumentV1,
+  stateMachineId: projectFormatV1.Id,
+): string {
+  return document.stateMachines.find(({ id }) => id === stateMachineId)?.name ?? stateMachineId;
+}
+
+/** Renders a lifecycle `SequenceAction` as a human-readable label, resolving ids to display names. */
+function describeSequenceAction(
+  document: projectFormatV1.BroadsetDocumentV1,
+  action: projectFormatV1.SequenceAction,
+): string {
+  switch (action.kind) {
+    case 'play-sequence':
+      return `Play ${resolveSequenceName(document, action.sequenceId)} (${action.behavior})`;
+    case 'stop-sequence':
+      return `Stop ${resolveSequenceName(document, action.sequenceId)}`;
+    case 'seek-sequence':
+      return `Seek ${resolveSequenceName(document, action.sequenceId)} @ ${String(action.tick)}`;
+    case 'send-event':
+      return `Send event to ${resolveStateMachineName(document, action.stateMachineId)}`;
+  }
+}
+
+function toLifecycleSlots(document: projectFormatV1.BroadsetDocumentV1): readonly LifecycleSlotView[] {
+  const lifecycle = document.lifecycle;
+
+  return LIFECYCLE_PHASES.map((phase) => ({
+    phase,
+    actionLabels: (lifecycle?.[phase] ?? []).map((action) => describeSequenceAction(document, action)),
+  }));
+}
+
+function toStateMachineViews(document: projectFormatV1.BroadsetDocumentV1): readonly StateMachineView[] {
+  return [...document.stateMachines]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((machine) => ({
+      id: machine.id,
+      name: machine.name,
+      stateNames: machine.states.map(({ name }) => name),
+    }));
+}
+
+function toSequenceNameViews(document: projectFormatV1.BroadsetDocumentV1): readonly SequenceNameView[] {
+  return document.sequences.map((sequence) => ({ id: sequence.id, name: sequence.name }));
 }
 
 export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): JSX.Element {
@@ -144,6 +206,33 @@ export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): JSX.
             keyframeId: projectFormatV1.idSchema.parse(keyframeId),
             value: { type: 'number', value },
           });
+        }}
+      />
+      <AnimationStateSections
+        lifecycleSlots={toLifecycleSlots(document)}
+        sequenceNames={toSequenceNameViews(document)}
+        stateMachines={toStateMachineViews(document)}
+        onAddModifier={(name) => {
+          state.addModifierStateMachine({ name, activeValues: [] });
+        }}
+        onAssignLifecycleSequence={(phase, sequenceId) => {
+          state.setLifecyclePhaseActions(phase, [
+            { kind: 'play-sequence', sequenceId: projectFormatV1.idSchema.parse(sequenceId), behavior: 'restart' },
+          ]);
+        }}
+        onClearLifecyclePhase={(phase) => {
+          state.setLifecyclePhaseActions(phase, []);
+        }}
+        onCreateReverseExit={(sequenceId) => {
+          const parsedSequenceId = projectFormatV1.idSchema.parse(sequenceId);
+
+          state.createReverseExitSequence(
+            parsedSequenceId,
+            resolveSequenceName(document, parsedSequenceId) + REVERSE_EXIT_SUFFIX,
+          );
+        }}
+        onRemoveStateMachine={(stateMachineId) => {
+          state.removeStateMachine(projectFormatV1.idSchema.parse(stateMachineId));
         }}
       />
     </aside>

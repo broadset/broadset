@@ -1,3 +1,4 @@
+export * from './animation-state-sections';
 export * from './easing-graph-editor';
 export * from './keyframe-authoring-panel';
 export * from './keyframe-property-context';

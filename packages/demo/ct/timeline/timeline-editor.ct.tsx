@@ -231,3 +231,24 @@ test('opacity edits fall through to the base element when the selected keyframe 
   expect(await readTrackKeyframeValue(page, LAST_KEYFRAME_INDEX)).toEqual(liveDotKeyframeBefore);
   await expect(page.getByTestId('keyframe-mode-banner')).not.toBeVisible();
 });
+
+/**
+ * @description timeline.md "Lifecycle and State-Machine Authoring": the friendly modifier toggle
+ * compiles to a canonical two-state machine. Regions: properties/animation panel → store.
+ */
+test('adding a modifier authors a canonical two-state machine', async ({ mount, page }) => {
+  await mount(<DemoAppFresh />);
+  await selectLayer(page, 'Score Bug');
+  await openTab(page, 'Animation');
+  await page.getByRole('textbox', { name: 'New modifier name' }).fill('Flash');
+  await page.getByRole('button', { name: 'Add modifier' }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const machines = window.__broadsetProjectEditorStore?.getState().project.documents[0]?.stateMachines ?? [];
+
+        return machines.map((machine) => machine.states.map(({ name }) => name));
+      }),
+    )
+    .toContainEqual(['inactive', 'active']);
+});
