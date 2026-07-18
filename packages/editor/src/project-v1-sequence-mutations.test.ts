@@ -281,4 +281,26 @@ describe('v1 sequence authoring transforms', () => {
     expect(activeDocument(next).pages[0]?.sequenceId).toBeUndefined();
     expect(isValid(next)).toBe(true);
   });
+
+  it('rejects creating a property track that targets element-level visibility', () => {
+    const createId = idFactory();
+    const base = addSequenceInProject({
+      project: createMotionProject(),
+      documentId: id('doc-1'),
+      sequence: createSequenceV1({ id: id('seq-1'), name: 'Intro', durationTicks: 60 }),
+    });
+
+    for (const pointer of ['/visible', '/visibility']) {
+      const track = createTrackV1({
+        id: createId(),
+        name: 'Visibility',
+        target: { entity: OPACITY_TARGET.entity, pointer },
+        valueType: 'boolean',
+        keyframes: [createKeyframeV1({ id: createId(), tick: 0, value: { type: 'boolean', value: true } })],
+      });
+      const next = createTrackInProject({ project: base, documentId: id('doc-1'), sequenceId: id('seq-1'), track });
+
+      expect(next).toBe(base); // identity-equal: rejected as a no-op
+    }
+  });
 });
