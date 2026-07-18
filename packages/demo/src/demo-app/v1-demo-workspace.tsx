@@ -1,45 +1,30 @@
 import {
   createProjectEditorStore,
   ProjectEditorProvider,
-  type ProjectEditorState,
   type ProjectEditorStore,
-  resolvePreviewSequenceId,
   selectActiveDocumentV1,
-  selectActiveElementIdsV1,
 } from '@broadset/editor';
 import { type EditorConfig, projectFormatV1 } from '@broadset/model';
-import {
-  isInterpolationPreset,
-  KEYFRAME_INTERPOLATION_PRESETS,
-  KeyframePropertyProvider,
-  PageSorter,
-  resolveSnapIntervalTicks,
-  TimelineBottomPanel,
-  TimelineEditingProvider,
-  TimelineEditor,
-  type TimelineOwnerAddress,
-  useTimelineEditing,
-} from '@broadset/ui';
+import { KeyframePropertyProvider, PageSorter, TimelineEditingProvider } from '@broadset/ui';
 import { Tabs, Toast, toast } from '@heroui/react';
-import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { loadStoredProjectV1, saveStoredProjectV1 } from '../v1-project-persistence';
 import { useEditorSelector } from './helpers';
-import { presetToInterpolation } from './keyframe-interpolation-presets';
+import { TimelineOpenBridge } from './timeline-open-bridge';
+import { useWorkspaceKeyboardShortcuts } from './use-workspace-keyboard-shortcuts';
 import { V1AnimationToolbar } from './v1-animation-toolbar';
 import { V1DataSidebar } from './v1-data-sidebar';
 import { V1DemoCanvasSurface } from './v1-demo-canvas-surface';
+import { parseTimelineId, resolveActiveSequenceId } from './v1-demo-workspace-helpers';
+import type { TimelineKeyframeSelection } from './v1-demo-workspace-types';
 import { V1ElementSidebar } from './v1-element-sidebar';
 import { V1ElementToolbar } from './v1-element-toolbar';
 import { createKeyframePropertyAdapter } from './v1-keyframe-property-adapter';
 import { V1ProjectFileControls } from './v1-project-file-controls';
 import { V1SequenceSidebar } from './v1-sequence-sidebar';
-import { buildTimelineViewSequence } from './v1-timeline-adapter';
+import { renderTimelinePanel } from './v1-timeline-panel';
 import { V1ViewportToolbar } from './v1-viewport-toolbar';
-
-/** timeline.md's 100 ms grid preference, converted once per render to an integer tick interval. */
-const SNAP_PREFERENCE_MS = 100;
 
 interface V1DemoWorkspaceProps {
   readonly project: projectFormatV1.BroadsetProjectV1;
@@ -61,11 +46,6 @@ interface V1DemoWorkspaceProps {
 
 type WorkspaceTab = 'layers' | 'properties' | 'animation' | 'data';
 
-interface TimelineKeyframeSelection {
-  readonly trackId: string;
-  readonly keyframeId: string;
-}
-
 function renderWorkspaceSidebar(editorStore: ProjectEditorStore, tab: WorkspaceTab): React.JSX.Element {
   switch (tab) {
     case 'animation':
@@ -76,361 +56,6 @@ function renderWorkspaceSidebar(editorStore: ProjectEditorStore, tab: WorkspaceT
     case 'properties':
       return <V1ElementSidebar editorStore={editorStore} tab={tab} />;
   }
-}
-
-function parseTimelineId(value: string): projectFormatV1.Id {
-  return projectFormatV1.idSchema.parse(value);
-}
-
-/**
- * Seed a newly appended keyframe from the target track's own last keyframe value so the seed is
- * always type-correct for that track's `valueType` (color/tuple/length/etc. tracks, not just
- * opacity). Falls back to the element's opacity only for the degenerate case of a track with no
- * keyframes yet, which should not occur in practice since every authored track carries at least one.
- */
-function resolveAddedKeyframeSeedValue(options: {
-  readonly track: projectFormatV1.Track | undefined;
-  readonly document: projectFormatV1.BroadsetDocumentV1;
-}): projectFormatV1.TypedValue {
-  const lastTrackKeyframeValue = options.track?.keyframes[options.track.keyframes.length - 1]?.value;
-
-  if (lastTrackKeyframeValue !== undefined) return lastTrackKeyframeValue;
-
-  const seededElement = options.document.elements.find(({ id }) => id === options.track?.target.entity.entityId);
-
-  return { type: 'number', value: seededElement?.appearance.opacity ?? 1 };
-}
-
-/** Scrubbing the ruler takes precedence over the underlying playback-playing flag for the preview label. */
-function resolveTimelinePreviewState(options: {
-  readonly scrubbing: boolean;
-  readonly playing: boolean;
-}): 'playing' | 'paused' | 'scrubbing' {
-  if (options.scrubbing) return 'scrubbing';
-
-  return options.playing ? 'playing' : 'paused';
-}
-
-/** The sequence currently being previewed: an explicit playback pin, else the active page's default. */
-function resolveActiveSequenceId(state: ProjectEditorState): projectFormatV1.Id | null {
-  if (state.playbackSequenceId !== null) return state.playbackSequenceId;
-
-  const document = selectActiveDocumentV1(state);
-
-  if (document === undefined) return null;
-
-  return resolvePreviewSequenceId({
-    project: state.project,
-    documentId: state.activeDocumentId,
-    pageId: state.activePageId,
-  });
-}
-
-/** Hosts the shipped TimelineEditor for the sequence currently previewed by playback, or renders nothing. */
-function renderTimelinePanel(options: {
-  readonly state: ProjectEditorState;
-  readonly timelineOpen: boolean;
-  readonly selectedTimelineKeyframe: TimelineKeyframeSelection | null;
-  /** True once the user has dismissed the easing graph for the current selection; hides the graph without touching the selection. */
-  readonly easingGraphDismissed: boolean;
-  readonly scrubbing: boolean;
-  readonly onCloseTimeline: () => void;
-  readonly onClearSelectedTimelineKeyframe: () => void;
-  readonly onDismissEasingGraph: () => void;
-  readonly onScrubbingChange: (scrubbing: boolean) => void;
-  readonly onSelectTimelineKeyframe: (selection: TimelineKeyframeSelection) => void;
-}): React.JSX.Element | null {
-  const {
-    state,
-    timelineOpen,
-    selectedTimelineKeyframe,
-    easingGraphDismissed,
-    scrubbing,
-    onCloseTimeline,
-    onClearSelectedTimelineKeyframe,
-    onDismissEasingGraph,
-    onScrubbingChange,
-    onSelectTimelineKeyframe,
-  } = options;
-  const document = selectActiveDocumentV1(state);
-  const sequenceId = resolveActiveSequenceId(state);
-  const sequence = document?.sequences.find(({ id }) => id === sequenceId);
-
-  if (document === undefined || sequence === undefined) return null;
-
-  const view = buildTimelineViewSequence({
-    document,
-    sequence,
-    selectedElementIds: new Set(selectActiveElementIdsV1(state)),
-  });
-  const snapIntervalTicks = resolveSnapIntervalTicks(SNAP_PREFERENCE_MS, view.ticksPerSecond);
-  const selectedTrack = sequence.tracks.find(({ id }) => id === selectedTimelineKeyframe?.trackId);
-  const selectedIndex =
-    selectedTrack?.keyframes.findIndex(({ id }) => id === selectedTimelineKeyframe?.keyframeId) ?? -1;
-  const selectedModelKeyframe = selectedIndex >= 0 ? selectedTrack?.keyframes[selectedIndex] : undefined;
-  const nextModelKeyframe = selectedIndex >= 0 ? selectedTrack?.keyframes[selectedIndex + 1] : undefined;
-  const easing =
-    !easingGraphDismissed && selectedTrack !== undefined && selectedModelKeyframe?.interpolation !== undefined ?
-      {
-        interpolation: selectedModelKeyframe.interpolation,
-        presets: KEYFRAME_INTERPOLATION_PRESETS.filter((preset) =>
-          projectFormatV1.interpolationMatchesType(presetToInterpolation(preset), selectedTrack.valueType),
-        ),
-        previewProgress:
-          (
-            nextModelKeyframe !== undefined &&
-            state.playbackTick >= selectedModelKeyframe.tick &&
-            state.playbackTick <= nextModelKeyframe.tick &&
-            nextModelKeyframe.tick > selectedModelKeyframe.tick
-          ) ?
-            (state.playbackTick - selectedModelKeyframe.tick) / (nextModelKeyframe.tick - selectedModelKeyframe.tick)
-          : null,
-      }
-    : null;
-
-  const previewState = resolveTimelinePreviewState({ scrubbing, playing: state.playbackPlaying });
-
-  return (
-    <TimelineBottomPanel isOpen={timelineOpen} subtitle={document.name} title={sequence.name} onClose={onCloseTimeline}>
-      <TimelineEditor
-        currentTick={state.playbackTick}
-        easing={easing}
-        previewState={previewState}
-        selectedKeyframe={selectedTimelineKeyframe}
-        sequence={view}
-        snapIntervalTicks={snapIntervalTicks}
-        onAddKeyframe={(seqId, trackId, tick) => {
-          const track = sequence.tracks.find(({ id }) => id === trackId);
-
-          state.addKeyframe({
-            sequenceId: parseTimelineId(seqId),
-            trackId: parseTimelineId(trackId),
-            tick,
-            value: resolveAddedKeyframeSeedValue({ track, document }),
-          });
-        }}
-        onCloseEasing={onDismissEasingGraph}
-        onCommitEasing={(interpolation) => {
-          if (selectedTimelineKeyframe === null) return;
-
-          state.updateKeyframe({
-            sequenceId: parseTimelineId(sequence.id),
-            trackId: parseTimelineId(selectedTimelineKeyframe.trackId),
-            keyframeId: parseTimelineId(selectedTimelineKeyframe.keyframeId),
-            interpolation,
-          });
-        }}
-        onDeleteKeyframe={(trackId, keyframeId) => {
-          state.removeKeyframe({
-            sequenceId: parseTimelineId(sequence.id),
-            trackId: parseTimelineId(trackId),
-            keyframeId: parseTimelineId(keyframeId),
-          });
-          onClearSelectedTimelineKeyframe();
-        }}
-        onMoveKeyframe={(trackId, keyframeId, tick) => {
-          state.updateKeyframe({
-            sequenceId: parseTimelineId(sequence.id),
-            trackId: parseTimelineId(trackId),
-            keyframeId: parseTimelineId(keyframeId),
-            tick,
-          });
-        }}
-        onScrubbingChange={onScrubbingChange}
-        onSeekTick={(tick) => {
-          state.seekPlaybackTick(tick);
-        }}
-        onSelectEasingPreset={(preset) => {
-          if (selectedTimelineKeyframe === null || !isInterpolationPreset(preset)) return;
-
-          state.updateKeyframe({
-            sequenceId: parseTimelineId(sequence.id),
-            trackId: parseTimelineId(selectedTimelineKeyframe.trackId),
-            keyframeId: parseTimelineId(selectedTimelineKeyframe.keyframeId),
-            interpolation: presetToInterpolation(preset),
-          });
-        }}
-        onSelectKeyframe={(trackId, keyframeId) => {
-          onSelectTimelineKeyframe({ trackId, keyframeId });
-        }}
-      />
-    </TimelineBottomPanel>
-  );
-}
-
-/** Timeline open/close API derived from the ambient `TimelineEditingProvider` target. */
-interface TimelineOpenBridgeApi {
-  readonly timelineOpen: boolean;
-  readonly openTimeline: (owner: TimelineOwnerAddress, sequenceId: string) => void;
-  readonly closeTimeline: () => void;
-}
-
-interface TimelineOpenBridgeProps {
-  readonly children: (api: TimelineOpenBridgeApi) => ReactNode;
-}
-
-/**
- * Bridges `useTimelineEditing()` into a render-prop so the workspace body keeps deriving
- * `timelineOpen` from the sequence/track editing target instead of a parallel ad-hoc boolean,
- * without hoisting the entire workspace render tree's local state into a second component.
- */
-function TimelineOpenBridge({ children }: TimelineOpenBridgeProps): React.JSX.Element {
-  const timelineEditing = useTimelineEditing();
-  const api: TimelineOpenBridgeApi = {
-    timelineOpen: (timelineEditing?.target ?? null) !== null,
-    openTimeline(owner, sequenceId) {
-      timelineEditing?.openSequence(owner, sequenceId, null);
-    },
-    closeTimeline() {
-      timelineEditing?.closeSequence();
-    },
-  };
-
-  return <>{children(api)}</>;
-}
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  );
-}
-
-function cancelPlacementFromEscape(store: ProjectEditorStore, event: KeyboardEvent): boolean {
-  if (event.key !== 'Escape' || store.getState().placement === null) return false;
-
-  event.preventDefault();
-  store.getState().cancelPlacement();
-
-  return true;
-}
-
-function finishPathDrawingFromKeyboard(store: ProjectEditorStore, event: KeyboardEvent): boolean {
-  const state = store.getState();
-  const elementId = state.pathDrawingElementId;
-
-  if (elementId === null || (event.key !== 'Enter' && event.key !== 'Escape')) return false;
-
-  event.preventDefault();
-
-  if (event.key === 'Enter') {
-    state.updateElement(elementId, (element) => {
-      if (element.kind !== 'vector' || element.geometryData.kind !== 'path') return element;
-      if (element.geometryData.path.closed) return element;
-
-      return {
-        ...element,
-        geometryData: {
-          ...element.geometryData,
-          path: {
-            ...element.geometryData.path,
-            closed: true,
-            segments: [
-              ...element.geometryData.path.segments,
-              { id: projectFormatV1.idSchema.parse(crypto.randomUUID()), kind: 'close' },
-            ],
-          },
-        },
-      };
-    });
-  }
-
-  store.getState().finishPathDrawing();
-
-  return true;
-}
-
-function exitEditingFromEscape(store: ProjectEditorStore, event: KeyboardEvent): boolean {
-  const state = store.getState();
-
-  if (event.key !== 'Escape' || (state.pathEditingElementId === null && state.clipPathEditingElementId === null)) {
-    return false;
-  }
-
-  event.preventDefault();
-  state.finishPathDrawing();
-
-  return true;
-}
-
-function handleClipboardWorkspaceShortcut(store: ProjectEditorStore, event: KeyboardEvent): boolean {
-  if (!(event.ctrlKey || event.metaKey)) return false;
-
-  const state = store.getState();
-
-  switch (event.key.toLowerCase()) {
-    case 'c':
-      event.preventDefault();
-      void state.copySelection();
-
-      return true;
-    case 'd':
-      event.preventDefault();
-      void state.duplicateSelection();
-
-      return true;
-    case 'v':
-      event.preventDefault();
-      void state.pasteClipboard();
-
-      return true;
-    case 'x':
-      event.preventDefault();
-      void state.cutSelection();
-
-      return true;
-    default:
-      return false;
-  }
-}
-
-function handleGeneralWorkspaceShortcut(store: ProjectEditorStore, event: KeyboardEvent): void {
-  const state = store.getState();
-  const modifier = event.ctrlKey || event.metaKey;
-  const key = event.key.toLowerCase();
-
-  if ((event.key === 'Delete' || event.key === 'Backspace') && state.activeInstanceAddresses.length > 0) {
-    event.preventDefault();
-    state.removeElements(state.activeInstanceAddresses.map(({ elementId }) => elementId));
-
-    return;
-  }
-
-  if (modifier && key === 'a') {
-    const document = selectActiveDocumentV1(state);
-
-    if (document === undefined) return;
-
-    event.preventDefault();
-    state.setActiveElements(document.elements.map(({ id }) => id));
-
-    return;
-  }
-
-  if (handleClipboardWorkspaceShortcut(store, event)) return;
-
-  if (modifier && key === 'z') {
-    event.preventDefault();
-    if (event.shiftKey) state.redo();
-    else state.undo();
-
-    return;
-  }
-
-  if (modifier && key === 'y') {
-    event.preventDefault();
-    state.redo();
-  }
-}
-
-function handleWorkspaceKeyDown(store: ProjectEditorStore, event: KeyboardEvent): void {
-  if (isEditableTarget(event.target)) return;
-  if (finishPathDrawingFromKeyboard(store, event)) return;
-  if (exitEditingFromEscape(store, event)) return;
-  if (cancelPlacementFromEscape(store, event)) return;
-
-  handleGeneralWorkspaceShortcut(store, event);
 }
 
 export function V1DemoWorkspace({
@@ -485,18 +110,7 @@ export function V1DemoWorkspace({
     onStoreReady?.(editorStore);
   }, [editorStore, onStoreReady]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      handleWorkspaceKeyDown(editorStore, event);
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      editorStore.getState().clearClipboard();
-    };
-  }, [editorStore]);
+  useWorkspaceKeyboardShortcuts({ editorStore });
 
   useEffect(() => {
     if (persistence === undefined) return undefined;
