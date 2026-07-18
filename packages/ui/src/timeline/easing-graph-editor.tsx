@@ -20,9 +20,17 @@ const GRAPH_SIZE = 200;
 const HANDLE_RADIUS = 6;
 const SPRING_SAMPLES = 64;
 const HANDLE_KEY_STEP = 0.02;
+const HANDLE_VALUE_MIN = 0;
+const HANDLE_VALUE_MAX = 1;
+const HANDLE_VALUE_DECIMALS = 2;
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
+}
+
+/** Human-readable announcement for a bezier handle's 2D control point, surfaced via aria-valuetext. */
+function formatHandleValueText(x: number, y: number): string {
+  return `x ${x.toFixed(HANDLE_VALUE_DECIMALS)}, y ${y.toFixed(HANDLE_VALUE_DECIMALS)}`;
 }
 
 /** Damped-oscillator sketch used purely as an overshoot/decay visualization (not the runtime solver). */
@@ -148,6 +156,10 @@ export function EasingGraphEditor(props: EasingGraphEditorProps): JSX.Element {
                 <circle
                   key={handleIndex}
                   aria-label={`Ease control point ${String(handleIndex)}`}
+                  aria-valuemax={HANDLE_VALUE_MAX}
+                  aria-valuemin={HANDLE_VALUE_MIN}
+                  aria-valuenow={x}
+                  aria-valuetext={formatHandleValueText(x, y)}
                   data-testid={`easing-handle-${String(handleIndex)}`}
                   cx={position.cx}
                   cy={position.cy}

@@ -335,8 +335,8 @@ function readKeyframeInterpolationKindById(page: Page, keyframeId: unknown): Pro
     (id) =>
       window.__broadsetProjectEditorStore
         ?.getState()
-        .project.documents[0]?.sequences[0]?.tracks[0]?.keyframes.find((keyframe) => keyframe.id === id)
-        ?.interpolation?.kind,
+        .project.documents[0]?.sequences[0]?.tracks[0]?.keyframes.find((keyframe) => keyframe.id === id)?.interpolation
+        ?.kind,
     keyframeId,
   );
 }

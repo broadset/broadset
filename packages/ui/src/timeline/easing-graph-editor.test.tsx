@@ -170,5 +170,22 @@ describe('EasingGraphEditor', () => {
       expect(fireEvent.keyDown(handle, { key: 'a' })).toBe(true);
       expect(props.onCommit).not.toHaveBeenCalled();
     });
+
+    it('exposes aria-valuemin/max/now/text on both handles for the current control points', () => {
+      setup();
+
+      const handle1 = screen.getByTestId('easing-handle-1');
+      const handle2 = screen.getByTestId('easing-handle-2');
+
+      expect(handle1.getAttribute('aria-valuemin')).toBe('0');
+      expect(handle1.getAttribute('aria-valuemax')).toBe('1');
+      expect(handle1.getAttribute('aria-valuenow')).toBe('0.42');
+      expect(handle1.getAttribute('aria-valuetext')).toContain('x 0.42');
+      expect(handle1.getAttribute('aria-valuetext')).toContain('y 0.00');
+
+      expect(handle2.getAttribute('aria-valuemin')).toBe('0');
+      expect(handle2.getAttribute('aria-valuemax')).toBe('1');
+      expect(handle2.getAttribute('aria-valuenow')).toBe('0.58');
+    });
   });
 });
