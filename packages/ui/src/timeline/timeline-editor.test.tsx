@@ -28,11 +28,15 @@ function editorProps(overrides: Partial<Parameters<typeof TimelineEditor>[0]> = 
     snapIntervalTicks: 100,
     selectedKeyframe: null,
     previewState: 'paused' as const,
+    easing: null,
     onSeekTick: vi.fn(),
     onSelectKeyframe: vi.fn(),
     onAddKeyframe: vi.fn(),
     onMoveKeyframe: vi.fn(),
     onDeleteKeyframe: vi.fn(),
+    onCommitEasing: vi.fn(),
+    onSelectEasingPreset: vi.fn(),
+    onCloseEasing: vi.fn(),
     ...overrides,
   };
 }
@@ -68,6 +72,30 @@ describe('TimelineEditor', () => {
     render(<TimelineEditor {...editorProps({ sequence: twoTracks })} />);
     expect(screen.getByRole('button', { name: 'Add keyframe' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByText('Select a property track')).toBeDefined();
+  });
+
+  it('renders the easing graph below the ruler when a segment is selected', () => {
+    render(
+      <TimelineEditor
+        {...editorProps({
+          selectedKeyframe: { trackId: 'track-1', keyframeId: 'kf-a' },
+          easing: {
+            interpolation: { kind: 'cubic-bezier', controlPoints: [0.42, 0, 0.58, 1] },
+            presets: ['linear'],
+            previewProgress: null,
+          },
+          onCommitEasing: vi.fn(),
+          onSelectEasingPreset: vi.fn(),
+          onCloseEasing: vi.fn(),
+        })}
+      />,
+    );
+    expect(screen.getByTestId('easing-graph-editor')).toBeDefined();
+  });
+
+  it('renders no easing graph when easing is null', () => {
+    render(<TimelineEditor {...editorProps({ easing: null })} />);
+    expect(screen.queryByTestId('easing-graph-editor')).toBeNull();
   });
 });
 

@@ -64,7 +64,7 @@ export interface KeyframeAuthoringPanelProps {
 
 const INTERPOLATION_PRESET_SET: ReadonlySet<string> = new Set(KEYFRAME_INTERPOLATION_PRESETS);
 
-function isInterpolationPreset(value: string): value is KeyframeInterpolationPreset {
+export function isInterpolationPreset(value: string): value is KeyframeInterpolationPreset {
   return INTERPOLATION_PRESET_SET.has(value);
 }
 

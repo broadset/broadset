@@ -1,8 +1,10 @@
+import type { projectFormatV1 } from '@broadset/model';
 import { Button } from '@heroui/react';
 import { Plus } from 'lucide-react';
 import type { JSX } from 'react';
 
 import { color, font, sp } from '../tokens';
+import { EasingGraphEditor } from './easing-graph-editor';
 import { TimelineLanes } from './timeline-lanes';
 import { formatTickSeconds } from './timeline-math';
 import { TimelineRuler } from './timeline-ruler';
@@ -14,11 +16,20 @@ export interface TimelineEditorProps {
   readonly snapIntervalTicks: number;
   readonly selectedKeyframe: { readonly trackId: string; readonly keyframeId: string } | null;
   readonly previewState: 'playing' | 'paused' | 'scrubbing';
+  /** The selected keyframe's outgoing segment easing; null hides the graph even when a keyframe is selected. */
+  readonly easing: {
+    readonly interpolation: projectFormatV1.Interpolation;
+    readonly presets: readonly string[];
+    readonly previewProgress: number | null;
+  } | null;
   readonly onSeekTick: (tick: number) => void;
   readonly onSelectKeyframe: (trackId: string, keyframeId: string) => void;
   readonly onAddKeyframe: (sequenceId: string, trackId: string, tick: number) => void;
   readonly onMoveKeyframe: (trackId: string, keyframeId: string, tick: number) => void;
   readonly onDeleteKeyframe: (trackId: string, keyframeId: string) => void;
+  readonly onCommitEasing: (interpolation: projectFormatV1.Interpolation) => void;
+  readonly onSelectEasingPreset: (preset: string) => void;
+  readonly onCloseEasing: () => void;
 }
 
 const PREVIEW_LABELS = { playing: 'Playing', paused: 'Paused', scrubbing: 'Scrubbing' } as const;
@@ -67,6 +78,16 @@ export function TimelineEditor(props: TimelineEditorProps): JSX.Element {
         ticksPerSecond={props.sequence.ticksPerSecond}
         onSeekTick={props.onSeekTick}
       />
+      {props.selectedKeyframe !== null && props.easing !== null && (
+        <EasingGraphEditor
+          interpolation={props.easing.interpolation}
+          presets={props.easing.presets}
+          previewProgress={props.easing.previewProgress}
+          onClose={props.onCloseEasing}
+          onCommit={props.onCommitEasing}
+          onSelectPreset={props.onSelectEasingPreset}
+        />
+      )}
       <TimelineLanes
         durationTicks={props.sequence.durationTicks}
         selectedKeyframe={props.selectedKeyframe}

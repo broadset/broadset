@@ -8,12 +8,20 @@ import {
   selectActiveElementIdsV1,
 } from '@broadset/editor';
 import { type EditorConfig, projectFormatV1 } from '@broadset/model';
-import { PageSorter, resolveSnapIntervalTicks, TimelineBottomPanel, TimelineEditor } from '@broadset/ui';
+import {
+  isInterpolationPreset,
+  KEYFRAME_INTERPOLATION_PRESETS,
+  PageSorter,
+  resolveSnapIntervalTicks,
+  TimelineBottomPanel,
+  TimelineEditor,
+} from '@broadset/ui';
 import { Tabs, Toast, toast } from '@heroui/react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { loadStoredProjectV1, saveStoredProjectV1 } from '../v1-project-persistence';
 import { useEditorSelector } from './helpers';
+import { presetToInterpolation } from './keyframe-interpolation-presets';
 import { V1AnimationToolbar } from './v1-animation-toolbar';
 import { V1DataSidebar } from './v1-data-sidebar';
 import { V1DemoCanvasSurface } from './v1-demo-canvas-surface';
@@ -105,11 +113,35 @@ function renderTimelinePanel(options: {
     selectedElementIds: new Set(selectActiveElementIdsV1(state)),
   });
   const snapIntervalTicks = resolveSnapIntervalTicks(SNAP_PREFERENCE_MS, view.ticksPerSecond);
+  const selectedTrack = sequence.tracks.find(({ id }) => id === selectedTimelineKeyframe?.trackId);
+  const selectedIndex =
+    selectedTrack?.keyframes.findIndex(({ id }) => id === selectedTimelineKeyframe?.keyframeId) ?? -1;
+  const selectedModelKeyframe = selectedIndex >= 0 ? selectedTrack?.keyframes[selectedIndex] : undefined;
+  const nextModelKeyframe = selectedIndex >= 0 ? selectedTrack?.keyframes[selectedIndex + 1] : undefined;
+  const easing =
+    selectedTrack !== undefined && selectedModelKeyframe?.interpolation !== undefined ?
+      {
+        interpolation: selectedModelKeyframe.interpolation,
+        presets: KEYFRAME_INTERPOLATION_PRESETS.filter((preset) =>
+          projectFormatV1.interpolationMatchesType(presetToInterpolation(preset), selectedTrack.valueType),
+        ),
+        previewProgress:
+          (
+            nextModelKeyframe !== undefined &&
+            state.playbackTick >= selectedModelKeyframe.tick &&
+            state.playbackTick <= nextModelKeyframe.tick &&
+            nextModelKeyframe.tick > selectedModelKeyframe.tick
+          ) ?
+            (state.playbackTick - selectedModelKeyframe.tick) / (nextModelKeyframe.tick - selectedModelKeyframe.tick)
+          : null,
+      }
+    : null;
 
   return (
     <TimelineBottomPanel isOpen={timelineOpen} subtitle={document.name} title={sequence.name} onClose={onCloseTimeline}>
       <TimelineEditor
         currentTick={state.playbackTick}
+        easing={easing}
         previewState={state.playbackPlaying ? 'playing' : 'paused'}
         selectedKeyframe={selectedTimelineKeyframe}
         sequence={view}
@@ -123,6 +155,17 @@ function renderTimelinePanel(options: {
             trackId: parseTimelineId(trackId),
             tick,
             value: { type: 'number', value: seeded?.appearance.opacity ?? 1 },
+          });
+        }}
+        onCloseEasing={onClearSelectedTimelineKeyframe}
+        onCommitEasing={(interpolation) => {
+          if (selectedTimelineKeyframe === null) return;
+
+          state.updateKeyframe({
+            sequenceId: parseTimelineId(sequence.id),
+            trackId: parseTimelineId(selectedTimelineKeyframe.trackId),
+            keyframeId: parseTimelineId(selectedTimelineKeyframe.keyframeId),
+            interpolation,
           });
         }}
         onDeleteKeyframe={(trackId, keyframeId) => {
@@ -143,6 +186,16 @@ function renderTimelinePanel(options: {
         }}
         onSeekTick={(tick) => {
           state.seekPlaybackTick(tick);
+        }}
+        onSelectEasingPreset={(preset) => {
+          if (selectedTimelineKeyframe === null || !isInterpolationPreset(preset)) return;
+
+          state.updateKeyframe({
+            sequenceId: parseTimelineId(sequence.id),
+            trackId: parseTimelineId(selectedTimelineKeyframe.trackId),
+            keyframeId: parseTimelineId(selectedTimelineKeyframe.keyframeId),
+            interpolation: presetToInterpolation(preset),
+          });
         }}
         onSelectKeyframe={(trackId, keyframeId) => {
           onSelectTimelineKeyframe({ trackId, keyframeId });
