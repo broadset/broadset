@@ -1,6 +1,6 @@
 import type { projectFormatV1 } from '@broadset/model';
 import { Button } from '@heroui/react';
-import type { JSX, PointerEvent } from 'react';
+import type { JSX, KeyboardEvent, PointerEvent } from 'react';
 import { useEffect, useRef } from 'react';
 
 import { color, font, sp } from '../tokens';
@@ -19,6 +19,7 @@ export interface EasingGraphEditorProps {
 const GRAPH_SIZE = 200;
 const HANDLE_RADIUS = 6;
 const SPRING_SAMPLES = 64;
+const HANDLE_KEY_STEP = 0.02;
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
@@ -76,6 +77,41 @@ export function EasingGraphEditor(props: EasingGraphEditorProps): JSX.Element {
     props.onCommit({ kind: 'cubic-bezier', controlPoints });
   };
 
+  /** Keyboard equivalent of dragging a handle: arrow keys nudge by HANDLE_KEY_STEP and commit via the same onCommit path as pointer drag. */
+  const nudgeHandle = (handleIndex: 1 | 2, event: KeyboardEvent<SVGCircleElement>): void => {
+    if (bezier === null) return;
+
+    const [x1, y1, x2, y2] = bezier.controlPoints;
+    const x = handleIndex === 1 ? x1 : x2;
+    const y = handleIndex === 1 ? y1 : y2;
+    let nextX = x;
+    let nextY = y;
+
+    switch (event.key) {
+      case 'ArrowLeft':
+        nextX = clamp01(x - HANDLE_KEY_STEP);
+        break;
+      case 'ArrowRight':
+        nextX = clamp01(x + HANDLE_KEY_STEP);
+        break;
+      case 'ArrowUp':
+        nextY = y + HANDLE_KEY_STEP; // unclamped: overshoot allowed, matches drag behavior
+        break;
+      case 'ArrowDown':
+        nextY = y - HANDLE_KEY_STEP; // unclamped: overshoot allowed, matches drag behavior
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+
+    const controlPoints: readonly [number, number, number, number] =
+      handleIndex === 1 ? [nextX, nextY, x2, y2] : [x1, y1, nextX, nextY];
+
+    props.onCommit({ kind: 'cubic-bezier', controlPoints });
+  };
+
   const handlePosition = (x: number, y: number): { readonly cx: number; readonly cy: number } => ({
     cx: x * GRAPH_SIZE,
     cy: (1 - y) * GRAPH_SIZE,
@@ -111,12 +147,18 @@ export function EasingGraphEditor(props: EasingGraphEditorProps): JSX.Element {
               return (
                 <circle
                   key={handleIndex}
+                  aria-label={`Ease control point ${String(handleIndex)}`}
                   data-testid={`easing-handle-${String(handleIndex)}`}
                   cx={position.cx}
                   cy={position.cy}
                   fill={color('focus')}
                   r={HANDLE_RADIUS}
+                  role="slider"
                   style={{ cursor: 'grab', touchAction: 'none' }}
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    nudgeHandle(handleIndex, event);
+                  }}
                   onPointerDown={(event) => {
                     if (event.button === 0 && typeof event.currentTarget.setPointerCapture === 'function') {
                       try {

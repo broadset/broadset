@@ -92,4 +92,83 @@ describe('EasingGraphEditor', () => {
     fireEvent.mouseDown(document.body);
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
+
+  describe('keyboard access', () => {
+    it('exposes handle 1 as a focusable, labeled slider', () => {
+      setup();
+
+      const handle = screen.getByTestId('easing-handle-1');
+
+      expect(handle.getAttribute('tabindex')).toBe('0');
+      expect(handle.getAttribute('role')).toBe('slider');
+      expect(handle.getAttribute('aria-label')).toBeTruthy();
+    });
+
+    it('nudges control point 1 right on ArrowRight and commits via onCommit', () => {
+      const props = setup();
+      const handle = screen.getByTestId('easing-handle-1');
+
+      fireEvent.keyDown(handle, { key: 'ArrowRight' });
+
+      expect(props.onCommit).toHaveBeenLastCalledWith({
+        kind: 'cubic-bezier',
+        controlPoints: [0.44, 0, 0.58, 1],
+      });
+    });
+
+    it('nudges control point 1 up on ArrowUp without clamping y', () => {
+      const props = setup();
+      const handle = screen.getByTestId('easing-handle-1');
+
+      fireEvent.keyDown(handle, { key: 'ArrowUp' });
+
+      expect(props.onCommit).toHaveBeenLastCalledWith({
+        kind: 'cubic-bezier',
+        controlPoints: [0.42, 0.02, 0.58, 1],
+      });
+    });
+
+    it('nudges control point 2 down on ArrowDown without clamping y', () => {
+      const props = setup();
+      const handle = screen.getByTestId('easing-handle-2');
+
+      fireEvent.keyDown(handle, { key: 'ArrowDown' });
+
+      expect(props.onCommit).toHaveBeenLastCalledWith({
+        kind: 'cubic-bezier',
+        controlPoints: [0.42, 0, 0.58, 0.98],
+      });
+    });
+
+    it('clamps x at 0 on ArrowLeft when the control point is already at the left edge', () => {
+      const props = setup({ interpolation: { kind: 'cubic-bezier', controlPoints: [0, 0, 0.58, 1] } });
+      const handle = screen.getByTestId('easing-handle-1');
+
+      fireEvent.keyDown(handle, { key: 'ArrowLeft' });
+
+      expect(props.onCommit).toHaveBeenLastCalledWith({
+        kind: 'cubic-bezier',
+        controlPoints: [0, 0, 0.58, 1],
+      });
+    });
+
+    it('prevents default browser scroll behavior for all four arrow keys', () => {
+      setup();
+
+      const handle = screen.getByTestId('easing-handle-1');
+
+      expect(fireEvent.keyDown(handle, { key: 'ArrowLeft' })).toBe(false);
+      expect(fireEvent.keyDown(handle, { key: 'ArrowRight' })).toBe(false);
+      expect(fireEvent.keyDown(handle, { key: 'ArrowUp' })).toBe(false);
+      expect(fireEvent.keyDown(handle, { key: 'ArrowDown' })).toBe(false);
+    });
+
+    it('ignores non-arrow keys: no commit, no preventDefault', () => {
+      const props = setup();
+      const handle = screen.getByTestId('easing-handle-1');
+
+      expect(fireEvent.keyDown(handle, { key: 'a' })).toBe(true);
+      expect(props.onCommit).not.toHaveBeenCalled();
+    });
+  });
 });
