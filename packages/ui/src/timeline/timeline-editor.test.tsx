@@ -97,6 +97,24 @@ describe('TimelineEditor', () => {
     render(<TimelineEditor {...editorProps({ easing: null })} />);
     expect(screen.queryByTestId('easing-graph-editor')).toBeNull();
   });
+
+  it('reports scrubbing state while the ruler rail is dragged', () => {
+    const onScrubbingChange = vi.fn();
+
+    render(<TimelineEditor {...editorProps({ onScrubbingChange })} />);
+
+    const rail = screen.getByTestId('timeline-ruler-rail');
+
+    vi.spyOn(rail, 'getBoundingClientRect').mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 24, width: 400, height: 24, toJSON: () => ({}),
+    });
+
+    fireEvent.pointerDown(rail, { button: 0, pointerId: 1, clientX: 200 });
+    expect(onScrubbingChange).toHaveBeenLastCalledWith(true);
+
+    fireEvent.pointerUp(rail, { pointerId: 1 });
+    expect(onScrubbingChange).toHaveBeenLastCalledWith(false);
+  });
 });
 
 describe('TimelineBottomPanel', () => {

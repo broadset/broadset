@@ -23,6 +23,7 @@ export interface TimelineEditorProps {
     readonly previewProgress: number | null;
   } | null;
   readonly onSeekTick: (tick: number) => void;
+  readonly onScrubbingChange?: (scrubbing: boolean) => void;
   readonly onSelectKeyframe: (trackId: string, keyframeId: string) => void;
   readonly onAddKeyframe: (sequenceId: string, trackId: string, tick: number) => void;
   readonly onMoveKeyframe: (trackId: string, keyframeId: string, tick: number) => void;
@@ -76,6 +77,8 @@ export function TimelineEditor(props: TimelineEditorProps): JSX.Element {
         currentTick={props.currentTick}
         durationTicks={props.sequence.durationTicks}
         ticksPerSecond={props.sequence.ticksPerSecond}
+        onScrubEnd={() => props.onScrubbingChange?.(false)}
+        onScrubStart={() => props.onScrubbingChange?.(true)}
         onSeekTick={props.onSeekTick}
       />
       {props.selectedKeyframe !== null && props.easing !== null && (

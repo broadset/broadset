@@ -9,6 +9,8 @@ export interface TimelineRulerProps {
   readonly ticksPerSecond: number;
   readonly currentTick: number;
   readonly onSeekTick: (tick: number) => void;
+  readonly onScrubStart?: () => void;
+  readonly onScrubEnd?: () => void;
 }
 
 const RAIL_HEIGHT_PX = 24;
@@ -16,6 +18,7 @@ const RAIL_HEIGHT_PX = 24;
 /** Exact-tick scrub rail. Pointer widgets are plain elements by repo precedent (not HeroUI chrome). */
 export function TimelineRuler(props: TimelineRulerProps): JSX.Element {
   const railRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingRef = useRef(false);
   const seekFromPointer = (event: PointerEvent<HTMLDivElement>): void => {
     const rail = railRef.current;
 
@@ -25,6 +28,12 @@ export function TimelineRuler(props: TimelineRulerProps): JSX.Element {
     const ratio = bounds.width === 0 ? 0 : (event.clientX - bounds.left) / bounds.width;
 
     props.onSeekTick(tickFromRailRatio(ratio, props.durationTicks));
+  };
+  const endDrag = (): void => {
+    if (!isDraggingRef.current) return;
+
+    isDraggingRef.current = false;
+    props.onScrubEnd?.();
   };
 
   return (
@@ -43,6 +52,9 @@ export function TimelineRuler(props: TimelineRulerProps): JSX.Element {
         onPointerDown={(event) => {
           if (event.button !== 0) return;
 
+          isDraggingRef.current = true;
+          props.onScrubStart?.();
+
           if (typeof event.currentTarget.setPointerCapture === 'function') {
             try {
               event.currentTarget.setPointerCapture(event.pointerId);
@@ -57,6 +69,8 @@ export function TimelineRuler(props: TimelineRulerProps): JSX.Element {
           if (event.buttons !== 1) return;
           seekFromPointer(event);
         }}
+        onPointerCancel={endDrag}
+        onPointerUp={endDrag}
       >
         {rulerLabelTicks(props.durationTicks, props.ticksPerSecond).map((tick) => (
           <span

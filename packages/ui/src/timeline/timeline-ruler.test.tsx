@@ -11,6 +11,27 @@ function renderRuler(onSeekTick = vi.fn()): { readonly onSeekTick: ReturnType<ty
   return { onSeekTick };
 }
 
+function renderRulerWithScrubSpies(): {
+  readonly onScrubStart: ReturnType<typeof vi.fn>;
+  readonly onScrubEnd: ReturnType<typeof vi.fn>;
+} {
+  const onScrubStart = vi.fn();
+  const onScrubEnd = vi.fn();
+
+  render(
+    <TimelineRuler
+      currentTick={250}
+      durationTicks={1000}
+      ticksPerSecond={1000}
+      onScrubEnd={onScrubEnd}
+      onScrubStart={onScrubStart}
+      onSeekTick={vi.fn()}
+    />,
+  );
+
+  return { onScrubStart, onScrubEnd };
+}
+
 function railAt(ratio: number): { clientX: number } {
   const rail = screen.getByTestId('timeline-ruler-rail');
 
@@ -47,5 +68,39 @@ describe('TimelineRuler', () => {
 
     fireEvent.pointerDown(rail, { button: 2, pointerId: 1, ...railAt(0.5) });
     expect(onSeekTick).not.toHaveBeenCalled();
+  });
+
+  it('fires onScrubStart on rail pointer-down and onScrubEnd on pointer-up', () => {
+    const { onScrubStart, onScrubEnd } = renderRulerWithScrubSpies();
+    const rail = screen.getByTestId('timeline-ruler-rail');
+
+    fireEvent.pointerDown(rail, { button: 0, pointerId: 1, ...railAt(0.5) });
+    expect(onScrubStart).toHaveBeenCalledOnce();
+    expect(onScrubEnd).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(rail, { pointerId: 1 });
+    expect(onScrubEnd).toHaveBeenCalledOnce();
+  });
+
+  it('fires onScrubEnd on pointer-cancel', () => {
+    const { onScrubStart, onScrubEnd } = renderRulerWithScrubSpies();
+    const rail = screen.getByTestId('timeline-ruler-rail');
+
+    fireEvent.pointerDown(rail, { button: 0, pointerId: 1, ...railAt(0.5) });
+    expect(onScrubStart).toHaveBeenCalledOnce();
+
+    fireEvent.pointerCancel(rail, { pointerId: 1 });
+    expect(onScrubEnd).toHaveBeenCalledOnce();
+  });
+
+  it('does not fire onScrubStart for a non-primary pointer down, and does not fire onScrubEnd without an active drag', () => {
+    const { onScrubStart, onScrubEnd } = renderRulerWithScrubSpies();
+    const rail = screen.getByTestId('timeline-ruler-rail');
+
+    fireEvent.pointerDown(rail, { button: 2, pointerId: 1, ...railAt(0.5) });
+    expect(onScrubStart).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(rail, { pointerId: 1 });
+    expect(onScrubEnd).not.toHaveBeenCalled();
   });
 });

@@ -78,6 +78,16 @@ function parseTimelineId(value: string): projectFormatV1.Id {
   return projectFormatV1.idSchema.parse(value);
 }
 
+/** Scrubbing the ruler takes precedence over the underlying playback-playing flag for the preview label. */
+function resolveTimelinePreviewState(options: {
+  readonly scrubbing: boolean;
+  readonly playing: boolean;
+}): 'playing' | 'paused' | 'scrubbing' {
+  if (options.scrubbing) return 'scrubbing';
+
+  return options.playing ? 'playing' : 'paused';
+}
+
 /** Hosts the shipped TimelineEditor for the sequence currently previewed by playback, or renders nothing. */
 function renderTimelinePanel(options: {
   readonly state: ProjectEditorState;
@@ -85,9 +95,11 @@ function renderTimelinePanel(options: {
   readonly selectedTimelineKeyframe: TimelineKeyframeSelection | null;
   /** True once the user has dismissed the easing graph for the current selection; hides the graph without touching the selection. */
   readonly easingGraphDismissed: boolean;
+  readonly scrubbing: boolean;
   readonly onCloseTimeline: () => void;
   readonly onClearSelectedTimelineKeyframe: () => void;
   readonly onDismissEasingGraph: () => void;
+  readonly onScrubbingChange: (scrubbing: boolean) => void;
   readonly onSelectTimelineKeyframe: (selection: TimelineKeyframeSelection) => void;
 }): React.JSX.Element | null {
   const {
@@ -95,9 +107,11 @@ function renderTimelinePanel(options: {
     timelineOpen,
     selectedTimelineKeyframe,
     easingGraphDismissed,
+    scrubbing,
     onCloseTimeline,
     onClearSelectedTimelineKeyframe,
     onDismissEasingGraph,
+    onScrubbingChange,
     onSelectTimelineKeyframe,
   } = options;
   const document = selectActiveDocumentV1(state);
@@ -144,12 +158,14 @@ function renderTimelinePanel(options: {
       }
     : null;
 
+  const previewState = resolveTimelinePreviewState({ scrubbing, playing: state.playbackPlaying });
+
   return (
     <TimelineBottomPanel isOpen={timelineOpen} subtitle={document.name} title={sequence.name} onClose={onCloseTimeline}>
       <TimelineEditor
         currentTick={state.playbackTick}
         easing={easing}
-        previewState={state.playbackPlaying ? 'playing' : 'paused'}
+        previewState={previewState}
         selectedKeyframe={selectedTimelineKeyframe}
         sequence={view}
         snapIntervalTicks={snapIntervalTicks}
@@ -191,6 +207,7 @@ function renderTimelinePanel(options: {
             tick,
           });
         }}
+        onScrubbingChange={onScrubbingChange}
         onSeekTick={(tick) => {
           state.seekPlaybackTick(tick);
         }}
@@ -379,6 +396,7 @@ export function V1DemoWorkspace({
   const [quarantinedProjectBytes, setQuarantinedProjectBytes] = useState<Uint8Array | null>(null);
   const [tab, setTab] = useState<WorkspaceTab>('properties');
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
   const [selectedTimelineKeyframe, setSelectedTimelineKeyframe] = useState<TimelineKeyframeSelection | null>(null);
   /**
    * Whether the user has dismissed the easing graph (outside mousedown, Esc, etc.) for the
@@ -575,6 +593,7 @@ export function V1DemoWorkspace({
           timelineOpen,
           selectedTimelineKeyframe,
           easingGraphDismissed,
+          scrubbing,
           onCloseTimeline: () => {
             setTimelineOpen(false);
             setSelectedTimelineKeyframe(null);
@@ -587,6 +606,7 @@ export function V1DemoWorkspace({
           onDismissEasingGraph: () => {
             setEasingGraphDismissed(true);
           },
+          onScrubbingChange: setScrubbing,
           onSelectTimelineKeyframe: (selection) => {
             setSelectedTimelineKeyframe(selection);
             setEasingGraphDismissed(false);
