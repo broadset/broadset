@@ -310,6 +310,76 @@ test('a real mousedown on the Opacity slider while an eased keyframe is selected
   await expect(page.getByTestId('keyframe-mode-banner')).toBeVisible();
 });
 
+/** Reads the FIRST 'Live Dot' opacity track keyframe's stable id (unaffected by this test — no add/delete). */
+function readTrackKeyframeId(page: Page, keyframeIndex: number): Promise<unknown> {
+  return page.evaluate(
+    (index) =>
+      window.__broadsetProjectEditorStore?.getState().project.documents[0]?.sequences[0]?.tracks[0]?.keyframes[index]
+        ?.id,
+    keyframeIndex,
+  );
+}
+
+function readTrackKeyframeInterpolationKind(page: Page, keyframeIndex: number): Promise<unknown> {
+  return page.evaluate(
+    (index) =>
+      window.__broadsetProjectEditorStore?.getState().project.documents[0]?.sequences[0]?.tracks[0]?.keyframes[index]
+        ?.interpolation?.kind,
+    keyframeIndex,
+  );
+}
+
+/** Looks the keyframe up by id rather than index, so the assertion targets THAT keyframe specifically. */
+function readKeyframeInterpolationKindById(page: Page, keyframeId: unknown): Promise<unknown> {
+  return page.evaluate(
+    (id) =>
+      window.__broadsetProjectEditorStore
+        ?.getState()
+        .project.documents[0]?.sequences[0]?.tracks[0]?.keyframes.find((keyframe) => keyframe.id === id)
+        ?.interpolation?.kind,
+    keyframeId,
+  );
+}
+
+/**
+ * @description timeline.md "Visual Easing Graph Editor" Apply preset scenario: selecting a
+ * keyframe with an outgoing interpolation opens the graph editor with the current typed curve,
+ * and clicking a preset chip applies its typed interpolation record immediately. Selects the
+ * FIRST 'Live Dot' opacity keyframe (tick 0) deliberately: it carries a cubic-bezier outgoing
+ * interpolation, so the graph mounts (the LAST keyframe has none — see the entity-identity test
+ * above). Asserts on that keyframe's stable id, not "some keyframe changed", so the test would
+ * fail if a regression applied the preset to the wrong keyframe. Regions: timeline (marker
+ * select) → timeline (bottom-panel easing graph) → store.
+ */
+test('selecting a keyframe shows the easing graph and a preset click updates the interpolation', async ({
+  mount,
+  page,
+}) => {
+  await mount(<DemoAppFresh />);
+  await selectLayer(page, 'Live Dot');
+  await page.getByRole('button', { name: /open timeline/i }).click();
+
+  const marker = page.locator('[data-testid^="timeline-marker-"]').first();
+
+  await marker.click();
+  await expect(marker).toHaveAttribute('aria-pressed', 'true');
+
+  const easingGraph = page.getByTestId('easing-graph-editor');
+
+  await expect(easingGraph).toBeVisible();
+
+  const keyframeId = await readTrackKeyframeId(page, FIRST_KEYFRAME_INDEX);
+  const kindBefore = await readTrackKeyframeInterpolationKind(page, FIRST_KEYFRAME_INDEX);
+
+  expect(kindBefore).toBe('cubic-bezier');
+
+  await easingGraph.getByRole('button', { name: 'spring', exact: true }).click();
+
+  await expect.poll(() => readKeyframeInterpolationKindById(page, keyframeId)).toBe('spring');
+  // Confirm the change landed on the SAME keyframe the graph was opened for, not merely "some" keyframe.
+  expect(await readTrackKeyframeId(page, FIRST_KEYFRAME_INDEX)).toBe(keyframeId);
+});
+
 /**
  * @description timeline.md "Lifecycle and State-Machine Authoring": the friendly modifier toggle
  * compiles to a canonical two-state machine. Regions: properties/animation panel → store.
