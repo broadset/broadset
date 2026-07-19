@@ -1,5 +1,5 @@
 import { projectFormatV1 } from '@broadset/model';
-import type { GuardDraft } from '@broadset/ui';
+import type { GuardComparisonDraft, GuardGroupDraft, GuardNodeDraft } from '@broadset/ui';
 
 const TICKS_PER_SECOND = 1000;
 const SEQUENCE_DURATION_TICKS = 2000;
@@ -214,9 +214,29 @@ export function buildProjectFixture(options: ProjectFixtureOptions): ProjectFixt
   };
 }
 
-export function stripClauseIds(guard: GuardDraft): {
-  readonly connective: GuardDraft['connective'];
-  readonly clauses: readonly Omit<GuardDraft['clauses'][number], 'id'>[];
-} {
-  return { connective: guard.connective, clauses: guard.clauses.map(({ id: _clauseId, ...rest }) => rest) };
+type StrippedGuardComparison = Omit<GuardComparisonDraft, 'id'>;
+
+interface StrippedGuardGroup extends Omit<GuardGroupDraft, 'children' | 'id'> {
+  readonly children: readonly StrippedGuardNode[];
+}
+
+type StrippedGuardNode = StrippedGuardComparison | StrippedGuardGroup;
+
+/**
+ * Strips every UI-local `id` from a guard tree, recursively, so a round-trip test
+ * (`guardDraftToExpression` -> `expressionToGuard`) can compare tree SHAPE (connective, negated,
+ * nesting, operands, operators, literals) without depending on the deterministic-but-different ids
+ * the forward (author-minted) and reverse (`nodeId`-synthesized) directions produce for the same
+ * structural position.
+ */
+export function stripGuardIds(node: GuardNodeDraft): StrippedGuardNode {
+  if (node.kind === 'comparison') {
+    const { id: _id, ...rest } = node;
+
+    return rest;
+  }
+
+  const { id: _id, ...rest } = node;
+
+  return { ...rest, children: node.children.map(stripGuardIds) };
 }

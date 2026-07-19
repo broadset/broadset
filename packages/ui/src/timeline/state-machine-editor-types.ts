@@ -49,8 +49,15 @@ export interface GuardLiteralDraft {
   readonly value: string | number | boolean;
 }
 
-export interface GuardClauseDraft {
-  /** UI-minted local clause id (stable within an editing session); not a branded model id. */
+/**
+ * A single `operand OPERATOR literal` comparison leaf in a {@link GuardGroupDraft} tree. Always
+ * infers to boolean — the operator menu and literal editor are derived from the referenced
+ * operand's `valueType` (see the operator-legality table in the PR-F contract), so any tree built
+ * from these leaves is valid-by-construction.
+ */
+export interface GuardComparisonDraft {
+  readonly kind: 'comparison';
+  /** UI-minted local id (stable within an editing session); not a branded model id. */
   readonly id: string;
   /** References a {@link GuardOperandOption.id}. */
   readonly operandId: string;
@@ -58,11 +65,30 @@ export interface GuardClauseDraft {
   readonly literal: GuardLiteralDraft;
 }
 
-export interface GuardDraft {
+/**
+ * A nested AND/OR/NOT group in a guard tree: `connective` combines {@link children} with all
+ * (AND) or any (OR) semantics, and `negated` wraps the combined result in a unary NOT. Children
+ * are either comparison leaves or further nested groups, so the tree can express arbitrary boolean
+ * nesting while every leaf stays a typed, schema-valid comparison.
+ */
+export interface GuardGroupDraft {
+  readonly kind: 'group';
+  /** UI-minted local id (stable within an editing session); not a branded model id. */
+  readonly id: string;
+  /** `all` => model `and`; `any` => model `or`. */
   readonly connective: 'all' | 'any';
-  /** Empty clauses => no guard (model guard undefined). */
-  readonly clauses: readonly GuardClauseDraft[];
+  /** `true` => wrap the combined group in a unary `not`. */
+  readonly negated: boolean;
+  readonly children: readonly GuardNodeDraft[];
 }
+
+export type GuardNodeDraft = GuardComparisonDraft | GuardGroupDraft;
+
+/**
+ * The guard IS its root group — `TransitionGuardEditor` always renders a `GuardGroupDraft` at the
+ * top level. An empty root (`children: []`) means no guard (the model guard is undefined).
+ */
+export type GuardDraft = GuardGroupDraft;
 
 export interface StateMachineTransitionView {
   readonly id: string;
@@ -72,9 +98,9 @@ export interface StateMachineTransitionView {
   readonly priority: number;
   /** Optional so pre-PR-F callers keep compiling; treat an absent value as `[]` at the render boundary. */
   readonly actions?: readonly SequenceActionDraft[];
-  /** Present when the model guard fits the flat builder shape. */
+  /** Present when the model guard fits the nested AND/OR/NOT tree builder shape. */
   readonly guard?: GuardDraft;
-  /** True when a model guard exists but is NOT flat-representable; shown read-only and preserved. */
+  /** True when a model guard exists but is NOT tree-representable; shown read-only and preserved. */
   readonly guardIsAdvanced?: boolean;
 }
 
@@ -102,7 +128,7 @@ export interface TransitionUpdatePatch {
   readonly trigger?: TransitionTriggerDraft;
   readonly priority?: number;
   readonly actions?: readonly SequenceActionDraft[];
-  /** Present => set/replace/clear (empty clauses => clear); absent => no change. */
+  /** Present => set/replace/clear (an empty root group's `children` => clear); absent => no change. */
   readonly guard?: GuardDraft;
 }
 

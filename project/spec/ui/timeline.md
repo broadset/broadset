@@ -408,7 +408,7 @@ Double-clicking a lane creates/updates a keyframe on that track at the resolved 
 - [ ] Frame-number and timecode ruler label modes (spec MAY) are not yet implemented; labels render seconds only.
 - [ ] Marker pointer-drag repositioning is unit-tested at the widget level; a Playwright CT for the drag gesture remains open.
 - [ ] Per-property lane grouping (Geometry/Appearance/Typography accordion, double-click-to-add on a lane, one-group-expands) is not yet implemented; lanes render flat (one lane per track, deterministic order) and keyframe creation goes through the add button.
-- [ ] Guard-expression editing supports only flat AND/OR predicates of `field/variable OPERATOR literal` comparisons (built by `TransitionGuardEditor`, translated via the demo's `v1-guard-action-translation` module); a model guard using nested/mixed-connective, function/`get`/`index`, or other non-flat expressions is detected and shown read-only (`guardIsAdvanced`) rather than edited, and is preserved losslessly until replaced or cleared.
+- [ ] Guard-expression editing supports NESTED AND/OR/NOT predicates of `field/variable OPERATOR literal` comparisons — arbitrarily deep groups combining `all`/`any` connectives with an optional negate, built by `TransitionGuardEditor`'s recursive `GuardGroupEditor` and translated via the demo's `v1-guard-action-translation` module's recursive `guardDraftToExpression`/`expressionToGuard`. A model guard whose operand is a function/`get`/`index`/conditional/arithmetic expression, or that otherwise falls outside this AND/OR/NOT-of-comparisons grammar, is detected and shown read-only (`guardIsAdvanced`) rather than edited, and is preserved losslessly until replaced or cleared.
 
 ---
 

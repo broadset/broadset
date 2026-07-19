@@ -1,7 +1,13 @@
+import { projectFormatV1 } from '@broadset/model';
 import { expect, test } from '@playwright/experimental-ct-react';
 import type { Page } from '@playwright/test';
 
 import { DemoAppFresh } from '../helpers/demo-app-fresh.helper';
+
+const DEMO_LIVE_DATA_VIEW_MODEL_ID = projectFormatV1.idSchema.parse('demo-live-data');
+const SHOW_BRANDING_FIELD_ID = projectFormatV1.idSchema.parse('field-showBranding');
+const SHOW_STATS_FIELD_ID = projectFormatV1.idSchema.parse('field-showStats');
+const SHOW_SPONSOR_FIELD_ID = projectFormatV1.idSchema.parse('field-showSponsor');
 
 async function openTab(page: Page, name: 'Animation' | 'Layers' | 'Properties'): Promise<void> {
   await page.getByRole('tab', { name }).click();
@@ -615,13 +621,14 @@ function readTransitionActions(page: Page, transitionId: string): Promise<unknow
 
 /**
  * @description timeline.md "Lifecycle and State-Machine Authoring Sections": state-machine
- * controls edit expression guards, not just typed triggers/priorities. Clicking "Add clause" on a
- * transition (the default clause references the demo's first `guardOperands` entry — the "Live
- * Broadcast Data" view model's `homeAbbr` field, resolved by `buildGuardOperands`) must set a
- * valid-by-construction guard expression referencing that real document field on the store
- * transition. Regions: animation panel (state-machine editor) → store.
+ * controls edit expression guards, not just typed triggers/priorities. Clicking "Add condition" on
+ * the empty root group (`sm-guard-add-condition-guard-root`, the placeholder id `TransitionGuardEditor`
+ * renders when a transition has no guard yet — the default condition references the demo's first
+ * `guardOperands` entry, the "Live Broadcast Data" view model's `homeAbbr` field, resolved by
+ * `buildGuardOperands`) must set a valid-by-construction guard expression referencing that real
+ * document field on the store transition. Regions: animation panel (state-machine editor) → store.
  */
-test('adding a guard clause to a modifier transition sets a field-comparison guard on the store', async ({
+test('adding a guard condition to a modifier transition sets a field-comparison guard on the store', async ({
   mount,
   page,
 }) => {
@@ -642,7 +649,7 @@ test('adding a guard clause to a modifier transition sets a field-comparison gua
   const editor = page.getByTestId(`state-machine-editor-${machineId}`);
   const row = editor.getByTestId(`sm-transition-${activationId}`);
 
-  await row.getByTestId(`sm-transition-${activationId}-guard-add-clause`).click();
+  await row.getByTestId('sm-guard-add-condition-guard-root').click();
 
   await expect.poll(() => readTransitionGuard(page, activationId)).not.toBeNull();
   expect(await readTransitionGuard(page, activationId)).toEqual({
@@ -683,4 +690,98 @@ test('adding a sequence action to a modifier transition appends it to the store'
   await expect
     .poll(() => readTransitionActions(page, activationId))
     .toEqual([{ kind: 'play-sequence', sequenceId: 'tl-live-pulse', behavior: 'restart' }]);
+});
+
+/**
+ * Reads the Flash modifier machine's DEACTIVATION transition (the one entering its `inactive`
+ * initial state) stable id from the live store, or null if the machine hasn't landed yet.
+ */
+function readFlashDeactivationTransitionId(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const machines = window.__broadsetProjectEditorStore?.getState().project.documents[0]?.stateMachines ?? [];
+    const machine = machines.find((candidate) => candidate.name === 'Flash');
+    const deactivation = machine?.transitions.find(({ targetStateId }) => targetStateId === machine.initialStateId);
+
+    return deactivation?.id ?? null;
+  });
+}
+
+/**
+ * @description timeline.md "Lifecycle and State-Machine Authoring Sections": guard editing now
+ * supports NESTED AND/OR/NOT groups, not just a flat list of comparisons. A group the "Add group"
+ * control creates starts EMPTY, and an empty group contributes nothing to the persisted
+ * `ExpressionAst` — `guardDraftToExpression` drops it — so it is pruned the instant the store round
+ * trip re-derives the presentational tree; the only way to reach a non-empty, EDITABLE nested group
+ * through genuine interaction is for it to already hold a condition. This test seeds the
+ * deactivation transition directly with an already-nested model guard —
+ * `and(showBranding == true, or(showStats == true, showSponsor == true))` — then clicks "Add
+ * condition" scoped to the nested inner group's OWN control
+ * (`sm-guard-add-condition-grp-1`, the deterministic reverse-translated id for the group at the
+ * root's child index 1), and polls the store until the guard reflects a THIRD condition folded into
+ * that SAME nested `or` branch while the root-level sibling comparison stays untouched. Regions:
+ * animation panel (state-machine editor) → store.
+ */
+test('adding a condition inside a nested guard group updates only that group on the store', async ({ mount, page }) => {
+  await mount(<DemoAppFresh />);
+  await selectLayer(page, 'Score Bug');
+  await openTab(page, 'Animation');
+  await page.getByRole('textbox', { name: 'New modifier name' }).fill('Flash');
+  await page.getByRole('button', { name: 'Add modifier' }).click();
+
+  const machineId = await readFlashMachineId(page);
+
+  if (machineId === null) throw new Error('expected Flash machine id');
+
+  const deactivationId = await readFlashDeactivationTransitionId(page);
+
+  if (deactivationId === null) throw new Error('expected a deactivation transition');
+
+  const fieldEqualsTrue = (fieldId: projectFormatV1.Id): projectFormatV1.ExpressionAst => ({
+    kind: 'binary',
+    operator: 'eq',
+    left: { kind: 'field', viewModelId: DEMO_LIVE_DATA_VIEW_MODEL_ID, fieldId },
+    right: { kind: 'literal', value: { type: 'boolean', value: true } },
+  });
+  const nestedGuard: projectFormatV1.ExpressionAst = {
+    kind: 'binary',
+    operator: 'and',
+    left: fieldEqualsTrue(SHOW_BRANDING_FIELD_ID),
+    right: {
+      kind: 'binary',
+      operator: 'or',
+      left: fieldEqualsTrue(SHOW_STATS_FIELD_ID),
+      right: fieldEqualsTrue(SHOW_SPONSOR_FIELD_ID),
+    },
+  };
+
+  await page.evaluate(
+    ({ machineId: seedMachineId, transitionId, guard }) => {
+      const store = window.__broadsetProjectEditorStore;
+      const machine = store
+        ?.getState()
+        .project.documents[0]?.stateMachines.find((candidate) => candidate.id === seedMachineId);
+      const transition = machine?.transitions.find((candidate) => candidate.id === transitionId);
+
+      if (store === undefined || transition === undefined) throw new Error('expected the seeded transition');
+
+      store.getState().upsertTransition(seedMachineId, { ...transition, guard });
+    },
+    { machineId: projectFormatV1.idSchema.parse(machineId), transitionId: deactivationId, guard: nestedGuard },
+  );
+
+  await expect.poll(() => readTransitionGuard(page, deactivationId)).toEqual(nestedGuard);
+
+  const editor = page.getByTestId(`state-machine-editor-${machineId}`);
+  const row = editor.getByTestId(`sm-transition-${deactivationId}`);
+
+  await row.getByTestId('sm-guard-add-condition-grp-1').click();
+
+  await expect
+    .poll(() => readTransitionGuard(page, deactivationId))
+    .toMatchObject({
+      kind: 'binary',
+      operator: 'and',
+      left: fieldEqualsTrue(SHOW_BRANDING_FIELD_ID),
+      right: { kind: 'binary', operator: 'or' },
+    });
 });

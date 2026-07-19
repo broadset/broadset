@@ -14,3 +14,4 @@ export * from './timeline-ruler';
 export * from './timeline-types';
 export * from './transition-actions-editor';
 export * from './transition-guard-editor';
+export * from './transition-guard-group-editor';

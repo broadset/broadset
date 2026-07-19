@@ -2,7 +2,7 @@ import { createProjectEditorStore, type ProjectEditorStore } from '@broadset/edi
 import { projectFormatV1 } from '@broadset/model';
 import type * as BroadsetUi from '@broadset/ui';
 import type { StateMachineEditorProps } from '@broadset/ui';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SAMPLE_PROJECT_V1 } from '../sample-project-v1';
@@ -306,13 +306,15 @@ describe('V1SequenceSidebar', () => {
 
   /**
    * @description timeline.md "Lifecycle and State-Machine Authoring Sections": state-machine
-   * controls edit expression guards, not just typed triggers/priorities. Adding a clause on the
-   * "Live Broadcast Data / Show Network Bug" boolean view-model field and switching its literal to
-   * `true` must produce a valid-by-construction `eq` comparison guard, keep the project
-   * semantically valid, and round-trip back through `expressionToGuard` as a non-advanced draft
-   * (proving the reverse view sees the same guard it just authored).
+   * controls edit expression guards, not just typed triggers/priorities. Adding a root-level
+   * condition (`sm-guard-add-condition-guard-root`, the empty-root placeholder id) and switching
+   * the fresh comparison's operand to the "Live Broadcast Data / Show Network Bug" boolean
+   * view-model field then flipping its literal to `true` must produce a valid-by-construction `eq`
+   * comparison guard, keep the project semantically valid, and round-trip back through
+   * `expressionToGuard` as a non-advanced, single-comparison root group (proving the reverse view
+   * sees the same guard it just authored, at the deterministic `grp-root`/`cmp-0` path ids).
    */
-  it('adds a guard clause on a boolean view-model field, producing a valid boolean-equality guard', () => {
+  it('adds a guard condition on a boolean view-model field, producing a valid boolean-equality guard', () => {
     const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
 
     render(<V1SequenceSidebar editorStore={store} />);
@@ -332,13 +334,15 @@ describe('V1SequenceSidebar', () => {
       `sm-transition-${activation.id}`,
     );
 
-    fireEvent.click(within(row).getByTestId(`sm-transition-${activation.id}-guard-add-clause`));
+    fireEvent.click(within(row).getByTestId('sm-guard-add-condition-guard-root'));
 
-    const clauseRow = within(row).getByTestId(`sm-transition-${activation.id}-guard-clause-0`);
+    const comparisonRow = within(row).getByTestId('sm-guard-comparison-cmp-0');
 
-    fireEvent.click(within(clauseRow).getByRole('button', { name: /guard operand/i }));
+    fireEvent.click(within(comparisonRow).getByRole('button', { name: /guard operand/i }));
     fireEvent.click(screen.getByRole('option', { name: 'Live Broadcast Data / Show Network Bug' }));
-    fireEvent.click(within(clauseRow).getByRole('switch', { name: 'Guard literal' }));
+    fireEvent.click(
+      within(within(row).getByTestId('sm-guard-comparison-cmp-0')).getByRole('switch', { name: 'Guard literal' }),
+    );
 
     const updated = findMachineByName(store, 'Flash')?.transitions.find(({ id }) => id === activation.id);
 
@@ -358,16 +362,123 @@ describe('V1SequenceSidebar', () => {
 
     expect(reverseTransition?.guardIsAdvanced).toBeFalsy();
     expect(reverseTransition?.guard).toEqual({
+      kind: 'group',
+      id: 'grp-root',
       connective: 'all',
-      clauses: [
+      negated: false,
+      children: [
         {
-          id: 'clause-0',
+          kind: 'comparison',
+          id: 'cmp-0',
           operandId: guardOperandId({ kind: 'field', viewModelId, fieldId }),
           operator: 'eq',
           literal: { valueType: 'boolean', value: true },
         },
       ],
     });
+  });
+
+  /**
+   * @description PR-G contract: the guard tree supports NESTED AND/OR groups, not just a flat list
+   * of comparisons. Seeds a transition directly with an already-nested model guard —
+   * `and(showBranding == true, or(showStats == true, showSponsor == true))` — because a group the
+   * UI adds via "Add group" starts EMPTY, and an empty group contributes nothing to the persisted
+   * `ExpressionAst` (see `guardDraftToExpression`'s empty-group handling), so it is pruned the
+   * instant the round trip through the store re-derives the presentational tree; the only way to
+   * reach a non-empty, editable nested group through genuine UI interaction is for it to already
+   * exist. Then drives a REAL click scoped to the nested inner group's own "Add condition" control
+   * (`sm-guard-add-condition-grp-1`, the deterministic reverse-translated id for the group at root
+   * child index 1) to prove the edit only appends to THAT group's children — the sibling root-level
+   * comparison is untouched — while the whole tree stays a valid nested `and`/`or` expression.
+   */
+  it('edits a nested guard tree, adding a condition scoped to the nested group and keeping the guard semantically valid', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+
+    render(<V1SequenceSidebar editorStore={store} />);
+    addModifier('Flash');
+
+    const flash = findMachineByName(store, 'Flash');
+
+    if (flash === undefined) throw new Error('Expected a Flash machine');
+
+    const deactivationTransition = flash.transitions.find(
+      ({ targetStateId }) => targetStateId === flash.initialStateId,
+    );
+
+    if (deactivationTransition === undefined) throw new Error('Expected a deactivation transition');
+
+    const document = store.getState().project.documents[0];
+
+    if (document === undefined) throw new Error('Expected a document');
+
+    const { viewModelId, fieldId: brandingFieldId } = findViewModelField(document, 'showBranding');
+    const { fieldId: statsFieldId } = findViewModelField(document, 'showStats');
+    const { fieldId: sponsorFieldId } = findViewModelField(document, 'showSponsor');
+    const fieldEqualsTrue = (fieldId: projectFormatV1.Id): projectFormatV1.ExpressionAst => ({
+      kind: 'binary',
+      operator: 'eq',
+      left: { kind: 'field', viewModelId, fieldId },
+      right: { kind: 'literal', value: { type: 'boolean', value: true } },
+    });
+    const nestedGuard: projectFormatV1.ExpressionAst = {
+      kind: 'binary',
+      operator: 'and',
+      left: fieldEqualsTrue(brandingFieldId),
+      right: {
+        kind: 'binary',
+        operator: 'or',
+        left: fieldEqualsTrue(statsFieldId),
+        right: fieldEqualsTrue(sponsorFieldId),
+      },
+    };
+    // A direct store mutation (bypassing `fireEvent`) is not auto-wrapped in `act()` by React
+    // Testing Library, so it must be wrapped explicitly here — otherwise the subsequent DOM query
+    // for the nested group's own "Add condition" control can observe a stale, pre-update render.
+    let seeded = false;
+
+    act(() => {
+      seeded = store.getState().upsertTransition(flash.id, { ...deactivationTransition, guard: nestedGuard });
+    });
+
+    expect(seeded).toBe(true);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+
+    const editor = screen.getByTestId(`state-machine-editor-${flash.id}`);
+    const row = within(editor).getByTestId(`sm-transition-${deactivationTransition.id}`);
+
+    fireEvent.click(within(row).getByTestId('sm-guard-add-condition-grp-1'));
+
+    const updatedGuard = findMachineByName(store, 'Flash')?.transitions.find(
+      ({ id }) => id === deactivationTransition.id,
+    )?.guard;
+
+    if (updatedGuard?.kind !== 'binary') {
+      throw new Error('Expected the nested guard to remain a binary and/or expression');
+    }
+
+    expect(updatedGuard.operator).toBe('and');
+    expect(updatedGuard.left).toEqual(fieldEqualsTrue(brandingFieldId));
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+
+    if (capturedStateMachineEditorProps === null) throw new Error('Expected StateMachineEditor to render');
+
+    const reverseTransition = capturedStateMachineEditorProps.machine.transitions.find(
+      ({ id }) => id === deactivationTransition.id,
+    );
+
+    expect(reverseTransition?.guardIsAdvanced).toBeFalsy();
+
+    if (reverseTransition?.guard === undefined) throw new Error('Expected a resolved nested guard draft');
+
+    expect(reverseTransition.guard.children).toHaveLength(2);
+
+    const nestedChild = reverseTransition.guard.children[1];
+
+    if (nestedChild?.kind !== 'group') {
+      throw new Error('Expected the second root child to remain a nested group');
+    }
+
+    expect(nestedChild.children).toHaveLength(3);
   });
 
   /**
@@ -406,10 +517,11 @@ describe('V1SequenceSidebar', () => {
 
   /**
    * @description timeline.md "Lifecycle and State-Machine Authoring Sections": clearing a guard's
-   * last clause (an empty-clauses `GuardDraft`) must translate back to `undefined` on the store
-   * transition, per `guardDraftToExpression`'s empty-clauses-clears-the-guard contract.
+   * last remaining root-level condition (an empty-children root `GuardDraft`) must translate back
+   * to `undefined` on the store transition, per `guardDraftToExpression`'s
+   * empty-children-clears-the-guard contract.
    */
-  it('clears the guard when the last clause is removed', () => {
+  it('clears the guard when the last condition is removed from the root group', () => {
     const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
 
     render(<V1SequenceSidebar editorStore={store} />);
@@ -424,13 +536,15 @@ describe('V1SequenceSidebar', () => {
       `sm-transition-${activation.id}`,
     );
 
-    fireEvent.click(within(row).getByTestId(`sm-transition-${activation.id}-guard-add-clause`));
+    fireEvent.click(within(row).getByTestId('sm-guard-add-condition-guard-root'));
 
     const withClause = findMachineByName(store, 'Flash')?.transitions.find(({ id }) => id === activation.id);
 
     expect(withClause?.guard).not.toBeUndefined();
 
-    fireEvent.click(within(row).getByTestId(`sm-transition-${activation.id}-guard-remove-clause-0`));
+    const comparisonRow = within(row).getByTestId('sm-guard-comparison-cmp-0');
+
+    fireEvent.click(within(comparisonRow).getByRole('button', { name: 'Remove condition' }));
 
     const cleared = findMachineByName(store, 'Flash')?.transitions.find(({ id }) => id === activation.id);
 
@@ -474,11 +588,11 @@ describe('V1SequenceSidebar', () => {
     const editor = screen.getByTestId(`state-machine-editor-${primary.id}`);
     const row = within(editor).getByTestId(`sm-transition-${transition.id}`);
 
-    fireEvent.click(within(row).getByTestId(`sm-transition-${transition.id}-guard-add-clause`));
+    fireEvent.click(within(row).getByTestId('sm-guard-add-condition-guard-root'));
 
-    const clauseRow = within(row).getByTestId(`sm-transition-${transition.id}-guard-clause-0`);
+    const comparisonRow = within(row).getByTestId('sm-guard-comparison-cmp-0');
 
-    fireEvent.click(within(clauseRow).getByRole('button', { name: /guard operand/i }));
+    fireEvent.click(within(comparisonRow).getByRole('button', { name: /guard operand/i }));
     fireEvent.click(screen.getByRole('option', { name: 'Live Data / Kickoff' }));
 
     const withDefaultLiteral = findTransition();
@@ -486,7 +600,9 @@ describe('V1SequenceSidebar', () => {
     expect(withDefaultLiteral?.guard).toBeDefined();
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
 
-    const literalInput = within(clauseRow).getByLabelText('Guard literal', { selector: 'input' });
+    const literalInput = within(within(row).getByTestId('sm-guard-comparison-cmp-0')).getByLabelText('Guard literal', {
+      selector: 'input',
+    });
 
     fireEvent.change(literalInput, { target: { value: 'not-a-date' } });
 

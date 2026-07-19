@@ -12,10 +12,11 @@ import {
   guardOperandId,
   literalToTypedValue,
 } from './v1-guard-action-translation';
-import { buildProjectFixture, id, stripClauseIds } from './v1-guard-action-translation.test-support';
+import { buildProjectFixture, id, stripGuardIds } from './v1-guard-action-translation.test-support';
 
 const SEEK_TICK = 500;
 const SCORE_THRESHOLD = 10;
+const NESTED_GUARD_SCORE_THRESHOLD = 3;
 const ARITHMETIC_LITERAL_VALUE = 1;
 const RED_CHANNEL = 1;
 const NO_CHANNEL = 0;
@@ -109,15 +110,35 @@ describe('guardDraftToExpression', () => {
     collectionId: fixture.collectionId,
     variableId: fixture.scoreVariableId,
   });
-
-  it('returns undefined for an empty clause list', () => {
-    expect(guardDraftToExpression({ draft: { connective: 'all', clauses: [] }, refById })).toBeUndefined();
+  const flagOperandId = guardOperandId({
+    kind: 'variable',
+    collectionId: fixture.collectionId,
+    variableId: fixture.flagVariableId,
+  });
+  const boolEqTrue = (nodeId: string): GuardDraft['children'][number] => ({
+    kind: 'comparison',
+    id: nodeId,
+    operandId: boolOperandId,
+    operator: 'eq',
+    literal: { valueType: 'boolean', value: true },
   });
 
-  it('builds the exact binary comparison for a single clause', () => {
+  it('returns undefined for an empty root group', () => {
+    expect(
+      guardDraftToExpression({
+        draft: { kind: 'group', id: 'root', connective: 'all', negated: false, children: [] },
+        refById,
+      }),
+    ).toBeUndefined();
+  });
+
+  it('builds the exact binary comparison for a single comparison child, with no group wrapper', () => {
     const draft: GuardDraft = {
+      kind: 'group',
+      id: 'root',
       connective: 'all',
-      clauses: [{ id: 'c0', operandId: boolOperandId, operator: 'eq', literal: { valueType: 'boolean', value: true } }],
+      negated: false,
+      children: [boolEqTrue('c0')],
     };
 
     expect(guardDraftToExpression({ draft, refById })).toEqual({
@@ -128,12 +149,21 @@ describe('guardDraftToExpression', () => {
     });
   });
 
-  it('left-folds two clauses under the "any" connective into an or of comparisons', () => {
+  it('left-folds two comparisons under the "any" connective into an or of comparisons', () => {
     const draft: GuardDraft = {
+      kind: 'group',
+      id: 'root',
       connective: 'any',
-      clauses: [
-        { id: 'c0', operandId: boolOperandId, operator: 'eq', literal: { valueType: 'boolean', value: true } },
-        { id: 'c1', operandId: scoreOperandId, operator: 'eq', literal: { valueType: 'number', value: 3 } },
+      negated: false,
+      children: [
+        boolEqTrue('c0'),
+        {
+          kind: 'comparison',
+          id: 'c1',
+          operandId: scoreOperandId,
+          operator: 'eq',
+          literal: { valueType: 'number', value: 3 },
+        },
       ],
     };
 
@@ -155,17 +185,103 @@ describe('guardDraftToExpression', () => {
     });
   });
 
-  it('drops clauses with an unresolvable operandId instead of throwing', () => {
+  it('wraps a negated group in a unary not', () => {
     const draft: GuardDraft = {
+      kind: 'group',
+      id: 'root',
       connective: 'all',
-      clauses: [
+      negated: true,
+      children: [boolEqTrue('c0')],
+    };
+
+    expect(guardDraftToExpression({ draft, refById })).toEqual({
+      kind: 'unary',
+      operator: 'not',
+      operand: {
+        kind: 'binary',
+        operator: 'eq',
+        left: { kind: 'field', viewModelId: fixture.viewModelId, fieldId: fixture.boolFieldId },
+        right: { kind: 'literal', value: { type: 'boolean', value: true } },
+      },
+    });
+  });
+
+  it('folds a NESTED group (root all, children=[c1, group{any,[c2,c3]}]) into and(c1, or(c2,c3))', () => {
+    const draft: GuardDraft = {
+      kind: 'group',
+      id: 'root',
+      connective: 'all',
+      negated: false,
+      children: [
+        boolEqTrue('c0'),
         {
+          kind: 'group',
+          id: 'inner',
+          connective: 'any',
+          negated: false,
+          children: [
+            {
+              kind: 'comparison',
+              id: 'c1',
+              operandId: scoreOperandId,
+              operator: 'gte',
+              literal: { valueType: 'number', value: SCORE_THRESHOLD },
+            },
+            {
+              kind: 'comparison',
+              id: 'c2',
+              operandId: flagOperandId,
+              operator: 'neq',
+              literal: { valueType: 'boolean', value: false },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(guardDraftToExpression({ draft, refById })).toEqual({
+      kind: 'binary',
+      operator: 'and',
+      left: {
+        kind: 'binary',
+        operator: 'eq',
+        left: { kind: 'field', viewModelId: fixture.viewModelId, fieldId: fixture.boolFieldId },
+        right: { kind: 'literal', value: { type: 'boolean', value: true } },
+      },
+      right: {
+        kind: 'binary',
+        operator: 'or',
+        left: {
+          kind: 'binary',
+          operator: 'gte',
+          left: { kind: 'variable', collectionId: fixture.collectionId, variableId: fixture.scoreVariableId },
+          right: { kind: 'literal', value: { type: 'number', value: SCORE_THRESHOLD } },
+        },
+        right: {
+          kind: 'binary',
+          operator: 'neq',
+          left: { kind: 'variable', collectionId: fixture.collectionId, variableId: fixture.flagVariableId },
+          right: { kind: 'literal', value: { type: 'boolean', value: false } },
+        },
+      },
+    });
+  });
+
+  it('drops comparisons with an unresolvable operandId instead of throwing', () => {
+    const draft: GuardDraft = {
+      kind: 'group',
+      id: 'root',
+      connective: 'all',
+      negated: false,
+      children: [
+        {
+          kind: 'comparison',
           id: 'c0',
           operandId: 'field:missing:missing',
           operator: 'eq',
           literal: { valueType: 'boolean', value: true },
         },
-        { id: 'c1', operandId: boolOperandId, operator: 'eq', literal: { valueType: 'boolean', value: true } },
+        boolEqTrue('c1'),
       ],
     };
 
@@ -177,11 +293,66 @@ describe('guardDraftToExpression', () => {
     });
   });
 
-  it('returns undefined when every clause is unresolvable', () => {
+  it('drops an unresolvable comparison nested inside a sub-group, without dropping the whole sub-group', () => {
     const draft: GuardDraft = {
+      kind: 'group',
+      id: 'root',
       connective: 'all',
-      clauses: [
+      negated: false,
+      children: [
+        boolEqTrue('c0'),
         {
+          kind: 'group',
+          id: 'inner',
+          connective: 'any',
+          negated: false,
+          children: [
+            {
+              kind: 'comparison',
+              id: 'c1',
+              operandId: 'field:missing:missing',
+              operator: 'eq',
+              literal: { valueType: 'boolean', value: true },
+            },
+            {
+              kind: 'comparison',
+              id: 'c2',
+              operandId: scoreOperandId,
+              operator: 'eq',
+              literal: { valueType: 'number', value: 3 },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(guardDraftToExpression({ draft, refById })).toEqual({
+      kind: 'binary',
+      operator: 'and',
+      left: {
+        kind: 'binary',
+        operator: 'eq',
+        left: { kind: 'field', viewModelId: fixture.viewModelId, fieldId: fixture.boolFieldId },
+        right: { kind: 'literal', value: { type: 'boolean', value: true } },
+      },
+      right: {
+        kind: 'binary',
+        operator: 'eq',
+        left: { kind: 'variable', collectionId: fixture.collectionId, variableId: fixture.scoreVariableId },
+        right: { kind: 'literal', value: { type: 'number', value: 3 } },
+      },
+    });
+  });
+
+  it('returns undefined when every comparison is unresolvable', () => {
+    const draft: GuardDraft = {
+      kind: 'group',
+      id: 'root',
+      connective: 'all',
+      negated: false,
+      children: [
+        {
+          kind: 'comparison',
           id: 'c0',
           operandId: 'field:missing:missing',
           operator: 'eq',
@@ -191,6 +362,26 @@ describe('guardDraftToExpression', () => {
     };
 
     expect(guardDraftToExpression({ draft, refById })).toBeUndefined();
+  });
+
+  it('drops a nested sub-group that is empty (or becomes empty), leaving its siblings untouched', () => {
+    const draft: GuardDraft = {
+      kind: 'group',
+      id: 'root',
+      connective: 'all',
+      negated: false,
+      children: [
+        boolEqTrue('c0'),
+        { kind: 'group', id: 'empty-inner', connective: 'all', negated: false, children: [] },
+      ],
+    };
+
+    expect(guardDraftToExpression({ draft, refById })).toEqual({
+      kind: 'binary',
+      operator: 'eq',
+      left: { kind: 'field', viewModelId: fixture.viewModelId, fieldId: fixture.boolFieldId },
+      right: { kind: 'literal', value: { type: 'boolean', value: true } },
+    });
   });
 });
 
@@ -225,27 +416,72 @@ describe('round trip: guardDraftToExpression -> expressionToGuard', () => {
 
   const cases: readonly GuardDraft[] = [
     {
+      kind: 'group',
+      id: 'root',
       connective: 'all',
-      clauses: [{ id: 'x', operandId: boolOperandId, operator: 'eq', literal: { valueType: 'boolean', value: true } }],
-    },
-    {
-      connective: 'all',
-      clauses: [
-        { id: 'x', operandId: flagOperandId, operator: 'neq', literal: { valueType: 'boolean', value: false } },
-      ],
-    },
-    {
-      connective: 'all',
-      clauses: [
-        { id: 'x', operandId: boolOperandId, operator: 'eq', literal: { valueType: 'boolean', value: true } },
-        { id: 'y', operandId: scoreOperandId, operator: 'gte', literal: { valueType: 'number', value: 5 } },
-      ],
-    },
-    {
-      connective: 'any',
-      clauses: [
-        { id: 'x', operandId: integerOperandId, operator: 'lt', literal: { valueType: 'integer', value: 2 } },
+      negated: false,
+      children: [
         {
+          kind: 'comparison',
+          id: 'x',
+          operandId: boolOperandId,
+          operator: 'eq',
+          literal: { valueType: 'boolean', value: true },
+        },
+      ],
+    },
+    {
+      kind: 'group',
+      id: 'root',
+      connective: 'all',
+      negated: false,
+      children: [
+        {
+          kind: 'comparison',
+          id: 'x',
+          operandId: flagOperandId,
+          operator: 'neq',
+          literal: { valueType: 'boolean', value: false },
+        },
+      ],
+    },
+    {
+      kind: 'group',
+      id: 'root',
+      connective: 'all',
+      negated: false,
+      children: [
+        {
+          kind: 'comparison',
+          id: 'x',
+          operandId: boolOperandId,
+          operator: 'eq',
+          literal: { valueType: 'boolean', value: true },
+        },
+        {
+          kind: 'comparison',
+          id: 'y',
+          operandId: scoreOperandId,
+          operator: 'gte',
+          literal: { valueType: 'number', value: 5 },
+        },
+      ],
+    },
+    {
+      kind: 'group',
+      id: 'root',
+      connective: 'any',
+      negated: false,
+      children: [
+        {
+          kind: 'comparison',
+          id: 'x',
+          operandId: integerOperandId,
+          operator: 'lt',
+          literal: { valueType: 'integer', value: 2 },
+        },
+        {
+          kind: 'comparison',
           id: 'y',
           operandId: dateOperandId,
           operator: 'lte',
@@ -254,11 +490,184 @@ describe('round trip: guardDraftToExpression -> expressionToGuard', () => {
       ],
     },
     {
+      kind: 'group',
+      id: 'root',
       connective: 'all',
-      clauses: [
-        { id: 'x', operandId: boolOperandId, operator: 'eq', literal: { valueType: 'boolean', value: true } },
-        { id: 'y', operandId: scoreOperandId, operator: 'gte', literal: { valueType: 'number', value: 5 } },
-        { id: 'z', operandId: integerOperandId, operator: 'neq', literal: { valueType: 'integer', value: 0 } },
+      negated: false,
+      children: [
+        {
+          kind: 'comparison',
+          id: 'x',
+          operandId: boolOperandId,
+          operator: 'eq',
+          literal: { valueType: 'boolean', value: true },
+        },
+        {
+          kind: 'comparison',
+          id: 'y',
+          operandId: scoreOperandId,
+          operator: 'gte',
+          literal: { valueType: 'number', value: 5 },
+        },
+        {
+          kind: 'comparison',
+          id: 'z',
+          operandId: integerOperandId,
+          operator: 'neq',
+          literal: { valueType: 'integer', value: 0 },
+        },
+      ],
+    },
+    // Negated root wrapping multiple children: NOT(bool = true AND flag != false).
+    {
+      kind: 'group',
+      id: 'root',
+      connective: 'all',
+      negated: true,
+      children: [
+        {
+          kind: 'comparison',
+          id: 'x',
+          operandId: boolOperandId,
+          operator: 'eq',
+          literal: { valueType: 'boolean', value: true },
+        },
+        {
+          kind: 'comparison',
+          id: 'y',
+          operandId: flagOperandId,
+          operator: 'neq',
+          literal: { valueType: 'boolean', value: false },
+        },
+      ],
+    },
+    // 2-level nesting: bool = true AND (integer < 2 OR date <= X).
+    {
+      kind: 'group',
+      id: 'root',
+      connective: 'all',
+      negated: false,
+      children: [
+        {
+          kind: 'comparison',
+          id: 'x',
+          operandId: boolOperandId,
+          operator: 'eq',
+          literal: { valueType: 'boolean', value: true },
+        },
+        {
+          kind: 'group',
+          id: 'inner',
+          connective: 'any',
+          negated: false,
+          children: [
+            {
+              kind: 'comparison',
+              id: 'y',
+              operandId: integerOperandId,
+              operator: 'lt',
+              literal: { valueType: 'integer', value: 2 },
+            },
+            {
+              kind: 'comparison',
+              id: 'z',
+              operandId: dateOperandId,
+              operator: 'lte',
+              literal: { valueType: 'date-time', value: '2025-06-01T00:00:00Z' },
+            },
+          ],
+        },
+      ],
+    },
+    // 2-level nesting with the inner group negated: bool = true AND NOT(score >= 5 OR integer != 0).
+    {
+      kind: 'group',
+      id: 'root',
+      connective: 'all',
+      negated: false,
+      children: [
+        {
+          kind: 'comparison',
+          id: 'x',
+          operandId: boolOperandId,
+          operator: 'eq',
+          literal: { valueType: 'boolean', value: true },
+        },
+        {
+          kind: 'group',
+          id: 'inner',
+          connective: 'any',
+          negated: true,
+          children: [
+            {
+              kind: 'comparison',
+              id: 'y',
+              operandId: scoreOperandId,
+              operator: 'gte',
+              literal: { valueType: 'number', value: 5 },
+            },
+            {
+              kind: 'comparison',
+              id: 'z',
+              operandId: integerOperandId,
+              operator: 'neq',
+              literal: { valueType: 'integer', value: 0 },
+            },
+          ],
+        },
+      ],
+    },
+    // 3-level nesting: bool = true AND (score >= 5 OR (integer != 0 AND date <= X)).
+    {
+      kind: 'group',
+      id: 'root',
+      connective: 'all',
+      negated: false,
+      children: [
+        {
+          kind: 'comparison',
+          id: 'x',
+          operandId: boolOperandId,
+          operator: 'eq',
+          literal: { valueType: 'boolean', value: true },
+        },
+        {
+          kind: 'group',
+          id: 'mid',
+          connective: 'any',
+          negated: false,
+          children: [
+            {
+              kind: 'comparison',
+              id: 'y',
+              operandId: scoreOperandId,
+              operator: 'gte',
+              literal: { valueType: 'number', value: 5 },
+            },
+            {
+              kind: 'group',
+              id: 'deep',
+              connective: 'all',
+              negated: false,
+              children: [
+                {
+                  kind: 'comparison',
+                  id: 'z',
+                  operandId: integerOperandId,
+                  operator: 'neq',
+                  literal: { valueType: 'integer', value: 0 },
+                },
+                {
+                  kind: 'comparison',
+                  id: 'w',
+                  operandId: dateOperandId,
+                  operator: 'lte',
+                  literal: { valueType: 'date-time', value: '2025-06-01T00:00:00Z' },
+                },
+              ],
+            },
+          ],
+        },
       ],
     },
   ];
@@ -275,12 +684,106 @@ describe('round trip: guardDraftToExpression -> expressionToGuard', () => {
 
       if (result.guard === undefined) throw new Error('Expected a resolved guard draft');
 
-      expect(stripClauseIds(result.guard)).toEqual(stripClauseIds(draft));
+      expect(stripGuardIds(result.guard)).toEqual(stripGuardIds(draft));
     });
   });
 });
 
-describe('expressionToGuard: advanced (non-flat) guards', () => {
+describe('expressionToGuard: nested and/or trees are directly representable', () => {
+  it('parses a nested and(or(eq,eq), eq) expression into a 2-level nested group tree with deterministic path ids', () => {
+    const fixture = buildProjectFixture({});
+    const { refById } = buildGuardOperands({ document: fixture.document, project: fixture.project });
+    const boolOperandId = guardOperandId({
+      kind: 'field',
+      viewModelId: fixture.viewModelId,
+      fieldId: fixture.boolFieldId,
+    });
+    const booleanFieldExpr: projectFormatV1.ExpressionAst = {
+      kind: 'field',
+      viewModelId: fixture.viewModelId,
+      fieldId: fixture.boolFieldId,
+    };
+    const eqTrue = (): projectFormatV1.ExpressionAst => ({
+      kind: 'binary',
+      operator: 'eq',
+      left: booleanFieldExpr,
+      right: { kind: 'literal', value: { type: 'boolean', value: true } },
+    });
+    const expression: projectFormatV1.ExpressionAst = {
+      kind: 'binary',
+      operator: 'and',
+      left: { kind: 'binary', operator: 'or', left: eqTrue(), right: eqTrue() },
+      right: eqTrue(),
+    };
+    const literal = { valueType: 'boolean' as const, value: true };
+
+    const result = expressionToGuard({ expression, refById });
+
+    expect(result.guardIsAdvanced).toBe(false);
+    expect(result.guard).toEqual({
+      kind: 'group',
+      id: 'grp-root',
+      connective: 'all',
+      negated: false,
+      children: [
+        {
+          kind: 'group',
+          id: 'grp-0',
+          connective: 'any',
+          negated: false,
+          children: [
+            { kind: 'comparison', id: 'cmp-0-0', operandId: boolOperandId, operator: 'eq', literal },
+            { kind: 'comparison', id: 'cmp-0-1', operandId: boolOperandId, operator: 'eq', literal },
+          ],
+        },
+        { kind: 'comparison', id: 'cmp-1', operandId: boolOperandId, operator: 'eq', literal },
+      ],
+    });
+  });
+
+  it('parses not(and(eq,eq)) by flipping negated on the reused inner group, not by adding another level', () => {
+    const fixture = buildProjectFixture({});
+    const { refById } = buildGuardOperands({ document: fixture.document, project: fixture.project });
+    const boolOperandId = guardOperandId({
+      kind: 'field',
+      viewModelId: fixture.viewModelId,
+      fieldId: fixture.boolFieldId,
+    });
+    const booleanFieldExpr: projectFormatV1.ExpressionAst = {
+      kind: 'field',
+      viewModelId: fixture.viewModelId,
+      fieldId: fixture.boolFieldId,
+    };
+    const eqTrue = (): projectFormatV1.ExpressionAst => ({
+      kind: 'binary',
+      operator: 'eq',
+      left: booleanFieldExpr,
+      right: { kind: 'literal', value: { type: 'boolean', value: true } },
+    });
+    const expression: projectFormatV1.ExpressionAst = {
+      kind: 'unary',
+      operator: 'not',
+      operand: { kind: 'binary', operator: 'and', left: eqTrue(), right: eqTrue() },
+    };
+    const literal = { valueType: 'boolean' as const, value: true };
+
+    const result = expressionToGuard({ expression, refById });
+
+    expect(result.guardIsAdvanced).toBe(false);
+    expect(result.guard).toEqual({
+      kind: 'group',
+      id: 'grp-root',
+      connective: 'all',
+      negated: true,
+      children: [
+        { kind: 'comparison', id: 'cmp-0', operandId: boolOperandId, operator: 'eq', literal },
+        { kind: 'comparison', id: 'cmp-1', operandId: boolOperandId, operator: 'eq', literal },
+      ],
+    });
+  });
+});
+
+describe('expressionToGuard: advanced (non-representable) guards', () => {
   const fixture = buildProjectFixture({});
   const { refById } = buildGuardOperands({ document: fixture.document, project: fixture.project });
   const booleanFieldExpr: projectFormatV1.ExpressionAst = {
@@ -298,7 +801,13 @@ describe('expressionToGuard: advanced (non-flat) guards', () => {
     expect(expressionToGuard({ expression: undefined, refById })).toEqual({ guard: undefined, guardIsAdvanced: false });
   });
 
-  it('flags a unary not as advanced', () => {
+  /**
+   * A `not` of a bare field reference (not a comparison, and not an and/or group) has nothing for
+   * the `not(E)` parse rule to reuse or wrap into a comparison leaf — this stays advanced even
+   * though `not` of a COMPARISON or a GROUP is now fully representable (see the "directly
+   * representable" describe block above).
+   */
+  it('flags a not-of-a-bare-field (neither a comparison nor a group) as advanced', () => {
     const expression: projectFormatV1.ExpressionAst = { kind: 'unary', operator: 'not', operand: booleanFieldExpr };
 
     expect(expressionToGuard({ expression, refById })).toEqual({ guard: undefined, guardIsAdvanced: true });
@@ -314,21 +823,20 @@ describe('expressionToGuard: advanced (non-flat) guards', () => {
     expect(expressionToGuard({ expression, refById })).toEqual({ guard: undefined, guardIsAdvanced: true });
   });
 
-  it('flags a mixed and/or tree as advanced', () => {
-    const eqTrue = (): projectFormatV1.ExpressionAst => ({
-      kind: 'binary',
-      operator: 'eq',
-      left: booleanFieldExpr,
-      right: { kind: 'literal', value: { type: 'boolean', value: true } },
-    });
-    const mixed: projectFormatV1.ExpressionAst = {
-      kind: 'binary',
-      operator: 'and',
-      left: { kind: 'binary', operator: 'or', left: eqTrue(), right: eqTrue() },
-      right: eqTrue(),
+  it('flags a "get" expression as advanced', () => {
+    const expression: projectFormatV1.ExpressionAst = { kind: 'get', source: booleanFieldExpr, fieldId: id('nested') };
+
+    expect(expressionToGuard({ expression, refById })).toEqual({ guard: undefined, guardIsAdvanced: true });
+  });
+
+  it('flags an "index" expression as advanced', () => {
+    const expression: projectFormatV1.ExpressionAst = {
+      kind: 'index',
+      source: stringFieldExpr,
+      index: { kind: 'literal', value: { type: 'integer', value: 0 } },
     };
 
-    expect(expressionToGuard({ expression: mixed, refById })).toEqual({ guard: undefined, guardIsAdvanced: true });
+    expect(expressionToGuard({ expression, refById })).toEqual({ guard: undefined, guardIsAdvanced: true });
   });
 
   it('flags a comparison whose right side is a field, not a literal, as advanced', () => {
@@ -354,10 +862,9 @@ describe('expressionToGuard: advanced (non-flat) guards', () => {
   });
 
   /**
-   * A top-level arithmetic binary (`add`) is a `binary` node, so it clears `flattenGuardTree`'s
-   * `and`/`or` check and reaches `leafToClauseDraft` as a single leaf — this exercises the
-   * `isComparisonOperator` rejection specifically, distinct from the `unary not` case above (which
-   * is rejected earlier, by `leaf.kind !== 'binary'`).
+   * A top-level arithmetic binary (`add`) is a `binary` node, so it clears the `and`/`or`/`not`
+   * checks in `parseGuardExpression` and reaches `parseComparisonLeaf` as a single leaf — this
+   * exercises the `isComparisonOperator` rejection specifically.
    */
   it('flags a top-level arithmetic binary (add) as advanced', () => {
     const numberFieldExpr: projectFormatV1.ExpressionAst = {
@@ -402,6 +909,38 @@ describe('expressionToGuard: advanced (non-flat) guards', () => {
 
     expect(expressionToGuard({ expression, refById })).toEqual({ guard: undefined, guardIsAdvanced: true });
   });
+
+  /**
+   * A single unparseable leaf ANYWHERE in an otherwise fully-nestable tree still poisons the WHOLE
+   * guard — a guard tree has no way to show "3 of 4 clauses" read-only inside an editable group.
+   */
+  it('flags the whole guard as advanced when one leaf inside an otherwise-nestable and/or tree fails to parse', () => {
+    const eqTrue = (): projectFormatV1.ExpressionAst => ({
+      kind: 'binary',
+      operator: 'eq',
+      left: booleanFieldExpr,
+      right: { kind: 'literal', value: { type: 'boolean', value: true } },
+    });
+    const numberFieldExpr: projectFormatV1.ExpressionAst = {
+      kind: 'field',
+      viewModelId: fixture.viewModelId,
+      fieldId: fixture.numberFieldId,
+    };
+    const badArithmeticLeaf: projectFormatV1.ExpressionAst = {
+      kind: 'binary',
+      operator: 'add',
+      left: numberFieldExpr,
+      right: { kind: 'literal', value: { type: 'number', value: ARITHMETIC_LITERAL_VALUE } },
+    };
+    const expression: projectFormatV1.ExpressionAst = {
+      kind: 'binary',
+      operator: 'and',
+      left: eqTrue(),
+      right: { kind: 'binary', operator: 'or', left: eqTrue(), right: badArithmeticLeaf },
+    };
+
+    expect(expressionToGuard({ expression, refById })).toEqual({ guard: undefined, guardIsAdvanced: true });
+  });
 });
 
 describe('actionToDraft / actionDraftToModel', () => {
@@ -441,9 +980,13 @@ describe('semantic validity', () => {
     const base = buildProjectFixture({});
     const { refById } = buildGuardOperands({ document: base.document, project: base.project });
     const draft: GuardDraft = {
+      kind: 'group',
+      id: 'root',
       connective: 'all',
-      clauses: [
+      negated: false,
+      children: [
         {
+          kind: 'comparison',
           id: 'c0',
           operandId: guardOperandId({ kind: 'field', viewModelId: base.viewModelId, fieldId: base.boolFieldId }),
           operator: 'eq',
@@ -464,15 +1007,20 @@ describe('semantic validity', () => {
     const base = buildProjectFixture({});
     const { refById } = buildGuardOperands({ document: base.document, project: base.project });
     const draft: GuardDraft = {
+      kind: 'group',
+      id: 'root',
       connective: 'all',
-      clauses: [
+      negated: false,
+      children: [
         {
+          kind: 'comparison',
           id: 'c0',
           operandId: guardOperandId({ kind: 'field', viewModelId: base.viewModelId, fieldId: base.boolFieldId }),
           operator: 'eq',
           literal: { valueType: 'boolean', value: true },
         },
         {
+          kind: 'comparison',
           id: 'c1',
           operandId: guardOperandId({
             kind: 'variable',
@@ -496,5 +1044,87 @@ describe('semantic validity', () => {
     const fixture = buildProjectFixture({ guard, actions: actionsDraftToModel(actionDrafts) });
 
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(fixture.project)).toEqual([]);
+  });
+
+  /**
+   * @description PR-G contract: a NESTED guard — `(Show Branding is true) AND (Score > 3 OR
+   * NOT(Period == 'first'))`, i.e. `and(eq, or(gt, not(eq)))` — must translate to a valid
+   * `ExpressionAst`, keep the whole project semantically valid, and structurally infer to boolean
+   * (via `validateBooleanExpressionStructure`, independent of `validateBroadsetProjectV1Semantics`'s
+   * whole-project check).
+   */
+  it('a NESTED guard tree (AND of a comparison and a nested OR/NOT group) infers to boolean and keeps the project valid', () => {
+    const base = buildProjectFixture({});
+    const { refById } = buildGuardOperands({ document: base.document, project: base.project });
+    const draft: GuardDraft = {
+      kind: 'group',
+      id: 'root',
+      connective: 'all',
+      negated: false,
+      children: [
+        {
+          kind: 'comparison',
+          id: 'c0',
+          operandId: guardOperandId({ kind: 'field', viewModelId: base.viewModelId, fieldId: base.boolFieldId }),
+          operator: 'eq',
+          literal: { valueType: 'boolean', value: true },
+        },
+        {
+          kind: 'group',
+          id: 'inner',
+          connective: 'any',
+          negated: false,
+          children: [
+            {
+              kind: 'comparison',
+              id: 'c1',
+              operandId: guardOperandId({
+                kind: 'variable',
+                collectionId: base.collectionId,
+                variableId: base.scoreVariableId,
+              }),
+              operator: 'gt',
+              literal: { valueType: 'number', value: NESTED_GUARD_SCORE_THRESHOLD },
+            },
+            {
+              kind: 'group',
+              id: 'not-period',
+              connective: 'all',
+              negated: true,
+              children: [
+                {
+                  kind: 'comparison',
+                  id: 'c2',
+                  operandId: guardOperandId({
+                    kind: 'field',
+                    viewModelId: base.viewModelId,
+                    fieldId: base.enumFieldId,
+                  }),
+                  operator: 'eq',
+                  literal: { valueType: 'string', value: 'first' },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const guard = guardDraftToExpression({ draft, refById });
+
+    if (guard === undefined) throw new Error('Expected guard expression');
+
+    const structuralResult = projectFormatV1.validateBooleanExpressionStructure(guard);
+
+    expect(structuralResult.diagnostics).toEqual([]);
+    expect(structuralResult.valueType).toBe('boolean');
+
+    const fixture = buildProjectFixture({ guard });
+
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(fixture.project)).toEqual([]);
+
+    const reverse = expressionToGuard({ expression: guard, refById });
+
+    expect(reverse.guardIsAdvanced).toBe(false);
+    expect(reverse.guard === undefined ? undefined : stripGuardIds(reverse.guard)).toEqual(stripGuardIds(draft));
   });
 });
