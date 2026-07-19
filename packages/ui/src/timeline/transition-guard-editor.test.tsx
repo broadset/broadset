@@ -2,7 +2,12 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { Mock } from 'vitest';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { GuardComparisonDraft, GuardDraft, GuardGroupDraft, GuardOperandOption } from './state-machine-editor-types';
+import type {
+  GuardComparisonDraft,
+  GuardDraft,
+  GuardGroupDraft,
+  GuardOperandOption,
+} from './state-machine-editor-types';
 import { TransitionGuardEditor } from './transition-guard-editor';
 
 const OPERANDS: readonly GuardOperandOption[] = [
@@ -110,9 +115,7 @@ describe('TransitionGuardEditor', () => {
   it('offers all six operators for a number operand and renders a NumField literal', () => {
     setup({
       guard: buildGroup({
-        children: [
-          buildComparison({ operandId: 'f3', operator: 'gte', literal: { valueType: 'number', value: 12 } }),
-        ],
+        children: [buildComparison({ operandId: 'f3', operator: 'gte', literal: { valueType: 'number', value: 12 } })],
       }),
     });
 
@@ -134,9 +137,7 @@ describe('TransitionGuardEditor', () => {
   it('renders a Select literal over enumValues for an enum string operand', () => {
     setup({
       guard: buildGroup({
-        children: [
-          buildComparison({ operandId: 'f2', operator: 'eq', literal: { valueType: 'string', value: 'H1' } }),
-        ],
+        children: [buildComparison({ operandId: 'f2', operator: 'eq', literal: { valueType: 'string', value: 'H1' } })],
       }),
     });
 
@@ -177,18 +178,71 @@ describe('TransitionGuardEditor', () => {
   });
 
   /**
-   * @description "Add group" on the root appends a nested group seeded with exactly one default
-   * comparison child (operands[0], its first legal operator, a type-default literal), leaving
-   * existing children untouched. A nested group must NOT be left empty: the editor is fully
-   * controlled from a store-derived `ExpressionAst`, and the guard translation drops empty AND/OR
-   * groups entirely (no model representation) — an empty nested group would be pruned on the very
-   * next round-trip, before the user could ever add a condition inside it, making nesting
-   * impossible to create through the UI. The root group staying empty when it has no children is a
-   * separate, still-correct case ("no guard") — see the no-guard-hint test.
+   * @description "Add group" must create a nested group that SURVIVES the store round-trip: a
+   * single-child, non-negated, same-connective group has no distinct model representation —
+   * `guardGroupToExpression` folds it down to just its one child, so the group boundary vanishes on
+   * the next round-trip. A group seeded with the OPPOSITE connective of its parent AND two default
+   * comparison children (operands[0], its first legal operator, a type-default literal) produces a
+   * distinct binary `and`/`or` node that `unflattenSameConnective` will not merge into the parent,
+   * so it survives. On the root (`all`), "Add group" must append a nested `any` group with exactly
+   * two default comparisons, leaving existing children untouched.
    */
-  it('appends a nested group seeded with one default comparison via the root add-group control', () => {
+  it('appends a nested "any" group seeded with two default comparisons via the root ("all") add-group control', () => {
     const rootComparison = buildComparison({ id: 'cmp-root' });
     const rootGroup = buildGroup({ children: [rootComparison] });
+    const { onChange } = setup({ guard: rootGroup });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add group' }));
+
+    expect(onChange).toHaveBeenCalledWith({
+      ...rootGroup,
+      children: [
+        rootComparison,
+        expect.objectContaining({
+          kind: 'group',
+          connective: 'any',
+          negated: false,
+          children: [
+            expect.objectContaining({
+              kind: 'comparison',
+              operandId: 'f1',
+              operator: 'eq',
+              literal: { valueType: 'boolean', value: false },
+            }),
+            expect.objectContaining({
+              kind: 'comparison',
+              operandId: 'f1',
+              operator: 'eq',
+              literal: { valueType: 'boolean', value: false },
+            }),
+          ],
+        }),
+      ],
+    });
+
+    const addedGroup = onChange.mock.calls[0]?.[0]?.children[1];
+
+    if (addedGroup?.kind !== 'group') throw new Error('Expected the appended child to be a group');
+
+    expect(addedGroup.children).toHaveLength(2);
+
+    const [firstChild, secondChild] = addedGroup.children;
+
+    if (firstChild?.kind !== 'comparison' || secondChild?.kind !== 'comparison') {
+      throw new Error('Expected two comparison children');
+    }
+
+    expect(firstChild.id).not.toBe(secondChild.id);
+  });
+
+  /**
+   * @description The vice-versa case: "Add group" inside an "any" group must seed the opposite
+   * connective ("all") — proving `addGroup` always picks the opposite of ITS OWN group's connective,
+   * not a hardcoded default.
+   */
+  it('appends a nested "all" group seeded with two default comparisons via an "any" group\'s add-group control', () => {
+    const rootComparison = buildComparison({ id: 'cmp-root' });
+    const rootGroup = buildGroup({ connective: 'any', children: [rootComparison] });
     const { onChange } = setup({ guard: rootGroup });
 
     fireEvent.click(screen.getByRole('button', { name: 'Add group' }));
@@ -202,12 +256,8 @@ describe('TransitionGuardEditor', () => {
           connective: 'all',
           negated: false,
           children: [
-            expect.objectContaining({
-              kind: 'comparison',
-              operandId: 'f1',
-              operator: 'eq',
-              literal: { valueType: 'boolean', value: false },
-            }),
+            expect.objectContaining({ kind: 'comparison', operandId: 'f1', operator: 'eq' }),
+            expect.objectContaining({ kind: 'comparison', operandId: 'f1', operator: 'eq' }),
           ],
         }),
       ],
@@ -244,7 +294,10 @@ describe('TransitionGuardEditor', () => {
         rootComparison,
         {
           ...nestedGroup,
-          children: [nestedComparison, expect.objectContaining({ kind: 'comparison', operandId: 'f1', operator: 'eq' })],
+          children: [
+            nestedComparison,
+            expect.objectContaining({ kind: 'comparison', operandId: 'f1', operator: 'eq' }),
+          ],
         },
       ],
     });

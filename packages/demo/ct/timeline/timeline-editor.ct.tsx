@@ -8,6 +8,8 @@ const DEMO_LIVE_DATA_VIEW_MODEL_ID = projectFormatV1.idSchema.parse('demo-live-d
 const SHOW_BRANDING_FIELD_ID = projectFormatV1.idSchema.parse('field-showBranding');
 const SHOW_STATS_FIELD_ID = projectFormatV1.idSchema.parse('field-showStats');
 const SHOW_SPONSOR_FIELD_ID = projectFormatV1.idSchema.parse('field-showSponsor');
+/** The demo's first `guardOperands` entry (see `buildGuardOperands`) — the operand a fresh "Add condition" always defaults to. */
+const HOME_ABBR_FIELD_ID = projectFormatV1.idSchema.parse('field-homeAbbr');
 
 async function openTab(page: Page, name: 'Animation' | 'Layers' | 'Properties'): Promise<void> {
   await page.getByRole('tab', { name }).click();
@@ -718,8 +720,14 @@ function readFlashDeactivationTransitionId(page: Page): Promise<string | null> {
  * condition" scoped to the nested inner group's OWN control
  * (`sm-guard-add-condition-grp-1`, the deterministic reverse-translated id for the group at the
  * root's child index 1), and polls the store until the guard reflects a THIRD condition folded into
- * that SAME nested `or` branch while the root-level sibling comparison stays untouched. Regions:
- * animation panel (state-machine editor) → store.
+ * that SAME nested `or` branch while the root-level sibling comparison stays untouched. The final
+ * assertion is an exact `toEqual`, not a `toMatchObject({ right: { operator: 'or' } })` shape check —
+ * that looser shape is already satisfied by the SEEDED two-condition `or` before the click, so it
+ * would pass even if the DOM click never appended anything to the store. The exact match requires
+ * `right.left` to still be the original `or(showStats, showSponsor)` (untouched) and `right.right` to
+ * be the newly appended THIRD comparison (the demo's default operand, `homeAbbr`), which only holds
+ * if the click genuinely folded a new condition into the existing nested group. Regions: animation
+ * panel (state-machine editor) → store.
  */
 test('adding a condition inside a nested guard group updates only that group on the store', async ({ mount, page }) => {
   await mount(<DemoAppFresh />);
@@ -778,10 +786,28 @@ test('adding a condition inside a nested guard group updates only that group on 
 
   await expect
     .poll(() => readTransitionGuard(page, deactivationId))
-    .toMatchObject({
+    .toEqual({
       kind: 'binary',
       operator: 'and',
       left: fieldEqualsTrue(SHOW_BRANDING_FIELD_ID),
-      right: { kind: 'binary', operator: 'or' },
+      right: {
+        kind: 'binary',
+        operator: 'or',
+        // The ORIGINAL nested `or` branch, untouched — proves the append target scoping.
+        left: {
+          kind: 'binary',
+          operator: 'or',
+          left: fieldEqualsTrue(SHOW_STATS_FIELD_ID),
+          right: fieldEqualsTrue(SHOW_SPONSOR_FIELD_ID),
+        },
+        // The NEWLY appended third condition — proves the click genuinely added a child rather than
+        // being a no-op the looser `toMatchObject({ right: { operator: 'or' } })` shape would miss.
+        right: {
+          kind: 'binary',
+          operator: 'eq',
+          left: { kind: 'field', viewModelId: DEMO_LIVE_DATA_VIEW_MODEL_ID, fieldId: HOME_ABBR_FIELD_ID },
+          right: { kind: 'literal', value: { type: 'string', value: '' } },
+        },
+      },
     });
 });

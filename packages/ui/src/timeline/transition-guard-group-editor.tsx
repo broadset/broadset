@@ -5,7 +5,7 @@ import type { JSX } from 'react';
 import { ToggleSwitch } from '../inputs';
 import { color, font, sp } from '../tokens';
 import { removeAt, replaceAt } from './editor-array-ops';
-import { defaultComparisonFieldsForOperand,GuardComparisonRow } from './guard-comparison-row';
+import { defaultComparisonFieldsForOperand, GuardComparisonRow } from './guard-comparison-row';
 import { rowStyle } from './state-machine-editor-styles';
 import type { GuardComparisonDraft, GuardGroupDraft, GuardOperandOption } from './state-machine-editor-types';
 
@@ -78,26 +78,31 @@ export function GuardGroupEditor({
   };
 
   /**
-   * A newly appended group is always a NESTED group (a child of `group`, never the tree's root),
-   * so it must be seeded with one default comparison child rather than left empty: the editor is
-   * fully controlled from a store-derived `ExpressionAst`, and `guardDraftToExpression` drops empty
-   * AND/OR groups entirely (no model representation) — an empty nested group would be pruned on
-   * the very next round-trip, before the user could ever add a condition inside it, making nesting
-   * impossible to create through the UI. A group with >= 1 child is always model-representable and
-   * survives the round-trip. The root group staying empty when it has no children is unaffected —
-   * that's the correct "no guard" state and is never produced by this action.
+   * A newly appended group is always a NESTED group (a child of `group`, never the tree's root), so
+   * it must be seeded with a shape that actually survives `guardDraftToExpression -> expressionToGuard`
+   * — the editor is fully controlled from a store-derived `ExpressionAst`, so anything the round trip
+   * can't represent is silently pruned before the user could ever edit it. A nested group survives
+   * the round trip only if it has a connective DIFFERENT from its parent's with >= 2 children (a
+   * distinct `and`/`or` node `unflattenSameConnective` won't merge into the parent), or if it is
+   * negated. A single-child, non-negated, same-or-any connective group has no distinct model
+   * representation: `guardGroupToExpression` folds one child to just that child's expression, so the
+   * group boundary vanishes on the very next re-render. This seeds the OPPOSITE connective with two
+   * default comparisons (via the same `defaultComparisonFieldsForOperand` logic "Add condition"
+   * uses), which is exactly such a surviving shape.
    */
   const addGroup = (): void => {
-    const seedComparison = buildDefaultComparison(operands);
+    const firstComparison = buildDefaultComparison(operands);
+    const secondComparison = buildDefaultComparison(operands);
 
-    if (seedComparison === null) return;
+    if (firstComparison === null || secondComparison === null) return;
 
+    const oppositeConnective: GuardConnective = group.connective === 'all' ? 'any' : 'all';
     const nextGroup: GuardGroupDraft = {
       kind: 'group',
       id: crypto.randomUUID(),
-      connective: 'all',
+      connective: oppositeConnective,
       negated: false,
-      children: [seedComparison],
+      children: [firstComparison, secondComparison],
     };
 
     onChange({ ...group, children: [...group.children, nextGroup] });

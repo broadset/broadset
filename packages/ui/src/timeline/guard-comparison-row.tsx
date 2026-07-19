@@ -5,7 +5,13 @@ import { useEffect, useState } from 'react';
 
 import { NumField, ToggleSwitch } from '../inputs';
 import { rowStyle } from './state-machine-editor-styles';
-import type { GuardComparisonDraft, GuardLiteralDraft, GuardOperandOption, GuardOperator, GuardValueType } from './state-machine-editor-types';
+import type {
+  GuardComparisonDraft,
+  GuardLiteralDraft,
+  GuardOperandOption,
+  GuardOperator,
+  GuardValueType,
+} from './state-machine-editor-types';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -22,7 +28,7 @@ const NUMBER_LITERAL_STEP = 0.1;
  * `guardDraftToExpression -> upsertTransition -> isValidProject` silently rejects the whole guard
  * edit the instant a date-time operand is selected (see PR-F final review, FIX 1).
  */
-export const DEFAULT_UTC_TIMESTAMP = '2000-01-01T00:00:00Z';
+const DEFAULT_UTC_TIMESTAMP = '2000-01-01T00:00:00Z';
 
 const BOOLEAN_OPERATORS: readonly GuardOperator[] = ['eq', 'neq'];
 const FULL_OPERATORS: readonly GuardOperator[] = ['eq', 'neq', 'lt', 'lte', 'gt', 'gte'];
@@ -63,7 +69,7 @@ function defaultLiteralForValueType(
   return { valueType, value: firstEnumValue ?? '' };
 }
 
-export interface DefaultComparisonFields {
+interface DefaultComparisonFields {
   readonly operandId: string;
   readonly operator: GuardOperator;
   readonly literal: GuardLiteralDraft;
@@ -305,7 +311,7 @@ function GuardLiteralEditor({
 /*  A single comparison row — operand + operator + literal + remove    */
 /* ------------------------------------------------------------------ */
 
-export interface GuardComparisonRowProps {
+interface GuardComparisonRowProps {
   readonly comparison: GuardComparisonDraft;
   readonly operands: readonly GuardOperandOption[];
   readonly isValidDateTimeLiteral: (value: string) => boolean;

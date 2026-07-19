@@ -230,7 +230,7 @@ Runtime editing context starts with no sequence/track target and no preview snap
 
 The authoring sections MUST edit canonical lifecycle and state-machine structures in the owning document. For component-owned sequences, sequence editing stays within the component definition; document lifecycle and state machines may reference only resolving allowed targets.
 
-Lifecycle controls edit IN, HOLD/UPDATE, and OUT sequence/event references by stable ID. State-machine controls edit stable states/transitions, typed triggers, expression guards, unique safe-integer priorities, and optional transition sequence actions.
+Lifecycle controls edit IN, HOLD/UPDATE, and OUT sequence references by stable ID. State-machine controls edit stable states/transitions, typed triggers, expression guards, unique safe-integer priorities, and optional transition sequence actions.
 
 A friendly independent “modifier” toggle creates or edits a two-state machine (`inactive`/`active`) rather than a modifier binding. The UI MAY offer “create reverse exit”: this creates a separate canonical sequence with fresh IDs, reverses keyframe ticks/interpolation compatibly within explicit `durationTicks`, and assigns its ID to the deactivation transition. It does not serialize an in/out timeline pair.
 
@@ -256,7 +256,7 @@ Ordering remains predictable: lifecycle IN first, custom state machines alphabet
 
 #### Acceptance Criteria
 
-- [ ] Lifecycle controls edit stable sequence/event references
+- [ ] Lifecycle controls edit stable sequence references
 - [ ] State-machine controls edit typed triggers, guards, priorities, and sequence actions
 - [ ] Friendly toggles compile to canonical two-state machines
 - [ ] Reverse exit creates a separate valid sequence with fresh IDs and type-compatible reversed segments

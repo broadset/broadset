@@ -379,6 +379,55 @@ describe('V1SequenceSidebar', () => {
   });
 
   /**
+   * @description PR-G final-review FIX 1 (Critical): a single-child, non-negated, same-connective
+   * group has no distinct model representation — `guardGroupToExpression` folds it down to just its
+   * one child, so the group boundary vanishes on the very next store round-trip and nesting can
+   * never be authored through the UI at all. "Add group" must instead seed the OPPOSITE connective
+   * of its parent with two default comparison children, which produces a distinct `and(existing,
+   * or(c1,c2))` node `unflattenSameConnective` will not merge away. Drives two REAL clicks — "Add
+   * condition" then "Add group", both scoped to the root group — and reads the COMMITTED STORE guard
+   * directly: it must be a nested `and(comparison, or(comparison, comparison))` expression, never a
+   * flat `and(comparison, comparison)` pair (the pre-fix collapse, indistinguishable from clicking
+   * "Add condition" twice).
+   */
+  it('adds a nested group via "Add group" that survives the store round-trip as a distinct and(…, or(…)) guard', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+
+    render(<V1SequenceSidebar editorStore={store} />);
+    addModifier('Flash');
+
+    const flash = findMachineByName(store, 'Flash');
+
+    if (flash === undefined) throw new Error('Expected a Flash machine');
+
+    const activation = findActivationTransition(flash);
+    const row = within(screen.getByTestId(`state-machine-editor-${flash.id}`)).getByTestId(
+      `sm-transition-${activation.id}`,
+    );
+
+    fireEvent.click(within(row).getByTestId('sm-guard-add-condition-guard-root'));
+    // The first click commits a single bare comparison, which the store round-trip re-derives as
+    // root group `grp-root` (see `expressionToGuard`'s bare-comparison-wrapping branch) — this is
+    // the deterministic id "Add group" is now scoped under.
+    fireEvent.click(within(row).getByTestId('sm-guard-add-group-grp-root'));
+
+    const guard = findMachineByName(store, 'Flash')?.transitions.find(({ id }) => id === activation.id)?.guard;
+
+    if (guard === undefined) throw new Error('Expected "Add group" to produce a committed guard expression');
+    if (guard.kind !== 'binary') throw new Error('Expected a binary and/or guard expression');
+
+    expect(guard.operator).toBe('and');
+
+    // The pre-fix bug collapsed the appended group into a bare comparison sibling, so `guard.right`
+    // would be a plain `eq` comparison — indistinguishable from a flat two-condition guard. A
+    // survived nested group's right branch must itself be a distinct binary `or` node.
+    if (guard.right.kind !== 'binary') throw new Error('Expected the appended group to survive as a nested node');
+
+    expect(guard.right.operator).toBe('or');
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
+
+  /**
    * @description PR-G contract: the guard tree supports NESTED AND/OR groups, not just a flat list
    * of comparisons. Seeds a transition directly with an already-nested model guard —
    * `and(showBranding == true, or(showStats == true, showSponsor == true))` — because a group the
